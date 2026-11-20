@@ -21,7 +21,9 @@ export function PluginsTable({ onShowError, onShowDetails, onManageVersion, onDe
   return (
     <Table data-cy="plugins-list-table">
       <TableScrollContainer>
-        <TableContent aria-label={t('title')}>
+        {/* Arrow mode (child focus): arrow keys land on the row's actions trigger, and focus returns to that trigger
+            when its menu or a dialog opened from it closes, instead of to the last focused cell. */}
+        <TableContent aria-label={t('title')} keyboardNavigationBehavior="arrow">
           <TableHeader>
             <TableColumn isRowHeader>{t('columns.name')}</TableColumn>
             <TableColumn>{t('columns.version')}</TableColumn>

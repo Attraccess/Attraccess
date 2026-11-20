@@ -140,7 +140,8 @@ function renderAction(action: TableRowAction) {
 
 export function TableRowActions(props: Readonly<TableRowActionsProps>) {
   const { actions, itemName, sections = [], isPending } = props;
-  const { t } = useTranslations({ en, de });
+  // React escapes the label; escaping it here too would put `&amp;` into a name like `A & B`.
+  const { t } = useTranslations({ en, de }, { escapeValues: false });
   const wrapperRef = useRef<HTMLDivElement>(null);
   const visible = actions.filter((action) => !action.isHidden);
   if (visible.length === 0) return null;

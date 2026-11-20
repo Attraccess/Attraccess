@@ -7,7 +7,7 @@
   },
   "installPlugin": "Install plugin",
   "uploadButton": "Upload ZIP file",
-  "docsButton": "Documentation",
+  "docsButton": "Developer guide",
   "manageVersion": "Manage version",
   "classification": {
     "official": {
@@ -152,10 +152,6 @@
     }
   },
   "deleteTooltip": "Remove plugin",
-  "aside": {
-    "title": "Writing a plugin",
-    "description": "Plugins extend the API and the frontend from a single bundle. The developer guide covers the manifest, the permission model and local development."
-  },
   "deleteConfirmation": {
     "title": "Remove plugin?",
     "cancel": "Cancel",

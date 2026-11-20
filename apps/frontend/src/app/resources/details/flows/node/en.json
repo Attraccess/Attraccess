@@ -81,14 +81,14 @@
           },
           "stopped": {
             "title": "Usage stopped",
-            "description": "Triggers when a usage session stops.",
+            "description": "Triggers when a usage session stops. Does not trigger when a session is taken over.",
             "outputs": {
               "output": "Output"
             }
           },
           "takeover": {
             "title": "Usage taken over",
-            "description": "Triggers when a usage session is taken over.",
+            "description": "Triggers when a usage session is taken over. The previous session ends without running Usage stopped; add its billing items here.",
             "outputs": {
               "output": "Output"
             }
@@ -787,7 +787,7 @@
             },
             "preview": {
               "baselineValue": "Baseline",
-              "source": "Meter"
+              "source": "Source"
             }
           },
           "report": {

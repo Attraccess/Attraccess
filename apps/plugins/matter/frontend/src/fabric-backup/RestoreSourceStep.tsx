@@ -1,4 +1,4 @@
-import { PasswordInput, StatusAlert, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
+import { FileInput, PasswordInput, StatusAlert, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { Description, Label, Radio, RadioGroup } from '@heroui/react';
 import { useMatterTranslations } from '../i18n';
 import type { BackupView } from './api';
@@ -85,10 +85,8 @@ export function RestoreSourceStep(props: Props) {
       ) : (
         <label className="mt:flex mt:flex-col mt:gap-1 mt:text-sm">
           {t('fabric.restore.file')}
-          <input
-            type="file"
+          <FileInput
             accept=".attraccess-matter-backup,application/octet-stream"
-            className="mt:block mt:w-full mt:cursor-pointer mt:text-sm mt:file:mr-3 mt:file:cursor-pointer mt:file:rounded-lg mt:file:border-0 mt:file:bg-default mt:file:px-3 mt:file:py-1.5 mt:file:text-sm mt:file:font-medium mt:file:text-foreground"
             onChange={(event) => props.onFile(event.target.files?.[0] ?? null)}
             data-cy="matter-restore-file"
           />

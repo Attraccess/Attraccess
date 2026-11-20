@@ -16,6 +16,7 @@ export * from './button';
 export * from './confirmable-button';
 export * from './delete-confirmation-modal';
 export * from './page-header';
+export * from './file-input/FileInput';
 export * from './password-input/PasswordInput';
 export * from './status-dialog';
 export * from './string-list-field/StringListField';

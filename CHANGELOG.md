@@ -1,3 +1,17 @@
+## 1.11.0-beta.4 (2026-11-19)
+
+### 🩹 Fixes
+
+- **attractap-lab:** publish the flashed reader ELF, not the OTA rebuild's (ATT-1340) ([#2243](https://github.com/Attraccess/Attraccess/pull/2243))
+- **frontend:** unique keys for flow node preview rows (ATT-1264) ([#2251](https://github.com/Attraccess/Attraccess/pull/2251))
+- **frontend:** open usage details from the project usage history (ATT-1259) ([#2250](https://github.com/Attraccess/Attraccess/pull/2250))
+- **plugins:** declare READER_UI in the reservations npm manifest (ATT-1364) ([#2256](https://github.com/Attraccess/Attraccess/pull/2256))
+- **ui:** raise field border contrast to WCAG 3:1 (ATT-856) ([#2252](https://github.com/Attraccess/Attraccess/pull/2252))
+
+### ❤️ Thank You
+
+- Jan Jaap @jappyjan
+
 ## 1.11.0-beta.3 (2026-11-18)
 
 ### 🚀 Features

@@ -72,7 +72,7 @@ class CommissioningFixture(WagoFixture):
             self.network.append({"method": request.method, "url": request.url, "action": "fixture"})
             route.fulfill(status=503, json={"message": "Controller status transport outside commissioning acceptance"})
             return
-        if path.startswith("/api/wago/controllers/91058/configuration/") or path == "/api/wago/configuration/presets":
+        if path.startswith("/api/wago/controllers/91058/configuration/"):
             self.network.append({"method": request.method, "url": request.url, "action": "fixture"})
             return super().route(route)
         if not path.startswith("/api/"):
@@ -289,11 +289,11 @@ class CommissioningDesktop(unittest.TestCase):
         expect(security.get_by_role("status")).to_contain_text("Management baseline not verified")
         self.capture("management-recovered")
         self.button("Configure inputs and outputs").click()
-        # The configuration editor is a full-page workspace on its host route, not a dialog.
+        # The front panel is a full-page workspace on its host route, not a dialog.
         editor = self.page.get_by_role("main", name="Inputs & outputs", exact=True)
         expect(editor).to_be_visible()
         expect(editor.get_by_role("heading", name="Inputs & outputs", level=1)).to_be_visible()
-        # The workspace only enables editing after draft/baseline/preset APIs initialize it.
+        # The panel only enables editing after the draft and baseline requests initialize it.
         expect(editor.get_by_role("button", name="Configure DO1", exact=True)).to_be_enabled()
         self.assertEqual(editor.locator("textarea").count(), 0)
         self.capture("configuration-navigation")

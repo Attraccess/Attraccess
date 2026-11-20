@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 // Register the shared API mocks before loading the component's feature modules.
-import { hoisted, makePlugin, renderWithQuery } from './index.test.hoisted';
+import { chooseRowAction, hoisted, makePlugin, renderWithQuery } from './index.test.hoisted';
 import { PluginsSection } from './index';
 
 const LEGACY_ERROR =
@@ -32,7 +32,7 @@ function legacyAndCurrentCopies() {
 async function openRemoval(pluginId: string) {
   const user = userEvent.setup();
   renderWithQuery(<PluginsSection />);
-  await user.click(document.querySelector(`[data-cy="plugins-list-actions-${pluginId}"]`) as Element);
+  await user.click(document.querySelector(`[data-cy="plugins-list-actions-button-${pluginId}"]`) as Element);
   await user.click(document.querySelector(`[data-cy="plugins-list-delete-plugin-button-${pluginId}"]`) as Element);
   const message = await waitFor(() => {
     const element = document.querySelector('[data-cy="plugins-list-delete-confirmation-message"]');
@@ -50,8 +50,8 @@ describe('PluginsSection with refused plugins', () => {
     expect(screen.getAllByText('Cool Plugin')).toHaveLength(2);
     expect(screen.getByText('Refused')).toBeInTheDocument();
     expect(screen.getByText('Loaded')).toBeInTheDocument();
-    expect(document.querySelector('[data-cy="plugins-list-actions-legacy-id"]')).toBeInTheDocument();
-    expect(document.querySelector('[data-cy="plugins-list-actions-current-id"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-cy="plugins-list-actions-button-legacy-id"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-cy="plugins-list-actions-button-current-id"]')).toBeInTheDocument();
   });
 
   it('explains a refused plugin and offers to remove it instead of a retry', async () => {

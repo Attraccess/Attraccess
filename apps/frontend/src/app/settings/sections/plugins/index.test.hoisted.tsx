@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import type { UserEvent } from '@testing-library/user-event';
 import type { PropsWithChildren, ReactElement } from 'react';
 import { afterEach, beforeEach, vi } from 'vitest';
 
@@ -239,8 +240,28 @@ export function makePlugin(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+/** Picks an item from a plugin row's actions menu, where Details, Manage version and Remove plugin live. */
+export async function chooseRowAction(user: UserEvent, pluginId: string, item: string) {
+  const trigger = await waitFor(() => {
+    const element = document.querySelector(`[data-cy="plugins-list-actions-button-${pluginId}"]`);
+    if (!element) throw new Error(`No actions menu for ${pluginId}`);
+    return element;
+  });
+  await user.click(trigger);
+  await user.click(await screen.findByRole('menuitem', { name: item }));
+}
 beforeEach(resetTestFixture);
 afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
 });
+
+/** Opens the marketplace registry select and picks a registry by its visible name. */
+export async function pickRegistry(user: { click: (element: Element) => Promise<void> }, name: string) {
+  const trigger = document.querySelector(
+    '[data-cy="marketplace-registry-select"] button, button[data-cy="marketplace-registry-select"]',
+  );
+  if (!trigger) throw new Error('registry select missing');
+  await user.click(trigger);
+  await user.click(await screen.findByRole('option', { name }));
+}

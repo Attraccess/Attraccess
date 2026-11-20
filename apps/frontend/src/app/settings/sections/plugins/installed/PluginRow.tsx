@@ -119,7 +119,7 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
       <TableCell>
         <TableRowActions
           itemName={plugin.name}
-          data-cy={`plugins-list-actions-${plugin.id}`}
+          data-cy={`plugins-list-actions-button-${plugin.id}`}
           actions={[
             {
               key: 'details',
@@ -127,6 +127,7 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
               icon: Info,
               isHidden: !installed,
               onPress: () => onShowDetails({ name: plugin.name, registryId: installed?.registryId ?? 'npm' }),
+              'data-cy': `plugins-list-details-button-${plugin.id}`,
             },
             {
               key: 'manageVersion',

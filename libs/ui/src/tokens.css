@@ -39,7 +39,7 @@
     --separator: #e0e6e6;
     --field-background: #ffffff;
     --field-foreground: var(--foreground);
-    --field-border: #8a989b;
+    --field-border: #76878a;
     --field-border-width: 1px;
     --field-border-hover: #5d6b6e;
     --field-border-focus: var(--accent);
@@ -75,7 +75,7 @@
     --accent-soft-hover: #294c53;
     --focus: var(--accent);
     --link: var(--accent);
-    --field-border: #64787c;
+    --field-border: #7f9599;
     --field-border-hover: #9fb1b5;
     --field-border-focus: var(--accent);
     --overlay: #293639;

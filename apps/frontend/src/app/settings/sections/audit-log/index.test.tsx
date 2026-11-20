@@ -3,6 +3,7 @@ import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError, UseAuditControllerMetaKeyFn } from '@attraccess/react-query-client';
 import type { AuditEntryDto, AuditMetaDto, AuditSettingsDto } from '@attraccess/react-query-client';
 import { AuditLogSection } from './index';
 import { auditLabel } from './components/auditLabel';
@@ -106,8 +107,8 @@ const meta: AuditMetaDto = {
   actions: ['resource.updated', 'demo.publication'],
 };
 let client: QueryClient;
-function mount() {
-  client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } });
+function mount(queries: { retry: number | false; retryDelay?: number } = { retry: false }) {
+  client = new QueryClient({ defaultOptions: { queries: { ...queries, gcTime: 0 }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <AuditLogSection />
@@ -422,6 +423,110 @@ describe('audit admin workflows', () => {
     expect(screen.queryByText('No activity found')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ })).toBeInTheDocument();
+  });
+
+  it.each(['foo', 'nonsense.created'])('rejects the unknown event prefix %s before requesting it', async (prefix) => {
+    const user = userEvent.setup();
+    mount();
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
+    // Wait for meta to settle, not just to be requested: before it loads, only the shape check applies.
+    await waitFor(() => expect(client.getQueryState(UseAuditControllerMetaKeyFn())?.status).toBe('success'));
+    fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: prefix } });
+    await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+    expect(await screen.findByText('Enter a valid event prefix.')).toBeInTheDocument();
+    expect(list).not.toHaveBeenCalledWith(expect.objectContaining({ eventPrefix: prefix }));
+    expect(screen.queryByText('Activity could not be loaded.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Actions for .+ \(#52\)$/ })).toBeInTheDocument();
+  });
+
+  it('shows the prefix validation message with a clear action when the API rejects the prefix', async () => {
+    const user = userEvent.setup();
+    mount();
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
+    // The demo plugin was unloaded after meta loaded: the API no longer knows its prefix.
+    list.mockRejectedValueOnce(
+      new ApiError(
+        { method: 'GET', url: '/api/audit' },
+        {
+          body: { message: ['eventPrefix must start with a recognized audit event prefix'], statusCode: 400 },
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          url: '/api/audit',
+        },
+        'Bad Request',
+      ),
+    );
+    fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: 'demo.' } });
+    await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+    expect(await screen.findByText('Enter a valid event prefix.')).toBeInTheDocument();
+    expect(screen.queryByText('Activity could not be loaded.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ })).toBeInTheDocument();
+    expect(list.mock.lastCall?.[0]).not.toHaveProperty('eventPrefix');
+  });
+
+  it('does not retry a rejected event prefix, so the message shows without the retry backoff', async () => {
+    const user = userEvent.setup();
+    mount({ retry: 3, retryDelay: 0 });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
+    list.mockRejectedValue(
+      new ApiError(
+        { method: 'GET', url: '/api/audit' },
+        {
+          body: { message: ['eventPrefix must start with a recognized audit event prefix'], statusCode: 400 },
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          url: '/api/audit',
+        },
+        'Bad Request',
+      ),
+    );
+    fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: 'demo.' } });
+    await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+    expect(await screen.findByText('Enter a valid event prefix.')).toBeInTheDocument();
+    expect(list.mock.calls.filter(([query]) => query?.eventPrefix === 'demo.')).toHaveLength(1);
+  });
+
+  it('does not fall back to an unfiltered list when applied filters turn invalid once meta loads', async () => {
+    const user = userEvent.setup();
+    let resolveMeta: (value: AuditMetaDto) => void = () => undefined;
+    getMeta.mockReturnValue(new Promise<AuditMetaDto>((resolve) => (resolveMeta = resolve)));
+    mount();
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
+    fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: 'foo' } });
+    await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+    await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ eventPrefix: 'foo' })));
+    const requestsBefore = list.mock.calls.length;
+    resolveMeta(meta);
+    expect(await screen.findByText('Enter a valid event prefix.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Actions for .+ \(#52\)$/ })).not.toBeInTheDocument();
+    expect(list).toHaveBeenCalledTimes(requestsBefore);
+    // The list query is off, not failed, so only the filter error keeps the export from running unfiltered.
+    expect(screen.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
+  });
+
+  it('keeps the load error and retry for a 400 that is not about the event prefix', async () => {
+    list.mockRejectedValueOnce(
+      new ApiError(
+        { method: 'GET', url: '/api/audit' },
+        {
+          body: { message: ['actorId must be a positive integer'], statusCode: 400 },
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          url: '/api/audit',
+        },
+        'Bad Request',
+      ),
+    );
+    mount();
+    expect(await screen.findByText('Activity could not be loaded.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    expect(screen.queryByText('Enter a valid event prefix.')).not.toBeInTheDocument();
   });
 });
 
