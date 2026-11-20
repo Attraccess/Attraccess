@@ -60,10 +60,12 @@ describe('DoorControls', () => {
       <DoorControls
         onLock={vi.fn()}
         onUnlock={vi.fn()}
+        onOpen={vi.fn()}
         separateUnlockAndUnlatch
         lockIsPending={false}
         unlockIsPending={false}
         unlatchIsPending={false}
+        openIsPending={false}
       />,
     );
     expect(screen.queryByRole('button', { name: 'Unlatch' })).not.toBeInTheDocument();
