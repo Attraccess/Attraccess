@@ -15,7 +15,7 @@ namespace EfuseReport
 
     struct KeyBlock
     {
-        std::string purpose; // ESP-IDF purpose name, e.g. "HMAC_DOWN_DIGITAL_SIGNATURE"; "USER" when unused
+        std::string purpose; // ESP-IDF purpose name, e.g. "XTS_AES_128_KEY"; "USER" when unused
         bool used = false;
         bool readProtected = false;
     };

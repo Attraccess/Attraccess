@@ -97,6 +97,17 @@ describe('eFuse report check', () => {
   });
 });
 
+describe('eFuse report contract with the firmware', () => {
+  // The bytes a fully secured reader sends; apps/attractap/firmware/tests/efuse-report pins the firmware to them.
+  const golden = join(__dirname, '../../../../attractap/firmware/tests/efuse-report/golden-efuse-report.json');
+
+  it('parses the firmware golden report and finds no problems', () => {
+    const report = parseEfuseReport(JSON.parse(readFileSync(golden, 'utf8')));
+    expect(report).not.toBeNull();
+    expect(checkEfuseReport(report as EfuseReport, recorded)).toEqual([]);
+  });
+});
+
 describe('eFuse report parsing', () => {
   const valid = JSON.parse(JSON.stringify(releaseReport())) as Record<string, unknown>;
 

@@ -13,6 +13,9 @@ target_compile_features(efuse-report-test PRIVATE cxx_std_17)
 target_compile_options(efuse-report-test PRIVATE -Wall -Wextra -Wpedantic)
 target_include_directories(efuse-report-test PRIVATE "${FIRMWARE_DIR}/src/api/security")
 target_link_libraries(efuse-report-test PRIVATE ArduinoJson)
+# The contract with the server's parser (apps/api/src/attractap/security/efuse-report.spec.ts reads it too).
+target_compile_definitions(efuse-report-test PRIVATE
+    EFUSE_GOLDEN_JSON="${CMAKE_CURRENT_SOURCE_DIR}/golden-efuse-report.json")
 
 enable_testing()
 add_test(NAME efuse-report-test COMMAND efuse-report-test)

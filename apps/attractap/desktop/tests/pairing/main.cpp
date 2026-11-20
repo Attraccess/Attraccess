@@ -7,6 +7,7 @@
 #include "api/security/reader_link.hpp"
 #include "api/security/session_framing.hpp"
 #include "display/display.hpp"
+#include "settings/kvstore.hpp"
 #include "settings/reader_credentials.hpp"
 #include "settings/settings.hpp"
 #include "state/state.hpp"
@@ -208,7 +209,20 @@ int main()
     {
         ProfileStore profile("http://reader.test", 0, storage);
         KVStore::setHostProfile(&profile);
+        // A reader updated from before 2.6.0 still holds the retired API token: setup wipes it, and the
+        // token never makes the reader count as registered (it pairs below like a new reader).
+        KVStore legacy;
+        check(legacy.begin("settings", false) && legacy.putString("api.key", "retired-token") > 0 &&
+                  legacy.putUInt("api.readerId", 42) > 0,
+              "seed the retired token keys");
+        legacy.end();
         Settings::setup();
+        legacy.begin("settings", true);
+        check(legacy.getString("api.key", "gone") == "gone" && legacy.getUInt("api.readerId", 0) == 0,
+              "retired token keys erased at setup");
+        legacy.end();
+        check(profile.get("kv.settings:api.key").empty() && profile.get("kv.settings:api.readerId").empty(),
+              "retired token keys erased from the stored profile");
         Settings::saveAttraccessApiConfig("reader.test", 80, false);
         Settings::setDevicePin("1234");
 
@@ -237,7 +251,7 @@ int main()
         };
         pump(2200); // boot screen
 
-        // No credentials: straight to pairing, never the old registration.
+        // No credentials (the retired token does not count): straight to pairing, never the old registration.
         check(link.currentChannel() == ReaderLink::Channel::Pairing, "new reader uses the pairing channel");
         check(socket.subprotocol == SessionFraming::PAIRING_SUBPROTOCOL, "pairing subprotocol");
         socket.open();
