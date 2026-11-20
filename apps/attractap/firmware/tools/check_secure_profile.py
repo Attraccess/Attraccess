@@ -208,6 +208,7 @@ def check_against_base(ref):
 
 CONSOLE_INPUT = "/src/serial/serialConsoleInput.cpp"
 BLUETOOTH_CHANNEL = "/src/bt_setup/bt_setup.cpp"
+APP_COMPONENT = "__idf_main.dir"
 LAB_ONLY_DEFINES = ("ATTRACTAP_CRASH_TRIGGER=1", "ATTRACTAP_TEST_HOOKS=1")
 
 
@@ -231,7 +232,8 @@ def check_command_paths(compile_commands):
     def command(entry):
         return entry.get("command") or " ".join(entry.get("arguments", []))
 
-    app = [e for e in compile_commands if "/src/" in path(e)]
+    # The reader app is ESP-IDF's `main` component (main/CMakeLists.txt); other components have src/ trees too.
+    app = [e for e in compile_commands if APP_COMPONENT in command(e)]
     errors = []
     console = sorted(path(e) for e in app if path(e).endswith(CONSOLE_INPUT))
     if console:
