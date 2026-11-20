@@ -61,6 +61,7 @@ public:
     static bool isScanning() { return false; }
     static WifiScanResult getKnownWifiNetworks() { return {}; }
     static bool isConnected() { return true; }
+    static bool reassociate() { return false; }
     #else
     static void setup();
     static void connectToNetwork(const std::string &ssid, const std::string &password);
@@ -70,6 +71,9 @@ public:
     static bool isScanning();
     static WifiScanResult getKnownWifiNetworks();
     static bool isConnected();
+    // Drops and re-establishes the association with the saved network. False when Wi-Fi is not the
+    // active link or nothing is saved. For a link that is up but carries no traffic (ATT-1366).
+    static bool reassociate();
     #endif
 
 private:

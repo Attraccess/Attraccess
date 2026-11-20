@@ -13,6 +13,7 @@
 #include "../logger/logger.hpp"
 #include "certManager/AdaptiveCertManager.hpp"
 #include "../api/reader_transport.hpp"
+#include "connect_watchdog.hpp"
 
 class Websocket : public IReaderTransport
 {
@@ -128,8 +129,7 @@ private:
 
     // Reboot when no connection could be established for this long even though
     // network and server config are present (ATT-714).
-    static constexpr uint32_t CONNECT_WATCHDOG_TIMEOUT_MS = 90000;
-    uint32_t connectWatchdogStartMs = 0; // 0 = not waiting
+    ConnectWatchdog connectWatchdog;
     // Cert index seen at the last watchdog check: an advancing sweep re-arms the
     // watchdog, since a full sweep (certs x attempts x retry interval) takes far
     // longer than one watchdog period and the sweep position only lives in RAM.

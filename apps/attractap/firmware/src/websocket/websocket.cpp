@@ -5,6 +5,7 @@
 #include "esp_system.h"
 #include "../psram_task.hpp"
 #include "../settings/kvstore.hpp"
+#include "../network/wifi/wifi.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -103,7 +104,7 @@ void Websocket::loop()
 
     if (!connectionAttemptsEnabled)
     {
-        this->connectWatchdogStartMs = 0;
+        this->connectWatchdog.reset();
         return;
     }
 
@@ -113,7 +114,7 @@ void Websocket::loop()
 
     if (!network_is_connected)
     {
-        this->connectWatchdogStartMs = 0;
+        this->connectWatchdog.reset();
         return;
     }
 
@@ -326,30 +327,25 @@ void Websocket::handleConnectFailure(const char *reason)
 void Websocket::checkConnectWatchdog(const AttraccessApiConfig &apiConfig)
 {
     bool waitingForConnection = _state != CONNECTED && !apiConfig.hostname.empty() && apiConfig.port != 0;
-    if (!waitingForConnection)
-    {
-        this->connectWatchdogStartMs = 0;
-        return;
-    }
-
-    uint32_t now = millis();
     int certIndex = this->_certManager.getCurrentCertIndex();
     bool sweepAdvanced = certIndex != this->connectWatchdogCertIndex;
     this->connectWatchdogCertIndex = certIndex;
 
-    if (this->connectWatchdogStartMs == 0 || sweepAdvanced)
+    switch (this->connectWatchdog.poll(waitingForConnection, millis(), sweepAdvanced))
     {
-        this->connectWatchdogStartMs = now ? now : 1;
+    case ConnectWatchdog::Action::None:
         return;
-    }
-
-    if (now - this->connectWatchdogStartMs < CONNECT_WATCHDOG_TIMEOUT_MS)
-    {
+    case ConnectWatchdog::Action::RenewLink:
+        this->logger.warnf("No connection for %u ms; renewing the Wi-Fi association",
+                           (unsigned)ConnectWatchdog::RENEW_LINK_AFTER_MS);
+        Wifi::reassociate();
         return;
+    case ConnectWatchdog::Action::Reboot:
+        break;
     }
 
     this->logger.errorf("No connection for %u ms despite network and config; rebooting to recover",
-                        (unsigned)CONNECT_WATCHDOG_TIMEOUT_MS);
+                        (unsigned)ConnectWatchdog::REBOOT_AFTER_MS);
 
     // Same mechanism as handleConnectFailure: leave the reboot cause for the
     // next boot's crash report (read and cleared by api_diag.cpp).

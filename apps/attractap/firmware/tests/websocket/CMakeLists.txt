@@ -13,3 +13,7 @@ target_include_directories(websocket-network-quality PRIVATE shims "${FIRMWARE_D
 target_compile_definitions(websocket-network-quality PRIVATE ESP_PLATFORM=1 LOGGER_LEVEL_NUM=0)
 add_test(NAME websocket-network-quality COMMAND websocket-network-quality)
 set_tests_properties(websocket-network-quality PROPERTIES TIMEOUT 5)
+add_executable(websocket-connect-watchdog connect_watchdog_test.cpp)
+target_include_directories(websocket-connect-watchdog PRIVATE "${FIRMWARE_DIR}/src")
+add_test(NAME websocket-connect-watchdog COMMAND websocket-connect-watchdog)
+set_tests_properties(websocket-connect-watchdog PROPERTIES TIMEOUT 5)
