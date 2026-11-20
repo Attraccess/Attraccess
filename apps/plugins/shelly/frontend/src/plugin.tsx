@@ -15,7 +15,7 @@ import { DevicesPage } from './devices/DevicesPage';
 
 export default class ShellyPlugin implements AttraccessFrontendPlugin {
   getPluginName(): string {
-    return 'shelly-plugin@0.1.0';
+    return 'shelly-plugin@0.2.0';
   }
 
   getDependencies(): string[] {

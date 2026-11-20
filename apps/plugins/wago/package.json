@@ -1,6 +1,6 @@
 {
   "name": "@attraccess/plugin-wago",
-  "version": "0.1.0-alpha.0",
+  "version": "0.2.0-alpha.0",
   "description": "Attraccess integration for WAGO CC100 controllers. Operational control only: not a safety function, and not yet qualified for physical use.",
   "keywords": [
     "attraccess-plugin",

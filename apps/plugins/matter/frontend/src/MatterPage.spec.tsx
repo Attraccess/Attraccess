@@ -32,8 +32,8 @@ const signIn = (...effectivePermissions: string[]) =>
 const entry = {
   wireVersion: 1,
   attraccess: '^2.0.0',
-  plugin: '0.4.0-alpha.0',
-  sidecar: '0.4.0-alpha.0',
+  plugin: '0.5.0-alpha.0',
+  sidecar: '0.5.0-alpha.0',
   matterJs: '0.18.0',
 };
 const baseStatus: ConnectionStatus = {
@@ -98,16 +98,16 @@ describe('MatterPage', () => {
       {
         state: 'connected',
         sidecar: {
-          sidecar: '0.4.0-alpha.0',
+          sidecar: '0.5.0-alpha.0',
           matterJs: '0.18.0',
           wireVersion: 1,
-          build: { version: '0.4.0-alpha.0+abc' },
+          build: { version: '0.5.0-alpha.0+abc' },
         },
       },
       configured,
     );
     expect(await screen.findByText('Connected')).toBeInTheDocument();
-    expect(screen.getByText('0.4.0-alpha.0')).toBeInTheDocument();
+    expect(screen.getByText('0.5.0-alpha.0')).toBeInTheDocument();
     expect(screen.getByText('0.18.0')).toBeInTheDocument();
   });
 
@@ -151,7 +151,7 @@ describe('MatterPage', () => {
           message: 'Not a supported combination.',
           correlationId: null,
           details: {
-            received: { attraccess: '2.0.0', plugin: '0.4.0-alpha.0', sidecar: '9.9.9', matterJs: '0.18.0' },
+            received: { attraccess: '2.0.0', plugin: '0.5.0-alpha.0', sidecar: '9.9.9', matterJs: '0.18.0' },
           },
         },
       },
