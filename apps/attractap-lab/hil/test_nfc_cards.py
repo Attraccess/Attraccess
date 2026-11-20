@@ -316,6 +316,44 @@ def test_unknown_uid_is_rejected(reader, resource, emulator, hooks):
         time.sleep(8)
 
 
+def test_refused_card_is_answered_once_per_presentation(reader, resource, emulator, hooks):
+    """ATT-882: a refused card that is lost and found again within 2 s gets no second check or beep.
+
+    The emulator's card keeps answering ISO-DEP, so the reader does not lose it by itself (a real
+    MIFARE Classic or NTAG21x tag does); the test takes it away and presents it again instead.
+    The unknown UID is a 4-byte 0x08... random UID, the identity phones share.
+    """
+    wait_idle(hooks)
+    console = reader["console"]
+    verdict = "Reader reported error: CARD_NOT_FOUND"
+    emulator.command("scenario", {"name": "unknown-uid"})
+    mark = console.mark()
+    try:
+        present(emulator, "alice")
+        console.expect(verdict, mark, 20)
+        for _ in range(4):
+            emulator.command("remove")
+            time.sleep(0.4)
+            present(emulator, "alice")
+            time.sleep(0.4)
+        assert console.since(mark).count(verdict) == 1, console.since(mark)[-800:]
+        assert "Refused card still present, ignored" in console.since(mark), console.since(mark)[-800:]
+        # Away for at least 2 s: checked again, one more answer.
+        emulator.command("remove")
+        time.sleep(2.6)
+        present(emulator, "alice")
+        deadline = time.monotonic() + 20
+        while console.since(mark).count(verdict) < 2:
+            assert time.monotonic() < deadline, console.since(mark)[-800:]
+            time.sleep(0.2)
+        time.sleep(1.5)
+        assert console.since(mark).count(verdict) == 2
+    finally:
+        emulator.command("remove")
+        emulator.command("behavior.clear")
+        time.sleep(8)
+
+
 def test_deactivated_card_is_rejected(api, admin, reader, resource, emulator, state, hooks):
     requires(state, "alice-card")
     card = state["alice-card"]
