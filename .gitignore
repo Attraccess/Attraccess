@@ -73,3 +73,7 @@ apps/plugins/wago/runtime-assets/
 
 # WAGO reliability summaries are measurement output, never committed
 reliability-summary*.json
+
+# Nx generatePackageJson writes a pruned lockfile into dist/; a copy in the source tree is a mistake (ATT-1367)
+/apps/*/pnpm-lock.yaml
+/libs/*/pnpm-lock.yaml
