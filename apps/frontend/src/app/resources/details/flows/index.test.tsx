@@ -521,3 +521,22 @@ it('hides the MQTT explorer while no MQTT server exists', () => {
   show();
   expect(explorerButton()).toBeNull();
 });
+
+it('asks before leaving a changed flow for another page and stays clean after a save', async () => {
+  const view = show();
+  act(() => state.setNodes((previous) => previous.slice(1)));
+  await act(() => view.router.navigate('/elsewhere'));
+  expect(await screen.findByText('unsavedChanges.title')).toBeTruthy();
+  expect(view.router.state.location.pathname).toBe('/resources/7/flows');
+
+  fireEvent.click(screen.getByText('unsavedChanges.stay'));
+  expect(view.router.state.location.pathname).toBe('/resources/7/flows');
+  expect(state.nodes).toHaveLength(1);
+
+  // A save refetches the flow, so it matches the editor again and leaving no longer asks.
+  state.original = { nodes: state.nodes, edges: state.edges };
+  fireEvent.click(screen.getByRole('button', { name: 'actions.modePan' }));
+  expect(saveButton()).toBeDisabled();
+  await act(() => view.router.navigate('/elsewhere'));
+  expect(screen.getByText('Elsewhere')).toBeTruthy();
+});

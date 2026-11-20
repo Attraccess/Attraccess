@@ -43,5 +43,11 @@
       "title": "Flow not saved",
       "description": "These nodes are not available in global flows: {{nodes}}"
     }
+  },
+  "unsavedChanges": {
+    "title": "Discard unsaved changes?",
+    "description": "Your changes to this flow have not been saved. If you leave now, they will be lost.",
+    "leave": "Leave without saving",
+    "stay": "Stay"
   }
 }
