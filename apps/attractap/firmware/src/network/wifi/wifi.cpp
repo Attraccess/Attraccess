@@ -198,6 +198,18 @@ void Wifi::tryAutoConnect()
     connectToNetwork(savedSSID, savedPassword);
 }
 
+bool Wifi::reassociate()
+{
+    if (_state != WIFI_STATE_CONNECTED || !hasSavedCredentials())
+    {
+        return false;
+    }
+    logger.info("Re-associating with the access point: the link is up but carries no traffic");
+    last_reconnect_attempt_time_ms = millis();
+    tryAutoConnect();
+    return true;
+}
+
 bool Wifi::hasSavedCredentials()
 {
     return Settings::getNetworkConfig().ssid.length() > 0;
