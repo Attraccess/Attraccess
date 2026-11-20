@@ -106,7 +106,7 @@ export function DevicesTable({ devices, onAdd, ...rowProps }: DevicesTableProps)
             <TableColumn className="sh:hidden sh:lg:table-cell">{t('devices.model')}</TableColumn>
             <TableColumn className="sh:hidden sh:sm:table-cell">{t('devices.auth')}</TableColumn>
             <TableColumn className="sh:hidden sh:xl:table-cell">{t('devices.firmware')}</TableColumn>
-            <TableColumn id="actions" className="sh:text-end">
+            <TableColumn id="actions">
               <TableActionsColumnHeader />
             </TableColumn>
           </TableHeader>

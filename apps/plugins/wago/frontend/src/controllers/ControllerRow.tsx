@@ -59,7 +59,7 @@ export function ControllerRow({
           )
         )}
       </TableCell>
-      <TableCell className={`wg:text-end ${cellClass}`}>
+      <TableCell className={cellClass}>
         <TableRowActions
           itemName={controller.name ?? controller.hardwareId}
           actions={[{ key: 'details', label: t('controllers.details'), icon: InfoIcon, onPress: onDetails }]}

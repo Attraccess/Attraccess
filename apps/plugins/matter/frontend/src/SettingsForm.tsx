@@ -152,8 +152,7 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
             {settings.url !== null && (
               <ConfirmableButton
                 label={t('form.remove')}
-                status="warning"
-                buttonProps={{ variant: 'danger-soft' }}
+                status="error"
                 isDisabled={busy}
                 onConfirm={remove}
                 confirm={{

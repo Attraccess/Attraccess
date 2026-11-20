@@ -87,7 +87,7 @@ export function ControllersTable({ controllers, sessions, onClaim, onConfigure, 
               <TableColumn>
                 <span className="wg:sr-only">{t('controllers.mainAction')}</span>
               </TableColumn>
-              <TableColumn id="actions" className="wg:text-end">
+              <TableColumn id="actions">
                 <TableActionsColumnHeader />
               </TableColumn>
             </TableHeader>

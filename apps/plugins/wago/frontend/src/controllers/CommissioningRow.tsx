@@ -52,7 +52,7 @@ export function CommissioningRow({
           </Button>
         )}
       </TableCell>
-      <TableCell className={`wg:text-end ${cellClass}`}>
+      <TableCell className={cellClass}>
         <TableRowActions
           itemName={name}
           actions={[{ key: 'details', label: t('controllers.details'), icon: InfoIcon, onPress: onDetails }]}
