@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ConnectScreen } from './ConnectScreen';
 
@@ -19,7 +20,10 @@ beforeEach(() => {
   if (!Element.prototype.getAnimations)
     Object.defineProperty(Element.prototype, 'getAnimations', { configurable: true, value: () => [] });
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  act(() => useTranslationState.getState().setLanguage('en'));
+});
 
 it('explains the USB fallback instead of connecting when Web Bluetooth is missing', async () => {
   state.available = false;
@@ -44,10 +48,31 @@ it('reports a failed Bluetooth connection', async () => {
   state.connectBluetooth.mockRejectedValueOnce(new Error('GATT server disconnected'));
   render(<ConnectScreen />);
   fireEvent.click(screen.getByRole('button', { name: 'Set up over Bluetooth' }));
-  expect(await screen.findByText('Could not connect to the bridge')).toBeTruthy();
+  expect(await screen.findByText('Could not connect over Bluetooth')).toBeTruthy();
 });
 
-it('confirms a bridge that closed Bluetooth after pairing', () => {
+it('confirms a reader or bridge that closed Bluetooth after pairing', () => {
   render(<ConnectScreen closedAfterPairing />);
-  expect(screen.getByText('Bridge set up')).toBeTruthy();
+  expect(screen.getByText('Setup complete')).toBeTruthy();
+  expect(screen.getByText(/The device is connected to Attraccess/)).toBeTruthy();
+});
+
+it('explains how readers and bridges open their Bluetooth setup', () => {
+  render(<ConnectScreen />);
+  const hint = screen.getByText(/Set it up without a cable/).textContent;
+  expect(hint).toMatch(/Attractap Touch opens it for 10 minutes after it starts, or with the "Bluetooth setup" button/);
+  expect(hint).toMatch(/Attractap Lite opens it for 10 minutes after power-up/);
+  expect(hint).toMatch(/BLE Bridge opens it when you hold its button for 3 seconds/);
+  expect(hint).not.toMatch(/only works for the BLE Bridge/);
+});
+
+it('has the reader copy in German', async () => {
+  act(() => useTranslationState.getState().setLanguage('de'));
+  state.connectBluetooth.mockRejectedValueOnce(new Error('GATT server disconnected'));
+  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  render(<ConnectScreen closedAfterPairing />);
+  expect(screen.getByText('Einrichtung abgeschlossen')).toBeTruthy();
+  expect(screen.getByText(/Schaltfläche „Bluetooth-Einrichtung“ auf seinem Display/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Per Bluetooth einrichten' }));
+  expect(await screen.findByText('Bluetooth-Verbindung fehlgeschlagen')).toBeTruthy();
 });
