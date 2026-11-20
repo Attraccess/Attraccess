@@ -157,6 +157,24 @@ void Application::setupNfcCallbacks()
     }
 #endif
 
+    // A card the server just refused and that is still (or again) on the reader gets no second
+    // check, beep or screen change (ATT-882). Decided before any side effect below.
+#ifdef HAS_LVGL_DISPLAY
+    // While "Sign-in failed" is up the state is not a sign-in state yet: dismissing the status is what returns it.
+    lv_lock();
+    const bool signInFailedShown = this->statusHeld && !this->unlocked && Display::isActive(&Display::statusScreen) &&
+                                   Display::statusScreen.purpose() == StatusScreen::Purpose::SignInFailed;
+    lv_unlock();
+    const bool tapSignInState = signInFailedShown || this->state == APPLICATION_STATE_LOCKED ||
+                                this->state == APPLICATION_STATE_RESOURCE_LIST;
+#else
+    const bool tapSignInState = this->state == APPLICATION_STATE_WAIT_FOR_CARD;
+#endif
+    if (tapSignInState && this->refusedCardGuard.shouldSuppress(uid, uidLength, millis())) {
+      this->logger.debugf("Refused card still present, ignored: %s", hexToString(uid, uidLength).c_str());
+      return;
+    }
+
 #ifndef HAS_LVGL_DISPLAY
     this->cardDetected = true;
     this->cardRemoved = false;
@@ -192,6 +210,7 @@ void Application::setupNfcCallbacks()
       if (this->resourceIsSelected) Display::lockscreen.showActionProgress();
       else Display::resourceListScreen.showActionProgress(FirmwareI18n::Message::CheckingCard, FirmwareI18n::Message::OneMoment);
       lv_unlock();
+      this->refusedCardGuard.noteChecked(uid, uidLength);
       if (!this->api.sendCardDetected("tap", uid, uidLength, this->authenticationResourceId)) {
         // Nothing reached the server: don't leave "checking card" up until the 30 s timeout.
         Display::asyncCall(
@@ -202,6 +221,7 @@ void Application::setupNfcCallbacks()
             this);
       }
 #else
+      this->refusedCardGuard.noteChecked(uid, uidLength);
       this->api.sendCardDetected("tap", uid, uidLength, this->selectedResourceId);
 #endif
       return;

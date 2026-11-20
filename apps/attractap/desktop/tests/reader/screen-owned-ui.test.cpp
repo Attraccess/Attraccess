@@ -109,8 +109,9 @@ void ReaderWorkflow::testScreenOwnedUi()
     assert(lv_screen_active() == Display::statusScreen.getScreen() && label(lv_screen_active(), "Anmeldung fehlgeschlagen"));
     display.capture(output, "sign-in-failed");
     // A card tapped meanwhile dismisses it and signs in as usual.
+    // (The refused card itself is ignored until it was away for 2 s: ATT-882.)
     const auto requests = server.count("CARD_DETECTED");
-    nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump();
+    nfc.setPresent(0, false); pump(2100); nfc.setPresent(0, true); pump();
     assert(lv_screen_active() != Display::statusScreen.getScreen());
     assert(server.count("CARD_DETECTED") == requests + 1);
     nfc.setPresent(0, false); pump();

@@ -117,6 +117,7 @@ void Application::handleReaderError(const std::string &eventType, const std::str
                                                this->state == APPLICATION_STATE_RESOURCE_LIST);
     if (this->cardAuthenticationPending) this->finishCardAuthentication(false);
     if (!signingIn) return;
+    if (RefusedCardGuard::isCardVerdict(code)) this->refusedCardGuard.recordRefusalOfChecked(millis());
     this->beeper.errorBeep();
     this->nfc.enableCardDetection();
     // Unknown, inactive and unverifiable cards get one answer (as a wrong-key card did on firmware

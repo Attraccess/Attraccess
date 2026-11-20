@@ -204,7 +204,7 @@ void ReaderWorkflow::testLocalization()
     assert(!State::getApiState().userAuthenticated && State::getActiveLanguage() == "en");
     assert(label(lv_screen_active(), "Sign-in failed"));
     display.capture(output, "i18n-failed-verification-default");
-    clearStatus(); nfc.setPresent(0, false); pump();
+    clearStatus(); nfc.setPresent(0, false); pump(2100); // away long enough for the refused card to be checked again
     server.push("READER_LANGUAGE", R"({"language":"de"})"); pump();
     // Losing the API session (the link dropped or the pairing was removed) clears it and keeps the most recent default.
     userLocale = "en"; login();

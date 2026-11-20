@@ -199,6 +199,7 @@ struct ReaderWorkflow
     void testButtonErrors();
     void testFormErrors();
     void testTransientRouting();
+    void testRefusedCardSuppression();
     void testListAndAuthentication();
     void testSessionStart();
     void testUsageStats();

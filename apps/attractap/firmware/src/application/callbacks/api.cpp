@@ -86,6 +86,7 @@ void Application::setupApiCallbacks()
           State::setUserLanguage(false);
           // Same line as the generic error path: lab tests read the server's verdict from it.
           this->logger.error((std::string("Reader reported error: ") + response.error).c_str());
+          if (RefusedCardGuard::isCardVerdict(response.error)) this->refusedCardGuard.recordRefusalOfChecked(millis());
           this->beeper.errorBeep();
 #ifdef HAS_WS2812_LED
           this->cardRejectedLedPending = true;
@@ -200,6 +201,8 @@ void Application::setupErrorCallbacks()
         p);
 #else
     this->logger.errorf("Reader error on %s: %s", eventType, code);
+    if (std::string(eventType) == "CARD_AUTHENTICATION_DATA" && RefusedCardGuard::isCardVerdict(code))
+      this->refusedCardGuard.recordRefusalOfChecked(millis());
     this->beeper.errorBeep();
     if (this->state == APPLICATION_STATE_WAIT_FOR_CARD) {
       this->nfc.enableCardDetection();
