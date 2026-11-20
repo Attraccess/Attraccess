@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "../heap_guard.hpp"
 #include "ble_adv.hpp"
 #include "ble_codec.hpp"
 
@@ -86,8 +87,12 @@ namespace ble
 
     AdvertisementWatch::Device *AdvertisementWatch::makeRoom()
     {
-        if (devices.size() < MAX_WATCH_DEVICES)
+        // The list grows once, to its bound, and only with the heap to spare; otherwise a device is replaced.
+        const bool grow = devices.size() < devices.capacity() ||
+                          heap_guard::fits(MAX_WATCH_DEVICES * sizeof(Device));
+        if (devices.size() < MAX_WATCH_DEVICES && (grow || devices.empty()))
         {
+            if (devices.size() == devices.capacity()) devices.reserve(grow ? MAX_WATCH_DEVICES : 1);
             devices.emplace_back();
             return &devices.back();
         }

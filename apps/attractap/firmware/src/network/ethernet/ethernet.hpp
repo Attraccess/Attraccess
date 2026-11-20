@@ -40,6 +40,8 @@ private:
     static esp_err_t ethernet_init(esp_eth_handle_t *eth_handles, uint8_t *eth_port_cnt);
 #ifdef ETH_RMII_EMAC
     static esp_err_t emac_init(esp_eth_handle_t *eth_handle);
+    // Stops the driver and frees it with its netif, glue, MAC and PHY, in the order the driver needs.
+    static void emac_release();
 #endif
     // W5500 on SPI (PIN_ETH_SPI_CS), or the internal EMAC (ETH_RMII_EMAC, BLE bridge).
     static constexpr bool configured()

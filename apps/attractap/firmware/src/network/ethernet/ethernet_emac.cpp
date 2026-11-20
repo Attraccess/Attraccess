@@ -65,4 +65,40 @@ esp_err_t Ethernet::emac_init(esp_eth_handle_t *handle)
     return ESP_OK;
 }
 
+// The netif glue holds a reference to the driver, so it goes before the uninstall; otherwise the uninstall fails
+// ("2 ethernet reference in use"), the EMAC keeps its SMI pins and the next init after a cable unplug fails.
+// The uninstall does not free the MAC and PHY objects (the EMAC's DMA buffers): they are deleted here.
+void Ethernet::emac_release()
+{
+    esp_eth_mac_t *mac = nullptr;
+    esp_eth_phy_t *phy = nullptr;
+    if (eth_handle != nullptr)
+    {
+        esp_eth_stop(eth_handle);
+        esp_eth_get_mac_instance(eth_handle, &mac);
+        esp_eth_get_phy_instance(eth_handle, &phy);
+    }
+    if (eth_netif_glue != nullptr)
+    {
+        esp_eth_del_netif_glue(eth_netif_glue);
+        eth_netif_glue = nullptr;
+    }
+    if (eth_netif != nullptr)
+    {
+        esp_netif_destroy(eth_netif);
+        eth_netif = nullptr;
+    }
+    if (eth_handle == nullptr) return;
+    const esp_err_t ret = esp_eth_driver_uninstall(eth_handle);
+    eth_handle = nullptr;
+    if (ret != ESP_OK)
+    {
+        // Still referenced: freeing the MAC under the driver would be worse than the leak.
+        logger.errorf("Ethernet driver uninstall failed: %s", esp_err_to_name(ret));
+        return;
+    }
+    if (mac) mac->del(mac);
+    if (phy) phy->del(phy);
+}
+
 #endif

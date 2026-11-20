@@ -38,7 +38,8 @@ namespace ble
     {
         constexpr uint32_t SYNC_TIMEOUT_MS = 3000;
         // NimBLE's own host task, like nimble_port_freertos_init but with its stack in PSRAM where the board has it.
-        constexpr uint32_t HOST_TASK_STACK = 4096;
+        // QA (ATT-1315) measured 2.7 KB in use after a GATT session on the bridge: the high-water mark plus 2 KB.
+        constexpr uint32_t HOST_TASK_STACK = 4864;
         // Free DMA-capable internal RAM the stack needs to start. Espressif's controller takes about 24 KB of it
         // (28 KB with a link) and does not check every allocation: with too little it asserts and the reader
         // restarts (seen with 20 KB free). The rest is headroom for whatever else needs internal RAM meanwhile.
