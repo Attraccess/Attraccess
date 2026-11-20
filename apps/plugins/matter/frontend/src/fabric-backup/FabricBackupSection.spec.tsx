@@ -82,8 +82,8 @@ const validation = (preflight: Partial<RestoreValidation['preflight']> = {}): Re
   backup: {
     backupId: 'b1',
     createdAt: '2026-11-06T10:00:00.000Z',
-    pluginVersion: '0.4.0-alpha.0',
-    sidecarVersion: '0.4.0-alpha.0',
+    pluginVersion: '0.5.0-alpha.0',
+    sidecarVersion: '0.5.0-alpha.0',
     fabricId: 'FAB-1',
     rootCertFingerprint: 'AA:BB',
     fabricGeneration: 3,

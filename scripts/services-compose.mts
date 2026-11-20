@@ -136,6 +136,7 @@ export const ACTIONS: Action[] = ['up', 'stop', 'down', 'status', 'list'];
 export const SETS: Record<string, string[]> = {
   mailpit: ['mailpit'],
   valkey: ['valkey'],
+  postgres: ['postgres'],
   authentik: ['authentik-postgresql', 'authentik-redis', 'authentik-server', 'authentik-worker'],
   keycloak: ['keycloak'],
   'webhook-site': ['webhook-site'],

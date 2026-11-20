@@ -15,8 +15,10 @@ import {
 import { ResourceFlowLog, useGetOneResourceById } from '@attraccess/react-query-client';
 import { useLiveLogs } from '../liveLogs';
 import { FlowOwner, useFlowNodeSchemasQuery } from '../flowOwner';
+import type { NodeValidationError } from '../node/validationMessages';
 import { FlowCanvasNode } from '../node/FlowCanvasNode';
 import { FlowContext, type FlowContextType, type LiveLogReceiver } from './flowContext';
+import { groupValidationErrorsByNode } from './groupValidationErrorsByNode';
 
 export interface FlowProviderProps {
   children: ReactNode;
@@ -26,7 +28,7 @@ export interface FlowProviderProps {
 export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
-  const [validationErrors, setValidationErrorsState] = useState<Record<string, string>>({});
+  const [validationErrors, setValidationErrorsState] = useState<Record<string, NodeValidationError[]>>({});
   const { data: resource } = useGetOneResourceById(
     { path: { id: owner.kind === 'resource' ? owner.resourceId : 0 } },
     undefined,
@@ -66,16 +68,8 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
     [setNodes],
   );
 
-  const setValidationErrors = useCallback((errors: Array<{ nodeId: string; message: string }>) => {
-    setValidationErrorsState(
-      errors.reduce<Record<string, string>>(
-        (messages, error) => ({
-          ...messages,
-          [error.nodeId]: messages[error.nodeId] ? `${messages[error.nodeId]} ${error.message}` : error.message,
-        }),
-        {},
-      ),
-    );
+  const setValidationErrors = useCallback((errors: ReadonlyArray<NodeValidationError & { nodeId: string }>) => {
+    setValidationErrorsState(groupValidationErrorsByNode(errors));
   }, []);
 
   const liveLogReceivers = useRef<LiveLogReceiver[]>([]);

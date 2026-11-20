@@ -27,7 +27,7 @@ afterAll(async () => {
 });
 
 /**
- * Plugin readers on a real SQLite schema behind plugin contexts built by the real factory. A tap runs the real door
+ * Plugin readers on a real PostgreSQL schema behind plugin contexts built by the real factory. A tap runs the real door
  * action and gate; only the gate's lookups (maintenance, health, control permission) are stubs.
  */
 export async function createPluginReadersHost(

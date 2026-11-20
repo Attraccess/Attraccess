@@ -3,7 +3,6 @@ import { Logger } from '@nestjs/common';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { ModuleRef } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
 import {
   PluginBackendModule,
   PluginContext,
@@ -13,15 +12,15 @@ import {
 } from '@attraccess/plugins-backend-sdk';
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import {
-  createSqlitePluginMigrationEngine,
-  createSqlitePluginPersistenceHost,
-} from '../../database/sqlite/plugin-storage/sqlite-plugin-storage';
+  createPostgresPluginMigrationEngine,
+  createPostgresPluginPersistenceHost,
+} from '../../database/postgres/plugin-storage/postgres-plugin-storage';
+import { createTestDataSource, closeTestDataSource, createTestDatabaseLocation } from '../../test-utils/test-database';
 import { loadPluginEntryExports } from '../runtime/module-loader';
 import { compileModuleStorage } from '../plugin-storage/storage-loader';
 import { PluginEventsService } from '../plugin-events.service';
 import { build } from 'esbuild';
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'fs';
-import { tmpdir } from 'os';
+import { existsSync, mkdirSync, rmSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 
 interface PocPongPayload {
@@ -80,25 +79,18 @@ function loadDefaultExport(artifactPath: string): PluginBackendModule {
 async function bootAndPing(artifactPath: string): Promise<PocPongPayload> {
   const plugin = loadDefaultExport(artifactPath);
   // The host creates the declared tables before the plugin runs, then serves them through the record port.
-  const directory = mkdtempSync(join(tmpdir(), 'poc-plugin-'));
-  const database = join(directory, 'host.sqlite');
+  const database = await createTestDatabaseLocation({ empty: true });
   const compiled = compileModuleStorage(
     { name: 'poc-backend-plugin', permissions: [PluginPermission.PLUGIN_STORAGE] },
     plugin,
   );
   expect(compiled?.ownedTables).toEqual(['plugin_poc_backend_plugin_notes']);
   if (!compiled) throw new Error('the poc plugin declares storage');
-  await createSqlitePluginMigrationEngine(
-    { type: 'better-sqlite3', invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' }, database },
-    () => ({ type: 'better-sqlite3', database }),
-  ).migrate(compiled);
-  const dataSource = await new DataSource({
-    type: 'better-sqlite3',
-    invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-    database,
-    entities: [],
-  }).initialize();
-  const contexts = createSqlitePluginPersistenceHost(() => dataSource).createContexts('poc-backend-plugin', compiled);
+  await createPostgresPluginMigrationEngine({ type: 'postgres', url: database.location } as never, () => {
+    throw new Error('the test database is configured explicitly');
+  }).migrate(compiled);
+  const dataSource = await createTestDataSource({ location: database.location, entities: [] });
+  const contexts = createPostgresPluginPersistenceHost(() => dataSource).createContexts('poc-backend-plugin', compiled);
 
   const events = new EventEmitter2();
   const moduleRefHolder: { ref: ModuleRef | null } = { ref: null };
@@ -153,8 +145,8 @@ async function bootAndPing(artifactPath: string): Promise<PocPongPayload> {
   const payload = await pong;
 
   await app.close();
-  await dataSource.destroy();
-  rmSync(directory, { recursive: true, force: true });
+  await closeTestDataSource(dataSource);
+  await database.remove();
   return payload;
 }
 

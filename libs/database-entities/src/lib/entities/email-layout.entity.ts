@@ -15,10 +15,10 @@ export class EmailLayout {
   body!: string;
 
   @ApiProperty({ description: 'Timestamp of when the layout was created' })
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
   @ApiProperty({ description: 'Timestamp of when the layout was last updated' })
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
 }

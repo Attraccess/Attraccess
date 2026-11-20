@@ -52,7 +52,7 @@ Erweitern Sie Attraccess mit Plugins. Das Plugin-System bietet SDKs für Fronten
 Attraccess besteht aus:
 
 - **Webanwendung** – React-Frontend mit NestJS-Backend
-- **Datenbank** – SQLite (keine separate Datenbank nötig)
+- **Datenbank** – PostgreSQL (in den Docker-Compose-Dateien als Dienst enthalten)
 - **RFID-Hardware** – Attractap-Leser (ESP32-basiert, optional)
 - **Bereitstellung** – Docker-Container
 

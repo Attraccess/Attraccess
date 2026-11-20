@@ -12,9 +12,16 @@ import { excludedDirectory, generatedClients, git } from './lib/repo-files.mjs';
  * `@attraccess/database-entities` (each with every subpath). Every import form counts: static imports, type-only
  * imports, re-exports, dynamic `import()`, `require()` and `import x = require()`.
  *
- * Adapter internals (apps/api/src/database/adapters, apps/api/src/database/sqlite, libs/database-entities) may only
- * be imported by Nest composition files (`*.module.ts`) and tests. The SDK's former engine subpath
- * (`@attraccess/plugins-backend-sdk/sqlite`) no longer exists and is flagged everywhere.
+ * Adapter internals (apps/api/src/database/adapters, apps/api/src/database/postgres, libs/database-entities) may only
+ * be imported by Nest composition files (`*.module.ts`) and tests. apps/api/src/database/transfer (the SQLite import
+ * at startup) may also be imported by the two process entry points, main.ts and main.bootstrap.ts. The SDK's former
+ * engine subpath (`@attraccess/plugins-backend-sdk/sqlite`) no longer exists and is flagged everywhere.
+ *
+ * PostgreSQL is the only runtime database. SQLite code (apps/api/src/database/sqlite) exists for the one-way import
+ * only: apps/api/src/database/transfer and tests (specs, test fixtures, e2e) may use it, nothing else, composition
+ * files included. The removed SQLite runtime (process-wide write queue and file lock, `runSerializedTransaction`,
+ * the SQLite backend, unit of work and connection factory) may not come back in any file, tests included; those
+ * findings are never baselined.
  *
  * Plugin zone (SDK 2.0: plugins have no database access): `apps/plugins/**`, `examples/**` and
  * `libs/plugins-backend-sdk/src/**` get no exemptions, migrations included. Besides the packages above they may not
@@ -58,17 +65,37 @@ export const isPluginZoneModule = anyOf([
 const isEngine = anyOf(forbiddenPluginModules.engines);
 const sdkSubpath = /^@attraccess\/plugins-backend-sdk\/(?!package\.json$).+/;
 const adapterInternals =
-  /^apps\/api\/src\/database\/(?:adapters|sqlite)(?:\/|$)|(?:^|\/)libs\/database-entities(?:\/|$)/;
+  /^apps\/api\/src\/database\/(?:adapters|postgres)(?:\/|$)|(?:^|\/)libs\/database-entities(?:\/|$)/;
+// The SQLite import at startup: the process entry points start it before anything else runs.
+const transferInternals = /^apps\/api\/src\/database\/transfer(?:\/|$)/;
+const entryPoint = /^apps\/api\/src\/main(?:\.bootstrap)?\.ts$/;
+// SQLite is the source of the one-way import, not a runtime database.
+const sqliteInternals = /^apps\/api\/src\/database\/sqlite(?:\/|$)/;
+// The removed SQLite runtime: its modules, and the names that stood for the process-wide write lock.
+const removedRuntimeModule =
+  /(?:^|\/)(?:run-serialized-transaction|sqlite-file-lock|sqlite-backend|sqlite-unit-of-work|sqlite-connection|sqlite-errors)(?:\.[cm]?[jt]s)?$/;
+const removedRuntimeNames = new Set([
+  'runSerializedTransaction',
+  'insideSerializedTransaction',
+  'onResourceConnection',
+  'closeResourceTransactionConnection',
+  'acquireFileLock',
+  'releaseFileLock',
+  'fileLockKey',
+  'createSqliteUnitOfWork',
+  'sqliteBackend',
+  'sqliteErrorClassifier',
+]);
 
 // Persistence implementation code that may use the ORM and the drivers. Only the engine folders of
 // apps/api/src/database are listed: its neutral seam (unit-of-work.ts, persistence-errors.ts, transaction-context.ts,
 // backend/database-backend.ts, ...) stays checked.
 const allowedPaths = [
   /^libs\/database-entities\//,
-  /^apps\/api\/src\/database\/(?:adapters|sqlite|conformance|migrations|migration-helpers)\//,
+  /^apps\/api\/src\/database\/(?:adapters|postgres|sqlite|transfer|conformance|migrations|migration-helpers)\//,
   // The backend registry: the one file that lists the engines and types the selected one for the composition root.
   /^apps\/api\/src\/database\/backend\/resolve-database-backend\.ts$/,
-  // The import path released migration 1790100000000 uses for the engine's usage recovery (a re-export of sqlite/).
+  // The import path released migration 1790100000000 uses for the usage recovery (a re-export of sqlite/, import only).
   /^apps\/api\/src\/database\/resource-usage-integrity\.ts$/,
   /(^|\/)migrations\//,
   // Real-engine tests: they open actual databases to prove migrations, constraints, transactions and concurrency.
@@ -147,10 +174,37 @@ export function findViolations(file, content) {
     if (mayOpenEngine && isEngine(specifier)) return false;
     if (forbiddenPackage.test(specifier) || sdkEngineSubpath.test(specifier)) return true;
     if (zone && (isPluginZoneModule(specifier) || sdkSubpath.test(specifier))) return true;
-    if (!specifier.startsWith('.') || mayWireAdapters) return false;
+    if (!specifier.startsWith('.')) return false;
     const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier));
+    // SQLite code is for the import path only: not even composition files may use it.
+    if (sqliteInternals.test(resolved)) return !(testFile.test(file) && !zone);
+    if (mayWireAdapters) return false;
+    if (transferInternals.test(resolved)) return !entryPoint.test(file);
     return adapterInternals.test(resolved);
   });
+}
+
+/** Identifiers of the removed SQLite runtime (write queue, file lock, backend), one entry per occurrence. */
+function collectRemovedRuntimeNames(node, names) {
+  if (ts.isIdentifier(node) && removedRuntimeNames.has(node.text)) names.push(node.text);
+  ts.forEachChild(node, (child) => collectRemovedRuntimeNames(child, names));
+}
+
+/**
+ * Uses of the removed SQLite runtime in any source file (the allowed persistence folders and tests included): its
+ * module names and the names of its process-wide write lock. PostgreSQL has no such lock; SQLite is import-only.
+ */
+export function findRemovedRuntime(file, content) {
+  if (!sourceFile.test(file) || file.endsWith('.d.ts') || excludedDirectory.test(file) || generatedClients.test(file)) {
+    return [];
+  }
+  const kind = file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+  const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, false, kind);
+  const specifiers = [];
+  collectSpecifiers(source, specifiers);
+  const found = specifiers.filter((specifier) => specifier.startsWith('.') && removedRuntimeModule.test(specifier));
+  collectRemovedRuntimeNames(source, found);
+  return found;
 }
 
 function listTrackedAndNewFiles() {
@@ -174,6 +228,25 @@ export function workingTreeSources(listFiles = listTrackedAndNewFiles, readFile 
     if (content !== undefined) result.set(file, content);
   }
   return result;
+}
+
+/** Every checked or allowed source file of the working tree, for the removed-runtime rule. */
+export function allSources(listFiles = listTrackedAndNewFiles, readFile = readIfFile) {
+  const result = new Map();
+  for (const file of listFiles().filter((candidate) => sourceFile.test(candidate))) {
+    const content = readFile(file);
+    if (content !== undefined) result.set(file, content);
+  }
+  return result;
+}
+
+export function countRemovedRuntime(sources) {
+  const counts = {};
+  for (const [file, content] of sources) {
+    const found = findRemovedRuntime(file, content);
+    if (found.length > 0) counts[file] = found.length;
+  }
+  return counts;
 }
 
 export function countViolations(sources) {
@@ -223,8 +296,14 @@ export function updatedBaseline(counts) {
 }
 
 /** The problems of the counts against the baseline, plus the plugin debt they leave. */
-export function checkAgainstBaseline(counts, baseline, requireCleanPlugins) {
+export function checkAgainstBaseline(counts, baseline, requireCleanPlugins, removedRuntime = {}) {
   const problems = compareWithBaseline(counts, baseline);
+  for (const [file, count] of Object.entries(removedRuntime).sort(([a], [b]) => a.localeCompare(b))) {
+    problems.push(
+      `${file}: ${count} use(s) of the removed SQLite runtime (write queue, file lock, backend, unit of work). ` +
+        `PostgreSQL is the only runtime database; SQLite code exists for the one-way import only.`,
+    );
+  }
   const debt = pluginDebt(counts, baseline);
   if (requireCleanPlugins && debt.length > 0) {
     problems.push(`${debt.length} plugin-zone file(s) still use the old persistence surface: ${debt.join(', ')}`);
@@ -258,7 +337,12 @@ function main() {
     return;
   }
   const baseline = JSON.parse(readFileSync(baselineFile, 'utf8'));
-  const result = checkAgainstBaseline(counts, baseline, process.argv.includes('--require-clean-plugins'));
+  const result = checkAgainstBaseline(
+    counts,
+    baseline,
+    process.argv.includes('--require-clean-plugins'),
+    countRemovedRuntime(allSources()),
+  );
   const { error, lines } = describeResult(result, baseline);
   if (error) {
     console.error(error);

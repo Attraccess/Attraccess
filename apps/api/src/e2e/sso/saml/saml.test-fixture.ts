@@ -24,9 +24,6 @@ import { SSOProviderType } from '@attraccess/application-models';
 import type { ConfigService } from '@nestjs/config';
 import type { ModuleRef } from '@nestjs/core';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { promises as fs } from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 import type { DataSource, Repository } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import type { AppConfigType } from '../../../config/app.config';
@@ -110,12 +107,11 @@ let userRepo: Repository<User>;
 
 beforeAll(async () => {
   // ── Database setup ─────────────────────────────────────────────────────────
-  const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'att-sso-saml-e2e-'));
   process.env.AUTH_SESSION_SECRET = 'sso-saml-e2e-test-secret-must-be-long';
 
-  dataSource = await createTestDataSource({ location: path.join(tmpRoot, 'attraccess.sqlite'), synchronize: true });
+  dataSource = await createTestDataSource({ synchronize: true });
 
-  // ── Build real services backed by SQLite ────────────────────────────────────
+  // ── Build real services backed by PostgreSQL ────────────────────────────────────
   userRepo = dataSource.getRepository(User);
   const authDetailRepo = dataSource.getRepository(AuthenticationDetail);
   const sessionRepo = dataSource.getRepository(Session);

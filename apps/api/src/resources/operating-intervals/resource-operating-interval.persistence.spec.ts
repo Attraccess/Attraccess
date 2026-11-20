@@ -1,36 +1,19 @@
 import { ConflictException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceOperatingInterval } from '@attraccess/database-entities';
-import { DataSource, EntitySchema } from 'typeorm';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import type { DataSource } from 'typeorm';
 import { ResourceOperatingIntervalService } from './resource-operating-interval.service';
 import { OperatingMetricsRecorder } from '../../metrics/instrumentation/operating/operating.helper';
-import { ResourceOperatingInterval1783500000000 } from '../../database/migrations/1783500000000-resource-operating-interval';
-import { OperatingTransitionProvenance1784300000000 } from '../../database/migrations/1784300000000-operating-transition-provenance';
 import { EntityManagerResolver } from '../../database/adapters/entity-manager-resolver';
+import { unitOfWorkFor } from '../../database/adapters/shared-unit-of-work';
 import { TypeOrmOperatingTimelineStore } from '../../database/adapters/operating-intervals/typeorm-operating-timeline.store';
-import { resolveDatabaseBackend } from '../../database/backend';
-import { closeResourceTransactionConnection } from '../../database/sqlite/run-serialized-transaction';
-import { createSqliteUnitOfWork } from '../../database/sqlite/sqlite-unit-of-work';
+import {
+  closeTestDataSource,
+  createTestDatabaseLocation,
+  createTestDataSource,
+  type TestDatabaseLocation,
+} from '../../test-utils/test-database';
 import { ResourceOperatingStateChangedEvent } from './events/resource-operating-state-changed.event';
-
-const IntervalSchema = new EntitySchema<ResourceOperatingInterval>({
-  name: 'ResourceOperatingInterval',
-  target: ResourceOperatingInterval,
-  tableName: 'resource_operating_interval',
-  columns: {
-    id: { type: Number, primary: true, generated: true },
-    resourceId: { type: Number },
-    startTime: { type: 'datetime' },
-    endTime: { type: 'datetime', nullable: true },
-    startFlowNodeId: { type: String, nullable: true },
-    startFlowRunId: { type: String, nullable: true },
-    endFlowNodeId: { type: String, nullable: true },
-    endFlowRunId: { type: String, nullable: true },
-  },
-});
 
 const metrics = {
   recordTransition: jest.fn(),
@@ -38,44 +21,35 @@ const metrics = {
   recordDataQualityFailures: jest.fn(),
 } as unknown as OperatingMetricsRecorder;
 
-/** One connection of the application to the file, with the service on top of its operating timeline adapter. */
+/** One connection of the application to the database, with the service on top of its operating timeline adapter. */
 function serviceOn(source: DataSource, eventEmitter: EventEmitter2): ResourceOperatingIntervalService {
-  const unitOfWork = createSqliteUnitOfWork(source);
+  const unitOfWork = unitOfWorkFor(source);
   const store = new TypeOrmOperatingTimelineStore(unitOfWork, new EntityManagerResolver(unitOfWork, source));
   return new ResourceOperatingIntervalService(store, metrics, eventEmitter);
 }
 
 describe('Operating interval persistence', () => {
-  let directory: string;
+  let database: TestDatabaseLocation;
   let source: DataSource;
   let service: ResourceOperatingIntervalService;
   let eventEmitter: EventEmitter2;
   const intervals = () => source.getRepository(ResourceOperatingInterval).find({ order: { id: 'ASC' } });
 
   beforeEach(async () => {
-    resolveDatabaseBackend();
-    directory = await mkdtemp(join(tmpdir(), 'attraccess-operating-'));
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: join(directory, 'test.sqlite'),
-      entities: [IntervalSchema],
-    }).initialize();
-    await source.query('CREATE TABLE resource (id integer PRIMARY KEY)');
-    await source.query('INSERT INTO resource (id) VALUES (1), (9)');
-    const runner = source.createQueryRunner();
-    await new ResourceOperatingInterval1783500000000().up(runner);
-    await new OperatingTransitionProvenance1784300000000().up(runner);
-    await runner.release();
+    database = await createTestDatabaseLocation();
+    source = await createTestDataSource({ location: database.location });
+    // The ids are fixed: the specs refer to the resources by number.
+    await source.query(
+      `INSERT INTO "resource" ("id", "name", "type") VALUES (1, 'One', 'machine'), (9, 'Nine', 'machine')`,
+    );
     eventEmitter = new EventEmitter2();
     service = serviceOn(source, eventEmitter);
   });
 
   afterEach(async () => {
     jest.useRealTimers();
-    await closeResourceTransactionConnection(source);
-    await source.destroy();
-    await rm(directory, { recursive: true, force: true });
+    await closeTestDataSource(source);
+    await database.remove();
   });
 
   it('keeps an accepted observation when an unrelated application transaction rolls back', async () => {
@@ -169,7 +143,7 @@ describe('Operating interval persistence', () => {
 
   it('closes an interval opened by an earlier instance and rejects an idle before its start', async () => {
     await source.query(
-      `INSERT INTO resource_operating_interval (resourceId, startTime) VALUES (9, '2026-08-27 12:00:00.001')`,
+      `INSERT INTO resource_operating_interval ("resourceId", "startTime") VALUES (9, '2026-08-27T12:00:00.001Z')`,
     );
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] }).setSystemTime(new Date('2026-08-27T12:00:00.000Z'));
 
@@ -185,8 +159,8 @@ describe('Operating interval persistence', () => {
     'rejects %s before a persisted idle boundary and accepts it once the clock catches up',
     async (state) => {
       await source.query(
-        `INSERT INTO resource_operating_interval (resourceId, startTime, endTime)
-         VALUES (9, '2026-08-27 12:00:00.000', '2026-08-27 12:10:00.001')`,
+        `INSERT INTO resource_operating_interval ("resourceId", "startTime", "endTime")
+         VALUES (9, '2026-08-27T12:00:00.000Z', '2026-08-27T12:10:00.001Z')`,
       );
       jest
         .useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] })
@@ -202,31 +176,26 @@ describe('Operating interval persistence', () => {
     },
   );
 
-  it('serializes conflicting transitions of one resource in arrival order', async () => {
+  it('keeps conflicting transitions of one resource consistent, whichever one the database lock admits first', async () => {
     await Promise.all([service.transition(1, 'operating'), service.transition(1, 'idle')]);
 
-    expect(await intervals()).toEqual([expect.objectContaining({ resourceId: 1, endTime: expect.any(Date) })]);
+    // Idle first is a no-op and operating then opens the interval; operating first is closed by the idle.
+    const rows = await intervals();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ resourceId: 1 });
   });
 
-  describe('two independent connections to the same file', () => {
+  describe('two independent connections to the same database', () => {
     let other: DataSource;
     let otherService: ResourceOperatingIntervalService;
 
     beforeEach(async () => {
-      other = await resolveDatabaseBackend()
-        .createDataSource({
-          type: 'better-sqlite3',
-          invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-          database: source.options.database as string,
-          entities: [IntervalSchema],
-        })
-        .initialize();
+      other = await createTestDataSource({ location: database.location });
       otherService = serviceOn(other, new EventEmitter2());
     });
 
     afterEach(async () => {
-      await closeResourceTransactionConnection(other);
-      await other.destroy();
+      await closeTestDataSource(other);
     });
 
     it('never creates a second open interval when both race to start the same resource', async () => {

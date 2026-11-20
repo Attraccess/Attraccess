@@ -1,6 +1,6 @@
 # Environment Variables
 
-<!-- llms-description: Reference of all environment variables that configure Attraccess: required settings, application, logging, database, storage, SMTP and TLS. -->
+<!-- llms-description: Reference of all environment variables that configure Attraccess: required settings, application, logging, database, backup, storage, SMTP and TLS. -->
 
 All configuration options for Attraccess that can be set via environment variables.
 
@@ -49,11 +49,60 @@ In containers, give the API write access to the file path and mount its director
 
 ## Database
 
-| Variable        | Default  | Description                                                                                                          |
-| --------------- | -------- | -------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_TYPE` | `sqlite` | Database engine. Only `sqlite` is supported; any other value stops the start before a database or plugin is touched. |
+Attraccess stores all data in PostgreSQL. There is no other runtime database: SQLite is only read once when an existing 1.x installation is moved, see [Updating](installation/updating.md#moving-from-sqlite-to-postgresql).
+
+| Variable            | Default    | Description                                                                                                                                                                                                                     |
+| ------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`      | –          | **Required.** Connection URL of the PostgreSQL database, e.g. `postgres://user:password@postgres:5432/attraccess`. Percent-encode special characters in the password.                                                           |
+| `DATABASE_SSL`      | `off`      | TLS to PostgreSQL: `off`, `require`, `verify-ca` or `verify-full`. `true` and `1` mean `require`; `false` and `0` mean `off`.                                                                                                   |
+| `DATABASE_POOL_MAX` | `10`       | Maximum connections in the pool of one API process, an integer from 1 to 500. Keep it below the `max_connections` of the server divided by the number of API instances.                                                         |
+| `DATABASE_SCHEMA`   | `public`   | PostgreSQL schema that holds the tables and the migrations table. A plain SQL identifier. A schema other than `public` is created on start when it is missing (the database user needs the `CREATE` privilege on the database). |
+| `DATABASE_TYPE`     | `postgres` | Database engine. Only `postgres` is supported. `sqlite` stops the start with a message that links to the [upgrade guide](installation/updating.md); any other value also stops the start.                                       |
+
+A missing or invalid setting stops the start with a clear message that never contains the password. The image does not include PostgreSQL: run it as its own service (all shipped Compose files already contain one, pinned to `postgres:18.6-alpine`). See [Backup & Restore](installation/backup-restore.md) for backing it up.
+
+TLS is configured with `DATABASE_SSL` only. TLS parameters in `DATABASE_URL` (`ssl`, `sslmode`, `sslrootcert`, `sslcert`, `sslkey`, `sslpassword`, `sslcompat`) are refused at start, because they would silently override `DATABASE_SSL`. If the server certificate is signed by a private CA, use `verify-ca` or `verify-full` and point `NODE_EXTRA_CA_CERTS` at the CA file (PEM), e.g. `NODE_EXTRA_CA_CERTS=/certs/db-ca.pem` with the file mounted into the container. The session parameters `options` and `application_name` are refused as well: the API sets its own time zone, lock timeout, search path (see `DATABASE_SCHEMA`) and application name.
+
+### PostgreSQL on balena
+
+The balena stack (`docker-compose.balena.yml`) starts a `postgres` service with the user and database `attraccess`. balena cannot build values from other variables, so the stack reads the database settings from `.env.docker-compose`, which ships with the placeholder password `change-me`. **Replace it before the first start** (or before the upgrade that adds PostgreSQL): the `postgres` image fixes the password when it creates the `postgres-data` volume, and changing the variable later has no effect on an existing volume.
+
+Set **both** as balena device variables, with the same password (they override `.env.docker-compose`):
+
+| Variable            | Value                                                                                                    |
+| ------------------- | -------------------------------------------------------------------------------------------------------- |
+| `POSTGRES_PASSWORD` | A random password, letters and digits only (e.g. `openssl rand -hex 24`).                                |
+| `DATABASE_URL`      | `postgres://attraccess:<the same password>@postgres:5432/attraccess`, used by Attraccess and the backup. |
+
+To change the password later:
+
+1. Open a shell in the `postgres` container (balenaCloud dashboard terminal, or `balena ssh <device-uuid> postgres`) and set the new password:
+
+   ```bash
+   psql -U attraccess -d attraccess -c "ALTER USER attraccess WITH PASSWORD '<new password>'"
+   ```
+
+2. Set `POSTGRES_PASSWORD` and `DATABASE_URL` to the new password. balena restarts the services with the new values.
 
 See [Adding a Database Backend](developer/adding-a-database-backend.md) for the engine seam.
+
+### Backup sidecar (balena)
+
+The balena stack contains a `backup` service that backs up the database and the volumes with restic. It is configured with the variables below, see [Backup & Restore](installation/backup-restore.md#balena-restic-sidecar).
+
+| Variable                                                         | Default             | Description                                                                                                                                                                       |
+| ---------------------------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BACKUP_REPOSITORY`                                              | –                   | restic repository, e.g. `s3:s3.amazonaws.com/bucket/attraccess`. Without it no backup runs. Set it as a device variable, not a fleet variable.                                    |
+| `BACKUP_PASSWORD`                                                | –                   | Encrypts the repository. Required; without it the backups cannot be read.                                                                                                         |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `B2_*`, …          | –                   | Credentials of the backup target, passed to restic unchanged.                                                                                                                     |
+| `BACKUP_SCHEDULE`                                                | `0 3 * * *`         | Cron expression (5 fields); by default every night at 03:00.                                                                                                                      |
+| `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY` | `7`, `4`, `6`       | How many daily, weekly and monthly snapshots are kept.                                                                                                                            |
+| `BACKUP_HOST`                                                    | `attraccess`        | Name of this installation in the repository. Use one repository per installation; only when devices share one, give each its own `BACKUP_HOST`.                                   |
+| `BACKUP_DATABASE_URL`                                            | `DATABASE_URL`      | Database to dump and restore, when it differs from `DATABASE_URL` (other credentials, or libpq TLS parameters such as `?sslmode=require`, which `DATABASE_URL` must not contain). |
+| `BACKUP_PG_WAIT_SECONDS`                                         | `120`               | How long a run waits for PostgreSQL before it fails.                                                                                                                              |
+| `BACKUP_FORCE`                                                   | –                   | `true` makes every restore replace a non-empty database, like `restore --force`.                                                                                                  |
+| `BACKUP_STATE_DIR`                                               | `/var/lib/backup`   | Working directory of the sidecar (the `backup-state` volume): the dump during a run, the restic cache, the lock and the last-success metric.                                      |
+| `BACKUP_DATA_DIR`                                                | `/external-storage` | Directory below which the volumes to back up are mounted.                                                                                                                         |
 
 ## Storage
 
@@ -91,17 +140,17 @@ See [Adding a Database Backend](developer/adding-a-database-backend.md) for the 
 
 ## Session
 
-| Variable                 | Default     | Description                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AUTH_SESSION_SECRET`    | –           | **Required.** Secret key for session encryption                                                                                                                                                                                                                                                                                                             |
-| `SESSION_COOKIE_MAX_AGE` | `604800000` | Maximum session duration in milliseconds (default: 7 days)                                                                                                                                                                                                                                                                                                  |
-| `VALKEY_URL`             | –           | Connection URL for a Valkey/Redis-compatible session store (e.g. `redis://valkey:6379`). When set, sessions are stored in Valkey with native TTL instead of SQLite — required for horizontal scaling. Falls back to SQLite when unset. Accepts any `ioredis`-compatible URL including `rediss://` (TLS), Redis Cluster, Sentinel, ElastiCache, and Upstash. |
+| Variable                 | Default     | Description                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AUTH_SESSION_SECRET`    | –           | **Required.** Secret key for session encryption                                                                                                                                                                                                                                                                                                                     |
+| `SESSION_COOKIE_MAX_AGE` | `604800000` | Maximum session duration in milliseconds (default: 7 days)                                                                                                                                                                                                                                                                                                          |
+| `VALKEY_URL`             | –           | Connection URL for a Valkey/Redis-compatible session store (e.g. `redis://valkey:6379`). When set, sessions are stored in Valkey with native TTL instead of PostgreSQL — required for horizontal scaling. Falls back to PostgreSQL when unset. Accepts any `ioredis`-compatible URL including `rediss://` (TLS), Redis Cluster, Sentinel, ElastiCache, and Upstash. |
 
 > [!NOTE]
 > The bundled Docker Compose variants (Balena, Coolify) include a `valkey/valkey:9-alpine` sidecar and set `VALKEY_URL` automatically. For external deployments, point `VALKEY_URL` at your own Valkey/Redis instance.
 
 > [!NOTE]
-> When `VALKEY_URL` is set, the API still starts when Valkey cannot be reached (for example while the Valkey container is still starting). It logs a warning, and a `Valkey connection error` line for each reconnect attempt, until Valkey is reachable. Sessions are not moved to SQLite: until Valkey is back, sign-in, requests from signed-in users and API token requests are answered with `503 Service Unavailable`, while public pages keep working. Once Valkey is reachable again, signing in works again, and authorization cache invalidation and the locking of machine starts and stops across API instances resume on their own, without restarting the API.
+> When `VALKEY_URL` is set, the API still starts when Valkey cannot be reached (for example while the Valkey container is still starting). It logs a warning, and a `Valkey connection error` line for each reconnect attempt, until Valkey is reachable. Sessions are not moved to PostgreSQL: until Valkey is back, sign-in, requests from signed-in users and API token requests are answered with `503 Service Unavailable`, while public pages keep working. Once Valkey is reachable again, signing in works again, and authorization cache invalidation and the locking of machine starts and stops across API instances resume on their own, without restarting the API.
 
 ## Plugins
 

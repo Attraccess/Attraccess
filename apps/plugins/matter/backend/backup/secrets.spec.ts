@@ -88,7 +88,7 @@ describe('secrets never leave the plugin', () => {
         sidecar: h.backend.handle('backup.snapshot', {}) as never,
         tables: { plugin_matter_nodes: [{ lifecycle_state: 'bogus', id: 'x', node_id: '1' }] },
       },
-      { pluginVersion: '0.4.0-alpha.0', pluginMigration: (await h.migrationReader()) as string },
+      { pluginVersion: '0.5.0-alpha.0', pluginMigration: (await h.migrationReader()) as string },
       second,
     );
     const poisoned = await h.restore.validate(

@@ -1,14 +1,14 @@
 import { readerTimeZoneStub } from '../../attractap/websockets/reader-time-zone.test-fixture';
-import { entities, Resource, ResourceGroup, ResourceIntroducer, User } from '@attraccess/database-entities';
+import { Resource, ResourceGroup, ResourceIntroducer, User } from '@attraccess/database-entities';
 import { ResourceIntroducerType, ResourceType } from '@attraccess/application-models';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
-import * as migrations from '../../database/migrations';
 import { ResourceListService } from '../../attractap/websockets/handlers/resource-list/resource-list.service';
 import { AuthenticatedWebSocket } from '../../attractap/websockets/websocket.types';
 import { ResourceIntroducersService } from './resourceIntroducers.service';
 import { TypeOrmResourceIntroducerStore } from '../../database/adapters/resources/resource-introducer-store.adapter';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
+import { createTestDataSource, closeTestDataSource } from '../../test-utils/test-database';
 
 // Use migrated, persisted memberships: mocked aggregated rows cannot catch a broken join.
 describe('persisted resource introducer aggregation', () => {
@@ -16,17 +16,11 @@ describe('persisted resource introducer aggregation', () => {
   let service: ResourceIntroducersService;
   // Migrating is the slow part (every migration, on a busy coverage run): do it once per file.
   beforeAll(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      entities: Object.values(entities),
-      migrations: Object.values(migrations),
-    }).initialize();
+    source = await createTestDataSource();
     await source.runMigrations();
   }, 120_000);
   afterAll(async () => {
-    if (source?.isInitialized) await source.destroy();
+    await closeTestDataSource(source);
   });
   beforeEach(async () => {
     // Each test starts from the same rows; children before the rows they reference.

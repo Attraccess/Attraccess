@@ -11,8 +11,14 @@ RULES:
 
 Create worktrees with `scripts/create-worktree.sh <worktree-path> <branch>
 [start-point]`. It runs `scripts/setup-dev-dependencies.sh` after `git worktree
-add` succeeds, installing dependencies, creating `.env`, and running database
-migrations. For Attractap firmware work, run `INSTALL_ESP_IDF=true
+add` succeeds, installing dependencies, creating `.env`, creating this
+worktree's own PostgreSQL database (`attraccess_<worktree-slug>`, written to
+`DATABASE_URL` in `.env`) and running its migrations. PostgreSQL is the only
+database: it needs the shared dev PostgreSQL from `services.docker-compose.yml`
+(the bootstrap starts it with Docker when nothing answers; set `POSTGRES_PORT`
+when 5432 is taken, or `DEV_POSTGRES_URL` for an existing server). Tests that
+need a database read `TEST_DATABASE_URL`, an admin connection from which
+per-test databases are created. For Attractap firmware work, run `INSTALL_ESP_IDF=true
 ./scripts/setup-dev-dependencies.sh` in the new worktree to install the
 project-local ESP-IDF v6.0.2 toolchain at `.tools/esp-idf`. The completion
 marker is created only after setup succeeds. If bootstrap fails, rerun that

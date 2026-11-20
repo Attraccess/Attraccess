@@ -18,14 +18,14 @@ vi.mock('@attraccess/react-query-client', () => ({
 }));
 vi.mock('../liveLogs', () => ({ useLiveLogs: () => ({ liveLogs: [] }) }));
 vi.mock('../node/index', () => ({
-  AttraccessNode: (props: { schema: { type: string }; validationError?: string; node: NodeProps }) => {
+  AttraccessNode: (props: { schema: { type: string }; validationErrors?: { message: string }[]; node: NodeProps }) => {
     state.rendered(props);
     useEffect(() => {
       state.mounts(props.node.id);
     }, []); // eslint-disable-line react-hooks/exhaustive-deps -- counts mounts only
     return (
       <div data-testid={`node-${props.node.id}`}>
-        {props.schema.type}: {props.validationError ?? 'ok'}
+        {props.schema.type}: {props.validationErrors?.map((error) => error.message).join(' ') ?? 'ok'}
       </div>
     );
   },
@@ -64,7 +64,7 @@ it('keeps every node type component identical across validation errors, node cha
   expect(Object.keys(first).sort()).toEqual(['action', 'trigger']);
   expect(first['trigger']).toBe(first['action']);
 
-  act(() => context.setValidationErrors([{ nodeId: 'one', message: 'Missing config' }]));
+  act(() => context.setValidationErrors([{ nodeId: 'one', field: 'data', message: 'Missing config' }]));
   act(() => context.setNodes([{ id: 'one', type: 'trigger', position: { x: 0, y: 0 }, data: {} }]));
   act(() => context.setEdges([{ id: 'edge', source: 'one', target: 'one' }]));
   view.rerender(
@@ -107,7 +107,7 @@ it('gives React Flow no reason to warn about new node types (#002) or unknown on
   try {
     const view = render(flow());
     act(() => context.setNodes([{ id: 'one', type: 'trigger', position: { x: 0, y: 0 }, data: {} }]));
-    act(() => context.setValidationErrors([{ nodeId: 'one', message: 'Missing config' }]));
+    act(() => context.setValidationErrors([{ nodeId: 'one', field: 'data', message: 'Missing config' }]));
     act(() => context.setEdges([{ id: 'edge', source: 'one', target: 'one' }]));
     state.schemas = [...(state.schemas ?? [])];
     view.rerender(flow());
@@ -127,9 +127,9 @@ it('shows validation errors on the right node without remounting it', () => {
 
   act(() =>
     context.setValidationErrors([
-      { nodeId: 'one', message: 'Missing config.' },
-      { nodeId: 'one', message: 'No server.' },
-      { nodeId: 'two', message: 'Other node.' },
+      { nodeId: 'one', field: 'data', message: 'Missing config.' },
+      { nodeId: 'one', field: 'server', message: 'No server.' },
+      { nodeId: 'two', field: 'data', message: 'Other node.' },
     ]),
   );
   expect(screen.getByTestId('node-one')).toHaveTextContent(/^trigger: Missing config\. No server\.$/);

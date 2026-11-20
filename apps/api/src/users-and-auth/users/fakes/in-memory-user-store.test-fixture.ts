@@ -156,6 +156,10 @@ export class InMemoryUserStore implements UserStore {
     return { users: matching.slice(start, start + query.limit), total: matching.length };
   }
 
+  async lockAccountCreation(_context: TransactionContext) {
+    this.calls.push('lockAccountCreation');
+  }
+
   async insertUser(user: NewUser) {
     const [saved] = await this.insertUsers([user]);
     return saved;

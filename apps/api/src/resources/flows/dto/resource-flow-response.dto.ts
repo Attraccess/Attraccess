@@ -61,8 +61,8 @@ export class ResourceFlowResponseDto {
         nodeId: 'TGVgqDzCKXKVr-XGUD5V4',
         nodeType: 'action.http.sendRequest',
         field: 'url',
-        message: 'Invalid URL format',
-        value: 'not-a-valid-url',
+        code: 'required',
+        message: 'This field is required.',
       },
     ],
   })

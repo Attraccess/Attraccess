@@ -1,18 +1,18 @@
 import { DataSource } from 'typeorm';
 import { Setting } from '@attraccess/database-entities';
-import { SqliteFileFixture } from '../sqlite-file.test-fixture';
+import { PostgresDatabaseFixture } from '../postgres-database.test-fixture';
 import { TypeOrmSsoLinkSecretStore } from './typeorm-sso-link-secret-store';
 
 jest.setTimeout(60_000);
 
-describe('TypeOrmSsoLinkSecretStore on real SQLite', () => {
-  let fixture: SqliteFileFixture;
+describe('TypeOrmSsoLinkSecretStore on real PostgreSQL', () => {
+  let fixture: PostgresDatabaseFixture;
   let first: DataSource;
   let storeA: TypeOrmSsoLinkSecretStore;
   let storeB: TypeOrmSsoLinkSecretStore;
 
   beforeAll(async () => {
-    fixture = await SqliteFileFixture.create();
+    fixture = await PostgresDatabaseFixture.create();
     first = await fixture.open();
     storeA = new TypeOrmSsoLinkSecretStore(first.getRepository(Setting));
     storeB = new TypeOrmSsoLinkSecretStore((await fixture.open()).getRepository(Setting));

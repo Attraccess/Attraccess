@@ -25,7 +25,7 @@ export function FlowCanvasNode(props: NodeProps) {
       tNodeExists={tExists}
       schema={schema}
       node={props}
-      validationError={validationErrors[props.id]}
+      validationErrors={validationErrors[props.id]}
     />
   );
 }

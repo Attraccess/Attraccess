@@ -47,7 +47,7 @@ export default class ReservationsPlugin implements AttraccessFrontendPlugin {
   private readonly sidebarListeners = new Set<() => void>();
 
   getPluginName(): string {
-    return 'reservations-plugin@0.1.0';
+    return 'reservations-plugin@0.2.0';
   }
 
   getDependencies(): string[] {

@@ -102,20 +102,23 @@ What happens to the plugin's data depends on how it was installed. The confirmat
 Attraccess 2.0 changed the plugin SDK: plugins have no database access any more and keep their own data in tables the
 host manages (see [Plugin Storage](plugins/plugin-storage.md)). Plugins built for 1.x are not loaded: they stay in the
 plugin list with an error that names the plugin, states the reason and links the
-[migration guide](plugins/migrating-to-2.md), and their data is left untouched. Typical reasons:
+[migration guide](plugins/migrating-to-2.md). Typical reasons:
 
 - the plugin targets the SDK 1.x (it declares no minimum host version of `2.0.0-0` or higher);
 - it requests the removed `DATABASE_ACCESS` permission (2.0 plugins ask for `PLUGIN_STORAGE`);
 - it still declares `persistence.backends` or a TypeORM migrations entry, or its bundle imports TypeORM or a database
   driver;
 - the database holds only part of the plugin's old (1.x) migrations: the data comes from a release older than
-  Attraccess 1.11. Attraccess 2.0 adopts plugin data only from the last 1.x release (1.11). Restore the backup taken
-  before the upgrade, update to Attraccess 1.11 and start it once so the plugin's migrations finish, then update to
-  2.0. Nothing was changed (see [Upgrading to Attraccess 2.0](installation/updating.md#upgrading-to-attraccess-20)).
+  Attraccess 1.11. Attraccess 2.0 adopts plugin data only from the last 1.x release (1.11). Update to Attraccess 1.11
+  and start it once so the plugin's migrations finish, then update to 2.0 (see
+  [Upgrading to Attraccess 2.0](installation/updating.md#upgrading-to-attraccess-20)).
 
-Before or right after upgrading, install the 2.0 build of each plugin (upload or marketplace), or delete the old plugin
-from the list. Deleting a refused plugin removes its files without running its code; its tables stay in the database
-until a 2.0 build adopts them or you drop them by hand.
+Every 1.x installation keeps its data in SQLite and moves it to PostgreSQL on the first start of 2.0. If a plugin's
+tables hold rows, its 2.0 build must be in the plugin folder **before** that first start: otherwise the transfer stops
+and the API does not start (the SQLite file stays untouched). Attraccess 1.11 cannot install 2.0 builds.
+[Plugins with data](installation/updating.md#plugins-with-data) shows how to put them in place. Plugins without data
+can be installed after the upgrade, or deleted from the list. Deleting a refused plugin removes its files without
+running its code.
 
 ## Troubleshooting
 

@@ -19,7 +19,7 @@ export class PasswordHistory {
   @ApiProperty({ description: 'Bcrypt hash of a previously used password', required: false })
   passwordHash!: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'When this entry was recorded' })
   createdAt!: Date;
 

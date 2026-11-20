@@ -1,24 +1,33 @@
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
+import { Client } from 'pg';
 import { resolveDatabaseBackend } from '../database/backend';
 import { SUPPORTED_DATABASE_TYPES } from '../database/backend/database-backend';
-import { resolveDatabasePath } from '../config/storage-path';
 import {
   closeTestDataSource,
   createTestDatabaseLocation,
   createTestDataSource,
   createTestDataSourceOptions,
+  testAdminUrl,
 } from './test-database';
+
+const databaseExists = async (name: string) => {
+  const admin = new Client({ connectionString: testAdminUrl() });
+  await admin.connect();
+  try {
+    return ((await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [name])).rowCount ?? 0) > 0;
+  } finally {
+    await admin.end();
+  }
+};
 
 describe('test database factory', () => {
   it('builds options from the selected backend, with migrations off and no schema sync unless asked', () => {
     const backend = resolveDatabaseBackend();
     const options = createTestDataSourceOptions();
     expect(options).toMatchObject({
-      type: backend.createDataSourceOptions().type,
-      database: ':memory:',
+      type: 'postgres',
       synchronize: false,
       migrationsRun: false,
       migrationsTableName: backend.migrationTrack.tableName,
@@ -30,30 +39,37 @@ describe('test database factory', () => {
     });
   });
 
-  it('opens through the backend connection factory and closes idempotently', async () => {
+  it('opens a private migrated database through the backend and drops it on close, idempotently', async () => {
     const source = await createTestDataSource();
+    const { current_database: name } = (await source.query('SELECT current_database()'))[0];
     expect(source.isInitialized).toBe(true);
-    await source.query('CREATE TABLE t (id integer)');
+    expect(await databaseExists(name)).toBe(true);
+    // The database starts at the current release: the migrated tables are there.
+    expect(await source.query(`SELECT to_regclass('public."user"') IS NOT NULL AS present`)).toEqual([
+      { present: true },
+    ]);
     await closeTestDataSource(source);
     expect(source.isInitialized).toBe(false);
+    expect(await databaseExists(name)).toBe(false);
     await closeTestDataSource(source);
     await closeTestDataSource(undefined);
   });
 
-  it('keeps data in a file location across independent connections', async () => {
-    const database = await createTestDatabaseLocation();
+  it('keeps data in a database location across independent connections', async () => {
+    const database = await createTestDatabaseLocation({ empty: true });
     try {
-      const first = await createTestDataSource({ location: database.location });
+      const first = await createTestDataSource({ location: database.location, entities: [], migrations: [] });
       await first.query('CREATE TABLE t (id integer)');
       await first.query('INSERT INTO t VALUES (1)');
-      const second = await createTestDataSource({ location: database.location });
+      const second = await createTestDataSource({ location: database.location, entities: [], migrations: [] });
       expect(await second.query('SELECT id FROM t')).toEqual([{ id: 1 }]);
       await closeTestDataSource(first);
       await closeTestDataSource(second);
+      expect(await databaseExists(database.name)).toBe(true);
     } finally {
       await database.remove();
     }
-    expect(existsSync(database.directory)).toBe(false);
+    expect(await databaseExists(database.name)).toBe(false);
   });
 
   it('lets a spec map only the entities and migrations it needs', () => {
@@ -65,7 +81,7 @@ describe('test database factory', () => {
 
 /**
  * The operational scripts (apps/api/scripts/lib/database-provider.mjs) cannot import the TypeScript seam, so a test
- * keeps their idea of the supported backends and of the default database location in step with it.
+ * keeps their idea of the supported backends in step with it.
  */
 describe('database provider of the operational scripts', () => {
   const provider = resolve(__dirname, '../../scripts/lib/database-provider.mjs');
@@ -82,20 +98,15 @@ describe('database provider of the operational scripts', () => {
     expect(await evaluate('console.log(JSON.stringify(p.SUPPORTED_DATABASE_TYPES))')).toEqual([
       ...SUPPORTED_DATABASE_TYPES,
     ]);
-    expect(await evaluate('console.log(JSON.stringify(p.DEFAULT_DATABASE_TYPE))')).toBe('sqlite');
+    expect(await evaluate('console.log(JSON.stringify(p.DEFAULT_DATABASE_TYPE))')).toBe('postgres');
   });
 
-  it('locates the sqlite database where the application does', async () => {
-    const env = { STORAGE_ROOT: 'relative/storage' };
-    const cwd = resolve(__dirname, '../../../..');
+  it('locates the database through DATABASE_URL like the application does', async () => {
+    const url = 'postgres://u:p@db.example:5432/attraccess';
     expect(
-      await evaluate(
-        `console.log(JSON.stringify(p.sqliteProvider.defaultLocation(process.env, ${JSON.stringify(cwd)})))`,
-        env,
-      ),
-    ).toBe(resolveDatabasePath(env, cwd));
-    expect(
-      await evaluate(`console.log(JSON.stringify(p.sqliteProvider.defaultLocation({}, ${JSON.stringify(cwd)})))`),
-    ).toBe(resolveDatabasePath({}, cwd));
+      await evaluate('console.log(JSON.stringify(p.postgresProvider.defaultLocation(process.env)))', {
+        DATABASE_URL: url,
+      }),
+    ).toBe(url);
   });
 });

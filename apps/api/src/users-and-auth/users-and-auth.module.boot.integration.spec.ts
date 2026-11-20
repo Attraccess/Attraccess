@@ -1,11 +1,10 @@
 import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 import { AuditService } from '../audit/audit.service';
-import { entities } from '@attraccess/database-entities';
 import type { InjectionToken, ModuleMetadata, Type } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { testTypeOrmModule, dropTestDatabases } from '../test-utils/typeorm-test-module.test-fixture';
 import { AuditModule } from '../audit/audit.module';
 import { ApprovedOriginsService } from '../common/security/approved-origins.service';
 import { SecurityModule } from '../common/security/security.module';
@@ -30,13 +29,7 @@ process.env.AUTH_SESSION_SECRET ??= 'boot-spec-session-secret-0123456789abcdef';
 const infrastructure = (): NonNullable<ModuleMetadata['imports']> => [
   ConfigModule.forRoot({ load: [appConfiguration, storageConfigObject, sessionConfig, valkeyConfig], isGlobal: true }),
   EventEmitterModule.forRoot(),
-  TypeOrmModule.forRoot({
-    type: 'better-sqlite3',
-    invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-    database: ':memory:',
-    synchronize: true,
-    entities: Object.values(entities),
-  }),
+  testTypeOrmModule(),
   MetricsModule,
   ValkeyModule,
 ];
@@ -55,6 +48,8 @@ const compileWithout = (target: Type, missing?: InjectionToken) =>
     .compile();
 
 describe('UsersAndAuthModule boot (required security and audit collaborators)', () => {
+  afterAll(dropTestDatabases);
+
   describe('with the real module and its global providers', () => {
     let moduleRef: TestingModule;
 

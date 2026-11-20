@@ -4,10 +4,9 @@ import {
   ReaderUiPluginSettings,
   ReaderUiReaderSettings,
   ReaderUiResourceSettings,
-  entities,
 } from '@attraccess/database-entities';
-import { DataSource } from 'typeorm';
-import * as migrations from '../../migrations';
+import type { DataSource } from 'typeorm';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { ReaderUiAlertsAdapter } from './reader-ui-alerts.adapter';
 import { ReaderUiSettingsAdapter } from './reader-ui-settings.adapter';
 
@@ -17,14 +16,7 @@ describe('reader UI persistence adapters on a real database', () => {
   let settings: ReaderUiSettingsAdapter;
 
   beforeEach(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      entities: Object.values(entities),
-      migrations: Object.values(migrations),
-    }).initialize();
-    await source.runMigrations();
+    source = await createTestDataSource();
     alerts = new ReaderUiAlertsAdapter(source.getRepository(ReaderUiAlert));
     settings = new ReaderUiSettingsAdapter(
       source.getRepository(ReaderUiResourceSettings),
@@ -34,7 +26,7 @@ describe('reader UI persistence adapters on a real database', () => {
   });
 
   afterEach(async () => {
-    await source.destroy();
+    await closeTestDataSource(source);
   });
 
   describe('alerts', () => {

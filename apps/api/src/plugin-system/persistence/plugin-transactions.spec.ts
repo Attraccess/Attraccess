@@ -1,10 +1,10 @@
 import { PluginStorageConflict, PluginStorageInvalid } from '@attraccess/plugins-backend-sdk';
 import { registerPersistenceErrorClassifier } from '../../database/persistence-errors';
-import { sqliteBackend } from '../../database/sqlite/sqlite-backend';
+import { postgresErrorClassifier } from '../../database/postgres/postgres-errors';
 import { handleOfScope } from './plugin-transaction-scope';
 import { createPluginTransactions, type PluginTransactionsOptions } from './plugin-transactions';
 
-const busy = () => Object.assign(new Error('SQLITE_BUSY: database is locked BEGIN IMMEDIATE'), { code: 'SQLITE_BUSY' });
+const busy = () => Object.assign(new Error('could not serialize access BEGIN ISOLATION LEVEL'), { code: '40001' });
 
 function setup(overrides: Partial<PluginTransactionsOptions> = {}) {
   const onCallbackError = jest.fn();
@@ -19,7 +19,7 @@ function setup(overrides: Partial<PluginTransactionsOptions> = {}) {
 }
 
 describe('createPluginTransactions', () => {
-  beforeAll(() => registerPersistenceErrorClassifier(sqliteBackend.errors));
+  beforeAll(() => registerPersistenceErrorClassifier(postgresErrorClassifier));
 
   it('hands work an open scope on the engine handle and runs after-commit work in order after it', async () => {
     const { persistence, handle, transactions, onCallbackError } = setup();
@@ -76,11 +76,11 @@ describe('createPluginTransactions', () => {
     expect(() => kept?.afterCommit(() => undefined)).toThrow(PluginStorageInvalid);
   });
 
-  it('maps a busy database at BEGIN or COMMIT to PluginStorageConflict without the engine text', async () => {
+  it('maps a serialization failure at BEGIN or COMMIT to PluginStorageConflict without the engine text', async () => {
     const atBegin = setup({ runInTransaction: () => Promise.reject(busy()) });
     const error = await atBegin.persistence.transaction(async () => 1).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(PluginStorageConflict);
-    expect((error as Error).message).not.toMatch(/SQLITE|BEGIN/);
+    expect((error as Error).message).not.toMatch(/serialize|BEGIN/);
 
     const after = jest.fn();
     const atCommit = setup({

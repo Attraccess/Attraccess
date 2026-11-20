@@ -20,11 +20,11 @@ export class Form {
   @ApiProperty({ description: 'The ID of the form' })
   id!: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'The date and time the form was created' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'The date and time the form was last updated' })
   updatedAt!: Date;
 
@@ -100,7 +100,7 @@ export class FormField {
   @ApiProperty({ description: 'Position of the field within the form' })
   position!: number;
 
-  @Column({ type: 'json', nullable: true })
+  @Column({ type: 'jsonb', nullable: true })
   @ApiProperty({ description: 'The options of the form field' })
   options!: Record<string, unknown> | string[] | null;
 }
@@ -127,17 +127,17 @@ export class FormSubmission {
   @ApiProperty({ description: 'The form that the submission belongs to', type: () => Form })
   form!: Form;
 
-  @Column({ type: 'json' })
+  @Column({ type: 'jsonb' })
   @ApiProperty({
     description: 'The data of the form submission',
   })
   data!: FormSubmissionData;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'The date and time the submission was created' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'The date and time the submission was last updated' })
   updatedAt!: Date;
 

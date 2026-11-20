@@ -1,9 +1,8 @@
-import { createSqliteAuditService } from '../database/adapters/audit/sqlite-audit-service.test-fixture';
+import { createPostgresAuditService } from '../database/adapters/audit/postgres-audit-service.test-fixture';
 import {
   AuditLog,
   BillingTransaction,
   BillingTransactionItem,
-  entities,
   Resource,
   ResourceBillingConfiguration,
   ResourceUsage,
@@ -23,8 +22,7 @@ import { BillingService } from '../billing/charges/billing.service';
 import { TransactionContextResolver } from '../database/adapters/transaction-context';
 import { TypeOrmBillingConfigurationStore } from '../database/adapters/billing/typeorm-billing-configuration.store';
 import { TypeOrmBillingLedgerStore } from '../database/adapters/billing/typeorm-billing-ledger.store';
-import { createSqliteUnitOfWork } from '../database/sqlite/sqlite-unit-of-work';
-import * as migrations from '../database/migrations';
+import { createPostgresUnitOfWork } from '../database/postgres/postgres-unit-of-work';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { TypeOrmSsoProviderStore } from '../database/adapters/sso/typeorm-sso-provider-store';
 import { SSOService } from '../users-and-auth/auth/sso/sso.service';
@@ -33,10 +31,11 @@ import { createTestAuditMetrics, droppedRecords } from '../database/adapters/aud
 import { AuditMetrics } from '../metrics/definitions/audit.metrics';
 import { TypeOrmSettingsRows } from '../database/adapters/settings/typeorm-settings-rows';
 import { legacyEngineTransactionScope } from '../database/adapters/common/legacy-engine-transaction';
+import { createTestDataSource, closeTestDataSource } from '../test-utils/test-database';
 
 /**
  * A service that owns a transactional change records its audit row with the same EntityManager, so the row commits
- * and rolls back with the change. These run the real services against a fully migrated, file-backed SQLite database
+ * and rolls back with the change. These run the real services against a fully migrated PostgreSQL database
  * and the real audit storage; nothing in the write path is a stand-in.
  */
 describe('audit recorded by an owning service inside its transaction', () => {
@@ -48,14 +47,7 @@ describe('audit recorded by an owning service inside its transaction', () => {
 
   beforeAll(async () => {
     directory = await mkdtemp(join(tmpdir(), 'audit-service-transactions-'));
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: join(directory, 'audit.sqlite'),
-      entities: Object.values(entities),
-      migrations: Object.values(migrations),
-    }).initialize();
-    await source.runMigrations();
+    source = await createTestDataSource();
     store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(source.getRepository(Setting)), null);
     await store.setPlainSetting('audit', 'domains', JSON.stringify(['billing', 'sso']));
   }, 120_000);
@@ -75,7 +67,7 @@ describe('audit recorded by an owning service inside its transaction', () => {
     ])
       await source.query(`DELETE FROM "${source.getMetadata(entity).tableName}"`);
     metrics = createTestAuditMetrics();
-    audit = createSqliteAuditService(source, store, metrics);
+    audit = createPostgresAuditService(source, store, metrics);
     await audit.onModuleInit();
   });
 
@@ -84,7 +76,7 @@ describe('audit recorded by an owning service inside its transaction', () => {
   });
 
   afterAll(async () => {
-    if (source?.isInitialized) await source.destroy();
+    await closeTestDataSource(source);
     if (directory) await rm(directory, { recursive: true, force: true });
   });
 
@@ -110,7 +102,7 @@ describe('audit recorded by an owning service inside its transaction', () => {
         startTime: new Date('2026-11-13T09:00:00.000Z'),
         lifecyclePending: true,
       });
-      const unitOfWork = createSqliteUnitOfWork(source);
+      const unitOfWork = createPostgresUnitOfWork(source);
       const contexts = new TransactionContextResolver(source, unitOfWork);
       billing = new BillingService(
         new TypeOrmBillingLedgerStore(
@@ -259,18 +251,22 @@ describe('audit recorded by an owning service inside its transaction', () => {
       expect(JSON.stringify(await auditRows())).not.toContain('never-record-this-secret');
     });
 
-    it('rolls the audit row back with the provider when the enclosing transaction fails', async () => {
-      let createdId = 0;
-      await expect(
-        source.transaction(async (manager) => {
-          // The service's own transaction runs as a savepoint of this one (one SQLite connection).
-          createdId = (await sso.createProvider(dto as never, actor)).id;
-          expect(await manager.query('SELECT action FROM audit_log')).toEqual([{ action: 'sso.provider.created' }]);
-          throw new Error('enclosing work failed');
-        }),
-      ).rejects.toThrow('enclosing work failed');
+    it('rolls the audit row back with the provider when the transaction fails after the audit was recorded', async () => {
+      const record = audit.record.bind(audit);
+      let recordedInTransaction = false;
+      const spy = jest.spyOn(audit, 'record').mockImplementation(async (...args) => {
+        await record(...args);
+        recordedInTransaction = args[1] !== undefined;
+        throw new Error('enclosing work failed');
+      });
+      try {
+        await expect(sso.createProvider(dto as never, actor)).rejects.toThrow('enclosing work failed');
+      } finally {
+        spy.mockRestore();
+      }
 
-      expect(createdId).toBeGreaterThan(0);
+      // The audit row was written through the service transaction's scope, so it went down with the provider.
+      expect(recordedInTransaction).toBe(true);
       expect(await source.getRepository(SSOProvider).count()).toBe(0);
       expect(await source.getRepository(SSOProviderOIDCConfiguration).count()).toBe(0);
       expect(await auditRows()).toEqual([]);

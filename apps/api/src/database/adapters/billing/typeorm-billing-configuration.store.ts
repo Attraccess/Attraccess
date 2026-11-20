@@ -5,7 +5,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
 import { BillingConfigurationStore, ResourceRates } from '../../../billing/ports/billing-configuration.port';
 import type { BillingTransactionContext } from '../../../billing/ports/billing-ledger.port';
-import { isUniqueViolation } from '../../persistence-errors';
 import { TransactionContextResolver } from '../transaction-context';
 import { toConfigurationRecord } from './billing-mappers';
 
@@ -49,16 +48,15 @@ export class TypeOrmBillingConfigurationStore implements BillingConfigurationSto
     const repository = this.contexts.manager(context).getRepository(ResourceBillingConfiguration);
     const existing = await repository.findOneBy({ resourceId });
     if (existing) return toConfigurationRecord(existing);
-    try {
-      const created = await repository.save(
-        repository.create({ resourceId, creditsPerUsage: 0, creditsPerMinute: 0, creditsPerOperatingMinute: 0 }),
-      );
-      return toConfigurationRecord(created);
-    } catch (error) {
-      // A concurrent request stored the free default first; the unique resource id makes that one the answer.
-      if (!isUniqueViolation(error)) throw error;
-      return toConfigurationRecord(await repository.findOneByOrFail({ resourceId }));
-    }
+    // ON CONFLICT DO NOTHING instead of catching a unique violation: inside a transaction the failed INSERT would
+    // abort it. A concurrent request that stored the free default first wins; its row is the answer.
+    await repository
+      .createQueryBuilder()
+      .insert()
+      .values({ resourceId, creditsPerUsage: 0, creditsPerMinute: 0, creditsPerOperatingMinute: 0 })
+      .orIgnore()
+      .execute();
+    return toConfigurationRecord(await repository.findOneByOrFail({ resourceId }));
   }
 
   async saveResourceRates(resourceId: number, rates: ResourceRates): Promise<ResourceBillingConfigurationRecord> {

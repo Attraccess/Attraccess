@@ -25,12 +25,32 @@ services:
       - attraccess-storage:/app/storage
     environment:
       - AUTH_SESSION_SECRET=your-random-secure-key
+      - DATABASE_URL=postgres://attraccess:your-database-password@postgres:5432/attraccess
       - ATTRACCESS_URL=https://attraccess.your-domain.com
       - LICENSE_KEY=your-license-key
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:18.6-alpine
+    environment:
+      - POSTGRES_USER=attraccess
+      - POSTGRES_PASSWORD=your-database-password
+      - POSTGRES_DB=attraccess
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U attraccess -d attraccess"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
 volumes:
   attraccess-storage:
+  postgres-data:
 ```
 
 ## 2. Set Environment Variables
@@ -42,6 +62,7 @@ As an alternative to inline variables, you can enter values individually in the 
 | `AUTH_SESSION_SECRET` | A random, secure key |
 | `ATTRACCESS_URL` | The URL of your installation |
 | `LICENSE_KEY` | Your license key |
+| `DATABASE_URL` | `postgres://attraccess:<password>@postgres:5432/attraccess` (same password as the `postgres` service) |
 
 More variables can be found at [Environment Variables](installation/environment-variables.md).
 

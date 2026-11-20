@@ -63,11 +63,17 @@ export class TypeOrmDashboardPinStore implements DashboardPinStore {
   }
 
   /**
-   * Writes from several tabs must not interleave between reading and rewriting the list. SQLite serializes whole
-   * transactions in its unit of work; other drivers lock the user's row, which exists even while the user has no pins.
+   * Writes from several tabs must not interleave between reading and rewriting the list: the user's row is locked
+   * (FOR NO KEY UPDATE) for the rest of the transaction. It exists even while the user has no pins, and only its id is
+   * selected so no outer join ends up under the lock. The no-key variant does not block the FOR KEY SHARE locks that
+   * inserts referencing the user (sessions, usage, bills) take.
    */
   private async lockUser(manager: EntityManager, userId: number): Promise<void> {
-    if (manager.connection.options.type === 'better-sqlite3') return;
-    await manager.getRepository(User).findOneOrFail({ where: { id: userId }, lock: { mode: 'pessimistic_write' } });
+    await manager
+      .createQueryBuilder(User, 'user')
+      .select('user.id')
+      .where('user.id = :userId', { userId })
+      .setLock('for_no_key_update')
+      .getOneOrFail();
   }
 }

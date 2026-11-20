@@ -8,7 +8,7 @@ import { unitOfWorkFor } from '../shared-unit-of-work';
 import { TransactionContextResolver } from '../transaction-context';
 import { TransactionHandles } from './transaction-handles';
 
-/** Releases the connections the backend opened beside the application connection (SQLite: the lifecycle writer). */
+/** Releases the connections the backend opened beside the application connection. */
 @Injectable()
 class BackendConnectionsLifecycle implements OnModuleDestroy {
   constructor(@Inject(getDataSourceToken()) private readonly source: DataSource) {}

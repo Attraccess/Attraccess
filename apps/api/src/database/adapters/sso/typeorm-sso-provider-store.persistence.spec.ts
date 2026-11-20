@@ -2,7 +2,7 @@ import { DataSource } from 'typeorm';
 import { SSOProvider, SSOProviderOIDCConfiguration, SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
 import { SSOProviderType } from '@attraccess/application-models';
 import type { AuditEvent, AuditRecorder } from '../../../audit/recorder/audit-event';
-import { SqliteFileFixture } from '../sqlite-file.test-fixture';
+import { PostgresDatabaseFixture } from '../postgres-database.test-fixture';
 import { TypeOrmSsoProviderStore } from './typeorm-sso-provider-store';
 
 jest.setTimeout(60_000);
@@ -27,8 +27,8 @@ const event = (action: string, id = 0): AuditEvent<'sso'> =>
     details: {},
   }) as unknown as AuditEvent<'sso'>;
 
-describe('TypeOrmSsoProviderStore on real SQLite', () => {
-  let fixture: SqliteFileFixture;
+describe('TypeOrmSsoProviderStore on real PostgreSQL', () => {
+  let fixture: PostgresDatabaseFixture;
   let first: DataSource;
   let second: DataSource;
   let recorder: { record: jest.Mock };
@@ -40,7 +40,7 @@ describe('TypeOrmSsoProviderStore on real SQLite', () => {
   ) => first.getRepository(type).count();
 
   beforeAll(async () => {
-    fixture = await SqliteFileFixture.create();
+    fixture = await PostgresDatabaseFixture.create();
     first = await fixture.open();
     second = await fixture.open();
   });

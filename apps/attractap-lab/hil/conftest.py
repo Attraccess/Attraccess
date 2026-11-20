@@ -157,7 +157,7 @@ def api_host(reader_ip):
 
 @pytest.fixture(scope="session")
 def api():
-    return Api(os.environ["API_URL"], os.environ["API_DB"])
+    return Api(os.environ["API_URL"], os.environ["DATABASE_URL"])
 
 
 @pytest.fixture(scope="session")

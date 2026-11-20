@@ -16,7 +16,7 @@ module.exports = {
   collectCoverage: true,
   coverageReporters: ['json'],
   coverageDirectory: '../../coverage/apps/api/test',
-  // SQLite integration tests and bcrypt exceed their per-test timeouts under the default worker count.
+  // Database integration tests and bcrypt exceed their per-test timeouts under the default worker count.
   maxWorkers: 3,
   moduleNameMapper: {
     '^lodash-es$': 'lodash',

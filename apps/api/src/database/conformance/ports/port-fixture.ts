@@ -59,8 +59,8 @@ export interface PortDatabase {
 }
 
 /**
- * A database backend the port conformance suites run against. ATT-584 adds a PostgreSQL fixture next to the SQLite
- * one; the suites stay as they are.
+ * A database backend the port conformance suites run against (PostgreSQL, the only runtime database; see
+ * postgres-port.test-fixture). A further backend adds a fixture; the suites stay as they are.
  */
 export interface PortBackendFixture {
   /** Human readable backend name used in the test titles. */

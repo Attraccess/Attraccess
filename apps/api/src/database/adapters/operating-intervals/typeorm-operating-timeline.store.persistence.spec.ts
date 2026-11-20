@@ -6,14 +6,9 @@ import {
   User,
 } from '@attraccess/database-entities';
 import { ResourceType, ResourceUsageAction, SupervisionMode } from '@attraccess/application-models';
-import { DataSource } from 'typeorm';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { schemas } from '../usage/lifecycle-fixtures/schemas.test-fixture';
-import { resolveDatabaseBackend } from '../../backend';
-import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
-import { createSqliteUnitOfWork } from '../../sqlite/sqlite-unit-of-work';
+import type { DataSource } from 'typeorm';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
+import { unitOfWorkFor } from '../shared-unit-of-work';
 import { EntityManagerResolver } from '../entity-manager-resolver';
 import { TypeOrmOperatingTimelineStore } from './typeorm-operating-timeline.store';
 
@@ -21,7 +16,6 @@ const at = (time: string) => new Date(`2026-08-28T${time}.000Z`);
 
 /** The reads of the operating timeline against a real database: window semantics, filters and mapping. */
 describe('TypeOrmOperatingTimelineStore reads', () => {
-  let directory: string;
   let source: DataSource;
   let store: TypeOrmOperatingTimelineStore;
 
@@ -40,28 +34,18 @@ describe('TypeOrmOperatingTimelineStore reads', () => {
     } as ResourceUsage);
 
   beforeEach(async () => {
-    resolveDatabaseBackend();
-    directory = await mkdtemp(join(tmpdir(), 'attraccess-timeline-store-'));
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: join(directory, 'test.sqlite'),
-      synchronize: true,
-      entities: schemas,
-    }).initialize();
+    source = await createTestDataSource();
     await source.getRepository(Resource).save([
-      { id: 1, name: 'Printer', type: ResourceType.Machine, supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED },
-      { id: 2, name: 'Saw', type: ResourceType.Machine, supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED },
+      { name: 'Printer', type: ResourceType.Machine, supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED },
+      { name: 'Saw', type: ResourceType.Machine, supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED },
     ]);
-    await source.getRepository(User).save({ id: 1, username: 'user' });
-    const unitOfWork = createSqliteUnitOfWork(source);
+    await source.getRepository(User).save({ username: 'user', email: 'user@example.test' });
+    const unitOfWork = unitOfWorkFor(source);
     store = new TypeOrmOperatingTimelineStore(unitOfWork, new EntityManagerResolver(unitOfWork, source));
   });
 
   afterEach(async () => {
-    await closeResourceTransactionConnection(source);
-    await source.destroy();
-    await rm(directory, { recursive: true, force: true });
+    await closeTestDataSource(source);
   });
 
   it('lists intervals overlapping each resource window, open ones included, earliest first', async () => {
@@ -111,7 +95,7 @@ describe('TypeOrmOperatingTimelineStore reads', () => {
   });
 
   it('reads inside the transaction the caller holds', async () => {
-    const unitOfWork = createSqliteUnitOfWork(source);
+    const unitOfWork = unitOfWorkFor(source);
     const inScope = new TypeOrmOperatingTimelineStore(unitOfWork, new EntityManagerResolver(unitOfWork, source));
 
     const seen = await unitOfWork.run(async (scope) => {

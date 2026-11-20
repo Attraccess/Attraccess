@@ -56,11 +56,11 @@ export class PasswordPolicy {
   @ApiProperty({ description: 'Forced rotation interval in days (0 disables)', example: 0 })
   rotationDays!: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'When the policy record was created' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'When the policy record was last updated' })
   updatedAt!: Date;
 

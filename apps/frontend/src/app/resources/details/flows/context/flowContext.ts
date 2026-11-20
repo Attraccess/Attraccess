@@ -5,6 +5,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { Connection, Edge, Node, NodeTypes, OnEdgesChange, OnNodesChange } from '@xyflow/react';
 import type { ResourceFlowLog, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 import type { FlowOwner } from '../flowOwner';
+import type { NodeValidationError } from '../node/validationMessages';
 
 export type LiveLogReceiver = (log: ResourceFlowLog) => void;
 
@@ -34,8 +35,9 @@ export interface FlowContextType {
   copySelectedNodes: () => Promise<void>;
   cutSelectedNodes: () => Promise<void>;
   pasteNodes: (targetFlowPosition?: { x: number; y: number }) => Promise<void>;
-  validationErrors: Record<string, string>;
-  setValidationErrors: (errors: Array<{ nodeId: string; message: string }>) => void;
+  /** API validation errors by node id. */
+  validationErrors: Record<string, NodeValidationError[]>;
+  setValidationErrors: (errors: ReadonlyArray<NodeValidationError & { nodeId: string }>) => void;
 }
 
 export const FlowContext = createContext<FlowContextType | undefined>(undefined);

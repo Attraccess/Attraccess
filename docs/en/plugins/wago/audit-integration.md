@@ -26,8 +26,8 @@ record(event: PluginAuditEvent & { pluginId: string }): Promise<PluginAuditRecei
 // PluginAuditReceipt = { status: 'recorded' } | { status: 'unavailable' }
 ```
 
-`recorded` means a completed autocommitted insert on a separate connection to the
-host SQLite file with `synchronous=FULL`. Rows have server timestamps, actor and
+`recorded` means a completed autocommitted insert on a separate connection pool to the
+host PostgreSQL database with `synchronous_commit` on. Rows have server timestamps, actor and
 API-token IDs, plugin identity, operation UUID, outcome, subject and safe details.
 Historical identifiers have no cascading foreign keys: deleting a controller,
 principal, token or plugin does not delete its history. A database trigger rejects
@@ -36,21 +36,20 @@ overrides any caller-supplied plugin ID.
 
 Plugin calls carry no host transaction, so the row is not committed or rolled
 back together with the plugin's own change. Each call is written on the
-separate audit connection: writes are serialized, up to 1,000 can be queued,
-and each one waits up to 5 seconds for a busy SQLite lock instead of giving up.
+separate audit connection: up to 1,000 can be queued, and a write that waits for a
+database lock is retried a few times instead of giving up at once.
 A write that is not stored returns `unavailable`, logs one
 `Audit record dropped` line in the API log and increments
 `attraccess_audit_records_dropped_total` (see the
 [audit alert](monitoring/prometheus-grafana.md#audit-alert)). Reasons are a
-storage error, a full queue, audit storage that is not available (startup failed
-or `:memory:` database), shutdown, unreadable audit settings or an invalid
+storage error, a full queue, audit storage that is not available (startup failed), shutdown, unreadable audit settings or an invalid
 event. Writes already queued when shutdown starts are still stored, for up to 4 seconds. The bridge
 also returns `unavailable` when no provider is registered or the provider
 throws; it never serializes errors as fallback records. Disabled audit or a
 disabled plugin domain also returns `unavailable`, but is not counted as a drop.
 WAGO emits only the fixed warning `WAGO audit storage unavailable` for any `unavailable` receipt.
 Rejected writes are not retried and the receipt cannot change the domain result:
-domain operations continue. Persistence tests use isolated on-disk SQLite fixtures.
+domain operations continue. Persistence tests use isolated PostgreSQL test databases.
 Upgrade the host SDK before deploying a
 plugin expecting this bridge. Older contexts without `audit` remain supported.
 

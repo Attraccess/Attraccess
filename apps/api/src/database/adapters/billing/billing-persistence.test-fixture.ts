@@ -1,6 +1,5 @@
 import {
   BillingTransaction,
-  entities,
   Resource,
   ResourceBillingConfiguration,
   ResourceUsage,
@@ -8,23 +7,23 @@ import {
   User,
 } from '@attraccess/database-entities';
 import { ResourceType, ResourceUsageAction } from '@attraccess/application-models';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { DataSource, EntityManager } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 import type { AuditRecorder } from '../../../audit/recorder/audit-event';
 import { BillingService } from '../../../billing/charges/billing.service';
 import { LiveNotificationsService } from '../../../billing/live-notifications/live-notifications.service';
-import * as migrations from '../../migrations';
-import { sqliteBackend } from '../../sqlite/sqlite-backend';
-import { createSqliteUnitOfWork } from '../../sqlite/sqlite-unit-of-work';
-import { ScopedUnitOfWork } from '../../unit-of-work';
+import {
+  closeTestDataSource,
+  createTestDatabaseLocation,
+  createTestDataSource,
+} from '../../../test-utils/test-database';
+import type { ScopedUnitOfWork } from '../../unit-of-work';
+import { unitOfWorkFor } from '../shared-unit-of-work';
 import { TransactionContextResolver } from '../transaction-context';
 import { TypeOrmBillingConfigurationStore } from './typeorm-billing-configuration.store';
 import { TypeOrmBillingLedgerStore } from './typeorm-billing-ledger.store';
 import { TypeOrmSumUpCredentialStore } from './typeorm-sumup-credential.store';
 
-/** One connection to the shared database file with the real billing adapters built on it. */
+/** One connection to the shared database with the real billing adapters built on it. */
 export interface BillingConnection {
   source: DataSource;
   unitOfWork: ScopedUnitOfWork<EntityManager>;
@@ -38,34 +37,25 @@ export interface BillingConnection {
 }
 
 /**
- * A fully migrated, file-backed SQLite database that any number of independent connections (own handles, own
- * unit of work) can open, so concurrency guarantees are tested across connections and not on one shared handle.
+ * A PostgreSQL database built by the released migration track that any number of independent connections (own pools,
+ * own unit of work) can open, so concurrency guarantees are tested across connections and not on one shared handle.
+ * `close` drops it.
  */
 export async function createBillingDatabase() {
-  const directory = await mkdtemp(join(tmpdir(), 'billing-persistence-'));
-  const file = join(directory, 'billing.sqlite');
+  const database = await createTestDatabaseLocation();
   const sources: DataSource[] = [];
 
   const openSource = async () => {
-    const source = await sqliteBackend
-      .createDataSource({
-        type: 'better-sqlite3',
-        invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-        database: file,
-        entities: Object.values(entities),
-        migrations: Object.values(migrations),
-      })
-      .initialize();
+    const source = await createTestDataSource({ location: database.location });
     sources.push(source);
     return source;
   };
 
   const first = await openSource();
-  await first.runMigrations();
 
   const connect = async (existing?: DataSource): Promise<BillingConnection> => {
     const source = existing ?? (await openSource());
-    const unitOfWork = createSqliteUnitOfWork(source);
+    const unitOfWork = unitOfWorkFor(source);
     const contexts = new TransactionContextResolver(source, unitOfWork);
     const audited: BillingConnection['audited'] = [];
     // Stands in for the audit store: when handed a transaction it writes a row that must commit or roll back with it.
@@ -135,16 +125,13 @@ export async function createBillingDatabase() {
   return {
     primary: first,
     connect: () => connect(first),
-    /** A second, independent connection to the same file. */
+    /** A second, independent connection to the same database. */
     connectIndependent: () => connect(),
     seed,
     seedUsage,
     async close() {
-      for (const source of sources) {
-        await sqliteBackend.shutdown(source);
-        if (source.isInitialized) await source.destroy();
-      }
-      await rm(directory, { recursive: true, force: true });
+      for (const source of sources.splice(0)) await closeTestDataSource(source);
+      await database.remove();
     },
   };
 }

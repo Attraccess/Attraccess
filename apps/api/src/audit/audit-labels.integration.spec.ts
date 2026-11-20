@@ -1,12 +1,11 @@
-import { createSqliteAuditService } from '../database/adapters/audit/sqlite-audit-service.test-fixture';
-import { AuditLog, entities, Resource, Setting, User } from '@attraccess/database-entities';
+import { createPostgresAuditService } from '../database/adapters/audit/postgres-audit-service.test-fixture';
+import { AuditLog, Resource, Setting, User } from '@attraccess/database-entities';
 import { ResourceType } from '@attraccess/application-models';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
-import * as migrations from '../database/migrations';
 import { createTestAuditMetrics } from '../database/adapters/audit/audit.test-fixture';
 import { registerPluginAuditDomains, resetPluginAuditRegistry } from '../plugin-system/audit/audit-registry';
 import { SettingsStoreService } from '../settings/settings-store.service';
@@ -16,6 +15,7 @@ import { PluginAuditHost } from './plugin-audit-host';
 import { AuditService } from './audit.service';
 import { canvasDetails, canvasSaveDetails, diffCanvas } from '../resources/flows/flow-audit';
 import { TypeOrmSettingsRows } from '../database/adapters/settings/typeorm-settings-rows';
+import { createTestDataSource, closeTestDataSource } from '../test-utils/test-database';
 
 const fixturePluginId = 'abcdefghijklmnopqrstu';
 
@@ -39,16 +39,9 @@ describe('persisted audit names', () => {
       },
     ]);
     directory = await mkdtemp(join(tmpdir(), 'audit-labels-'));
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: join(directory, 'fixture.sqlite'),
-      entities: Object.values(entities),
-      migrations: Object.values(migrations),
-    }).initialize();
-    await source.runMigrations();
+    source = await createTestDataSource();
     const store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(source.getRepository(Setting)), null);
-    service = createSqliteAuditService(source, store, createTestAuditMetrics());
+    service = createPostgresAuditService(source, store, createTestAuditMetrics());
     await service.onModuleInit();
     controller = new AuditController(new AuditQueryService(service, store));
     await source.getRepository(User).insert({
@@ -67,7 +60,7 @@ describe('persisted audit names', () => {
   afterEach(async () => {
     resetPluginAuditRegistry();
     await service?.onModuleDestroy();
-    if (source?.isInitialized) await source.destroy();
+    await closeTestDataSource(source);
     await rm(directory, { recursive: true, force: true });
   });
 
@@ -80,11 +73,14 @@ describe('persisted audit names', () => {
       details: { scheduleId: 3, name: 'Monthly oiling' },
     });
     const queries: string[] = [];
-    const queryRunner = source.createQueryRunner();
-    const query = queryRunner.query.bind(queryRunner);
-    const spy = jest.spyOn(queryRunner, 'query').mockImplementation((...args: Parameters<typeof query>) => {
+    // Every pooled connection has its own query runner: observe them all through their shared prototype.
+    const runner = source.createQueryRunner();
+    const prototype = Object.getPrototypeOf(runner) as typeof runner;
+    await runner.release();
+    const query = prototype.query;
+    const spy = jest.spyOn(prototype, 'query').mockImplementation(function (this: typeof runner, ...args) {
       queries.push(args[0]);
-      return query(...args);
+      return query.apply(this, args);
     });
     const { items } = await controller.list({ limit: 50 });
     spy.mockRestore();

@@ -441,7 +441,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
    * When maintenance is marked done, this allows the next schedule to trigger immediately
    * instead of waiting for the next cron run (up to 5 minutes).
    *
-   * Deferred via setImmediate to avoid nested transaction / SQLite savepoint errors when the
+   * Deferred via setImmediate to avoid nested transaction / savepoint errors when the
    * event is emitted from within evaluateResource's transaction (e.g. createMaintenanceFromSchedule).
    */
   @OnEvent(ResourceMaintenanceChangedEvent.EVENT_NAME)

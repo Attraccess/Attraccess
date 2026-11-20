@@ -46,7 +46,7 @@ export function mergeSessionsIntoRuns(
 
 /**
  * Adds up the machine minutes of the runs per resource, per day and in total. A run counts toward the UTC date of its
- * earliest session, the same day SQLite's DATE(startTime) gives that session, so the days add up to the total.
+ * earliest session, the same UTC day the database groups that session under, so the days add up to the total.
  */
 export function sumMachineMinutes(sessions: Parameters<typeof mergeSessionsIntoRuns>[0]) {
   const machineMinutesByResource = new Map<number, number>();

@@ -40,7 +40,7 @@ import { AUDIT_METRICS } from '../metrics/definitions/tokens';
 import { demoDomain, setupAuditDatabase } from '../database/adapters/audit/audit.test-fixture';
 import { SessionPermissionSync } from '../users-and-auth/auth/sso/session-permission-sync';
 import { TypeOrmSettingsRows } from '../database/adapters/settings/typeorm-settings-rows';
-describe('durable audit SQLite', () => {
+describe('durable audit (PostgreSQL)', () => {
   const fixture = setupAuditDatabase();
   it('enforces HTTP session permissions, token ceilings, query validation and persisted settings updates', async () => {
     const ownerPermissions = new Set(['system.audit.read', 'system.settings.manage', 'users.api-tokens.manage']);
@@ -94,6 +94,8 @@ describe('durable audit SQLite', () => {
     await app.init();
     try {
       await app.listen(0, '127.0.0.1');
+      // The migrated database lists the default domains in its own order; the assertions below compare lists.
+      await fixture.store.setPlainSetting('audit', 'domains', JSON.stringify(fixture.config.domains));
       await fixture.plugins.record(fixture.event());
       await fixture.service.record({
         domain: 'resource',
@@ -175,7 +177,10 @@ describe('durable audit SQLite', () => {
       }
       ownerPermissions.delete('users.api-tokens.manage');
       await request(server).get('/api/settings/audit').set('Authorization', 'Bearer settings-token').expect(401);
-      const restartedStore = new SettingsStoreService(TypeOrmSettingsRows.forRepository(fixture.source.getRepository(Setting)), null);
+      const restartedStore = new SettingsStoreService(
+        TypeOrmSettingsRows.forRepository(fixture.source.getRepository(Setting)),
+        null,
+      );
       expect(await readAuditSettings(restartedStore)).toEqual({
         enabled: false,
         retention_days: 4,

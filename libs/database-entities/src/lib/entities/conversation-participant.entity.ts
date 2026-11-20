@@ -18,7 +18,7 @@ export class ConversationParticipant {
   @ApiProperty({ description: 'The ID of the participating user', example: 1 })
   userId!: number;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @ApiProperty({
     description: 'When this participant last read the conversation',
     example: '2025-01-18T12:30:00.000Z',
@@ -26,7 +26,7 @@ export class ConversationParticipant {
   })
   lastReadAt!: Date | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @ApiProperty({
     description:
       'When this participant was last sent an offline email notification for this conversation. Used to debounce email fallback to once per unread burst.',

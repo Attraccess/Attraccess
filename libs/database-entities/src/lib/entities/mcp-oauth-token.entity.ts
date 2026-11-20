@@ -22,17 +22,17 @@ export class McpOAuthToken {
   grantId!: string | null;
 
   /** Request and code parameters (client, redirect URI, PKCE challenge, state, scope, resource). */
-  @Column({ type: 'simple-json', nullable: true })
+  @Column({ type: 'jsonb', nullable: true })
   payload!: Record<string, unknown> | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamptz' })
   expiresAt!: Date;
 
   /** Set when a single-use value (request, code, refresh token) has been consumed. */
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   usedAt!: Date | null;
 
   @ManyToOne(() => McpOAuthGrant, { onDelete: 'CASCADE', nullable: true })

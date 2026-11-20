@@ -18,24 +18,24 @@ export class McpOAuthGrant {
   clientId!: string;
 
   /** Permissions the user approved. The effective permissions are this list intersected with the user's current ones. */
-  @Column({ type: 'simple-json' })
+  @Column({ type: 'jsonb' })
   permissionKeys!: string[];
 
   /** Canonical URL of the MCP resource the tokens are bound to (RFC 8707). */
   @Column({ type: 'text' })
   resource!: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
   /** Absolute lifetime of the grant; refresh tokens cannot extend it. */
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamptz' })
   expiresAt!: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   lastUsedAt!: Date | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   revokedAt!: Date | null;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })

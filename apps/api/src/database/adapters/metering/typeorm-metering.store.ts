@@ -48,6 +48,7 @@ import { segmentsOfUsage, usageBoundarySince } from './metering-queries';
 import { toAttempt, toMeter, toOperation, toSegment, toSession, toUsage } from './metering-mappers';
 import { EntityManagerResolver } from '../entity-manager-resolver';
 import { findActiveUsages } from '../usage/active-usage-queries';
+import { RESOURCE_LOCK, lockResource } from '../resources/resource-locks';
 
 /** TypeORM implementation of the metering port. Every write joins the caller's transaction when it has one. */
 @Injectable()
@@ -58,10 +59,8 @@ export class TypeOrmMeteringStore implements MeteringStore {
 
   async findDefinitionFlow(resourceId: number, context?: TransactionContext): Promise<MeteringDefinitionFlow> {
     const manager = this.managers.resolve(context);
-    const [nodes, edges] = await Promise.all([
-      manager.find(ResourceFlowNode, { where: { resourceId } }),
-      manager.find(ResourceFlowEdge, { where: { resourceId } }),
-    ]);
+    const nodes = await manager.find(ResourceFlowNode, { where: { resourceId } });
+    const edges = await manager.find(ResourceFlowEdge, { where: { resourceId } });
     return {
       allNodes: nodes.map((node) => ({ id: node.id, type: node.type, data: node.data ?? null })),
       edges: edges.map((edge) => ({ source: edge.source, target: edge.target })),
@@ -79,17 +78,24 @@ export class TypeOrmMeteringStore implements MeteringStore {
     return (await this.managers.resolve(context).find(ResourceMeter)).map(toMeter);
   }
 
+  /** In a unit of work the meter row is locked (FOR NO KEY UPDATE): counter read-modify-writes queue instead of racing. */
   async findMeter(
     resourceId: number,
     meterId: number,
     context?: TransactionContext,
   ): Promise<ResourceMeterRecord | null> {
-    const row = await this.managers.resolve(context).findOne(ResourceMeter, { where: { id: meterId, resourceId } });
+    const row = await this.managers.resolve(context).findOne(ResourceMeter, {
+      where: { id: meterId, resourceId },
+      ...(context ? { lock: { mode: 'for_no_key_update' as const } } : {}),
+    });
     return row ? toMeter(row) : null;
   }
 
   async findMeterById(meterId: number, context?: TransactionContext): Promise<ResourceMeterRecord | null> {
-    const row = await this.managers.resolve(context).findOne(ResourceMeter, { where: { id: meterId } });
+    const row = await this.managers.resolve(context).findOne(ResourceMeter, {
+      where: { id: meterId },
+      ...(context ? { lock: { mode: 'for_no_key_update' as const } } : {}),
+    });
     return row ? toMeter(row) : null;
   }
 
@@ -135,8 +141,11 @@ export class TypeOrmMeteringStore implements MeteringStore {
 
   // ---- usages and lifecycle attempts --------------------------------------------------------------
 
+  /** Takes the per-resource lifecycle lock of the usage store, so metering decisions queue with starts and stops. */
   async findSessionLimit(resourceId: number, context?: TransactionContext): Promise<number> {
-    const resource = await this.managers.resolve(context).findOne(Resource, {
+    const manager = this.managers.resolve(context);
+    if (context) await lockResource(manager, RESOURCE_LOCK.usageLifecycle, resourceId);
+    const resource = await manager.findOne(Resource, {
       where: { id: resourceId },
       select: { id: true, type: true, maxParallelSessions: true },
     });
@@ -207,8 +216,12 @@ export class TypeOrmMeteringStore implements MeteringStore {
 
   // ---- metering sessions ------------------------------------------------------------------------
 
+  /** In a unit of work the row is locked (FOR NO KEY UPDATE): settlements of one session queue, so a correction is once-only. */
   async findSession(sessionId: string, context?: TransactionContext): Promise<ResourceMeteringSessionRecord | null> {
-    const row = await this.managers.resolve(context).findOne(ResourceMeteringSession, { where: { id: sessionId } });
+    const row = await this.managers.resolve(context).findOne(ResourceMeteringSession, {
+      where: { id: sessionId },
+      ...(context ? { lock: { mode: 'for_no_key_update' as const } } : {}),
+    });
     return row ? toSession(row) : null;
   }
 
@@ -503,10 +516,12 @@ export class TypeOrmMeteringStore implements MeteringStore {
     return row ? toSegment(row) : null;
   }
 
+  /** In a unit of work the open segment is locked (FOR NO KEY UPDATE): boundaries of one meter queue behind each other. */
   async findOpenSegment(meterId: number, context?: TransactionContext): Promise<ResourceMeteringSegmentRecord | null> {
     const row = await this.managers.resolve(context).findOne(ResourceMeteringSegment, {
       where: { meterId, status: 'open' },
       order: { startedAt: 'DESC' },
+      ...(context ? { lock: { mode: 'for_no_key_update' as const } } : {}),
     });
     return row ? toSegment(row) : null;
   }

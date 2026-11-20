@@ -1,89 +1,68 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { DataSource, EntityManager } from 'typeorm';
-import { ResourceMaintenanceSchedule } from '@attraccess/database-entities';
-import { ResourceMaintenanceScheduleTriggerType, UsageDurationUnit } from '@attraccess/application-models';
-import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
+import type { DataSource } from 'typeorm';
+import { Resource, ResourceMaintenance, ResourceMaintenanceSchedule } from '@attraccess/database-entities';
 import {
-  closeResourceTransactionConnection,
-  runSerializedTransaction,
-} from '../../database/sqlite/run-serialized-transaction';
+  ResourceMaintenanceScheduleTriggerType,
+  ResourceType,
+  UsageDurationUnit,
+} from '@attraccess/application-models';
+import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 import {
   TypeOrmMaintenanceEvaluationStore,
   TypeOrmMaintenanceEvaluationView,
 } from '../../database/adapters/resources/maintenance-evaluation-store.adapter';
+import { TypeOrmResourceMaintenanceStore } from '../../database/adapters/resources/maintenance-store.adapter';
 import { unitOfWorkFor } from '../../database/adapters/shared-unit-of-work';
 import { engineTransactionOf } from '../../database/adapters/common/legacy-engine-transaction';
+import { closeTestDataSource, createTestDataSource } from '../../test-utils/test-database';
 import type { TransactionScope } from '../../database/unit-of-work';
 import { MaintenanceResourceEvaluation } from './evaluation/resource-evaluation';
 
-const deferred = () => {
-  let resolve!: () => void;
-  const promise = new Promise<void>((done) => {
-    resolve = done;
-  });
-  return { promise, resolve };
-};
-
-describe('Maintenance transaction coordination (file-backed SQLite)', () => {
-  let directory: string;
+describe('Maintenance transaction coordination (PostgreSQL)', () => {
   let source: DataSource;
   let evaluator: MaintenanceScheduleEvaluatorService;
   let enabled: boolean;
   let failCreation: boolean;
-  let notifications: Promise<unknown[]>[];
-  let transactionsDuringUsage: number;
-  let usageActive: boolean;
+  let notifications: number[];
+  let scheduleId: number;
 
-  const schedule = {
-    id: 1,
+  const schedule = () => ({
+    id: scheduleId,
     resourceId: 1,
     enabled: true,
     triggerType: ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL,
     timeIntervalConfig: { duration: 1, unit: UsageDurationUnit.DAYS },
-  };
+  });
+  const maintenances = () => source.getRepository(ResourceMaintenance).find({ order: { id: 'ASC' } });
 
   beforeEach(async () => {
-    directory = await mkdtemp(join(tmpdir(), 'maintenance-transactions-'));
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: join(directory, 'test.sqlite'),
-    }).initialize();
-    await source.query('CREATE TABLE maintenance_probe (resourceId INTEGER PRIMARY KEY)');
-    await source.query('CREATE TABLE usage_probe (id INTEGER PRIMARY KEY)');
+    source = await createTestDataSource();
+    await source.getRepository(Resource).save({ name: 'Laser', type: ResourceType.Machine });
+    scheduleId = (
+      await source.getRepository(ResourceMaintenanceSchedule).save({
+        resourceId: 1,
+        name: 'Belt',
+        triggerType: ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL,
+        enabled: true,
+      })
+    ).id;
     enabled = true;
     failCreation = false;
     notifications = [];
-    transactionsDuringUsage = 0;
-    usageActive = false;
 
-    // Observe transaction entry before SQLite I/O so the overlap assertion does not
-    // depend on how quickly the database happens to execute BEGIN TRANSACTION.
-    const transaction = source.manager.transaction.bind(source.manager);
-    jest.spyOn(source.manager, 'transaction').mockImplementation(async (isolationOrWork, work) => {
-      if (usageActive) transactionsDuringUsage++;
-      return typeof isolationOrWork === 'function' ? transaction(isolationOrWork) : transaction(isolationOrWork, work);
-    });
-
-    // The evaluator and transaction helper are real. Only schedule configuration
-    // and maintenance business dependencies are fixtures; all writes use SQLite.
-    const getRepository = EntityManager.prototype.getRepository;
-    jest.spyOn(EntityManager.prototype, 'getRepository').mockImplementation(function (this: EntityManager, target) {
-      if (target === ResourceMaintenanceSchedule) {
-        return { find: async () => (enabled ? [schedule] : []) } as never;
-      }
-      return getRepository.call(this, target) as never;
-    });
+    // The evaluator, the evaluation store and the maintenance store are real; only the schedule configuration and
+    // the business service around the maintenance store are fixtures. All writes go to PostgreSQL.
     const store = new TypeOrmMaintenanceEvaluationStore(source, unitOfWorkFor(source));
+    const maintenanceStore = new TypeOrmResourceMaintenanceStore(source, unitOfWorkFor(source));
     jest.spyOn(store, 'hasEnabledSchedules').mockImplementation(async () => enabled);
-    jest.spyOn(store, 'listEnabledSchedules').mockImplementation(async () => (enabled ? [schedule] : []) as never);
+    jest.spyOn(store, 'listEnabledSchedules').mockImplementation(async () => (enabled ? [schedule()] : []) as never);
+    jest
+      .spyOn(TypeOrmMaintenanceEvaluationView.prototype, 'enabledSchedules')
+      .mockImplementation(async () => (enabled ? [schedule()] : []) as never);
     jest.spyOn(store, 'findResourceCreatedAt').mockResolvedValue(new Map([[1, new Date('2020-01-01')]]));
     jest.spyOn(store, 'loadServiceCycleStates').mockResolvedValue([
       {
         resourceId: 1,
-        scheduleId: 1,
+        scheduleId,
         baseline: new Date('2020-01-01'),
         hasActiveMaintenance: false,
         completedSessions: 0,
@@ -94,24 +73,24 @@ describe('Maintenance transaction coordination (file-backed SQLite)', () => {
     evaluator = new MaintenanceScheduleEvaluatorService(
       store,
       {
-        hasActiveMaintenance: async (resourceId: number, context: TransactionScope) =>
-          (await handle(context).query('SELECT * FROM maintenance_probe WHERE resourceId = ?', [resourceId])).length >
-          0,
+        hasActiveMaintenance: (resourceId: number, context: TransactionScope) =>
+          maintenanceStore.hasActive({ resourceId }, new Date(), context),
         createMaintenanceFromSchedule: async (
           resourceId: number,
-          _scheduleId: number,
-          _reason: string,
+          id: number,
+          reason: string,
           context: TransactionScope,
           notify: boolean,
         ) => {
           expect(notify).toBe(false);
-          await handle(context).query('INSERT INTO maintenance_probe VALUES (?)', [resourceId]);
+          const created = await handle(context)
+            .getRepository(ResourceMaintenance)
+            .save({ resourceId, maintenanceSchedule: { id }, startTime: new Date(), endTime: null, reason });
           if (failCreation) throw new Error('Maintenance creation failed');
-          return { id: resourceId };
+          return { id: created.id };
         },
-        emitScheduledMaintenanceCreated: () => {
-          // The main connection must see the committed write from the dedicated connection.
-          notifications.push(source.query('SELECT * FROM maintenance_probe'));
+        emitScheduledMaintenanceCreated: (_resourceId: number, maintenanceId: number) => {
+          notifications.push(maintenanceId);
         },
       } as never,
       {} as never,
@@ -126,56 +105,38 @@ describe('Maintenance transaction coordination (file-backed SQLite)', () => {
 
   afterEach(async () => {
     await evaluator?.onModuleDestroy();
-    await closeResourceTransactionConnection(source);
-    await source.destroy();
+    await closeTestDataSource(source);
     jest.restoreAllMocks();
-    await rm(directory, { recursive: true, force: true });
   });
 
-  it.each(['resource', 'cron'] as const)('queues %s evaluation behind an active usage transaction', async (path) => {
-    const entered = deferred();
-    const release = deferred();
-    const usage = runSerializedTransaction(source.manager, async (manager) => {
-      await manager.query('INSERT INTO usage_probe VALUES (1)');
-      usageActive = true;
-      entered.resolve();
-      await release.promise;
-      usageActive = false;
-    });
-    await entered.promise;
-    // Attach a rejection handler immediately, including on the broken implementation.
-    const evaluation = Promise.allSettled([
-      path === 'resource' ? evaluator.evaluateResource(1) : evaluator.evaluateAll(),
-    ]);
-    try {
-      // Fixture reads resolve in microtasks. Drain them before releasing usage;
-      // an unqueued transaction entry is observed synchronously by the spy above.
-      await new Promise<void>((resolve) => setImmediate(resolve));
-    } finally {
-      release.resolve();
-      await usage;
-    }
-    const results = await evaluation;
-    expect(transactionsDuringUsage).toBe(0);
-    expect(results).toEqual([{ status: 'fulfilled', value: undefined }]);
-    expect(await source.query('SELECT * FROM usage_probe')).toEqual([{ id: 1 }]);
-    expect(await source.query('SELECT * FROM maintenance_probe')).toEqual([{ resourceId: 1 }]);
-    expect(await Promise.all(notifications)).toEqual([[{ resourceId: 1 }]]);
-  });
+  it.each(['resource', 'cron'] as const)(
+    'creates the maintenance of a %s evaluation once and notifies after commit',
+    async (path) => {
+      if (path === 'resource') await evaluator.evaluateResource(1);
+      else await evaluator.evaluateAll();
 
-  it('serializes concurrent resource and cron evaluations without duplicate maintenance', async () => {
+      const rows = await maintenances();
+      expect(rows).toHaveLength(1);
+      expect(notifications).toEqual([rows[0].id]);
+    },
+  );
+
+  it('creates one maintenance when resource and cron evaluations run in parallel (per-resource lock)', async () => {
     const results = await Promise.allSettled([
+      evaluator.evaluateResource(1),
       evaluator.evaluateResource(1),
       evaluator.evaluateResource(1),
       evaluator.evaluateAll(),
     ]);
+
     expect(results.every((result) => result.status === 'fulfilled')).toBe(true);
-    expect(await source.query('SELECT * FROM maintenance_probe')).toEqual([{ resourceId: 1 }]);
-    expect(await Promise.all(notifications)).toEqual([[{ resourceId: 1 }]]);
+    const rows = await maintenances();
+    expect(rows).toHaveLength(1);
+    expect(notifications).toEqual([rows[0].id]);
   });
 
   it.each(['resource', 'cron'] as const)(
-    'recovers usage and maintenance writes after a failed %s evaluation',
+    'rolls the maintenance back after a failed %s evaluation and recovers on the next one',
     async (path) => {
       failCreation = true;
       if (path === 'resource') {
@@ -184,38 +145,25 @@ describe('Maintenance transaction coordination (file-backed SQLite)', () => {
         // Cron logs individual failures and rolls back their savepoints.
         await evaluator.evaluateAll();
       }
-      expect(await source.query('SELECT * FROM maintenance_probe')).toEqual([]);
+      expect(await maintenances()).toEqual([]);
       expect(notifications).toHaveLength(0);
-      await runSerializedTransaction(source.manager, (manager) => manager.query('INSERT INTO usage_probe VALUES (2)'));
+
       failCreation = false;
       await evaluator.evaluateResource(1);
-      expect(await source.query('SELECT * FROM usage_probe')).toEqual([{ id: 2 }]);
-      expect(await Promise.all(notifications)).toEqual([[{ resourceId: 1 }]]);
+
+      const rows = await maintenances();
+      expect(rows).toHaveLength(1);
+      expect(notifications).toEqual([rows[0].id]);
     },
   );
 
-  it('skips the transaction queue when no schedules are enabled', async () => {
+  it('does nothing when no schedules are enabled', async () => {
     enabled = false;
-    // A blocked usage transaction must not delay this no-op evaluation.
-    const entered = deferred();
-    const release = deferred();
-    const usage = runSerializedTransaction(source.manager, async () => {
-      entered.resolve();
-      await release.promise;
-    });
-    await entered.promise;
-    let completed = false;
-    const evaluation = evaluator.evaluateResource(1).then(() => {
-      completed = true;
-    });
-    try {
-      await new Promise<void>((resolve) => setImmediate(resolve));
-      expect(completed).toBe(true);
-      expect(source.manager.transaction).not.toHaveBeenCalled();
-      expect(notifications).toHaveLength(0);
-    } finally {
-      release.resolve();
-      await Promise.all([usage, evaluation]);
-    }
+
+    await evaluator.evaluateResource(1);
+    await evaluator.evaluateAll();
+
+    expect(await maintenances()).toEqual([]);
+    expect(notifications).toHaveLength(0);
   });
 });

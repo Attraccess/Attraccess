@@ -28,8 +28,8 @@ A matching wire version is not enough. Attraccess, the Matter plugin and the sid
 | -------------- | ----------------------------------------------------------- |
 | Wire version   | `1`                                                         |
 | Attraccess     | `^2.0.0-0` (prereleases of a matching version are accepted) |
-| Matter plugin  | exactly `0.4.0-alpha.0`                                     |
-| Matter sidecar | exactly `0.4.0-alpha.0`                                     |
+| Matter plugin  | exactly `0.5.0-alpha.0`                                     |
+| Matter sidecar | exactly `0.5.0-alpha.0`                                     |
 | matter.js      | exactly `0.18.0` (plugin and sidecar share one release)     |
 
 The plugin's `attraccess.host` (`package.json`) and `attraccessVersion.min` (`plugin.json`) are derived from the same table, and a test checks that they match. Every new plugin or sidecar release needs a table update; otherwise the sidecar rejects it. The Attraccess range is deliberately a range, so a new Attraccess 2.x release does not by itself require a sidecar release.

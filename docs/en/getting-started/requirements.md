@@ -15,7 +15,7 @@ Attraccess is deployed as a Docker container. You need a server with:
 | **Docker Compose** | v2.0+ | Latest version |
 
 > [!NOTE]
-> Attraccess uses SQLite as its database. You do not need a separate database server.
+> Attraccess stores its data in PostgreSQL. The Docker Compose files start a PostgreSQL service for you (`postgres:18.6-alpine`); with your own setup you need a PostgreSQL server that Attraccess can reach through `DATABASE_URL`.
 
 ## Network Requirements
 

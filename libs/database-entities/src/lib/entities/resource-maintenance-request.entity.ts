@@ -14,13 +14,13 @@ export class ResourceMaintenanceRequest {
   })
   id!: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the request was created',
   })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the request was last updated',
   })
@@ -56,21 +56,21 @@ export class ResourceMaintenanceRequest {
   })
   status!: MaintenanceRequestStatus;
 
-  @ManyToOne(() => User, { nullable: true })
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @ApiProperty({
     description: 'The user who reported the resource as broken',
     required: false,
   })
   createdByUser!: User | null;
 
-  @ManyToOne(() => User, { nullable: true })
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @ApiProperty({
     description: 'The maintainer who resolved or dismissed the request',
     required: false,
   })
   resolvedByUser!: User | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @ApiProperty({
     description: 'When the request was resolved or dismissed',
     required: false,
@@ -80,7 +80,7 @@ export class ResourceMaintenanceRequest {
   })
   resolvedAt!: Date | null;
 
-  @ManyToOne(() => ResourceMaintenance, { nullable: true })
+  @ManyToOne(() => ResourceMaintenance, { nullable: true, onDelete: 'SET NULL' })
   @ApiProperty({
     description: 'The maintenance created from this request (null until converted)',
     required: false,

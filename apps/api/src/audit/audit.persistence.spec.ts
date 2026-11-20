@@ -1,176 +1,51 @@
 import { TypeOrmSettingsRows } from '../database/adapters/settings/typeorm-settings-rows';
 import {
   auditConnectionOf,
-  createSqliteAuditService,
-} from '../database/adapters/audit/sqlite-audit-service.test-fixture';
+  createPostgresAuditService,
+} from '../database/adapters/audit/postgres-audit-service.test-fixture';
 import { billingTransactionAuditEvent } from './policies/billing';
-import { AuditLog, Setting, entities } from '@attraccess/database-entities';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { AuditLog, Setting } from '@attraccess/database-entities';
+import { Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { DataSource, Repository } from 'typeorm';
-import * as migrations from '../database/migrations';
-import { DurableAudit1783700000000 } from '../database/migrations/1783700000000-durable-audit';
-import { IdentityAudit1783800000000 } from '../database/migrations/1783800000000-identity-audit';
-import { RetirePasswordPolicyAudit1783900000000 } from '../database/migrations/1783900000000-retire-password-policy-audit';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { SettingsService } from '../settings/settings.service';
 import { AuditQueryDto } from './dto/audit-query.dto';
 import { readAuditSettings } from './audit.config';
-import { AuditController } from './audit.controller';
-import { AuditQueryService } from './audit-query.service';
 import { PluginAuditHost } from './plugin-audit-host';
 import { MAX_PENDING_AUDIT_WRITES } from './persistence/audit-storage';
-import { AUDIT_BUSY_RETRIES } from '../database/adapters/audit/sqlite-audit-store';
-import { createDataSource, SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite/sqlite-connection';
+import { AUDIT_BUSY_RETRIES } from '../database/adapters/audit/postgres-audit-store';
 import { AUDIT_DROP_REASONS } from '../metrics/definitions/audit.metrics';
 import {
   createTestAuditMetrics,
   droppedRecords,
   setupAuditDatabase,
 } from '../database/adapters/audit/audit.test-fixture';
-describe('durable audit SQLite', () => {
+describe('durable audit (PostgreSQL)', () => {
   const fixture = setupAuditDatabase();
-  it('upgrades additively, survives connection restart and principal deletion, prevents updates, and reverts', async () => {
-    expect(await fixture.source.query('SELECT * FROM role_permission')).toEqual([
-      { roleId: 1, permissionKey: 'system.audit.read' },
-    ]);
+  it('stores audit rows immutably without foreign keys, and survives a connection restart and principal deletion', async () => {
+    const [grant] = await fixture.source.query(
+      `SELECT "roleId" FROM role_permission WHERE "permissionKey" = 'system.audit.read'`,
+    );
+    expect(grant).toEqual({ roleId: expect.any(Number) });
     expect(await fixture.plugins.record(fixture.event())).toEqual({ status: 'recorded' });
     await expect(fixture.source.query("UPDATE audit_log SET outcome = 'failed'")).rejects.toThrow('immutable');
-    expect(await fixture.source.query('PRAGMA foreign_key_list(audit_log)')).toEqual([]);
-    await fixture.source.query('DELETE FROM role WHERE id = 1');
+    expect(
+      await fixture.source.query(
+        `SELECT conname FROM pg_constraint WHERE conrelid = 'audit_log'::regclass AND contype = 'f'`,
+      ),
+    ).toEqual([]);
+    await fixture.source.query('DELETE FROM role WHERE id = $1', [grant.roleId]);
     await fixture.service.onModuleDestroy();
-    await fixture.source.destroy();
-    await fixture.source.initialize();
-    await fixture.source.query(
-      'CREATE TABLE IF NOT EXISTS setting (id integer PRIMARY KEY AUTOINCREMENT, parent varchar NOT NULL, key varchar NOT NULL, value varchar NOT NULL, createdAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP)',
-    );
     fixture.store = new SettingsStoreService(
       TypeOrmSettingsRows.forRepository(fixture.source.getRepository(Setting)),
       null,
     );
-    fixture.service = createSqliteAuditService(fixture.source, fixture.store, fixture.metrics);
+    fixture.service = createPostgresAuditService(fixture.source, fixture.store, fixture.metrics);
     await fixture.service.onModuleInit();
     expect((await fixture.query.list(new AuditQueryDto())).items).toEqual([
       expect.objectContaining({ actorId: 42, details: { revision: 2 } }),
     ]);
-    await fixture.service.onModuleDestroy();
-    await fixture.identityMigration.down(fixture.source.createQueryRunner());
-    await fixture.migration.down(fixture.source.createQueryRunner());
-    expect(await fixture.source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toEqual([]);
-    expect(await fixture.source.query('SELECT * FROM permission')).toEqual([]);
-    expect(await fixture.source.query('SELECT * FROM role')).toEqual([{ id: 2, key: 'member' }]);
-    await fixture.migration.up(fixture.source.createQueryRunner());
-    await fixture.identityMigration.up(fixture.source.createQueryRunner());
-  });
-
-  it('preserves shared audit rows through identity downgrade and re-upgrade', async () => {
-    const rows = [
-      [
-        901,
-        'resource',
-        null,
-        'resource.usage_auto_closed',
-        '00000000-0000-4000-8000-000000000901',
-        null,
-        null,
-        null,
-        'resource.usage',
-        11,
-        null,
-        null,
-      ],
-      [
-        902,
-        'demo',
-        'abcdefghijklmnopqrstu',
-        'demo.device_connected',
-        '00000000-0000-4000-8000-000000000902',
-        42,
-        'api_token',
-        7,
-        'demo.device',
-        12,
-        '192.0.2.42',
-        'Demo/1.0',
-      ],
-      [
-        903,
-        'resource',
-        null,
-        'resource.maintenance_started',
-        '00000000-0000-4000-8000-000000000903',
-        null,
-        null,
-        null,
-        'resource.maintenance',
-        13,
-        '2001:db8::3',
-        'Resource worker/1.0',
-      ],
-    ];
-
-    for (const row of rows) {
-      await fixture.source.query(
-        `INSERT INTO "audit_log" ("id", "at", "domain", "pluginId", "action", "operationId", "actorId", "authenticationMethod", "apiTokenId", "outcome", "subjectType", "subjectId", "ipAddress", "userAgent", "details")
-         VALUES (?, datetime('now'), ?, ?, ?, ?, ?, ?, ?, 'succeeded', ?, ?, ?, ?, '{"source":"migration-test"}')`,
-        row,
-      );
-    }
-
-    await fixture.identityMigration.down(fixture.source.createQueryRunner());
-    await fixture.identityMigration.up(fixture.source.createQueryRunner());
-
-    expect(
-      await fixture.source
-        .query(`SELECT "id", "pluginId", "actorId", "authenticationMethod", "apiTokenId", "ipAddress", "userAgent"
-        FROM "audit_log" WHERE "id" IN (901, 902, 903) ORDER BY "id"`),
-    ).toEqual([
-      {
-        id: 901,
-        pluginId: null,
-        actorId: null,
-        authenticationMethod: null,
-        apiTokenId: null,
-        ipAddress: null,
-        userAgent: null,
-      },
-      {
-        id: 902,
-        pluginId: 'abcdefghijklmnopqrstu',
-        actorId: 42,
-        authenticationMethod: 'api_token',
-        apiTokenId: 7,
-        ipAddress: '192.0.2.42',
-        userAgent: 'Demo/1.0',
-      },
-      {
-        id: 903,
-        pluginId: null,
-        actorId: null,
-        authenticationMethod: null,
-        apiTokenId: null,
-        ipAddress: '2001:db8::3',
-        userAgent: 'Resource worker/1.0',
-      },
-    ]);
-    expect(
-      (await fixture.source.query('PRAGMA index_list(audit_log)')).map(({ name }: { name: string }) => name),
-    ).toEqual(
-      expect.arrayContaining([
-        'IDX_audit_log_at',
-        'IDX_audit_log_domain_id',
-        'IDX_audit_log_actor_id',
-        'IDX_audit_log_subject_id',
-        'IDX_audit_log_operation_id',
-        'IDX_audit_log_domain_at',
-      ]),
-    );
-    await expect(fixture.source.query("UPDATE audit_log SET outcome = 'failed' WHERE id = 901")).rejects.toThrow(
-      'immutable',
-    );
   });
 
   it('records while an unrelated transaction is open on the main connection', async () => {
@@ -234,8 +109,10 @@ describe('durable audit SQLite', () => {
       userAgent: null,
       details: { revision: 1 },
     });
+    await fixture.source.query(`CREATE FUNCTION fail_audit_cleanup_fn() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN RAISE EXCEPTION 'cleanup delete failure'; END; $$`);
     await fixture.source.query(`CREATE TRIGGER fail_audit_cleanup BEFORE DELETE ON audit_log
-      BEGIN SELECT RAISE(ROLLBACK, 'cleanup delete failure'); END`);
+      FOR EACH ROW EXECUTE FUNCTION fail_audit_cleanup_fn()`);
     const storage = auditConnectionOf(fixture.service);
     const originalTransaction = storage.transaction.bind(storage);
     let releaseCleanup!: () => void;
@@ -336,7 +213,7 @@ describe('durable audit SQLite', () => {
     ]) {
       for (const [key, value] of Object.entries(disabled))
         await fixture.store.setPlainSetting('audit', key, JSON.stringify(value));
-      const sink = createSqliteAuditService(fixture.source, fixture.store, fixture.metrics);
+      const sink = createPostgresAuditService(fixture.source, fixture.store, fixture.metrics);
       await sink.onModuleInit();
       expect(await new PluginAuditHost(sink).record(fixture.event())).toEqual({ status: 'unavailable' });
       await sink.onModuleDestroy();
@@ -368,7 +245,7 @@ describe('durable audit SQLite', () => {
     const row = (await fixture.query.list({ limit: 1 })).items[0];
     await expect(
       fixture.source.getRepository(AuditLog).insert({ ...row, id: undefined, details: { raw: 'x'.repeat(4096) } }),
-    ).rejects.toThrow('CHECK constraint');
+    ).rejects.toThrow('check constraint');
   });
 
   it('records every one of many concurrent writes', async () => {
@@ -378,10 +255,10 @@ describe('durable audit SQLite', () => {
     expect(await droppedRecords(fixture.metrics)).toEqual({});
   });
 
-  describe('when the database stays locked past the busy timeout', () => {
+  describe('when the database reports a serialization failure or deadlock', () => {
     afterEach(() => jest.restoreAllMocks());
 
-    /** Makes the next `failures` audit inserts fail like SQLite does after waiting out the busy timeout. */
+    /** Makes the next `failures` audit inserts fail like PostgreSQL does for a lost serialization race. */
     const lockAuditInserts = (failures: number) => {
       const insert = Repository.prototype.insert;
       let remaining = failures;
@@ -390,7 +267,7 @@ describe('durable audit SQLite', () => {
         if (this.target !== AuditLog) return insert.apply(this, args);
         attempts++;
         if (remaining-- > 0)
-          return Promise.reject(Object.assign(new Error('database is locked'), { code: 'SQLITE_BUSY' }));
+          return Promise.reject(Object.assign(new Error('could not serialize access'), { code: '40001' }));
         return insert.apply(this, args);
       });
       return () => attempts;
@@ -410,7 +287,7 @@ describe('durable audit SQLite', () => {
       expect(await fixture.plugins.record(fixture.event())).toEqual({ status: 'unavailable' });
       expect(attempts()).toBe(AUDIT_BUSY_RETRIES + 1);
       expect(await droppedRecords(fixture.metrics)).toEqual({ 'demo:storage_error': 1 });
-      expect(String(error.mock.calls[0][0])).toContain('code=SQLITE_BUSY');
+      expect(String(error.mock.calls[0][0])).toContain('code=40001');
     });
 
     it('does not repeat an insert that failed for another reason', async () => {
@@ -451,7 +328,8 @@ describe('durable audit SQLite', () => {
   }, 60_000);
 
   it('persists validated settings across store and service restarts, and fails closed on read failure', async () => {
-    expect(await readAuditSettings(fixture.store)).toEqual(fixture.config);
+    const stored = await readAuditSettings(fixture.store);
+    expect({ ...stored, domains: [...stored.domains].sort() }).toEqual(fixture.config);
     const settings = new SettingsService(null, fixture.store, null);
     await expect(settings.updateAuditSettings({ retention_days: 0 })).rejects.toThrow();
     await expect(settings.updateAuditSettings({ domains: ['unknown'] as never })).rejects.toThrow();
@@ -469,7 +347,7 @@ describe('durable audit SQLite', () => {
       plugin_domains_disabled: [],
       retention_days: 2,
     });
-    fixture.service = createSqliteAuditService(fixture.source, fixture.store, fixture.metrics);
+    fixture.service = createPostgresAuditService(fixture.source, fixture.store, fixture.metrics);
     await fixture.service.onModuleInit();
     expect(await fixture.plugins.record(fixture.event())).toEqual({ status: 'unavailable' });
     await settings.updateAuditSettings({ enabled: true, domains: ['resource'] });
@@ -545,36 +423,30 @@ describe('durable audit SQLite', () => {
     expect((await fixture.query.list({ limit: 10, to: new Date(0).toISOString() })).items).toHaveLength(0);
   });
 
-  it('waits for a held SQLite write lock instead of dropping the write', async () => {
-    expect(SQLITE_BUSY_TIMEOUT_MS).toBe(5000);
-    // Guarded like the API's connections: an unguarded better-sqlite3 lock holder would make the audit write
-    // busy-wait on the event loop, so the ROLLBACK below could never run.
-    const lock = await createDataSource({
-      type: 'better-sqlite3',
-      database: fixture.source.options.database as string,
-    }).initialize();
+  it('waits for a held table lock instead of dropping the write', async () => {
+    const lock = fixture.source.createQueryRunner();
     try {
-      await lock.query('BEGIN IMMEDIATE');
+      await lock.startTransaction();
+      await lock.query('LOCK TABLE audit_log IN ACCESS EXCLUSIVE MODE');
       const receipts = Promise.all(Array.from({ length: 8 }, () => fixture.plugins.record(fixture.event())));
       await new Promise((resolve) => setTimeout(resolve, 400));
-      await lock.query('ROLLBACK');
+      await lock.rollbackTransaction();
       expect((await receipts).every((receipt) => receipt.status === 'recorded')).toBe(true);
       expect(await fixture.source.getRepository(AuditLog).count()).toBe(8);
       expect(await droppedRecords(fixture.metrics)).toEqual({});
     } finally {
-      await lock.destroy();
+      await lock.release();
     }
   }, 15_000);
 
   it('logs and counts storage_unavailable when the audit connection cannot exist', async () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     const memory = new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
+      type: 'postgres',
+      url: 'postgres://nobody:nothing@127.0.0.1:1/none',
     });
     const metrics = createTestAuditMetrics();
-    const sink = createSqliteAuditService(memory, fixture.store, metrics);
+    const sink = createPostgresAuditService(memory, fixture.store, metrics);
     await sink.onModuleInit();
     try {
       expect(await new PluginAuditHost(sink).record(fixture.event())).toEqual({ status: 'unavailable' });
@@ -653,20 +525,16 @@ describe('durable audit SQLite', () => {
   });
 
   it('drops writes still queued when the shutdown drain runs out of time', async () => {
-    // Guarded like the API's connections: an unguarded better-sqlite3 lock holder would make the audit write
-    // busy-wait on the event loop, so the ROLLBACK below could never run.
-    const lock = await createDataSource({
-      type: 'better-sqlite3',
-      database: fixture.source.options.database as string,
-    }).initialize();
+    const lock = fixture.source.createQueryRunner();
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     try {
-      await lock.query('BEGIN IMMEDIATE');
+      await lock.startTransaction();
+      await lock.query('LOCK TABLE audit_log IN ACCESS EXCLUSIVE MODE');
       const writes = Array.from({ length: 3 }, () => fixture.plugins.record(fixture.event()));
       (fixture.service as unknown as { shutdownDrainMs: number }).shutdownDrainMs = 50;
       const shutdown = fixture.service.onModuleDestroy();
       await new Promise((resolve) => setTimeout(resolve, 300));
-      await lock.query('ROLLBACK');
+      await lock.rollbackTransaction();
       // The write that was already waiting for the lock finishes; the two behind it are dropped.
       expect((await Promise.all(writes)).map((receipt) => receipt.status)).toEqual([
         'recorded',
@@ -677,18 +545,14 @@ describe('durable audit SQLite', () => {
       expect(await droppedRecords(fixture.metrics)).toEqual({ 'demo:shutting_down': 2 });
     } finally {
       warn.mockRestore();
-      await lock.destroy();
+      await lock.release();
     }
   }, 15_000);
 
   it('creates zero series for registered plugin domains at startup', async () => {
     const metrics = createTestAuditMetrics();
-    const sink = createSqliteAuditService(
-      new DataSource({
-        type: 'better-sqlite3',
-        invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-        database: ':memory:',
-      }),
+    const sink = createPostgresAuditService(
+      new DataSource({ type: 'postgres', url: 'postgres://nobody:nothing@127.0.0.1:1/none' }),
       fixture.store,
       metrics,
     );
@@ -705,198 +569,3 @@ describe('durable audit SQLite', () => {
     }
   });
 });
-it('upgrades the full registered schema, reverts the audit migration, and reapplies it', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'audit-upgrade-'));
-  const prior = Object.values(migrations).filter(
-    (migration) =>
-      migration !== DurableAudit1783700000000 &&
-      migration !== IdentityAudit1783800000000 &&
-      migration !== RetirePasswordPolicyAudit1783900000000 &&
-      migration !== migrations.AttractapAuditDomain1784000000000 &&
-      migration !== migrations.FullAuditDomains1784100000000,
-  );
-  const database = join(directory, 'upgrade.sqlite');
-  let source = new DataSource({
-    type: 'better-sqlite3',
-    invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-    database,
-    entities: Object.values(entities),
-    migrations: prior,
-  });
-  try {
-    await source.initialize();
-    await source.runMigrations();
-    await source.query(`INSERT INTO "password_policy_audit" ("event", "actorId", "actorUsername", "ip", "userAgent", "requestId", "before", "after", "changedFields")
-      VALUES ('global_policy_updated', 1, 'migration-user', '127.0.0.1', 'migration-test', 'migration-request', '{"minLength":12}', '{"minLength":16}', '["minLength"]')`);
-    const oversizedRequestId = 'r'.repeat(5_000);
-    const oversizedBefore = JSON.stringify({ minLength: 12, requireUppercase: true });
-    const oversizedAfter = JSON.stringify({ minLength: 16, requireUppercase: false });
-    await source.query(
-      `INSERT INTO "password_policy_audit" ("event", "actorId", "actorUsername", "ip", "userAgent", "requestId", "before", "after", "changedFields")
-      VALUES ('global_policy_updated', 1, 'migration-user', '127.0.0.1', 'migration-test', ?, ?, ?, '["minLength"]')`,
-      [oversizedRequestId, oversizedBefore, oversizedAfter],
-    );
-    await source.query(
-      `INSERT INTO "setting" ("parent", "key", "value") VALUES ('audit', 'domains', '["billing","resource","demo-plugin"]')`,
-    );
-    await source.destroy();
-    source = new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database,
-      entities: Object.values(entities),
-      migrations: Object.values(migrations),
-    });
-    await source.initialize();
-    const applied = await source.runMigrations();
-    expect(applied.map((migration) => migration.name)).toEqual([
-      'DurableAudit1783700000000',
-      'IdentityAudit1783800000000',
-      'RetirePasswordPolicyAudit1783900000000',
-      'AttractapAuditDomain1784000000000',
-      'FullAuditDomains1784100000000',
-    ]);
-    expect(source.hasMetadata(AuditLog)).toBeTruthy();
-    expect(await source.query('PRAGMA foreign_key_list(audit_log)')).toEqual([]);
-    expect(await source.query(`SELECT "value" FROM "setting" WHERE "parent" = 'audit' AND "key" = 'domains'`)).toEqual([
-      { value: '["billing","resource","identity","attractap","administration","project","sso"]' },
-    ]);
-    expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(
-      2,
-    );
-    expect(
-      await source.query(`SELECT "metadata" FROM "password_policy_audit_overflow" WHERE "legacyAuditId" = 2`),
-    ).toEqual([
-      {
-        metadata: JSON.stringify({
-          actorUsername: 'migration-user',
-          requestId: oversizedRequestId,
-          role: null,
-          before: oversizedBefore,
-          after: oversizedAfter,
-          changedFields: '["minLength"]',
-        }),
-      },
-    ]);
-    const migratedStore = new SettingsStoreService(
-      TypeOrmSettingsRows.forRepository(source.getRepository(Setting)),
-      null,
-    );
-    const migratedAudit = createSqliteAuditService(source, migratedStore, createTestAuditMetrics());
-    await migratedAudit.onModuleInit();
-    const migratedList = await new AuditController(new AuditQueryService(migratedAudit, migratedStore)).list({
-      limit: 10,
-    });
-    const migratedOversizedEvent = migratedList.items.find((item) => item.details.legacyAuditId === 2);
-    expect(migratedOversizedEvent).toMatchObject({
-      details: {
-        detailsTruncated: 1,
-        actorUsername: 'migration-user',
-        requestId: oversizedRequestId,
-        before: oversizedBefore,
-        after: oversizedAfter,
-        changedFields: '["minLength"]',
-      },
-    });
-    expect(migratedOversizedEvent?.operationId).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
-    );
-    await expect(
-      new ValidationPipe({ transform: true }).transform(
-        { operationId: migratedOversizedEvent?.operationId },
-        { type: 'query', metatype: AuditQueryDto },
-      ),
-    ).resolves.toMatchObject({ operationId: migratedOversizedEvent?.operationId });
-    const now = jest.spyOn(Date, 'now').mockReturnValue(new Date('2026-06-16T12:00:00.000Z').getTime());
-    await source.query(`INSERT INTO "password_policy_audit_overflow" ("legacyAuditId", "metadata")
-      VALUES (999, '{"actorUsername":"expired-user"}')`);
-    await source.query(`INSERT INTO "audit_log" ("at", "domain", "action", "operationId", "outcome", "subjectType", "subjectId", "details")
-      VALUES ('2026-06-15 11:00:00.000', 'identity', 'identity.password_policy_updated', 'password-policy-audit-999', 'succeeded', 'identity.password_policy', 1,
-         '{"migrationSource":"password_policy_audit","legacyAuditId":999,"detailsTruncated":true}')`);
-    await source.query(`INSERT INTO "password_policy_audit_overflow" ("legacyAuditId", "metadata")
-      VALUES (998, '{"actorUsername":"retained-user"}')`);
-    await source.query(`INSERT INTO "audit_log" ("at", "domain", "action", "operationId", "outcome", "subjectType", "subjectId", "details")
-      VALUES ('2026-06-15 13:00:00.000', 'identity', 'identity.password_policy_updated', 'e3aedfb1-15c7-4290-9a0c-777f27a8357f', 'succeeded', 'identity.password_policy', 1,
-        '{"migrationSource":"password_policy_audit","legacyAuditId":998,"detailsTruncated":true}')`);
-    await migratedStore.setPlainSetting('audit', 'retention_days', '1');
-    await source.query(`CREATE TRIGGER abort_audit_cleanup BEFORE DELETE ON "audit_log"
-      WHEN OLD.id IN (SELECT id FROM "audit_log" WHERE "at" < '2026-06-15 12:00:00.000')
-      BEGIN SELECT RAISE(ABORT, 'audit cleanup failed'); END`);
-    await migratedAudit.cleanup();
-    expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toHaveLength(
-      1,
-    );
-    await source.query('DROP TRIGGER abort_audit_cleanup');
-    await migratedAudit.cleanup();
-    expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toEqual([]);
-    expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 998')).toHaveLength(
-      1,
-    );
-    now.mockRestore();
-    await migratedAudit.onModuleDestroy();
-    await source.query(`INSERT INTO "audit_log" ("at", "domain", "action", "operationId", "outcome", "subjectType", "subjectId", "details")
-      VALUES (datetime('now'), 'identity', 'identity.password_policy_updated', 'f4ae9dd5-3b66-4d5e-a46c-03cfaa25e266', 'succeeded', 'identity.password_policy', 1, '{"field":"minLength"}')`);
-    await source.query(`UPDATE "setting" SET "value" = '["identity"]'
-      WHERE "parent" = 'audit' AND "key" = 'domains'`);
-    await source.undoLastMigration();
-    await source.undoLastMigration();
-    await source.undoLastMigration();
-    expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
-    expect(await source.query('SELECT * FROM password_policy_audit')).toHaveLength(4);
-    expect(
-      await source.query(
-        `SELECT "actorUsername", "requestId", "before", "after", "changedFields" FROM password_policy_audit WHERE "requestId" = 'migration-request'`,
-      ),
-    ).toEqual([
-      {
-        actorUsername: 'migration-user',
-        requestId: 'migration-request',
-        before: '{"minLength":12}',
-        after: '{"minLength":16}',
-        changedFields: '["minLength"]',
-      },
-    ]);
-    expect(
-      await source.query(`SELECT "requestId", "before", "after" FROM password_policy_audit WHERE "requestId" = ?`, [
-        oversizedRequestId,
-      ]),
-    ).toEqual([{ requestId: oversizedRequestId, before: oversizedBefore, after: oversizedAfter }]);
-    expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(
-      0,
-    );
-    expect(await source.query(`SELECT "value" FROM "setting" WHERE "parent" = 'audit' AND "key" = 'domains'`)).toEqual([
-      { value: '[]' },
-    ]);
-    expect((await source.runMigrations()).map((migration) => migration.name)).toEqual([
-      'RetirePasswordPolicyAudit1783900000000',
-      'AttractapAuditDomain1784000000000',
-      'FullAuditDomains1784100000000',
-    ]);
-    expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(
-      4,
-    );
-    await source.undoLastMigration();
-    await source.undoLastMigration();
-    await source.undoLastMigration();
-    expect(
-      await source.query(`SELECT "requestId", "before", "after" FROM password_policy_audit WHERE "requestId" = ?`, [
-        oversizedRequestId,
-      ]),
-    ).toEqual([{ requestId: oversizedRequestId, before: oversizedBefore, after: oversizedAfter }]);
-    expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
-    await source.undoLastMigration();
-    expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
-    await source.undoLastMigration();
-    expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toEqual([]);
-    expect((await source.runMigrations()).map((migration) => migration.name)).toEqual([
-      'DurableAudit1783700000000',
-      'IdentityAudit1783800000000',
-      'RetirePasswordPolicyAudit1783900000000',
-      'AttractapAuditDomain1784000000000',
-      'FullAuditDomains1784100000000',
-    ]);
-  } finally {
-    if (source.isInitialized) await source.destroy();
-    await rm(directory, { recursive: true, force: true });
-  }
-}, 60_000);

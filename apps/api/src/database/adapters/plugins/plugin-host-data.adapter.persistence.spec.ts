@@ -11,7 +11,6 @@ import {
   Setting,
   User,
   UserRole,
-  entities,
 } from '@attraccess/database-entities';
 import {
   ResourceHealthSource,
@@ -19,10 +18,10 @@ import {
   ResourceType,
   SupervisionMode,
 } from '@attraccess/application-models';
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import type { PluginTransactionScope } from '@attraccess/plugins-backend-sdk';
 import { createTransactionScope } from '../../../plugin-system/persistence/plugin-transaction-scope';
-import * as migrations from '../../migrations';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { createPluginCoreLookup, createPluginHostData } from './plugin-host-data.adapter';
 
 describe('plugin host data adapter on a real database', () => {
@@ -42,14 +41,7 @@ describe('plugin host data adapter on a real database', () => {
   const hostData = () => createPluginHostData(() => source);
 
   beforeAll(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      entities: Object.values(entities),
-      migrations: Object.values(migrations),
-    }).initialize();
-    await source.runMigrations();
+    source = await createTestDataSource();
 
     const users = source.getRepository(User);
     const active = await users.save({ username: 'ada', email: 'ada@example.test', locale: 'de' });
@@ -173,7 +165,7 @@ describe('plugin host data adapter on a real database', () => {
   });
 
   afterAll(async () => {
-    await source.destroy();
+    await closeTestDataSource(source);
   });
 
   describe('resources', () => {
@@ -230,12 +222,12 @@ describe('plugin host data adapter on a real database', () => {
     it('shows a hidden group to users with a granted introduction, not after it was revoked', async () => {
       const learner = await source.getRepository(User).save({ username: 'learner', email: 'learner@example.test' });
       await source.query(
-        `INSERT INTO resource_introduction (id, resourceGroupId, receiverUserId, tutorUserId, completedAt, createdAt) VALUES (900, ?, ?, ?, datetime('now'), datetime('now'))`,
+        `INSERT INTO resource_introduction (id, "resourceGroupId", "receiverUserId", "tutorUserId", "completedAt", "createdAt") VALUES (900, $1, $2, $3, now(), now())`,
         [ids.hiddenGroup, learner.id, ids.active],
       );
       const history = (action: string, at: string) =>
         source.query(
-          `INSERT INTO resource_introduction_history_item (introductionId, action, performedByUserId, createdAt) VALUES (900, ?, ?, ?)`,
+          `INSERT INTO resource_introduction_history_item ("introductionId", action, "performedByUserId", "createdAt") VALUES (900, $1, $2, $3)`,
           [action, ids.active, at],
         );
       const all = [ids.printer, ids.door, ids.hiddenOnly];

@@ -75,7 +75,7 @@ export class ResourceHealthState {
   })
   source!: ResourceHealthSource;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the health state was last reported (or when the heartbeat last fired)',
     type: String,
@@ -83,13 +83,13 @@ export class ResourceHealthState {
   })
   lastReportedAt!: Date;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the health state record was created',
   })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the health state record was last updated',
   })

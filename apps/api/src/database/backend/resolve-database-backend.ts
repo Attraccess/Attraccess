@@ -1,7 +1,7 @@
 import type { DataSource, DataSourceOptions, EntityManager } from 'typeorm';
 import type { DatabaseBackend } from './database-backend';
 import { DatabaseType, parseDatabaseType } from './database-type';
-import { sqliteBackend } from '../sqlite/sqlite-backend';
+import { postgresBackend } from '../postgres/postgres-backend';
 import { registerPersistenceErrorClassifier } from '../persistence-errors';
 
 export { parseDatabaseType, UnsupportedDatabaseTypeError } from './database-type';
@@ -10,7 +10,7 @@ export { parseDatabaseType, UnsupportedDatabaseTypeError } from './database-type
 export type TypeOrmDatabaseBackend = DatabaseBackend<DataSource, DataSourceOptions, EntityManager>;
 
 /** Every backend the application can run on, by DATABASE_TYPE. Adding a backend means adding its object here. */
-export const DATABASE_BACKENDS: Readonly<Record<DatabaseType, TypeOrmDatabaseBackend>> = { sqlite: sqliteBackend };
+export const DATABASE_BACKENDS: Readonly<Record<DatabaseType, TypeOrmDatabaseBackend>> = { postgres: postgresBackend };
 
 /**
  * Resolves the configured backend and activates its error interpretation. Throws before any connection, migration

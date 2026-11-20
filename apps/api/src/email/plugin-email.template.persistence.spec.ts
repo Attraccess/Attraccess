@@ -16,6 +16,7 @@ import { SettingsStoreService } from '../settings/settings-store.service';
 import { SettingsService } from '../settings/settings.service';
 import { PluginEmailService } from './plugin-email.service';
 import { EmailService } from './email.service';
+import { createTestDataSource, closeTestDataSource } from '../test-utils/test-database';
 
 const ACTOR = { id: 1, authenticationMethod: 'session' as const };
 const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
@@ -47,13 +48,7 @@ describe('PluginEmailService.sendPluginTemplate (real template store)', () => {
   const bob = { id: 2, username: 'bob', email: 'bob@example.com', locale: 'de' } as NotificationRecipient;
 
   beforeEach(async () => {
-    dataSource = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      synchronize: true,
-      entities: [EmailTemplate, EmailTemplateTranslation],
-    }).initialize();
+    dataSource = await createTestDataSource({ synchronize: true, entities: [EmailTemplate, EmailTemplateTranslation] });
     const templates = new EmailTemplateService(
       new TypeOrmEmailTemplateStore(
         dataSource.getRepository(EmailTemplate),
@@ -96,7 +91,7 @@ describe('PluginEmailService.sendPluginTemplate (real template store)', () => {
 
   afterEach(async () => {
     unregisterPluginEmailTemplates('demo');
-    await dataSource.destroy();
+    await closeTestDataSource(dataSource);
   });
 
   const variables = { resource: { name: 'Laser <1>' }, reservation: { id: 7, when: 'Mon 14:00' } };

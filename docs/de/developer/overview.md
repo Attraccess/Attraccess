@@ -11,7 +11,7 @@ Entwicklung, Weitergabe und kommerzielle Nutzung unterliegen der [modifizierten 
 |-------|------------|
 | **Frontend** | React, TypeScript, HeroUI, TanStack Query, React Router |
 | **Backend** | NestJS (Node.js), TypeScript |
-| **Datenbank** | SQLite mit TypeORM |
+| **Datenbank** | PostgreSQL mit TypeORM |
 | **Monorepo** | NX Workspace |
 | **Paketmanager** | pnpm |
 | **Containerisierung** | Docker |

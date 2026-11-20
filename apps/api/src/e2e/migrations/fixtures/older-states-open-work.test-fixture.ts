@@ -1,9 +1,10 @@
 import type { DataSource } from 'typeorm';
-import { appliedPluginMigrationsOn, usageSessionsOn, utc } from './older-state-ports.test-fixture';
-import { rows, type OlderState } from './older-state.test-fixture';
-
-const PLUGIN_TRACK = 'plugin_bookings_migrations';
-const PLUGIN_MIGRATIONS = ['CreateBookings1700000000000', 'AddBookingNote1700000000001'];
+import { definePluginStorage, f, step, table } from '@attraccess/plugins-backend-sdk';
+import { postgresBackend } from '../../../database/postgres/postgres-backend';
+import { createSqlitePluginMigrationEngine } from '../../../database/sqlite/sqlite-plugin-migrations';
+import type { PluginDescriptor } from '../../../database/transfer-snapshot';
+import { compilePluginStorage } from '../../../plugin-system/plugin-storage/storage-schema';
+import type { OlderState } from './older-state.test-fixture';
 
 /**
  * A deployment stopped in the middle of work, before parallel machine sessions: a running session (no end time), a
@@ -36,102 +37,32 @@ export const openWorkRelease: OlderState = {
         originalAttributedOperatingDurationInMinutes, recoveredAt, reason) VALUES
         (3, 1, 2, '2026-02-28 07:00:00', NULL, 1.5, '2026-02-28 07:10:00', 'cancelled_orphan_unfinalized_session')`,
     );
-    // What TypeORM's migration executor of the plugin lifecycle created in the same database file.
-    await source.query(
-      `CREATE TABLE "${PLUGIN_TRACK}" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "timestamp" bigint NOT NULL,
-        "name" varchar NOT NULL)`,
-    );
-    await source.query(`INSERT INTO "${PLUGIN_TRACK}" ("timestamp", "name") VALUES (?, ?), (?, ?)`, [
-      1700000000000,
-      PLUGIN_MIGRATIONS[0],
-      1700000000001,
-      PLUGIN_MIGRATIONS[1],
-    ]);
-    await source.query(
-      `CREATE TABLE "plugin_bookings_booking" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-        "slot" datetime NOT NULL, "confirmed" boolean NOT NULL, "note" text)`,
-    );
-    await source.query(
-      `INSERT INTO "plugin_bookings_booking" ("slot", "confirmed", "note") VALUES ('2026-03-02 09:00:00', 1, 'Router')`,
-    );
   },
-  async verify(source) {
-    expect(
-      await rows(
-        source,
-        'SELECT id, resourceId, userId, startTime, endTime, isFinalized, lifecyclePending FROM resource_usage ORDER BY id',
-      ),
-    ).toEqual([
-      {
-        id: 1,
-        resourceId: 1,
-        userId: 1,
-        startTime: '2026-03-01 08:00:00',
-        endTime: null,
-        isFinalized: 1,
-        lifecyclePending: 0,
-      },
-      {
-        id: 2,
-        resourceId: 2,
-        userId: 2,
-        startTime: '2026-03-01 08:05:00',
-        endTime: null,
-        isFinalized: 0,
-        lifecyclePending: 1,
-      },
-      {
-        id: 3,
-        resourceId: 1,
-        userId: 2,
-        startTime: '2026-02-28 07:00:00',
-        endTime: '2026-02-28 07:00:00',
-        isFinalized: 0,
-        lifecyclePending: 0,
-      },
-    ]);
-    expect(
-      await rows(
-        source,
-        'SELECT usageId, originalAttributedOperatingDurationInMinutes AS operating, recoveredAt, reason FROM resource_usage_recovery',
-      ),
-    ).toEqual([
-      {
-        usageId: 3,
-        operating: 1.5,
-        recoveredAt: '2026-02-28 07:10:00',
-        reason: 'cancelled_orphan_unfinalized_session',
-      },
-    ]);
-    expect(await rows(source, 'SELECT slot, confirmed, note FROM plugin_bookings_booking')).toEqual([
-      { slot: '2026-03-02 09:00:00', confirmed: 1, note: 'Router' },
-    ]);
-
-    await verifyThroughPorts(source);
-  },
+  installPlugins: async (file, source) => [await installBookingsPlugin(file, source)],
 };
 
-async function verifyThroughPorts(source: DataSource): Promise<void> {
-  const sessions = usageSessionsOn(source);
-  // The running session is still the machine's active one, with typed values.
-  const [running, ...others] = await sessions.findActiveSessions(1);
-  expect(others).toEqual([]);
-  expect(running).toMatchObject({ id: 1, userId: 1, endTime: null, isFinalized: true, lifecyclePending: false });
-  expect(running.startTime).toEqual(utc('2026-03-01 08:00:00'));
-  expect(running.attributedOperatingDurationInMinutes).toBe(2.25);
-  expect(running.sessionDurationCreditsPerMinute).toBe(3);
-  // A reservation is never published; its attempt still holds the start.
-  expect(await sessions.findActiveSessions(2)).toEqual([]);
-  const attempt = await sessions.findAttempt('attempt-1', 2);
-  expect(attempt).toMatchObject({
-    kind: 'start',
-    candidateUsageId: 2,
-    previousUsageId: null,
-    formSubmissions: [],
-    billingItems: [{ name: 'Blade', unitPrice: 4, quantity: 1 }],
+const booking = table({
+  id: f.id(),
+  slot: f.timestamp(),
+  confirmed: f.boolean(),
+  note: f.text().optional(),
+});
+const BOOKINGS_STORAGE = definePluginStorage({
+  tables: { booking },
+  migrations: [{ version: 1, name: 'bookings', steps: [step.createTable('booking', booking)] }],
+});
+
+/** The 2.x plugin "bookings", installed in the SQLite file of this state: storage migrated, one booking written. */
+export const BOOKINGS_PLUGIN = { id: 'bookings', version: '1.4.0' } as const;
+export const BOOKINGS_TABLE = 'plugin_bookings_booking';
+
+export async function installBookingsPlugin(file: string, source: DataSource): Promise<PluginDescriptor> {
+  const storage = compilePluginStorage(BOOKINGS_PLUGIN.id, BOOKINGS_STORAGE, {
+    reservedTables: postgresBackend.plugins.coreTableNames(),
   });
-  expect(attempt?.transitionTime).toEqual(utc('2026-03-01 08:05:00'));
-  expect(await sessions.isSessionBeingEnded(1)).toBe(false);
-  // The plugin's legacy migration history is intact: the host adopts it as the baseline, it never re-runs or drops it.
-  expect(await appliedPluginMigrationsOn(source, PLUGIN_TRACK)).toEqual([...PLUGIN_MIGRATIONS].reverse());
+  await createSqlitePluginMigrationEngine(file).migrate(storage);
+  await source.query(
+    `INSERT INTO "${BOOKINGS_TABLE}" ("slot", "confirmed", "note") VALUES ('2026-03-02 09:00:00.000', 1, 'Router')`,
+  );
+  return { ...BOOKINGS_PLUGIN, storage };
 }

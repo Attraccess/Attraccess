@@ -45,11 +45,11 @@ export class ResourceFlowVariable {
   @ApiProperty({ description: 'Value JSON type tag' })
   valueType!: ResourceFlowVariableValueType;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ type: String, format: 'date-time' })
   updatedAt!: Date;
 

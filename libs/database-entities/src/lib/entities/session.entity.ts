@@ -70,26 +70,26 @@ export class Session {
   @ApiHideProperty()
   ssoSessionId?: string | null;
 
-  @Column({ type: 'simple-json', nullable: true, select: false })
+  @Column({ type: 'jsonb', nullable: true, select: false })
   @Exclude()
   @ApiHideProperty()
   ssoContext?: SsoSessionContext | null;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When this session expires',
     example: '2025-01-19T12:00:00.000Z',
   })
   expiresAt!: Date;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When this session was created',
     example: '2025-01-18T12:00:00.000Z',
   })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When this session was last accessed',
     example: '2025-01-18T12:30:00.000Z',

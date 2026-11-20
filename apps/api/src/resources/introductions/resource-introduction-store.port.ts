@@ -39,7 +39,7 @@ export interface ResourceIntroductionStore {
   ): Promise<IntroductionHistoryRecord | null>;
 
   /** The newest GRANT history item of the introduction. */
-  latestGrant(introductionId: number): Promise<IntroductionHistoryRecord | null>;
+  latestGrant(introductionId: number, context?: ResourcePersistenceContext): Promise<IntroductionHistoryRecord | null>;
 
   /**
    * Introductions of a resource with receiver, tutor and history; with `includeGroups` also those of the groups the

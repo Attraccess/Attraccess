@@ -1,7 +1,7 @@
 import { createMock } from '@golevelup/ts-jest';
 import type { PluginFlowTriggerNodeDefinition } from '@attraccess/plugins-backend-sdk';
 import { ResourceFlowNodeType, ResourceType } from '@attraccess/application-models';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import { registerPluginFlowNodes } from '../../plugin-system/flows/node-registry';
@@ -52,8 +52,136 @@ it('reports invalid plugin trigger configuration when loading a saved flow', asy
   graph.addNode({ id: 'event', type: definition.type as ResourceFlowNodeType, resourceId: 1 });
   await expect(service.getResourceFlow(1)).resolves.toMatchObject({
     validationErrors: [
-      { nodeId: 'event', nodeType: definition.type, field: 'channelId', message: 'Select an applied channel.' },
+      {
+        nodeId: 'event',
+        nodeType: definition.type,
+        field: 'channelId',
+        code: 'invalid',
+        message: 'Select an applied channel.',
+      },
     ],
+  });
+});
+
+describe('node configuration errors', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  const meteringStart = (data: unknown) => ({ id: 'start', type: ResourceFlowNodeType.INPUT_METERING_START, data });
+
+  it('reports a missing field as required, with a short message and no value', async () => {
+    const { service } = newService();
+    const errors = await service.validateNodeData(meteringStart({}));
+    expect(errors).toStrictEqual([
+      {
+        nodeId: 'start',
+        nodeType: ResourceFlowNodeType.INPUT_METERING_START,
+        field: 'meterId',
+        code: 'required',
+        message: 'This field is required.',
+      },
+    ]);
+  });
+
+  it('reports an out-of-range value as invalid, with a message that is not JSON', async () => {
+    const { service } = newService();
+    const errors = await service.validateNodeData(meteringStart({ meterId: 1, timeoutSeconds: 9999 }));
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ field: 'timeoutSeconds', code: 'invalid' });
+    expect(errors[0]).not.toHaveProperty('value');
+    expect(errors[0].message).not.toMatch(/^[[{]/);
+  });
+
+  it('reports a failed check generically, without the node data', async () => {
+    const { resources, service } = newService();
+    resources.meterError = new Error('{"secret":"internal detail"}');
+    const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const errors = await service.validateNodeData(
+      meteringStart({ meterId: 1 }),
+      new Map<string, unknown>([['meterResourceId', 1]]),
+    );
+    expect(errors).toStrictEqual([
+      {
+        nodeId: 'start',
+        nodeType: ResourceFlowNodeType.INPUT_METERING_START,
+        field: 'data',
+        code: 'invalid',
+        message: 'Invalid node configuration',
+      },
+    ]);
+    expect(logError).toHaveBeenCalledWith(expect.stringContaining('start'), expect.stringContaining('internal detail'));
+  });
+
+  it('passes on only the field and message of plugin errors', async () => {
+    registerPluginFlowNodes('validation-shape-test', [
+      {
+        type: 'plugin.validation-shape-test.event',
+        label: 'Event',
+        isInput: true,
+        inputs: [],
+        outputs: ['output'],
+        validateConfig: jest
+          .fn()
+          .mockResolvedValue([
+            { field: 'token', message: 'Bad token.', value: 'secret-token', nodeId: 'other', code: 'required' },
+          ]),
+      } as PluginFlowTriggerNodeDefinition,
+    ]);
+    const { service } = newService();
+    await expect(
+      service.validateNodeData({
+        id: 'p',
+        type: 'plugin.validation-shape-test.event',
+        data: { token: 'secret-token' },
+      }),
+    ).resolves.toStrictEqual([
+      {
+        nodeId: 'p',
+        nodeType: 'plugin.validation-shape-test.event',
+        field: 'token',
+        code: 'invalid',
+        message: 'Bad token.',
+      },
+    ]);
+  });
+
+  it('reports a failing plugin check generically instead of failing the whole flow', async () => {
+    registerPluginFlowNodes('validation-throw-test', [
+      {
+        type: 'plugin.validation-throw-test.event',
+        label: 'Event',
+        isInput: true,
+        inputs: [],
+        outputs: ['output'],
+        validateConfig: jest.fn().mockRejectedValue(new Error('plugin internals')),
+      },
+    ]);
+    const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const { service } = newService();
+    await expect(
+      service.validateNodeData({ id: 'p', type: 'plugin.validation-throw-test.event', data: {} }),
+    ).resolves.toStrictEqual([
+      {
+        nodeId: 'p',
+        nodeType: 'plugin.validation-throw-test.event',
+        field: 'data',
+        code: 'invalid',
+        message: 'Invalid node configuration',
+      },
+    ]);
+    expect(logError).toHaveBeenCalledWith(expect.stringContaining('p'), expect.stringContaining('plugin internals'));
+  });
+
+  it('reports an unknown node type as invalid', async () => {
+    const { service } = newService();
+    await expect(service.validateNodeData({ id: 'x', type: 'plugin.missing.node', data: {} })).resolves.toStrictEqual([
+      {
+        nodeId: 'x',
+        nodeType: 'plugin.missing.node',
+        field: 'type',
+        code: 'invalid',
+        message: 'Unknown node type: plugin.missing.node',
+      },
+    ]);
   });
 });
 

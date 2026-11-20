@@ -1,4 +1,4 @@
-// Test harness for fabric persistence and backups: the device harness (real SQLite with the plugin's migrations) plus
+// Test harness for fabric persistence and backups: the device harness (the in-memory fake of the record port over the plugin's declared tables) plus
 // the fabric, backup and restore services on top of an in-process fake sidecar.
 import { MatterBackupService } from '../backup/backup.service';
 import { MatterRestoreService, type RollbackTiming } from '../backup/restore.service';

@@ -5,13 +5,9 @@ import {
   ResourceMeteringSession,
 } from '@attraccess/database-entities';
 
-import { rm } from 'node:fs/promises';
-
-import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
-
 import { inheritTestScope } from '../../../test-utils/inherit-test-scope';
 
-import { resetTestFixture } from './fixtures/setup.test-fixture';
+import { closeMeteringFixture, resetTestFixture } from './fixtures/setup.test-fixture';
 
 import { createFlowDefinedMeteringFixture } from './fixtures/flow-defined-meters.test-fixture';
 
@@ -19,7 +15,7 @@ import { createGenericMetersFixture } from './fixtures/generic-meters.test-fixtu
 
 import { createUsageLifecycleFixture } from './fixtures/usage-lifecycle.test-fixture';
 
-// This SQLite suite runs multiple settlements per case; coverage on CI exceeds Jest's five-second default.
+// This PostgreSQL suite runs multiple settlements per case; coverage on CI exceeds Jest's five-second default.
 jest.setTimeout(30_000);
 
 export { Handler } from './fixtures/report-handler.test-fixture';
@@ -37,11 +33,7 @@ describe('Flow-defined metering', () => {
 
   afterEach(async () => {
     scope.usage?.onModuleDestroy();
-    if (scope.source) {
-      await closeResourceTransactionConnection(scope.source);
-      if (scope.source.isInitialized) await scope.source.destroy();
-    }
-    if (scope.directory) await rm(scope.directory, { recursive: true, force: true });
+    await closeMeteringFixture(scope);
     jest.restoreAllMocks();
   });
 
@@ -215,6 +207,7 @@ describe('Flow-defined metering', () => {
       await operationsScope.source.getRepository(ResourceMeteringOperation).save({
         id: 'stuck',
         sessionId: session.id,
+        meterId: 1,
         resourceId: 1,
         kind: 'interim',
         status: 'pending',

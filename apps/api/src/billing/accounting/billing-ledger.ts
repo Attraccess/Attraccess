@@ -5,7 +5,7 @@ import {
   BillingTransactionStatus,
   ResourceBillingConfigurationRecord,
 } from '@attraccess/application-models';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { billingTransactionAuditEvent } from '../../audit/policies/billing';
 import { AuditRecorder } from '../../audit/recorder/audit-event';
@@ -21,12 +21,15 @@ import { InsufficientBalanceError } from '../errors/insufficient-balance.error';
 import { RefundAmountHigherThanTransactionAmountException } from '../errors/refund-amount-higher-than-transaction-amount.error';
 import { ResourceBillingConfigurationNotFoundException } from '../errors/resource-billing-configuration-not-found.error';
 import { ResourceBillingConfigurationChangedEvent } from '../events/resource-billing-configuration-changed.event';
+import { bestEffortPush } from '../live-notifications/best-effort-push';
 import { LiveNotificationsService } from '../live-notifications/live-notifications.service';
 import { BillingConfigurationStore } from '../ports/billing-configuration.port';
 import { BillingLedgerStore, BillingTransactionContext } from '../ports/billing-ledger.port';
 
 /** Balances, transaction history, manual and refund transactions, and the billing configuration. */
 export class BillingLedger {
+  private readonly logger = new Logger(BillingLedger.name);
+
   constructor(
     private readonly ledgerStore: BillingLedgerStore,
     private readonly configurationStore: BillingConfigurationStore,
@@ -91,7 +94,11 @@ export class BillingLedger {
       status: BillingTransactionStatus.Completed,
     });
 
-    this.liveNotificationsService.notifyTransactionUpdate(transaction);
+    bestEffortPush(
+      this.liveNotificationsService.notifyTransactionUpdate(transaction),
+      this.logger,
+      `transaction ${transaction.id}`,
+    );
     void this.auditService.record(
       billingTransactionAuditEvent({
         transactionId: transaction.id,
@@ -139,7 +146,11 @@ export class BillingLedger {
       refundOfId: transaction.id,
     });
 
-    this.liveNotificationsService.notifyTransactionUpdate(refundTransaction);
+    bestEffortPush(
+      this.liveNotificationsService.notifyTransactionUpdate(refundTransaction),
+      this.logger,
+      `refund ${refundTransaction.id}`,
+    );
     void this.auditService.record(
       billingTransactionAuditEvent({
         transactionId: refundTransaction.id,

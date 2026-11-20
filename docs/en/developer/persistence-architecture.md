@@ -1,26 +1,29 @@
 # Persistence Architecture
 
-<!-- llms-description: Who owns database access in Attraccess: neutral models, SQLite schema, backend seam, ports and adapters, the enforced import boundary and ownership per feature area. -->
+<!-- llms-description: Who owns database access in Attraccess: neutral models, PostgreSQL schema, backend seam, ports and adapters, the enforced import boundary and ownership per feature area. -->
 
 Attraccess separates business logic, HTTP/WebSocket/MQTT/device contracts and plugin APIs from the database engine.
-SQLite is the only working backend and the default. This page describes the structure that lets a second relational
-backend (PostgreSQL, tracked in ATT-584) be added by writing adapters, schema and configuration, without rewriting
-feature rules or public contracts.
+PostgreSQL is the only runtime backend. SQLite is import-only: its frozen migrations and a read adapter exist solely to
+move an old installation's data into PostgreSQL once (see
+[Updating](installation/updating.md#moving-from-sqlite-to-postgresql)). This page describes the structure that keeps
+another relational backend possible by writing adapters, schema and configuration, without rewriting feature rules or
+public contracts.
 
 > [!NOTE]
 > The separation is introduced incrementally. This page states what is done and which code still depends on the
-> ORM (see [Ownership by feature area](#ownership-by-feature-area)). Nothing here claims PostgreSQL support.
+> ORM (see [Ownership by feature area](#ownership-by-feature-area)).
 
 ## The layers
 
-| Layer                                              | Location                                                                    | May import `typeorm`, drivers, entities? |
-| -------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------- |
-| Neutral models, enums, constants                   | `libs/application-models` (`@attraccess/application-models`)                | No, never                                |
-| Application, domain, HTTP/WebSocket transport      | `apps/api/src/**` (except `database/`)                                      | No (see the baseline below)              |
-| Backend seam, ports, error categories              | `apps/api/src/database/backend`, `persistence-errors.ts`, `unit-of-work.ts` | Seam only: types, no queries             |
-| SQLite adapter                                     | `apps/api/src/database/sqlite`                                              | Yes                                      |
-| SQLite/TypeORM schema (entities, columns, indexes) | `libs/database-entities`                                                    | Yes                                      |
-| Released SQLite migrations                         | `apps/api/src/database/migrations`                                          | Yes, frozen                              |
+| Layer                                                | Location                                                                    | May import `typeorm`, drivers, entities? |
+| ---------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------- |
+| Neutral models, enums, constants                     | `libs/application-models` (`@attraccess/application-models`)                | No, never                                |
+| Application, domain, HTTP/WebSocket transport        | `apps/api/src/**` (except `database/`)                                      | No (see the baseline below)              |
+| Backend seam, ports, error categories                | `apps/api/src/database/backend`, `persistence-errors.ts`, `unit-of-work.ts` | Seam only: types, no queries             |
+| PostgreSQL adapter                                   | `apps/api/src/database/postgres`                                            | Yes                                      |
+| SQLite import (frozen track, read adapter, transfer) | `apps/api/src/database/sqlite`, `apps/api/src/database/transfer`            | Yes, import only                         |
+| TypeORM schema (entities, columns, indexes)          | `libs/database-entities`                                                    | Yes                                      |
+| Released SQLite migrations (frozen, transfer only)   | `apps/api/src/database/migrations`                                          | Yes, frozen                              |
 
 `libs/database-entities` imports from `libs/application-models`, never the other way round. The enums, singleton ids
 and the SSO session context type that used to live in the entity files now live in the neutral library. The entity
@@ -30,18 +33,19 @@ library re-exports them only because released migrations still import them from 
 
 One composition seam, `apps/api/src/database/backend`, selects the engine:
 
-- `DATABASE_TYPE` (default `sqlite`). Any other value fails at startup, before any connection, migration or plugin
+- `DATABASE_TYPE` (default `postgres`, the only supported value; `sqlite` fails with a message that links to the upgrade docs). Any other value fails at startup, before any connection, migration or plugin
   work. The error names the supported values and never echoes a value that does not look like a plain engine name.
 - A `DatabaseBackend` bundles the connection options, the entity set, the migration track, the connection factory,
   the interpretation of driver errors and the shutdown of extra connections.
-- A **migration track** is one ordered, released history for one engine. SQLite's track keeps the table name
-  `migrations` and all released migrations byte for byte. Another engine adds its own track instead of re-using SQLite SQL.
+- A **migration track** is one ordered, released history for one engine. The PostgreSQL track is one baseline
+  migration with later PostgreSQL-only migrations. The released SQLite migrations are kept byte for byte but only run on a
+  temporary copy during the transfer. Another engine adds its own track instead of re-using PostgreSQL SQL.
 
 ## Neutral error categories
 
 Application code does not read driver error codes. The active backend registers a classifier and the application asks
-`isDatabaseBusyError`, `isUniqueViolation` or `isWriteConflict` (`persistence-errors.ts`). The SQLite classifier, which
-owns codes such as `SQLITE_BUSY` and the message form of constraint failures, lives in `database/sqlite/sqlite-errors.ts`.
+`isDatabaseBusyError`, `isUniqueViolation` or `isWriteConflict` (`persistence-errors.ts`). The PostgreSQL classifier, which
+owns SQLSTATEs such as `40001`, `40P01`, `55P03` and `23505`, lives in `database/postgres/postgres-errors.ts`.
 
 ## Unit of work
 
@@ -55,9 +59,16 @@ merge queue) fails when code outside the persistence implementation imports `typ
 `better-sqlite3`, `@attraccess/database-entities` (including their subpaths) or adapter internals. It covers static
 imports, type-only imports, re-exports, dynamic `import()`, `require()`, `import x = require()` and `import('x')` types.
 
-Adapter internals are `apps/api/src/database/adapters/**`, `apps/api/src/database/sqlite/**` and
+Adapter internals are `apps/api/src/database/adapters/**`, `apps/api/src/database/postgres/**` and
 `libs/database-entities`. Only Nest composition files (`*.module.ts`) and tests may import them, so application,
-domain and transport code reaches persistence through ports alone. The neutral seam files in `apps/api/src/database`
+domain and transport code reaches persistence through ports alone. `apps/api/src/database/transfer/**` (the SQLite
+import at startup) may in addition be imported by the two process entry points, `main.ts` and `main.bootstrap.ts`.
+
+PostgreSQL is the only runtime database. `apps/api/src/database/sqlite/**` exists for the one-way SQLite import: only
+the import path (`database/transfer`) and tests may use it, composition files and entry points may not. The removed
+SQLite runtime (the process-wide write queue and file lock, `runSerializedTransaction`, the SQLite backend, unit of
+work and connection factory) may not return in any file, the persistence folders and tests included; the check reports
+those findings separately and never accepts them on the baseline. The neutral seam files in `apps/api/src/database`
 (`unit-of-work.ts`, `persistence-errors.ts`, `backend/database-backend.ts`) are checked like application code. The
 plugin SDK has no engine subpath any more: plugins cannot import TypeORM, a driver or an entity at all.
 
@@ -70,36 +81,35 @@ Allowed locations: `libs/database-entities`, the engine and adapter folders unde
 
 Every area persists through the TypeORM schema in `libs/database-entities`, but only adapters touch it. The boundary
 check has an empty baseline: no application, domain or transport file imports `typeorm`, the drivers, the entity
-library or adapter internals. "Port" names the application-owned persistence contract; "Adapter" is where its SQLite
-implementation lives (`apps/api/src/database/adapters/<area>`).
+library or adapter internals. "Port" names the application-owned persistence contract; "Adapter" is where its implementation lives (`apps/api/src/database/adapters/<area>`).
 
-| Feature area                                                           | Application code                                                | Port                                                                                                             | Adapter                                                             |
-| ---------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Backend selection, connection, migrations, shutdown, transfer          | `database/backend`, `database/sqlite`                           | `DatabaseBackend`                                                                                                | `database/sqlite`                                                   |
-| Error categories, transactions, post-commit hooks, bounded retry       | `database/persistence-errors.ts`, `database/unit-of-work.ts`    | `UnitOfWork`, error classifier                                                                                   | `database/sqlite`                                                   |
-| Usage sessions (start, end, takeover, recovery), operating intervals   | `resources/usage`, `resources/operating-intervals`              | `UsageSessionStore`, `OperatingTimelineStore`                                                                    | `adapters/usage`, `adapters/operating-intervals`                    |
-| Metering                                                               | `resources/metering`                                            | `MeteringStore`                                                                                                  | `adapters/metering`                                                 |
-| Billing, payments, balances, SumUp                                     | `billing`                                                       | `BillingLedgerStore`, `BillingConfigurationStore`, `SumUpCredentialStore`                                        | `adapters/billing`                                                  |
-| Resources, groups, introductions, introducers, retraining, supervision | `resources/**`                                                  | `ResourceStore`, `ResourceGroupStore`, `ResourceIntroductionStore`, `ResourceIntroducerStore`, `RetrainingStore` | `adapters/resources`                                                |
-| Maintenance (records, requests, schedules, evaluation), health, forms  | `resources/maintenances`, `resources/health`, `resources/forms` | `MaintenanceEvaluationStore` and the maintenance, health and form stores                                         | `adapters/resources`                                                |
-| Flows, flow nodes, variables, executors                                | `resources/flows`                                               | `FlowGraphStore`, `FlowTriggerStore`, `FlowVariableStore`, `FlowResourceDirectory`, `FlowBillingItemStore`       | `adapters/flows`                                                    |
-| Users, invitations, registration, passwords                            | `users-and-auth/users`                                          | `UserStore`                                                                                                      | `adapters/users`                                                    |
-| RBAC, permissions, role assignment                                     | `users-and-auth/rbac`                                           | `RbacStore`                                                                                                      | `adapters/users`                                                    |
-| Local credentials, TOTP, API tokens, password policy                   | `users-and-auth/auth`, `password-policy`                        | `CredentialStore`, `TotpStore`, `ApiTokenStore`, `PasswordPolicyStore`                                           | `adapters/auth`                                                     |
-| Sessions (SQLite and Valkey), passkeys, SSO, rate limiting             | `users-and-auth/auth`                                           | `SessionStore`, `PasskeyStore`, `SsoProviderStore`, `AccountLockoutStore`                                        | `adapters/sessions`, `passkeys`, `sso`, `rate-limiting`             |
-| Audit                                                                  | `audit`                                                         | `AuditStore`                                                                                                     | `adapters/audit` (own connection, PRAGMAs, durable acknowledgement) |
-| Attractap readers, credentials, cards, crash reports, secure boot      | `attractap`                                                     | `ATTRACTAP_*` stores                                                                                             | `adapters/attractap`                                                |
-| Companion devices, MQTT servers                                        | `companion`, `mqtt`                                             | `CompanionDeviceStore`, `MqttServerStore`                                                                        | `adapters/companion`, `adapters/mqtt`                               |
-| Messaging, notifications, push, email, templates                       | `messaging`, `notifications`, `push`, `email*`                  | conversation, notification, push, template and recipient stores                                                  | `adapters/messaging`, `notifications`, `push`, `email`              |
-| Settings, analytics, CSV export, metrics                               | `settings`, `analytics`, `metrics`                              | `SettingsRows`, `AnalyticsReader`, `CsvExportTemplateStore`, metrics readers                                     | `adapters/settings`, `analytics`, `metrics`                         |
-| Projects, system statistics                                            | `projects`, `version`                                           | `ProjectStore`, `ProjectInvitationStore`, `SystemStatsStore`                                                     | `adapters/projects`, `adapters/system`                              |
-| Plugin management, plugin SDK                                          | `plugin-system`, `libs/plugins-backend-sdk`                     | plugin storage (record port), host data, neutral migrations, transactions                                        | `adapters/plugins`                                                  |
-| Built-in plugins and examples                                          | `apps/plugins/*`, `examples/*`                                  | SDK 2.0 root only: `context.storage` over declared tables, host ports                                            | none: the host's plugin-storage adapter serves them                 |
-| MCP OAuth clients, grants and tokens                                   | `mcp`                                                           | `McpOAuthStore`                                                                                                  | `adapters/mcp`                                                      |
-| Dashboard pins                                                         | `dashboard`                                                     | `DashboardPinStore`                                                                                              | `adapters/dashboard`                                                |
-| Bootstrap, shutdown, persistence error filters                         | `main.bootstrap.ts`, `app`, `exceptions`                        | `DatabaseLifecycle`, neutral error categories                                                                    | `database/sqlite`                                                   |
-| Seeds, setup scripts, test databases, tooling                          | `apps/api/scripts`, `scripts/*`, `apps/api/src/e2e`             | `DATABASE_TYPE` provider (`apps/api/scripts/lib/database-provider.mjs`), `apps/api/migration-tracks.cjs`         | `database/sqlite`                                                   |
-| Frontend                                                               | `apps/frontend`                                                 | none, imports `@attraccess/application-models` only                                                              | n/a                                                                 |
+| Feature area                                                           | Application code                                                | Port                                                                                                             | Adapter                                                 |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Backend selection, connection, migrations, shutdown, transfer          | `database/backend`, `database/postgres`                         | `DatabaseBackend`                                                                                                | `database/postgres`                                     |
+| Error categories, transactions, post-commit hooks, bounded retry       | `database/persistence-errors.ts`, `database/unit-of-work.ts`    | `UnitOfWork`, error classifier                                                                                   | `database/postgres`                                     |
+| Usage sessions (start, end, takeover, recovery), operating intervals   | `resources/usage`, `resources/operating-intervals`              | `UsageSessionStore`, `OperatingTimelineStore`                                                                    | `adapters/usage`, `adapters/operating-intervals`        |
+| Metering                                                               | `resources/metering`                                            | `MeteringStore`                                                                                                  | `adapters/metering`                                     |
+| Billing, payments, balances, SumUp                                     | `billing`                                                       | `BillingLedgerStore`, `BillingConfigurationStore`, `SumUpCredentialStore`                                        | `adapters/billing`                                      |
+| Resources, groups, introductions, introducers, retraining, supervision | `resources/**`                                                  | `ResourceStore`, `ResourceGroupStore`, `ResourceIntroductionStore`, `ResourceIntroducerStore`, `RetrainingStore` | `adapters/resources`                                    |
+| Maintenance (records, requests, schedules, evaluation), health, forms  | `resources/maintenances`, `resources/health`, `resources/forms` | `MaintenanceEvaluationStore` and the maintenance, health and form stores                                         | `adapters/resources`                                    |
+| Flows, flow nodes, variables, executors                                | `resources/flows`                                               | `FlowGraphStore`, `FlowTriggerStore`, `FlowVariableStore`, `FlowResourceDirectory`, `FlowBillingItemStore`       | `adapters/flows`                                        |
+| Users, invitations, registration, passwords                            | `users-and-auth/users`                                          | `UserStore`                                                                                                      | `adapters/users`                                        |
+| RBAC, permissions, role assignment                                     | `users-and-auth/rbac`                                           | `RbacStore`                                                                                                      | `adapters/users`                                        |
+| Local credentials, TOTP, API tokens, password policy                   | `users-and-auth/auth`, `password-policy`                        | `CredentialStore`, `TotpStore`, `ApiTokenStore`, `PasswordPolicyStore`                                           | `adapters/auth`                                         |
+| Sessions (PostgreSQL and Valkey), passkeys, SSO, rate limiting         | `users-and-auth/auth`                                           | `SessionStore`, `PasskeyStore`, `SsoProviderStore`, `AccountLockoutStore`                                        | `adapters/sessions`, `passkeys`, `sso`, `rate-limiting` |
+| Audit                                                                  | `audit`                                                         | `AuditStore`                                                                                                     | `adapters/audit` (durable acknowledgement)              |
+| Attractap readers, credentials, cards, crash reports, secure boot      | `attractap`                                                     | `ATTRACTAP_*` stores                                                                                             | `adapters/attractap`                                    |
+| Companion devices, MQTT servers                                        | `companion`, `mqtt`                                             | `CompanionDeviceStore`, `MqttServerStore`                                                                        | `adapters/companion`, `adapters/mqtt`                   |
+| Messaging, notifications, push, email, templates                       | `messaging`, `notifications`, `push`, `email*`                  | conversation, notification, push, template and recipient stores                                                  | `adapters/messaging`, `notifications`, `push`, `email`  |
+| Settings, analytics, CSV export, metrics                               | `settings`, `analytics`, `metrics`                              | `SettingsRows`, `AnalyticsReader`, `CsvExportTemplateStore`, metrics readers                                     | `adapters/settings`, `analytics`, `metrics`             |
+| Projects, system statistics                                            | `projects`, `version`                                           | `ProjectStore`, `ProjectInvitationStore`, `SystemStatsStore`                                                     | `adapters/projects`, `adapters/system`                  |
+| Plugin management, plugin SDK                                          | `plugin-system`, `libs/plugins-backend-sdk`                     | plugin storage (record port), host data, neutral migrations, transactions                                        | `adapters/plugins`                                      |
+| Built-in plugins and examples                                          | `apps/plugins/*`, `examples/*`                                  | SDK 2.0 root only: `context.storage` over declared tables, host ports                                            | none: the host's plugin-storage adapter serves them     |
+| MCP OAuth clients, grants and tokens                                   | `mcp`                                                           | `McpOAuthStore`                                                                                                  | `adapters/mcp`                                          |
+| Dashboard pins                                                         | `dashboard`                                                     | `DashboardPinStore`                                                                                              | `adapters/dashboard`                                    |
+| Bootstrap, shutdown, persistence error filters                         | `main.bootstrap.ts`, `app`, `exceptions`                        | `DatabaseLifecycle`, neutral error categories                                                                    | `database/postgres`                                     |
+| Seeds, setup scripts, test databases, tooling                          | `apps/api/scripts`, `scripts/*`, `apps/api/src/e2e`             | `DATABASE_TYPE` provider (`apps/api/scripts/lib/database-provider.mjs`), `apps/api/migration-tracks.cjs`         | `database/postgres`                                     |
+| Frontend                                                               | `apps/frontend`                                                 | none, imports `@attraccess/application-models` only                                                              | n/a                                                     |
 
 Plugins have no database access. The SDK has no TypeORM, no host entity, no raw SQL and no engine subpath. A plugin
 declares tables in a neutral schema and uses the record port; the host's **plugin-storage adapter** maps that port and
@@ -119,7 +129,8 @@ These are accepted limits of this change, not hidden work:
   `EntityManagerResolver`, `managerFor`). All resolve through the one global unit of work and can be merged into one.
 - The built-in plugins use only the record port, so they run on any engine that has a plugin-storage adapter. The port
   has no joins; plugins read over several of their own tables with several calls.
-- Plugin transactions are serialized per host process, like core's.
+- Plugin transactions are not queued per host process. A per-plugin advisory lock orders the transactions of one plugin
+  (across instances too); core work and other plugins run in parallel.
 - Some lifecycle test fixtures build older schemas with `synchronize` on purpose, to test upgrades and recovery from a
   schema before the integrity migrations.
 - Swagger schemas that documented secret or never-populated fields are now accurate (see below).

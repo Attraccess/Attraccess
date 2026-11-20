@@ -135,7 +135,7 @@ describe('MCP OAuth (real application)', () => {
         token_endpoint_auth_method: 'none',
         redirect_uris: [REDIRECT, 'https://client.example/cb'],
       });
-      const rows = await t.db.query(`SELECT * FROM mcp_oauth_client WHERE clientId = ?`, [response.body.client_id]);
+      const rows = await t.db.query(`SELECT * FROM mcp_oauth_client WHERE "clientId" = $1`, [response.body.client_id]);
       expect(rows).toHaveLength(1);
     });
 
@@ -308,7 +308,7 @@ describe('MCP OAuth (real application)', () => {
       const rows: Array<Record<string, unknown>> = await t.db.query(
         `SELECT * FROM audit_log ORDER BY id DESC LIMIT 10`,
       );
-      expect(rows.find((row) => String(row.details).includes('created-via-oauth'))).toMatchObject({
+      expect(rows.find((row) => JSON.stringify(row.details).includes('created-via-oauth'))).toMatchObject({
         authenticationMethod: 'mcp-oauth',
         actorId: user.id,
         apiTokenId: null,
@@ -316,7 +316,7 @@ describe('MCP OAuth (real application)', () => {
 
       // No full user session was created for the grant.
       const sessions = await t.db
-        .query(`SELECT COUNT(*) AS n FROM session WHERE userId = ?`, [user.id])
+        .query(`SELECT COUNT(*) AS n FROM session WHERE "userId" = $1`, [user.id])
         .catch(() => [{ n: 0 }]);
       expect(Number(sessions[0].n)).toBeLessThanOrEqual(1);
 
@@ -353,7 +353,7 @@ describe('MCP OAuth (real application)', () => {
     it('stores only hashed token values', async () => {
       const user = await t.createUser(ADMIN_PERMISSIONS);
       const { tokens } = await fullFlow(user.id);
-      const rows = await t.db.query(`SELECT tokenHash FROM mcp_oauth_token`);
+      const rows = await t.db.query(`SELECT "tokenHash" FROM mcp_oauth_token`);
       const stored = rows.map((row: { tokenHash: string }) => row.tokenHash);
       expect(stored).not.toContain(tokens.body.access_token);
       expect(stored).not.toContain(tokens.body.refresh_token);
@@ -443,7 +443,7 @@ describe('MCP OAuth (real application)', () => {
       const user = await t.createUser(ADMIN_PERMISSIONS);
       const { clientId, tokens } = await fullFlow(user.id);
       await t.db.query(
-        `UPDATE mcp_oauth_token SET expiresAt = datetime('now', '-1 minute') WHERE kind = 'access' AND grantId IN (SELECT id FROM mcp_oauth_grant WHERE userId = ?)`,
+        `UPDATE mcp_oauth_token SET "expiresAt" = now() - interval '1 minute' WHERE kind = 'access' AND "grantId" IN (SELECT id FROM mcp_oauth_grant WHERE "userId" = $1)`,
         [user.id],
       );
       expect((await t.callTool(tokens.body.access_token, 'listRoles')).status).toBe(401);
@@ -454,7 +454,7 @@ describe('MCP OAuth (real application)', () => {
         refresh_token: tokens.body.refresh_token,
       });
       expect(refreshed.status).toBe(200);
-      await t.db.query(`UPDATE mcp_oauth_grant SET expiresAt = datetime('now', '-1 minute') WHERE userId = ?`, [
+      await t.db.query(`UPDATE mcp_oauth_grant SET "expiresAt" = now() - interval '1 minute' WHERE "userId" = $1`, [
         user.id,
       ]);
       expect((await t.callTool(refreshed.body.access_token, 'listRoles')).status).toBe(401);
@@ -487,14 +487,14 @@ describe('MCP OAuth (real application)', () => {
     it('revokes grants together with a deleted or disabled user', async () => {
       const user = await t.createUser(ADMIN_PERMISSIONS);
       const { tokens } = await fullFlow(user.id);
-      await t.db.query(`UPDATE "user" SET isDisabled = 1 WHERE id = ?`, [user.id]);
+      await t.db.query(`UPDATE "user" SET "isDisabled" = true WHERE id = $1`, [user.id]);
       expect((await t.callTool(tokens.body.access_token, 'listRoles')).status).toBe(401);
     });
 
     it('does not refresh the tokens of a disabled user and ends the grant', async () => {
       const user = await t.createUser(ADMIN_PERMISSIONS);
       const { clientId, tokens } = await fullFlow(user.id);
-      await t.db.query(`UPDATE "user" SET isDisabled = 1 WHERE id = ?`, [user.id]);
+      await t.db.query(`UPDATE "user" SET "isDisabled" = true WHERE id = $1`, [user.id]);
       const refreshed = await tokenRequest({
         grant_type: 'refresh_token',
         client_id: clientId,
@@ -504,7 +504,7 @@ describe('MCP OAuth (real application)', () => {
       expect(refreshed.status).toBe(400);
       expect(refreshed.body.error).toBe('invalid_grant');
       // The grant is gone for good: re-enabling the user does not bring the old tokens back.
-      await t.db.query(`UPDATE "user" SET isDisabled = 0 WHERE id = ?`, [user.id]);
+      await t.db.query(`UPDATE "user" SET "isDisabled" = false WHERE id = $1`, [user.id]);
       expect((await t.callTool(tokens.body.access_token, 'listRoles')).status).toBe(401);
     });
   });
@@ -537,9 +537,9 @@ describe('MCP OAuth (real application)', () => {
     it('ends the grants of a deleted user', async () => {
       const user = await t.createUser(ADMIN_PERMISSIONS);
       const { tokens } = await fullFlow(user.id);
-      await t.db.query(`DELETE FROM "user" WHERE id = ?`, [user.id]);
+      await t.db.query(`DELETE FROM "user" WHERE id = $1`, [user.id]);
       expect((await t.callTool(tokens.body.access_token, 'listRoles')).status).toBe(401);
-      expect(await t.db.query(`SELECT id FROM mcp_oauth_grant WHERE userId = ?`, [user.id])).toEqual([]);
+      expect(await t.db.query(`SELECT id FROM mcp_oauth_grant WHERE "userId" = $1`, [user.id])).toEqual([]);
     });
 
     it('serves a client from MCP_OAUTH_CLIENTS and ends its grants once the operator removes it', async () => {

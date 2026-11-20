@@ -21,7 +21,7 @@ Attraccess/
 │   ├── plugins-frontend-sdk/ # Plugin SDK for frontend extensions
 │   ├── plugins-frontend-ui/  # Shared UI components for plugins
 │   └── env/                  # Environment configuration
-└── storage/                  # SQLite database files (runtime)
+└── storage/                  # Uploads and plugins (runtime)
 ```
 
 ## Applications
@@ -87,10 +87,10 @@ After making API changes, regenerate these libraries to keep them in sync.
 
 ## Database
 
-Attraccess uses **SQLite** as its database, managed through **TypeORM**. Key characteristics:
+Attraccess uses **PostgreSQL** as its only database, managed through **TypeORM**. Key characteristics:
 
-- No separate database server required
-- Database file stored in the `storage/` directory
+- A separate PostgreSQL server, configured with `DATABASE_URL` (see [Environment Variables](installation/environment-variables.md#database))
+- Uploads and plugins are stored in the `storage/` directory
 - Migrations run automatically on application startup
 - Entity definitions live in the `database-entities` library
 

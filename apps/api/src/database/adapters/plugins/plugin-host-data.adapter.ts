@@ -273,7 +273,7 @@ class FlowDirectory implements PluginFlowDirectory {
   }
 }
 
-/** The SQLite/TypeORM implementation of the plugin host data lookups. */
+/** The TypeORM implementation of the plugin host data lookups. */
 export function createPluginHostData(source: () => DataSource): PluginHostDataContext {
   return {
     resources: new ResourceDirectory(source),

@@ -84,7 +84,7 @@ export class TypeOrmAnalyticsReader implements AnalyticsReader {
       },
       { entity: ResourceOperatingInterval, alias: 'interval', condition: 'interval.startTime < :asOf' },
     ];
-    // Open and closed records are checked apart so SQLite can search the (resourceId, endTime) indexes.
+    // Open and closed records are checked apart so each probe can use the (resourceId, endTime) indexes.
     const exists = sources.flatMap(({ entity, alias, condition }) =>
       [`${alias}.endTime IS NULL`, `${alias}.endTime > :start`].map(
         (end) =>

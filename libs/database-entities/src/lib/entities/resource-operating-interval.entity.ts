@@ -4,6 +4,7 @@ import { Resource } from './resource.entity';
 
 @Index('IDX_resource_operating_interval_resourceId_endTime', ['resourceId', 'endTime'])
 @Index('IDX_resource_operating_interval_resourceId_startTime_id', ['resourceId', 'startTime', 'id'])
+@Index('IDX_resource_operating_interval_one_open', ['resourceId'], { unique: true, where: '"endTime" IS NULL' })
 @Entity()
 export class ResourceOperatingInterval {
   @PrimaryGeneratedColumn()
@@ -14,11 +15,11 @@ export class ResourceOperatingInterval {
   @ApiProperty({ description: 'The resource being operated', example: 1 })
   resourceId!: number;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamptz' })
   @ApiProperty({ description: 'UTC instant at which operation began', format: 'date-time' })
   startTime!: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @ApiProperty({ description: 'UTC instant at which operation ended', format: 'date-time', nullable: true })
   endTime!: Date | null;
 
@@ -39,7 +40,7 @@ export class ResourceOperatingInterval {
   @ApiProperty({ description: 'Flow execution that closed this interval, if recorded', nullable: true })
   endFlowRunId!: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
   @ManyToOne(() => Resource, (resource) => resource.operatingIntervals, { onDelete: 'CASCADE' })

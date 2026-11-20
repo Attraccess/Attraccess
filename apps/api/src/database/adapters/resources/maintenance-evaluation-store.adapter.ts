@@ -15,15 +15,12 @@ import type {
   ServiceCycleState,
 } from '../../../resources/maintenances/maintenance-evaluation-store.port';
 import { ScopedUnitOfWork, UNIT_OF_WORK, type TransactionScope, type UnitOfWork } from '../../unit-of-work';
-import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 import {
   MAX_PAIRS_PER_QUERY,
   buildScheduleEvaluationQuery,
   buildScheduleStateQuery,
-  formatDbDate,
-  parseDbDate,
 } from './maintenance-evaluation-queries';
-import { MaintenanceSnapshotReader, captureDurationState } from './maintenance-snapshot-reader';
+import { captureDurationState } from './maintenance-duration-state';
 import { toMaintenanceScheduleRecord } from './maintenance-mappers';
 import { findRelations } from '../find-options';
 
@@ -32,8 +29,8 @@ const CONFIG_RELATIONS = ['usageHoursConfig', 'usageCountConfig', 'timeIntervalC
 interface CycleRow {
   resourceId: number;
   scheduleId: number;
-  baseline?: string | Date;
-  hasActiveMaintenance?: number | boolean;
+  baseline?: Date;
+  hasActiveMaintenance?: boolean;
   totalCount?: number | string | null;
 }
 
@@ -105,13 +102,12 @@ export class TypeOrmMaintenanceEvaluationView implements MaintenanceEvaluationVi
 }
 
 /**
- * TypeORM implementation of the maintenance evaluation port. On SQLite, history is read through an independent
- * read-only connection (see MaintenanceSnapshotReader) so evaluation never borrows the connection of in-flight
- * session writes; the evaluator validates the result inside a short write transaction.
+ * TypeORM implementation of the maintenance evaluation port. PostgreSQL readers never block writers, so history is
+ * read on the connection pool directly (no separate snapshot connection); the evaluator validates the result inside
+ * a short write transaction.
  */
 @Injectable()
 export class TypeOrmMaintenanceEvaluationStore implements MaintenanceEvaluationStore {
-  private snapshotReader?: MaintenanceSnapshotReader;
   private readonly unitOfWork: ScopedUnitOfWork<EntityManager>;
 
   constructor(
@@ -122,7 +118,7 @@ export class TypeOrmMaintenanceEvaluationStore implements MaintenanceEvaluationS
   }
 
   get snapshotReads(): boolean {
-    return this.dataSource.options.type === 'better-sqlite3';
+    return false;
   }
 
   current(): MaintenanceEvaluationView {
@@ -156,14 +152,14 @@ export class TypeOrmMaintenanceEvaluationStore implements MaintenanceEvaluationS
     const toState = (row: CycleRow, createdAt: Date | undefined): ServiceCycleState => ({
       resourceId: row.resourceId,
       scheduleId: row.scheduleId,
-      baseline: row.baseline ? parseDbDate(row.baseline) : (createdAt ?? now),
+      baseline: row.baseline ? new Date(row.baseline) : (createdAt ?? now),
       hasActiveMaintenance: Boolean(row.hasActiveMaintenance),
       completedSessions: Number(row.totalCount ?? 0),
     });
     const createdAtOf = new Map(requests.map((r) => [`${r.scheduleId}:${r.resourceId}`, r.createdAt]));
     const params = (chunk: ServiceCycleRequest[]) => [
-      ...chunk.flatMap((pair) => [pair.resourceId, pair.scheduleId, formatDbDate(pair.createdAt)]),
-      formatDbDate(now),
+      ...chunk.flatMap((pair) => [pair.resourceId, pair.scheduleId, pair.createdAt]),
+      now,
     ];
 
     // Completed-maintenance baselines and active state, without scanning resource usage.
@@ -190,10 +186,9 @@ export class TypeOrmMaintenanceEvaluationStore implements MaintenanceEvaluationS
     return states;
   }
 
-  async inSnapshot<T>(work: (view: MaintenanceEvaluationView) => Promise<T>): Promise<T> {
-    this.snapshotReader ??= new MaintenanceSnapshotReader(this.dataSource);
-    const reader = await this.snapshotReader.manager();
-    return work(new TypeOrmMaintenanceEvaluationView(reader, legacyEngineTransactionScope(reader)));
+  /** No separate snapshot connection on PostgreSQL (`snapshotReads` is false): reads the committed state directly. */
+  inSnapshot<T>(work: (view: MaintenanceEvaluationView) => Promise<T>): Promise<T> {
+    return work(this.current());
   }
 
   inTransaction<T>(work: (view: MaintenanceEvaluationView) => Promise<T>): Promise<T> {
@@ -203,6 +198,6 @@ export class TypeOrmMaintenanceEvaluationStore implements MaintenanceEvaluationS
   }
 
   async close(): Promise<void> {
-    await this.snapshotReader?.close();
+    // Nothing to release: reads use the application's connection pool.
   }
 }
