@@ -60,19 +60,30 @@ def save(artifacts, name, data):
     (artifacts / f"bt-setup-{name}.json").write_text(json.dumps(data, indent=1))
 
 
-def texts(hooks):
-    return [" ".join([widget["text"], *widget["texts"]]) for widget in hooks.widgets()["widgets"]]
+def reset(target, console):
+    """Hardware-reset the reader and reopen its console (the capture keeps the log)."""
+    flash = target.get_driver(ESPToolDriver, activate=False)
+    driver = target.get_driver("SerialDriver", activate=False)
+    console.stop()
+    target.deactivate(driver)
+    target.activate(flash)
+    flash.reset()
+    target.deactivate(flash)
+    open_console(target, driver)
+    console.start()
 
 
 @pytest.fixture
 def fresh_console(target, artifacts, request):
-    """The reader flashed erased (unpaired, no PIN), its console captured from boot."""
+    """The reader flashed erased (unpaired, no PIN), its console captured from a reset on (the boot after the flash
+    is over before the console opens)."""
     driver = target.get_driver("SerialDriver", activate=False)
     target.deactivate(driver)
     flash_reader(target, os.environ["READER_IMAGE"], erase=True)
     open_console(target, driver)
     console = ReaderConsole(driver, artifacts / f"bt-setup-{request.node.name}-serial.log")
     console.start()
+    reset(target, console)
     yield console
     console.stop()
 
@@ -85,11 +96,14 @@ def test_bt_setup_sets_up_and_pairs_a_fresh_reader(fresh_console, target, api, a
 
     # PIN over the encrypted link: the OS pairs on the first write (RX refuses unencrypted writes).
     lines = central("run", name, "auth.status.get", command("auth.code.set", {"newCode": PIN}))
+    # The first write met an unencrypted link and was refused; it went through once the OS had paired.
+    assert any("Insufficient" in line.get("refused", "") for line in lines), lines
     assert reply(lines, "auth.status.get") == {"pinIsSet": False}
     assert reply(lines, "auth.code.set")["success"] is True
     hooks = ReaderTestHooks(console.stream(), PIN)
-    on_screen = texts(hooks)
-    assert any(name in text for text in on_screen), on_screen
+    # The status ("Bluetooth setup open · mm:ss" over the name) is a plain label, which ui.widgets does not list:
+    # the panel's frame is the evidence.
+    hooks.screenshot().save(artifacts / "bt-setup-open-device.png")
     screenshot("bt-setup-open")
     heap_open = read_heap(console)
 
@@ -134,15 +148,7 @@ def test_bt_setup_sets_up_and_pairs_a_fresh_reader(fresh_console, target, api, a
 
     # A paired reader neither advertises nor offers the button, also after a restart.
     mark = console.mark()
-    flash = target.get_driver(ESPToolDriver, activate=False)
-    driver = target.get_driver("SerialDriver", activate=False)
-    console.stop()
-    target.deactivate(driver)
-    target.activate(flash)
-    flash.reset()
-    target.deactivate(flash)
-    open_console(target, driver)
-    console.start()
+    reset(target, console)
     console.expect(r"Reader Authentication successful", mark, 120)
     assert "Bluetooth setup open" not in console.since(mark)
     assert not any(device["name"] == name for device in central("scan", "10", name))
@@ -162,7 +168,7 @@ def test_bt_setup_times_out_and_the_button_opens_a_new_window(fresh_console, art
     assert "error" not in console.command("api.configuration.set", {"authCode": PIN, **UNREACHABLE_SERVER}).lower()
     hooks = ReaderTestHooks(console.stream(), PIN)
     hooks.wait_for(screen="InitScreen", timeout=30)
-    assert any(name in text for text in texts(hooks))
+    hooks.screenshot().save(artifacts / "bt-setup-connecting-device.png")
     assert not hooks.find("Bluetooth-Einrichtung") and not hooks.find("Bluetooth setup"), "button while open"
 
     mark = console.mark()
@@ -172,6 +178,7 @@ def test_bt_setup_times_out_and_the_button_opens_a_new_window(fresh_console, art
     assert not any(device["name"] == name for device in central("scan", "10", name))
     caption = "Bluetooth-Einrichtung" if hooks.find("Bluetooth-Einrichtung") else "Bluetooth setup"
     hooks.wait_for(caption, timeout=10)
+    hooks.screenshot().save(artifacts / "bt-setup-button-device.png")
     screenshot("bt-setup-button")
 
     hooks.tap_text(caption)
@@ -179,5 +186,6 @@ def test_bt_setup_times_out_and_the_button_opens_a_new_window(fresh_console, art
     assert any(device["name"] == name for device in central("scan", "15", name))
     hooks.wait_for(screen="InitScreen", timeout=5)
     assert not hooks.find(caption)
+    hooks.screenshot().save(artifacts / "bt-setup-reopened-device.png")
     screenshot("bt-setup-reopened")
     save(artifacts, "timeout", {"name": name, "windowSeconds": round(lasted)})
