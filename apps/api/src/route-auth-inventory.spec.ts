@@ -205,6 +205,11 @@ const REVIEWED_PUBLIC_ROUTES: Record<string, ReviewedPublicRoute> = {
     exemption: 'emailed 128-bit single-use token; guessing is infeasible',
   },
   'UsersRegistrationController.resendVerificationEmail': { reason: 'registration flow', credential: 'none' },
+  'UsersRegistrationController.changeUnverifiedEmail': {
+    reason: 'registration flow: an unverified account redirects its activation link, proven by its password',
+    credential: 'password',
+    rateLimit: true,
+  },
   'UsersRegistrationController.acceptInvitation': {
     reason: 'emailed single-use token',
     credential: 'random-token',

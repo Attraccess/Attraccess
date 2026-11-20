@@ -1,0 +1,9 @@
+{
+  "openButton": "Change email address",
+  "emailLabel": "New email address",
+  "submit": "Send activation link",
+  "cancel": "Cancel",
+  "successTitle": "Email address changed",
+  "successMessage": "We sent a new activation link to {{email}}. The previous link no longer works.",
+  "invalidEmail": "Enter a valid email address."
+}

@@ -69,6 +69,25 @@ export async function recordFailure(
     return;
   }
 
+  await recordAccountFailureImplementation(context, policy, userId, now, windowMs);
+}
+
+/** A failure against one account that must not move the per-IP counters again (the caller counted the IP). */
+export async function recordAccountFailure(context: FailureContext, userId: number): Promise<void> {
+  const policy = await context.settingsService.getRateLimitPolicy();
+  const windowMs = policy.windowSeconds * 1000;
+  const now = context.nowFn();
+  context.evictStale(now, windowMs);
+  await recordAccountFailureImplementation(context, policy, userId, now, windowMs);
+}
+
+async function recordAccountFailureImplementation(
+  context: FailureContext,
+  policy: Policy,
+  userId: number,
+  now: number,
+  windowMs: number,
+): Promise<void> {
   const accountEntry = context.upsertCounter(context.accountCounters, userId, now, windowMs);
   if (accountEntry.count >= policy.maxAttempts) {
     const durationMs = computeLockoutMs(policy, accountEntry.lockoutCount);

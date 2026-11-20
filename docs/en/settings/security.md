@@ -91,7 +91,7 @@ Changing the secret makes the stored card keys and reader pairing keys unreadabl
 
 ## Auth Rate Limiting and Account Lockout
 
-Failed authentication attempts on login, registration, password reset, verification email resend, SSO account linking, and SSO provisioning endpoints are throttled per IP. Repeated login failures and wrong SSO account-link passwords additionally lock the affected account. Settings are admin-tunable from **Settings -> Auth rate limiting**.
+Failed authentication attempts on login, registration, password reset, verification email resend, changing the email address of an unverified account, SSO account linking, and SSO provisioning endpoints are throttled per IP. Repeated login failures, wrong SSO account-link passwords and wrong passwords when changing an unverified email address additionally lock the affected account. Settings are admin-tunable from **Settings -> Auth rate limiting**.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -190,7 +190,7 @@ auth.success type=login outcome=success ip=1.2.3.4 user_id=42 username=alice ts=
 | Field | Description |
 |-------|-------------|
 | `prefix` | `auth.success` for successes, `auth.failed` otherwise. |
-| `type` | One of `login`, `register`, `password_reset_request`, `verification_email_resend`, `password_reset_complete`, `sso_link_account`, `sso_provisioning`. |
+| `type` | One of `login`, `register`, `password_reset_request`, `verification_email_resend`, `unverified_email_change`, `password_reset_complete`, `sso_link_account`, `sso_provisioning`. |
 | `outcome` | `success`, `invalid_credentials`, `account_locked`, `rate_limited`, `two_factor_required`, `two_factor_invalid`, `email_not_verified`, `invalid_token`, `invalid_input`, `unknown_user`. |
 | `ip` | Client IP. Falls back to `unknown` when not resolvable. |
 | `user_id` | Numeric user id when known, `-` otherwise. |
@@ -205,7 +205,7 @@ auth.success type=login outcome=success ip=1.2.3.4 user_id=42 username=alice ts=
 A minimal `failregex` for `/etc/fail2ban/filter.d/attraccess-auth.conf`:
 
 ```
-failregex = ^.*auth\.failed type=(?:login|register|password_reset_request|verification_email_resend|password_reset_complete|sso_link_account) outcome=\S+ ip=<HOST> .*$
+failregex = ^.*auth\.failed type=(?:login|register|password_reset_request|verification_email_resend|unverified_email_change|password_reset_complete|sso_link_account) outcome=\S+ ip=<HOST> .*$
 ignoreregex =
 ```
 

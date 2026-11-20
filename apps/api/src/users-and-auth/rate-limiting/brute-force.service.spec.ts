@@ -144,6 +144,17 @@ describe('BruteForceProtectionService', () => {
       expect(lockout.recordFailureStreak).toHaveBeenCalledTimes(2);
     });
 
+    it('counts recordAccountFailure on the same account counter as sign-in failures', async () => {
+      await service.recordFailure('login', '1.1.1.1', 42);
+      await service.recordAccountFailure(42);
+      expect(lockout.lockAccount).not.toHaveBeenCalled();
+      await service.recordAccountFailure(42);
+      expect(lockout.lockAccount).toHaveBeenCalledWith(42, expect.any(Date));
+      await expect(service.assertAccountAllowed({ id: 42, lockedUntil: null })).rejects.toBeInstanceOf(
+        AccountLockedException,
+      );
+    });
+
     it('rejects when assertAccountAllowed sees future lockedUntil', async () => {
       const future = new Date(Date.now() + 60_000);
       await expect(service.assertAccountAllowed({ id: 1, lockedUntil: future })).rejects.toBeInstanceOf(
