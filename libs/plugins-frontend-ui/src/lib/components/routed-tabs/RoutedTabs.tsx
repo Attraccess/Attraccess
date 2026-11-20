@@ -22,7 +22,7 @@ export interface RoutedTabItem {
   icon?: ReactNode;
   /** The first path segment below `basePath` that selects this tab. Empty for the tab at `basePath` itself. */
   path: string;
-  /** Hidden tabs are not offered and never active; their URLs select the first visible tab's fallback. */
+  /** Hidden tabs are not offered and never active. Redirecting away from their URLs is up to the page. */
   hidden?: boolean;
 }
 
@@ -32,9 +32,12 @@ export interface RoutedTabsProps {
   basePath: string;
   /** Names the tab list and the picker. */
   'aria-label': string;
-  /** Text of the picker option; defaults to the label when that is a string. */
-  getTextValue?: (item: RoutedTabItem) => string;
-  /** Tab switches push a history entry. */
+  /**
+   * The tab shown as selected while no visible tab matches the location (e.g. before the page redirects); defaults to
+   * the first visible tab. Always selecting a tab keeps HeroUI's tabs from picking one themselves and navigating.
+   */
+  fallbackKey?: string;
+  /** Marks the tab list; the picker gets `<data-cy>-mobile-picker`, its options `select-item-<key>`. */
   'data-cy'?: string;
   className?: string;
 }
@@ -42,12 +45,13 @@ export interface RoutedTabsProps {
 /**
  * Renders the visible items. The active tab follows the location: the first segment below `basePath` is matched
  * against the items' `path`, so nested URLs such as `/matter/devices/<id>` keep their tab selected. Choosing a tab
- * navigates (a history entry per switch). Below `sm` the same items are a `Select`.
+ * navigates and pushes a history entry; choosing the active tab on a nested URL goes back to the tab's own path.
+ * Below `sm` the same items are a `Select`; option text is the label when that is a string, else the key.
  */
 export function RoutedTabs({
   items,
   basePath,
-  getTextValue,
+  fallbackKey,
   className,
   'aria-label': ariaLabel,
   'data-cy': dataCy,
@@ -55,21 +59,30 @@ export function RoutedTabs({
   const location = useLocation();
   const navigate = useNavigate();
   const visible = items.filter((item) => !item.hidden);
-  const activeKey = activeRoutedTab(visible, basePath, location.pathname)?.key;
+  const matched = activeRoutedTab(visible, basePath, location.pathname)?.key;
+  const fallback = visible.find((item) => item.key === fallbackKey) ?? visible[0];
+  const activeKey = matched ?? fallback?.key ?? null;
 
   const select = (key: string | number | null) => {
     const next = visible.find((item) => item.key === key);
     if (next) navigate(routedTabPath(basePath, next.path));
   };
-  const textOf = (item: RoutedTabItem) =>
-    getTextValue?.(item) ?? (typeof item.label === 'string' ? item.label : item.key);
+  /**
+   * The picker reports no change when its selected option is chosen again, so a nested URL would stay open. Tabs do
+   * report it (React Aria fires the selection again), so `select` already covers them.
+   */
+  const reselect = (item: RoutedTabItem) => {
+    const path = routedTabPath(basePath, item.path);
+    if (item.key === activeKey && location.pathname !== path) navigate(path);
+  };
+  const textOf = (item: RoutedTabItem) => (typeof item.label === 'string' ? item.label : item.key);
 
   return (
     <div className={className}>
       <div className="sm:hidden">
         <Select
           aria-label={ariaLabel}
-          value={activeKey ?? null}
+          value={activeKey}
           onChange={select}
           fullWidth
           data-cy={dataCy ? `${dataCy}-mobile-picker` : undefined}
@@ -81,7 +94,13 @@ export function RoutedTabs({
           <SelectPopover>
             <ListBox>
               {visible.map((item) => (
-                <ListBoxItem key={item.key} id={item.key} textValue={textOf(item)}>
+                <ListBoxItem
+                  key={item.key}
+                  id={item.key}
+                  textValue={textOf(item)}
+                  onPress={() => reselect(item)}
+                  data-cy={`select-item-${item.key}`}
+                >
                   {item.label}
                 </ListBoxItem>
               ))}

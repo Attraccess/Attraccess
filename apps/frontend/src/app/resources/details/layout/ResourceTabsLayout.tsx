@@ -179,6 +179,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
           path: tab.path,
         }))}
         basePath={`/resources/${resourceId}`}
+        fallbackKey="overview"
         aria-label={t('tabs.mobilePickerLabel')}
         data-cy="resource-tabs"
       />

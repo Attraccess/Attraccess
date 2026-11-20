@@ -63,14 +63,20 @@ describe('createPluginApiClient', () => {
     );
   });
 
-  it('joins sentence-style validation messages without a stray ".,"', async () => {
-    fetchMock.mockReturnValue(
-      respond(JSON.stringify({ message: ['url: The URL is too long.', 'credential: Too short.'] }), { status: 400 }),
-    );
+  it.each([
+    [['url: The URL is too long.', 'credential: Too short.'], 'url: The URL is too long. credential: Too short.'],
+    [['Stop!', 'Really?', 'yes'], 'Stop! Really? yes'],
+    [['A sentence.', 'a fragment', 'another fragment'], 'A sentence. a fragment, another fragment'],
+    [['a fragment', 'A sentence.'], 'a fragment, A sentence.'],
+    [['  first  ', '', '   ', 'second'], 'first, second'],
+  ])('joins validation messages %j without a stray ".,"', async (message, expected) => {
+    fetchMock.mockReturnValue(respond(JSON.stringify({ message }), { status: 400 }));
 
-    await expect(createPluginApiClient().request('/api/demo/things')).rejects.toThrow(
-      new PluginApiError('url: The URL is too long. credential: Too short.', 400),
-    );
+    const error = await createPluginApiClient()
+      .request('/api/demo/things')
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(PluginApiError);
+    expect(error).toMatchObject({ message: expected, status: 400 });
   });
 
   it('falls back to a status message when the error body is not JSON', async () => {

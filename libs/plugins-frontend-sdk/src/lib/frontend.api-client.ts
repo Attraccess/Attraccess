@@ -59,7 +59,7 @@ export interface PluginApiClient {
  * Joins validation messages into one text. Messages that already end a sentence are separated by a space, so
  * "The URL is too long." and "The token is short." never become "long., token".
  */
-export function joinErrorMessages(parts: readonly string[]): string {
+function joinErrorMessages(parts: readonly string[]): string {
   return parts
     .map((part) => part.trim())
     .filter(Boolean)
