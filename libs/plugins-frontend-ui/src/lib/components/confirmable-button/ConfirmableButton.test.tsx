@@ -47,6 +47,7 @@ describe('ConfirmableButton', () => {
     const dialog = screen.getByRole('alertdialog');
     await userEvent.click(dialog.querySelector('[data-cy="confirm"]') as HTMLElement);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled());
+    expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('alertdialog')).toBeInTheDocument();
   });
 

@@ -91,7 +91,11 @@ describe('TableRowActions', () => {
       <TableRowActions itemName="Laser" actions={[edit(), { ...remove(), isHidden: true }]} />,
     );
     const menu = await openMenu();
-    expect(within(menu).getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Edit']);
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Edit']);
 
     rerender(<TableRowActions itemName="Laser" actions={[{ ...edit(), isHidden: true }]} />);
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Actions for Laser' })).toBeNull());
@@ -153,6 +157,10 @@ describe('TableRowActions', () => {
       </Table>,
     );
     expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
+    // Positive control: a click elsewhere in the row does run the row action.
+    await userEvent.click(screen.getByText('Laser'));
+    expect(onRowAction).toHaveBeenCalledTimes(1);
+    onRowAction.mockClear();
 
     await userEvent.click(within(await openMenu()).getByRole('menuitem', { name: 'Edit' }));
     expect(onEdit).toHaveBeenCalledTimes(1);

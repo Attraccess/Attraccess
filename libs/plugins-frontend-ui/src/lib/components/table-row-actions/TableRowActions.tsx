@@ -17,7 +17,12 @@ import {
 import { buttonVariants } from '@heroui/styles';
 import { MoreVerticalIcon } from 'lucide-react';
 import { useTranslations } from '../../i18n';
-import { ConfirmableButton, ConfirmableConfirmOptions, ConfirmableHost, ConfirmableStatus } from '../confirmable-button';
+import {
+  ConfirmableButton,
+  ConfirmableConfirmOptions,
+  ConfirmableHost,
+  ConfirmableStatus,
+} from '../confirmable-button';
 import en from './en.json';
 import de from './de.json';
 
@@ -38,7 +43,10 @@ export interface TableRowAction {
   /** The action; with `confirm`, it runs after the user confirms. */
   onPress?: () => unknown;
   href?: string;
-  /** Asks for confirmation first; status defaults to `error` for danger actions, `warning` otherwise. */
+  /**
+   * Asks for confirmation first; status defaults to `error` for danger actions, `warning` otherwise.
+   * An action with `confirm` runs `onPress` after confirming and never follows `href`.
+   */
   confirm?: ConfirmableConfirmOptions & { status?: ConfirmableStatus };
   'data-cy'?: string;
 }
@@ -95,7 +103,11 @@ function groupActions(actions: TableRowAction[], sections: TableRowActionSection
     groups.get(key)?.push(action);
   }
   return order
-    .map((key) => ({ key, title: sections.find((section) => section.key === key)?.title, actions: groups.get(key) ?? [] }))
+    .map((key) => ({
+      key,
+      title: sections.find((section) => section.key === key)?.title,
+      actions: groups.get(key) ?? [],
+    }))
     .filter((group) => group.actions.length > 0);
 }
 
@@ -133,7 +145,8 @@ function renderAction(action: TableRowAction) {
       status={status ?? (action.tone === 'danger' ? 'error' : 'warning')}
       confirm={confirm}
       onConfirm={() => action.onPress?.()}
-      renderActivator={(open) => <ActionItem action={action} onAction={open} />}
+      // Without the href, choosing the item only opens the confirmation instead of navigating straight away.
+      renderActivator={(open) => <ActionItem action={{ ...action, href: undefined }} onAction={open} />}
     />
   );
 }
@@ -171,7 +184,10 @@ export function TableRowActions(props: Readonly<TableRowActionsProps>) {
               {groups.map((group, index) => (
                 <Fragment key={group.key}>
                   {index > 0 && <Separator />}
-                  <DropdownSection id={group.key} aria-label={typeof group.title === 'string' ? group.title : undefined}>
+                  <DropdownSection
+                    id={group.key}
+                    aria-label={typeof group.title === 'string' ? group.title : undefined}
+                  >
                     {group.title !== undefined && <Header>{group.title}</Header>}
                     {group.actions.map(renderAction)}
                   </DropdownSection>
