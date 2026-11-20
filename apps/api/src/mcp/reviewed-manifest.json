@@ -54,6 +54,11 @@
     "reason": "Credential flow: re-sends the e-mail verification token.",
     "shape": "e60b5347"
   },
+  "changeUnverifiedEmail": {
+    "decision": "deny",
+    "reason": "Credential flow: takes the account password to redirect the e-mail verification token.",
+    "shape": "a36a9c86"
+  },
   "acceptInvitation": {
     "decision": "deny",
     "reason": "Credential flow: accepts an account invitation with a one-time token and sets the password.",
