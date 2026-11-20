@@ -7,7 +7,12 @@ config-ui) to an encrypted restic repository and prunes old snapshots.
 
 Without `BACKUP_REPOSITORY` the container logs one warning and idles: nothing is backed up.
 
-## Settings (environment, e.g. balena device/fleet variables)
+## Settings (environment, e.g. balena device variables)
+
+Use one restic repository per installation. Set `BACKUP_REPOSITORY` as a **device** variable (or give each device its
+own path in the repository), not as a fleet variable: a fleet variable gives every device of the fleet the same
+repository. If several installations must share one repository, give each its own `BACKUP_HOST`; otherwise their
+retention (`forget --prune`) and `restore latest` mix up the snapshots of different installations.
 
 | Variable                                                 | Default             | Meaning                                                                     |
 | -------------------------------------------------------- | ------------------- | --------------------------------------------------------------------------- |
@@ -16,14 +21,16 @@ Without `BACKUP_REPOSITORY` the container logs one warning and idles: nothing is
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `B2_*`, …  | –                   | credentials of the target, passed to restic unchanged                       |
 | `BACKUP_SCHEDULE`                                        | `0 3 * * *`         | 5-field cron expression (container time zone, `TZ`)                         |
 | `BACKUP_KEEP_DAILY` / `BACKUP_KEEP_WEEKLY` / `…_MONTHLY` | `7`/`4`/`6`         | retention                                                                   |
+| `BACKUP_HOST`                                            | `attraccess`        | restic host name: backup, retention, `snapshots` and `restore` only use it  |
 | `DATABASE_URL` (or `BACKUP_DATABASE_URL`)                | from stack          | database to dump and restore (`BACKUP_DATABASE_URL` wins when both are set) |
 | `BACKUP_PG_WAIT_SECONDS`                                 | `120`               | how long a run waits for PostgreSQL before it fails                         |
 | `BACKUP_FORCE`                                           | –                   | `true` makes every `restore` behave as `restore --force`                    |
 | `BACKUP_STATE_DIR`                                       | `/var/lib/backup`   | scratch space: dump during a run, restic cache, lock, metric file           |
 | `BACKUP_DATA_DIR`                                        | `/external-storage` | the volumes to back up and restore (mounted below it)                       |
 
-The password in the database URL may be percent-encoded. The tools get the URL without the password on their command
-line (visible in `ps`); the password goes to libpq through `PGPASSWORD`.
+The password in the database URL may be percent-encoded, in the user info (`user:password@host`) or as a `password=`
+query parameter. The tools get the URL without the password on their command line (visible in `ps`); the password goes
+to libpq through `PGPASSWORD`.
 
 A run logs `backup started`, then either `backup SUCCEEDED in …s` or `BACKUP FAILED`. After a success the file
 `/var/lib/backup/backup_last_success_timestamp_seconds.prom` holds `backup_last_success_timestamp_seconds <unix time>`
@@ -56,7 +63,8 @@ has tables unless `--force` (which replaces its contents). Stop the other servic
 Name the snapshot explicitly (`attraccess-backup snapshots` lists them) rather than relying on `latest`: a backup of a
 freshly set-up, empty stack is also a snapshot, and it becomes `latest`.
 
-Restoring onto a new device: bring up the stack with the same `BACKUP_REPOSITORY` and `BACKUP_PASSWORD`, stop the
+Restoring onto a new device: bring up the stack with the same `BACKUP_REPOSITORY`, `BACKUP_PASSWORD` and `BACKUP_HOST`
+(if you set one), stop the
 other services and run `restore --force <snapshot-id>` (the first start already created the empty tables). Do it
 **before** the first scheduled backup of the new device (by default at 03:00); if one already ran, pick the snapshot
 of the old device from `attraccess-backup snapshots` by its time.

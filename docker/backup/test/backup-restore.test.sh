@@ -106,19 +106,32 @@ grep -q "restoring snapshot $snapshot_id" "$work/force.log" || die "the named sn
 [ "$(psql -X -A -t -d "$(admin_url_for "$db_dst")" -c "SELECT to_regclass('added_after_snapshot') IS NULL")" = "t" ] || die "forced restore left a table that is not in the snapshot"
 pass "restore refuses a non-empty database and replaces it with --force from a named snapshot"
 
-# 6. The database password never appears on a command line (ps), neither plain nor percent-encoded.
+# 6. A password given as a `password=` query parameter also goes through the environment; other parameters stay. A
+#    second installation with its own BACKUP_HOST in the same repository neither sees nor prunes the first one's
+#    snapshots.
+count_snapshots() { "$lib/entrypoint.sh" snapshots --json | grep -o '"short_id"' | wc -l | tr -d ' '; }
+first_host_snapshots="$(count_snapshots)"
+query_url="$(admin_url_for "$db_src" | sed "s|://[^@]*@|://$role@|")?application_name=attraccess-backup-test&password=$role_password_encoded"
+DATABASE_URL="$query_url" BACKUP_HOST=second-installation sh "$lib/backup.sh" >"$work/query.log" 2>&1 ||
+  { cat "$work/query.log"; die "backup with a password query parameter failed"; }
+grep -q 'application_name=attraccess-backup-test' "$work/argv.log" || die "the other query parameters were dropped"
+[ "$(export BACKUP_HOST=second-installation; count_snapshots)" = 1 ] || die "the second installation must see only its own snapshot"
+[ "$(count_snapshots)" = "$first_host_snapshots" ] || die "the second installation changed the first one's snapshots"
+pass "a password query parameter is supported and BACKUP_HOST separates installations in one repository"
+
+# 7. The database password never appears on a command line (ps), neither plain nor percent-encoded.
 [ -s "$work/argv.log" ] || die "the tool shims recorded nothing"
 if grep -qF -e "$role_password" -e "$role_password_encoded" "$work/argv.log"; then cat "$work/argv.log" >&2; die "the database password was on a command line"; fi
 pass "the database password is passed through the environment, not the command line"
 
-# 7. Without BACKUP_REPOSITORY the scheduler logs one warning and idles; backup and snapshots fail loudly.
+# 8. Without BACKUP_REPOSITORY the scheduler logs one warning and idles; backup and snapshots fail loudly.
 out="$(env -u BACKUP_REPOSITORY timeout 3 "$lib/entrypoint.sh" run 2>&1 || true)"
 [ "$(printf '%s\n' "$out" | grep -c 'WARNING')" = "1" ] || die "expected exactly one warning, got: $out"
 if env -u BACKUP_REPOSITORY sh "$lib/backup.sh" >/dev/null 2>&1; then die "backup without a repository must fail"; fi
 if env -u BACKUP_REPOSITORY "$lib/entrypoint.sh" snapshots >/dev/null 2>&1; then die "snapshots without a repository must fail"; fi
 pass "no repository: one warning, idle, backup refuses"
 
-# 8. A wrong password fails loudly and reports failure.
+# 9. A wrong password fails loudly and reports failure.
 if BACKUP_PASSWORD=wrong sh "$lib/backup.sh" >"$work/wrong.log" 2>&1; then die "wrong password must fail"; fi
 grep -q 'BACKUP FAILED' "$work/wrong.log" || die "missing failure line"
 grep -q 'wrong BACKUP_PASSWORD' "$work/wrong.log" || die "a wrong password must be named as the cause"
@@ -126,7 +139,7 @@ if grep -q 'initialising the restic repository' "$work/wrong.log"; then die "a w
 [ ! -e "$work/state/dump/attraccess.dump" ] || die "a failed backup left the plaintext dump behind"
 pass "a failing backup logs BACKUP FAILED, names the wrong password and removes the dump"
 
-# 9. An invalid BACKUP_SCHEDULE is reported and disables the scheduler (crond would skip such a line silently).
+# 10. An invalid BACKUP_SCHEDULE is reported and disables the scheduler (crond would skip such a line silently).
 for bad in 'bad' '* * * *' '61 25 * * *' '0 24 * * *' '0 3 32 * *' '0 3 * 13 *' '0 3 * * 8'; do
   out="$(BACKUP_SCHEDULE="$bad" timeout 3 "$lib/entrypoint.sh" run 2>&1 || true)"
   printf '%s\n' "$out" | grep -q 'BACKUP_SCHEDULE must be' || die "schedule '$bad' must be rejected, got: $out"

@@ -174,6 +174,10 @@ Limits of adopted tables:
 - `f.decimal` is not allowed on an adopted table (1.x stored decimals differently). Keep such a column as it was
   stored, for example `f.string()`, or copy it into a new table (below).
 - There is no binary field type. A 1.x `blob` column declared as `f.text()` reads as base64 text; write base64 too.
+- A step that drops an index backing a constraint (a UNIQUE constraint or the primary key) is refused when the
+  migration runs. So is a step that drops a column that is part of an index or key, or that a UNIQUE, CHECK or
+  foreign key constraint uses. PostgreSQL would remove these along with it. Nothing is changed. To leave such a layout
+  behind, copy the rows into a new table (below).
 
 **1.x names the host refuses.** When a 1.x table name is one of the forbidden names above, the table cannot be
 declared, so a 2.0 build can neither read, adopt nor drop it. Contact the Attraccess maintainers before you release

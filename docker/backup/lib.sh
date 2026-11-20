@@ -10,7 +10,10 @@ DATA_DIR="${BACKUP_DATA_DIR:-/external-storage}"
 DUMP_DIR="$STATE_DIR/dump"
 DUMP_FILE="$DUMP_DIR/attraccess.dump"
 METRIC_FILE="$STATE_DIR/backup_last_success_timestamp_seconds.prom"
-RESTIC_HOST="attraccess"
+# The restic host name groups this installation's snapshots: backup, forget --prune, snapshots and restore only see
+# their own host. Keep the default unless several installations share one repository (then give each its own
+# BACKUP_HOST). A replacement device restores with the same value (the default works without setting anything).
+RESTIC_HOST="${BACKUP_HOST:-attraccess}"
 
 log() {
   printf '%s backup: %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$*"
@@ -48,7 +51,9 @@ percent_decode() {
 
 # Reads DATABASE_URL (or BACKUP_DATABASE_URL) and sets PG_URL to the same URL WITHOUT the password, and exports the
 # (percent-decoded) password as PGPASSWORD. The PostgreSQL tools get PG_URL on their command line, which every process
-# on the host can read (ps); libpq takes the password from the environment. Call it in the main shell, not in $(...).
+# on the host can read (ps); libpq takes the password from the environment. The password may be in the user info
+# (user:password@host) or in a `password=` query parameter; both are removed from PG_URL (the query parameter wins,
+# like in libpq). Call it in the main shell, not in $(...).
 connect_database() {
   url="${BACKUP_DATABASE_URL:-${DATABASE_URL:-}}"
   [ -n "$url" ] || fail "DATABASE_URL (or BACKUP_DATABASE_URL) is required"
@@ -75,7 +80,25 @@ connect_database() {
       authority="$userinfo@${authority##*@}"
       ;;
   esac
-  PG_URL="$scheme://$authority$tail"
+  db_path="${tail%%\?*}"
+  query=""
+  case "$tail" in *\?*) query="${tail#*\?}" ;; esac
+  kept=""
+  saved_ifs="$IFS"
+  IFS='&'
+  set -f
+  for parameter in $query; do
+    case "$parameter" in
+      password=*)
+        PGPASSWORD="$(percent_decode "${parameter#password=}")"
+        export PGPASSWORD
+        ;;
+      ?*) kept="${kept:+$kept&}$parameter" ;;
+    esac
+  done
+  set +f
+  IFS="$saved_ifs"
+  PG_URL="$scheme://$authority$db_path${kept:+?$kept}"
 }
 
 # Waits until PostgreSQL accepts connections; fails loudly after BACKUP_PG_WAIT_SECONDS (default 120).

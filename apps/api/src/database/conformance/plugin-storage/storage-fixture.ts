@@ -33,7 +33,7 @@ export interface ColumnInfo {
 
 /**
  * A migrated database of the backend under test, with the introspection and seeding the suite needs for its
- * assertions. ATT-584 adds a PostgreSQL fixture next to the SQLite one; the suite stays as it is.
+ * assertions. PostgreSQL is the runtime backend; the SQLite flavor is left for the transfer specs that read 1.x data.
  */
 export interface StorageDatabase {
   /** The engine family: the few cases that depend on how it stores data (a binary value in a text column) branch on it. */

@@ -103,7 +103,12 @@ Der balena-Stack (`docker-compose.balena.yml`) enthält einen Dienst `backup`. E
 
 Ohne `BACKUP_REPOSITORY` meldet der Dienst einmal eine Warnung und tut nichts: **Es wird kein Backup erstellt, bis Sie ein Repository konfigurieren.**
 
-Setzen Sie diese Werte als balena-Geräte- oder Flottenvariablen:
+> [!IMPORTANT]
+> Der Sidecar ersetzt Duplicati, das frühere balena-Releases enthielten. Das Update entfernt Duplicati und seine Backup-Jobs. Erstellen Sie vor dem Update ein letztes Duplicati-Backup und setzen Sie danach die Variablen unten.
+
+Nutzen Sie **ein Repository pro Installation**. Setzen Sie `BACKUP_REPOSITORY` als **Gerätevariable** (oder geben Sie jedem Gerät einen eigenen Pfad), nicht als Flottenvariable: Eine Flottenvariable gibt allen Geräten der Flotte dasselbe Repository. Müssen sich Geräte ein Repository teilen, geben Sie jedem ein eigenes `BACKUP_HOST`. Sonst löscht die Aufbewahrung eines Geräts Snapshots der anderen, und `restore` ohne Snapshot-ID kann die Daten eines anderen Geräts wiederherstellen.
+
+Setzen Sie diese Werte als balena-Gerätevariablen:
 
 | Variable                                                         | Standard      | Bedeutung                                                                                       |
 | ---------------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------- |
@@ -112,6 +117,7 @@ Setzen Sie diese Werte als balena-Geräte- oder Flottenvariablen:
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `B2_*`, …          | –             | Zugangsdaten des Ziels, unverändert an restic weitergereicht                                    |
 | `BACKUP_SCHEDULE`                                                | `0 3 * * *`   | Cron-Ausdruck mit 5 Feldern in der Zeitzone des Containers (`TZ`): täglich um 03:00 Uhr         |
 | `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY` | `7`, `4`, `6` | Aufbewahrung: Wie viele tägliche, wöchentliche und monatliche Snapshots bleiben                 |
+| `BACKUP_HOST`                                                    | `attraccess`  | Name dieser Installation im Repository; nur nötig, wenn sich Geräte eines teilen                |
 
 Ein Lauf protokolliert `backup started` und danach entweder `backup SUCCEEDED in …s` oder `BACKUP FAILED`. Nach einem Erfolg schreibt der Sidecar den Zeitpunkt des letzten Erfolgs in die Datei `backup_last_success_timestamp_seconds.prom` im Volume `backup-state` (Prometheus-Textfile-Format). Standardmäßig liest niemand diese Datei, und es ist kein Alarm eingerichtet: Um bei einem ausbleibenden Backup alarmiert zu werden, binden Sie das Volume in einen Textfile-Collector von node-exporter ein (`--collector.textfile.directory`) und legen selbst eine Alarmregel an.
 
@@ -138,7 +144,7 @@ balena-engine exec -it <backup-container> attraccess-backup snapshots
 
 3. Starten Sie die übrigen Dienste wieder.
 
-Für eine Wiederherstellung auf einem neuen Gerät starten Sie den Stack, setzen dieselben `BACKUP_*`-Variablen, stoppen die übrigen Dienste und führen die Wiederherstellung mit `--force` und der Snapshot-ID aus: Der erste Start von Attraccess hat die (leeren) Tabellen bereits angelegt, `--force` ersetzt sie. Tun Sie das, **bevor** das erste geplante Backup des neuen Geräts läuft (standardmäßig um 03:00 Uhr): Dieses Backup sichert die leere neue Installation und wird zu `latest`. Ist es schon gelaufen, wählen Sie den Snapshot des alten Geräts anhand seines Zeitpunkts in der Liste von `snapshots`.
+Für eine Wiederherstellung auf einem neuen Gerät starten Sie den Stack, setzen dieselben `BACKUP_*`-Variablen (auch `BACKUP_HOST`, falls Sie es gesetzt haben), stoppen die übrigen Dienste und führen die Wiederherstellung mit `--force` und der Snapshot-ID aus: Der erste Start von Attraccess hat die (leeren) Tabellen bereits angelegt, `--force` ersetzt sie. Tun Sie das, **bevor** das erste geplante Backup des neuen Geräts läuft (standardmäßig um 03:00 Uhr): Dieses Backup sichert die leere neue Installation und wird zu `latest`. Ist es schon gelaufen, wählen Sie den Snapshot des alten Geräts anhand seines Zeitpunkts in der Liste von `snapshots`.
 
 ## Coolify
 

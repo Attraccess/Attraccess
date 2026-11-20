@@ -67,7 +67,7 @@ TLS is configured with `DATABASE_SSL` only. TLS parameters in `DATABASE_URL` (`s
 
 The balena stack (`docker-compose.balena.yml`) starts a `postgres` service with the user and database `attraccess`. balena cannot build values from other variables, so the stack reads the database settings from `.env.docker-compose`, which ships with the placeholder password `change-me`. **Replace it before the first start** (or before the upgrade that adds PostgreSQL): the `postgres` image fixes the password when it creates the `postgres-data` volume, and changing the variable later has no effect on an existing volume.
 
-Set these as balena device or fleet variables (they override `.env.docker-compose`):
+Set **both** as balena device variables, with the same password (they override `.env.docker-compose`):
 
 | Variable            | Value                                                                                                    |
 | ------------------- | -------------------------------------------------------------------------------------------------------- |
@@ -92,11 +92,12 @@ The balena stack contains a `backup` service that backs up the database and the 
 
 | Variable                                                         | Default             | Description                                                                                                                                                                       |
 | ---------------------------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BACKUP_REPOSITORY`                                              | –                   | restic repository, e.g. `s3:s3.amazonaws.com/bucket/attraccess`. Without it no backup runs.                                                                                       |
+| `BACKUP_REPOSITORY`                                              | –                   | restic repository, e.g. `s3:s3.amazonaws.com/bucket/attraccess`. Without it no backup runs. Set it as a device variable, not a fleet variable.                                    |
 | `BACKUP_PASSWORD`                                                | –                   | Encrypts the repository. Required; without it the backups cannot be read.                                                                                                         |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `B2_*`, …          | –                   | Credentials of the backup target, passed to restic unchanged.                                                                                                                     |
 | `BACKUP_SCHEDULE`                                                | `0 3 * * *`         | Cron expression (5 fields); by default every night at 03:00.                                                                                                                      |
 | `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY` | `7`, `4`, `6`       | How many daily, weekly and monthly snapshots are kept.                                                                                                                            |
+| `BACKUP_HOST`                                                    | `attraccess`        | Name of this installation in the repository. Use one repository per installation; only when devices share one, give each its own `BACKUP_HOST`.                                   |
 | `BACKUP_DATABASE_URL`                                            | `DATABASE_URL`      | Database to dump and restore, when it differs from `DATABASE_URL` (other credentials, or libpq TLS parameters such as `?sslmode=require`, which `DATABASE_URL` must not contain). |
 | `BACKUP_PG_WAIT_SECONDS`                                         | `120`               | How long a run waits for PostgreSQL before it fails.                                                                                                                              |
 | `BACKUP_FORCE`                                                   | –                   | `true` makes every restore replace a non-empty database, like `restore --force`.                                                                                                  |

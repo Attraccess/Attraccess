@@ -103,7 +103,12 @@ The balena stack (`docker-compose.balena.yml`) contains a `backup` service. Ever
 
 Without `BACKUP_REPOSITORY` the service logs one warning and does nothing: **no backup is made until you configure a repository.**
 
-Set these as balena device or fleet variables:
+> [!IMPORTANT]
+> The sidecar replaces Duplicati, which earlier balena releases contained. Updating removes Duplicati and its backup jobs. Take a last Duplicati backup before you update, then set the variables below.
+
+Use **one repository per installation**. Set `BACKUP_REPOSITORY` as a **device** variable (or give each device its own path), not as a fleet variable: a fleet variable gives every device of the fleet the same repository. If devices must share a repository, give each its own `BACKUP_HOST`. Otherwise the retention of one device deletes snapshots of the others, and `restore` without a snapshot id can restore another device's data.
+
+Set these as balena device variables:
 
 | Variable                                                         | Default       | Meaning                                                                                |
 | ---------------------------------------------------------------- | ------------- | -------------------------------------------------------------------------------------- |
@@ -112,6 +117,7 @@ Set these as balena device or fleet variables:
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `B2_*`, …          | –             | Credentials of the target, passed to restic unchanged                                  |
 | `BACKUP_SCHEDULE`                                                | `0 3 * * *`   | 5-field cron expression in the container time zone (`TZ`): daily at 03:00              |
 | `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY` | `7`, `4`, `6` | Retention: how many daily, weekly and monthly snapshots are kept                       |
+| `BACKUP_HOST`                                                    | `attraccess`  | Name of this installation in the repository; only needed when devices share one        |
 
 A run logs `backup started`, then either `backup SUCCEEDED in …s` or `BACKUP FAILED`. After a success the sidecar writes the time of the last success to `backup_last_success_timestamp_seconds.prom` in the `backup-state` volume (Prometheus textfile format). Nothing collects this file by default and no alert is set up: to alert on a missing backup, attach the volume to a node-exporter textfile collector (`--collector.textfile.directory`) and add an alert rule yourself.
 
@@ -138,7 +144,7 @@ balena-engine exec -it <backup container> attraccess-backup snapshots
 
 3. Start the other services again.
 
-To restore onto a new device, bring the stack up, set the same `BACKUP_*` variables, stop the other services and run the restore with `--force` and the snapshot id: the first start of Attraccess has already created the (empty) tables, which `--force` replaces. Do this **before** the first scheduled backup of the new device runs (by default at 03:00): that backup saves the empty new installation and becomes `latest`. If it has already run, pick the snapshot of the old device by its time in the `snapshots` list.
+To restore onto a new device, bring the stack up, set the same `BACKUP_*` variables (including `BACKUP_HOST` if you set one), stop the other services and run the restore with `--force` and the snapshot id: the first start of Attraccess has already created the (empty) tables, which `--force` replaces. Do this **before** the first scheduled backup of the new device runs (by default at 03:00): that backup saves the empty new installation and becomes `latest`. If it has already run, pick the snapshot of the old device by its time in the `snapshots` list.
 
 ## Coolify
 

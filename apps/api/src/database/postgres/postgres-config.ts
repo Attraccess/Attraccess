@@ -2,8 +2,8 @@
  * The PostgreSQL connection configuration (DATABASE_URL, DATABASE_SSL, DATABASE_POOL_MAX, DATABASE_SCHEMA).
  * Validation errors never contain the URL, its password or any other part of the value: only the variable name.
  */
-export const UPGRADE_DOCS_URL =
-  'https://docs.attraccess.org/#/en/installation/updating?id=moving-from-sqlite-to-postgresql';
+// Defined once, with the database type that links it; re-exported for callers of the PostgreSQL configuration.
+export { UPGRADE_DOCS_URL } from '../backend/database-type';
 /** The database settings reference (docsify: only `/#/<lang>/<page>?id=<heading>` resolves). */
 export const DATABASE_SETTINGS_DOCS_URL =
   'https://docs.attraccess.org/#/en/installation/environment-variables?id=database';

@@ -37,9 +37,10 @@ services:
 
   # PostgreSQL: the only database of Attraccess. Not published, only the other services of the app reach it.
   # Balena does not interpolate ${VAR} from device variables, so the credentials come from .env.docker-compose
-  # (POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB and DATABASE_URL for the API). Set the SAME values as balena
-  # device/fleet variables (they override the file) BEFORE the first start: the password is fixed when the data
-  # volume is initialised. The settings below suit small devices (Raspberry Pi class, 1-2 GB RAM).
+  # (POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB and DATABASE_URL for the API). Set POSTGRES_PASSWORD and
+  # DATABASE_URL (with the same password) as balena device variables (they override the file) BEFORE the first
+  # start: the password is fixed when the data volume is initialised. The settings below suit small devices
+  # (Raspberry Pi class, 1-2 GB RAM).
   postgres:
     image: 'postgres:18.6-alpine'
     restart: unless-stopped
@@ -306,9 +307,10 @@ services:
       - grafana
 
   # Scheduled restic backups of the database (pg_dump) and of the volumes below (docker/backup/README.md).
-  # Without BACKUP_REPOSITORY it logs one warning and idles. Configure with balena device/fleet variables:
+  # Without BACKUP_REPOSITORY it logs one warning and idles. Configure with balena device variables:
   # BACKUP_REPOSITORY, BACKUP_PASSWORD, the target's credentials (e.g. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY),
   # optionally BACKUP_SCHEDULE (cron, default '0 3 * * *') and BACKUP_KEEP_DAILY/WEEKLY/MONTHLY (7/4/6).
+  # One repository per device: BACKUP_REPOSITORY as a fleet variable would share it; then set BACKUP_HOST per device.
   # Restore (stop the other services first): `docker compose run --rm backup restore [snapshot]`, on a balena device
   # `balena-engine exec -it <backup container> attraccess-backup restore [snapshot]`.
   # The volumes are mounted writable only because `restore` writes them back; a backup run only reads them.

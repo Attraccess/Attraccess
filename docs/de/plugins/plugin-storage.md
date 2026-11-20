@@ -182,6 +182,11 @@ Grenzen übernommener Tabellen:
   (siehe unten).
 - Es gibt keinen Binärtyp. Eine 1.x-Spalte vom Typ `blob`, als `f.text()` deklariert, liest sich als Base64-Text;
   schreiben Sie ebenfalls Base64.
+- Ein Schritt, der einen Index löscht, hinter dem ein Constraint steht (ein UNIQUE-Constraint oder der Primärschlüssel),
+  wird beim Ausführen der Migration abgelehnt. Ebenso ein Schritt, der eine Spalte löscht, die Teil eines Index oder
+  Schlüssels ist oder die ein UNIQUE-, CHECK- oder Fremdschlüssel-Constraint nutzt. PostgreSQL würde diese mit
+  entfernen. Nichts wird geändert. Um ein solches Layout hinter sich zu lassen, kopieren Sie die Zeilen in eine neue
+  Tabelle (siehe unten).
 
 **1.x-Namen, die der Host ablehnt.** Ist ein 1.x-Tabellenname einer der oben verbotenen Namen, lässt sich die Tabelle
 nicht deklarieren; ein 2.0-Build kann sie dann weder lesen noch übernehmen noch löschen. Wenden Sie sich an die
