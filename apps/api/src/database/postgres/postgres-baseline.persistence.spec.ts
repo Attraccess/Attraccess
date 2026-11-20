@@ -174,6 +174,21 @@ describe('PostgreSQL baseline migration', () => {
     }
   });
 
+  it('keeps a maintenance request when the user who reported or resolved it is deleted', async () => {
+    await user(7);
+    await user(8);
+    const request = await one<{ id: number }>(
+      `INSERT INTO resource_maintenance_request ("resourceId", reason, "createdByUserId", "resolvedByUserId")
+       VALUES (1, 'Spindle noise', 7, 8) RETURNING id`,
+    );
+    await source.query('DELETE FROM "user" WHERE id IN (7, 8)');
+    const kept = await one<{ created: number | null; resolved: number | null }>(
+      `SELECT "createdByUserId" AS created, "resolvedByUserId" AS resolved FROM resource_maintenance_request WHERE id = $1`,
+      [request.id],
+    );
+    expect(kept).toEqual({ created: null, resolved: null });
+  });
+
   describe('on an empty database with the application entities loaded (the migration CLI)', () => {
     let empty: DataSource;
     beforeAll(async () => {
