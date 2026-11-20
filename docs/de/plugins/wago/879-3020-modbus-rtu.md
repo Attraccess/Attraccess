@@ -44,15 +44,25 @@ Richtungssteuerung der Firmware; er schaltet keine GPIOs und benötigt keinen pr
 
 ## Messwerte konfigurieren
 
-1. Öffnen Sie die Seite **Konfigurieren** des Controllers, dann **Externe Geräte**.
-2. Fügen Sie eine RTU-Verbindung mit den oben genannten Einstellungen hinzu. Beginnen Sie mit 2000 ms Antwort-Timeout
-   und einer gemeinsamen Verbindung für den RS-485-Bus.
-3. Fügen Sie das Messgerät mit Geräteadresse 1 und dem Profil **WAGO 879-3020 (4PS) — Modbus RTU** hinzu.
-4. Fügen Sie Messwertkanäle hinzu, die an die benötigten Signale gebunden sind. Auf der Seite **Ein- & Ausgänge**
-   erzeugt **Modbus-Gerät hinzufügen** alle Kanäle auf einmal, mit aktivierten empfohlenen Messwerten (siehe
+1. Wählen Sie unter **WAGO-Steuerungen** beim Controller **Konfigurieren**. Die Frontplatte
+   **Ein- & Ausgänge** öffnet sich.
+2. Wählen Sie auf der Karte **Integrierte CC100-Ein- und Ausgänge** die Zusammenfassung der
+   RS-485-Schnittstelle (zum Beispiel `RS-485-Schnittstelle · 9600 E1`), um
+   **RS-485-Schnittstelle konfigurieren** zu öffnen. Stellen Sie Baudrate, Parität und Stoppbits auf
+   die Einstellungen des Messgeräts ein; die Standardwerte (9600, gerade, 1) entsprechen seinen
+   Werkseinstellungen. Diese Einstellungen gelten für alle Geräte an der RS-485-Schnittstelle des
+   CC100, die ein Antwort-Timeout von 1000 ms verwendet.
+3. Wählen Sie **Modbus-Gerät hinzufügen**. Das neue Gerät verwendet das Profil
+   **WAGO 879-3020 (4PS) — Modbus RTU** an der RS-485-Schnittstelle des CC100, die nächste freie
+   Modbus-Adresse und ein Leseintervall von 5 Sekunden. Es erhält alle Kanäle auf einmal, mit
+   aktivierten empfohlenen Messwerten (siehe
    [Standard-Messwerte](#standard-messwerte-und-weitere-aktivieren)).
-5. Speichern, prüfen und veröffentlichen Sie. Warten Sie, bis die Revision angewendet wurde, und prüfen Sie dann
-   die frischen Messwerte unter **Diagnose**.
+4. Geben Sie in den Geräteeinstellungen unter **Name** einen Namen ein, stellen Sie die **Modbus-Adresse** auf
+   die Adresse des Messgeräts (Werkseinstellung 1), passen Sie bei Bedarf die Messwerte an und
+   wählen Sie **Fertig**.
+5. Wählen Sie **Auf Controller anwenden**, prüfen Sie die aktuellen Ausgangspegel und betroffene
+   Flows und bestätigen Sie. Sobald der Controller die Konfiguration angewendet hat, zeigt die
+   Gerätekarte Live-Messwerte.
 
 Das Profil stellt alle 131 dokumentierten, nicht reservierten FC03-Werte aus Anhang
 A3.2, Seiten 34–38, bereit. Die Frontplatte des Controllers gruppiert sie in aufklappbare Bereiche:
