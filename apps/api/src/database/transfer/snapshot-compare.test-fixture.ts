@@ -57,7 +57,15 @@ function rowsOf(table: TableSnapshot, columns: readonly string[]): unknown[][] {
  * the generic proof that nothing was lost, changed or reordered by moving a database to another engine. Returns the
  * differences; an empty list means equal.
  */
-export function compareSnapshots(expected: DatabaseSnapshot, actual: DatabaseSnapshot): TableDifference[] {
+export function compareSnapshots(
+  expected: DatabaseSnapshot,
+  actual: DatabaseSnapshot,
+  /**
+   * Columns of `actual` that migrations after the baseline added (`columnsAddedAfterBaseline`): data that came from
+   * the other engine has none of them, so they are left out. Every other column must match.
+   */
+  addedAfterBaseline: ReadonlyMap<string, readonly string[]> = new Map(),
+): TableDifference[] {
   const differences: TableDifference[] = [];
   const left = byName(expected);
   const right = byName(actual);
@@ -71,7 +79,11 @@ export function compareSnapshots(expected: DatabaseSnapshot, actual: DatabaseSna
     const target = right.get(name);
     if (!target) continue;
     const sourceColumns = source.columns.map((column) => column.name).sort();
-    const targetColumns = target.columns.map((column) => column.name).sort();
+    const added = new Set(addedAfterBaseline.get(name) ?? []);
+    const targetColumns = target.columns
+      .map((column) => column.name)
+      .filter((column) => !added.has(column) || sourceColumns.includes(column))
+      .sort();
     if (JSON.stringify(sourceColumns) !== JSON.stringify(targetColumns)) {
       differences.push({ table: name, detail: `columns differ: ${sourceColumns} vs ${targetColumns}` });
       continue;

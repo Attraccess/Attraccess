@@ -24,6 +24,12 @@ export interface MigrationTrack {
   readonly directory: string;
   /** The migration index module exports classes plus a few helper constants; TypeORM ignores the non-classes. */
   readonly migrations: readonly unknown[];
+  /**
+   * The migration whose schema equals the final schema of the engine this one replaced (the frozen SQLite track). A
+   * snapshot of that engine is imported at this point, and the migrations after it then run on its data, like on any
+   * upgraded database. Without it, this track imports no other engine's snapshot.
+   */
+  readonly foreignBaseline?: string;
 }
 
 /** What the plugin runtime needs from a backend: plugin storage migrations, plugin storage, host transactions. */

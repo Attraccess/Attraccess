@@ -8,6 +8,7 @@ import {
 import { compareSnapshots, rowCounts } from '../transfer/snapshot-compare.test-fixture';
 import { exportSqliteSnapshot, transferSqliteToPostgres } from '../transfer/sqlite-to-postgres';
 import { closeTestDataSource, createTestDataSource } from '../../test-utils/test-database';
+import { PostgresBaseline1760000000000 } from '../postgres/migrations/1760000000000-baseline';
 import { postgresBackend } from '../postgres/postgres-backend';
 import { postgresIntegrityViolations } from '../postgres/postgres-transfer';
 import { createSqliteSource } from '../sqlite/sqlite-source';
@@ -48,7 +49,9 @@ describe('SQLite to PostgreSQL transfer conformance', () => {
       await sqlite.destroy();
     }
     sqliteSnapshot = await exportSqliteSnapshot(workspace.file, [plugin], quiet);
-    target = await createTestDataSource();
+    // At the baseline, the schema the SQLite data has: the comparison then covers every column. The migrations after
+    // the baseline run on transferred data like on any upgraded database (postgres-migration-steps.persistence.spec).
+    target = await createTestDataSource({ migrations: [PostgresBaseline1760000000000], migrationsRun: true });
     const url = (target.options as { url: string }).url;
     await transferSqliteToPostgres({
       sqliteFile: workspace.file,

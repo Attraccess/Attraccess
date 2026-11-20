@@ -1,6 +1,7 @@
 import { postgresBackend } from '../../database/postgres/postgres-backend';
 import { postgresIntegrityViolations } from '../../database/postgres/postgres-transfer';
 import { disposeMigratedSqliteTemplate } from '../../database/transfer/sqlite-import.test-fixture';
+import { columnsAddedAfterBaseline } from '../../database/postgres/migrations-after-baseline.test-fixture';
 import { compareSnapshots, rowCounts } from '../../database/transfer/snapshot-compare.test-fixture';
 import type { DatabaseSnapshot } from '../../database/transfer-snapshot';
 import { olderStates } from './fixtures/older-states.test-fixture';
@@ -31,6 +32,7 @@ describe.each(olderStates)('transfer of the SQLite database of the $name', (stat
   let before: string;
   let finalSqlite: DatabaseSnapshot;
   let imported: DatabaseSnapshot;
+  let added: Map<string, string[]>;
 
   beforeAll(async () => {
     installation = await createOldInstallation(state);
@@ -39,6 +41,7 @@ describe.each(olderStates)('transfer of the SQLite database of the $name', (stat
     summary = await target.transfer(installation);
     finalSqlite = summary.snapshot;
     imported = await postgresBackend.transfer.exportSnapshot(target.source, { plugins: installation.plugins });
+    added = await columnsAddedAfterBaseline();
   });
 
   afterAll(async () => {
@@ -47,7 +50,7 @@ describe.each(olderStates)('transfer of the SQLite database of the $name', (stat
   });
 
   it('carries every table, column and row of the final SQLite state into PostgreSQL', () => {
-    expect(compareSnapshots(finalSqlite, imported)).toEqual([]);
+    expect(compareSnapshots(finalSqlite, imported, added)).toEqual([]);
     expect(rowCounts(imported)).toEqual(rowCounts(finalSqlite));
     const nonEmpty = Object.entries(rowCounts(finalSqlite)).filter(([, count]) => count > 0);
     expect(nonEmpty.length).toBeGreaterThan(2);

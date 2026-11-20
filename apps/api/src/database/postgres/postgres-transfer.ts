@@ -1,4 +1,4 @@
-import type { DataSource, EntityManager } from 'typeorm';
+import type { DataSource, EntityManager, QueryRunner } from 'typeorm';
 import { versionsTableName } from '../../plugin-system/plugin-storage/storage-model';
 import type { MigrationTrack } from '../backend/database-backend';
 import { declaredColumns, declaredTables, fieldKind } from '../transfer-declared';
@@ -21,6 +21,7 @@ import {
   selectExpression,
   type ColumnPlan,
 } from './postgres-transfer-values';
+import { migrateDownTo, migrateUp } from './postgres-migration-steps';
 import { describePostgresError, loadTableRows } from './postgres-transfer-load';
 import { cellLocation, rowLocation } from '../transfer/row-location';
 
@@ -398,9 +399,22 @@ export function createPostgresTransfer(track: MigrationTrack): DatabaseTransfer<
       snapshot: DatabaseSnapshot,
       options: ImportSnapshotOptions = {},
     ): Promise<void> {
-      const plans = await assertRestorable(target, snapshot, track, options);
+      const foreign = snapshot.backend !== 'postgres';
+      if (foreign && !track.foreignBaseline) {
+        throw new SnapshotIncompatibleError(
+          `The "${track.name}" migration track imports no ${snapshot.backend} snapshot`,
+        );
+      }
+      // A snapshot of this engine is checked before the transaction opens. A foreign one only once the schema is back
+      // at the baseline its data has.
+      const checked = foreign ? undefined : await assertRestorable(target, snapshot, track, options);
       await target.transaction(async (manager) => {
         await manager.query('SET LOCAL lock_timeout = 0');
+        const runner = manager.queryRunner as QueryRunner;
+        // The other engine's final schema is this track's baseline: its data goes in there, and the later migrations
+        // then run on it. All in this transaction, so a failed import leaves the schema as it was.
+        const later = foreign ? await migrateDownTo(runner, track, track.foreignBaseline as string) : [];
+        const plans = checked ?? (await assertRestorable(manager, snapshot, track, options));
         const keys = await foreignKeys(manager);
         for (const key of keys)
           await manager.query(`ALTER TABLE ${quote(key.child)} DROP CONSTRAINT ${quote(key.name)}`);
@@ -434,6 +448,7 @@ export function createPostgresTransfer(track: MigrationTrack): DatabaseTransfer<
         // Last, before the commit; rolled back with the transaction because the TRUNCATE above restarted them.
         await resetSequences(manager, snapshot, new Set(wipe));
         for (const table of triggered) await manager.query(`ALTER TABLE ${quote(table)} ENABLE TRIGGER USER`);
+        await migrateUp(runner, track, later);
       });
     },
   };
