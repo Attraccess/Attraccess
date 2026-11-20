@@ -236,9 +236,11 @@ namespace ble
         // Whether the stack must stay up: an owner (a scan, or a session until the controller let its link go),
         // anything still to go out, or anything the controller still runs. Not idle(), which only says whether this
         // task may sleep: work without an owner that keeps the radio busy (a standing scan, say) must count here.
+        // The watch's own scan counts whatever the radio reports, so the watch never loses its stack.
         bool stackInUse() const
         {
-            return currentOwner != Owner::None || !outbox.empty() || notifications.size() != 0 || radio.active();
+            return currentOwner != Owner::None || !outbox.empty() || notifications.size() != 0 || watchScanning ||
+                   radio.active();
         }
         bool ensureRadio(const Command &command);
         void shutdownIdleStack(uint32_t now);

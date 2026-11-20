@@ -390,6 +390,26 @@ namespace bletest
             h.advance(WATCH_RETRY_MS + 100);
             expect(h.core.watching() && h.radio.count("watch") == 3, "restarted");
         }
+        void watchHoldsTheStack()
+        {
+            // The idle shutdown frees the controller's RAM between exchanges; a standing watch scan is work, even
+            // when the radio does not report it as such, so it must never lose its stack.
+            WatchFixture f;
+            f.watchOn();
+            f.advance(3 * STACK_IDLE_SHUTDOWN_MS);
+            expect(f.radio.count("shutdown") == 0 && f.core.watching() && f.core.radioReady(),
+                   "a scanning watch keeps the stack up past the idle period");
+
+            f.request("BLE_WATCH_SET", "{\"v\":1,\"requestId\":9,\"filters\":[]}");
+            f.advance(STACK_IDLE_SHUTDOWN_MS - 300);
+            expect(f.radio.count("shutdown") == 0, "the idle period starts once the watch ends");
+            f.advance(400);
+            expect(f.radio.count("shutdown") == 1 && !f.core.radioReady(), "then the stack shuts down");
+
+            f.request("BLE_WATCH_SET", watchSet(10, MANUFACTURER_FILTER));
+            expect(f.radio.initCalls == 2 && f.core.watching(), "a new watch brings a fresh stack up");
+        }
+
     }
 
     void runWatchTests()
@@ -402,5 +422,6 @@ namespace bletest
         backpressureDropsKeepalivesFirst();
         sharesTheRadio();
         otaLinkLossAndRadioFailures();
+        watchHoldsTheStack();
     }
 }
