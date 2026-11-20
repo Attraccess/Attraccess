@@ -71,10 +71,14 @@ export interface Props {
 export function VariablesModal(props: Props) {
   const { resourceId } = props;
   const { isOpen, open, setOpen, close } = useOverlayState();
-  const { t, tExists } = useTranslations({
-    en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
-    de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
-  });
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  const { t, tExists } = useTranslations(
+    {
+      en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
+      de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
+    },
+    { escapeValues: false },
+  );
   const formatDateTime = useDateTimeFormatter({ showSeconds: false });
   const toast = useToastMessage();
   const queryClient = useQueryClient();

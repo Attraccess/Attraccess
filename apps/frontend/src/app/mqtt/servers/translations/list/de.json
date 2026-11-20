@@ -6,10 +6,11 @@
   "columnAddress": "Adresse",
   "errorLoading": "Fehler beim Laden der MQTT-Server.",
   "noServersConfigured": "Noch keine MQTT-Server konfiguriert. Klicken Sie auf \"Neuen Server hinzufügen\", um einen zu erstellen.",
-  "deleteConfirmation": "Sind Sie sicher, dass Sie diesen MQTT-Server löschen möchten?",
+  "deleteConfirmation": "Möchten Sie den MQTT-Server „{{name}}“ wirklich löschen? Dies kann nicht rückgängig gemacht werden.",
   "serverDeleted": "MQTT-Server gelöscht",
   "serverDeletedDesc": "Der MQTT-Server wurde erfolgreich gelöscht.",
   "errorGeneric": "Fehler",
   "failedToDelete": "Fehler beim Löschen des MQTT-Servers.",
-  "cancel": "Abbrechen"
+  "cancel": "Abbrechen",
+  "deleteConfirmTitle": "{{name}} löschen?"
 }

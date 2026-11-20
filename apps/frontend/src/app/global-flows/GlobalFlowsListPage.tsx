@@ -16,7 +16,7 @@ import {
   TableScrollContainer,
   useOverlayState,
 } from '@heroui/react';
-import { PencilIcon, PlusIcon, SettingsIcon, Trash2Icon } from 'lucide-react';
+import { PencilIcon, PlusIcon, Trash2Icon, WorkflowIcon } from 'lucide-react';
 import {
   AlertStatusIcon,
   EmptyState,
@@ -161,14 +161,14 @@ export function GlobalFlowsListPage() {
                           {
                             key: 'open',
                             label: t('list.editTooltip'),
-                            icon: PencilIcon,
+                            icon: WorkflowIcon,
                             onPress: () => navigate(`/devices/flows/${flow.id}`),
                             'data-cy': `global-flow-edit-${flow.id}`,
                           },
                           {
                             key: 'details',
                             label: t('list.editDetailsTooltip'),
-                            icon: SettingsIcon,
+                            icon: PencilIcon,
                             onPress: () => {
                               setFlowToEdit(flow);
                               editModal.open();

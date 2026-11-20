@@ -34,10 +34,14 @@ import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-er
 import { SumUpReadersPairing } from './pairing';
 
 export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
-  const { t, tExists, language } = useTranslations({
-    en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
-    de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
-  });
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  const { t, tExists, language } = useTranslations(
+    {
+      en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
+      de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
+    },
+    { escapeValues: false },
+  );
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 

@@ -6,8 +6,7 @@
   "configuration": "Configuration",
   "loading": "Loading...",
   "errorLoading": "Error loading SSO providers",
-  "deleteConfirmation": "Are you sure you want to delete this SSO provider?",
-  "deleteProvider": "Delete Provider",
+  "deleteConfirmation": "Are you sure you want to delete the SSO provider \"{{name}}\"? Users can no longer sign in with it.",
   "deleteProviderDesc": "This will permanently delete the SSO provider.",
   "providerDeleted": "Provider Deleted",
   "providerDeletedDesc": "The SSO provider has been successfully deleted.",
@@ -143,5 +142,6 @@
   "defaultsUsed": "Defaults used: {{{defaults}}}",
   "scopesEmptyHint": "Defaults used: openid · email · profile",
   "signingAlgorithmsEmptyHint": "An empty list is saved as RS256",
-  "emailAttributeKeysEmptyHint": "Built-in names used: {{{defaults}}}"
+  "emailAttributeKeysEmptyHint": "Built-in names used: {{{defaults}}}",
+  "deleteConfirmTitle": "Delete {{name}}?"
 }

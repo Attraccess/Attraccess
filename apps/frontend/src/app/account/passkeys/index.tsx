@@ -36,7 +36,8 @@ import en from './en.json';
 import de from './de.json';
 
 export function PasskeysCard() {
-  const { t } = useTranslations({ en, de });
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  const { t } = useTranslations({ en, de }, { escapeValues: false });
   const { showToast } = useToastMessage();
   const { data: passkeys, isLoading, refetch } = useListPasskeys();
 

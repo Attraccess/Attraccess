@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import { HistoryIcon, ShieldCheckIcon, ShieldOffIcon, Trash2Icon } from 'lucide-react';
+import { HistoryIcon, ShieldCheckIcon, ShieldOffIcon, UserMinusIcon } from 'lucide-react';
 import { ResourceIntroducerType, User } from '@attraccess/react-query-client';
 import { TableRowAction, TableRowActions, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { IntroductionCommentField } from './IntroductionCommentField';
@@ -37,7 +37,8 @@ export function PeopleRowActions(props: Readonly<PeopleRowActionsProps>) {
     onChangeIntroduction,
     onRevokeIntroducer,
   } = props;
-  const { t } = useTranslations({ en, de });
+  // React escapes the output; escaping the username again would show `&amp;` in the confirmations.
+  const { t } = useTranslations({ en, de }, { escapeValues: false });
   // The confirm dialog keeps a snapshot of its content, so the comment is read from a ref when confirmed.
   const commentRef = useRef('');
   const setComment = useCallback((comment: string) => {
@@ -82,7 +83,7 @@ export function PeopleRowActions(props: Readonly<PeopleRowActionsProps>) {
         title: t('confirm.grantIntroduction.title'),
         message: commentField(t('confirm.grantIntroduction.message', { name })),
         status: 'info',
-        confirmDataCy: 'people-revoke-submit',
+        confirmDataCy: 'people-grant-submit',
       },
       'data-cy': `people-row-grant-introduction-${row.user.id}`,
     };
@@ -96,7 +97,7 @@ export function PeopleRowActions(props: Readonly<PeopleRowActionsProps>) {
           return {
             key: `revoke-introducer-${introducer.id}`,
             label: isMaintainer ? t('rowActions.revokeMaintainer') : t('rowActions.revokeIntroducer'),
-            icon: Trash2Icon,
+            icon: UserMinusIcon,
             tone: 'danger',
             section: 'introducer',
             isPending:

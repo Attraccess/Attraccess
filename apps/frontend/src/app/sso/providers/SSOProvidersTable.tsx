@@ -8,7 +8,7 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { Key, Pencil, Trash } from 'lucide-react';
+import { Key, Pencil, Trash2 } from 'lucide-react';
 import { SsoProvider } from '@attraccess/react-query-client';
 import {
   EmptyState,
@@ -27,7 +27,8 @@ interface SSOProvidersTableProps {
 }
 
 export const SSOProvidersTable = ({ providers, onEdit, onDelete }: SSOProvidersTableProps) => {
-  const { t } = useTranslations({ en, de });
+  // React escapes the output; escaping again would put `&amp;` into a name like `A & B`.
+  const { t } = useTranslations({ en, de }, { escapeValues: false });
 
   if (!providers || providers.length === 0) {
     return (
@@ -76,13 +77,13 @@ export const SSOProvidersTable = ({ providers, onEdit, onDelete }: SSOProvidersT
                       {
                         key: 'delete',
                         label: t('deleteText'),
-                        icon: Trash,
+                        icon: Trash2,
                         tone: 'danger',
                         onPress: () => onDelete(provider.id),
                         'data-cy': `sso-provider-delete-button-${provider.id}`,
                         confirm: {
-                          title: t('deleteProvider'),
-                          message: t('deleteConfirmation'),
+                          title: t('deleteConfirmTitle', { name: provider.name }),
+                          message: t('deleteConfirmation', { name: provider.name }),
                           cancelLabel: t('cancel'),
                           confirmDataCy: 'sso-provider-delete-confirm-button',
                         },

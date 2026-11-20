@@ -57,7 +57,8 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
   const { success, error: showError } = useToastMessage();
   const { confirmationDialog } = useQrCodeAction({ resourceId });
 
-  const { t } = useTranslations({ en, de });
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  const { t } = useTranslations({ en, de }, { escapeValues: false });
 
   const canUpdateResources = hasPermission('resources.update');
   const canDeleteResources = hasPermission('resources.delete');

@@ -30,7 +30,8 @@ import { PluginSlot } from '../../plugins/PluginSlot';
 import { MQTT_SERVER_LIST_ROW_SLOT, MqttServerSlotContext } from '../mqtt.slots';
 
 export function MqttServerList() {
-  const { t } = useTranslations({ en, de });
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  const { t } = useTranslations({ en, de }, { escapeValues: false });
   const navigate = useNavigate();
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
@@ -122,8 +123,8 @@ export function MqttServerList() {
                         tone: 'danger',
                         onPress: () => deleteServer.mutateAsync({ path: { id: server.id } }),
                         confirm: {
-                          title: t('deleteServer'),
-                          message: t('deleteConfirmation'),
+                          title: t('deleteConfirmTitle', { name: server.name }),
+                          message: t('deleteConfirmation', { name: server.name }),
                           cancelLabel: t('cancel'),
                           'data-cy': 'mqtt-server-list-delete-confirmation-modal',
                           confirmDataCy: 'mqtt-server-list-delete-confirmation-delete-button',

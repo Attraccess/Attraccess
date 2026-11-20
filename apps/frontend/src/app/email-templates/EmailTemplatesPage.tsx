@@ -10,7 +10,7 @@ import {
   TableCell,
   Chip,
 } from '@heroui/react';
-import { Edit3, Mail } from 'lucide-react';
+import { Mail, Pencil } from 'lucide-react';
 import {
   EmptyState,
   PageHeader,
@@ -90,7 +90,7 @@ export function EmailTemplatesPage() {
                     <TableRowActions
                       itemName={item.type}
                       actions={[
-                        { key: 'edit', label: t('editButton'), icon: Edit3, onPress: () => openEditor(item.key) },
+                        { key: 'edit', label: t('editButton'), icon: Pencil, onPress: () => openEditor(item.key) },
                       ]}
                     />
                   </TableCell>

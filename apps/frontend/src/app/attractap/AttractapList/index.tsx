@@ -45,10 +45,14 @@ import de from './de.json';
 import en from './en.json';
 
 export function AttractapList() {
-  const { t } = useTranslations({
-    de,
-    en,
-  });
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  const { t } = useTranslations(
+    {
+      de,
+      en,
+    },
+    { escapeValues: false },
+  );
 
   const { data: license } = useGetLicenseInformation();
 

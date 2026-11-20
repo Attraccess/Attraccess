@@ -30,10 +30,14 @@ export function FormEditorPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const toast = useToastMessage();
-  const { t, tExists } = useTranslations({
-    en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
-    de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
-  });
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  const { t, tExists } = useTranslations(
+    {
+      en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
+      de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
+    },
+    { escapeValues: false },
+  );
 
   const { data: resource } = useGetOneResourceById({ path: { id: resourceId } });
   const { data: formResponse, isLoading: isLoadingForm } = useResourceFormsGetOne(

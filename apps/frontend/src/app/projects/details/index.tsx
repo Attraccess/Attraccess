@@ -32,16 +32,20 @@ export function ProjectDetailsPage() {
   const navigate = useNavigate();
   const toast = useToastMessage();
   const queryClient = useQueryClient();
-  const { t, tExists } = useTranslations({
-    en: {
-      ...en,
-      api: API_ERROR_TRANSLATIONS_EN,
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  const { t, tExists } = useTranslations(
+    {
+      en: {
+        ...en,
+        api: API_ERROR_TRANSLATIONS_EN,
+      },
+      de: {
+        ...de,
+        api: API_ERROR_TRANSLATIONS_DE,
+      },
     },
-    de: {
-      ...de,
-      api: API_ERROR_TRANSLATIONS_DE,
-    },
-  });
+    { escapeValues: false },
+  );
 
   const { data: project } = useFindOneProject({ path: { id: projectId } }, undefined, {
     enabled: hasValidProjectId,

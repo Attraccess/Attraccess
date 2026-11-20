@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { PasskeysCard } from './index';
@@ -119,4 +119,16 @@ it('lists last-use information and handles successful and failed deletion', asyn
   await waitFor(() => expect(state.toast).toHaveBeenCalledWith({ title: 'errors.deleteFailed', type: 'error' }));
   expect(state.refetch).toHaveBeenCalledOnce();
   expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+});
+it('deletes a passkey only after the confirmation, not on cancel', async () => {
+  state.keys = [{ id: 1, name: 'Laptop' }];
+  render(<PasskeysCard />);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'Actions for Laptop' }));
+  await user.click(screen.getByRole('menuitem', { name: 'actions.delete' }));
+  const dialog = await screen.findByRole('alertdialog', { name: 'deleteConfirm.title:Laptop' });
+  expect(state.remove).not.toHaveBeenCalled();
+  await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+  expect(state.remove).not.toHaveBeenCalled();
 });

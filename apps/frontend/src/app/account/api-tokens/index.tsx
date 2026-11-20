@@ -59,7 +59,8 @@ export interface CreatedApiToken extends ApiToken {
 export const PAGE_SIZE = 10;
 
 export function ApiTokensCard({ availablePermissions }: { availablePermissions: string[] }) {
-  const { t } = useTranslations({ en, de });
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  const { t } = useTranslations({ en, de }, { escapeValues: false });
   const { showToast } = useToastMessage();
   const { permissionLabel, permissionDescription, permissionCategory } = useRbacCatalogTranslations();
   const { data: allPermissions } = useListPermissions();

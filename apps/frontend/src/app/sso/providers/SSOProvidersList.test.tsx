@@ -41,7 +41,7 @@ describe('SSOProvidersList', () => {
     render(<SSOProvidersList />);
 
     await startDelete();
-    expect(await screen.findByRole('alertdialog', { name: 'Delete Provider' })).toBeInTheDocument();
+    expect(await screen.findByRole('alertdialog', { name: 'Delete Company?' })).toBeInTheDocument();
     expect(mocks.mutateAsync).not.toHaveBeenCalled();
     expect(mocks.browserConfirm).not.toHaveBeenCalled();
 
