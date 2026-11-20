@@ -1,10 +1,6 @@
 import { FLOW_NODE_PREVIEW_QUERY_KEY } from '@attraccess/plugins-frontend-sdk';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type {
-  ClaimControllerInput,
-  CreateCommissioningSessionInput,
-  WagoConfigurationSnapshot,
-} from './client';
+import type { ClaimControllerInput, CreateCommissioningSessionInput } from './client';
 import {
   acknowledgeConfigurationRejection,
   claimController,
@@ -18,15 +14,12 @@ import {
   listControllers,
   listMqttServers,
   previewConfigurationRevision,
-  publishConfiguration,
   recoverCommissioningSession,
   removeCommissioningSession,
   removeController,
-  reviewConfiguration,
   revokeCommissioningSession,
   rollbackConfiguration,
   setSettings,
-  validateConfiguration,
 } from './client';
 import { useWagoLiveQuery } from './live-updates';
 
@@ -118,15 +111,6 @@ export function useConfigurationActions(controllerId: number) {
       client.invalidateQueries({ queryKey: FLOW_NODE_PREVIEW_QUERY_KEY }),
     ]);
   };
-  const validate = useMutation({
-    mutationFn: (snapshot: WagoConfigurationSnapshot) => validateConfiguration(controllerId, snapshot),
-  });
-  const review = useMutation({ mutationFn: () => reviewConfiguration(controllerId) });
-  const publish = useMutation({
-    mutationFn: ({ force, reviewedHash }: { force: boolean; reviewedHash: string }) =>
-      publishConfiguration(controllerId, force, reviewedHash),
-    onSuccess: refresh,
-  });
   const preview = useMutation({
     mutationFn: (revision: number) => previewConfigurationRevision(controllerId, revision),
   });
@@ -158,7 +142,7 @@ export function useConfigurationActions(controllerId: number) {
     }) => rollbackConfiguration(controllerId, revision, force, sourceHash, currentHash, draftHash),
     onSettled: refresh,
   });
-  return { validate, review, publish, preview, acknowledgeRejection, rollback };
+  return { preview, acknowledgeRejection, rollback };
 }
 
 export function useConfigurationRevisionPreviewQuery(controllerId: number, revision: number, enabled: boolean) {
@@ -265,4 +249,3 @@ export function useRevokeCommissioningSessionMutation() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.commissioningSessions }),
   });
 }
-

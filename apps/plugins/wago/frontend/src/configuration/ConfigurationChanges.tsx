@@ -1,4 +1,3 @@
-import { Checkbox } from '@heroui/react';
 import { useWagoTranslations } from '../i18n';
 import { EmptyState, type TFunction } from '@attraccess/plugins-frontend-ui';
 import type { ConfigurationDiff, ConfigurationValidationError, WagoConfigurationSnapshot } from '../api/client';
@@ -38,37 +37,22 @@ export function ConfigurationChanges({
   before,
   after,
   names,
-  selected,
-  onSelect,
 }: {
   changes: ConfigurationDiff[];
   before: WagoConfigurationSnapshot | null;
   after: WagoConfigurationSnapshot;
   names: Record<string, string>;
-  selected?: string[];
-  onSelect?: (path: string, selected: boolean) => void;
 }) {
   const { t, tBackendMessage } = useWagoTranslations();
   const valueOptions = { translateName: tBackendMessage, metadataNames: names };
   names = configurationNames(after, configurationNames(before, names, t, tBackendMessage), t, tBackendMessage);
-  const displayed = onSelect ? changes : readableStructuralChanges(changes, before, after);
+  const displayed = readableStructuralChanges(changes, before, after);
   if (!displayed.length) return <EmptyState message={t('configuration.empty')} />;
   return (
     <ul className="wg:flex wg:flex-col wg:gap-3">
       {displayed.map((change) => (
         <li key={change.path}>
-          {onSelect ? (
-            <Checkbox isSelected={selected?.includes(change.path)} onChange={(value) => onSelect(change.path, value)}>
-              <Checkbox.Content className="wg:items-start">
-                <Checkbox.Control className="wg:mt-0.5">
-                  <Checkbox.Indicator />
-                </Checkbox.Control>
-                {changeLabel(change, before, after, names, t)}
-              </Checkbox.Content>
-            </Checkbox>
-          ) : (
-            <p className="wg:font-medium">{changeLabel(change, before, after, names, t)}</p>
-          )}
+          <p className="wg:font-medium">{changeLabel(change, before, after, names, t)}</p>
           <p className="wg:text-sm">
             {t('configuration.before')}{' '}
             {readableChangeValue(change.path, change.previous, before, names, t, valueOptions)}

@@ -36,11 +36,9 @@ function ControllerHistory({ controllerId }: { controllerId: number }) {
       </Button>
       <PageHeader title={t('panel.history')} noMargin />
       <ConfigurationRevisions
-        view="history"
         controllerId={controllerId}
         metadata={readMetadata(draft.data?.presetProvenance ?? null)}
         disabled={!draft.isSuccess}
-        hasSavedDraft={Boolean(draft.data)}
         generation={generation}
         onBusyChange={setBusy}
         onRollback={async () => {

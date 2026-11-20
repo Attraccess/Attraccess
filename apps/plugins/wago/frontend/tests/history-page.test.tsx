@@ -1,4 +1,4 @@
-// Covers the revision history page and the review-and-publish view of the revision list.
+// Covers the revision history page.
 // FEATURE: WAGO controller history keeps rejection details, acknowledgement and rollback protections.
 // These flows were once exercised through the removed configuration editor; the history page is now their only entry.
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
@@ -7,7 +7,6 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HistoryPage } from '../src/front-panel/HistoryPage';
-import { ConfigurationRevisions } from '../src/configuration/ConfigurationRevisions';
 
 const api = vi.hoisted(() => ({
   getDraft: vi.fn(),
@@ -15,8 +14,6 @@ const api = vi.hoisted(() => ({
   preview: vi.fn(),
   acknowledge: vi.fn(),
   rollback: vi.fn(),
-  review: vi.fn(),
-  publish: vi.fn(),
 }));
 vi.mock('../src/api/client', async (original) => ({
   ...(await original<typeof import('../src/api/client')>()),
@@ -25,8 +22,6 @@ vi.mock('../src/api/client', async (original) => ({
   previewConfigurationRevision: api.preview,
   acknowledgeConfigurationRejection: api.acknowledge,
   rollbackConfiguration: api.rollback,
-  reviewConfiguration: api.review,
-  publishConfiguration: api.publish,
 }));
 
 const channel = {
@@ -94,18 +89,6 @@ const impact = {
   references: [{ resourceId: 4, flowId: null, nodeId: 'node-1', nodeType: 'plugin.wago.command' }],
 };
 
-const reviewResult = {
-  draft,
-  previous: {
-    ...revision(3, 'applied'),
-    snapshot: JSON.stringify(oneChannel),
-    presetProvenance: draft.presetProvenance,
-  },
-  changed: true,
-  diff: [{ path: '$.logicalChannels[0].disconnectPolicy.mode', previous: 'hold', current: 'immediate' }],
-  impacts: [],
-};
-
 let client: QueryClient;
 function renderHistory(path = '/wago/controllers/1/configuration/history') {
   return render(
@@ -135,8 +118,6 @@ beforeEach(() => {
   api.preview.mockImplementation(async (_id: number, number: number) => previewOf(number));
   api.acknowledge.mockResolvedValue(revision(2, 'rejected', { rejectionAcknowledgedAt: '2026-09-30T10:02:00.000Z' }));
   api.rollback.mockResolvedValue(revision(4, 'pending'));
-  api.review.mockResolvedValue(reviewResult);
-  api.publish.mockResolvedValue(revision(4, 'pending'));
 });
 afterEach(() => {
   cleanup();
@@ -342,59 +323,5 @@ describe('rollback from the history page', () => {
     fireEvent.click(await (await revisionSection(1)).findByRole('button', { name: 'Preview rollback to revision 1' }));
     expect((await screen.findByText('Revision 1 is gone')).getAttribute('role')).toBe('alert');
     expect(screen.queryByText('Restore revision 1 as a new revision')).toBeNull();
-  });
-});
-
-describe('review and publish view', () => {
-  function renderReview() {
-    return render(
-      <QueryClientProvider client={client}>
-        <ConfigurationRevisions
-          controllerId={1}
-          metadata={{ names: { output: 'Laser power' }, presets: [] }}
-          disabled={false}
-          generation={0}
-          onBusyChange={vi.fn()}
-          onRollback={vi.fn(async () => undefined)}
-        />
-      </QueryClientProvider>,
-    );
-  }
-
-  it('reviews the saved draft and publishes exactly the reviewed hash', async () => {
-    renderReview();
-    expect(await screen.findByText(/Revision 3 · Applied by controller/)).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Choose a resource for your first flow' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Review saved draft' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Publish reviewed draft' }));
-    await waitFor(() => expect(api.publish).toHaveBeenCalledWith(1, false, 'reviewed'));
-    expect(await screen.findByText(/Publication submitted for revision 4/)).toBeTruthy();
-  });
-
-  it('keeps publication disabled until flow impacts are acknowledged', async () => {
-    api.review.mockResolvedValue({ ...reviewResult, impacts: [impact] });
-    renderReview();
-    fireEvent.click(await screen.findByRole('button', { name: 'Review saved draft' }));
-    const publish = await screen.findByRole('button', { name: 'Publish reviewed draft' });
-    expect(publish.hasAttribute('disabled')).toBe(true);
-    fireEvent.click(screen.getByRole('checkbox', { name: /I checked the affected channel references/ }));
-    await waitFor(() => expect(publish.hasAttribute('disabled')).toBe(false));
-    fireEvent.click(publish);
-    await waitFor(() => expect(api.publish).toHaveBeenCalledWith(1, true, 'reviewed'));
-  });
-
-  it('does not publish a draft whose review carries no hash', async () => {
-    api.review.mockResolvedValue({ ...reviewResult, draft: { ...draft, reviewedHash: null } });
-    renderReview();
-    fireEvent.click(await screen.findByRole('button', { name: 'Review saved draft' }));
-    expect((await screen.findByRole('button', { name: 'Publish reviewed draft' })).hasAttribute('disabled')).toBe(true);
-    expect(api.publish).not.toHaveBeenCalled();
-  });
-
-  it('shows a failed review as an alert', async () => {
-    api.review.mockRejectedValue(new Error('Draft changed'));
-    renderReview();
-    fireEvent.click(await screen.findByRole('button', { name: 'Review saved draft' }));
-    expect((await screen.findByRole('alert')).textContent).toBe('Draft changed');
   });
 });

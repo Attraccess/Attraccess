@@ -7,11 +7,9 @@ import { Field } from './Field';
 export function FormatFields({
   value,
   onChange,
-  disabled,
 }: {
   value: RegisterFormat;
   onChange: (value: RegisterFormat) => void;
-  disabled: boolean;
 }) {
   const { t } = useWagoTranslations();
   return (
@@ -22,7 +20,6 @@ export function FormatFields({
           label={t(`modbus.${key}`)}
           value={value[key]}
           numeric
-          disabled={disabled}
           onChange={(v) => onChange({ ...value, [key]: Number(v) })}
         />
       ))}
@@ -30,14 +27,12 @@ export function FormatFields({
         label={t('modbus.addressConvention')}
         value={value.addressBase}
         options={[0, 1]}
-        disabled={disabled}
         onChange={(v) => onChange({ ...value, addressBase: Number(v) as 0 | 1 })}
       />
       <Choice
         label={t('modbus.dataType')}
         value={value.dataType}
         options={['uint16', 'int16', 'uint32', 'int32', 'float32']}
-        disabled={disabled}
         onChange={(v) => onChange({ ...value, dataType: v as RegisterFormat['dataType'] })}
       />
       {(['byteOrder', 'wordOrder'] as const).map((key) => (
@@ -46,7 +41,6 @@ export function FormatFields({
           label={t(`modbus.${key}`)}
           value={value[key]}
           options={['big', 'little']}
-          disabled={disabled}
           onChange={(v) => onChange({ ...value, [key]: v })}
         />
       ))}

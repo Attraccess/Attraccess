@@ -3,7 +3,6 @@ import { Button } from '@heroui/react';
 import { modbusDisplayName } from './modbus-labels';
 import type { ModbusProfile } from '../../../../modbus/model';
 import { useWagoTranslations } from '../../i18n';
-import { BUILTIN_MODBUS_PROFILES } from '../../../../modbus/model';
 import { emptyFormat } from './emptyFormat';
 import { Field } from './Field';
 import { ModbusActionForm } from './ModbusActionForm';
@@ -12,61 +11,34 @@ import { ModbusMeasurementForm } from './ModbusMeasurementForm';
 export function ModbusProfileForm({
   value,
   onChange,
-  isDisabled = false,
-  showIdentifiers = true,
-  collapseSignals = false,
 }: {
   value: ModbusProfile;
   onChange: (value: ModbusProfile) => void;
-  isDisabled?: boolean;
-  showIdentifiers?: boolean;
-  collapseSignals?: boolean;
 }) {
   const { t, tBackendMessage } = useWagoTranslations();
-  const readonly = isDisabled || BUILTIN_MODBUS_PROFILES.includes(value);
 
   return (
     <section className="wg:flex wg:flex-col wg:gap-4">
       <header>
         <h3>{modbusDisplayName(value, value.name, tBackendMessage)}</h3>
-        <p>{t(readonly ? 'modbus.readonly' : 'modbus.customHint')}</p>
+        <p>{t('modbus.customHint')}</p>
       </header>
       <div className="wg:flex wg:flex-col wg:gap-4">
-        {showIdentifiers && (
-          <Field
-            label={t('modbus.profileId')}
-            value={value.id}
-            disabled={readonly}
-            onChange={(id) => onChange({ ...value, id })}
-          />
-        )}
         <Field
           label={t('modbus.profileName')}
           value={modbusDisplayName(value, value.name, tBackendMessage)}
-          disabled={readonly}
           onChange={(name) => onChange({ ...value, name })}
         />
         <Field
           label={t('modbus.version')}
           value={value.version}
           numeric
-          disabled={readonly}
           onChange={(v) => onChange({ ...value, version: Number(v) })}
         />
         {value.measurements.map((m, index) => (
-          <ModbusMeasurementForm
-            key={index}
-            profile={value}
-            measurement={m}
-            index={index}
-            onChange={onChange}
-            collapseSignals={collapseSignals}
-            showIdentifiers={showIdentifiers}
-            readonly={readonly}
-          />
+          <ModbusMeasurementForm key={index} profile={value} measurement={m} index={index} onChange={onChange} />
         ))}
         <Button
-          isDisabled={readonly}
           variant="secondary"
           onPress={() =>
             onChange({
@@ -89,19 +61,9 @@ export function ModbusProfileForm({
           {t('modbus.addMeasurement')}
         </Button>
         {value.actions.map((a, index) => (
-          <ModbusActionForm
-            key={index}
-            profile={value}
-            action={a}
-            index={index}
-            onChange={onChange}
-            collapseSignals={collapseSignals}
-            showIdentifiers={showIdentifiers}
-            readonly={readonly}
-          />
+          <ModbusActionForm key={index} profile={value} action={a} index={index} onChange={onChange} />
         ))}
         <Button
-          isDisabled={readonly}
           variant="secondary"
           onPress={() =>
             onChange({

@@ -1,5 +1,6 @@
 // Tests live controls and apply behavior with isolated controller endpoints.
 // FEATURE: WAGO front panel edits never replace applied control routing.
+import { FLOW_NODE_PREVIEW_QUERY_KEY } from '@attraccess/plugins-frontend-sdk';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
@@ -331,6 +332,24 @@ describe('front panel', () => {
     expect(api.validate).toHaveBeenCalledTimes(1);
     expect(api.save).toHaveBeenCalledWith(1, expect.anything(), expect.anything(), draft);
     await waitFor(() => expect(result.current.pending).toBe(true));
+  });
+
+  it('invalidates cached flow node previews once a front-panel publish succeeds', async () => {
+    const { result } = renderHook(() => useFrontPanel(1), { wrapper: wrapper });
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    const key = [...FLOW_NODE_PREVIEW_QUERY_KEY, 6, 'plugin.wago.command', { controllerId: 1 }];
+    client.setQueryData(key, { preview: [{ label: 'Channel', value: 'Old name' }] });
+    act(() =>
+      result.current.edit(
+        updateTerminal(required(result.current.configuration), DIGITAL_TERMINALS[0], 'Renamed output', {}),
+      ),
+    );
+    act(() => result.current.apply());
+    await waitFor(() => expect(result.current.review).not.toBeNull());
+    expect(client.getQueryState(key)?.isInvalidated).toBe(false);
+    act(() => result.current.confirmApply());
+    await waitFor(() => expect(api.publish).toHaveBeenCalled());
+    await waitFor(() => expect(client.getQueryState(key)?.isInvalidated).toBe(true));
   });
 
   it.each([
