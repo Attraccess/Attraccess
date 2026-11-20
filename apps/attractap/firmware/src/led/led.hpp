@@ -21,6 +21,8 @@ public:
         LED_STATE_ENROLLMENT_PENDING,
         // Lite card-confirm: amber ring drains over the confirm window (LedFeedback::Pattern::ConfirmWait).
         LED_STATE_CONFIRM_WAIT,
+        // Bluetooth setup window open (ATT-1371): blue double pulse, steady with a browser connected (led_bt_setup.hpp).
+        LED_STATE_BT_SETUP,
     };
 
     LedController() : _strip(WS2812_LED_COUNT, PIN_WS2812_DATA) {}

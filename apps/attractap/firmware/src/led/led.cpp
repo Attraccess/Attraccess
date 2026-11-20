@@ -1,6 +1,8 @@
 #ifdef HAS_WS2812_LED
 
 #include "led.hpp"
+#include "led_bt_setup.hpp"
+#include "../bt_setup/bt_setup.hpp"
 #include "../platform.hpp"
 #include "../settings/settings.hpp"
 
@@ -224,6 +226,13 @@ void LedController::loop()
         return;
     }
 
+    if (_state == LED_STATE_BT_SETUP)
+    {
+        setAll(dim(_strip.Color(0, 0, 255), LedBtSetup::level(now, bt_setup::linked())));
+        _strip.show();
+        return;
+    }
+
     runAnimation();
     _strip.show();
 }
@@ -396,6 +405,7 @@ void LedController::runCircularAnimation()
         break;
 
     case LED_STATE_FIRMWARE_UPDATE:
+    case LED_STATE_BT_SETUP:
         break;
     }
 }
@@ -462,6 +472,7 @@ void LedController::runLinearAnimation()
         break;
 
     case LED_STATE_FIRMWARE_UPDATE:
+    case LED_STATE_BT_SETUP:
         break;
     }
 }

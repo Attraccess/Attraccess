@@ -8,6 +8,8 @@ set(ATTRACTAP_FIRMWARE_NAME "attractap_bridge")
 set(ATTRACTAP_FIRMWARE_FRIENDLY_NAME "Attractap BLE Bridge")
 set(ATTRACTAP_FIRMWARE_VARIANT "gl_s10")
 set(ATTRACTAP_FIRMWARE_VARIANT_FRIENDLY_NAME "GL.iNet GL-S10")
+# Bluetooth setup (src/bt_setup): advertised as "Attractap Bridge XXXX" (last two bytes of the Bluetooth MAC).
+set(ATTRACTAP_BT_SETUP_NAME_PREFIX "Attractap Bridge")
 
 set(ATTRACTAP_DEFINES
     FIRMWARE_NAME="${ATTRACTAP_FIRMWARE_NAME}"
@@ -16,6 +18,8 @@ set(ATTRACTAP_DEFINES
     FIRMWARE_VARIANT_FRIENDLY_NAME="${ATTRACTAP_FIRMWARE_VARIANT_FRIENDLY_NAME}"
 
     LOGGER_LEVEL_NUM=3
+
+    BT_SETUP_NAME_PREFIX="${ATTRACTAP_BT_SETUP_NAME_PREFIX}"
 
     ATTRACTAP_BLE_BRIDGE=1
     # No PSRAM (GPIO17 drives the RMII clock): the proxy reports smaller bounds that fit internal RAM.

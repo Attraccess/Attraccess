@@ -131,6 +131,7 @@ void Application::loop() {
   this->snapshotBootDiagnostics();
 
   SerialCommandHandler::loop();
+  this->tickBtSetup();
 
 #ifdef HAS_LVGL_DISPLAY
   Display::loop();

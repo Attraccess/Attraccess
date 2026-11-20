@@ -1,7 +1,9 @@
 #include <cstdio>
 #include "esp_err.h"
 #include "nvs_flash.h"
+#ifndef ATTRACTAP_SECURE_PROFILE
 #include "serial/console_io.hpp"
+#endif
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -113,7 +115,7 @@ extern "C" void app_main(void)
     // Console input (serialCommandHandler) reads from the USB-Serial-JTAG
     // driver (UART0 on the BLE bridge); log output goes through stdout, which
     // the VFS console routes to the same port. The secure profile has no
-    // console and no serial config handler.
+    // console: its commands arrive only over the Bluetooth setup (src/bt_setup).
     console_io::install();
 
     // Give the host time to enumerate USB before the first log lines

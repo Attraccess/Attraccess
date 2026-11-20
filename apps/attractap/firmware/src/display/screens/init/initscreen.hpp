@@ -3,6 +3,8 @@
 #include <lvgl.h>
 #include "../../images/logo_400w_png.hpp"
 #include "../IScreen.hpp"
+#include "../../shared/btSetupStatus.hpp"
+#include "../../shared/buttonError.hpp"
 #include <string>
 #include <functional>
 #include "../../../state/state.hpp"
@@ -22,12 +24,23 @@ public:
     bool shouldAutoUnload() const override { return false; }
 
     void setOnOpenSettingsCallback(std::function<void()> onOpenSettingsCallback);
+    // The "Bluetooth setup" button (ATT-1371): next to Settings while the reader is not paired and no setup window is
+    // open. The callback opens a window; showBluetoothSetupError() says on the button that it could not.
+    void setOnBluetoothSetupCallback(std::function<void()> callback);
+    void showBluetoothSetupError();
 
 private:
     void createNetworkRows(lv_obj_t *statesContainer);
     void createApiRows(lv_obj_t *statesContainer);
     void createConnectionDetails(lv_obj_t *statesContainer);
     std::function<void()> onOpenSettingsCallback;
+    std::function<void()> onBluetoothSetupCallback;
+    lv_obj_t *bluetoothSetupButton = nullptr;
+    ButtonError bluetoothSetupError;
+    BtSetupStatus bluetoothSetupStatus;
+    void createButtons(lv_obj_t *statesContainer);
+    void updateBluetoothSetup();
+    static void onBluetoothSetupButtonEvent(lv_event_t *e);
     lv_obj_t *screen = nullptr;
     void finalizeState(lv_obj_t *spinner, lv_obj_t *label, lv_color_t color);
     void markStateAsSuccess(lv_obj_t *spinner, lv_obj_t *label);

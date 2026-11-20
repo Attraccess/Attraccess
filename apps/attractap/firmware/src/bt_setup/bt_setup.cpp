@@ -1,6 +1,13 @@
-#ifdef ATTRACTAP_BLE_BRIDGE
+#include "bt_setup.hpp"
 
-#include "provisioning.hpp"
+#if ATTRACTAP_BT_SETUP
+
+// Before NimBLE's headers: its log macros (LOG_LEVEL_ERROR, ...) would break the logger's enum.
+#include "../logger/logger.hpp"
+#include "../platform.hpp"
+#include "../serial/serialCommandHandler.hpp"
+#include "../settings/reader_credentials.hpp"
+#include "bt_setup_logic.hpp"
 
 #include <atomic>
 #include <cstdio>
@@ -9,8 +16,10 @@
 #include <cstring>
 #include <string>
 
+#include "esp_heap_caps.h"
 #include "esp_mac.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "host/ble_gap.h"
@@ -21,13 +30,18 @@
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
 
-#include "../logger/logger.hpp"
-#include "../platform.hpp"
-#include "provisioning_logic.hpp"
+#if !CONFIG_BT_NIMBLE_ROLE_PERIPHERAL || !CONFIG_BT_NIMBLE_ROLE_BROADCASTER || !CONFIG_BT_NIMBLE_SECURITY_ENABLE ||  \
+    !CONFIG_BT_NIMBLE_SM_SC
+#error "The Bluetooth setup needs the NimBLE peripheral and broadcaster roles and LE Secure Connections (sdkconfig)"
+#endif
+// Per variant (variants/*.cmake): "Attractap Bridge", "Attractap Touch", "Attractap Lite".
+#ifndef BT_SETUP_NAME_PREFIX
+#error "BT_SETUP_NAME_PREFIX must be defined by the variant"
+#endif
 
 extern "C" void ble_store_config_init(void);
 
-namespace bridge::provisioning
+namespace bt_setup
 {
     namespace
     {
@@ -51,6 +65,12 @@ namespace bridge::provisioning
         const ble_uuid128_t TX_UUID = ATTRACTAP_SETUP_UUID(0x03);
 #undef ATTRACTAP_SETUP_UUID
 
+        // The window (the task of request() and update()) and its mirrors for other tasks.
+        SetupWindow window;
+        std::atomic<bool> windowOpen{false};
+        // Until the first request read the credentials, the device counts as paired (no button).
+        std::atomic<bool> paired{true};
+
         // NimBLE belongs to the setup from the start of open() to the end of close().
         std::atomic<bool> owned{false};
         // Advertising and the link are wanted (cleared first when closing).
@@ -59,8 +79,10 @@ namespace bridge::provisioning
         std::atomic<uint16_t> connHandle{BLE_HS_CONN_HANDLE_NONE};
         uint16_t txHandle = 0;
         uint8_t ownAddressType = BLE_OWN_ADDR_RANDOM;
-        char deviceName[24] = "Attractap Bridge";
-        TaskHandle_t hostTaskHandle = nullptr;
+        char deviceName[MAX_NAME_LENGTH + 1] = "";
+        // NimBLE's host configuration before open() changed it. close() restores it, so the BLE proxy, which brings
+        // NimBLE up again later, starts as a plain central: no pairing setup, no bond store, none of our callbacks.
+        struct ble_hs_cfg savedHsCfg;
 
         std::mutex linesMutex;
         LineAssembler assembler(SerialCommandHandler::MAX_COMMAND_LENGTH);
@@ -100,7 +122,7 @@ namespace bridge::provisioning
         void onSync()
         {
             // A new random static address for every window: a computer that paired with an earlier window holds keys
-            // the bridge no longer has, and would fail to encrypt instead of pairing again.
+            // the device no longer has, and would fail to encrypt instead of pairing again.
             ble_addr_t address;
             if (ble_hs_id_gen_rnd(0, &address) == 0 && ble_hs_id_set_rnd(address.val) == 0)
                 ownAddressType = BLE_OWN_ADDR_RANDOM;
@@ -198,11 +220,23 @@ namespace bridge::provisioning
             services[0].characteristics = characteristics;
         }
 
-        void hostTask(void *)
+        // `arg` is non-null when the stack came from heap_caps (PSRAM): such a task must end with vTaskDeleteWithCaps.
+        void hostTask(void *arg)
         {
             nimble_port_run(); // until close() calls nimble_port_stop()
-            hostTaskHandle = nullptr;
-            vTaskDelete(nullptr);
+            if (arg) vTaskDeleteWithCaps(nullptr);
+            else vTaskDelete(nullptr);
+        }
+
+        // NimBLE's host task, its stack in PSRAM where there is some (the readers), else in internal RAM (the bridge).
+        bool startHostTask()
+        {
+            static int withCaps = 1;
+            return xTaskCreatePinnedToCoreWithCaps(hostTask, "nimble_host", HOST_TASK_STACK, &withCaps,
+                                                   configMAX_PRIORITIES - 4, nullptr, CONFIG_BT_NIMBLE_PINNED_TO_CORE,
+                                                   MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) == pdPASS ||
+                   xTaskCreatePinnedToCore(hostTask, "nimble_host", HOST_TASK_STACK, nullptr, configMAX_PRIORITIES - 4,
+                                           nullptr, CONFIG_BT_NIMBLE_PINNED_TO_CORE) == pdPASS;
         }
 
         bool notify(uint16_t conn, const char *data, size_t size)
@@ -245,80 +279,129 @@ namespace bridge::provisioning
         };
 
         SetupChannel setupChannel;
-    }
 
-    bool open()
-    {
-        if (owned) return true;
-        owned = true;
-        uint8_t mac[6] = {};
-        esp_read_mac(mac, ESP_MAC_BT);
-        snprintf(deviceName, sizeof deviceName, "Attractap Bridge %02X%02X", mac[4], mac[5]);
-        forgetPartialInput();
-
-        if (nimble_port_init() != ESP_OK)
+        // Brings NimBLE up and advertises. False when there is not enough memory (nothing stays allocated).
+        bool open()
         {
-            // Also when the BLE proxy already runs NimBLE (a bridge whose pairing was revoked): a reboot frees it.
-            logger.error("Bluetooth setup: NimBLE init failed");
-            owned = false;
-            return false;
+            if (owned) return true;
+            owned = true;
+            uint8_t mac[6] = {};
+            esp_read_mac(mac, ESP_MAC_BT);
+            formatName(deviceName, sizeof deviceName, BT_SETUP_NAME_PREFIX, mac);
+            forgetPartialInput();
+
+            if (nimble_port_init() != ESP_OK)
+            {
+                // Also when the BLE proxy already runs NimBLE (a device whose pairing was revoked): a reboot frees it.
+                logger.error("Bluetooth setup: NimBLE init failed");
+                owned = false;
+                return false;
+            }
+            savedHsCfg = ble_hs_cfg;
+            ble_hs_cfg.sync_cb = onSync;
+            ble_hs_cfg.reset_cb = onReset;
+            ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
+            // Just Works with LE Secure Connections: no display or keypad takes part in the pairing.
+            ble_hs_cfg.sm_io_cap = BLE_HS_IO_NO_INPUT_OUTPUT;
+            ble_hs_cfg.sm_bonding = 1;
+            ble_hs_cfg.sm_mitm = 0;
+            ble_hs_cfg.sm_sc = 1;
+            ble_hs_cfg.sm_our_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
+            ble_hs_cfg.sm_their_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
+
+            ble_gatts_reset();
+            ble_svc_gap_init();
+            ble_svc_gatt_init();
+            defineServices();
+            int rc = ble_gatts_count_cfg(services);
+            if (rc == 0) rc = ble_gatts_add_svcs(services);
+            if (rc == 0) rc = ble_svc_gap_device_name_set(deviceName);
+            ble_store_config_init();
+            running = true;
+            if (rc != 0 || !startHostTask())
+            {
+                running = false;
+                logger.errorf("Bluetooth setup: not enough memory (%d)", rc);
+                nimble_port_deinit();
+                ble_hs_cfg = savedHsCfg;
+                owned = false;
+                return false;
+            }
+            return true;
         }
-        ble_hs_cfg.sync_cb = onSync;
-        ble_hs_cfg.reset_cb = onReset;
-        ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
-        // Just Works with LE Secure Connections: the bridge has no display or keypad.
-        ble_hs_cfg.sm_io_cap = BLE_HS_IO_NO_INPUT_OUTPUT;
-        ble_hs_cfg.sm_bonding = 1;
-        ble_hs_cfg.sm_mitm = 0;
-        ble_hs_cfg.sm_sc = 1;
-        ble_hs_cfg.sm_our_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
-        ble_hs_cfg.sm_their_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
 
-        ble_gatts_reset();
-        ble_svc_gap_init();
-        ble_svc_gatt_init();
-        defineServices();
-        int rc = ble_gatts_count_cfg(services);
-        if (rc == 0) rc = ble_gatts_add_svcs(services);
-        if (rc == 0) rc = ble_svc_gap_device_name_set(deviceName);
-        ble_store_config_init();
-        running = true;
-        if (rc != 0 || xTaskCreatePinnedToCore(hostTask, "nimble_host", HOST_TASK_STACK, nullptr,
-                                               configMAX_PRIORITIES - 4, &hostTaskHandle,
-                                               CONFIG_BT_NIMBLE_PINNED_TO_CORE) != pdPASS)
+        // Drops the link, stops advertising and frees NimBLE.
+        void close()
         {
+            if (!owned) return;
             running = false;
-            logger.errorf("Bluetooth setup: not enough memory (%d)", rc);
+            const uint16_t conn = connHandle;
+            if (conn != BLE_HS_CONN_HANDLE_NONE) ble_gap_terminate(conn, BLE_ERR_REM_USER_CONN_TERM);
+            ble_gap_adv_stop();
+            // Let the terminate go out before the host stops.
+            delay(200);
+            nimble_port_stop();
             nimble_port_deinit();
+            ble_hs_cfg = savedHsCfg;
+            connected = false;
+            connHandle = BLE_HS_CONN_HANDLE_NONE;
+            forgetPartialInput();
             owned = false;
-            return false;
+            logger.info("Bluetooth setup closed");
         }
-        return true;
     }
 
-    void close()
+    void registerChannel() { SerialCommandHandler::setChannel(&setupChannel); }
+
+    Request request(uint32_t now)
     {
-        if (!owned) return;
-        running = false;
-        const uint16_t conn = connHandle;
-        if (conn != BLE_HS_CONN_HANDLE_NONE) ble_gap_terminate(conn, BLE_ERR_REM_USER_CONN_TERM);
-        ble_gap_adv_stop();
-        // Let the terminate go out before the host stops.
-        delay(200);
-        nimble_port_stop();
-        nimble_port_deinit();
-        connected = false;
-        connHandle = BLE_HS_CONN_HANDLE_NONE;
-        forgetPartialInput();
-        owned = false;
-        logger.info("Bluetooth setup closed");
+        const bool isPaired = CredentialStore::load().paired();
+        paired = isPaired;
+        if (isPaired) return Request::Paired;
+        if (window.request(false, now) != SetupWindow::Change::Open) return Request::AlreadyOpen;
+        if (!open())
+        {
+            window = SetupWindow();
+            return Request::NoMemory;
+        }
+        windowOpen = true;
+        return Request::Opened;
     }
 
-    bool active() { return owned; }
+    void update(bool authenticated, uint32_t now)
+    {
+        if (authenticated) paired = true;
+        if (window.update(authenticated, now) != SetupWindow::Change::Close) return;
+        windowOpen = false;
+        close();
+    }
+
+    bool isOpen() { return windowOpen; }
 
     bool linked() { return running && connected; }
 
-    SerialCommandHandler::Channel &channel() { return setupChannel; }
+    uint32_t remainingMs(uint32_t now) { return window.remainingMs(now); }
+
+    const char *name() { return deviceName; }
+
+    bool offerButton() { return buttonVisible(paired, windowOpen); }
+
+    bool active() { return owned; }
+}
+
+#else
+
+namespace bt_setup
+{
+    void registerChannel() {}
+    Request request(uint32_t) { return Request::Unsupported; }
+    void update(bool, uint32_t) {}
+    bool isOpen() { return false; }
+    bool linked() { return false; }
+    uint32_t remainingMs(uint32_t) { return 0; }
+    const char *name() { return ""; }
+    bool offerButton() { return false; }
+    bool active() { return false; }
 }
 
 #endif

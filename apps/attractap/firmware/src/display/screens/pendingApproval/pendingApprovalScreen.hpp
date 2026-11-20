@@ -3,6 +3,7 @@
 #include <string>
 
 #include "../IScreen.hpp"
+#include "../../shared/btSetupStatus.hpp"
 #include "../../../state/state.hpp"
 #include "../../../logger/logger.hpp"
 
@@ -53,5 +54,7 @@ private:
     std::string shownCode;
     uint32_t shownSeconds = 0;
     std::string qrUrl;
+    // While a Bluetooth setup window is open (ATT-1371).
+    BtSetupStatus bluetoothSetupStatus;
     Logger logger;
 };

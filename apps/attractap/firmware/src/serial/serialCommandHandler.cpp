@@ -6,7 +6,6 @@
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "console_io.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -22,7 +21,6 @@
 #include "../testhooks/test_hooks.hpp"
 #endif
 
-std::string SerialCommandHandler::inputBuffer = "";
 Logger SerialCommandHandler::logger("SerialCmd");
 SerialCommandHandler::Channel *SerialCommandHandler::extraChannel = nullptr;
 SerialCommandHandler::Channel *SerialCommandHandler::replyChannel = nullptr;
@@ -30,43 +28,17 @@ SerialCommandHandler::Channel *SerialCommandHandler::replyChannel = nullptr;
 void SerialCommandHandler::setup()
 {
     logger.info("Serial command handler ready");
+#ifndef ATTRACTAP_SECURE_PROFILE
     inputBuffer.reserve(MAX_COMMAND_LENGTH);
+#endif
 }
 #endif
 
 void SerialCommandHandler::loop()
 {
-    // Non-blocking drain of the console RX buffer (USB-Serial-JTAG, or UART0 on the BLE bridge; driver
-    // installed in main.cpp during startup).
-    uint8_t byte;
-    while (console_io::readByte(byte))
-    {
-        char c = static_cast<char>(byte);
-
-        if (c == '\r')
-        {
-            continue;
-        }
-
-        if (c == '\n')
-        {
-            if (inputBuffer.length() > 0)
-            {
-                processLine(inputBuffer);
-            }
-            inputBuffer = "";
-            continue;
-        }
-
-        if (inputBuffer.length() >= MAX_COMMAND_LENGTH)
-        {
-            logger.error("Serial command too long, clearing buffer");
-            inputBuffer = "";
-            continue;
-        }
-
-        inputBuffer += c;
-    }
+#ifndef ATTRACTAP_SECURE_PROFILE
+    readConsole();
+#endif
 
     if (extraChannel)
     {
@@ -133,7 +105,9 @@ void SerialCommandHandler::sendJsonResponse(const std::string &topic, const std:
         replyChannel->reply("RESP " + topic + " " + payload + "\n");
         return;
     }
+#ifndef ATTRACTAP_SECURE_PROFILE
     printf("RESP %s %s\n", topic.c_str(), payload.c_str());
+#endif
 }
 
 void SerialCommandHandler::sendErrorResponse(const std::string &topic, const char *error)
@@ -151,7 +125,6 @@ void SerialCommandHandler::sendErrorResponse(const std::string &topic, const cha
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "console_io.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -252,7 +225,6 @@ const char *SerialCommandHandler::encryptionTypeToString(wifi_auth_mode_t mode)
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "console_io.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -421,7 +393,6 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "console_io.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>

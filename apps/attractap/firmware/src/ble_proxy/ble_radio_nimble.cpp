@@ -19,13 +19,7 @@
 #include "nimble/nimble_port.h"
 
 #include "ble_errors.hpp"
-#ifdef ATTRACTAP_BLE_BRIDGE
-// src/bridge/provisioning.hpp (not included: its logger header clashes with NimBLE's log macros).
-namespace bridge::provisioning
-{
-    bool active();
-}
-#endif
+#include "../bt_setup/bt_setup.hpp"
 
 namespace ble
 {
@@ -126,10 +120,9 @@ namespace ble
     Error NimbleRadio::init()
     {
         if (synced) return Error();
-#ifdef ATTRACTAP_BLE_BRIDGE
-        // The Bluetooth setup holds NimBLE until its window closes (retryable).
-        if (bridge::provisioning::active()) return Error(Code::ReaderOffline, "bt-setup");
-#endif
+        // The Bluetooth setup holds NimBLE until its window closes (retryable). Its close() restored ble_hs_cfg, so
+        // the setup's pairing settings and bond store do not carry over into the proxy.
+        if (bt_setup::active()) return Error(Code::ReaderOffline, "bt-setup");
         if (!syncSemaphore) syncSemaphore = xSemaphoreCreateBinary();
         if (!hostStopped) hostStopped = xSemaphoreCreateBinary();
         if (!syncSemaphore || !hostStopped) return Error(Code::ReaderOffline, "no-memory");
