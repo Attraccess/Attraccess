@@ -1,5 +1,5 @@
 import { useState, type Dispatch, type SetStateAction, type ReactNode } from 'react';
-import { cleanup, render, act, fireEvent, screen } from '@testing-library/react';
+import { cleanup, render, act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import type { Node, Edge } from '@xyflow/react';
 import { afterEach, beforeEach, vi, expect, it } from 'vitest';
@@ -522,7 +522,7 @@ it('hides the MQTT explorer while no MQTT server exists', () => {
   expect(explorerButton()).toBeNull();
 });
 
-it('asks before leaving a changed flow for another page and stays clean after a save', async () => {
+it('asks before leaving a changed flow for another page, and not once the refetched flow matches', async () => {
   const view = show();
   act(() => state.setNodes((previous) => previous.slice(1)));
   await act(() => view.router.navigate('/elsewhere'));
@@ -530,10 +530,11 @@ it('asks before leaving a changed flow for another page and stays clean after a 
   expect(view.router.state.location.pathname).toBe('/resources/7/flows');
 
   fireEvent.click(screen.getByText('unsavedChanges.stay'));
+  await waitFor(() => expect(screen.queryByText('unsavedChanges.title')).toBeNull());
   expect(view.router.state.location.pathname).toBe('/resources/7/flows');
   expect(state.nodes).toHaveLength(1);
 
-  // A save refetches the flow, so it matches the editor again and leaving no longer asks.
+  // As after a save: the refetched flow matches the editor again, so leaving no longer asks.
   state.original = { nodes: state.nodes, edges: state.edges };
   fireEvent.click(screen.getByRole('button', { name: 'actions.modePan' }));
   expect(saveButton()).toBeDisabled();

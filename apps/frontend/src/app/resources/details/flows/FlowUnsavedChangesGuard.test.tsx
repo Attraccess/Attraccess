@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, Link, RouterProvider } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { FlowUnsavedChangesGuard } from './FlowUnsavedChangesGuard';
 
 const EDITOR = '/devices/flows/3';
@@ -53,6 +53,18 @@ describe('FlowUnsavedChangesGuard', () => {
     await waitFor(() => expect(dialog()).toBeNull());
     expect(router.state.location.pathname).toBe(EDITOR);
     expect(screen.getByText('Editor')).toBeTruthy();
+
+    // The guard stays armed after Stay.
+    fireEvent.click(screen.getByText('Back'));
+    expect(await screen.findByRole('alertdialog')).toBeTruthy();
+  });
+
+  it('treats Escape as Stay', async () => {
+    const router = show(true);
+    fireEvent.click(screen.getByText('Back'));
+    fireEvent.keyDown(await screen.findByRole('alertdialog'), { key: 'Escape' });
+    await waitFor(() => expect(dialog()).toBeNull());
+    expect(router.state.location.pathname).toBe(EDITOR);
   });
 
   it('continues to the target on Leave without saving', async () => {
@@ -76,35 +88,30 @@ describe('FlowUnsavedChangesGuard', () => {
     const router = show(true);
     await act(() => router.navigate(`${EDITOR}?node=a#b`));
     expect(router.state.location.search).toBe('?node=a');
+    expect(router.state.location.hash).toBe('#b');
+    await act(() => router.navigate(`${EDITOR}?node=c`));
+    expect(router.state.location.search).toBe('?node=c');
     expect(dialog()).toBeNull();
   });
 
-  it('adds the beforeunload prompt only while dirty and removes it when clean or unmounted', () => {
-    const add = vi.spyOn(window, 'addEventListener');
-    const remove = vi.spyOn(window, 'removeEventListener');
-    const unloadListeners = (spy: typeof add) =>
-      spy.mock.calls.filter(([type]) => (type as string) === 'beforeunload').map(([, listener]) => listener);
-    try {
-      show(false);
-      expect(unloadListeners(add)).toHaveLength(0);
-
-      fireEvent.click(screen.getByText('Toggle dirty'));
-      const [listener] = unloadListeners(add);
-      expect(listener).toBeTypeOf('function');
-      const event = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+  it('makes the browser ask before unloading only while dirty, and stops when clean or unmounted', () => {
+    const unloadIsPrevented = () => {
+      const event = new Event('beforeunload', { cancelable: true });
       window.dispatchEvent(event);
-      expect(event.defaultPrevented).toBe(true);
+      return event.defaultPrevented;
+    };
+    show(false);
+    expect(unloadIsPrevented()).toBe(false);
 
-      fireEvent.click(screen.getByText('Toggle dirty'));
-      expect(unloadListeners(remove)).toContain(listener);
+    fireEvent.click(screen.getByText('Toggle dirty'));
+    expect(unloadIsPrevented()).toBe(true);
 
-      fireEvent.click(screen.getByText('Toggle dirty'));
-      const [, again] = unloadListeners(add);
-      cleanup();
-      expect(unloadListeners(remove)).toContain(again);
-    } finally {
-      add.mockRestore();
-      remove.mockRestore();
-    }
+    fireEvent.click(screen.getByText('Toggle dirty'));
+    expect(unloadIsPrevented()).toBe(false);
+
+    fireEvent.click(screen.getByText('Toggle dirty'));
+    expect(unloadIsPrevented()).toBe(true);
+    cleanup();
+    expect(unloadIsPrevented()).toBe(false);
   });
 });

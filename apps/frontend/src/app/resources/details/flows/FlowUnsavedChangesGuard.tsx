@@ -1,27 +1,18 @@
-import { useCallback, useEffect } from 'react';
+import { memo, useCallback } from 'react';
 import { useBlocker, type BlockerFunction } from 'react-router-dom';
 import { StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './de.json';
 import en from './en.json';
-
-/** Asks the browser to confirm reload, tab close and external navigation while `isDirty`. */
-function useBeforeUnloadWhileDirty(isDirty: boolean) {
-  useEffect(() => {
-    if (!isDirty) return;
-    const preventUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', preventUnload);
-    return () => window.removeEventListener('beforeunload', preventUnload);
-  }, [isDirty]);
-}
+import { useBeforeUnloadWhileDirty } from './useBeforeUnloadWhileDirty';
 
 /**
  * Keeps unsaved flow edits from being lost: in-app navigation to another page asks in a dialog, reload and
  * close get the browser's own prompt. Search or hash changes on the editor page (e.g. `?node=`) pass.
+ * Memoised: the canvas re-renders on every drag frame, the dirty flag rarely changes.
  */
-export function FlowUnsavedChangesGuard({ isDirty }: Readonly<{ isDirty: boolean }>) {
+export const FlowUnsavedChangesGuard = memo(function FlowUnsavedChangesGuard({
+  isDirty,
+}: Readonly<{ isDirty: boolean }>) {
   const { t } = useTranslations({ en, de });
   const shouldBlock = useCallback<BlockerFunction>(
     ({ currentLocation, nextLocation }) => isDirty && currentLocation.pathname !== nextLocation.pathname,
@@ -48,4 +39,4 @@ export function FlowUnsavedChangesGuard({ isDirty }: Readonly<{ isDirty: boolean
       {t('unsavedChanges.description')}
     </StatusDialog>
   );
-}
+});
