@@ -25,6 +25,8 @@ namespace
     // Requests: the session queue (16) plus a scan/open/close/cancel in flight.
     constexpr UBaseType_t COMMAND_QUEUE_DEPTH = ble::MAX_PENDING_REQUESTS + 8;
     constexpr UBaseType_t EVENT_QUEUE_DEPTH = 32;
+    // A request is taken only with this much heap to spare beyond heap_guard's reserve; otherwise READER_BUSY `memory`.
+    constexpr size_t REQUEST_HEADROOM_BYTES = 1024;
     // Advertisements (many, droppable) never take the last slots: connection and operation results always fit.
     constexpr UBaseType_t EVENT_QUEUE_RESERVE = 8;
     // Radio results must not get lost; NimBLE's host task waits this long for room.
@@ -146,6 +148,8 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
     {
         // A crowded band under a continuous watch scan must not crowd out radio results.
         if (uxQueueSpacesAvailable(events) <= EVENT_QUEUE_RESERVE) return;
+        // Droppable too when the heap is short: the copy must not be the allocation that fails.
+        if (!heap_guard::fits(sizeof(RadioEvent) + length)) return;
         RadioEvent *event = make(RadioEvent::Kind::Advertisement);
         if (!event) return;
         event->address = address;
@@ -367,6 +371,10 @@ bool BleProxy::handleMessage(const char *type, JsonObjectConst payload, bool tru
     const bool parsed = ble::parseCommand(type, payload, *command, error);
     if (!trusted) error = ble::Error(ble::Code::ReaderUnsupported, "unauthenticated");
     else if (parsed && !impl->task) error = ble::Error(ble::Code::ReaderOffline, "ble-init-failed");
+    // Closing and cancelling only free memory; anything else waits for the heap to recover (the API retries).
+    else if (parsed && command->type != ble::CommandType::Close && command->type != ble::CommandType::Cancel &&
+             !heap_guard::fits(REQUEST_HEADROOM_BYTES))
+        error = ble::Error(ble::Code::ReaderBusy, "memory");
     if (!error.ok())
     {
         impl->logger.warnf("ble request refused type=%s code=%s detail=%s", type, ble::codeName(error.code),

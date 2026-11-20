@@ -55,7 +55,13 @@ public:
     // Consecutive failed handshakes (timeouts, errors, text frames) before the screen shows an error.
     static constexpr int HANDSHAKE_FAILURES_BEFORE_ERROR = 2;
     // Session worker (device only): stack in PSRAM, below the LVGL and WebSocket tasks.
+#ifdef ATTRACTAP_BLE_BRIDGE
+    // The bridge has no PSRAM, so this stack is internal RAM: QA (ATT-1315) measured 5.3 KB in use with the
+    // session up (P-256 handshake included). The high-water mark plus about 4 KB.
+    static constexpr uint32_t SESSION_WORKER_STACK = 9216;
+#else
     static constexpr uint32_t SESSION_WORKER_STACK = 16384;
+#endif
     static constexpr unsigned SESSION_WORKER_PRIORITY = 2;
 
     ReaderLink(IReaderTransport &socket, Options options);

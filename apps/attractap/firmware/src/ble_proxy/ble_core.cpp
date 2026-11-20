@@ -115,7 +115,20 @@ namespace ble
             answer(command, Error(Code::ReaderBusy, "busy"), nullptr, 0, now);
             return;
         }
+        if (!heap_guard::fits(SCAN_HEADROOM_BYTES))
+        {
+            answer(command, noMemory(), nullptr, 0, now);
+            return;
+        }
         if (!ensureRadio(command)) return;
+        // The candidate list never grows during the scan: an advertisement must not need an allocation that can fail.
+        PsVector<Advertisement> candidates;
+        if (!heap_guard::fits(SCAN_HEADROOM_BYTES))
+        {
+            answer(command, noMemory(), nullptr, 0, now);
+            return;
+        }
+        candidates.reserve(MAX_SCAN_CANDIDATES);
         // The on-demand scan replaces the watch's for its duration (and feeds the watch meanwhile).
         stopWatchScan();
         const Error error = radio.startScan(command.durationMs);
@@ -127,7 +140,7 @@ namespace ble
         currentOwner = Owner::Scan;
         scan.command = std::move(command);
         scan.deadline = now + scan.command.durationMs;
-        scan.candidates.clear();
+        scan.candidates = std::move(candidates);
     }
 
     void BleProxyCore::openSession(Command &&command, uint32_t now)
@@ -137,11 +150,18 @@ namespace ble
             answer(command, Error(Code::ReaderBusy, "busy"), nullptr, 0, now);
             return;
         }
+        if (!heap_guard::fits(OPEN_HEADROOM_BYTES))
+        {
+            answer(command, noMemory(), nullptr, 0, now);
+            return;
+        }
         if (!ensureRadio(command)) return;
         session = Session();
         std::memcpy(session.id, command.sessionId, sizeof session.id);
         session.address = command.address;
         session.allowlist = command.allowlist;
+        // One subscription per allowlist entry at most: subscribing never grows the list.
+        session.subscriptions.reserve(session.allowlist.size());
         session.openRequestId = command.requestId;
         session.openedMs = now;
         session.leaseMs = command.leaseMs;
@@ -233,6 +253,11 @@ namespace ble
         if (session.queue.size() >= MAX_PENDING_REQUESTS)
         {
             answer(command, Error(Code::ReaderBusy, "queue-full"), nullptr, 0, now);
+            return;
+        }
+        if (!heap_guard::fits(QUEUE_HEADROOM_BYTES))
+        {
+            answer(command, noMemory(), nullptr, 0, now);
             return;
         }
         Queued queued;
@@ -355,6 +380,11 @@ namespace ble
         switch (command.type)
         {
         case CommandType::Read:
+            if (!heap_guard::fits(READ_HEADROOM_BYTES))
+            {
+                error = noMemory();
+                break;
+            }
             start = radio.read(current.token, command.service, command.characteristic, error);
             break;
         case CommandType::Write:

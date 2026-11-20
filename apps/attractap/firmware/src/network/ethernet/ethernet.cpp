@@ -200,6 +200,9 @@ void Ethernet::cleanupPartialInit()
     esp_event_handler_unregister(IP_EVENT, IP_EVENT_ETH_GOT_IP, got_ip_event_handler);
     esp_event_handler_unregister(ETH_EVENT, ESP_EVENT_ANY_ID, eth_event_handler);
 
+#ifdef ETH_RMII_EMAC
+    emac_release();
+#else
     // Stop and clean up Ethernet driver
     if (eth_handle != nullptr)
     {
@@ -220,6 +223,7 @@ void Ethernet::cleanupPartialInit()
         esp_netif_destroy(eth_netif);
         eth_netif = nullptr;
     }
+#endif
 
     // The W5500 driver owns its SPI device and removed it during uninstall;
     // the SPI bus itself stays up for other users.

@@ -28,7 +28,10 @@ namespace ble
 
         explicit NotificationBuffer(size_t maxEntries = MAX_NOTIFICATION_QUEUE,
                                     size_t maxBytes = MAX_NOTIFICATION_QUEUE_BYTES)
-            : maxEntries(maxEntries), maxBytes(maxBytes) {}
+            : maxEntries(maxEntries), maxBytes(maxBytes)
+        {
+            overflowedKeys.reserve(MAX_ALLOWLIST_ENTRIES);
+        }
 
         // false: dropped (buffer full, or the characteristic already overflowed).
         bool push(const Uuid &service, const Uuid &characteristic, const uint8_t *data, size_t length);
@@ -48,6 +51,8 @@ namespace ble
             Uuid characteristic;
         };
         bool overflowed(const Uuid &service, const Uuid &characteristic) const;
+        // What one entry may add besides its value: a new block of the deque.
+        static constexpr size_t ENTRY_HEADROOM_BYTES = 512;
 
         const size_t maxEntries;
         const size_t maxBytes;

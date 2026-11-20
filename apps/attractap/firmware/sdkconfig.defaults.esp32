@@ -19,7 +19,8 @@ CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_INTERNAL=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions-4mb.csv"
 
 # --- Main task: no display or plugin UI on this board, so less stack than the S3 readers ---
-CONFIG_ESP_MAIN_TASK_STACK_SIZE=12288
+# QA (ATT-1315) measured 11.1 KB in use after an Ethernet boot: the high-water mark plus about 2 KB.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=13312
 
 # --- BLE: BLE-only controller with one connection (the NimBLE host settings come from sdkconfig.defaults) ---
 CONFIG_BTDM_CTRL_MODE_BLE_ONLY=y

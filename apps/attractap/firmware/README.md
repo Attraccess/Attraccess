@@ -164,13 +164,13 @@ of Lock, Unlock and Release latch, and a Lite reader opens it on any tap, short 
 as the existing unlock request; the server records it as the door being opened. A resource list
 without the field (an older server) means a regular door.
 
-## BLE bridge (2.7.0)
+## BLE bridge (2.8.0)
 
 `attractap-bridge-gl-s10` turns a GL.iNet GL-S10 BLE gateway into a headless BLE proxy for plugins
 (ATT-1315). The API treats it as a reader that announces `capabilities.ble` v1, so `context.ble` and
 `ReaderBleDriver` work through it unchanged. It reports `capabilities.nfc: false` (and no `cardRelay`),
 so the API never assigns it a resource or sends it card or resource-list traffic. Every other firmware
-reports `nfc: true`; firmware before 2.7.0 omits the field, which means true.
+reports `nfc: true`; firmware before 2.8.0 omits the field, which means true.
 
 **Target and build.** The variant sets `set(ATTRACTAP_IDF_TARGET "esp32")`; `CMakeLists.txt` passes it to
 ESP-IDF as `IDF_TARGET` (default `esp32s3`), and `build_firmwares.py` reads it for esptool `--chip` and
@@ -185,8 +185,8 @@ target.
 slots of `0x1f0000` (1.94 MB) at `0x10000` and `0x200000`, and a 64 KB `coredump` at `0x3f0000`. No
 SPIFFS. The bootloader sits at `0x1000` on the classic ESP32. `tools/check_release_build.py` fails a
 release image that leaves less than 10 % of its smallest app slot free. Release build (log level
-ERROR, 2.7.0, with the Bluetooth setup): app image 1,544,880 bytes (24 % of the slot free, 476 KB),
-static DRAM 67.5 KB, IRAM 91 %, bootloader 26,096 bytes (9 % of its 28 KB free).
+ERROR, 2.8.0, with the Bluetooth setup): app image 1,543,312 bytes (24 % of the slot free, 477 KB),
+static DRAM 67.4 KB, IRAM 91 %, bootloader 26,096 bytes (9 % of its 28 KB free).
 
 **PSRAM.** Not used. The S10 drives the 50 MHz RMII reference clock out on GPIO17, which the ESP32's
 external PSRAM needs as its clock pin, so PSRAM and Ethernet cannot run together. The proxy's bulk
@@ -210,6 +210,29 @@ skips the beeper task. `CMND heap` (no PIN, release builds too) answers with the
 minimum since boot, its largest block, the DMA-capable heap and the unused stack of the firmware's
 tasks; the bridge logs no heap figures at log level ERROR. First release build on a GL-S10 (rev v1.0),
 Wi-Fi up, no API session: 73,068 B free, 53,896 B minimum, largest block 69,632 B.
+
+Hardware QA of 2.7.0 then showed two aborts and a tight budget. With a session and a GATT session up,
+the minimum free heap fell to about 8 KB, and a failed allocation reboots the reader: the firmware builds
+without C++ exceptions, so a failed `new` or container growth calls `abort()`. Since 2.8.0:
+
+- **Heap guard** (`src/heap_guard.hpp`). Work that grows on behalf of the network first checks the largest
+  free block and keeps a reserve (8 KB for bulk BLE work, 2 KB for received TLS bytes). The proxy refuses a
+  scan, a session open, a queued operation or a read with `READER_BUSY` `memory`, which the API retries
+  like any busy reader. It skips advertising reports and builds a scan result only with room for it,
+  reserves the scan's candidate list, a session's subscriptions and a long read's value up front, and
+  lets notifications wait in, or overflow, their bounded buffer. `tests/ble-proxy/ble_memory_test.cpp`
+  drives each path with a short heap.
+- **Received TLS bytes** (`session_tls.cpp`). The buffer drops what TLS already read before new bytes are
+  appended, frees a large buffer (an OTA chunk) once it has been read, and fails the session instead of
+  aborting when the heap has no room. The reader then opens a new session.
+- **Stacks, bridge only**, sized from the QA high-water marks plus about 2 KB: `main` 13 KB (was 12 KB,
+  1.1 KB left after an Ethernet boot), `websocket_task` 8 KB (was 16 KB, about 1.5 KB used), `rl_tls`
+  9 KB (was 16 KB, 5.3 KB used), `ws_conn` 4 KB (was 8 KB, 1.9 KB used) and the proxy's `nimble_host`
+  4.75 KB (was 4 KB, 1.4 KB left). The S3 readers keep their sizes. QA measured these figures against a
+  local `ws://` API. Behind `wss://` the websocket task also runs the outer TLS handshake.
+- **Ethernet unplug.** The EMAC release removes the netif glue before uninstalling the driver, then
+  deletes the MAC and PHY. Before, the uninstall failed ("2 ethernet reference in use"), the next init
+  could not claim the SMI pins, and every reinit leaked the EMAC's DMA buffers.
 
 **Ethernet with Wi-Fi fallback.** Internal EMAC over RMII: MDC GPIO23, MDIO GPIO18, clock out on GPIO17
 (`EMAC_CLK_OUT`), PHY power/reset GPIO5. LAN8720 (v1.x units) and IP101 (v2.x units) both run with

@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "api/security/pairing_client.hpp"
+#include "heap_guard.hpp"
 #include "api/security/pairing_codec.hpp"
 #include "api/security/reader_identity.hpp"
 #include "api/security/session_certificates.hpp"
@@ -616,6 +617,14 @@ void testSessionTls()
         CHECK(delivered.size() == 2 && delivered[0].first == SessionFraming::FrameType::BINARY &&
               delivered[0].second == big.size() && delivered[1].second == hello.size());
         CHECK(client.open());
+        // ATT-1315: received bytes without the heap for them fail the session; they never abort the reader.
+        {
+            Bytes record(64, 0x17);
+            heap_guard::setTestBudget(heap_guard::CRITICAL_RESERVE_BYTES + 16);
+            SessionTls::Status after = client.feed(record.data(), record.size(), nullptr);
+            heap_guard::setTestBudget(SIZE_MAX);
+            CHECK(after == SessionTls::Status::Failed && client.lastError() == MBEDTLS_ERR_SSL_ALLOC_FAILED);
+        }
     }
 
     // Bootstrap: no installation known yet, learned from the verified certificate.

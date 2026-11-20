@@ -21,6 +21,8 @@
 #include "esp_heap_caps.h"
 #endif
 
+#include "../heap_guard.hpp"
+
 namespace ble
 {
     constexpr int PROTOCOL_VERSION = 1;
@@ -46,7 +48,13 @@ namespace ble
     constexpr size_t MAX_NOTIFICATION_QUEUE_BYTES = 32 * 1024;
 #endif
     constexpr size_t MAX_ALLOWLIST_ENTRIES = 16;
+#ifdef BLE_PROXY_INTERNAL_RAM
+    // A queued write holds its request (about 1 KB with its value): 8 in flight is what the bridge's heap budget
+    // carries next to two TLS sessions, and what the API's transfer window uses at most (ATT-1315 QA).
+    constexpr size_t MAX_PENDING_REQUESTS = 8;
+#else
     constexpr size_t MAX_PENDING_REQUESTS = 16;
+#endif
     constexpr size_t MAX_SESSION_ID_LENGTH = 64;
     constexpr size_t MAX_FILTER_UUIDS = 8;
     constexpr size_t MAX_FILTER_MANUFACTURERS = 8;

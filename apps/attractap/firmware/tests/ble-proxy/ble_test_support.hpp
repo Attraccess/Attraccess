@@ -254,4 +254,6 @@ namespace bletest
     void runLinkTests();
     // ble_watch_test.cpp: the advertisement watch.
     void runWatchTests();
+    // ble_memory_test.cpp: a short heap refuses or drops work instead of aborting.
+    void runMemoryTests();
 }

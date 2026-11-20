@@ -263,8 +263,15 @@ namespace ble
             error = Error(Code::GattError, "characteristic-not-found");
             return Start::Failed;
         }
+        // The value buffer is reserved up front, so the pieces of a long read never need an allocation that can fail.
+        if (!heap_guard::fits(MAX_PAYLOAD_BYTES + 1))
+        {
+            error = Error(Code::ReaderBusy, "memory");
+            return Start::Failed;
+        }
         opToken = token;
         opValue.clear();
+        opValue.reserve(MAX_PAYLOAD_BYTES + 1);
         const Start start = startResult(ble_gattc_read_long(conn, c->valHandle, 0, readTrampoline, this), error);
         if (start != Start::Pending) opToken = 0;
         return start;

@@ -20,6 +20,9 @@ namespace ble
     void BleProxyCore::onAdvertisement(const Address &address, int8_t rssi, bool hasRssi, const uint8_t *data,
                                        size_t length, uint32_t now)
     {
+        // Decoding allocates (names, UUIDs, manufacturer data): with the heap short, the report is skipped. The device
+        // advertises again.
+        if (!heap_guard::fits(advertisementCost(length))) return;
         // Reports of an on-demand scan feed the watch too, so it does not go blind while the scan replaces its own.
         if (watch.active() && (watchScanning || currentOwner == Owner::Scan))
             watch.onAdvertisement(address, rssi, hasRssi, data, length, now);
@@ -35,7 +38,8 @@ namespace ble
         }
         if (!target)
         {
-            if (scan.candidates.size() >= MAX_SCAN_CANDIDATES)
+            // The list was reserved when the scan started and never grows.
+            if (scan.candidates.size() >= MAX_SCAN_CANDIDATES || scan.candidates.size() == scan.candidates.capacity())
             {
                 // A crowded band fills the list: make room by dropping a device its own data already rules out.
                 target = evictableCandidate();
@@ -88,17 +92,23 @@ namespace ble
         if (currentOwner == Owner::Scan) finishScan(Error(), now);
     }
 
-    void BleProxyCore::finishScan(const Error &error, uint32_t now)
+    void BleProxyCore::finishScan(const Error &scanError, uint32_t now)
     {
-        PsVector<Advertisement> matches;
-        if (error.ok())
+        // The matches stay in the candidate list (filtered in place): the result needs no second list.
+        PsVector<Advertisement> &matches = scan.candidates;
+        size_t kept = 0;
+        size_t resultBytes = 1024;
+        for (Advertisement &candidate : scan.candidates)
         {
-            for (Advertisement &candidate : scan.candidates)
-            {
-                if (matches.size() >= scan.command.maxResults) break;
-                if (matchesFilter(candidate, scan.command)) matches.push_back(std::move(candidate));
-            }
+            if (!scanError.ok() || kept >= scan.command.maxResults) break;
+            if (!matchesFilter(candidate, scan.command)) continue;
+            resultBytes += scanResultCost(candidate);
+            if (&scan.candidates[kept] != &candidate) scan.candidates[kept] = std::move(candidate);
+            kept++;
         }
+        matches.erase(matches.begin() + static_cast<std::ptrdiff_t>(kept), matches.end());
+        // The answer is built in one string: with the heap short, the API gets a busy reader and scans again.
+        const Error error = scanError.ok() && !heap_guard::fits(resultBytes) ? noMemory() : scanError;
         char id[9];
         shortId(scan.command.sessionId, id);
         const LogLevel level =
@@ -343,8 +353,9 @@ namespace ble
         // notifications up in their bounded buffer (which overflows with a marker), never into the outbox.
         if (!outbox.empty()) return;
         NotificationBuffer::Entry entry;
-        // Asks for room only with a notification to send: an empty buffer must not mark the proxy as waiting.
-        while (notifications.peek(entry) && sink.canSendNotification())
+        // Asks for room only with a notification to send: an empty buffer must not mark the proxy as waiting. The copy
+        // and the message need heap; while it is short, notifications wait in their bounded buffer.
+        while (heap_guard::fits(NOTIFY_HEADROOM_BYTES) && notifications.peek(entry) && sink.canSendNotification())
         {
             Subscription *subscription = currentOwner == Owner::Session && session.state == SessionState::Open
                                              ? findSubscription(entry.service, entry.characteristic)

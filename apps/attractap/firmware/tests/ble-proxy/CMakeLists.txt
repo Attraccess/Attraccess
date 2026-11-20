@@ -10,7 +10,7 @@ FetchContent_MakeAvailable(ArduinoJson)
 
 set(BLE_DIR "${FIRMWARE_DIR}/src/ble_proxy")
 # The pure part of the proxy only: no NimBLE, no FreeRTOS (ble_proxy.cpp and ble_radio_nimble.cpp stay out).
-set(BLE_TEST_SOURCES ble_proxy_test.cpp ble_proxy_edge_test.cpp ble_link_test.cpp ble_watch_test.cpp ble_stack_test.cpp
+set(BLE_TEST_SOURCES ble_proxy_test.cpp ble_proxy_edge_test.cpp ble_link_test.cpp ble_watch_test.cpp ble_stack_test.cpp ble_memory_test.cpp
     "${BLE_DIR}/ble_core.cpp" "${BLE_DIR}/ble_core_events.cpp" "${BLE_DIR}/ble_core_watch.cpp" "${BLE_DIR}/ble_codec.cpp"
     "${BLE_DIR}/ble_adv.cpp" "${BLE_DIR}/ble_errors.cpp" "${BLE_DIR}/ble_notification_buffer.cpp" "${BLE_DIR}/ble_watch.cpp")
 # ble-proxy-test-internal-ram: the same tests with the smaller bounds of boards without PSRAM (the BLE bridge).
