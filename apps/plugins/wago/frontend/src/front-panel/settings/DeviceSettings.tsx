@@ -237,7 +237,7 @@ export function DeviceSettings({
           </Button>
         )}
       </div>
-      {!builtin && <ModbusProfileForm value={profile} onChange={setProfile} showIdentifiers={false} collapseSignals />}
+      {!builtin && <ModbusProfileForm value={profile} onChange={setProfile} />}
       {profile.measurements.length > 0 && (
         <ReadingSettings
           profile={profile}

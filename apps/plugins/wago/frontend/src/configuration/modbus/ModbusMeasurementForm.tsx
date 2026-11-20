@@ -13,20 +13,9 @@ interface ModbusMeasurementFormProps {
   measurement: ModbusMeasurement;
   index: number;
   onChange: (value: ModbusProfile) => void;
-  collapseSignals: boolean;
-  showIdentifiers: boolean;
-  readonly: boolean;
 }
 
-export function ModbusMeasurementForm({
-  profile,
-  measurement: m,
-  index,
-  onChange,
-  collapseSignals,
-  showIdentifiers,
-  readonly,
-}: ModbusMeasurementFormProps) {
+export function ModbusMeasurementForm({ profile, measurement: m, index, onChange }: ModbusMeasurementFormProps) {
   const { t, tBackendMessage } = useWagoTranslations();
   const update = (patch: Partial<ModbusMeasurement>) =>
     onChange({
@@ -35,46 +24,37 @@ export function ModbusMeasurementForm({
     });
   return (
     <SignalDisclosure
-      defaultExpanded={!collapseSignals && (profile.measurements.length <= 16 || index < 5)}
       label={t('modbus.measurementTitle', { name: modbusDisplayName(profile, m.name, tBackendMessage) })}
     >
       <div className="wg:flex wg:flex-col wg:gap-3 wg:pt-3">
-        {showIdentifiers && (
-          <Field label={t('modbus.measurementId')} value={m.id} disabled={readonly} onChange={(id) => update({ id })} />
-        )}
         <Field
           label={t('modbus.name')}
           value={modbusDisplayName(profile, m.name, tBackendMessage)}
-          disabled={readonly}
           onChange={(name) => update({ name })}
         />
         <Choice
           label={t('modbus.readFunction')}
           value={m.functionCode}
           options={[3, 4]}
-          disabled={readonly}
           onChange={(v) => update({ functionCode: Number(v) as 3 | 4 })}
         />
-        <FormatFields value={m} disabled={readonly} onChange={update} />
+        <FormatFields value={m} onChange={update} />
         <Choice
           label={t('modbus.numericEncoding')}
           value={m.encoding ?? 'binary'}
           options={['binary', 'bcd']}
-          disabled={readonly}
           onChange={(v) => update({ encoding: v === 'bcd' ? 'bcd' : undefined })}
         />
         <Choice
           label={t('modbus.unit')}
           value={m.unit}
           options={ENGINEERING_UNITS}
-          disabled={readonly}
           onChange={(v) => update({ unit: v as typeof m.unit })}
         />
         <Choice
           label={t('modbus.kind')}
           value={m.kind}
           options={['live', 'cumulative']}
-          disabled={readonly}
           onChange={(v) => {
             update({ kind: v as typeof m.kind, rollover: v === 'live' ? undefined : m.rollover });
           }}
@@ -90,14 +70,12 @@ export function ModbusMeasurementForm({
             2: t('modbus.units', { precision: '0.01' }),
             3: t('modbus.units', { precision: '0.001' }),
           }}
-          disabled={readonly}
           onChange={(v) => update({ decimalPlaces: v === 'exact' ? undefined : Number(v) })}
         />
         <Field
           label={t('modbus.polling')}
           value={m.pollIntervalMs}
           numeric
-          disabled={readonly}
           onChange={(v) => update({ pollIntervalMs: Number(v) })}
         />
         {m.kind === 'cumulative' && (
@@ -106,12 +84,10 @@ export function ModbusMeasurementForm({
             allowEmpty
             value={m.rollover ?? ''}
             numeric
-            disabled={readonly}
             onChange={(v) => update({ rollover: v === '' ? undefined : Number(v) })}
           />
         )}
         <Button
-          isDisabled={readonly}
           variant="danger"
           onPress={() => onChange({ ...profile, measurements: profile.measurements.filter((_, i) => i !== index) })}
         >

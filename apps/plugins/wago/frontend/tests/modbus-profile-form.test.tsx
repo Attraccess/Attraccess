@@ -1,12 +1,12 @@
 // Covers the Modbus profile form that the front panel's device dialog embeds for custom devices.
-// FEATURE: custom Modbus register maps are edited field by field and built-in maps stay read-only.
+// FEATURE: custom Modbus register maps are edited field by field; the dialog never renders built-in maps here.
 // These forms were once exercised through the removed configuration editor.
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { BUILTIN_MODBUS_PROFILES, type ModbusProfile } from '../../modbus/model';
+import type { ModbusProfile } from '../../modbus/model';
 import { ModbusProfileForm } from '../src/configuration/modbus/ModbusProfileForm';
 
 const format = {
@@ -29,18 +29,25 @@ const custom: ModbusProfile = {
 };
 
 let latest: ModbusProfile;
-function Harness({
-  initial = custom,
-  ...props
-}: { initial?: ModbusProfile } & Partial<Parameters<typeof ModbusProfileForm>[0]>) {
+function Harness({ initial = custom }: { initial?: ModbusProfile }) {
   const [value, setValue] = useState(initial);
   latest = value;
-  return <ModbusProfileForm {...props} value={value} onChange={setValue} />;
+  return <ModbusProfileForm value={value} onChange={setValue} />;
 }
 /** Text entry without per-key events: the form's own change handling is what is under test. */
 const set = (element: HTMLElement, value: string) => fireEvent.change(element, { target: { value } });
-const measurementPanel = () => within(screen.getByText('Measurement: Boiler temp').closest('details') as HTMLElement);
-const actionPanel = () => within(screen.getByText('Action: Burner').closest('details') as HTMLElement);
+/** Signals render collapsed in the front panel, so a test opens a signal's disclosure before editing inside it. */
+const openPanel = (title: string) => {
+  const details = screen.getByText(title).closest('details') as HTMLDetailsElement;
+  // Opening is idempotent: a second call keeps the panel and its mounted fields open.
+  if (!details.open) {
+    details.open = true;
+    fireEvent(details, new Event('toggle'));
+  }
+  return within(details);
+};
+const measurementPanel = () => openPanel('Measurement: Boiler temp');
+const actionPanel = () => openPanel('Action: Burner');
 
 beforeEach(() => {
   useTranslationState.getState().setLanguage('en');
@@ -48,16 +55,15 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('custom profile', () => {
-  it('edits the profile identity and numeric fields while keeping incomplete numeric text', async () => {
+  it('edits the profile name and version while keeping incomplete numeric text', async () => {
     render(<Harness />);
-    set(screen.getByLabelText('Profile ID'), 'boiler-v2');
     set(screen.getByLabelText('Profile name'), 'Boiler');
     const version = screen.getByLabelText('Version');
     set(version, '');
     expect(latest.version).toBeNaN();
     expect(version.getAttribute('aria-invalid')).toBe('true');
     set(version, '3');
-    expect(latest).toMatchObject({ id: 'boiler-v2', name: 'Boiler', version: 3 });
+    expect(latest).toMatchObject({ name: 'Boiler', version: 3 });
     expect(version.getAttribute('aria-invalid')).toBeNull();
     // Incomplete text that still parses to the stored number stays as typed.
     set(version, '3.');
@@ -155,19 +161,6 @@ describe('custom profile', () => {
     expect(latest.actions[0]).toMatchObject({ name: 'Pump', functionCode: 16, onValue: 255, offValue: 2 });
   });
 
-  it('shows and edits the identifiers only when asked to', async () => {
-    const { unmount } = render(<Harness showIdentifiers={false} />);
-    expect(screen.queryByLabelText('Profile ID')).toBeNull();
-    expect(screen.queryByLabelText('Measurement ID')).toBeNull();
-    expect(screen.queryByLabelText('Action ID')).toBeNull();
-    unmount();
-    render(<Harness />);
-    set(measurementPanel().getByLabelText('Measurement ID'), 'flow');
-    set(actionPanel().getByLabelText('Action ID'), 'pump');
-    expect(latest.measurements[0].id).toBe('flow');
-    expect(latest.actions[0].id).toBe('pump');
-  });
-
   it('adds and removes measurements and actions', async () => {
     const user = userEvent.setup();
     render(<Harness />);
@@ -182,13 +175,15 @@ describe('custom profile', () => {
     });
     expect(latest.actions).toHaveLength(2);
     expect(latest.actions[1]).toMatchObject({ name: 'Switch', functionCode: 5, onValue: 1, offValue: 0 });
+    // A measurement's remove button mounts only with its fields, so the first measurement is opened first.
+    measurementPanel();
     await user.click(screen.getAllByRole('button', { name: 'Remove measurement' })[0]);
     await user.click(screen.getAllByRole('button', { name: 'Remove action' })[0]);
     expect(latest.measurements.map((m) => m.name)).toEqual(['Measurement']);
     expect(latest.actions.map((a) => a.name)).toEqual(['Switch']);
   });
 
-  it('collapses signals of a large profile unless they were asked to open', () => {
+  it('collapses every signal until it is opened', () => {
     const many = {
       ...custom,
       measurements: Array.from({ length: 20 }, (_, i) => ({
@@ -197,33 +192,19 @@ describe('custom profile', () => {
         name: `Reading ${i}`,
       })),
     };
-    const { container, unmount } = render(<Harness initial={many} />);
-    const open = () => [...container.querySelectorAll('details')].map((d) => d.open);
-    expect(open().slice(0, 5)).toEqual([true, true, true, true, true]);
-    expect(
-      open()
-        .slice(5, 20)
-        .every((value) => !value),
-    ).toBe(true);
-    unmount();
-    const collapsed = render(<Harness collapseSignals />);
-    expect([...collapsed.container.querySelectorAll('details')].every((d) => !d.open)).toBe(true);
-  });
-});
-
-describe('read-only profiles', () => {
-  it('locks every field of a built-in profile', () => {
-    render(<Harness initial={BUILTIN_MODBUS_PROFILES[0]} isDisabled={false} />);
-    expect(screen.getByText(/Read-only profile\. Duplicate to customize\./)).toBeTruthy();
-    expect(screen.getByLabelText('Profile name').hasAttribute('disabled')).toBe(true);
-    expect(screen.getByRole('button', { name: 'Add measurement' }).hasAttribute('disabled')).toBe(true);
-    expect(screen.getAllByRole('button', { name: 'Remove measurement' })[0].hasAttribute('disabled')).toBe(true);
+    const { container } = render(<Harness initial={many} />);
+    const details = [...container.querySelectorAll('details')];
+    expect(details).toHaveLength(21);
+    expect(details.every((d) => !d.open)).toBe(true);
   });
 
-  it('locks a custom profile while the dialog is busy', () => {
-    render(<Harness isDisabled />);
-    expect(screen.getByText(/Read-only profile/)).toBeTruthy();
-    expect(screen.getByLabelText('Profile name').hasAttribute('disabled')).toBe(true);
-    expect(screen.getByRole('button', { name: 'Add action' }).hasAttribute('disabled')).toBe(true);
+  it('shows the custom-profile hint and no identifier fields', () => {
+    render(<Harness />);
+    expect(screen.getByText('Custom register map — verify against the device manual before use.')).toBeTruthy();
+    expect(screen.queryByText(/Read-only profile/)).toBeNull();
+    expect(screen.queryByLabelText('Profile ID')).toBeNull();
+    const panel = measurementPanel();
+    expect(panel.queryByLabelText('Measurement ID')).toBeNull();
+    expect(actionPanel().queryByLabelText('Action ID')).toBeNull();
   });
 });

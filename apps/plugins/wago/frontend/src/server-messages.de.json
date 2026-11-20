@@ -499,6 +499,7 @@
   "a guard or feedback cannot use a disabled channel": "Eine Freigabebedingung oder Rückmeldung kann keinen deaktivierten Kanal verwenden",
   "configuration draft is invalid": "Der Konfigurationsentwurf ist ungültig",
   "rollback configuration is invalid": "Die Konfiguration für das Zurücksetzen ist ungültig",
+  "configuration changed since rollback preview; preview and confirm again": "Die Konfiguration wurde seit der Vorschau des Zurücksetzens geändert. Öffne die Vorschau erneut und bestätige noch einmal.",
   "This configuration disables channels, but the CC100 runtime on this controller cannot disable channels. Update the CC100 runtime, or enable every channel before publishing.": "Diese Konfiguration deaktiviert Kanäle, aber die CC100-Laufzeit auf diesem Controller kann keine Kanäle deaktivieren. Aktualisiere die CC100-Laufzeit oder aktiviere vor dem Veröffentlichen alle Kanäle.",
   "Channel disabled. Flows reading it will see it as unavailable.": "Kanal deaktiviert. Abläufe, die ihn lesen, sehen ihn als nicht verfügbar.",
   "The CC100 runtime on this controller is older and accepts at most 256 physical points. Update the CC100 runtime to use the higher limits, or remove points or devices.": "Die CC100-Laufzeit auf diesem Controller ist älter und akzeptiert höchstens 256 physische Punkte. Aktualisiere die CC100-Laufzeit, um die höheren Grenzen zu nutzen, oder entferne Punkte oder Geräte.",

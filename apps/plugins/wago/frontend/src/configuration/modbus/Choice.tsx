@@ -6,7 +6,6 @@ export function Choice({
   value,
   options,
   onChange,
-  disabled = false,
   labels = {},
 }: {
   label: string;
@@ -14,13 +13,12 @@ export function Choice({
   labels?: Record<string, string>;
   options: readonly (string | number)[];
   onChange: (value: string) => void;
-  disabled?: boolean;
 }) {
   const { t, tExists } = useWagoTranslations();
   const optionLabel = (option: string | number) =>
     labels[String(option)] ?? (tExists(`modbus.options.${option}`) ? t(`modbus.options.${option}`) : String(option));
   return (
-    <Select isDisabled={disabled} value={String(value)} onChange={(key) => key !== null && onChange(String(key))}>
+    <Select value={String(value)} onChange={(key) => key !== null && onChange(String(key))}>
       <Label>{label}</Label>
       <Select.Trigger>
         <Select.Value />

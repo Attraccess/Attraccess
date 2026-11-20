@@ -7,14 +7,12 @@ export function Field({
   onChange,
   numeric = false,
   allowEmpty = false,
-  disabled = false,
 }: {
   label: string;
   value: string | number;
   onChange: (value: string) => void;
   numeric?: boolean;
   allowEmpty?: boolean;
-  disabled?: boolean;
 }) {
   const display = Number.isNaN(value) ? '' : String(value);
   // Keep incomplete numeric text only while it still represents our own emitted value.
@@ -24,7 +22,6 @@ export function Field({
   if (edit && !currentEdit) setEdit(null);
   return (
     <TextField
-      isDisabled={disabled}
       isInvalid={numeric && Number.isNaN(value)}
       value={currentEdit?.text ?? display}
       onBlur={() => setEdit(null)}

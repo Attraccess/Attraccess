@@ -27,11 +27,10 @@ export default defineConfig({
     setupFiles: [fileURLToPath(new URL('../../scripts/css-escape.test-setup.ts', import.meta.url))],
     include: ['apps/plugins/wago/frontend/tests/*.test.tsx', 'apps/plugins/wago/frontend/src/**/*.{test,spec}.tsx'],
     // Large jsdom renders of the 879-3020 register map set the pace: the meter dialog in tests/front-panel.test.tsx
-    // ("meter readings") and the built-in profile in tests/modbus-profile-form.test.tsx. Measured for ATT-1216 with
-    // coverage: "adds a meter with the recommended readings and switches readings per register and section" takes
-    // 4.6-5.2 s on a quiet host and 7.8 s in the full parallel run, and the slowest front-panel tests reach 11-25 s on
-    // a loaded host; modbus-profile-form tests reach 5.2 s in the full run. The 5 s default is too tight for both
-    // files. File parallelism needs no override: each test file runs in its own worker with its own jsdom.
+    // ("meter readings"). Measured for ATT-1216 with coverage: "adds a meter with the recommended readings and switches
+    // readings per register and section" takes 4.6-5.2 s on a quiet host and 7.8 s in the full parallel run, and the
+    // slowest front-panel tests reach 11-25 s on a loaded host, so the 5 s default is too tight. File parallelism needs
+    // no override: each test file runs in its own worker with its own jsdom.
     testTimeout: 30_000,
     coverage: {
       // Unit coverage feeds the project's crap-score target.

@@ -1,15 +1,8 @@
 import { useState, type ReactNode } from 'react';
 
-export function SignalDisclosure({
-  label,
-  defaultExpanded,
-  children,
-}: {
-  label: string;
-  defaultExpanded: boolean;
-  children: ReactNode;
-}) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+/** A signal starts collapsed and mounts its fields only once opened. */
+export function SignalDisclosure({ label, children }: { label: string; children: ReactNode }) {
+  const [expanded, setExpanded] = useState(false);
   return (
     <details
       open={expanded}
