@@ -1,4 +1,4 @@
-import { Card, Chip } from '@heroui/react';
+import { Chip } from '@heroui/react';
 import { useMatterTranslations } from '../i18n';
 import type { MatterEndpointDetail } from './api';
 import { BridgeInfo } from './BridgeInfo';
@@ -22,28 +22,31 @@ export function EndpointCard({
   const { t } = useMatterTranslations();
   const title = endpoint.metadata.displayName ?? t('devices.endpoint.number', { number: endpoint.endpointId });
   return (
-    <Card data-cy="matter-endpoint" data-endpoint-id={endpoint.endpointId}>
-      <Card.Content className="mt:flex mt:flex-col mt:gap-3">
-        <div className="mt:flex mt:flex-wrap mt:items-center mt:gap-2">
-          <h4 className="mt:min-w-0 mt:break-words mt:font-semibold" data-cy="matter-endpoint-name">
-            {title}
-          </h4>
-          <Chip size="sm" variant="soft" data-cy="matter-endpoint-profile">
-            {t(`profile.${endpoint.profile}`)}
-          </Chip>
-        </div>
-        <BridgeInfo endpoint={endpoint} bridgeName={bridgeName} />
-        {canEdit && (
-          <MetadataForm
-            value={endpoint.metadata}
-            fields={['displayName']}
-            idPrefix={`matter-endpoint-${endpoint.endpointId}`}
-            onSave={(changes) => onRename(endpoint.id, changes)}
-          />
-        )}
-        <StateEntries endpointRef={endpoint.id} enabled={canRead} />
-        {showFlowUsage && <FlowUsage endpointRef={endpoint.id} />}
-      </Card.Content>
-    </Card>
+    // Not a Card: the rename field would share the Card's fill and be invisible (ATT-294 / ATT-834).
+    <section
+      className="mt:flex mt:flex-col mt:gap-3 mt:rounded-xl mt:border mt:border-separator mt:p-4"
+      data-cy="matter-endpoint"
+      data-endpoint-id={endpoint.endpointId}
+    >
+      <div className="mt:flex mt:flex-wrap mt:items-center mt:gap-2">
+        <h4 className="mt:min-w-0 mt:break-words mt:font-semibold" data-cy="matter-endpoint-name">
+          {title}
+        </h4>
+        <Chip size="sm" variant="soft" data-cy="matter-endpoint-profile">
+          {t(`profile.${endpoint.profile}`)}
+        </Chip>
+      </div>
+      <BridgeInfo endpoint={endpoint} bridgeName={bridgeName} />
+      {canEdit && (
+        <MetadataForm
+          value={endpoint.metadata}
+          fields={['displayName']}
+          idPrefix={`matter-endpoint-${endpoint.endpointId}`}
+          onSave={(changes) => onRename(endpoint.id, changes)}
+        />
+      )}
+      <StateEntries endpointRef={endpoint.id} enabled={canRead} />
+      {showFlowUsage && <FlowUsage endpointRef={endpoint.id} />}
+    </section>
   );
 }

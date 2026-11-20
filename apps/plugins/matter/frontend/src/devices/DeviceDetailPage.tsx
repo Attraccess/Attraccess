@@ -1,5 +1,5 @@
 import { StatusAlert } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, Spinner } from '@heroui/react';
+import { Button, Spinner } from '@heroui/react';
 import { ArrowLeftIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Fact } from '../Fact';
@@ -103,11 +103,13 @@ export function DeviceDetailPage({ nodeId }: Readonly<{ nodeId: string }>) {
         />
       )}
       <IdentityCard node={node} />
-      <Card data-cy="matter-metadata">
-        <Card.Header>
-          <Card.Title>{t('devices.metadata.title')}</Card.Title>
-        </Card.Header>
-        <Card.Content>
+      {/* Not a Card: form fields share the Card's fill and would be invisible (ATT-294 / ATT-834). */}
+      <section
+        className="mt:flex mt:flex-col mt:gap-3 mt:rounded-xl mt:border mt:border-separator mt:p-4"
+        data-cy="matter-metadata"
+      >
+        <h3 className="mt:font-semibold">{t('devices.metadata.title')}</h3>
+        <div>
           {editable ? (
             <MetadataForm
               value={node.metadata}
@@ -132,8 +134,8 @@ export function DeviceDetailPage({ nodeId }: Readonly<{ nodeId: string }>) {
               {t(node.lifecycleState === 'unclaimed' ? 'devices.metadata.claimFirst' : 'devices.metadata.resolveFirst')}
             </p>
           )}
-        </Card.Content>
-      </Card>
+        </div>
+      </section>
       {/* Read-only for an unclaimed or detached device: it helps decide how to resolve it, but nothing is editable. */}
       <section className="mt:flex mt:flex-col mt:gap-3" data-cy="matter-endpoints">
         <h3 className="mt:text-lg mt:font-semibold">{t('devices.endpoint.title')}</h3>
