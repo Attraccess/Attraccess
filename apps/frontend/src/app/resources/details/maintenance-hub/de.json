@@ -34,7 +34,9 @@
       "delete": "Löschen"
     },
     "deleteConfirm": "Zeitplan \"{{name}}\" löschen?",
-    "deleteMessage": "Diese Aktion kann nicht rückgängig gemacht werden."
+    "deleteMessage": "Diese Aktion kann nicht rückgängig gemacht werden.",
+    "deleted": "Zeitplan gelöscht",
+    "deleteFailed": "Der Zeitplan konnte nicht gelöscht werden"
   },
   "activity": {
     "actions": {

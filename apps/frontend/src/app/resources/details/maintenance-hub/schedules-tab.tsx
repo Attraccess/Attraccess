@@ -10,6 +10,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { ScheduleAccordionItem } from './schedule-accordion-item';
 import { SectionCard } from './section-card';
+import { useToastMessage } from '../../../../components/toastProvider';
 import { OperatingTrackingNotice, useOperatingTrackingReadiness } from '../operating-readiness';
 import de from './de.json';
 import en from './en.json';
@@ -26,6 +27,7 @@ export function SchedulesTab(props: Props) {
   const { resourceId, schedules, isLoading, onCreate, onEdit } = props;
   const { t } = useTranslations({ de, en });
   const queryClient = useQueryClient();
+  const toast = useToastMessage();
   const hasOperatingSchedule = schedules.some(
     (schedule) =>
       schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS &&
@@ -38,7 +40,9 @@ export function SchedulesTab(props: Props) {
       queryClient.invalidateQueries({
         queryKey: [useFindMaintenanceSchedulesKey],
       });
+      toast.success({ title: t('schedules.deleted') });
     },
+    onError: (error) => toast.error({ title: t('schedules.deleteFailed'), description: (error as Error).message }),
   });
 
   const renderBody = () => {

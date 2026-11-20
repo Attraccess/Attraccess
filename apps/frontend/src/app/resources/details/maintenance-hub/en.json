@@ -34,7 +34,9 @@
       "delete": "Delete"
     },
     "deleteConfirm": "Delete schedule \"{{name}}\"?",
-    "deleteMessage": "This action cannot be undone."
+    "deleteMessage": "This action cannot be undone.",
+    "deleted": "Schedule deleted",
+    "deleteFailed": "Could not delete the schedule"
   },
   "activity": {
     "actions": {
