@@ -7,6 +7,7 @@
 #include "api/security/reader_link.hpp"
 #include "api/security/session_framing.hpp"
 #include "display/display.hpp"
+#include "settings/kvstore.hpp"
 #include "settings/reader_credentials.hpp"
 #include "settings/settings.hpp"
 #include "state/state.hpp"
@@ -197,54 +198,6 @@ void untrustedHandshake(PairingSocket &socket, const std::function<void()> &step
     socket.binary(reply.data(), reply.size());
     step();
 }
-
-// Completes one pairing round trip and the approval on an open pairing connection.
-void approve(PairingSocket &socket, PairingServer &server, const std::function<void()> &step)
-{
-    const std::vector<uint8_t> ns(16, 0x41);
-    socket.deliver(server.round(1, ns, nullptr));
-    step();
-    socket.deliver(PairingServer::reveal(1, ns));
-    step();
-    socket.deliver(R"({"type":"accepted"})");
-    step();
-}
-
-// A token reader an admin asked to pair, whose approval came from someone posing as the server: the
-// session never verifies, so after a few attempts it forgets that key and keeps its token.
-void tokenReaderFallsBackWhenTheServerNeverVerifies()
-{
-    Settings::saveAttraccessAuthConfig("token-1", 7);
-    PairingSocket socket;
-    ReaderLink link(socket, {false, {"attractap-desktop", "desktop", "test"}, pairingClock});
-    link.setup();
-    const auto step = [&] { for (int i = 0; i < 4; i++) link.loop(); };
-    check(link.currentChannel() == ReaderLink::Channel::Legacy, "token reader starts on the token channel");
-    link.startPairing("ticket-1");
-    step();
-    check(link.currentChannel() == ReaderLink::Channel::Pairing, "pairing on request");
-    socket.open();
-    step();
-    JsonDocument hello = socket.last();
-    check(hello["ticket"] == "ticket-1", "ticket in hello");
-    PairingServer server;
-    check(PairingCodec::base64Decode(hello["publicKey"] | "", server.readerKey), "reader key");
-    approve(socket, server, step);
-    check(link.currentChannel() == ReaderLink::Channel::Session, "session after approval");
-    check(Settings::getAttraccessAuthConfig().apiKey == "token-1", "token kept until the grant is verified");
-
-    for (int attempt = 1; attempt < ReaderLink::BOOTSTRAP_UNTRUSTED_LIMIT; attempt++)
-    {
-        untrustedHandshake(socket, step);
-        check(link.serverUntrusted() && link.currentChannel() == ReaderLink::Channel::Session, "retries the session");
-    }
-    untrustedHandshake(socket, step);
-    check(link.currentChannel() == ReaderLink::Channel::Legacy, "back to the token channel");
-    check(!CredentialStore::load().paired(), "unconfirmed pin forgotten");
-    check(Settings::getAttraccessAuthConfig().apiKey == "token-1", "token still there");
-    check(State::getSessionProblem() == State::SESSION_PROBLEM_NONE, "no session error on the token channel");
-    std::cout << "PASS token reader keeps its token when the pairing is never confirmed\n";
-}
 }
 
 int main()
@@ -256,9 +209,21 @@ int main()
     {
         ProfileStore profile("http://reader.test", 0, storage);
         KVStore::setHostProfile(&profile);
+        // A reader updated from before 2.6.0 still holds the retired API token: setup wipes it, and the
+        // token never makes the reader count as registered (it pairs below like a new reader).
+        KVStore legacy;
+        check(legacy.begin("settings", false) && legacy.putString("api.key", "retired-token") > 0 &&
+                  legacy.putUInt("api.readerId", 42) > 0,
+              "seed the retired token keys");
+        legacy.end();
         Settings::setup();
+        legacy.begin("settings", true);
+        check(legacy.getString("api.key", "gone") == "gone" && legacy.getUInt("api.readerId", 0) == 0,
+              "retired token keys erased at setup");
+        legacy.end();
+        check(profile.get("kv.settings:api.key").empty() && profile.get("kv.settings:api.readerId").empty(),
+              "retired token keys erased from the stored profile");
         Settings::saveAttraccessApiConfig("reader.test", 80, false);
-        Settings::saveAttraccessAuthConfig("", 0);
         Settings::setDevicePin("1234");
 
         PairingSocket socket;
@@ -286,7 +251,7 @@ int main()
         };
         pump(2200); // boot screen
 
-        // No credentials: straight to pairing, never the old registration.
+        // No credentials (the retired token does not count): straight to pairing, never the old registration.
         check(link.currentChannel() == ReaderLink::Channel::Pairing, "new reader uses the pairing channel");
         check(socket.subprotocol == SessionFraming::PAIRING_SUBPROTOCOL, "pairing subprotocol");
         socket.open();
@@ -342,7 +307,6 @@ int main()
         check(link.currentChannel() == ReaderLink::Channel::Session, "session channel after approval");
         check(socket.subprotocol == SessionFraming::SESSION_SUBPROTOCOL, "session subprotocol");
         check(CredentialStore::load().caSpki == server.ca->publicKeySpki(), "CA key pinned");
-        check(Settings::getAttraccessAuthConfig().apiKey.empty(), "no token");
         socket.open();
         pump();
         check(socket.binaryFrames == 1, "ClientHello sent as one binary frame");
@@ -377,8 +341,6 @@ int main()
         check(socket.last()["publicKey"].as<std::string>() == PairingCodec::base64Encode(server.readerKey), "same reader key");
 
         std::cout << "PASS reader pairing journey\n";
-
-        tokenReaderFallsBackWhenTheServerNeverVerifies();
     }
     catch (const std::exception &error)
     {

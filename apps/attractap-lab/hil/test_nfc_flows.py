@@ -40,8 +40,8 @@ def rows(api, sql, *args):
 def other_paired_reader(api):
     """A second paired reader record (never connected): the setting only accepts paired readers."""
     found, _ = api.sql(
-        'INSERT INTO attractap (name, "apiTokenHash", "pairingState", "firmwareCapabilitiesCardrelay") '
-        "VALUES ('HIL other reader', 'unused', 'paired', true) RETURNING id"
+        'INSERT INTO attractap (name, "pairingState", "firmwareCapabilitiesCardrelay") '
+        "VALUES ('HIL other reader', 'paired', true) RETURNING id"
     )
     return found[0][0]
 

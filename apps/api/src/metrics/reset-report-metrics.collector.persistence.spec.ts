@@ -46,9 +46,7 @@ describe('ResetReportMetricsCollector', () => {
   beforeEach(async () => {
     jest.useFakeTimers({ now: NOW, doNotFake: ['setImmediate', 'nextTick', 'setTimeout', 'clearTimeout'] });
     source = await createTestDataSource();
-    await source.query(
-      `INSERT INTO attractap (id, name, "apiTokenHash") VALUES (1, 'Door', 'hash-1'), (2, 'Laser', 'hash-2')`,
-    );
+    await source.query(`INSERT INTO attractap (id, name) VALUES (1, 'Door'), (2, 'Laser')`);
     registry.clear();
     gauges = {
       attractapResetReportsLastHour: new Gauge({

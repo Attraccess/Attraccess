@@ -226,7 +226,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Reader koppeln](https://docs.attraccess.org/de/attractap/pairing.md): Wie ein Leser mit einer Admin-Freigabe in die Installation aufgenommen wird: Status, erneutes Koppeln und verschlüsselte Verbindung.
 - [RFID-Karten](https://docs.attraccess.org/de/attractap/rfid-cards.md): Wie RFID-Karten mit Benutzerkonten verknüpft sind, Kartenverwaltung, Kartentypen und welche Leser Karten registrieren oder zurücksetzen dürfen.
 - [Firmware-Updates](https://docs.attraccess.org/de/attractap/firmware-updates.md): Wie Attractap-Leser Over-the-Air-Firmware-Updates vom Attraccess-Backend erhalten, inklusive Firmware-Varianten und Fehlerbehebung.
-- [Reader-Sicherheit](https://docs.attraccess.org/de/attractap/reader-security.md): Wie Attractap-Touch-V2-Leser abgesichert werden, damit sie nur mit Ihren eigenen Secure-Boot-Schlüsseln signierte Firmware akzeptieren, inklusive Sichern und Wiederherstellen.
+- [Reader-Sicherheit](https://docs.attraccess.org/de/attractap/reader-security.md): Wie Attractap-Touch-V2-Reader gesichert werden, damit sie nur mit deinen eigenen Secure-Boot-Schlüsseln signierte Firmware akzeptieren, inklusive Backup und Wiederherstellung der Schlüssel.
 - [Reader-Anzeige](https://docs.attraccess.org/de/attractap/reader-ui.md): Wie Plugins Hinweise und Abfragen auf Attractap-Bildschirmen anzeigen, welche Leser das können, sowie Admin-Einstellungen und Alarme.
 
 ## Deutsch: MQTT & IoT

@@ -36,18 +36,18 @@ describe('AttractapController', () => {
     expect(attractapService.getPairedReaders).toHaveBeenCalledWith(expect.objectContaining({ withResources: true }));
   });
 
-  // Readers that are not paired yet exist for the pairing session only.
-  it('lists only paired readers; the unpaired ones come from the pairing session list', async () => {
+  // Readers whose pairing was removed exist for the pairing session only.
+  it('lists only paired readers; the revoked ones come from the pairing session list', async () => {
     const paired = [makeReader({ id: 1, pairingState: 'paired' })];
-    const unpaired = [makeReader({ id: 2, pairingState: 'unpaired' })];
+    const revoked = [makeReader({ id: 2, pairingState: 'revoked' })];
     attractapService.getPairedReaders.mockResolvedValueOnce(paired);
-    attractapService.getReadersToPair.mockResolvedValueOnce(unpaired);
+    attractapService.getReadersToPair.mockResolvedValueOnce(revoked);
 
     await expect(controller.getReaders()).resolves.toEqual(paired.map(toReaderDto));
-    await expect(controller.getReadersToPair()).resolves.toEqual(unpaired.map(toReaderDto));
+    await expect(controller.getReadersToPair()).resolves.toEqual(revoked.map(toReaderDto));
   });
 
-  it.each(['unpaired', 'revoked'])('does not show a %s reader by id', async (pairingState) => {
+  it.each(['revoked'])('does not show a %s reader by id', async (pairingState) => {
     attractapService.findReaderById.mockResolvedValueOnce({ id: 4, pairingState });
     await expect(controller.getReaderById(4)).rejects.toThrow('not found');
   });
@@ -58,14 +58,11 @@ describe('AttractapController', () => {
     await expect(controller.getReaderById(4)).resolves.toEqual(toReaderDto(reader));
   });
 
-  // The token hash is an internal field: no reader response may carry it, however the reader was loaded.
-  it('never puts the token hash or other internal fields into a reader response', async () => {
-    const reader = makeReader({ id: 4, apiTokenHash: 'secret-hash', resources: [] });
+  // No reader response carries the credential or certificate internals, however the reader was loaded.
+  it('never puts the credential internals into a reader response', async () => {
+    const reader = makeReader({ id: 4, resources: [] });
     attractapService.findReaderById.mockResolvedValueOnce(reader);
-    attractapService.getPairedReaders.mockResolvedValueOnce([reader]);
     const byId = await controller.getReaderById(4);
-    const listed = await controller.getReaders();
-    expect(JSON.stringify([byId, listed])).not.toContain('secret-hash');
     expect(Object.keys(byId)).not.toContain('apiTokenHash');
   });
 
@@ -76,7 +73,7 @@ describe('AttractapController', () => {
 
   // A rename or a resource assignment through the API would make a reader that is not paired appear in
   // the resource's reader list.
-  it.each(['unpaired', 'revoked'])('does not update a %s reader', async (pairingState) => {
+  it.each(['revoked'])('does not update a %s reader', async (pairingState) => {
     attractapService.findReaderById.mockResolvedValueOnce({ id: 4, pairingState });
     await expect(controller.updateReader(4, { name: 'x', connectedResourceIds: [1] })).rejects.toThrow('not found');
     expect(attractapService.updateReader).not.toHaveBeenCalled();
@@ -97,7 +94,7 @@ describe('AttractapController', () => {
     });
   });
 
-  it.each(['unpaired', 'revoked'])('has no diagnostics for a %s reader', async (pairingState) => {
+  it.each(['revoked'])('has no diagnostics for a %s reader', async (pairingState) => {
     attractapService.findReaderById.mockResolvedValue({ id: 4, pairingState });
     await expect(controller.getReaderCrashReports(4)).rejects.toThrow('not found');
     await expect(controller.getReaderCrashReportCoredump(4, 1)).rejects.toThrow('not found');

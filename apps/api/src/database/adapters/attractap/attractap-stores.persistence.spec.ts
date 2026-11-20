@@ -38,9 +38,9 @@ describe('Attractap persistence adapters on PostgreSQL', () => {
       const lathe = await resources.save({ name: 'Lathe', type: ResourceType.Machine });
       const mill = await resources.save({ name: 'Mill', type: ResourceType.Machine });
       const readers = store();
-      const created = await readers.create({ apiTokenHash: 'secret-hash', name: 'abcd' });
+      const created = await readers.create({ name: 'abcd' });
 
-      expect(created).toMatchObject({ name: 'abcd', pairingState: 'unpaired', ledBrightness: 255 });
+      expect(created).toMatchObject({ name: 'abcd', pairingState: 'revoked', ledBrightness: 255 });
       expect(created.firmware.capabilities).toMatchObject({ resourceSelection: true, cardRelay: false });
 
       // A pairing that lands after the editor read the reader must not be undone by the edit.
@@ -58,7 +58,6 @@ describe('Attractap persistence adapters on PostgreSQL', () => {
         ledBrightness: 10,
         pairingState: 'paired',
         credentialFingerprint: 'fp',
-        apiTokenHash: 'secret-hash',
         firmware: { version: '2.0.1' },
       });
       expect(read.resources.map((r) => r.name).sort()).toEqual(['Lathe', 'Mill']);
@@ -153,7 +152,7 @@ describe('Attractap persistence adapters on PostgreSQL', () => {
 
   describe('crash report store', () => {
     it('keeps the coredump out of listings and serves it on its own', async () => {
-      const readerId = (await source.getRepository(Attractap).save({ name: 'r', apiTokenHash: 'h' } as Attractap)).id;
+      const readerId = (await source.getRepository(Attractap).save({ name: 'r' } as Attractap)).id;
       const store = new TypeOrmAttractapCrashReportStore(source.getRepository(AttractapCrashReport));
       const report = await store.create({
         attractapId: readerId,
@@ -203,8 +202,7 @@ describe('Attractap persistence adapters on PostgreSQL', () => {
         coredumpExpectedCrc32: announced.crc32,
         symbolicationStatus: null,
       });
-      const newReader = async () =>
-        (await source.getRepository(Attractap).save({ name: 'r', apiTokenHash: 'h' } as Attractap)).id;
+      const newReader = async () => (await source.getRepository(Attractap).save({ name: 'r' } as Attractap)).id;
 
       it('keeps an unsigned CRC-32 above 2^31 and finds the awaiting report by it', async () => {
         const readerId = await newReader();

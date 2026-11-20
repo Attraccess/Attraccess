@@ -43,10 +43,6 @@ export class ReaderBleDriver implements BleTransportDriver {
   readerStatus(readerId: number): BleReaderStatus {
     const socket = this.currentSocket(readerId);
     if (!socket) return { status: 'offline' };
-    // BLE only travels on the paired reader link: a reader on its legacy token connection must pair first.
-    if (socket.transport !== 'session' || socket.state.pairingRequired !== false) {
-      return { status: 'offline', detail: 'pairing-required' };
-    }
     const ble = socket.state.ble;
     if (!ble) return { status: 'offline', detail: 'firmware-info-pending' };
     if ('detail' in ble) return { status: 'unsupported', detail: ble.detail };

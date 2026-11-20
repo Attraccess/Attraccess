@@ -7,6 +7,8 @@ import type {
   AttractapReader,
   AttractapReaderEdit,
   AttractapReaderFilter,
+  AttractapReaderSecurity,
+  AttractapReaderSecurityPatch,
   AttractapReaderWithResources,
 } from '@attraccess/application-models';
 import { FindOptionsWhere, In, Not, Repository } from 'typeorm';
@@ -35,6 +37,37 @@ export class TypeOrmAttractapReaderStore implements AttractapReaderStore {
     return reader ? (toReader(reader) as AttractapReaderWithResources) : undefined;
   }
 
+  async findSecurity(id: number): Promise<AttractapReaderSecurity | undefined> {
+    const row = await this.readers.findOne({
+      where: { id },
+      select: {
+        id: true,
+        secureBootDigest0: true,
+        secureBootDigest1: true,
+        secured: true,
+        securedAt: true,
+        firmwareProfile: true,
+        secureVersion: true,
+        efuseSecureVersion: true,
+        securityReportCheckedAt: true,
+        securityReportProblems: true,
+      },
+    });
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      secureBootDigest0: row.secureBootDigest0 ?? null,
+      secureBootDigest1: row.secureBootDigest1 ?? null,
+      secured: row.secured ?? false,
+      securedAt: row.securedAt ?? null,
+      firmwareProfile: row.firmwareProfile ?? null,
+      secureVersion: row.secureVersion ?? null,
+      efuseSecureVersion: row.efuseSecureVersion ?? null,
+      securityReportCheckedAt: row.securityReportCheckedAt ?? null,
+      securityReportProblems: row.securityReportProblems ?? null,
+    };
+  }
+
   async list(filter: AttractapReaderFilter = {}): Promise<AttractapReader[]> {
     const where: FindOptionsWhere<Attractap> = {};
     if (filter.paired === true) where.pairingState = 'paired';
@@ -48,18 +81,13 @@ export class TypeOrmAttractapReaderStore implements AttractapReaderStore {
     return readers.map(toReader);
   }
 
-  async listUnpaired(): Promise<AttractapReader[]> {
-    const readers = await this.readers.find({ where: { pairingState: Not('paired') }, relations: { resources: true } });
+  async listRevoked(): Promise<AttractapReader[]> {
+    const readers = await this.readers.find({ where: { pairingState: 'revoked' }, relations: { resources: true } });
     return readers.map(toReader);
   }
 
-  async create(input: {
-    apiTokenHash: string;
-    name: string;
-    firmware?: AttractapFirmwareInfo;
-  }): Promise<AttractapReader> {
+  async create(input: { name: string; firmware?: AttractapFirmwareInfo }): Promise<AttractapReader> {
     const saved = await this.readers.save({
-      apiTokenHash: input.apiTokenHash,
       name: input.name,
       firmware: input.firmware ? firmwareColumns(input.firmware) : undefined,
     });
@@ -82,6 +110,16 @@ export class TypeOrmAttractapReaderStore implements AttractapReaderStore {
     if (edit.firmware) changes.firmware = firmwareColumns(edit.firmware);
     if (edit.resourceIds) changes.resources = edit.resourceIds.map((resourceId) => ({ id: resourceId }) as Resource);
     await this.readers.save(changes);
+  }
+
+  async applySecurity(id: number, patch: AttractapReaderSecurityPatch, whenCredential?: string): Promise<boolean> {
+    if (Object.keys(patch).length === 0) return true;
+    const where =
+      whenCredential === undefined
+        ? { id }
+        : { id, pairingState: 'paired' as const, credentialFingerprint: whenCredential };
+    const result = await this.readers.update(where, { ...patch });
+    return Boolean(result.affected);
   }
 
   async recordConnection(id: number, at: Date): Promise<void> {

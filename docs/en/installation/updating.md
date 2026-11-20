@@ -20,6 +20,13 @@ You can also check manually at any time by comparing your running version (shown
 
 Check the [release notes](https://github.com/Attraccess/Attraccess/releases) for breaking changes before updating.
 
+> [!WARNING]
+> **Attractap readers pair again after the release that removes token sign-in (Attractap firmware 2.6.0).**
+> Its first start deletes every reader record, together with reader names, resource links, per-reader
+> settings and the card writer's reader choice. Every reader has to be paired again. Readers that still
+> sign in with a token cannot update over the air; flash them to firmware 2.6.0 over USB with the web
+> flasher first. See [After the upgrade: every reader pairs again](attractap/pairing.md#after-the-upgrade-every-reader-pairs-again).
+
 ## Moving from SQLite to PostgreSQL
 
 Attraccess now runs on PostgreSQL only. This is a breaking change and ships in a major release. Installations of earlier releases that stored their data in `<STORAGE_ROOT>/attraccess.sqlite` move their data automatically on the first start.

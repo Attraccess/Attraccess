@@ -6,6 +6,8 @@ import { AuthenticatedWebSocket } from '../websockets/websocket.types';
 import { CredentialRegistryService } from './credential-registry.service';
 import { HandshakeLimiter } from './handshake-limiter';
 import { InstallationIdentityService } from './installation-identity.service';
+import { ReaderControlService } from './reader-control.service';
+import { SessionSecurityState } from './session-security-state';
 import { BootstrapGrant, PairingService } from './pairing.service';
 import { PeerIdentity, SessionConnection, SessionDecision, SessionError } from './session-connection';
 import { Frame, FrameType } from './session-framing';
@@ -16,8 +18,8 @@ const AGGREGATE_FLUSH_MS = 60_000;
 
 /**
  * Turns an upgraded WebSocket on the session subprotocol into an authenticated reader socket.
- * It never looks inside application messages: they are passed to the normal handlers as if they
- * had arrived on a legacy connection, and replies leave through the same `send`.
+ * It never looks inside application messages: they are passed to the normal handlers as text
+ * frames, and replies leave through the same `send`.
  */
 @Injectable()
 export class ReaderSessionService implements OnModuleDestroy {
@@ -32,6 +34,7 @@ export class ReaderSessionService implements OnModuleDestroy {
     private readonly pairing: PairingService,
     private readonly authHandler: AttractapAuthHandler,
     private readonly metrics: SessionMetrics,
+    private readonly controls: ReaderControlService,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {
     this.flushTimer = setInterval(() => void this.flushRejections(), AGGREGATE_FLUSH_MS);
@@ -47,7 +50,6 @@ export class ReaderSessionService implements OnModuleDestroy {
    * before any await, so early TLS bytes and stray text frames are seen first by the session.
    */
   public open(ws: WebSocket): SessionConnection {
-    (ws as unknown as AuthenticatedWebSocket).transport = 'session';
     return new SessionConnection(ws, this.limiter);
   }
 
@@ -109,7 +111,11 @@ export class ReaderSessionService implements OnModuleDestroy {
       socket.readerId = decision.readerId;
       this.attach(socket, connection, onReady);
       const fingerprint = peerFingerprint as string | null;
-      if (fingerprint) this.pairing.forgetGrant(fingerprint);
+      if (fingerprint) {
+        this.pairing.forgetGrant(fingerprint);
+        socket.sessionSecurity = new SessionSecurityState(decision.readerId, fingerprint);
+        this.controls.attach(connection, socket.sessionSecurity);
+      }
 
       // The server time goes first: it feeds the reader's trusted-time floor before anything else.
       connection.sendFrame(FrameType.CONTROL, this.encode(await this.helloControl()));

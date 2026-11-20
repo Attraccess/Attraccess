@@ -14,6 +14,13 @@ Die Leser-Firmware wird mit Attraccess selbst ausgeliefert: Jedes Attraccess-Rel
 
 Sie aktualisieren Ihre Leser also, indem Sie Attraccess aktualisieren. Sobald das Backend ein Release mit neuerer Leser-Firmware ausfuehrt, uebernimmt jeder Leser sie bei seiner naechsten Verbindung.
 
+> [!IMPORTANT]
+> Updates laufen über die verschlüsselte Verbindung eines gekoppelten Lesegeräts. Ein Lesegerät, das sich
+> noch mit einem Token anmeldet, lässt sich nicht per Funk aktualisieren: Flashen Sie es per USB mit dem
+> Web-Flasher auf Firmware 2.6.0 und koppeln Sie es dann. Ein Lesegerät mit Firmware 1.8.0 bis 2.5.x muss
+> nach dem Server-Upgrade neu gekoppelt werden, bevor es Updates erhält. Siehe
+> [Nach dem Upgrade: jeder Reader koppelt neu](attractap/pairing.md#nach-dem-upgrade-jeder-reader-koppelt-neu).
+
 > [!NOTE]
 > Waehrend eines Firmware-Updates ist der Leser voruebergehend nicht verfuegbar. Das Update dauert in der Regel weniger als eine Minute.
 

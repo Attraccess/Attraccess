@@ -74,6 +74,9 @@ idf_component_register(
         espcoredump
         nvs_flash
         mbedtls
+        efuse
+        bootloader_support
+        spi_flash
         esp_rom
         lwip
         vfs

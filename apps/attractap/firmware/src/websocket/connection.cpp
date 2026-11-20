@@ -164,7 +164,7 @@ void Websocket::connectWebSocketLocked()
         websocket_cfg.transport = WEBSOCKET_TRANSPORT_OVER_SSL;
         websocket_cfg.cert_pem = certPem;
     }
-    // Selects the reader channel (session / pairing); none is the token channel.
+    // Selects the reader channel (session / pairing).
     websocket_cfg.subprotocol = subprotocol.empty() ? nullptr : subprotocol.c_str();
 
     _clientCertIndex = certIndex;

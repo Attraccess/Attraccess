@@ -1,5 +1,4 @@
 import type { AttractapService } from '../attractap.service';
-import type { AttractapAuthHandler } from './handlers/auth/auth.handler';
 import type { AttractapBillingHandler } from './handlers/billing/billing.handler';
 import type { CardConversationFailure, CardConversationService } from './card-conversation.service';
 import type { CardDetectedRouter } from './card-detected.router';
@@ -21,7 +20,6 @@ export type AttractapEventHandler = (socket: AuthenticatedWebSocket, eventData: 
 /** The gateway members the dispatch table reads. They are injected after construction, so read lazily. */
 export interface EventHandlerDeps {
   attractapService: AttractapService;
-  authHandler: AttractapAuthHandler;
   firmwareHandler: AttractapFirmwareHandler;
   crashReportHandler: AttractapCrashReportHandler;
   cardHandler: AttractapCardHandler;
@@ -43,23 +41,12 @@ export interface EventHandlerDeps {
     extra?: Record<string, unknown>,
   ): Promise<void>;
   onReaderSessionEnded(socket: AuthenticatedWebSocket, reason?: CardConversationFailure): void;
-  resetReaderConnectionState(
-    socket: AuthenticatedWebSocket,
-    readerId: number | null,
-    reason: CardConversationFailure,
-  ): void;
   rejectServerEvent(socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']): never;
 }
 
 /** Typed `Record<AttractapEventType, ...>`: every event type must be listed here. */
 export function buildEventHandlers(d: EventHandlerDeps): Record<AttractapEventType, AttractapEventHandler> {
   return {
-    [AttractapEventType.READER_REGISTER]: (socket, eventData) => d.authHandler.handleReaderRegister(socket, eventData),
-    [AttractapEventType.READER_AUTHENTICATE]: (socket, eventData) => {
-      // A new identity on this connection starts from nothing: no verified card, no armed flow.
-      d.resetReaderConnectionState(socket, socket.readerId, 'READER_SESSION_ENDED');
-      return d.authHandler.handleAuthentication(socket, eventData);
-    },
     [AttractapEventType.READER_FIRMWARE_INFO]: (socket, eventData) => {
       // The reader is back on this connection: plugin BLE work on an older, half-open one of it is gone.
       d.readerBleDriver.readerConnected(socket);
@@ -130,12 +117,9 @@ export function buildEventHandlers(d: EventHandlerDeps): Record<AttractapEventTy
       d.formsHandler.handleResourceUsageFormCancel(socket, eventData);
     },
     [AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED]: () => undefined,
-    [AttractapEventType.READER_START_PAIRING]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
     [AttractapEventType.REQUEST_RESOURCE_LIST]: (socket, eventData) =>
       d.resourceListService.sendResourceListToSocket(socket, { requestId: eventData.payload?.requestId }),
     [AttractapEventType.RESOURCE_LIST]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
-    [AttractapEventType.READER_UNAUTHORIZED]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
-    [AttractapEventType.READER_REQUEST_AUTHENTICATION]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
     [AttractapEventType.READER_AUTHENTICATED]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
     [AttractapEventType.READER_LANGUAGE]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
     [AttractapEventType.CARD_AUTHENTICATION_DATA]: (socket, eventData) => d.rejectServerEvent(socket, eventData),

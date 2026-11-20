@@ -36,9 +36,6 @@ export class PairingDto {
   @ApiProperty({ type: PairingFirmwareDto })
   firmware!: PairingFirmwareDto;
 
-  @ApiProperty({ nullable: true, description: 'Reader record this device proved ownership of with its token' })
-  boundReaderId!: number | null;
-
   @ApiProperty({ nullable: true, description: 'The reader record this request was paired to, once approved' })
   targetReaderId!: number | null;
 
@@ -84,7 +81,9 @@ export class ApprovePairingDto {
   @MaxLength(32)
   code?: string;
 
-  @ApiPropertyOptional({ description: 'Lite readers: the round of the pattern that was compared (current or previous)' })
+  @ApiPropertyOptional({
+    description: 'Lite readers: the round of the pattern that was compared (current or previous)',
+  })
   @IsOptional()
   @IsInt()
   @Min(1)
@@ -93,8 +92,7 @@ export class ApprovePairingDto {
 
   @ApiProperty({
     enum: PAIRING_MODES,
-    description:
-      'new: create a reader record; pair: pair the token reader that is connecting; takeover: bind the device to targetReaderId',
+    description: 'new: create a reader record; takeover: bind the device to targetReaderId',
   })
   @IsIn(PAIRING_MODES)
   mode!: PairingMode;
@@ -115,9 +113,4 @@ export class ApprovePairingDto {
   @IsOptional()
   @IsIn(['flasher'])
   via?: 'flasher';
-}
-
-export class RequestPairingResponseDto {
-  @ApiProperty({ description: 'False when the reader is not connected with a token session right now' })
-  requested!: boolean;
 }

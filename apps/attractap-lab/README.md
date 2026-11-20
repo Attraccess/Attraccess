@@ -434,6 +434,12 @@ READER_PROFILE=secure-lab pnpm nx run attractap-lab:hil
   profile (`efuse.check`). Then they erase the chip and write the image
   encrypted (`ESPToolDriver.erase_and_flash_encrypted`), the same write the
   janitor uses to park this reader.
+- `hil/test_efuse_report.py` checks the eFuse report the reader sends after its
+  session is up: the server must keep this development-mode reader *not
+  secured* and list `profile-not-secure` and `flash-encryption-not-release`.
+  That is the expected result. Nothing in the lab burns eFuses or puts a
+  release secure image on the reader; the reader identity is the P-256 key it
+  pairs with.
 - When the run ends, also after a failed setup, the tests write the image
   again, so no Wi-Fi, PIN or pairing stays on the reader even where the place
   has no janitor. With `janitor=park`, the janitor then parks it with the

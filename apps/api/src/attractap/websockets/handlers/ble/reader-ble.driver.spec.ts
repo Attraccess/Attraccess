@@ -37,33 +37,12 @@ describe('ReaderBleDriver (plugin BLE over the reader websocket)', () => {
       expect(firmware().received).toEqual([]);
     });
 
-    it('treats a reader that has not sent its firmware info yet, or must pair, as offline', async () => {
+    it('treats a reader that has not sent its firmware info yet as offline', async () => {
       socket().state.ble = undefined;
       await expect(ble.scan(1, PROFILE.id)).rejects.toMatchObject({
         code: 'READER_OFFLINE',
         detail: 'firmware-info-pending',
       });
-      socket().state.ble = parseBleCapability(undefined);
-      socket().state.pairingRequired = true;
-      await expect(ble.scan(1, PROFILE.id)).rejects.toMatchObject({
-        code: 'READER_OFFLINE',
-        detail: 'pairing-required',
-      });
-    });
-
-    it.each([
-      ['a legacy token connection', { transport: 'legacy' as const, pairingRequired: false }],
-      ['a connection of unknown transport', { transport: undefined, pairingRequired: false }],
-      ['a session that has not signed in yet', { transport: 'session' as const, pairingRequired: undefined }],
-    ])('offers no BLE on %s, even with a BLE capable firmware', async (_name, connection) => {
-      socket().transport = connection.transport;
-      socket().state.pairingRequired = connection.pairingRequired;
-      await expect(ble.scan(1, PROFILE.id)).rejects.toMatchObject({
-        code: 'READER_OFFLINE',
-        detail: 'pairing-required',
-      });
-      expect((await ble.listReaders())[0].available).toBe(false);
-      expect(firmware().received).toEqual([]);
     });
 
     it('clamps announced limits and refuses profiles larger than the reader allowlist', async () => {

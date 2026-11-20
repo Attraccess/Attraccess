@@ -8,7 +8,6 @@ struct ReaderProfileConfiguration
         KVStore::setHostProfile(&profile);
         Settings::setup();
         Settings::saveAttraccessApiConfig("reader.test", 80, false);
-        Settings::saveAttraccessAuthConfig("test", 880);
         Settings::setDevicePin("1234");
     }
 };

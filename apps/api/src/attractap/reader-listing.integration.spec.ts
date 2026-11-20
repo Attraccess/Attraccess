@@ -16,11 +16,10 @@ describe('reader listings and pairing state', () => {
   let service: AttractapService;
   let resource: Resource;
 
-  const addReader = (name: string, pairingState: 'unpaired' | 'paired' | 'revoked') =>
+  const addReader = (name: string, pairingState: 'paired' | 'revoked') =>
     source.getRepository(Attractap).save({
       name,
       pairingState,
-      apiTokenHash: `hash-${name}`,
       resources: [resource],
     } as Attractap);
 
@@ -28,7 +27,6 @@ describe('reader listings and pairing state', () => {
     source = await createTestDataSource();
     resource = await source.getRepository(Resource).save({ name: 'Lathe', type: ResourceType.Machine });
     await addReader('paired', 'paired');
-    await addReader('never paired', 'unpaired');
     await addReader('pairing removed', 'revoked');
     const store = new TypeOrmAttractapReaderStore(source.getRepository(Attractap), source.getRepository(Resource));
     service = Object.assign(Object.create(AttractapService.prototype), { readerStore: store });
@@ -60,9 +58,9 @@ describe('reader listings and pairing state', () => {
     expect(readers.map((reader) => reader.name)).toEqual(['paired']);
   });
 
-  it('gives the pairing session the readers that are not paired, and only those', async () => {
+  it('gives the pairing session the readers whose pairing was removed, and only those', async () => {
     const readers = await service.getReadersToPair();
-    expect(readers.map((reader) => reader.name).sort()).toEqual(['never paired', 'pairing removed']);
+    expect(readers.map((reader) => reader.name).sort()).toEqual(['pairing removed']);
     expect(readers[0].resources).toHaveLength(1);
   });
 });

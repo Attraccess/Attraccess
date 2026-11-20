@@ -94,7 +94,7 @@ describe('AttractapSupervisionHandler', () => {
       await expect(fixture.arm()).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it.each(['unpaired', 'revoked'])('refuses a %s reader and arms nothing', async (pairingState) => {
+    it.each(['revoked'])('refuses a %s reader and arms nothing', async (pairingState) => {
       fixture.attractapService.findReaderById.mockResolvedValueOnce({
         id: fixture.READER_ID,
         pairingState,

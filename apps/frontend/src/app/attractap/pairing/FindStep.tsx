@@ -11,9 +11,7 @@ export function FindStep(props: Readonly<{ flow: PairingFlow; insecure: boolean;
   const { t } = useTranslations({ de, en });
   const format = useDateTimeFormatter();
   const targetName = flow.readers?.find((reader) => reader.id === presetTargetReaderId)?.name;
-  const waitingLite = presetTargetReaderId
-    ? flow.running.filter((p) => p.kind === 'lite' && p.boundReaderId === null && !p.mode)
-    : [];
+  const waitingLite = presetTargetReaderId ? flow.running.filter((p) => p.kind === 'lite' && !p.mode) : [];
   return (
     <div className="flex flex-col gap-3">
       {targetName && <p>{t('dialog.takesOver', { name: targetName })}</p>}
