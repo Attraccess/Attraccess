@@ -8,6 +8,7 @@ import { MatterFabricGuard } from '../fabric/guard';
 import { PLUGIN_CONTEXT } from '../plugin-context';
 import { matterStorage, type MatterTables } from '../plugin-storage/access';
 import { DeviceAuditService, type AuditActor, type AuditBy, type DeviceAuditSubject } from './audit.service';
+import { MatterChangeBus } from './change-bus';
 import { pruneCommands } from './commands';
 import {
   RECONCILIATION_ROW_ID,
@@ -86,6 +87,7 @@ export class MatterReconciliationService {
     @Inject(MatterConnectionService) private readonly connectionService: Pick<MatterConnectionService, 'connection'>,
     @Inject(DeviceAuditService) private readonly audit: DeviceAuditService,
     @Inject(MatterFabricGuard) private readonly guard: MatterFabricGuard,
+    @Inject(MatterChangeBus) private readonly changes: MatterChangeBus,
   ) {}
 
   private get source(): InventorySource {
@@ -155,6 +157,9 @@ export class MatterReconciliationService {
         { conflictOn: ['id'] },
       );
     });
+    // After every finished run, also one that changed nothing, was skipped or failed: the device views follow its
+    // changes, and the reconciliation status and outcome (read over REST on the refetch) changed in any case.
+    this.changes.inventoryChanged();
     // After the commit and never inside it: the audit store is a separate database.
     // One operation ID for the run's entries; an automatic run is recorded as the system, never as a user.
     const actor: AuditActor = this.audit.actorOf(by);

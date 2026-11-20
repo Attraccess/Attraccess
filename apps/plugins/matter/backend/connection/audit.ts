@@ -76,6 +76,7 @@ export const MATTER_AUDIT_DOMAIN: PluginAuditDomainDeclaration = {
       },
     },
     { action: 'matter.connection_removed', subjectTypes: ['matter.connection'] },
+    { action: 'matter.connection_reconnect_requested', subjectTypes: ['matter.connection'] },
     // Device model (ATT-996). Subject IDs are numeric (a host rule), so the plugin UUID travels in `nodeRef` /
     // `endpointRef` / `fabricRef`. Details are bounded IDs, enums and flags: never device free text.
     {

@@ -163,8 +163,9 @@ private:
     lv_obj_t *lockDoorButton = nullptr;
     lv_obj_t *unlockDoorButton = nullptr;
     lv_obj_t *unlatchDoorButton = nullptr;
-    // An access-only door has one full-width Open button (the unlock button); other doors have all three.
-    void showDoorButtons(bool accessOnly);
+    // An access-only door has one full-width Open button (the unlock button). Other doors have Lock and Unlock, plus
+    // Unlatch only with a separate unlatch (Lock and Unlock widen to fill the row without it).
+    void showDoorButtons(bool accessOnly, bool separateUnlockAndUnlatch);
     bool startIsTakeover = false;
     bool stopIsForeign = false;
     lv_obj_t *buttonFor(button_click_type_t type, const std::string &flowId) const;

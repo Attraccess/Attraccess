@@ -2,7 +2,7 @@
 // FEATURE: ATT-386 Resource details page full redesign tabbed hub layout
 
 import { useParams, Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Button, Spinner, Tabs, TabList, Tab } from '@heroui/react';
+import { Button, Spinner } from '@heroui/react';
 import {
   ArrowLeft,
   Settings2Icon,
@@ -14,17 +14,16 @@ import {
   Users,
   WrenchIcon,
 } from 'lucide-react';
-import { memo, ReactNode, JSX, useMemo, useRef } from 'react';
+import { memo, ReactNode, JSX, useRef } from 'react';
 import { ResourceQrCode } from '../qrcode/index';
 import { filenameToUrl } from '../../../../api/index';
 import { ResourceHealthWarning } from '../health-state/index';
-import { Select } from '../../../../components/select/index';
 import { ResourceTabKey, useResourceTabs } from './useResourceTabs';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useDeleteOneResource, useGetOneResourceById, useGetAllResourcesKey } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { PageAction, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { PageAction, PageHeader, RoutedTabs, activeRoutedTab, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQrCodeAction } from '../useQrCodeAction';
 import de from '../resourceDetails.de.json';
 import en from '../resourceDetails.en.json';
@@ -75,14 +74,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
 
   const { tabs } = useResourceTabs(resourceId);
 
-  const activeTabKey = useMemo<ResourceTabKey>(() => {
-    const base = `/resources/${resourceId}`;
-    const remainder = location.pathname.startsWith(base)
-      ? location.pathname.slice(base.length).replace(/^\//, '').split('/')[0]
-      : '';
-    const match = tabs.find((tab) => tab.path === remainder);
-    return match?.key ?? 'overview';
-  }, [location.pathname, resourceId, tabs]);
+  const activeTabKey = activeRoutedTab(tabs, `/resources/${resourceId}`, location.pathname)?.key ?? 'overview';
 
   const handleDelete = async () => {
     if (!canDeleteResources) return;
@@ -159,11 +151,6 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
     },
   ];
 
-  const navigateToTab = (key: ResourceTabKey) => {
-    const next = tabs.find((tab) => tab.key === key);
-    if (next) navigate(`/resources/${resourceId}${next.path ? '/' + next.path : ''}`);
-  };
-
   return (
     <div className="flex flex-col h-full min-h-0">
       <DashboardPinTargetContext.Provider value={resourcePinTarget(resourceId)}>
@@ -183,40 +170,19 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
 
       <ResourceHealthWarning resourceId={resourceId} />
 
-      <div className="mt-4 mb-4">
-        <div className="sm:hidden">
-          <Select
-            aria-label={t('tabs.mobilePickerLabel')}
-            value={activeTabKey}
-            onChange={(key) => navigateToTab(key as ResourceTabKey)}
-            items={tabs.map((tab) => ({ key: tab.key, label: t(tab.translationKey) }))}
-            data-cy="resource-tabs-mobile-picker"
-          />
-        </div>
-
-        <div className="hidden sm:block">
-          <Tabs
-            aria-label={t('tabs.mobilePickerLabel')}
-            selectedKey={activeTabKey}
-            onSelectionChange={(key) => navigateToTab(key as ResourceTabKey)}
-            data-cy="resource-tabs"
-          >
-            <Tabs.ListContainer>
-              <TabList>
-                {tabs.map((tab) => (
-                  <Tab key={tab.key} id={tab.key}>
-                    <Tabs.Indicator />
-                    <span className="flex items-center gap-2">
-                      {TAB_ICONS[tab.key]}
-                      {t(tab.translationKey)}
-                    </span>
-                  </Tab>
-                ))}
-              </TabList>
-            </Tabs.ListContainer>
-          </Tabs>
-        </div>
-      </div>
+      <RoutedTabs
+        className="mt-4 mb-4"
+        items={tabs.map((tab) => ({
+          key: tab.key,
+          label: t(tab.translationKey),
+          icon: TAB_ICONS[tab.key],
+          path: tab.path,
+        }))}
+        basePath={`/resources/${resourceId}`}
+        fallbackKey="overview"
+        aria-label={t('tabs.mobilePickerLabel')}
+        data-cy="resource-tabs"
+      />
 
       <div className="flex-1 min-h-0 overflow-auto">{children ?? <Outlet />}</div>
       {confirmationDialog}

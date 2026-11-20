@@ -79,14 +79,16 @@ const REFOCUS_WINDOW_MS = 1000;
 function keepFocusOnTrigger(wrapper: HTMLElement | null) {
   const trigger = wrapper?.querySelector('button');
   if (!trigger) return;
+  // Held on to: when the timer fires the global `document` may be gone (a test environment torn down meanwhile).
+  const doc = trigger.ownerDocument;
   const fellBack = (target: EventTarget | null) =>
-    target === document.body || (target instanceof Node && target !== trigger && target.contains(trigger));
+    target === doc.body || (target instanceof Node && target !== trigger && target.contains(trigger));
   const refocus = (event?: FocusEvent) => {
-    if (trigger.isConnected && fellBack(event ? event.target : document.activeElement)) trigger.focus();
+    if (trigger.isConnected && fellBack(event ? event.target : doc.activeElement)) trigger.focus();
   };
-  document.addEventListener('focusin', refocus);
+  doc.addEventListener('focusin', refocus);
   window.setTimeout(() => {
-    document.removeEventListener('focusin', refocus);
+    doc.removeEventListener('focusin', refocus);
     refocus();
   }, REFOCUS_WINDOW_MS);
   refocus();

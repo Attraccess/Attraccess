@@ -32,12 +32,13 @@ describe('Matter device ingestion over a real sidecar connection', () => {
     const settings = new MatterSettingsService(h.context);
     await settings.save({ url: fake.url, credential: TOKEN }, 1);
     connection = new MatterConnectionService(h.context, settings);
-    state = new MatterStateService(h.context);
+    state = new MatterStateService(h.context, h.bus);
     reconciliation = new MatterReconciliationService(
       h.context,
       connection,
       new DeviceAuditService(h.context),
       new MatterFabricGuard(),
+      h.bus,
     );
     ingestion = new MatterIngestionService(h.context, connection, reconciliation, state);
     ingestion.onModuleInit();

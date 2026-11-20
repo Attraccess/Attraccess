@@ -54,3 +54,5 @@ export const getStatus = () => api.request<ConnectionStatus>('/status');
 export const saveSettings = (input: SettingsInput) =>
   api.request<ConnectionSettings>('', { method: 'PUT', body: input });
 export const removeSettings = () => api.request<null>('', { method: 'DELETE' });
+/** "Retry now": reconnects at once with the saved settings and answers with the status right after. */
+export const reconnect = () => api.request<ConnectionStatus>('/reconnect', { method: 'POST' });

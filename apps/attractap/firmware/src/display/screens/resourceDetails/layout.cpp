@@ -9,12 +9,16 @@
 
 #include "resourceDetailsCopy.hpp"
 
-void ResourceDetailsScreen::showDoorButtons(bool accessOnly)
+void ResourceDetailsScreen::showDoorButtons(bool accessOnly, bool separateUnlockAndUnlatch)
 {
    if (!this->lockDoorButton || !this->unlockDoorButton || !this->unlatchDoorButton) return;
    lv_obj_set_flag(this->lockDoorButton, LV_OBJ_FLAG_HIDDEN, accessOnly);
-   lv_obj_set_flag(this->unlatchDoorButton, LV_OBJ_FLAG_HIDDEN, accessOnly);
-   lv_obj_set_width(this->unlockDoorButton, accessOnly ? lv_pct(100) : lv_pct(30));
+   // Unlatch only exists on doors with a separate unlatch; without it, lock and unlock share the row.
+   const bool showUnlatch = !accessOnly && separateUnlockAndUnlatch;
+   lv_obj_set_flag(this->unlatchDoorButton, LV_OBJ_FLAG_HIDDEN, !showUnlatch);
+   const lv_coord_t buttonWidth = showUnlatch ? lv_pct(30) : lv_pct(48);
+   lv_obj_set_width(this->lockDoorButton, buttonWidth);
+   lv_obj_set_width(this->unlockDoorButton, accessOnly ? lv_pct(100) : buttonWidth);
    // The same unlock action: the server treats an unlock of an access-only door as Open.
    FirmwareI18n::setLabel(lv_obj_get_child(this->unlockDoorButton, 0),
                           accessOnly ? FirmwareI18n::Message::Open : FirmwareI18n::Message::Unlock);

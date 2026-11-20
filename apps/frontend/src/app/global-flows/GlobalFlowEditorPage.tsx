@@ -41,7 +41,8 @@ export function GlobalFlowEditorPage() {
     return <Navigate to="/" />;
   }
 
-  if (isError || !Number.isInteger(flowId) || flowId <= 0) {
+  // A failed background refetch keeps the loaded flow, so the editor and its unsaved edits stay.
+  if ((isError && !flow) || !Number.isInteger(flowId) || flowId <= 0) {
     return (
       <Alert status="danger" data-cy="global-flow-load-error">
         <AlertStatusIcon status="danger" />

@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConnectionSettings, ConnectionStatus } from './api';
 import { MatterPage } from './MatterPage';
@@ -14,6 +14,7 @@ const api = vi.hoisted(() => ({
   getStatus: vi.fn(),
   saveSettings: vi.fn(),
   removeSettings: vi.fn(),
+  reconnect: vi.fn(),
 }));
 vi.mock('./api', () => api);
 // The fabric & backup section has its own spec (fabric-backup/FabricBackupSection.spec.tsx).
@@ -23,11 +24,17 @@ vi.mock('./fabric-backup/FabricBackupSection', () => ({
   ),
 }));
 
+/** The parts of the page are marked with `data-cy`; this spec's own stubs use `data-testid`. */
+const byCy = (cy: string) => document.querySelector(`[data-cy="${cy}"]`) as HTMLElement | null;
+
 // HeroUI's spinner has no accessible role.
 const spinner = () => document.querySelector('[data-slot="spinner"]');
 
 const signIn = (...effectivePermissions: string[]) =>
   act(() => setMatterAuthData({ authToken: '', user: {} as never, effectivePermissions }));
+
+/** A token the form accepts (32+ printable ASCII characters). */
+const SECRET = 'secret-token-0123456789-0123456789-abc';
 
 const entry = {
   wireVersion: 1,
@@ -64,14 +71,22 @@ const configured: ConnectionSettings = {
   updatedAt: '2026-11-05T09:00:00.000Z',
 };
 
+// The Infrastructure tab holds the connection status, the settings and the fabric section; the layout specs are in
+// MatterPage.routing.spec.tsx.
+function renderAt(path: string) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/matter/*" element={<MatterPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 function renderPage(status: Partial<ConnectionStatus>, settings: ConnectionSettings = empty) {
   api.getStatus.mockResolvedValue({ ...baseStatus, ...status });
   api.getSettings.mockResolvedValue(settings);
-  return render(
-    <MemoryRouter>
-      <MatterPage />
-    </MemoryRouter>,
-  );
+  return renderAt('/matter/infrastructure');
 }
 
 beforeEach(() => signIn('matter.devices.read', 'matter.devices.manage'));
@@ -272,16 +287,14 @@ describe('MatterPage', () => {
 
   it('reports a failed save in an error dialog without echoing the token', async () => {
     const user = userEvent.setup();
-    api.saveSettings.mockRejectedValue(
-      new Error('credential: The credential must be 32-512 printable ASCII characters.'),
-    );
+    api.saveSettings.mockRejectedValue(new Error('The sidecar rejected this token.'));
     renderPage({}, empty);
     await user.type(await screen.findByLabelText(/Sidecar URL/), 'http://127.0.0.1:8581');
-    await user.type(screen.getByLabelText(/^Token/), 'short-secret-value');
+    await user.type(screen.getByLabelText(/^Token/), SECRET);
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('Saving failed')).toBeInTheDocument();
-    expect(screen.getByText(/32-512 printable ASCII/)).toBeInTheDocument();
-    expect(document.body.textContent).not.toContain('short-secret-value');
+    expect(screen.getByText(/rejected this token/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(SECRET);
   });
 
   it('asks for confirmation before removing the configuration', async () => {
@@ -353,15 +366,98 @@ describe('MatterPage polling', () => {
   });
 });
 
+describe('MatterPage settings polling (ATT-1202)', () => {
+  const elsewhere: ConnectionSettings = {
+    ...configured,
+    url: 'https://other.example.com',
+    updatedAt: '2026-11-06T11:00:00.000Z',
+  };
+
+  it('warns an edited form about a change saved elsewhere and blocks Save until reload', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderPage({ state: 'connected' }, configured);
+    const url = await screen.findByLabelText(/Sidecar URL/);
+    await user.type(url, '/');
+    api.getSettings.mockResolvedValue(elsewhere);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STATUS_POLL_MS);
+    });
+    await waitFor(() => expect(byCy('matter-settings-stale')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(url).toHaveValue('https://matter.example.com/');
+    await user.click(byCy('matter-settings-reload') as HTMLElement);
+    expect(url).toHaveValue('https://other.example.com');
+  });
+
+  it('does not let a poll answered after a save bring the old settings back', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderPage({ state: 'connected' }, configured);
+    const url = await screen.findByLabelText(/Sidecar URL/);
+    let answerPoll: (settings: ConnectionSettings) => void = () => undefined;
+    api.getSettings.mockImplementationOnce(() => new Promise((resolve) => (answerPoll = resolve)));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STATUS_POLL_MS);
+    });
+    await user.clear(url);
+    await user.type(url, 'https://other.example.com');
+    await user.type(screen.getByLabelText(/^Token/), SECRET);
+    api.saveSettings.mockResolvedValue(elsewhere);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Close' }));
+    await act(async () => answerPoll(configured));
+    expect(url).toHaveValue('https://other.example.com');
+    expect(byCy('matter-settings-stale')).not.toBeInTheDocument();
+  });
+
+  it('polls the settings only while Infrastructure is open', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    signIn('matter.devices.read', 'matter.devices.manage', 'matter.devices.commission');
+    api.getStatus.mockResolvedValue({ ...baseStatus, state: 'connected' });
+    renderAt('/matter/commissioning');
+    await waitFor(() => expect(byCy('matter-commissioning-tab')).toBeInTheDocument());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STATUS_POLL_MS * 2);
+    });
+    expect(api.getStatus.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(api.getSettings).not.toHaveBeenCalled();
+  });
+
+  it('pauses the polls while the browser tab is hidden and refreshes once it is visible again', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let visibility: DocumentVisibilityState = 'visible';
+    const spy = vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
+    const setVisibility = (next: DocumentVisibilityState) =>
+      act(() => {
+        visibility = next;
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+    try {
+      renderPage({ state: 'connected' }, configured);
+      await screen.findByLabelText(/Sidecar URL/);
+      setVisibility('hidden');
+      const status = api.getStatus.mock.calls.length;
+      const settings = api.getSettings.mock.calls.length;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(STATUS_POLL_MS * 3);
+      });
+      expect(api.getStatus.mock.calls.length).toBe(status);
+      expect(api.getSettings.mock.calls.length).toBe(settings);
+      setVisibility('visible');
+      await waitFor(() => expect(api.getStatus.mock.calls.length).toBe(status + 1));
+      expect(api.getSettings.mock.calls.length).toBe(settings + 1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
 describe('MatterPage recovery', () => {
   it('reports a failed settings load even when the status loads', async () => {
     api.getStatus.mockResolvedValue({ ...baseStatus, state: 'connected' });
     api.getSettings.mockRejectedValue(new Error('Failed to fetch'));
-    render(
-      <MemoryRouter>
-        <MatterPage />
-      </MemoryRouter>,
-    );
+    renderAt('/matter/infrastructure');
     expect(await screen.findByText('The connection settings could not be loaded.')).toBeInTheDocument();
     expect(screen.getByText('Connected')).toBeInTheDocument();
     expect(screen.queryByText('The status could not be loaded.')).not.toBeInTheDocument();
@@ -371,11 +467,7 @@ describe('MatterPage recovery', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     api.getStatus.mockRejectedValueOnce(new Error('Failed to fetch')).mockResolvedValue(baseStatus);
     api.getSettings.mockRejectedValueOnce(new Error('Failed to fetch')).mockResolvedValue(configured);
-    render(
-      <MemoryRouter>
-        <MatterPage />
-      </MemoryRouter>,
-    );
+    renderAt('/matter/infrastructure');
     expect(await screen.findByText('The status could not be loaded.')).toBeInTheDocument();
     expect(screen.queryByLabelText(/Sidecar URL/)).not.toBeInTheDocument();
     await act(async () => {
@@ -395,7 +487,9 @@ describe('MatterPage permissions', () => {
     expect(screen.getByTestId('fabric-section-stub')).toHaveTextContent('read');
     expect(api.getSettings).not.toHaveBeenCalled();
     expect(screen.queryByLabelText(/Sidecar URL/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    // No control at all on the tab: whatever a later change adds there must check manage too.
+    expect(within(byCy('matter-infrastructure-tab') as HTMLElement).queryAllByRole('button')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: 'Retry now' })).not.toBeInTheDocument();
   });
 
   it('shows the settings form and the manage actions with matter.devices.manage', async () => {
@@ -411,7 +505,9 @@ describe('MatterPage permissions', () => {
     expect(api.getStatus).not.toHaveBeenCalled();
     expect(api.getSettings).not.toHaveBeenCalled();
     expect(screen.queryByTestId('fabric-section-stub')).not.toBeInTheDocument();
-    expect(screen.getByText('Matter devices are hidden')).toBeInTheDocument();
+    // The user lands on the one tab they may see.
+    expect(screen.getByText('Thread is not set up')).toBeInTheDocument();
+    expect(screen.queryByText('Matter devices are hidden')).not.toBeInTheDocument();
   });
 
   it('keeps loading, without requests or the "hidden" notice, until the host has pushed the auth state', async () => {
@@ -428,12 +524,14 @@ describe('MatterPage permissions', () => {
   });
 
   it('shows the spinner again when the permissions grow after a run that requested nothing', async () => {
+    const user = userEvent.setup();
     signIn('thread.network.read');
     renderPage({ state: 'connected' }, configured);
     await waitFor(() => expect(spinner()).not.toBeInTheDocument());
     let answer: (status: ConnectionStatus) => void = () => undefined;
     api.getStatus.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
-    signIn('matter.devices.read');
+    signIn('thread.network.read', 'matter.devices.read');
+    await user.click(await screen.findByRole('tab', { name: 'Infrastructure' }));
     expect(spinner()).toBeInTheDocument();
     await act(async () => answer({ ...baseStatus, state: 'connected' }));
     expect(await screen.findByText('Connected')).toBeInTheDocument();
@@ -502,9 +600,19 @@ describe('plugin registration', () => {
     expect(plugin.getSidebarItems()).toEqual([
       expect.objectContaining({ label: 'Matter', path: '/matter', group: 'devices' }),
     ]);
-    expect(plugin.getRoutes()).toEqual([
-      expect.objectContaining({ path: '/matter', authRequired: ['matter.devices.read', 'thread.network.read'] }),
+    // One flat route per subpage, each opened by any Matter or Thread read key; the tabs check their own key inside.
+    const routes = plugin.getRoutes();
+    expect(routes.map((route) => route.path)).toEqual([
+      '/matter',
+      '/matter/devices',
+      '/matter/infrastructure',
+      '/matter/thread',
+      '/matter/commissioning',
+      '/matter/health',
+      '/matter/updates',
+      '/matter/devices/:nodeId',
     ]);
+    for (const route of routes) expect(route.authRequired).toEqual(['matter.devices.read', 'thread.network.read']);
   });
 
   it('passes the host auth state on to the page', async () => {

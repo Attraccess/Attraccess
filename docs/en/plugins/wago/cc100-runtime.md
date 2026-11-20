@@ -204,8 +204,8 @@ permanent MQTT connection, enrolment-credential revocation, applied configuratio
 and runtime readiness are confirmed. The table shows a short setup status; its
 **Details** drawer shows the actual pending prerequisite and progress during
 SSH cutover/reboot. There is no manual continue
-action. When configuration is pending, select **Configure**, review and publish the
-inputs and outputs configuration, and resolve any rejection; SSH setup resumes
+action. When configuration is pending, select **Configure**, then **Apply to controller** on the
+**Inputs & outputs** front panel, and resolve any rejection shown there; SSH setup resumes
 automatically after the controller confirms it.
 Settled current controllers are rechecked over SSH at most once every five minutes;
 a changed build image bypasses this deadline, and retained transaction cleanup
@@ -533,7 +533,7 @@ Once a controller is claimed and its configuration is applied, the flow catalog 
 
 Select the controller, the named logical channel, and the operation or event/state category. Command nodes list only output channels and pin the applied configuration revision; reopen and save them after publishing a new revision. Event/read/wait nodes also support input and measurement channels.
 
-The channel's **Output behavior** is authoritative:
+The channel's output behavior (switched or pulsed) is authoritative:
 
 | Configured behavior       | Command node operation | Result                                                                      |
 | ------------------------- | ---------------------- | --------------------------------------------------------------------------- |
@@ -541,7 +541,7 @@ The channel's **Output behavior** is authoritative:
 | Pulsed                    | Trigger pulse          | Turn on for the channel's configured duration, then turn off automatically. |
 | Input or measurement only | No command operation   | Use event, read, or wait nodes.                                             |
 
-Setup presets copy starting settings into the channel. Their names do not constrain later customization: a channel created from a pulse preset can be changed to switched behavior. Pulse duration, operational guards, feedback monitoring, and disconnect behavior belong to the controller configuration. Flow nodes choose when to issue the permitted operation; they cannot override those settings or supply a different duration. Guards are checked and configured feedback is monitored for commands of either output behavior.
+On the **Inputs & outputs** front panel, select an output terminal to choose its behavior under **When a flow turns it on**: **Stay on until turned off** (switched) or **Pulse, then turn off automatically** (pulsed, with a **Pulse length (seconds)**). **If Attraccess is unreachable** sets its disconnect behavior. You can change an output between switched and pulsed at any time; select **Apply to controller** to publish the change. Pulse duration, operational guards, feedback monitoring, and disconnect behavior belong to the controller configuration. Flow nodes choose when to issue the permitted operation; they cannot override those settings or supply a different duration. Guards are checked and configured feedback is monitored for commands of either output behavior.
 
 The existing version 1 snapshot format is retained. The `pulse` capability and positive `pulse.durationMs` together define pulsed behavior; output channels without either are switched. Inconsistent pulse settings are rejected by both API and runtime configuration validation. The command wire actions remain `set` (with a boolean `value`) and `pulse`.
 

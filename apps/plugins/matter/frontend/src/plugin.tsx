@@ -12,6 +12,7 @@ import type {
 import type { PluginStore } from 'react-pluggable';
 import { MATTER_PAGE_PERMISSIONS } from '../../backend/permission-keys';
 import { MatterPage } from './MatterPage';
+import { MATTER_ROUTE_PATHS } from './matterPaths';
 import { setMatterAuthData } from './permissions';
 
 export default class MatterPlugin implements AttraccessFrontendPlugin {
@@ -46,8 +47,14 @@ export default class MatterPlugin implements AttraccessFrontendPlugin {
   }
 
   getRoutes(): RouteConfig[] {
-    // Any Matter or Thread read key opens the page; the sidebar entry follows the route.
-    return [{ path: '/matter', authRequired: [...MATTER_PAGE_PERMISSIONS], element: <MatterPage /> }];
+    // Any Matter or Thread read key opens the page; each tab then checks its own permission inside MatterPage. The host
+    // router takes flat routes, so every subpage is one route that renders the same layout (`/matter` redirects to the
+    // first tab the user may see). The sidebar entry stays highlighted on all of them (`dashboardPaths: ["/matter"]`).
+    return MATTER_ROUTE_PATHS.map((path) => ({
+      path,
+      authRequired: [...MATTER_PAGE_PERMISSIONS],
+      element: <MatterPage />,
+    }));
   }
 
   getSidebarItems(): PluginSidebarItem[] {

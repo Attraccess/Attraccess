@@ -26,12 +26,13 @@ Geräte-Oberfläche.
 
 ## Wo es erscheint
 
-Eine Admin-Seite unter **Geräte → Matter** in der Seitenleiste mit den Verbindungseinstellungen zum Sidecar (URL,
-Service-Token, optional CA-Zertifikat), der Fabric, ihren Backups und der Wiederherstellung.
+Eine Admin-Seite unter **Geräte → Matter** in der Seitenleiste mit Tabs für Geräte, Infrastruktur (Verbindungseinstellungen zum
+Sidecar, Fabric, Backups und Wiederherstellung), Thread-Netzwerk, Inbetriebnahme, Systemzustand und Software-Updates.
 
 ## In diesem Bereich
 
 - [Architektur](plugins/matter/architecture.md): Plugin plus Sidecar, Vertrag, Fehler und Ereignisse
+- [Verwaltungsseite](plugins/matter/admin-ui.md): die Tabs unter Geräte → Matter, Berechtigungen, degradierte Zustände und die Oberfläche für den Gerätelebenszyklus
 - [Betriebsanleitung](plugins/matter/operator.md): Sidecar bauen und starten, Konfiguration, Attraccess verbinden
 - [Datenmodell und Lebenszyklus](plugins/matter/data-model.md): Knoten, Endpunkte, Zustand und Lebenszyklus
 - [Backup und Wiederherstellung](plugins/matter/backup-restore.md): verschlüsselte Fabric-Backups und Wiederherstellung

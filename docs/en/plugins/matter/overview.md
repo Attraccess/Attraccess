@@ -23,12 +23,13 @@ control or list devices yet, so there is no device UI.
 
 ## Where it appears
 
-An admin page under **Devices → Matter** in the sidebar, with the sidecar connection settings (URL, service token,
-optional CA certificate), the fabric, its backups and recovery.
+An admin page under **Devices → Matter** in the sidebar, with tabs for devices, infrastructure (the sidecar connection
+settings, the fabric, its backups and recovery), Thread network, commissioning, health and software updates.
 
 ## In this section
 
 - [Architecture](plugins/matter/architecture.md): plugin plus sidecar, contract, errors and events
+- [Administration Page](plugins/matter/admin-ui.md): the tabs under Devices → Matter, permissions, degraded states and the device lifecycle UI
 - [Operator Guide](plugins/matter/operator.md): build and start the sidecar, configuration, connecting Attraccess
 - [Data Model and Lifecycle](plugins/matter/data-model.md): nodes, endpoints, state and lifecycle
 - [Backup and Recovery](plugins/matter/backup-restore.md): encrypted fabric backups and recovery

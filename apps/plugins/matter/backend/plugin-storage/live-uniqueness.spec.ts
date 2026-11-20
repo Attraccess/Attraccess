@@ -21,7 +21,7 @@ function instance(h: Harness) {
   const connection = { connection: h.sidecar } as unknown as MatterConnectionService;
   return {
     context,
-    reconciliation: new MatterReconciliationService(context, connection, audit, new MatterFabricGuard()),
+    reconciliation: new MatterReconciliationService(context, connection, audit, new MatterFabricGuard(), h.bus),
     keys: new RecoveryKeyService(context, audit),
   };
 }

@@ -1,7 +1,7 @@
 {
   "page": {
     "title": "Matter",
-    "subtitle": "Connection to the Matter sidecar.",
+    "subtitle": "Devices, infrastructure and health of the Matter integration.",
     "insecure": "Insecure connection",
     "insecureText": "The sidecar is reached over plain http on a non-loopback address. The token travels unencrypted. Use https, or keep the sidecar on the same host.",
     "insecureTextReadOnly": "The sidecar is reached over plain http on a non-loopback address. The token travels unencrypted. Ask an administrator to check the connection settings.",
@@ -32,7 +32,8 @@
     "received": "Received",
     "supported": "Supported combination",
     "combination": "Attraccess {{attraccess}}, plugin {{plugin}}, sidecar {{sidecar}}, matter.js {{matterJs}}",
-    "loadError": "The status could not be loaded."
+    "loadError": "The status could not be loaded.",
+    "lastKnown": "{{label}} (last known)"
   },
   "hint": {
     "not_configured": "Enter the sidecar URL and token below to connect.",
@@ -74,7 +75,19 @@
     "removeText": "The URL and token are deleted and the plugin disconnects from the sidecar.",
     "removeConfirm": "Remove",
     "removeError": "Removing failed",
-    "loadError": "The connection settings could not be loaded."
+    "loadError": "The connection settings could not be loaded.",
+    "changedElsewhere": "These settings changed elsewhere",
+    "changedElsewhereText": "Another administrator saved new connection settings while you were editing. Saving is blocked so nothing is overwritten. Reload to see the current settings and lose your edits.",
+    "reload": "Reload settings",
+    "caUndo": "Undo clearing the CA certificate",
+    "validation": {
+      "urlScheme": "The URL must start with http:// or https://.",
+      "urlInvalid": "Enter a valid URL without user name, query or fragment.",
+      "urlTooLong": "The URL is too long.",
+      "credential": "The token must be 32 to 512 printable ASCII characters, without spaces.",
+      "caShape": "Enter one or more PEM certificates (-----BEGIN CERTIFICATE-----) and nothing else.",
+      "caTooLong": "The certificate text is larger than 64 KiB."
+    }
   },
   "fabric": {
     "title": "Fabric & backup",
@@ -300,6 +313,460 @@
       "newConfirmText": "Every device commissioned before must be factory-reset and commissioned again, because it belongs to the old fabric. This cannot be undone.",
       "newConfirm": "Start new fabric",
       "error": "The recovery action failed"
+    }
+  },
+  "tabs": {
+    "label": "Matter sections",
+    "devices": "Devices",
+    "infrastructure": "Infrastructure",
+    "thread": "Thread Network",
+    "commissioning": "Commissioning",
+    "health": "Health",
+    "updates": "Software Updates"
+  },
+  "banner": {
+    "title": {
+      "connected": "Connected",
+      "not_configured": "Matter is not set up",
+      "connecting": "Connecting to the Matter sidecar",
+      "unavailable": "Matter sidecar unreachable",
+      "unauthorized": "Matter sidecar rejected the token",
+      "incompatible": "Matter sidecar is incompatible",
+      "misconfigured": "Matter connection is misconfigured"
+    },
+    "since": {
+      "connecting": "Connecting since {{time}}.",
+      "unavailable": "Unreachable since {{time}}.",
+      "unauthorized": "Rejected since {{time}}.",
+      "incompatible": "Incompatible since {{time}}.",
+      "misconfigured": "Misconfigured since {{time}}."
+    },
+    "openInfrastructure": "Open Infrastructure",
+    "retryNow": "Retry now",
+    "retryError": "Retrying failed"
+  },
+  "notAvailable": {
+    "available": "The sidecar supports \"{{family}}\", but this plugin version does not use it yet. It comes with a later plugin version.",
+    "unavailable": "The sidecar does not report \"{{family}}\" as available. It comes with a later plugin version, and needs a sidecar that supports it.",
+    "unknown": "The sidecar is not connected, so its \"{{family}}\" support is unknown. This part comes with a later plugin version.",
+    "noStatus": "This part comes with a later plugin version. Whether the sidecar supports \"{{family}}\" is not shown here."
+  },
+  "thread": {
+    "emptyTitle": "Thread is not set up",
+    "emptyText": "No Thread network, Border Router or dataset is shown yet. This page will show them once Thread support is available.",
+    "coexistenceTitle": "Zigbee and Thread on 2.4 GHz",
+    "coexistenceText": "Thread and Zigbee share the 2.4 GHz band with Wi-Fi. Plan the channels so they do not overlap: keep Thread and Zigbee at least a few channels apart, and away from the busiest Wi-Fi channels. Changing the channel later means re-joining devices, so decide before you build the network.",
+    "docs": "Read the documentation",
+    "docsUrl": "https://docs.attraccess.org/#/en/plugins/matter/admin-ui",
+    "dataset": {
+      "title": "Dataset",
+      "text": "The Thread dataset status (network name and channel, never the keys) appears here."
+    },
+    "borderRouters": {
+      "title": "Border Routers",
+      "text": "Border Routers (OTBR) of your Thread network and their state appear here."
+    },
+    "rcps": {
+      "title": "RCPs",
+      "text": "Radio co-processors that serve as Thread radios, with their state, appear here."
+    },
+    "smlight": {
+      "title": "SMLIGHT diagnostics",
+      "text": "Diagnostics of SMLIGHT radios, such as firmware and channel use, appear here."
+    }
+  },
+  "commissioning": {
+    "emptyTitle": "Commissioning is not available yet",
+    "emptyText": "Adding devices happens on this page, as a guided flow with several steps. It is not available yet: nothing here collects or sends a setup code.",
+    "stepsTitle": "How adding a device will work",
+    "steps": {
+      "prepare": {
+        "title": "Prepare the device",
+        "text": "Reset the device or open its pairing window, and keep it close to the Matter sidecar."
+      },
+      "code": {
+        "title": "Enter or scan the code",
+        "text": "Enter the setup code or scan the QR code printed on the device or its packaging."
+      },
+      "progress": {
+        "title": "Watch the progress",
+        "text": "Attraccess shows each commissioning step and tells you what to do if one fails."
+      },
+      "claim": {
+        "title": "Name and claim",
+        "text": "Give the new device a name and claim it, so it can be used in flows."
+      }
+    }
+  },
+  "updates": {
+    "emptyTitle": "Update discovery is not available yet",
+    "emptyText": "Finding, approving and applying device software updates comes with OTA support. Until then, this page lists the software each device runs now.",
+    "currentTitle": "Current software"
+  },
+  "devices": {
+    "nodeFallback": "Node {{nodeId}}",
+    "unknown": "Unknown",
+    "vendorProduct": "Vendor / product",
+    "software": "Software",
+    "hardware": "Hardware {{version}}",
+    "endpoints": "Endpoints",
+    "lastSeen": "Last seen",
+    "details": "Details",
+    "detailsFor": "Details: {{name}}",
+    "actionFor": "{{action}}: {{name}}",
+    "back": "All devices",
+    "empty": "No devices match this filter.",
+    "noDevices": "No Matter devices yet. Devices appear here once they are commissioned and the sidecar reports them.",
+    "loadError": "The devices could not be loaded.",
+    "detailError": "The device could not be loaded.",
+    "retry": "Try again",
+    "refreshError": "The device could not be refreshed.",
+    "actionFailed": "The action failed",
+    "lifecycle": {
+      "unclaimed": "Unclaimed",
+      "claimed": "Claimed",
+      "detached": "Detached",
+      "archived": "Archived",
+      "removed": "Removed"
+    },
+    "reachability": {
+      "reachable": "Reachable",
+      "unreachable": "Unreachable",
+      "unknown": "Reachability unknown"
+    },
+    "callout": {
+      "unclaimed": {
+        "title": "Unclaimed device",
+        "text": "This device is in the fabric but nobody has taken responsibility for it. It cannot be used in flows until an administrator claims it. Claim it, or archive or remove it if it does not belong here."
+      },
+      "detached": {
+        "title": "Detached device",
+        "text": "This device is no longer connected to its record. It cannot be used until you repair or relink it.",
+        "reason": {
+          "absent_from_sidecar": "The sidecar no longer lists it.",
+          "fabric_mismatch": "The fabric of the sidecar changed.",
+          "fabric_absent": "Its fabric is not known to the sidecar."
+        }
+      }
+    },
+    "flowUsage": {
+      "none": "Not used in any flow."
+    },
+    "bridge": {
+      "aggregator": "Bridge",
+      "behind": "Behind bridge {{bridge}}",
+      "reportedAs": "Bridged device: {{name}}"
+    },
+    "claim": {
+      "title": "Claim device",
+      "text": "Claiming makes this device part of your installation, so it can be used in flows.",
+      "name": "Name (optional)",
+      "nameHint": "At most 100 characters. You can change it later."
+    },
+    "validation": {
+      "nameLength": "At most 100 characters.",
+      "length": "At most {{max}} characters."
+    },
+    "relink": {
+      "title": "Relink device",
+      "text": "Choose the unclaimed device that replaced this one. The detached record takes over its identity and state and keeps its name and its use in flows.",
+      "none": "There is no unclaimed device to relink to.",
+      "source": "Unclaimed device",
+      "next": "Continue",
+      "back": "Back",
+      "confirm": "Relink anyway",
+      "mismatchTitle": "The devices do not match",
+      "mismatchText": "These details differ between the two devices: {{fields}}. Relinking anyway transfers this record to a different device. Only continue if you are sure.",
+      "field": {
+        "vendorId": "vendor",
+        "productId": "product",
+        "serialNumber": "serial number"
+      }
+    },
+    "actions": {
+      "claim": "Claim",
+      "repair": "Repair",
+      "relink": "Relink",
+      "archive": "Archive",
+      "restore": "Restore",
+      "forceRemove": "Force remove"
+    },
+    "confirm": {
+      "repair": {
+        "title": "Repair {{name}}?",
+        "text": "The device is read from the sidecar again. If the sidecar still lists it, the record is reconnected."
+      },
+      "archive": {
+        "title": "Archive {{name}}?",
+        "text": "An archived device is hidden from the list and cannot be used. You can restore it later."
+      },
+      "restore": {
+        "title": "Restore {{name}}?",
+        "text": "The device returns as detached. The next reconciliation reconnects it if the sidecar still lists it."
+      },
+      "forceRemove": {
+        "title": "Force remove {{name}}?",
+        "text": "This removes the device from Attraccess only. It does not factory-reset the device and does not remove it from the Matter fabric. If the sidecar still lists it, it comes back as a new unclaimed device."
+      }
+    },
+    "filter": {
+      "label": "Show",
+      "active": "All active",
+      "all": "All",
+      "unclaimed": "Unclaimed",
+      "claimed": "Claimed",
+      "detached": "Detached",
+      "archived": "Archived",
+      "removed": "Removed",
+      "includeInactive": "Include archived and removed"
+    },
+    "reconciliation": {
+      "title": "Reconciliation",
+      "loadError": "The reconciliation status could not be loaded.",
+      "runError": "Reconciliation failed",
+      "lastRun": "Last run",
+      "never": "No reconciliation yet",
+      "run": "Run reconciliation now",
+      "nodesListed": {
+        "one": "{{count}} device listed",
+        "many": "{{count}} devices listed"
+      },
+      "changes": {
+        "one": "{{count}} change",
+        "many": "{{count}} changes"
+      },
+      "result": {
+        "applied": "Applied",
+        "skipped_unavailable": "Skipped: sidecar unavailable",
+        "skipped_non_authoritative": "Skipped: inventory incomplete",
+        "failed": "Failed"
+      }
+    },
+    "stale": {
+      "title": "Live updates are unavailable",
+      "text": "What you see may be out of date. The page refreshes itself regularly until live updates work again."
+    },
+    "metadata": {
+      "title": "Name and location",
+      "displayName": "Name",
+      "description": "Description",
+      "location": "Location",
+      "maxLength": "At most {{max}} characters.",
+      "save": "Save",
+      "claimFirst": "Claim the device to name it.",
+      "resolveFirst": "Repair or relink the device to edit it."
+    },
+    "endpoint": {
+      "title": "Endpoints",
+      "number": "Endpoint {{number}}"
+    },
+    "identity": {
+      "title": "Identity",
+      "vendor": "Vendor",
+      "product": "Product",
+      "serial": "Serial number",
+      "software": "Software version",
+      "hardware": "Hardware version",
+      "attestation": "Attestation",
+      "firstSeen": "First seen"
+    },
+    "attestation": {
+      "verified": "Verified",
+      "unverified": "Not verified",
+      "failed": "Failed",
+      "unknown": "Unknown"
+    },
+    "state": {
+      "none": "No state reported yet.",
+      "noValue": "No value",
+      "complexValue": "Structured value",
+      "notLive": "Not live",
+      "yes": "Yes",
+      "no": "No",
+      "observed": "Observed",
+      "uncertain": "Outcome uncertain",
+      "fault": "Fault: {{message}}",
+      "loadError": "The state could not be loaded.",
+      "freshness": {
+        "fresh": "Current",
+        "stale": "Stale",
+        "unknown": "No data"
+      },
+      "keys": {
+        "onOff": {
+          "onOff": "Power"
+        },
+        "booleanState": {
+          "stateValue": "Contact"
+        },
+        "occupancySensing": {
+          "occupancy": "Occupancy"
+        },
+        "doorLock": {
+          "lockState": "Lock",
+          "doorState": "Door"
+        },
+        "electricalPowerMeasurement": {
+          "activePower": "Active power"
+        },
+        "electricalEnergyMeasurement": {
+          "cumulativeEnergyImported": "Energy imported"
+        },
+        "bridgedDeviceBasicInformation": {
+          "reachable": "Reachable"
+        },
+        "levelControl": {
+          "currentLevel": "Level"
+        }
+      },
+      "values": {
+        "onOff": {
+          "onOff": {
+            "true": "On",
+            "false": "Off"
+          }
+        },
+        "booleanState": {
+          "stateValue": {
+            "true": "Closed",
+            "false": "Open"
+          }
+        },
+        "doorLock": {
+          "lockState": {
+            "0": "Not fully locked",
+            "1": "Locked",
+            "2": "Unlocked",
+            "3": "Unlatched"
+          },
+          "doorState": {
+            "0": "Open",
+            "1": "Closed",
+            "2": "Jammed",
+            "3": "Forced open",
+            "4": "Error",
+            "5": "Ajar"
+          }
+        },
+        "bridgedDeviceBasicInformation": {
+          "reachable": {
+            "true": "Reachable",
+            "false": "Unreachable"
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "title": "Diagnostics",
+      "text": "Raw device types, cluster, attribute and command IDs and capabilities, for support. You do not need them to use a device."
+    }
+  },
+  "profile": {
+    "on_off_actuator": "Switch",
+    "dimmable_actuator": "Dimmable light",
+    "contact_sensor": "Contact sensor",
+    "occupancy_sensor": "Occupancy sensor",
+    "lock": "Door lock",
+    "power_meter": "Power meter",
+    "bridge_aggregator": "Bridge",
+    "generic": "Device"
+  },
+  "health": {
+    "loadError": "This could not be loaded.",
+    "levels": {
+      "ok": "Healthy",
+      "warning": "Needs attention",
+      "danger": "Problem",
+      "unknown": "Unknown"
+    },
+    "fix": {
+      "infrastructure": "Open Infrastructure",
+      "devices": "Open Devices",
+      "thread": "Open Thread Network"
+    },
+    "connection": {
+      "title": "Sidecar connection",
+      "lastError": "Last error"
+    },
+    "compatibility": {
+      "title": "Compatibility",
+      "ok": "Compatible",
+      "incompatible": "Incompatible",
+      "noVersions": "No version is known yet. It appears when the sidecar connects.",
+      "versions": "Sidecar {{sidecar}}, matter.js {{matterJs}}, wire version {{wire}}.",
+      "versionsLastKnown": "Last known: sidecar {{sidecar}}, matter.js {{matterJs}}, wire version {{wire}}."
+    },
+    "capabilities": {
+      "title": "Capabilities",
+      "reported": "Reported",
+      "unknown": "Capabilities are known while the sidecar is connected.",
+      "state": {
+        "available": "available",
+        "unavailable": "not available",
+        "unknown": "unknown"
+      },
+      "family": {
+        "health": "Health",
+        "fabric": "Fabric",
+        "commissioning": "Commissioning",
+        "inventory": "Inventory",
+        "commands": "Commands",
+        "subscriptions": "Subscriptions",
+        "thread": "Thread",
+        "ota": "Updates (OTA)",
+        "backup": "Backup"
+      }
+    },
+    "fabric": {
+      "title": "Fabric",
+      "ok": "Fabric ready",
+      "recovery": "Recovery needed",
+      "unreachable": "Sidecar unreachable",
+      "uninitialized": "No fabric yet",
+      "unknown": "Unknown",
+      "text": {
+        "ok": "The sidecar has the fabric the plugin recorded.",
+        "recovery": "The plugin and the sidecar disagree about the fabric. Choose how to recover in Infrastructure.",
+        "unreachable": "The fabric cannot be checked while the sidecar is unreachable.",
+        "uninitialized": "The sidecar has no fabric yet. Create one in Infrastructure.",
+        "unknown": "The fabric status is not known."
+      }
+    },
+    "backup": {
+      "title": "Backup",
+      "ok": "Backed up",
+      "never": "No backup yet",
+      "failed": "Last backup failed",
+      "overdue": "Backup overdue",
+      "noFabric": "No fabric",
+      "unknown": "Unknown",
+      "last": "Last backup",
+      "noneYet": "none yet",
+      "age": {
+        "one": "{{count}} day ago",
+        "many": "{{count}} days ago"
+      },
+      "today": "today",
+      "next": "Next scheduled"
+    },
+    "reconciliation": {
+      "title": "Reconciliation and events",
+      "noEvents": "No device events applied or ignored since the plugin started.",
+      "events": {
+        "applied": "applied",
+        "outOfOrder": "out of order",
+        "unknownEndpoint": "unknown endpoint",
+        "inactiveNode": "inactive device",
+        "unmappedCluster": "unmapped",
+        "unknownCommand": "unknown command",
+        "futureTimestamp": "future timestamp",
+        "oversizedValue": "oversized",
+        "dropped": "dropped"
+      }
+    },
+    "thread": {
+      "title": "Thread",
+      "text": "Thread health (Border Routers, radios) appears here once Thread support is available."
     }
   }
 }

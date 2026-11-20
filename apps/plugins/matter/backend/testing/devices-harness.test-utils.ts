@@ -7,6 +7,7 @@ import type { ConnectionStatus } from '../client/connection';
 import { MatterConnectionService } from '../connection/connection.service';
 import { CONNECTION_ROW_ID } from '../connection/entity';
 import { DeviceAuditService } from '../devices/audit.service';
+import { MatterChangeBus } from '../devices/change-bus';
 import type { MatterNode } from '../devices/entities';
 import { MatterLifecycleService } from '../devices/lifecycle.service';
 import { MatterFabricGuard } from '../fabric/guard';
@@ -191,9 +192,11 @@ export async function createHarness() {
   const connectionService = { connection: sidecar } as unknown as MatterConnectionService;
   const auditService = new DeviceAuditService(context);
   const guard = new MatterFabricGuard();
-  const state = new MatterStateService(context);
-  const reconciliation = new MatterReconciliationService(context, connectionService, auditService, guard);
-  const lifecycle = new MatterLifecycleService(context, connectionService, auditService);
+  // The services announce their changes on one bus, as in the plugin; a test subscribes to `bus.changes`.
+  const bus = new MatterChangeBus();
+  const state = new MatterStateService(context, bus);
+  const reconciliation = new MatterReconciliationService(context, connectionService, auditService, guard, bus);
+  const lifecycle = new MatterLifecycleService(context, connectionService, auditService, bus);
   const actions = () => audit.mock.calls.map((call) => (call as unknown as [{ action: string }])[0].action);
   return {
     context,
@@ -202,6 +205,7 @@ export async function createHarness() {
     audit,
     actions,
     sidecar,
+    bus,
     state,
     guard,
     reconciliation,
