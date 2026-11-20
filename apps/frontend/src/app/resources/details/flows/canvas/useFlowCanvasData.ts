@@ -13,7 +13,6 @@ import nodesEnTranslations from '../node/en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import { edgesHaveChanged, nodesHaveChanged } from './flowComparison';
-import type { NodeValidationError } from '../node/validationMessages';
 
 /**
  * Loads the saved flow into the editor and offers save, import and export. Also turns off pull-to-refresh
@@ -101,10 +100,7 @@ export function useFlowCanvasData() {
     if (originalFlowData) {
       setNodes(originalFlowData.nodes);
       setEdges(originalFlowData.edges);
-      setValidationErrors(
-        (originalFlowData as unknown as { validationErrors?: Array<NodeValidationError & { nodeId: string }> })
-          .validationErrors ?? [],
-      );
+      setValidationErrors(originalFlowData.validationErrors ?? []);
     }
   }, [originalFlowData, setNodes, setEdges, setValidationErrors]);
 

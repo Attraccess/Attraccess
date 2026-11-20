@@ -99,6 +99,9 @@ describe('AttraccessNode', () => {
     rerender(<AttraccessNode schema={{ ...schema, supportedByResource: false }} tNodeTranslations={tStub} />);
 
     expect(screen.getByText('nodes.unsupportedForResourceType')).toBeInTheDocument();
+    // The unsupported notice wraps within the card width like the validation errors.
+    expect(screen.getByText('nodes.unsupportedForResourceType')).toHaveClass('wrap-anywhere');
+    expect(screen.getByText('nodes.unsupportedForResourceType').parentElement).toHaveClass('w-64', 'text-warning');
   });
 
   it('shows the description on nodes without configuration', () => {
@@ -321,7 +324,7 @@ describe('validation errors', () => {
       <AttraccessNode schema={schema} tNodeTranslations={tStub} validationErrors={[{ field: 'data', message }]} />,
     );
     const text = screen.getByText(message);
-    expect(text).toHaveClass('break-words', '[overflow-wrap:anywhere]', 'min-w-0');
+    expect(text).toHaveClass('wrap-anywhere', 'min-w-0');
     expect(text.parentElement).toHaveClass('w-64', 'items-start');
     expect(text.parentElement?.querySelector('svg')).toHaveClass('shrink-0');
   });

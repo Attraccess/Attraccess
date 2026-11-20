@@ -20,6 +20,7 @@ import { AttraccessNode } from '../node/index';
 import type { NodeValidationError } from '../node/validationMessages';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FlowContext, type FlowContextType, type LiveLogReceiver } from './flowContext';
+import { groupValidationErrorsByNode } from './groupValidationErrorsByNode';
 import nodesDeTranslations from '../node/de.json';
 import nodesEnTranslations from '../node/en.json';
 
@@ -77,11 +78,7 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
   );
 
   const setValidationErrors = useCallback((errors: ReadonlyArray<NodeValidationError & { nodeId: string }>) => {
-    const byNode: Record<string, NodeValidationError[]> = {};
-    for (const { nodeId, field, code, message } of errors) {
-      (byNode[nodeId] ??= []).push({ field, code, message });
-    }
-    setValidationErrorsState(byNode);
+    setValidationErrorsState(groupValidationErrorsByNode(errors));
   }, []);
 
   const liveLogReceivers = useRef<LiveLogReceiver[]>([]);

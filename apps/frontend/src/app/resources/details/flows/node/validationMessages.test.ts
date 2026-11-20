@@ -15,9 +15,26 @@ const schema = (type: string, properties: Record<string, unknown> = {}) =>
 describe('validationMessages', () => {
   const core = { schema: schema('core.node'), t, tExists: (key: string) => key.endsWith('.config.items.label') };
 
-  it('labels a dotted path with its first segment', () => {
-    expect(validationMessages([{ field: 'items.0.key', code: 'required', message: 'x' }], core)).toEqual([
-      'label(nodes.core.node.config.items.label) is missing',
+  it('labels a dotted path with its first segment, without calling the whole field missing', () => {
+    expect(
+      validationMessages([{ field: 'items.0.key', code: 'required', message: 'This field is required.' }], core),
+    ).toEqual(['label(nodes.core.node.config.items.label): This field is required.']);
+  });
+
+  it('does not repeat a label the message already starts with', () => {
+    const titled = { schema: schema('core.node', { duration: { title: 'Duration' } }), t, tExists: () => false };
+    expect(
+      validationMessages(
+        [{ field: 'duration', code: 'invalid', message: 'Duration must be a positive integer' }],
+        titled,
+      ),
+    ).toEqual(['Duration must be a positive integer']);
+  });
+
+  it('prefers the schema title over the translation, like the node editor', () => {
+    const titled = { schema: schema('core.node', { items: { title: 'Entries' } }), t, tExists: () => true };
+    expect(validationMessages([{ field: 'items', code: 'required', message: 'x' }], titled)).toEqual([
+      'Entries is missing',
     ]);
   });
 

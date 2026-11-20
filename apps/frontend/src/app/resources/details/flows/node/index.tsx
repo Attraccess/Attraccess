@@ -1,6 +1,6 @@
 import { Button, Card, Code, cn, Tooltip, TooltipContent, TooltipTrigger } from '@heroui/react';
 import { Handle, NodeToolbar, Position, useNodeId, NodeProps } from '@xyflow/react';
-import { Edit2Icon, Trash2Icon, TriangleAlertIcon } from 'lucide-react';
+import { Edit2Icon, Trash2Icon } from 'lucide-react';
 import { NodeEditor } from './editor/index';
 import { ResourceFlowLogType, ResourceFlowLog, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 import { useFlowContext } from '../context/flowContext';
@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNodePreviewRows } from './preview/index';
 import { ConfirmableButton, TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 import { NodeValidationError, validationMessages } from './validationMessages';
+import { NodeNotice } from './NodeNotice';
 
 export interface Props {
   tNodeTranslations: TFunction;
@@ -337,15 +338,5 @@ export function AttraccessNode(props: Props) {
         </div>
       )}
     </NodeEditor>
-  );
-}
-
-/** A warning line under the card, kept to the card's width; long text wraps, even without spaces. */
-function NodeNotice({ className, children }: { className: string; children: React.ReactNode }) {
-  return (
-    <div className={cn('text-xs mt-1 px-1 w-64 flex flex-row items-start gap-1', className)}>
-      <TriangleAlertIcon size={12} className="shrink-0 mt-0.5" />
-      <span className="min-w-0 break-words [overflow-wrap:anywhere]">{children}</span>
-    </div>
   );
 }
