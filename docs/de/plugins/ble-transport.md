@@ -19,7 +19,7 @@ Backend-Plugins mit der Berechtigung `BLE_TRANSPORT` können über Attractap-Rea
 
 Die Durchsetzung läuft immer im Host. Die Prüffunktionen sind aus dem SDK exportiert, damit sich der Fake identisch verhält; ein Plugin kann sie aber nicht umgehen.
 
-Plugin-Bluetooth funktioniert nur an [gekoppelten Readern](attractap/pairing.md), die über die verschlüsselte Reader-Verbindung mit dem Server sprechen. Die Reader-Firmware lehnt BLE-Befehle über die ältere tokenbasierte Verbindung und vor der Anmeldung des Readers ab; der Host meldet einen solchen Reader als `READER_OFFLINE` mit Detail `pairing-required`.
+Plugin-Bluetooth funktioniert nur an [gekoppelten Readern](attractap/pairing.md), die über die verschlüsselte Reader-Verbindung mit dem Server sprechen. Die Reader-Firmware lehnt BLE-Befehle auf dem Kopplungskanal und vor der Anmeldung des Readers ab. Ein nicht gekoppelter Reader kann sich gar nicht verbinden; der Host meldet ihn als `READER_OFFLINE` ohne Detail.
 
 > [!IMPORTANT]
 > Die Funkverbindung zwischen Reader und Gerät hat **keine Sicherheit auf Bluetooth-Ebene**. Die Reader-Firmware ist ohne BLE-Sicherheit gebaut (`CONFIG_BT_NIMBLE_SECURITY_ENABLE` ist aus): Sie koppelt sich nie mit einem Gerät (kein Pairing, kein Bonding), und die BLE-Verbindung ist nicht verschlüsselt. Jeder in Funkreichweite kann den Verkehr mitschneiden. Sind Nutzdaten sensibel (Benutzercodes, Schlüssel, Entsperrbefehle), muss Ihr Plugin sie selbst verschlüsseln und authentifizieren, zum Beispiel mit der Sicherheit des Geräteprotokolls.
@@ -295,10 +295,9 @@ Die Reader-Firmware (2.5.0 oder neuer) meldet Plugin-Bluetooth beim Verbinden an
   Nichts geht stillschweigend verloren.
 
 - **Diagnose.** Funkfehler werden auf die Codes oben abgebildet; `detail` enthält den Rohgrund als sicheren Text, zum Beispiel `nimble:rc=13`, `hci:0x3e`, `att:0x0a` oder `reason:0x08`. `READER_OFFLINE` hat diese Details:
-  - `pairing-required`: Der Reader ist nicht gekoppelt (siehe [Vertrauensgrenze](#vertrauensgrenze)). Koppeln Sie ihn.
   - `firmware-info-pending`: Der Reader ist verbunden, hat seine Firmware aber noch nicht gemeldet. Versuchen Sie es kurz danach erneut.
   - `ble-init-failed`: Der Reader konnte seinen Bluetooth-Stack nicht starten. Starten Sie den Reader neu, wenn der Fehler bleibt.
-  - kein Detail: Der Reader ist nicht verbunden.
+  - kein Detail: Der Reader ist nicht verbunden (ein nicht gekoppelter Reader verbindet sich nie; siehe [Vertrauensgrenze](#vertrauensgrenze)).
 - **Latenz.** Jede Operation, auf die Sie warten, läuft vom Server zum Reader und zurück, über WLAN typischerweise 0,2 s (Reader-Firmware 2.5.1 oder neuer; davor 0,3 s). Ein Protokoll, das nach jedem Stück auf eine Bestätigung wartet, ist durch diesen Roundtrip begrenzt: gemessen mit 512-Byte-Stücken, die jeweils per Benachrichtigung bestätigt werden, etwa 2,7 KiB/s (vor 2.5.1: 1,8 KiB/s). Schicken Sie große Datenmengen als Schreiben ohne Antwort in Stücken von `session.mtu - 3` Bytes (höchstens `maxWriteBytes` der Characteristic) und lassen Sie mehrere Stücke unbestätigt: mit 8 offenen Stücken erreichte dieselbe Übertragung etwa 18 KiB/s (vor 2.5.1: 12 KiB/s), rund 1 MB pro Minute.
 - **Abbrechen auf dem Reader.** Ein abgebrochener `scan` oder `openSession` endet sofort, aber der Reader bleibt belegt, bis er die abgebrochene Anfrage beantwortet hat (der Abbruch selbst hat keine Antwort), meist einen Roundtrip lang (0,2 s; vor Firmware 2.5.1 0,3 s). Ein `scan` oder `openSession` in diesem Fenster endet mit `READER_BUSY` (wiederholbar); versuchen Sie es nach einer kurzen Pause erneut.
 - **Firmware-Updates.** Startet ein Reader ein Firmware-Update, beendet er seine BLE-Sitzung (`disconnected`) und lehnt neue BLE-Arbeit bis zum Neustart mit `READER_BUSY` (Detail `ota`) ab.

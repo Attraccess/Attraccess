@@ -116,6 +116,8 @@
   "save": "Save",
   "edit": "Edit",
   "deleteText": "Delete",
+  "editProviderLabel": "Edit {{name}}",
+  "deleteProviderLabel": "Delete {{name}}",
   "createNewProvider": "Create New SSO Provider",
   "editProvider": "Edit SSO Provider",
   "fillAllFields": "Please fill all required fields.",

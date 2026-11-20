@@ -52,7 +52,6 @@ function wrap(source: DataSource): PluginBleTestDatabase {
       await readers().insert({
         id: reader.id,
         name: reader.name,
-        apiTokenHash: 'hash',
         allowPluginBle: reader.allowPluginBle,
       } as Attractap);
     },

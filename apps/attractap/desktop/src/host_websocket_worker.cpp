@@ -37,7 +37,7 @@ void HostWebsocket::run()
             std::lock_guard lock(mutex);
             protocol = subprotocol;
         }
-        // The subprotocol selects the reader channel (session / pairing); none is the token channel.
+        // The subprotocol selects the reader channel (session / pairing).
         curl_slist *headers = nullptr;
         if (!protocol.empty())
             headers = curl_slist_append(headers, ("Sec-WebSocket-Protocol: " + protocol).c_str());

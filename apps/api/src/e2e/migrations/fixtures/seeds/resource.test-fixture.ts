@@ -46,7 +46,7 @@ export async function migrationResourceSeeds(dataSource: DataSource, seedTag: st
     separateUnlockAndUnlatch: false,
   }));
 
-  // An access-only door (DoorAccessOnly1793700000000), which the plugin reader seed is assigned to.
+  // An access-only door (DoorAccessOnly1793750000000), which the plugin reader seed is assigned to.
   const accessOnlyDoor =
     (await resourceRepo.findOne({ where: { accessOnly: true } })) ??
     (await resourceRepo.save(

@@ -6,8 +6,7 @@ import { AttractapFirmwareService } from '../../../firmware.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { AttractapFirmware } from '../../../dtos/firmware.dto';
 import { validateReaderUiCapabilities } from '../../../../resources/forms/reader-ui.validation';
-import { promptPairing } from '../../../reader-pairing';
-import { PairingService } from '../../../security/pairing.service';
+import { parseReportedBuild } from '../../../security/session-security-state';
 import { AttractapUiHandler } from '../ui/ui.handler';
 import { parseBleCapability } from '../ble/ble-wire';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
@@ -24,9 +23,6 @@ export class AttractapFirmwareHandler {
 
   @Inject(MetricsService)
   private metricsService: MetricsService;
-
-  @Inject(PairingService)
-  private pairingService: PairingService;
 
   @Inject(AttractapUiHandler)
   private uiHandler: AttractapUiHandler;
@@ -89,19 +85,18 @@ export class AttractapFirmwareHandler {
     socket.state.cardRelay = data.payload?.capabilities?.cardRelay === true;
     // Plugin BLE (protocol v1): older or incompatible firmware makes plugins see READER_UNSUPPORTED.
     socket.state.ble = parseBleCapability(data.payload?.capabilities?.ble);
+    // The eFuse report on the control channel waits for the build: hand it over before the database writes,
+    // so a slow write cannot run it into its wait limit.
+    const build = parseReportedBuild(data.payload);
+    socket.sessionSecurity?.setBuild(build);
+    await this.attractapService.recordReaderBuild(socket.readerId, build);
     await this.attractapService.updateReaderFirmware(socket.readerId, this.withValidatedUi(data.payload));
     // Initial full slot sync and crash-loop protection, in the background: it must not stop or delay the OTA check.
-    // A reader that is not paired shows nothing from the server.
-    if (!socket.state.pairingRequired)
-      void this.uiHandler.onFirmwareInfo(socket, data.payload).catch((error) => {
-        this.logger.warn(`Reader UI sync after firmware info failed: ${(error as Error).message}`);
-      });
+    void this.uiHandler.onFirmwareInfo(socket, data.payload).catch((error) => {
+      this.logger.warn(`Reader UI sync after firmware info failed: ${(error as Error).message}`);
+    });
 
-    // Firmware gate first: a reader that needs the update gets it. Then the pairing gate: a reader that
-    // is not paired starts pairing, also when no update could be offered.
-    if (!(await this.isFirmwareLatest(data.payload)) && (await this.offerFirmwareUpdate(socket, data.payload))) return;
-    socket.state.updateCheckDone = true;
-    if (socket.state.pairingRequired) await promptPairing(socket, this.pairingService);
+    if (!(await this.isFirmwareLatest(data.payload))) await this.offerFirmwareUpdate(socket, data.payload);
   }
 
   /** Sends READER_FIRMWARE_UPDATE_REQUIRED; false when no update can be offered. */

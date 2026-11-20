@@ -23,7 +23,8 @@ interface SSOProvidersTableProps {
 }
 
 export const SSOProvidersTable = ({ providers, onEdit, onDelete }: SSOProvidersTableProps) => {
-  const { t } = useTranslations({ en, de });
+  // React escapes the output; escaping again would put `&amp;` into a name like `A & B` in aria-labels.
+  const { t } = useTranslations({ en, de }, { escapeValues: false });
 
   if (!providers || providers.length === 0) {
     return (
@@ -62,6 +63,7 @@ export const SSOProvidersTable = ({ providers, onEdit, onDelete }: SSOProvidersT
                       <Button
                         variant="ghost"
                         isIconOnly
+                        aria-label={t('editProviderLabel', { name: provider.name })}
                         onPress={() => onEdit(provider)}
                         data-cy={`sso-provider-edit-button-${provider.id}`}
                       >
@@ -73,6 +75,7 @@ export const SSOProvidersTable = ({ providers, onEdit, onDelete }: SSOProvidersT
                       <Button
                         variant="danger-soft"
                         isIconOnly
+                        aria-label={t('deleteProviderLabel', { name: provider.name })}
                         onPress={() => onDelete(provider.id)}
                         data-cy={`sso-provider-delete-button-${provider.id}`}
                       >

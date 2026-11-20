@@ -67,7 +67,7 @@ async function setup(secret = 'test-secret', database?: DataSource) {
   const store = new TypeOrmAttractapSecureBootKeyStore(keys, readers, handles);
   const service = new SecureBootKeyService(store, unitOfWork, encryption, audit as never);
   const addReader = (secureBootDigest0: string | null, secureBootDigest1: string | null) =>
-    readers.save(readers.create({ name: 'reader', apiTokenHash: 'hash', secureBootDigest0, secureBootDigest1 }));
+    readers.save(readers.create({ name: 'reader', secureBootDigest0, secureBootDigest1 }));
   return { database, keys, readers, service, addReader, events, inTransaction };
 }
 

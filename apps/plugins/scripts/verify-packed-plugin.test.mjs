@@ -8,6 +8,7 @@ import {
   resolvePluginTestHostVersion,
   validateLicenseFile,
   validatePackageContract,
+  validatePermissionsMatch,
   verifyPackedPlugin,
 } from './verify-packed-plugin.mjs';
 
@@ -167,4 +168,15 @@ test('rejects a backend bundle that imports TypeORM, host entities or an SDK sub
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('rejects plugin.json and package.json permissions that diverge', () => {
+  const pkg = fixture();
+  pkg.attraccess.permissions = ['PLUGIN_STORAGE'];
+  assert.doesNotThrow(() => validatePermissionsMatch(pkg, { permissions: ['PLUGIN_STORAGE'] }));
+  assert.throws(
+    () => validatePermissionsMatch(pkg, { permissions: ['PLUGIN_STORAGE', 'READER_UI'] }),
+    /missing in package.json: READER_UI/,
+  );
+  assert.throws(() => validatePermissionsMatch(pkg, { permissions: [] }), /only in package.json: PLUGIN_STORAGE/);
 });

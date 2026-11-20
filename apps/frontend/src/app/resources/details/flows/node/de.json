@@ -81,14 +81,14 @@
           },
           "stopped": {
             "title": "Nutzung beendet",
-            "description": "Wird ausgelöst, wenn eine Nutzungssitzung endet.",
+            "description": "Wird ausgelöst, wenn eine Nutzungssitzung endet. Wird nicht ausgelöst, wenn eine Sitzung übernommen wird.",
             "outputs": {
               "output": "Ausgabe"
             }
           },
           "takeover": {
             "title": "Nutzung übernommen",
-            "description": "Wird ausgelöst, wenn eine Nutzungssitzung übernommen wird.",
+            "description": "Wird ausgelöst, wenn eine Nutzungssitzung übernommen wird. Für die bisherige Sitzung läuft Nutzung beendet nicht; ihre Abrechnungspositionen hier hinzufügen.",
             "outputs": {
               "output": "Ausgabe"
             }

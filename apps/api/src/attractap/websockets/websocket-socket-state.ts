@@ -1,24 +1,17 @@
 import type { AttractapReader } from '@attraccess/application-models';
 import { ResourceFormAction } from '@attraccess/application-models';
+import type { SessionSecurityState } from '../security/session-security-state';
 import type { CardConversation } from './card-conversation.service';
 import type { BleCapabilityState } from './handlers/ble/ble-wire';
 import type { CardSessionState, UiSlotsState, UiStepState } from './handlers/ui/ui-socket-state';
 import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
 
 export interface AttractapMessageBaseData<TPayload = unknown> {
-  auth?: {
-    id: number;
-    token: string;
-  };
   messageId?: number;
   payload: TPayload;
 }
 
 export enum AttractapEventType {
-  READER_REGISTER = 'READER_REGISTER',
-  READER_AUTHENTICATE = 'READER_AUTHENTICATE',
-  READER_UNAUTHORIZED = 'READER_UNAUTHORIZED',
-  READER_REQUEST_AUTHENTICATION = 'READER_REQUEST_AUTHENTICATION',
   READER_AUTHENTICATED = 'READER_AUTHENTICATED',
   READER_LANGUAGE = 'READER_LANGUAGE',
   READER_FIRMWARE_UPDATE_REQUIRED = 'READER_FIRMWARE_UPDATE_REQUIRED',
@@ -29,8 +22,6 @@ export enum AttractapEventType {
   READER_COREDUMP_BEGIN = 'READER_COREDUMP_BEGIN',
   READER_COREDUMP_CHUNK = 'READER_COREDUMP_CHUNK',
   READER_COREDUMP_COMPLETE = 'READER_COREDUMP_COMPLETE',
-  /** Server-pushed: asks a token-signed-in reader to open a pairing connection. */
-  READER_START_PAIRING = 'READER_START_PAIRING',
   FIRMWARE_REQUEST_CHUNK = 'FIRMWARE_REQUEST_CHUNK',
   RESOURCE_LIST = 'RESOURCE_LIST',
   REQUEST_RESOURCE_LIST = 'REQUEST_RESOURCE_LIST',
@@ -121,7 +112,7 @@ export enum AttractapEventType {
   UI_ACTION = 'UI_ACTION',
 
   // Plugin BLE transport (ATT-1033/ATT-1036). Wire contract, protocol v1 (handlers/ble/ble-wire.ts): only on the
-  // paired reader link (session transport), never on a legacy token connection. Every payload carries `v`, every
+  // paired reader link (session transport). Every payload carries `v`, every
   // request a server-assigned `sessionId` and a per-connection `requestId`; bytes are base64. Never ACKed;
   // correlation is by sessionId + requestId only. The reader announces capabilities.ble.
   /** Server → reader: bounded scan with the profile's advertisement filter. Answered by BLE_SCAN_RESULT. */
@@ -260,8 +251,8 @@ export function queuedSendBytes(socket: Pick<AuthenticatedWebSocket, 'pendingSen
 export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   messageCount: number;
   id: string;
-  /** `session` connections carry TLS 1.3 inside binary frames; everything else is legacy. */
-  transport?: 'legacy' | 'session';
+  /** The credential this session authenticated with and the build the reader reported. */
+  sessionSecurity?: SessionSecurityState;
   /** Set when a session connection sent a plain text frame; nothing from it may be processed. */
   sessionViolation?: boolean;
   /** Drops the connection without a closing handshake. */
@@ -294,16 +285,9 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
     cardRelay?: boolean;
     /**
      * Plugin BLE support negotiated from capabilities.ble; undefined until READER_FIRMWARE_INFO arrived. Used only
-     * on the paired reader link (`transport` `session`).
+     * on the paired reader link (the session; pairing connections get no socket state).
      */
     ble?: BleCapabilityState;
-    /**
-     * The reader signed in with its legacy token but is not paired. Like firmware before 2.0.0 it gets
-     * no functions, only the firmware update and the push to start pairing bound to its record.
-     */
-    pairingRequired?: boolean;
-    /** This connection's firmware info was handled and no update was offered, so pairing comes next. */
-    updateCheckDone?: boolean;
     /**
      * The user whose card this connection verified with the server (EV2 authentication with the
      * stored key). Never set from a UID alone or from anything the reader claims. Cleared on

@@ -61,12 +61,16 @@ class ReaderConsole:
             return self.data[mark:].decode(errors="replace")
 
     def expect(self, pattern, since, timeout):
-        """Wait for a regex in the log after position ``since``."""
+        """Wait for a regex in the complete log lines after position ``since``.
+
+        The UART arrives in chunks that can end inside a line; a capture such as
+        ``([0-9a-f]+)`` would otherwise match just the part received so far.
+        """
         regex = re.compile(pattern.encode())
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             with self.lock:
-                match = regex.search(self.data, since)
+                match = regex.search(self.data, since, self.data.rfind(b"\n") + 1)
             if match:
                 return match
             time.sleep(0.1)

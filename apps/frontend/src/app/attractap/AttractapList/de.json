@@ -19,6 +19,7 @@
       "actions": "Aktionen"
     },
     "noData": "Keine Attractap gefunden",
+    "emptyHint": "Reader erscheinen hier, sobald sie gekoppelt sind. Ein neuer Reader zeigt einen Code und wartet in der Liste „Nicht gekoppelt“, wo du ihn koppelst. Nach dem Upgrade auf die Attractap-Firmware 2.6.0 muss jeder Reader neu gekoppelt werden.",
     "actions": {
       "editReader": "Bearbeiten",
       "diagnostics": "Diagnose",

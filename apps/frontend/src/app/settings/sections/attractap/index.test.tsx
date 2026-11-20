@@ -28,7 +28,7 @@ const reader = (
   id: number,
   name: string,
   capabilities: Record<string, boolean> = {},
-  pairingState: 'unpaired' | 'paired' | 'revoked' = 'paired',
+  pairingState: 'paired' | 'revoked' = 'paired',
 ) => ({
   id,
   name,
@@ -130,10 +130,9 @@ describe('AttractapSection (which readers may write cards)', () => {
 
   it('never lists a reader that is not paired, so it cannot be allowed to write cards', () => {
     selectedMode([1]);
-    readersQuery([reader(1, 'Front desk'), reader(2, 'Legacy', {}, 'unpaired'), reader(3, 'Removed', {}, 'revoked')]);
+    readersQuery([reader(1, 'Front desk'), reader(3, 'Removed', {}, 'revoked')]);
     render(<AttractapSection />);
     expect(screen.getByRole('checkbox', { name: 'Front desk' })).toBeInTheDocument();
-    expect(screen.queryByRole('checkbox', { name: 'Legacy' })).toBeNull();
     expect(screen.queryByRole('checkbox', { name: 'Removed' })).toBeNull();
   });
 });

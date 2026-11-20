@@ -19,7 +19,7 @@ Backend plugins with the `BLE_TRANSPORT` permission can talk to Bluetooth Low En
 
 Enforcement always runs in the host. The validation helpers are exported from the SDK so the fake behaves identically, but a plugin cannot skip them.
 
-Plugin Bluetooth works only on [paired readers](attractap/pairing.md), which talk to the server over the encrypted reader link. The reader firmware refuses BLE commands on the older token-based connection and before the reader has signed in; the host reports such a reader as `READER_OFFLINE` with detail `pairing-required`.
+Plugin Bluetooth works only on [paired readers](attractap/pairing.md), which talk to the server over the encrypted reader link. The reader firmware refuses BLE commands on the pairing channel and before the reader has signed in. A reader that is not paired cannot connect at all, so the host reports it as `READER_OFFLINE` without detail.
 
 > [!IMPORTANT]
 > The radio link between the reader and the device has **no Bluetooth-level security**. The reader firmware is built without BLE security (`CONFIG_BT_NIMBLE_SECURITY_ENABLE` is off): it never pairs or bonds with a device, and the BLE link is not encrypted. Anyone in radio range can record the traffic. If payloads are sensitive (user codes, keys, unlock commands), your plugin must encrypt and authenticate them itself, for example with the device's own protocol security.
@@ -295,10 +295,9 @@ The reader firmware (2.5.0 or later) announces plugin Bluetooth when it connects
   Nothing is dropped silently.
 
 - **Diagnostics.** Radio failures map to the codes above; `detail` carries the raw reason as safe text, for example `nimble:rc=13`, `hci:0x3e`, `att:0x0a` or `reason:0x08`. `READER_OFFLINE` has these details:
-  - `pairing-required`: the reader is not paired (see [Trust boundary](#trust-boundary)). Pair it.
   - `firmware-info-pending`: the reader connected but has not announced its firmware yet. Retry after a moment.
   - `ble-init-failed`: the reader could not start its Bluetooth stack. Restart the reader if the error persists.
-  - no detail: the reader is not connected.
+  - no detail: the reader is not connected (a reader that is not paired never connects; see [Trust boundary](#trust-boundary)).
 - **Latency.** Every operation you await travels from the server to the reader and back, typically 0.2 s over Wi-Fi (reader firmware 2.5.1 or later; 0.3 s before). A protocol that waits for an acknowledgement after every chunk is limited by that round trip: measured with 512-byte chunks, each acknowledged by a notification, about 2.7 KiB/s (1.8 KiB/s before 2.5.1). Send bulk data as writes without response in chunks of `session.mtu - 3` bytes (at most the characteristic's `maxWriteBytes`), and keep several chunks unacknowledged: with 8 in flight the same transfer reached about 18 KiB/s (12 KiB/s before 2.5.1), roughly 1 MB per minute.
 - **Cancelling on the reader.** A cancelled `scan` or `openSession` rejects at once, but the reader stays busy until it answered the cancelled request (the cancel itself has no answer), usually one round trip (0.2 s; 0.3 s before firmware 2.5.1). A `scan` or `openSession` in that window rejects with `READER_BUSY` (retryable); retry after a short pause.
 - **Firmware updates.** A reader that starts a firmware update ends its BLE session (`disconnected`) and refuses new BLE work with `READER_BUSY` (detail `ota`) until it restarted.
