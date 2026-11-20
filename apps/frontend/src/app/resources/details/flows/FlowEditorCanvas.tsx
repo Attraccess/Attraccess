@@ -21,6 +21,7 @@ import { NodeCatalogHandle, NodeCatalogPanel } from './nodeCatalog';
 import { LogViewer } from './logViewer';
 import { VariablesModal } from './variablesModal';
 import { FlowNodeQuerySelection } from './FlowNodeQuerySelection';
+import { FlowUnsavedChangesGuard } from './FlowUnsavedChangesGuard';
 import { EdgeWithDeleteButton } from './edgeWithDeleteButton';
 import { useCanvasInteractionMode } from './canvas/useCanvasInteractionMode';
 import { useFlowCanvasData } from './canvas/useFlowCanvasData';
@@ -82,6 +83,7 @@ export function FlowEditorCanvas() {
 
   return (
     <div className="h-full w-full flex flex-col">
+      <FlowUnsavedChangesGuard isDirty={flowHasChanged} />
       <div className="flex flex-row w-full flex-1 min-h-0 rounded-lg overflow-hidden border border-border">
         <NodeCatalogPanel
           ref={nodeCatalogRef}

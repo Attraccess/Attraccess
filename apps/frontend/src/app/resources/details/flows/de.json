@@ -43,5 +43,11 @@
       "title": "Flow nicht gespeichert",
       "description": "Diese Knoten sind in globalen Flows nicht verfügbar: {{nodes}}"
     }
+  },
+  "unsavedChanges": {
+    "title": "Ungespeicherte Änderungen verwerfen?",
+    "description": "Deine Änderungen an diesem Flow wurden nicht gespeichert. Wenn du die Seite jetzt verlässt, gehen sie verloren.",
+    "leave": "Ohne Speichern verlassen",
+    "stay": "Bleiben"
   }
 }

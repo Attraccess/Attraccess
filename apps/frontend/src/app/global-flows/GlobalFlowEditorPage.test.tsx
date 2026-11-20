@@ -2,11 +2,16 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GlobalFlowEditorPage } from './GlobalFlowEditorPage';
 import { TestWrapper } from '../../test-utils/wrappers';
 
-const state = vi.hoisted(() => ({ update: vi.fn(), owner: undefined as unknown }));
+const FLOW = { id: 9, name: 'Power off all', description: null, enabled: true };
+const state = vi.hoisted(() => ({
+  update: vi.fn(),
+  owner: undefined as unknown,
+  query: undefined as unknown as { data: unknown; isError: boolean },
+}));
 
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: () => true }) }));
 vi.mock('../resources/details/flows/FlowEditor', () => ({
@@ -17,14 +22,38 @@ vi.mock('../resources/details/flows/FlowEditor', () => ({
 }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/react-query-client')>()),
-  useGetGlobalFlow: () => ({
-    data: { id: 9, name: 'Power off all', description: null, enabled: true },
-    isError: false,
-  }),
+  useGetGlobalFlow: () => state.query,
   useUpdateGlobalFlow: () => ({ mutate: state.update, isPending: false }),
 }));
 
+function show() {
+  render(
+    <TestWrapper
+      initialRoute="/devices/flows/9"
+      routes={<Route path="/devices/flows/:flowId" element={<GlobalFlowEditorPage />} />}
+    />,
+  );
+}
+
+beforeEach(() => {
+  state.query = { data: FLOW, isError: false };
+});
+
 describe('GlobalFlowEditorPage', () => {
+  it('keeps the editor, and its unsaved edits, when a background refetch fails', () => {
+    state.query = { data: FLOW, isError: true };
+    show();
+    expect(screen.getByText('editor')).toBeInTheDocument();
+    expect(screen.queryByText('This flow could not be loaded.')).toBeNull();
+  });
+
+  it('shows the load error when the flow never loaded', () => {
+    state.query = { data: undefined, isError: true };
+    show();
+    expect(screen.getByText('This flow could not be loaded.')).toBeInTheDocument();
+    expect(screen.queryByText('editor')).toBeNull();
+  });
+
   it('opens the editor for the global flow with its name, the notice and the enabled switch', async () => {
     render(
       <TestWrapper

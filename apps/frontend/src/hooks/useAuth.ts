@@ -128,7 +128,8 @@ export function useAuth() {
     // Several components use this hook; consuming the URL also prevents duplicate notices.
     if (url.searchParams.get('ssoLogout') !== returnToken) return;
     url.searchParams.delete('ssoLogout');
-    window.history.replaceState(null, '', url.toString());
+    // Keep React Router's entry state: without its index, browser Back would skip navigation blockers.
+    window.history.replaceState(window.history.state, '', url.toString());
     queryClient.setQueryData(['auth-logout-return', returnToken], null);
     if (!providerReturn || currentUser) return;
     const key =
