@@ -3,6 +3,7 @@ import type { MatterPermissions } from './permissions';
 import {
   getSettings,
   getStatus,
+  reconnect,
   removeSettings,
   saveSettings,
   type ConnectionSettings,
@@ -26,8 +27,9 @@ function withTimeout<T>(request: Promise<T>): Promise<T> {
 }
 
 /**
- * Loads the settings and polls the status while the page is open. Saving and removing refresh both. If the first
- * settings load failed (API briefly down), the poll retries it so the form appears without a manual reload.
+ * Loads the settings and polls the status while the page is open. Saving and removing refresh both. The settings are
+ * polled with the status, so a change another administrator saved reaches the open form (see SettingsForm), and a
+ * first load that failed (API briefly down) is retried without a manual reload.
  *
  * A poll tick is skipped while an earlier request is still pending, so a hanging API does not pile up requests, and
  * only the newest status request may update the page, so a late answer never overwrites a newer one.
@@ -42,7 +44,6 @@ export function useMatterPage({ known, canRead, canManage }: MatterPermissions) 
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const mounted = useRef(true);
-  const settingsLoaded = useRef(false);
   const statusSeq = useRef(0);
   const statusPending = useRef(0);
   const settingsPending = useRef(false);
@@ -67,7 +68,6 @@ export function useMatterPage({ known, canRead, canManage }: MatterPermissions) 
     try {
       const next = await withTimeout(getSettings());
       if (!mounted.current) return;
-      settingsLoaded.current = true;
       setSettings(next);
       setSettingsError(null);
     } catch (error) {
@@ -94,7 +94,7 @@ export function useMatterPage({ known, canRead, canManage }: MatterPermissions) 
     );
     const timer = setInterval(() => {
       if (canRead && statusPending.current === 0) void refreshStatus();
-      if (canManage && !settingsLoaded.current && !settingsPending.current) void refreshSettings();
+      if (canManage && !settingsPending.current) void refreshSettings();
     }, STATUS_POLL_MS);
     return () => {
       cancelled = true;
@@ -106,7 +106,6 @@ export function useMatterPage({ known, canRead, canManage }: MatterPermissions) 
     async (input: SettingsInput) => {
       const saved = await saveSettings(input);
       if (mounted.current) {
-        settingsLoaded.current = true;
         setSettings(saved);
       }
       await refreshStatus();
@@ -120,5 +119,14 @@ export function useMatterPage({ known, canRead, canManage }: MatterPermissions) 
     await Promise.all([refreshSettings(), refreshStatus()]);
   }, [refreshSettings, refreshStatus]);
 
-  return { settings, settingsError, status, statusError, loading, save, remove };
+  /** "Retry now": reconnects at once and shows the status right after. Needs `canManage`. */
+  const retryNow = useCallback(async () => {
+    const next = await withTimeout(reconnect());
+    if (!mounted.current) return;
+    statusSeq.current += 1;
+    setStatus(next);
+    setStatusError(null);
+  }, []);
+
+  return { settings, settingsError, status, statusError, loading, save, remove, retryNow };
 }

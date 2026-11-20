@@ -63,6 +63,16 @@ describe('createPluginApiClient', () => {
     );
   });
 
+  it('joins sentence-style validation messages without a stray ".,"', async () => {
+    fetchMock.mockReturnValue(
+      respond(JSON.stringify({ message: ['url: The URL is too long.', 'credential: Too short.'] }), { status: 400 })
+    );
+
+    await expect(createPluginApiClient().request('/api/demo/things')).rejects.toThrow(
+      new PluginApiError('url: The URL is too long. credential: Too short.', 400)
+    );
+  });
+
   it('falls back to a status message when the error body is not JSON', async () => {
     fetchMock.mockReturnValue(respond('<html>gateway</html>', { status: 503 }));
 

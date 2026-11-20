@@ -52,13 +52,27 @@ export interface PluginApiClient {
   fetch(path: string, init?: RequestInit): Promise<Response>;
 }
 
+/**
+ * Joins validation messages into one text. Messages that already end a sentence are separated by a space, so
+ * "The URL is too long." and "The token is short." never become "long., token".
+ */
+export function joinErrorMessages(parts: readonly string[]): string {
+  return parts
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .reduce((joined, part) => {
+      if (joined === '') return part;
+      return /[.!?]$/.test(joined) ? `${joined} ${part}` : `${joined}, ${part}`;
+    }, '');
+}
+
 // The backend wraps failures in HTTP exceptions whose `message` explains what
 // went wrong (broker unreachable, missing privileges, …) — surface that text
 // instead of a bare status code.
 async function toError(res: Response): Promise<PluginApiError> {
   try {
     const body = (await res.json()) as { message?: string | string[] };
-    const message = Array.isArray(body.message) ? body.message.join(', ') : body.message;
+    const message = Array.isArray(body.message) ? joinErrorMessages(body.message) : body.message;
     if (message) {
       return new PluginApiError(message, res.status);
     }

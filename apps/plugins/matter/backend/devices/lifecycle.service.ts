@@ -62,6 +62,15 @@ export class MatterLifecycleService {
     });
   }
 
+  /** The number of live endpoints of each node (by node UUID), for the device list. */
+  async endpointCounts(): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+    for (const endpoint of await this.storage.tables.endpoints.find({ where: { removedAt: null } })) {
+      counts.set(endpoint.nodeRef, (counts.get(endpoint.nodeRef) ?? 0) + 1);
+    }
+    return counts;
+  }
+
   async getNode(id: string) {
     const { tables } = this.storage;
     const node = await this.require(tables, id);

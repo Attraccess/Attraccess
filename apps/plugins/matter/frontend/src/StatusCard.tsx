@@ -74,6 +74,9 @@ function Combination({ entry }: Readonly<{ entry: SupportedCombination | Record<
 export function StatusCard({ status, canManage }: Readonly<{ status: ConnectionStatus; canManage: boolean }>) {
   const { t } = useMatterTranslations();
   const formatDateTime = useDateTimeFormatter({ showSeconds: true });
+  // While the sidecar is not connected, its versions are what it reported last (or what this plugin expects): say so.
+  const versionLabel = (key: string) =>
+    status.state === 'connected' ? t(key) : t('status.lastKnown', { label: t(key) });
   const error = status.lastError;
   const received = error?.details?.received;
   return (
@@ -102,11 +105,17 @@ export function StatusCard({ status, canManage }: Readonly<{ status: ConnectionS
           )}
           {status.sidecar && (
             <>
-              <Field label={t('status.sidecarVersion')}>{status.sidecar.sidecar}</Field>
-              <Field label={t('status.matterJsVersion')}>{status.sidecar.matterJs}</Field>
+              <Field label={versionLabel('status.sidecarVersion')} dataCy="matter-sidecar-version">
+                {status.sidecar.sidecar}
+              </Field>
+              <Field label={versionLabel('status.matterJsVersion')} dataCy="matter-matterjs-version">
+                {status.sidecar.matterJs}
+              </Field>
             </>
           )}
-          <Field label={t('status.wireVersion')}>{status.wireVersion}</Field>
+          <Field label={versionLabel('status.wireVersion')} dataCy="matter-wire-version">
+            {status.wireVersion}
+          </Field>
         </dl>
         {error && (
           <StatusAlert status="warning" title={t('status.lastError')} data-cy="matter-last-error">

@@ -2,7 +2,7 @@
 import '@testing-library/jest-dom/vitest';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConnectionSettings, ConnectionStatus } from './api';
 import { MatterPage } from './MatterPage';
@@ -14,6 +14,7 @@ const api = vi.hoisted(() => ({
   getStatus: vi.fn(),
   saveSettings: vi.fn(),
   removeSettings: vi.fn(),
+  reconnect: vi.fn(),
 }));
 vi.mock('./api', () => api);
 // The fabric & backup section has its own spec (fabric-backup/FabricBackupSection.spec.tsx).
@@ -28,6 +29,9 @@ const spinner = () => document.querySelector('[data-slot="spinner"]');
 
 const signIn = (...effectivePermissions: string[]) =>
   act(() => setMatterAuthData({ authToken: '', user: {} as never, effectivePermissions }));
+
+/** A token the form accepts (32+ printable ASCII characters). */
+const SECRET = 'secret-token-0123456789-0123456789-abc';
 
 const entry = {
   wireVersion: 1,
@@ -64,14 +68,22 @@ const configured: ConnectionSettings = {
   updatedAt: '2026-11-05T09:00:00.000Z',
 };
 
+// The Infrastructure tab holds the connection status, the settings and the fabric section; the layout specs are in
+// MatterPage.routing.spec.tsx.
+function renderAt(path: string) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/matter/*" element={<MatterPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 function renderPage(status: Partial<ConnectionStatus>, settings: ConnectionSettings = empty) {
   api.getStatus.mockResolvedValue({ ...baseStatus, ...status });
   api.getSettings.mockResolvedValue(settings);
-  return render(
-    <MemoryRouter>
-      <MatterPage />
-    </MemoryRouter>,
-  );
+  return renderAt('/matter/infrastructure');
 }
 
 beforeEach(() => signIn('matter.devices.read', 'matter.devices.manage'));
@@ -272,16 +284,14 @@ describe('MatterPage', () => {
 
   it('reports a failed save in an error dialog without echoing the token', async () => {
     const user = userEvent.setup();
-    api.saveSettings.mockRejectedValue(
-      new Error('credential: The credential must be 32-512 printable ASCII characters.'),
-    );
+    api.saveSettings.mockRejectedValue(new Error('The sidecar rejected this token.'));
     renderPage({}, empty);
     await user.type(await screen.findByLabelText(/Sidecar URL/), 'http://127.0.0.1:8581');
-    await user.type(screen.getByLabelText(/^Token/), 'short-secret-value');
+    await user.type(screen.getByLabelText(/^Token/), SECRET);
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('Saving failed')).toBeInTheDocument();
-    expect(screen.getByText(/32-512 printable ASCII/)).toBeInTheDocument();
-    expect(document.body.textContent).not.toContain('short-secret-value');
+    expect(screen.getByText(/rejected this token/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(SECRET);
   });
 
   it('asks for confirmation before removing the configuration', async () => {
@@ -357,11 +367,7 @@ describe('MatterPage recovery', () => {
   it('reports a failed settings load even when the status loads', async () => {
     api.getStatus.mockResolvedValue({ ...baseStatus, state: 'connected' });
     api.getSettings.mockRejectedValue(new Error('Failed to fetch'));
-    render(
-      <MemoryRouter>
-        <MatterPage />
-      </MemoryRouter>,
-    );
+    renderAt('/matter/infrastructure');
     expect(await screen.findByText('The connection settings could not be loaded.')).toBeInTheDocument();
     expect(screen.getByText('Connected')).toBeInTheDocument();
     expect(screen.queryByText('The status could not be loaded.')).not.toBeInTheDocument();
@@ -371,11 +377,7 @@ describe('MatterPage recovery', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     api.getStatus.mockRejectedValueOnce(new Error('Failed to fetch')).mockResolvedValue(baseStatus);
     api.getSettings.mockRejectedValueOnce(new Error('Failed to fetch')).mockResolvedValue(configured);
-    render(
-      <MemoryRouter>
-        <MatterPage />
-      </MemoryRouter>,
-    );
+    renderAt('/matter/infrastructure');
     expect(await screen.findByText('The status could not be loaded.')).toBeInTheDocument();
     expect(screen.queryByLabelText(/Sidecar URL/)).not.toBeInTheDocument();
     await act(async () => {
@@ -395,7 +397,7 @@ describe('MatterPage permissions', () => {
     expect(screen.getByTestId('fabric-section-stub')).toHaveTextContent('read');
     expect(api.getSettings).not.toHaveBeenCalled();
     expect(screen.queryByLabelText(/Sidecar URL/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Save|Replace|Remove|Retry now/ })).not.toBeInTheDocument();
   });
 
   it('shows the settings form and the manage actions with matter.devices.manage', async () => {
@@ -411,7 +413,9 @@ describe('MatterPage permissions', () => {
     expect(api.getStatus).not.toHaveBeenCalled();
     expect(api.getSettings).not.toHaveBeenCalled();
     expect(screen.queryByTestId('fabric-section-stub')).not.toBeInTheDocument();
-    expect(screen.getByText('Matter devices are hidden')).toBeInTheDocument();
+    // The user lands on the one tab they may see.
+    expect(screen.getByText('Thread is not set up')).toBeInTheDocument();
+    expect(screen.queryByText('Matter devices are hidden')).not.toBeInTheDocument();
   });
 
   it('keeps loading, without requests or the "hidden" notice, until the host has pushed the auth state', async () => {
@@ -428,17 +432,20 @@ describe('MatterPage permissions', () => {
   });
 
   it('shows the spinner again when the permissions grow after a run that requested nothing', async () => {
+    const user = userEvent.setup();
     signIn('thread.network.read');
     renderPage({ state: 'connected' }, configured);
     await waitFor(() => expect(spinner()).not.toBeInTheDocument());
     let answer: (status: ConnectionStatus) => void = () => undefined;
     api.getStatus.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
-    signIn('matter.devices.read');
+    signIn('thread.network.read', 'matter.devices.read');
+    await user.click(await screen.findByRole('tab', { name: 'Infrastructure' }));
     expect(spinner()).toBeInTheDocument();
     await act(async () => answer({ ...baseStatus, state: 'connected' }));
     expect(await screen.findByText('Connected')).toBeInTheDocument();
     expect(spinner()).not.toBeInTheDocument();
   });
+
 
   it('shows no manage controls, and requests nothing, for matter.devices.manage without read', async () => {
     signIn('matter.devices.manage');
@@ -502,9 +509,19 @@ describe('plugin registration', () => {
     expect(plugin.getSidebarItems()).toEqual([
       expect.objectContaining({ label: 'Matter', path: '/matter', group: 'devices' }),
     ]);
-    expect(plugin.getRoutes()).toEqual([
-      expect.objectContaining({ path: '/matter', authRequired: ['matter.devices.read', 'thread.network.read'] }),
+    // One flat route per subpage, each opened by any Matter or Thread read key; the tabs check their own key inside.
+    const routes = plugin.getRoutes();
+    expect(routes.map((route) => route.path)).toEqual([
+      '/matter',
+      '/matter/devices',
+      '/matter/infrastructure',
+      '/matter/thread',
+      '/matter/commissioning',
+      '/matter/health',
+      '/matter/updates',
+      '/matter/devices/:nodeId',
     ]);
+    for (const route of routes) expect(route.authRequired).toEqual(['matter.devices.read', 'thread.network.read']);
   });
 
   it('passes the host auth state on to the page', async () => {

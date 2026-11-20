@@ -1,10 +1,12 @@
-import { Button, PasswordInput, StatusDialog, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
-import { Description, Form, Input, Label, TextArea, TextField } from '@heroui/react';
-import { useState, type FormEvent } from 'react';
+import { Button, PasswordInput, StatusAlert, StatusDialog, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
+import { Description, FieldError, Form, Input, Label, TextArea, TextField } from '@heroui/react';
+import { useRef, useState, type FormEvent } from 'react';
 import type { ConnectionSettings, SettingsInput } from './api';
 import { useMatterTranslations } from './i18n';
+import { validateCa, validateCredential, validateUrl } from './settingsValidation';
 
 type Props = Readonly<{
+  /** The settings as the server has them now. They are polled: a change made elsewhere arrives here as a new value. */
   settings: ConnectionSettings;
   /** Resolves with the settings as stored, which the form then shows. */
   onSave: (input: SettingsInput) => Promise<ConnectionSettings>;
@@ -29,10 +31,17 @@ function normalizedUrl(value: string): string {
  * The token is write-only: once saved, the form only shows that one is configured and offers to replace it. The
  * backend never sends it back. Changing the URL or the CA certificate needs the token again, so a stored token never
  * goes to a new endpoint; the backend refuses such a save without it.
+ *
+ * The form is a draft of the settings it was loaded from (`base`). When another administrator saves meanwhile, the
+ * new settings arrive through `settings`: an untouched form adopts them, a form with edits keeps them, says so and
+ * blocks Save until the administrator reloads, so nothing is overwritten silently. URL, token and CA certificate are
+ * checked while typing. Clearing the CA certificate can be undone until saved. After a dialog closes, the focus returns
+ * to the control that started the action.
  */
 export function SettingsForm({ settings, onSave, onRemove }: Props) {
   const { t } = useMatterTranslations();
   const formatDateTime = useDateTimeFormatter({});
+  const [base, setBase] = useState(settings);
   const [url, setUrl] = useState(settings.url ?? '');
   const [replacing, setReplacing] = useState(!settings.credentialConfigured);
   const [credential, setCredential] = useState('');
@@ -40,13 +49,45 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
   const [caCleared, setCaCleared] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
+  const saveRef = useRef<HTMLButtonElement>(null);
+  const removeRef = useRef<HTMLButtonElement>(null);
 
-  const caChanged = caCleared || ca.trim() !== (settings.caCertificate ?? '').trim();
+  const load = (next: ConnectionSettings) => {
+    setBase(next);
+    setUrl(next.url ?? '');
+    setCa(next.caCertificate ?? '');
+    setCaCleared(false);
+    setCredential('');
+    setReplacing(!next.credentialConfigured);
+  };
+
+  const caChanged = caCleared || ca.trim() !== (base.caCertificate ?? '').trim();
+  const urlChanged = url.trim() !== (base.url ?? '');
+  const dirty = urlChanged || caChanged || credential !== '' || (replacing && base.credentialConfigured);
+  const changedElsewhere = settings.updatedAt !== base.updatedAt || settings.url !== base.url;
+  // An untouched form follows the server; adopted during render, so there is no frame with stale values.
+  if (changedElsewhere && !dirty && !busy) load(settings);
+
   const endpointChanged =
-    settings.credentialConfigured &&
-    (caChanged || (settings.url !== null && normalizedUrl(url) !== normalizedUrl(settings.url)));
+    base.credentialConfigured && (caChanged || (base.url !== null && normalizedUrl(url) !== normalizedUrl(base.url)));
   const needsCredential = replacing || endpointChanged;
-  const canSave = url.trim() !== '' && (!needsCredential || credential !== '') && !busy;
+  const urlError = validateUrl(url);
+  const credentialError = needsCredential ? validateCredential(credential) : null;
+  const caError = caCleared ? null : validateCa(ca);
+  const canSave =
+    url.trim() !== '' &&
+    (!needsCredential || credential !== '') &&
+    !urlError &&
+    !credentialError &&
+    !caError &&
+    !changedElsewhere &&
+    !busy;
+
+  /** Closes a dialog and puts the focus back where the action started. */
+  const closeNotice = (returnTo: React.RefObject<HTMLButtonElement | null>) => {
+    setNotice(null);
+    setTimeout(() => returnTo.current?.focus(), 0);
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -55,12 +96,7 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
     if (caChanged) input.caCertificate = ca.trim() === '' || caCleared ? null : ca.trim();
     setBusy(true);
     try {
-      const saved = await onSave(input);
-      setUrl(saved.url ?? '');
-      setCa(saved.caCertificate ?? '');
-      setCaCleared(false);
-      setCredential('');
-      setReplacing(!saved.credentialConfigured);
+      load(await onSave(input));
       setNotice({ kind: 'saved' });
     } catch (error) {
       setNotice({ kind: 'error', title: t('form.saveError'), message: messageOf(error) });
@@ -73,11 +109,7 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
     setBusy(true);
     try {
       await onRemove();
-      setUrl('');
-      setCa('');
-      setCaCleared(false);
-      setCredential('');
-      setReplacing(true);
+      load({ url: null, credentialConfigured: false, credentialUpdatedAt: null, caCertificate: null, updatedAt: null });
       setNotice(null);
     } catch (error) {
       setNotice({ kind: 'error', title: t('form.removeError'), message: messageOf(error) });
@@ -89,12 +121,23 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
   return (
     <section className="mt:flex mt:flex-col mt:gap-4" data-cy="matter-settings">
       <h2 className="mt:text-lg mt:font-semibold">{t('form.title')}</h2>
+      {changedElsewhere && dirty && (
+        <StatusAlert status="warning" title={t('form.changedElsewhere')} data-cy="matter-settings-stale">
+          {t('form.changedElsewhereText')}
+          <span className="mt:mt-2 mt:block">
+            <Button size="sm" variant="secondary" onPress={() => load(settings)} data-cy="matter-settings-reload">
+              {t('form.reload')}
+            </Button>
+          </span>
+        </StatusAlert>
+      )}
       <div>
         <Form onSubmit={submit} className="mt:flex mt:flex-col mt:gap-4">
-          <TextField value={url} onChange={setUrl} className="mt:w-full" isRequired>
+          <TextField value={url} onChange={setUrl} className="mt:w-full" isRequired isInvalid={urlError !== null}>
             <Label>{t('form.url')}</Label>
             <Input placeholder={t('form.urlPlaceholder')} autoComplete="off" data-cy="matter-url-input" />
             <Description>{t('form.urlDescription')}</Description>
+            {urlError && <FieldError data-cy="matter-url-error">{t(`form.validation.${urlError}`)}</FieldError>}
           </TextField>
 
           {needsCredential ? (
@@ -105,9 +148,11 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
                 autoComplete="new-password"
                 value={credential}
                 onValueChange={setCredential}
+                isInvalid={credentialError !== null}
+                errorMessage={credentialError && <span data-cy="matter-credential-error">{t(`form.validation.${credentialError}`)}</span>}
                 data-cy="matter-credential-input"
               />
-              {settings.credentialConfigured && !endpointChanged && (
+              {base.credentialConfigured && !endpointChanged && (
                 <Button variant="tertiary" onPress={() => setReplacing(false)} data-cy="matter-keep-credential">
                   {t('form.cancelReplace')}
                 </Button>
@@ -120,7 +165,7 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
             >
               <span>
                 {t('form.credential')}:{' '}
-                {t('form.credentialConfigured', { time: formatDateTime(settings.credentialUpdatedAt) })}
+                {t('form.credentialConfigured', { time: formatDateTime(base.credentialUpdatedAt) })}
               </span>
               <Button variant="secondary" onPress={() => setReplacing(true)} data-cy="matter-replace-credential">
                 {t('form.replace')}
@@ -128,23 +173,30 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
             </div>
           )}
 
-          <TextField value={caCleared ? '' : ca} onChange={setCa} isDisabled={caCleared} className="mt:w-full">
+          <TextField value={caCleared ? '' : ca} onChange={setCa} isDisabled={caCleared} className="mt:w-full" isInvalid={caError !== null}>
             <Label>{t('form.ca')}</Label>
             <TextArea rows={5} spellCheck={false} data-cy="matter-ca-input" />
             <Description>{caCleared ? t('form.caCleared') : t('form.caDescription')}</Description>
+            {caError && <FieldError data-cy="matter-ca-error">{t(`form.validation.${caError}`)}</FieldError>}
           </TextField>
-          {settings.caCertificate && !caCleared && (
+          {base.caCertificate && !caCleared && (
             <Button variant="tertiary" onPress={() => setCaCleared(true)} data-cy="matter-clear-ca">
               {t('form.caClear')}
             </Button>
           )}
+          {caCleared && (
+            <Button variant="tertiary" onPress={() => setCaCleared(false)} data-cy="matter-undo-clear-ca">
+              {t('form.caUndo')}
+            </Button>
+          )}
 
           <div className="mt:flex mt:flex-wrap mt:gap-2">
-            <Button type="submit" isDisabled={!canSave} isPending={busy} data-cy="matter-save">
+            <Button ref={saveRef} type="submit" isDisabled={!canSave} isPending={busy} data-cy="matter-save">
               {t('form.save')}
             </Button>
-            {settings.url !== null && (
+            {base.url !== null && (
               <Button
+                ref={removeRef}
                 variant="danger-soft"
                 isDisabled={busy}
                 onPress={() => setNotice({ kind: 'remove' })}
@@ -161,7 +213,7 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
         isOpen={notice?.kind === 'saved'}
         status="success"
         title={t('form.saved')}
-        onClose={() => setNotice(null)}
+        onClose={() => closeNotice(saveRef)}
         data-cy="matter-saved-dialog"
       >
         {t('form.savedText')}
@@ -170,7 +222,7 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
         isOpen={notice?.kind === 'error'}
         status="error"
         title={notice?.kind === 'error' ? notice.title : ''}
-        onClose={() => setNotice(null)}
+        onClose={() => closeNotice(saveRef)}
         data-cy="matter-error-dialog"
       >
         {notice?.kind === 'error' ? notice.message : ''}
@@ -179,7 +231,7 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
         isOpen={notice?.kind === 'remove'}
         status="warning"
         title={t('form.removeTitle')}
-        onClose={() => setNotice(null)}
+        onClose={() => closeNotice(removeRef)}
         action={{
           label: t('form.removeConfirm'),
           isPending: busy,

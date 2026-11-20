@@ -1,7 +1,7 @@
 {
   "page": {
     "title": "Matter",
-    "subtitle": "Verbindung zum Matter-Sidecar.",
+    "subtitle": "Geräte, Infrastruktur und Zustand der Matter-Integration.",
     "insecure": "Unsichere Verbindung",
     "insecureText": "Der Sidecar wird über unverschlüsseltes http an einer Nicht-Loopback-Adresse erreicht. Das Token wird unverschlüsselt übertragen. Verwende https oder betreibe den Sidecar auf demselben Host.",
     "insecureTextReadOnly": "Der Sidecar wird über unverschlüsseltes http an einer Nicht-Loopback-Adresse erreicht. Das Token wird unverschlüsselt übertragen. Bitte einen Administrator, die Verbindungseinstellungen zu prüfen.",
@@ -32,7 +32,8 @@
     "received": "Empfangen",
     "supported": "Unterstützte Kombination",
     "combination": "Attraccess {{attraccess}}, Plugin {{plugin}}, Sidecar {{sidecar}}, matter.js {{matterJs}}",
-    "loadError": "Der Status konnte nicht geladen werden."
+    "loadError": "Der Status konnte nicht geladen werden.",
+    "lastKnown": "{{label}} (zuletzt bekannt)"
   },
   "hint": {
     "not_configured": "Gib unten die Sidecar-URL und das Token ein, um die Verbindung herzustellen.",
@@ -74,7 +75,19 @@
     "removeText": "URL und Token werden gelöscht und das Plugin trennt die Verbindung zum Sidecar.",
     "removeConfirm": "Entfernen",
     "removeError": "Entfernen fehlgeschlagen",
-    "loadError": "Die Verbindungseinstellungen konnten nicht geladen werden."
+    "loadError": "Die Verbindungseinstellungen konnten nicht geladen werden.",
+    "changedElsewhere": "Diese Einstellungen wurden anderswo geändert",
+    "changedElsewhereText": "Ein anderer Administrator hat neue Verbindungseinstellungen gespeichert, während du bearbeitet hast. Speichern ist gesperrt, damit nichts überschrieben wird. Lade neu, um die aktuellen Einstellungen zu sehen; deine Änderungen gehen dabei verloren.",
+    "reload": "Einstellungen neu laden",
+    "caUndo": "Entfernen des CA-Zertifikats rückgängig machen",
+    "validation": {
+      "urlScheme": "Die URL muss mit http:// oder https:// beginnen.",
+      "urlInvalid": "Gib eine gültige URL ohne Benutzernamen, Query oder Fragment ein.",
+      "urlTooLong": "Die URL ist zu lang.",
+      "credential": "Das Token muss aus 32 bis 512 druckbaren ASCII-Zeichen ohne Leerzeichen bestehen.",
+      "caShape": "Gib ein oder mehrere PEM-Zertifikate (-----BEGIN CERTIFICATE-----) ein und sonst nichts.",
+      "caTooLong": "Der Zertifikatstext ist größer als 64 KiB."
+    }
   },
   "fabric": {
     "title": "Fabric & Backup",
@@ -300,6 +313,436 @@
       "newConfirmText": "Jedes zuvor eingebundene Gerät muss auf Werkseinstellungen zurückgesetzt und neu eingebunden werden, da es zur alten Fabric gehört. Das lässt sich nicht rückgängig machen.",
       "newConfirm": "Neue Fabric starten",
       "error": "Die Wiederherstellungsaktion ist fehlgeschlagen"
+    }
+  },
+  "tabs": {
+    "label": "Matter-Bereiche",
+    "devices": "Geräte",
+    "infrastructure": "Infrastruktur",
+    "thread": "Thread-Netzwerk",
+    "commissioning": "Inbetriebnahme",
+    "health": "Zustand",
+    "updates": "Software-Updates"
+  },
+  "banner": {
+    "title": {
+      "not_configured": "Matter ist nicht eingerichtet",
+      "connecting": "Verbindung zum Matter-Sidecar wird aufgebaut",
+      "unavailable": "Matter-Sidecar nicht erreichbar",
+      "unauthorized": "Matter-Sidecar hat das Token abgelehnt",
+      "incompatible": "Matter-Sidecar ist inkompatibel",
+      "misconfigured": "Matter-Verbindung ist falsch konfiguriert"
+    },
+    "since": {
+      "not_configured": "Nicht konfiguriert seit {{time}}.",
+      "connecting": "Verbindungsaufbau seit {{time}}.",
+      "unavailable": "Nicht erreichbar seit {{time}}.",
+      "unauthorized": "Abgelehnt seit {{time}}.",
+      "incompatible": "Inkompatibel seit {{time}}.",
+      "misconfigured": "Falsch konfiguriert seit {{time}}."
+    },
+    "openInfrastructure": "Infrastruktur öffnen",
+    "retryNow": "Jetzt erneut versuchen",
+    "retryError": "Erneuter Versuch fehlgeschlagen"
+  },
+  "notAvailable": {
+    "available": "Der Sidecar unterstützt „{{family}}“, aber diese Plugin-Version nutzt es noch nicht. Es kommt mit einer späteren Plugin-Version.",
+    "unavailable": "Der Sidecar meldet „{{family}}“ nicht als verfügbar. Es kommt mit einer späteren Plugin-Version und braucht einen Sidecar, der es unterstützt.",
+    "unknown": "Der Sidecar ist nicht verbunden, daher ist seine Unterstützung für „{{family}}“ unbekannt. Dieser Teil kommt mit einer späteren Plugin-Version."
+  },
+  "thread": {
+    "emptyTitle": "Thread ist nicht eingerichtet",
+    "emptyText": "Es werden noch kein Thread-Netzwerk, kein Border Router und kein Dataset angezeigt. Diese Seite zeigt sie, sobald Thread unterstützt wird.",
+    "coexistenceTitle": "Zigbee und Thread auf 2,4 GHz",
+    "coexistenceText": "Thread und Zigbee teilen sich das 2,4-GHz-Band mit WLAN. Plane die Kanäle so, dass sie sich nicht überlappen: Halte Thread und Zigbee mindestens einige Kanäle auseinander und fern von den am stärksten genutzten WLAN-Kanälen. Ein späterer Kanalwechsel erfordert, Geräte neu einzubinden. Entscheide also, bevor du das Netzwerk aufbaust.",
+    "docs": "Dokumentation lesen",
+    "docsUrl": "https://docs.attraccess.org/#/de/plugins/matter/admin-ui",
+    "dataset": {
+      "title": "Dataset",
+      "text": "Hier erscheint der Status des Thread-Datasets (Netzwerkname und Kanal, nie die Schlüssel)."
+    },
+    "borderRouters": {
+      "title": "Border Router",
+      "text": "Hier erscheinen die Border Router (OTBR) deines Thread-Netzwerks und ihr Zustand."
+    },
+    "rcps": {
+      "title": "RCPs",
+      "text": "Hier erscheinen Radio-Co-Prozessoren, die als Thread-Funkmodule dienen, mit ihrem Zustand."
+    },
+    "smlight": {
+      "title": "SMLIGHT-Diagnose",
+      "text": "Hier erscheint die Diagnose von SMLIGHT-Funkmodulen, etwa Firmware und Kanalnutzung."
+    }
+  },
+  "commissioning": {
+    "emptyTitle": "Inbetriebnahme ist noch nicht verfügbar",
+    "emptyText": "Geräte hinzufügen läuft auf dieser Seite als geführter Ablauf in mehreren Schritten. Er ist noch nicht verfügbar: Hier wird kein Setup-Code erfasst oder gesendet.",
+    "stepsTitle": "So läuft das Hinzufügen eines Geräts ab",
+    "steps": {
+      "prepare": {
+        "title": "Gerät vorbereiten",
+        "text": "Setze das Gerät zurück oder öffne sein Pairing-Fenster und halte es nah am Matter-Sidecar."
+      },
+      "code": {
+        "title": "Code eingeben oder scannen",
+        "text": "Gib den Setup-Code ein oder scanne den QR-Code auf dem Gerät oder seiner Verpackung."
+      },
+      "progress": {
+        "title": "Fortschritt verfolgen",
+        "text": "Attraccess zeigt jeden Schritt der Inbetriebnahme und sagt dir, was du bei einem Fehler tun kannst."
+      },
+      "claim": {
+        "title": "Benennen und übernehmen",
+        "text": "Gib dem neuen Gerät einen Namen und übernimm es, damit es in Flows genutzt werden kann."
+      }
+    }
+  },
+  "updates": {
+    "emptyTitle": "Update-Erkennung ist noch nicht verfügbar",
+    "emptyText": "Software-Updates für Geräte finden, freigeben und einspielen kommt mit der OTA-Unterstützung. Bis dahin listet diese Seite die Software, die jedes Gerät gerade nutzt.",
+    "currentTitle": "Aktuelle Software"
+  },
+  "devices": {
+    "nodeFallback": "Node {{nodeId}}",
+    "unknown": "Unbekannt",
+    "vendorProduct": "Hersteller / Produkt",
+    "software": "Software",
+    "hardware": "Hardware {{version}}",
+    "endpoints": "Endpunkte",
+    "lastSeen": "Zuletzt gesehen",
+    "details": "Details",
+    "back": "Alle Geräte",
+    "empty": "Keine passenden Geräte.",
+    "loadError": "Die Geräte konnten nicht geladen werden.",
+    "detailError": "Das Gerät konnte nicht geladen werden.",
+    "refreshError": "Das Gerät konnte nicht aktualisiert werden.",
+    "actionFailed": "Die Aktion ist fehlgeschlagen",
+    "lifecycle": {
+      "unclaimed": "Nicht übernommen",
+      "claimed": "Übernommen",
+      "detached": "Getrennt",
+      "archived": "Archiviert",
+      "removed": "Entfernt"
+    },
+    "reachability": {
+      "reachable": "Erreichbar",
+      "unreachable": "Nicht erreichbar",
+      "unknown": "Erreichbarkeit unbekannt"
+    },
+    "callout": {
+      "unclaimed": {
+        "title": "Nicht übernommenes Gerät",
+        "text": "Dieses Gerät ist in der Fabric, aber niemand hat die Verantwortung dafür übernommen. Es kann in Flows erst genutzt werden, wenn ein Administrator es übernimmt. Übernimm es, oder archiviere oder entferne es, wenn es nicht hierher gehört."
+      },
+      "detached": {
+        "title": "Getrenntes Gerät",
+        "text": "Dieses Gerät ist nicht mehr mit seinem Datensatz verbunden. Es kann erst genutzt werden, wenn du es reparierst oder neu verknüpfst.",
+        "reason": {
+          "absent_from_sidecar": "Der Sidecar listet es nicht mehr auf.",
+          "fabric_mismatch": "Die Fabric des Sidecars hat sich geändert.",
+          "fabric_absent": "Seine Fabric ist dem Sidecar nicht bekannt."
+        }
+      }
+    },
+    "flowUsage": {
+      "none": "In keinem Flow verwendet."
+    },
+    "bridge": {
+      "aggregator": "Bridge",
+      "behind": "Hinter Bridge {{bridge}}"
+    },
+    "claim": {
+      "title": "Gerät übernehmen",
+      "text": "Mit dem Übernehmen wird dieses Gerät Teil deiner Installation und kann in Flows genutzt werden.",
+      "name": "Name (optional)",
+      "nameHint": "Höchstens 100 Zeichen. Du kannst ihn später ändern."
+    },
+    "validation": {
+      "nameLength": "Höchstens 100 Zeichen.",
+      "length": "Höchstens {{max}} Zeichen."
+    },
+    "relink": {
+      "title": "Gerät neu verknüpfen",
+      "text": "Wähle das nicht übernommene Gerät, das dieses ersetzt hat. Der getrennte Datensatz übernimmt dessen Identität und Zustand und behält seinen Namen und seine Verwendung in Flows.",
+      "none": "Es gibt kein nicht übernommenes Gerät zum Verknüpfen.",
+      "source": "Nicht übernommenes Gerät",
+      "next": "Weiter",
+      "back": "Zurück",
+      "confirm": "Trotzdem verknüpfen",
+      "mismatchTitle": "Die Geräte passen nicht zusammen",
+      "mismatchText": "Diese Angaben unterscheiden sich zwischen beiden Geräten: {{fields}}. Wenn du trotzdem verknüpfst, wird dieser Datensatz auf ein anderes Gerät übertragen. Fahre nur fort, wenn du sicher bist.",
+      "field": {
+        "vendorId": "Hersteller",
+        "productId": "Produkt",
+        "serialNumber": "Seriennummer"
+      }
+    },
+    "actions": {
+      "claim": "Übernehmen",
+      "repair": "Reparieren",
+      "relink": "Neu verknüpfen",
+      "archive": "Archivieren",
+      "restore": "Wiederherstellen",
+      "forceRemove": "Erzwungen entfernen"
+    },
+    "confirm": {
+      "repair": {
+        "title": "{{name}} reparieren?",
+        "text": "Das Gerät wird erneut vom Sidecar gelesen. Listet der Sidecar es noch, wird der Datensatz wieder verbunden."
+      },
+      "archive": {
+        "title": "{{name}} archivieren?",
+        "text": "Ein archiviertes Gerät wird in der Liste ausgeblendet und kann nicht genutzt werden. Du kannst es später wiederherstellen."
+      },
+      "restore": {
+        "title": "{{name}} wiederherstellen?",
+        "text": "Das Gerät kehrt als getrennt zurück. Der nächste Abgleich verbindet es wieder, wenn der Sidecar es noch listet."
+      },
+      "forceRemove": {
+        "title": "{{name}} erzwungen entfernen?",
+        "text": "Das entfernt das Gerät nur aus Attraccess. Es setzt das Gerät nicht auf Werkseinstellungen zurück und entfernt es nicht aus der Matter-Fabric. Listet der Sidecar es noch, kommt es als neues, nicht übernommenes Gerät zurück."
+      }
+    },
+    "filter": {
+      "label": "Anzeigen",
+      "active": "Alle aktiven",
+      "unclaimed": "Nicht übernommen",
+      "claimed": "Übernommen",
+      "detached": "Getrennt",
+      "archived": "Archiviert",
+      "removed": "Entfernt",
+      "includeInactive": "Archivierte und entfernte einbeziehen"
+    },
+    "reconciliation": {
+      "title": "Abgleich",
+      "loadError": "Der Abgleichstatus konnte nicht geladen werden.",
+      "runError": "Abgleich fehlgeschlagen",
+      "lastRun": "Letzter Lauf",
+      "never": "Noch kein Abgleich",
+      "run": "Abgleich jetzt ausführen",
+      "summary": "{{nodes}} Geräte gelistet, {{changes}} Änderungen",
+      "result": {
+        "applied": "Angewendet",
+        "skipped_unavailable": "Übersprungen: Sidecar nicht verfügbar",
+        "skipped_non_authoritative": "Übersprungen: Inventar unvollständig",
+        "failed": "Fehlgeschlagen"
+      }
+    },
+    "stale": {
+      "title": "Live-Updates sind nicht verfügbar",
+      "text": "Was du siehst, kann veraltet sein. Die Seite aktualisiert sich regelmäßig selbst, bis die Live-Updates wieder funktionieren."
+    },
+    "metadata": {
+      "title": "Name und Ort",
+      "displayName": "Name",
+      "description": "Beschreibung",
+      "location": "Ort",
+      "maxLength": "Höchstens {{max}} Zeichen.",
+      "save": "Speichern",
+      "claimFirst": "Übernimm das Gerät, um es zu benennen."
+    },
+    "endpoint": {
+      "title": "Endpunkte",
+      "number": "Endpunkt {{number}}"
+    },
+    "identity": {
+      "title": "Identität",
+      "vendor": "Hersteller",
+      "product": "Produkt",
+      "serial": "Seriennummer",
+      "software": "Softwareversion",
+      "hardware": "Hardwareversion",
+      "attestation": "Attestierung",
+      "firstSeen": "Erstmals gesehen"
+    },
+    "attestation": {
+      "verified": "Verifiziert",
+      "unverified": "Nicht verifiziert",
+      "failed": "Fehlgeschlagen",
+      "unknown": "Unbekannt"
+    },
+    "state": {
+      "none": "Noch kein Zustand gemeldet.",
+      "noValue": "Kein Wert",
+      "yes": "Ja",
+      "no": "Nein",
+      "observed": "Beobachtet",
+      "uncertain": "Ergebnis ungewiss",
+      "fault": "Fehler: {{message}}",
+      "loadError": "Der Zustand konnte nicht geladen werden.",
+      "freshness": {
+        "fresh": "Aktuell",
+        "stale": "Veraltet",
+        "unknown": "Keine Daten"
+      },
+      "keys": {
+        "onOff": {
+          "onOff": "Strom"
+        },
+        "booleanState": {
+          "stateValue": "Kontakt"
+        },
+        "occupancySensing": {
+          "occupancy": "Belegung"
+        },
+        "doorLock": {
+          "lockState": "Schloss",
+          "doorState": "Tür"
+        },
+        "electricalPowerMeasurement": {
+          "activePower": "Wirkleistung"
+        },
+        "electricalEnergyMeasurement": {
+          "cumulativeEnergyImported": "Bezogene Energie"
+        },
+        "bridgedDeviceBasicInformation": {
+          "reachable": "Erreichbar"
+        },
+        "levelControl": {
+          "currentLevel": "Helligkeit"
+        }
+      },
+      "values": {
+        "onOff": {
+          "onOff": {
+            "true": "An",
+            "false": "Aus"
+          }
+        },
+        "booleanState": {
+          "stateValue": {
+            "true": "Geschlossen",
+            "false": "Offen"
+          }
+        },
+        "doorLock": {
+          "lockState": {
+            "0": "Nicht ganz verriegelt",
+            "1": "Verriegelt",
+            "2": "Entriegelt",
+            "3": "Entriegelt, Falle zurückgezogen"
+          },
+          "doorState": {
+            "0": "Offen",
+            "1": "Geschlossen",
+            "2": "Verklemmt",
+            "3": "Aufgebrochen",
+            "4": "Fehler",
+            "5": "Angelehnt"
+          }
+        },
+        "bridgedDeviceBasicInformation": {
+          "reachable": {
+            "true": "Erreichbar",
+            "false": "Nicht erreichbar"
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "title": "Diagnose",
+      "text": "Rohe Gerätetypen, Cluster-, Attribut- und Befehls-IDs sowie Fähigkeiten, für den Support. Du brauchst sie nicht, um ein Gerät zu nutzen."
+    }
+  },
+  "profile": {
+    "on_off_actuator": "Schalter",
+    "dimmable_actuator": "Dimmbares Licht",
+    "contact_sensor": "Kontaktsensor",
+    "occupancy_sensor": "Belegungssensor",
+    "lock": "Türschloss",
+    "power_meter": "Leistungsmesser",
+    "bridge_aggregator": "Bridge",
+    "generic": "Gerät"
+  },
+  "health": {
+    "loadError": "Das konnte nicht geladen werden.",
+    "levels": {
+      "ok": "In Ordnung",
+      "warning": "Braucht Aufmerksamkeit",
+      "danger": "Problem",
+      "unknown": "Unbekannt"
+    },
+    "fix": {
+      "infrastructure": "Infrastruktur öffnen",
+      "devices": "Geräte öffnen",
+      "thread": "Thread-Netzwerk öffnen"
+    },
+    "connection": {
+      "title": "Sidecar-Verbindung",
+      "lastError": "Letzter Fehler"
+    },
+    "compatibility": {
+      "title": "Kompatibilität",
+      "ok": "Kompatibel",
+      "incompatible": "Inkompatibel",
+      "noVersions": "Noch keine Version bekannt. Sie erscheint, sobald der Sidecar verbunden ist.",
+      "versions": "Sidecar {{sidecar}}, matter.js {{matterJs}}, Wire-Version {{wire}}.",
+      "versionsLastKnown": "Zuletzt bekannt: Sidecar {{sidecar}}, matter.js {{matterJs}}, Wire-Version {{wire}}."
+    },
+    "capabilities": {
+      "title": "Fähigkeiten",
+      "reported": "Gemeldet",
+      "unknown": "Die Fähigkeiten sind bekannt, solange der Sidecar verbunden ist.",
+      "available": "verfügbar",
+      "unavailable": "nicht verfügbar",
+      "family": {
+        "health": "Zustand",
+        "fabric": "Fabric",
+        "commissioning": "Inbetriebnahme",
+        "inventory": "Inventar",
+        "commands": "Befehle",
+        "subscriptions": "Abonnements",
+        "thread": "Thread",
+        "ota": "Updates (OTA)",
+        "backup": "Backup"
+      }
+    },
+    "fabric": {
+      "title": "Fabric",
+      "ok": "Fabric bereit",
+      "recovery": "Wiederherstellung nötig",
+      "unreachable": "Sidecar nicht erreichbar",
+      "uninitialized": "Noch keine Fabric",
+      "unknown": "Unbekannt",
+      "text": {
+        "ok": "Der Sidecar hat die Fabric, die das Plugin aufgezeichnet hat.",
+        "recovery": "Plugin und Sidecar sind sich über die Fabric uneins. Wähle in der Infrastruktur, wie du wiederherstellst.",
+        "unreachable": "Die Fabric kann nicht geprüft werden, solange der Sidecar nicht erreichbar ist.",
+        "uninitialized": "Der Sidecar hat noch keine Fabric. Lege in der Infrastruktur eine an.",
+        "unknown": "Der Fabric-Status ist nicht bekannt."
+      }
+    },
+    "backup": {
+      "title": "Backup",
+      "ok": "Gesichert",
+      "never": "Noch kein Backup",
+      "failed": "Letztes Backup fehlgeschlagen",
+      "overdue": "Backup überfällig",
+      "noFabric": "Keine Fabric",
+      "unknown": "Unbekannt",
+      "last": "Letztes Backup",
+      "noneYet": "noch keins",
+      "age": "vor {{days}} Tagen",
+      "next": "Nächstes geplant"
+    },
+    "reconciliation": {
+      "title": "Abgleich und Ereignisse",
+      "noEvents": "Seit dem Start des Plugins wurden keine Geräteereignisse angewendet oder ignoriert.",
+      "events": {
+        "applied": "angewendet",
+        "outOfOrder": "außer der Reihe",
+        "unknownEndpoint": "unbekannter Endpunkt",
+        "inactiveNode": "inaktives Gerät",
+        "unmappedCluster": "nicht zugeordnet",
+        "unknownCommand": "unbekannter Befehl",
+        "futureTimestamp": "Zeitstempel in der Zukunft",
+        "oversizedValue": "zu groß",
+        "dropped": "verworfen"
+      }
+    },
+    "thread": {
+      "title": "Thread",
+      "text": "Der Thread-Zustand (Border Router, Funkmodule) erscheint hier, sobald Thread unterstützt wird."
     }
   }
 }
