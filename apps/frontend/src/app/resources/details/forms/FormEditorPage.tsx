@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ApiError,
   useResourceFormsCreate,
+  UseResourceFormsGetOneKeyFn,
   useResourceFormsDelete,
   useResourceFormsGetOne,
   useResourceFormsUpdate,
@@ -17,6 +18,8 @@ import { EditableForm, parseFieldFromResponse } from './types';
 import { FormFieldsSection } from './editor/FormFieldsSection';
 import { FormSettingsSections } from './editor/FormSettingsSections';
 import { EMPTY_FORM, buildRequestBody, invalidateFormQueries, sanitizeFormPayload } from './editor/formPayloads';
+import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 import en from './en.json';
 import de from './de.json';
 
@@ -27,7 +30,10 @@ export function FormEditorPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const toast = useToastMessage();
-  const { t, tExists } = useTranslations({ en, de });
+  const { t, tExists } = useTranslations({
+    en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
+    de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
+  });
 
   const { data: resource } = useGetOneResourceById({ path: { id: resourceId } });
   const { data: formResponse, isLoading: isLoadingForm } = useResourceFormsGetOne(
@@ -84,8 +90,12 @@ export function FormEditorPage() {
   const deleteForm = useResourceFormsDelete(undefined, {
     onSuccess: async () => {
       toast.success({ title: t('editor.deleteSuccess') });
-      await invalidateFormQueries(resourceId, queryClient, mutationVariables.formId);
+      // Refetching the deleted form would 404 through every retry and keep the confirmation pending.
       navigate(`/resources/${resourceId}/forms`, { replace: true });
+      queryClient.removeQueries({
+        queryKey: UseResourceFormsGetOneKeyFn({ path: { resourceId, formId: mutationVariables.formId } }),
+      });
+      await invalidateFormQueries(resourceId, queryClient);
     },
     onError: (error) => {
       toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' });
