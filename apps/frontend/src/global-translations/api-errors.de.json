@@ -107,6 +107,10 @@
     "title": "E-Mail bereits bestätigt",
     "description": "Dieses Konto ist bereits bestätigt. Melde dich stattdessen an."
   },
+  "UnverifiedEmailChangeNotAllowed": {
+    "title": "E-Mail-Adresse kann hier nicht geändert werden",
+    "description": "Die E-Mail-Adresse dieses Kontos kann vor der Aktivierung nicht geändert werden. Öffne den Aktivierungslink, den wir dir geschickt haben, oder fordere einen neuen an."
+  },
   "UnkownUserOrPasswordException": {
     "title": "Unbekannter Benutzer oder Passwort",
     "description": "Der Benutzer oder das Passwort ist ungültig."
@@ -117,7 +121,7 @@
   },
   "EmailSendFailed": {
     "title": "E-Mail konnte nicht gesendet werden",
-    "description": "Wir konnten die E-Mail nicht senden. Versuche es in ein paar Minuten erneut. Wenn das Problem bleibt, bitte eine Administratorin oder einen Administrator, die Mailserver-Konfiguration zu prüfen."
+    "description": "Wir konnten die E-Mail nicht senden. Versuche es in ein paar Minuten erneut. Wenn das Problem bleibt, muss die Mailserver-Konfiguration geprüft werden."
   },
   "You cannot update your own permissions": {
     "title": "Eigene Berechtigungen können nicht geändert werden",

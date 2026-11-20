@@ -139,7 +139,8 @@ export class UsersRegistrationController {
 
   @Post('change-unverified-email')
   @HttpCode(200)
-  @AuthRateLimit('unverified_email_change')
+  // A success must not wipe the IP's failures: one own unverified account would otherwise reset them at will.
+  @AuthRateLimit('unverified_email_change', { clearFailuresOnSuccess: false })
   @ApiOperation({
     summary: 'Change the email address of an account that has not been verified yet',
     operationId: 'changeUnverifiedEmail',
@@ -161,7 +162,8 @@ export class UsersRegistrationController {
   @ApiResponse({ status: 401, description: 'Unknown user or wrong password.' })
   @ApiResponse({
     status: 403,
-    description: 'The account is already verified, or the domain of the new email is not allowed.',
+    description:
+      'The account is already verified or protected by two-factor authentication, or the domain of the new email is not allowed.',
   })
   @ApiResponse({ status: 429, description: 'Too many attempts.' })
   @ApiResponse({ status: 503, description: 'The verification email could not be sent.' })
