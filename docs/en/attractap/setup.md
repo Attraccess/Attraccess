@@ -8,27 +8,44 @@ This guide walks you through pairing a new Attractap reader in Attraccess and as
 Before you begin, make sure:
 
 - Your Attraccess server is running and accessible
-- The Attractap reader is powered on and connected to the same network as your server
+- The Attractap reader is powered on and can reach your server over the network (Wi-Fi or Ethernet)
 - You have administrator permissions in Attraccess
 
-## Step 1: Connect the Reader to Your Network
+## Step 1: Give the Reader Its PIN, Network and Server
 
-### WiFi Variant
+A new reader (freshly flashed, or reset) needs a PIN, its network and the address of your Attraccess server. There are three ways to set them:
 
-1. Power on the Attractap reader
-2. The reader creates a temporary WiFi access point (e.g. `Attractap-Setup`)
-3. Connect to this access point from your phone or laptop
-4. Enter your WiFi network name (SSID) and password
-5. The reader restarts and connects to your network
+- **Over USB** with the web flasher: open **Devices** > **Attractap Readers**, choose **Set up Attractap** and click **Connect via USB**. It installs the firmware and then configures the PIN, Wi-Fi and server (Serial Configurator).
+- **On the reader itself** (Attractap Touch): a reader without a server address shows its settings on the screen. Enter the Wi-Fi network, the server and a PIN there.
+- **Over Bluetooth**, without a cable (firmware 2.8.0 or later): see below.
 
-### Ethernet Variant
+Ethernet variants (Attractap Lite) take their address from DHCP as soon as the cable is plugged in; they only need the PIN and the server.
 
-1. Connect the Attractap reader to your network via an Ethernet cable
-2. Power on the reader
-3. The reader automatically obtains an IP address via DHCP
+### Set up over Bluetooth
+
+A reader that is **not paired yet** opens its Bluetooth setup by itself:
+
+| Reader | How the setup opens | What it shows |
+|--------|---------------------|---------------|
+| **Attractap Touch** (and Touch V2) | For 10 minutes after every start. Later, press **Bluetooth setup** next to **Settings** on the connecting screen for another 10 minutes. | A line on the screen: "Bluetooth setup open · 09:41 · Attractap Touch 71C8", and "Bluetooth setup: browser connected" while your browser is connected. |
+| **Attractap Lite** | For 10 minutes after every power-up. Unplug and plug in again for another 10 minutes. | The LED ring pulses blue twice every 1.5 seconds; it stays blue while your browser is connected. See the [LED Guide](attractap/led-guide.md). |
+| **BLE Bridge** | Hold its button for 3 seconds. | See [BLE Bridge](attractap/ble-bridge.md). |
+
+1. In Attraccess, open **Devices** > **Attractap Readers**, choose **Set up Attractap** and click **Set up over Bluetooth**.
+2. Pick the reader in the browser's list. Its name is "Attractap Touch", "Attractap Lite" or "Attractap Bridge" followed by four characters; a Touch shows its name on the screen. Confirm the pairing prompt of your computer or phone if one appears.
+3. Set the PIN, then the Wi-Fi network (not on the Lite) and the server. The Firmware tab is not offered over Bluetooth: firmware is installed over USB or updated over the network.
+4. Continue with step 2: the reader asks to be paired.
+
+The setup closes after 10 minutes, about 10 seconds after the reader is paired (your browser then shows **Setup complete**), or when the reader restarts. A paired reader never opens it and shows no **Bluetooth setup** button. The connection is encrypted (Bluetooth LE Secure Connections), so the Wi-Fi password is never sent in clear text, and the same PIN rules apply as over USB. See [Reader Security](attractap/reader-security.md#setup-over-bluetooth).
+
+| Browser | Bluetooth setup |
+|---------|-----------------|
+| Chrome or Edge on Windows, macOS, Linux | Supported |
+| Chrome on Android | Supported |
+| Firefox, Safari, any browser on iOS | Not supported: use USB with Chrome or Edge on a computer |
 
 > [!NOTE]
-> The reader's display shows its connection status and IP address once connected.
+> The page must be opened over HTTPS (or `localhost`); browsers only offer Bluetooth to secure pages. While the setup is open, plugins cannot use the reader's Bluetooth yet; they get it once the setup has closed.
 
 ## Step 2: Pair the Reader with Attraccess
 
