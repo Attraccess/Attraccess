@@ -1,5 +1,5 @@
 import { AuthenticationType } from '@attraccess/application-models';
-import { ForbiddenException, Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, Logger } from '@nestjs/common';
 import { identityAuditEvent } from '../../audit/policies/identity';
 import { AUDIT_RECORDER, AuditOrigin, AuditRecorder } from '../../audit/recorder/audit-event';
 import { EmailService } from '../../email/email.service';
@@ -95,12 +95,12 @@ export class UnverifiedEmailChangeService {
     });
   }
 
-  /** Maps mail failures to the 503 registration answers with; user errors such as a taken address pass unchanged. */
+  /** Maps mail failures as registration does (503, or 400 without SMTP); user errors such as a taken address pass. */
   private toClientError(userId: number, error: unknown): unknown {
     try {
       mapEmailSendError(error);
     } catch (mapped) {
-      if (mapped instanceof ServiceUnavailableException) {
+      if (mapped !== error) {
         this.logger.error(
           `Could not send the verification email for user ID: ${userId}`,
           error instanceof Error ? error.stack : String(error),

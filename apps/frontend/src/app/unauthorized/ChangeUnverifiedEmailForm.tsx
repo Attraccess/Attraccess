@@ -56,7 +56,8 @@ export function ChangeUnverifiedEmailForm({
           setError(null);
         }}
         isInvalid={trimmed.length > 0 && !isValid}
-        isDisabled={change.isPending}
+        // Read-only, not disabled: a disabled field would drop the keyboard focus while the request runs.
+        isReadOnly={change.isPending}
         // Only this field's message: it sits inside the login form and must not block signing in.
         validationBehavior="aria"
       >
