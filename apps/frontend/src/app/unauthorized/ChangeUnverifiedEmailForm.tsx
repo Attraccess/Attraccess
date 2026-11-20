@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Alert, AlertContent, AlertDescription, AlertTitle, FieldError, Input, Label, TextField } from '@heroui/react';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useChangeUnverifiedEmail } from '@attraccess/react-query-client';
@@ -32,15 +32,18 @@ export function ChangeUnverifiedEmailForm({
   const [error, setError] = useState<ApiErrorNotice | null>(null);
   const trimmed = newEmail.trim();
   const isValid = isValidEmail(trimmed);
+  // The address the request was sent with, not whatever the field holds when the answer arrives.
+  const submitted = useRef('');
 
   const change = useChangeUnverifiedEmail(undefined, {
-    onSuccess: () => onChanged(trimmed),
+    onSuccess: () => onChanged(submitted.current),
     onError: (mutationError) => setError(toApiErrorNotice(mutationError, t, tExists)),
   });
 
   const submit = () => {
     if (!isValid || change.isPending) return;
     setError(null);
+    submitted.current = trimmed;
     change.mutate({ body: { identifier, password, newEmail: trimmed } });
   };
 
@@ -53,6 +56,9 @@ export function ChangeUnverifiedEmailForm({
           setError(null);
         }}
         isInvalid={trimmed.length > 0 && !isValid}
+        isDisabled={change.isPending}
+        // Only this field's message: it sits inside the login form and must not block signing in.
+        validationBehavior="aria"
       >
         <Label>{t('emailLabel')}</Label>
         <Input

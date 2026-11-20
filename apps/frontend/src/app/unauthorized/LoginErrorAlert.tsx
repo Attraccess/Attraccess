@@ -26,22 +26,27 @@ export function LoginErrorAlert({
 }: Readonly<LoginErrorAlertProps>) {
   const trimmedIdentifier = identifier.trim();
   const [resendEmail, setResendEmail] = useState(isValidEmail(trimmedIdentifier) ? trimmedIdentifier : '');
+  const [changeCount, setChangeCount] = useState(0);
 
+  // Only the message is the live region: the actions below hold their own notices, which would otherwise be
+  // announced twice, and controls that change inside an alert make screen readers repeat the whole card.
   return (
-    <Alert status="danger" role="alert" data-cy="login-form-error-alert">
+    <Alert status="danger" data-cy="login-form-error-alert">
       <AlertContent className="space-y-3">
-        <div>
+        <div role="alert">
           <AlertTitle>{title}</AlertTitle>
           <AlertDescription>{description}</AlertDescription>
         </div>
         {isEmailNotVerified && (
           <>
-            <ResendVerificationAction email={resendEmail} onEmailChange={setResendEmail} />
+            {/* Keyed so a resend notice does not outlive the address it was about. */}
+            <ResendVerificationAction key={changeCount} email={resendEmail} onEmailChange={setResendEmail} />
             <ChangeUnverifiedEmailAction
               identifier={trimmedIdentifier}
               password={password}
               onChanged={(newEmail) => {
                 setResendEmail(newEmail);
+                setChangeCount((count) => count + 1);
                 onEmailChanged?.(newEmail);
               }}
             />

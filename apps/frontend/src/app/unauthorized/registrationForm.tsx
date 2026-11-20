@@ -2,7 +2,7 @@ import { ArrowRight } from 'lucide-react';
 import { Input, Label, TextField } from '@heroui/react';
 import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../components/UsernameInput/index';
 import { PasswordField } from '../../components/PasswordField/index';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './registrationForm.en.json';
 import de from './registrationForm.de.json';
@@ -51,6 +51,8 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
   const queryClient = useQueryClient();
   // Held in memory only: the confirmation screen needs them to prove the account when the address is changed.
   const [registered, setRegistered] = useState<{ email: string; username: string; password: string } | null>(null);
+  // What the request was sent with: the fields stay editable while it runs.
+  const submitted = useRef<{ email: string; username: string; password: string } | null>(null);
   const toast = useToastMessage();
 
   const [username, setUsername] = useState<string>('');
@@ -122,7 +124,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
         queryKey: [useFindManyKey],
       });
       setServerErrors([]);
-      setRegistered({ email: trimmedEmail, username: trimmedUsername, password });
+      setRegistered(submitted.current);
     },
     onError: (error) => {
       const policyErrors = extractPolicyErrors(error);
@@ -147,6 +149,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
         return;
       }
       setServerErrors([]);
+      submitted.current = { email: trimmedEmail, username: trimmedUsername, password };
       createUserMutate({
         body: {
           username: trimmedUsername,

@@ -7,6 +7,7 @@ import { RegistrationForm } from './registrationForm';
 import { TestWrapper } from '../../test-utils/wrappers';
 import en from './registrationForm.en.json';
 import de from './registrationForm.de.json';
+import apiEn from '../../global-translations/api-errors.en.json';
 
 const mutateMock = vi.fn();
 const onHasAccountMock = vi.fn();
@@ -266,6 +267,47 @@ describe('RegistrationForm', () => {
       await user.click(screen.getByRole('button', { name: 'Cancel' }));
       expect(screen.queryByLabelText('New email address')).toBeNull();
       expect(screen.getByText('jane@example.org', { selector: 'strong' })).toBeInTheDocument();
+    });
+
+    it.each([
+      ['TooManyAuthAttempts', apiEn.TooManyAuthAttempts.title],
+      ['EmailSendFailed', apiEn.EmailSendFailed.title],
+      ['ForbiddenSignupDomainException', apiEn.ForbiddenSignupDomainException.title],
+      ['UnverifiedEmailChangeNotAllowed', apiEn.UnverifiedEmailChangeNotAllowed.title],
+    ])('translates a %s change error inline', async (message, title) => {
+      const user = userEvent.setup();
+      await register(user);
+      await user.click(screen.getByRole('button', { name: 'Change email address' }));
+      await user.type(screen.getByLabelText('New email address'), 'new@example.org');
+      await user.click(screen.getByRole('button', { name: 'Send activation link' }));
+
+      act(() => change.options?.onError?.({ message: 'x', body: { message } }));
+      expect(screen.getByRole('alert')).toHaveTextContent(title);
+    });
+
+    it("shows the server's message for an untranslated change error, not the error object", async () => {
+      const user = userEvent.setup();
+      await register(user);
+      await user.click(screen.getByRole('button', { name: 'Change email address' }));
+      await user.type(screen.getByLabelText('New email address'), 'new@example.org');
+      await user.click(screen.getByRole('button', { name: 'Send activation link' }));
+
+      act(() => change.options?.onError?.({ message: 'ApiError: Bad Request', body: { message: 'Something odd' } }));
+      expect(screen.getByRole('alert')).toHaveTextContent('Something odd');
+      expect(screen.getByRole('alert')).not.toHaveTextContent('ApiError');
+    });
+
+    it('shows the address that was submitted, even when the field changed while the request ran', async () => {
+      const user = userEvent.setup();
+      await register(user);
+      await user.click(screen.getByRole('button', { name: 'Change email address' }));
+      const field = screen.getByLabelText('New email address');
+      await user.type(field, 'new@example.org');
+      await user.click(screen.getByRole('button', { name: 'Send activation link' }));
+      await user.type(field, 'x');
+
+      act(() => change.options?.onSuccess?.());
+      expect(screen.getByText('new@example.org', { selector: 'strong' })).toBeInTheDocument();
     });
 
     it('does not submit an invalid new address', async () => {

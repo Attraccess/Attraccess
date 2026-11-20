@@ -10,13 +10,13 @@ export interface ApiErrorNotice {
 
 /** Translates an API error with the `api` translations (including the rate-limit message). */
 export function toApiErrorNotice(error: unknown, t: TFunction, tExists: TExists): ApiErrorNotice {
-  const { key } = getTranslationKeyForApiError({
+  const { key, errorMessage } = getTranslationKeyForApiError({
     error: error as ApiError,
     t,
     tExists,
     baseTranslationKey: 'api',
     fallbackKey: 'generic',
   });
-  const data = { error, retryAfterSeconds: getRetryAfterSeconds(error as ApiError) };
+  const data = { error: errorMessage, retryAfterSeconds: getRetryAfterSeconds(error as ApiError) };
   return { title: t(key + '.title', data), description: t(key + '.description', data) };
 }

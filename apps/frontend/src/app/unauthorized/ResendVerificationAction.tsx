@@ -25,6 +25,7 @@ export function ResendVerificationAction({ email, onEmailChange }: Readonly<Rese
   const hasField = onEmailChange !== undefined;
   const trimmed = email.trim();
 
+  const canSend = isValidEmail(trimmed);
   const resend = useResendVerificationEmail(undefined, {
     onSuccess: () => {
       setError(null);
@@ -35,6 +36,11 @@ export function ResendVerificationAction({ email, onEmailChange }: Readonly<Rese
       setError(toApiErrorNotice(mutationError, t, tExists));
     },
   });
+
+  const send = () => {
+    if (!canSend || resend.isPending) return;
+    resend.mutate({ body: { email: trimmed } });
+  };
 
   return (
     <div className="w-full space-y-2" data-testid="resend-verification-section">
@@ -49,7 +55,17 @@ export function ResendVerificationAction({ email, onEmailChange }: Readonly<Rese
             }}
           >
             <Label>{t('emailLabel')}</Label>
-            <Input type="email" data-testid="resend-email-input" />
+            <Input
+              type="email"
+              autoComplete="email"
+              data-testid="resend-email-input"
+              onKeyDown={(event) => {
+                // Inside the login form Enter would sign in again instead of sending the mail.
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                send();
+              }}
+            />
           </TextField>
         </>
       )}
@@ -74,12 +90,9 @@ export function ResendVerificationAction({ email, onEmailChange }: Readonly<Rese
       <Button
         variant="secondary"
         className="w-full"
-        onPress={() => {
-          if (!isValidEmail(trimmed)) return;
-          resend.mutate({ body: { email: trimmed } });
-        }}
+        onPress={send}
         isPending={resend.isPending}
-        isDisabled={!isValidEmail(trimmed) || resend.isPending}
+        isDisabled={!canSend || resend.isPending}
         data-testid="resend-verification-button"
       >
         {hasField ? t('button') : t('confirmationButton')}

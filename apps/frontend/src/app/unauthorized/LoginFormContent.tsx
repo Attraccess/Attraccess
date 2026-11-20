@@ -29,6 +29,8 @@ export function LoginFormContent(props: Readonly<{ onForgotPassword: () => void 
   const [identifier, setIdentifier] = useState('');
   const [passwordValue, setPasswordValue] = useState('');
   const [challengeCredentials, setChallengeCredentials] = useState<{ username: string; password: string } | null>(null);
+  // What the last attempt sent: the error card proves the account with these even after the fields are edited.
+  const [submitted, setSubmitted] = useState<{ username: string; password: string } | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const submitting = useRef(false);
   const errorMessage = getLoginErrorMessage(error);
@@ -42,12 +44,7 @@ export function LoginFormContent(props: Readonly<{ onForgotPassword: () => void 
   // Remounts the error card per attempt, so its resend field starts from the identifier just submitted.
   const [attempt, setAttempt] = useState(0);
 
-  const isEmailNotVerified = useMemo(() => {
-    if (!error) return false;
-    const apiError = error as ApiError;
-    const body = apiError?.body as Record<string, unknown> | undefined;
-    return body?.message === 'UserEmailNotVerifiedException';
-  }, [error]);
+  const isEmailNotVerified = errorMessage === 'UserEmailNotVerifiedException';
 
   const errorNotice = useMemo(
     () => (!error || errorMessage === 'TwoFactorRequired' ? null : toApiErrorNotice(error, t, tExists)),
@@ -77,6 +74,7 @@ export function LoginFormContent(props: Readonly<{ onForgotPassword: () => void 
       // Keep native autofill visible when the pending/challenge state rerenders the fields.
       setIdentifier(credentials.username);
       setPasswordValue(credentials.password);
+      setSubmitted(credentials);
 
       setAttempt((count) => count + 1);
       submitting.current = true;
@@ -167,10 +165,14 @@ export function LoginFormContent(props: Readonly<{ onForgotPassword: () => void 
           title={errorNotice.title}
           description={errorNotice.description}
           isEmailNotVerified={isEmailNotVerified}
-          identifier={identifier}
-          password={passwordValue}
-          // The old address no longer signs in, so a typed email identifier follows the change.
-          onEmailChanged={(newEmail) => setIdentifier((current) => (isValidEmail(current.trim()) ? newEmail : current))}
+          identifier={submitted?.username ?? identifier}
+          password={submitted?.password ?? passwordValue}
+          // The old address no longer signs in, so an email identifier follows the change.
+          onEmailChanged={(newEmail) => {
+            const follow = (current: string) => (isValidEmail(current.trim()) ? newEmail : current);
+            setIdentifier(follow);
+            setSubmitted((current) => current && { ...current, username: follow(current.username) });
+          }}
         />
       )}
       <div className="flex items-center justify-between">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, AlertContent, AlertDescription, AlertTitle } from '@heroui/react';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ChangeUnverifiedEmailForm } from './ChangeUnverifiedEmailForm';
@@ -21,9 +21,19 @@ export function ChangeUnverifiedEmailAction({
   const { t } = useTranslations({ en, de });
   const [isOpen, setIsOpen] = useState(false);
   const [changedTo, setChangedTo] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const wasOpen = useRef(false);
+
+  // The form unmounts with focus inside it; hand focus back to the button that opened it.
+  useEffect(() => {
+    if (wasOpen.current && !isOpen) {
+      containerRef.current?.querySelector<HTMLButtonElement>('[data-testid="change-email-open-button"]')?.focus();
+    }
+    wasOpen.current = isOpen;
+  }, [isOpen]);
 
   return (
-    <div className="w-full space-y-2">
+    <div ref={containerRef} className="w-full space-y-2">
       {changedTo !== null && (
         <Alert status="success" role="status" data-testid="change-email-success-alert">
           <AlertContent>

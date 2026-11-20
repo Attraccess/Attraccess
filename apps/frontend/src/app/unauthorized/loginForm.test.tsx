@@ -189,7 +189,7 @@ describe('LoginForm – resend verification email', () => {
     expect(screen.getByRole('button', { name: 'Passwort vergessen?' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Anmelden' })).toBeInTheDocument();
     expect(screen.getByLabelText('E-Mail-Adresse')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Verifizierungsmail erneut senden' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Verifizierungs-E-Mail erneut senden' })).toBeInTheDocument();
   });
 
   it('keeps the German resend action visible and named while pending', () => {
@@ -200,7 +200,7 @@ describe('LoginForm – resend verification email', () => {
     loginError = apiError;
     renderLogin();
 
-    const button = screen.getByRole('button', { name: 'Verifizierungsmail erneut senden' });
+    const button = screen.getByRole('button', { name: 'Verifizierungs-E-Mail erneut senden' });
     expect(button).toBeDisabled();
   });
 
@@ -329,9 +329,11 @@ describe('LoginForm – resend verification email', () => {
     act(() => resendOnSuccess?.());
 
     await waitFor(() => {
-      expect(screen.getByTestId('resend-success-alert')).toBeInTheDocument();
-      expect(screen.getByText(resendEn.successTitle)).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent(resendEn.successTitle);
     });
+    expect(document.querySelector('[data-cy="login-form-error-alert"]')).toContainElement(
+      screen.getByTestId('resend-success-alert'),
+    );
   });
 
   it('shows the error alert alongside the resend section', () => {
@@ -600,13 +602,19 @@ describe('LoginForm credential and authenticator steps', () => {
       unverified();
       renderLogin();
 
-      const alert = screen.getByRole('alert');
+      const message = screen.getByRole('alert');
+      const card = message.closest('[data-cy="login-form-error-alert"]') as HTMLElement;
       const signIn = screen.getByRole('button', { name: 'Sign in' });
-      expect(alert).toBe(screen.getByText('Email not verified').closest('[role="alert"]'));
-      expect(alert.compareDocumentPosition(signIn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(alert).toContainElement(screen.getByTestId('resend-verification-section'));
-      expect(alert).toContainElement(screen.getByRole('button', { name: 'Change email address' }));
-      expect(alert).toHaveTextContent('request a new one below');
+      expect(message).toHaveTextContent('Email not verified');
+      expect(message).toHaveTextContent('request a new one below');
+      expect(card.compareDocumentPosition(signIn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(
+        screen.getByLabelText(labels.en.password).compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(card).toContainElement(screen.getByTestId('resend-verification-section'));
+      expect(card).toContainElement(screen.getByRole('button', { name: 'Change email address' }));
+      // One live region: the actions and their own notices sit outside the announced message.
+      expect(message).not.toContainElement(screen.getByTestId('resend-verification-section'));
     });
 
     it.each([
@@ -622,7 +630,7 @@ describe('LoginForm credential and authenticator steps', () => {
       loginError = apiError;
       renderLogin();
 
-      expect(screen.getByRole('alert')).toHaveAttribute('data-cy', 'login-form-error-alert');
+      expect(screen.getByRole('alert').closest('[data-cy="login-form-error-alert"]')).toBeInTheDocument();
     });
 
     it('prefills the resend field when the user signed in with an email address', async () => {
@@ -657,28 +665,65 @@ describe('LoginForm credential and authenticator steps', () => {
       });
       act(() => changeOnSuccess?.());
       expect(screen.getByRole('status')).toHaveTextContent('new@example.org');
+      expect(screen.getByRole('button', { name: 'Change email address' })).toHaveFocus();
+      expect(window.sessionStorage.length).toBe(0);
+      expect(window.localStorage.length).toBe(0);
     });
 
-    it.each([
-      ['an email address', 'jane@example.org', 'new@example.org'],
-      ['a username', 'jane', 'jane'],
-    ])('keeps the sign-in identifier usable after the address changed when it is %s', async (_kind, typed, expected) => {
+    it('proves the account with the submitted password even after the field was edited', async () => {
       const user = userEvent.setup();
       renderLogin();
-      await user.type(screen.getByLabelText(labels.en.username), typed);
+      await user.type(screen.getByLabelText(labels.en.username), 'jane');
       await user.type(screen.getByLabelText(labels.en.password), 'secret-password');
       loginMock.mockRejectedValue(
         Object.assign(new Error('Forbidden'), { body: { message: 'UserEmailNotVerifiedException' } }),
       );
       await user.click(screen.getByRole('button', { name: 'Sign in' }));
+      await user.clear(await screen.findByLabelText(labels.en.password));
+      await user.type(screen.getByLabelText(labels.en.password), 'sec');
 
-      await user.click(await screen.findByRole('button', { name: 'Change email address' }));
+      await user.click(screen.getByRole('button', { name: 'Change email address' }));
       await user.type(screen.getByLabelText('New email address'), 'new@example.org');
       await user.click(screen.getByRole('button', { name: 'Send activation link' }));
-      act(() => changeOnSuccess?.());
 
-      expect(screen.getByLabelText(labels.en.username)).toHaveValue(expected);
-      expect(screen.getByTestId('resend-email-input')).toHaveValue('new@example.org');
+      expect(changeMutateMock).toHaveBeenCalledWith({
+        body: { identifier: 'jane', password: 'secret-password', newEmail: 'new@example.org' },
+      });
     });
+
+    it('resends with Enter in the email field instead of signing in again', async () => {
+      const user = userEvent.setup();
+      unverified();
+      renderLogin();
+      await user.type(screen.getByTestId('resend-email-input'), 'jane@example.org{Enter}');
+
+      expect(resendMutateMock).toHaveBeenCalledWith({ body: { email: 'jane@example.org' } });
+      expect(loginMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['an email address', 'jane@example.org', 'new@example.org'],
+      ['a username', 'jane', 'jane'],
+    ])(
+      'keeps the sign-in identifier usable after the address changed when it is %s',
+      async (_kind, typed, expected) => {
+        const user = userEvent.setup();
+        renderLogin();
+        await user.type(screen.getByLabelText(labels.en.username), typed);
+        await user.type(screen.getByLabelText(labels.en.password), 'secret-password');
+        loginMock.mockRejectedValue(
+          Object.assign(new Error('Forbidden'), { body: { message: 'UserEmailNotVerifiedException' } }),
+        );
+        await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+        await user.click(await screen.findByRole('button', { name: 'Change email address' }));
+        await user.type(screen.getByLabelText('New email address'), 'new@example.org');
+        await user.click(screen.getByRole('button', { name: 'Send activation link' }));
+        act(() => changeOnSuccess?.());
+
+        expect(screen.getByLabelText(labels.en.username)).toHaveValue(expected);
+        expect(screen.getByTestId('resend-email-input')).toHaveValue('new@example.org');
+      },
+    );
   });
 });
