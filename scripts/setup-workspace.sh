@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Idempotent workspace setup: dependencies, .env, submodules and database migrations.
+# Idempotent workspace setup: dependencies, .env, submodules, the PostgreSQL database and its migrations.
 set -e
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -34,10 +34,14 @@ setup_project() {
     pnpm install
     echo "✓ pnpm install complete"
 
-    echo "Running database migrations..."
+    # Each checkout gets its own database (attraccess_<folder>) in the shared dev PostgreSQL and its URL in .env.
+    echo "Preparing the PostgreSQL development database..."
+    node "$REPO_ROOT/scripts/setup-dev-database.mjs"
     storage_root=$(node --env-file="$REPO_ROOT/.env" --input-type=module -e \
         'import { resolveStorageRoot } from "./apps/api/src/config/storage-path.ts"; process.stdout.write(resolveStorageRoot())')
     mkdir -p "$storage_root"
+
+    echo "Running database migrations..."
     pnpm nx run api:migrations-run
 }
 

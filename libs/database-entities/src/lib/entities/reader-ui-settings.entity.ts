@@ -60,10 +60,10 @@ export class ReaderUiAlert {
   @Column({ type: 'text' })
   message!: string;
 
-  @CreateDateColumn({ type: 'datetime' })
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   clearedAt!: Date | null;
 
   @Column({ type: 'integer', nullable: true })

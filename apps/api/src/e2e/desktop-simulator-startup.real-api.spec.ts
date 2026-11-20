@@ -3,9 +3,10 @@ import { NestFactory } from '@nestjs/core';
 import { existsSync } from 'fs';
 import { bootstrap } from '../main.bootstrap';
 import { withDesktopCleanup } from './desktop-simulator-cleanup';
-import { disposeStorage, storageRoot } from '../test/desktop-real-api.test-fixture';
+import { disposeStorage, provisionDatabase, storageRoot } from '../test/desktop-real-api.test-fixture';
 
 it('releases the real database and storage when migration startup and application closure both fail', async () => {
+  await provisionDatabase();
   let database: DataSource | undefined;
   let started: Awaited<ReturnType<typeof bootstrap>> | undefined;
   const create = NestFactory.create.bind(NestFactory);

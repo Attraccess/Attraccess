@@ -33,15 +33,15 @@ export class ResourceUsageLifecycleAttempt {
   @Column({ type: 'integer', nullable: true })
   previousUsageId!: number | null;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamptz' })
   transitionTime!: Date;
 
-  @Column({ type: 'simple-json' })
+  @Column({ type: 'jsonb' })
   formSubmissions!: FormSubmission[];
 
-  @Column({ type: 'simple-json' })
+  @Column({ type: 'jsonb' })
   billingItems!: LifecycleBillingItem[];
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }

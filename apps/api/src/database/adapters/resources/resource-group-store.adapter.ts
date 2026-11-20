@@ -114,7 +114,7 @@ export class TypeOrmResourceGroupStore implements ResourceGroupStore {
 
     const activeIntroductions = await this.dataSource.getRepository(ResourceIntroduction).query(
       `SELECT 1 FROM "resource_introduction" "rin"
-       WHERE "rin"."resourceGroupId" = ? AND "rin"."receiverUserId" = ?
+       WHERE "rin"."resourceGroupId" = $1 AND "rin"."receiverUserId" = $2
        AND (
          SELECT "h"."action" FROM "resource_introduction_history_item" "h"
          WHERE "h"."introductionId" = "rin"."id"

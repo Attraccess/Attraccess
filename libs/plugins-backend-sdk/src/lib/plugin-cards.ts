@@ -78,6 +78,11 @@ export interface PluginAuthenticatedCard {
   uid: string;
   /** Owner of the card. Access decisions stay with the plugin (for example through `context.resourceAccess`). */
   userId: number;
+  /**
+   * Opaque, single-use proof of this authentication for `context.readers.tap` on the same device, valid for 30 s.
+   * Absent on hosts predating plugin readers.
+   */
+  authentication?: string;
 }
 
 export type PluginCardAuthenticationResult =

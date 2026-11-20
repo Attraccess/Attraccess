@@ -54,17 +54,19 @@ describe('MCP endpoint with API tokens (real application)', () => {
       const owner = await t.createUser(ADMIN_PERMISSIONS);
       const revoked = await t.createApiToken(owner.id, ADMIN_PERMISSIONS);
       expect((await t.rpc(revoked, 'tools/list')).status).toBe(200);
-      await t.db.query(`UPDATE api_token SET revokedAt = CURRENT_TIMESTAMP WHERE userId = ?`, [owner.id]);
+      await t.db.query(`UPDATE api_token SET "revokedAt" = CURRENT_TIMESTAMP WHERE "userId" = $1`, [owner.id]);
       expect((await t.rpc(revoked, 'tools/list')).status).toBe(401);
 
       const expiring = await t.createUser(ADMIN_PERMISSIONS);
       const expired = await t.createApiToken(expiring.id, ADMIN_PERMISSIONS);
-      await t.db.query(`UPDATE api_token SET expiresAt = datetime('now', '-1 hour') WHERE userId = ?`, [expiring.id]);
+      await t.db.query(`UPDATE api_token SET "expiresAt" = now() - interval '1 hour' WHERE "userId" = $1`, [
+        expiring.id,
+      ]);
       expect((await t.rpc(expired, 'tools/list')).status).toBe(401);
 
       const doomed = await t.createUser(ADMIN_PERMISSIONS);
       const orphaned = await t.createApiToken(doomed.id, ADMIN_PERMISSIONS);
-      await t.db.query(`UPDATE "user" SET isDisabled = 1 WHERE id = ?`, [doomed.id]);
+      await t.db.query(`UPDATE "user" SET "isDisabled" = true WHERE id = $1`, [doomed.id]);
       expect((await t.rpc(orphaned, 'tools/list')).status).toBe(401);
     });
 

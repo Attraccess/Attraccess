@@ -81,6 +81,51 @@ describe('context.cards', () => {
       expect(services.conversations.activeConversations).toBe(0);
     });
 
+    it('hands a plugin with READER_DEVICES a single-use authentication for the device', async () => {
+      const services = createPluginCardsHost(fixture.manifest, [
+        PluginPermission.CARD_AUTHENTICATION,
+        PluginPermission.READER_DEVICES,
+      ]);
+      const card = await services.enroll(kind);
+
+      const result = await services.context.cards.authenticate({
+        uid: UID,
+        device: 'door-1',
+        channel: cardChannel(card),
+      });
+
+      expect(result).toEqual({
+        ok: true,
+        card: { id: services.cards[0].id, uid: UID, userId: services.user.id, authentication: expect.any(String) },
+      });
+      const { authentication } = (result as any).card;
+      expect(authentication).toMatch(/^[A-Za-z0-9_-]{43}$/);
+      expect(services.authentications.consume(authentication)).toEqual({
+        pluginId: PLUGIN_ID,
+        device: 'door-1',
+        cardId: services.cards[0].id,
+        userId: services.user.id,
+        issuedAt: expect.any(Number),
+      });
+    });
+
+    it('issues no authentication for a refused card', async () => {
+      const services = createPluginCardsHost(fixture.manifest, [
+        PluginPermission.CARD_AUTHENTICATION,
+        PluginPermission.READER_DEVICES,
+      ]);
+      await services.enroll(kind);
+
+      const result = await services.context.cards.authenticate({
+        uid: UID,
+        device: 'door-1',
+        channel: cardChannel(new EmulatedCard(kind)),
+      });
+
+      expect(result).toEqual({ ok: false, reason: 'CARD_AUTHENTICATION_FAILED' });
+      expect(services.authentications.size).toBe(0);
+    });
+
     it('refuses a card with another key behind a copied UID', async () => {
       const services = host();
       await services.enroll(kind);

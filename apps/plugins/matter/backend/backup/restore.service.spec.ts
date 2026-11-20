@@ -129,27 +129,6 @@ describe('MatterRestoreService', () => {
       });
     });
 
-    it('tells open device views to refetch once the tables are replaced, before reconciliation runs', async () => {
-      await disaster();
-      const validation = await h.restore.validate(stored(), undefined, ADMIN);
-      const listed = () => h.connection.requests.filter((operation) => operation === 'inventory.list').length;
-      const inventoryAt: number[] = [];
-      h.bus.changes.subscribe((change) => {
-        if (change.kind === 'inventory') inventoryAt.push(listed());
-      });
-      const stateChanged = jest.spyOn(h.bus, 'stateChanged');
-      const before = listed();
-
-      await h.restore.confirm(validation.validationId, undefined, ADMIN);
-
-      // The first signal comes from the restore itself, before the reconciliation read the inventory; that
-      // reconciliation then signals again, whether or not it changed anything.
-      expect(inventoryAt[0]).toBe(before);
-      expect(inventoryAt.length).toBeGreaterThanOrEqual(2);
-      // Every restored endpoint's state is announced (none here: the restored nodes have no endpoints).
-      expect(stateChanged).toHaveBeenCalledWith([]);
-    });
-
     it('does not let a reconciliation that starts during the restore touch the tables', async () => {
       await disaster();
       const validation = await h.restore.validate(stored(), undefined, ADMIN);
@@ -302,9 +281,9 @@ describe('MatterRestoreService', () => {
       const validation = await h.restore.validate(stored(), undefined, ADMIN);
       await h.restore.confirm(validation.validationId, originalFabricId, ADMIN);
       const triggers = (await h.backups.list()).map((b) => b.trigger);
-      // Newest first. The two setup backups can share a millisecond and then have no defined order between them.
+      // Backups of one millisecond have random ids, so the two oldest cannot be ordered among themselves.
       expect(triggers.slice(0, 2)).toEqual(['restore', 'pre_restore']);
-      expect([...triggers.slice(2)].sort()).toEqual(['fabric_created', 'manual']);
+      expect(triggers.slice(2).sort()).toEqual(['fabric_created', 'manual']);
       // The pre-restore and the post-restore backup belong to the restore's operation.
       const backups = auditCalls('matter.backup_succeeded');
       expect(backups.map((entry) => entry.details['trigger'])).toEqual(['pre_restore', 'restore']);

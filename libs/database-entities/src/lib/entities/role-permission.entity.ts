@@ -1,8 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, Index, Unique } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Role } from './role.entity';
 import { Permission } from './permission.entity';
 
+@Unique('UQ_role_permission', ['roleId', 'permissionKey'])
+@Index('IDX_role_permission_role', ['roleId'])
+@Index('IDX_role_permission_permissionKey', ['permissionKey'])
 @Entity('role_permission')
 export class RolePermission {
   @PrimaryGeneratedColumn()
@@ -18,7 +21,7 @@ export class RolePermission {
   })
   permissionKey!: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
   @ManyToOne(() => Role, (role) => role.rolePermissions, { onDelete: 'CASCADE' })

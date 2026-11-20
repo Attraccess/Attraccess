@@ -90,8 +90,8 @@ const sqlType = (field: PluginStorageField): string => {
 };
 
 /**
- * A declared `text` field matches an unbounded legacy `varchar`: SQLite stores both as TEXT without a length check, so
- * the adopted column is the same. The layout declares `text` where a value can exceed the 255 characters a `string`
+ * A declared `text` field matches an unbounded legacy `varchar`: the 1.x SQLite database stored both as TEXT without a length
+ * check, so the imported column is the same. The layout declares `text` where a value can exceed the 255 characters a `string`
  * field enforces. A bounded `varchar(n)` still has to be a `string` of length n.
  */
 const comparableType = (declared: string, legacy: string): string =>

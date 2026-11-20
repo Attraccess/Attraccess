@@ -26,11 +26,11 @@ export class CompanionDevice {
   @ApiProperty({ description: 'Whether this device is currently locked (persisted so a restart re-locks)' })
   locked!: boolean;
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   @ApiProperty({ description: 'Last time this device connected' })
   lastConnection!: Date;
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   @ApiProperty({ description: 'First time this device connected' })
   firstConnection!: Date;
 

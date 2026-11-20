@@ -6,7 +6,7 @@ import { SettingsAdministrationService } from '../settings/settings-administrati
 import { SettingsService } from '../settings/settings.service';
 import { AuditQueryDto } from './dto/audit-query.dto';
 import { setupAuditDatabase } from '../database/adapters/audit/audit.test-fixture';
-describe('durable audit SQLite', () => {
+describe('durable audit (PostgreSQL)', () => {
   const fixture = setupAuditDatabase();
   it.each([{ enabled: false }, { domains: ['resource'] }])(
     'records the final disabling settings change and suppresses subsequent events (%j)',

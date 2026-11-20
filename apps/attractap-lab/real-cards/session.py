@@ -7,14 +7,13 @@ re-tap recovers it -> reset. Every step is driven by what the reader and the API
 a stopwatch: a prompt is shown, the script waits for the outcome, and repeats the prompt when the
 card was not seen. With --emulate the NFC emulator answers instead of real cards; nothing else
 differs. Environment (set by the shell entry point): READER_IMAGE, EMULATOR_IMAGE (--emulate),
-API_URL, API_DB, API_HOST, READER_API_PORT, API_PORT, WIRETAP_FILE, WIRETAP_DROP, RUN_DIR.
+API_URL, DATABASE_URL, API_HOST, READER_API_PORT, API_PORT, WIRETAP_FILE, WIRETAP_DROP, RUN_DIR.
 """
 
 import argparse
 import json
 import os
 import re
-import sqlite3
 import subprocess
 import sys
 import time
@@ -56,7 +55,7 @@ class Kit:
         self.events = (run_dir / "events.jsonl").open("a", buffering=1)
         self.user_seconds = 0.0  # time spent waiting for a card to be placed or lifted
         self.prompts = 0
-        self.api = Api(os.environ["API_URL"], os.environ["API_DB"])
+        self.api = Api(os.environ["API_URL"], os.environ["DATABASE_URL"])
         self.admin = self.api.login("admin")
         self.emulator = None
         self.console = None
@@ -272,14 +271,14 @@ class Kit:
         return cards
 
     def db_rows(self, sql, *params):
-        with sqlite3.connect(os.environ["API_DB"]) as db:
-            return db.execute(sql, params).fetchall()
+        rows, _ = self.api.sql(sql, *params)
+        return [tuple(row) for row in rows]
 
     def snapshot_keys(self):
         """Append the keys the API holds now (card and pending) to keys.json for the replay check."""
         path = self.run_dir / "keys.json"
         known = json.loads(path.read_text()) if path.exists() else []
-        out = subprocess.run(["node", str(HERE / "dump-keys.mjs"), os.environ["API_DB"]], capture_output=True, text=True,
+        out = subprocess.run(["node", str(HERE / "dump-keys.mjs")], capture_output=True, text=True,
                              env={**os.environ, "AUTH_SESSION_SECRET": os.environ["AUTH_SESSION_SECRET"]})
         if out.returncode == 0:
             for entry in json.loads(out.stdout):
@@ -375,7 +374,7 @@ class Kit:
     def check_record(self, user, card_id):
         cards = self.cards_of(user)
         assert [c["id"] for c in cards] == [card_id], cards
-        row = self.db_rows("SELECT uid, keyNo, isActive FROM nfc_card WHERE id = ?", card_id)[0]
+        row = self.db_rows("SELECT uid, \"keyNo\", \"isActive\" FROM nfc_card WHERE id = ?", card_id)[0]
         assert 1 <= row[1] <= 5 and row[2] == 1, row
         self.log("record", uid=row[0], keyNo=row[1])
         self.say(f"    card record: uid {row[0]}, key slot {row[1]}")

@@ -1,9 +1,8 @@
 import { createMock } from '@golevelup/ts-jest';
-import { entities, Role, User, UserRole } from '@attraccess/database-entities';
+import { Role, User, UserRole } from '@attraccess/database-entities';
 import { UserRoleSource } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
-import * as migrations from '../../database/migrations';
-import { createDataSource } from '../../database/sqlite/sqlite-connection';
+import { createTestDataSource, closeTestDataSource } from '../../test-utils/test-database';
 import { LicenseService } from '../../license/license.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { RbacService } from '../rbac/rbac.service';
@@ -15,14 +14,7 @@ describe('taking back invitations whose email failed', () => {
   let users: UsersService;
 
   beforeAll(async () => {
-    source = await createDataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      entities: Object.values(entities),
-      migrations: Object.values(migrations),
-    }).initialize();
-    await source.runMigrations();
+    source = await createTestDataSource();
     users = composeUsersService(
       source.getRepository(User),
       undefined,
@@ -39,7 +31,7 @@ describe('taking back invitations whose email failed', () => {
   }, 60_000);
 
   afterAll(async () => {
-    if (source?.isInitialized) await source.destroy();
+    await closeTestDataSource(source);
   });
 
   it('deletes invited users with their roles, but keeps those who already accepted', async () => {

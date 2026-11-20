@@ -124,6 +124,14 @@ export class Resource {
   separateUnlockAndUnlatch!: boolean | null;
 
   @ApiProperty({
+    description:
+      '(only for doors) whether the door is access only: its only action is Open (stored as a door unlock); lock and unlatch are refused',
+    example: false,
+    default: false,
+  })
+  accessOnly!: boolean;
+
+  @ApiProperty({
     description: 'A detailed description of the resource',
     example: 'Prusa i3 MK3S+ 3D printer with 0.4mm nozzle',
     required: false,
@@ -207,6 +215,7 @@ export function toResourceDto(record: ResourceRecord): Resource {
     name: record.name,
     type: record.type,
     separateUnlockAndUnlatch: record.separateUnlockAndUnlatch,
+    accessOnly: record.accessOnly,
     description: record.description,
     imageFilename: record.imageFilename,
     documentationType: record.documentationType,

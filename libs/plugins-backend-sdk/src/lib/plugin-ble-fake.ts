@@ -10,7 +10,8 @@ import {
   PluginBleProfile,
   PluginBleSession,
 } from './plugin-ble';
-import { FakeBleClock } from './plugin-ble-fake-clock';
+import { FakeBleClock, flushMicrotasks } from './plugin-ble-fake-clock';
+import { FakeBleWatchHub, type FakeBleOpenWatch, type FakeBleWatchAdvertisement } from './plugin-ble-fake-watch';
 import { BleSessionEngine, BleSessionLink } from './plugin-ble-session-engine';
 import {
   bleProfilesEqual,
@@ -28,6 +29,8 @@ import {
   validateBleProfileId,
   validateBleReaderId,
 } from './plugin-ble-validation';
+
+export type { FakeBleOpenWatch, FakeBleWatchAdvertisement } from './plugin-ble-fake-watch';
 
 /**
  * Deterministic fake of the host BLE transport for plugin unit and integration tests. It has no Nest, database
@@ -112,6 +115,13 @@ export interface FakeBleHost {
   setReaderAvailable(readerId: number, available: boolean): void;
   /** `false` simulates reader firmware without plugin BLE support (`READER_UNSUPPORTED` with `detail`). */
   setReaderSupported(readerId: number, supported: boolean, detail?: string): void;
+  /** `false` simulates reader firmware without the advertisement watch (`unsupported`, default `no-watch-capability`). */
+  setReaderWatchSupported(readerId: number, supported: boolean, detail?: string): void;
+  /**
+   * The reader sees an advertisement: watches whose profile matches get an event. `changed` defaults to whether the
+   * payload (not the RSSI) differs from the last one the reader reported for the address. Resolves once delivered.
+   */
+  advertise(readerId: number, advertisement: FakeBleWatchAdvertisement, options?: { changed?: boolean }): Promise<void>;
   /** `false` simulates a host without a transport driver (`TRANSPORT_UNAVAILABLE`). */
   setTransportAvailable(available: boolean): void;
   setReady(ready: boolean): void;
@@ -124,12 +134,13 @@ export interface FakeBleHost {
   /** Makes the next occurrence of `op` fail with `code`. */
   failNext(op: FakeBleOperation, code: PluginBleErrorCode, options?: { detail?: string }): void;
   advance(ms: number): Promise<void>;
-  /** Simulates the plugin module being destroyed: closes its sessions with `shutdown`. */
+  /** Simulates the plugin module being destroyed: closes its sessions and watches with `shutdown`. */
   shutdownPlugin(pluginId: string): Promise<void>;
-  /** Simulates plugin uninstall: closes its sessions and deletes its endpoints. */
+  /** Simulates plugin uninstall: closes its sessions and watches and deletes its endpoints. */
   uninstallPlugin(pluginId: string): Promise<void>;
   readonly transcript: FakeBleTranscriptEntry[];
   openSessions(): FakeBleOpenSession[];
+  openWatches(): FakeBleOpenWatch[];
 }
 
 interface StoredEndpoint extends PluginBleEndpoint {
@@ -163,7 +174,10 @@ function copyEndpoint(endpoint: StoredEndpoint): PluginBleEndpoint {
 export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost {
   const clock = new FakeBleClock(options.startTime ?? Date.UTC(2026, 0, 1));
   const transcript: FakeBleTranscriptEntry[] = [];
-  const readers = new Map<number, { name: string; allow: boolean; available: boolean; unsupported?: string }>();
+  const readers = new Map<
+    number,
+    { name: string; allow: boolean; available: boolean; unsupported?: string; watchUnsupported?: string }
+  >();
   const peripherals = new Map<
     string,
     {
@@ -182,6 +196,12 @@ export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost
   let ready = options.ready ?? true;
   let transportAvailable = true;
   let mtu = options.mtu ?? FAKE_BLE_DEFAULT_MTU;
+  const watches = new FakeBleWatchHub({
+    reader: (readerId) => readers.get(readerId),
+    readerIds: () => [...readers.keys()].sort((x, y) => x - y),
+    transportAvailable: () => transportAvailable,
+    now: () => clock.now(),
+  });
 
   const record = (entry: FakeBleTranscriptEntry) => {
     transcript.push(entry);
@@ -410,6 +430,10 @@ export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost
             }
             return found;
           }),
+        watch: (profileId, handler, watchOptions) =>
+          guard(() =>
+            watches.watch(pluginId, requireProfile(pluginId, validateBleProfileId(profileId)), handler, watchOptions),
+          ),
         createEndpoint: (input) =>
           guard(() => {
             const normalized = normalizeBleEndpointInput(input);
@@ -470,27 +494,42 @@ export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost
         allow: reader.allowPluginBle ?? false,
         available: reader.available ?? true,
       });
+      watches.refresh();
     },
     async removeReader(readerId) {
       readers.delete(readerId);
+      watches.refresh();
       await closeWhere((entry) => entry.endpoint.readerId === readerId, 'reader-access-revoked');
       for (const endpoint of [...endpoints.values()]) if (endpoint.readerId === readerId) endpoints.delete(endpoint.id);
     },
     async setReaderAccess(readerId, allowed) {
       const reader = readers.get(readerId);
       if (reader) reader.allow = allowed;
+      watches.refresh();
       if (!allowed) await closeWhere((entry) => entry.endpoint.readerId === readerId, 'reader-access-revoked');
     },
     setReaderAvailable(readerId, available) {
       const reader = readers.get(readerId);
       if (reader) reader.available = available;
+      watches.refresh();
     },
     setReaderSupported(readerId, supported, detail = 'no-ble-capability') {
       const reader = readers.get(readerId);
       if (reader) reader.unsupported = supported ? undefined : detail;
+      watches.refresh();
+    },
+    setReaderWatchSupported(readerId, supported, detail = 'no-watch-capability') {
+      const reader = readers.get(readerId);
+      if (reader) reader.watchUnsupported = supported ? undefined : detail;
+      watches.refresh();
+    },
+    async advertise(readerId, advertisement, advertiseOptions) {
+      watches.advertise(readerId, advertisement, advertiseOptions?.changed);
+      await flushMicrotasks();
     },
     setTransportAvailable(available) {
       transportAvailable = available;
+      watches.refresh();
     },
     setReady(value) {
       ready = value;
@@ -530,8 +569,12 @@ export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost
       failures.set(op, queue);
     },
     advance: (ms) => clock.advance(ms),
-    shutdownPlugin: (pluginId) => closeWhere((entry) => entry.pluginId === pluginId, 'shutdown'),
+    shutdownPlugin: async (pluginId) => {
+      await watches.closeWhere((entry) => entry.pluginId === pluginId, 'shutdown');
+      await closeWhere((entry) => entry.pluginId === pluginId, 'shutdown');
+    },
     async uninstallPlugin(pluginId) {
+      await watches.closeWhere((entry) => entry.pluginId === pluginId, 'shutdown');
       await closeWhere((entry) => entry.pluginId === pluginId, 'endpoint-deleted');
       for (const endpoint of [...endpoints.values()]) if (endpoint.pluginId === pluginId) endpoints.delete(endpoint.id);
     },
@@ -543,6 +586,7 @@ export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost
         readerId: endpoint.readerId,
         address: endpoint.address,
       })),
+    openWatches: () => watches.openWatches(),
   };
   return host;
 }

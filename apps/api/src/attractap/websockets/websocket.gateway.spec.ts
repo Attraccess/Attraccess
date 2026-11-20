@@ -352,6 +352,22 @@ describe('AttractapGateway', () => {
       expect(released).toHaveBeenCalledWith(socket);
     });
 
+    it('sends the advertisement watch set once the firmware info stored the BLE capability', async () => {
+      const socket = fixture.createMockSocket({ readerId: 7 });
+      const order: string[] = [];
+      jest.spyOn(fixture.gateway['firmwareHandler'], 'handleFirmwareInfo').mockImplementation(async () => {
+        order.push('firmware-info');
+      });
+      jest
+        .spyOn(fixture.gateway['readerBleDriver'], 'readerAnnounced')
+        .mockImplementation((announced) => void order.push(announced === socket ? 'announced' : 'other'));
+      await fixture.gateway.onClientEvent(
+        { type: AttractapEventType.READER_FIRMWARE_INFO, payload: { name: 'attractap', version: '2.5.0' } },
+        socket,
+      );
+      expect(order).toEqual(['firmware-info', 'announced']);
+    });
+
     it('rejects server-only event types from clients', async () => {
       const socket = fixture.createMockSocket({ id: 'ev-1', readerId: 1 });
 
@@ -370,6 +386,7 @@ describe('AttractapGateway', () => {
         AttractapEventType.BLE_UNSUBSCRIBE,
         AttractapEventType.BLE_CANCEL,
         AttractapEventType.BLE_SESSION_CLOSE,
+        AttractapEventType.BLE_WATCH_SET,
       ];
 
       for (const type of serverOnlyEvents) {

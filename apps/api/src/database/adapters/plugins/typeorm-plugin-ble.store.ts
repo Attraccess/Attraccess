@@ -1,7 +1,11 @@
 import { Attractap, PluginBleEndpointEntity } from '@attraccess/database-entities';
 import type { PluginBleEndpointRecord, PluginBleReaderAccess } from '@attraccess/application-models';
-import type { DataSource } from 'typeorm';
+import { In, type DataSource } from 'typeorm';
 import type { PluginBleStore } from '../../../plugin-system/ble/plugin-ble-store.port';
+
+/** The endpoint id is a `uuid` column: PostgreSQL rejects any other text (22P02) instead of finding no row. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isEndpointId = (id: unknown): id is string => typeof id === 'string' && UUID.test(id);
 
 function toEndpoint(row: PluginBleEndpointEntity): PluginBleEndpointRecord {
   return {
@@ -28,9 +32,9 @@ export function createTypeOrmPluginBleStore(source: () => DataSource): PluginBle
   const readerColumns = { id: true, name: true, allowPluginBle: true } as const;
 
   return {
-    async listOpenReaders() {
+    async listOpenReaders(readerIds) {
       const rows = await readers().find({
-        where: { allowPluginBle: true },
+        where: readerIds ? { allowPluginBle: true, id: In(readerIds) } : { allowPluginBle: true },
         select: readerColumns,
         order: { id: 'ASC' },
       });
@@ -43,6 +47,7 @@ export function createTypeOrmPluginBleStore(source: () => DataSource): PluginBle
     },
 
     async findEndpoint(pluginId, id) {
+      if (!isEndpointId(id)) return null;
       const row = await endpoints().findOneBy({ id, pluginId });
       return row ? toEndpoint(row) : null;
     },
@@ -63,6 +68,7 @@ export function createTypeOrmPluginBleStore(source: () => DataSource): PluginBle
     },
 
     async updateEndpoint(id, changes) {
+      if (!isEndpointId(id)) return null;
       const current = await endpoints().findOneBy({ id });
       if (!current) return null;
       Object.assign(current, changes);
@@ -71,6 +77,7 @@ export function createTypeOrmPluginBleStore(source: () => DataSource): PluginBle
     },
 
     async deleteEndpoint(id) {
+      if (!isEndpointId(id)) return;
       await endpoints().delete({ id });
     },
 

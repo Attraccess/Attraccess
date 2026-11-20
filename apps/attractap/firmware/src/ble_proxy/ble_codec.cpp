@@ -142,10 +142,85 @@ namespace ble
             return true;
         }
 
+        // Optional parts of a watch filter may be missing or null; an empty name prefix is no prefix.
+        bool parseWatchFilter(JsonObjectConst raw, WatchFilter &filter)
+        {
+            uint32_t id = 0;
+            if (raw.isNull() || !readUint(raw["id"], 0, 0xffff, id)) return false;
+            filter.id = static_cast<uint16_t>(id);
+            JsonVariantConst servicesValue = raw["serviceUuids"];
+            JsonVariantConst manufacturersValue = raw["manufacturerIds"];
+            if ((!servicesValue.isNull() && !servicesValue.is<JsonArrayConst>()) ||
+                (!manufacturersValue.isNull() && !manufacturersValue.is<JsonArrayConst>()))
+                return false;
+            JsonArrayConst services = servicesValue.as<JsonArrayConst>();
+            JsonArrayConst manufacturers = manufacturersValue.as<JsonArrayConst>();
+            if (services.size() > MAX_FILTER_UUIDS || manufacturers.size() > MAX_FILTER_MANUFACTURERS) return false;
+            for (JsonVariantConst entry : services)
+            {
+                Uuid uuid;
+                if (!parseUuid(entry.as<const char *>(), uuid)) return false;
+                filter.services.push_back(uuid);
+            }
+            for (JsonVariantConst entry : manufacturers)
+            {
+                uint32_t company = 0;
+                if (!readUint(entry, 0, 0xffff, company)) return false;
+                filter.manufacturers.push_back(static_cast<uint16_t>(company));
+            }
+            JsonVariantConst prefix = raw["namePrefix"];
+            if (!prefix.isNull())
+            {
+                const char *text = prefix.as<const char *>();
+                if (!text) return false;
+                const size_t length = std::strlen(text);
+                if (length > MAX_NAME_PREFIX) return false;
+                std::memcpy(filter.namePrefix, text, length + 1);
+                filter.hasNamePrefix = length > 0;
+            }
+            return true;
+        }
+
+        bool parseWatchSet(JsonObjectConst payload, Command &command, Error &error)
+        {
+            JsonArrayConst filters = payload["filters"].as<JsonArrayConst>();
+            if (filters.isNull()) return false;
+            if (filters.size() > MAX_WATCH_FILTERS)
+            {
+                error = Error(Code::InvalidArgument, "too-many-filters");
+                return false;
+            }
+            if (!payload["keepaliveMs"].isNull() &&
+                !readUint(payload["keepaliveMs"], MIN_WATCH_KEEPALIVE_MS, MAX_WATCH_KEEPALIVE_MS, command.keepaliveMs))
+            {
+                error = Error(Code::InvalidArgument, "keepalive");
+                return false;
+            }
+            for (JsonVariantConst raw : filters)
+            {
+                WatchFilter filter;
+                if (!parseWatchFilter(raw.as<JsonObjectConst>(), filter))
+                {
+                    error = Error(Code::InvalidArgument, "filter");
+                    return false;
+                }
+                for (const WatchFilter &other : command.watchFilters)
+                {
+                    if (other.id != filter.id) continue;
+                    error = Error(Code::InvalidArgument, "duplicate-filter-id");
+                    return false;
+                }
+                command.watchFilters.push_back(std::move(filter));
+            }
+            return true;
+        }
+
         bool parseBody(Command &command, JsonObjectConst payload, Error &error)
         {
             switch (command.type)
             {
+            case CommandType::WatchSet:
+                return parseWatchSet(payload, command, error);
             case CommandType::Scan:
                 return parseScan(payload, command);
             case CommandType::Open:
@@ -191,6 +266,7 @@ namespace ble
                 {"BLE_UNSUBSCRIBE", CommandType::Unsubscribe},
                 {"BLE_CANCEL", CommandType::Cancel},
                 {"BLE_SESSION_CLOSE", CommandType::Close},
+                {"BLE_WATCH_SET", CommandType::WatchSet},
             };
             if (!type) return false;
             for (const auto &entry : TYPES)
@@ -218,8 +294,36 @@ namespace ble
             data["type"] = type;
             JsonObject payload = data["payload"].to<JsonObject>();
             payload["v"] = PROTOCOL_VERSION;
-            payload["sessionId"] = sessionId;
+            // The watch messages belong to no session.
+            if (sessionId) payload["sessionId"] = sessionId;
             return payload;
+        }
+
+        // The BLE_SCAN_RESULT shape, shared by BLE_WATCH_EVENT.
+        void putAdvertisement(JsonObject entry, const Advertisement &ad)
+        {
+            char address[18];
+            formatAddress(ad.address, address);
+            entry["address"] = address;
+            entry["addressType"] = ad.address.random ? "random" : "public";
+            if (ad.hasRssi) entry["rssi"] = ad.rssi;
+            if (!ad.name.empty()) entry["name"] = ad.name;
+            JsonArray uuids = entry["serviceUuids"].to<JsonArray>();
+            for (const Uuid &uuid : ad.serviceUuids)
+            {
+                char text[37];
+                formatUuid(uuid, text);
+                uuids.add(text);
+            }
+            JsonArray manufacturers = entry["manufacturerData"].to<JsonArray>();
+            for (const auto &m : ad.manufacturers)
+            {
+                JsonObject item = manufacturers.add<JsonObject>();
+                item["companyId"] = m.companyId;
+                std::string encoded;
+                base64Encode(m.data.data(), m.data.size(), encoded);
+                item["data"] = encoded;
+            }
         }
 
         std::string serialize(const JsonDocument &doc)
@@ -345,7 +449,7 @@ namespace ble
             error = Error(Code::InvalidArgument, "protocol-version");
             return false;
         }
-        if (!id || !hasSession) return false;
+        if (!id || (!hasSession && command.type != CommandType::WatchSet)) return false;
         if (!parseBody(command, payload, error)) return false;
         error = Error();
         return true;
@@ -387,32 +491,7 @@ namespace ble
         }
         JsonArray list = payload["advertisements"].to<JsonArray>();
         if (!advertisements) return serialize(doc);
-        for (const Advertisement &ad : *advertisements)
-        {
-            JsonObject entry = list.add<JsonObject>();
-            char address[18];
-            formatAddress(ad.address, address);
-            entry["address"] = address;
-            entry["addressType"] = ad.address.random ? "random" : "public";
-            if (ad.hasRssi) entry["rssi"] = ad.rssi;
-            if (!ad.name.empty()) entry["name"] = ad.name;
-            JsonArray uuids = entry["serviceUuids"].to<JsonArray>();
-            for (const Uuid &uuid : ad.serviceUuids)
-            {
-                char text[37];
-                formatUuid(uuid, text);
-                uuids.add(text);
-            }
-            JsonArray manufacturers = entry["manufacturerData"].to<JsonArray>();
-            for (const auto &m : ad.manufacturers)
-            {
-                JsonObject item = manufacturers.add<JsonObject>();
-                item["companyId"] = m.companyId;
-                std::string encoded;
-                base64Encode(m.data.data(), m.data.size(), encoded);
-                item["data"] = encoded;
-            }
-        }
+        for (const Advertisement &ad : *advertisements) putAdvertisement(list.add<JsonObject>(), ad);
         return serialize(doc);
     }
 
@@ -443,8 +522,43 @@ namespace ble
         return serialize(doc);
     }
 
+    std::string watchStateMessage(uint32_t requestId, const Error &error, bool active, const char *detail)
+    {
+        JsonDocument doc;
+        JsonObject payload = envelope(doc, "BLE_WATCH_STATE", nullptr);
+        if (requestId) payload["requestId"] = requestId;
+        payload["ok"] = error.ok();
+        if (!error.ok())
+        {
+            putError(payload, error);
+            return serialize(doc);
+        }
+        payload["active"] = active;
+        if (detail && detail[0]) payload["detail"] = detail;
+        return serialize(doc);
+    }
+
+    std::string watchEventMessage(const WatchEvent *events, size_t count)
+    {
+        JsonDocument doc;
+        JsonObject payload = envelope(doc, "BLE_WATCH_EVENT", nullptr);
+        JsonArray list = payload["events"].to<JsonArray>();
+        for (size_t i = 0; i < count; i++)
+        {
+            const WatchEvent &event = events[i];
+            JsonObject entry = list.add<JsonObject>();
+            JsonArray filters = entry["filters"].to<JsonArray>();
+            for (uint8_t k = 0; k < event.filterCount; k++) filters.add(event.filters[k]);
+            if (event.advertisement) putAdvertisement(entry, *event.advertisement);
+            entry["changed"] = event.changed;
+        }
+        return serialize(doc);
+    }
+
     std::string refusalMessage(const Command &command, const Error &error)
     {
+        if (command.type == CommandType::WatchSet)
+            return command.requestId ? watchStateMessage(command.requestId, error, false) : std::string();
         if (!command.requestId || !command.sessionId[0]) return std::string();
         if (command.type == CommandType::Scan)
             return scanResultMessage(command.sessionId, command.requestId, error, nullptr);

@@ -1,20 +1,19 @@
 import { TypeOrmSettingsRows } from '../settings/typeorm-settings-rows';
-import { AuditLog, Setting } from '@attraccess/database-entities';
+import { Setting } from '@attraccess/database-entities';
 import type { PluginAuditDomainDeclaration } from '@attraccess/plugins-backend-sdk';
 import { PluginAuditEvent } from '@attraccess/plugins-backend-sdk';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DataSource } from 'typeorm';
-import { DurableAudit1783700000000 } from '../../migrations/1783700000000-durable-audit';
-import { IdentityAudit1783800000000 } from '../../migrations/1783800000000-identity-audit';
+import type { DataSource } from 'typeorm';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { registerPluginAuditDomains, resetPluginAuditRegistry } from '../../../plugin-system/audit/audit-registry';
 import { SettingsStoreService } from '../../../settings/settings-store.service';
 import { Registry } from 'prom-client';
 import { AuditMetrics, createAuditMetrics } from '../../../metrics/definitions/audit.metrics';
 import { AuditService } from '../../../audit/audit.service';
-import { createSqliteAuditService } from './sqlite-audit-service.test-fixture';
+import { createPostgresAuditService } from './postgres-audit-service.test-fixture';
 import { AuditQueryService } from '../../../audit/audit-query.service';
 import { PluginAuditHost } from '../../../audit/plugin-audit-host';
 
@@ -107,41 +106,22 @@ export function setupAuditDatabase() {
 
   let metrics: AuditMetrics;
 
-  const migration = new DurableAudit1783700000000();
-
-  const identityMigration = new IdentityAudit1783800000000();
-
   beforeEach(async () => {
     resetPluginAuditRegistry();
     registerPluginAuditDomains({ name: 'audit-fixture-plugin', id: fixturePluginId }, [demoDomain]);
     directory = await mkdtemp(join(tmpdir(), 'audit-'));
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: join(directory, 'fixture.sqlite'),
-      entities: [AuditLog, Setting],
-    }).initialize();
-    // Existing RBAC schema, with data that an additive upgrade must preserve.
-    await source.query('CREATE TABLE permission (key text PRIMARY KEY, label text, description text, category text)');
-    await source.query('CREATE TABLE role (id integer PRIMARY KEY, key text)');
-    await source.query('CREATE TABLE role_permission (roleId integer, permissionKey text)');
-    await source.query('CREATE TABLE api_token_permission (apiTokenId integer, permissionKey text)');
-    await source.query("INSERT INTO role VALUES (1, 'administrator'), (2, 'member')");
-    await migration.up(source.createQueryRunner());
-    await identityMigration.up(source.createQueryRunner());
-    await source.query(
-      'CREATE TABLE IF NOT EXISTS setting (id integer PRIMARY KEY AUTOINCREMENT, parent varchar NOT NULL, key varchar NOT NULL, value varchar NOT NULL, createdAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP)',
-    );
+    // A private database at the current release: audit_log, setting and the RBAC tables included.
+    source = await createTestDataSource();
     store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(source.getRepository(Setting)), null);
     metrics = createTestAuditMetrics();
-    service = createSqliteAuditService(source, store, metrics);
+    service = createPostgresAuditService(source, store, metrics);
     await service.onModuleInit();
   });
 
   afterEach(async () => {
     resetPluginAuditRegistry();
     await service.onModuleDestroy();
-    if (source.isInitialized) await source.destroy();
+    await closeTestDataSource(source);
     await rm(directory, { recursive: true, force: true });
   });
   return {
@@ -178,12 +158,6 @@ export function setupAuditDatabase() {
     },
     get metrics() {
       return metrics;
-    },
-    get migration() {
-      return migration;
-    },
-    get identityMigration() {
-      return identityMigration;
     },
     set service(value: typeof service) {
       service = value;

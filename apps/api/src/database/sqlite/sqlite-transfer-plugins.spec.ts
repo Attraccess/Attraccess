@@ -1,7 +1,7 @@
 import { definePluginStorage, f, step, table } from '@attraccess/plugins-backend-sdk';
 import type { DataSource } from 'typeorm';
 import { compilePluginStorage } from '../../plugin-system/plugin-storage/storage-schema';
-import { closeTestDataSource, createTestDataSource } from '../../test-utils/test-database';
+import { createSqliteTestFile, type SqliteTestFile } from './sqlite-test-file.test-fixture';
 import type { MigrationTrack } from '../backend/database-backend';
 import { SnapshotIncompatibleError, type DatabaseSnapshot, type PluginDescriptor } from '../transfer-snapshot';
 import { sqliteStorageDdl } from './plugin-storage/sqlite-storage-ddl';
@@ -29,9 +29,16 @@ const plugin: PluginDescriptor = { id: '@demo/meter', version: '2.0.0', storage:
 const READINGS = 'plugin_demo_meter_readings';
 const VERSIONS = 'plugin_storage_migrations_demo_meter';
 
+const files: SqliteTestFile[] = [];
+async function newSource(): Promise<DataSource> {
+  const file = await createSqliteTestFile();
+  files.push(file);
+  return file.source;
+}
+
 /** A database with the core migration table and the plugin's storage at version 1, as the host creates them. */
 async function createDatabase(withRows: boolean): Promise<DataSource> {
-  const source = await createTestDataSource();
+  const source = await newSource();
   await source.query(
     'CREATE TABLE migrations (id integer PRIMARY KEY AUTOINCREMENT NOT NULL, timestamp bigint, name varchar)',
   );
@@ -66,7 +73,8 @@ describe('SQLite transfer of plugin storage', () => {
   });
 
   afterEach(async () => {
-    await Promise.all(open.splice(0).map((source) => closeTestDataSource(source)));
+    open.length = 0;
+    await Promise.all(files.splice(0).map((file) => file.close()));
   });
 
   it('types plugin columns by the declaration and exports values in their neutral form', () => {

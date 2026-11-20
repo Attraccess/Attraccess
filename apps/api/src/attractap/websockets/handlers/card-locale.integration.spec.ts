@@ -1,9 +1,8 @@
-import { entities, NFCCard, NFCCardPendingChange, Resource, ResourceUsage, User } from '@attraccess/database-entities';
+import { NFCCard, NFCCardPendingChange, Resource, ResourceUsage, User } from '@attraccess/database-entities';
 import { ResourceType } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import { TypeOrmAttractapCardStore } from '../../../database/adapters/attractap/typeorm-card.store';
 import { TypeOrmAttractapResourceReads } from '../../../database/adapters/attractap/typeorm-resource-reads';
-import * as migrations from '../../../database/migrations';
 import { UserProfileController } from '../../../users-and-auth/users/user-profile.controller';
 import { UsersService } from '../../../users-and-auth/users/users.service';
 import { composeUsersService } from '../../../users-and-auth/users/fixtures/compose.test-fixture';
@@ -13,23 +12,18 @@ import { AttractapService } from '../../attractap.service';
 import { AuthenticatedWebSocket, AttractapEventType } from '../websocket.types';
 import { AttractapCardHandler } from './card/card.handler';
 import { CardSessionService } from './ui/card-session.service';
+import { createTestDataSource, closeTestDataSource } from '../../../test-utils/test-database';
 
 describe('persisted web UI locale at card authentication', () => {
   let source: DataSource;
 
   beforeAll(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      entities: Object.values(entities),
-      migrations: Object.values(migrations),
-    }).initialize();
+    source = await createTestDataSource();
     await source.runMigrations();
   }, 60_000);
 
   afterAll(async () => {
-    if (source?.isInitialized) await source.destroy();
+    await closeTestDataSource(source);
   });
 
   it('delivers each saved language on the next tap without updating the card or reconnecting', async () => {

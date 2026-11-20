@@ -1,6 +1,7 @@
-import { entities } from '@attraccess/database-entities';
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import * as migrations from '.';
+import { migrateFrozenSqlite } from '../sqlite/sqlite-frozen-track';
+import { createSqliteSource } from '../sqlite/sqlite-source';
 import { PluginDeclaredPermissions1793600000000 } from './1793600000000-plugin-declared-permissions';
 
 const NEW_COLUMNS = ['pluginName', 'labelDe', 'descriptionDe', 'categoryLabel', 'categoryLabelDe', 'available'];
@@ -14,13 +15,9 @@ describe('plugin-declared permissions migration', () => {
     source.query(`SELECT "key", "label", "description", "category" FROM "permission" ORDER BY "key"`);
 
   beforeEach(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      database: ':memory:',
-      entities: Object.values(entities),
-      migrations: Object.values(migrations),
-    }).initialize();
-    await source.runMigrations();
+    // A frozen SQLite migration: it runs against an in-memory SQLite database directly (no entities map there).
+    source = await createSqliteSource(':memory:', { migrations: Object.values(migrations) } as never).initialize();
+    await migrateFrozenSqlite(source);
   });
 
   afterEach(async () => {
@@ -55,7 +52,7 @@ describe('plugin-declared permissions migration', () => {
     await source.query(
       `INSERT INTO "role_permission" ("roleId", "permissionKey") SELECT "id", 'acme.widgets.read' FROM "role" WHERE "key" = 'administrator'`,
     );
-    await source.getRepository(entities.User).save({ id: 1, username: 'owner', email: 'owner@example.com' });
+    await source.query(`INSERT INTO "user" ("id", "username", "email") VALUES (1, 'owner', 'owner@example.com')`);
     await source.query(`INSERT INTO "api_token" ("id", "userId", "name", "tokenHash") VALUES (1, 1, 'ci', 'hash')`);
     await source.query(
       `INSERT INTO "api_token_permission" ("apiTokenId", "permissionKey") VALUES (1, 'resources.read'), (1, 'acme.widgets.read')`,

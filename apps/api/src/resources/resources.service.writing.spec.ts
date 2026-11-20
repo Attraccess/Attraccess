@@ -29,6 +29,8 @@ import { ResourcesService } from './resources.service';
 
 import { RESOURCE_STORE } from './resource-store.port';
 
+import { ACCESS_ONLY_DOORS_ONLY_MESSAGE, ACCESS_ONLY_WITH_SEPARATE_UNLATCH_MESSAGE } from './door-options';
+
 import { mockMetricsService } from './resources.service.spec.mock-metrics-service';
 
 type Resource = ResourceRecord;
@@ -349,6 +351,58 @@ describe('ResourcesService', () => {
       await expect(updateResourceScope.service.updateResource(resourceId, updateDto)).rejects.toThrow(
         ResourceNotFoundException,
       );
+    });
+  });
+
+  describe('access-only doors', () => {
+    const door = () => createMockResource({ id: 3, type: ResourceType.Door });
+
+    beforeEach(() => {
+      scope.resourceRepository.create.mockImplementation((value) => value as Resource);
+      scope.resourceRepository.save.mockImplementation(async (value) => value as Resource);
+    });
+
+    it('creates an access-only door', async () => {
+      const created = await scope.service.createResource({ name: 'Side', type: ResourceType.Door, accessOnly: true });
+
+      expect(created.accessOnly).toBe(true);
+    });
+
+    it.each([
+      [{ type: ResourceType.Machine, accessOnly: true }, ACCESS_ONLY_DOORS_ONLY_MESSAGE],
+      [
+        { type: ResourceType.Door, accessOnly: true, separateUnlockAndUnlatch: true },
+        ACCESS_ONLY_WITH_SEPARATE_UNLATCH_MESSAGE,
+      ],
+    ])('refuses to create %o', async (options, message) => {
+      await expect(scope.service.createResource({ name: 'X', ...options })).rejects.toThrow(message);
+      expect(scope.resourceRepository.save).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['access only on a door with separate unlatching', { separateUnlockAndUnlatch: true }, { accessOnly: true }],
+      ['separate unlatching on an access-only door', { accessOnly: true }, { separateUnlockAndUnlatch: true }],
+    ])('refuses to turn on %s', async (_name, stored, dto) => {
+      jest.spyOn(scope.service, 'getResourceById').mockResolvedValue({ ...door(), ...stored });
+
+      await expect(scope.service.updateResource(3, dto)).rejects.toThrow(ACCESS_ONLY_WITH_SEPARATE_UNLATCH_MESSAGE);
+      expect(scope.resourceRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('refuses to turn an access-only door into a machine', async () => {
+      jest.spyOn(scope.service, 'getResourceById').mockResolvedValue({ ...door(), accessOnly: true });
+
+      await expect(scope.service.updateResource(3, { type: ResourceType.Machine })).rejects.toThrow(
+        ACCESS_ONLY_DOORS_ONLY_MESSAGE,
+      );
+    });
+
+    it('switches a door from separate unlatching to access only in one update', async () => {
+      jest.spyOn(scope.service, 'getResourceById').mockResolvedValue({ ...door(), separateUnlockAndUnlatch: true });
+
+      const updated = await scope.service.updateResource(3, { accessOnly: true, separateUnlockAndUnlatch: false });
+
+      expect(updated).toMatchObject({ accessOnly: true, separateUnlockAndUnlatch: false });
     });
   });
 

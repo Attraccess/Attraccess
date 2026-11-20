@@ -1,7 +1,5 @@
 import { Resource, ResourceUsage, ResourceUsageLifecycleAttempt, User } from '@attraccess/database-entities';
 import { ResourceFlowNodeType, SupervisionMode } from '@attraccess/application-models';
-import { rm } from 'node:fs/promises';
-import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
 import { EndUsageSessionExecutor } from '../../flows/node-executors/end-usage-session.executor';
 import { NodeExecutionContext } from '../../flows/node-executors/node-executor.interface';
 import { MachineBusyError } from '../errors/machine-busy.error';
@@ -14,7 +12,10 @@ import {
   SWEEP_EVERY_MS,
   ValkeySessionChangeCoordination,
 } from '../sessions/session-change-coordination';
-import { resetTestFixture } from '../../../database/adapters/usage/lifecycle-fixtures/setup.test-fixture';
+import {
+  closeLifecycleFixture,
+  resetTestFixture,
+} from '../../../database/adapters/usage/lifecycle-fixtures/setup.test-fixture';
 import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../../../database/adapters/usage/lifecycle-fixtures/state.test-fixture';
 
 jest.setTimeout(30_000);
@@ -27,7 +28,11 @@ describe('Shared machines: restart, waiting and audit', () => {
     const users = await scope.source
       .getRepository(User)
       .save(
-        Array.from({ length: count }, (_, index) => ({ id: firstId + index, username: `user-${firstId + index}` })),
+        Array.from({ length: count }, (_, index) => ({
+          id: firstId + index,
+          username: `user-${firstId + index}`,
+          email: `user-${firstId + index}@example.test`,
+        })),
       );
     users.forEach((user) => Object.assign(user, { effectivePermissions: new Set(['resources.update']) }));
     return users;
@@ -69,12 +74,7 @@ describe('Shared machines: restart, waiting and audit', () => {
   });
 
   afterEach(async () => {
-    scope.usage?.onModuleDestroy();
-    if (scope.source) {
-      await closeResourceTransactionConnection(scope.source);
-      if (scope.source.isInitialized) await scope.source.destroy();
-    }
-    if (scope.directory) await rm(scope.directory, { recursive: true, force: true });
+    await closeLifecycleFixture(scope);
     jest.restoreAllMocks();
   });
 

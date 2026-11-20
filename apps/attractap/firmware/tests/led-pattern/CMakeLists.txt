@@ -18,3 +18,8 @@ add_executable(lite_step_test lite_step_test.cpp)
 target_compile_features(lite_step_test PRIVATE cxx_std_17)
 target_compile_options(lite_step_test PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME lite_step_test COMMAND lite_step_test)
+
+add_executable(lite_door_tap_test lite_door_tap_test.cpp)
+target_compile_features(lite_door_tap_test PRIVATE cxx_std_17)
+target_compile_options(lite_door_tap_test PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME lite_door_tap_test COMMAND lite_door_tap_test)

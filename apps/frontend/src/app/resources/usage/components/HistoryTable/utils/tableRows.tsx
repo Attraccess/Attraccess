@@ -75,6 +75,8 @@ export function generateRowCells(
       </TableCell>,
     );
   } else if (resource.type === 'door') {
+    // An access-only door has a single action, Open, stored as a door unlock.
+    const actionKey = resource.accessOnly && session.usageAction === 'door.unlock' ? 'door.open' : session.usageAction;
     cells.push(
       <TableCell key={`time-${session.id}`}>
         <DateTimeDisplay date={session.startTime} />
@@ -82,9 +84,9 @@ export function generateRowCells(
       <TableCell key={`action-${session.id}`} className="hidden md:table-cell">
         <div className="flex items-center gap-2 flex-row flex-grow w-full">
           {session.usageAction === 'door.lock' && <LockIcon />}
-          {session.usageAction === 'door.unlock' && <UnlockIcon />}
-          {session.usageAction === 'door.unlatch' && <DoorOpenIcon />}
-          {t('rows.door.action.' + session.usageAction)}
+          {actionKey === 'door.unlock' && <UnlockIcon />}
+          {(actionKey === 'door.unlatch' || actionKey === 'door.open') && <DoorOpenIcon />}
+          {t('rows.door.action.' + actionKey)}
         </div>
       </TableCell>,
     );

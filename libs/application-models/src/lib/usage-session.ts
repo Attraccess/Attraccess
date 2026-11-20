@@ -29,6 +29,7 @@ export interface UsageSessionResource {
   allowTakeOver?: boolean;
   supervisionMode?: SupervisionMode;
   separateUnlockAndUnlatch?: boolean | null;
+  accessOnly?: boolean;
   supervisedUsagesUntilIntroduction?: number | null;
   autoIntroductionTarget?: AutoIntroductionTarget | null;
   autoIntroductionGroupId?: number | null;

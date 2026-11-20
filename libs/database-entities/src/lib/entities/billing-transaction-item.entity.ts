@@ -39,7 +39,7 @@ export class BillingTransactionItem {
   })
   externalReference!: string | null;
 
-  @Column({ type: 'integer' })
+  @Column({ type: 'bigint' })
   @ApiProperty({ description: 'The unit price of the billing transaction item', example: '100' })
   unitPrice!: number;
 
@@ -47,7 +47,7 @@ export class BillingTransactionItem {
   @ApiProperty({ description: 'The quantity of the billing transaction item', example: '100' })
   quantity!: number;
 
-  @Column({ type: 'integer', nullable: true })
+  @Column({ type: 'bigint', nullable: true })
   @ApiProperty({
     description: 'Raw milliseconds used to calculate this duration charge; null for legacy or non-duration items',
     nullable: true,
@@ -64,11 +64,11 @@ export class BillingTransactionItem {
   })
   meterQuantity!: string | null;
 
-  @Column({ type: 'integer', nullable: true })
+  @Column({ type: 'bigint', nullable: true })
   @ApiProperty({ nullable: true, required: false, description: 'Captured price per measured value' })
   meterCreditsPerUnit!: number | null;
 
-  @Column({ type: 'simple-json', nullable: true })
+  @Column({ type: 'jsonb', nullable: true })
   @ApiProperty({
     nullable: true,
     required: false,

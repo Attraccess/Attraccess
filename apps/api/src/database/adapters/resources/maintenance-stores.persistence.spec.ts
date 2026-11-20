@@ -1,6 +1,6 @@
-import { DataSource } from 'typeorm';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
+import type { DataSource } from 'typeorm';
 import {
-  entities,
   Resource,
   ResourceGroup,
   ResourceIntroducer,
@@ -25,7 +25,7 @@ import { TypeOrmMaintenanceScheduleStore } from './maintenance-schedule-store.ad
 import { TypeOrmResourceRecipientStore } from './resource-recipient-store.adapter';
 import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 
-describe('maintenance stores on real SQLite', () => {
+describe('maintenance stores on real PostgreSQL', () => {
   let source: DataSource;
   let maintenance: TypeOrmResourceMaintenanceStore;
   let requests: TypeOrmMaintenanceRequestStore;
@@ -39,13 +39,7 @@ describe('maintenance stores on real SQLite', () => {
     source.getRepository(User).save(source.getRepository(User).create({ username, email: `${username}@example.test` }));
 
   beforeEach(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      synchronize: true,
-      entities: Object.values(entities),
-    }).initialize();
+    source = await createTestDataSource();
     audit = { record: jest.fn().mockResolvedValue(undefined) };
     maintenance = new TypeOrmResourceMaintenanceStore(source);
     requests = new TypeOrmMaintenanceRequestStore(source);
@@ -60,7 +54,7 @@ describe('maintenance stores on real SQLite', () => {
   });
 
   afterEach(async () => {
-    await source.destroy();
+    await closeTestDataSource(source);
   });
 
   describe('maintenance records', () => {

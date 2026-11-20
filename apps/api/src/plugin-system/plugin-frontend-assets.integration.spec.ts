@@ -17,6 +17,7 @@ import { PluginService } from './plugin.service';
 import { PluginModule } from './plugin.module';
 import { MqttClientService } from '../mqtt/mqtt-client.service';
 import { MqttServerService } from '../mqtt/servers/mqtt-server.service';
+import { createTestDataSource, closeTestDataSource } from '../test-utils/test-database';
 
 let hostDataSource: DataSource;
 
@@ -109,14 +110,7 @@ describe('plugin frontend module-federation route', () => {
     PluginService.configure({ PLUGIN_DIR: PLUGIN_PATH, RESTART_BY_EXIT: true });
     PluginModule.configure({ DISABLE_PLUGINS: false });
 
-    dataSource = new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      synchronize: true,
-      entities: [],
-    });
-    await dataSource.initialize();
+    dataSource = await createTestDataSource({ entities: [], synchronize: true });
     hostDataSource = dataSource;
 
     const moduleRef = await Test.createTestingModule({
@@ -140,7 +134,7 @@ describe('plugin frontend module-federation route', () => {
 
   afterAll(async () => {
     if (app) await app.close();
-    if (dataSource?.isInitialized) await dataSource.destroy();
+    await closeTestDataSource(dataSource);
     jest.restoreAllMocks();
     rmSync(CACHE_DIR, { recursive: true, force: true });
   });

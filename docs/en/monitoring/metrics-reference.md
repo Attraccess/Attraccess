@@ -112,7 +112,7 @@ attraccess_resource_maintenance_overdue > 0
 The two `..._last_hour` gauges are counted from the database every time `/api/metrics` is scraped, over the last 3600 whole seconds, measured by when the server stored each report. A report exactly one hour old is excluded; a report stored at scrape time is included. Notes:
 
 - They count **stored reports**. A reader that uploads a report again after a lost acknowledgement is counted twice, unless the report announces a coredump that is still awaited: the server then acknowledges the existing report again.
-- The count has a 5-second timeout. If the query fails or times out, `/api/metrics` returns an error instead of zero, so Prometheus marks the target down (`AttractapServiceDown` and `ScrapeFailures` can fire). The timeout does not cancel the underlying SQLite query.
+- The count has a 5-second timeout. If the query fails or times out, `/api/metrics` returns an error instead of zero, so Prometheus marks the target down (`AttractapServiceDown` and `ScrapeFailures` can fire). The timeout does not cancel the underlying database query.
 - The alert rules use `max` across scrape targets, so several targets of **one** installation (one shared database) are not double counted. Combining independent installations in one Prometheus/Grafana instance gives incorrect totals and is unsupported.
 - The counts rely on an index on `attractap_crash_report.createdAt` added by a database migration.
 
@@ -151,7 +151,7 @@ sum(
 | `attraccess_mqtt_servers_healthy` | Gauge | -- | Number of healthy MQTT servers |
 | `attraccess_plugins_loaded` | Gauge | -- | Number of loaded plugins |
 | `attraccess_email_sent_total` | Counter | `status` | Emails sent by delivery status |
-| `attraccess_audit_records_dropped_total` | Counter | `domain`, `reason` | Audit records that were not stored. `domain` is the audit domain, core or plugin-registered (`unknown` only when a plugin event could not be turned into an audit record). `reason` is `storage_error` (insert failed, e.g. SQLite busy timeout or constraint), `queue_full` (more than 1,000 writes waiting), `storage_unavailable` (audit storage not available: startup failed or in-memory database), `shutting_down` (record arrived during shutdown), `settings_unavailable` (audit settings could not be read) or `invalid_event` (event rejected; points to a bug). Series start at 0 for every core and registered plugin domain. Disabled audit or a disabled domain is not a drop. Alert: [`AuditRecordsDropped`](monitoring/prometheus-grafana.md#audit-alert) |
+| `attraccess_audit_records_dropped_total` | Counter | `domain`, `reason` | Audit records that were not stored. `domain` is the audit domain, core or plugin-registered (`unknown` only when a plugin event could not be turned into an audit record). `reason` is `storage_error` (insert failed, e.g. lock timeout or constraint), `queue_full` (more than 1,000 writes waiting), `storage_unavailable` (audit storage not available: startup failed), `shutting_down` (record arrived during shutdown), `settings_unavailable` (audit settings could not be read) or `invalid_event` (event rejected; points to a bug). Series start at 0 for every core and registered plugin domain. Disabled audit or a disabled domain is not a drop. Alert: [`AuditRecordsDropped`](monitoring/prometheus-grafana.md#audit-alert) |
 | `attraccess_websocket_connections_active` | Gauge | -- | Active WebSocket connections |
 
 ## WebSocket Timing
@@ -187,6 +187,10 @@ Plugins with the `BLE_TRANSPORT` permission talk to Bluetooth devices through At
 | `attraccess_plugin_ble_session_closes_total` | Counter | `reason` | Closed sessions by reason (`closed`, `lease-expired`, `disconnected`, `cancelled`, ...) |
 | `attraccess_plugin_ble_rejections_total` | Counter | `code` | Calls refused by the profile, the reader allowlist or a payload bound (`OPERATION_NOT_ALLOWED`, `UNKNOWN_CHARACTERISTIC`, `PAYLOAD_TOO_LARGE`) |
 | `attraccess_plugin_ble_notifications_total` | Counter | `outcome` | Notifications by outcome: `delivered` (handed to the plugin's stream), `overflow` (the reader's buffer or the API's per-subscription queue overflowed; the stream fails with `NOTIFICATION_OVERFLOW`), `oversized` (above the profile's `maxNotificationBytes`; `PAYLOAD_TOO_LARGE`), `malformed` (bad encoding or a sequence gap or duplicate from the reader; `INTERNAL`). Every outcome other than `delivered` fails that stream |
+| `attraccess_plugin_ble_watches_active` | Gauge | -- | Open advertisement watches (`context.ble.watch`) |
+| `attraccess_plugin_ble_watch_events_received_total` | Counter | -- | Advertisement watch events the API accepted from readers |
+| `attraccess_plugin_ble_watch_events_routed_total` | Counter | -- | Watch events handed to plugin watches; one event can reach several watches |
+| `attraccess_plugin_ble_watch_events_dropped_total` | Counter | `reason` | Watch events that reached no plugin: `malformed`, `batch-too-large` (more than 8 per message), `rate-limit` (far above the rate the reader announced), `stale-connection` (from a connection the set was not sent to), `access-denied` (reader not open for plugins), `no-watch` (no watch for the named filter), `filter-mismatch` (the profile filter does not match), `queue-full` (the oldest queued event of a busy watch) |
 
 **Operation duration buckets:** 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s, 30s, 60s
 

@@ -1,15 +1,18 @@
+import { closeTestDataSource, createTestDataSource } from '../../test-utils/test-database';
 import { createOperatingTimelineStore } from '../../database/adapters/operating-intervals/typeorm-operating-timeline.store';
-import { DataSource, EntitySchema } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import {
+  Resource,
   ResourceOperatingInterval,
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
   ResourceMaintenanceSchedule,
 } from '@attraccess/database-entities';
 import {
+  ResourceType,
+  ResourceUsageAction,
   ResourceMaintenanceScheduleDurationBasis,
   ResourceMaintenanceScheduleTriggerType,
-  ResourceUsageAction,
   UsageDurationUnit,
 } from '@attraccess/application-models';
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
@@ -19,45 +22,6 @@ import {
   TypeOrmMaintenanceEvaluationView,
 } from '../../database/adapters/resources/maintenance-evaluation-store.adapter';
 import { unitOfWorkFor } from '../../database/adapters/shared-unit-of-work';
-
-const UsageSchema = new EntitySchema<ResourceUsage>({
-  name: 'ResourceUsage',
-  target: ResourceUsage,
-  tableName: 'resource_usage',
-  columns: {
-    id: { type: Number, primary: true, generated: true },
-    resourceId: { type: Number },
-    usageAction: { type: String, default: ResourceUsageAction.Usage },
-    lifecyclePending: { type: Boolean, default: false },
-    startTime: { type: 'datetime' },
-    endTime: { type: 'datetime', nullable: true },
-    usageInMinutes: { type: Number, default: 0 },
-    attributedOperatingDurationInMinutes: { type: Number, nullable: true },
-  },
-});
-const IntervalSchema = new EntitySchema<ResourceOperatingInterval>({
-  name: 'ResourceOperatingInterval',
-  target: ResourceOperatingInterval,
-  tableName: 'resource_operating_interval',
-  columns: {
-    id: { type: Number, primary: true, generated: true },
-    resourceId: { type: Number },
-    startTime: { type: 'datetime' },
-    endTime: { type: 'datetime', nullable: true },
-  },
-});
-
-const AttemptSchema = new EntitySchema<ResourceUsageLifecycleAttempt>({
-  name: 'ResourceUsageLifecycleAttempt',
-  target: ResourceUsageLifecycleAttempt,
-  columns: {
-    id: { type: String, primary: true },
-    resourceId: { type: Number },
-    kind: { type: String },
-    previousUsageId: { type: Number, nullable: true },
-    transitionTime: { type: 'datetime' },
-  },
-});
 
 describe('Maintenance duration from authoritative intervals', () => {
   let dataSource: DataSource;
@@ -75,13 +39,8 @@ describe('Maintenance duration from authoritative intervals', () => {
     });
 
   beforeEach(async () => {
-    dataSource = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      synchronize: true,
-      entities: [UsageSchema, IntervalSchema, AttemptSchema],
-    }).initialize();
+    dataSource = await createTestDataSource();
+    await dataSource.getRepository(Resource).save({ name: 'Laser', type: ResourceType.Machine });
     attribution = new ResourceOperatingAttributionService(createOperatingTimelineStore(dataSource));
     evaluator = new MaintenanceScheduleEvaluatorService(
       new TypeOrmMaintenanceEvaluationStore(dataSource, unitOfWorkFor(dataSource)),
@@ -96,7 +55,7 @@ describe('Maintenance duration from authoritative intervals', () => {
 
   afterEach(async () => {
     jest.useRealTimers();
-    await dataSource.destroy();
+    await closeTestDataSource(dataSource);
   });
 
   it('counts live unattributed operating time and clips operation at the service baseline', async () => {
@@ -114,8 +73,10 @@ describe('Maintenance duration from authoritative intervals', () => {
   it('counts an open usage session up to now without rounding a millisecond up', async () => {
     await dataSource.getRepository(ResourceUsage).save({
       resourceId: 1,
+      usageAction: ResourceUsageAction.Usage,
       startTime: new Date(baseline.getTime() + 1),
       endTime: null,
+      isFinalized: true,
     });
     const session = schedule(ResourceMaintenanceScheduleDurationBasis.SESSION_DURATION);
 
@@ -128,15 +89,15 @@ describe('Maintenance duration from authoritative intervals', () => {
     await dataSource.getRepository(ResourceUsage).save([
       {
         resourceId: 1,
+        usageAction: ResourceUsageAction.Usage,
         startTime: new Date('2026-09-01T08:00:00.000Z'),
         endTime: baseline,
-        usageInMinutes: 120,
       },
       {
         resourceId: 1,
+        usageAction: ResourceUsageAction.Usage,
         startTime: new Date('2026-09-01T09:00:00.000Z'),
         endTime: now,
-        usageInMinutes: 120,
       },
     ]);
 
@@ -148,9 +109,9 @@ describe('Maintenance duration from authoritative intervals', () => {
   it('does not synthesize operating time from historical session snapshots', async () => {
     await dataSource.getRepository(ResourceUsage).save({
       resourceId: 1,
+      usageAction: ResourceUsageAction.Usage,
       startTime: baseline,
       endTime: now,
-      usageInMinutes: 60,
       attributedOperatingDurationInMinutes: 60,
     });
     await expect(
@@ -160,6 +121,7 @@ describe('Maintenance duration from authoritative intervals', () => {
   it('excludes pending sessions while retaining independent machine operation', async () => {
     await dataSource.getRepository(ResourceUsage).save({
       resourceId: 1,
+      usageAction: ResourceUsageAction.Usage,
       startTime: baseline,
       endTime: null,
       lifecyclePending: true,
@@ -181,8 +143,10 @@ describe('Maintenance duration from authoritative intervals', () => {
     async (kind) => {
       const usage = await dataSource.getRepository(ResourceUsage).save({
         resourceId: 1,
+        usageAction: ResourceUsageAction.Usage,
         startTime: baseline,
         endTime: null,
+        isFinalized: true,
       });
       await dataSource.getRepository(ResourceOperatingInterval).save({
         resourceId: 1,
@@ -195,6 +159,8 @@ describe('Maintenance duration from authoritative intervals', () => {
         kind,
         previousUsageId: usage.id,
         transitionTime: new Date('2026-09-01T10:30:00.000Z'),
+        formSubmissions: [],
+        billingItems: [],
       });
 
       const session = schedule(ResourceMaintenanceScheduleDurationBasis.SESSION_DURATION);

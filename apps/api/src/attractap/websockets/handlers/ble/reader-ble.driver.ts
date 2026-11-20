@@ -13,6 +13,7 @@ import { WebsocketService } from '../../websocket.service';
 import { AttractapEventType, type AttractapEvent, type AuthenticatedWebSocket } from '../../websocket.types';
 import { BLE_PROTOCOL_VERSION, loggableInt } from './ble-wire';
 import { ReaderBleChannel } from './reader-ble-channel';
+import { ReaderBleWatch } from './reader-ble-watch';
 
 const realClock: BleSessionClock = {
   now: () => Date.now(),
@@ -26,7 +27,8 @@ const realClock: BleSessionClock = {
 /**
  * Plugin BLE through Attractap readers (ATT-1033/ATT-1036): the `BleTransportDriver` over the reader websocket,
  * protocol v1 (see `ble-wire.ts`). One BLE owner (scan or session) per reader connection; conflicts are refused
- * with `READER_BUSY`, never queued. Everything is bound to the socket instance it started on.
+ * with `READER_BUSY`, never queued. Everything is bound to the socket instance it started on. The advertisement
+ * watch (`reader-ble-watch.ts`) is no owner: it runs beside scans and sessions.
  */
 @Injectable()
 export class ReaderBleDriver implements BleTransportDriver {
@@ -34,6 +36,13 @@ export class ReaderBleDriver implements BleTransportDriver {
   private readonly channels = new WeakMap<AuthenticatedWebSocket, ReaderBleChannel>();
   /** Overridable for tests. */
   public clock: BleSessionClock = realClock;
+  private readonly watch = new ReaderBleWatch({
+    clock: () => this.clock,
+    logger: () => this.logger,
+    metrics: () => this.metrics,
+    readerStatus: (readerId) => this.readerStatus(readerId),
+    currentSocket: (readerId) => this.currentSocket(readerId),
+  });
 
   constructor(
     private readonly websocketService: WebsocketService,
@@ -57,6 +66,10 @@ export class ReaderBleDriver implements BleTransportDriver {
     return this.channelFor(request.readerId, 'connect').connect(request);
   }
 
+  setWatch(request: Parameters<NonNullable<BleTransportDriver['setWatch']>>[0]): void {
+    this.watch.set(request);
+  }
+
   /** Inbound BLE_* message of a reader. Unknown versions, sessions and requests are dropped and logged. */
   handleMessage(socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']): void {
     const payload = eventData.payload as Record<string, unknown> | undefined;
@@ -68,6 +81,8 @@ export class ReaderBleDriver implements BleTransportDriver {
       );
       return;
     }
+    if (eventData.type === AttractapEventType.BLE_WATCH_STATE) return this.watch.handleState(socket, payload);
+    if (eventData.type === AttractapEventType.BLE_WATCH_EVENT) return this.watch.handleEvents(socket, payload);
     const channel = this.channels.get(socket);
     if (!channel) {
       this.logger.debug(
@@ -91,6 +106,7 @@ export class ReaderBleDriver implements BleTransportDriver {
    * fail with DISCONNECTED `reader-link-lost`. Other sockets of the same reader are not touched.
    */
   socketClosed(socket: AuthenticatedWebSocket): void {
+    this.watch.socketClosed(socket);
     const channel = this.channels.get(socket);
     if (!channel) return;
     this.channels.delete(socket);
@@ -110,6 +126,14 @@ export class ReaderBleDriver implements BleTransportDriver {
     for (const other of this.websocketService.sockets.values()) {
       if (other !== socket && other.readerId === socket.readerId && this.channels.has(other)) this.socketClosed(other);
     }
+  }
+
+  /**
+   * READER_FIRMWARE_INFO was applied on `socket` (`capabilities.ble` is known): the advertisement watch set of the
+   * reader goes to this connection, or the reader is reported `unsupported` when its firmware cannot watch.
+   */
+  readerAnnounced(socket: AuthenticatedWebSocket): void {
+    this.watch.readerAnnounced(socket);
   }
 
   /** The newest open connection of the reader: a stale one that did not close yet is never used for new work. */

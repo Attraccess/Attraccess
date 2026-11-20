@@ -8,15 +8,11 @@ import {
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
 } from '@attraccess/database-entities';
-import { EmailTemplateType, ResourceMeteringSessionStatus } from '@attraccess/application-models';
+import { EmailTemplateType, ResourceMeteringSessionStatus, ResourceUsageAction } from '@attraccess/application-models';
 
 import Handlebars from 'handlebars';
 
 import type { DataSource } from 'typeorm';
-
-import { rm } from 'node:fs/promises';
-
-import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
 
 import { readDefaultTemplateBody, SHIPPED_TRANSLATIONS } from '../../../email-template/email-defaults';
 
@@ -26,7 +22,8 @@ import { TypeOrmMeteringStore } from './typeorm-metering.store';
 
 import { MeteringReadings } from '../../../resources/metering/metering-readings';
 
-import { createMeteringPersistence, resetTestFixture } from './fixtures/setup.test-fixture';
+import { withoutIntegrityTriggers } from '../usage/integrity-triggers.test-fixture';
+import { createMeteringPersistence, closeMeteringFixture, resetTestFixture } from './fixtures/setup.test-fixture';
 
 import { createFlowDefinedMeteringFixture } from './fixtures/flow-defined-meters.test-fixture';
 
@@ -39,7 +36,7 @@ const readingsOn = (source: DataSource) => {
   return [store, unitOfWork, new Map<string, Date>()] as const;
 };
 
-// This SQLite suite runs multiple settlements per case; coverage on CI exceeds Jest's five-second default.
+// This PostgreSQL suite runs multiple settlements per case; coverage on CI exceeds Jest's five-second default.
 jest.setTimeout(30_000);
 
 export { Handler } from './fixtures/report-handler.test-fixture';
@@ -57,11 +54,7 @@ describe('Flow-defined metering', () => {
 
   afterEach(async () => {
     scope.usage?.onModuleDestroy();
-    if (scope.source) {
-      await closeResourceTransactionConnection(scope.source);
-      if (scope.source.isInitialized) await scope.source.destroy();
-    }
-    if (scope.directory) await rm(scope.directory, { recursive: true, force: true });
+    await closeMeteringFixture(scope);
     jest.restoreAllMocks();
   });
 
@@ -136,6 +129,7 @@ describe('Flow-defined metering', () => {
         const session = await usages.save({
           resourceId: 1,
           userId: 1,
+          usageAction: ResourceUsageAction.Usage,
           startTime: new Date('2026-01-01T00:00:00Z'),
           isFinalized,
           lifecyclePending,
@@ -145,6 +139,8 @@ describe('Flow-defined metering', () => {
           id: `meter-${session.id}`,
           resourceId: 1,
           usageId: session.id,
+          meterId: 1,
+          meterName: 'Energy',
           status: ResourceMeteringSessionStatus.Active,
           creditsPerUnit: 30,
           collectionMode: 'increment',
@@ -153,15 +149,17 @@ describe('Flow-defined metering', () => {
         return session;
       };
 
-      const orphan = await seedSession(false, false, 'Orphan');
+      // Legacy rows (an orphan, two published sessions of one person) that the integrity guards refuse today.
+      const legacy = <T>(work: () => Promise<T>) => withoutIntegrityTriggers(genericMetersScope.source, work);
+      const orphan = await legacy(() => seedSession(false, false, 'Orphan'));
       const pending = await seedSession(true, true, 'Pending end');
       expect((await genericMetersScope.metering.getLive(1)).meters[0].session).toBeNull();
       await genericMetersScope.metering.report(1, 1, { kind: 'reading', mode: 'increment', value: '1' });
       expect((await genericMetersScope.sessionOf(orphan.id)).latestValue).toBe('0');
       expect((await genericMetersScope.sessionOf(pending.id)).latestValue).toBe('0');
 
-      const older = await seedSession(true, false, 'Older');
-      const newest = await seedSession(true, false, 'Newest');
+      const older = await legacy(() => seedSession(true, false, 'Older'));
+      const newest = await legacy(() => seedSession(true, false, 'Newest'));
       expect((await genericMetersScope.usage.getActiveSession(1))?.id).toBe(newest.id);
       expect((await genericMetersScope.metering.getLive(1)).meters[0].session).toMatchObject({
         usageId: newest.id,
@@ -288,6 +286,7 @@ describe('Flow-defined metering', () => {
       await genericMetersScope.source.getRepository(ResourceFlowNode).save({
         id: 'increment-report',
         resourceId: 1,
+        position: { x: 0, y: 0 },
         type: genericMetersScope.T.OUTPUT_METERING_REPORT,
         data: { meterId: 1, mode: 'increment', value: '1' },
       });
@@ -459,6 +458,7 @@ describe('Flow-defined metering', () => {
         await genericMetersScope.source.getRepository(ResourceFlowNode).save({
           id: 'increment-report',
           resourceId: 1,
+          position: { x: 0, y: 0 },
           type: genericMetersScope.T.OUTPUT_METERING_REPORT,
           data: { meterId: 1, mode: 'increment', value: '1' },
         });
@@ -512,6 +512,7 @@ describe('Flow-defined metering', () => {
       await genericMetersScope.source.getRepository(ResourceFlowNode).save({
         id: 'heartbeat-report',
         resourceId: 1,
+        position: { x: 0, y: 0 },
         type: genericMetersScope.T.OUTPUT_METERING_REPORT,
         data: { meterId: other.id, mode: 'increment', value: '1' },
       });
@@ -573,12 +574,14 @@ describe('Flow-defined metering', () => {
         {
           id: 'increment-report',
           resourceId: 1,
+          position: { x: 0, y: 0 },
           type: genericMetersScope.T.OUTPUT_METERING_REPORT,
           data: { meterId: 1, mode: 'increment', value: '1' },
         },
         {
           id: 'total-report',
           resourceId: 1,
+          position: { x: 0, y: 0 },
           type: genericMetersScope.T.OUTPUT_METERING_REPORT,
           data: { meterId: 1, mode, value: '105' },
         },
@@ -602,6 +605,7 @@ describe('Flow-defined metering', () => {
       await genericMetersScope.source.getRepository(ResourceFlowNode).save({
         id: 'increment-report',
         resourceId: 1,
+        position: { x: 0, y: 0 },
         type: genericMetersScope.T.OUTPUT_METERING_REPORT,
         data: { meterId: 1, mode: 'increment', value: '1' },
       });
@@ -649,7 +653,7 @@ describe('Flow-defined metering', () => {
       ]);
     });
 
-    // Multiple SQLite settlements and receipt rendering run slower under CI coverage.
+    // Multiple settlements and receipt rendering run slower under CI coverage.
     it.each(['en', 'de'])(
       'carries paid, free, zero and unavailable meter evidence from settlement into the %s receipt',
       async (locale) => {
@@ -797,6 +801,7 @@ describe('Flow-defined metering', () => {
       await genericMetersScope.source.getRepository(ResourceFlowNode).save({
         id: 'increment-report',
         resourceId: 1,
+        position: { x: 0, y: 0 },
         type: genericMetersScope.T.OUTPUT_METERING_REPORT,
         data: { meterId: 1, mode: 'increment', value: '1' },
       });
@@ -816,6 +821,7 @@ describe('Flow-defined metering', () => {
       await genericMetersScope.source.getRepository(ResourceFlowNode).save({
         id: 'increment-report',
         resourceId: 1,
+        position: { x: 0, y: 0 },
         type: genericMetersScope.T.OUTPUT_METERING_REPORT,
         data: { meterId: 1, mode: 'increment', value: '1' },
       });

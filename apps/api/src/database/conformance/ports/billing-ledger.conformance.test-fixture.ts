@@ -190,27 +190,24 @@ export function describeBillingLedgerConformance(fixture: PortBackendFixture): v
         expect(await balanceOf(held.userId)).toBe(1);
       });
 
-      (fixture.concurrentWriters ? it : it.skip)(
-        'commits a unit of work on another account on a second connection while the first one is open',
-        async () => {
-          const held = await db.seedMember('held-writer');
-          const free = await db.seedMember('free-writer');
-          const { release, unit } = await holdOpenUnit(held.userId);
-          try {
-            const write = other.ports.unitOfWork.run((scope) =>
-              other.ports.billingLedger.insertTransaction(
-                { userId: free.userId, amount: 4, status: BillingTransactionStatus.Completed },
-                { context: scope },
-              ),
-            );
-            expect(await settlesWithin(write, 2_000)).toBe(true);
-          } finally {
-            release();
-            await unit;
-          }
-          expect([await balanceOf(held.userId), await balanceOf(free.userId)]).toEqual([1, 4]);
-        },
-      );
+      it('commits a unit of work on another account on a second connection while the first one is open', async () => {
+        const held = await db.seedMember('held-writer');
+        const free = await db.seedMember('free-writer');
+        const { release, unit } = await holdOpenUnit(held.userId);
+        try {
+          const write = other.ports.unitOfWork.run((scope) =>
+            other.ports.billingLedger.insertTransaction(
+              { userId: free.userId, amount: 4, status: BillingTransactionStatus.Completed },
+              { context: scope },
+            ),
+          );
+          expect(await settlesWithin(write, 2_000)).toBe(true);
+        } finally {
+          release();
+          await unit;
+        }
+        expect([await balanceOf(held.userId), await balanceOf(free.userId)]).toEqual([1, 4]);
+      });
 
       it('lets the second account commit once the first unit of work finished, without a deadlock', async () => {
         const held = await db.seedMember('held-queued');

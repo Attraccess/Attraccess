@@ -16,7 +16,7 @@ export type OpenStartupSettings = () => Promise<StandaloneSettingsRows | null>;
 const openBackendStartupSettings: OpenStartupSettings = () => resolveDatabaseBackend().plugins.openStartupSettings();
 
 /**
- * Opening SQLite can wait on a lock (busy timeout) and verifying the key is CPU work. Either way, startup waits a
+ * Opening the database can wait (connection or lock timeout) and verifying the key is CPU work. Either way, startup waits a
  * bounded time only; past it, license-gated plugins stay unloaded.
  */
 export const STARTUP_LICENSE_TIMEOUT_MS = 15_000;

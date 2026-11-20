@@ -70,11 +70,11 @@ export class PasswordPolicyOverride {
   })
   rotationDays!: number | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'When the override row was created' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'When the override row was last updated' })
   updatedAt!: Date;
 

@@ -14,6 +14,9 @@ import { TransactionContextResolver } from '../transaction-context';
 import type { CredentialStore } from '../../../users-and-auth/auth/credentials/credential-store.port';
 import { appendPasswordHistory } from './password-history';
 
+/** Advisory lock namespace (first key of the two-key form) for changes of a user's local password. */
+const LOCAL_PASSWORD_LOCK = 584_401;
+
 function toCredentialRecord(detail: AuthenticationDetail): CredentialRecord {
   return { id: detail.id, userId: detail.userId, type: detail.type };
 }
@@ -77,6 +80,9 @@ export class TypeOrmCredentialStore implements CredentialStore {
   ): Promise<void> {
     return this.transactions.run(context, async (manager) => {
       const details = manager.getRepository(AuthenticationDetail);
+      // Two changes of one user's password queue here, so the second archives the hash the first one stored and a
+      // first password cannot be created twice.
+      await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [LOCAL_PASSWORD_LOCK, userId]);
       const current = await details.findOne({ where: { userId, type: AuthenticationType.LOCAL_PASSWORD } });
       if (!current) {
         const created = new AuthenticationDetail();

@@ -87,6 +87,7 @@ jobs:
         attractap-firmware-version,
         wago-runtime-version,
         balena-compose-check,
+        backup-sidecar,
         fail2ban-smoke,
         grafana-provisioning-smoke,
       ]
@@ -236,26 +237,38 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_TYPE: postgres
+      DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/attraccess
+      # Admin connection the tests create one database per test from.
+      TEST_DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/postgres
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - uses: ./.github/actions/start-postgres
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
       # Runs every test target, api:test-conformance included: the backend-parameterised persistence contract
-      # (ATT-1146) on real SQLite files with independent connections. api:test leaves those specs to it.
+      # (ATT-1146) on a real PostgreSQL service with independent connections. api:test leaves those specs to it.
       - name: Test all core projects
         run: node scripts/ci-test-projects.mjs --group=core
 
   browser-e2e:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_TYPE: postgres
+      DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/attraccess
+      # Admin connection the tests create one database per test from.
+      TEST_DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/postgres
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - uses: ./.github/actions/start-postgres
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
@@ -273,10 +286,15 @@ jobs:
 
   crap-score:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_TYPE: postgres
+      DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/attraccess
+      TEST_DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/postgres
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - uses: ./.github/actions/start-postgres
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
@@ -295,11 +313,17 @@ jobs:
     # RabbitMQ plugin E2E tests use Testcontainers and require Docker, which is
     # available on the stable Ubuntu runner image.
     runs-on: ubuntu-26.04
+    env:
+      DATABASE_TYPE: postgres
+      DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/attraccess
+      # Admin connection the tests create one database per test from.
+      TEST_DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/postgres
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - uses: ./.github/actions/start-postgres
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
@@ -377,6 +401,40 @@ jobs:
           esp-idf: 'false'
       - name: Validate docker-compose.balena.yml with balena's parser
         run: pnpm nx run @attraccess/source:check-balena-compose
+
+  backup-sidecar:
+    # Builds the restic backup sidecar (docker/backup) and runs its backup/restore round trip against a real
+    # PostgreSQL. The job always runs (it is gated above); the steps only do work when the sidecar changed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Detect sidecar changes
+        id: changes
+        run: |
+          if git diff --quiet "$NX_AFFECTED_BASE"...HEAD -- docker/backup .github/workflows/pull-requests.yml .github/actions/start-postgres; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Start PostgreSQL
+        if: steps.changes.outputs.changed == 'true'
+        uses: ./.github/actions/start-postgres
+        with:
+          port: '55432'
+          container-name: backup-test-postgres
+      - name: Build the backup sidecar image
+        if: steps.changes.outputs.changed == 'true'
+        run: docker build -t attraccess-backup docker/backup
+      - name: Run the backup/restore round trip
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          docker run --rm --network host \
+            -e TEST_DATABASE_URL=postgres://attraccess:attraccess@127.0.0.1:55432/postgres \
+            -v "$PWD/docker/backup/test:/test:ro" --entrypoint sh attraccess-backup /test/backup-restore.test.sh
 
   build-companion:
     uses: ./.github/workflows/build-companion-binaries.yml

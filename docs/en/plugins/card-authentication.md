@@ -18,7 +18,8 @@ A card enrolled at an Attractap therefore works the same way at the plugin's dev
 | Access decisions after authentication                          | Limits, timeouts and the server-wide conversation budget         |
 
 Card keys and session keys never leave the API. The plugin only sees the APDUs Attraccess sends and the card's answers;
-both are protected by the card's secure messaging. The result carries the card's `id`, `uid` and `userId`, nothing else.
+both are protected by the card's secure messaging. The result carries the card's `id`, `uid` and `userId`, nothing else;
+for a plugin with `READER_DEVICES` also `authentication` (see below).
 
 ## Permission
 
@@ -58,6 +59,14 @@ async function onCardPresented(
   return access.allowed ? grant(result.card.userId) : deny('NO_ACCESS');
 }
 ```
+
+### Opening a door with the result
+
+Authentication only says whose card it is. To run an action of Attraccess with it, for example to open an access-only
+door, register the device as a [plugin reader](plugins/plugin-readers.md) (permission `READER_DEVICES`). For such a
+plugin, a successful result also carries `card.authentication`: an opaque, single-use proof of this authentication on
+this `device`, valid for 30 seconds, that `context.readers.tap` takes. It is absent without `READER_DEVICES` and on
+hosts predating plugin readers, so check for it: `if (context.readers && result.card.authentication)`. Never log it.
 
 ### The card channel
 

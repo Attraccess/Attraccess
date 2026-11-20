@@ -120,7 +120,7 @@ export class SSOProviderSAMLConfiguration {
   provisioningSecret?: string | null;
 
   // ponytail: keeps the legacy 'permissionMappings' DB column — renaming it would need a migration for zero gain
-  @Column({ type: 'json', nullable: true, name: 'permissionMappings' })
+  @Column({ type: 'jsonb', nullable: true, name: 'permissionMappings' })
   @ApiProperty({
     description: 'Mapping between Attraccess role keys and SAML role/group attribute values',
     required: false,
@@ -172,13 +172,13 @@ export class SSOProviderSAMLConfiguration {
   @ApiProperty({ description: 'Identity Provider Single Logout endpoint', required: false, nullable: true })
   logoutURL?: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the configuration was created',
   })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the configuration was last updated',
   })

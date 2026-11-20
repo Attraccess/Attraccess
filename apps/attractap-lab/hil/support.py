@@ -1,15 +1,20 @@
 """Reader console capture and a minimal Attraccess API client for lab tests."""
 
+import base64
 import json
+import os
 import re
-import sqlite3
+import subprocess
 import threading
 import time
 import urllib.error
 import urllib.request
 import uuid
+from pathlib import Path
 
 from pexpect import TIMEOUT
+
+DB_QUERY = Path(__file__).with_name("db-query.mjs")
 
 
 class ReaderConsole:
@@ -126,9 +131,25 @@ class ConsoleStream:
 class Api:
     """The few Attraccess REST calls the lab tests need, plus dev-DB user setup."""
 
-    def __init__(self, base_url, database):
+    def __init__(self, base_url, database_url):
         self.base = base_url.rstrip("/") + "/api"
-        self.database = database
+        self.database_url = database_url
+
+    def sql(self, statement, *args):
+        """Run one statement on the run's throwaway PostgreSQL database; return ``(rows, changes)``.
+
+        ``?`` marks parameters; camelCase identifiers need double quotes. Rows are lists of values in column
+        order (bytea columns arrive as ``bytes``). Goes through ``db-query.mjs`` (Node and the API's ``pg``
+        driver), so the lab's Python needs no database driver.
+        """
+        done = subprocess.run(["node", str(DB_QUERY)], input=json.dumps({"sql": statement, "params": list(args)}),
+                              capture_output=True, text=True, env={**os.environ, "DATABASE_URL": self.database_url})
+        if done.returncode != 0:
+            raise RuntimeError(f"database statement failed: {done.stderr.strip()}\n{statement}")
+        answer = json.loads(done.stdout)
+        rows = [[base64.b64decode(value["$bytes"]) if isinstance(value, dict) and "$bytes" in value else value
+                 for value in row] for row in answer["rows"]]
+        return rows, answer["changes"]
 
     def call(self, method, path, body=None, token=None, form=None, timeout=40):
         headers = {"Authorization": f"Bearer {token}"} if token else {}
@@ -166,13 +187,13 @@ class Api:
         The run uses a throwaway database, so writing it directly avoids the
         e-mail verification round trip.
         """
-        with sqlite3.connect(self.database) as db:
-            row = db.execute("SELECT id FROM user WHERE username = ?", (username,)).fetchone()
-            if row:
-                return row[0]
-            cursor = db.execute("INSERT INTO user (username, email, isEmailVerified) VALUES (?, ?, 1)",
-                                (username, f"{username}@lab.test"))
-            db.execute("INSERT INTO authentication_detail (userId, type, password) "
-                       "SELECT ?, 'local_password', password FROM authentication_detail "
-                       "WHERE userId = (SELECT id FROM user WHERE username = 'admin')", (cursor.lastrowid,))
-            return cursor.lastrowid
+        rows, _ = self.sql('SELECT id FROM "user" WHERE username = ?', username)
+        if rows:
+            return rows[0][0]
+        rows, _ = self.sql('INSERT INTO "user" (username, email, "isEmailVerified") VALUES (?, ?, true) RETURNING id',
+                           username, f"{username}@lab.test")
+        user_id = rows[0][0]
+        self.sql('INSERT INTO authentication_detail ("userId", type, password) '
+                 "SELECT ?::int, 'local_password', password FROM authentication_detail "
+                 "WHERE \"userId\" = (SELECT id FROM \"user\" WHERE username = 'admin')", user_id)
+        return user_id

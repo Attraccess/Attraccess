@@ -32,6 +32,7 @@ export interface NewResource {
   maxParallelSessions: number;
   type: ResourceType;
   separateUnlockAndUnlatch: boolean;
+  accessOnly: boolean;
   metadata: Record<string, unknown> | null;
   retrainingMaxAgeDays: number | null;
   retrainingMaxInactivityDays: number | null;

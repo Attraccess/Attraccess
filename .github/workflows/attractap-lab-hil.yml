@@ -61,7 +61,10 @@ jobs:
     runs-on: ubuntu-latest
     environment: attractap-lab
     timeout-minutes: 90
+    # The API the readers talk to needs its PostgreSQL (the test database is dropped with the runner).
     env:
+      DATABASE_TYPE: postgres
+      DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/attraccess
       LAB_HOST: ${{ vars.LAB_HOST }}
       LG_COORDINATOR: ${{ vars.LAB_HOST }}:${{ vars.ATTRACTAP_LAB_COORDINATOR_PORT || '20408' }}
       LG_PLACE_NAME: ${{ matrix.place }}
@@ -85,6 +88,7 @@ jobs:
 
       - uses: actions/checkout@v7
 
+      - uses: ./.github/actions/start-postgres
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'true'

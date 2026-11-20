@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  allSources,
   checkAgainstBaseline,
   compareWithBaseline,
+  countRemovedRuntime,
   countViolations,
   describeResult,
+  findRemovedRuntime,
   findViolations,
   isChecked,
   isPluginZone,
@@ -50,7 +53,7 @@ test('flags every subpath of the persistence packages', () => {
 
 test('adapter internals may only be imported by Nest composition files and tests', () => {
   const adapter = "import { X } from '../database/adapters/projects/typeorm-project.store';";
-  const engine = "import { Y } from '../database/sqlite/run-serialized-transaction';";
+  const engine = "import { Y } from '../database/postgres/postgres-backend';";
   for (const content of [adapter, engine]) {
     assert.equal(find(content, 'apps/api/src/projects/projects.service.ts').length, 1);
     assert.equal(find(content, 'apps/api/src/projects/project.dto.ts').length, 1);
@@ -62,6 +65,30 @@ test('adapter internals may only be imported by Nest composition files and tests
   // The neutral seam of the database folder is not an adapter internal.
   assert.equal(find("import { UNIT_OF_WORK } from '../database/unit-of-work';").length, 0);
   assert.equal(find("import { parseDatabaseType } from '../database/backend';").length, 0);
+});
+
+test('the SQLite import at startup may be started by the process entry points and composition files', () => {
+  const transfer = "import { prepareDatabaseAtStartup } from './database/transfer/startup-transfer';";
+  assert.equal(find(transfer, 'apps/api/src/main.bootstrap.ts').length, 0);
+  assert.equal(find(transfer, 'apps/api/src/main.ts').length, 0);
+  assert.equal(find(transfer, 'apps/api/src/app/app.module.ts').length, 0);
+  assert.equal(
+    find("import { x } from '../database/transfer/sqlite-to-postgres';", 'apps/api/src/a/a.service.ts').length,
+    1,
+  );
+});
+
+test('SQLite code is for the one-way import only: tests and the import path may use it, composition files may not', () => {
+  const sqlite = "import { createSqliteSource } from '../database/sqlite/sqlite-source';";
+  assert.equal(find(sqlite, 'apps/api/src/projects/projects.service.ts').length, 1);
+  assert.equal(find(sqlite, 'apps/api/src/projects/projects.module.ts').length, 1);
+  assert.equal(
+    find("import { createSqliteSource } from './database/sqlite/sqlite-source';", 'apps/api/src/main.bootstrap.ts')
+      .length,
+    1,
+  );
+  assert.equal(find(sqlite, 'apps/api/src/projects/projects.service.spec.ts').length, 0);
+  assert.equal(find(sqlite, 'apps/api/src/e2e/migrations/fixtures/x.test-fixture.ts').length, 0);
 });
 
 test('a Nest module still may not import the ORM itself', () => {
@@ -194,7 +221,11 @@ test('the plugin debt lists the plugin-zone files that are on the baseline or st
 });
 
 test('flags relative imports of adapter internals but not neutral modules', () => {
-  assert.equal(find("import { x } from '../../database/sqlite/sqlite-connection';", 'apps/api/src/a/b/c.ts').length, 1);
+  assert.equal(find("import { x } from '../../database/sqlite/sqlite-source';", 'apps/api/src/a/b/c.ts').length, 1);
+  assert.equal(
+    find("import { x } from '../../database/postgres/postgres-backend';", 'apps/api/src/a/b/c.ts').length,
+    1,
+  );
   assert.equal(
     find("import { x } from '../../../../libs/database-entities/src/index';", 'apps/api/src/a/b/c.ts').length,
     1,
@@ -208,7 +239,9 @@ test('ignores mentions in strings and comments', () => {
 });
 
 test('persistence implementation code is allowed, application code is checked', () => {
-  assert.equal(isChecked('apps/api/src/database/sqlite/sqlite-backend.ts'), false);
+  assert.equal(isChecked('apps/api/src/database/postgres/postgres-backend.ts'), false);
+  assert.equal(isChecked('apps/api/src/database/sqlite/sqlite-source.ts'), false);
+  assert.equal(isChecked('apps/api/src/database/transfer/startup-transfer.ts'), false);
   assert.equal(isChecked('apps/api/src/database/migrations/1-x.ts'), false);
   assert.equal(isChecked('libs/database-entities/src/lib/entities/user.entity.ts'), false);
   assert.equal(isChecked('apps/api/src/billing/billing.integration.spec.ts'), false);
@@ -220,7 +253,15 @@ test('persistence implementation code is allowed, application code is checked', 
 });
 
 test('only the engine folders of the database code are allowed; its neutral seam is checked', () => {
-  for (const folder of ['adapters/users', 'sqlite', 'conformance', 'migrations', 'migration-helpers']) {
+  for (const folder of [
+    'adapters/users',
+    'postgres',
+    'sqlite',
+    'transfer',
+    'conformance',
+    'migrations',
+    'migration-helpers',
+  ]) {
     assert.equal(isChecked(`apps/api/src/database/${folder}/x.ts`), false, folder);
   }
   assert.equal(isChecked('apps/api/src/database/backend/resolve-database-backend.ts'), false);
@@ -237,6 +278,50 @@ test('only the engine folders of the database code are allowed; its neutral seam
   ]) {
     assert.equal(isChecked(`apps/api/src/database/${file}`), true, file);
   }
+});
+
+test('finds the removed SQLite runtime anywhere: its modules and the names of its process-wide write lock', () => {
+  const removed = (content, file = 'apps/api/src/x/x.service.ts') => findRemovedRuntime(file, content);
+  assert.deepEqual(removed("import { runSerializedTransaction } from './run-serialized-transaction';"), [
+    './run-serialized-transaction',
+    'runSerializedTransaction',
+  ]);
+  assert.equal(removed("import { sqliteBackend } from '../sqlite/sqlite-backend';").length, 2);
+  assert.equal(removed("import { createSqliteUnitOfWork } from '../sqlite/sqlite-unit-of-work';").length, 2);
+  assert.equal(removed('await acquireFileLock(key);\nreleaseFileLock(key);').length, 2);
+  assert.equal(removed("import { sqliteFrozenTrack } from '../sqlite/sqlite-frozen-track';").length, 0);
+  assert.equal(removed("import { createSqliteSource } from '../sqlite/sqlite-source';").length, 0);
+  // Not even the persistence folders and tests may bring it back.
+  assert.equal(removed('export const sqliteBackend = {};', 'apps/api/src/database/sqlite/sqlite-backend.ts').length, 1);
+  assert.equal(
+    removed('runSerializedTransaction();', 'apps/api/src/database/adapters/x/x.persistence.spec.ts').length,
+    1,
+  );
+  // Mentions in comments and strings do not count; other files are not sources.
+  assert.equal(removed("// runSerializedTransaction\nconst s = 'sqliteBackend';").length, 0);
+  assert.equal(removed('runSerializedTransaction();', 'docs/example.md').length, 0);
+});
+
+test('counts the removed SQLite runtime per file and never accepts it on the baseline', () => {
+  const sources = new Map([
+    ['apps/api/src/database/adapters/a.persistence.spec.ts', 'sqliteBackend.x(); sqliteBackend.y();'],
+    ['apps/api/src/b.ts', 'const ok = 1;'],
+  ]);
+  assert.deepEqual(countRemovedRuntime(sources), { 'apps/api/src/database/adapters/a.persistence.spec.ts': 2 });
+  const file = 'apps/api/src/database/adapters/a.persistence.spec.ts';
+  const { problems } = checkAgainstBaseline({}, { [file]: 5 }, false, { [file]: 2 });
+  assert.equal(problems.length, 2);
+  assert.match(problems[1], new RegExp(`${file.replaceAll('.', '\\.')}: 2 use\\(s\\) of the removed SQLite runtime`));
+  assert.deepEqual(checkAgainstBaseline({}, {}, false, {}), { problems: [], debt: [] });
+});
+
+test('reads every source file of the working tree for the removed-runtime rule, allowed folders included', () => {
+  const contents = { 'apps/api/src/database/adapters/b.ts': 'b', 'apps/api/src/a.ts': 'a' };
+  const sources = allSources(
+    () => ['apps/api/src/database/adapters/b.ts', 'apps/api/src/a.ts', 'apps/api/src/gone.ts', 'README.md'],
+    (file) => contents[file],
+  );
+  assert.deepEqual([...sources.keys()], ['apps/api/src/database/adapters/b.ts', 'apps/api/src/a.ts']);
 });
 
 test('the baseline only shrinks', () => {

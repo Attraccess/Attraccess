@@ -9,7 +9,7 @@ import { f, table } from '@attraccess/plugins-backend-sdk';
  * - Timestamps are ISO-8601 strings in `varchar` columns, compared lexicographically (so `f.string`, not `f.timestamp`).
  * - Snapshots, provenance and metadata are JSON documents in `text` columns, serialized by the plugin (so `f.text`).
  * - Text that can exceed 255 characters (free-form text, values reported by a controller or set by an administrator
- *   without a length check) is declared `f.text`; the legacy `varchar` columns are unbounded and SQLite gives both
+ *   without a length check) is declared `f.text`; the legacy `varchar` columns are unbounded and the 1.x SQLite database gave both
  *   the same TEXT affinity, so adoption is unaffected.
  * - Core identifiers (MQTT server ids, user ids) are plain integers. Only plugin tables are referenced.
  * - Lease deadlines are epoch milliseconds in integer columns (`bigint` in the 1.x layout).

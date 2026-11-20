@@ -289,6 +289,7 @@ export default plugin;
 | `context.license`                                         | Query the license (`getLicense`, `hasModule`, `verify`). Optional: older hosts do not provide it. See [License requirements](#license-requirements).              | none                     |
 | `context.ble`                                             | Bluetooth transport through Attractap readers: profiles, endpoints, sessions. See [Bluetooth Transport for Plugins](plugins/ble-transport.md).                    | `BLE_TRANSPORT`          |
 | `context.cards`                                           | Authenticate NFC cards held to your plugin's own devices. See [Card Authentication for Plugins](plugins/card-authentication.md).                                  | `CARD_AUTHENTICATION`    |
+| `context.readers`                                         | Register your plugin's own card readers and run their action on their resource for a card authenticated on them. See [Plugin Readers](plugins/plugin-readers.md). | `READER_DEVICES`         |
 
 > [!IMPORTANT]
 > A plugin has no database access. Keep data of your own in declared tables through `context.storage`
@@ -304,22 +305,23 @@ array. At runtime the host hands your plugin a **guarded** `PluginContext`:
 accessing a capability whose permission you did not declare throws a clear error
 naming the missing permission.
 
-| Permission               | Grants access to                                                                                                                                                                                                                          |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `READ_USERS`             | `context.hostData.users` — read user names, languages, account state and role-based permission holders.                                                                                                                                   |
-| `ACCESS_RESOURCES`       | `context.hostData.resources` — read resources — and the read-only `context.resourceAccess` queries. See [Resource access](#resource-access-queries).                                                                                      |
-| `READ_SETTINGS`          | `context.hostData.settings` — read application settings.                                                                                                                                                                                  |
-| `PLUGIN_STORAGE`         | `context.storage` and `context.persistence`: the declared tables of your own plugin and transactions over them. No access to core tables. See [Plugin Storage](plugins/plugin-storage.md).                                                |
-| `TRIGGER_FLOWS`          | `context.flows.trigger(...)` and `context.hostData.flows` (flow node lookups).                                                                                                                                                            |
-| `EMIT_EVENTS`            | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`.                                                                                                                                                               |
-| `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                                                                                                                                                   |
-| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                                                                                          |
-| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)`, `context.mqtt.subscribe(...)`, and `context.mqtt.publish(...)` — access an MQTT server through the host's pooled connection.                                                                     |
-| `READER_UI`              | `context.readerUi.invalidate(...)` and the `readerUi` provider — show widgets on Attractap reader screens. See [Reader UI](#reader-ui-and-start-hooks).                                                                                   |
-| `ACCESS_HOOKS`           | The `preStartHook`, `sessionEndHook`, `startBlockedQuery` and `startCapacityHook` — ask for a confirmation or block a session start, and show a blocked start in the UI. See [Reader UI](#reader-ui-and-start-hooks).                     |
-| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` — send in-app, push and email notifications under categories the plugin declares, and declare editable email templates. See [Notifications](#notifications).                                        |
-| `BLE_TRANSPORT`          | `context.ble` — use the Bluetooth radio of Attractap readers an administrator opened for plugins, limited to the BLE profiles your plugin registers. See [Bluetooth Transport for Plugins](plugins/ble-transport.md).                     |
-| `CARD_AUTHENTICATION`    | `context.cards` — authenticate NFC cards held to your plugin's own devices with the Attraccess card keys; your plugin gets the card and its owner, never the keys. See [Card Authentication for Plugins](plugins/card-authentication.md). |
+| Permission               | Grants access to                                                                                                                                                                                                                                    |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `READ_USERS`             | `context.hostData.users` — read user names, languages, account state and role-based permission holders.                                                                                                                                             |
+| `ACCESS_RESOURCES`       | `context.hostData.resources` — read resources — and the read-only `context.resourceAccess` queries. See [Resource access](#resource-access-queries).                                                                                                |
+| `READ_SETTINGS`          | `context.hostData.settings` — read application settings.                                                                                                                                                                                            |
+| `PLUGIN_STORAGE`         | `context.storage` and `context.persistence`: the declared tables of your own plugin and transactions over them. No access to core tables. See [Plugin Storage](plugins/plugin-storage.md).                                                          |
+| `TRIGGER_FLOWS`          | `context.flows.trigger(...)` and `context.hostData.flows` (flow node lookups).                                                                                                                                                                      |
+| `EMIT_EVENTS`            | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`.                                                                                                                                                                         |
+| `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                                                                                                                                                             |
+| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                                                                                                    |
+| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)`, `context.mqtt.subscribe(...)`, and `context.mqtt.publish(...)` — access an MQTT server through the host's pooled connection.                                                                               |
+| `READER_UI`              | `context.readerUi.invalidate(...)` and the `readerUi` provider — show widgets on Attractap reader screens. See [Reader UI](#reader-ui-and-start-hooks).                                                                                             |
+| `ACCESS_HOOKS`           | The `preStartHook`, `sessionEndHook`, `startBlockedQuery` and `startCapacityHook` — ask for a confirmation or block a session start, and show a blocked start in the UI. See [Reader UI](#reader-ui-and-start-hooks).                               |
+| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` — send in-app, push and email notifications under categories the plugin declares, and declare editable email templates. See [Notifications](#notifications).                                                  |
+| `BLE_TRANSPORT`          | `context.ble` — use the Bluetooth radio of Attractap readers an administrator opened for plugins, limited to the BLE profiles your plugin registers. See [Bluetooth Transport for Plugins](plugins/ble-transport.md).                               |
+| `CARD_AUTHENTICATION`    | `context.cards` — authenticate NFC cards held to your plugin's own devices with the Attraccess card keys; your plugin gets the card and its owner, never the keys. See [Card Authentication for Plugins](plugins/card-authentication.md).           |
+| `READER_DEVICES`         | `context.readers` — register your plugin's own card readers; a card authenticated on one runs its action on its assigned resource for the card owner, with the same checks as an Attractap reader. See [Plugin Readers](plugins/plugin-readers.md). |
 
 ### Plugin-declared RBAC permissions
 
@@ -775,10 +777,12 @@ Keep effects in `afterCommit` so the caller can run the whole transaction again.
 - pass `{ scope }` on every write inside `work`. A write without it is rejected with `PluginStorageInvalid`; only a
   read without a scope runs outside the transaction, and it does not see the uncommitted writes of `work`.
 
-How the host orders transactions is an engine detail. On SQLite it runs them one at a time per host process, sharing
-that queue with core session starts and ends, so plugins that need exclusion across several API instances need a
-cross-instance lock of their own; the reservations plugin runs on a single instance for that reason (see
-[Reservations](plugins/reservations/administration.md#single-instance-operation)).
+The host either orders the transactions of your plugin (one runs after the other) or fails one with
+`PluginStorageConflict`; it never retries. On PostgreSQL every transaction of a plugin, and every write without a
+scope, first takes a lock of that plugin in the database, so the order also holds across several API instances. Core
+session starts and ends and other plugins are not queued behind it. State a plugin keeps in its process (an in-process
+lock, a cache, a scheduler) is not shared between instances; the reservations plugin runs on a single instance for that
+reason (see [Reservations](plugins/reservations/administration.md#single-instance-operation)).
 
 ### Flow nodes
 

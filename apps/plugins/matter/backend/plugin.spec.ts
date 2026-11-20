@@ -126,7 +126,7 @@ describe('host-version declarations', () => {
   });
 
   it('use the plugin release listed in the table', () => {
-    expect(combination.plugin).toBe('0.4.0-alpha.0');
+    expect(combination.plugin).toBe('0.5.0-alpha.0');
     expect(read('package.json').version).toBe(combination.plugin);
     expect(read('plugin.json').version).toBe(combination.plugin);
   });

@@ -26,13 +26,13 @@ export class ResourceMaintenanceSchedule {
   })
   id!: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the schedule was created',
   })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the schedule was last updated',
   })

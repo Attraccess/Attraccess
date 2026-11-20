@@ -10,6 +10,7 @@ import {
   useUnlockDoor,
   useUnlatchDoor,
   useLockDoor,
+  useOpenDoor,
   ApiError,
   FormSubmissionRequestDto,
   UseResourceUsageGetActiveSessionKeyFn,
@@ -182,6 +183,13 @@ export function StartSessionControls(
     },
   });
 
+  const { mutate: openDoorMutate, isPending: openDoorIsPending } = useOpenDoor(undefined, {
+    onSuccess: onStartSuccess,
+    onError: (error) => {
+      onStartError(error as ApiError);
+    },
+  });
+
   const [selectedProjectId, setSelectedProjectId] = useState<number | undefined>(undefined);
 
   const isFormsMissingError = useCallback((error: unknown) => {
@@ -283,6 +291,7 @@ export function StartSessionControls(
     () => unlatchDoorMutate({ path: { resourceId: resourceId } }),
     [resourceId, unlatchDoorMutate],
   );
+  const handleOpenDoor = useCallback(() => openDoorMutate({ path: { resourceId: resourceId } }), [openDoorMutate, resourceId]);
 
   return (
     <div {...divProps}>
@@ -292,10 +301,13 @@ export function StartSessionControls(
             onLock={handleLockDoor}
             onUnlock={handleUnlockDoor}
             onUnlatch={resource.separateUnlockAndUnlatch ? handleUnlatchDoor : undefined}
+            onOpen={handleOpenDoor}
             lockIsPending={lockDoorIsPending}
             unlockIsPending={unlockDoorIsPending}
             unlatchIsPending={unlatchDoorIsPending}
+            openIsPending={openDoorIsPending}
             separateUnlockAndUnlatch={resource.separateUnlockAndUnlatch}
+            accessOnly={resource.accessOnly}
           />
         )}
         {/* Plugins block session starts only (pre-start hook); door actions never pass that hook, so the door

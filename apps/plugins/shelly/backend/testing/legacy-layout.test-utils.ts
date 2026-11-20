@@ -135,8 +135,8 @@ export function describeDeclaredTable(physicalName: string, declared: PluginStor
 }
 
 /**
- * A `text` field matches an unbounded legacy `varchar`: SQLite stores both as TEXT without a length check, so the
- * adopted column is the same. Declarations use `text` where a value can exceed the 255 characters a `string` field
+ * A `text` field matches an unbounded legacy `varchar`: the 1.x SQLite database stored both as TEXT without a length
+ * check, so the imported column is the same. Declarations use `text` where a value can exceed the 255 characters a `string` field
  * enforces, so both sides compare as `text`.
  */
 const storageClassOf = (type: string) => (type === 'varchar' ? 'text' : type);

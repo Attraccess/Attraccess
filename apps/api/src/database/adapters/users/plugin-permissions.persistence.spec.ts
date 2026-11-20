@@ -1,9 +1,5 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import {
   ApiToken,
-  entities,
   Permission,
   Role,
   RolePermission,
@@ -15,7 +11,6 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SYSTEM_PERMISSIONS } from '@attraccess/shared';
 import { DataSource } from 'typeorm';
-import * as migrations from '../../migrations';
 import { SYSTEM_AUDIT_ACTOR } from '../../../audit/recorder/audit-event';
 import { TokenHashService } from '../../../encryption/token-hash.service';
 import { DeclaredPluginPermission } from '../../../plugin-system/runtime/plugin-permissions';
@@ -23,9 +18,7 @@ import { ApiTokenService } from '../../../users-and-auth/auth/api-token/api-toke
 import { PluginPermissionSyncService } from '../../../users-and-auth/rbac/plugin-permission-sync.service';
 import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 import { UserPermissionsChangedEvent } from '../../../users-and-auth/rbac/events/user-permissions-changed.event';
-import { resolveDatabaseBackend } from '../../backend';
-import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
-import { createDataSource } from '../../sqlite/sqlite-connection';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { TypeOrmApiTokenStore } from '../auth/typeorm-api-token.store';
 import { TypeOrmSessionUserDirectory } from '../sessions/typeorm-session-user-directory';
 import { unitOfWorkFor } from '../shared-unit-of-work';
@@ -47,9 +40,8 @@ const declared = (overrides: Partial<DeclaredPluginPermission> = {}): DeclaredPl
 });
 const ACME = [declared(), declared({ key: 'acme.widgets.manage', defaultRoles: [] })];
 
-// The services on the real adapters and a migrated SQLite file: the unit of work runs on its own connection.
-describe('plugin-declared permissions on a real SQLite file', () => {
-  let directory: string;
+// The services on the real adapters and a database at the current release.
+describe('plugin-declared permissions on real PostgreSQL', () => {
   let source: DataSource;
   let rbac: RbacService;
   let sync: PluginPermissionSyncService;
@@ -76,16 +68,7 @@ describe('plugin-declared permissions on a real SQLite file', () => {
   };
 
   beforeEach(async () => {
-    resolveDatabaseBackend();
-    directory = await mkdtemp(join(tmpdir(), 'plugin-permissions-'));
-    source = await createDataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: join(directory, 'test.sqlite'),
-      entities: Object.values(entities),
-      migrations: Object.values(migrations),
-    }).initialize();
-    await source.runMigrations();
+    source = await createTestDataSource();
     const uow = unitOfWorkFor(source);
     const resolver = new TransactionContextResolver(source, uow);
     rbac = new RbacService(new TypeOrmRbacStore(source, resolver), uow, new EventEmitter2(), null, {
@@ -107,9 +90,7 @@ describe('plugin-declared permissions on a real SQLite file', () => {
   });
 
   afterEach(async () => {
-    await closeResourceTransactionConnection(source);
-    await source.destroy();
-    await rm(directory, { recursive: true, force: true });
+    await closeTestDataSource(source);
   });
 
   it('keeps core rows unchanged: no owner, available', async () => {

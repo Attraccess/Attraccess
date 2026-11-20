@@ -3,7 +3,7 @@ import { BillingConnection, createBillingDatabase } from './billing-persistence.
 
 type Database = Awaited<ReturnType<typeof createBillingDatabase>>;
 
-describe('billing configuration and credential stores on real SQLite', () => {
+describe('billing configuration and credential stores on real PostgreSQL', () => {
   let db: Database;
   let main: BillingConnection;
 
@@ -75,15 +75,15 @@ describe('billing configuration and credential stores on real SQLite', () => {
       });
     });
 
-    it('sees the configuration a caller transaction has created but not committed', async () => {
+    it('sees the configuration a caller transaction has created but not committed, while other connections do not', async () => {
       const { resource } = await db.seed(db.primary, 'cfg-tx');
 
       await expect(
         main.unitOfWork.run(async (scope) => {
           await main.configuration.getOrCreateResourceConfiguration(resource.id, scope);
           expect(await main.configuration.findResourceConfiguration(resource.id, scope)).not.toBeNull();
-          // A main-connection read of the flow that owns the transaction joins it instead of waiting for its lock.
-          expect(await main.configuration.findResourceConfiguration(resource.id)).not.toBeNull();
+          // Another connection of the pool reads committed data only (read committed): it does not see it yet.
+          expect(await main.configuration.findResourceConfiguration(resource.id)).toBeNull();
           throw new Error('abort');
         }),
       ).rejects.toThrow('abort');

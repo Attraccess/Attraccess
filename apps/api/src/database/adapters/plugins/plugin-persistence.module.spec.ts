@@ -8,6 +8,7 @@ import {
   PLUGIN_HOST_DATA,
 } from '../../../plugin-system/persistence/plugin-host-data.port';
 import { PLUGIN_MAINTENANCE_WINDOWS } from '../../../plugin-system/persistence/plugin-maintenance-window.port';
+import { PLUGIN_READER_STORE } from '../../../plugin-system/readers/plugin-reader-store.port';
 import { PluginPersistenceModule } from './plugin-persistence.module';
 
 const hostConnection = { kind: 'host-connection' } as unknown as DataSource;
@@ -30,6 +31,7 @@ describe('PluginPersistenceModule', () => {
       'listResourceIds',
     ]);
     expect(typeof app.get(PLUGIN_MAINTENANCE_WINDOWS).findWindow).toBe('function');
+    expect(typeof app.get(PLUGIN_READER_STORE).findCardOwner).toBe('function');
     await app.close();
   });
 });

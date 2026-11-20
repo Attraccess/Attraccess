@@ -2,9 +2,9 @@
 // One released migration track per database backend, selected by DATABASE_TYPE. A second backend adds its
 // track directory here, its MigrationTrack in database/<backend>/ and its entry in resolveDatabaseBackend; a
 // test (migration-tracks.spec.ts) keeps this list in step with the backends.
-const DEFAULT_DATABASE_TYPE = 'sqlite';
+const DEFAULT_DATABASE_TYPE = 'postgres';
 const MIGRATION_TRACK_DIRECTORIES = {
-  sqlite: 'apps/api/src/database/migrations',
+  postgres: 'apps/api/src/database/postgres/migrations',
 };
 
 /** Only a plain identifier is echoed: a misplaced connection string must not reach build logs. */

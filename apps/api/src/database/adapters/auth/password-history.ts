@@ -25,7 +25,7 @@ export async function appendPasswordHistory(
     select: { id: true },
   });
   const keptIds = kept.map((row) => row.id);
-  const prune = history.createQueryBuilder().delete().where('userId = :userId', { userId });
-  if (keptIds.length > 0) prune.andWhere('id NOT IN (:...keptIds)', { keptIds });
+  const prune = history.createQueryBuilder().delete().where('"userId" = :userId', { userId });
+  if (keptIds.length > 0) prune.andWhere('"id" NOT IN (:...keptIds)', { keptIds });
   await prune.execute();
 }

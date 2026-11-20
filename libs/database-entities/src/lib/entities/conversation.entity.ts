@@ -7,14 +7,14 @@ export class Conversation {
   @ApiProperty({ description: 'The unique identifier of the conversation', example: 1 })
   id!: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When this conversation was created',
     example: '2025-01-18T12:00:00.000Z',
   })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When this conversation was last updated',
     example: '2025-01-18T12:30:00.000Z',

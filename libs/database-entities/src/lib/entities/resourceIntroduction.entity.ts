@@ -47,14 +47,14 @@ export class ResourceIntroduction {
   })
   resourceGroupId!: number | null;
 
-  @Column({ type: 'datetime', default: () => "datetime('now')" })
+  @Column({ type: 'timestamptz', default: () => 'now()' })
   @ApiProperty({
     description: 'When the introduction was completed',
     example: '2021-01-01T00:00:00.000Z',
   })
   completedAt!: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @ApiProperty({
     description: 'When the user was last notified that retraining is due (used to avoid repeat notifications)',
     example: '2021-01-01T00:00:00.000Z',
@@ -63,10 +63,10 @@ export class ResourceIntroduction {
   })
   retrainingNotifiedAt!: Date | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   retrainingRequiredAuditedAt!: Date | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the introduction record was created',
     example: '2021-01-01T00:00:00.000Z',

@@ -13,6 +13,9 @@ const { defineBleContractSuite } = require(resolve(sdkLib, 'plugin-ble-contract.
 const { defineBleContractSessionSuite } = require(resolve(sdkLib, 'plugin-ble-contract-sessions.test-cases')) as {
   defineBleContractSessionSuite(name: string, create: BleContractFactory): void;
 };
+const { defineBleContractWatchSuite } = require(resolve(sdkLib, 'plugin-ble-contract-watch.test-cases')) as {
+  defineBleContractWatchSuite(name: string, create: BleContractFactory): void;
+};
 
 const fake: BleContractFactory = async (options) => ({
   host: createFakeBleHost(options),
@@ -28,7 +31,7 @@ const readerWebsocket: BleContractFactory = async (options) => {
   return { host: harness, dispose: () => harness.dispose() };
 };
 
-for (const define of [defineBleContractSuite, defineBleContractSessionSuite]) {
+for (const define of [defineBleContractSuite, defineBleContractSessionSuite, defineBleContractWatchSuite]) {
   define('SDK fake transport', fake);
   define('host service with a test driver', hostService);
   // The real reader driver, protocol v1 over a fake reader socket: what plugins get on real readers.

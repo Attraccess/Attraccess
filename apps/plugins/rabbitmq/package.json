@@ -1,6 +1,6 @@
 {
   "name": "@attraccess/plugin-rabbitmq",
-  "version": "0.1.0-alpha.0",
+  "version": "0.2.0-alpha.0",
   "description": "Official Attraccess integration for RabbitMQ.",
   "license": "SEE LICENSE IN LICENSE.md",
   "repository": {

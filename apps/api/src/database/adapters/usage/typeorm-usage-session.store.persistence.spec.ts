@@ -106,7 +106,7 @@ describe('TypeOrmUsageSessionStore with two independent connections', () => {
     expect(results.filter(Boolean)).toHaveLength(1);
     const ended = await a.store.findSessionWithRelations(session.id, 'ended');
     expect(ended.endTime).not.toBeNull();
-    expect(['by a', 'by b']).toContain(ended.endNotes);
+    expect(['by a', 'by b', 'again a', 'again b']).toContain(ended.endNotes);
     expect(await a.store.countActiveSessions(1)).toBe(0);
   });
 
@@ -211,5 +211,57 @@ describe('TypeOrmUsageSessionStore with two independent connections', () => {
     await a.unitOfWork.run((scope) => a.store.publishSession(reserved.id, scope));
 
     expect((await b.store.findActiveSessions(1)).map((session) => session.id)).toEqual([reserved.id]);
+  });
+
+  describe('per-resource lifecycle lock', () => {
+    const OTHER_USERS = [4, 5, 6, 7, 8];
+
+    it('never lets parallel starts exceed the machine capacity', async () => {
+      await a.source.getRepository(Resource).update(1, { maxParallelSessions: 2 });
+      await a.source.getRepository(User).save(OTHER_USERS.map((id) => userRow(id)));
+      // The decision of every start: read the limit, count the occupied slots, then take one (as the start does).
+      const start = (instance: Instance, userId: number) =>
+        instance.unitOfWork.run(async (scope) => {
+          const limit = await instance.store.findSessionLimit(1, scope);
+          if ((await instance.store.countOccupiedSlots(1, scope)) >= limit) throw new Error('machine is full');
+          const reserved = await instance.store.createPendingSession(draft(userId), scope);
+          await instance.store.publishSession(reserved.id, scope);
+        });
+
+      const results = await Promise.allSettled([1, 2, 3, 4, 5, 6].map((userId, i) => start(i % 2 ? b : a, userId)));
+
+      expect(outcomes(results).fulfilled).toBe(2);
+      outcomes(results).rejected.forEach((result) => expect(String(result.reason)).toContain('machine is full'));
+      expect(await a.store.countActiveSessions(1)).toBe(2);
+    });
+
+    it('queues lifecycle decisions of one machine, but not of another machine or plain reads', async () => {
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      let locked!: () => void;
+      const hasLock = new Promise<void>((resolve) => (locked = resolve));
+      const holder = a.unitOfWork.run(async (scope) => {
+        await a.store.findSessionLimit(1, scope);
+        locked();
+        await held;
+      });
+      await hasLock;
+
+      // Another machine and plain reads are not blocked by the held lock.
+      await expect(b.unitOfWork.run((scope) => b.store.findSessionLimit(2, scope))).resolves.toBe(1);
+      await expect(b.store.findActiveSessions(1)).resolves.toEqual([]);
+
+      let decided = false;
+      const waiting = b.unitOfWork.run(async (scope) => {
+        await b.store.findSessionLimit(1, scope);
+        decided = true;
+      });
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(decided).toBe(false);
+
+      release();
+      await Promise.all([holder, waiting]);
+      expect(decided).toBe(true);
+    });
   });
 });

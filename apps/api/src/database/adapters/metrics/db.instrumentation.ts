@@ -16,7 +16,7 @@ interface ParsedSql {
   observable: boolean;
 }
 
-const SKIP_VERBS = new Set(['begin', 'commit', 'rollback', 'savepoint', 'release', 'pragma']);
+const SKIP_VERBS = new Set(['begin', 'commit', 'rollback', 'savepoint', 'release']);
 
 const PATCH_FLAG = '__attraccessDbMetricsPatched';
 
@@ -37,8 +37,7 @@ export class DbMetricsInstrumentation implements OnModuleInit {
 
   onModuleInit(): void {
     this.install(this.dataSource);
-    // Unit-of-work transactions run on a connection the backend opens beside this one (SQLite: the serialized
-    // write connection); their statements are timed too.
+    // Connections the backend opens beside the application connection are timed too.
     resolveDatabaseBackend().onCompanionConnection(this.dataSource, (connection) => this.install(connection));
   }
 

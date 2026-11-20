@@ -1,15 +1,11 @@
-import { auditConnectionOf } from '../database/adapters/audit/sqlite-audit-service.test-fixture';
+import { auditConnectionOf } from '../database/adapters/audit/postgres-audit-service.test-fixture';
 import { billingTransactionAuditEvent } from './policies/billing';
 import { Logger } from '@nestjs/common';
-import {
-  closeResourceTransactionConnection,
-  runSerializedTransaction,
-} from '../database/sqlite/run-serialized-transaction';
-import { AuditTransactionAbortedError } from './persistence/audit-storage';
+import type { EntityManager } from 'typeorm';
 import { droppedRecords, setupAuditDatabase } from '../database/adapters/audit/audit.test-fixture';
 import { legacyEngineTransactionScope } from '../database/adapters/common/legacy-engine-transaction';
 
-describe('durable audit SQLite', () => {
+describe('durable audit (PostgreSQL)', () => {
   const fixture = setupAuditDatabase();
 
   describe('inside the caller transaction', () => {
@@ -28,18 +24,10 @@ describe('durable audit SQLite', () => {
       await fixture.source.query('CREATE TABLE business_change (id integer PRIMARY KEY)');
     });
 
-    afterEach(async () => {
-      await closeResourceTransactionConnection(fixture.source);
-    });
+    // Every transaction runs on a pooled connection of its own; the caller's transaction is this one.
+    const run = <T>(work: (manager: EntityManager) => Promise<T>) => fixture.source.transaction(work);
 
-    // The main connection shares one query runner; the resource-lifecycle connection is a second, independent one.
-    const connections = {
-      main: (work: Parameters<typeof runSerializedTransaction>[1]) => fixture.source.transaction(work),
-      'resource-lifecycle': (work: Parameters<typeof runSerializedTransaction>[1]) =>
-        runSerializedTransaction(fixture.source.manager, work),
-    };
-
-    describe.each(Object.entries(connections))('on the %s connection', (_name, run) => {
+    describe('on the main connection', () => {
       it('commits the audit row with the change', async () => {
         await run(async (manager) => {
           await manager.query('INSERT INTO business_change VALUES (1)');
@@ -101,8 +89,10 @@ describe('durable audit SQLite', () => {
       });
 
       it('keeps the business change, logs and counts when the audit insert fails', async () => {
+        await fixture.source.query(`CREATE FUNCTION fail_audit_insert_fn() RETURNS trigger LANGUAGE plpgsql AS $$
+          BEGIN RAISE EXCEPTION 'secret-detail' USING ERRCODE = 'integrity_constraint_violation'; END; $$`);
         await fixture.source.query(
-          "CREATE TRIGGER fail_audit_insert BEFORE INSERT ON audit_log BEGIN SELECT RAISE(ABORT, 'secret-detail'); END",
+          'CREATE TRIGGER fail_audit_insert BEFORE INSERT ON audit_log FOR EACH ROW EXECUTE FUNCTION fail_audit_insert_fn()',
         );
         const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
         try {
@@ -118,7 +108,7 @@ describe('durable audit SQLite', () => {
             });
             // The failed savepoint is gone: the transaction keeps working and later audit rows still land.
             await manager.query('INSERT INTO business_change VALUES (2)');
-            await manager.query('DROP TRIGGER fail_audit_insert');
+            await manager.query('DROP TRIGGER fail_audit_insert ON audit_log');
             expect(
               await fixture.service.record(
                 billingTransactionAuditEvent(billing(9)),
@@ -137,7 +127,7 @@ describe('durable audit SQLite', () => {
           expect(error).toHaveBeenCalledTimes(1);
           const line = String(error.mock.calls[0][0]);
           expect(line).toContain('domain=billing action=billing.transaction.created reason=storage_error');
-          expect(line).toContain('code=SQLITE_CONSTRAINT');
+          expect(line).toContain('code=23000');
           expect(line).not.toContain('secret-detail');
         } finally {
           error.mockRestore();
@@ -145,8 +135,10 @@ describe('durable audit SQLite', () => {
       });
 
       it('keeps a concurrent audit row when an overlapping audit insert in the same transaction fails', async () => {
+        await fixture.source.query(`CREATE FUNCTION fail_audit_insert_fn() RETURNS trigger LANGUAGE plpgsql AS $$
+          BEGIN RAISE EXCEPTION 'x' USING ERRCODE = 'integrity_constraint_violation'; END; $$`);
         await fixture.source.query(
-          'CREATE TRIGGER fail_audit_insert BEFORE INSERT ON audit_log WHEN NEW."subjectId" = 8 BEGIN SELECT RAISE(ABORT, \'x\'); END',
+          'CREATE TRIGGER fail_audit_insert BEFORE INSERT ON audit_log FOR EACH ROW WHEN (NEW."subjectId" = 8) EXECUTE FUNCTION fail_audit_insert_fn()',
         );
         const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
         try {
@@ -159,53 +151,6 @@ describe('durable audit SQLite', () => {
           expect(receipts).toEqual([{ status: 'unavailable' }, { status: 'recorded' }]);
           expect(await auditedSubjects()).toEqual([9]);
           expect(await droppedRecords(fixture.metrics)).toEqual({ 'billing:storage_error': 1 });
-        } finally {
-          error.mockRestore();
-        }
-      });
-
-      it('aborts the caller when SQLite discards the whole transaction, and the connection stays usable', async () => {
-        const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
-        try {
-          let receipts = 0;
-          await expect(
-            run(async (manager) => {
-              await manager.query('INSERT INTO business_change VALUES (1)');
-              // SQLITE_FULL rolls back the whole transaction, so the savepoint cannot be rolled back.
-              const [{ page_count }] = await manager.query('PRAGMA page_count');
-              await manager.query(`PRAGMA max_page_count = ${page_count}`);
-              while (
-                (
-                  await fixture.service.record(
-                    billingTransactionAuditEvent(billing(++receipts)),
-                    legacyEngineTransactionScope(manager),
-                  )
-                ).status === 'recorded'
-              );
-              await manager.query('INSERT INTO business_change VALUES (2)');
-            }),
-          ).rejects.toBeInstanceOf(AuditTransactionAbortedError);
-          await fixture.source.query('PRAGMA max_page_count = 1073741823');
-          expect(await fixture.source.query('SELECT * FROM business_change')).toEqual([]);
-          expect(await auditedSubjects()).toEqual([]);
-          expect(await droppedRecords(fixture.metrics)).toEqual({ 'billing:storage_error': 1 });
-          expect(String(error.mock.calls[0][0])).toContain('code=SQLITE_FULL');
-          // A later transaction on the same connection starts at depth 1 (BEGIN, not a stale savepoint) and commits.
-          await run(async (manager) => {
-            await manager.query('PRAGMA max_page_count = 1073741823');
-            expect((manager.queryRunner as unknown as { transactionDepth: number }).transactionDepth).toBe(1);
-            await manager.query('INSERT INTO business_change VALUES (3)');
-            expect(
-              await fixture.service.record(
-                billingTransactionAuditEvent(billing(99)),
-                legacyEngineTransactionScope(manager),
-              ),
-            ).toEqual({
-              status: 'recorded',
-            });
-          });
-          expect(await fixture.source.query('SELECT id FROM business_change')).toEqual([{ id: 3 }]);
-          expect(await auditedSubjects()).toEqual([99]);
         } finally {
           error.mockRestore();
         }

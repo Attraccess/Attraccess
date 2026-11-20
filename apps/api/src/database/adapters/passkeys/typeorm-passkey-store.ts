@@ -25,11 +25,6 @@ function toRecord(passkey: Passkey): PasskeyRecord {
   };
 }
 
-/** SQLite hands raw `datetime` columns back as 'YYYY-MM-DD HH:MM:SS.mmm' in UTC. */
-function parseStoredDate(value: string | Date): Date {
-  return value instanceof Date ? value : new Date(`${value.replace(' ', 'T')}Z`);
-}
-
 @Injectable()
 export class TypeOrmPasskeyStore implements PasskeyStore {
   constructor(
@@ -86,13 +81,14 @@ export class TypeOrmPasskeyStore implements PasskeyStore {
   }
 
   // One DELETE ... RETURNING statement: the database hands each stored challenge to exactly one caller.
-  // better-sqlite3 marks RETURNING statements as readers, so TypeORM's runner returns their rows.
   async consumeChallenge(challenge: string): Promise<PasskeyChallengeRecord | null> {
-    const rows = (await this.challenges.query(
-      'delete FROM "passkey_challenge" WHERE "challenge" = ? RETURNING "challenge", "userId", "expiresAt"',
-      [challenge],
-    )) as { challenge: string; userId: number | null; expiresAt: string | Date }[];
-    const row = rows[0];
-    return row ? { challenge: row.challenge, userId: row.userId, expiresAt: parseStoredDate(row.expiresAt) } : null;
+    const result = await this.challenges
+      .createQueryBuilder()
+      .delete()
+      .where('"challenge" = :challenge', { challenge })
+      .returning(['challenge', 'userId', 'expiresAt'])
+      .execute();
+    const row = (result.raw as { challenge: string; userId: number | null; expiresAt: Date }[])[0];
+    return row ? { challenge: row.challenge, userId: row.userId, expiresAt: new Date(row.expiresAt) } : null;
   }
 }

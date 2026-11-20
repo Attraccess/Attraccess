@@ -15,6 +15,7 @@ import { ScopedUnitOfWork, UNIT_OF_WORK } from '../../unit-of-work';
 import { managerFor } from './persistence-context';
 import { toMaintenanceRecord } from './maintenance-mappers';
 import { findRelations } from '../find-options';
+import { RESOURCE_LOCK, lockResource } from './resource-locks';
 
 const AUDIT_USERS = ['createdByUser', 'completedByUser'];
 
@@ -93,7 +94,12 @@ export class TypeOrmResourceMaintenanceStore implements ResourceMaintenanceStore
     now: Date,
     context?: ResourcePersistenceContext,
   ): Promise<boolean> {
-    const query = this.manager(context)
+    const manager = this.manager(context);
+    // Inside a unit of work the answer decides whether a maintenance is created next: the per-resource lock (held
+    // until commit) makes that check-then-create exclusive, so two schedules, a cron run and an event-driven
+    // evaluation cannot all create one.
+    if (context) await lockResource(manager, RESOURCE_LOCK.maintenance, filter.resourceId);
+    const query = manager
       .getRepository(ResourceMaintenance)
       .createQueryBuilder('maintenance')
       .where('maintenance.resourceId = :resourceId', { resourceId: filter.resourceId })

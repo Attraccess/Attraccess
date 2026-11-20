@@ -121,6 +121,33 @@ export class ResourceUsageController {
     return toUsageSessionResponse(await this.resourceUsageService.unlatchDoor(resourceId, req.user));
   }
 
+  @Post('open')
+  @Auth()
+  @ApiOperation({ summary: 'Open an access-only door', operationId: 'openDoor' })
+  @ApiResponse({
+    status: 200,
+    description: 'Door opened successfully (recorded as a door unlock).',
+    type: ResourceUsageResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - The resource is not an access-only door',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - User is not authenticated',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Resource not found',
+  })
+  async openDoor(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<UsageSessionResponse> {
+    return toUsageSessionResponse(await this.resourceUsageService.openDoor(resourceId, req.user));
+  }
+
   @Get('history')
   @Auth()
   @ApiOperation({ summary: 'Get usage history for a resource', operationId: 'resourceUsageGetHistory' })

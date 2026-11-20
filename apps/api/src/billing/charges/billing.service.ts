@@ -24,6 +24,7 @@ import { SetBillingConfigurationDto } from '../dto/set-configuration.dto';
 import { UpdateResourceBillingConfigurationDto } from '../dto/update-resource-billing-configuration.dto';
 import { InsufficientBalanceError } from '../errors/insufficient-balance.error';
 import { LiveNotificationsService } from '../live-notifications/live-notifications.service';
+import { bestEffortPush } from '../live-notifications/best-effort-push';
 import { BILLING_CONFIGURATION_STORE, BillingConfigurationStore } from '../ports/billing-configuration.port';
 import {
   BILLING_LEDGER_STORE,
@@ -276,7 +277,11 @@ export class BillingService {
       if (!receipt) return;
       const { transaction, recipient, usage } = receipt;
 
-      this.liveNotificationsService.notifyTransactionUpdate(transaction);
+      bestEffortPush(
+        this.liveNotificationsService.notifyTransactionUpdate(transaction),
+        this.logger,
+        `resource usage charge ${transactionId}`,
+      );
       if (!recipient?.email || !usage || transaction.amount === 0) return;
 
       const configuration = await this.getConfiguration();

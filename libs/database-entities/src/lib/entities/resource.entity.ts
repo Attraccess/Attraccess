@@ -181,6 +181,15 @@ export class Resource {
   })
   separateUnlockAndUnlatch!: boolean | null;
 
+  @Column({ type: 'boolean', default: false })
+  @ApiProperty({
+    description:
+      '(only for doors) whether the door is access only: its only action is Open (stored as a door unlock); lock and unlatch are refused',
+    example: false,
+    default: false,
+  })
+  accessOnly!: boolean;
+
   @Column({ type: 'text', nullable: true })
   @ApiProperty({
     description: 'A detailed description of the resource',
@@ -223,7 +232,7 @@ export class Resource {
   })
   documentationUrl!: string | null;
 
-  @Column({ type: 'json', nullable: true })
+  @Column({ type: 'jsonb', nullable: true })
   @ApiProperty({
     description: 'Custom metadata key-value pairs configured for this resource',
     required: false,
@@ -236,19 +245,19 @@ export class Resource {
   })
   metadata!: Record<string, unknown> | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the resource was created',
   })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the resource was last updated',
   })
   updatedAt!: Date;
 
-  @DeleteDateColumn()
+  @DeleteDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the resource was deleted',
     nullable: true,

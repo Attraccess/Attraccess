@@ -261,11 +261,11 @@ Hinweise:
 
 ## Audit-Alarm
 
-`AuditRecordsDropped` ist ein kritischer Grafana-Alarm. Er löst aus, sobald `attraccess_audit_records_dropped_total` in den letzten 5 Minuten gestiegen ist, also mindestens ein Audit-Eintrag nicht gespeichert werden konnte, und wird etwa 5 Minuten nach dem letzten Verlust wieder aufgehoben. Die beschriebene Änderung selbst wurde trotzdem durchgeführt. Das API-Log enthält pro Verlust eine Zeile `Audit record dropped` mit Aktivitätsbereich (`domain`), Aktion, Grund und SQLite-Fehlercode (nie Ereignisdetails). Das Label `reason` nennt den Grund:
+`AuditRecordsDropped` ist ein kritischer Grafana-Alarm. Er löst aus, sobald `attraccess_audit_records_dropped_total` in den letzten 5 Minuten gestiegen ist, also mindestens ein Audit-Eintrag nicht gespeichert werden konnte, und wird etwa 5 Minuten nach dem letzten Verlust wieder aufgehoben. Die beschriebene Änderung selbst wurde trotzdem durchgeführt. Das API-Log enthält pro Verlust eine Zeile `Audit record dropped` mit Aktivitätsbereich (`domain`), Aktion, Grund und Datenbank-Fehlercode (nie Ereignisdetails). Das Label `reason` nennt den Grund:
 
-- `storage_error`: Das Einfügen ist fehlgeschlagen; der SQLite-Code nennt die Ursache (z. B. `SQLITE_BUSY`, wenn die Datenbank 5 Sekunden lang gesperrt blieb).
+- `storage_error`: Das Einfügen ist fehlgeschlagen; der PostgreSQL-Code nennt die Ursache (z. B. `55P03` oder `57014`, wenn das Einfügen länger als das Lock-Timeout von 10 Sekunden wartete).
 - `queue_full`: Mehr als 1.000 Audit-Schreibvorgänge warteten.
-- `storage_unavailable`: Audit-Speicher nicht verfügbar (Start fehlgeschlagen oder In-Memory-Datenbank).
+- `storage_unavailable`: Audit-Speicher nicht verfügbar (Start fehlgeschlagen).
 - `shutting_down`: Der Eintrag kam an, während die API herunterfuhr; bei einem Neustart zu erwarten.
 - `settings_unavailable`: Die Audit-Einstellungen konnten nicht gelesen werden.
 - `invalid_event`: Das Ereignis wurde als ungültig abgelehnt; das deutet auf einen Programmfehler hin.

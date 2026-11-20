@@ -10,6 +10,8 @@ export interface ResourceRecord {
   name: string;
   type: ResourceType;
   separateUnlockAndUnlatch: boolean | null;
+  /** Doors only: the door's only action is Open, stored as a door unlock. */
+  accessOnly: boolean;
   description: string | null;
   imageFilename: string | null;
   documentationType: DocumentationType | null;

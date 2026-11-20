@@ -40,6 +40,8 @@ import { MqttCredentialProvisioningService } from './../mqtt/mqtt-credential-pro
 import * as readerUiWiring from './runtime/reader-ui-wiring';
 import { PluginSystemEventsBridge } from './plugin-system-events.bridge';
 import { PluginBleService } from './ble/plugin-ble.service';
+import { PluginCardAuthentications } from './readers/plugin-card-authentications';
+import { PluginReadersService } from './readers/plugin-readers.service';
 import {
   listPluginNotificationCategories,
   unregisterPluginNotificationCategories,
@@ -207,6 +209,8 @@ describe('PluginModule', () => {
         PluginLiveUpdatesService,
         PluginSystemEventsBridge,
         PluginBleService,
+        PluginCardAuthentications,
+        PluginReadersService,
       ]);
       expect(module.exports).toEqual([PluginEventsService]);
       expect(module.controllers).toEqual([PluginController]);
@@ -506,8 +510,11 @@ describe('PluginModule', () => {
       createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
     };
 
+    // The transaction's manager: the host first takes the plugin's transaction lock through it.
+    const txManager = { query: jest.fn(async () => []), toString: () => 'tx-manager' };
+
     it('runs the callback in a transaction of the host connection and hands an opaque scope carrying that transaction', async () => {
-      const transaction = jest.fn(async (work: (manager: unknown) => Promise<unknown>) => work('tx-manager'));
+      const transaction = jest.fn(async (work: (manager: unknown) => Promise<unknown>) => work(txManager));
       const host = {
         manager: { connection: { options: { type: 'postgres' } }, transaction },
       };
@@ -520,12 +527,13 @@ describe('PluginModule', () => {
         context.persistence.transaction(async (scope) => `ran:${String(handleOfScope(scope))}`),
       ).resolves.toBe('ran:tx-manager');
       expect(transaction).toHaveBeenCalledTimes(1);
+      expect(txManager.query).toHaveBeenCalledWith(expect.stringContaining('pg_advisory_xact_lock'), expect.any(Array));
     });
 
     it('runs post-commit work after the transaction and rejects a nested transaction', async () => {
       const order: string[] = [];
       const transaction = jest.fn(async (work: (manager: unknown) => Promise<unknown>) => {
-        const result = await work('tx-manager');
+        const result = await work(txManager);
         order.push('commit');
         return result;
       });

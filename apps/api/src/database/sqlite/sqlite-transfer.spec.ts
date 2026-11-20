@@ -1,5 +1,5 @@
 import type { DataSource } from 'typeorm';
-import { closeTestDataSource, createTestDataSource } from '../../test-utils/test-database';
+import { createSqliteTestFile, type SqliteTestFile } from './sqlite-test-file.test-fixture';
 import type { MigrationTrack } from '../backend/database-backend';
 import { SnapshotIncompatibleError, type DatabaseSnapshot } from '../transfer-snapshot';
 import { columnKind, createSqliteTransfer, toInstantIso } from './sqlite-transfer';
@@ -7,13 +7,20 @@ import { columnKind, createSqliteTransfer, toInstantIso } from './sqlite-transfe
 const track: MigrationTrack = { name: 'test-track', tableName: 'migrations', directory: 'none', migrations: [] };
 const transfer = createSqliteTransfer(track);
 
+const files: SqliteTestFile[] = [];
+async function newSource(): Promise<DataSource> {
+  const file = await createSqliteTestFile();
+  files.push(file);
+  return file.source;
+}
+
 /**
  * A tiny schema with the shapes that matter for a transfer: an account whose balance a trigger maintains from its
  * entries (the account table sorts first, so a trigger left active would apply every entry on top of the copied
  * balance), generated keys, a generated column, binary data, big integers and exact text.
  */
 async function createDatabase(): Promise<DataSource> {
-  const source = await createTestDataSource();
+  const source = await newSource();
   await source.query(
     'CREATE TABLE migrations (id integer PRIMARY KEY AUTOINCREMENT NOT NULL, timestamp bigint NOT NULL, name varchar NOT NULL)',
   );
@@ -50,7 +57,8 @@ describe('SQLite transfer', () => {
   };
 
   afterEach(async () => {
-    await Promise.all(open.splice(0).map((source) => closeTestDataSource(source)));
+    open.length = 0;
+    await Promise.all(files.splice(0).map((file) => file.close()));
   });
 
   describe('column kinds', () => {
@@ -130,11 +138,36 @@ describe('SQLite transfer', () => {
       expect(await transfer.exportSnapshot(source)).toEqual(await transfer.exportSnapshot(source));
     });
 
+    it('hands on a fractional number that INTEGER affinity kept as REAL, such as a flow editor canvas position', async () => {
+      const source = await database();
+      await source.query('INSERT INTO a_account (id) VALUES (1)');
+      await source.query('INSERT INTO b_entry (id, accountId, amount) VALUES (1, 1, 76.04591836734696)');
+      expect(await source.query('SELECT typeof(amount) AS storage FROM b_entry')).toEqual([{ storage: 'real' }]);
+
+      const snapshot = await transfer.exportSnapshot(source);
+
+      const entry = snapshot.tables.find((table) => table.name === 'b_entry');
+      expect(entry?.rows[0].slice(0, 3)).toEqual([1, 1, 76.04591836734696]);
+    });
+
     it('refuses a value that is not what its column declares instead of exporting a guess', async () => {
       const source = await database();
       await source.query('INSERT INTO a_account (id) VALUES (1)');
       await source.query("INSERT INTO b_entry (id, accountId, amount, bookedAt) VALUES (1, 1, 1, 'last tuesday')");
-      await expect(transfer.exportSnapshot(source)).rejects.toThrow(/b_entry\.bookedAt/);
+      await expect(transfer.exportSnapshot(source)).rejects.toThrow(
+        'table b_entry, row 1 (id 1), column bookedAt: "last tuesday" is not an instant',
+      );
+    });
+
+    it('names the row of a bad value by its 1-based number and its primary key', async () => {
+      const source = await database();
+      await source.query('INSERT INTO a_account (id) VALUES (1)');
+      await source.query(
+        "INSERT INTO b_entry (id, accountId, amount, bookedAt) VALUES (4, 1, 1, '2026-01-01 00:00:00'), (9, 1, 1, 'soon')",
+      );
+      await expect(transfer.exportSnapshot(source)).rejects.toThrow(
+        /^table b_entry, row 2 \(id 9\), column bookedAt: /,
+      );
     });
   });
 

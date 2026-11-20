@@ -267,6 +267,7 @@ describe('ResourceListService', () => {
                   name: '3D Printer',
                   type: 'machine',
                   separateUnlockAndUnlatch: true,
+                  accessOnly: false,
                   description: 'A printer',
                   allowTakeOver: false,
                   introducers: ['introducer-a'],
@@ -298,6 +299,31 @@ describe('ResourceListService', () => {
           }),
         }),
       );
+    });
+
+    it('marks an access-only door', async () => {
+      fixture.attractapService.findReaderById.mockResolvedValue(
+        fixture.createReaderFixture({
+          resources: [{ id: 10, name: 'Side Door', type: 'door', separateUnlockAndUnlatch: false, accessOnly: true }],
+        }),
+      );
+      const socket = fixture.createMockSocket();
+
+      await fixture.service.sendResourceListToSocket(socket);
+
+      const [resource] = socket.sendMessage.mock.calls[0][0].data.payload.resources;
+      expect(resource).toMatchObject({ type: 'door', accessOnly: true, separateUnlockAndUnlatch: false });
+    });
+
+    it('never marks a machine access only', async () => {
+      fixture.attractapService.findReaderById.mockResolvedValue(
+        fixture.createReaderFixture({ resources: [{ id: 10, name: 'Lathe', type: 'machine', accessOnly: true }] }),
+      );
+      const socket = fixture.createMockSocket();
+
+      await fixture.service.sendResourceListToSocket(socket);
+
+      expect(socket.sendMessage.mock.calls[0][0].data.payload.resources[0].accessOnly).toBe(false);
     });
 
     it('includes introducers inherited from resource groups', async () => {

@@ -10,7 +10,7 @@ import { UsageSessionNotifications } from '../usage-session-notifications';
 import { UsageSessionRecords } from '../usage-session-records';
 import { UsageSessionStartPreparation } from '../usage-session-start-preparation';
 import { UsageSessionStarts } from '../usage-session-starts';
-import { usagePersistenceFor } from '../../../../database/adapters/usage/sqlite-usage-persistence.test-fixture';
+import { usagePersistenceFor } from '../../../../database/adapters/usage/usage-persistence.test-fixture';
 
 /**
  * Builds ResourceUsageService and its collaborators without Nest, taking the dependencies in the order the

@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 
-import { FlowNodeRecord, ResourceFlowNodeType, getExternalEffectFailureBehavior } from '@attraccess/application-models';
+import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 
 import type { TransactionContext } from '../../../database/transaction-context';
 
@@ -21,6 +21,8 @@ import { ExternalEffectFailureError } from '../errors/external-effect-failure.er
 import { FlowExecutionError } from '../errors/flow-execution.error';
 
 import { getPluginFlowNode } from '../../../plugin-system/flows/node-registry';
+
+import { resolveNodeFailurePolicy } from './node-failure-policy';
 
 import { randomBytes } from 'crypto';
 
@@ -193,10 +195,9 @@ export class FlowExecutionEngine {
       });
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      const failureBehavior = dispatchStarted ? getExternalEffectFailureBehavior(node.type, node.data) : undefined;
-      const failureKind = dispatchStarted
-        ? (this.nodeExecutors[node.type]?.getFailureKind?.(error) ?? 'node-failure')
-        : 'node-failure';
+      const { behavior: failureBehavior, kind: failureKind } = dispatchStarted
+        ? resolveNodeFailurePolicy(node, error, this.nodeExecutors[node.type as ResourceFlowNodeType])
+        : { behavior: undefined, kind: 'node-failure' as const };
       const errorMessage = this.errorReason(error);
       this.logger.error(
         `Failed to process flow node ID: ${node.id} (Type: ${node.type}) after ${processingTime}ms`,

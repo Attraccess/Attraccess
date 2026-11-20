@@ -95,7 +95,7 @@ COPY --from=builder /app/docs docs
 COPY --from=builder /app/deploy/api /app/dist/apps/api
 
 # Operator command to move stored card keys to a new AUTH_SESSION_SECRET (docs/en/settings/security.md).
-# Plain Node script; placed inside the API package so it resolves better-sqlite3 from the API's node_modules.
+# Plain Node script; placed inside the API package so it resolves pg (and better-sqlite3, kept for the one-time SQLite import) from the API's node_modules.
 COPY --from=builder /app/apps/api/scripts/reencrypt-card-keys.mjs /app/dist/apps/api/scripts/reencrypt-card-keys.mjs
 COPY --from=builder /app/apps/api/scripts/lib/database-provider.mjs /app/dist/apps/api/scripts/lib/database-provider.mjs
 

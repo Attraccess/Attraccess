@@ -36,6 +36,12 @@ namespace ble
         // (28 KB with a link) and does not check every allocation: with too little it asserts and the reader
         // restarts (seen with 20 KB free). The rest is headroom for whatever else needs internal RAM meanwhile.
         constexpr size_t STACK_MIN_FREE_INTERNAL = 40 * 1024;
+        // The watch's passive scan, in 0.625 ms units: 30 ms of every 100 ms without a link (30 %), 30 ms of every
+        // 200 ms with one (15 %). The rest of the air time stays with the connection's events and with Wi-Fi, which
+        // shares the radio through the coexistence arbiter.
+        constexpr uint16_t WATCH_WINDOW = 48;
+        constexpr uint16_t WATCH_INTERVAL = 160;
+        constexpr uint16_t WATCH_INTERVAL_CONNECTED = 320;
 
         NimbleRadio *instance = nullptr;
         SemaphoreHandle_t syncSemaphore = nullptr;
@@ -62,6 +68,11 @@ namespace ble
         int gapTrampoline(struct ble_gap_event *event, void *arg)
         {
             return static_cast<NimbleRadio *>(arg)->onGapEvent(event);
+        }
+
+        int watchTrampoline(struct ble_gap_event *event, void *arg)
+        {
+            return static_cast<NimbleRadio *>(arg)->onWatchGapEvent(event);
         }
 
         void hostTask(void *)
@@ -196,6 +207,39 @@ namespace ble
         const int rc = ble_gap_disc(ownAddressType, static_cast<int32_t>(durationMs), &params, gapTrampoline, this);
         if (rc != 0) return mapGattStatus(rc);
         return Error();
+    }
+
+    Error NimbleRadio::startWatchScan(bool connected)
+    {
+        struct ble_gap_disc_params params = {};
+        params.itvl = connected ? WATCH_INTERVAL_CONNECTED : WATCH_INTERVAL;
+        params.window = WATCH_WINDOW;
+        params.passive = 1; // no scan requests: the watch only listens
+        // Every report: changes and keepalives are the point. The watch's table deduplicates.
+        params.filter_duplicates = 0;
+        const int rc = ble_gap_disc(ownAddressType, BLE_HS_FOREVER, &params, watchTrampoline, this);
+        // BLE_HS_EALREADY: still running (the core missed nothing, it only lost track after a stale end event).
+        if (rc != 0 && rc != BLE_HS_EALREADY) return mapGattStatus(rc);
+        return Error();
+    }
+
+    int NimbleRadio::onWatchGapEvent(struct ble_gap_event *event)
+    {
+        // Scan events touch no connection state: no lock.
+        switch (event->type)
+        {
+        case BLE_GAP_EVENT_DISC:
+        {
+            const auto &d = event->disc;
+            events.radioAdvertisement(fromNimble(d.addr), d.rssi, d.rssi != 127, d.data, d.length_data);
+            return 0;
+        }
+        case BLE_GAP_EVENT_DISC_COMPLETE:
+            events.radioWatchScanEnded();
+            return 0;
+        default:
+            return 0;
+        }
     }
 
     void NimbleRadio::stopScan()

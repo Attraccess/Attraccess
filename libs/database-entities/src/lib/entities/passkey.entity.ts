@@ -25,7 +25,7 @@ export class Passkey {
   publicKey!: string;
 
   /** signature counter last reported by the authenticator; never leaves the server */
-  @Column({ type: 'integer', default: 0 })
+  @Column({ type: 'bigint', default: 0 })
   @Exclude()
   counter!: number;
 
@@ -48,11 +48,11 @@ export class Passkey {
   })
   backedUp!: boolean;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'When this passkey was registered', example: '2025-01-18T12:30:00.000Z' })
   createdAt!: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @ApiProperty({
     description: 'When this passkey was last used to sign in',
     example: '2025-01-18T12:30:00.000Z',
@@ -82,6 +82,6 @@ export class PasskeyChallenge {
   @Column({ type: 'integer', nullable: true })
   userId!: number | null;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamptz' })
   expiresAt!: Date;
 }

@@ -2,6 +2,7 @@ import { DataSource } from 'typeorm';
 import { entities, ResourceGroup } from '@attraccess/database-entities';
 import { ResourceGroupsService } from './resourceGroups.service';
 import { TypeOrmResourceGroupStore } from '../../database/adapters/resources/resource-group-store.adapter';
+import { createTestDataSource, closeTestDataSource } from '../../test-utils/test-database';
 
 describe('ResourceGroupsService partial updates', () => {
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
@@ -9,13 +10,7 @@ describe('ResourceGroupsService partial updates', () => {
   let service: ResourceGroupsService;
 
   beforeEach(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      entities: Object.values(entities),
-      synchronize: true,
-    }).initialize();
+    source = await createTestDataSource({ entities: Object.values(entities), synchronize: true });
     service = new ResourceGroupsService(
       new TypeOrmResourceGroupStore(source),
       { emit: jest.fn() } as never,
@@ -26,7 +21,7 @@ describe('ResourceGroupsService partial updates', () => {
   });
 
   afterEach(async () => {
-    await source.destroy();
+    await closeTestDataSource(source);
   });
 
   it('preserves omitted fields with SQLite persistence and skips no-op audits', async () => {

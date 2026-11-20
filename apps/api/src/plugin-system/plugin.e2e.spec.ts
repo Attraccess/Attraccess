@@ -17,6 +17,12 @@ import { zipFileUpload } from './__test__/make-zip';
 import { MqttClientService } from '../mqtt/mqtt-client.service';
 import { MqttServerService } from '../mqtt/servers/mqtt-server.service';
 import { PluginMigrationService } from './plugin-migration.service';
+import {
+  createTestDataSource,
+  closeTestDataSource,
+  createTestDatabaseLocation,
+  type TestDatabaseLocation,
+} from '../test-utils/test-database';
 
 let hostDataSource: DataSource;
 
@@ -88,6 +94,7 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
   let app: INestApplication;
   let events: EventEmitter2;
   let dataSource: DataSource;
+  let database: TestDatabaseLocation;
   let restartSpy: jest.SpyInstance;
 
   beforeAll(async () => {
@@ -131,21 +138,11 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
     PluginModule.configure({ DISABLE_PLUGINS: false });
 
     // The host migrates the plugin's declared storage at boot, before the application starts.
-    const databaseFile = join(CACHE_DIR, 'host.sqlite');
-    PluginMigrationService.configureForTesting({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: databaseFile,
-    });
+    database = await createTestDatabaseLocation({ empty: true });
+    PluginMigrationService.configureForTesting({ type: 'postgres', url: database.location } as never);
     await PluginMigrationService.runPendingUpMigrationsForAllPlugins();
     const pluginModule = PluginModule.forRoot();
-    dataSource = new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: databaseFile,
-      entities: [],
-    });
-    await dataSource.initialize();
+    dataSource = await createTestDataSource({ location: database.location, entities: [] });
     hostDataSource = dataSource;
     events = new EventEmitter2();
 
@@ -166,7 +163,8 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
 
   afterAll(async () => {
     if (app) await app.close();
-    if (dataSource?.isInitialized) await dataSource.destroy();
+    await closeTestDataSource(dataSource);
+    await database?.remove();
     PluginMigrationService.configureForTesting(null);
     jest.restoreAllMocks();
     rmSync(CACHE_DIR, { recursive: true, force: true });
@@ -221,9 +219,10 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
     const plugin = PluginService.getPlugins().find((p) => p.name === PLUGIN_NAME);
     expect(plugin).toBeDefined();
 
-    await new PluginUninstallService(new PluginService(), {
-      deleteAllForPlugin: async () => undefined,
-    } as never).deletePlugin((plugin as LoadedPluginManifest).id);
+    const owned = { deleteAllForPlugin: async () => undefined } as never;
+    await new PluginUninstallService(new PluginService(), owned, owned).deletePlugin(
+      (plugin as LoadedPluginManifest).id,
+    );
 
     expect(existsSync(join(PLUGIN_PATH, PLUGIN_NAME))).toBe(false);
     expect(restartSpy).toHaveBeenCalledTimes(0);

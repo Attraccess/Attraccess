@@ -26,6 +26,7 @@ import { LiveNotificationsService } from '../live-notifications/live-notificatio
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { SumupTransactionCallbackDto, SumupTransactionEventType } from '../dto/sumup/sumup-transaction-callback.dto';
+import { bestEffortPush } from '../live-notifications/best-effort-push';
 import { BILLING_LEDGER_STORE, BillingLedgerStore } from '../ports/billing-ledger.port';
 import { SUMUP_CREDENTIAL_STORE, SumUpCredentialStore } from '../ports/sumup-credentials.port';
 
@@ -200,7 +201,11 @@ export class SumUpService {
     );
     const updatedTransaction = await this.ledgerStore.updateTransactionStatus(transaction.id, nextStatus);
     this.hasPendingTransactions = true;
-    this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
+    bestEffortPush(
+      this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction),
+      this.logger,
+      `transaction ${updatedTransaction.id}`,
+    );
     void this.auditService.record(
       billingTransactionAuditEvent({
         transactionId: updatedTransaction.id,
@@ -244,7 +249,11 @@ export class SumUpService {
             transaction.id,
             BillingTransactionStatus.Failed,
           );
-          this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
+          bestEffortPush(
+            this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction),
+            this.logger,
+            `transaction ${updatedTransaction.id}`,
+          );
           void this.auditService.record(
             billingTransactionAuditEvent({
               transactionId: updatedTransaction.id,
@@ -303,7 +312,11 @@ export class SumUpService {
       });
       this.hasPendingTransactions = true;
 
-      this.liveNotificationsService.notifyTransactionUpdate(transaction);
+      bestEffortPush(
+        this.liveNotificationsService.notifyTransactionUpdate(transaction),
+        this.logger,
+        `transaction ${transaction.id}`,
+      );
       void this.auditService.record(
         billingTransactionAuditEvent({
           transactionId: transaction.id,

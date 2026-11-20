@@ -1,6 +1,6 @@
-import { Project, Resource, ResourceUsage, ResourceUsageLifecycleAttempt, User } from '@attraccess/database-entities';
+import { Resource, ResourceUsage, ResourceUsageLifecycleAttempt, User } from '@attraccess/database-entities';
 import { ResourceType, ResourceUsageAction, SupervisionMode } from '@attraccess/application-models';
-import { createMigratedUsageDatabase, userRow } from './migrated-usage-database.test-fixture';
+import { createMigratedUsageDatabase, insertProject, userRow } from './migrated-usage-database.test-fixture';
 
 jest.setTimeout(30_000);
 
@@ -40,7 +40,7 @@ describe('TypeOrmUsageSessionStore reads and ends', () => {
       { id: 3, name: 'Door', type: ResourceType.Door, supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED },
     ]);
     await a.source.getRepository(User).save([1, 2, 3].map((id) => userRow(id)));
-    await a.source.getRepository(Project).save({ id: 9, name: 'Thesis', owner: { id: 1 } });
+    await insertProject(a.source, { id: 9, name: 'Thesis', ownerId: 1 });
     b = await database.connect();
   });
 

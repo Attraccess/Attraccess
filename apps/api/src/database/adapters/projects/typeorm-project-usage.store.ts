@@ -18,6 +18,9 @@ type TimeSeriesSpendRaw = { usageDate: string; spend: string };
 type ResourceUsageAggregateRaw = { resourceId: string; resourceName: string | null; sessions: string; minutes: string };
 type ResourceSpendAggregateRaw = { resourceId: string; spend: string };
 
+/** The UTC calendar day of a session start as `YYYY-MM-DD` (independent of the database session's time zone). */
+const START_DAY = "to_char(usage.startTime AT TIME ZONE 'UTC', 'YYYY-MM-DD')";
+
 const SPEND_SUM = 'COALESCE(SUM(CASE WHEN tx.amount < 0 THEN -tx.amount ELSE 0 END), 0)';
 
 @Injectable()
@@ -89,11 +92,11 @@ export class TypeOrmProjectUsageStore implements ProjectUsageStore {
 
     const timeSeriesRaw = (await completedUsageQb
       .clone()
-      .select('DATE(usage.startTime)', 'usageDate')
+      .select(START_DAY, 'usageDate')
       .addSelect('COUNT(*)', 'sessions')
       .addSelect('COALESCE(SUM(usage.usageInMinutes), 0)', 'minutes')
-      .groupBy('usageDate')
-      .orderBy('usageDate', 'ASC')
+      .groupBy(START_DAY)
+      .orderBy(START_DAY, 'ASC')
       .getRawMany()) as TimeSeriesUsageRaw[];
 
     const sessions = await completedUsageQb
@@ -120,10 +123,10 @@ export class TypeOrmProjectUsageStore implements ProjectUsageStore {
       .getRawMany()) as ResourceSpendAggregateRaw[];
     const timeSeriesSpendRaw = (await billingBaseQb
       .clone()
-      .select('DATE(usage.startTime)', 'usageDate')
+      .select(START_DAY, 'usageDate')
       .addSelect(SPEND_SUM, 'spend')
-      .groupBy('usageDate')
-      .orderBy('usageDate', 'ASC')
+      .groupBy(START_DAY)
+      .orderBy(START_DAY, 'ASC')
       .getRawMany()) as TimeSeriesSpendRaw[];
 
     return {

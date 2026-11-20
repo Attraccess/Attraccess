@@ -33,11 +33,11 @@ export class Flow {
   @ApiProperty({ description: 'The kind of flow', enum: ['resource', 'global'], example: 'global' })
   scope!: FlowScope;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ type: String, format: 'date-time' })
   updatedAt!: Date;
 

@@ -48,10 +48,10 @@ export class Role {
   })
   isDefault!: boolean;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
 
   @OneToMany(() => RolePermission, (rp) => rp.role, { onDelete: 'CASCADE' })

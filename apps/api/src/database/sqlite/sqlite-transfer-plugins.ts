@@ -1,54 +1,16 @@
 import type { EntityManager } from 'typeorm';
 import { type CompiledField, versionsTableName } from '../../plugin-system/plugin-storage/storage-model';
 import { normalizeDecimal } from '../../plugin-system/plugin-storage/storage-values';
-import {
-  SnapshotIncompatibleError,
-  type PluginDescriptor,
-  type SnapshotColumnKind,
-  type SnapshotValue,
-} from '../transfer-snapshot';
+import { SnapshotIncompatibleError, type SnapshotValue } from '../transfer-snapshot';
+import { DATE_PATTERN } from '../transfer-declared';
 import { sqliteStorageDialect } from './plugin-storage/sqlite-storage-dialect';
 
-/** The fields plugins declared, by physical table and physical column. */
-export type DeclaredColumns = ReadonlyMap<string, ReadonlyMap<string, CompiledField>>;
+export { declaredColumns, declaredTables, fieldKind, type DeclaredColumns } from '../transfer-declared';
+const DATE = DATE_PATTERN;
 
 type Query = Pick<EntityManager, 'query'>;
 
 const quote = (identifier: string): string => `"${identifier.replace(/"/g, '""')}"`;
-
-const FIELD_KINDS: Record<CompiledField['type'], SnapshotColumnKind> = {
-  string: 'text',
-  text: 'text',
-  uuid: 'text',
-  json: 'text',
-  integer: 'integer',
-  decimal: 'decimal',
-  boolean: 'boolean',
-  timestamp: 'timestamp',
-  date: 'date',
-};
-
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
-
-/** The physical tables of a plugin's declared storage, as the record port serves them. */
-export function declaredTables(plugin: PluginDescriptor): string[] {
-  return [...plugin.storage.tables.values()].map((table) => table.physical);
-}
-
-export function declaredColumns(plugins: readonly PluginDescriptor[] = []): DeclaredColumns {
-  const tables = new Map<string, Map<string, CompiledField>>();
-  for (const plugin of plugins) {
-    for (const table of plugin.storage.tables.values()) {
-      tables.set(table.physical, new Map([...table.fields.values()].map((field) => [field.column, field])));
-    }
-  }
-  return tables;
-}
-
-/** The neutral kind of a declared plugin field: what the value means, not how SQLite stores it. */
-export function fieldKind(field: CompiledField): SnapshotColumnKind {
-  return FIELD_KINDS[field.type];
-}
 
 function declared(field: CompiledField | undefined, where: string): CompiledField {
   if (!field) throw new SnapshotIncompatibleError(`${where}: no plugin storage declaration types this column`);

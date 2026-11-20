@@ -112,11 +112,11 @@ test('workspace-only bootstrap skips host installation and keeps firmware opt-in
   assert.equal(unsupported.status, 1);
   assert.match(unsupported.stderr, /Unsupported DATABASE_TYPE "oracle"/);
   assert.deepEqual(unsupported.calls, []);
-  assert.deepEqual(run(['--workspace-only'], 'false', { DATABASE_TYPE: 'sqlite' }).calls, ['workspace']);
+  assert.deepEqual(run(['--workspace-only'], 'false', { DATABASE_TYPE: 'postgres' }).calls, ['workspace']);
   // The repository .env selects the backend too, and the environment wins over it.
   writeFileSync(path.join(root, '.env'), 'DATABASE_TYPE=oracle\n');
   assert.equal(run(['--workspace-only'], 'false', { DATABASE_TYPE: undefined }).status, 1);
-  assert.deepEqual(run(['--workspace-only'], 'false', { DATABASE_TYPE: 'sqlite' }).calls, ['workspace']);
+  assert.deepEqual(run(['--workspace-only'], 'false', { DATABASE_TYPE: 'postgres' }).calls, ['workspace']);
 });
 
 test('worktree creation refuses an unsupported DATABASE_TYPE before creating the worktree', (t) => {
@@ -152,7 +152,7 @@ test('worktree creation refuses an unsupported DATABASE_TYPE before creating the
   assert.equal(existsSync(path.join(root, 'wt-bad')), false);
   assert.doesNotMatch(git('branch', '--list', 'wt-bad').stdout, /wt-bad/);
 
-  const created = create('wt-ok', 'sqlite');
+  const created = create('wt-ok', 'postgres');
   assert.equal(created.status, 0, created.stderr);
   assert.equal(existsSync(path.join(root, 'wt-ok/.worktree-bootstrap-complete')), true);
 });

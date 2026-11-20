@@ -32,6 +32,8 @@ Die Kartenaufforderung zeigt die Uhr auch dann, wenn die ausgewählte Ressource 
 
 Tippen Sie in der Ressourcenliste neben einer Maschine auf **Start** oder neben einer Tür auf **Öffnen**. Füllen Sie gegebenenfalls ein Formular aus oder lassen Sie die angeforderte Aufsicht bestätigen. Warten Sie anschließend auf das Ergebnis auf dem Display.
 
+Eine Tür mit der Option [„Nur Zutritt“](resources/creating-resources.md#tür-optionen) hat eine einzige Aktion: Ihre Details zeigen statt Abschließen, Aufschließen und Falle öffnen eine einzige Schaltfläche **Öffnen**. An einem Attractap-Lite-Leser (ohne Display) öffnet jedes Auflegen Ihrer Karte eine solche Tür, ob kurz oder lang; der Leser signalisiert dort kein langes Auflegen.
+
 Während der Leser eine Aktion verarbeitet, sind die Bedienelemente kurzzeitig nicht verfügbar. Warten Sie, bis der Status der Ressource aktualisiert wurde, bevor Sie erneut tippen. Nach dem Start einer Maschine zeigt deren Zeile Ihren Namen und die Schaltfläche **Stop**.
 
 ### Ein Projekt auswählen

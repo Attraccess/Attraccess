@@ -1,7 +1,10 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, Index, Unique } from 'typeorm';
 import { ApiToken } from './api-token.entity';
 import { Permission } from './permission.entity';
 
+@Unique('UQ_api_token_permission', ['apiTokenId', 'permissionKey'])
+@Index('IDX_api_token_permission_token', ['apiTokenId'])
+@Index('IDX_api_token_permission_permission', ['permissionKey'])
 @Entity('api_token_permission')
 export class ApiTokenPermission {
   @PrimaryGeneratedColumn()
@@ -13,7 +16,7 @@ export class ApiTokenPermission {
   @Column({ type: 'text' })
   permissionKey!: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
   @ManyToOne(() => ApiToken, (apiToken) => apiToken.apiTokenPermissions, { onDelete: 'CASCADE' })

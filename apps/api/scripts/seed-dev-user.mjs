@@ -1,19 +1,18 @@
 #!/usr/bin/env node
 /* eslint-disable no-console -- Preserve operational diagnostics and CLI output. */
-// Seeds local development data directly after migrations have created the SQLite schema.
+// Seeds local development data directly after migrations have created the PostgreSQL schema.
 // Usage: pnpm seed:dev -- [--demo] [--fixture path/to/fixture.json] [--username admin] [--password password]
-import { existsSync, realpathSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertUsageIntegrity } from './usage-integrity.mjs';
 import bcrypt from 'bcrypt';
 import { loadEnvFile } from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { resolveStorageRoot } from '../src/config/storage-path.ts';
-import { resolveDatabaseProvider, sqliteProvider } from './lib/database-provider.mjs';
+import { describeLocation, isLocalHost, postgresProvider, resolveDatabaseProvider } from './lib/database-provider.mjs';
 
 // The provider main() selects through DATABASE_TYPE; the helpers below delegate to it.
-let provider = sqliteProvider;
+let provider = postgresProvider;
 
 // Statement helpers come from the selected database provider (scripts/lib/database-provider.mjs).
 export const run = (db, sql, params = []) => provider.run(db, sql, params);
@@ -31,8 +30,8 @@ export async function upsertAdmin(db, { username, email, password }) {
   const writableValues = {
     username,
     email,
-    isEmailVerified: 1,
-    isDisabled: 0,
+    isEmailVerified: true,
+    isDisabled: false,
     failedLoginAttempts: 0,
     firstFailedLoginAt: null,
     lockedUntil: null,
@@ -50,7 +49,7 @@ export async function upsertAdmin(db, { username, email, password }) {
   } else {
     const result = await run(
       db,
-      `INSERT INTO "user" (${fields.map(([column]) => `"${column}"`).join(', ')}) VALUES (${fields.map(() => '?').join(', ')})`,
+      `INSERT INTO "user" (${fields.map(([column]) => `"${column}"`).join(', ')}) VALUES (${fields.map(() => '?').join(', ')}) RETURNING id`,
       fields.map(([, value]) => value),
     );
     seededUserId = result.lastID;
@@ -62,13 +61,13 @@ export async function upsertAdmin(db, { username, email, password }) {
   const passwordHash = await bcrypt.hash(password, 10);
   const authentication = await get(
     db,
-    "SELECT id FROM authentication_detail WHERE userId = ? AND type = 'local_password'",
+    'SELECT id FROM authentication_detail WHERE "userId" = ? AND type = \'local_password\'',
     [seededUserId],
   );
   if (authentication) {
     await run(db, 'UPDATE authentication_detail SET password = ? WHERE id = ?', [passwordHash, authentication.id]);
   } else {
-    await run(db, "INSERT INTO authentication_detail (userId, type, password) VALUES (?, 'local_password', ?)", [
+    await run(db, 'INSERT INTO authentication_detail ("userId", type, password) VALUES (?, \'local_password\', ?)', [
       seededUserId,
       passwordHash,
     ]);
@@ -81,12 +80,13 @@ export async function assignRole(db, username, roleKey) {
   const role = await get(db, 'SELECT id FROM "role" WHERE key = ?', [roleKey]);
   if (!user) throw new Error(`Fixture user not found: ${username}`);
   if (!role) throw new Error(`Fixture role not found: ${roleKey}`);
-  const assignment = await get(db, "SELECT id FROM user_role WHERE userId = ? AND roleId = ? AND source = 'manual'", [
-    user.id,
-    role.id,
-  ]);
+  const assignment = await get(
+    db,
+    'SELECT id FROM user_role WHERE "userId" = ? AND "roleId" = ? AND source = \'manual\'',
+    [user.id, role.id],
+  );
   if (!assignment) {
-    await run(db, "INSERT INTO user_role (userId, roleId, source) VALUES (?, ?, 'manual')", [user.id, role.id]);
+    await run(db, 'INSERT INTO user_role ("userId", "roleId", source) VALUES (?, ?, \'manual\')', [user.id, role.id]);
   }
 }
 
@@ -155,7 +155,7 @@ export async function applyResources(db, entries) {
     if (!resource.name || !['machine', 'door'].includes(resource.type)) {
       throw new Error('Every resource requires a name and a type of machine or door');
     }
-    const existing = await get(db, 'SELECT id FROM resource WHERE name = ? AND deletedAt IS NULL', [resource.name]);
+    const existing = await get(db, 'SELECT id FROM resource WHERE name = ? AND "deletedAt" IS NULL', [resource.name]);
     let resourceId = existing?.id;
     if (resourceId) {
       if (Object.hasOwn(resource, 'description')) {
@@ -168,7 +168,7 @@ export async function applyResources(db, entries) {
         await run(db, 'UPDATE resource SET type = ? WHERE id = ?', [resource.type, resourceId]);
       }
     } else {
-      const result = await run(db, 'INSERT INTO resource (name, type, description) VALUES (?, ?, ?)', [
+      const result = await run(db, 'INSERT INTO resource (name, type, description) VALUES (?, ?, ?) RETURNING id', [
         resource.name,
         resource.type,
         resource.description ?? null,
@@ -180,7 +180,7 @@ export async function applyResources(db, entries) {
       if (!group) throw new Error(`Resource group not found: ${groupName}`);
       await run(
         db,
-        'INSERT OR IGNORE INTO resource_groups_resource_group (resourceId, resourceGroupId) VALUES (?, ?)',
+        'INSERT INTO resource_groups_resource_group ("resourceId", "resourceGroupId") VALUES (?, ?) ON CONFLICT DO NOTHING',
         [resourceId, group.id],
       );
     }
@@ -198,7 +198,7 @@ export async function applyRoles(db, entries) {
         unknownPermissions.push(permissionKey);
     }
     if (unknownPermissions.length) throw new Error(`Unknown permission keys: ${unknownPermissions.join(', ')}`);
-    const existing = await get(db, 'SELECT id, isSystemManaged FROM "role" WHERE key = ?', [role.key]);
+    const existing = await get(db, 'SELECT id, "isSystemManaged" FROM "role" WHERE key = ?', [role.key]);
     let roleId = existing?.id;
     if (roleId) {
       if (existing.isSystemManaged) throw new Error(`Fixture cannot modify system-managed role: ${role.key}`);
@@ -214,18 +214,21 @@ export async function applyRoles(db, entries) {
     } else {
       const result = await run(
         db,
-        'INSERT INTO "role" (key, name, description, isSystemManaged, isDefault) VALUES (?, ?, ?, 0, 0)',
+        'INSERT INTO "role" (key, name, description, "isSystemManaged", "isDefault") VALUES (?, ?, ?, false, false) RETURNING id',
         [role.key, role.name, role.description ?? ''],
       );
       roleId = result.lastID;
     }
     for (const permissionKey of role.permissions) {
-      const grant = await get(db, 'SELECT id FROM role_permission WHERE roleId = ? AND permissionKey = ?', [
+      const grant = await get(db, 'SELECT id FROM role_permission WHERE "roleId" = ? AND "permissionKey" = ?', [
         roleId,
         permissionKey,
       ]);
       if (!grant)
-        await run(db, 'INSERT INTO role_permission (roleId, permissionKey) VALUES (?, ?)', [roleId, permissionKey]);
+        await run(db, 'INSERT INTO role_permission ("roleId", "permissionKey") VALUES (?, ?)', [
+          roleId,
+          permissionKey,
+        ]);
     }
   }
 }
@@ -242,11 +245,6 @@ function parseArgs(argv) {
   return out;
 }
 
-function within(directory, file) {
-  const relative = path.relative(directory, file);
-  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
-}
-
 export async function main(
   argv = process.argv.slice(2),
   repoRoot = fileURLToPath(new URL('../../../', import.meta.url)),
@@ -257,22 +255,13 @@ export async function main(
   // Selecting the provider validates DATABASE_TYPE before any path is resolved or database opened.
   provider = resolveDatabaseProvider(process.env);
   const args = parseArgs(argv);
-  const storageDir = resolveStorageRoot(process.env, repoRoot);
-  const requestedPath = args.db || process.env.SEED_DB_PATH;
-  const dbPath = requestedPath ? path.resolve(requestedPath) : provider.defaultLocation(process.env, repoRoot);
-  const isLocal = within(repoRoot, storageDir) && within(storageDir, dbPath);
-  if (!isLocal && !args['allow-external-db']) {
+  const requestedUrl = typeof args.db === 'string' ? args.db : process.env.SEED_DATABASE_URL;
+  const databaseUrl = requestedUrl || provider.defaultLocation(process.env);
+  const { host, database } = describeLocation(databaseUrl);
+  if (!isLocalHost(host) && !args['allow-external-db']) {
     throw new Error(
-      'Refusing to seed a database outside configured local storage. Use --allow-external-db only for an isolated local database.',
+      `Refusing to seed the database ${database} on ${host}. Use --allow-external-db only for an isolated development database.`,
     );
-  }
-  if (!existsSync(dbPath)) throw new Error(`DB not found at ${dbPath}. Start the API once so migrations create it.`);
-  if (isLocal) {
-    const resolvedStorageDir = realpathSync(storageDir);
-    const resolvedDbPath = realpathSync(dbPath);
-    if (!within(realpathSync(repoRoot), resolvedStorageDir) || !within(resolvedStorageDir, resolvedDbPath)) {
-      throw new Error('Refusing to follow a database symlink outside configured local storage.');
-    }
   }
 
   const username = String(args.username || 'admin').toLowerCase();
@@ -281,12 +270,14 @@ export async function main(
     .toLowerCase();
   const password = String(args.password || 'password');
   const fixture = args.fixture ? loadFixture(path.resolve(String(args.fixture))) : null;
-  const db = await provider.open(dbPath);
+  const db = await provider.open(databaseUrl);
   try {
     await provider.begin(db);
     const rbacTables = ['role', 'permission', 'role_permission', 'user_role'];
-    if (!(await Promise.all(rbacTables.map((table) => hasTable(db, table)))).every(Boolean)) {
-      throw new Error('RBAC tables are missing - start the API with the latest migrations before seeding');
+    for (const table of rbacTables) {
+      if (!(await hasTable(db, table))) {
+        throw new Error('RBAC tables are missing - start the API with the latest migrations before seeding');
+      }
     }
     const userId = await upsertAdmin(db, { username, email, password });
     await assignRole(db, username, 'administrator');

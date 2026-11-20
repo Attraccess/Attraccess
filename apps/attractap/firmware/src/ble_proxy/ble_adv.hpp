@@ -17,4 +17,6 @@ namespace ble
     // The API's semantics: every criterion that is set must match (any listed UUID, any listed company id, the
     // name prefix). A filter without any criterion matches nothing.
     bool matchesFilter(const Advertisement &ad, const Command &scan);
+    // The same semantics for one filter of the advertisement watch.
+    bool matchesFilter(const Advertisement &ad, const WatchFilter &filter);
 }

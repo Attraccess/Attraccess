@@ -20,16 +20,16 @@ export class ApiToken {
   @Exclude()
   tokenHash!: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   lastUsedAt!: Date | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   expiresAt!: Date | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   revokedAt!: Date | null;
 
   @ManyToOne(() => User, (user) => user.apiTokens, { onDelete: 'CASCADE' })

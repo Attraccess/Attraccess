@@ -25,6 +25,7 @@ export const CORE_SUBJECT_TYPES = [
   'attractap.installation',
   'attractap.card',
   'attractap.ui-alert',
+  'attractap.plugin-reader',
   'setting',
   'email-template',
   'email-layout',

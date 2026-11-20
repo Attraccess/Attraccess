@@ -17,6 +17,8 @@ import { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
 
 import { TentativeSessionCancelledError } from '../errors/tentative-session-cancelled.error';
 
+import { SessionChangeInterruptedError } from '../errors/session-change-interrupted.error';
+
 import { RESOURCE_USAGE_LOG_CONTEXT, StartSessionOptions, UsageLifecycle } from '../lifecycle/usage-lifecycle';
 
 import { usageFlowPayload } from '../lifecycle/usage-flow-payload';
@@ -144,7 +146,11 @@ export class UsageSessionStarts {
         // Both changes remain atomic if the replacement can no longer be afforded.
         await this.billingService.handleResourceUsageStart(resourceId, createdSession, user, scope);
         if (!existingActiveSession) await this.lifecycle.applyLifecycleDrafts(scope, currentAttempt);
-        await this.lifecycle.sessions.publishSession(createdSession.id, scope);
+        // The attempt row is locked since the read above, so nothing removes the candidate meanwhile; a missing one
+        // means the change was cleaned up, and nothing of it (charge, audit) may commit.
+        if (!(await this.lifecycle.sessions.publishSession(createdSession.id, scope))) {
+          throw new SessionChangeInterruptedError();
+        }
         await this.lifecycle.sessions.deleteAttempt(attemptId, resourceId, scope);
         // Audit rows commit or roll back with the session change they describe.
         if (existingActiveSession) {

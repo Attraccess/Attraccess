@@ -81,7 +81,7 @@ describe('login with a busy database', () => {
       { findByLoginIdentifier: jest.fn().mockResolvedValue({ id: 7, lockedUntil: null }) } as unknown as UsersService,
       { log } as unknown as AuthAuditLogger,
     );
-    const busy = Object.assign(new Error('SQLITE_BUSY: waited 5000 ms'), { code: 'SQLITE_BUSY' });
+    const busy = Object.assign(new Error('canceling statement due to lock timeout'), { code: '55P03' });
     const authenticate = jest
       .spyOn(Object.getPrototypeOf(LoginRateLimitGuard.prototype), 'canActivate')
       .mockRejectedValue(busy);

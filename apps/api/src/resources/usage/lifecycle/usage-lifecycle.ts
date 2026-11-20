@@ -10,7 +10,7 @@ import { ConflictException, Inject, Injectable, Logger, Optional } from '@nestjs
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { TransactionScope, UNIT_OF_WORK, UnitOfWork } from '../../../database/unit-of-work';
+import { TransactionScope, UNIT_OF_WORK, UnitOfWork, runWithRetry } from '../../../database/unit-of-work';
 
 import { ResourceUsageLifecycleAbortedEvent } from '../events/resource-usage.events';
 
@@ -100,11 +100,13 @@ export class UsageLifecycle {
 
   /**
    * Runs one short, atomic database phase of a session change. External effects (device commands, payments, mails)
-   * never belong in `work`: it runs again when the database asks for a retry. They go through `scope.afterCommit` or
-   * run after the phase returned.
+   * never belong in `work`: it runs again when the database asks for a retry (a deadlock or serialization conflict,
+   * see `runWithRetry`). They go through `scope.afterCommit` or run after the phase returned. Inside a unit of work
+   * the caller already holds, the phase joins it and the owner of that unit of work decides about retries.
    */
   transaction<T>(work: (scope: TransactionScope) => Promise<T>): Promise<T> {
-    return this.unitOfWork.run(work);
+    if (this.unitOfWork.current()?.isOpen) return this.unitOfWork.run(work);
+    return runWithRetry(this.unitOfWork, work);
   }
 
   /** Whether sessions are metered at all, so their meter rates are worth recording. */
@@ -343,7 +345,11 @@ export class UsageLifecycle {
     return attempt;
   }
 
-  /** Billing flow effects belong to the attempt until the entire lifecycle succeeds. */
+  /**
+   * Billing flow effects belong to the attempt until the entire lifecycle succeeds. Parallel flow branches stage items
+   * at the same time; the attempt row stays locked from the read to the write, so each one appends to the items the
+   * previous one committed.
+   */
   async stageLifecycleBillingItem(
     attemptId: string,
     resourceId: number,

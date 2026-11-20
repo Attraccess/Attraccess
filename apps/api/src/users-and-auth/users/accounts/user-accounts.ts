@@ -1,5 +1,5 @@
 import { getSupportedDeviceLanguage } from '@attraccess/shared';
-import type { SSOProviderType, UserAccount, UserPatch, UserRecord } from '@attraccess/application-models';
+import type { NewUser, SSOProviderType, UserAccount, UserPatch, UserRecord } from '@attraccess/application-models';
 
 import {
   BadRequestException,
@@ -22,7 +22,7 @@ import { PaginationOptions } from '../../../types/request';
 import type { TransactionContext } from '../../../database/transaction-context';
 import { UNIT_OF_WORK, type UnitOfWork } from '../../../database/unit-of-work';
 import { normalizeEmail } from './normalize-email';
-import { USER_STORE, type UserStore } from '../user-store.port';
+import { USER_STORE, UserIdentityTakenError, type UserIdentityField, type UserStore } from '../user-store.port';
 
 export type UserListOptions = PaginationOptions & {
   search?: string;
@@ -51,6 +51,10 @@ export class DeleteAccountTokenExpiredException extends UnauthorizedException {
     super('DeleteAccountTokenExpiredException');
   }
 }
+
+/** The 400 for an email or username another account holds. */
+export const identityTakenException = (field: UserIdentityField) =>
+  new BadRequestException(field === 'email' ? 'Email already exists' : 'Username already exists');
 
 export class UserHasActiveUsageSessionsException extends BadRequestException {
   constructor() {
@@ -166,51 +170,20 @@ export class UserAccounts {
       this.validateUsernameOrThrow(data.username);
     }
 
-    // verifying usage limits
-    const currentAmountOfUsers = await this.store.countUsers(
-      { excludingUserId: options.excludedUserIdFromLicenseUsage },
-      context,
-    );
-    try {
-      await this.licenseService.verifyLicense({
-        usageLimits: {
-          users: currentAmountOfUsers,
-        },
-      });
-    } catch (error) {
-      if (error instanceof LicenseError) {
-        this.logger.warn(`Blocking user creation due to license: ${error.reason}`);
-        throw new ForbiddenException(error.reason);
-      }
-      throw error;
-    }
+    // The checks and the insert run under the account creation lock, held until the transaction ends: a concurrent
+    // registration (on any API instance) waits and then sees this one, so only one of them can be the first user.
+    const create = async (transaction: TransactionContext) => {
+      await this.store.lockAccountCreation(transaction);
+      await this.assertWithinLicense(options.excludedUserIdFromLicenseUsage, transaction);
+      await this.assertIdentityAvailable(data, transaction);
 
-    // Check for existing email
-    this.logger.debug(`Checking if email already exists: ${data.email}`);
-    const existingEmail = await this.findOne({ email: data.email }, undefined, context);
-    if (existingEmail) {
-      this.logger.debug(`Email already exists: ${data.email}`);
-      throw new BadRequestException('Email already exists');
-    }
+      this.logger.debug('Checking if this is the first user in the system');
+      const isFirstUser = (await this.store.countUsers({}, transaction)) === 0;
 
-    // Check for existing username
-    this.logger.debug(`Checking if username already exists: ${data.username}`);
-    const existingUsername = await this.findOne({ username: data.username }, undefined, context);
-    if (existingUsername) {
-      this.logger.debug(`Username already exists: ${data.username}`);
-      throw new BadRequestException('Username already exists');
-    }
-
-    // Check if this is the first user in the system
-    this.logger.debug('Checking if this is the first user in the system');
-    const totalUsers = await this.store.countUsers({}, context);
-    const isFirstUser = totalUsers === 0;
-
-    this.logger.debug('Saving new user to database');
-    // Wrap save + role assignment in a single transaction so a role-assignment failure
-    // doesn't leave an administrator-less account on a fresh install.
-    const saveUser = async (transaction: TransactionContext) => {
-      const saved = await this.store.insertUser(
+      this.logger.debug('Saving new user to database');
+      // Save and role assignment share the transaction, so a role-assignment failure doesn't leave an
+      // administrator-less account on a fresh install.
+      const saved = await this.insertOrThrowTaken(
         {
           ...data,
           // Keep an unknown preference distinct from the system fallback.
@@ -226,13 +199,52 @@ export class UserAccounts {
       }
       return saved;
     };
-    const savedUser = context ? await saveUser(context) : await this.uow.run(saveUser);
+    const savedUser = context ? await create(context) : await this.uow.run(create);
     this.logger.debug(`User saved with ID: ${savedUser.id}`);
 
     if (!context) {
       this.recordCreatedUser(savedUser);
     }
     return savedUser;
+  }
+
+  private async assertWithinLicense(excludingUserId: number | undefined, context: TransactionContext): Promise<void> {
+    const currentAmountOfUsers = await this.store.countUsers({ excludingUserId }, context);
+    try {
+      await this.licenseService.verifyLicense({ usageLimits: { users: currentAmountOfUsers } });
+    } catch (error) {
+      if (error instanceof LicenseError) {
+        this.logger.warn(`Blocking user creation due to license: ${error.reason}`);
+        throw new ForbiddenException(error.reason);
+      }
+      throw error;
+    }
+  }
+
+  private async assertIdentityAvailable(
+    data: { email: string; username: string },
+    context: TransactionContext,
+  ): Promise<void> {
+    this.logger.debug(`Checking if email already exists: ${data.email}`);
+    if (await this.findOne({ email: data.email }, undefined, context)) {
+      this.logger.debug(`Email already exists: ${data.email}`);
+      throw identityTakenException('email');
+    }
+    this.logger.debug(`Checking if username already exists: ${data.username}`);
+    if (await this.findOne({ username: data.username }, undefined, context)) {
+      this.logger.debug(`Username already exists: ${data.username}`);
+      throw identityTakenException('username');
+    }
+  }
+
+  /** Inserts the user; an identity a concurrent write took after the checks is the same 400 as the checks give. */
+  private async insertOrThrowTaken(user: NewUser, context: TransactionContext): Promise<UserRecord> {
+    try {
+      return await this.store.insertUser(user, context);
+    } catch (error) {
+      if (error instanceof UserIdentityTakenError) throw identityTakenException(error.field);
+      throw error;
+    }
   }
 
   public recordCreatedUser(user: Pick<UserRecord, 'locale'>): void {
@@ -248,6 +260,9 @@ export class UserAccounts {
   }
 
   public async releaseFirstTimeSetupAdminIdentifiers(context?: TransactionContext): Promise<UserRecord> {
+    if (!context) return this.uow.run((transaction) => this.releaseFirstTimeSetupAdminIdentifiers(transaction));
+    // Under the account creation lock a concurrent claim or registration has committed (and is seen) or waits.
+    await this.store.lockAccountCreation(context);
     const existingAdmin = await this.store.findFirstUser(context);
     if (!existingAdmin || existingAdmin.isEmailVerified) {
       throw new ForbiddenException('First-time setup is already complete');

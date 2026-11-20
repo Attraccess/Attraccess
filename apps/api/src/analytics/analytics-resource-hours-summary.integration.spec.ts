@@ -1,21 +1,16 @@
 import { createOperatingTimelineStore } from '../database/adapters/operating-intervals/typeorm-operating-timeline.store';
-import {
-  BillingTransaction,
-  entities,
-  Resource,
-  ResourceOperatingInterval,
-  ResourceUsage,
-} from '@attraccess/database-entities';
+import { BillingTransaction, Resource, ResourceOperatingInterval, ResourceUsage } from '@attraccess/database-entities';
 import { ResourceUsageAction } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import { ResourceOperatingAttributionService } from '../resources/operating-intervals/resource-operating-attribution.service';
 import { AnalyticsService } from './analytics.service';
 import { TypeOrmAnalyticsReader } from '../database/adapters/analytics/typeorm-analytics-reader';
+import { createTestDataSource, closeTestDataSource } from '../test-utils/test-database';
 
 const HOUR = 3_600_000;
 const FEBRUARY = { start: new Date('2024-02-01T00:00:00Z'), end: new Date('2024-03-01T00:00:00Z') };
 
-describe('AnalyticsService resource hours summary (SQLite)', () => {
+describe('AnalyticsService resource hours summary (PostgreSQL)', () => {
   let source: DataSource;
   let attribution: ResourceOperatingAttributionService;
   let service: AnalyticsService;
@@ -31,6 +26,8 @@ describe('AnalyticsService resource hours summary (SQLite)', () => {
       userId: 1,
       usageAction: ResourceUsageAction.Usage,
       lifecyclePending: false,
+      // The database refuses an open usage that is neither finalized (published) nor lifecycle-pending.
+      isFinalized: endTime === null,
       startTime: new Date(startTime),
       endTime: endTime ? new Date(endTime) : null,
       ...overrides,
@@ -44,15 +41,8 @@ describe('AnalyticsService resource hours summary (SQLite)', () => {
 
   // Schema synchronization under CI coverage can exceed Jest's five-second default.
   beforeEach(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      entities: Object.values(entities),
-      synchronize: true,
-    }).initialize();
-    await source.query('PRAGMA foreign_keys = OFF');
-    await source.query("INSERT INTO user (username, email) VALUES ('owner', 'owner@example.test')");
+    source = await createTestDataSource();
+    await source.query(`INSERT INTO "user" (username, email) VALUES ('owner', 'owner@example.test')`);
     attribution = new ResourceOperatingAttributionService(createOperatingTimelineStore(source));
     service = new AnalyticsService(
       new TypeOrmAnalyticsReader(
@@ -64,17 +54,19 @@ describe('AnalyticsService resource hours summary (SQLite)', () => {
     );
   }, 30_000);
 
-  afterEach(() => source.destroy());
+  afterEach(() => closeTestDataSource(source));
 
   const addResources = async (count: number) => {
     for (let id = 1; id <= count; id++) {
-      await source.query("INSERT INTO resource (id, name, type) VALUES (?, ?, 'machine')", [id, `R${id}`]);
+      await source.query("INSERT INTO resource (id, name, type) VALUES ($1, $2, 'machine')", [id, `R${id}`]);
     }
   };
 
   it('lists the resources active in the range with clipped person and machine hours', async () => {
     await addResources(8);
-    await source.query('UPDATE resource SET metadata = ? WHERE id = 4', [JSON.stringify({ costCenter: '4711' })]);
+    await source.query('UPDATE resource SET metadata = $1::jsonb WHERE id = 4', [
+      JSON.stringify({ costCenter: '4711' }),
+    ]);
     // 4: shared machine, A 10-12 and B 11-13
     await usage(4, '2024-02-10T10:00:00Z', '2024-02-10T12:00:00Z');
     await usage(4, '2024-02-10T11:00:00Z', '2024-02-10T13:00:00Z');
@@ -83,7 +75,7 @@ describe('AnalyticsService resource hours summary (SQLite)', () => {
     await usage(6, '2024-02-10T10:00:00Z', '2024-02-10T12:00:00Z', { usageAction: ResourceUsageAction.DoorUnlock });
     // 7: spans the range start, stored without milliseconds
     await source.query(
-      "INSERT INTO resource_usage (usageAction, resourceId, userId, startTime, endTime, lifecyclePending) VALUES ('usage', 7, 1, '2024-01-31 23:00:00', '2024-02-01 01:00:00', 0)",
+      `INSERT INTO resource_usage ("usageAction", "resourceId", "userId", "startTime", "endTime", "lifecyclePending") VALUES ('usage', 7, 1, '2024-01-31 23:00:00+00', '2024-02-01 01:00:00+00', false)`,
     );
     // 8: only an operating interval spanning the range end (2024 is a leap year: 25 h fall inside the range)
     await interval(8, '2024-02-28T23:00:00Z', '2024-03-01T01:00:00Z');
@@ -187,7 +179,7 @@ describe('AnalyticsService resource hours summary (SQLite)', () => {
     await addResources(2);
     await usage(1, '2024-02-10T10:00:00Z', '2024-02-10T11:00:00Z');
     await usage(2, '2024-02-10T10:00:00Z', '2024-02-10T12:00:00Z');
-    await source.query("UPDATE resource SET deletedAt = '2024-02-20 00:00:00' WHERE id = 2");
+    await source.query(`UPDATE resource SET "deletedAt" = '2024-02-20 00:00:00+00' WHERE id = 2`);
     const getForResources = jest.spyOn(attribution, 'getForResources');
 
     const [rows, total] = await service.getResourceHoursSummaryInDateRange(

@@ -187,4 +187,46 @@ describe('runWithRetry', () => {
     );
     expect(effects).toEqual([3]);
   });
+
+  it.each([
+    ['a serialization failure', '40001', 2],
+    ['a deadlock', '40P01', 2],
+    ['a lock timeout', '55P03', 2],
+    ['a statement timeout', '57014', 2],
+    // A COMMIT whose connection dropped may have committed: running the work again could apply it twice.
+    ['a lost connection', '08006', 1],
+    ['a connection failure', '08003', 1],
+    ['an admin shutdown', '57P01', 1],
+    ['too many connections', '53300', 1],
+    ['a unique violation', '23505', 1],
+  ])('by default retries %s only when the database guarantees nothing committed (%s)', async (_, code, expected) => {
+    const { driver } = fakeDriver();
+    const failure = Object.assign(new Error('driver failure'), { code });
+    let attempts = 0;
+    await runWithRetry(
+      new ScopedUnitOfWork(driver),
+      async () => {
+        if (++attempts === 1) throw failure;
+      },
+      { sleep: async () => undefined },
+    ).catch((error: unknown) => expect(error).toBe(failure));
+    expect(attempts).toBe(expected);
+  });
+
+  it('does not retry an exhausted connection pool by default', async () => {
+    const { driver } = fakeDriver();
+    let attempts = 0;
+    const failure = new Error('timeout exceeded when trying to connect');
+    await expect(
+      runWithRetry(
+        new ScopedUnitOfWork(driver),
+        async () => {
+          attempts++;
+          throw failure;
+        },
+        { sleep: async () => undefined },
+      ),
+    ).rejects.toBe(failure);
+    expect(attempts).toBe(1);
+  });
 });

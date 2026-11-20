@@ -11,8 +11,8 @@ import type {
  * address binding is a unique violation, a deleted reader a foreign key violation).
  */
 export interface PluginBleStore {
-  /** Readers that allow plugins to use Bluetooth, by id. */
-  listOpenReaders(): Promise<PluginBleReaderAccess[]>;
+  /** Readers that allow plugins to use Bluetooth, by id; with `readerIds`, only those among them. */
+  listOpenReaders(readerIds?: number[]): Promise<PluginBleReaderAccess[]>;
   findReader(readerId: number): Promise<PluginBleReaderAccess | null>;
 
   findEndpoint(pluginId: string, id: string): Promise<PluginBleEndpointRecord | null>;

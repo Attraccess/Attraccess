@@ -1,5 +1,6 @@
 import {
   normalizeBleAddress,
+  normalizeBleAdvertisement,
   type FakeBleHost,
   type FakeBleOpenSession,
   type FakeBleOperation,
@@ -17,6 +18,7 @@ import { BleTestDriver, ManualClock } from './ble-test-driver.test-fixture';
 import {
   createFakeReaderSocket,
   FAKE_READER_BLE_CAPABILITY,
+  FAKE_READER_BLE_CAPABILITY_WITHOUT_WATCH,
   type FakeBleReaderFirmware,
 } from '../../../attractap/websockets/handlers/ble/__test__/fake-ble-reader.test-fixture';
 import { parseBleCapability } from '../../../attractap/websockets/handlers/ble/ble-wire';
@@ -65,6 +67,21 @@ export async function createHostBleHarness(
   if (readerDriver) readerDriver.clock = clock;
   const readers: HostBleHarness['readers'] = new Map();
   let connections = 0;
+  /** What a reader's firmware announces: plugin BLE (or why not), and whether it can watch. */
+  const capabilityOf = (readerId: number) => {
+    const unsupported = driver.unsupported.get(readerId);
+    if (unsupported !== undefined) return { supported: false as const, detail: unsupported };
+    return parseBleCapability(
+      driver.watchUnsupported.has(readerId) ? FAKE_READER_BLE_CAPABILITY_WITHOUT_WATCH : FAKE_READER_BLE_CAPABILITY,
+    );
+  };
+  /** The reader (re)announces its firmware on its current connection, as after READER_FIRMWARE_INFO. */
+  const announce = (readerId: number) => {
+    const socket = readers.get(readerId)?.socket;
+    if (!socket || !readerDriver) return;
+    socket.state.ble = capabilityOf(readerId);
+    readerDriver.readerAnnounced(socket);
+  };
   const connectReader = (readerId: number) => {
     if (!readerDriver) return;
     const reader = createFakeReaderSocket({
@@ -75,6 +92,7 @@ export async function createHostBleHarness(
     });
     readers.set(readerId, reader);
     websocketService.sockets.set(reader.socket.id, reader.socket);
+    announce(readerId);
   };
   const dropReader = (readerId: number) => {
     const reader = readers.get(readerId);
@@ -137,17 +155,28 @@ export async function createHostBleHarness(
       );
     },
     setReaderAvailable: (readerId, available) => {
-      driver.available.set(readerId, available);
+      driver.setAvailable(readerId, available);
       if (!available) dropReader(readerId);
       else if (!readers.has(readerId)) connectReader(readerId);
     },
     setReaderSupported: (readerId, supported, detail = 'no-ble-capability') => {
-      if (supported) driver.unsupported.delete(readerId);
-      else driver.unsupported.set(readerId, detail);
-      const socket = readers.get(readerId)?.socket;
-      if (socket) {
-        socket.state.ble = supported ? parseBleCapability(FAKE_READER_BLE_CAPABILITY) : { supported: false, detail };
-      }
+      driver.setUnsupported(readerId, supported ? undefined : detail);
+      announce(readerId);
+    },
+    setReaderWatchSupported: (readerId, supported, detail = 'no-watch-capability') => {
+      driver.setWatchUnsupported(readerId, supported ? undefined : detail);
+      announce(readerId);
+    },
+    advertise: async (readerId, raw, advertiseOptions) => {
+      const advertisement = normalizeBleAdvertisement({
+        ...raw,
+        addressType: raw.addressType ?? 'public',
+        serviceUuids: raw.serviceUuids ?? [],
+        manufacturerData: raw.manufacturerData ?? [],
+      });
+      if (readerDriver) readers.get(readerId)?.firmware.advertise(advertisement, advertiseOptions?.changed);
+      else driver.advertise(readerId, advertisement, advertiseOptions?.changed);
+      await clock.advance(0);
     },
     setTransportAvailable: (available) => {
       driverPresent = available;
@@ -176,6 +205,7 @@ export async function createHostBleHarness(
         readerId,
         address,
       })),
+    openWatches: () => service.watches.list(),
   };
   return host;
 }

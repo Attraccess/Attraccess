@@ -46,7 +46,7 @@ export class AuditService implements AuditRecorder, OnModuleInit, OnModuleDestro
     if (this.store.isOpen || this.state.stopping) return;
     const opened = await this.store.open();
     if (opened.status === 'unsupported') {
-      this.logger.warn('Audit storage unavailable: requires a file-backed SQLite database');
+      this.logger.warn('Audit storage unavailable: requires a PostgreSQL database');
       return;
     }
     if (opened.status === 'failed') {

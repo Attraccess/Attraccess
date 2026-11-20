@@ -9,6 +9,7 @@ import { PluginController } from './plugin.controller';
 import { NpmPluginService } from './npm-plugin.service';
 import { PluginService } from './plugin.service';
 import { PluginBleService } from './ble/plugin-ble.service';
+import { PluginReadersService } from './readers/plugin-readers.service';
 
 describe('npm plugin request DTOs (HTTP integration)', () => {
   let app: INestApplication;
@@ -35,6 +36,7 @@ describe('npm plugin request DTOs (HTTP integration)', () => {
         { provide: AUDIT_RECORDER, useValue: { record: jest.fn() } },
         PluginAdministrationService,
         { provide: PluginBleService, useValue: { deleteAllForPlugin: jest.fn() } },
+        { provide: PluginReadersService, useValue: { deleteAllForPlugin: jest.fn() } },
         PluginUninstallService,
         DualAuthGuard,
         EffectivePermissionsGuard,

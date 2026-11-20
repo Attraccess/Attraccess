@@ -23,6 +23,17 @@ describe('core flow node catalog', () => {
     }
   });
 
+  it('offers an access-only door only the trigger it fires: door unlocked (its Open)', () => {
+    const door = new Map(getCoreNodeSchemas(ResourceType.Door, true).map((schema) => [schema.type, schema]));
+    expect(door.get(Type.INPUT_RESOURCE_DOOR_UNLOCKED).supportedByResource).toBe(true);
+    for (const type of [Type.INPUT_RESOURCE_DOOR_LOCKED, Type.INPUT_RESOURCE_DOOR_UNLATCHED]) {
+      expect(door.get(type).supportedByResource).toBe(false);
+    }
+    const lockingDoor = new Map(getCoreNodeSchemas(ResourceType.Door).map((schema) => [schema.type, schema]));
+    expect(lockingDoor.get(Type.INPUT_RESOURCE_DOOR_LOCKED).supportedByResource).toBe(true);
+    expect(lockingDoor.get(Type.INPUT_RESOURCE_DOOR_UNLATCHED).supportedByResource).toBe(true);
+  });
+
   it('preserves failure, conditional, terminal and event ports', () => {
     const schemas = new Map(getCoreNodeSchemas(ResourceType.Machine).map((schema) => [schema.type, schema]));
     expect(schemas.get(Type.OUTPUT_HTTP_SEND_REQUEST)).toMatchObject({
