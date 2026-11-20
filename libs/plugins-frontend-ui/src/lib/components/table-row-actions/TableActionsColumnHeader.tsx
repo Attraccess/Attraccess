@@ -4,8 +4,8 @@ import { useTranslations } from '../../i18n';
 import en from './en.json';
 import de from './de.json';
 
-/** Use as the content of the last `TableColumn`: "Actions" / "Aktionen". */
+/** Use as the content of the last `TableColumn`: "Actions" / "Aktionen", centred above the ⋮ triggers. */
 export function TableActionsColumnHeader() {
   const { t } = useTranslations({ en, de });
-  return <>{t('column')}</>;
+  return <span className="block text-center">{t('column')}</span>;
 }

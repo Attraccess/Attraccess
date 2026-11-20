@@ -158,4 +158,38 @@ describe('TableRowActions', () => {
     expect(onEdit).toHaveBeenCalledTimes(1);
     expect(onRowAction).not.toHaveBeenCalled();
   });
+
+  it('puts focus that falls back to the row after the menu or its confirmation closed onto the trigger', async () => {
+    render(
+      <table>
+        <tbody>
+          <tr tabIndex={-1} data-testid="row">
+            <td>
+              <TableRowActions itemName="Laser" actions={[edit(), remove()]} />
+            </td>
+          </tr>
+        </tbody>
+      </table>,
+    );
+    const trigger = screen.getByRole('button', { name: 'Actions for Laser' });
+    const row = screen.getByTestId('row');
+
+    await openMenu();
+    await userEvent.keyboard('{Escape}');
+    row.focus();
+    await waitFor(() => expect(trigger).toHaveFocus());
+
+    await userEvent.click(within(await openMenu()).getByRole('menuitem', { name: 'Delete' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    row.focus();
+    await waitFor(() => expect(trigger).toHaveFocus());
+
+    // Focus the user moves elsewhere stays there.
+    const outside = document.createElement('button');
+    document.body.append(outside);
+    outside.focus();
+    expect(outside).toHaveFocus();
+    outside.remove();
+  });
 });

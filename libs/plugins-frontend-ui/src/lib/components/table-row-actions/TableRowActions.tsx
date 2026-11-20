@@ -1,6 +1,6 @@
 // Row actions of a table: an icon-only ⋮ trigger opening a sectioned dropdown menu
 // FEATURE: one row action pattern for every table in core and plugins
-import { ComponentType, Fragment, ReactNode } from 'react';
+import { ComponentType, Fragment, ReactNode, useRef } from 'react';
 import {
   cn,
   Dropdown,
@@ -57,6 +57,31 @@ interface TableRowActionsProps {
   /** Shows a spinner on the trigger, e.g. while a row-wide operation runs. */
   isPending?: boolean;
   'data-cy'?: string;
+}
+
+/** How long after the menu or its confirmation closed focus falling back is still moved to the trigger. */
+const REFOCUS_WINDOW_MS = 1000;
+
+/**
+ * When the menu or its confirmation closes, the table grid moves focus to the trigger's cell or row (or
+ * it ends up on the page body), where Enter would run the row action instead of reopening the menu. For a
+ * short while, put focus that falls back there onto the trigger again; focus the user moves elsewhere
+ * is left alone.
+ */
+function keepFocusOnTrigger(wrapper: HTMLElement | null) {
+  const trigger = wrapper?.querySelector('button');
+  if (!trigger) return;
+  const fellBack = (target: EventTarget | null) =>
+    target === document.body || (target instanceof Node && target !== trigger && target.contains(trigger));
+  const refocus = (event?: FocusEvent) => {
+    if (trigger.isConnected && fellBack(event ? event.target : document.activeElement)) trigger.focus();
+  };
+  document.addEventListener('focusin', refocus);
+  window.setTimeout(() => {
+    document.removeEventListener('focusin', refocus);
+    refocus();
+  }, REFOCUS_WINDOW_MS);
+  refocus();
 }
 
 const REGULAR = '__regular';
@@ -116,6 +141,7 @@ function renderAction(action: TableRowAction) {
 export function TableRowActions(props: Readonly<TableRowActionsProps>) {
   const { actions, itemName, sections = [], isPending } = props;
   const { t } = useTranslations({ en, de });
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const visible = actions.filter((action) => !action.isHidden);
   if (visible.length === 0) return null;
 
@@ -123,34 +149,37 @@ export function TableRowActions(props: Readonly<TableRowActionsProps>) {
   const groups = groupActions(visible, sections);
 
   return (
-    <ConfirmableHost>
-      <Dropdown>
-        {/* HeroUI's .dropdown__trigger is inline-block; re-assert the button's centering. */}
-        <DropdownTrigger
-          className={cn(
-            buttonVariants({ variant: 'ghost', size: 'sm', isIconOnly: true }),
-            'inline-flex items-center justify-center',
-          )}
-          aria-label={label}
-          isDisabled={isPending}
-          data-cy={props['data-cy']}
-        >
-          {isPending ? <Spinner size="sm" color="current" /> : <MoreVerticalIcon className="size-4" />}
-        </DropdownTrigger>
-        <DropdownPopover placement="bottom end">
-          <DropdownMenu aria-label={label}>
-            {groups.map((group, index) => (
-              <Fragment key={group.key}>
-                {index > 0 && <Separator />}
-                <DropdownSection id={group.key} aria-label={typeof group.title === 'string' ? group.title : undefined}>
-                  {group.title !== undefined && <Header>{group.title}</Header>}
-                  {group.actions.map(renderAction)}
-                </DropdownSection>
-              </Fragment>
-            ))}
-          </DropdownMenu>
-        </DropdownPopover>
-      </Dropdown>
+    <ConfirmableHost onClose={() => keepFocusOnTrigger(wrapperRef.current)}>
+      {/* Centred in its cell, below the centred TableActionsColumnHeader. */}
+      <div ref={wrapperRef} className="flex justify-center">
+        <Dropdown onOpenChange={(isOpen) => !isOpen && keepFocusOnTrigger(wrapperRef.current)}>
+          {/* HeroUI's .dropdown__trigger is inline-block; re-assert the button's centering. */}
+          <DropdownTrigger
+            className={cn(
+              buttonVariants({ variant: 'ghost', size: 'sm', isIconOnly: true }),
+              'inline-flex items-center justify-center',
+            )}
+            aria-label={label}
+            isDisabled={isPending}
+            data-cy={props['data-cy']}
+          >
+            {isPending ? <Spinner size="sm" color="current" /> : <MoreVerticalIcon className="size-4" />}
+          </DropdownTrigger>
+          <DropdownPopover placement="bottom end">
+            <DropdownMenu aria-label={label}>
+              {groups.map((group, index) => (
+                <Fragment key={group.key}>
+                  {index > 0 && <Separator />}
+                  <DropdownSection id={group.key} aria-label={typeof group.title === 'string' ? group.title : undefined}>
+                    {group.title !== undefined && <Header>{group.title}</Header>}
+                    {group.actions.map(renderAction)}
+                  </DropdownSection>
+                </Fragment>
+              ))}
+            </DropdownMenu>
+          </DropdownPopover>
+        </Dropdown>
+      </div>
     </ConfirmableHost>
   );
 }
