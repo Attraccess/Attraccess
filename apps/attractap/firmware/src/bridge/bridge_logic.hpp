@@ -45,7 +45,7 @@ namespace bridge
         BleActivity ble = BleActivity::Idle;
         uint32_t buttonHeldMs = 0; // how long the button is held now (0: released)
         bool factoryReset = false; // the reset runs; the board reboots shortly
-        bool setupWindow = false;  // the Bluetooth setup window is open (provisioning_logic.hpp)
+        bool setupWindow = false;  // the Bluetooth setup window is open (src/bt_setup)
         bool setupLinked = false;  // ... and the web app is connected to it
     };
 

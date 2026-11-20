@@ -4,6 +4,8 @@ set(ATTRACTAP_FIRMWARE_NAME "attractap_lite")
 set(ATTRACTAP_FIRMWARE_FRIENDLY_NAME "Attractap Lite")
 set(ATTRACTAP_FIRMWARE_VARIANT "ethernet")
 set(ATTRACTAP_FIRMWARE_VARIANT_FRIENDLY_NAME "Ethernet")
+# Bluetooth setup (src/bt_setup): advertised as "Attractap Lite XXXX" (last two bytes of the Bluetooth MAC).
+set(ATTRACTAP_BT_SETUP_NAME_PREFIX "Attractap Lite")
 
 set(ATTRACTAP_DEFINES
     FIRMWARE_NAME="${ATTRACTAP_FIRMWARE_NAME}"
@@ -17,6 +19,8 @@ set(ATTRACTAP_DEFINES
     USE_CIRCULAR_LED_RING=1
 
     LOGGER_LEVEL_NUM=3
+
+    BT_SETUP_NAME_PREFIX="${ATTRACTAP_BT_SETUP_NAME_PREFIX}"
 
     PIN_NFC_I2C_SDA=48
     PIN_NFC_I2C_SCL=47

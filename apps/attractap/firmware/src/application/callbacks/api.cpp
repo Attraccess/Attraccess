@@ -351,6 +351,7 @@ void Application::setupDisplayCallbacks()
       [this](std::string pin) { Settings::setDevicePin(pin); });
 
   Display::connectionConfigurationScreen.setOnCancelPinLockCallback([this]() {
+    this->settingsOpenedByUser = false;
     Display::transitionToScreen(&Display::initScreen);
     this->state = APPLICATION_STATE_BOOT;
     this->api.enableConnectionAttempts();
@@ -374,6 +375,7 @@ void Application::setupDisplayCallbacks()
     Display::transitionToScreen(&Display::demoSettingsScreen);
 #else
     this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
+    this->settingsOpenedByUser = true;
     this->api.disableConnectionAttempts();
     Display::connectionConfigurationScreen.enablePinLock();
     Display::transitionToScreen(&Display::connectionConfigurationScreen);
@@ -391,6 +393,7 @@ void Application::setupDisplayCallbacks()
     Display::transitionToScreen(&Display::demoSettingsScreen);
 #else
     this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
+    this->settingsOpenedByUser = true;
     this->api.disableConnectionAttempts();
     Display::connectionConfigurationScreen.enablePinLock();
     Display::transitionToScreen(&Display::connectionConfigurationScreen);

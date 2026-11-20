@@ -69,9 +69,17 @@ def build_table(entries):
     return out + b"\xeb\xeb" + b"\xff" * 30
 
 
+def compile_entry(name, defines="-DATTRACTAP_SECURE_PROFILE=1"):
+    return {"file": f"/fw/src/{name}", "command": f"xtensa-esp32s3-elf-g++ {defines} -c {name}"}
+
+
+# A secure build: the command handler and the Bluetooth setup, no console input.
 SECURE_COMPILE_COMMANDS = [
-    {"file": "/fw/src/main.cpp", "command": "xtensa-esp32s3-elf-g++ -DATTRACTAP_SECURE_PROFILE=1 -c main.cpp"},
-    {"file": "/fw/src/api/security/tls_memory.c", "command": "xtensa-esp32s3-elf-gcc -c tls_memory.c"},
+    compile_entry("main.cpp"),
+    compile_entry("serial/serialCommandHandler.cpp"),
+    compile_entry("bt_setup/bt_setup.cpp"),
+    compile_entry("api/security/tls_memory.c"),
+    {"file": "/idf/components/bt/host/nimble/ble_hs.c", "command": "xtensa-esp32s3-elf-gcc -c ble_hs.c"},
 ]
 
 
@@ -169,21 +177,49 @@ class SecureProfileChecks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as build:
             write_build_dir(build, sdkconfig=PROFILE.replace("CONFIG_NVS_ENCRYPTION=y\n", ""),
                             bootloader_size=0x7800, table=build_table([]),
-                            compile_commands=[{"file": "/fw/src/serial/serialCommandHandler.cpp",
-                                               "arguments": ["g++", "-c", "serialCommandHandler.cpp"]}],
+                            compile_commands=[{"file": "/fw/src/serial/serialConsoleInput.cpp",
+                                               "arguments": ["g++", "-c", "serialConsoleInput.cpp"]}],
                             linker_map=UNLINKED_MAP)
-            self.assertEqual(len(c.run_checks(build)), 7)
+            # sdkconfig, bootloader, partition table, then: console input, define, Bluetooth channel, and the
+            # TLS allocator neither compiled in nor linked.
+            self.assertEqual(len(c.run_checks(build)), 8)
 
-    def test_serial_handler_must_be_compiled_out(self):
-        errors = c.check_serial_handler_compiled_out(
-            SECURE_COMPILE_COMMANDS + [{"file": "/fw/src/serial/serialCommandHandler.cpp", "command": "g++ -c x"}])
+    def test_console_on_fails(self):
+        with tempfile.TemporaryDirectory() as build:
+            write_build_dir(build, sdkconfig=PROFILE.replace("CONFIG_ESP_CONSOLE_NONE=y\n", ""))
+            errors = c.run_checks(build)
+            self.assertTrue(any("CONFIG_ESP_CONSOLE_NONE is not set" in e for e in errors), errors)
+
+    def test_handler_without_console_input_passes(self):
+        self.assertEqual(c.check_command_paths(SECURE_COMPILE_COMMANDS), [])
+
+    def test_console_input_must_be_compiled_out(self):
+        errors = c.check_command_paths(SECURE_COMPILE_COMMANDS + [compile_entry("serial/serialConsoleInput.cpp")])
         self.assertEqual(len(errors), 1)
-        self.assertIn("serial config handler is compiled in", errors[0])
+        self.assertIn("console command input is compiled in", errors[0])
 
-    def test_secure_profile_define_is_required(self):
-        errors = c.check_serial_handler_compiled_out([{"file": "/fw/src/main.cpp", "arguments": ["g++", "-c", "x"]}])
+    def test_secure_profile_define_is_required_on_every_app_source(self):
+        errors = c.check_command_paths(SECURE_COMPILE_COMMANDS + [compile_entry("serial/heapStatus.cpp", "")])
         self.assertEqual(len(errors), 1)
         self.assertIn("ATTRACTAP_SECURE_PROFILE=1", errors[0])
+        self.assertIn("heapStatus.cpp", errors[0])
+
+    def test_bluetooth_channel_is_required(self):
+        errors = c.check_command_paths([e for e in SECURE_COMPILE_COMMANDS if "bt_setup" not in e["file"]])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("Bluetooth setup channel", errors[0])
+
+    def test_crash_trigger_and_test_hooks_fail(self):
+        for entry in (compile_entry("main.cpp", "-DATTRACTAP_SECURE_PROFILE=1 -DATTRACTAP_CRASH_TRIGGER=1"),
+                      compile_entry("main.cpp", "-DATTRACTAP_SECURE_PROFILE=1 -DATTRACTAP_TEST_HOOKS=1"),
+                      compile_entry("testhooks/test_hooks.cpp")):
+            errors = c.check_command_paths(SECURE_COMPILE_COMMANDS + [entry])
+            self.assertEqual(len(errors), 1, entry)
+            self.assertIn("crash trigger or test hooks", errors[0])
+
+    def test_malformed_compile_commands_is_a_clean_error(self):
+        with self.assertRaises(c.GateError):
+            c.check_command_paths({"file": "x"})
 
     def test_tls_allocator_must_be_compiled_in(self):
         self.assertEqual(c.check_tls_allocator_compiled_in(SECURE_COMPILE_COMMANDS), [])

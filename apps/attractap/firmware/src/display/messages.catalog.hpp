@@ -290,6 +290,7 @@ enum class Message {
     SendFailuresLastMinute, ConnectionTimeoutsLastMinute, PingTimeoutsLastMinute, PingLossLastMinute,
     MissedHeartbeatsLastMinute, NotAvailable, Milliseconds, Percent,
     SessionYou, SessionNameJoin, SessionNamesMore, SessionUsersLine, SessionCountOf,
+    BluetoothSetup, BluetoothSetupOpen, BluetoothSetupLinked, BluetoothSetupUnavailable,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };

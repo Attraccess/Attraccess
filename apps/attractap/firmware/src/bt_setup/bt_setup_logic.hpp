@@ -1,18 +1,20 @@
 #pragma once
 
-// BLE bridge (ATT-1315): the decisions of the Bluetooth setup, as plain C++ so host tests can drive them.
-// provisioning.cpp wires them to NimBLE and to the command handler.
+// Bluetooth setup (ATT-1315, ATT-1371): its decisions, as plain C++ so host tests can drive them. bt_setup.cpp wires
+// them to NimBLE and to the command handler; the BLE bridge (src/bridge) and the readers (src/application) open it.
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <string>
 
-namespace bridge
+namespace bt_setup
 {
-    // When the Bluetooth setup is reachable. It opens only on request (the button held 3 s) and only on a bridge that
-    // is not paired with an Attraccess server yet (fresh flash, factory reset, or a pairing that never completed).
-    // It closes after OPEN_MS, CLOSE_AFTER_PAIRED_MS after the reader got paired (the web app reads the new status
-    // first), or with a reboot (nothing is persisted). A request while it is open changes nothing.
+    // When the Bluetooth setup is reachable. It opens only on request (the bridge: the button held 3 s; a reader:
+    // at boot, or the "Bluetooth setup" button on a Touch screen) and only on a device that is not paired with an
+    // Attraccess server yet (fresh flash, factory reset, or a pairing that never completed). It closes after
+    // OPEN_MS, CLOSE_AFTER_PAIRED_MS after the reader got paired (the web app reads the new status first), or with a
+    // reboot (nothing is persisted). A request while it is open changes nothing.
     class SetupWindow
     {
     public:
@@ -26,7 +28,7 @@ namespace bridge
             Close,
         };
 
-        // The button asked for the setup. `paired`: the bridge holds pairing credentials of a server.
+        // Someone asked for the setup. `paired`: the device holds pairing credentials of a server.
         Change request(bool paired, uint32_t now)
         {
             if (open || paired) return Change::None;
@@ -55,6 +57,14 @@ namespace bridge
 
         bool isOpen() const { return open; }
 
+        // Time left until the window times out (0 when closed).
+        uint32_t remainingMs(uint32_t now) const
+        {
+            if (!open) return 0;
+            const uint32_t elapsed = now - openedAt;
+            return elapsed >= OPEN_MS ? 0 : OPEN_MS - elapsed;
+        }
+
     private:
         bool open = false;
         bool sawPaired = false;
@@ -62,59 +72,27 @@ namespace bridge
         uint32_t pairedSince = 0;
     };
 
-    // Who may use the setup link. The window is open to anyone in radio range (Just Works pairing confirms nothing)
-    // and the controller takes one link at a time, so:
-    // - a link that is not encrypted within UNENCRYPTED_MS, or sends no command for IDLE_MS, is dropped, so one
-    //   idle connection cannot hold the setup for the whole window;
-    // - after MAX_PIN_FAILURES wrong PINs in one window the setup refuses every further command until the window is
-    //   opened again (reboot, then hold the button), so the 4-digit PIN cannot be guessed over the air.
-    class LinkGuard
+    // The Touch screens offer a "Bluetooth setup" button that opens a new window: only on a reader that is not paired
+    // and only while no window is open (an open window shows its status line instead).
+    inline bool buttonVisible(bool paired, bool windowOpen) { return !paired && !windowOpen; }
+
+    // The name the setup advertises (scan response): "<prefix> XXXX", XXXX the last two bytes of the Bluetooth MAC
+    // in hex, so the user can pick the right device in the browser's list. It must fit the 31-byte scan response
+    // with its two header bytes: at most MAX_NAME_LENGTH characters (longer prefixes are cut).
+    constexpr size_t MAX_NAME_LENGTH = 29;
+    inline void formatName(char *out, size_t size, const char *prefix, const uint8_t mac[6])
     {
-    public:
-        static constexpr uint32_t UNENCRYPTED_MS = 30000;
-        static constexpr uint32_t IDLE_MS = 5 * 60 * 1000;
-        static constexpr uint8_t MAX_PIN_FAILURES = 5;
+        snprintf(out, size, "%.*s %02X%02X", static_cast<int>(MAX_NAME_LENGTH - 5), prefix, mac[4], mac[5]);
+    }
 
-        // A new window: forgets the failures of the last one.
-        void reset() { *this = LinkGuard(); }
-
-        void connected(uint32_t now)
-        {
-            linked = true;
-            encrypted = false;
-            terminating = false;
-            lastActivity = now;
-        }
-        void disconnected() { linked = false; }
-        // The link is being dropped: do not ask again until its disconnect (or a new link) arrives.
-        void dropping() { terminating = true; }
-        void encryptedNow() { encrypted = true; }
-        void command(uint32_t now) { lastActivity = now; }
-        void pinFailed()
-        {
-            if (pinFailures < MAX_PIN_FAILURES) pinFailures++;
-        }
-
-        bool lockedOut() const { return pinFailures >= MAX_PIN_FAILURES; }
-
-        // Whether the current link must be dropped now.
-        bool shouldDrop(uint32_t now) const
-        {
-            if (!linked || terminating) return false;
-            if (lockedOut()) return true;
-            // A time stamped after `now` was read (another task) is no quiet time at all.
-            const int32_t quiet = static_cast<int32_t>(now - lastActivity);
-            if (quiet <= 0) return false;
-            return static_cast<uint32_t>(quiet) >= (encrypted ? IDLE_MS : UNENCRYPTED_MS);
-        }
-
-    private:
-        bool linked = false;
-        bool encrypted = false;
-        bool terminating = false;
-        uint8_t pinFailures = 0;
-        uint32_t lastActivity = 0;
-    };
+    // "mm:ss" of a remaining time, rounded up to the next second (the countdown never shows 00:00 while open).
+    inline std::string countdown(uint32_t remainingMs)
+    {
+        const uint32_t seconds = (remainingMs + 999) / 1000;
+        char text[12];
+        snprintf(text, sizeof text, "%02u:%02u", static_cast<unsigned>(seconds / 60), static_cast<unsigned>(seconds % 60));
+        return text;
+    }
 
     // Splits the bytes the web app writes into command lines, like the serial console does: `\n` ends a line, `\r`
     // is ignored. A line longer than maxLength is dropped whole (up to its newline) instead of being cut.

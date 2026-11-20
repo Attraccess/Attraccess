@@ -66,7 +66,7 @@ def main() -> int:
     errors = []
     catalog = (ROOT / "messages.catalog.hpp").read_text()
     extra_catalogs = [ROOT / "messages.catalog.card-relay.hpp", ROOT / "messages.catalog.network-status.hpp",
-                      ROOT / "messages.catalog.session-users.hpp"]
+                      ROOT / "messages.catalog.session-users.hpp", ROOT / "messages.catalog.bt-setup.hpp"]
     entries_source = catalog + "".join(path.read_text() for path in extra_catalogs if path.exists())
     entries = re.findall(r'\{Message::(\w+), ("(?:[^"\\]|\\.)*"), ("(?:[^"\\]|\\.)*")\}', entries_source)
     ids = [entry[0] for entry in entries]

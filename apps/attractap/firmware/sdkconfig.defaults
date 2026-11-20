@@ -38,19 +38,40 @@ CONFIG_FREERTOS_HZ=1000
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=18432
 CONFIG_ESP_MAIN_TASK_AFFINITY_CPU1=y
 
-# --- Plugin BLE proxy (ATT-1033, src/ble_proxy): central-only NimBLE, one connection ---
-# Nothing starts at boot: the proxy brings NimBLE up on a BLE request and releases host and controller
+# --- Plugin BLE proxy (ATT-1033, src/ble_proxy) and Bluetooth setup (ATT-1371, src/bt_setup): NimBLE, one connection ---
+# Nothing starts at boot for the proxy: it brings NimBLE up on a BLE request and releases host and controller
 # (~24 KB internal RAM) after 30 s without BLE work, so a reader that does no BLE right now keeps today's
-# RAM and radio. Host memory comes from PSRAM.
+# RAM and radio. The setup brings NimBLE up only while its window is open (an unpaired reader, 10 minutes
+# after boot) and frees it when the window closes. Host memory comes from PSRAM.
 CONFIG_BT_ENABLED=y
 CONFIG_BT_NIMBLE_ENABLED=y
 # CONFIG_BT_BLUEDROID_ENABLED is not set
 CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
 CONFIG_BT_NIMBLE_ROLE_CENTRAL=y
 CONFIG_BT_NIMBLE_ROLE_OBSERVER=y
-# CONFIG_BT_NIMBLE_ROLE_PERIPHERAL is not set
-# CONFIG_BT_NIMBLE_ROLE_BROADCASTER is not set
-# CONFIG_BT_NIMBLE_SECURITY_ENABLE is not set
+# Bluetooth setup: a GATT server the web app writes the setup commands to. Peripheral role and LE Secure
+# Connections pairing (Just Works), so the Wi-Fi password never crosses the air in clear text. No legacy
+# pairing, no signed writes, no stored bonds: every setup window pairs anew under a new random address.
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
+CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
+CONFIG_BT_NIMBLE_SECURITY_ENABLE=y
+# CONFIG_BT_NIMBLE_SM_LEGACY is not set
+CONFIG_BT_NIMBLE_SM_SC=y
+# CONFIG_BT_NIMBLE_SM_SIGN_CNT is not set
+# CONFIG_BT_NIMBLE_NVS_PERSIST is not set
+# Only the GAP and GATT services the setup needs: none of NimBLE's example profiles. (SPS stays: ESP-IDF's
+# ble_gatts_reset() calls into it.)
+# CONFIG_BT_NIMBLE_PROX_SERVICE is not set
+# CONFIG_BT_NIMBLE_ANS_SERVICE is not set
+# CONFIG_BT_NIMBLE_CTS_SERVICE is not set
+# CONFIG_BT_NIMBLE_HTP_SERVICE is not set
+# CONFIG_BT_NIMBLE_IPSS_SERVICE is not set
+# CONFIG_BT_NIMBLE_TPS_SERVICE is not set
+# CONFIG_BT_NIMBLE_IAS_SERVICE is not set
+# CONFIG_BT_NIMBLE_LLS_SERVICE is not set
+# CONFIG_BT_NIMBLE_HR_SERVICE is not set
+# CONFIG_BT_NIMBLE_BAS_SERVICE is not set
+# CONFIG_BT_NIMBLE_DIS_SERVICE is not set
 CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
 # Largest ATT MTU; the proxy exchanges it right after connecting.
 CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=517
@@ -62,8 +83,9 @@ CONFIG_BT_CTRL_BLE_MAX_ACT=2
 # (the proxy ends it first); a long NVS erase may cost a connection event, which BLE tolerates.
 CONFIG_BT_CTRL_RUN_IN_FLASH_ONLY=y
 # CONFIG_BT_CTRL_DTM_ENABLE is not set
-# CONFIG_BT_CTRL_BLE_SECURITY_ENABLE is not set
-# CONFIG_BT_CTRL_BLE_ADV is not set
+# The setup advertises and encrypts its link (controller side of the settings above).
+CONFIG_BT_CTRL_BLE_SECURITY_ENABLE=y
+CONFIG_BT_CTRL_BLE_ADV=y
 
 # --- Console over USB-Serial-JTAG (both boards route USB D+/D- to the S3) ---
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y

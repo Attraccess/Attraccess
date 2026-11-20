@@ -1,12 +1,10 @@
-// Host test: the BLE bridge's Wi-Fi fallback, status LEDs, button and PHY detection (src/bridge/bridge_logic.hpp),
-// and the Bluetooth setup window, line assembly and chunking (src/bridge/provisioning_logic.hpp).
+// Host test: the BLE bridge's Wi-Fi fallback, status LEDs, button and PHY detection (src/bridge/bridge_logic.hpp).
+// The Bluetooth setup it shares with the readers is tested in tests/bt-setup.
 #include "bridge_logic.hpp"
-#include "provisioning_logic.hpp"
 
 #include <cstdio>
 #include <string>
 #include <string_view>
-#include <vector>
 
 static int failures = 0;
 #define CHECK(cond)                                                              \
@@ -158,145 +156,8 @@ static void phy()
     CHECK(std::string_view(phyName(0xffff, 0xffff)) == "unknown");
 }
 
-static void setupWindow()
-{
-    using C = SetupWindow::Change;
-    // A paired bridge never opens it.
-    SetupWindow w;
-    CHECK(w.request(true, 1000) == C::None && !w.isOpen());
-    CHECK(w.update(false, 2000) == C::None);
-
-    // Unpaired: opens, a second request changes nothing, closes after 10 minutes.
-    CHECK(w.request(false, 1000) == C::Open && w.isOpen());
-    CHECK(w.request(false, 5000) == C::None);
-    CHECK(w.update(false, 1000 + SetupWindow::OPEN_MS - 1) == C::None && w.isOpen());
-    CHECK(w.update(false, 1000 + SetupWindow::OPEN_MS) == C::Close && !w.isOpen());
-    CHECK(w.update(false, 1000 + SetupWindow::OPEN_MS + 1) == C::None);
-    // It does not reopen by itself, only with a new request.
-    CHECK(!w.isOpen());
-
-    // Setup done: closes a short time after the reader got paired (the web app reads the status first).
-    CHECK(w.request(false, 50000) == C::Open);
-    CHECK(w.update(true, 60000) == C::None);
-    CHECK(w.update(false, 60000 + SetupWindow::CLOSE_AFTER_PAIRED_MS - 1) == C::None);
-    CHECK(w.update(false, 60000 + SetupWindow::CLOSE_AFTER_PAIRED_MS) == C::Close);
-    // A new window after a close starts fresh: an old pairing moment does not close it at once.
-    CHECK(w.request(false, 200000) == C::Open);
-    CHECK(w.update(false, 200001) == C::None && w.isOpen());
-
-    // millis() wrap.
-    SetupWindow wrap;
-    CHECK(wrap.request(false, 0xFFFFFF00u) == C::Open);
-    CHECK(wrap.update(false, SetupWindow::OPEN_MS - 0x101) == C::None);
-    CHECK(wrap.update(false, SetupWindow::OPEN_MS - 0x100) == C::Close);
-}
-
-static void lineAssembly()
-{
-    std::vector<std::string> lines;
-    auto collect = [&](const std::string &line) { lines.push_back(line); };
-    LineAssembler a(24);
-    auto feed = [&](const std::string &bytes) { a.feed(reinterpret_cast<const uint8_t *>(bytes.data()), bytes.size(), collect); };
-
-    // A line split over several writes, \r\n endings, empty lines ignored.
-    feed("CMND auth.");
-    feed("status.get\r");
-    CHECK(lines.empty());
-    feed("\n\nCMND a\nCMND b");
-    CHECK(lines.size() == 2 && lines[0] == "CMND auth.status.get" && lines[1] == "CMND a");
-    feed("\n");
-    CHECK(lines.size() == 3 && lines[2] == "CMND b");
-
-    // Too long: dropped whole, the next line is intact.
-    lines.clear();
-    feed(std::string(25, 'x'));
-    feed("yyyy\nCMND ok\n");
-    CHECK(lines.size() == 1 && lines[0] == "CMND ok");
-    // Exactly the limit is fine.
-    lines.clear();
-    feed(std::string(24, 'z') + "\n");
-    CHECK(lines.size() == 1 && lines[0].size() == 24);
-    // reset() forgets a partial line (the web app disconnected mid-command).
-    lines.clear();
-    feed("CMND half");
-    a.reset();
-    feed("CMND new\n");
-    CHECK(lines.size() == 1 && lines[0] == "CMND new");
-}
-
-static void chunking()
-{
-    std::vector<std::pair<size_t, size_t>> parts;
-    auto record = [&](size_t offset, size_t size) {
-        parts.emplace_back(offset, size);
-        return true;
-    };
-    CHECK(forEachChunk(10, 4, record));
-    using Part = std::pair<size_t, size_t>;
-    const std::vector<Part> expected{{0, 4}, {4, 4}, {8, 2}};
-    CHECK(parts == expected);
-    parts.clear();
-    CHECK(forEachChunk(8, 4, record) && parts.size() == 2);
-    parts.clear();
-    CHECK(forEachChunk(0, 4, record) && parts.empty());
-    CHECK(!forEachChunk(4, 0, record));
-    // A failed send stops the rest.
-    int calls = 0;
-    CHECK(!forEachChunk(10, 2, [&](size_t, size_t) { return ++calls < 2; }));
-    CHECK(calls == 2);
-}
-
-static void linkGuard()
-{
-    LinkGuard g;
-    CHECK(!g.shouldDrop(0));
-    // Not encrypted within 30 s: dropped.
-    g.connected(1000);
-    CHECK(!g.shouldDrop(1000 + LinkGuard::UNENCRYPTED_MS - 1));
-    CHECK(g.shouldDrop(1000 + LinkGuard::UNENCRYPTED_MS));
-    // Encrypted: the idle limit applies, every command restarts it.
-    g.connected(100000);
-    g.encryptedNow();
-    CHECK(!g.shouldDrop(100000 + LinkGuard::UNENCRYPTED_MS));
-    g.command(200000);
-    CHECK(!g.shouldDrop(200000 + LinkGuard::IDLE_MS - 1));
-    CHECK(g.shouldDrop(200000 + LinkGuard::IDLE_MS));
-    g.disconnected();
-    CHECK(!g.shouldDrop(200000 + LinkGuard::IDLE_MS));
-    // millis() wrap.
-    g.connected(0xFFFFFF00u);
-    CHECK(!g.shouldDrop(0x10));
-    // A command stamped just after the caller read the clock: not 49 days of quiet.
-    g.command(5000);
-    CHECK(!g.shouldDrop(4990));
-    // Asked once per link: while the drop is under way it is not asked again, a new link is.
-    g.connected(0);
-    CHECK(g.shouldDrop(LinkGuard::UNENCRYPTED_MS));
-    g.dropping();
-    CHECK(!g.shouldDrop(LinkGuard::UNENCRYPTED_MS + 1));
-    g.connected(100);
-    CHECK(g.shouldDrop(100 + LinkGuard::UNENCRYPTED_MS));
-    // Wrong PINs: locked out after the limit, across reconnects, until the next window.
-    g.connected(0);
-    g.encryptedNow();
-    for (int i = 0; i < LinkGuard::MAX_PIN_FAILURES - 1; i++) g.pinFailed();
-    CHECK(!g.lockedOut() && !g.shouldDrop(1));
-    g.pinFailed();
-    CHECK(g.lockedOut() && g.shouldDrop(1));
-    g.disconnected();
-    g.connected(10);
-    g.encryptedNow();
-    CHECK(g.lockedOut() && g.shouldDrop(10));
-    g.reset();
-    CHECK(!g.lockedOut() && !g.shouldDrop(10));
-}
-
 int main()
 {
-    setupWindow();
-    linkGuard();
-    lineAssembly();
-    chunking();
     networkFallback();
     leds();
     button();

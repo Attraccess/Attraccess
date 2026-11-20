@@ -12,12 +12,10 @@
 #include "esp_core_dump.h"
 #endif
 
+#include "../bt_setup/bt_setup.hpp"
 #include "../logger/logger.hpp"
 #include "../platform.hpp"
-#include "../settings/reader_credentials.hpp"
 #include "../state/state.hpp"
-#include "provisioning.hpp"
-#include "provisioning_logic.hpp"
 
 namespace bridge
 {
@@ -31,23 +29,20 @@ namespace bridge
 
         Logger logger("Bridge");
         std::function<BleActivity()> activitySource;
-        SetupWindow setupWindow;
 
         void requestSetup(uint32_t now)
         {
-            const bool paired = CredentialStore::load().paired();
-            if (paired)
+            switch (bt_setup::request(now))
             {
+            case bt_setup::Request::Opened:
+                logger.info("Button held 3 s: Bluetooth setup open for 10 minutes");
+                break;
+            case bt_setup::Request::Paired:
                 logger.info("Button held 3 s: Bluetooth setup is only available before the bridge is paired");
-                return;
+                break;
+            default:
+                break;
             }
-            if (setupWindow.request(paired, now) != SetupWindow::Change::Open) return;
-            if (!provisioning::open())
-            {
-                setupWindow = SetupWindow();
-                return;
-            }
-            logger.info("Button held 3 s: Bluetooth setup open for 10 minutes");
         }
 
         // The S10's LEDs are active low.
@@ -101,9 +96,7 @@ namespace bridge
                     break;
                 }
 
-                if (setupWindow.update(State::getApiState().authenticated, now) == SetupWindow::Change::Close)
-                    provisioning::close();
-                provisioning::tick();
+                bt_setup::update(State::getApiState().authenticated, now);
 
                 const State::NetworkState network = State::getNetworkState();
                 LedInputs in;
@@ -111,8 +104,8 @@ namespace bridge
                 in.apiConnected = State::getWebsocketState().connected;
                 in.ble = activitySource ? activitySource() : BleActivity::Idle;
                 in.buttonHeldMs = button.heldMs(now);
-                in.setupWindow = setupWindow.isOpen();
-                in.setupLinked = provisioning::linked();
+                in.setupWindow = bt_setup::isOpen();
+                in.setupLinked = bt_setup::linked();
                 show(ledLevels(in, now));
                 vTaskDelay(pdMS_TO_TICKS(TICK_MS));
             }
@@ -122,7 +115,7 @@ namespace bridge
     void start(std::function<BleActivity()> bleActivity)
     {
         activitySource = std::move(bleActivity);
-        SerialCommandHandler::setChannel(&provisioning::channel());
+        bt_setup::registerChannel();
 
         gpio_config_t leds = {};
         leds.pin_bit_mask = (1ULL << PIN_LED_POWER) | (1ULL << PIN_LED_NETWORK) | (1ULL << PIN_LED_BT);

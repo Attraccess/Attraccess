@@ -176,7 +176,8 @@ reports `nfc: true`; firmware before 2.10.0 omits the field, which means true.
 ESP-IDF as `IDF_TARGET` (default `esp32s3`), and `build_firmwares.py` reads it for esptool `--chip` and
 the manifest (`chip`, `boardFamily` `ESP32`, `bleBridge: true`, and the image's own flash settings
 `dio`/`40m`/`4MB`). ESP-IDF applies `sdkconfig.defaults.esp32` after `sdkconfig.defaults` for that target
-only, so the generated `sdkconfig` of every S3 variant stays byte-identical. The overlay sets 4 MB DIO
+only. (2.7.0 kept the S3 `sdkconfig` byte-identical; 2.8.0 turns the setup's NimBLE options on for the S3
+too, see "Bluetooth setup".) The overlay sets 4 MB DIO
 flash at 40 MHz, no PSRAM, the BLE-only controller with one connection, Wi-Fi/BT software coexistence,
 the UART0 console, the internal EMAC and `partitions-4mb.csv`. The secure profile is refused for this
 target.
@@ -258,19 +259,10 @@ between 3 and 10 s asks for the Bluetooth setup; at 10 s the bridge erases NVS (
 pairing credentials, PIN), lights all LEDs and reboots unconfigured. Releasing between 2 and 3 s does
 nothing. GPIO0 stays the download button.
 
-**Bluetooth setup** (`src/bridge/provisioning*`). On a bridge without pairing credentials, releasing the
-button after 3 s opens a 10-minute window: NimBLE comes up as a peripheral under a new random static
-address and advertises `Attractap Bridge XXXX` (last two bytes of the BT MAC) with service
-`2665a001-44cd-4fe2-a450-916b627619d7`. RX `...a002` (write, encrypted link required) takes the bytes
-of Serial Configurator lines (`CMND <topic> <json>\n`, a line may span several writes, at most 256
-bytes); TX `...a003` notifies the replies (`RESP <topic> <json>\n`, split into ATT MTU - 3 pieces).
-The lines run through `SerialCommandHandler` on the main loop with the serial PIN rules
-(`SerialCommandHandler::Channel`). Pairing is LE Secure Connections, Just Works, without stored bonds.
-The window closes after 10 minutes, 10 s after the reader is authenticated with the server (so the web
-app can show the enrollment code and the approval like over serial), or on a reboot; closing frees all
-of NimBLE. While it is open the BLE proxy refuses to start (`bt-setup`, retryable); a bridge that is
-paired ignores the 3 s hold. If the proxy already holds NimBLE (a bridge unpaired at runtime), the setup
-fails to open until a reboot.
+**Bluetooth setup** (shared with the readers, see "Bluetooth setup (2.8.0)"). On a bridge without pairing
+credentials, releasing the button after 3 s opens a 10-minute window, advertised as `Attractap Bridge XXXX`. A
+bridge that is paired ignores the 3 s hold. If the proxy already holds NimBLE (a bridge unpaired at runtime), the
+setup fails to open until a reboot.
 
 **Serial setup.** The Bluetooth setup is the alternative that needs no open case. The classic ESP32 has no USB-Serial-JTAG. The console and the Serial Configurator
 protocol run on UART0 (GPIO1/3, 115200 8N1) through a 3.3 V USB-TTL adapter on the serial pads
@@ -299,6 +291,61 @@ secure profile; development units stay unfused. A later secure bridge build need
 
 Installations that rely on the reader secure profile get bridges without it; physical access to a
 bridge exposes its flash, including its pairing credentials.
+
+## Bluetooth setup (2.8.0)
+
+`src/bt_setup/` (ATT-1315 for the bridge, ATT-1371 for the readers): the web app's **Set up over Bluetooth**
+sets the PIN, Wi-Fi and server address of a device that is not paired yet. Every variant with NimBLE and an API
+has it (the condition of the BLE proxy, `ATTRACTAP_BT_SETUP`): Touch, Touch V2 (also the secure profile), Lite
+and the bridge. The demo variants, the park images and the desktop simulator get stubs.
+
+**Window** (`bt_setup_logic.hpp`, `SetupWindow`). It opens only while `CredentialStore::load().paired()` is
+false and stays open 10 minutes. It closes 10 s after the reader runs an authenticated session (so the web app
+reads the new status first), when it times out, or with a reboot; nothing is persisted. A request while it is open
+changes nothing. Who opens it:
+
+- Touch / Touch V2: at every boot while unpaired (`Application::tickBtSetup`, first main-loop pass), and the **Bluetooth setup**
+  button next to **Settings** on `InitScreen` (shown only while unpaired and no window is open; no PIN, the commands
+  check it). If NimBLE cannot start, the button shows "Bluetooth unavailable". While the window is open,
+  `InitScreen` and the pairing-code screen show "Bluetooth setup open · mm:ss · Attractap Touch XXXX", or
+  "Bluetooth setup: browser connected" (`display/shared/btSetupStatus.hpp`, `messages.catalog.bt-setup.hpp`).
+- Lite: at every boot while unpaired. The ring shows `LED_STATE_BT_SETUP` (`led/led_bt_setup.hpp`): two short
+  blue pulses every 1.5 s over a dim ring, steady blue with a browser connected. It replaces Configuration Required
+  and Initializing; the pairing pattern takes priority.
+- Bridge: the 3 s button hold (above); the bridge runs the window on its button task, the readers on the main loop.
+
+A configuration that arrives over USB or Bluetooth while the reader shows "not configured" now leaves that state
+by itself (`Application::settingsOpenedByUser` keeps settings the user opened on screen until saved or cancelled).
+
+**Service.** NimBLE comes up as a peripheral under a new random static address and advertises service
+`2665a001-44cd-4fe2-a450-916b627619d7`, with `<BT_SETUP_NAME_PREFIX> XXXX` (last two bytes of the BT MAC, at most
+29 characters) in the scan response; the variant files set the prefix. RX `...a002` (write, encrypted link
+required) takes the bytes of Serial Configurator lines (`CMND <topic> <json>\n`, a line may span several writes, at
+most 256 bytes; a longer one is dropped whole); TX `...a003` notifies the replies (`RESP <topic> <json>\n`, split
+into ATT MTU - 3 pieces). The lines run through `SerialCommandHandler` on the main loop with the serial PIN rules
+(`SerialCommandHandler::Channel`). Pairing is LE Secure Connections, Just Works, without stored bonds. The host task
+stack (4 KB) comes from PSRAM where there is some.
+
+**NimBLE ownership.** While the window is open the BLE proxy refuses to start (`READER_OFFLINE` `bt-setup`,
+retryable). Closing drops the link, stops advertising, frees NimBLE and restores `ble_hs_cfg` as it was before the
+setup (pairing settings, bond store, callbacks), so the proxy brings NimBLE up again as a plain central without a
+reboot.
+
+**sdkconfig (S3).** `sdkconfig.defaults` turns on the peripheral and broadcaster roles, NimBLE security with SM SC
+only (no legacy pairing, no signed writes), no NVS persistence of bonds, the controller's advertising and BLE
+security, and leaves NimBLE's example GATT services out. NimBLE memory stays in PSRAM
+(`CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL`). The options also apply to paired readers that never open a window;
+image sizes are in the PR of ATT-1371. `sdkconfig.defaults.esp32` keeps the bridge's own values.
+
+**Secure profile.** Secure builds keep the setup: the command handler is compiled in, but only for the Bluetooth
+channel. The console stays off (`CONFIG_ESP_CONSOLE_NONE`): `CMakeLists.txt` leaves out
+`src/serial/serialConsoleInput.cpp` (the console reads), and `ATTRACTAP_SECURE_PROFILE=1` drops the console driver
+in `main.cpp` and the console fallback of the replies. `tools/check_secure_profile.py` fails a secure build that
+compiles the console input, lacks the define on an app source, lacks `src/bt_setup/bt_setup.cpp`, or has the crash
+trigger or the test hooks.
+
+Host tests: `tests/bt-setup` (window, triggers, name, countdown, line assembly, chunking, the Lite ring);
+`tests/bridge` keeps the bridge's button, LEDs, Wi-Fi fallback and PHY.
 
 ## BLE proxy protocol (2.5.0)
 
