@@ -38,6 +38,7 @@ def echo():
 
 def client(cafile, max_version=None):
     context = ssl.create_default_context(cafile=cafile)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     if max_version:
         context.maximum_version = max_version
     return context
