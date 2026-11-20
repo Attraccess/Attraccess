@@ -48,10 +48,9 @@ export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: 
   const [dialog, setDialog] = useState<OpenDialog | null>(null);
 
   const { data: pairings } = useGetPairings({}, undefined, { refetchInterval: 3000 });
+  // Every waiting request is a reader that asks to be paired; a request only gets a record once it is approved.
   const running = (pairings ?? []).filter((p) => isPairingRunning(p.state));
   const readers = props.readers.filter((reader) => reader.pairingState !== 'paired');
-  // Every waiting request is a reader that asks to be paired; a request only gets a record once it is approved.
-  const devices = running;
 
   // The machines the record was linked to before its pairing was removed.
   const resourcesOf = (reader: Attractap) => {
@@ -61,7 +60,7 @@ export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: 
 
   return (
     <>
-      {(readers.length > 0 || devices.length > 0) && (
+      {(readers.length > 0 || running.length > 0) && (
         <Card data-cy="attractap-readers-to-pair">
           <Card.Header>
             <PageHeader noMargin title={t('toPair.title')} subtitle={t('toPair.description')} />
@@ -91,7 +90,7 @@ export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: 
                 }
               />
             ))}
-            {devices.map((pairing) => (
+            {running.map((pairing) => (
               <PairingRow
                 key={pairing.id}
                 kind={pairing.kind}

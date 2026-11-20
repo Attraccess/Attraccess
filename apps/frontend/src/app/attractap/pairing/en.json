@@ -10,7 +10,8 @@
     "chooseMode": "What is this reader?",
     "mode": {
       "new": "A new reader",
-      "takeover": "A reader that takes over one I already have (after a reset or as a replacement)"
+      "takeover": "A reader that takes over one I already have (after a reset or as a replacement)",
+      "takeoverUnavailable": "There is no reader yet that it could take over."
     },
     "targetReader": "Which reader?",
     "connectionLost": "Connection to the server lost. The status shown here may be out of date.",

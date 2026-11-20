@@ -134,6 +134,25 @@ describe('AttractapList pairing', () => {
     expect(screen.getByText('–')).toBeInTheDocument();
   });
 
+  describe('empty list', () => {
+    beforeEach(() => {
+      mockLicense(['attractap']);
+      data.toPair = [];
+    });
+
+    it('says once where readers come from when no reader is paired (e.g. right after the upgrade)', () => {
+      data.readers = [];
+      render(<AttractapList />);
+      expect(screen.getAllByText('emptyHint')).toHaveLength(1);
+    });
+
+    it('drops the hint as soon as one reader is paired', () => {
+      data.readers = [reader(1, 'Paired door', 'paired')];
+      render(<AttractapList />);
+      expect(screen.queryByText('emptyHint')).toBeNull();
+    });
+  });
+
   describe('opening the settings', () => {
     beforeEach(() => {
       mockLicense(['attractap']);

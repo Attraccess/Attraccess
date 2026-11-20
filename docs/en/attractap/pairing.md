@@ -105,7 +105,8 @@ These actions are in the **Pairing** tab of a paired reader's settings.
   example after a defect). The new reader shows its code, you approve it for the existing record.
   Name, machines and settings stay; the old pairing stops working right away.
 - **Remove pairing**: asks for confirmation, then disconnects the reader within a second. It shows
-  "Pairing removed", creates a **new key** and waits for approval again. Afterwards the reader appears in the **Not paired** list; click **Pair** to pair it again.
+  "Pairing removed", creates a **new key** and waits for approval again. Afterwards the reader appears
+  in the **Not paired** list; click **Pair** to pair it again.
 
 The **History** in the Pairing tab lists every pairing, replacement and removal with the user who
 did it and when. It is kept even after the reader is deleted.
@@ -127,6 +128,10 @@ tab of the reader. Only a release build of a regular variant, connected with its
 secured; a lab build (development mode), a plain build, a demo or a debug build never does, whatever its
 report says. A failing report and removing the pairing both clear the state. The report is the reader's
 own statement and no hardware attestation; plain readers show nothing here.
+
+**Secured** also needs the fingerprints of the reader's Secure Boot keys, which the server records only
+when it secures the reader. That procedure is not available yet, so secure readers show **Not secured**
+for now. See [Reader Security](attractap/reader-security.md#reader-identity-and-the-secured-status).
 
 ### What an attacker can and cannot do
 

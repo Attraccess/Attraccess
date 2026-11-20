@@ -609,6 +609,30 @@ describe('PairingDialog', () => {
       expect(pickerLabels()).toEqual(['Door', 'Removed reader (paired)']);
     });
 
+    it('disables the takeover with a reason while there is no reader record to take over', () => {
+      mocks.readers.current = [];
+      mocks.readersToPair.current = [];
+      open({ pairingId: 'p1' });
+      const modeSelect = mocks.selects.at(-1) as unknown as {
+        disabledKeys: string[];
+        items: Array<{ key: string; description?: string }>;
+      };
+      expect(modeSelect.disabledKeys).toEqual(['takeover']);
+      expect(modeSelect.items.find((item) => item.key === 'takeover')?.description).toBe(
+        'There is no reader yet that it could take over.',
+      );
+    });
+
+    it('offers the takeover once a reader record exists', () => {
+      open({ pairingId: 'p1' });
+      const modeSelect = mocks.selects.at(-1) as unknown as {
+        disabledKeys: string[];
+        items: Array<{ key: string; description?: string }>;
+      };
+      expect(modeSelect.disabledKeys).toEqual([]);
+      expect(modeSelect.items.every((item) => item.description === undefined)).toBe(true);
+    });
+
     it('names a preset target that is only in the list of readers to pair', () => {
       mocks.pairings.current = [];
       open({ presetTargetReaderId: 9 });

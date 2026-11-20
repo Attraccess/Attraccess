@@ -74,7 +74,7 @@ Reader, deren Kopplung entfernt wurde, erscheinen nur im Block **Nicht gekoppelt
 > [!IMPORTANT]
 > **Erlauben Sie nur gekoppelten, vertrauenswürdigen Readern, Karten zu registrieren und zurückzusetzen.** Eine neue Karte hat noch den öffentlich bekannten Werksschlüssel, deshalb schreibt der Server den neuen Kartenschlüssel unter diesem Werksschlüssel.
 >
-> - **Die Verbindung:** Ein [gekoppelter Reader](attractap/pairing.md) spricht über eine verschlüsselte Verbindung mit dem Server, niemand im Netzwerk kann den Schlüssel mitlesen. Ein noch nicht gekoppelter Reader verbindet sich weiterhin unverschlüsselt. Ein noch nicht gekoppelter Reader kann Karten überhaupt nicht registrieren oder zurücksetzen.
+> - **Die Verbindung:** Ein [gekoppelter Reader](attractap/pairing.md) spricht über eine verschlüsselte Verbindung mit dem Server, niemand im Netzwerk kann den Schlüssel mitlesen. Ein nicht gekoppelter Reader kann sich gar nicht verbinden und deshalb nie Karten registrieren oder zurücksetzen.
 > - **Der Reader selbst:** Der Reader, der den Schreibvorgang weiterreicht, kann den neuen Schlüssel weiterhin ermitteln. Ein manipulierter Reader könnte so Karten kopieren, die an ihm registriert oder zurückgesetzt wurden. Beschränken Sie das unter **Einstellungen -> RFID-Kartenregistrierung** auf Reader an einem Ort, den Sie kontrollieren, zum Beispiel am Empfang. Gegen manipulierte Reader soll abgesicherte Reader-Firmware helfen, die für eine spätere Version geplant ist.
 >
 > Das normale Vorhalten einer Karte ist nicht betroffen: Der Server prüft die Karte, ohne dass der Schlüssel über den Reader läuft.

@@ -2,9 +2,21 @@
 <!-- llms-description: How to secure Attractap Touch V2 readers so they only accept firmware signed with your own Secure Boot keys, including backup and restore. -->
 
 Attractap Touch V2 readers can be **secured**: afterwards they only accept firmware signed by _your_
-installation, their flash is encrypted and their server identity is locked to the chip. This page
-covers the keys your installation needs for that. Securing a reader itself is not available yet; the
-button appears in a later release once the procedure has been verified on real hardware.
+installation, and their flash and settings storage are encrypted. This page covers the keys your
+installation needs for that. Securing a reader itself is not available yet; the button appears in a
+later release once the procedure has been verified on real hardware.
+
+## Reader identity and the Secured status
+
+A reader's identity is the P-256 key it creates itself and that your installation trusts once an admin
+has [paired](attractap/pairing.md) it. On a reader running a secure build, flash encryption and NVS
+encryption protect that key.
+
+A secure reader reports its security settings (eFuses) each time it connects, and the **Pairing** tab of
+the reader editor shows **Secured** or **Not secured** with the settings that do not match (see
+[Secure readers](attractap/pairing.md#secure-readers)). **Secured** also needs the fingerprints of the
+reader's Secure Boot keys, which the server only records when it secures the reader. Until that
+procedure is available, secure readers show **Not secured**.
 
 Open **Settings → Reader security** (permission `system.settings.manage`).
 
@@ -78,5 +90,5 @@ It is only possible while no reader has this installation's keys burned in.
 - Key revocation and rotation for already-secured readers are not supported yet.
 - A secured reader cannot be moved to another installation.
 - The protection targets an attacker with brief physical access. It makes no claims against glitching,
-  side-channel or invasive attacks, and the chip's digital signature (DS) peripheral proves key use but is
-  not remote attestation.
+  side-channel or invasive attacks. The security report is the reader's own statement, not remote
+  attestation.

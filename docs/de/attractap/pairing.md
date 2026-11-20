@@ -142,6 +142,11 @@ Build, Demo- und Debug-Build werden nie gesichert, egal was der Bericht sagt. Ei
 Bericht und das Entfernen der Kopplung setzen den Status zurück. Der Bericht ist die eigene Aussage des
 Readers und kein Hardware-Nachweis; einfache Reader zeigen hier nichts.
 
+Für **Gesichert** braucht der Server außerdem die Fingerabdrücke der Secure-Boot-Schlüssel des Readers,
+die er erst beim Sichern des Readers speichert. Dieser Ablauf ist noch nicht verfügbar, deshalb zeigen
+sichere Reader vorerst **Nicht gesichert**. Siehe
+[Reader-Sicherheit](attractap/reader-security.md#identität-und-sicherheitsstatus-des-readers).
+
 ### Was ein Angreifer kann und was nicht
 
 Der Code wird aus den Schlüsseln und Zufallswerten beider Seiten berechnet. Deine Freigabe ist

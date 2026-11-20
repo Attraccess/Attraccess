@@ -46,8 +46,9 @@ The reader connects and is ready. See [Reader Pairing](attractap/pairing.md) for
 LED pattern, security notes and what to do after the upgrade to firmware 2.6.0, when every reader pairs again.
 
 > [!NOTE]
-> You need the `resources.update` permission to approve a reader. Readers running firmware older
-> than 1.8.0 cannot pair a new reader; update them with the web flasher first.
+> You need the `resources.update` permission to approve a reader. A reader that signs in with a token
+> (any firmware older than 1.8.0, and a reader on 1.8.0 to 2.5.x that was never paired) cannot pair and
+> cannot update over the air; flash it to firmware 2.6.0 with the web flasher (USB) first.
 
 ## Step 3: Assign Resources to the Reader
 
@@ -95,7 +96,7 @@ The reader communicates with the Attraccess backend via WebSocket. The connectio
 | Reader display shows "No connection" | Check network connectivity and verify the Attraccess server URL |
 | Reader not appearing in Attraccess | Ensure the reader is on the same network and can reach the backend. A reverse proxy must pass the `Sec-WebSocket-Protocol` header |
 | Code is rejected | The code changes every 30 seconds; enter the one currently shown. If a correctly read code keeps failing, check your network |
-| Settings of a reader are locked | The reader is not paired yet; use **Pair** on its row |
+| Reader list is empty after a server update | The release that removes token sign-in (Attractap firmware 2.6.0) deletes every reader record. Pair each reader again, see [After the upgrade](attractap/pairing.md#after-the-upgrade-every-reader-pairs-again) |
 | Card scan has no response | Verify the RFID card is registered and the reader has an assigned resource |
 
 ## See Also

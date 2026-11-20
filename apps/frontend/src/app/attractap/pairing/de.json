@@ -10,7 +10,8 @@
     "chooseMode": "Was ist das für ein Reader?",
     "mode": {
       "new": "Ein neuer Reader",
-      "takeover": "Ein Reader, der einen vorhandenen übernimmt (nach einem Zurücksetzen oder als Ersatz)"
+      "takeover": "Ein Reader, der einen vorhandenen übernimmt (nach einem Zurücksetzen oder als Ersatz)",
+      "takeoverUnavailable": "Es gibt noch keinen Reader, den er übernehmen könnte."
     },
     "targetReader": "Welcher Reader?",
     "connectionLost": "Verbindung zum Server verloren. Der angezeigte Status ist möglicherweise veraltet.",
