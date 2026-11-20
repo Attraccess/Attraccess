@@ -202,7 +202,6 @@ bool Wifi::reassociate()
 {
     if (_state != WIFI_STATE_CONNECTED || !hasSavedCredentials())
     {
-        logger.infof("Not re-associating: state=%s saved=%d", getStateName(_state), hasSavedCredentials() ? 1 : 0);
         return false;
     }
     logger.info("Re-associating with the access point: the link is up but carries no traffic");
