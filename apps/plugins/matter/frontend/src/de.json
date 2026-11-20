@@ -326,6 +326,7 @@
   },
   "banner": {
     "title": {
+      "connected": "Verbunden",
       "not_configured": "Matter ist nicht eingerichtet",
       "connecting": "Verbindung zum Matter-Sidecar wird aufgebaut",
       "unavailable": "Matter-Sidecar nicht erreichbar",
@@ -348,7 +349,8 @@
   "notAvailable": {
     "available": "Der Sidecar unterstützt „{{family}}“, aber diese Plugin-Version nutzt es noch nicht. Es kommt mit einer späteren Plugin-Version.",
     "unavailable": "Der Sidecar meldet „{{family}}“ nicht als verfügbar. Es kommt mit einer späteren Plugin-Version und braucht einen Sidecar, der es unterstützt.",
-    "unknown": "Der Sidecar ist nicht verbunden, daher ist seine Unterstützung für „{{family}}“ unbekannt. Dieser Teil kommt mit einer späteren Plugin-Version."
+    "unknown": "Der Sidecar ist nicht verbunden, daher ist seine Unterstützung für „{{family}}“ unbekannt. Dieser Teil kommt mit einer späteren Plugin-Version.",
+    "noStatus": "Dieser Teil kommt mit einer späteren Plugin-Version. Ob der Sidecar „{{family}}“ unterstützt, wird hier nicht angezeigt."
   },
   "thread": {
     "emptyTitle": "Thread ist nicht eingerichtet",
@@ -415,6 +417,7 @@
     "empty": "Keine passenden Geräte.",
     "loadError": "Die Geräte konnten nicht geladen werden.",
     "detailError": "Das Gerät konnte nicht geladen werden.",
+    "retry": "Erneut versuchen",
     "refreshError": "Das Gerät konnte nicht aktualisiert werden.",
     "actionFailed": "Die Aktion ist fehlgeschlagen",
     "lifecycle": {
@@ -683,8 +686,11 @@
       "title": "Fähigkeiten",
       "reported": "Gemeldet",
       "unknown": "Die Fähigkeiten sind bekannt, solange der Sidecar verbunden ist.",
-      "available": "verfügbar",
-      "unavailable": "nicht verfügbar",
+      "state": {
+        "available": "verfügbar",
+        "unavailable": "nicht verfügbar",
+        "unknown": "unbekannt"
+      },
       "family": {
         "health": "Zustand",
         "fabric": "Fabric",

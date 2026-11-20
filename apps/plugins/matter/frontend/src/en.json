@@ -326,6 +326,7 @@
   },
   "banner": {
     "title": {
+      "connected": "Connected",
       "not_configured": "Matter is not set up",
       "connecting": "Connecting to the Matter sidecar",
       "unavailable": "Matter sidecar unreachable",
@@ -348,7 +349,8 @@
   "notAvailable": {
     "available": "The sidecar supports \"{{family}}\", but this plugin version does not use it yet. It comes with a later plugin version.",
     "unavailable": "The sidecar does not report \"{{family}}\" as available. It comes with a later plugin version, and needs a sidecar that supports it.",
-    "unknown": "The sidecar is not connected, so its \"{{family}}\" support is unknown. This part comes with a later plugin version."
+    "unknown": "The sidecar is not connected, so its \"{{family}}\" support is unknown. This part comes with a later plugin version.",
+    "noStatus": "This part comes with a later plugin version. Whether the sidecar supports \"{{family}}\" is not shown here."
   },
   "thread": {
     "emptyTitle": "Thread is not set up",
@@ -415,6 +417,7 @@
     "empty": "No devices match.",
     "loadError": "The devices could not be loaded.",
     "detailError": "The device could not be loaded.",
+    "retry": "Try again",
     "refreshError": "The device could not be refreshed.",
     "actionFailed": "The action failed",
     "lifecycle": {
@@ -683,8 +686,11 @@
       "title": "Capabilities",
       "reported": "Reported",
       "unknown": "Capabilities are known while the sidecar is connected.",
-      "available": "available",
-      "unavailable": "not available",
+      "state": {
+        "available": "available",
+        "unavailable": "not available",
+        "unknown": "unknown"
+      },
       "family": {
         "health": "Health",
         "fabric": "Fabric",

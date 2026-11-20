@@ -1,5 +1,5 @@
 import { EmptyState, StatusAlert } from '@attraccess/plugins-frontend-ui';
-import { Spinner } from '@heroui/react';
+import { Button, Spinner } from '@heroui/react';
 import { useState } from 'react';
 import { useMatterTranslations } from '../i18n';
 import { useMatterPermissions } from '../permissions';
@@ -49,7 +49,16 @@ export function DeviceList() {
       {nodes.loading && <Spinner data-cy="matter-devices-loading" />}
       {nodes.error && (
         <StatusAlert status="danger" title={t('devices.loadError')} data-cy="matter-devices-error">
-          {nodes.error}
+          <span className="mt:block">{nodes.error}</span>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="mt:mt-2"
+            onPress={() => void nodes.refetch()}
+            data-cy="matter-devices-retry"
+          >
+            {t('devices.retry')}
+          </Button>
         </StatusAlert>
       )}
       {!nodes.loading && !nodes.error && shown.length === 0 && (

@@ -8,8 +8,9 @@ import { SettingsForm } from '../SettingsForm';
 import { StatusCard } from '../StatusCard';
 
 /**
- * Infrastructure: the connection status, the connection settings (manage) and the fabric and backup section, which
- * moved here as one component (ATT-998). Visible with `matter.devices.read`; the settings, fabric, recovery key,
+ * Infrastructure: the connection status, the connection settings (manage, right after the status so a first-run
+ * "enter the URL and token" hint is not buried) and the fabric and backup section, which moved here as one
+ * component (ATT-998). Visible with `matter.devices.read`; the settings, fabric, recovery key,
  * backup and restore controls need `matter.devices.manage`. No secret is ever shown: the credential is write-only.
  */
 export function InfrastructureTab() {
@@ -30,8 +31,8 @@ export function InfrastructureTab() {
           {settingsError}
         </StatusAlert>
       )}
-      {permissions.canRead && <FabricBackupSection canManage={permissions.canManage} />}
       {permissions.canManage && settings && <SettingsForm settings={settings} onSave={save} onRemove={remove} />}
+      {permissions.canRead && <FabricBackupSection canManage={permissions.canManage} />}
     </div>
   );
 }

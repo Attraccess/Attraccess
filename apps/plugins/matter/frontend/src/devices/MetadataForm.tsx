@@ -1,5 +1,5 @@
 import { Button } from '@attraccess/plugins-frontend-ui';
-import { Description, Form, Input, Label, TextArea, TextField } from '@heroui/react';
+import { Description, FieldError, Form, Input, Label, TextArea, TextField } from '@heroui/react';
 import { useState, type FormEvent } from 'react';
 import { useMatterTranslations } from '../i18n';
 import type { Metadata } from './api';
@@ -28,11 +28,20 @@ export function MetadataForm({
   idPrefix: string;
 }>) {
   const { t } = useMatterTranslations();
-  const [draft, setDraft] = useState<Record<MetadataField, string>>({
+  const stored: Record<MetadataField, string> = {
     displayName: value.displayName ?? '',
     description: value.description ?? '',
     location: value.location ?? '',
-  });
+  };
+  const [draft, setDraft] = useState(stored);
+  const [seen, setSeen] = useState(stored);
+  // The stored values changed (another administrator, or this form's own save). An untouched form follows them; one
+  // with edits keeps its edits, so nothing the user typed is lost.
+  if (fields.some((field) => seen[field] !== stored[field])) {
+    const untouched = fields.every((field) => draft[field].trim() === seen[field]);
+    setSeen(stored);
+    if (untouched) setDraft(stored);
+  }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,11 +83,11 @@ export function MetadataForm({
           ) : (
             <Input autoComplete="off" data-cy={`${idPrefix}-${field}`} />
           )}
-          <Description>
-            {tooLong.includes(field)
-              ? t('devices.validation.length', { max: METADATA_LIMITS[field] })
-              : t('devices.metadata.maxLength', { max: METADATA_LIMITS[field] })}
-          </Description>
+          <Description>{t('devices.metadata.maxLength', { max: METADATA_LIMITS[field] })}</Description>
+          {/* HeroUI hides the description while the field is invalid, so the error carries the message. */}
+          <FieldError data-cy={`${idPrefix}-${field}-error`}>
+            {t('devices.validation.length', { max: METADATA_LIMITS[field] })}
+          </FieldError>
         </TextField>
       ))}
       {error && (

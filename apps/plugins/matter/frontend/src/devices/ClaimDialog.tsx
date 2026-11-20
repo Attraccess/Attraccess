@@ -1,5 +1,5 @@
 import { StatusDialog } from '@attraccess/plugins-frontend-ui';
-import { Description, Input, Label, TextField } from '@heroui/react';
+import { Description, FieldError, Input, Label, TextField } from '@heroui/react';
 import { useState } from 'react';
 import { useMatterTranslations } from '../i18n';
 
@@ -38,7 +38,8 @@ export function ClaimDialog({
         <TextField value={name} onChange={setName} isInvalid={tooLong}>
           <Label>{t('devices.claim.name')}</Label>
           <Input autoComplete="off" data-cy="matter-claim-name" />
-          <Description>{tooLong ? t('devices.validation.nameLength') : t('devices.claim.nameHint')}</Description>
+          <Description>{t('devices.claim.nameHint')}</Description>
+          <FieldError data-cy="matter-claim-name-error">{t('devices.validation.nameLength')}</FieldError>
         </TextField>
       </div>
     </StatusDialog>

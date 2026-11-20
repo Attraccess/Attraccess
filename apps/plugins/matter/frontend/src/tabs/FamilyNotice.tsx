@@ -9,6 +9,7 @@ import { useMatterConnection } from '../MatterConnectionContext';
 export function FamilyNotice({ family }: Readonly<{ family: FeatureFamily }>) {
   const { t } = useMatterTranslations();
   const { status } = useMatterConnection();
-  const availability = familyAvailability(status, family);
+  // No status at all (the user may not read the connection, or it has not loaded) is not "not connected".
+  const availability = status ? familyAvailability(status, family) : 'noStatus';
   return <p data-cy={`matter-family-notice-${family}`}>{t(`notAvailable.${availability}`, { family })}</p>;
 }

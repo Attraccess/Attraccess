@@ -57,7 +57,16 @@ export function DeviceDetailPage({ nodeId }: Readonly<{ nodeId: string }>) {
       <div className="mt:flex mt:flex-col mt:gap-4">
         {back}
         <StatusAlert status="danger" title={t('devices.detailError')} data-cy="matter-device-error">
-          {detail.error}
+          <span className="mt:block">{detail.error}</span>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="mt:mt-2"
+            onPress={() => void detail.refetch()}
+            data-cy="matter-device-retry"
+          >
+            {t('devices.retry')}
+          </Button>
         </StatusAlert>
       </div>
     );

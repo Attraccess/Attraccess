@@ -30,7 +30,7 @@ export function CapabilitiesHealthCard() {
                 data-cy={`matter-capability-${family}`}
                 data-availability={availability}
               >
-                {t(`health.capabilities.family.${family}`)}: {t(`health.capabilities.${availability}`)}
+                {t(`health.capabilities.family.${family}`)}: {t(`health.capabilities.state.${availability}`)}
               </Chip>
             </li>
           );

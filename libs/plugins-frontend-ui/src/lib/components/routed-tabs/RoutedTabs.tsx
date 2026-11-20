@@ -96,7 +96,7 @@ export function RoutedTabs({
               {visible.map((item) => (
                 <Tab key={item.key} id={item.key}>
                   <Tabs.Indicator />
-                  <span className="flex items-center gap-2">
+                  <span className="flex items-center gap-2 whitespace-nowrap">
                     {item.icon}
                     {item.label}
                   </span>
