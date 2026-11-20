@@ -2,7 +2,7 @@
 
 <!-- llms-description: How plugins show notes and prompts on Attractap reader screens, which readers support them, and the related admin settings and alerts. -->
 
-Plugins, for example a reservation plugin, can show short notes on the screen of Attractap readers, ask members
+Plugins (for example the [Reservations](plugins/reservations/overview.md) plugin) can show short notes on the screen of Attractap readers, ask members
 for a confirmation before a machine starts, refuse a start with a reason, and ask a short question after a stop.
 This page explains what members see, which readers can show what, and the settings admins have. In the admin UI
 all of this is called **Reader display**. Plugin developers find the technical contract in
@@ -41,16 +41,15 @@ all of this is called **Reader display**. Plugin developers find the technical c
   question at that moment; tap the card again.
 - **Reader offline:** while a reader has no connection to the server, nothing starts and plugin notes disappear.
 
-On an Attractap Touch with current firmware, a time such as "14:25" is never split across two lines. Each line
-holds one part of a note, for example "Free until 13:55," above "then reserved by bea until 14:25", and the
-check-in note "(check in by 14:10)" under the booking. With a long name, the times get a line of their own.
+On an Attractap Touch with current firmware, a time such as "14:25" is never split across two lines, and plugins can put
+each part of a note on its own line. The Reservations plugin does this; see
+[Reservations: Attractap readers](plugins/reservations/using-reservations.md#attractap-readers).
 
 ## Time and time zone
 
-Readers show local time in 24-hour format. Each reader uses **one** time zone: the time zone of the plugin that
-writes times on its screen (the Reservations plugin's **Timezone** setting) when a plugin sets one, otherwise the
-server's own (`TZ`). The Reservations plugin proposes its zone only for resources that have reservations turned on;
-for all others the server's zone applies. So the clock and a text like "check in by 14:15" always agree, and so do
+Readers show local time in 24-hour format. Each reader uses **one** time zone: the time zone of a plugin that sets one, otherwise the
+server's own (`TZ`). A plugin decides for which resources it proposes its zone; for all others the server's zone applies (for an example, see
+[Reservations: Attractap readers](plugins/reservations/using-reservations.md#attractap-readers)). This way the clock and a text like "check in by 14:15" always agree, and so do
 the start times of sessions. If an admin changes the plugin's timezone, the readers switch at once, the start times
 of sessions included; the offset also follows daylight saving time by itself. If no plugin answers in time, for
 example right after a server restart, the reader keeps the zone it had (the server's after a restart) and the server

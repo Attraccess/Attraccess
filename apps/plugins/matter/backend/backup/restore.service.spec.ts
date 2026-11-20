@@ -1,9 +1,7 @@
 import { COMPATIBILITY_TABLE } from '@attraccess/matter-contract';
 import { auditSubjectId } from '../devices/audit.service';
-import { MatterFabric, MatterNode } from '../devices/entities';
 import { formatRecoveryKey, generateRecoveryKey, recoveryKeyId } from './recovery-key';
-import { ADMIN, createFabricHarness, type FabricHarness } from '../testing/fabric-harness.test-utils';
-import { MatterBackup, MatterRecoveryKey } from './entities';
+import { ADMIN, createFabricHarness, nodeRow, type FabricHarness } from '../testing/fabric-harness.test-utils';
 import { encryptBackup, type BackupBody } from './format';
 import { PLUGIN_TABLES, readTables } from './tables';
 
@@ -19,7 +17,12 @@ const failure = async (promise: Promise<unknown>): Promise<{ status: number; bod
   }
   throw new Error('expected a failure');
 };
-type AuditCall = { action: string; subject: { type: string; id: number }; details: Record<string, unknown> };
+type AuditCall = {
+  action: string;
+  operationId: string;
+  subject: { type: string; id: number };
+  details: Record<string, unknown>;
+};
 
 describe('MatterRestoreService', () => {
   let h: FabricHarness;
@@ -27,19 +30,10 @@ describe('MatterRestoreService', () => {
   let originalFabricId: string;
 
   const addNode = (id: string, nodeId: string) =>
-    h.dataSource.getRepository(MatterNode).save({
-      id,
-      fabricRef: 'fabric-ref',
-      nodeId,
-      lifecycleState: 'unclaimed',
-      firstSeenAt: 't',
-      lastSeenAt: 't',
-      createdAt: 't',
-      updatedAt: 't',
-    } as MatterNode);
-  const nodeIds = async () => (await h.dataSource.getRepository(MatterNode).find()).map((n) => n.nodeId).sort();
+    h.tables.nodes.insert(nodeRow({ id, fabricRef: 'fabric-ref', nodeId }));
+  const nodeIds = async () => (await h.tables.nodes.find()).map((n) => n.nodeId).sort();
   const sidecarFacts = () => JSON.stringify({ fabric: h.backend.fabric(), secret: h.backend.storage?.secret });
-  const tables = () => h.dataSource.transaction((manager) => readTables(manager)).then((t) => JSON.stringify(t));
+  const tables = () => readTables(h.tables).then((t) => JSON.stringify(t));
 
   /** A backup file in the plugin's format around a real snapshot of the fake sidecar, with the given changes. */
   const forge = async (
@@ -47,7 +41,7 @@ describe('MatterRestoreService', () => {
     key?: Buffer,
   ) => {
     const snapshot = h.backend.handle('backup.snapshot', {}) as BackupBody['sidecar'];
-    const body: BackupBody = { sidecar: snapshot, tables: await h.dataSource.transaction((m) => readTables(m)) };
+    const body: BackupBody = { sidecar: snapshot, tables: await readTables(h.tables) };
     const meta = { pluginVersion: entry.plugin, pluginMigration: (await h.migrationReader()) as string };
     change(body, meta);
     const usedKey = key ?? ((await h.keys.currentKey())?.key as Buffer);
@@ -73,7 +67,7 @@ describe('MatterRestoreService', () => {
   /** The sidecar lost its fabric and the plugin lost its devices: the situation a restore is for. */
   const disaster = async () => {
     h.backend.clear();
-    await h.dataSource.query('DELETE FROM plugin_matter_nodes');
+    await h.clear('nodes');
     await h.fabric.detect('connect');
   };
 
@@ -83,9 +77,7 @@ describe('MatterRestoreService', () => {
       expect(h.guard.mismatch).toBe('sidecar_uninitialized');
       h.audit.mockClear();
 
-      const recordedRow = await h.dataSource
-        .getRepository(MatterFabric)
-        .findOneByOrFail({ fabricId: originalFabricId });
+      const recordedRow = await h.one('fabrics', { fabricId: originalFabricId });
       const validation = await h.restore.validate(stored(), undefined, ADMIN);
       expect(validation.preflight).toEqual({
         sidecarState: 'uninitialized',
@@ -173,7 +165,7 @@ describe('MatterRestoreService', () => {
       const key = generateRecoveryKey();
       const file = await forge(undefined, key);
       await disaster();
-      await h.dataSource.getRepository(MatterRecoveryKey).clear();
+      await h.clear('recoveryKeys');
       h.audit.mockClear();
       const typed = formatRecoveryKey(key);
 
@@ -184,7 +176,7 @@ describe('MatterRestoreService', () => {
       expect(validation.backup.recoveryKeyId).toBe(keyId);
       expect(result.status.recoveryKey).toMatchObject({ present: true, keyId, acknowledged: true });
       expect((await h.keys.currentKey())?.key.equals(key)).toBe(true);
-      const row = await h.dataSource.getRepository(MatterRecoveryKey).findOneByOrFail({ keyId });
+      const row = await h.one('recoveryKeys', { keyId });
       expect(row.encryptedKey).not.toContain(key.toString('base64'));
       expect(result.status.backups.stored[0]).toMatchObject({ trigger: 'restore', recoveryKeyId: keyId });
       expect(auditCalls('matter.recovery_key_generated')).toEqual([
@@ -194,6 +186,31 @@ describe('MatterRestoreService', () => {
       expect(JSON.stringify([validation, result])).not.toContain(typed);
       expect(h.emitted()).not.toContain(typed);
       expect(h.emitted()).not.toContain(key.toString('base64'));
+    });
+
+    it('gives every entry of one restore its validation ID: recovery choice, key, backup and outcome', async () => {
+      // Disaster recovery in recovery state onto an installation without a key, so every follow-up step is audited.
+      const key = generateRecoveryKey();
+      const file = await forge(undefined, key);
+      await disaster();
+      await h.clear('recoveryKeys');
+      expect(h.guard.recoveryRequired).toBe(true);
+      const validation = await h.restore.validate(upload(file), formatRecoveryKey(key), ADMIN);
+      h.audit.mockClear();
+
+      await h.restore.confirm(validation.validationId, undefined, ADMIN);
+
+      const entries = h.audit.mock.calls.map((call) => (call as unknown as [AuditCall])[0]);
+      expect(entries.map((entry) => entry.action)).toEqual(
+        expect.arrayContaining([
+          'matter.recovery_action_chosen',
+          'matter.restore_confirmed',
+          'matter.restore_succeeded',
+          'matter.recovery_key_generated',
+          'matter.backup_succeeded',
+        ]),
+      );
+      expect(new Set(entries.map((entry) => entry.operationId))).toEqual(new Set([validation.validationId]));
     });
 
     it('does not replace an existing key with the typed-in one', async () => {
@@ -225,7 +242,7 @@ describe('MatterRestoreService', () => {
 
     it('uses a retired key by itself for an older backup', async () => {
       await h.fabric.rotateRecoveryKey(ADMIN);
-      const old = (await h.dataSource.getRepository(MatterBackup).findOneByOrFail({ id: backupId })).recoveryKeyId;
+      const old = (await h.one('backups', { id: backupId })).recoveryKeyId;
       expect(old).not.toBe((await h.keys.current())?.keyId);
       const validation = await h.restore.validate(stored(), undefined, ADMIN);
       expect(validation.backup.recoveryKeyId).toBe(old);
@@ -265,6 +282,10 @@ describe('MatterRestoreService', () => {
       await h.restore.confirm(validation.validationId, originalFabricId, ADMIN);
       const triggers = (await h.backups.list()).map((b) => b.trigger);
       expect(triggers).toEqual(['restore', 'pre_restore', 'manual', 'fabric_created']);
+      // The pre-restore and the post-restore backup belong to the restore's operation.
+      const backups = auditCalls('matter.backup_succeeded');
+      expect(backups.map((entry) => entry.details['trigger'])).toEqual(['pre_restore', 'restore']);
+      expect(backups.map((entry) => entry.operationId)).toEqual([validation.validationId, validation.validationId]);
       expect(h.actions()).toEqual(
         expect.arrayContaining(['matter.backup_succeeded', 'matter.restore_confirmed', 'matter.restore_succeeded']),
       );
@@ -297,7 +318,7 @@ describe('MatterRestoreService', () => {
       const file = await forge(undefined, other);
       h.backend.seedFabric('999', 3);
       await h.fabric.detect('connect');
-      await h.dataSource.getRepository(MatterRecoveryKey).clear();
+      await h.clear('recoveryKeys');
       const before = { tables: await tables(), sidecar: sidecarFacts() };
       const validation = await h.restore.validate(upload(file), formatRecoveryKey(other), ADMIN);
       expect(await failure(h.restore.confirm(validation.validationId, '999', ADMIN))).toMatchObject({

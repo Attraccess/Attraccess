@@ -2,9 +2,10 @@ import { AuditRecorder } from '../../../audit/recorder/audit-event';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { closeResourceTransactionConnection } from '../../../database/run-serialized-transaction';
-import { DataSource, Repository } from 'typeorm';
-import { Session, SsoSessionContext, User, entities } from '@attraccess/database-entities';
+import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
+import { DataSource } from 'typeorm';
+import { Session, User, entities } from '@attraccess/database-entities';
+import { SsoSessionContext } from '@attraccess/application-models';
 import { GenericContainer, StartedTestContainer } from 'testcontainers';
 import Redis from 'ioredis';
 import { instanceToPlain } from 'class-transformer';
@@ -24,7 +25,7 @@ import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { Response } from 'express';
 import { MetricsService } from '../../../metrics/metrics.service';
 import { CronTimer } from '../../../metrics/instrumentation/cron/cron.helper';
-import { SqliteSessionStore } from './sqlite.session-store';
+import { SqliteSessionStore } from '../../../database/adapters/sessions/sqlite-session-store';
 import { ValkeySessionStore } from './valkey.session-store';
 import { TokenHashService } from '../../../encryption/token-hash.service';
 import { SSOService } from '../sso/sso.service';
@@ -63,9 +64,10 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
       if (backend === 'SQLite') {
         directory = mkdtempSync(join(tmpdir(), 'attraccess-session-'));
         source = await new DataSource({
-          type: 'sqlite',
+          type: 'better-sqlite3',
+          invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
           database: join(directory, 'sessions.sqlite'),
-          busyTimeout: 5000,
+          timeout: 5000,
           entities: Object.values(entities),
           synchronize: true,
         }).initialize();
@@ -77,11 +79,12 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
         );
         store = new SqliteSessionStore(source.getRepository(Session), hash);
       } else {
-        container = await new GenericContainer('valkey/valkey:8-alpine').withExposedPorts(6379).start();
+        container = await new GenericContainer('valkey/valkey:9-alpine').withExposedPorts(6379).start();
         client = new Redis(container.getMappedPort(6379), container.getHost());
         const users = {
-          findOne: async () => ({ id: 7, username: 'fixture', email: 'fixture@example.com', isEmailVerified: true }),
-        } as unknown as Repository<User>;
+          findSessionUser: async () =>
+            ({ id: 7, username: 'fixture', email: 'fixture@example.com', isEmailVerified: true }) as never,
+        };
         store = new ValkeySessionStore(client, users, hash);
       }
     });

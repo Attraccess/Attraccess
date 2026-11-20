@@ -3,10 +3,10 @@ import { Button, Spinner } from '@heroui/react';
 import { FolderIcon, Gauge, ListChecks, Settings2Icon, StethoscopeIcon, WorkflowIcon, WrenchIcon } from 'lucide-react';
 import {
   ResourceType,
-  UseResourcesServiceGetOneResourceByIdKeyFn,
-  useResourcesServiceGetAllResourcesKey,
-  useResourcesServiceGetOneResourceById,
-  useResourcesServiceUpdateOneResource,
+  UseGetOneResourceByIdKeyFn,
+  useGetAllResourcesKey,
+  useGetOneResourceById,
+  useUpdateOneResource,
   Resource,
   SupervisionMode,
   UpdateResourceDto,
@@ -40,6 +40,7 @@ export function fromResource(resource: Resource): FormData {
     maxParallelSessions: resource.maxParallelSessions ?? 1,
     type: resource.type ?? ResourceType.MACHINE,
     separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch ?? false,
+    accessOnly: resource.accessOnly ?? false,
     retrainingMaxAgeDays: resource.retrainingMaxAgeDays ?? null,
     retrainingMaxInactivityDays: resource.retrainingMaxInactivityDays ?? null,
     retrainingBlocksAccess: resource.retrainingBlocksAccess ?? false,
@@ -51,11 +52,18 @@ export function fromResource(resource: Resource): FormData {
   };
 }
 
-export function useResourceSettingsEditorState({ resourceId }: { resourceId: number }) {
+export function ResourceSettingsPage() {
+  const { id } = useParams<{ id: string }>();
+  const resourceId = Number(id);
+  if (!Number.isInteger(resourceId) || resourceId <= 0) return <Navigate to="/resources" replace />;
+  return <ResourceSettingsEditor resourceId={resourceId} />;
+}
+
+function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
   const { t } = useTranslations({ en: { ...editorEn, ...en }, de: { ...editorDe, ...de } });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
-  const { data: resource, isLoading, error } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  const { data: resource, isLoading, error } = useGetOneResourceById({ path: { id: resourceId } });
   const [formData, setFormData] = useState<FormData | null>(null);
   const [selectedImage, setSelectedImage] = useState<File | null>();
   const [deleteImage, setDeleteImage] = useState(false);
@@ -73,15 +81,15 @@ export function useResourceSettingsEditorState({ resourceId }: { resourceId: num
     setDirty(true);
   }, []);
 
-  const updateResource = useResourcesServiceUpdateOneResource({
+  const updateResource = useUpdateOneResource(undefined, {
     onSuccess: (updated) => {
       toast.success({
         title: t('update.success.toast.title'),
         description: t('update.success.toast.description', { name: updated.name }),
       });
-      queryClient.setQueryData(UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId }), updated);
-      queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
-      queryClient.invalidateQueries({ queryKey: UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId }) });
+      queryClient.setQueryData(UseGetOneResourceByIdKeyFn({ path: { id: resourceId } }), updated);
+      queryClient.invalidateQueries({ queryKey: [useGetAllResourcesKey] });
+      queryClient.invalidateQueries({ queryKey: UseGetOneResourceByIdKeyFn({ path: { id: resourceId } }) });
       if (editRevision.current === submittedRevision.current) {
         setFormData(fromResource(updated));
         setSelectedImage(undefined);
@@ -104,80 +112,59 @@ export function useResourceSettingsEditorState({ resourceId }: { resourceId: num
     }
     submittedRevision.current = editRevision.current;
     updateResource.mutate({
-      id: resourceId,
-      formData: { ...formData, name: formData.name.trim(), image: selectedImage ?? undefined, deleteImage },
+      path: { id: resourceId },
+      body: {
+        ...formData,
+        name: formData.name.trim(),
+        // Only doors can be access only; a door switched to a machine drops it.
+        accessOnly: formData.type === ResourceType.DOOR && Boolean(formData.accessOnly),
+        image: selectedImage ?? undefined,
+        deleteImage,
+      },
     });
   };
-  return {
-    t,
-    resource,
-    isLoading,
-    error,
-    formData,
-    setSelectedImage,
-    setDeleteImage,
-    dirty,
-    setDirty,
-    editRevision,
-    setField,
-    updateResource,
-    save,
-    resourceId,
-  } as const;
-}
 
-export function ResourceSettingsPage() {
-  const { id } = useParams<{ id: string }>();
-  const resourceId = Number(id);
-  if (!Number.isInteger(resourceId) || resourceId <= 0) return <Navigate to="/resources" replace />;
-  return <ResourceSettingsEditor resourceId={resourceId} />;
-}
-
-function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
-  const model = useResourceSettingsEditorState({ resourceId });
-
-  if (model.isLoading || (!model.resource && !model.error))
+  if (isLoading || (!resource && !error))
     return (
       <div className="flex justify-center py-16">
         <Spinner />
       </div>
     );
-  if (model.error || !model.resource || !model.formData)
-    return <div className="py-16 text-center">{model.t('notFound')}</div>;
+  if (error || !resource || !formData) return <div className="py-16 text-center">{t('notFound')}</div>;
 
   const saveButton = (
     <div className="mt-5 flex justify-end">
       <Button
         variant="primary"
-        onPress={model.save}
-        isPending={model.updateResource.isPending}
-        isDisabled={!model.dirty}
+        onPress={save}
+        isPending={updateResource.isPending}
+        isDisabled={!dirty}
         data-cy="resource-settings-save"
       >
-        {model.t('save')}
+        {t('save')}
       </Button>
     </div>
   );
-  const editorProps = { t: model.t, formData: model.formData, setField: model.setField, resource: model.resource };
+  const editorProps = { formData, setField, resource };
   const groups: SettingsDirectoryGroup[] = [
     {
       key: 'general',
-      label: model.t('groups.general'),
+      label: t('groups.general'),
       items: [
         {
           key: 'details',
-          title: model.t('topics.details.title'),
-          description: model.t('topics.details.description'),
+          title: t('topics.details.title'),
+          description: t('topics.details.description'),
           icon: <Gauge size={19} />,
           content: (
             <>
               <SharedDataTab
                 {...editorProps}
                 onImageSelected={(file) => {
-                  model.editRevision.current += 1;
-                  model.setSelectedImage(file);
-                  model.setDeleteImage(file === null);
-                  model.setDirty(true);
+                  editRevision.current += 1;
+                  setSelectedImage(file);
+                  setDeleteImage(file === null);
+                  setDirty(true);
                 }}
               />
               {saveButton}
@@ -186,8 +173,8 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
         },
         {
           key: 'behavior',
-          title: model.t('topics.behavior.title'),
-          description: model.t('topics.behavior.description'),
+          title: t('topics.behavior.title'),
+          description: t('topics.behavior.description'),
           icon: <WrenchIcon size={19} />,
           content: (
             <>
@@ -196,18 +183,14 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
                   {[ResourceType.MACHINE, ResourceType.DOOR].map((type) => (
                     <Button
                       key={type}
-                      variant={model.formData.type === type ? 'primary' : 'outline'}
-                      onPress={() => model.setField('type', type)}
+                      variant={formData.type === type ? 'primary' : 'outline'}
+                      onPress={() => setField('type', type)}
                     >
-                      {model.t(`inputs.type.options.${type}`)}
+                      {t(`inputs.type.options.${type}`)}
                     </Button>
                   ))}
                 </div>
-                {model.formData.type === ResourceType.DOOR ? (
-                  <DoorTab {...editorProps} />
-                ) : (
-                  <MachineTab {...editorProps} />
-                )}
+                {formData.type === ResourceType.DOOR ? <DoorTab {...editorProps} /> : <MachineTab {...editorProps} />}
               </div>
               {saveButton}
             </>
@@ -215,16 +198,12 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
         },
         {
           key: 'metadata',
-          title: model.t('topics.metadata.title'),
-          description: model.t('topics.metadata.description'),
+          title: t('topics.metadata.title'),
+          description: t('topics.metadata.description'),
           icon: <Settings2Icon size={19} />,
           content: (
             <>
-              <ResourceMetadataEditor
-                t={model.t}
-                value={model.formData.metadata}
-                onChange={(value) => model.setField('metadata', value)}
-              />
+              <ResourceMetadataEditor value={formData.metadata} onChange={(value) => setField('metadata', value)} />
               {saveButton}
             </>
           ),
@@ -233,12 +212,12 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
     },
     {
       key: 'access',
-      label: model.t('groups.access'),
+      label: t('groups.access'),
       items: [
         {
           key: 'retraining',
-          title: model.t('topics.retraining.title'),
-          description: model.t('topics.retraining.description'),
+          title: t('topics.retraining.title'),
+          description: t('topics.retraining.description'),
           content: (
             <>
               <RetrainingTab {...editorProps} />
@@ -248,8 +227,8 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
         },
         {
           key: 'supervision',
-          title: model.t('topics.supervision.title'),
-          description: model.t('topics.supervision.description'),
+          title: t('topics.supervision.title'),
+          description: t('topics.supervision.description'),
           content: (
             <>
               <SupervisionTab {...editorProps} />
@@ -259,21 +238,21 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
         },
         {
           key: 'readerUi',
-          title: model.t('topics.readerUi.title'),
-          description: model.t('topics.readerUi.description'),
+          title: t('topics.readerUi.title'),
+          description: t('topics.readerUi.description'),
           content: <ResourceReaderUiSettings resourceId={resourceId} />,
         },
         {
           key: 'groups',
-          title: model.t('topics.groups.title'),
-          description: model.t('topics.groups.description'),
+          title: t('topics.groups.title'),
+          description: t('topics.groups.description'),
           icon: <FolderIcon size={19} />,
           to: `/resources/${resourceId}/groups`,
         },
         {
           key: 'forms',
-          title: model.t('topics.forms.title'),
-          description: model.t('topics.forms.description'),
+          title: t('topics.forms.title'),
+          description: t('topics.forms.description'),
           icon: <ListChecks size={19} />,
           to: `/resources/${resourceId}/forms`,
         },
@@ -281,19 +260,19 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
     },
     {
       key: 'automation',
-      label: model.t('groups.automation'),
+      label: t('groups.automation'),
       items: [
         {
           key: 'flows',
-          title: model.t('topics.flows.title'),
-          description: model.t('topics.flows.description'),
+          title: t('topics.flows.title'),
+          description: t('topics.flows.description'),
           icon: <WorkflowIcon size={19} />,
           to: `/resources/${resourceId}/flows`,
         },
         {
           key: 'diagnostics',
-          title: model.t('topics.diagnostics.title'),
-          description: model.t('topics.diagnostics.description'),
+          title: t('topics.diagnostics.title'),
+          description: t('topics.diagnostics.description'),
           icon: <StethoscopeIcon size={19} />,
           to: `/resources/${resourceId}/diagnostics`,
         },
@@ -304,12 +283,12 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
   return (
     <div data-cy="resource-settings-page">
       <PageHeader
-        title={model.t('title', { name: model.resource.name })}
-        subtitle={model.t('subtitle')}
+        title={t('title', { name: resource.name })}
+        subtitle={t('subtitle')}
         icon={<Settings2Icon size={20} />}
         backTo={`/resources/${resourceId}`}
       />
-      <SettingsDirectory groups={groups} searchLabel={model.t('search')} emptyMessage={model.t('noResults')} />
+      <SettingsDirectory groups={groups} searchLabel={t('search')} emptyMessage={t('noResults')} />
       <div className="mx-auto mt-6 flex w-full max-w-3xl flex-col gap-6 empty:hidden">
         <ResourceSettingsPluginSlot resourceId={resourceId} />
       </div>

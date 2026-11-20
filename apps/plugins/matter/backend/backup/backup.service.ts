@@ -8,18 +8,17 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { randomUUID, createHash } from 'node:crypto';
-import type { EntityManager } from 'typeorm';
 import { MatterConnectionService } from '../connection/connection.service';
-import { DeviceAuditService } from '../devices/audit.service';
-import { MatterFabric } from '../devices/entities';
-import { runTransaction } from '../fabric/db';
+import { DeviceAuditService, auditUserId, isSystemAudit, type AuditBy } from '../devices/audit.service';
 import { INSECURE_MESSAGE, conflict, sidecarCode } from '../fabric/errors';
 import { factsOfRow, recordedFabricRow, type FabricFacts } from '../fabric/facts';
 import { MatterFabricGuard } from '../fabric/guard';
 import { RecoveryKeyService, RecoveryKeyUnreadableError } from '../fabric/recovery-key.service';
 import { PLUGIN_MIGRATION_READER, type PluginMigrationReader } from '../fabric/tokens';
 import { PLUGIN_CONTEXT } from '../plugin-context';
-import { BackupTrigger, MatterBackup } from './entities';
+import { decodeBlob, encodeBlob } from '../plugin-storage/blob';
+import { matterStorage, type MatterTables } from '../plugin-storage/access';
+import type { BackupTrigger, MatterBackup } from './entities';
 import { FILE_EXTENSION, FORMAT_VERSION, encryptBackup, type TableRows } from './format';
 import { readTables } from './tables';
 
@@ -103,30 +102,12 @@ export type BackupsSummary = {
   stored: BackupView[];
 };
 
-const VIEW_COLUMNS = [
-  'id',
-  'createdAt',
-  'trigger',
-  'actor',
-  'outcome',
-  'reason',
-  'sizeBytes',
-  'sha256',
-  'formatVersion',
-  'pluginVersion',
-  'sidecarVersion',
-  'matterJsVersion',
-  'storageSchemaVersion',
-  'pluginMigration',
-  'fabricId',
-  'rootCertFingerprint',
-  'fabricGeneration',
-  'storageInstanceId',
-  'recoveryKeyId',
-  'consistent',
-] as const satisfies readonly (keyof MatterBackup)[];
+/** A backup row without the file: the list views never need it. */
+type BackupRow = Omit<MatterBackup, 'blob'>;
 
-export function backupView(row: MatterBackup): BackupView {
+const withoutFile = ({ blob: _blob, ...row }: MatterBackup): BackupRow => row;
+
+export function backupView(row: BackupRow): BackupView {
   return {
     id: row.id,
     createdAt: row.createdAt,
@@ -162,8 +143,8 @@ export class MatterBackupService {
     @Inject(PLUGIN_MIGRATION_READER) private readonly migrationReader: PluginMigrationReader,
   ) {}
 
-  private get repo() {
-    return this.context.getRepository(MatterBackup);
+  private get storage() {
+    return matterStorage(this.context);
   }
 
   setNextScheduledAt(at: string | null): void {
@@ -178,45 +159,39 @@ export class MatterBackupService {
 
   /**
    * Takes a backup now. Joins a backup that is already running, except for `pre_restore`, `restore` and `fresh` ones,
-   * which must reflect the state at their own moment. `principal: null` is the plugin itself (schedule, events).
+   * which must reflect the state at their own moment. `by: null` is the plugin itself (schedule, events); an actor ties
+   * the entry to the operation that asked for the backup.
    */
-  async backup(
-    trigger: BackupTrigger,
-    principal: PluginAuditPrincipal | null = null,
-    options: BackupOptions = {},
-  ): Promise<BackupView> {
+  async backup(trigger: BackupTrigger, by: AuditBy = null, options: BackupOptions = {}): Promise<BackupView> {
     if (this.guard.busy) throw conflict('busy', 'A restore is in progress.');
     const own = options.fresh === true || trigger === 'pre_restore' || trigger === 'restore';
     while (this.inFlight) {
       if (!own) return this.inFlight;
       await this.inFlight.catch(() => undefined);
     }
-    const run = this.attempt(trigger, principal, options).finally(() => {
+    const run = this.attempt(trigger, by, options).finally(() => {
       if (this.inFlight === run) this.inFlight = undefined;
     });
     this.inFlight = run;
     return run;
   }
 
-  private async attempt(
-    trigger: BackupTrigger,
-    principal: PluginAuditPrincipal | null,
-    options: BackupOptions,
-  ): Promise<BackupView> {
+  private async attempt(trigger: BackupTrigger, by: AuditBy, options: BackupOptions): Promise<BackupView> {
     const id = randomUUID();
     const createdAt = new Date().toISOString();
+    const system = isSystemAudit(by);
     try {
-      const row = await this.produce({ id, createdAt, trigger, actor: principal?.userId ?? null }, options);
+      const row = await this.produce({ id, createdAt, trigger, actor: auditUserId(by) }, options);
       await this.prune();
       await this.audit.record(
         'matter.backup_succeeded',
-        principal,
+        by,
         { type: 'matter.backup', ref: id },
         {
           backupRef: id,
           trigger,
           fabricGeneration: row.fabricGeneration ?? 0,
-          system: principal === null,
+          system,
         },
       );
       for (const listener of this.succeededListeners) listener(trigger);
@@ -224,12 +199,12 @@ export class MatterBackupService {
     } catch (error) {
       const reason = error instanceof BackupFailure ? error.reason : 'internal';
       if (!(error instanceof BackupFailure)) this.context.logger.warn?.('A Matter backup failed unexpectedly.');
-      await this.recordFailure(id, createdAt, trigger, principal?.userId ?? null, reason);
+      await this.recordFailure(id, createdAt, trigger, auditUserId(by), reason);
       await this.audit.record(
         'matter.backup_failed',
-        principal,
+        by,
         { type: 'matter.backup', ref: id },
-        { backupRef: id, trigger, reason, system: principal === null },
+        { backupRef: id, trigger, reason, system },
         'failed',
       );
       throw this.toHttp(reason);
@@ -247,9 +222,9 @@ export class MatterBackupService {
   private async collect(connection: MatterConnectionService['connection'], options: BackupOptions): Promise<Contents> {
     // The plugin's tables are read in one transaction together with the fabric record they must agree with; the
     // sidecar's snapshot is checked against that record afterwards.
-    const { tables, recorded } = await runTransaction(this.context, async (manager) => ({
-      recorded: factsOfRow(await recordedFabricRow(manager)),
-      tables: await readTables(manager),
+    const { tables, recorded } = await this.storage.transaction(async (db) => ({
+      recorded: factsOfRow(await recordedFabricRow(db)),
+      tables: await readTables(db),
     }));
     if (!recorded && !options.allowInRecovery) throw new BackupFailure('no_fabric');
 
@@ -279,7 +254,7 @@ export class MatterBackupService {
       },
       key.key,
     );
-    return this.repo.save({
+    return this.storage.tables.backups.insert({
       ...run,
       outcome: 'succeeded',
       reason: null,
@@ -297,7 +272,7 @@ export class MatterBackupService {
       storageInstanceId: header.storageInstanceId,
       recoveryKeyId: key.keyId,
       consistent,
-      blob: file,
+      blob: encodeBlob(file),
     });
   }
 
@@ -323,7 +298,7 @@ export class MatterBackupService {
 
   /** Whether the snapshot is of the fabric the plugin recorded, and the record did not move meanwhile. */
   private async matchesRecord(header: SnapshotHeader, recorded: FabricFacts | null): Promise<boolean> {
-    const after = factsOfRow(await recordedFabricRow(this.context.getRepository(MatterFabric).manager));
+    const after = factsOfRow(await recordedFabricRow(this.storage.tables));
     const consistent =
       recorded !== null &&
       header.fabricId === recorded.fabricId &&
@@ -344,34 +319,54 @@ export class MatterBackupService {
     reason: BackupFailureReason,
   ): Promise<void> {
     try {
-      await this.repo.save({ id, createdAt, trigger, actor, outcome: 'failed', reason, blob: null });
-      const stale = await this.repo
-        .createQueryBuilder('b')
-        .select('b.id', 'id')
-        .where(`b.outcome = 'failed'`)
-        .orderBy('b.createdAt', 'DESC')
-        .offset(FAILED_ATTEMPTS_KEPT)
-        .limit(1000)
-        .getRawMany<{ id: string }>();
-      if (stale.length) await this.repo.delete(stale.map((row) => row.id));
+      const { backups } = this.storage.tables;
+      await backups.insert({
+        id,
+        createdAt,
+        trigger,
+        actor,
+        outcome: 'failed',
+        reason,
+        sizeBytes: null,
+        sha256: null,
+        formatVersion: null,
+        pluginVersion: null,
+        sidecarVersion: null,
+        matterJsVersion: null,
+        storageSchemaVersion: null,
+        pluginMigration: null,
+        fabricId: null,
+        rootCertFingerprint: null,
+        fabricGeneration: null,
+        storageInstanceId: null,
+        recoveryKeyId: null,
+        consistent: null,
+        blob: null,
+      });
+      const stale = await backups.find({
+        where: { outcome: 'failed' },
+        orderBy: [{ field: 'createdAt', direction: 'desc' }],
+        offset: FAILED_ATTEMPTS_KEPT,
+        limit: 1000,
+      });
+      if (stale.length) await backups.delete({ id: { in: stale.map((row) => row.id) } });
     } catch {
       this.context.logger.warn?.('A failed Matter backup attempt could not be recorded.');
     }
   }
 
   /** Keeps the newest `BACKUP_RETENTION` successful backups. */
-  async prune(manager: EntityManager = this.repo.manager): Promise<number> {
-    const surplus = await manager
-      .getRepository(MatterBackup)
-      .createQueryBuilder('b')
-      .select('b.id', 'id')
-      .where(`b.outcome = 'succeeded'`)
-      .orderBy('b.createdAt', 'DESC')
-      .addOrderBy('b.id', 'DESC')
-      .offset(BACKUP_RETENTION)
-      .limit(1000)
-      .getRawMany<{ id: string }>();
-    if (surplus.length) await manager.getRepository(MatterBackup).delete(surplus.map((row) => row.id));
+  async prune(tables: MatterTables = this.storage.tables): Promise<number> {
+    const surplus = await tables.backups.find({
+      where: { outcome: 'succeeded' },
+      orderBy: [
+        { field: 'createdAt', direction: 'desc' },
+        { field: 'id', direction: 'desc' },
+      ],
+      offset: BACKUP_RETENTION,
+      limit: 1000,
+    });
+    if (surplus.length) await tables.backups.delete({ id: { in: surplus.map((row) => row.id) } });
     return surplus.length;
   }
 
@@ -386,23 +381,30 @@ export class MatterBackupService {
 
   /** Without the file itself. */
   async list(): Promise<BackupView[]> {
-    const rows = await this.repo
-      .createQueryBuilder('b')
-      .select(VIEW_COLUMNS.map((column) => `b.${column}`))
-      .where(`b.outcome = 'succeeded'`)
-      .orderBy('b.createdAt', 'DESC')
-      .addOrderBy('b.id', 'DESC')
-      .getMany();
-    return rows.map(backupView);
+    const rows = await this.storage.tables.backups.find({
+      where: { outcome: 'succeeded' },
+      orderBy: [
+        { field: 'createdAt', direction: 'desc' },
+        { field: 'id', direction: 'desc' },
+      ],
+    });
+    return rows.map((row) => backupView(withoutFile(row)));
   }
 
   async summary(): Promise<BackupsSummary> {
     const stored = await this.list();
-    const last = await this.repo
-      .createQueryBuilder('b')
-      .select(['b.createdAt', 'b.outcome', 'b.trigger', 'b.reason'])
-      .orderBy('b.createdAt', 'DESC')
-      .getOne();
+    // The newest attempt of any outcome: the newest stored backup, or a failed attempt that is newer. Ids are random,
+    // so equal timestamps cannot be ordered: a tie counts the failed attempt as the later one (it is recorded
+    // after the backup it refused to extend).
+    const failed = await this.storage.tables.backups.findOne({
+      where: { outcome: 'failed' },
+      orderBy: [{ field: 'createdAt', direction: 'desc' }],
+    });
+    const newest = stored[0];
+    const last =
+      newest && (!failed || newest.createdAt > failed.createdAt)
+        ? { createdAt: newest.createdAt, outcome: newest.outcome, trigger: newest.trigger, reason: null }
+        : failed;
     return {
       lastSuccessfulAt: stored[0]?.createdAt ?? null,
       lastAttempt: last
@@ -414,21 +416,28 @@ export class MatterBackupService {
     };
   }
 
-  /** The encrypted file, as stored: the ciphertext only, with a download name. */
-  async download(id: string): Promise<{ filename: string; file: Buffer }> {
-    const row = await this.repo.findOneBy({ id, outcome: 'succeeded' });
-    if (!row?.blob) throw new NotFoundException({ code: 'not_found', message: 'There is no such backup.' });
+  /** The encrypted file, as stored: the ciphertext only, with a download name. Audited: it leaves the installation. */
+  async download(id: string, principal: PluginAuditPrincipal): Promise<{ filename: string; file: Buffer }> {
+    const row = await this.storage.tables.backups.findOne({ where: { id, outcome: 'succeeded' } });
+    const file = decodeBlob(row?.blob);
+    if (!row || !file) throw new NotFoundException({ code: 'not_found', message: 'There is no such backup.' });
+    await this.audit.record(
+      'matter.backup_downloaded',
+      principal,
+      { type: 'matter.backup', ref: row.id },
+      { backupRef: row.id, fabricGeneration: row.fabricGeneration ?? 0 },
+    );
     const date = row.createdAt.slice(0, 10);
     return {
       filename: `attraccess-matter-${date}-${row.id.slice(0, 8)}${FILE_EXTENSION}`,
-      file: Buffer.from(row.blob),
+      file,
     };
   }
 
   /** The stored file for a restore. */
   async fileOf(id: string): Promise<Buffer | null> {
-    const row = await this.repo.findOneBy({ id, outcome: 'succeeded' });
-    return row?.blob ? Buffer.from(row.blob) : null;
+    const row = await this.storage.tables.backups.findOne({ where: { id, outcome: 'succeeded' } });
+    return decodeBlob(row?.blob);
   }
 }
 

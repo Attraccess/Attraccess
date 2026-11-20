@@ -6,18 +6,15 @@
       "directory": "dist",
       "entryPoint": "index.js"
     },
-    "migrations": {
-      "directory": "dist",
-      "entryPoint": "migrations.js"
-    },
     "frontend": {
       "directory": "frontend",
       "entryPoint": "remoteEntry.js",
-      "styles": "style.css"
+      "styles": "style.css",
+      "dashboardPaths": ["/shelly"]
     }
   },
   "attraccessVersion": {
-    "min": "1.11.0"
+    "min": "2.0.0-0"
   },
-  "permissions": ["DATABASE_ACCESS"]
+  "permissions": ["PLUGIN_STORAGE"]
 }

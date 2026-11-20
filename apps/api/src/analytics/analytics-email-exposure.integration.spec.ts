@@ -2,12 +2,13 @@ import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 import { ClassSerializerInterceptor, ExecutionContext, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { BillingTransaction, ResourceUsage, User } from '@attraccess/database-entities';
 import { DualAuthGuard, EffectivePermissionsGuard } from '@attraccess/plugins-backend-sdk';
 import { AnalyticsController } from './analytics.controller';
 import { AnalyticsService } from './analytics.service';
+import { ANALYTICS_READER } from './analytics-reader.port';
+import { TypeOrmAnalyticsReader } from '../database/adapters/analytics/typeorm-analytics-reader';
 import { ResourceOperatingAttributionService } from '../resources/operating-intervals/resource-operating-attribution.service';
 import { UsersAdminController } from '../users-and-auth/users/users-admin.controller';
 import { UsersService } from '../users-and-auth/users/users.service';
@@ -50,8 +51,14 @@ describe('email exposure (HTTP integration, with the global ClassSerializerInter
       providers: [
         AnalyticsService,
         { provide: AUDIT_RECORDER, useValue: { record: jest.fn() } },
-        { provide: getRepositoryToken(ResourceUsage), useValue: { findAndCount: async () => [[usage], 1] } },
-        { provide: getRepositoryToken(BillingTransaction), useValue: { findAndCount: async () => [[transaction], 1] } },
+        {
+          provide: ANALYTICS_READER,
+          useValue: new TypeOrmAnalyticsReader(
+            { findAndCount: async () => [[usage], 1] } as never,
+            { findAndCount: async () => [[transaction], 1] } as never,
+            {} as never,
+          ),
+        },
         { provide: ResourceOperatingAttributionService, useValue: {} },
         { provide: UsersService, useValue: usersService },
         { provide: UserPasswordService, useValue: {} },
@@ -140,6 +147,15 @@ describe('email exposure (HTTP integration, with the global ClassSerializerInter
     expect(row.user).not.toHaveProperty('email');
     expect(row.initiator).not.toHaveProperty('email');
   });
+
+  it.each(['resources.update', 'billing.manage'])(
+    'rejects the resource hours summary for a caller with only %s',
+    async (permission) => {
+      permissions = [permission];
+
+      await request(app.getHttpServer()).get(`/analytics/resource-hours-summary?${range}`).expect(403);
+    },
+  );
 
   it('still excludes the email from a regular user endpoint (GET /users/:id)', async () => {
     const response = await request(app.getHttpServer()).get('/users/1').expect(200);

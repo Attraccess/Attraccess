@@ -1,16 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
-import {
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  ResourceFlowVariableScope,
-  VariableChangedNodeDataSchema,
-} from '@attraccess/database-entities';
+import { ResourceFlowVariableScope, VariableChangedNodeDataSchema } from '@attraccess/application-models';
+import { FLOW_TRIGGER_STORE, FlowTriggerStore } from '../flow-trigger-store.port';
 import { ResourceFlowVariableChangedEvent } from '../events/flow-variable-changed.event';
 import { ResourceFlowsExecutorService } from '../execution/resource-flows-executor.service';
-import { enabledGlobalNodesWhere, isGlobalFlowNode } from '../execution/flow-node-queries';
+import { isGlobalFlowNode } from '../execution/flow-node-queries';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 
 @Injectable()
@@ -18,8 +12,7 @@ export class ResourceFlowVariableTriggerService {
   private readonly logger = new Logger(ResourceFlowVariableTriggerService.name);
 
   constructor(
-    @InjectRepository(ResourceFlowNode)
-    private readonly nodeRepository: Repository<ResourceFlowNode>,
+    @Inject(FLOW_TRIGGER_STORE) private readonly triggers: FlowTriggerStore,
     private readonly executor: ResourceFlowsExecutorService,
     private readonly variables: ResourceFlowVariablesService,
   ) {}
@@ -27,18 +20,9 @@ export class ResourceFlowVariableTriggerService {
   @OnEvent(ResourceFlowVariableChangedEvent.EVENT_NAME)
   async handle(event: ResourceFlowVariableChangedEvent): Promise<void> {
     // A resource variable only concerns that resource's own flow; global flows react to every resource.
-    const candidates = await this.nodeRepository.find({
-      where: [
-        {
-          type: ResourceFlowNodeType.INPUT_VARIABLE_CHANGED,
-          flowId: IsNull(),
-          ...(event.scope === ResourceFlowVariableScope.RESOURCE && event.resourceId !== null
-            ? { resourceId: event.resourceId }
-            : {}),
-        },
-        enabledGlobalNodesWhere(ResourceFlowNodeType.INPUT_VARIABLE_CHANGED),
-      ],
-    });
+    const candidates = await this.triggers.findVariableTriggerNodes(
+      event.scope === ResourceFlowVariableScope.RESOURCE ? event.resourceId : null,
+    );
 
     for (const node of candidates) {
       const parsed = VariableChangedNodeDataSchema.safeParse(node.data);

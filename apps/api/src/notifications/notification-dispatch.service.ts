@@ -1,25 +1,26 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ResourceHealthStatus, User } from '@attraccess/database-entities';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { NotificationRecipient, ResourceHealthStatus } from '@attraccess/application-models';
 import { PushService } from '../push/push.service';
 import { EmailService } from '../email/email.service';
 import { NotificationPreferenceService } from './notification-preference.service';
 import { NotificationLiveService } from './notification-live.service';
 import { AnyNotificationCategory, NotificationCategory, NotificationChannel } from './notification-types';
 import { SettingsService } from '../settings/settings.service';
+import { EMAIL_RECIPIENT_DIRECTORY, type EmailRecipientDirectory } from '../email/email-recipient-directory.port';
 
 export interface NotificationDispatchRequest {
   category: AnyNotificationCategory;
-  recipients: User[];
+  recipients: NotificationRecipient[];
   channels?: NotificationChannel[];
   /** Static string, or a per-recipient resolver for locale-specific strings. */
-  title: string | ((recipient: User) => string);
-  body: string | ((recipient: User) => string);
+  title: string | ((recipient: NotificationRecipient) => string);
+  body: string | ((recipient: NotificationRecipient) => string);
   url?: string;
   actorId?: number;
   severity?: 'info' | 'warning';
   dedupeKey?: string;
   /** Keep the original recipient locale for custom catalogs; use language for code-defined translations. */
-  sendEmail?: (recipient: User, language: 'en' | 'de') => Promise<void>;
+  sendEmail?: (recipient: NotificationRecipient, language: 'en' | 'de') => Promise<void>;
 }
 
 @Injectable()
@@ -32,7 +33,18 @@ export class NotificationDispatchService {
     private readonly liveService: NotificationLiveService,
     private readonly emailService: EmailService,
     private readonly settingsService: SettingsService,
+    @Inject(EMAIL_RECIPIENT_DIRECTORY) private readonly recipientDirectory: EmailRecipientDirectory,
   ) {}
+
+  /**
+   * Dispatches to a user the caller knows only by id. The recipient is loaded first, so the texts use
+   * the user's language and the email has an address; a user that no longer exists gets nothing.
+   */
+  public async dispatchToUser(userId: number, request: Omit<NotificationDispatchRequest, 'recipients'>): Promise<void> {
+    const recipient = await this.recipientDirectory.findById(userId);
+    if (!recipient) return;
+    await this.dispatch({ ...request, recipients: [recipient] });
+  }
 
   public async dispatch(request: NotificationDispatchRequest): Promise<void> {
     await Promise.all(
@@ -42,11 +54,18 @@ export class NotificationDispatchService {
     );
   }
 
-  private async dispatchToRecipient(request: NotificationDispatchRequest, recipient: User): Promise<void> {
+  private async dispatchToRecipient(
+    request: NotificationDispatchRequest,
+    recipient: NotificationRecipient,
+  ): Promise<void> {
     const language = await this.settingsService.resolveLanguage(recipient.locale);
-    const textRecipient: User = Object.assign(Object.create(Object.getPrototypeOf(recipient)), recipient, {
-      locale: language,
-    });
+    const textRecipient: NotificationRecipient = Object.assign(
+      Object.create(Object.getPrototypeOf(recipient)),
+      recipient,
+      {
+        locale: language,
+      },
+    );
     const channels = request.channels ?? [
       NotificationChannel.EMAIL,
       NotificationChannel.PUSH,
@@ -74,7 +93,11 @@ export class NotificationDispatchService {
     ]);
   }
 
-  private async tryEmail(request: NotificationDispatchRequest, recipient: User, language: 'en' | 'de'): Promise<void> {
+  private async tryEmail(
+    request: NotificationDispatchRequest,
+    recipient: NotificationRecipient,
+    language: 'en' | 'de',
+  ): Promise<void> {
     try {
       await request.sendEmail?.(recipient, language);
     } catch (error) {
@@ -87,7 +110,7 @@ export class NotificationDispatchService {
 
   private async tryPush(
     request: NotificationDispatchRequest,
-    recipient: User,
+    recipient: NotificationRecipient,
     title: string,
     body: string,
   ): Promise<void> {
@@ -101,7 +124,7 @@ export class NotificationDispatchService {
 
   private async tryToast(
     request: NotificationDispatchRequest,
-    recipient: User,
+    recipient: NotificationRecipient,
     title: string,
     body: string,
   ): Promise<void> {
@@ -118,7 +141,7 @@ export class NotificationDispatchService {
   }
 
   public async sendEmailTemplate(
-    recipient: User,
+    recipient: NotificationRecipient,
     category: NotificationCategory,
     context: Record<string, unknown>,
   ): Promise<void> {

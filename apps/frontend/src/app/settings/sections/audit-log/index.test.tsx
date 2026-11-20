@@ -3,9 +3,10 @@ import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError, UseAuditControllerMetaKeyFn } from '@attraccess/react-query-client';
 import type { AuditEntryDto, AuditMetaDto, AuditSettingsDto } from '@attraccess/react-query-client';
 import { AuditLogSection } from './index';
-import { auditLabel } from './components/AuditLogPanels';
+import { auditLabel } from './components/auditLabel';
 import { humanize } from './audit-log-model';
 import de from './de.json';
 import en from './en.json';
@@ -24,31 +25,32 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
   const original = await importOriginal<typeof import('@attraccess/react-query-client')>();
   // Route the generated hooks through the real react-query primitives into the test
   // doubles, so caching, retries and key-driven refetches behave as in production.
+  // `list` receives the query parameters of the list request.
   const { useMutation, useQuery } = await import('@tanstack/react-query');
   return {
     ...original,
-    AuditService: { auditControllerList: list },
-    useAuditServiceAuditControllerList: (params?: object, _queryKey?: unknown, options?: object) =>
+    auditControllerList: async ({ query }: { query?: object }) => ({ data: await list(query ?? {}) }),
+    useAuditControllerList: (params?: { query?: object }, _queryKey?: unknown, options?: object) =>
       useQuery({
-        queryKey: original.UseAuditServiceAuditControllerListKeyFn(params as never),
-        queryFn: () => list(params),
+        queryKey: original.UseAuditControllerListKeyFn(params as never),
+        queryFn: () => list(params?.query ?? {}),
         ...options,
       }),
-    useAuditServiceAuditControllerMeta: (_queryKey?: unknown, options?: object) =>
+    useAuditControllerMeta: (_clientOptions: unknown, _queryKey?: unknown, options?: object) =>
       useQuery({
-        queryKey: original.UseAuditServiceAuditControllerMetaKeyFn(),
+        queryKey: original.UseAuditControllerMetaKeyFn(),
         queryFn: () => getMeta(),
         ...options,
       }),
-    useSettingsServiceSettingsControllerGetAuditSettings: (_queryKey?: unknown, options?: object) =>
+    useSettingsControllerGetAuditSettings: (_clientOptions: unknown, _queryKey?: unknown, options?: object) =>
       useQuery({
-        queryKey: original.UseSettingsServiceSettingsControllerGetAuditSettingsKeyFn(),
+        queryKey: original.UseSettingsControllerGetAuditSettingsKeyFn(),
         queryFn: () => getSettings(),
         ...options,
       }),
-    useSettingsServiceSettingsControllerUpdateAuditSettings: (options?: object) =>
+    useSettingsControllerUpdateAuditSettings: (_mutationKey: unknown, options?: object) =>
       useMutation({
-        mutationFn: (variables: { requestBody: unknown }) => updateSettings(variables),
+        mutationFn: (variables: { body: unknown }) => updateSettings(variables),
         ...options,
       }),
   };
@@ -105,13 +107,17 @@ const meta: AuditMetaDto = {
   actions: ['resource.updated', 'demo.publication'],
 };
 let client: QueryClient;
-function mount() {
-  client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } });
+function mount(queries: { retry: number | false; retryDelay?: number } = { retry: false }) {
+  client = new QueryClient({ defaultOptions: { queries: { ...queries, gcTime: 0 }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <AuditLogSection />
     </QueryClientProvider>,
   );
+}
+async function inspect(id: number) {
+  await userEvent.click(await screen.findByRole('button', { name: new RegExp(`^Actions for .+ \\(#${id}\\)$`) }));
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'View event' }));
 }
 beforeEach(() => {
   // jsdom lacks the layout observers and animation API used by HeroUI's tabs.
@@ -138,7 +144,7 @@ beforeEach(() => {
   list.mockResolvedValue({ items: [entry], nextCursor: 51 });
   getMeta.mockResolvedValue(meta);
   getSettings.mockResolvedValue(settings);
-  updateSettings.mockImplementation(async ({ requestBody }) => requestBody);
+  updateSettings.mockImplementation(async ({ body }) => body);
 });
 afterEach(() => {
   cleanup();
@@ -152,7 +158,7 @@ describe('audit admin workflows', () => {
     async (label) => {
       const user = userEvent.setup();
       mount();
-      await screen.findByRole('button', { name: 'View event #52' });
+      await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
       const field = within(screen.getAllByRole('group', { name: label })[0]);
       const apply = screen.getByRole('button', { name: 'Apply filters' });
       for (const [segment, value] of [
@@ -218,7 +224,7 @@ describe('audit admin workflows', () => {
       nextCursor: null,
     });
     mount();
-    await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));
+    await inspect(52);
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText(
@@ -248,7 +254,7 @@ describe('audit admin workflows', () => {
       nextCursor: null,
     });
     mount();
-    await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));
+    await inspect(52);
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Password')).toBeInTheDocument();
     expect(within(dialog).getAllByText('Not recorded')).toHaveLength(2);
@@ -269,7 +275,7 @@ describe('audit admin workflows', () => {
       nextCursor: null,
     });
     mount();
-    await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));
+    await inspect(52);
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('["truncated')).toBeInTheDocument();
     expect(within(dialog).getAllByText('Current name; may have changed since this event')).toHaveLength(2);
@@ -279,7 +285,7 @@ describe('audit admin workflows', () => {
 
   it('opens a readable change comparison and exposes only changed fields', async () => {
     mount();
-    await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));
+    await inspect(52);
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('What changed')).toBeInTheDocument();
     expect(within(dialog).getByText('Enabled')).toBeInTheDocument();
@@ -289,24 +295,52 @@ describe('audit admin workflows', () => {
     expect(within(dialog).getByText('Workshop admin')).toBeInTheDocument();
   });
 
+  it('shows a meter allocation change with its labels and allocation names', async () => {
+    list.mockResolvedValue({
+      items: [
+        {
+          ...entry,
+          action: 'meter.updated',
+          details: {
+            meterId: 4,
+            meterName: 'Energy',
+            'before.allocation': 'shared',
+            'after.allocation': 'per-session',
+          },
+        },
+      ],
+      nextCursor: null,
+    });
+    mount();
+    await inspect(52);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Meter updated')).toBeInTheDocument();
+    expect(within(dialog).getByText('Allocation')).toBeInTheDocument();
+    expect(within(dialog).getByText('Meter name')).toBeInTheDocument();
+    expect(within(dialog).getByText('Allocation before')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('Shared and split')).toHaveLength(2);
+    expect(within(dialog).getAllByText('Measured per session')).toHaveLength(2);
+    expect(within(dialog).queryByText('per-session')).not.toBeInTheDocument();
+  });
+
   it('returns from the older page without sending the invalid zero cursor', async () => {
     list.mockImplementation(async ({ beforeId }) => ({
       items: [{ ...entry, id: beforeId ? 50 : 52 }],
       nextCursor: beforeId ? null : 51,
     }));
     mount();
-    await screen.findByRole('button', { name: 'View event #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     await userEvent.click(screen.getByRole('button', { name: 'Older' }));
-    await screen.findByRole('button', { name: 'View event #50' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#50\)$/ });
     await userEvent.click(screen.getByRole('button', { name: 'Newer' }));
-    await screen.findByRole('button', { name: 'View event #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     expect(list.mock.calls.some(([query]) => query.beforeId === 51)).toBe(true);
     expect(list.mock.calls.some(([query]) => query.beforeId === 0)).toBe(false);
   });
 
   it('validates IDs before applying filters and preserves the current result on invalid input', async () => {
     mount();
-    await screen.findByRole('button', { name: 'View event #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     await userEvent.click(screen.getByRole('button', { name: 'More filters' }));
     await userEvent.type(screen.getByLabelText('Actor ID'), '-1');
     await userEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
@@ -320,10 +354,22 @@ describe('audit admin workflows', () => {
     );
   });
 
+  it('keeps the expanded filters after switching to the settings tab and back', async () => {
+    // The Activity panel unmounts on a tab switch, so the disclosure state has to live above the tabs.
+    mount();
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
+    await userEvent.click(screen.getByRole('button', { name: 'More filters' }));
+    expect(screen.getByLabelText('Actor ID')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Logging settings' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Activity' }));
+    expect(await screen.findByLabelText('Actor ID')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fewer filters' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
   it('clears partially typed dates when resetting all filters', async () => {
     const user = userEvent.setup();
     mount();
-    await screen.findByRole('button', { name: 'View event #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: 'resource.' } });
     await user.click(screen.getByRole('button', { name: 'Apply filters' }));
     await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ eventPrefix: 'resource.' })));
@@ -342,9 +388,7 @@ describe('audit admin workflows', () => {
     await userEvent.click(await screen.findByRole('switch', { name: 'Demo devices' }));
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() =>
-      expect(updateSettings).toHaveBeenCalledWith({
-        requestBody: { ...settings, plugin_domains_disabled: ['demo'] },
-      }),
+      expect(updateSettings).toHaveBeenCalledWith({ body: { ...settings, plugin_domains_disabled: ['demo'] } }),
     );
     expect(await screen.findByText('Logging settings saved.')).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Billing' })).toBeChecked();
@@ -367,7 +411,7 @@ describe('audit admin workflows', () => {
   it('does not request or offer management settings to read-only audit users', async () => {
     permissions.delete('system.settings.manage');
     mount();
-    await screen.findByRole('button', { name: 'View event #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     expect(getSettings).not.toHaveBeenCalled();
     expect(screen.queryByRole('tab', { name: 'Logging settings' })).not.toBeInTheDocument();
   });
@@ -378,7 +422,111 @@ describe('audit admin workflows', () => {
     expect(await screen.findByText('Activity could not be loaded.')).toBeInTheDocument();
     expect(screen.queryByText('No activity found')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(await screen.findByRole('button', { name: 'View event #52' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ })).toBeInTheDocument();
+  });
+
+  it.each(['foo', 'nonsense.created'])('rejects the unknown event prefix %s before requesting it', async (prefix) => {
+    const user = userEvent.setup();
+    mount();
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
+    // Wait for meta to settle, not just to be requested: before it loads, only the shape check applies.
+    await waitFor(() => expect(client.getQueryState(UseAuditControllerMetaKeyFn())?.status).toBe('success'));
+    fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: prefix } });
+    await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+    expect(await screen.findByText('Enter a valid event prefix.')).toBeInTheDocument();
+    expect(list).not.toHaveBeenCalledWith(expect.objectContaining({ eventPrefix: prefix }));
+    expect(screen.queryByText('Activity could not be loaded.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Actions for .+ \(#52\)$/ })).toBeInTheDocument();
+  });
+
+  it('shows the prefix validation message with a clear action when the API rejects the prefix', async () => {
+    const user = userEvent.setup();
+    mount();
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
+    // The demo plugin was unloaded after meta loaded: the API no longer knows its prefix.
+    list.mockRejectedValueOnce(
+      new ApiError(
+        { method: 'GET', url: '/api/audit' },
+        {
+          body: { message: ['eventPrefix must start with a recognized audit event prefix'], statusCode: 400 },
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          url: '/api/audit',
+        },
+        'Bad Request',
+      ),
+    );
+    fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: 'demo.' } });
+    await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+    expect(await screen.findByText('Enter a valid event prefix.')).toBeInTheDocument();
+    expect(screen.queryByText('Activity could not be loaded.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ })).toBeInTheDocument();
+    expect(list.mock.lastCall?.[0]).not.toHaveProperty('eventPrefix');
+  });
+
+  it('does not retry a rejected event prefix, so the message shows without the retry backoff', async () => {
+    const user = userEvent.setup();
+    mount({ retry: 3, retryDelay: 0 });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
+    list.mockRejectedValue(
+      new ApiError(
+        { method: 'GET', url: '/api/audit' },
+        {
+          body: { message: ['eventPrefix must start with a recognized audit event prefix'], statusCode: 400 },
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          url: '/api/audit',
+        },
+        'Bad Request',
+      ),
+    );
+    fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: 'demo.' } });
+    await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+    expect(await screen.findByText('Enter a valid event prefix.')).toBeInTheDocument();
+    expect(list.mock.calls.filter(([query]) => query?.eventPrefix === 'demo.')).toHaveLength(1);
+  });
+
+  it('does not fall back to an unfiltered list when applied filters turn invalid once meta loads', async () => {
+    const user = userEvent.setup();
+    let resolveMeta: (value: AuditMetaDto) => void = () => undefined;
+    getMeta.mockReturnValue(new Promise<AuditMetaDto>((resolve) => (resolveMeta = resolve)));
+    mount();
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
+    fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: 'foo' } });
+    await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+    await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ eventPrefix: 'foo' })));
+    const requestsBefore = list.mock.calls.length;
+    resolveMeta(meta);
+    expect(await screen.findByText('Enter a valid event prefix.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Actions for .+ \(#52\)$/ })).not.toBeInTheDocument();
+    expect(list).toHaveBeenCalledTimes(requestsBefore);
+    // The list query is off, not failed, so only the filter error keeps the export from running unfiltered.
+    expect(screen.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
+  });
+
+  it('keeps the load error and retry for a 400 that is not about the event prefix', async () => {
+    list.mockRejectedValueOnce(
+      new ApiError(
+        { method: 'GET', url: '/api/audit' },
+        {
+          body: { message: ['actorId must be a positive integer'], statusCode: 400 },
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          url: '/api/audit',
+        },
+        'Bad Request',
+      ),
+    );
+    mount();
+    expect(await screen.findByText('Activity could not be loaded.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    expect(screen.queryByText('Enter a valid event prefix.')).not.toBeInTheDocument();
   });
 });
 
@@ -446,6 +594,18 @@ it('labels the recorded details of MQTT explorer events in both languages', () =
     'QoS',
     'Nachricht behalten (retain)',
   ]);
+});
+
+it('labels the verification email resend apart from the password reset request in both languages', () => {
+  const translate = (strings: typeof en) => (key: string) => {
+    const [, section, value] = /^(\w+)\[(.*)\]$/.exec(key) ?? [];
+    return (strings as unknown as Record<string, Record<string, string>>)[section][JSON.parse(value)];
+  };
+  expect(auditLabel('events', 'identity.verification_email_resent', translate(en))).toBe('Verification email resent');
+  expect(auditLabel('events', 'identity.verification_email_resent', translate(de))).toBe(
+    'Bestätigungs-E-Mail erneut gesendet',
+  );
+  expect(auditLabel('events', 'identity.password_reset_requested', translate(en))).toBe('Password reset requested');
 });
 
 it('labels every flow audit event, target and detail field in both languages', () => {
@@ -540,7 +700,7 @@ it('shows a global flow audit entry with its recorded flow name and a readable p
     nextCursor: null,
   });
   mount();
-  await userEvent.click(await screen.findByRole('button', { name: 'View event #31' }));
+  await inspect(31);
   const dialog = await screen.findByRole('dialog');
   expect(within(dialog).getAllByText('Global flow deleted').length).toBeGreaterThan(0);
   expect(within(dialog).getAllByText('Door bell').length).toBeGreaterThan(0);

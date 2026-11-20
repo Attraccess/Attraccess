@@ -21,6 +21,7 @@ public:
     std::queue<std::string> incoming;
     std::function<void(const char *, size_t)> receive;
     bool failSends = false; // Simulates a dropped connection for outgoing messages.
+    unsigned connectionDisables = 0; // The connection settings stop the connection; nothing else may.
     void setup() override {}
     void loop() override {
         while (!incoming.empty()) {
@@ -35,7 +36,7 @@ public:
     bool sendHeartbeat(const char *, size_t) override { return true; }
     void setMessageCallbackRaw(std::function<void(const char *, size_t)> value) override { receive = std::move(value); }
     void enableConnectionAttempts() override {}
-    void disableConnectionAttempts() override {}
+    void disableConnectionAttempts() override { ++connectionDisables; }
     void forceReconnect(const char *) override {}
     void resetCertificateTrust() override {}
     void push(const char *type, const std::string &payload, uint32_t messageId = 0) {

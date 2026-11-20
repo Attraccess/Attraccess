@@ -3,18 +3,20 @@ import 'reflect-metadata';
 import { Global, INestApplication, Module } from '@nestjs/common';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
-import { Column, DataSource, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { PluginContext, PluginPermission, PluginPermissionError } from '@attraccess/plugins-backend-sdk';
 import { build } from 'esbuild';
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import request from 'supertest';
 import { PluginService } from './plugin.service';
+import { PluginUninstallService } from './plugin-uninstall.service';
 import { PluginModule } from './plugin.module';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { zipFileUpload } from './__test__/make-zip';
 import { MqttClientService } from '../mqtt/mqtt-client.service';
 import { MqttServerService } from '../mqtt/servers/mqtt-server.service';
+import { PluginMigrationService } from './plugin-migration.service';
 
 let hostDataSource: DataSource;
 
@@ -29,18 +31,9 @@ let hostDataSource: DataSource;
 })
 class HostModule {}
 
-@Entity()
-class PocNote {
-  @PrimaryGeneratedColumn()
-  id!: number;
-
-  @Column()
-  message!: string;
-}
-
 interface PocPongPayload {
   eventsInstanceMatch: boolean;
-  dataSourceInstanceMatch: boolean;
+  entityMetadataResolved: boolean;
   savedId: number;
   savedMessage: string;
   hostGreeting: string;
@@ -52,7 +45,7 @@ const PLUGIN_NAME = 'poc-backend-plugin';
 const ALL_PERMISSIONS = [
   PluginPermission.LISTEN_EVENTS,
   PluginPermission.EMIT_EVENTS,
-  PluginPermission.DATABASE_ACCESS,
+  PluginPermission.PLUGIN_STORAGE,
   PluginPermission.RESOLVE_HOST_PROVIDERS,
 ];
 
@@ -76,7 +69,6 @@ const SHARED = [
   '@nestjs/core',
   '@nestjs/event-emitter',
   'eventemitter2',
-  'typeorm',
   'reflect-metadata',
   '@attraccess/plugins-backend-sdk',
 ];
@@ -88,7 +80,7 @@ const PLUGIN_JSON = {
     frontend: { directory: 'frontend', entryPoint: 'index.mjs' },
     backend: { directory: 'dist', entryPoint: 'index.js' },
   },
-  attraccessVersion: { min: '1.0.0' },
+  attraccessVersion: { min: '2.0.0-0' },
   permissions: ALL_PERMISSIONS,
 };
 
@@ -138,13 +130,27 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
     PluginService.configure({ PLUGIN_DIR: PLUGIN_PATH, RESTART_BY_EXIT: true });
     PluginModule.configure({ DISABLE_PLUGINS: false });
 
-    dataSource = new DataSource({ type: 'sqlite', database: ':memory:', synchronize: true, entities: [PocNote] });
+    // The host migrates the plugin's declared storage at boot, before the application starts.
+    const databaseFile = join(CACHE_DIR, 'host.sqlite');
+    PluginMigrationService.configureForTesting({
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database: databaseFile,
+    });
+    await PluginMigrationService.runPendingUpMigrationsForAllPlugins();
+    const pluginModule = PluginModule.forRoot();
+    dataSource = new DataSource({
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database: databaseFile,
+      entities: [],
+    });
     await dataSource.initialize();
     hostDataSource = dataSource;
     events = new EventEmitter2();
 
     const moduleRef = await Test.createTestingModule({
-      imports: [EventEmitterModule.forRoot(), HostModule, PluginModule.forRoot()],
+      imports: [EventEmitterModule.forRoot(), HostModule, pluginModule],
     })
       .overrideProvider(EventEmitter2)
       .useValue(events)
@@ -161,6 +167,7 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
   afterAll(async () => {
     if (app) await app.close();
     if (dataSource?.isInitialized) await dataSource.destroy();
+    PluginMigrationService.configureForTesting(null);
     jest.restoreAllMocks();
     rmSync(CACHE_DIR, { recursive: true, force: true });
   });
@@ -185,7 +192,7 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
     events.emit(PING_EVENT, 'hello');
     const payload = await pong;
 
-    expect(payload.dataSourceInstanceMatch).toBe(true);
+    expect(payload.entityMetadataResolved).toBe(true);
     expect(payload.savedId).toBeGreaterThan(0);
     expect(payload.savedMessage).toBe(`${PLUGIN_NAME}:hello`);
     expect(payload.hostGreeting).toBe('hello from host');
@@ -199,22 +206,25 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
       pluginDirectory: PLUGIN_NAME,
       permissions: [PluginPermission.LISTEN_EVENTS],
       main: PLUGIN_JSON.main,
-      attraccessVersion: { min: '1.0.0' },
+      attraccessVersion: { min: '2.0.0-0' },
     } as unknown as LoadedPluginManifest;
 
     const ctx = (
       PluginModule as unknown as { createPluginContext(m: LoadedPluginManifest): PluginContext }
     ).createPluginContext(manifest);
 
-    expect(() => ctx.dataSource).toThrow(PluginPermissionError);
-    expect(() => ctx.dataSource).toThrow(/DATABASE_ACCESS/);
+    expect(() => ctx.persistence).toThrow(PluginPermissionError);
+    expect(() => ctx.persistence).toThrow(/PLUGIN_STORAGE/);
   });
 
   it('deletes the plugin and removes it from disk', async () => {
     const plugin = PluginService.getPlugins().find((p) => p.name === PLUGIN_NAME);
     expect(plugin).toBeDefined();
 
-    await new PluginService().deletePlugin((plugin as LoadedPluginManifest).id);
+    const owned = { deleteAllForPlugin: async () => undefined } as never;
+    await new PluginUninstallService(new PluginService(), owned, owned).deletePlugin(
+      (plugin as LoadedPluginManifest).id,
+    );
 
     expect(existsSync(join(PLUGIN_PATH, PLUGIN_NAME))).toBe(false);
     expect(restartSpy).toHaveBeenCalledTimes(0);

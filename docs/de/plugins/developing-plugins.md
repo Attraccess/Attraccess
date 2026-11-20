@@ -30,6 +30,145 @@ Ein Frontend-Plugin kann:
 > [!TIP]
 > Lesen Sie die SDK-Dokumentation, die mit `@attraccess/plugins-frontend-sdk` mitgeliefert wird, für eine detaillierte API-Referenz, Beispiele und Typdefinitionen.
 
+### Dashboard-Pins
+
+Benutzer können Seiten mit dem Stern in der Seitenkopfzeile an ihr persönliches
+Dashboard anheften. Plugin-Seiten sind nur anheftbar, wenn das Plugin es
+erlaubt: Listen Sie die Pfade der Seitenleiste in `attraccess.dashboardPaths`
+in `package.json` (bzw. `main.frontend.dashboardPaths` in `plugin.json`) auf:
+
+```json
+"dashboardPaths": ["/my-plugin/tools"]
+```
+
+Jeder Pfad muss auch von `getSidebarItems()` und `getRoutes()` geliefert
+werden, aus einfachen Segmenten bestehen und außerhalb von `/kiosk` und
+`/dashboard` liegen. Die API lehnt Pins für Pfade ab, die kein aktives Plugin
+auflistet. Der Host zeigt den Stern im ersten `PageHeader` aus
+`@attraccess/plugins-frontend-ui` auf der Seite; rendern Sie also einen als
+Seitentitel, weiterer Code ist nicht nötig. Die Seite erscheint außerdem als
+kleine Verknüpfungskachel in der Gruppe Ihres Plugins in der Galerie „Widget
+hinzufügen“. Die Kachel verwendet Beschriftung und Symbol Ihres
+Seitenleisteneintrags, und die Berechtigungen der
+Route entscheiden, ob der Benutzer sie öffnen darf. Verliert ein Benutzer den
+Zugriff oder ist Ihr Plugin deaktiviert bzw. listet den Pfad nicht mehr, wird
+die Karte als nicht mehr zugänglich angezeigt, bis der Benutzer sie entfernt.
+
+### Dashboard-Widgets
+
+Neben angehefteten Seiten können Benutzer **Widgets** zu ihrem Dashboard
+hinzufügen: Kacheln mit Live-Inhalten und Schnellaktionen, die sie in der
+Galerie „Widget hinzufügen“ auswählen. Ein Plugin bietet
+Widgets in zwei Schritten an.
+
+1. Listen Sie die Widget-IDs in `attraccess.dashboardWidgets` in
+   `package.json` (bzw. `main.frontend.dashboardWidgets` in `plugin.json`) auf.
+   IDs bestehen aus Kleinbuchstaben, Ziffern und Bindestrichen (kebab-case),
+   sind höchstens 64 Zeichen lang und werden in den Dashboards der Benutzer
+   gespeichert; benennen Sie also nie eine um:
+
+   ```json
+   "dashboardWidgets": ["my-plugin-summary"]
+   ```
+
+2. Geben Sie aus `getDashboardWidgets()` die Widgets zurück, die der aktuelle
+   Benutzer verwenden darf:
+
+   ```tsx
+   import type { AttraccessFrontendPlugin, PluginDashboardWidget } from '@attraccess/plugins-frontend-sdk';
+
+   export default class MyPlugin implements AttraccessFrontendPlugin {
+     private readonly widgetListeners = new Set<() => void>();
+
+     getDashboardWidgets(): PluginDashboardWidget[] {
+       return [
+         {
+           id: 'my-plugin-summary',
+           title: 'Zusammenfassung', // übersetzen: der Host fragt bei einem Sprachwechsel erneut
+           description: 'Was heute passiert ist', // eine Zeile in der Galerie „Widget hinzufügen“
+           icon: <ChartIcon />,
+           href: '/my-plugin/summary', // dorthin führt die Kopfzeile außerhalb des Bearbeitungsmodus
+           sizes: ['small', 'medium'], // Standard: ['medium']
+           defaultSize: 'medium', // Standard: der erste Eintrag von sizes
+           group: 'Mein Plugin', // Gruppe in der Galerie; Standard: die Gruppe Ihres Plugins, benannt nach der ersten Gruppe, die ein Widget nennt, sonst nach dem Manifest-Namen
+           keywords: ['Bericht', 'Statistik'], // zusätzliche Suchbegriffe für die Galerie
+           render: ({ size, isPreview }) => <SummaryWidget size={size} isPreview={isPreview} />,
+         },
+       ];
+     }
+
+     // Optional: Rufen Sie die Listener auf, wenn sich die Antwort von getDashboardWidgets() ändert,
+     // zum Beispiel nach einer asynchronen Berechtigungsprüfung.
+     onDashboardWidgetsChange(listener: () => void): () => void {
+       this.widgetListeners.add(listener);
+       return () => this.widgetListeners.delete(listener);
+     }
+     // ...
+   }
+   ```
+
+Der Host rendert die Karte: die Kopfzeile mit Ihrem Symbol und Titel, die
+Bearbeitungselemente und eine Error Boundary. `render()` liefert nur den
+Inhalt. Wirft der Inhalt einen Fehler, zeigt seine Karte eine Fehlermeldung;
+der Rest des Dashboards funktioniert weiter. Setzen Sie `hasFields: true`, wenn
+der Inhalt Formularfelder enthält: Der Host rendert das Widget dann auf einem
+umrandeten Abschnitt statt auf einer Kartenfläche, auf der Felder verschwinden
+würden. Außerhalb des Bearbeitungsmodus führt die Kopfzeile zu `href`;
+wiederholen Sie also keinen „Öffnen …“-Link im Inhalt.
+
+#### Größen
+
+Kacheln liegen in einem Raster mit fester Zeilenhöhe, wie Widgets auf dem
+Startbildschirm eines Smartphones. Es gibt drei Größen:
+
+| Größe    | Rasterzellen         |
+| -------- | -------------------- |
+| `small`  | 1 Spalte × 1 Zeile   |
+| `medium` | 2 Spalten × 1 Zeile  |
+| `large`  | 2 Spalten × 2 Zeilen |
+
+Listen Sie in `sizes` die Größen auf, die Ihr Widget unterstützt; Benutzer
+wählen eine beim Hinzufügen und können sie im Bearbeitungsmodus ändern.
+`render()` erhält die Größe der Kachel als `size`. Eine Kachel wächst nie mit
+ihrem Inhalt; zeigen Sie also je Größe eine feste Anzahl von Einträgen (zum
+Beispiel 1, 3 und 7), statt zu messen, und kürzen Sie lange Texte. Inhalt, der
+trotzdem nicht passt, wird abgeschnitten. Eine gespeicherte Größe, die Ihr
+Widget nicht mehr unterstützt, wird in `defaultSize` gezeigt.
+
+#### Vorschauen
+
+Die Galerie „Widget hinzufügen“ zeigt jedes Widget als Live-Vorschau in der
+gewählten Größe. Der Host ruft `render()` mit `isPreview: true` auf und setzt
+das Ergebnis in einen `inert`-Rahmen, der vor Hilfstechnologien verborgen ist:
+Nichts darin lässt sich fokussieren oder anklicken. Laden Sie Ihre Daten wie
+gewohnt, aber öffnen Sie keine Dialoge, navigieren Sie nicht und starten Sie
+nichts (zum Beispiel einen schreibenden Timer oder eine Anfrage, die Daten
+ändert), solange `isPreview` gesetzt ist.
+
+#### Ältere Widgets
+
+Alle neuen Felder sind optional. Ein Widget ohne `sizes` unterstützt nur
+`medium`, und ein `render()` ohne Parameter funktioniert weiter: Es wird in
+seiner Standardgröße gerendert.
+
+Ein Widget wird nur angeboten, solange Ihr Plugin aktiv ist, seine ID im
+Manifest auflistet und es aus `getDashboardWidgets()` zurückgibt. Die API lehnt
+IDs ab, die kein aktives Plugin auflistet. Eine eingebaute Widget-ID hat immer
+Vorrang vor Ihrer (der Host ignoriert Ihre und protokolliert eine Warnung).
+Geben Sie nur zurück, was der aktuelle Benutzer verwenden darf, und prüfen Sie
+jeden Link und jede Aktion im Inhalt nach derselben Regel wie ihr Ziel.
+Ein verborgenes Widget ist keine Zugriffskontrolle: Jeder Benutzer kann eine
+deklarierte ID anheften, daher müssen Ihre Backend-Endpunkte den Zugriff selbst
+prüfen. Der
+Host fragt erneut, wenn sich Benutzer oder Sprache ändern und nachdem
+`onDashboardWidgetsChange` ausgelöst wurde. Verliert ein Benutzer den Zugriff
+oder ist Ihr Plugin deaktiviert bzw. gibt das Widget nicht mehr zurück, wird
+die Karte als nicht mehr zugänglich angezeigt, bis der Benutzer sie entfernt.
+
+Das Widget `reservations-upcoming` des Reservierungs-Plugins
+(`apps/plugins/reservations/frontend/src/dashboard/`) ist ein vollständiges
+Beispiel.
+
 ### Slots (eingebettete Erweiterungspunkte)
 
 Neben eigenen Routen kann ein Frontend-Plugin über `getSlotContributions()` UI **in** Host-Seiten einbetten. Jeder
@@ -39,7 +178,7 @@ ignoriert, und jeder Beitrag läuft in einer Error Boundary. Verfügbare Slots:
 | Slot-ID                   | Ort                                                                                               | Kontext                   |
 | ------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------- |
 | `mqtt.server.detail`      | Detail-/Bearbeitungsansicht eines MQTT-Servers                                                    | `{ mqttServerId }`        |
-| `mqtt.server.list.row`    | MQTT-Serverliste, Aktionsbereich pro Zeile                                                        | `{ mqttServerId }`        |
+| `mqtt.server.list.row`    | MQTT-Serverliste, Badge-Bereich neben dem Servernamen                                             | `{ mqttServerId }`        |
 | `resource.overview`       | Hauptbereich der Ressourcen-Detailseite                                                           | `{ resourceId }`          |
 | `resource.active-session` | Panel der aktiven Nutzung, direkt nach den Flow-Bedienelementen                                   | `{ resourceId, usageId }` |
 | `resource.list.row`       | Kompakter Statusbereich einer Ressourcenzeile                                                     | `{ resourceId }`          |
@@ -74,6 +213,100 @@ Optionale Abhängigkeiten (`required: false`) werden nicht automatisch installie
 
 Updates und Downgrades müssen auch die Anforderungen installierter abhängiger Plugins erfüllen. Beim Entfernen einer erforderlichen Abhängigkeit müssen alle direkt und indirekt abhängigen Plugins ausdrücklich zur gemeinsamen Entfernung bestätigt werden. Automatisch installierte Abhängigkeiten bleiben normale Plugins; sie werden nicht automatisch entfernt, wenn ihr letztes abhängiges Plugin entfernt wird. Paketänderungen werden gemeinsam übernommen; Migrationen und Aktivierung erfolgen beim Neustart gemäß dem bestehenden Lebenszyklus. Beim Entfernen von npm-Plugins bleiben Daten und Geheimnisse erhalten.
 
+## Lizenzanforderungen
+
+Ein Plugin kann eine Attraccess-Lizenz voraussetzen. Der Host erzwingt die Anforderung mit derselben Lizenzlogik wie bei
+Kernfunktionen (gültiger Schlüssel, optional mit benannten Modulen). Ein Plugin baut also keine eigene Lizenzprüfung.
+
+Ein Plugin ohne eigene Lizenzbedingungen steht unter der Kernlizenz (siehe `LICENSE.md` im Repository), einschließlich
+der kostenlosen Nutzung durch Privatpersonen und gemeinnützige Organisationen. Ein Plugin mit eigener kommerzieller
+Lizenz fällt nicht unter diese Erlaubnis: Es bringt eine eigene `LICENSE.md` mit und deklariert sein bezahltes Modul wie
+unten beschrieben. Der Schlüssel für gemeinnützige Nutzung schaltet nur die Kernmodule frei und **nie ein
+Plugin-Modul**.
+
+### Anforderung deklarieren
+
+Ergänzen Sie einen optionalen `license`-Block. Bei einem ZIP-Plugin steht er in der `plugin.json`, bei einem npm-Plugin in
+der `package.json` unter `attraccess` (daraus baut der Host das Manifest):
+
+```json
+{ "license": { "required": true, "modules": ["wago"] } }
+```
+
+| Feld       | Typ        | Bedeutung                                                                                                                                         |
+| ---------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `modules`  | `string[]` | Lizenzmodule, ohne die das Plugin gar nicht geladen werden darf. Eine nicht leere Liste impliziert `required`.                                    |
+| `required` | `boolean`  | Das Plugin braucht eine gültige Attraccess-Lizenz (der Schlüssel für gemeinnützige Nutzung zählt), aber kein bestimmtes Modul. Standard: `false`. |
+
+Alles, was hier steht, ist eine harte Anforderung. Der Host prüft die Lizenz **einmal beim Start**, bevor er ein Plugin
+lädt. Ist die Anforderung nicht erfüllt, wird das Plugin gar nicht geladen: kein Backend, keine Migrationen, keine
+Flow-Knoten, Audit-Domänen, Reader-UI, Hooks oder Frontend. In **Einstellungen → Plugins** steht es als **Lizenz fehlt**,
+mit den fehlenden Modulen. Lässt sich die Lizenz nicht ermitteln (kein Schlüssel, ein Schlüssel, der sich nicht prüfen
+lässt, nicht lesbare Einstellungen), gilt ein geschütztes Plugin als nicht lizenziert. Bei einer Neuinstallation nutzt
+der Host die Umgebungsvariable `LICENSE_KEY`. Ein Plugin mit einer erforderlichen Abhängigkeit von einem nicht
+lizenzierten Plugin wird ebenfalls nicht geladen; es zeigt den üblichen Abhängigkeitsfehler.
+
+Das Nichtladen aus Lizenzgründen ist kein Fehler: Das Plugin wird nicht unter Quarantäne gestellt und lädt nach dem
+nächsten Neustart, sobald die Lizenz es abdeckt. Ein ungültiger `license`-Block (falsche Typen, unbekannte Schlüssel) ist
+ein Manifestfehler: Das Plugin wird nicht geladen (**Einstellungen → Plugins** listet es mit dem Fehler, damit es
+gelöscht werden kann), ein ZIP-Upload wird mit HTTP 400 abgelehnt. Hosts, die älter als die
+Plugin-Lizenzunterstützung sind, ignorieren den Block. Setzen Sie bei npm-Plugins `attraccess.host` auf die erste Version,
+die ihn durchsetzt; der Host prüft diesen Bereich bei der Installation. Das `attraccessVersion` eines ZIP-Plugins wird
+nicht mit der Host-Version verglichen, ein alter Host lädt ein ZIP-Plugin daher ohne die Sperre.
+
+Speichert eine Administratorin oder ein Administrator einen anderen, gültigen Lizenzschlüssel oder entfernt den
+Schlüssel, prüft der Host die Plugins erneut. Er startet genau dann automatisch neu, wenn sich dadurch ändert, ob mindestens ein geschütztes Plugin
+geladen wird. Ein ungültiger, abgelaufener oder nicht prüfbarer Schlüssel startet nie neu, weil der Host damit nicht
+starten würde. Es gibt keine periodische Prüfung: Eine abgelaufene Lizenz fällt beim nächsten Start auf.
+
+### Zur Laufzeit entscheiden
+
+Soll ein Plugin je nach Lizenz mehr oder weniger anbieten, statt gar nicht zu laden, deklariert es das Modul **nicht**
+im Manifest. Es fragt den Host und entscheidet selbst. Der Host sperrt Routen oder UI eines solchen Plugins nicht.
+
+**Backend:** `context.license` (im Typ optional, weil ältere Hosts es nicht bereitstellen; keine Berechtigung nötig):
+
+| Member                          | Zweck                                                                                                                                      |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `license.getLicense()`          | `{ valid, reason?, modules, usageLimits, isNonProfit }`. Wirft nie: Lässt sich die Lizenz nicht ermitteln, ist `valid` `false`.            |
+| `license.hasModule(module)`     | `true` nur, wenn die Lizenz gültig ist und das Modul enthält. `false`, wenn sie sich nicht ermitteln lässt.                                |
+| `license.verify(requirements?)` | Läuft durch, wenn die Lizenz gültig ist und `{ modules?, usageLimits? }` erfüllt, sonst wirft sie einen `PluginLicenseError` mit `reason`. |
+
+Jeder Aufruf prüft die Lizenz neu (eine lokale Signaturprüfung, keine Netzwerkanfrage), ein Plugin sieht einen
+geänderten Schlüssel also ohne Neustart. Eine ungültige Lizenz meldet keine Module und keine Nutzungsgrenzen. Prüfen Sie
+in häufig durchlaufenem Code, etwa pro Nachricht oder pro Reader-Ereignis, einmal pro Vorgang statt pro Element.
+
+```ts
+import { PluginLicenseError } from '@attraccess/plugins-backend-sdk';
+
+// Export nur mit dem Modul `reports` anbieten. `false` auf Hosts ohne `context.license`.
+if (!(await context.license?.hasModule('reports'))) throw new ForbiddenException('Benötigt das Modul reports');
+
+// Oder mit dem Grund des Hosts scheitern. Zuerst auf `context.license` prüfen: Auf älteren Hosts täte `?.verify` nichts.
+if (!context.license) throw new ForbiddenException('Dieser Host kann die Lizenz nicht prüfen');
+try {
+  await context.license.verify({ modules: ['reports'], usageLimits: { users: userCount } });
+} catch (error) {
+  if (error instanceof PluginLicenseError) throw new ForbiddenException(error.reason);
+  throw error;
+}
+```
+
+**Frontend:** `usePluginLicense()` aus `@attraccess/plugins-frontend-sdk` liest `GET /api/license-data` (für angemeldete
+Nutzer). Es liefert `{ license, isLoading, error, hasModule(module), refetch() }`; `hasModule` ist beim Laden und bei
+unbekannter Lizenz `false`. Eingebundene Hooks teilen sich 30 Sekunden lang eine Anfrage; `refetch()` fragt neu.
+`fetchPluginLicense()` macht dieselbe Anfrage ohne React.
+
+```tsx
+import { usePluginLicense } from '@attraccess/plugins-frontend-sdk';
+
+function Reports() {
+  const { hasModule, isLoading } = usePluginLicense();
+  if (isLoading) return null;
+  return hasModule('reports') ? <ReportsPage /> : <p>Berichte brauchen das Lizenzmodul reports.</p>;
+}
+```
+
 ## Backend-Plugins
 
 Das Backend-SDK ermöglicht es Ihrem Plugin, API-Endpunkte zu registrieren, die auf dem Attraccess-Server ausgeführt werden.
@@ -92,14 +325,15 @@ Ein Backend-Plugin kann:
 
 ### Backend-Plugins verpacken
 
-Ein Backend-Plugin läuft **innerhalb** des Attraccess-Serverprozesses und teilt sich die NestJS-Laufzeit, den Event-Bus und die Datenbankverbindung des Hosts. Damit das funktioniert, muss Ihr Build _dieselben_ Kopien dieser Pakete verwenden, die der Host bereits geladen hat -- er darf keine eigenen mitbündeln.
+Ein Backend-Plugin läuft **innerhalb** des Attraccess-Serverprozesses und teilt sich die NestJS-Laufzeit und den Event-Bus des Hosts. Damit das funktioniert, muss Ihr Build _dieselben_ Kopien dieser Pakete verwenden, die der Host bereits geladen hat -- er darf keine eigenen mitbündeln.
 
 Teilen Sie Ihre Abhängigkeiten in zwei Gruppen auf:
 
-| Abhängigkeit                                                                                                                                                         | Deklaration                                                       | Grund                                                                                                                                                                                                   |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata`, `@nestjs/swagger`, `class-validator`, `class-transformer` | `peerDependencies`, beim Build **externalisiert** (nie gebündelt) | Sie tragen die Dependency-Injection-Identitäten, den gemeinsamen Event-Bus und die einzelne Datenbankverbindung. Eine gebündelte Kopie gilt als _anderer_ Typ und verbindet sich stillschweigend nicht. |
-| `@attraccess/plugins-backend-sdk` und Ihr eigener Code                                                                                                               | Normal bündeln                                                    | Kann sicher in Ihr Artefakt aufgenommen werden.                                                                                                                                                         |
+| Abhängigkeit                                                                                                                                              | Deklaration                                                       | Grund                                                                                                                                                                 |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `reflect-metadata`, `@nestjs/swagger`, `class-validator`, `class-transformer` | `peerDependencies`, beim Build **externalisiert** (nie gebündelt) | Sie tragen die Dependency-Injection-Identitäten und den gemeinsamen Event-Bus. Eine gebündelte Kopie gilt als _anderer_ Typ und verbindet sich stillschweigend nicht. |
+| `@attraccess/plugins-backend-sdk`                                                                                                                         | beim Build **externalisiert**                                     | Der Host reicht seine eigene Instanz an den Plugin-Loader weiter. Fügen Sie weder `typeorm` noch einen Datenbanktreiber hinzu: Plugins haben keinen Datenbankzugriff. |
+| Ihr eigener Code                                                                                                                                          | Normal bündeln                                                    | -                                                                                                                                                                     |
 
 Liefern Sie einen **CommonJS**-Einstiegspunkt (`index.js`) aus, kein ES-Modul (`index.mjs`). Verweisen Sie im `plugin.json`-Manifest darauf:
 
@@ -108,7 +342,7 @@ Liefern Sie einen **CommonJS**-Einstiegspunkt (`index.js`) aus, kein ES-Modul (`
   "name": "my-plugin",
   "version": "1.0.0",
   "main": { "backend": { "directory": "dist", "entryPoint": "index.js" } },
-  "attraccessVersion": { "min": "1.0.0" }
+  "attraccessVersion": { "min": "2.0.0-0" }
 }
 ```
 
@@ -119,12 +353,13 @@ esbuild src/index.ts \
   --bundle --platform=node --format=cjs --outfile=dist/index.js \
   --external:@nestjs/common --external:@nestjs/core \
   --external:@nestjs/event-emitter --external:eventemitter2 \
-  --external:typeorm --external:reflect-metadata \
-  --external:@nestjs/swagger --external:class-validator --external:class-transformer
+  --external:reflect-metadata \
+  --external:@nestjs/swagger --external:class-validator --external:class-transformer \
+  --external:@attraccess/plugins-backend-sdk
 ```
 
 > [!WARNING]
-> Wenn Sie eines der externalisierten Pakete mitbündeln, lädt Ihr Plugin möglicherweise fehlerfrei, empfängt aber stillschweigend keine Events, teilt sich nicht die Datenbank oder kann keine Host-Dienste auflösen. Halten Sie die obige Abhängigkeitsliste im Zweifel extern.
+> Wenn Sie eines der externalisierten Pakete mitbündeln, lädt Ihr Plugin möglicherweise fehlerfrei, empfängt aber stillschweigend keine Events, oder kann keine Host-Dienste auflösen. Halten Sie die obige Abhängigkeitsliste im Zweifel extern.
 
 ### Backend-Plugin-Berechtigungen
 
@@ -141,24 +376,28 @@ nennt.
   "name": "my-plugin",
   "version": "1.0.0",
   "main": { "backend": { "directory": "dist", "entryPoint": "index.js" } },
-  "attraccessVersion": { "min": "1.0.0" },
+  "attraccessVersion": { "min": "2.0.0-0" },
   "permissions": ["READ_USERS", "EMIT_EVENTS"]
 }
 ```
 
-| Berechtigung             | Gewährt Zugriff auf                                                                                                                                                                                                                            |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `READ_USERS`             | `context.getRepository(User)` -- Benutzerkonten lesen.                                                                                                                                                                                         |
-| `ACCESS_RESOURCES`       | `context.getRepository(Resource)` -- Ressourcen lesen und schreiben -- sowie die lesenden `context.resourceAccess`-Abfragen. Siehe [Ressourcen-Zugriff](#ressourcen-zugriff-abfragen).                                                         |
-| `READ_SETTINGS`          | `context.getRepository(Setting)` -- Anwendungseinstellungen lesen.                                                                                                                                                                             |
-| `DATABASE_ACCESS`        | `context.dataSource`, `context.getRepository(...)` für jede andere Entität und `context.runSerialized(...)`.                                                                                                                                   |
-| `EMIT_EVENTS`            | `context.emitEvent(...)` und `context.events.emit(...)` / `emitAsync(...)` -- auf dem geteilten Event-Bus senden.                                                                                                                              |
-| `LISTEN_EVENTS`          | `context.onEvent(...)` und `context.events.on(...)` / `once(...)` / ... -- den geteilten Event-Bus abonnieren.                                                                                                                                 |
-| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` -- beliebige Host-Dienste per Injection-Token auflösen.                                                                                                                                                                   |
-| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)` -- Verbindungskonfiguration und aufgelöste (entschlüsselte) Zugangsdaten eines MQTT-Servers lesen.                                                                                                     |
-| `READER_UI`              | `context.readerUi.invalidate(...)` und der `readerUi`-Provider -- Widgets auf Attractap-Reader-Bildschirmen anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks).                                                                           |
-| `ACCESS_HOOKS`           | `preStartHook`, `sessionEndHook` und `startBlockedQuery` -- eine Bestätigung verlangen oder einen Sitzungsstart blockieren und einen blockierten Start in der Oberfläche anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks).              |
-| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` -- Benachrichtigungen in der App, per Push und per E-Mail unter vom Plugin deklarierten Kategorien senden und bearbeitbare E-Mail-Vorlagen deklarieren. Siehe [Benachrichtigungen](#benachrichtigungen). |
+| Berechtigung             | Gewährt Zugriff auf                                                                                                                                                                                                                                                                                    |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `READ_USERS`             | `context.hostData.users` -- Benutzernamen, Sprachen, Kontostatus und Inhaber von Berechtigungen lesen.                                                                                                                                                                                                 |
+| `ACCESS_RESOURCES`       | `context.hostData.resources` -- Ressourcen lesen -- sowie die lesenden `context.resourceAccess`-Abfragen. Siehe [Ressourcen-Zugriff](#ressourcen-zugriff-abfragen).                                                                                                                                    |
+| `READ_SETTINGS`          | `context.hostData.settings` -- Anwendungseinstellungen lesen.                                                                                                                                                                                                                                          |
+| `PLUGIN_STORAGE`         | `context.storage` und `context.persistence`: die deklarierten Tabellen Ihres eigenen Plugins und Transaktionen darüber. Kein Zugriff auf Kerntabellen. Siehe [Plugin-Speicher](plugins/plugin-storage.md).                                                                                             |
+| `TRIGGER_FLOWS`          | `context.flows.trigger(...)` und `context.hostData.flows` (Flow-Knoten-Abfragen).                                                                                                                                                                                                                      |
+| `EMIT_EVENTS`            | `context.emitEvent(...)` und `context.events.emit(...)` / `emitAsync(...)` -- auf dem geteilten Event-Bus senden.                                                                                                                                                                                      |
+| `LISTEN_EVENTS`          | `context.onEvent(...)` und `context.events.on(...)` / `once(...)` / ... -- den geteilten Event-Bus abonnieren.                                                                                                                                                                                         |
+| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` -- beliebige Host-Dienste per Injection-Token auflösen.                                                                                                                                                                                                                           |
+| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)` -- Verbindungskonfiguration und aufgelöste (entschlüsselte) Zugangsdaten eines MQTT-Servers lesen.                                                                                                                                                             |
+| `READER_UI`              | `context.readerUi.invalidate(...)` und der `readerUi`-Provider -- Widgets auf Attractap-Reader-Bildschirmen anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks).                                                                                                                                   |
+| `ACCESS_HOOKS`           | `preStartHook`, `sessionEndHook`, `startBlockedQuery` und `startCapacityHook` -- eine Bestätigung verlangen oder einen Sitzungsstart blockieren und einen blockierten Start in der Oberfläche anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks).                                                 |
+| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` -- Benachrichtigungen in der App, per Push und per E-Mail unter vom Plugin deklarierten Kategorien senden und bearbeitbare E-Mail-Vorlagen deklarieren. Siehe [Benachrichtigungen](#benachrichtigungen).                                                         |
+| `BLE_TRANSPORT`          | `context.ble` -- die Bluetooth-Funkverbindung von Attractap-Readern nutzen, die ein Administrator für Plugins freigegeben hat, begrenzt auf die BLE-Profile, die das Plugin registriert. Siehe [Bluetooth-Transport für Plugins](plugins/ble-transport.md).                                            |
+| `CARD_AUTHENTICATION`    | `context.cards` -- NFC-Karten an eigenen Geräten des Plugins mit den Attraccess-Kartenschlüsseln authentifizieren; das Plugin erhält die Karte und ihren Besitzer, nie die Schlüssel. Siehe [Kartenauthentifizierung für Plugins](plugins/card-authentication.md).                                     |
+| `READER_DEVICES`         | `context.readers` -- eigene Kartenleser des Plugins registrieren; eine daran authentifizierte Karte führt die Aktion des Readers auf seiner zugewiesenen Ressource für den Karteninhaber aus, mit denselben Prüfungen wie an einem Attractap-Reader. Siehe [Plugin-Reader](plugins/plugin-readers.md). |
 
 `context.manifest` und `context.logger` sind immer verfügbar und benötigen
 keine Berechtigung. Dasselbe gilt für `context.hostVersion`: die Version des
@@ -169,11 +408,9 @@ nicht geladen wird.
 
 Einige Hinweise zur Grenze:
 
-- `DATABASE_ACCESS` ist die weitreichende Berechtigung: sie umfasst die rohe
-  `dataSource` (inkl. Verbindungskonfiguration) und ein Repository für **jede**
-  Entität und schließt damit implizit `READ_USERS`, `ACCESS_RESOURCES` und
-  `READ_SETTINGS` ein. Bevorzugen Sie die engeren Entitäts-Berechtigungen, wenn
-  Sie nur eine dieser Tabellen brauchen.
+- `PLUGIN_STORAGE` deckt nur Ihre **eigenen** deklarierten Tabellen ab. Es schließt `READ_USERS`,
+  `ACCESS_RESOURCES`, `READ_SETTINGS` und `TRIGGER_FLOWS` nicht ein: Jede `hostData`-Gruppe prüft beim Aufruf einer Methode ihre eigene
+  Berechtigung. Beliebige Host-Tabellen lassen sich nicht lesen.
 - Der Event-Bus wird als **eingeschränkte** Oberfläche bereitgestellt. Nur
   `emit`/`emitAsync` (unter `EMIT_EVENTS`) und die Listener-Methoden `on`, `once`,
   `addListener`, `prependListener`, `prependOnceListener`, `many`, `prependMany`,
@@ -185,6 +422,172 @@ Einige Hinweise zur Grenze:
 > Fordern Sie nur die minimal nötigen Berechtigungen an. Administratoren sehen
 > auf der Plugins-Seite jede angeforderte Berechtigung, bevor sie einem Plugin
 > vertrauen.
+
+### Plugin-eigene RBAC-Berechtigungen
+
+Die `permissions` im Manifest oben sind **Host-Fähigkeiten**, die Ihr Plugin-Code nutzen darf. RBAC-Berechtigungen
+sind etwas anderes: Sie legen fest, welche **Benutzer und API-Tokens** Ihre Routen aufrufen, Ihre Seiten öffnen und
+Ihre Live-Themen abonnieren dürfen. Ein Plugin kann eigene Schlüssel deklarieren, statt breite Kernschlüssel wie
+`system.plugins.manage` wiederzuverwenden. Der Host nimmt sie in den Berechtigungskatalog auf, sodass Administratoren
+sie im Rollen-Editor und in der Auswahl für API-Tokens sehen, gruppiert unter dem Namen des Plugins.
+
+Jeder Host, der Plugins mit SDK 2 lädt, unterstützt plugin-eigene Schlüssel. Das `attraccessVersion.min` von `2.0.0-0`,
+das SDK 2 verlangt, deckt sie also schon ab.
+
+#### Schlüssel deklarieren
+
+Deklarieren Sie die Schlüssel einmal mit `definePluginPermissions` und exportieren Sie die Deklaration als
+`permissions` am Backend-Modul:
+
+```typescript
+// backend/permissions.ts
+import { definePluginPermissions } from '@attraccess/plugins-backend-sdk';
+
+export const ACME_PERMISSIONS = definePluginPermissions({
+  // Optionale Gruppenbezeichnung im Rollen-Editor; Standard ist der Plugin-Name aus dem Manifest.
+  category: { en: 'Acme widgets', de: 'Acme-Widgets' },
+  permissions: [
+    {
+      key: 'acme.widgets.read',
+      label: { en: 'View widgets', de: 'Widgets anzeigen' },
+      description: { en: 'View widgets and their status', de: 'Widgets und ihren Status anzeigen' },
+      defaultRoles: ['administrator', 'resource-manager'],
+    },
+    {
+      key: 'acme.widgets.manage',
+      label: { en: 'Manage widgets', de: 'Widgets verwalten' },
+      description: { en: 'Create, change and delete widgets', de: 'Widgets anlegen, ändern und löschen' },
+    },
+  ],
+});
+
+export const WIDGETS_READ = ACME_PERMISSIONS.keys['acme.widgets.read'];
+export const WIDGETS_MANAGE = ACME_PERMISSIONS.keys['acme.widgets.manage'];
+```
+
+```typescript
+// backend/plugin.ts
+const plugin: PluginBackendModule = {
+  permissions: ACME_PERMISSIONS,
+  register(context) {
+    /* … */
+  },
+};
+```
+
+Jeder Schlüssel braucht eine englische und eine deutsche Bezeichnung und Beschreibung; der Rollen-Editor zeigt sie in
+der Sprache des Benutzers.
+
+#### Format und Kollisionsregeln
+
+Der Host prüft die Deklaration beim Laden des Plugins:
+
+- Ein Schlüssel besteht aus kleingeschriebenen, durch Punkte getrennten Segmenten, mindestens zwei
+  (`PLUGIN_PERMISSION_KEY_PATTERN`, `^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$`), höchstens 100 Zeichen. Stellen Sie den
+  Namen Ihres Plugins voran.
+- Ein Schlüssel darf keinem Kernschlüssel entsprechen und nicht mit einem reservierten Kern-Namensraum beginnen
+  (`RESERVED_PERMISSION_NAMESPACES`): `resources.`, `users.`, `system.`, `billing.`.
+- Ein Plugin darf denselben Schlüssel nicht zweimal deklarieren.
+- Ein Schlüssel gehört dem Plugin, das ihn zuerst registriert hat. Deklariert ihn später ein anderes Plugin, wird es
+  abgelehnt, auch während der Besitzer deinstalliert ist.
+- `defaultRoles` darf nur Systemrollen nennen (`PLUGIN_PERMISSION_DEFAULT_ROLES`): `user`, `resource-manager`,
+  `user-manager`, `billing-manager`, `system-admin`, `administrator`.
+
+Ein Verstoß verhindert nur das Laden Ihres Plugins: Es wird mit einem Fehler unter Quarantäne gestellt, der Schlüssel
+und Regel nennt. Der Host und alle anderen Plugins laufen weiter.
+
+#### Standardrollen
+
+- `defaultRoles` werden **nur bei der ersten Registrierung** eines Schlüssels vergeben. Spätere Starts vergeben ihn
+  nicht erneut; entfernt ein Administrator den Schlüssel aus einer Rolle, bleibt er entfernt.
+- Die Rolle `administrator` hält immer jeden verfügbaren Plugin-Schlüssel, ob Sie sie aufführen oder nicht. Der Host
+  stellt das bei jedem Start sicher; so funktionieren die Schutzmechanismen für den letzten Administrator weiter.
+- Eigene Rollen erhalten Plugin-Schlüssel nie automatisch. Beschreiben Sie in der Dokumentation Ihres Plugins, welche
+  Schlüssel Administratoren ihren eigenen Rollen hinzufügen sollen.
+
+SSO-Benutzer erhalten Plugin-Schlüssel wie Kernschlüssel über Rollen: SSO ordnet Gruppen des Anbieters Rollen zu,
+nicht Berechtigungsschlüsseln.
+
+#### Wenn ein Plugin nicht verfügbar ist
+
+Wird ein Plugin deinstalliert (hochgeladenes ZIP oder npm-Paket), unter Quarantäne gestellt oder schlägt sein Laden
+fehl, oder deklariert eine neuere Version einen Schlüssel nicht mehr, werden seine Schlüssel **nicht verfügbar**:
+
+- Sie verschwinden aus dem Berechtigungskatalog, dem Rollen-Editor und der Auswahl für API-Tokens.
+- Sie gewähren nichts, auch nicht Rollen und API-Tokens, die sie halten.
+- Die Zuweisungen an Rollen und API-Tokens bleiben in der Datenbank. Speichern einer Rolle oder eines Tokens in der
+  Oberfläche behält die verborgenen Zuweisungen.
+- Lädt das Plugin wieder, kommen die Schlüssel mit allen Zuweisungen zurück.
+
+Das Deinstallieren eines hochgeladenen Plugins löscht dessen eigene Daten (der Host entfernt seine deklarierten Tabellen), behält
+aber seine Berechtigungszeilen und Zuweisungen. Ein Plugin kann nicht in die RBAC-Tabellen des Kerns
+(`permission`, `role_permission`, `api_token_permission`) schreiben: Es hat keinen Zugriff auf Kerntabellen, der Host verwaltet sie.
+
+#### Schlüssel verwenden
+
+Die Schlüssel aus `definePluginPermissions` sind typisiert, die Auth-Decorators nehmen sie ohne Casts an:
+
+```typescript
+import { Auth, AuthAny, SessionAuth } from '@attraccess/plugins-backend-sdk';
+
+@Controller('acme/widgets')
+export class WidgetsController {
+  @Get()
+  @Auth(WIDGETS_READ)
+  list() {}
+
+  @Post()
+  @Auth(WIDGETS_MANAGE)
+  create() {}
+
+  // Nur Sitzungen: API-Tokens werden abgelehnt, auch wenn sie den Schlüssel tragen.
+  @Get('secret-export')
+  @SessionAuth(WIDGETS_MANAGE)
+  exportSecret() {}
+}
+```
+
+Eine Route ohne den Schlüssel antwortet mit `403`, bevor Ihr Handler läuft. API-Tokens funktionieren wie bei
+Kernschlüsseln: Der Umfang eines Tokens darf nur Schlüssel enthalten, die sein Besitzer hält, und eine Anfrage erhält
+die Schlüssel, die sowohl im Umfang als auch in den aktuellen Berechtigungen des Besitzers stehen.
+`context.resourceAccess.hasPermission(principal, WIDGETS_READ)` nimmt die Schlüssel ebenfalls an.
+
+Live-Themen prüfen sie in `authorize`, das bei jedem Abonnement und jeder Verlängerung läuft. Live-Updates gibt es
+nur für Sitzungen, API-Tokens können nicht abonnieren:
+
+```typescript
+context.liveUpdates.register({
+  topic: 'widgets',
+  identifier: 'none',
+  authorize: (_subscription, user) => {
+    if (!user.effectivePermissions?.has(WIDGETS_READ)) throw new ForbiddenException();
+  },
+  source: () => widgets$,
+});
+```
+
+Im Frontend schützen Sie Routen mit den Schlüsseln als Zeichenketten. `authRequired` nimmt einen Schlüssel oder eine
+Liste im Sinne von „einer davon“, und ein Seitenleisten-Eintrag folgt seiner Route. Um Bedienelemente innerhalb einer
+Seite auszublenden, lesen Sie die Berechtigungen aus den Auth-Daten, die der Host an `onApiAuthStateChange` übergibt:
+
+```tsx
+import { hasPluginAuthPermission } from '@attraccess/plugins-frontend-sdk';
+
+getRoutes(): RouteConfig[] {
+  return [{ path: '/widgets', authRequired: ['acme.widgets.read', 'acme.widgets.manage'], element: <WidgetsPage /> }];
+}
+
+onApiAuthStateChange(authData: AttraccessFrontendPluginAuthData | null): void {
+  this.canManage = hasPluginAuthPermission(authData, 'acme.widgets.manage');
+}
+```
+
+Teilen beide Hälften Ihres Plugins die Schlüssel, legen Sie sie in ein Modul ohne SDK-Importe, damit das
+Frontend-Bundle nicht das Backend-SDK einbindet.
+
+Wer einen Plugin-Schlüssel hält, gilt für die Zwei-Faktor-Authentifizierung als **privilegiert**, wie bei jedem
+Schlüssel außerhalb von `resources.*`. Verlangt Ihre Installation 2FA für privilegierte Benutzer, müssen diese sie
+einrichten, sobald sie einen Plugin-Schlüssel erhalten.
 
 ## Reader-UI und Start-Hooks
 
@@ -199,10 +602,11 @@ siehe [Reader-Anzeige](attractap/reader-ui.md).
 | Pre-Start-Hook                 | `preStartHook`                                                            | `ACCESS_HOOKS` |
 | Beratende Frage nach dem Stopp | `sessionEndHook`                                                          | `ACCESS_HOOKS` |
 | Start-blockiert-Zustand        | `startBlockedQuery` und `context.startBlocked.invalidate({ resourceId })` | `ACCESS_HOOKS` |
+| Start-Kapazität                | `startCapacityHook`                                                       | `ACCESS_HOOKS` |
 | Neu rendern                    | `context.readerUi.invalidate({ resourceId?, readerId? })`                 | `READER_UI`    |
 
 Ein Plugin, das `readerUi` oder einen Hook ohne die passende Berechtigung deklariert, **wird nicht geladen** und
-unter Quarantäne gestellt. Das Erstanbieter-Plugin [Reservierungen](resources/reservations.md) nutzt beide Hooks in der Praxis: Sein Pre-Start-Hook blockiert oder bestätigt Starts rund um Buchungen, sein Session-End-Hook fragt die buchende Person, ob sie den Rest einer Buchung behalten oder freigeben möchte. Ein lauffähiges Beispiel liegt in `examples/plugin-reader-ui`.
+unter Quarantäne gestellt. Das Erstanbieter-Plugin [Reservierungen](plugins/reservations/overview.md) nutzt beide Hooks in der Praxis: Sein Pre-Start-Hook blockiert oder bestätigt Starts rund um Buchungen, sein Session-End-Hook fragt die buchende Person, ob sie den Rest einer Buchung behalten oder freigeben möchte. Ein lauffähiges Beispiel liegt in `examples/plugin-reader-ui`.
 
 ### Slots
 
@@ -418,6 +822,54 @@ const startBlockedQuery: StartBlockedQuery = async (ctx) => {
 - Die HTTP-Seite ist `GET /api/resources/:resourceId/usage/start-blocked` und antwortet für die angemeldete Person mit
   `{ blocked, reason?, until?, plugin? }`.
 
+### Start-Kapazität auf geteilten Maschinen
+
+Bei einer Maschine mit `maxParallelSessions` über 1 deklariert ein Plugin, das Plätze für andere zurückhält (das
+Reservierungs-Plugin tut das für laufende bestätigte Buchungen, deren Inhaber noch keine Sitzung hat), den
+`startCapacityHook`. Der `preStartHook` allein kann das
+nicht sicher leisten: Zwei gleichzeitige Starts könnten beide durchkommen und denselben Platz belegen.
+
+```ts
+const startCapacityHook: StartCapacityHook = async (ctx) => {
+  // ctx.scope ist die Start-Transaktion des Hosts: Lesen Sie ausschließlich darüber
+  const held = await countSlotsHeldForOthers(ctx.scope, ctx.resourceId, ctx.userId, ctx.now); // liest Ihre eigenen Tabellen mit { scope }
+  if (!held) return { heldSlots: 0 };
+  return {
+    heldSlots: held,
+    reason: {
+      code: 'RESERVED',
+      title: ctx.language === 'de' ? 'Reserviert' : 'Reserved',
+      body: ctx.language === 'de' ? 'Alle freien Plätze sind reserviert.' : 'All free slots are reserved.',
+    },
+  };
+};
+```
+
+- **Wann er läuft.** Nur auf geteilten Maschinen (Limit über 1), innerhalb der serialisierten Start-Transaktion des
+  Kerns und nach dessen eigener Kapazitätsprüfung. Der Kontext enthält `sessionLimit`, `occupiedSlots` (Sitzungen und
+  laufende Starts, in derselben Transaktion gelesen), `usersInSession`, `userId`, `principal`, `action`, `origin`,
+  `confirmedStepKeys`, `language` und `now`.
+- **`usersInSession`** (`number[]`) nennt die Personen hinter `occupiedSlots` (Sitzungen und laufende Starts), in
+  derselben Transaktion gelesen. Damit erkennen Sie, ob ein Inhaber schon in einer Sitzung ist; der Hook muss die
+  Sitzungstabelle des Kerns nicht abfragen.
+- **`action` ist immer `start`.** Geteilte Maschinen kennen keine Übernahme: Ein Start fügt dort immer eine Sitzung
+  hinzu.
+- **Der Kern entscheidet.** Geben Sie `{ heldSlots, reason? }` zurück. Der Kern lehnt den Start mit Ihrem `reason` ab,
+  wenn `occupiedSlots + heldSlots >= sessionLimit`; gleichzeitige Starts können so nie einen zurückgehaltenen Platz
+  belegen.
+- **Geben Sie immer einen `reason` zurück, wenn Ihre zurückgehaltenen Plätze die Maschine füllen können.** Ohne ihn
+  lehnt der Kern mit seinem allgemeinen „nicht verfügbar“-Text ab und protokolliert ein ungültiges Ergebnis.
+- **Lesen Sie nur über `ctx.scope`, verschachteln Sie nie `persistence.transaction`.** `ctx.scope` ist ein
+  `PluginTransactionScope` der Start-Transaktion des Kerns (Ihre eigenen Tabellen lesen Sie mit `{ scope: ctx.scope }`):
+  Schreiben Sie nie darüber und rufen Sie darauf nie `scope.afterCommit` auf. Ein Speicher-Schreibaufruf oder eine
+  `persistence.transaction` im Hook, die `ctx.scope` nicht nutzt, wird abgewiesen. Beschränken Sie den Hook auf eine
+  indizierte Abfrage.
+- **Ausfälle.** Fehler, Timeout und ein offener Circuit Breaker folgen der Ausfallrichtlinie pro Ressource und
+  Plugin (fail open oder fail closed, siehe [Ausfälle und Vertrauen](#ausfälle-und-vertrauen)) und werden
+  protokolliert.
+- Benötigt `ACCESS_HOOKS`. Ein Plugin, das ihn ohne die Berechtigung deklariert, wird nicht geladen. Das Lesen Ihrer
+  eigenen Tabellen über `ctx.scope` braucht zusätzlich `PLUGIN_STORAGE`. Ist kein Hook registriert, ändert sich nichts.
+
 ### Frage nach dem Stopp
 
 `sessionEndHook` läuft nach dem Ende einer Sitzung und kann `{ decision: 'choose', choice }` mit bis zu 4
@@ -508,6 +960,12 @@ Weitere Events für Plugins, die Wartung, Gesundheit und laufende Sitzungen verf
 | `SystemEvent.RESOURCE_USAGE_SESSION_STARTED`    | `{ resourceId, usageId, userId, startTime, supervisorUserId }`                                    | Eine Person startet eine Sitzung auf einer freien Ressource (keine Übernahme). `supervisorUserId` ist bei beaufsichtigten Starts gesetzt.                                                                                      |
 | `SystemEvent.RESOURCE_USAGE_SESSION_TAKEN_OVER` | `{ resourceId, usageId, userId, startTime, previousUsageId, previousUserId }`                     | Eine Person übernimmt eine laufende Sitzung. Gilt für die **neue** Person.                                                                                                                                                     |
 | `SystemEvent.RESOURCE_USAGE_SESSION_ENDED`      | `{ resourceId, usageId, userId, startTime, endTime, reason: 'ended' \| 'taken_over' }`            | Eine Sitzung endet, ausdrücklich oder durch Übernahme.                                                                                                                                                                         |
+
+`SystemEvent.RESOURCE_SESSION_LIMIT_CHANGED` trägt eine `ResourceSessionLimitChangedPayload`:
+
+| Event                                        | Payload                                                | Wird gesendet                                                                                                                                                                                                                                                                          |
+| -------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SystemEvent.RESOURCE_SESSION_LIMIT_CHANGED` | `{ resourceId, previousLimit, newLimit, actorUserId }` | Nach dem Commit, wenn sich das effektive Sitzungslimit einer Ressource ändert (`maxParallelSessions` oder ein Typwechsel, der das Limit ändert). Für Türen und andere Nicht-Maschinen-Typen ist das Limit 1. `actorUserId` ist `null`, wenn keine Person die Änderung vorgenommen hat. |
 
 ### Benachrichtigungen
 
@@ -646,31 +1104,92 @@ Scheduler. Unbekannte Personen und Ressourcen ergeben negative Antworten (`false
 | `getMaintenanceWindows(resourceId, from, to)`   | Fenster, die `[from, to)` überschneiden, als `{ maintenanceId, resourceId, startTime, endTime \| null, reason \| null }`. Offene Wartung zählt bis zu ihrem Abschluss.                                                                                                                                                                                                                                                                                                                                                                                           |
 | `getActiveSessions(resourceId)`                 | Laufende Sitzungen `{ usageId, userId, startTime }`, die früheste zuerst.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
-### Serialisierte Transaktionen
+### Persistenz
 
-`context.runSerialized(fn)` (Berechtigung `DATABASE_ACCESS`) führt `fn(manager)` in einer Transaktion aus, die der Host
-unter SQLite nacheinander ausführt. Die Transaktion wird committet, wenn `fn` abschließt, und zurückgerollt, wenn `fn`
-wirft. Damit sind Prüfen-dann-Schreiben-Abläufe wie Überschneidungsprüfungen frei von Race Conditions:
+Ein Plugin hat keinen Datenbankzugriff. Eigene Daten liegen in Tabellen, die das Plugin deklariert und über
+`context.storage` (Berechtigung `PLUGIN_STORAGE`) liest und schreibt; Engine, DDL, Migrationen und Backups gehören dem
+Host. Tabellen deklarieren, neutrale Migrationen schreiben und der vollständige Port sind im
+[Plugin-Speicher](plugins/plugin-storage.md) beschrieben. Kurz:
 
 ```ts
-await context.runSerialized(async (manager) => {
-  const clash = await manager.getRepository(Booking).count({ where: {/* überschneidendes Fenster */} });
+import { definePluginStorage, f, step, table } from '@attraccess/plugins-backend-sdk';
+
+const bookings = table({ id: f.id(), slot: f.string(), userId: f.integer() });
+const storage = definePluginStorage({
+  tables: { bookings },
+  migrations: [{ version: 1, name: 'create-bookings', steps: [step.createTable('bookings', bookings)] }],
+});
+
+const plugin: PluginBackendModule = {
+  storage,
+  register(context) {
+    const { bookings } = context.storage.open(storage);
+    /* ... */
+  },
+};
+```
+
+`context.persistence` (Berechtigung `PLUGIN_STORAGE`) hat genau ein Mitglied, `transaction(work)`. Es führt `work(scope)`
+in einer atomaren Transaktion aus: Commit, wenn `work` abschließt, Rollback, wenn es wirft. `scope.afterCommit(callback)`
+läuft erst nach dem Commit. Es legt keine Verbindung, kein Repository, keine Abfrage-API und keine Engine-Information offen.
+
+Ein Plugin, dessen Deklaration die Regeln verletzt (ein TypeORM-Migrationseintrag, `persistence.backends`, ein Bundle,
+das TypeORM importiert, die entfernte Berechtigung `DATABASE_ACCESS`, ein verbotener Tabellenname), wird verweigert, bevor
+etwas davon registriert, migriert oder gestartet wird; es ändern sich keine Daten. Siehe
+[Plugins auf SDK 2.0 umstellen](plugins/migrating-to-2.md#ablehnungen).
+
+### Host-Daten
+
+`context.hostData` beantwortet lesende Fragen zu Host-Daten mit neutralen Modellen und einfachen Werten, nie mit
+Entitäten oder Abfrage-Handles. Jede Gruppe prüft beim Aufruf einer Methode ihre eigene Berechtigung.
+
+| Gruppe               | Berechtigung       | Methoden                                                                                                                                                                                                                                                                                                             |
+| -------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hostData.resources` | `ACCESS_RESOURCES` | `get(id, scope?)` (ein `PluginResourceModel` oder `null`; mit einem Transaktions-Scope liest es innerhalb dieser Transaktion), `getNames(ids)`, `filterVisible(userId, ids, { seeAll? })`, `filterRequiringSupervision(ids)`, `listIdsInGroups(groupIds)`, `countUnhealthyEntries(id)`, `listIntroducerUserIds(id)`. |
+| `hostData.users`     | `READ_USERS`       | `getUsernames(ids)`, `getLocales(ids)`, `isActive(id)` (existiert, nicht gelöscht, nicht deaktiviert), `listIdsWithAnyPermission(keys)`.                                                                                                                                                                             |
+| `hostData.settings`  | `READ_SETTINGS`    | `getApp(key)`: der getrimmte Wert einer Anwendungseinstellung oder `null`.                                                                                                                                                                                                                                           |
+| `hostData.flows`     | `TRIGGER_FLOWS`    | `findNodes(query)`: Flow-Knoten nach `type`, `typePrefix`, `dataEquals`, `dataIn`, `resourceId`, `excludeResourceId`, `excludeFlowId`, `orderById` und `limit`, als `{ id, type, resourceId, resourceName, flowId, flowName, data }`.                                                                                |
+
+`PluginUserModel` (`id`, `username`, `locale`, `isDisabled`) und `PluginResourceModel` (`id`, `name`, `type`,
+`description`, `allowTakeOver`, `maxParallelSessions`, `supervisionMode`) stammen aus `@attraccess/application-models`
+und werden vom SDK-Root re-exportiert. Sie sind auch die Nutzlast der Events `RESOURCE_USAGE_STARTED` und
+`RESOURCE_USAGE_ENDED` sowie der Benutzer von `AuthenticatedRequest`: Tokens, Kontaktdaten und andere Kontofelder
+erreichen Plugin-Code nie.
+
+### Transaktionen
+
+`persistence.transaction(work)` (Berechtigung `PLUGIN_STORAGE`) führt `work(scope)` in einer Transaktion aus. Die
+Transaktion wird committet, wenn `work` abschließt, und zurückgerollt, wenn `work`
+wirft. Damit sind Prüfen-dann-Schreiben-Abläufe wie Überschneidungsprüfungen frei von Race Conditions. Geben Sie
+`{ scope }` an jeden Speicheraufruf, der teilnehmen soll:
+
+```ts
+const { bookings } = context.storage.open(storage);
+await context.persistence.transaction(async (scope) => {
+  const clash = await bookings.count({ slot: { gte: from, lt: to } }, { scope });
   if (clash > 0) throw new ConflictException('OVERLAP');
-  await manager.getRepository(Booking).save(newBooking);
+  await bookings.insert(newBooking, { scope });
+  // Läuft erst nach dem Commit, nie bei Rollback. Fehlschlagende Callbacks werden protokolliert und machen den Commit nicht rückgängig.
+  scope.afterCommit(() => context.mqtt.publish(1, 'bookings/created', '{}'));
 });
 ```
 
-Die Warteschlange teilt sich `runSerialized` mit jedem Sitzungsstart und -ende des Kerns. Deshalb:
+Der Host ordnet gleichzeitige Transaktionen oder lässt eine davon mit `PluginStorageConflict` scheitern; er wiederholt
+nicht. Halten Sie Effekte in `afterCommit`, damit der Aufrufer die ganze Transaktion erneut ausführen kann. Deshalb:
 
-- `fn` kurz halten und auf Datenbankarbeit über den übergebenen `manager` beschränken; keine HTTP-, MQTT-, E-Mail-
-  oder andere Nicht-Datenbank-Ein-/Ausgabe darin;
-- Aufrufe nicht verschachteln. Ein in `fn` gestartetes `runSerialized` würde auf `fn` selbst warten; der Host weist
-  es deshalb mit einem Fehler ab, statt zu hängen. Geben Sie stattdessen den `manager` an Hilfsfunktionen weiter und
-  warten Sie in `fn` nicht auf Kern-Vorgänge, die über dieselbe Warteschlange schreiben (etwa Sitzungsstart oder -ende).
+- `work` kurz halten und auf Speicherzugriffe und lesende Host-Port-Aufrufe beschränken; keine HTTP-, MQTT-, E-Mail-
+  oder andere Nicht-Datenbank-Ein-/Ausgabe darin. Solche Effekte registrieren Sie mit `scope.afterCommit`;
+- Aufrufe nicht verschachteln. Eine in `work` gestartete Transaktion würde auf `work` selbst warten; der Host weist
+  sie deshalb mit einem Fehler ab, statt zu hängen. Geben Sie stattdessen den `scope` an Hilfsfunktionen weiter und
+  warten Sie in `work` nicht auf Kern-Vorgänge, die schreiben (etwa Sitzungsstart oder -ende);
+- in `work` jeden Schreibaufruf mit `{ scope }` ausführen. Ein Schreibaufruf ohne Scope wird mit `PluginStorageInvalid`
+  abgewiesen; nur ein Lesezugriff ohne Scope läuft außerhalb der Transaktion und sieht die noch nicht committeten
+  Schreibvorgänge von `work` nicht.
 
-Die Serialisierung gilt pro Host-Prozess. Plugins, die Ausschluss über mehrere API-Instanzen brauchen, benötigen eine
-eigene instanzübergreifende Sperre; das Reservierungs-Plugin läuft deshalb mit einer Instanz (siehe
-[Reservierungen](resources/reservations.md#betrieb-mit-einer-instanz)).
+Wie der Host Transaktionen ordnet, ist ein Detail der Engine. Unter SQLite führt er sie pro Host-Prozess nacheinander
+aus, in derselben Warteschlange wie Sitzungsstart und -ende des Kerns. Plugins, die Ausschluss über mehrere
+API-Instanzen brauchen, benötigen daher eine eigene instanzübergreifende Sperre; das Reservierungs-Plugin läuft deshalb
+mit einer Instanz (siehe [Reservierungen](plugins/reservations/administration.md#betrieb-mit-einer-instanz)).
 
 ### Flow-Knoten
 
@@ -795,40 +1314,85 @@ Teile **`@attraccess/plugins-frontend-ui` über Module Federation** mit
 `requiredVersion: '*'`, `import: false` und `generate: false`. Eine eigene Kopie
 würde einen separaten Sprachzustand erzeugen. Die gemeinsame Konfiguration
 `createPluginFederationConfig` enthält diesen Eintrag bereits. Deklariere die
-Bibliothek als Peer-Abhängigkeit und setze `attraccess.host` beziehungsweise
-`attraccessVersion.min` auf mindestens Version **1.11.0**, da ältere Hosts diese
-Bibliothek noch nicht teilen.
+Bibliothek als Peer-Abhängigkeit (`^2.0.0-0`). Jedes Plugin mit SDK 2.0 verlangt
+ohnehin Attraccess ab `2.0.0-0` in `attraccess.host` und `attraccessVersion.min`,
+und diese Hosts teilen die Bibliothek.
 
 ## Gemeinsame UI-Komponenten
 
 `@attraccess/plugins-frontend-ui` enthält auch die UI-Bausteine des Hosts, damit
 Plugins wie der Kern aussehen und sich verhalten, statt eigene Kopien mitzubringen:
 
-| Komponente                                              | Verwendung                                                         |
-| ------------------------------------------------------- | ------------------------------------------------------------------ |
-| `StatusDialog`                                          | Hinweise und Bestätigungen (`info`, `success`, `warning`, `error`) |
-| `DeleteConfirmationModal`                               | Löschen eines benannten Eintrags bestätigen                        |
-| `StandardModal`, `StandardDrawer`                       | Umfangreichere Modals und Drawer (Formulare, Listen)               |
-| `Button`                                                | Buttons mit Ladeanzeige                                            |
-| `AlertStatusIcon`, `StatusAlert`                        | Hinweise mit Statussymbol                                          |
-| `LabeledSwitch`, `PasswordInput`                        | Schalter mit Beschriftung, Passwortfeld mit Anzeigen/Verbergen     |
-| `EmptyState`, `TableDataLoadingIndicator`, `PageHeader` | Leere Listen, zentrierte Ladeanzeige, Seitenkopf mit Aktionen      |
-| `DateTimeDisplay`, `useDateTimeFormatter`               | Datum und Uhrzeit nach den Einstellungen des Benutzers             |
+| Komponente                                              | Verwendung                                                                       |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `StatusDialog`                                          | Hinweise (`info`, `success`, `warning`, `error`)                                 |
+| `ConfirmableButton`                                     | Button, der vor seiner Aktion in einem `StatusDialog` um Bestätigung bittet      |
+| `TableRowActions`, `TableActionsColumnHeader`           | Aktionen einer Tabellenzeile: ⋮-Menü in der letzten Spalte „Aktionen“            |
+| `DeleteConfirmationModal`                               | **Veraltet**: nutze `ConfirmableButton`                                          |
+| `StandardModal`, `StandardDrawer`                       | Umfangreichere Modals und Drawer (Formulare, Listen)                             |
+| `Button`                                                | Buttons mit Ladeanzeige                                                          |
+| `AlertStatusIcon`, `StatusAlert`                        | Hinweise mit Statussymbol                                                        |
+| `LabeledSwitch`, `PasswordInput`                        | Schalter mit Beschriftung, Passwortfeld mit Anzeigen/Verbergen                   |
+| `EmptyState`, `TableDataLoadingIndicator`, `PageHeader` | Leere Listen, zentrierte Ladeanzeige, Seitenkopf mit Aktionen                    |
+| `DateTimeDisplay`, `useDateTimeFormatter`               | Datum und Uhrzeit nach den Einstellungen des Benutzers                           |
 
 Verwende `StatusDialog` für kurze Hinweise und Bestätigungen. Nur `error` zeigt
 eine rote (Danger-)Aktionsschaltfläche, alle anderen Status eine primäre. Escape
 ruft `onClose` auf, ein Klick auf den Hintergrund bewirkt nichts. Nimm
 `StandardModal` nur, wenn der Dialog umfangreichere Inhalte braucht.
 
+Bestätige zerstörerische oder unumkehrbare Aktionen mit `ConfirmableButton`. Er
+nimmt ein `label`, eine Aktion `onConfirm`, einen `status` und die Texte des
+Dialogs in `confirm`. Während `onConfirm` läuft, bleibt der Dialog offen und zeigt
+den Ladezustand; er schließt sich, wenn die Aktion gelingt, und bleibt offen, wenn
+sie einen Fehler wirft. Melde den Fehler also selbst (zum Beispiel als Toast).
+`renderActivator` ersetzt den Standard-Button.
+
+```tsx
+<ConfirmableButton
+  label={t('revoke')}
+  status="error"
+  onConfirm={() => revokeKey.mutateAsync(key.id)}
+  confirm={{ title: t('revokeTitle'), message: t('revokeMessage', { name: key.name }) }}
+/>
+```
+
+Gib jeder Tabelle mit Zeilenaktionen eine letzte Spalte mit der Überschrift
+`<TableActionsColumnHeader />` und setze in ihre Zellen ein `TableRowActions`.
+Jede Aktion hat ein `label` und ein `icon`; `tone: 'danger'` markiert
+zerstörerische Aktionen, die einen eigenen letzten Abschnitt bekommen, und
+`confirm` fragt nach, bevor `onPress` läuft:
+
+```tsx
+<TableHeader>
+  <TableColumn isRowHeader>{t('name')}</TableColumn>
+  <TableColumn><TableActionsColumnHeader /></TableColumn>
+</TableHeader>
+…
+<TableRowActions
+  itemName={server.name}
+  actions={[
+    { key: 'edit', label: t('edit'), icon: PencilIcon, onPress: () => edit(server) },
+    {
+      key: 'delete',
+      label: t('delete'),
+      icon: Trash2Icon,
+      tone: 'danger',
+      onPress: () => remove(server.id),
+      confirm: { title: t('deleteTitle'), message: t('deleteMessage', { name: server.name }) },
+    },
+  ]}
+/>
+```
+
 Die Exporte `StandardModal` und `StandardDrawer` aus
 `@attraccess/plugins-frontend-sdk` sind **veraltet** (Re-Exports der obigen
 Komponenten); importiere sie aus `@attraccess/plugins-frontend-ui`.
 
-Diese Komponenten setzen einen Host und ein `@attraccess/plugins-frontend-ui`
-voraus, die sie bereits enthalten (**ab 1.11.0**, also dem Release, das sie
-einführt). Ein Plugin, das sie nutzt, schlägt auf älteren Hosts zur Laufzeit
-fehl; hebe daher `attraccess.host`, `attraccessVersion.min` und die
-Peer-Abhängigkeit entsprechend an.
+Jeder Host ab Attraccess 2.0 und `@attraccess/plugins-frontend-ui` 2.0 enthalten
+diese Komponenten; das Minimum `2.0.0-0`, das ein Plugin mit SDK 2.0 ohnehin
+deklariert, genügt also. Für Komponenten aus einem späteren Release hebe
+`attraccess.host`, `attraccessVersion.min` und die Peer-Abhängigkeit entsprechend an.
 
 ## Live-Updates
 
@@ -849,7 +1413,7 @@ erhalten frische Werte. Der Host stellt die Verbindung bei gültigem
 Sitzungswechsel desselben Benutzers ohne Löschen des Abfragecaches wieder her und
 behält sie bei Abmelden/Anmelden im selben React-Batch. Plugin-Ereignisse werden
 lokal nicht erneut zugestellt.
-Der [Vertrag mit Beispielen](../../development/live-updates.md#plugin-live-updates)
+Der [Vertrag mit Beispielen](https://github.com/Attraccess/Attraccess/blob/main/docs/development/live-updates.md#plugin-live-updates)
 beschreibt auch Wiederverbindung und Freigabe von Abonnements.
-Die [WAGO-Abfrageintervalle](../../development/live-updates.md#wago-sampling-schedule)
+Die [WAGO-Abfrageintervalle](https://github.com/Attraccess/Attraccess/blob/main/docs/development/live-updates.md#wago-sampling-schedule)
 listen die gemeinsamen Backend-Intervalle für alle neun WAGO-Themen auf.

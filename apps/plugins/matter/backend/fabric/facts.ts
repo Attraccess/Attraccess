@@ -1,7 +1,7 @@
 import type { OperationResponse } from '@attraccess/matter-contract';
 import { randomUUID } from 'node:crypto';
-import type { EntityManager } from 'typeorm';
-import { MatterFabric } from '../devices/entities';
+import type { MatterFabric } from '../devices/entities';
+import type { MatterTables } from '../plugin-storage/access';
 
 export type SidecarFabric = OperationResponse<'fabric.get'>;
 
@@ -47,28 +47,24 @@ export function factsOfRow(row: MatterFabric | null): FabricFacts | null {
  * The fabric the plugin recorded: the newest live fabric row that a fabric operation wrote the generation to. Rows
  * the inventory created (no generation) never count, so reconciliation cannot overwrite what the plugin recorded.
  */
-export function recordedFabricRow(manager: EntityManager): Promise<MatterFabric | null> {
-  return manager
-    .getRepository(MatterFabric)
-    .createQueryBuilder('f')
-    .where('f.fabricGeneration IS NOT NULL AND f.retiredAt IS NULL')
-    .orderBy('f.recordedAt', 'DESC')
-    .addOrderBy('f.firstSeenAt', 'DESC')
-    .getOne();
+export function recordedFabricRow({ fabrics }: MatterTables): Promise<MatterFabric | null> {
+  return fabrics.findOne({
+    where: { fabricGeneration: { isNull: false }, retiredAt: null },
+    orderBy: [
+      { field: 'recordedAt', direction: 'desc' },
+      { field: 'firstSeenAt', direction: 'desc' },
+    ],
+  });
 }
 
 /** Writes the facts onto the live row of this fabric, creating it when the inventory has not yet. */
 export async function recordFacts(
-  manager: EntityManager,
+  { fabrics }: MatterTables,
   facts: FabricFacts,
   label: string | null = null,
 ): Promise<MatterFabric> {
-  const repo = manager.getRepository(MatterFabric);
   const now = new Date().toISOString();
-  const existing = await repo
-    .createQueryBuilder('f')
-    .where('f.fabricId = :id AND f.retiredAt IS NULL', { id: facts.fabricId })
-    .getOne();
+  const existing = await fabrics.findOne({ where: { fabricId: facts.fabricId, retiredAt: null } });
   const fields = {
     fabricGeneration: facts.fabricGeneration,
     storageInstanceId: facts.storageInstanceId,
@@ -77,8 +73,17 @@ export async function recordFacts(
     status: 'active' as const,
     lastSeenAt: now,
   };
-  if (existing) return repo.save(Object.assign(existing, fields, label === null ? {} : { label }));
-  return repo.save(
-    repo.create({ id: randomUUID(), fabricId: facts.fabricId, label, firstSeenAt: now, retiredAt: null, ...fields }),
-  );
+  if (existing) {
+    const patch = label === null ? fields : { ...fields, label };
+    await fabrics.update({ id: existing.id }, patch);
+    return Object.assign(existing, patch);
+  }
+  return fabrics.insert({
+    id: randomUUID(),
+    fabricId: facts.fabricId,
+    label,
+    firstSeenAt: now,
+    retiredAt: null,
+    ...fields,
+  });
 }

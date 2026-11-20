@@ -3,14 +3,14 @@ import { AppController } from './app.controller';
 import { AuditModule } from '../audit/audit.module';
 import { AppService } from './app.service';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { dataSourceConfig } from '../database/datasource';
+import { DatabaseConnectionModule } from '../database/adapters/common/database-connection.module';
 import { ResourcesModule } from '../resources/resources.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import storageConfigObject, { StorageConfigType } from '../config/storage.config';
 import appConfiguration from '../config/app.config';
 import { AppConfigType } from '../config/app.config';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import { cdnServeStaticOptions } from './cdn-serve-static';
 import { resolve } from 'path';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -37,6 +37,8 @@ import { VersionModule } from '../version/version.module';
 import { MessagingModule } from '../messaging/messaging.module';
 import { PushModule } from '../push/push.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { DashboardModule } from '../dashboard/dashboard.module';
+import { McpModule } from '../mcp/mcp.module';
 
 const logger = new Logger('AppModule');
 
@@ -53,7 +55,7 @@ const logger = new Logger('AppModule');
     UsersAndAuthModule,
     SettingsModule,
     SecurityModule,
-    TypeOrmModule.forRoot(dataSourceConfig),
+    DatabaseConnectionModule,
     AuditModule,
     ResourcesModule,
     ServeStaticModule.forRootAsync({
@@ -90,12 +92,7 @@ const logger = new Logger('AppModule');
 
         const cdnRoot = resolve(storageConfig.cdn.root);
         logger.log(`Serving cdn files from (via config): ${cdnRoot}`);
-        return [
-          {
-            rootPath: cdnRoot,
-            serveRoot: storageConfig.cdn.serveRoot,
-          },
-        ];
+        return [cdnServeStaticOptions(cdnRoot, storageConfig.cdn.serveRoot)];
       },
     }),
     ServeStaticModule.forRootAsync({
@@ -112,7 +109,7 @@ const logger = new Logger('AppModule');
         return [
           {
             rootPath: resolvedFrontendPath,
-            exclude: ['/api/{*path}', '/docs/{*path}', '/cdn/{*path}'],
+            exclude: ['/api/{*path}', '/docs/{*path}', '/cdn/{*path}', '/.well-known/{*path}'],
           },
         ];
       },
@@ -132,6 +129,8 @@ const logger = new Logger('AppModule');
     MessagingModule,
     PushModule,
     NotificationsModule,
+    DashboardModule,
+    McpModule,
     LiveUpdatesModule,
   ],
   controllers: [AppController],

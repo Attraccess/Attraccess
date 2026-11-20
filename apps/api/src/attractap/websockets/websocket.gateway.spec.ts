@@ -1,10 +1,10 @@
+import { Logger } from '@nestjs/common';
 import { IncomingMessage } from 'http';
 import { WebSocket } from 'ws';
 import { LicenseModuleType } from '../../license/license.service';
-import { PAIRING_SUBPROTOCOL } from '../security/session-framing';
+import { PAIRING_SUBPROTOCOL, SESSION_SUBPROTOCOL } from '../security/session-framing';
 import { makeStringLVGLReady, sanitizeForLVGL } from './websocket-lvgl';
 import { registerAttractapGatewayFixture } from './websocket.gateway.attractap-gateway.test-fixture';
-import { makeStringLVGLReady, sanitizeForLVGL } from './websocket-lvgl';
 import { ReaderTimeZoneService } from './reader-time-zone.service';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 
@@ -61,11 +61,24 @@ describe('AttractapGateway', () => {
   describe('handleConnection', () => {
     it('closes the connection when license verification fails', async () => {
       fixture.licenseService.verifyLicense.mockRejectedValue(new Error('License invalid'));
-      const mockClient = { close: jest.fn(), send: jest.fn() } as unknown as WebSocket;
+      const mockClient = { protocol: SESSION_SUBPROTOCOL, close: jest.fn(), send: jest.fn() } as unknown as WebSocket;
 
       await fixture.gateway.handleConnection(mockClient);
 
       expect(mockClient.close).toHaveBeenCalled();
+    });
+
+    it('closes a connection without the session subprotocol: token sign-in is gone', async () => {
+      const warned = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      const mockClient = { close: jest.fn(), send: jest.fn(), on: jest.fn() } as unknown as WebSocket;
+
+      await fixture.gateway.handleConnection(mockClient);
+
+      expect(mockClient.close).toHaveBeenCalledTimes(1);
+      expect(mockClient.send).not.toHaveBeenCalled();
+      expect(fixture.websocketService.sockets.size).toBe(0);
+      expect(warned).toHaveBeenCalledTimes(1);
+      expect(String(warned.mock.calls[0][0])).toContain('token sign-in no longer supported');
     });
 
     it('gates pairing connections on the license check', async () => {
@@ -92,45 +105,33 @@ describe('AttractapGateway', () => {
       expect(client.close).not.toHaveBeenCalled();
     });
 
-    it('registers the socket and sends auth request on successful connection', async () => {
+    it('registers a session connection once its handshake accepted the certificate', async () => {
       const mockClient = {
+        protocol: SESSION_SUBPROTOCOL,
         close: jest.fn(),
         send: jest.fn(),
         on: jest.fn(),
       } as unknown as WebSocket;
 
-      // handleConnection blocks on waitForClientResponse (3 retries × 4s).
-      // Don't await — just let it start, then verify the socket was registered
-      // and that send() was called with the READER_REQUEST_AUTHENTICATION event.
-      const connectionPromise = fixture.gateway.handleConnection(mockClient);
-
-      // Give the event loop a tick so handleConnection reaches the send call
-      await new Promise((resolve) => setImmediate(resolve));
+      await fixture.gateway.handleConnection(mockClient);
 
       expect(fixture.websocketService.sockets.size).toBe(1);
       const registeredSocket = Array.from(fixture.websocketService.sockets.values())[0];
       expect(registeredSocket.readerId).toBeNull();
       expect(registeredSocket.state.verifiedUserId).toBeNull();
-
-      expect(mockClient.send).toHaveBeenCalled();
-      const sendMock = mockClient.send as jest.Mock;
-      const sentData = JSON.parse(sendMock.mock.calls[0][0]);
-      expect(sentData.data.type).toBe('READER_REQUEST_AUTHENTICATION');
-
-      // Clean up: advance all timers so the promise settles
-      jest.useFakeTimers();
-      jest.runAllTimers();
-      jest.useRealTimers();
-
-      // Wait for the promise to settle (connection will be closed due to no ACK)
-      await connectionPromise;
-    }, 30000);
+      // Nothing asks the reader to authenticate: the certificate was the identity.
+      expect(mockClient.send).not.toHaveBeenCalled();
+    });
   });
 
   describe('handleDisconnect', () => {
     it('cleans up a connection rejected before socket initialization', async () => {
       fixture.licenseService.verifyLicense.mockRejectedValue(new Error('License invalid'));
-      const client = { close: jest.fn(), send: jest.fn() } as unknown as AuthenticatedWebSocket;
+      const client = {
+        protocol: SESSION_SUBPROTOCOL,
+        close: jest.fn(),
+        send: jest.fn(),
+      } as unknown as AuthenticatedWebSocket;
       const connectedAt = (fixture.gateway as unknown as { connectedAt: WeakMap<object, bigint> }).connectedAt;
 
       await fixture.gateway.handleConnection(client);
@@ -340,17 +341,52 @@ describe('AttractapGateway', () => {
       expect(refresh).toHaveBeenCalledWith(socket, { requestId: 880 });
     });
 
+    it('releases plugin BLE work of older connections when a reader announces its firmware', async () => {
+      const socket = fixture.createMockSocket({ readerId: 7 });
+      const released = jest.spyOn(fixture.gateway['readerBleDriver'], 'readerConnected');
+      jest.spyOn(fixture.gateway['firmwareHandler'], 'handleFirmwareInfo').mockResolvedValue(undefined);
+      await fixture.gateway.onClientEvent(
+        { type: AttractapEventType.READER_FIRMWARE_INFO, payload: { name: 'attractap', version: '2.5.0' } },
+        socket,
+      );
+      expect(released).toHaveBeenCalledWith(socket);
+    });
+
+    it('sends the advertisement watch set once the firmware info stored the BLE capability', async () => {
+      const socket = fixture.createMockSocket({ readerId: 7 });
+      const order: string[] = [];
+      jest.spyOn(fixture.gateway['firmwareHandler'], 'handleFirmwareInfo').mockImplementation(async () => {
+        order.push('firmware-info');
+      });
+      jest
+        .spyOn(fixture.gateway['readerBleDriver'], 'readerAnnounced')
+        .mockImplementation((announced) => void order.push(announced === socket ? 'announced' : 'other'));
+      await fixture.gateway.onClientEvent(
+        { type: AttractapEventType.READER_FIRMWARE_INFO, payload: { name: 'attractap', version: '2.5.0' } },
+        socket,
+      );
+      expect(order).toEqual(['firmware-info', 'announced']);
+    });
+
     it('rejects server-only event types from clients', async () => {
       const socket = fixture.createMockSocket({ id: 'ev-1', readerId: 1 });
 
       const serverOnlyEvents = [
         AttractapEventType.RESOURCE_LIST,
-        AttractapEventType.READER_UNAUTHORIZED,
-        AttractapEventType.READER_REQUEST_AUTHENTICATION,
         AttractapEventType.READER_AUTHENTICATED,
         AttractapEventType.CARD_AUTHENTICATION_DATA,
         AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO,
         AttractapEventType.RESOURCE_USAGE_FORM_REQUEST,
+        // Plugin BLE requests travel only from the server to the reader.
+        AttractapEventType.BLE_SCAN,
+        AttractapEventType.BLE_SESSION_OPEN,
+        AttractapEventType.BLE_READ,
+        AttractapEventType.BLE_WRITE,
+        AttractapEventType.BLE_SUBSCRIBE,
+        AttractapEventType.BLE_UNSUBSCRIBE,
+        AttractapEventType.BLE_CANCEL,
+        AttractapEventType.BLE_SESSION_CLOSE,
+        AttractapEventType.BLE_WATCH_SET,
       ];
 
       for (const type of serverOnlyEvents) {
@@ -382,9 +418,9 @@ describe('AttractapGateway', () => {
       await expect(fixture.gateway.disconnectReader(999)).resolves.toBeUndefined();
     });
 
-    it('terminates all sockets for the given reader, token and session alike', async () => {
+    it('terminates all sockets of the given reader', async () => {
       const socket1 = fixture.createMockSocket({ id: 'dr-1', readerId: 5 });
-      const socket2 = fixture.createMockSocket({ id: 'dr-2', readerId: 5, transport: 'session' });
+      const socket2 = fixture.createMockSocket({ id: 'dr-2', readerId: 5 });
       const other = fixture.createMockSocket({ id: 'dr-3', readerId: 6 });
       for (const socket of [socket1, socket2, other]) fixture.websocketService.sockets.set(socket.id, socket);
 
@@ -460,10 +496,7 @@ describe('AttractapGateway', () => {
     (client.send as jest.Mock).mockClear();
     wait.mockImplementationOnce(async () => {
       if (reason === 'revoked') {
-        await fixture.gateway.onClientEvent(
-          { type: AttractapEventType.READER_AUTHENTICATE, payload: { id: 42, token: 'revoked' } },
-          client,
-        );
+        client.readerId = null;
       } else if (reason === 'closed') {
         Object.defineProperty(client, 'readyState', { value: WebSocket.CLOSED });
       } else if (reason === 'invalid-id') {

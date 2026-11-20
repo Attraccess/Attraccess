@@ -1,9 +1,9 @@
 import {
   AutoIntroductionTarget,
+  DocumentationType,
   ResourceType,
   SupervisionMode,
-  DocumentationType,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsEnum, IsInt, IsObject, IsOptional, IsString, Max, Min, ValidateIf, IsUrl } from 'class-validator';
 import { ToBoolean, ToJson, ToNumber } from '../../common/request-transformers';
@@ -92,6 +92,18 @@ export class UpdateResourceDto extends UpdateResourceDtoDocumentation {
   @IsOptional()
   @ToBoolean()
   separateUnlockAndUnlatch?: boolean;
+
+  @ApiProperty({
+    description:
+      '(only for doors) whether the door is access only: its only action is Open (stored as a door unlock). Cannot be combined with separateUnlockAndUnlatch',
+    example: false,
+    default: false,
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  @ToBoolean()
+  accessOnly?: boolean;
 
   @ApiProperty({
     description: 'A detailed description of the resource',

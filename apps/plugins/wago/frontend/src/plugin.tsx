@@ -6,7 +6,7 @@ import type {
   RouteConfig,
 } from '@attraccess/plugins-frontend-sdk';
 import type { PluginStore } from 'react-pluggable';
-import { ControllersPage } from './controllers/Page';
+import { ControllersPage } from './controllers/ControllersPage';
 import { ConfigurationPage } from './configuration/ConfigurationPage';
 import { HistoryPage } from './front-panel/HistoryPage';
 import {

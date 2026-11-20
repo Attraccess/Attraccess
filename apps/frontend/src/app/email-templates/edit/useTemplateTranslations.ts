@@ -1,10 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import {
   EmailTemplateType,
-  useEmailTemplatesServiceEmailTemplateControllerGetTranslations,
-  useEmailTemplatesServiceEmailTemplateControllerSetTranslations,
-  useEmailTemplatesServiceEmailTemplateControllerDeleteTranslations,
-  UseEmailTemplatesServiceEmailTemplateControllerGetTranslationsKeyFn,
+  useEmailTemplateControllerGetTranslations,
+  useEmailTemplateControllerSetTranslations,
+  useEmailTemplateControllerDeleteTranslations,
+  UseEmailTemplateControllerGetTranslationsKeyFn,
 } from '@attraccess/react-query-client';
 
 export function useTemplateTranslations(templateType: EmailTemplateType | undefined) {
@@ -12,20 +12,20 @@ export function useTemplateTranslations(templateType: EmailTemplateType | undefi
 
   const invalidate = () =>
     queryClient.invalidateQueries({
-      queryKey: UseEmailTemplatesServiceEmailTemplateControllerGetTranslationsKeyFn({ type: templateType as EmailTemplateType }),
+      queryKey: UseEmailTemplateControllerGetTranslationsKeyFn({ path: { type: templateType as EmailTemplateType } }),
     });
 
-  const query = useEmailTemplatesServiceEmailTemplateControllerGetTranslations(
-    { type: templateType as EmailTemplateType },
+  const query = useEmailTemplateControllerGetTranslations(
+    { path: { type: templateType as EmailTemplateType } },
     undefined,
     { enabled: !!templateType },
   );
 
-  const saveMutation = useEmailTemplatesServiceEmailTemplateControllerSetTranslations({
+  const saveMutation = useEmailTemplateControllerSetTranslations(undefined, {
     onSuccess: invalidate,
   });
 
-  const deleteMutation = useEmailTemplatesServiceEmailTemplateControllerDeleteTranslations({
+  const deleteMutation = useEmailTemplateControllerDeleteTranslations(undefined, {
     onSuccess: invalidate,
   });
 

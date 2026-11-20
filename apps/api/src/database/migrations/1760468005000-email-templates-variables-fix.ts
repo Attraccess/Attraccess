@@ -18,7 +18,7 @@ export class FixEmailTemplateVariables1760468005000 implements MigrationInterfac
           const parsed = JSON.parse(trimmed);
           if (Array.isArray(parsed)) {
             const csv = parsed.join(',');
-            await queryRunner.query(`UPDATE "email_templates" SET "variables" = $1 WHERE "type" = $2`, [csv, type]);
+            await queryRunner.query(`UPDATE "email_templates" SET "variables" = ? WHERE "type" = ?`, [csv, type]);
           }
         } catch {
           // ignore invalid JSON; leave as-is

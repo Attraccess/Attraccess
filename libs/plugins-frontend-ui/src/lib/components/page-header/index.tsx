@@ -1,8 +1,9 @@
-import { ReactNode } from 'react';
+import { ReactNode, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button, cn } from '@heroui/react';
 import { PageAction, PageHeaderActions } from './actions';
+import { usePageHeaderAccessory } from './accessory';
 
 export type {
   PageAction,
@@ -12,6 +13,7 @@ export type {
   PageActionVariant,
 } from './actions';
 export { PageHeaderActions } from './actions';
+export { PageHeaderAccessoryProvider, type PageHeaderAccessoryProviderProps } from './accessory';
 
 interface PageHeaderProps {
   title: string | ReactNode;
@@ -41,11 +43,16 @@ export function PageHeader({
   thumbnailAlt,
 }: Readonly<PageHeaderProps>) {
   const navigate = useNavigate();
+  const headerRef = useRef<HTMLDivElement>(null);
+  const Accessory = usePageHeaderAccessory(headerRef);
 
   const hasActions = !!actions && actions.some((a) => !a.isHidden);
 
   return (
-    <div className={cn('flex items-center w-full justify-between mb-8 flex-wrap gap-4', noMargin && 'mb-0')}>
+    <div
+      ref={headerRef}
+      className={cn('flex items-center w-full justify-between mb-8 flex-wrap gap-4', noMargin && 'mb-0')}
+    >
       <div className="flex items-center min-w-0">
         {(backTo || onBack) && (
           <Button
@@ -90,13 +97,17 @@ export function PageHeader({
         </div>
       </div>
 
-      {hasActions && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <PageHeaderActions
-            actions={actions as PageAction[]}
-            maxVisible={maxVisibleActions}
-            moreLabel={moreActionsLabel}
-          />
+      {(hasActions || Accessory) && (
+        // empty:hidden: the accessory may decide to render nothing on this page.
+        <div className="flex items-center gap-2 flex-wrap empty:hidden">
+          {Accessory && <Accessory />}
+          {hasActions && (
+            <PageHeaderActions
+              actions={actions as PageAction[]}
+              maxVisible={maxVisibleActions}
+              moreLabel={moreActionsLabel}
+            />
+          )}
         </div>
       )}
     </div>

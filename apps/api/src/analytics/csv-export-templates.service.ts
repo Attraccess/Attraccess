@@ -1,93 +1,86 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
-  CsvExportTemplate,
-  CsvExportTemplateColumn,
+  CsvExportTemplateColumnRecord,
   CsvExportTemplateColumnType,
+  CsvExportTemplateRecord,
   CsvExportType,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 import {
   CreateCsvExportTemplateDto,
   CsvExportTemplateColumnDto,
   UpdateCsvExportTemplateDto,
 } from './dtos/csvExportTemplate.dto';
+import {
+  CSV_EXPORT_TEMPLATE_STORE,
+  CsvExportTemplateNameTakenError,
+  CsvExportTemplateStore,
+} from './csv-export-template-store.port';
 
 // Store only the properties that belong to the column type (the DTO allows e.g. a `fieldKey` on a constant).
-function toStoredColumns(columns: CsvExportTemplateColumnDto[]): CsvExportTemplateColumn[] {
+function toStoredColumns(columns: CsvExportTemplateColumnDto[]): CsvExportTemplateColumnRecord[] {
   return columns.map(({ type, header, fieldKey, value }) =>
     type === CsvExportTemplateColumnType.FIELD ? { type, header, fieldKey } : { type, header, value: value ?? '' },
   );
 }
 
-function isUniqueViolation(error: unknown): boolean {
-  if (!(error instanceof QueryFailedError)) {
-    return false;
-  }
-  // '23505' = Postgres unique; SQLite reuses SQLITE_CONSTRAINT for FK/CHECK/NOT NULL too, so narrow by message
-  const code = (error as QueryFailedError & { code?: string | number }).code;
-  return code === '23505' || (code === 'SQLITE_CONSTRAINT' && error.message.includes('UNIQUE constraint failed'));
-}
-
 @Injectable()
 export class CsvExportTemplatesService {
   public constructor(
-    @InjectRepository(CsvExportTemplate)
-    private readonly templateRepository: Repository<CsvExportTemplate>,
+    @Inject(CSV_EXPORT_TEMPLATE_STORE)
+    private readonly store: CsvExportTemplateStore,
   ) {}
 
-  public async findAll(exportType?: CsvExportType): Promise<CsvExportTemplate[]> {
-    const templates = await this.templateRepository.find({
-      where: exportType ? { exportType } : {},
-      order: { name: 'ASC' },
-    });
+  public async findAll(exportType?: CsvExportType): Promise<CsvExportTemplateRecord[]> {
+    const templates = await this.store.list(exportType);
     // The database orders by binary collation ("Z" before "a"); users expect "a, B, c". The list is small.
     return templates.sort(
       (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || (a.name < b.name ? -1 : 1),
     );
   }
 
-  public async findOne(id: number): Promise<CsvExportTemplate> {
-    const template = await this.templateRepository.findOne({ where: { id } });
+  public async findOne(id: number): Promise<CsvExportTemplateRecord> {
+    const template = await this.store.find(id);
     if (!template) {
       throw new NotFoundException(`CSV export template ${id} not found`);
     }
     return template;
   }
 
-  public async create(dto: CreateCsvExportTemplateDto): Promise<CsvExportTemplate> {
-    const template = this.templateRepository.create({
-      name: dto.name,
-      exportType: dto.exportType,
-      columns: toStoredColumns(dto.columns),
-    });
-    return await this.save(template);
+  public async create(dto: CreateCsvExportTemplateDto): Promise<CsvExportTemplateRecord> {
+    return await this.guardNameConflict(() =>
+      this.store.create({
+        name: dto.name,
+        exportType: dto.exportType,
+        columns: toStoredColumns(dto.columns),
+      }),
+    );
   }
 
-  public async update(id: number, dto: UpdateCsvExportTemplateDto): Promise<CsvExportTemplate> {
-    const template = await this.findOne(id);
-    if (dto.name !== undefined) {
-      template.name = dto.name;
+  public async update(id: number, dto: UpdateCsvExportTemplateDto): Promise<CsvExportTemplateRecord> {
+    await this.findOne(id);
+    const updated = await this.guardNameConflict(() =>
+      this.store.update(id, {
+        name: dto.name,
+        columns: dto.columns === undefined ? undefined : toStoredColumns(dto.columns),
+      }),
+    );
+    if (!updated) {
+      throw new NotFoundException(`CSV export template ${id} not found`);
     }
-    if (dto.columns !== undefined) {
-      template.columns = toStoredColumns(dto.columns);
-    }
-    return await this.save(template);
+    return updated;
   }
 
   public async remove(id: number): Promise<void> {
-    const template = await this.findOne(id);
-    await this.templateRepository.remove(template);
+    await this.findOne(id);
+    await this.store.remove(id);
   }
 
-  private async save(template: CsvExportTemplate): Promise<CsvExportTemplate> {
+  private async guardNameConflict<T>(save: () => Promise<T>): Promise<T> {
     try {
-      return await this.templateRepository.save(template);
+      return await save();
     } catch (error) {
-      if (isUniqueViolation(error)) {
-        throw new ConflictException(
-          `A CSV export template named "${template.name}" already exists for this export type`,
-        );
+      if (error instanceof CsvExportTemplateNameTakenError) {
+        throw new ConflictException(error.message);
       }
       throw error;
     }

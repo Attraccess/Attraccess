@@ -1,19 +1,13 @@
 import { readerTimeZoneStub } from '../../attractap/websockets/reader-time-zone.test-fixture';
-import {
-  entities,
-  ResourceType,
-  Resource,
-  ResourceGroup,
-  ResourceIntroducer,
-  ResourceIntroducerType,
-  User,
-} from '@attraccess/database-entities';
+import { entities, Resource, ResourceGroup, ResourceIntroducer, User } from '@attraccess/database-entities';
+import { ResourceIntroducerType, ResourceType } from '@attraccess/application-models';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import * as migrations from '../../database/migrations';
 import { ResourceListService } from '../../attractap/websockets/handlers/resource-list/resource-list.service';
 import { AuthenticatedWebSocket } from '../../attractap/websockets/websocket.types';
 import { ResourceIntroducersService } from './resourceIntroducers.service';
+import { TypeOrmResourceIntroducerStore } from '../../database/adapters/resources/resource-introducer-store.adapter';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 
 // Use migrated, persisted memberships: mocked aggregated rows cannot catch a broken join.
@@ -23,7 +17,8 @@ describe('persisted resource introducer aggregation', () => {
   // Migrating is the slow part (every migration, on a busy coverage run): do it once per file.
   beforeAll(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: ':memory:',
       entities: Object.values(entities),
       migrations: Object.values(migrations),
@@ -46,12 +41,9 @@ describe('persisted resource introducer aggregation', () => {
     ]) {
       await source.query(`DELETE FROM "${metadata.tableName}"`);
     }
-    service = new ResourceIntroducersService(
-      source.getRepository(ResourceIntroducer),
-      source.getRepository(User),
-      new EventEmitter2(),
-      { dispatch: jest.fn() } as unknown as NotificationDispatchService,
-    );
+    service = new ResourceIntroducersService(new TypeOrmResourceIntroducerStore(source), new EventEmitter2(), {
+      dispatchToUser: jest.fn(),
+    } as unknown as NotificationDispatchService);
     await source.getRepository(User).insert(
       Array.from({ length: 6 }, (_, index) => ({
         id: index + 1,

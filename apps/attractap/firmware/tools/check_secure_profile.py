@@ -7,7 +7,9 @@ With a secure build directory, fails (exit 1) when:
   - the built partition table differs from partitions.csv,
   - CONFIG_BOOTLOADER_APP_SECURE_VERSION differs from secure-version-floor.txt,
   - the USB serial config handler (src/serial/) was compiled in, or the
-    ATTRACTAP_SECURE_PROFILE define that compiles it out is missing.
+    ATTRACTAP_SECURE_PROFILE define that compiles it out is missing,
+  - the mbedTLS allocator that keeps key material in internal RAM
+    (src/api/security/tls_memory.c) was not compiled in or not linked.
 With --base-ref (no build needed), fails when the secure version or the floor
 is lower than on that ref: anti-rollback means it must never decrease.
 
@@ -217,6 +219,30 @@ def check_serial_handler_compiled_out(compile_commands):
     return errors
 
 
+TLS_ALLOCATOR_SOURCE = "/src/api/security/tls_memory.c"
+TLS_ALLOCATOR_SYMBOL = "attractap_tls_memory_install"
+
+
+def check_tls_allocator_compiled_in(compile_commands):
+    """CONFIG_MBEDTLS_CUSTOM_MEM_ALLOC without the allocator leaves mbedTLS on plain calloc(), which puts
+    large blocks in PSRAM; the allocator source must be part of the build."""
+    if any(e["file"].replace(os.sep, "/").endswith(TLS_ALLOCATOR_SOURCE) for e in compile_commands):
+        return []
+    return [f"the mbedTLS allocator ({TLS_ALLOCATOR_SOURCE.lstrip('/')}) is not compiled in; "
+            "mbedTLS key material could land in PSRAM"]
+
+
+def check_tls_allocator_linked(map_text):
+    """The allocator installs itself from a constructor that nothing calls by name, so a compiled object can
+    still be left out of the image. The linker map lists the symbol with an address only when it is linked."""
+    for line in map_text.splitlines():
+        fields = line.split()
+        if len(fields) == 2 and fields[0].startswith("0x") and fields[1] == TLS_ALLOCATOR_SYMBOL:
+            return []
+    return [f"the mbedTLS allocator ({TLS_ALLOCATOR_SYMBOL}) is not linked into the app image; "
+            "mbedTLS key material could land in PSRAM"]
+
+
 def run_checks(build_dir):
     errors = check_profile(
         read(os.path.join(FIRMWARE_DIR, "sdkconfig.secure")),
@@ -241,6 +267,8 @@ def run_checks(build_dir):
     except ValueError as error:
         raise GateError(f"{build_dir}/compile_commands.json is not valid JSON") from error
     errors += check_serial_handler_compiled_out(compile_commands)
+    errors += check_tls_allocator_compiled_in(compile_commands)
+    errors += check_tls_allocator_linked(read(os.path.join(build_dir, "attractap.map")))
     return errors
 
 

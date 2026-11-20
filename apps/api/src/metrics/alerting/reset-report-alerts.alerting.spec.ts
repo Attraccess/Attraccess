@@ -45,7 +45,11 @@ describe('reset-report alerts against real Prometheus and Grafana', () => {
     beforeAll(async () => {
       stack = await AlertingStack.start(scaledRules(SHIPPED_RULES, PENDING, INTERVAL));
       // Two metrics servers share one database; max() must see both, or the no-double-count checks prove nothing.
-      await eventually(() => stack.targetsUp(), (up) => up === 2, 60 * SLOW);
+      await eventually(
+        () => stack.targetsUp(),
+        (up) => up === 2,
+        60 * SLOW,
+      );
     });
 
     afterAll(async () => {
@@ -90,7 +94,11 @@ describe('reset-report alerts against real Prometheus and Grafana', () => {
 
     it('cancels a Pending wait at three and starts a fresh wait on return to four', async () => {
       await stack.setReports(reports(1, 'PANIC', 4));
-      const first = await eventually(state(CRASH), (i) => i?.state === 'Pending' && i.description.includes('Door (#1): PANIC x4'), 60 * SLOW);
+      const first = await eventually(
+        state(CRASH),
+        (i) => i?.state === 'Pending' && i.description.includes('Door (#1): PANIC x4'),
+        60 * SLOW,
+      );
       await stack.setReports(reports(1, 'PANIC', 3));
       await eventually(state(CRASH), hasState('Normal'), 60 * SLOW);
       expect(notified(CRASH, 'firing')).toHaveLength(0);
@@ -113,7 +121,11 @@ describe('reset-report alerts against real Prometheus and Grafana', () => {
       expect(notified(CRASH, 'firing')).toHaveLength(0);
 
       await eventually(state(CRASH), hasState('Alerting'), 120 * SLOW);
-      await eventually(async () => notified(CRASH, 'firing'), (n) => n.length > 0, 60 * SLOW);
+      await eventually(
+        async () => notified(CRASH, 'firing'),
+        (n) => n.length > 0,
+        60 * SLOW,
+      );
       const message = notified(CRASH, 'firing')[0].message;
       expect(message).toContain('four or more');
       expect(message).toContain('4 crash or watchdog reset reports');
@@ -127,11 +139,7 @@ describe('reset-report alerts against real Prometheus and Grafana', () => {
       const before = await state(CRASH)();
       expect(before?.state).toBe('Alerting');
       await stack.setReports([...reports(3, 'WDT', 2), ...reports(1, 'INT_WDT', 2)]);
-      const after = await eventually(
-        state(CRASH),
-        (i) => !!i?.description.includes('Gate (#3): WDT x2'),
-        60 * SLOW,
-      );
+      const after = await eventually(state(CRASH), (i) => !!i?.description.includes('Gate (#3): WDT x2'), 60 * SLOW);
       expect(after?.state).toBe('Alerting');
       expect(after?.activeAt).toBe(before?.activeAt);
     });
@@ -140,7 +148,11 @@ describe('reset-report alerts against real Prometheus and Grafana', () => {
       const firstActiveAt = (await state(CRASH)())?.activeAt;
       await stack.setReports(reports(1, 'PANIC', 3));
       await eventually(state(CRASH), hasState('Normal'), 60 * SLOW);
-      await eventually(async () => notified(CRASH, 'resolved'), (n) => n.length > 0, 60 * SLOW);
+      await eventually(
+        async () => notified(CRASH, 'resolved'),
+        (n) => n.length > 0,
+        60 * SLOW,
+      );
 
       await stack.setReports(reports(1, 'PANIC', 4));
       const pending = await eventually(state(CRASH), hasState('Pending'), 60 * SLOW);
@@ -157,7 +169,11 @@ describe('reset-report alerts against real Prometheus and Grafana', () => {
     it('sends only the power-on warning, with restart wording', async () => {
       const crashFirings = notified(CRASH, 'firing').length;
       await stack.setReports(reports(2, 'POWERON', 4));
-      await eventually(async () => notified(POWER_ON, 'firing'), (n) => n.length > 0, 180 * SLOW);
+      await eventually(
+        async () => notified(POWER_ON, 'firing'),
+        (n) => n.length > 0,
+        180 * SLOW,
+      );
       const { title, message } = notified(POWER_ON, 'firing')[0];
       expect(message).toContain('4 power-on reset reports');
       expect(message).toContain('does not confirm a reader fault');
@@ -170,10 +186,18 @@ describe('reset-report alerts against real Prometheus and Grafana', () => {
     // A database failure must surface as an outage, not as zero reports. Runs last: the database stays broken.
     it('reports a database failure through the availability alerts', async () => {
       await stack.breakDatabase();
-      await eventually(() => stack.targetsUp(), (up) => up === 0, 60 * SLOW);
+      await eventually(
+        () => stack.targetsUp(),
+        (up) => up === 0,
+        60 * SLOW,
+      );
       // AttractapServiceDown keeps its shipped 2m wait; ScrapeFailures uses the shortened wait.
       for (const alertname of ['AttractapServiceDown', 'ScrapeFailures']) {
-        await eventually(async () => notified(alertname, 'firing'), (n) => n.length > 0, 240 * SLOW);
+        await eventually(
+          async () => notified(alertname, 'firing'),
+          (n) => n.length > 0,
+          240 * SLOW,
+        );
       }
     });
   });

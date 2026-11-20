@@ -1,4 +1,4 @@
-import { CreateSSOProviderDto, SSOProviderType } from '@attraccess/react-query-client';
+import { CreateSsoProviderDtoWritable, SsoProviderType } from '@attraccess/react-query-client';
 
 export const getDefaultOidcConfiguration = () => ({
   issuer: '',
@@ -13,8 +13,7 @@ export const getDefaultOidcConfiguration = () => ({
   permissionSyncTtlMinutes: null as number | null,
 });
 
-/** Mirrors MAX_PERMISSION_SYNC_TTL_MINUTES in database-entities; importing it would pull the entity barrel into the browser bundle. */
-export const MAX_PERMISSION_SYNC_TTL_MINUTES = 365 * 24 * 60;
+export { MAX_PERMISSION_SYNC_TTL_MINUTES } from '@attraccess/application-models';
 
 export const getDefaultSamlConfiguration = () => ({
   entryPoint: '',
@@ -32,17 +31,17 @@ export const getDefaultSamlConfiguration = () => ({
   spSigningPrivateKey: '',
 });
 
-export const defaultProviderValues: CreateSSOProviderDto = {
+export const defaultProviderValues: CreateSsoProviderDtoWritable = {
   name: '',
-  type: SSOProviderType.OIDC,
+  type: SsoProviderType.OIDC,
   oidcConfiguration: getDefaultOidcConfiguration(),
   samlConfiguration: getDefaultSamlConfiguration(),
 };
 
-export const ensureOidcConfiguration = (config?: CreateSSOProviderDto['oidcConfiguration']) =>
+export const ensureOidcConfiguration = (config?: CreateSsoProviderDtoWritable['oidcConfiguration']) =>
   config ?? getDefaultOidcConfiguration();
 
-export const ensureSamlConfiguration = (config?: CreateSSOProviderDto['samlConfiguration']) =>
+export const ensureSamlConfiguration = (config?: CreateSsoProviderDtoWritable['samlConfiguration']) =>
   config ?? getDefaultSamlConfiguration();
 
 export const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

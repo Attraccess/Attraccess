@@ -41,9 +41,6 @@ export function fitWithin(
   }
   const widthLimit = maxWidth ?? Number.POSITIVE_INFINITY;
   const heightLimit = maxHeight ?? Number.POSITIVE_INFINITY;
-  let targetWidth = srcWidth;
-  let targetHeight = srcHeight;
-
   const widthScale = widthLimit / srcWidth;
   const heightScale = heightLimit / srcHeight;
   const scale = Math.min(widthScale, heightScale);
@@ -52,8 +49,8 @@ export function fitWithin(
     return { width: srcWidth, height: srcHeight };
   }
 
-  targetWidth = Math.max(1, Math.floor(srcWidth * Math.min(scale, 1)));
-  targetHeight = Math.max(1, Math.floor(srcHeight * Math.min(scale, 1)));
+  const targetWidth = Math.max(1, Math.floor(srcWidth * Math.min(scale, 1)));
+  const targetHeight = Math.max(1, Math.floor(srcHeight * Math.min(scale, 1)));
   return { width: targetWidth, height: targetHeight };
 }
 

@@ -17,6 +17,17 @@
       "label": "pro Messwert ({{currency}})",
       "description": "0 deaktiviert die Abrechnung. Der Preis wird beim Sitzungsstart gespeichert.",
       "invalid": "Gib einen gültigen Preis mit bis zu {{digits}} Nachkommastellen ein."
+    },
+    "meterAllocation": {
+      "label": "Zuordnung",
+      "options": {
+        "shared": "Geteilt und aufgeteilt",
+        "per-session": "Pro Sitzung gemessen"
+      },
+      "description": {
+        "shared": "Jeder Start und jedes Ende einer Sitzung schließt einen Zeitabschnitt. Der Verbrauch dieses Abschnitts wird gleichmäßig auf die darin aktiven Sitzungen aufgeteilt.",
+        "per-session": "Ein Flow misst jede Sitzung getrennt über einen eigenen Messpunkt. Es wird nichts aufgeteilt."
+      }
     }
   },
   "actions": {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { SSOProviderType, useSsoServiceGetSsoLogoutUrls } from '@attraccess/react-query-client';
+import { SsoProviderType, useGetSsoLogoutUrls } from '@attraccess/react-query-client';
 import { getBaseUrl } from '../../../api';
 import { escapeRegex } from './formDefaults';
 
@@ -17,7 +17,7 @@ export interface SSOProviderSetupUrls {
   samlSloUrl: string;
 }
 
-const buildCallbackUrl = (ssoBaseUrl: string | undefined, type: SSOProviderType, providerId?: number) => {
+const buildCallbackUrl = (ssoBaseUrl: string | undefined, type: SsoProviderType, providerId?: number) => {
   if (!providerId) {
     return '';
   }
@@ -27,7 +27,7 @@ const buildCallbackUrl = (ssoBaseUrl: string | undefined, type: SSOProviderType,
       return '';
     }
     const callbackUrl = new URL(ssoBaseUrl);
-    callbackUrl.pathname = `/api/auth/sso/${type}/${providerId}/callback${type === SSOProviderType.SAML ? '*' : ''}`;
+    callbackUrl.pathname = `/api/auth/sso/${type}/${providerId}/callback${type === SsoProviderType.SAML ? '*' : ''}`;
     callbackUrl.search = '';
     callbackUrl.hash = '';
     return callbackUrl.toString();
@@ -37,7 +37,7 @@ const buildCallbackUrl = (ssoBaseUrl: string | undefined, type: SSOProviderType,
 };
 
 export const useSSOProviderSetupUrls = (providerId?: number): SSOProviderSetupUrls => {
-  const { data: logoutUrls } = useSsoServiceGetSsoLogoutUrls({ providerId: providerId ?? 0 }, undefined, {
+  const { data: logoutUrls } = useGetSsoLogoutUrls({ path: { providerId: providerId ?? 0 } }, undefined, {
     enabled: !!providerId,
     retry: false,
   });
@@ -68,12 +68,12 @@ export const useSSOProviderSetupUrls = (providerId?: number): SSOProviderSetupUr
   }, [ssoBaseUrl]);
 
   const samlCallbackUrl = React.useMemo(
-    () => buildCallbackUrl(ssoBaseUrl, SSOProviderType.SAML, providerId),
+    () => buildCallbackUrl(ssoBaseUrl, SsoProviderType.SAML, providerId),
     [providerId, ssoBaseUrl],
   );
 
   const oidcCallbackUrl = React.useMemo(
-    () => buildCallbackUrl(ssoBaseUrl, SSOProviderType.OIDC, providerId),
+    () => buildCallbackUrl(ssoBaseUrl, SsoProviderType.OIDC, providerId),
     [providerId, ssoBaseUrl],
   );
 

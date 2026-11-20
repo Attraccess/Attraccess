@@ -25,7 +25,7 @@ With the **Attractap RFID Reader**, you can control physical access to machines 
 
 ### Machine Integration & Automation
 
-Connect machines through the WAGO PLC plugin or build visual automations using the flow editor. Use MQTT or HTTP to link access decisions and usage sessions with equipment controls and status signals.
+Connect machines through the [WAGO PLC plugin](plugins/wago/overview.md) or build visual automations using the flow editor. Use MQTT or HTTP to link access decisions and usage sessions with equipment controls and status signals.
 
 ### Projects
 
@@ -63,6 +63,7 @@ Attraccess is **source-available** under the [modified Prosperity Public License
 - **Commercial use**, including internal use in a company, requires a commercial license after a free evaluation of up to **30 days**.
 - **Non-commercial use** by private individuals and non-profit organizations is free under the license terms.
 - **Forks and redistributed modifications** remain subject to the same license terms. Components with separate licenses retain those licenses.
+- **Plugins** fall under this license unless they ship their own. The **WAGO** and **Reservations** plugins have their own commercial license: they always need a paid license module (`wago`, `reservations`), and the non-profit key does not unlock them. See [License missing](plugins/installing-plugins.md#license-missing).
 
 The linked `LICENSE.md` contains the full terms in German and takes precedence over this English summary. For licensing questions and integration support, contact [contact@attraccess.org](mailto:contact@attraccess.org).
 

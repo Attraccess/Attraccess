@@ -1,6 +1,11 @@
-import { Button, Form, ModalBody, ModalFooter, ModalHeader, ModalHeading, Spinner } from '@heroui/react';
-import { StandardModal, StatusAlert } from '@attraccess/plugins-frontend-ui';
-import { FindStep, PairingResult, ReaderStep, errorText } from './PairingSteps';
+import { Button, Form, ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
+import { StandardModal, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { FindStep } from './FindStep';
+import { PairingResult } from './PairingResult';
+import { ReaderStep } from './ReaderStep';
+import { errorText } from './pairingErrorText';
+import de from './de.json';
+import en from './en.json';
 import { PairingFlow, PairingFlowProps, usePairingFlow } from './usePairingFlow';
 
 const FORM_ID = 'attractap-pairing-form';
@@ -23,9 +28,8 @@ export function PairingDialog(props: Readonly<PairingDialogProps>) {
 }
 
 function Footer({ flow, onClose }: Readonly<{ flow: PairingFlow; onClose: () => void }>) {
-  const { t } = flow;
-  // A reader that answers late can still be approved, so only a reader that never showed up ends here.
-  if (flow.finished || (flow.noResponse && !flow.activeId)) {
+  const { t } = useTranslations({ de, en });
+  if (flow.finished) {
     return <Button onPress={onClose}>{t('dialog.close')}</Button>;
   }
   return (
@@ -61,7 +65,8 @@ function Footer({ flow, onClose }: Readonly<{ flow: PairingFlow; onClose: () => 
 
 function PairingDialogContent(props: Readonly<PairingDialogProps>) {
   const flow = usePairingFlow(props);
-  const { t, current } = flow;
+  const { t } = useTranslations({ de, en });
+  const { current } = flow;
   const insecure = typeof window !== 'undefined' && !window.isSecureContext;
 
   return (
@@ -90,17 +95,6 @@ function PairingDialogContent(props: Readonly<PairingDialogProps>) {
               {t('dialog.connectionLost')}
             </StatusAlert>
           )}
-          {flow.waitingForReader && (
-            <div className="flex items-center justify-center gap-3" data-cy="attractap-pairing-waiting">
-              <Spinner size="sm" />
-              <span>{t('dialog.waitingForReader')}</span>
-            </div>
-          )}
-          {flow.noResponse && !flow.activeId && (
-            <StatusAlert status="danger" data-cy="attractap-pairing-no-response">
-              {t('dialog.noResponse')}
-            </StatusAlert>
-          )}
           {flow.needsCodeToFind && (
             <FindStep flow={flow} insecure={insecure} presetTargetReaderId={props.presetTargetReaderId} />
           )}
@@ -115,7 +109,7 @@ function PairingDialogContent(props: Readonly<PairingDialogProps>) {
               {errorText(t, flow.error)}
             </StatusAlert>
           )}
-          {flow.finished && current && <PairingResult flow={flow} current={current} />}
+          {flow.finished && current && <PairingResult current={current} />}
           {/* Enter submits through this button; the flow decides whether that finds or approves. */}
           <button type="submit" hidden />
         </Form>

@@ -1,15 +1,17 @@
-import { LabeledSwitch } from '@attraccess/plugins-frontend-ui';
+import { LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Input, TextArea } from '@heroui/react';
 import { Select } from '../../../../../components/select';
 import { FormFieldType } from '@attraccess/react-query-client';
+import en from '../en.json';
+import de from '../de.json';
 import { EditableFormField, TextFieldOptions, NumberFieldOptions, SelectFieldOptions } from '../types';
 
 interface FormPreviewProps {
   fields: EditableFormField[];
-  t: (key: string) => string;
 }
 
-export function FormPreview({ fields, t }: FormPreviewProps) {
+export function FormPreview({ fields }: Readonly<FormPreviewProps>) {
+  const { t } = useTranslations({ en, de });
   if (!fields.length) {
     return (
       <div className="rounded-lg border border-dashed border-default-200 p-6 text-center">

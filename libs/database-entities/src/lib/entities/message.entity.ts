@@ -1,12 +1,8 @@
+import { MessageReferenceType } from '@attraccess/application-models';
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index, CreateDateColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { Conversation } from './conversation.entity';
-
-export enum MessageReferenceType {
-  RESOURCE = 'RESOURCE',
-  ACTIVITY = 'ACTIVITY',
-}
 
 @Entity()
 @Index(['conversationId', 'createdAt'])

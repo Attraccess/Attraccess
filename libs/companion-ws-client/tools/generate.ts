@@ -1,17 +1,13 @@
 /* eslint-disable no-console -- Preserve operational diagnostics and CLI output. */
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join, resolve } from 'path';
-// ─── AsyncAPI 2.x types ───────────────────────────────────────────────────────
+// ─── AsyncAPI 3.x types ───────────────────────────────────────────────────────
 
 export interface AsyncApiSpec {
-  channels: Record<
-    string,
-    {
-      publish?: { message?: { payload?: SchemaOrRef } };
-      subscribe?: { message?: { payload?: SchemaOrRef } };
-    }
-  >;
-  components?: { schemas?: Record<string, JsonSchema> };
+  channels?: Record<string, { address?: string }>;
+  /** Server perspective: "receive" = the client sends, "send" = the client receives. */
+  operations?: Record<string, { action: 'send' | 'receive'; channel: { $ref: string }; messages?: { $ref: string }[] }>;
+  components?: { schemas?: Record<string, JsonSchema>; messages?: Record<string, { payload?: SchemaOrRef }> };
 }
 
 export interface JsonSchema {
@@ -218,7 +214,7 @@ ${dispatchCases.join('\n')}
 
   return clientTs;
 }
-// ─── AsyncAPI 2.x types ───────────────────────────────────────────────────────
+// ─── AsyncAPI 3.x types ───────────────────────────────────────────────────────
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -229,24 +225,18 @@ mkdirSync(outDir, { recursive: true });
 
 const spec: AsyncApiSpec = JSON.parse(readFileSync(specPath, 'utf8'));
 const schemas = spec.components?.schemas ?? {};
-// Channels where the CLIENT sends (spec "publish" = client publishes to server)
+// Channels where the CLIENT sends (server "receive" operations)
 const clientSends: ChannelInfo[] = [];
-// Channels where the CLIENT receives (spec "subscribe" = client subscribes to server)
+// Channels where the CLIENT receives (server "send" operations)
 const clientReceives: ChannelInfo[] = [];
 
-for (const [channel, ops] of Object.entries(spec.channels)) {
-  if (ops.publish) {
-    const payload = ops.publish.message?.payload;
-    const schemaRef = payload && '$ref' in payload && payload.$ref ? refName(payload.$ref) : null;
-    const schema = resolveSchema(payload, schemas);
-    clientSends.push({ channel, schemaName: schemaRef, schema });
-  }
-  if (ops.subscribe) {
-    const payload = ops.subscribe.message?.payload;
-    const schemaRef = payload && '$ref' in payload && payload.$ref ? refName(payload.$ref) : null;
-    const schema = resolveSchema(payload, schemas);
-    clientReceives.push({ channel, schemaName: schemaRef, schema });
-  }
+for (const operation of Object.values(spec.operations ?? {})) {
+  const channel = spec.channels?.[refName(operation.channel.$ref)]?.address ?? refName(operation.channel.$ref);
+  const messageRef = operation.messages?.[0]?.$ref;
+  const payload = messageRef ? spec.components?.messages?.[refName(messageRef)]?.payload : undefined;
+  const schemaRef = payload && '$ref' in payload && payload.$ref ? refName(payload.$ref) : null;
+  const info = { channel, schemaName: schemaRef, schema: resolveSchema(payload, schemas) };
+  (operation.action === 'receive' ? clientSends : clientReceives).push(info);
 }
 
 // ─── Generate types.ts ────────────────────────────────────────────────────────

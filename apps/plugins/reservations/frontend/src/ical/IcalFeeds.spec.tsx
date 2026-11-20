@@ -11,7 +11,7 @@ const resources = [
   { id: 2, name: 'Printer' },
 ];
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourcesServiceGetAllResources: ({ search }: { search: string }) => ({
+  useGetAllResources: ({ query: { search } }: { query: { search: string } }) => ({
     isLoading: false,
     data: { data: resources.filter((resource) => resource.name.toLowerCase().includes(search.toLowerCase())) },
   }),
@@ -79,7 +79,9 @@ describe('IcalFeeds', () => {
     expect(calls.some((call) => call.method === 'DELETE')).toBe(false);
     const dialog = await screen.findByRole('alertdialog');
     expect(dialog).toHaveTextContent('cannot be undone');
-    await user.click(screen.getAllByRole('button', { name: 'Revoke' }).at(-1) as HTMLElement);
+    const confirm = screen.getAllByRole('button', { name: 'Revoke' }).at(-1) as HTMLElement;
+    expect(confirm.className).toContain('button--danger');
+    await user.click(confirm);
     await waitFor(() => expect(calls.some((call) => call.method === 'DELETE')).toBe(true));
   });
 

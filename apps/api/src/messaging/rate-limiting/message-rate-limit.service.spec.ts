@@ -78,9 +78,7 @@ describe('MessageRateLimitService', () => {
   it('tracks limits independently per scope', async () => {
     await service.assertWithinLimit('contact', 1);
     await service.assertWithinLimit('contact', 1);
-    await expect(service.assertWithinLimit('contact', 1)).rejects.toBeInstanceOf(
-      MessageRateLimitExceededException,
-    );
+    await expect(service.assertWithinLimit('contact', 1)).rejects.toBeInstanceOf(MessageRateLimitExceededException);
     // The send_message scope for the same user still has budget.
     await expect(service.assertWithinLimit('send_message', 1)).resolves.toBeUndefined();
   });

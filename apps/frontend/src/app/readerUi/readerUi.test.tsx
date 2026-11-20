@@ -35,7 +35,7 @@ vi.mock('../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: api.toastSuccess, error: api.toastError }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAttractapServiceGetReaders: () => ({ data: api.readers }),
+  useGetReaders: () => ({ data: api.readers }),
 }));
 vi.mock('./readerUiApi', () => ({
   useReaderUiAlerts: () => ({ data: api.alerts }),
@@ -152,7 +152,7 @@ describe('reader UI admin', () => {
     ];
     api.readers = [
       { id: 7, name: 'Laser reader', pairingState: 'paired' },
-      { id: 9, name: 'Token reader', pairingState: 'unpaired' },
+      { id: 9, name: 'Removed reader', pairingState: 'revoked' },
     ];
     render(<ReaderUiAlerts />);
     expect(document.querySelector('[data-cy="reader-ui-alert-1"]')).not.toBeNull();

@@ -117,11 +117,6 @@ const SAFE_CALLS: Array<{ file: string; call: string; why: string }> = [
     why: 'the provisioning protocol reply channel; replies only carry status fields (pinIsSet, never the PIN or Wi-Fi password)',
   },
   {
-    file: 'apps/attractap/firmware/src/api/handlers/auth.cpp',
-    call: '("UNAUTHORIZED: " + message)',
-    why: "the server's READER_UNAUTHORIZED reason code (PLEASE_REREGISTER), not the reader's credentials",
-  },
-  {
     file: 'apps/attractap/firmware/src/application/callbacks/api.cpp',
     call: '("Reader error %s: %s", title, message)',
     why: 'the error code the server sent for display on the reader screen',
@@ -262,6 +257,25 @@ describe('secrets in logs', () => {
       /\.(spec|test-fixture)\.ts$/.test(file),
     );
     expect(offenders).toEqual([]);
+  });
+
+  it('the plugin BLE host never logs device payloads, keys or tokens', () => {
+    const offenders = ['apps/api/src/plugin-system/ble', 'apps/api/src/attractap/websockets/handlers/ble'].flatMap(
+      (root) => scan(root, ['.ts'], API_LOG_CALL, (file) => /\.(spec|test-fixture)\.ts$/.test(file)),
+    );
+    expect(offenders).toEqual([]);
+    // Read results, written values and notifications are plain `value`/`bytes`: none of them is ever interpolated.
+    const bytesInLogs = ['apps/api/src/plugin-system/ble', 'apps/api/src/attractap/websockets/handlers/ble'].flatMap(
+      (root) =>
+        sourceFiles(join(REPOSITORY_ROOT, root), ['.ts'])
+          .filter((path) => !/\.(spec|test-fixture)\.ts$/.test(path))
+          .flatMap((path) =>
+            logCalls(readFileSync(path, 'utf8'), API_LOG_CALL)
+              .filter(({ call }) => /\$\{[^}]*\b(?:value|bytes|data)\b[^}]*\}/.test(call))
+              .map(({ call }) => `${relative(REPOSITORY_ROOT, path)}: ${call.slice(0, 140)}`),
+          ),
+    );
+    expect(bytesInLogs).toEqual([]);
   });
 
   it('the reader firmware never logs keys, tokens, PINs, passwords or card traffic', () => {

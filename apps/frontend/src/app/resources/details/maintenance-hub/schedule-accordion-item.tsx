@@ -1,11 +1,11 @@
 import { AccordionBody, AccordionHeading, AccordionItem, AccordionPanel, AccordionTrigger, Chip } from '@heroui/react';
-import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, ConfirmableButton, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ClockIcon, GaugeIcon, HashIcon, PencilIcon, TrashIcon } from 'lucide-react';
 import {
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleTriggerType,
-  useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey,
-  useResourceMaintenanceSchedulesServiceUpdateMaintenanceSchedule,
+  useFindMaintenanceSchedulesKey,
+  useUpdateMaintenanceSchedule,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { configSummary } from './config-summary';
@@ -18,7 +18,8 @@ interface Props {
   resourceId: number;
   trackingReadiness: OperatingTrackingReadiness;
   onEdit: () => void;
-  onDelete: () => void;
+  /** Runs after the user confirmed; the confirmation stays open while it runs and when it fails. */
+  onDelete: () => unknown;
 }
 
 function TriggerIcon({ type }: { type: ResourceMaintenanceScheduleTriggerType }) {
@@ -32,17 +33,18 @@ export function ScheduleAccordionItem(props: Props) {
   const { t } = useTranslations({ de, en });
   const queryClient = useQueryClient();
 
-  const { mutate: updateSchedule, isPending: isToggling } =
-    useResourceMaintenanceSchedulesServiceUpdateMaintenanceSchedule({
-      onSuccess: () => {
-        queryClient.invalidateQueries({
-          queryKey: [useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey],
-        });
-      },
-    });
+  const { mutate: updateSchedule, isPending: isToggling } = useUpdateMaintenanceSchedule(undefined, {
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [useFindMaintenanceSchedulesKey],
+      });
+    },
+  });
+
+  const displayName = schedule.name ?? t(`schedules.triggerType.${schedule.triggerType}`);
 
   const togglePause = () => {
-    updateSchedule({ resourceId, scheduleId: schedule.id, requestBody: { enabled: !schedule.enabled } });
+    updateSchedule({ path: { resourceId, scheduleId: schedule.id }, body: { enabled: !schedule.enabled } });
   };
 
   return (
@@ -51,7 +53,7 @@ export function ScheduleAccordionItem(props: Props) {
         <AccordionTrigger>
           <div className="flex flex-wrap items-center gap-3 w-full">
             <TriggerIcon type={schedule.triggerType} />
-            <span className="font-medium">{schedule.name ?? t(`schedules.triggerType.${schedule.triggerType}`)}</span>
+            <span className="font-medium">{displayName}</span>
             <span className="text-default-500 text-sm ml-auto">{configSummary(schedule, t)}</span>
             {schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS &&
               (schedule as { durationBasis?: string }).durationBasis === 'ATTRIBUTABLE_OPERATING_DURATION' && (
@@ -76,10 +78,17 @@ export function ScheduleAccordionItem(props: Props) {
             <Button variant="ghost" onPress={togglePause} isPending={isToggling}>
               {schedule.enabled ? t('schedules.actions.pause') : t('schedules.actions.resume')}
             </Button>
-            <Button variant="danger-soft" onPress={onDelete}>
-              <TrashIcon className="w-4 h-4" />
-              {t('schedules.actions.delete')}
-            </Button>
+            <ConfirmableButton
+              label={t('schedules.actions.delete')}
+              icon={<TrashIcon className="w-4 h-4" />}
+              status="error"
+              buttonProps={{ variant: 'danger-soft' }}
+              confirm={{
+                title: t('schedules.deleteConfirm', { name: displayName }),
+                message: t('schedules.deleteMessage'),
+              }}
+              onConfirm={onDelete}
+            />
           </div>
         </AccordionBody>
       </AccordionPanel>

@@ -12,12 +12,7 @@ import {
 } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  ApiError,
-  RoleWithUsageDto,
-  useRbacServiceDeleteRole,
-  useRbacServiceListRolesKey,
-} from '@attraccess/react-query-client';
+import { ApiError, RoleWithUsageDto, useDeleteRole, useListRolesKey } from '@attraccess/react-query-client';
 import { Select } from '../../../components/select';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
@@ -54,9 +49,9 @@ export function DeleteRoleModal({ isOpen, onClose, role, allRoles }: Props) {
     }
   }, [isOpen]);
 
-  const { mutate: deleteRole, isPending: isDeleting } = useRbacServiceDeleteRole({
+  const { mutate: deleteRole, isPending: isDeleting } = useDeleteRole(undefined, {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [useRbacServiceListRolesKey] });
+      queryClient.invalidateQueries({ queryKey: [useListRolesKey] });
       toast.success({ title: t('messages.deleted') });
       onClose();
     },
@@ -74,8 +69,8 @@ export function DeleteRoleModal({ isOpen, onClose, role, allRoles }: Props) {
 
   const handleConfirm = () => {
     deleteRole({
-      id: role.id,
-      reassignToRoleId: mode === 'reassign' && reassignToRoleId ? Number(reassignToRoleId) : undefined,
+      path: { id: role.id },
+      query: { reassignToRoleId: mode === 'reassign' && reassignToRoleId ? Number(reassignToRoleId) : undefined },
     });
   };
 

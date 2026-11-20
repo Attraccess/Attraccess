@@ -21,18 +21,27 @@ Sie können die folgenden Optionen pro Ressource kombinieren:
 | **Credits pro Nutzung**        | Eine pauschale Anzahl von Credits, die pro Nutzungssitzung berechnet wird. Die Dauer spielt keine Rolle.                          |
 | **Credits pro Minute**         | Credits für jede angefangene Minute der Nutzungssitzung.                                                                          |
 | **Credits pro Betriebsminute** | Credits für jede angefangene Minute des aufgezeichneten Maschinenbetriebs, die der Sitzung zugeordnet ist. Standardwert ist null. |
-| **Preis pro Messwert**            | Optionaler Preis für jeden benannten Zähler. Standardwert ist null.     |
+| **Preis pro Messwert**         | Optionaler Preis für jeden benannten Zähler. Standardwert ist null.                                                               |
 
 > [!TIP]
 > Die Gebühren werden addiert. Beispiel: 10 Credits pro Nutzung + 2 Credits pro Sitzungsminute für eine 30-minütige Sitzung + 3 Credits pro Betriebsminute für 10 Minuten Maschinenbetrieb = 10 + 60 + 30 = 100 Credits, vor Anwendung des Abrechnungsfaktors des Benutzers.
 
 Sitzungsdauer und Betriebsdauer werden unabhängig voneinander auf volle Minuten aufgerundet. Genau eine Minute bleibt eine abgerechnete Minute; eine aufgezeichnete Dauer von null bleibt null. Für die Betriebsdauer sind aufgezeichnete Betriebszustände aus [Flows](flows/node-types.md) erforderlich. Der Start einer Sitzung allein belegt keinen Maschinenbetrieb.
 
-Pauschale, beide zeitabhängigen Tarife und der Abrechnungsfaktor des Benutzers werden beim Sitzungsstart gespeichert. Spätere Konfigurationsänderungen gelten für neue Sitzungen. Der gespeicherte Faktor wird auf die Summe aller Sitzungsposten angewendet, einschließlich zusätzlicher Abrechnungsposten aus Flows.
+Pauschale, beide zeitabhängigen Tarife und der Abrechnungsfaktor des Benutzers werden beim Sitzungsstart gespeichert. Spätere Konfigurationsänderungen gelten für neue Sitzungen. Der gespeicherte Faktor wird auf die Summe aller Sitzungsposten angewendet, einschließlich zusätzlicher Abrechnungsposten aus Flows. Bei einer übernommenen Sitzung stammen Posten, die Sie sonst beim Beenden ergänzen, aus dem Flow [Nutzung übernommen](flows/node-types.md#nutzung-übernommen), weil **Nutzung beendet** nicht läuft.
 
 ## Zählerverbrauch
 
 Jeder benannte Zähler kann in den Abrechnungseinstellungen einen Preis pro Messwert erhalten. Mehrere Zähler können gemeinsam abgerechnet werden. Namen und Preise werden beim Sitzungsstart gespeichert. Nur Sitzungsverbrauch wird berechnet; Leerlaufverbrauch erhöht den Gesamtverbrauch. Ein Preis von null deaktiviert nur die Abrechnung.
+
+### Gemeinsam genutzte Maschinen
+
+Bei Maschinen mit mehreren parallelen Sitzungen hat jeder Zähler in seinen Zählereinstellungen die Einstellung **Zuordnung**:
+
+- **Geteilt und aufgeteilt** (Standard): Der Verbrauch des Zählers wird zu gleichen Teilen auf die gleichzeitig aktiven Personen verteilt. Anteile werden exakt geführt und einmal pro Zeitsegment auf ganze Credits gerundet, sodass die berechneten Anteile immer die Segmentsumme ergeben.
+- **Pro Sitzung gemessen**: Jede Sitzung erhält ihren eigenen Messpunkt und wird eigenständig abgerechnet.
+
+Der Modus wird beim Sitzungsstart gespeichert; Änderungen werden im Audit-Log protokolliert. Die Betriebszeit wird unabhängig von dieser Einstellung immer auf dieselbe Weise auf die gleichzeitig aktiven Personen aufgeteilt. Nutzungsgebühr und Sitzungszeit werden nie aufgeteilt. Ein kostenpflichtiger Zähler, der sich nicht bei Bedarf lesen lässt (nur Zuwächse), kann immer nur von einer Sitzung gleichzeitig genutzt werden, sofern er nicht auf **Pro Sitzung gemessen** steht. Siehe [Zähler bei gemeinsam genutzten Maschinen](flows/energy-metering.md#zähler-bei-gemeinsam-genutzten-maschinen) für Segmente, Rundung, fehlgeschlagene Messungen und Beispiele.
 
 Siehe [Zähler und verbrauchsbasierte Abrechnung](flows/energy-metering.md) für Einrichtung, Meldemodi, Migration und Abrechnung.
 

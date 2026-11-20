@@ -5,26 +5,26 @@ import { MjmlVisualEditor } from '../email-templates/edit/MjmlVisualEditor';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { OnMount } from '@monaco-editor/react';
-import { Button, StandardDrawer, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, ConfirmableButton, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAppTheme } from '@attraccess/ui';
 import { useToastMessage } from '../../components/toastProvider';
 import { CONTENT_PLACEHOLDER, splitHead } from '../email-templates/edit/mjmlLayout';
 import {
-  useEmailLayoutServiceEmailLayoutControllerFindGlobal,
-  useEmailLayoutServiceEmailLayoutControllerUpdate,
-  useEmailLayoutServiceEmailLayoutControllerResetToDefault as useResetLayoutToDefault,
+  useEmailLayoutControllerFindGlobal,
+  useEmailLayoutControllerUpdate,
+  useEmailLayoutControllerResetToDefault as useResetLayoutToDefault,
 } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
 
 export const PLACEHOLDER_CLASS = 'layout-content-placeholder';
 
-export // The stored layout is a full <mjml> document with a raw {{content}} token in
+// The stored layout is a full <mjml> document with a raw {{content}} token in
 // mj-body. GrapesJS would drop that bare text node, so for editing we swap it
 // for a locked, visibly-marked section and swap back on save. The mj-head is
 // split off too (GrapesJS has no mj-attributes component) and carried through
 // verbatim; MjmlVisualEditor injects it into the canvas so styles still render.
-const placeholderSection = (label: string) =>
+export const placeholderSection = (label: string) =>
   `<mj-section css-class="${PLACEHOLDER_CLASS}" background-color="#F1F5F9" border="2px dashed #94A3B8">` +
   `<mj-column><mj-text align="center" color="#64748B" font-size="14px">${label}</mj-text></mj-column>` +
   `</mj-section>`;
@@ -42,14 +42,14 @@ export const toStorable = (editedDoc: string, head: string) =>
     // a literal '<mjml>' match would silently drop the head for such layouts.
     .replace(/<mjml([^>]*)>/, (_match, attrs) => `<mjml${attrs}>${head}`);
 
-export function useEmailLayoutPageState() {
+export function EmailLayoutPage() {
   const navigate = useNavigate();
   const basePath = '/settings/email';
   const { t, language } = useTranslations({ en, de });
   const { resolvedTheme } = useAppTheme();
   const toast = useToastMessage();
 
-  const layout = useEmailLayoutServiceEmailLayoutControllerFindGlobal();
+  const layout = useEmailLayoutControllerFindGlobal();
 
   // Same uncontrolled-canvas setup as the template editor: the canvas reads its
   // initial value once per seed and reports edits into a ref, so typing never
@@ -78,7 +78,7 @@ export function useEmailLayoutPageState() {
     docRef.current = mjml;
   }, []);
 
-  const updateLayout = useEmailLayoutServiceEmailLayoutControllerUpdate();
+  const updateLayout = useEmailLayoutControllerUpdate();
   const onSave = useCallback(() => {
     const body = toStorable(docRef.current ?? '', headRef.current);
     if (!body.includes(CONTENT_PLACEHOLDER)) {
@@ -86,7 +86,7 @@ export function useEmailLayoutPageState() {
       return;
     }
     updateLayout.mutate(
-      { requestBody: { body } },
+      { body: { body } },
       {
         onSuccess: () => toast.success({ title: t('toast.saveSuccess') }),
         onError: (error) => {
@@ -98,17 +98,16 @@ export function useEmailLayoutPageState() {
     );
   }, [updateLayout, toast, t]);
 
-  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const resetLayout = useResetLayoutToDefault();
-  const onResetConfirm = useCallback(() => {
-    resetLayout.mutate(undefined, {
-      onSuccess: (data) => {
-        seedFromStored(data.body);
-        setResetConfirmOpen(false);
-        toast.success({ title: t('toast.resetSuccess') });
-      },
-      onError: () => toast.error({ title: t('toast.resetError') }),
-    });
+  const onResetConfirm = useCallback(async () => {
+    try {
+      const data = await resetLayout.mutateAsync(undefined);
+      seedFromStored(data.body);
+      toast.success({ title: t('toast.resetSuccess') });
+    } catch (error) {
+      toast.error({ title: t('toast.resetError') });
+      throw error;
+    }
   }, [resetLayout, seedFromStored, toast, t]);
 
   // The mj-head (global fonts/colors via mj-attributes, mj-style) has no visual
@@ -134,65 +133,6 @@ export function useEmailLayoutPageState() {
       monaco.editor.setModelLanguage(model, 'mjml');
     }
   }, []);
-  return {
-    navigate,
-    basePath,
-    t,
-    language,
-    resolvedTheme,
-    layout,
-    headRef,
-    docRef,
-    editorSeed,
-    handleDocChange,
-    updateLayout,
-    onSave,
-    resetConfirmOpen,
-    setResetConfirmOpen,
-    resetLayout,
-    onResetConfirm,
-    stylesOpen,
-    setStylesOpen,
-    headDraft,
-    setHeadDraft,
-    openStyles,
-    applyStyles,
-    handleMonacoMount,
-  } as const;
-}
-
-// The stored layout is a full <mjml> document with a raw {{content}} token in
-// mj-body. GrapesJS would drop that bare text node, so for editing we swap it
-// for a locked, visibly-marked section and swap back on save. The mj-head is
-// split off too (GrapesJS has no mj-attributes component) and carried through
-// verbatim; MjmlVisualEditor injects it into the canvas so styles still render.
-
-export function EmailLayoutPage() {
-  const {
-    navigate,
-    basePath,
-    t,
-    language,
-    resolvedTheme,
-    layout,
-    headRef,
-    docRef,
-    editorSeed,
-    handleDocChange,
-    updateLayout,
-    onSave,
-    resetConfirmOpen,
-    setResetConfirmOpen,
-    resetLayout,
-    onResetConfirm,
-    stylesOpen,
-    setStylesOpen,
-    headDraft,
-    setHeadDraft,
-    openStyles,
-    applyStyles,
-    handleMonacoMount,
-  } = useEmailLayoutPageState();
 
   return (
     <div className="h-full flex flex-col gap-3" data-cy="email-layout-page">
@@ -217,16 +157,28 @@ export function EmailLayoutPage() {
             <Palette size={16} />
             <span className="hidden sm:inline">{t('actions.styles')}</span>
           </Button>
-          <Button
-            isIconOnly
-            variant="ghost"
-            size="sm"
-            onPress={() => setResetConfirmOpen(true)}
-            aria-label={t('actions.resetToDefault')}
-            data-cy="email-layout-reset-button"
-          >
-            <RotateCcw size={16} />
-          </Button>
+          <ConfirmableButton
+            label={t('resetConfirm.confirm')}
+            status="error"
+            confirm={{
+              title: t('resetConfirm.title'),
+              message: t('resetConfirm.message'),
+              cancelLabel: t('resetConfirm.cancel'),
+            }}
+            onConfirm={onResetConfirm}
+            renderActivator={(open) => (
+              <Button
+                isIconOnly
+                variant="ghost"
+                size="sm"
+                onPress={open}
+                aria-label={t('actions.resetToDefault')}
+                data-cy="email-layout-reset-button"
+              >
+                <RotateCcw size={16} />
+              </Button>
+            )}
+          />
           <Button
             variant="primary"
             size="sm"
@@ -291,17 +243,6 @@ export function EmailLayoutPage() {
           </Button>
         </DrawerFooter>
       </StandardDrawer>
-
-      <StatusDialog
-        isOpen={resetConfirmOpen}
-        onClose={() => setResetConfirmOpen(false)}
-        status="error"
-        title={t('resetConfirm.title')}
-        closeLabel={t('resetConfirm.cancel')}
-        action={{ label: t('resetConfirm.confirm'), onPress: onResetConfirm, isPending: resetLayout.isPending }}
-      >
-        {t('resetConfirm.message')}
-      </StatusDialog>
     </div>
   );
 }

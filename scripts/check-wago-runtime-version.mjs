@@ -14,9 +14,11 @@ const dockerfilePath = 'apps/plugins/wago/cc100-runtime/Dockerfile';
 const distPath = 'dist/apps/wago-cc100-runtime';
 const placeholderVersion = '0.0.0';
 const docsOrTests = /\.(?:md|spec\.tsx?|test\.mjs)$/;
+const projectConfigPath = 'apps/plugins/wago/project.json';
 
 // WAGO-internal paths: any change needs a bump without building, including host-side deployment code that is not
-// part of the bundle (a deployment change only rolls out together with a new runtimeVersion).
+// part of the bundle (a deployment change only rolls out together with a new runtimeVersion). The project's Nx
+// configuration is decided by its content instead, see projectConfigAffectsRuntime.
 export function isRuntimeSource(path) {
   if (docsOrTests.test(path)) return false;
   if (/^apps\/plugins\/wago\/cc100-runtime\/(?:integration\/|.*simulator)/.test(path)) return false;
@@ -25,7 +27,6 @@ export function isRuntimeSource(path) {
       path.startsWith(prefix),
     ) ||
     [
-      'apps/plugins/wago/project.json',
       'apps/plugins/wago/channel-behavior.ts',
       'apps/plugins/wago/measurement-contract.ts',
       'apps/plugins/wago/backend/protocol/index.ts',
@@ -59,6 +60,42 @@ const buildInputs = new Set([
 export function isBuildCandidate(path) {
   if (buildInputs.has(path) || path.startsWith('patches/')) return true;
   return path.startsWith('apps/plugins/wago/') && !docsOrTests.test(path);
+}
+
+// Targets that only check the code (tests, lint, typecheck, CRAP score, the pack-test that verifies a packed plugin)
+// never build, package or deploy what ships, so
+// their configuration, e.g. a test target's cache inputs, can change without a runtime release.
+const checkOnlyTarget = /^(?:test|lint|typecheck|crap-score|pack-test)(?:-|$)/;
+// `fleet-acceptance` is the manual composed release gate: it runs other targets in sequence, no pipeline or target
+// depends on it, and the runtime build targets it runs are gated on their own.
+const checkOnlyTargets = new Set(['fleet-acceptance']);
+// The plugin's `build` target only assembles the npm package: it copies package.json, plugin.json and LICENSE.md next
+// to the bundles built by build-backend and build-frontend. It never builds the CC100 runtime (build-runtime and
+// build-cc100-runtime do, and stay gated), so changing which files it copies cannot change the runtime. `build-backend` bundles the plugin's own backend entry
+// (the NestJS plugin, no CC100 runtime), so dropping or adding a backend bundle entry cannot change it either.
+const npmPackageTargets = new Set(['build', 'build-backend']);
+
+function runtimeProjectConfig(text) {
+  const config = JSON.parse(text);
+  const targets = Object.fromEntries(
+    Object.entries(config.targets ?? {}).filter(
+      ([name]) => !checkOnlyTarget.test(name) && !checkOnlyTargets.has(name) && !npmPackageTargets.has(name),
+    ),
+  );
+  return JSON.stringify({ ...config, targets });
+}
+
+/**
+ * Whether a change to the plugin's project.json (null: the file does not exist on that side) can change what ships:
+ * anything except check-only targets and the npm package assembly target counts. A file that does not parse counts as a runtime change.
+ */
+export function projectConfigAffectsRuntime(before, after) {
+  if (before === null || after === null) return before !== after;
+  try {
+    return runtimeProjectConfig(before) !== runtimeProjectConfig(after);
+  } catch {
+    return true;
+  }
 }
 
 /* ---- Built-output comparison ---- */
@@ -218,11 +255,14 @@ export function checkRuntimeVersion(
   return checkReleaseVersion({
     base,
     versionFile: manifestPath,
-    isSource: isRuntimeSource,
+    isSource: (path, { ancestor, show }) =>
+      isRuntimeSource(path) ||
+      (path === projectConfigPath && projectConfigAffectsRuntime(show(ancestor, path), show('HEAD', path))),
     readVersion: (manifest) => JSON.parse(manifest).runtimeVersion,
     label: 'WAGO CC100 runtime',
     inspectChanges: ({ ancestor, paths }) => {
-      const candidates = paths.filter(isBuildCandidate);
+      // project.json only gets here when check-only targets changed, which cannot change the bundle.
+      const candidates = paths.filter((path) => isBuildCandidate(path) && path !== projectConfigPath);
       if (!candidates.length) return { reasons: [] };
       log(`Comparing the built WAGO CC100 runtime because of: ${listed(candidates).join(', ')}`);
       const built = (side, rev) => {

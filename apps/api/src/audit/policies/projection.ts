@@ -1,9 +1,25 @@
+import { AUTHENTICATION_METHODS, type AuthenticationMethod } from '@attraccess/application-models';
+
 /** Shared low-level projection primitives for audit policies. Never serialize caller objects directly. */
 
 export const positive = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) > 0;
 
 export const uuid = (v: unknown): v is string =>
   typeof v === 'string' && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);
+
+export const isAuthenticationMethod = (v: unknown): v is AuthenticationMethod =>
+  (AUTHENTICATION_METHODS as readonly unknown[]).includes(v);
+
+/**
+ * A non-empty string of at most `maxLength` UTF-16 units without control characters (C0, DEL). Values that land in
+ * audit details pass this, so input stored for later audit events (for example plugin reader names) is checked with
+ * it on the way in.
+ */
+export const printable = (v: unknown, maxLength: number): v is string =>
+  typeof v === 'string' &&
+  v.length > 0 &&
+  v.length <= maxLength &&
+  ![...v].some((ch) => ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f);
 
 export const oneOf =
   (...values: string[]) =>

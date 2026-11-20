@@ -1,10 +1,21 @@
-import { User } from '@attraccess/database-entities';
+import type { AuthenticationMethod, PluginUserModel } from '@attraccess/application-models';
 import { Request as BaseRequest } from 'express';
 
-export interface AuthenticatedUser extends User {
+export type { AuthenticationMethod };
+
+/**
+ * Extension point of the host application: the core augments it with its own user record. Plugins see only the
+ * neutral {@link PluginUserModel} fields.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-interface, @typescript-eslint/no-empty-object-type
+export interface AuthenticatedUserExtensions {}
+
+export interface AuthenticatedUser extends PluginUserModel, AuthenticatedUserExtensions {
   jwtTokenId: string;
-  authenticationMethod?: 'session' | 'api-token';
+  authenticationMethod?: AuthenticationMethod;
   apiTokenId?: number;
+  /** API token or MCP grant only: the keys it was granted, before they were intersected with the owner's. */
+  permissionScope?: readonly string[];
   /**
    * Effective permissions for this user. Stored as a Set for O(1) has() lookups.
    * Note: A plain Set serializes as {} in JSON — spread to an array before including in any HTTP response.

@@ -1,8 +1,10 @@
 import { ResourceAttractapsController } from './resource-attractaps.controller';
 import { AttractapService } from './attractap.service';
+import { makeReader } from './attractap-fake-stores.test-fixture';
+import { toReaderDto } from './dtos/reader.dto';
 
 describe('ResourceAttractapsController', () => {
-  const readers = [{ id: 3, name: 'Entrance' }];
+  const readers = [makeReader({ id: 3, name: 'Entrance' })];
   let attractapService: { getPairedReaders: jest.Mock };
   let controller: ResourceAttractapsController;
 
@@ -12,12 +14,17 @@ describe('ResourceAttractapsController', () => {
   });
 
   it('lists the readers linked to a resource', async () => {
-    await expect(controller.getResourceAttractaps(5)).resolves.toBe(readers);
-    expect(attractapService.getPairedReaders).toHaveBeenCalledWith({ where: { resources: { id: 5 } } });
+    await expect(controller.getResourceAttractaps(5)).resolves.toEqual(readers.map(toReaderDto));
+    expect(attractapService.getPairedReaders).toHaveBeenCalledWith({ resourceId: 5 });
+  });
+
+  it('does not expose reader credential internals', async () => {
+    const [reader] = await controller.getResourceAttractaps(5);
+    expect(Object.keys(reader)).not.toContain('apiTokenHash');
   });
 
   it('lists the readers linked to any resource of a group', async () => {
-    await expect(controller.getResourceGroupAttractaps(2)).resolves.toBe(readers);
-    expect(attractapService.getPairedReaders).toHaveBeenCalledWith({ where: { resources: { groups: { id: 2 } } } });
+    await expect(controller.getResourceGroupAttractaps(2)).resolves.toEqual(readers.map(toReaderDto));
+    expect(attractapService.getPairedReaders).toHaveBeenCalledWith({ resourceGroupId: 2 });
   });
 });

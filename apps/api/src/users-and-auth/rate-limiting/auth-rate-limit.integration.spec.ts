@@ -22,10 +22,40 @@ import { SettingsService } from '../../settings/settings.service';
 class FakeController {
   @Post('register')
   @AuthRateLimit('register')
-  register(@Body() body: { fail?: boolean; smtpDown?: boolean }) {
+  register(@Body() body: { fail?: boolean; smtpDown?: boolean; dbBusy?: boolean }) {
+    if (body?.dbBusy) {
+      throw Object.assign(new Error('SQLITE_BUSY: waited 5000 ms'), { code: 'SQLITE_BUSY' });
+    }
     if (body?.smtpDown) {
       throw new ServiceUnavailableException('EmailSendFailed');
     }
+    if (body?.fail) {
+      throw new UnauthorizedException('boom');
+    }
+    return { ok: true };
+  }
+
+  @Post('resend')
+  @AuthRateLimit('verification_email_resend')
+  resend(@Body() body: { fail?: boolean }) {
+    if (body?.fail) {
+      throw new UnauthorizedException('boom');
+    }
+    return { ok: true };
+  }
+
+  @Post('change-email')
+  @AuthRateLimit('unverified_email_change')
+  changeEmail(@Body() body: { fail?: boolean }) {
+    if (body?.fail) {
+      throw new UnauthorizedException('boom');
+    }
+    return { ok: true };
+  }
+
+  @Post('reset-request')
+  @AuthRateLimit('password_reset_request')
+  requestReset(@Body() body: { fail?: boolean }) {
     if (body?.fail) {
       throw new UnauthorizedException('boom');
     }
@@ -60,7 +90,7 @@ const policy = {
       provide: BruteForceProtectionService,
       useFactory: () =>
         new BruteForceProtectionService(
-          { update: jest.fn().mockResolvedValue(undefined) } as never,
+          { recordFailureStreak: jest.fn(), lockAccount: jest.fn(), clearLockout: jest.fn() },
           { getRateLimitPolicy: async () => policy } as SettingsService,
         ),
     },
@@ -85,6 +115,8 @@ describe('AuthRateLimitInterceptor (HTTP integration)', () => {
 
   afterEach(async () => {
     await app?.close();
+    // The audit mock is module-level; reset it so call assertions and implementations stay per test.
+    audit?.log.mockReset();
   });
 
   const hammerToLockout = async (headers: Record<string, string> = {}) => {
@@ -125,6 +157,53 @@ describe('AuthRateLimitInterceptor (HTTP integration)', () => {
       expect(blocked.status).toBe(429);
     });
 
+    it.each([
+      ['/resend', '/reset-request'],
+      ['/reset-request', '/resend'],
+    ])(
+      'a lockout on %s leaves %s open (verification email resend and password reset have separate counters)',
+      async (locked, open) => {
+        for (let i = 0; i < policy.maxAttempts; i += 1) {
+          const res = await request(app.getHttpServer()).post(locked).send({ fail: true });
+          expect(res.status).toBe(401);
+        }
+        expect((await request(app.getHttpServer()).post(locked).send({})).status).toBe(429);
+        expect((await request(app.getHttpServer()).post(open).send({})).status).toBe(201);
+      },
+    );
+
+    it('locks out repeated failed unverified email changes without touching sign-up or resend', async () => {
+      for (let i = 0; i < policy.maxAttempts; i += 1) {
+        expect((await request(app.getHttpServer()).post('/change-email').send({ fail: true })).status).toBe(401);
+      }
+      const blocked = await request(app.getHttpServer()).post('/change-email').send({});
+      expect(blocked.status).toBe(429);
+      expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0);
+      expect((await request(app.getHttpServer()).post('/register').send({})).status).toBe(201);
+      expect((await request(app.getHttpServer()).post('/resend').send({})).status).toBe(201);
+    });
+
+    it('records resends as identity.verification_email_resent, never as a password reset request', async () => {
+      const record = jest.fn().mockResolvedValue({ status: 'recorded' });
+      const realLogger = new AuthAuditLogger({ record } as never);
+      audit.log.mockImplementation((fields) => realLogger.log(fields));
+
+      expect((await request(app.getHttpServer()).post('/resend').send({})).status).toBe(201);
+      expect((await request(app.getHttpServer()).post('/resend').send({ fail: true })).status).toBe(401);
+
+      expect(record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'identity.verification_email_resent', outcome: 'succeeded', details: {} }),
+      );
+      expect(record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'identity.verification_email_resent',
+          outcome: 'failed',
+          details: { reason: 'invalid_credentials' },
+        }),
+      );
+      expect(record).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'identity.password_reset_requested' }));
+    });
+
     it('records a verification email outage as a dependency failure', async () => {
       const response = await request(app.getHttpServer()).post('/register').send({ smtpDown: true });
 
@@ -133,6 +212,19 @@ describe('AuthRateLimitInterceptor (HTTP integration)', () => {
         statusCode: 503,
         message: 'EmailSendFailed',
       });
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'register', outcome: 'dependency_failure' }),
+      );
+    });
+
+    it('does not count a busy database toward the lockout', async () => {
+      for (let i = 0; i < policy.maxAttempts; i += 1) {
+        const res = await request(app.getHttpServer()).post('/register').send({ dbBusy: true });
+        expect(res.status).toBe(500);
+      }
+
+      const after = await request(app.getHttpServer()).post('/register').send({});
+      expect(after.status).toBe(201);
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'register', outcome: 'dependency_failure' }),
       );

@@ -18,7 +18,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await (() => ({ useTranslations: () => ({ t: (key: string) => key }) }))()),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useSettingsServiceGetFirstTimeSetupStatus: () => {
+  useGetFirstTimeSetupStatus: () => {
     const [, refresh] = useReducer((n: number) => n + 1, 0);
     state.refresh = refresh;
     return { data: state.status, isLoading: state.loading };

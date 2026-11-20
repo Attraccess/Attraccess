@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { ApiTokensCard } from './index';
@@ -53,8 +53,10 @@ vi.mock('../../../components/permissionPicker', () => ({
   ),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useRbacServiceListPermissions: () => ({ data: [{ key: 'resources.view' }, { key: 'users.delete' }] }),
-  useApiTokensServiceListApiTokens: (params: unknown) => {
+  useListPermissions: () => ({
+    data: [{ key: 'resources.view' }, { key: 'users.delete' }, { key: 'matter.devices.read', pluginName: 'matter' }],
+  }),
+  useListApiTokens: (params: unknown) => {
     state.query(params);
     return {
       data: { data: state.tokens, total: state.total },
@@ -63,8 +65,8 @@ vi.mock('@attraccess/react-query-client', () => ({
       refetch: state.refetch,
     };
   },
-  useApiTokensServiceCreateApiToken: () => ({ mutateAsync: state.create }),
-  useApiTokensServiceRevokeApiToken: () => ({ mutateAsync: state.revoke }),
+  useCreateApiToken: () => ({ mutateAsync: state.create }),
+  useRevokeApiToken: () => ({ mutateAsync: state.revoke }),
 }));
 beforeEach(() => {
   vi.clearAllMocks();
@@ -103,7 +105,7 @@ it('creates a scoped token, exposes its secret once and copies it', async () => 
   fireEvent.click(screen.getByRole('button', { name: 'actions.create' }));
   expect(await screen.findByDisplayValue('secret-token')).toBeTruthy();
   expect(state.create).toHaveBeenCalledWith({
-    requestBody: { name: 'Integration', permissionKeys: ['resources.view'], expiresAt: undefined },
+    body: { name: 'Integration', permissionKeys: ['resources.view'], expiresAt: undefined },
   });
   expect(state.refetch).toHaveBeenCalledOnce();
   expect(screen.getByLabelText('nameLabel')).toHaveValue('');
@@ -130,7 +132,7 @@ it('keeps form input after creation fails', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'actions.create' }));
   await waitFor(() => expect(state.toast).toHaveBeenCalledWith({ title: 'errors.createFailed', type: 'error' }));
   expect(state.create).toHaveBeenCalledWith({
-    requestBody: {
+    body: {
       name: 'Integration',
       permissionKeys: ['resources.view'],
       expiresAt: new Date('2027-01-01T00:00:00').toISOString(),
@@ -170,7 +172,7 @@ it('blocks token creation with incomplete expiry segments and allows completion 
   await user.click(create);
   await waitFor(() =>
     expect(state.create).toHaveBeenCalledWith({
-      requestBody: {
+      body: {
         name: 'Integration',
         permissionKeys: ['resources.view'],
         expiresAt: new Date('2026-11-24T00:00:00').toISOString(),
@@ -184,7 +186,7 @@ it('blocks token creation with incomplete expiry segments and allows completion 
   await user.click(create);
   await waitFor(() =>
     expect(state.create).toHaveBeenLastCalledWith({
-      requestBody: { name: 'Integration', permissionKeys: ['resources.view'], expiresAt: undefined },
+      body: { name: 'Integration', permissionKeys: ['resources.view'], expiresAt: undefined },
     }),
   );
 });
@@ -198,12 +200,39 @@ it('shows token permissions and dates and handles revocation outcomes', async ()
   expect(screen.getByText('neverUsed')).toBeTruthy();
   expect(screen.getByText('neverExpires')).toBeTruthy();
   expect(screen.getByText('2026-09-01')).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: 'actions.revoke:Integration' }));
+  const user = userEvent.setup();
+  const revoke = async (name: string) => {
+    await user.click(screen.getByRole('button', { name: `Actions for ${name}` }));
+    await user.click(screen.getByRole('menuitem', { name: 'actions.revoke' }));
+    const dialog = await screen.findByRole('alertdialog', { name: `revokeConfirm.title:${name}` });
+    await user.click(within(dialog).getByRole('button', { name: 'actions.revoke' }));
+    return dialog;
+  };
+  await user.click(screen.getByRole('button', { name: 'Actions for Integration' }));
+  await user.click(screen.getByRole('menuitem', { name: 'actions.revoke' }));
+  await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+  expect(state.revoke).not.toHaveBeenCalled();
+  await revoke('Integration');
   await waitFor(() => expect(state.toast).toHaveBeenCalledWith({ title: 'success.revoked', type: 'success' }));
-  expect(state.revoke).toHaveBeenCalledWith({ id: 1 });
+  expect(state.revoke).toHaveBeenCalledWith({ path: { id: 1 } });
   expect(state.refetch).toHaveBeenCalledOnce();
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
   state.revoke.mockRejectedValue(new Error('Unavailable'));
-  fireEvent.click(screen.getByRole('button', { name: 'actions.revoke:Other' }));
+  const dialog = await revoke('Other');
   await waitFor(() => expect(state.toast).toHaveBeenCalledWith({ title: 'errors.revokeFailed', type: 'error' }));
   expect(state.refetch).toHaveBeenCalledOnce();
+  expect(dialog).toBeInTheDocument();
+});
+it('offers plugin permission keys the owner holds and scopes a token to them', async () => {
+  render(<ApiTokensCard availablePermissions={['matter.devices.read']} />);
+  expect(screen.queryByRole('button', { name: 'resources.view' })).toBeNull();
+  fireEvent.change(screen.getByLabelText('nameLabel'), { target: { value: 'Matter export' } });
+  fireEvent.click(screen.getByRole('button', { name: 'matter.devices.read' }));
+  fireEvent.click(screen.getByRole('button', { name: 'actions.create' }));
+  await waitFor(() =>
+    expect(state.create).toHaveBeenCalledWith({
+      body: { name: 'Matter export', permissionKeys: ['matter.devices.read'], expiresAt: undefined },
+    }),
+  );
 });

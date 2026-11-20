@@ -1,7 +1,5 @@
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { LiveSubscription } from '@attraccess/shared';
-import { Resource } from '@attraccess/database-entities';
-import { In, Repository } from 'typeorm';
 import { Subject } from 'rxjs';
 import { ResourceLiveTopicsProvider } from './resource-live-topics.provider';
 import { LiveTopicsService } from '../live-updates/live-topics.service';
@@ -11,7 +9,7 @@ import { ResourceActivityVisibilityService } from './usage/authorization/resourc
 
 function setup() {
   const registry = new LiveTopicsService();
-  const resources = { find: jest.fn(async () => [{ id: 1 }]) };
+  const resources = { existingIds: jest.fn(async () => [1]) };
   const events = { subscribeResource: jest.fn(async () => new Subject<{ data: object }>()) };
   const logs = { subjectFor: jest.fn(() => new Subject<{ data: object }>()), releaseSubject: jest.fn() };
   const visibility = {
@@ -22,7 +20,7 @@ function setup() {
   };
   const provider = new ResourceLiveTopicsProvider(
     registry,
-    resources as unknown as Repository<Resource>,
+    resources as never,
     events as unknown as ResourceEventsService,
     logs as unknown as FlowLogRecorderService,
     visibility as unknown as ResourceActivityVisibilityService,
@@ -47,8 +45,8 @@ describe('resource live topic provider', () => {
         ['resource:2', 'Resource not found'],
       ]),
     );
-    expect(resources.find).toHaveBeenCalledTimes(1);
-    expect(resources.find).toHaveBeenCalledWith({ where: { id: In([1, 2]) }, select: { id: true } });
+    expect(resources.existingIds).toHaveBeenCalledTimes(1);
+    expect(resources.existingIds).toHaveBeenCalledWith([1, 2]);
     user.effectivePermissions.add('resources.update');
     await expect(registry.authorize(subscriptions, user)).resolves.toEqual(
       new Map([['resource:2', 'Resource not found']]),
@@ -60,7 +58,7 @@ describe('resource live topic provider', () => {
         ['resource:2', 'Resource not found'],
       ]),
     );
-    expect(resources.find).toHaveBeenCalledTimes(3);
+    expect(resources.existingIds).toHaveBeenCalledTimes(3);
   });
 
   it('skips resource queries for user-only subscriptions', async () => {
@@ -69,7 +67,7 @@ describe('resource live topic provider', () => {
     await expect(registry.authorize([{ topic: 'messaging' }], { id: 1 } as AuthenticatedUser)).resolves.toEqual(
       new Map(),
     );
-    expect(resources.find).not.toHaveBeenCalled();
+    expect(resources.existingIds).not.toHaveBeenCalled();
   });
 
   it('delegates initial resource state and lazily creates and releases flow-log subjects', async () => {

@@ -1,13 +1,6 @@
-import type { EntityTarget, ObjectLiteral } from '@attraccess/plugins-backend-sdk';
-import {
-  isPluginPermission,
-  PluginContext,
-  PluginPermission,
-  PluginPermissionError,
-} from '@attraccess/plugins-backend-sdk';
+import { isPluginPermission, PluginContext, PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { Injectable, Logger } from '@nestjs/common';
 import { createGuardedContext as createGuardedContextImplementation } from './runtime/guarded-context';
-import { Resource, Setting, User } from '@attraccess/database-entities';
 
 export const EVENT_METHOD_PERMISSIONS = new Map<string, PluginPermission>([
   ['emit', PluginPermission.EMIT_EVENTS],
@@ -27,60 +20,9 @@ export const EVENT_METHOD_PERMISSIONS = new Map<string, PluginPermission>([
   ['waitFor', PluginPermission.LISTEN_EVENTS],
 ]);
 
-export const ENTITY_PERMISSIONS: Array<{ target: EntityTarget<ObjectLiteral>; permission: PluginPermission }> = [
-  { target: User, permission: PluginPermission.READ_USERS },
-  { target: Resource, permission: PluginPermission.ACCESS_RESOURCES },
-  { target: Setting, permission: PluginPermission.READ_SETTINGS },
-];
-
-export function entityLabel<T extends ObjectLiteral>(entity: EntityTarget<T>): string {
-  if (typeof entity === 'string') {
-    return entity;
-  }
-  if (typeof entity === 'function') {
-    return entity.name;
-  }
-  const named = entity as { name?: string; options?: { name?: string } };
-  return named.options?.name ?? named.name ?? 'UnknownEntity';
-}
-
-export function permissionForEntity<T extends ObjectLiteral>(
-  base: PluginContext,
-  entity: EntityTarget<T>,
-): PluginPermission {
-  const direct = ENTITY_PERMISSIONS.find((candidate) => candidate.target === entity);
-  if (direct) {
-    return direct.permission;
-  }
-
-  try {
-    const resolved = base.dataSource.getMetadata(entity).target;
-    const match = ENTITY_PERMISSIONS.find((candidate) => candidate.target === resolved);
-    if (match) {
-      return match.permission;
-    }
-  } catch {
-    return PluginPermission.DATABASE_ACCESS;
-  }
-
-  return PluginPermission.DATABASE_ACCESS;
-}
-
 @Injectable()
 export class PluginSandboxService {
   private static readonly logger = new Logger(PluginSandboxService.name);
-
-  /** Also called when a repository retained during bootstrap is first resolved. */
-  public static assertRepositoryPermission(
-    base: PluginContext,
-    declared: PluginPermission[],
-    entity: EntityTarget<ObjectLiteral>,
-  ): void {
-    const permission = permissionForEntity(base, entity);
-    if (!declared.includes(permission)) {
-      throw new PluginPermissionError(base.manifest.name, `getRepository(${entityLabel(entity)})`, permission);
-    }
-  }
 
   /**
    * Validates the permissions declared in a manifest. Returns the parsed set or
@@ -122,7 +64,6 @@ export class PluginSandboxService {
     return createGuardedContextImplementation(
       {
         guardEvents: getContextOwner().guardEvents.bind(getContextOwner()),
-        assertRepositoryPermission: getContextOwner().assertRepositoryPermission.bind(getContextOwner()),
       },
       base,
       declared,

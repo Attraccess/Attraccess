@@ -14,7 +14,12 @@ import {
   ManyToOne,
 } from 'typeorm';
 
-import { DocumentationType } from '../types/documentationType.enum';
+import {
+  AutoIntroductionTarget,
+  DocumentationType,
+  ResourceType,
+  SupervisionMode,
+} from '@attraccess/application-models';
 
 import { Attractap } from './attractap.entity';
 
@@ -27,8 +32,6 @@ import { ResourceMaintenanceSchedule } from './resource-maintenance-schedule.ent
 import { ResourceOperatingInterval } from './resource-operating-interval.entity';
 
 import { ResourceMaintenance } from './resource.maintenance';
-
-import { ResourceType } from './resource.type';
 
 import { ResourceFlowEdge } from './resourceFlowEdge';
 
@@ -43,8 +46,6 @@ import { ResourceIntroducer } from './resourceIntroducer.entity';
 import { ResourceIntroduction } from './resourceIntroduction.entity';
 
 import { ResourceUsage } from './resourceUsage.entity';
-
-import { AutoIntroductionTarget, SupervisionMode } from './resource.supervision';
 
 @Entity()
 export class Resource {
@@ -179,6 +180,15 @@ export class Resource {
     default: false,
   })
   separateUnlockAndUnlatch!: boolean | null;
+
+  @Column({ type: 'boolean', default: false })
+  @ApiProperty({
+    description:
+      '(only for doors) whether the door is access only: its only action is Open (stored as a door unlock); lock and unlatch are refused',
+    example: false,
+    default: false,
+  })
+  accessOnly!: boolean;
 
   @Column({ type: 'text', nullable: true })
   @ApiProperty({

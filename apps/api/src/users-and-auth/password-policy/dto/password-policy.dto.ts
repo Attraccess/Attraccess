@@ -1,7 +1,7 @@
 // Admin password policy DTOs: full read, partial update, per-role override CRUD payloads
 // FEATURE: Password policy admin contract (full surface + override CRUD)
 
-import { PasswordPolicyRole } from '@attraccess/database-entities';
+import { PasswordPolicyRole } from '@attraccess/application-models';
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -281,9 +281,10 @@ export class PreviewPasswordDto {
   @MaxLength(PREVIEW_PASSWORD_MAX)
   password!: string;
 
+  // No enumName: the first description given for a named enum becomes the shared component's description, and
+  // the required `role` path parameters reference that component.
   @ApiPropertyOptional({
     enum: PasswordPolicyRole,
-    enumName: 'PasswordPolicyRole',
     description: 'Evaluate against the effective policy for this role (uses global if omitted).',
   })
   @IsOptional()

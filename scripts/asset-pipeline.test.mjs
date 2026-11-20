@@ -91,7 +91,8 @@ const action = (name) => parse(fs.readFileSync(`.github/actions/${name}/action.y
 test('every main pipeline tests all deliverables and bundles artifacts built in the same run', () => {
   for (const name of ['pull-requests', 'docker-nightly-latest', 'release']) {
     const { jobs } = workflow(name);
-    for (const deliverable of ['build-companion', 'build-attractap-firmware', 'build-attractap-desktop']) {
+    assert.equal(jobs['build-attractap-desktop'], undefined, `${name}: the desktop simulator is dev-only`);
+    for (const deliverable of ['build-companion', 'build-attractap-firmware']) {
       assert.ok(jobs[deliverable].uses, `${name}: ${deliverable} must always run`);
       assert.equal(jobs[deliverable].if, undefined);
       const consumer = name === 'docker-nightly-latest' ? jobs['publish-gate'] : jobs.containerize;
@@ -132,10 +133,10 @@ test('nightly publishes plugins and the image from one gate and never moves nigh
   const gated = Object.keys(jobs).filter((name) => name !== 'publish-gate' && !publishers.includes(name));
   assert.deepEqual([...jobs['publish-gate'].needs].sort(), gated.sort());
   assert.ok(gated.includes('attractap-lab-hil'));
-  // failed or cancelled blocks, skipped (HIL variable off) does not
+  // failed or cancelled blocks, skipped (HIL variable off) does not; a commit that already passed publishes nothing
   assert.equal(
     jobs['publish-gate'].if,
-    "always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')",
+    "always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.changes.outputs.changed == 'true'",
   );
 
   const steps = jobs['publish-plugins'].steps;
@@ -217,7 +218,8 @@ test('manual builds use the dispatch ref without accepting a separate checkout r
     const checkout = jobs[job].steps.find((step) => step.uses === 'actions/checkout@v7');
     assert.equal(checkout.with?.ref, undefined);
   }
-  for (const job of ['build-companion', 'build-attractap-firmware', 'build-attractap-desktop']) {
+  assert.equal(jobs['build-attractap-desktop'], undefined);
+  for (const job of ['build-companion', 'build-attractap-firmware']) {
     assert.equal(jobs[job].with?.ref, undefined);
     assert.ok(jobs.balena.needs.includes(job));
   }
@@ -244,6 +246,10 @@ test('CI discovers specialized tests and avoids repeating shared dependencies', 
   assert.throws(() => selectTests(fixtures, 'unknown'), /Unknown test group/);
 });
 
+// Nx 24 lists task dependencies as { id } objects.
+const dependsOn = (taskGraph, task, dependency) =>
+  taskGraph.dependencies[task].some((entry) => (entry.id ?? entry) === dependency);
+
 test('WAGO frontend typechecks generate the API client before compiling shared plugin UI', () => {
   const selected = createTaskGraph(
     graph,
@@ -254,14 +260,14 @@ test('WAGO frontend typechecks generate the API client before compiling shared p
     {},
   );
   for (const target of ['typecheck-frontend-tests', 'test-typecheck-frontend-gate']) {
-    assert.ok(selected.dependencies[`plugin-wago:${target}`].includes('react-query-client:generate'));
+    assert.ok(dependsOn(selected, `plugin-wago:${target}`, 'react-query-client:generate'));
   }
 });
 
 // The SDK drops its graph edge to plugins-frontend-ui (see its project.json), so nothing else orders this.
 test('plugin SDK typecheck generates the API client before compiling shared plugin UI', () => {
   const selected = createTaskGraph(graph, {}, ['plugins-frontend-sdk'], ['typecheck'], undefined, {});
-  assert.ok(selected.dependencies['plugins-frontend-sdk:typecheck'].includes('react-query-client:generate'));
+  assert.ok(dependsOn(selected, 'plugins-frontend-sdk:typecheck', 'react-query-client:generate'));
 });
 
 test('ESP-IDF projects are scope:hardware, so toolchain-free CI runs skip them', () => {
@@ -280,4 +286,19 @@ test('ESP-IDF projects are scope:hardware, so toolchain-free CI runs skip them',
       (step) => step.run === 'pnpm nx run attractap-nfc-emulator:test',
     ),
   );
+});
+
+test('the lab readers run once a night, while every push to main still fills the Nx cache', () => {
+  const nightly = workflow('docker-nightly-latest');
+  assert.deepEqual(Object.keys(nightly.on).sort(), ['schedule', 'workflow_dispatch']);
+  assert.deepEqual(nightly.jobs['attractap-lab-hil'].needs, ['changes']);
+  assert.equal(nightly.jobs['attractap-lab-hil'].if, "needs.changes.outputs.changed == 'true'");
+
+  const cache = workflow('main-nx-cache');
+  assert.deepEqual(cache.on, { push: { branches: ['main'] } });
+  for (const [name, job] of Object.entries(cache.jobs)) {
+    assert.equal(job.uses, undefined, `${name}: no reusable workflows (lab, firmware, companion) on every push`);
+    assert.ok(!JSON.stringify(job).includes('publish'), `${name} must not publish`);
+  }
+  assert.deepEqual(Object.keys(cache.jobs).sort(), ['build', 'lint', 'test', 'typecheck']);
 });

@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode, ResourceFlowVariableScope } from '@attraccess/database-entities';
+import { FlowNodeRecord, ResourceFlowVariableScope } from '@attraccess/application-models';
 import { SetVariablesExecutor } from './set-variables.executor';
 import { ResourceFlowVariablesService } from '../variables/resource-flow-variables.service';
 import { NodeExecutionContext } from './node-executor.interface';
@@ -9,8 +9,8 @@ describe('SetVariablesExecutor', () => {
   let variablesService: ResourceFlowVariablesService;
   let ctx: NodeExecutionContext;
 
-  const makeNode = (data: object, resourceId = 7): ResourceFlowNode =>
-    ({ id: 'n1', type: 'processing.variables.set', resourceId, data }) as unknown as ResourceFlowNode;
+  const makeNode = (data: object, resourceId = 7): FlowNodeRecord =>
+    ({ id: 'n1', type: 'processing.variables.set', resourceId, data }) as unknown as FlowNodeRecord;
 
   beforeEach(() => {
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);

@@ -2,20 +2,24 @@ import { Logger, Module, ClassSerializerInterceptor, ValidationPipe } from '@nes
 import { ConfigService, ConfigModule as NestConfigModule } from '@nestjs/config';
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { DataSource } from 'typeorm';
+import { DATABASE_LIFECYCLE, DatabaseLifecycle } from './database/database-lifecycle';
 import appConfiguration, { AppConfigType } from './config/app.config';
 import { StorageConfigType } from './config/storage.config';
 import { initializeProcessLogging, withLoggingLifecycle } from './logging/process-logging';
 import { NpmPluginService } from './plugin-system/npm-plugin.service';
 import { PluginMigrationService } from './plugin-system/plugin-migration.service';
 import { PluginModule } from './plugin-system/plugin.module';
+import { loadRecordedPermissionOwners } from './plugin-system/runtime/permission-owners';
+import { setRecordedPermissionOwners } from './plugin-system/runtime/plugin-permissions';
 import { PluginService } from './plugin-system/plugin.service';
+import { evaluateStartupLicense } from './plugin-system/license/startup-license';
 import { SettingsService } from './settings/settings.service';
 import { createWsAdapter } from './common/text-frame-ws-adapter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
-import { SqliteReadonlyFilter } from './exceptions/sqlite-readonly.filter';
+import { PersistenceReadOnlyFilter } from './exceptions/persistence-read-only.filter';
+import { ValkeyUnavailableFilter } from './exceptions/valkey-unavailable.filter';
 import { isValidTrustProxyValue, resolveTrustProxySetting } from './trust-proxy';
 import { HttpsOptions } from '@nestjs/common/interfaces/external/https-options.interface';
 import { existsSync } from 'fs';
@@ -24,7 +28,11 @@ import type { Request } from 'express';
 import type { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 import { ApprovedOriginsService } from './common/security/approved-origins.service';
 import { createCA, createCert } from 'mkcert';
+import { McpToolRegistry } from './mcp/mcp-tool-registry';
+import type { OpenApiDocument } from './mcp/openapi-tools';
+import { MCP_UNPREFIXED_ROUTES } from './mcp/mcp-routes';
 import { join } from 'path';
+import { rejectEmptyAuthorityTargets } from './app/empty-authority-target';
 
 /** SAML state may carry authentication context. HTTPS is required even when
  * the configured application URL is missing, HTTP, or later changed. Express
@@ -40,7 +48,8 @@ export function samlSession(secret: string) {
 
 export function configureBootstrapApi(app: NestExpressApplication, appConfig: AppConfigType, bootstrapLogger: Logger) {
   const globalPrefix = appConfig.GLOBAL_PREFIX;
-  app.setGlobalPrefix(globalPrefix);
+  // OAuth discovery documents live at the well-known locations of the origin, not below the API prefix.
+  app.setGlobalPrefix(globalPrefix, { exclude: [...MCP_UNPREFIXED_ROUTES] });
 
   app.useWebSocketAdapter(createWsAdapter(app));
 
@@ -75,11 +84,23 @@ export function configureBootstrapApi(app: NestExpressApplication, appConfig: Ap
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, documentFactory);
+  // MCP tools come from this same document, filtered by the reviewed manifest.
+  try {
+    app
+      .get(McpToolRegistry, { strict: false })
+      .setDocumentFactory(() => documentFactory() as unknown as OpenApiDocument);
+  } catch (error) {
+    bootstrapLogger.warn(`MCP tools are unavailable: ${(error as Error).message}`);
+  }
 
   return { globalPrefix, documentFactory };
 }
 
 export function configureBootstrapHttp(app: NestExpressApplication, appConfig: AppConfigType, bootstrapLogger: Logger) {
+  // Registered before the body parser and the static mounts (which only attach while the app
+  // initialises), so a host-less target is answered before anything reads or serves it.
+  app.use(rejectEmptyAuthorityTargets);
+
   // Plugin configurations can include large device profiles and a previous
   // draft for conflict detection, exceeding Express's default 100 KiB limit.
   app.useBodyParser('json', { limit: '10mb' });
@@ -104,7 +125,7 @@ export function configureBootstrapHttp(app: NestExpressApplication, appConfig: A
     app.set('trust proxy', false);
   }
 
-  app.useGlobalFilters(new SqliteReadonlyFilter(app.get(HttpAdapterHost)));
+  app.useGlobalFilters(new ValkeyUnavailableFilter(new PersistenceReadOnlyFilter(app.get(HttpAdapterHost))));
 
   app.use(cookieParser());
 
@@ -197,14 +218,14 @@ async function generateSelfSignedCertificates(storageDir: string, domain: string
 })
 class PluginBootstrapConfigModule {}
 
-type OwnedApplication = { close(): Promise<void>; get?(token: typeof DataSource): DataSource };
+type OwnedApplication = { close(): Promise<void>; get?(token: typeof DATABASE_LIFECYCLE): DatabaseLifecycle };
 
 async function closeOwnedApplication(app: OwnedApplication, logger: Logger): Promise<void> {
   // Capture ownership before closing: an earlier shutdown hook may throw before
   // TypeORM's hook runs, and the application may no longer allow provider lookup.
-  let database: DataSource | undefined;
+  let database: DatabaseLifecycle | undefined;
   try {
-    database = app.get?.(DataSource);
+    database = app.get?.(DATABASE_LIFECYCLE);
   } catch {
     // The early configuration context has no database provider.
   }
@@ -275,8 +296,16 @@ export async function bootstrap() {
   if (earlyConfig.PLUGIN_DIR) await NpmPluginService.recoverBackups();
   bootstrapLogger.log('PluginSystem configured.');
 
-  // Record active plugins before migrations or module loading execute plugin code.
   const shouldGuardPluginLifecycle = !earlyConfig.DISABLE_PLUGINS && Boolean(earlyConfig.PLUGIN_DIR);
+
+  // Decide which license-gated plugins may load. PluginModule.forRoot() is synchronous, so the license is read here,
+  // before AppModule is imported. A failure never aborts boot: gated plugins then count as unlicensed. It runs before
+  // the boot guard, so plugins the license keeps out are never recorded as active (and never quarantined).
+  if (shouldGuardPluginLifecycle) {
+    PluginService.setLicenseSnapshot(await evaluateStartupLicense(earlyConfig, bootstrapLogger));
+  }
+
+  // Record active plugins before migrations or module loading execute plugin code.
   if (shouldGuardPluginLifecycle) PluginService.beginBootGuard();
 
   // Run plugin-shipped up-migrations BEFORE AppModule is imported, so every
@@ -289,6 +318,12 @@ export async function bootstrap() {
     await PluginMigrationService.runPendingUpMigrationsForAllPlugins();
   } else if (skipDatabaseMigrations) {
     bootstrapLogger.log('Skipping plugin database migrations.');
+  }
+
+  // Plugin load rejects permission keys another plugin owns; ownership lives in the database, which is not open
+  // while PluginModule.forRoot() runs.
+  if (!earlyConfig.DISABLE_PLUGINS) {
+    setRecordedPermissionOwners(await loadRecordedPermissionOwners());
   }
 
   // Import AppModule only now, so PluginModule.forRoot() sees the configured PLUGIN_DIR.
@@ -335,7 +370,7 @@ export async function bootstrap() {
       // Run migrations before the app fully starts
       try {
         bootstrapLogger.log('Running database migrations...');
-        const dataSource = app.get(DataSource);
+        const dataSource = app.get<DatabaseLifecycle>(DATABASE_LIFECYCLE);
 
         if (!dataSource.isInitialized) {
           await dataSource.initialize();

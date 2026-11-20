@@ -1,4 +1,5 @@
 import { PluginAdministrationService } from './plugin-administration.service';
+import { PluginUninstallService } from './plugin-uninstall.service';
 import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 import { ExecutionContext, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -7,6 +8,8 @@ import { DualAuthGuard, EffectivePermissionsGuard } from '@attraccess/plugins-ba
 import { PluginController } from './plugin.controller';
 import { NpmPluginService } from './npm-plugin.service';
 import { PluginService } from './plugin.service';
+import { PluginBleService } from './ble/plugin-ble.service';
+import { PluginReadersService } from './readers/plugin-readers.service';
 
 describe('npm plugin request DTOs (HTTP integration)', () => {
   let app: INestApplication;
@@ -32,6 +35,9 @@ describe('npm plugin request DTOs (HTTP integration)', () => {
         { provide: NpmPluginService, useValue: npmPluginService },
         { provide: AUDIT_RECORDER, useValue: { record: jest.fn() } },
         PluginAdministrationService,
+        { provide: PluginBleService, useValue: { deleteAllForPlugin: jest.fn() } },
+        { provide: PluginReadersService, useValue: { deleteAllForPlugin: jest.fn() } },
+        PluginUninstallService,
         DualAuthGuard,
         EffectivePermissionsGuard,
       ],

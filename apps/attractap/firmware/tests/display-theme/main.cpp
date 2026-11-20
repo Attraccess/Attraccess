@@ -249,6 +249,7 @@ int main(int argc, char **argv)
         test("screen/supervision", [&] { testSupervision(renderer); });
         test("screen/mass-introduction", [&] { testMassIntroduction(renderer); });
         test("screen/introducer-details", [&] { testIntroducerDetails(renderer); });
+        test("screen/access-only-door", [&] { testAccessOnlyDoorDetails(renderer); });
         test("ui/reader-clause-lines", [] { testReaderUiClauseLines(); });
         test("screen/parallel-sessions-policy", [&] { testParallelSessionPolicy(); });
         test("screen/parallel-sessions-list", [&] { testParallelSessionList(renderer); });

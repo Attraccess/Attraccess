@@ -1,11 +1,12 @@
-import { usePluginsServiceUploadPlugin } from '@attraccess/react-query-client';
+import { useUploadPlugin } from '@attraccess/react-query-client';
 import { useState, useRef } from 'react';
 import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading } from '@heroui/react';
 import { Upload } from 'lucide-react';
-import { Button, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, FileInput, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './UploadPluginModal.en.json';
 import de from './UploadPluginModal.de.json';
 import { useToastMessage } from '../../components/toastProvider';
+import { installFailureReason } from '../settings/sections/plugins/marketplace/describeInstallFailure';
 
 interface UploadPluginModalProps {
   isOpen: boolean;
@@ -19,7 +20,7 @@ export function UploadPluginModal({ isOpen, onClose }: UploadPluginModalProps) {
   const toast = useToastMessage();
   const { t } = useTranslations({ en, de });
 
-  const { mutate: uploadPlugin, isPending } = usePluginsServiceUploadPlugin({
+  const { mutate: uploadPlugin, isPending } = useUploadPlugin(undefined, {
     onSuccess: () => {
       setTimeout(() => {
         window.location.reload();
@@ -33,9 +34,10 @@ export function UploadPluginModal({ isOpen, onClose }: UploadPluginModalProps) {
     },
     onError: (error) => {
       console.error('Failed to upload plugin:', error);
+      // The server's 400 names what is wrong with the archive (e.g. an SDK 1.x plugin and its migration guide).
       toast.error({
         title: t('error.title'),
-        description: t('error.description'),
+        description: installFailureReason(error) ?? t('error.description'),
       });
     },
   });
@@ -55,7 +57,7 @@ export function UploadPluginModal({ isOpen, onClose }: UploadPluginModalProps) {
     if (!selectedFile || isFileInvalid) return;
 
     uploadPlugin({
-      formData: {
+      body: {
         pluginZip: selectedFile,
       },
     });
@@ -85,15 +87,12 @@ export function UploadPluginModal({ isOpen, onClose }: UploadPluginModalProps) {
             <p>{t('description')}</p>
 
             <div className="space-y-1">
-              <input
-                type="file"
+              <FileInput
                 ref={fileInputRef}
                 accept=".zip,application/zip,application/x-zip-compressed"
                 onChange={handleFileChange}
+                isInvalid={isFileInvalid}
                 data-cy="upload-plugin-modal-file-input"
-                className={`block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-4 file:rounded-md file:border-0 file:bg-gray-100 dark:file:bg-gray-800 file:px-4 file:py-2 file:text-sm file:font-medium file:text-gray-700 dark:file:text-gray-300 hover:file:bg-gray-200 dark:hover:file:bg-gray-700 cursor-pointer rounded-md border ${
-                  isFileInvalid ? 'border-danger' : 'border-gray-300 dark:border-gray-700'
-                } px-3 py-2`}
               />
               <p className="text-xs text-gray-500 dark:text-gray-400">{t('fileInputDescription')}</p>
               {isFileInvalid && <p className="text-xs text-danger">{t('errors.invalidFile')}</p>}

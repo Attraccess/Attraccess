@@ -1,9 +1,9 @@
-import { MeteringReadyNodeDataSchema, ResourceFlowNode } from '@attraccess/database-entities';
+import { FlowNodeRecord, MeteringReadyNodeDataSchema } from '@attraccess/application-models';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 
 export class MeteringReadyExecutor implements NodeExecutor {
-  async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+  async execute(node: FlowNodeRecord, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
     if (ctx.metering?.kind !== 'start') {
       throw new FlowExecutionError('"Metering ready" can only run in a branch started by "Metering start"');
     }

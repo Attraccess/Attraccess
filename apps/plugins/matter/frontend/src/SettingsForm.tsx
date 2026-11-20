@@ -1,4 +1,10 @@
-import { Button, PasswordInput, StatusDialog, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  ConfirmableButton,
+  PasswordInput,
+  StatusDialog,
+  useDateTimeFormatter,
+} from '@attraccess/plugins-frontend-ui';
 import { Description, Form, Input, Label, TextArea, TextField } from '@heroui/react';
 import { useState, type FormEvent } from 'react';
 import type { ConnectionSettings, SettingsInput } from './api';
@@ -11,13 +17,24 @@ type Props = Readonly<{
   onRemove: () => Promise<void>;
 }>;
 
-type Notice = { kind: 'saved' } | { kind: 'error'; title: string; message: string } | { kind: 'remove' } | null;
+type Notice = { kind: 'saved' } | { kind: 'error'; title: string; message: string } | null;
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
+/** The URL as the backend stores it (origin and path without trailing slashes), so a respelling is no change. */
+function normalizedUrl(value: string): string {
+  try {
+    const parsed = new URL(value.trim());
+    return `${parsed.origin}${parsed.pathname.replace(/\/+$/, '')}`;
+  } catch {
+    return value.trim();
+  }
+}
+
 /**
  * The token is write-only: once saved, the form only shows that one is configured and offers to replace it. The
- * backend never sends it back.
+ * backend never sends it back. Changing the URL or the CA certificate needs the token again, so a stored token never
+ * goes to a new endpoint; the backend refuses such a save without it.
  */
 export function SettingsForm({ settings, onSave, onRemove }: Props) {
   const { t } = useMatterTranslations();
@@ -31,12 +48,16 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
   const [notice, setNotice] = useState<Notice>(null);
 
   const caChanged = caCleared || ca.trim() !== (settings.caCertificate ?? '').trim();
-  const canSave = url.trim() !== '' && (!replacing || credential !== '') && !busy;
+  const endpointChanged =
+    settings.credentialConfigured &&
+    (caChanged || (settings.url !== null && normalizedUrl(url) !== normalizedUrl(settings.url)));
+  const needsCredential = replacing || endpointChanged;
+  const canSave = url.trim() !== '' && (!needsCredential || credential !== '') && !busy;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const input: SettingsInput = { url: url.trim() };
-    if (replacing) input.credential = credential;
+    if (needsCredential) input.credential = credential;
     if (caChanged) input.caCertificate = ca.trim() === '' || caCleared ? null : ca.trim();
     setBusy(true);
     try {
@@ -82,17 +103,17 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
             <Description>{t('form.urlDescription')}</Description>
           </TextField>
 
-          {replacing ? (
+          {needsCredential ? (
             <div className="mt:flex mt:flex-col mt:gap-2">
               <PasswordInput
                 label={t('form.credential')}
-                description={t('form.credentialDescription')}
+                description={endpointChanged ? t('form.credentialReenter') : t('form.credentialDescription')}
                 autoComplete="new-password"
                 value={credential}
                 onValueChange={setCredential}
                 data-cy="matter-credential-input"
               />
-              {settings.credentialConfigured && (
+              {settings.credentialConfigured && !endpointChanged && (
                 <Button variant="tertiary" onPress={() => setReplacing(false)} data-cy="matter-keep-credential">
                   {t('form.cancelReplace')}
                 </Button>
@@ -129,14 +150,19 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
               {t('form.save')}
             </Button>
             {settings.url !== null && (
-              <Button
-                variant="danger-soft"
+              <ConfirmableButton
+                label={t('form.remove')}
+                status="error"
                 isDisabled={busy}
-                onPress={() => setNotice({ kind: 'remove' })}
+                onConfirm={remove}
+                confirm={{
+                  title: t('form.removeTitle'),
+                  message: t('form.removeText'),
+                  confirmLabel: t('form.removeConfirm'),
+                  'data-cy': 'matter-remove-dialog',
+                }}
                 data-cy="matter-remove"
-              >
-                {t('form.remove')}
-              </Button>
+              />
             )}
           </div>
         </Form>
@@ -159,23 +185,6 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
         data-cy="matter-error-dialog"
       >
         {notice?.kind === 'error' ? notice.message : ''}
-      </StatusDialog>
-      <StatusDialog
-        isOpen={notice?.kind === 'remove'}
-        status="warning"
-        title={t('form.removeTitle')}
-        onClose={() => setNotice(null)}
-        action={{
-          label: t('form.removeConfirm'),
-          isPending: busy,
-          onPress: async () => {
-            setNotice(null);
-            await remove();
-          },
-        }}
-        data-cy="matter-remove-dialog"
-      >
-        {t('form.removeText')}
       </StatusDialog>
     </section>
   );

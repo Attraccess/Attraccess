@@ -2,13 +2,7 @@
 // FEATURE: Password policy core registration in DI graph
 
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import {
-  AuthenticationDetail,
-  PasswordHistory,
-  PasswordPolicy,
-  PasswordPolicyOverride,
-} from '@attraccess/database-entities';
+import { AuthPersistenceModule } from '../../database/adapters/auth/auth-persistence.module';
 import { PasswordPolicyService } from './password-policy.service';
 import { PasswordPolicyController } from './password-policy.controller';
 import { AdminPasswordPolicyController } from './admin-password-policy.controller';
@@ -17,15 +11,7 @@ import { ZxcvbnService } from './zxcvbn.service';
 import { RbacModule } from '../rbac/rbac.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([
-      PasswordPolicy,
-      PasswordPolicyOverride,
-      PasswordHistory,
-      AuthenticationDetail,
-    ]),
-    RbacModule,
-  ],
+  imports: [AuthPersistenceModule, RbacModule],
   providers: [PasswordPolicyService, HibpClient, ZxcvbnService],
   controllers: [PasswordPolicyController, AdminPasswordPolicyController],
   exports: [PasswordPolicyService],

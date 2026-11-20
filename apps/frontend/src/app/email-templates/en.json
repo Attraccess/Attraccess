@@ -8,8 +8,7 @@
   },
   "columns": {
     "type": "Type",
-    "subject": "Subject",
-    "actions": "Actions"
+    "subject": "Subject"
   },
   "editButton": "Edit",
   "noTemplates": "No email templates found.",

@@ -1,6 +1,6 @@
-import { AuthenticationType, User } from '@attraccess/database-entities';
+import { AuthenticationType, type UserRecord } from '@attraccess/application-models';
 
-import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { EmailService } from '../../email/email.service';
 
@@ -20,8 +20,6 @@ import { SignupDomainService } from './signup-domain.service';
 
 import { UsersService } from './users.service';
 
-import { EntityManager } from 'typeorm';
-
 import { identityAuditEvent } from '../../audit/policies/identity';
 
 import { AUDIT_RECORDER, AuditOrigin, AuditRecorder, SYSTEM_AUDIT_ACTOR } from '../../audit/recorder/audit-event';
@@ -30,7 +28,6 @@ import { AUDIT_RECORDER, AuditOrigin, AuditRecorder, SYSTEM_AUDIT_ACTOR } from '
 export class UserRegistrationService {
   constructor(
     protected readonly usersService: UsersService,
-    @Inject(forwardRef(() => AuthService))
     protected readonly authService: AuthService,
     protected readonly emailService: EmailService,
     protected readonly passwordPolicyService: PasswordPolicyService,
@@ -43,7 +40,7 @@ export class UserRegistrationService {
   protected firstTimeSetupOverwriteLock = Promise.resolve();
 
   /** Registers an account (self-signup or by an administrator) and audits it; `request` is the signup request. */
-  public async createOne(body: CreateUserDto, locale?: string, request?: AuditOrigin['request']): Promise<User> {
+  public async createOne(body: CreateUserDto, locale?: string, request?: AuditOrigin['request']): Promise<UserRecord> {
     this.logger.debug(`Creating new user with username: ${body.username} and email: ${body.email}`);
 
     await this.signupDomainService.assertEmailDomainAllowed(body.email);
@@ -101,7 +98,7 @@ export class UserRegistrationService {
     }
   }
 
-  public async acceptInvitation(body: AcceptInvitationDto): Promise<User> {
+  public async acceptInvitation(body: AcceptInvitationDto): Promise<UserRecord> {
     this.logger.debug(`Accepting invitation for: ${body.email} with token: ${body.token.substring(0, 5)}...`);
 
     await this.authService.verifyEmail(body.email, body.token);
@@ -132,10 +129,10 @@ export class UserRegistrationService {
     locale: string | undefined,
     hashedPassword: string | undefined,
     overwriteFirstTimeAdmin: boolean | undefined,
-  ): Promise<User> {
-    let existingAdmin: User | undefined;
+  ): Promise<UserRecord> {
+    let existingAdmin: UserRecord | undefined;
 
-    const { user, verificationToken } = await this.usersService.withTransaction(async (manager: EntityManager) => {
+    const { user, verificationToken } = await this.usersService.withTransaction(async (manager) => {
       existingAdmin = overwriteFirstTimeAdmin
         ? await this.usersService.releaseFirstTimeSetupAdminIdentifiers(manager)
         : undefined;

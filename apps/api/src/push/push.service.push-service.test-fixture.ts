@@ -1,10 +1,10 @@
-import { PushSubscription } from '@attraccess/database-entities';
+import type { PushSubscriptionRecord } from '@attraccess/application-models';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import * as webpush from 'web-push';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { SettingsService } from '../settings/settings.service';
 import { PushService } from './push.service';
+import { PUSH_SUBSCRIPTION_STORE } from './push-subscription-store.port';
 
 jest.mock('web-push', () => ({
   generateVAPIDKeys: jest.fn(),
@@ -18,14 +18,13 @@ const VALID_PUBLIC_KEY = Buffer.alloc(65, 4).toString('base64url');
 
 const VALID_PRIVATE_KEY = Buffer.alloc(32, 7).toString('base64url');
 export function registerPushServiceFixture() {
-  let subscriptionRepository: {
-    find: jest.Mock;
-    findOne: jest.Mock;
-    create: jest.Mock;
-    save: jest.Mock;
-    delete: jest.Mock;
+  let subscriptionStore: {
     count: jest.Mock;
-    createQueryBuilder: jest.Mock;
+    deleteAll: jest.Mock;
+    upsertByEndpoint: jest.Mock;
+    findForUser: jest.Mock;
+    deleteForUser: jest.Mock;
+    deleteById: jest.Mock;
   };
 
   let settingsStore: {
@@ -41,13 +40,11 @@ export function registerPushServiceFixture() {
     getSmtpConfiguration: jest.Mock;
   };
 
-  let deleteExecute: jest.Mock;
-
   async function createService(): Promise<PushService> {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PushService,
-        { provide: getRepositoryToken(PushSubscription), useValue: subscriptionRepository },
+        { provide: PUSH_SUBSCRIPTION_STORE, useValue: subscriptionStore },
         { provide: SettingsStoreService, useValue: settingsStore },
         { provide: SettingsService, useValue: settingsService },
       ],
@@ -61,7 +58,7 @@ export function registerPushServiceFixture() {
     settingsStore.getSecretSetting.mockResolvedValue({ value: privateKey, configured: privateKey !== null });
   }
 
-  function makeSubscription(overrides: Partial<PushSubscription> = {}): PushSubscription {
+  function makeSubscription(overrides: Partial<PushSubscriptionRecord> = {}): PushSubscriptionRecord {
     return {
       id: 1,
       userId: 42,
@@ -71,24 +68,19 @@ export function registerPushServiceFixture() {
       userAgent: null,
       createdAt: new Date(),
       lastSeenAt: null,
-      user: undefined,
       ...overrides,
-    } as PushSubscription;
+    };
   }
 
   beforeEach(() => {
     jest.clearAllMocks();
-    deleteExecute = jest.fn().mockResolvedValue({ affected: 0 });
-    subscriptionRepository = {
-      find: jest.fn(),
-      findOne: jest.fn(),
-      create: jest.fn((data) => data),
-      save: jest.fn((data) => Promise.resolve(data)),
-      delete: jest.fn(),
+    subscriptionStore = {
       count: jest.fn().mockResolvedValue(0),
-      createQueryBuilder: jest.fn(() => ({
-        delete: () => ({ execute: deleteExecute }),
-      })),
+      deleteAll: jest.fn().mockResolvedValue(undefined),
+      upsertByEndpoint: jest.fn(),
+      findForUser: jest.fn(),
+      deleteForUser: jest.fn().mockResolvedValue(undefined),
+      deleteById: jest.fn().mockResolvedValue(undefined),
     };
     settingsStore = {
       getPlainSetting: jest.fn(),
@@ -116,17 +108,14 @@ export function registerPushServiceFixture() {
     get VALID_PRIVATE_KEY() {
       return VALID_PRIVATE_KEY;
     },
-    get subscriptionRepository() {
-      return subscriptionRepository;
+    get subscriptionStore() {
+      return subscriptionStore;
     },
     get settingsStore() {
       return settingsStore;
     },
     get settingsService() {
       return settingsService;
-    },
-    get deleteExecute() {
-      return deleteExecute;
     },
     get createService() {
       return createService;

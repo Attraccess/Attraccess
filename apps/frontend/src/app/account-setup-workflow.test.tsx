@@ -22,16 +22,16 @@ vi.mock('../components/toastProvider', () => ({
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('@attraccess/react-query-client', async (original) => ({
   ...(await original<typeof import('@attraccess/react-query-client')>()),
-  useUsersServiceAcceptInvitation: (callbacks: (typeof state.callbacks)[string]) => {
+  useAcceptInvitation: (_mutationKey: unknown, callbacks: (typeof state.callbacks)[string]) => {
     state.callbacks.accept = callbacks;
     return { mutate: state.accept, isPending: false };
   },
-  useUsersServiceCreateOneUser: (callbacks: (typeof state.callbacks)[string]) => {
+  useCreateOneUser: (_mutationKey: unknown, callbacks: (typeof state.callbacks)[string]) => {
     state.callbacks.create = callbacks;
     return { mutate: state.create, isPending: false };
   },
-  UseUsersServiceFindManyKeyFn: () => ['users'],
-  UseSettingsServiceGetFirstTimeSetupStatusKeyFn: () => ['setup'],
+  UseFindManyKeyFn: () => ['users'],
+  UseGetFirstTimeSetupStatusKeyFn: () => ['setup'],
 }));
 vi.mock('../components/PasswordField', () => ({
   PasswordField: ({
@@ -93,7 +93,7 @@ it('validates invitation passwords, submits its token and logs in after acceptan
   fireEvent.change(screen.getByLabelText('Confirm your Password'), { target: { value: 'secure-password' } });
   fireEvent.click(screen.getByRole('button', { name: 'Accept Invitation' }));
   expect(state.accept).toHaveBeenCalledWith({
-    requestBody: { token: 'invitation-token', email: 'alex@example.test', password: 'secure-password' },
+    body: { token: 'invitation-token', email: 'alex@example.test', password: 'secure-password' },
   });
   act(() => state.callbacks.accept.onSuccess({ username: 'alex' }));
   expect(state.login).toHaveBeenCalledWith({ username: 'alex', password: 'secure-password', tokenLocation: 'cookie' });
@@ -133,7 +133,7 @@ it.each([false, true])(
     fireEvent.click(screen.getByRole('button', { name: 'Create admin account' }));
     await waitFor(() =>
       expect(state.create).toHaveBeenCalledWith({
-        requestBody: {
+        body: {
           username: 'admin-user',
           email: 'admin@example.test',
           password: 'secure-password',

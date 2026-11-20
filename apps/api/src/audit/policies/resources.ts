@@ -1,4 +1,5 @@
-import { dataFields, positive, uuid, withinDetailsLimit } from './projection';
+import { dataFields, positive, uuid, withinDetailsLimit, isAuthenticationMethod } from './projection';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 export const RESOURCE_AUDIT_ACTIONS = [
   'resource.created',
@@ -21,6 +22,7 @@ export const RESOURCE_AUDIT_ACTIONS = [
   'usage_session.ended',
   'energy_charge.waived',
   'meter_charge.waived',
+  'meter.updated',
   'retraining.required',
   'retraining.cleared',
   'resource_flow.updated',
@@ -39,7 +41,7 @@ export interface ResourceAuditInput {
   action: ResourceAuditAction;
   operationId: string;
   actorId: number | null;
-  authenticationMethod?: 'session' | 'api-token' | null;
+  authenticationMethod?: AuthenticationMethod | null;
   apiTokenId?: number | null;
   subjectId: number;
   subjectType?: 'resource' | 'resource_group' | 'flow';
@@ -112,6 +114,14 @@ export const resourceDetailFields: Partial<Record<ResourceAuditAction, readonly 
   'usage_session.ended': ['usageId', 'usageUserId', 'triggeredByUserId'],
   'energy_charge.waived': ['usageId', 'waivedCredits'],
   'meter_charge.waived': ['meterId', 'usageId', 'waivedCredits'],
+  'meter.updated': [
+    'meterId',
+    'meterName',
+    'before.creditsPerUnit',
+    'after.creditsPerUnit',
+    'before.allocation',
+    'after.allocation',
+  ],
   'retraining.required': ['introductionId', 'retrainingReason', 'usageUserId'],
   'retraining.cleared': ['introductionId', 'usageUserId'],
   'resource_flow.updated': CANVAS_FIELDS,
@@ -148,8 +158,7 @@ export function validResourcePrincipal(input: ResourceAuditInput): boolean {
   } else if (
     (input.authenticationMethod !== undefined &&
       input.authenticationMethod !== null &&
-      input.authenticationMethod !== 'session' &&
-      input.authenticationMethod !== 'api-token') ||
+      !isAuthenticationMethod(input.authenticationMethod)) ||
     ((input.authenticationMethod === undefined || input.authenticationMethod === null) &&
       input.apiTokenId !== undefined &&
       input.apiTokenId !== null) ||

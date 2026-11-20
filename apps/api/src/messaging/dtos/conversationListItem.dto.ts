@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Message, User } from '@attraccess/database-entities';
+import type { MessageRecord, MessagingUser } from '@attraccess/application-models';
+import { UserSchemaRef } from '../../types/user-schema-ref';
+import { Message } from './message.dto';
 
 export class ConversationListItemDto {
   @ApiProperty({
@@ -8,12 +10,8 @@ export class ConversationListItemDto {
   })
   id!: number;
 
-  @ApiProperty({
-    description: 'The other participant of this 1:1 conversation',
-    type: () => User,
-    nullable: true,
-  })
-  otherParticipant!: User | null;
+  @UserSchemaRef({ description: 'The other participant of this 1:1 conversation', nullable: true })
+  otherParticipant!: MessagingUser | null;
 
   @ApiProperty({
     description: 'Whether the other participant currently has an open live messaging stream',
@@ -26,7 +24,7 @@ export class ConversationListItemDto {
     type: () => Message,
     nullable: true,
   })
-  lastMessage!: Message | null;
+  lastMessage!: MessageRecord | null;
 
   @ApiProperty({
     description: 'When this conversation was last updated',

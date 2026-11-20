@@ -24,6 +24,7 @@ import { CookieConfigService } from '../../common/services/cookie-config.service
 import { auditOriginOf } from '../../audit/recorder/audit-event';
 import { ApprovedOriginsService } from '../../common/security/approved-origins.service';
 import { SessionPermissionSync } from './sso/session-permission-sync';
+import { toSessionUser } from './session-user';
 
 @ApiTags('Authentication')
 @Controller('/auth')
@@ -77,13 +78,13 @@ export class AuthController {
 
       // Return user data without token for web browsers
       return {
-        user: request.user,
+        user: toSessionUser(request.user),
         authToken: '', // Empty token for web browsers using cookies
       };
     } else {
       // Return token in response body for programmatic clients
       return {
-        user: request.user,
+        user: toSessionUser(request.user),
         authToken: sessionToken,
       };
     }
@@ -126,12 +127,12 @@ export class AuthController {
     response.setHeader('Cache-Control', 'no-store');
     if (this.bearerToken(request)) {
       // Programmatic clients already hold the credential; they receive the new one.
-      return { user: request.user, authToken: newToken };
+      return { user: toSessionUser(request.user), authToken: newToken };
     }
 
     // Browser sessions never expose the token to page scripts.
     await this.cookieConfigService.setAuthCookie(response, newToken);
-    return { user: request.user, authToken: '' };
+    return { user: toSessionUser(request.user), authToken: '' };
   }
 
   private bearerToken(request: AuthenticatedRequest): string {

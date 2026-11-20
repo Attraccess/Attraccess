@@ -1,5 +1,5 @@
 import { registerSsoControllerFixture } from './sso.controller.sso-controller.test-fixture';
-import { SSOProviderType, AuthenticationDetail, AuthenticationType } from '@attraccess/database-entities';
+import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
 import { UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './../auth.service';
 import { UsersService } from './../../users/users.service';
@@ -27,12 +27,12 @@ describe('SsoController rate limiting (ATT-1223)', () => {
         {
           id: 10,
           type: AuthenticationType.LOCAL_PASSWORD,
-        } as AuthenticationDetail,
+        } as Record<string, unknown>,
       ],
     };
 
     function setupLinkMocks({
-      existingSSODetail = null as AuthenticationDetail | null,
+      existingSSODetail = null as Record<string, unknown> | null,
       passwordOk = true,
       ssoSubjectExistsForOtherUser = false,
       hasLocalPassword = true,

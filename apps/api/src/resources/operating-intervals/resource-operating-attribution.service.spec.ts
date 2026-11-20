@@ -1,7 +1,6 @@
 import { registerResourceOperatingAttributionServiceFixture } from './resource-operating-attribution.service.resource-operating-attribution-service.test-fixture';
-import { ResourceOperatingInterval, ResourceUsage, ResourceUsageAction } from '@attraccess/database-entities';
-import { MoreThan } from 'typeorm';
-import { TimeRange, UsageRange } from './resource-operating-attribution.service';
+
+import { ResourceUsageAction } from '@attraccess/application-models';
 
 describe('ResourceOperatingAttributionService', () => {
   const fixture = registerResourceOperatingAttributionServiceFixture();
@@ -31,8 +30,18 @@ describe('ResourceOperatingAttributionService', () => {
     });
   });
 
-  describe('parallel sessions (interim rule)', () => {
-    it('attributes each operating moment to exactly one session, the earliest started', () => {
+  describe('parallel sessions (equal split)', () => {
+    // The sessions that overlap the one a share is computed for, and the stops requested but not stored yet.
+    const managerWith = (others: unknown[], pending: { previousUsageId: number; transitionTime: Date }[] = []) => {
+      fixture.timeline.findIntervals.mockResolvedValue([fixture.operating(1, '10:00:00', '11:00:00')]);
+      fixture.timeline.findSessions.mockResolvedValue(others);
+      fixture.timeline.findPendingSessionEnds.mockResolvedValue(
+        new Map(pending.map(({ previousUsageId, transitionTime }) => [previousUsageId, transitionTime])),
+      );
+      return undefined;
+    };
+
+    it('splits each operating moment equally among the sessions active in it', () => {
       const result = fixture.service.derive(
         [fixture.operating(1, '10:00:00', '11:00:00')],
         [fixture.usage(2, '10:10:00', '10:40:00'), fixture.usage(3, '10:20:00', '10:50:00')],
@@ -41,97 +50,52 @@ describe('ResourceOperatingAttributionService', () => {
 
       const byUsage = (usageId: number) =>
         result.attributions.filter((entry) => entry.usageId === usageId).reduce((sum, e) => sum + e.durationMs, 0);
-      expect(byUsage(2)).toBe(30 * 60_000);
-      expect(byUsage(3)).toBe(10 * 60_000);
+      // 10:10-10:20 alone (10), 10:20-10:40 together (20 / 2), 10:40-10:50 alone (10)
+      expect(byUsage(2)).toBe(20 * 60_000);
+      expect(byUsage(3)).toBe(20 * 60_000);
       expect(result.attributedOperatingDurationMs).toBe(40 * 60_000);
       expect(byUsage(2) + byUsage(3)).toBe(result.attributedOperatingDurationMs);
     });
 
-    it('charges the persisted duration of a later session without the earlier overlapping one', async () => {
+    it('charges a session its share of the time it shared with a session that is still running', async () => {
       const earlier = fixture.usage(2, '10:00:00', null);
       const later = fixture.usage(3, '10:20:00', '10:50:00');
-      fixture.intervalRepository.find.mockResolvedValue([fixture.operating(1, '10:00:00', '11:00:00')]);
-      const manager = {
-        getRepository: (entity: unknown) => ({
-          find: async () =>
-            entity === ResourceOperatingInterval
-              ? [fixture.operating(1, '10:00:00', '11:00:00')]
-              : entity === ResourceUsage
-                ? [earlier]
-                : [],
-        }),
-      };
 
-      await expect(fixture.service.getForUsage(later, manager as never)).resolves.toBe(0);
+      // alone from 10:20 is not possible: the earlier session runs through, so all 30 minutes are shared
+      await expect(fixture.service.getForUsage(later, managerWith([earlier]))).resolves.toBe(15);
     });
 
-    it('charges a later session from the requested end of an earlier session whose end is in progress', async () => {
+    it('splits from the requested end of a session whose end is in progress', async () => {
       // A started first; its end was requested at 10:30 but is not persisted yet when B ends at 10:50.
       const earlier = fixture.usage(2, '10:00:00', null);
       const later = fixture.usage(3, '10:20:00', '10:50:00');
-      const manager = {
-        getRepository: (entity: unknown) => ({
-          find: async () =>
-            entity === ResourceOperatingInterval
-              ? [fixture.operating(1, '10:00:00', '11:00:00')]
-              : entity === ResourceUsage
-                ? [earlier]
-                : [{ previousUsageId: earlier.id, transitionTime: fixture.at('10:30:00') }],
-        }),
-      };
+      const pending = [{ previousUsageId: earlier.id, transitionTime: fixture.at('10:30:00') }];
 
-      await expect(fixture.service.getForUsage(later, manager as never)).resolves.toBe(20);
+      // 10:20-10:30 shared (10 / 2), 10:30-10:50 alone (20)
+      await expect(fixture.service.getForUsage(later, managerWith([earlier], pending))).resolves.toBe(25);
     });
 
-    it('matches the pairwise subtraction it replaced for random overlapping sessions', () => {
-      type Service = { withoutOverlaps(ranges: UsageRange[]): UsageRange[] };
-      const subtract = (span: TimeRange, taken: TimeRange): TimeRange[] => {
-        if (span.endTime <= taken.startTime || taken.endTime <= span.startTime) return [span];
-        const remainder: TimeRange[] = [];
-        if (span.startTime < taken.startTime) remainder.push({ startTime: span.startTime, endTime: taken.startTime });
-        if (taken.endTime < span.endTime) remainder.push({ startTime: taken.endTime, endTime: span.endTime });
-        return remainder;
-      };
-      // The previous O(n²) implementation, kept verbatim as the reference.
-      const reference = (usageRanges: UsageRange[]): UsageRange[] => {
-        const ordered = [...usageRanges].sort(
-          (left, right) =>
-            left.usage.startTime.getTime() - right.usage.startTime.getTime() || left.usage.id - right.usage.id,
-        );
-        const result: UsageRange[] = [];
-        const earlier: TimeRange[] = [];
-        for (const entry of ordered) {
-          let spans: TimeRange[] = [entry.range];
-          for (const taken of earlier) {
-            spans = spans.flatMap((span) => subtract(span, taken));
-            if (spans.length === 0) break;
-          }
-          result.push(...spans.map((range) => (range === entry.range ? entry : { usage: entry.usage, range })));
-          earlier.push(entry.range);
-        }
-        return usageRanges.length < 2 ? usageRanges : result;
-      };
-      const plain = (ranges: UsageRange[]) =>
-        ranges.map(({ usage, range }) => [usage.id, range.startTime.getTime(), range.endTime.getTime()]);
-      let seed = 1189;
-      const random = (limit: number) => {
-        seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
-        return seed % limit;
-      };
-      const base = fixture.at('10:00:00').getTime();
-      for (let run = 0; run < 500; run++) {
-        const ranges: UsageRange[] = Array.from({ length: random(12) }, (_, index) => {
-          // Coarse steps produce ties, touching ends and nested sessions; ids are shuffled against start order.
-          const start = base + random(20) * 60_000;
-          const range = { startTime: new Date(start), endTime: new Date(start + (1 + random(15)) * 60_000) };
-          const usage = { ...fixture.usage(100 - index, '10:00:00', null), startTime: range.startTime };
-          return { usage, range };
-        });
-        const actual = (fixture.service as unknown as Service).withoutOverlaps(ranges);
-        expect(plain(actual)).toEqual(plain(reference(ranges)));
-        // Untouched sessions keep their entry, so downstream identity checks behave as before.
-        reference(ranges).forEach((entry, index) => expect(actual[index] === entry).toBe(ranges.includes(entry)));
+    it('reports a session that never overlapped as not shared and charges its whole operating time', async () => {
+      const solo = fixture.usage(3, '10:20:00', '10:50:00');
+
+      const share = await fixture.service.getShareForUsage(solo, managerWith([]));
+
+      expect(share).toMatchObject({ shared: false, shareMs: 30 * 60_000 });
+    });
+
+    it('adds up the shares of everyone to the machine operating time', async () => {
+      const first = fixture.usage(2, '10:00:00', '10:40:00');
+      const second = fixture.usage(3, '10:20:00', '10:50:00');
+      const third = fixture.usage(4, '10:30:00', '10:45:00');
+      const all = [first, second, third];
+      const shares = [];
+      for (const usage of all) {
+        shares.push(await fixture.service.getShareForUsage(usage, managerWith(all.filter((other) => other !== usage))));
       }
+
+      // the machine ran 10:00-11:00, sessions cover 10:00-10:50
+      expect(shares.reduce((total, share) => total + (share?.shareMs ?? 0), 0)).toBe(50 * 60_000);
+      expect(shares.every((share) => share?.shared)).toBe(true);
     });
 
     it('splits ten thousand overlapping sessions without quadratic work', () => {
@@ -150,12 +114,12 @@ describe('ResourceOperatingAttributionService', () => {
 
   describe('getDurationsForWindows', () => {
     it('clips independent service cycles and unions overlapping intervals without requiring attribution', async () => {
-      fixture.intervalRepository.find.mockResolvedValue([
+      fixture.timeline.findIntervals.mockResolvedValue([
         fixture.operating(1, '09:00:00', null),
         fixture.operating(2, '10:00:00', '11:00:00'),
         { ...fixture.operating(3, '11:30:00', null), resourceId: 2 },
       ]);
-      fixture.usageRepository.find.mockResolvedValue([fixture.usage(1, '10:15:00', '10:45:00')]);
+      fixture.timeline.findSessions.mockResolvedValue([fixture.usage(1, '10:15:00', '10:45:00')]);
 
       const totals = await fixture.service.getDurationsForWindows(
         [
@@ -173,19 +137,19 @@ describe('ResourceOperatingAttributionService', () => {
           ['old:2', { sessionDurationMs: 0, operatingDurationMs: 30 * 60_000 }],
         ]),
       );
-      expect(fixture.intervalRepository.find).toHaveBeenCalledTimes(1);
-      expect(fixture.usageRepository.find).toHaveBeenCalledTimes(1);
+      expect(fixture.timeline.findIntervals).toHaveBeenCalledTimes(1);
+      expect(fixture.timeline.findSessions).toHaveBeenCalledTimes(1);
     });
 
     it('does not query the database when there are no duration windows', async () => {
       await expect(fixture.service.getDurationsForWindows([], fixture.asOf)).resolves.toEqual(new Map());
-      expect(fixture.intervalRepository.find).not.toHaveBeenCalled();
-      expect(fixture.usageRepository.find).not.toHaveBeenCalled();
+      expect(fixture.timeline.findIntervals).not.toHaveBeenCalled();
+      expect(fixture.timeline.findSessions).not.toHaveBeenCalled();
     });
 
     it('uses each resource service-cycle boundary when loading a batch', async () => {
-      fixture.intervalRepository.find.mockResolvedValue([]);
-      fixture.usageRepository.find.mockResolvedValue([]);
+      fixture.timeline.findIntervals.mockResolvedValue([]);
+      fixture.timeline.findSessions.mockResolvedValue([]);
 
       await fixture.service.getDurationsForWindows(
         [
@@ -195,22 +159,20 @@ describe('ResourceOperatingAttributionService', () => {
         fixture.asOf,
       );
 
-      const intervalWhere = fixture.intervalRepository.find.mock.calls[0][0].where as Array<{
-        resourceId: number;
-        endTime: unknown;
-      }>;
-      expect(intervalWhere).toHaveLength(4);
-      expect(intervalWhere.filter(({ resourceId }) => resourceId === 1)).toEqual(
-        expect.arrayContaining([expect.objectContaining({ endTime: MoreThan(fixture.at('01:00:00')) })]),
-      );
-      expect(intervalWhere.filter(({ resourceId }) => resourceId === 2)).toEqual(
-        expect.arrayContaining([expect.objectContaining({ endTime: MoreThan(fixture.at('11:00:00')) })]),
+      expect(fixture.timeline.findIntervals).toHaveBeenCalledTimes(1);
+      expect(fixture.timeline.findIntervals).toHaveBeenCalledWith(
+        [
+          { resourceId: 1, from: fixture.at('01:00:00') },
+          { resourceId: 2, from: fixture.at('11:00:00') },
+        ],
+        fixture.asOf,
+        undefined,
       );
     });
 
     it('propagates unavailable authoritative data instead of returning a zero duration', async () => {
-      fixture.intervalRepository.find.mockRejectedValue(new Error('interval read failed'));
-      fixture.usageRepository.find.mockResolvedValue([]);
+      fixture.timeline.findIntervals.mockRejectedValue(new Error('interval read failed'));
+      fixture.timeline.findSessions.mockResolvedValue([]);
       await expect(
         fixture.service.getDurationsForWindows(
           [{ key: '1', resourceId: 1, start: fixture.at('10:00:00') }],
@@ -346,6 +308,7 @@ describe('ResourceOperatingAttributionService', () => {
       asOf: fixture.asOf,
       windowStart: null,
       sessionDurationMs: 60 * 60_000,
+      personDurationMs: 60 * 60_000,
       operatingDataAvailable: false,
       operatingDurationMs: null,
       attributedOperatingDurationMs: null,
@@ -353,6 +316,70 @@ describe('ResourceOperatingAttributionService', () => {
       isOperating: false,
       isProvisional: false,
       attributions: [],
+    });
+  });
+
+  describe('person duration', () => {
+    const HOUR = 60 * 60_000;
+
+    it('sums overlapping sessions while the machine duration counts them once', () => {
+      const result = fixture.service.derive(
+        [],
+        [fixture.usage(1, '10:00:00', '12:00:00'), fixture.usage(2, '11:00:00', '13:00:00')],
+        fixture.at('14:00:00'),
+      );
+
+      expect(result.personDurationMs).toBe(4 * HOUR);
+      expect(result.sessionDurationMs).toBe(3 * HOUR);
+    });
+
+    it('equals the machine duration for touching sessions', () => {
+      const result = fixture.service.derive(
+        [],
+        [fixture.usage(1, '10:00:00', '11:00:00'), fixture.usage(2, '11:00:00', '12:00:00')],
+        fixture.at('14:00:00'),
+      );
+
+      expect(result.personDurationMs).toBe(2 * HOUR);
+      expect(result.sessionDurationMs).toBe(2 * HOUR);
+    });
+
+    it('counts open sessions up to the snapshot time', () => {
+      const result = fixture.service.derive(
+        [],
+        [fixture.usage(1, '10:00:00', null), fixture.usage(2, '10:30:00', null)],
+        fixture.at('11:00:00'),
+      );
+
+      expect(result.personDurationMs).toBe(HOUR + HOUR / 2);
+      expect(result.sessionDurationMs).toBe(HOUR);
+    });
+
+    it('clips every session to the window start and the snapshot time', () => {
+      const result = fixture.service.derive(
+        [],
+        [fixture.usage(1, '08:00:00', '10:00:00'), fixture.usage(2, '09:30:00', '13:00:00')],
+        fixture.at('11:00:00'),
+        fixture.at('09:00:00'),
+      );
+
+      // 09:00-10:00 and 09:30-11:00
+      expect(result.personDurationMs).toBe(HOUR + 1.5 * HOUR);
+      expect(result.sessionDurationMs).toBe(2 * HOUR);
+    });
+
+    it('ignores non-usage actions and sessions that are still pending their lifecycle', () => {
+      const result = fixture.service.derive(
+        [],
+        [
+          fixture.usage(1, '10:00:00', '11:00:00'),
+          { ...fixture.usage(2, '10:00:00', '11:00:00'), usageAction: ResourceUsageAction.DoorUnlock },
+          { ...fixture.usage(3, '10:00:00', '11:00:00'), lifecyclePending: true },
+        ],
+        fixture.asOf,
+      );
+
+      expect(result.personDurationMs).toBe(HOUR);
     });
   });
 
@@ -385,11 +412,8 @@ describe('ResourceOperatingAttributionService', () => {
   });
 
   it('derives an explicit diagnostics range through the same sweep as the default window (ATT-1024)', async () => {
-    fixture.intervalRepository.find.mockResolvedValue([
-      fixture.operating(1, '10:00:00', '11:00:00'),
-    ] as ResourceOperatingInterval[]);
-    fixture.usageRepository.find.mockResolvedValue([fixture.usage(2, '10:15:00', '10:45:00')] as ResourceUsage[]);
-    fixture.intervalRepository.existsBy.mockResolvedValue(true);
+    fixture.timeline.findIntervals.mockResolvedValue([fixture.operating(1, '10:00:00', '11:00:00')]);
+    fixture.timeline.findSessions.mockResolvedValue([fixture.usage(2, '10:15:00', '10:45:00')]);
     const windowStart = fixture.at('09:00:00');
 
     const result = await fixture.service.getForResource(1, fixture.asOf, windowStart);
@@ -403,63 +427,42 @@ describe('ResourceOperatingAttributionService', () => {
   });
 
   it('calculates a completed usage session from its exact operating overlap', async () => {
-    const manager = {
-      getRepository: jest.fn(() => ({
-        find: jest.fn().mockResolvedValue([fixture.operating(1, '10:00:00', '11:00:00')]),
-      })),
-    };
-    const minutes = await fixture.service.getForUsage(fixture.usage(2, '10:15:00', '10:45:00'), manager as never);
+    fixture.timeline.findIntervals.mockResolvedValue([fixture.operating(1, '10:00:00', '11:00:00')]);
+    const minutes = await fixture.service.getForUsage(fixture.usage(2, '10:15:00', '10:45:00'));
 
     expect(minutes).toBe(30);
   });
 
   it('loads only intervals that overlap the recent attribution window', async () => {
-    fixture.intervalRepository.find.mockResolvedValue([] as ResourceOperatingInterval[]);
-    fixture.usageRepository.find.mockResolvedValue([] as ResourceUsage[]);
+    fixture.timeline.findIntervals.mockResolvedValue([]);
+    fixture.timeline.findSessions.mockResolvedValue([]);
 
     const result = await fixture.service.getForResource(1, fixture.asOf);
 
     expect(result.windowStart).toEqual(new Date('2026-07-28T12:00:00.000Z'));
 
-    expect(fixture.intervalRepository.find).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.arrayContaining([
-          expect.objectContaining({ resourceId: 1 }),
-          expect.objectContaining({ resourceId: 1 }),
-        ]),
-      }),
-    );
-    expect(fixture.usageRepository.find).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.arrayContaining([
-          expect.objectContaining({ resourceId: 1, usageAction: ResourceUsageAction.Usage }),
-          expect.objectContaining({ resourceId: 1, usageAction: ResourceUsageAction.Usage }),
-        ]),
-      }),
-    );
+    const windows = [{ resourceId: 1, from: result.windowStart }];
+    expect(fixture.timeline.findIntervals).toHaveBeenCalledWith(windows, fixture.asOf);
+    expect(fixture.timeline.findSessions).toHaveBeenCalledWith(windows, fixture.asOf);
   });
 
   it('loads and derives reports for multiple resources in one query per source', async () => {
-    fixture.intervalRepository.find.mockResolvedValue([
+    fixture.timeline.findIntervals.mockResolvedValue([
       fixture.operating(1, '10:00:00', '11:00:00'),
       { ...fixture.operating(2, '10:00:00', '10:30:00'), resourceId: 2 },
-    ] as ResourceOperatingInterval[]);
-    fixture.usageRepository.find.mockResolvedValue([
+    ]);
+    fixture.timeline.findSessions.mockResolvedValue([
       fixture.usage(1, '10:00:00', '10:30:00'),
       { ...fixture.usage(2, '10:00:00', '10:15:00'), resourceId: 2 },
-    ] as ResourceUsage[]);
-    fixture.availabilityQuery.getRawMany.mockResolvedValue([{ resourceId: 1 }, { resourceId: 2 }]);
+    ]);
+    fixture.timeline.findResourcesWithIntervals.mockResolvedValue(new Set([1, 2]));
 
     const result = await fixture.service.getForResources([1, 2], fixture.at('09:00:00'), fixture.asOf);
 
     expect(result.get(1)).toMatchObject({ sessionDurationMs: 30 * 60_000, operatingDurationMs: 60 * 60_000 });
     expect(result.get(2)).toMatchObject({ sessionDurationMs: 15 * 60_000, operatingDurationMs: 30 * 60_000 });
-    expect(fixture.intervalRepository.find).toHaveBeenCalledTimes(1);
-    expect(fixture.usageRepository.find).toHaveBeenCalledTimes(1);
-    expect(fixture.intervalRepository.createQueryBuilder).toHaveBeenCalledWith('interval');
-    expect(fixture.availabilityQuery.select).toHaveBeenCalledWith('DISTINCT interval.resourceId', 'resourceId');
-    expect(fixture.availabilityQuery.where).toHaveBeenCalledWith('interval.resourceId IN (:...resourceIds)', {
-      resourceIds: [1, 2],
-    });
+    expect(fixture.timeline.findIntervals).toHaveBeenCalledTimes(1);
+    expect(fixture.timeline.findSessions).toHaveBeenCalledTimes(1);
+    expect(fixture.timeline.findResourcesWithIntervals).toHaveBeenCalledWith([1, 2]);
   });
 });

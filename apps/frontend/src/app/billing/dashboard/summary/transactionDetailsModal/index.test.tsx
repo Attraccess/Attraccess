@@ -9,8 +9,8 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useBillingServiceGetBillingTransaction: () => ({ data: state.transaction }),
-  useBillingServiceGetBillingConfiguration: () => ({ data: state.configuration }),
+  useGetBillingTransaction: () => ({ data: state.transaction }),
+  useGetBillingConfiguration: () => ({ data: state.configuration }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -229,4 +229,121 @@ it('distinguishes unavailable final evidence from a free zero reading and system
   const freeRow = screen.getByText('Free Heartbeats').closest('tr');
   expect(freeRow?.querySelectorAll('td')[2].textContent).toBe('0');
   expect(freeRow?.querySelectorAll('td')[3].textContent).toBe('0');
+});
+
+it('shows the shared marker and breakdown only for allocated items', async () => {
+  state.transaction = {
+    id: 9,
+    createdAt: '2026-01-02',
+    status: 'completed',
+    amount: -36,
+    resourceUsageId: 8,
+    resourceUsage: { id: 8, resource: { name: 'Lathe' } },
+    items: [
+      {
+        id: 1,
+        name: 'Energy',
+        quantity: 1,
+        unitPrice: 12,
+        meterQuantity: '0.4',
+        meterCreditsPerUnit: 30,
+        allocation: {
+          kind: 'meter',
+          segments: [
+            {
+              startedAt: '2026-01-01T10:00:00Z',
+              endedAt: '2026-01-01T11:00:00Z',
+              participants: 3,
+              totalQuantity: '1.2',
+              totalCredits: 36,
+              shareQuantity: '0.4',
+              shareCredits: 12,
+            },
+          ],
+        },
+      },
+      {
+        id: 2,
+        name: 'Solo meter',
+        quantity: 1,
+        unitPrice: 24,
+        meterQuantity: '0.8',
+        meterCreditsPerUnit: 30,
+        allocation: null,
+      },
+    ],
+  };
+  render(<TransactionDetailsModal transactionId={9} isOpen />);
+  expect(await screen.findByText('shared')).toBeTruthy();
+  expect(screen.getAllByText('shared')).toHaveLength(1);
+  expect(screen.getByText('items.meterSharedDescription')).toBeTruthy();
+  expect(screen.getByText('items.meterDescription')).toBeTruthy();
+  // The breakdown sits below the table, not in the narrow name cell.
+  const trigger = screen.getByRole('button', { name: 'breakdown' });
+  expect(trigger.closest('table')).toBeNull();
+  fireEvent.click(trigger);
+  expect(document.querySelectorAll('[data-cy="allocation-segment"]')).toHaveLength(1);
+});
+
+it('shows no rate for a shared running-time charge', async () => {
+  state.transaction = {
+    id: 9,
+    status: 'completed',
+    amount: -7,
+    items: [
+      {
+        id: 1,
+        name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+        quantity: 1,
+        unitPrice: 7,
+        durationMs: 90000,
+        allocation: {
+          kind: 'operating-time',
+          segments: [
+            {
+              startedAt: '2026-01-01T10:00:00Z',
+              endedAt: '2026-01-01T11:00:00Z',
+              participants: 2,
+              totalQuantity: '180000',
+              totalCredits: 14,
+              shareQuantity: '90000',
+              shareCredits: 7,
+            },
+          ],
+        },
+      },
+    ],
+  };
+  render(<TransactionDetailsModal transactionId={9} isOpen />);
+  expect(await screen.findByText('shared')).toBeTruthy();
+  const cells = screen.getByText('shared').closest('tr')?.querySelectorAll('td');
+  expect(cells?.[2].textContent).toBe('0:01:30');
+  expect(cells?.[3].textContent).toBe('—');
+  expect(cells?.[4].textContent).toBe('0,07');
+});
+
+it('explains a pending shared meter share instead of an unavailable reading', async () => {
+  state.transaction = {
+    id: 9,
+    status: 'completed',
+    amount: 0,
+    items: [
+      {
+        id: 1,
+        name: 'Energy',
+        quantity: 1,
+        unitPrice: 0,
+        meterQuantity: null,
+        meterCreditsPerUnit: 30,
+        allocation: { kind: 'meter', segments: [], pending: true },
+      },
+    ],
+  };
+  render(<TransactionDetailsModal transactionId={9} isOpen />);
+  expect(await screen.findByText('items.pending')).toBeTruthy();
+  expect(screen.getAllByText('items.meterPending').length).toBeGreaterThan(0);
+  expect(screen.queryByText('items.meterUnavailable')).toBeNull();
+  expect(screen.queryByText('items.unavailable')).toBeNull();
+  expect(screen.queryByText('shared')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'breakdown' })).toBeNull();
 });

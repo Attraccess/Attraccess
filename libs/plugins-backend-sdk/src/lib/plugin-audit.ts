@@ -1,3 +1,4 @@
+import type { AuthenticationMethod } from './auth.types';
 /**
  * Declarative audit policy a plugin contributes through `PluginBackendModule.auditDomains`.
  * The host registers the declaration, then enforces it on every event the plugin records:
@@ -125,16 +126,37 @@ function validateFieldPolicy(path: string, policy: unknown): void {
 /** Implemented by the generic audit foundation, not by individual plugins. */
 export const PLUGIN_AUDIT_HOST_PROVIDER = Symbol.for('attraccess.plugin.auditHostProvider');
 
+/** The user (session or API token) an event is attributed to. */
 export interface PluginAuditPrincipal {
   userId: number;
-  authenticationMethod: 'session' | 'api-token';
+  authenticationMethod: AuthenticationMethod;
   apiTokenId?: number;
+}
+
+/**
+ * An event no user started, such as a scheduled job or a reconciliation the plugin ran on its own. The audit log
+ * shows "System" as the actor. Never attribute such an event to a user instead, and do not audit state changes the
+ * plugin merely observed.
+ */
+export interface PluginAuditSystemPrincipal {
+  kind: 'system';
+}
+
+export const PLUGIN_AUDIT_SYSTEM_PRINCIPAL: PluginAuditSystemPrincipal = Object.freeze({ kind: 'system' });
+
+/** Who an audit event is attributed to: a user, or the system. */
+export type PluginAuditActor = PluginAuditPrincipal | PluginAuditSystemPrincipal;
+
+export function isPluginAuditSystemPrincipal(
+  actor: PluginAuditActor | null | undefined,
+): actor is PluginAuditSystemPrincipal {
+  return !!actor && (actor as Partial<PluginAuditSystemPrincipal>).kind === 'system';
 }
 
 export interface PluginAuditEvent {
   action: string;
   operationId: string;
-  principal: PluginAuditPrincipal;
+  principal: PluginAuditActor;
   outcome: 'attempted' | 'succeeded' | 'failed';
   subject: { type: string; id: number };
   /** Callers must project domain data through an explicit allowlist. */

@@ -16,13 +16,13 @@ import {
 import { ApiTags, ApiConsumes, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { FileStorageService } from '../common/services/file-storage.service';
 
-import { ProjectAccessService } from './project-access.service';
+import { ProjectAccessService, type ProjectWithAccess } from './project-access.service';
 
 import { ProjectUsageService } from './project-usage.service';
 
 import { ProjectsService } from './projects.service';
 
-import { Auth, AuthenticatedRequest, Project } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 import { FileInterceptor } from '@nestjs/platform-express';
 
@@ -48,7 +48,11 @@ import { FindManyProjectsQueryDto } from './dto/find-many-query.dto';
 
 import { FindManyProjectsResponseDto } from './dto/find-many-response.dto';
 
-import { ProjectInvitation } from '@attraccess/database-entities';
+import type { ProjectRecord } from '@attraccess/application-models';
+
+import { ProjectInvitationDto, toProjectDto, toProjectInvitationDto, toProjectMemberDto } from './dto/project.dto';
+
+import { toUserDto } from '../users-and-auth/users/dtos/user.dto';
 
 import { CreateProjectInvitationDto } from './dto/create-project-invitation.dto';
 
@@ -75,7 +79,7 @@ export class ProjectsController {
     @Req() req: AuthenticatedRequest,
     @Body() data: CreateProjectDto,
     @UploadedFile() logo?: FileUpload,
-  ): Promise<Project> {
+  ): Promise<ProjectWithAccessDto> {
     if (logo) {
       data.logo = logo;
     }
@@ -101,7 +105,7 @@ export class ProjectsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() data: UpdateProjectDto,
     @UploadedFile() logo?: FileUpload,
-  ): Promise<Project> {
+  ): Promise<ProjectWithAccessDto> {
     if (logo) {
       data.logo = logo;
     }
@@ -148,13 +152,12 @@ export class ProjectsController {
     return await this.projectUsageService.getProjectUsageStats(req.user.id, id, query);
   }
 
-  protected transformProject(project: ProjectWithAccessDto | Project): ProjectWithAccessDto {
-    const transformedProject = {
-      ...project,
+  protected transformProject(project: ProjectWithAccess | ProjectRecord): ProjectWithAccessDto {
+    return {
+      ...toProjectDto(project),
+      ...('access' in project ? { access: project.access } : {}),
       logo: project.logo ? this.fileStorageService.getPublicPath(`projects/${project.id}`, project.logo) : null,
     } as ProjectWithAccessDto;
-
-    return transformedProject;
   }
 
   @Get()
@@ -252,8 +255,8 @@ export class ProjectsController {
     const members = await this.projectsService.listMembers(id);
 
     return {
-      owner: project.owner,
-      members,
+      owner: toUserDto(project.owner as NonNullable<typeof project.owner>),
+      members: members.map(toProjectMemberDto),
     };
   }
 
@@ -278,67 +281,73 @@ export class ProjectsController {
   @Get(':id/invitations')
   @Auth()
   @ApiOperation({ summary: 'List project invitations', operationId: 'listProjectInvitations' })
-  @ApiResponse({ status: 200, type: ProjectInvitation, isArray: true })
+  @ApiResponse({ status: 200, type: ProjectInvitationDto, isArray: true })
   async listInvitations(
     @Req() req: AuthenticatedRequest,
     @Param('id', ParseIntPipe) id: number,
-  ): Promise<ProjectInvitation[]> {
+  ): Promise<ProjectInvitationDto[]> {
     await this.projectAccessService.ensureOwner(req.user.id, id);
-    return await this.projectsService.listProjectInvitations(id);
+    return (await this.projectsService.listProjectInvitations(id)).map(toProjectInvitationDto);
   }
 
   @Post(':id/invitations')
   @Auth()
   @ApiOperation({ summary: 'Create a project invitation', operationId: 'createProjectInvitation' })
-  @ApiResponse({ status: 201, type: ProjectInvitation })
+  @ApiResponse({ status: 201, type: ProjectInvitationDto })
   async createInvitation(
     @Req() req: AuthenticatedRequest,
     @Param('id', ParseIntPipe) id: number,
     @Body() data: CreateProjectInvitationDto,
-  ): Promise<ProjectInvitation> {
-    return await this.projectsService.createProjectInvitation(
-      req.user.id,
-      id,
-      data.invitedUserId,
-      data.role,
-      req.user.authenticationMethod ?? 'session',
-      req.user.apiTokenId,
+  ): Promise<ProjectInvitationDto> {
+    return toProjectInvitationDto(
+      await this.projectsService.createProjectInvitation(
+        req.user.id,
+        id,
+        data.invitedUserId,
+        data.role,
+        req.user.authenticationMethod ?? 'session',
+        req.user.apiTokenId,
+      ),
     );
   }
 
   @Post(':id/invitations/:invitationId/resend')
   @Auth()
   @ApiOperation({ summary: 'Resend a project invitation', operationId: 'resendProjectInvitation' })
-  @ApiResponse({ status: 200, type: ProjectInvitation })
+  @ApiResponse({ status: 200, type: ProjectInvitationDto })
   async resendInvitation(
     @Req() req: AuthenticatedRequest,
     @Param('id', ParseIntPipe) id: number,
     @Param('invitationId', ParseIntPipe) invitationId: number,
-  ): Promise<ProjectInvitation> {
-    return await this.projectsService.resendProjectInvitation(
-      req.user.id,
-      id,
-      invitationId,
-      req.user.authenticationMethod ?? 'session',
-      req.user.apiTokenId,
+  ): Promise<ProjectInvitationDto> {
+    return toProjectInvitationDto(
+      await this.projectsService.resendProjectInvitation(
+        req.user.id,
+        id,
+        invitationId,
+        req.user.authenticationMethod ?? 'session',
+        req.user.apiTokenId,
+      ),
     );
   }
 
   @Delete(':id/invitations/:invitationId')
   @Auth()
   @ApiOperation({ summary: 'Cancel a project invitation', operationId: 'cancelProjectInvitation' })
-  @ApiResponse({ status: 200, type: ProjectInvitation })
+  @ApiResponse({ status: 200, type: ProjectInvitationDto })
   async cancelInvitation(
     @Req() req: AuthenticatedRequest,
     @Param('id', ParseIntPipe) id: number,
     @Param('invitationId', ParseIntPipe) invitationId: number,
-  ): Promise<ProjectInvitation> {
-    return await this.projectsService.cancelProjectInvitation(
-      req.user.id,
-      id,
-      invitationId,
-      req.user.authenticationMethod ?? 'session',
-      req.user.apiTokenId,
+  ): Promise<ProjectInvitationDto> {
+    return toProjectInvitationDto(
+      await this.projectsService.cancelProjectInvitation(
+        req.user.id,
+        id,
+        invitationId,
+        req.user.authenticationMethod ?? 'session',
+        req.user.apiTokenId,
+      ),
     );
   }
 }

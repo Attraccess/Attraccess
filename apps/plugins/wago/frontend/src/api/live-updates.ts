@@ -31,18 +31,34 @@ export function useWagoLiveQuery(queryKey: QueryKey, topic: string, identifier?:
     const state = query.state;
     const pendingRead = query.promise;
     liveStates.set(query, { state, pendingRead });
-    // A settled retryer cannot be cancelled, but Query.fetch may still have its
-    // cache commit queued. Drain cancellation before restoring authoritative state.
+    const current = () =>
+      liveStates.get(query)?.state === state &&
+      query.promise === pendingRead &&
+      client.getQueryCache().find({ queryKey, exact: true }) === query;
+    const restore = () => {
+      if (current() && (query.state !== state || query.state.fetchStatus !== 'idle')) {
+        query.setState({ ...state, fetchStatus: 'idle' });
+      }
+    };
+    // A settled retryer cannot be cancelled, and its read may commit after the cancellation drained (the order
+    // depends on react-query internals). Restore the live state again when that read commits.
+    const cache = client.getQueryCache();
+    const unsubscribe = cache.subscribe((cacheEvent) => {
+      if (cacheEvent.query !== query) return;
+      // setQueryData (a newer live event) dispatches a manual success; only the read's own result counts.
+      const { action } = cacheEvent.type === 'updated' ? cacheEvent : { action: undefined };
+      const commit = (action?.type === 'success' && !action.manual) || action?.type === 'error';
+      if (!commit && cacheEvent.type !== 'removed' && current()) return;
+      unsubscribe();
+      restore();
+      if (liveStates.get(query)?.state === state) liveStates.delete(query);
+    });
     return cancellation.then(() => {
-      if (
-        liveStates.get(query)?.state === state &&
-        query.promise === pendingRead &&
-        client.getQueryCache().find({ queryKey, exact: true }) === query
-      ) {
-        liveStates.delete(query);
-        if (query.state !== state || query.state.fetchStatus !== 'idle') {
-          query.setState({ ...state, fetchStatus: 'idle' });
-        }
+      restore();
+      // Nothing left to commit: no read was pending, or it already settled.
+      if (!pendingRead || query.state.fetchStatus === 'idle') {
+        unsubscribe();
+        if (current()) liveStates.delete(query);
       }
     });
   };

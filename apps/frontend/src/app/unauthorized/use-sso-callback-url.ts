@@ -1,8 +1,8 @@
-import { SSOProviderType } from '@attraccess/database-entities';
+import type { SsoProviderType } from '@attraccess/react-query-client';
 import { getBaseUrl } from '../../api';
 import { useMemo } from 'react';
 
-export function useCallbackURL(providerId: number, providerType: SSOProviderType, redirectTo?: string) {
+export function useCallbackURL(providerId: number, providerType: SsoProviderType, redirectTo?: string) {
   return useMemo(() => {
     const apiBaseUrl = getBaseUrl();
     const encodedCallbackURL = encodeURIComponent(window.location.href);

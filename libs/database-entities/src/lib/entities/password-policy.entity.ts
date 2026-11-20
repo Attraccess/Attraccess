@@ -1,7 +1,6 @@
+import { PASSWORD_POLICY_SINGLETON_ID } from '@attraccess/application-models';
 import { Column, CreateDateColumn, Entity, PrimaryColumn, UpdateDateColumn, VersionColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-
-export const PASSWORD_POLICY_SINGLETON_ID = 1;
 
 @Entity()
 export class PasswordPolicy {

@@ -18,6 +18,7 @@ import { RabbitmqUserPanel } from './users/RabbitmqUserPanel';
 import { RabbitmqConnectionsPanel } from './connections/RabbitmqConnectionsPanel';
 import { RabbitmqStatsPanel } from './stats/RabbitmqStatsPanel';
 import { useCapabilities } from './capabilities';
+import { setRabbitmqAuthData, useCanViewBroker } from './access';
 
 // Host slot ids exposed by the MQTT UI. The SDK is vendor-agnostic and does not
 // export them, and the host owns them in apps/frontend (which a plugin cannot
@@ -46,9 +47,13 @@ function RabbitmqDataPanels({ mqttServerId, canManage }: { mqttServerId: number;
 // Everything the plugin contributes to the MQTT server detail view: the
 // connection-status panel (ATT-521), users (ATT-522), connections (ATT-523),
 // and broker stats (ATT-524).
-// Returns null (no wrapper element) for non-RabbitMQ servers so the host
-// layout is unchanged unless a RabbitMQ broker is positively detected.
+// Returns null (no wrapper element) for non-RabbitMQ servers, and for users without `rabbitmq.broker.read`, so the
+// host layout is unchanged unless a RabbitMQ broker is positively detected and may be viewed.
 export function RabbitmqDetailSlot({ mqttServerId }: { mqttServerId: number }) {
+  return useCanViewBroker() ? <RabbitmqDetailPanels mqttServerId={mqttServerId} /> : null;
+}
+
+function RabbitmqDetailPanels({ mqttServerId }: { mqttServerId: number }) {
   const { result } = useDetection(mqttServerId);
   const { canManage } = useCapabilities(result?.isRabbitMQ === true);
 
@@ -88,8 +93,9 @@ export default class RabbitmqPlugin implements AttraccessFrontendPlugin {
     // Called when the plugin is uninstalled.
   }
 
-  onApiAuthStateChange(_authData: null | AttraccessFrontendPluginAuthData): void {
-    // no-op — detection is read via relative `/api` URLs with session cookies.
+  onApiAuthStateChange(authData: null | AttraccessFrontendPluginAuthData): void {
+    // Requests use relative `/api` URLs with session cookies; the auth state only decides what is shown.
+    setRabbitmqAuthData(authData);
   }
 
   onApiEndpointChange(_endpoint: string): void {

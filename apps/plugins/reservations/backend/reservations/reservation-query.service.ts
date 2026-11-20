@@ -2,7 +2,7 @@ import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import type { AvailabilityDto, ManagedReservationListDto, ReservationDto } from '../api/dto.response';
 import { Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK } from '../constants';
-import { ReservationEntity, ReservationStatus } from '../entities/reservation.entity';
+import { ReservationRow, ReservationStatus } from '../storage/reservation-table';
 import { VisibilityService } from '../ical/visibility.service';
 import { GlobalSettingsService } from '../settings/global-settings.service';
 import { ResourceSettingsService } from '../settings/resource-settings.service';
@@ -42,7 +42,7 @@ export class ReservationQueryService {
    */
   async present(
     actor: ReservationActor,
-    rows: ReservationEntity[],
+    rows: ReservationRow[],
     knownManaged?: Map<number, boolean>,
   ): Promise<ReservationDto[]> {
     const known = knownManaged ?? new Map<number, boolean>();
@@ -171,6 +171,7 @@ export class ReservationQueryService {
         isManager: false,
         canBook,
         rules,
+        slots: 1,
         reservations: [],
         maintenance: [],
       };
@@ -184,7 +185,8 @@ export class ReservationQueryService {
       end: new Date(to.getTime() + settings.bufferAfterMinutes * MINUTE_MS),
     };
     const margin = MAX_BUFFER_MINUTES * MINUTE_MS;
-    const [candidates, windows] = await Promise.all([
+    const [slots, candidates, windows] = await Promise.all([
+      this.directory.getSessionLimit(resourceId),
       this.store.findOccupying(
         resourceId,
         new Date(span.start.getTime() - margin),
@@ -200,6 +202,7 @@ export class ReservationQueryService {
       isManager,
       canBook,
       rules,
+      slots,
       reservations: await this.present(actor, rows, new Map([[resourceId, isManager]])),
       maintenance: windows.map((window) => ({
         startTime: window.startTime.toISOString(),
@@ -220,8 +223,7 @@ export class ReservationQueryService {
   ): Promise<CanBookResult> {
     const result = await this.access.canBook(actor, resourceId, settings, isManager);
     if (!result.allowed || settings.maxActiveBookingsPerUser === 0) return result;
-    const manager = this.context.getRepository(ReservationEntity).manager;
-    const live = await this.store.countLiveForUser(manager, actor.userId, resourceId, this.clock());
+    const live = await this.store.countLiveForUser(undefined, actor.userId, resourceId, this.clock());
     return live >= settings.maxActiveBookingsPerUser ? { allowed: false, reason: 'USER_BOOKING_LIMIT' } : result;
   }
 }

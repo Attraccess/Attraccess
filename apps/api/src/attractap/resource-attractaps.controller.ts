@@ -1,10 +1,10 @@
 import { Controller, Get, Param, ParseIntPipe } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
-import { Attractap } from '@attraccess/database-entities';
 import { LicenseModuleType } from '../license/license.service';
 import { RequiresLicense } from '../license/require-license.decorator';
 import { AttractapService } from './attractap.service';
+import { AttractapReaderDto, toReaderDto } from './dtos/reader.dto';
 
 /** Readers seen from the resource side; visible to every signed-in user, like `GET /attractap/readers`. */
 @ApiTags('Attractap')
@@ -16,9 +16,9 @@ export class ResourceAttractapsController {
   @Get('resources/:resourceId/attractaps')
   @Auth()
   @ApiOperation({ summary: 'Get the readers linked to a resource', operationId: 'getResourceAttractaps' })
-  @ApiResponse({ status: 200, type: [Attractap] })
-  async getResourceAttractaps(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<Attractap[]> {
-    return this.attractapService.getPairedReaders({ where: { resources: { id: resourceId } } });
+  @ApiResponse({ status: 200, type: [AttractapReaderDto] })
+  async getResourceAttractaps(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<AttractapReaderDto[]> {
+    return (await this.attractapService.getPairedReaders({ resourceId })).map(toReaderDto);
   }
 
   @Get('resource-groups/:groupId/attractaps')
@@ -27,8 +27,8 @@ export class ResourceAttractapsController {
     summary: 'Get the readers linked to any resource of a resource group',
     operationId: 'getResourceGroupAttractaps',
   })
-  @ApiResponse({ status: 200, type: [Attractap] })
-  async getResourceGroupAttractaps(@Param('groupId', ParseIntPipe) groupId: number): Promise<Attractap[]> {
-    return this.attractapService.getPairedReaders({ where: { resources: { groups: { id: groupId } } } });
+  @ApiResponse({ status: 200, type: [AttractapReaderDto] })
+  async getResourceGroupAttractaps(@Param('groupId', ParseIntPipe) groupId: number): Promise<AttractapReaderDto[]> {
+    return (await this.attractapService.getPairedReaders({ resourceGroupId: groupId })).map(toReaderDto);
   }
 }

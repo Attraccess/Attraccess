@@ -5,11 +5,24 @@ import { isValueValid, initializeValue } from './property-input/schema-values';
 import { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 import { useResolveFlowNodeSchema } from '../../flowOwner';
 import { useNodeId, useNodesData } from '@xyflow/react';
-import { useFlowContext } from '../../context/index';
+import { useFlowContext } from '../../context/flowContext';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StandardDrawer, TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 
-export function useNodeEditorState(props: Props) {
+export const configProperty = (schema: ResourceFlowNodeSchemaDto) => {
+  const configSchema = { ...schema.configSchema };
+  delete configSchema.preview;
+  return { ...configSchema, type: 'object' } as Property<unknown>;
+};
+
+export interface Props {
+  schema: ResourceFlowNodeSchemaDto;
+  children: (onOpen: () => void) => React.ReactNode;
+  tNodeTranslations: TFunction;
+  tNodeExists?: TExists;
+}
+
+export function NodeEditor(props: Props) {
   const { tNodeTranslations: t, tNodeExists, schema } = props;
   const { isOpen, open, setOpen, close } = useOverlayState();
 
@@ -133,67 +146,6 @@ export function useNodeEditorState(props: Props) {
   const descriptionKey = 'nodes.' + resolvedSchema.type + '.description';
   const nodeTitle = tNodeExists?.(titleKey) ? t(titleKey) : (resolvedSchema.label ?? resolvedSchema.type);
   const nodeDescription = tNodeExists?.(descriptionKey) ? t(descriptionKey) : (resolvedSchema.description ?? '');
-  return {
-    t,
-    tNodeExists,
-    schema,
-    isOpen,
-    open,
-    setOpen,
-    resourceId,
-    formRef,
-    data,
-    resolvedSchema,
-    schemaError,
-    isResolvingSchema,
-    dataRef,
-    onClose,
-    onSave,
-    onFormSubmit,
-    resolveSchema,
-    onInputChange,
-    nodeTitle,
-    nodeDescription,
-    props,
-  };
-}
-
-export const configProperty = (schema: ResourceFlowNodeSchemaDto) => {
-  const configSchema = { ...schema.configSchema };
-  delete configSchema.preview;
-  return { ...configSchema, type: 'object' } as Property<unknown>;
-};
-
-export interface Props {
-  schema: ResourceFlowNodeSchemaDto;
-  children: (onOpen: () => void) => React.ReactNode;
-  tNodeTranslations: TFunction;
-  tNodeExists?: TExists;
-}
-
-export function NodeEditor(props: Props) {
-  const {
-    t,
-    tNodeExists,
-    schema,
-    isOpen,
-    open,
-    setOpen,
-    resourceId,
-    formRef,
-    data,
-    resolvedSchema,
-    schemaError,
-    isResolvingSchema,
-    dataRef,
-    onClose,
-    onSave,
-    onFormSubmit,
-    resolveSchema,
-    onInputChange,
-    nodeTitle,
-    nodeDescription,
-  } = useNodeEditorState(props);
 
   return (
     <>

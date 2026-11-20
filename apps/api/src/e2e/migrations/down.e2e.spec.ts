@@ -12,7 +12,7 @@ describe('Migrations down/up with data (e2e)', () => {
         await fixture.dataSource.undoLastMigration();
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        throw new Error(`Failed to undo migration ${migrationName ?? 'unknown'}: ${message}`);
+        throw new Error(`Failed to undo migration ${migrationName ?? 'unknown'}: ${message}`, { cause: error });
       }
       remaining = await fixture.getMigrationCount(fixture.dataSource);
     }

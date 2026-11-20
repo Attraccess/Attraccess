@@ -2,7 +2,7 @@
 // FEATURE: ATT-386 Resource details page full redesign tabbed hub layout
 
 import { useParams, Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Button, Spinner, Tabs, TabList, Tab, useOverlayState } from '@heroui/react';
+import { Button, Spinner, Tabs, TabList, Tab } from '@heroui/react';
 import {
   ArrowLeft,
   Settings2Icon,
@@ -22,16 +22,13 @@ import { Select } from '../../../../components/select/index';
 import { ResourceTabKey, useResourceTabs } from './useResourceTabs';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useToastMessage } from '../../../../components/toastProvider';
-import {
-  useResourcesServiceDeleteOneResource,
-  useResourcesServiceGetOneResourceById,
-  useResourcesServiceGetAllResourcesKey,
-} from '@attraccess/react-query-client';
+import { useDeleteOneResource, useGetOneResourceById, useGetAllResourcesKey } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { DeleteConfirmationModal, PageAction, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { PageAction, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQrCodeAction } from '../useQrCodeAction';
 import de from '../resourceDetails.de.json';
 import en from '../resourceDetails.en.json';
+import { DashboardPinTargetContext, resourcePinTarget } from '../../../dashboard/pinTarget';
 
 export const TAB_ICONS: Record<ResourceTabKey, JSX.Element> = {
   overview: <Gauge className="w-4 h-4" />,
@@ -40,23 +37,28 @@ export const TAB_ICONS: Record<ResourceTabKey, JSX.Element> = {
   maintenance: <WrenchIcon className="w-4 h-4" />,
 };
 
-export function useResourceTabsLayoutInnerState({
-  resourceId,
-  children,
-}: {
-  resourceId: number;
-  children?: ReactNode;
-}) {
+function ResourceTabsLayoutComponent({ children }: { children?: ReactNode }) {
+  const { id } = useParams<{ id: string }>();
+  const resourceId = Number.parseInt(id ?? '', 10);
+
+  if (!Number.isFinite(resourceId)) {
+    return <Navigate to="/resources" replace />;
+  }
+
+  return <ResourceTabsLayoutInner resourceId={resourceId}>{children}</ResourceTabsLayoutInner>;
+}
+
+function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number; children?: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { isOpen, open, close: closeDeleteModal } = useOverlayState();
 
   const { hasPermission } = useAuth();
   const { success, error: showError } = useToastMessage();
   const { confirmationDialog } = useQrCodeAction({ resourceId });
 
-  const { t } = useTranslations({ en, de });
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  const { t } = useTranslations({ en, de }, { escapeValues: false });
 
   const canUpdateResources = hasPermission('resources.update');
   const canDeleteResources = hasPermission('resources.delete');
@@ -65,9 +67,9 @@ export function useResourceTabsLayoutInnerState({
     data: resource,
     isLoading: isLoadingResource,
     error: resourceError,
-  } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  } = useGetOneResourceById({ path: { id: resourceId } });
 
-  const deleteResource = useResourcesServiceDeleteOneResource();
+  const deleteResource = useDeleteOneResource();
 
   const qrOpenRef = useRef<() => void>(() => undefined);
 
@@ -85,12 +87,12 @@ export function useResourceTabsLayoutInnerState({
   const handleDelete = async () => {
     if (!canDeleteResources) return;
     try {
-      await deleteResource.mutateAsync({ id: resourceId });
+      await deleteResource.mutateAsync({ path: { id: resourceId } });
       success({
         title: 'Resource deleted',
         description: `${resource?.name} has been successfully deleted`,
       });
-      queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
+      queryClient.invalidateQueries({ queryKey: [useGetAllResourcesKey] });
       navigate('/resources');
     } catch (err) {
       showError({
@@ -100,56 +102,6 @@ export function useResourceTabsLayoutInnerState({
       throw err;
     }
   };
-  return {
-    navigate,
-    isOpen,
-    open,
-    closeDeleteModal,
-    t,
-    canUpdateResources,
-    canDeleteResources,
-    resource,
-    isLoadingResource,
-    resourceError,
-    qrOpenRef,
-    tabs,
-    activeTabKey,
-    handleDelete,
-    resourceId,
-    children,
-    confirmationDialog,
-  };
-}
-
-function ResourceTabsLayoutComponent({ children }: { children?: ReactNode }) {
-  const { id } = useParams<{ id: string }>();
-  const resourceId = Number.parseInt(id ?? '', 10);
-
-  if (!Number.isFinite(resourceId)) {
-    return <Navigate to="/resources" replace />;
-  }
-
-  return <ResourceTabsLayoutInner resourceId={resourceId}>{children}</ResourceTabsLayoutInner>;
-}
-
-function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number; children?: ReactNode }) {
-  const {
-    navigate,
-    isOpen,
-    open,
-    closeDeleteModal,
-    t,
-    canUpdateResources,
-    canDeleteResources,
-    resource,
-    isLoadingResource,
-    resourceError,
-    qrOpenRef,
-    tabs,
-    activeTabKey,
-    handleDelete,
-    confirmationDialog,
-  } = useResourceTabsLayoutInnerState({ resourceId, children });
 
   if (isLoadingResource) {
     return (
@@ -195,7 +147,14 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
       icon: <Trash className="w-4 h-4" />,
       variant: 'destructive',
       isHidden: !canDeleteResources,
-      onPress: open,
+      onPress: handleDelete,
+      confirm: {
+        title: t('actions.deleteConfirm.title', { name: resource.name }),
+        message: t('actions.deleteConfirm.message'),
+        'data-cy': 'delete-confirmation-modal',
+        confirmDataCy: 'delete-button',
+        cancelDataCy: 'cancel-button',
+      },
       dataCy: 'delete-resource-button',
     },
   ];
@@ -207,18 +166,20 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <PageHeader
-        title={resource.name}
-        icon={!resource.imageFilename && <ShapesIcon className="w-6 h-6" />}
-        thumbnailSrc={resource.imageFilename ? filenameToUrl(resource.imageFilename) : undefined}
-        thumbnailAlt={resource.name}
-        subtitle={resource.description ?? undefined}
-        backTo="/resources"
-        actions={overflowActions}
-        maxVisibleActions={0}
-        moreActionsLabel={t('actions.moreLabel')}
-        noMargin
-      />
+      <DashboardPinTargetContext.Provider value={resourcePinTarget(resourceId)}>
+        <PageHeader
+          title={resource.name}
+          icon={!resource.imageFilename && <ShapesIcon className="w-6 h-6" />}
+          thumbnailSrc={resource.imageFilename ? filenameToUrl(resource.imageFilename) : undefined}
+          thumbnailAlt={resource.name}
+          subtitle={resource.description ?? undefined}
+          backTo="/resources"
+          actions={overflowActions}
+          maxVisibleActions={0}
+          moreActionsLabel={t('actions.moreLabel')}
+          noMargin
+        />
+      </DashboardPinTargetContext.Provider>
 
       <ResourceHealthWarning resourceId={resourceId} />
 
@@ -260,15 +221,6 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
       <div className="flex-1 min-h-0 overflow-auto">{children ?? <Outlet />}</div>
       {confirmationDialog}
 
-      {canDeleteResources && (
-        <DeleteConfirmationModal
-          isOpen={isOpen}
-          onClose={closeDeleteModal}
-          onConfirm={handleDelete}
-          itemName={resource.name}
-          data-cy="delete-confirmation-modal"
-        />
-      )}
       {canUpdateResources && (
         <ResourceQrCode
           resourceId={resourceId}

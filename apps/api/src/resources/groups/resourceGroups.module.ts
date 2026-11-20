@@ -1,14 +1,5 @@
-import { forwardRef, Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import {
-  Resource,
-  ResourceGroup,
-  ResourceIntroducer,
-  ResourceIntroduction,
-  ResourceIntroductionHistoryItem,
-} from '@attraccess/database-entities';
+import { Module } from '@nestjs/common';
 import { ResourceGroupsController } from './resourceGroups.controller';
-import { ResourceGroupsService } from './resourceGroups.service';
 import { ResourceGroupsIntroductionsController } from './introductions/resourceGroups.introductions.controller';
 import { ResourceGroupsIntroducersController } from './introducers/resourceGroups.introducers.controller';
 import { ResourceGroupsIntroductionsService } from './introductions/resourceGroups.introductions.service';
@@ -16,28 +7,15 @@ import { ResourceGroupsIntroducersService } from './introducers/resourceGroups.i
 import { IsResourceGroupIntroducerGuard } from './introductions/isIntroducerGuard';
 import { NotificationsModule } from '../../notifications/notifications.module';
 import { ResourceRetrainingModule } from '../retraining/resourceRetraining.module';
+import { ResourceGroupsCoreModule } from './resourceGroupsCore.module';
+import { GroupsPersistenceModule } from '../../database/adapters/resources/groups-persistence.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([
-      Resource,
-      ResourceGroup,
-      ResourceIntroduction,
-      ResourceIntroductionHistoryItem,
-      ResourceIntroducer,
-    ]),
-    NotificationsModule,
-    forwardRef(() => ResourceRetrainingModule),
-  ],
+  imports: [GroupsPersistenceModule, NotificationsModule, ResourceGroupsCoreModule, ResourceRetrainingModule],
   controllers: [ResourceGroupsController, ResourceGroupsIntroductionsController, ResourceGroupsIntroducersController],
-  providers: [
-    ResourceGroupsService,
-    ResourceGroupsIntroductionsService,
-    ResourceGroupsIntroducersService,
-    IsResourceGroupIntroducerGuard,
-  ],
+  providers: [ResourceGroupsIntroductionsService, ResourceGroupsIntroducersService, IsResourceGroupIntroducerGuard],
   exports: [
-    ResourceGroupsService,
+    ResourceGroupsCoreModule,
     ResourceGroupsIntroductionsService,
     ResourceGroupsIntroducersService,
     IsResourceGroupIntroducerGuard,

@@ -1,17 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
-import { In } from 'typeorm';
-import { User } from '@attraccess/database-entities';
+import { FakeUnitOfWork, InMemoryUserStore } from '../fakes/in-memory-user-store.test-fixture';
 import { UserAccounts } from './user-accounts';
 
 describe('UserAccounts email normalisation', () => {
   const setup = () => {
-    const repository = {
-      findOne: jest.fn().mockResolvedValue(null),
-      find: jest.fn().mockResolvedValue([]),
-      count: jest.fn().mockResolvedValue(1),
-    };
-    const em = { save: jest.fn(async (user: User) => ({ ...user, id: 5 })) };
-    const dataSource = { transaction: jest.fn(async (work: (m: typeof em) => unknown) => work(em)) };
+    const store = new InMemoryUserStore();
+    store.seed({ id: 1, username: 'alex', email: 'alex@example.com' });
+    const uow = new FakeUnitOfWork();
     const rbac = { assignDefaultRoles: jest.fn(), assignRoleByKey: jest.fn() };
     const metrics = {
       usersRegisteredTotal: { inc: jest.fn() },
@@ -19,52 +14,50 @@ describe('UserAccounts email normalisation', () => {
       usersPerLocale: { inc: jest.fn() },
     };
     const license = { verifyLicense: jest.fn() };
-    const accounts = new UserAccounts(
-      repository as never,
-      license as never,
-      dataSource as never,
-      metrics as never,
-      rbac as never,
-    );
-    return { accounts, repository, em };
+    const accounts = new UserAccounts(store, license as never, uow, metrics as never, rbac as never);
+    return { accounts, store };
   };
 
   it('looks users up by the normalised email', async () => {
-    const { accounts, repository } = setup();
-    const stored = { id: 1, email: 'alex@example.com' };
-    repository.findOne.mockResolvedValueOnce(stored);
-    await expect(accounts.findOne({ email: 'ALEX@Example.com' })).resolves.toBe(stored);
-    expect(repository.findOne).toHaveBeenCalledWith(expect.objectContaining({ where: { email: 'alex@example.com' } }));
+    const { accounts, store } = setup();
+    const spy = jest.spyOn(store, 'findUser');
+    await expect(accounts.findOne({ email: 'ALEX@Example.com' })).resolves.toMatchObject({ id: 1 });
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ email: 'alex@example.com' }), false, undefined);
   });
 
   it('trims a padded email before validating the lookup', async () => {
-    const { accounts, repository } = setup();
-    await accounts.findOne({ email: '  Alex@Example.com ' });
-    expect(repository.findOne).toHaveBeenCalledWith(expect.objectContaining({ where: { email: 'alex@example.com' } }));
+    const { accounts } = setup();
+    await expect(accounts.findOne({ email: '  Alex@Example.com ' })).resolves.toMatchObject({ id: 1 });
   });
 
   it('matches emails case-insensitively when searching by emails or usernames', async () => {
-    const { accounts, repository } = setup();
-    const matches = [{ id: 1, email: 'alex@example.com' }];
-    repository.find.mockResolvedValueOnce(matches);
-    await expect(accounts.findByEmailsOrUsernames([' Alex@Example.com ', 'alex@example.com'], [])).resolves.toBe(
-      matches,
-    );
-    expect(repository.find).toHaveBeenCalledWith({ where: [{ email: In(['alex@example.com']) }] });
+    const { accounts, store } = setup();
+    const spy = jest.spyOn(store, 'findByEmailsOrUsernames');
+    await expect(
+      accounts.findByEmailsOrUsernames([' Alex@Example.com ', 'alex@example.com'], [' ALEX ']),
+    ).resolves.toHaveLength(1);
+    expect(spy).toHaveBeenCalledWith(['alex@example.com'], ['alex']);
   });
 
   it('stores the normalised email on creation', async () => {
-    const { accounts, em } = setup();
-    await accounts.createOne({ username: 'alex', email: '  Alex@Example.COM ', externalIdentifier: null });
-    expect(em.save).toHaveBeenCalledWith(expect.objectContaining({ email: 'alex@example.com' }));
+    const { accounts, store } = setup();
+    await accounts.createOne({ username: 'alex2', email: '  Alex2@Example.COM ', externalIdentifier: null });
+    expect(store.users.map((user) => user.email)).toContain('alex2@example.com');
   });
 
   it('rejects a case-variant of an existing email', async () => {
-    const { accounts, repository } = setup();
-    repository.findOne.mockResolvedValueOnce({ id: 1, email: 'alex@example.com' });
+    const { accounts } = setup();
     await expect(
       accounts.createOne({ username: 'alex2', email: 'ALEX@example.com', externalIdentifier: null }),
     ).rejects.toThrow(new BadRequestException('Email already exists'));
-    expect(repository.findOne).toHaveBeenCalledWith(expect.objectContaining({ where: { email: 'alex@example.com' } }));
+  });
+
+  it('excludes the replaced first-time-setup account from the license usage count', async () => {
+    const { accounts, store } = setup();
+    const spy = jest.spyOn(store, 'countUsers');
+    await accounts.createOne({ username: 'alex2', email: 'alex2@example.com', externalIdentifier: null }, undefined, {
+      excludedUserIdFromLicenseUsage: 1,
+    });
+    expect(spy).toHaveBeenCalledWith({ excludingUserId: 1 }, undefined);
   });
 });

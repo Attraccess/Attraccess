@@ -1,4 +1,4 @@
-import { AttractapFirmware, useAttractapServiceGetFirmwares } from '@attraccess/react-query-client';
+import { AttractapFirmware, useGetFirmwares } from '@attraccess/react-query-client';
 import {
   Accordion,
   AccordionBody,
@@ -46,7 +46,7 @@ function FirmwareCard({ firmware, onSelect }: { firmware: AttractapFirmware; onS
 }
 
 export function FirmwareSelector(props: Props) {
-  const { data: firmwares, isLoading } = useAttractapServiceGetFirmwares();
+  const { data: firmwares, isLoading } = useGetFirmwares();
   const { t } = useTranslations({ de, en });
 
   const standard = firmwares?.filter((firmware) => firmware.variant !== 'demo') ?? [];

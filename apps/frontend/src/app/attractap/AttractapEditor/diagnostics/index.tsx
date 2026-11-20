@@ -1,24 +1,28 @@
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useGetReaderCrashReports } from '@attraccess/react-query-client';
 import { Spinner } from '@heroui/react';
-import { Props } from './useDiagnostics';
-import { formatBytes } from './Reports';
-import { useAttractapDiagnosticsState } from './useDiagnostics';
-import { renderAttractapDiagnosticsReports } from './Reports';
+import de from '../AttractapDiagnostics.de.json';
+import en from '../AttractapDiagnostics.en.json';
+import { CrashReportCard } from './CrashReportCard';
+import { HeapTrend } from './HeapTrend';
+import { hasPendingCoredump, PENDING_COREDUMP_POLL_INTERVAL_MS } from './pendingCoredump';
+import { useCoredumpDownload } from './useCoredumpDownload';
+
+export interface Props {
+  readerId?: number;
+}
 
 export function AttractapDiagnostics(props: Readonly<Props>) {
+  const { t } = useTranslations({ de, en });
   const {
-    t,
-    formatDateTime,
-    expandedReports,
-    toggleBacktrace,
-    reports,
+    data: reports,
     isLoading,
     isError,
-    downloadCoredump,
-    chronological,
-    heapValues,
-    maxHeap,
-    fallback,
-  } = useAttractapDiagnosticsState(props);
+  } = useGetReaderCrashReports({ path: { readerId: props.readerId as number } }, undefined, {
+    enabled: props.readerId !== undefined,
+    refetchInterval: (query) => (hasPendingCoredump(query.state.data) ? PENDING_COREDUMP_POLL_INTERVAL_MS : false),
+  });
+  const downloadCoredump = useCoredumpDownload(props.readerId);
 
   if (isLoading) {
     return (
@@ -44,6 +48,8 @@ export function AttractapDiagnostics(props: Readonly<Props>) {
       </p>
     );
   }
+  const chronological = [...reports].reverse();
+
   return (
     <div className="flex flex-col gap-6" data-cy="attractap-diagnostics">
       <div className="flex flex-col gap-1">
@@ -51,41 +57,14 @@ export function AttractapDiagnostics(props: Readonly<Props>) {
         <p className="text-sm text-default-500">{t('description')}</p>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <h4 className="text-sm font-medium">{t('heapTrend')}</h4>
-        {heapValues.length === 0 ? (
-          <p className="text-sm text-default-400">{t('heapTrendEmpty')}</p>
-        ) : (
-          <div className="flex items-end gap-1 h-24" data-cy="attractap-diagnostics-heap-trend">
-            {chronological.map((report) => {
-              const value = report.heapFreeBytes ?? 0;
-              const heightPct = maxHeap > 0 ? Math.max(4, Math.round((value / maxHeap) * 100)) : 4;
-              return (
-                <div
-                  key={report.id}
-                  className="flex-1 rounded-t-sm min-w-[6px]"
-                  style={{ height: `${heightPct}%`, backgroundColor: 'var(--accent)' }}
-                  title={`${formatBytes(report.heapFreeBytes, fallback)} — ${formatDateTime(report.createdAt)}`}
-                />
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <HeapTrend reports={chronological} />
 
       <div className="flex flex-col gap-2">
         <h4 className="text-sm font-medium">{t('resetHistory')}</h4>
         <div className="flex flex-col gap-3">
-          {reports.map((report) =>
-            renderAttractapDiagnosticsReports(report, {
-              t,
-              formatDateTime,
-              fallback,
-              toggleBacktrace,
-              expandedReports,
-              downloadCoredump,
-            }),
-          )}
+          {reports.map((report) => (
+            <CrashReportCard key={report.id} report={report} onDownloadCoredump={downloadCoredump} />
+          ))}
         </div>
       </div>
     </div>

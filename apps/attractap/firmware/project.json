@@ -69,6 +69,10 @@
           "python3 -I apps/attractap/firmware/tools/test_secure_profile_flag.py",
           "python3 -I apps/attractap/firmware/tools/test_secure_packaging.py",
           "python3 -I apps/attractap/firmware/tools/test_secure_lab_reader.py",
+          "python3 -I apps/attractap/firmware/tools/test_check_release_build.py",
+          "cmake -S apps/attractap/firmware/tests/crash-upload -B apps/attractap/firmware/tests/crash-upload/build",
+          "cmake --build apps/attractap/firmware/tests/crash-upload/build --parallel 4",
+          "ctest --test-dir apps/attractap/firmware/tests/crash-upload/build --output-on-failure",
           "cmake -S apps/attractap/firmware/tests/supervision -B apps/attractap/firmware/tests/supervision/build",
           "cmake --build apps/attractap/firmware/tests/supervision/build",
           "ctest --test-dir apps/attractap/firmware/tests/supervision/build --output-on-failure",
@@ -90,6 +94,9 @@
           "cmake -S apps/attractap/firmware/tests/websocket -B apps/attractap/firmware/tests/websocket/build",
           "cmake --build apps/attractap/firmware/tests/websocket/build",
           "ctest --test-dir apps/attractap/firmware/tests/websocket/build --output-on-failure",
+          "cmake -S apps/attractap/firmware/tests/efuse-report -B apps/attractap/firmware/tests/efuse-report/build",
+          "cmake --build apps/attractap/firmware/tests/efuse-report/build --parallel 4",
+          "ctest --test-dir apps/attractap/firmware/tests/efuse-report/build --output-on-failure",
           "cmake -S apps/attractap/firmware/tests/pairing -B apps/attractap/firmware/tests/pairing/build",
           "cmake --build apps/attractap/firmware/tests/pairing/build --parallel 4",
           "ctest --test-dir apps/attractap/firmware/tests/pairing/build --output-on-failure",
@@ -99,15 +106,18 @@
           "cmake -S apps/attractap/firmware/tests/test-hooks -B apps/attractap/firmware/tests/test-hooks/build",
           "cmake --build apps/attractap/firmware/tests/test-hooks/build --parallel 2",
           "ctest --test-dir apps/attractap/firmware/tests/test-hooks/build --output-on-failure",
+          "cmake -S apps/attractap/firmware/tests/ble-proxy -B apps/attractap/firmware/tests/ble-proxy/build",
+          "cmake --build apps/attractap/firmware/tests/ble-proxy/build --parallel 2",
+          "ctest --test-dir apps/attractap/firmware/tests/ble-proxy/build --output-on-failure",
+          "cmake -S apps/attractap/firmware/tests/tls-memory -B apps/attractap/firmware/tests/tls-memory/build",
+          "cmake --build apps/attractap/firmware/tests/tls-memory/build --parallel 4",
+          "ctest --test-dir apps/attractap/firmware/tests/tls-memory/build --output-on-failure",
           "sh apps/attractap/firmware/tests/pn532-target/run.sh"
         ],
         "parallel": false,
         "cwd": "."
       },
-      "cache": false,
-      "dependsOn": [
-        "test-node"
-      ]
+      "cache": false
     },
     "flash": {
       "executor": "nx:run-commands",
@@ -135,22 +145,6 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/attractap/firmware"
-      },
-      "dependsOn": [
-        "test-node"
-      ]
-    },
-    "test-node": {
-      "executor": "nx:run-commands",
-      "cache": true,
-      "inputs": [
-        "default"
-      ],
-      "outputs": [
-        "{workspaceRoot}/coverage/apps/attractap/firmware/test-node"
-      ],
-      "options": {
-        "command": "node scripts/crap-score/node-test.mjs apps/attractap/firmware coverage/apps/attractap/firmware/test-node apps/attractap/firmware/tests/ota/hardware-soak.test.mjs"
       }
     }
   }

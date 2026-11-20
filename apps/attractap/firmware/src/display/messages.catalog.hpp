@@ -148,6 +148,7 @@ enum class Message {
     LockingDoor,
     UnlockingDoor,
     ReleasingDoorLatch,
+    OpeningDoor,
     RunningAction,
     TakingOverSession,
     StartingSession,
@@ -284,6 +285,10 @@ enum class Message {
     ErrorEnrollNotConfirmed, ErrorNoFreeKeySlot, ErrorCardNotFactory, ErrorResetNotConfirmed, ErrorWrongCard,
     ErrorCardKeyUnavailable, ErrorFirmwareUpdateRequired, ErrorReaderNotAllowedToWriteCards,
     ErrorCardOperationExpired,
+    NetworkStatus, NetworkStatusShort, ConnectionQuality, ConnectionQualityGood, ConnectionQualityDegraded, ConnectionQualityOffline,
+    LastMessageAge, LatestPing, AveragePing, PingTrend, ReconnectsLastMinute, SendQueueDepth, SendQueueFullLastMinute,
+    SendFailuresLastMinute, ConnectionTimeoutsLastMinute, PingTimeoutsLastMinute, PingLossLastMinute,
+    MissedHeartbeatsLastMinute, NotAvailable, Milliseconds, Percent,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
@@ -434,6 +439,7 @@ inline constexpr Entry catalog[] = {
     {Message::LockingDoor, "Sperre Tür", "Locking door"},
     {Message::UnlockingDoor, "Entsperre Tür", "Unlocking door"},
     {Message::ReleasingDoorLatch, "Öffne Tür-Riegel", "Releasing door latch"},
+    {Message::OpeningDoor, "Öffne Tür", "Opening door"},
     {Message::RunningAction, "Aktion Ausführen", "Running action"},
     {Message::TakingOverSession, "Übernehme Sitzung", "Taking over session"},
     {Message::StartingSession, "Starte Sitzung", "Starting session"},

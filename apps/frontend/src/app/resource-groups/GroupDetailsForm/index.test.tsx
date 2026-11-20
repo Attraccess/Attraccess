@@ -15,18 +15,28 @@ const state = vi.hoisted(() => ({
   callbacks: {} as Record<string, { onSuccess: () => void; onError: (error: Error) => void }>,
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAccessControlServiceResourceIntroductionsGetPeopleKey: 'resourceIntroductions',
-  useResourcesServiceResourceGroupsGetOne: () => ({ data: state.group, isLoading: state.loading, error: state.error }),
-  useResourcesServiceResourceGroupsUpdateOne: (callbacks: (typeof state.callbacks)[string]) => {
+  useResourceIntroductionsGetPeopleKey: 'resourceIntroductions',
+  useResourceGroupsGetOne: () => ({ data: state.group, isLoading: state.loading, error: state.error }),
+  useResourceGroupsUpdateOne: (_mutationKey: unknown, callbacks: (typeof state.callbacks)[string]) => {
     state.callbacks.update = callbacks;
     return { mutateAsync: state.update };
   },
-  useResourcesServiceResourceGroupsDeleteOne: (callbacks: (typeof state.callbacks)[string]) => {
+  useResourceGroupsDeleteOne: (_mutationKey: unknown, callbacks: (typeof state.callbacks)[string]) => {
     state.callbacks.remove = callbacks;
-    return { mutate: state.remove };
+    return {
+      mutateAsync: async (variables: unknown) => {
+        try {
+          await state.remove(variables);
+        } catch (error) {
+          state.callbacks.remove.onError(error as Error);
+          throw error;
+        }
+        state.callbacks.remove.onSuccess();
+      },
+    };
   },
-  UseResourcesServiceResourceGroupsGetOneKeyFn: (input: unknown) => ['group', input],
-  UseResourcesServiceResourceGroupsGetManyKeyFn: () => ['groups'],
+  UseResourceGroupsGetOneKeyFn: (input: unknown) => ['group', input],
+  UseResourceGroupsGetManyKeyFn: () => ['groups'],
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('../../../components/toastProvider', () => ({
@@ -64,12 +74,12 @@ it('saves trimmed details and visibility, refreshes the group and reports errors
   fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
   await waitFor(() =>
     expect(state.update).toHaveBeenCalledWith({
-      id: 7,
-      requestBody: { name: 'New workshop', description: 'New description', isHidden: true },
+      path: { id: 7 },
+      body: { name: 'New workshop', description: 'New description', isHidden: true },
     }),
   );
   act(() => state.callbacks.update.onSuccess());
-  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['group', { id: 7 }] });
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['group', { path: { id: 7 } }] });
   expect(state.success).toHaveBeenCalledWith(expect.objectContaining({ title: 'Group updated successfully' }));
   act(() => state.callbacks.update.onError(new Error('Denied')));
   expect(state.toastError).toHaveBeenCalledWith(
@@ -78,8 +88,8 @@ it('saves trimmed details and visibility, refreshes the group and reports errors
   fireEvent.change(screen.getByPlaceholderText('Enter group description (optional)'), { target: { value: '  ' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
   expect(state.update).toHaveBeenLastCalledWith({
-    id: 7,
-    requestBody: { name: 'New workshop', description: undefined, isHidden: true },
+    path: { id: 7 },
+    body: { name: 'New workshop', description: undefined, isHidden: true },
   });
 });
 it('requires delete confirmation and navigates away after success', async () => {
@@ -88,11 +98,14 @@ it('requires delete confirmation and navigates away after success', async () => 
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(state.remove).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Delete Group' }));
+  state.remove.mockRejectedValueOnce(new Error('In use'));
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+  expect(state.remove).toHaveBeenCalledWith({ path: { groupId: 7 } });
+  await waitFor(() =>
+    expect(state.toastError).toHaveBeenCalledWith(expect.objectContaining({ title: 'Failed to delete group' })),
+  );
   fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-  expect(state.remove).toHaveBeenCalledWith({ groupId: 7 });
-  act(() => state.callbacks.remove.onError(new Error('In use')));
-  expect(state.toastError).toHaveBeenCalledWith(expect.objectContaining({ title: 'Failed to delete group' }));
-  act(() => state.callbacks.remove.onSuccess());
+  await waitFor(() => expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['groups'] }));
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['groups'] });
   expect(await screen.findByText('Resource list')).toBeInTheDocument();
 });

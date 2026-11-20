@@ -1,4 +1,10 @@
-import { Button, ResourceSelector, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  LabeledSwitch,
+  ResourceSelector,
+  StandardDrawer,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import de from './AttractapEditor.de.json';
 import en from './AttractapEditor.en.json';
 import {
@@ -17,12 +23,13 @@ import {
   Tabs,
 } from '@heroui/react';
 import { TextField, Label, Input } from '@heroui/react';
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  useAttractapServiceGetReaderById,
-  useAttractapServiceGetReadersKey,
-  useAttractapServiceUpdateReader,
+  useGetReaderById,
+  useGetReadersKey,
+  useUpdateReader,
+  UseGetReaderByIdKeyFn,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { ReaderSecurity } from '../pairing/ReaderSecurity';
@@ -43,7 +50,7 @@ export function AttractapEditor(props: Readonly<Props>) {
 
   const queryClient = useQueryClient();
 
-  const { data: reader } = useAttractapServiceGetReaderById({ readerId: props.readerId as number }, undefined, {
+  const { data: reader } = useGetReaderById({ path: { readerId: props.readerId as number } }, undefined, {
     enabled: props.readerId !== undefined,
   });
 
@@ -51,11 +58,16 @@ export function AttractapEditor(props: Readonly<Props>) {
 
   const [name, setName] = useState('');
   const [ledBrightness, setLedBrightness] = useState<number>(255);
+  const [allowPluginBle, setAllowPluginBle] = useState(false);
+  const allowPluginBleDescriptionId = useId();
   const [connectedResourceIds, setConnectedResourceIds] = useState<number[]>([]);
   const [selectedTab, setSelectedTab] = useState<'general' | 'resources' | 'readerUi' | 'security'>('general');
-  const updateReaderMutation = useAttractapServiceUpdateReader({
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [useAttractapServiceGetReadersKey] });
+  const updateReaderMutation = useUpdateReader(undefined, {
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: [useGetReadersKey] });
+      queryClient.invalidateQueries({
+        queryKey: UseGetReaderByIdKeyFn({ path: { readerId: variables.path.readerId } }),
+      });
       toast.success({
         title: t('readerUpdated'),
         description: t('readerUpdatedDescription'),
@@ -73,6 +85,7 @@ export function AttractapEditor(props: Readonly<Props>) {
   useEffect(() => {
     setName(reader?.name ?? '');
     setLedBrightness(reader?.ledBrightness ?? 255);
+    setAllowPluginBle(reader?.allowPluginBle ?? false);
     setConnectedResourceIds(reader?.resources.map((r) => r.id) ?? []);
   }, [reader]);
 
@@ -81,15 +94,19 @@ export function AttractapEditor(props: Readonly<Props>) {
       return;
     }
 
+    // Only send the opt-in when the administrator changed it, so a save with a stale or not yet loaded value
+    // can never switch plugin Bluetooth access off as a side effect (for example on a rename).
+    const allowPluginBleChanged = reader !== undefined && allowPluginBle !== (reader.allowPluginBle ?? false);
     updateReaderMutation.mutate({
-      readerId: props.readerId,
-      requestBody: {
+      path: { readerId: props.readerId },
+      body: {
         name,
         connectedResourceIds,
         ledBrightness,
+        ...(allowPluginBleChanged ? { allowPluginBle } : {}),
       },
     });
-  }, [name, connectedResourceIds, ledBrightness, props, updateReaderMutation]);
+  }, [name, connectedResourceIds, ledBrightness, allowPluginBle, reader, props, updateReaderMutation]);
 
   const onSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -162,6 +179,19 @@ export function AttractapEditor(props: Readonly<Props>) {
                       </SliderTrack>
                     </Slider>
                   )}
+                  <div className="flex flex-col gap-1">
+                    <LabeledSwitch
+                      isSelected={allowPluginBle}
+                      onChange={setAllowPluginBle}
+                      aria-describedby={allowPluginBleDescriptionId}
+                      data-cy="attractap-editor-allow-plugin-ble-switch"
+                    >
+                      {t('allowPluginBle')}
+                    </LabeledSwitch>
+                    <p id={allowPluginBleDescriptionId} className="text-sm text-default-500">
+                      {t('allowPluginBleDescription')}
+                    </p>
+                  </div>
                 </div>
               </TabPanel>
               <TabPanel id="resources" className="pt-4">

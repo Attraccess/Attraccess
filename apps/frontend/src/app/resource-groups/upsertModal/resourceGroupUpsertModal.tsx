@@ -16,11 +16,11 @@ import en from './resourceGroupUpsertModal.en.json';
 import de from './resourceGroupUpsertModal.de.json';
 import {
   ResourceGroup,
-  useResourcesServiceResourceGroupsCreateOne,
+  useResourceGroupsCreateOne,
   CreateResourceGroupDto,
-  useResourcesServiceResourceGroupsUpdateOne,
+  useResourceGroupsUpdateOne,
   UpdateResourceGroupDto,
-  useResourcesServiceResourceGroupsGetManyKey,
+  useResourceGroupsGetManyKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
@@ -28,8 +28,8 @@ import { useToastMessage } from '../../../components/toastProvider';
 
 export type FormData = CreateResourceGroupDto | UpdateResourceGroupDto;
 
-export // Define a more specific type for the expected error structure from the API
-interface ApiValidationError {
+// Define a more specific type for the expected error structure from the API
+export interface ApiValidationError {
   errors?: {
     [key: string]: string[];
   };
@@ -43,7 +43,9 @@ export interface Props {
   onUpserted?: (resourceGroup: ResourceGroup) => void;
 }
 
-export function useResourceGroupUpsertModalState(props: Readonly<Props>) {
+// Define a more specific type for the expected error structure from the API
+
+export function ResourceGroupUpsertModal(props: Readonly<Props>) {
   const { isOpen, open, setOpen, close: closeDisclosure } = useOverlayState();
   const { t } = useTranslations({
     en,
@@ -75,7 +77,7 @@ export function useResourceGroupUpsertModalState(props: Readonly<Props>) {
     });
 
     queryClient.invalidateQueries({
-      queryKey: [useResourcesServiceResourceGroupsGetManyKey],
+      queryKey: [useResourceGroupsGetManyKey],
     });
 
     if (!isEditMode) {
@@ -111,14 +113,14 @@ export function useResourceGroupUpsertModalState(props: Readonly<Props>) {
   };
 
   // Pass onSuccess and onError directly to the hook options
-  const createMutation = useResourcesServiceResourceGroupsCreateOne({
+  const createMutation = useResourceGroupsCreateOne(undefined, {
     onSuccess: (data) => {
       handleSuccess(data);
     },
     onError: handleError,
   });
 
-  const updateMutation = useResourcesServiceResourceGroupsUpdateOne({
+  const updateMutation = useResourceGroupsUpdateOne(undefined, {
     onSuccess: handleSuccess,
     onError: handleError,
   });
@@ -174,15 +176,10 @@ export function useResourceGroupUpsertModalState(props: Readonly<Props>) {
 
       if (isEditMode && props.resourceGroup) {
         // Ensure types match for update mutation
-        updateMutation.mutate({
-          id: props.resourceGroup.id,
-          requestBody: requestBody as UpdateResourceGroupDto,
-        });
+        updateMutation.mutate({ path: { id: props.resourceGroup.id }, body: requestBody as UpdateResourceGroupDto });
       } else {
         // Ensure types match for create mutation
-        createMutation.mutate({
-          requestBody: requestBody as CreateResourceGroupDto,
-        });
+        createMutation.mutate({ body: requestBody as CreateResourceGroupDto });
       }
     },
     // Dependencies should include the specific mutations if used directly
@@ -192,42 +189,6 @@ export function useResourceGroupUpsertModalState(props: Readonly<Props>) {
   const getFieldError = (fieldName: keyof FormData) => {
     return apiErrors[fieldName]?.[0];
   };
-  return {
-    isOpen,
-    open,
-    setOpen,
-    closeDisclosure,
-    t,
-    nameInputRef,
-    formData,
-    setFormData,
-    setApiErrors,
-    isEditMode,
-    mutation,
-    handleSubmit,
-    getFieldError,
-    props,
-  };
-}
-
-// Define a more specific type for the expected error structure from the API
-
-export function ResourceGroupUpsertModal(props: Readonly<Props>) {
-  const {
-    isOpen,
-    open,
-    setOpen,
-    closeDisclosure,
-    t,
-    nameInputRef,
-    formData,
-    setFormData,
-    setApiErrors,
-    isEditMode,
-    mutation,
-    handleSubmit,
-    getFieldError,
-  } = useResourceGroupUpsertModalState(props);
 
   return (
     <>

@@ -100,10 +100,10 @@ attraccess_resource_maintenance_overdue > 0
 | `attraccess_attractap_devices_connected` | Gauge | -- | Number of connected Attractap RFID readers |
 | `attraccess_attractap_nfc_taps_total` | Counter | -- | Total RFID tap events |
 | `attraccess_attractap_firmware_updates_total` | Counter | -- | Total firmware update events |
-| `attraccess_attractap_crash_reports_total` | Counter | `reader_id`, `reset_reason` | Reset reports received from readers, for every reset reason (including `POWERON` and `SW`), so it is not a count of crashes. `reset_reason` is a normalized reset cause (e.g. `PANIC`, `INT_WDT`, `BROWNOUT`, `UNKNOWN`). Unchanged; used by the dashboards |
+| `attraccess_attractap_crash_reports_total` | Counter | `reader_id`, `reset_reason` | Reset reports received from readers, for every reset reason (including `POWERON` and `SW`), so it is not a count of crashes. `reset_reason` is a normalized reset cause (e.g. `PANIC`, `INT_WDT`, `BROWNOUT`, `UNKNOWN`). A recovered coredump (a dump the reader found in flash without its boot record) is reported with `UNKNOWN`. Unchanged; used by the dashboards |
 | `attraccess_attractap_reset_reports_last_hour` | Gauge | `category` | Exact number of stored reset reports received in the last hour. `category` is `crash_watchdog` (`PANIC`, `INT_WDT`, `TASK_WDT`, `WDT`) or `power_on` (`POWERON`). Other reasons (`SW`, `BROWNOUT`, `UNKNOWN`, ...) are not counted |
 | `attraccess_attractap_reset_report_readers_last_hour` | Gauge | `category`, `readers` | Same count, with the contributing readers and reset reasons as text in the `readers` label (e.g. `Door (#1): PANIC x2; Laser (#2): WDT x2`). Used only for the alert text. Reader names are shortened to 40 characters with `<` and `>` removed, and the list is capped at about 200 characters (`; +N more`) |
-| `attraccess_attractap_sessions_active` | Gauge | -- | Open encrypted reader sessions (TLS 1.3 inside the WebSocket). Readers still signed in with a token are not counted |
+| `attraccess_attractap_sessions_active` | Gauge | -- | Open encrypted reader sessions (TLS 1.3 inside the WebSocket) |
 | `attraccess_attractap_handshake_queue_depth` | Gauge | -- | Reader TLS handshakes waiting for a free slot (32 run at once, up to 256 wait). A queue that stays high means many readers reconnect at the same time |
 | `attraccess_attractap_handshake_failures_total` | Counter | `reason` | Reader session handshakes that did not end in a session. `reason` is `handshake-refused` (queue full), `handshake-timeout`, `handshake-failed` (TLS error), `closed` (reader went away), or why the server turned the reader away: `unknown-credential`, `inactive-credential` (pairing removed or replaced), `invalid-certificate` (expired or not yet valid, e.g. a wrong clock), `no-reader-id`, `no-client-certificate` |
 
@@ -111,7 +111,7 @@ attraccess_resource_maintenance_overdue > 0
 
 The two `..._last_hour` gauges are counted from the database every time `/api/metrics` is scraped, over the last 3600 whole seconds, measured by when the server stored each report. A report exactly one hour old is excluded; a report stored at scrape time is included. Notes:
 
-- They count **stored reports**. A reader that uploads a report again after a lost acknowledgement is counted twice.
+- They count **stored reports**. A reader that uploads a report again after a lost acknowledgement is counted twice, unless the report announces a coredump that is still awaited: the server then acknowledges the existing report again.
 - The count has a 5-second timeout. If the query fails or times out, `/api/metrics` returns an error instead of zero, so Prometheus marks the target down (`AttractapServiceDown` and `ScrapeFailures` can fire). The timeout does not cancel the underlying SQLite query.
 - The alert rules use `max` across scrape targets, so several targets of **one** installation (one shared database) are not double counted. Combining independent installations in one Prometheus/Grafana instance gives incorrect totals and is unsupported.
 - The counts rely on an index on `attractap_crash_report.createdAt` added by a database migration.
@@ -173,6 +173,35 @@ histogram_quantile(0.95, sum by (event, le) (rate(attraccess_ws_message_duration
 
 # Message error rate by event
 sum by (event) (rate(attraccess_ws_messages_total{status="error"}[5m]))
+```
+
+## Plugin Bluetooth (BLE)
+
+Plugins with the `BLE_TRANSPORT` permission talk to Bluetooth devices through Attractap readers. Labels stay low-cardinality: reader, endpoint and session ids appear only in the API logs, in `ble op=<operation> ... outcome=<ok or code> detail=<safe detail> <duration>ms` lines. Successful operations log at debug level, failed ones at info (`log`) level, so enable debug logging to see every operation. The lines never contain payload bytes.
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `attraccess_plugin_ble_operations_total` | Counter | `operation`, `outcome` | Plugin BLE operations (`scan`, `connect`, `read`, `write`, `subscribe`, `unsubscribe`, ...); `outcome` is `ok` or the error code |
+| `attraccess_plugin_ble_operation_duration_seconds` | Histogram | `operation` | Duration of successful operations only, including the reader round trip; failed operations count only in `attraccess_plugin_ble_operations_total` |
+| `attraccess_plugin_ble_sessions_active` | Gauge | -- | Open plugin BLE sessions |
+| `attraccess_plugin_ble_session_closes_total` | Counter | `reason` | Closed sessions by reason (`closed`, `lease-expired`, `disconnected`, `cancelled`, ...) |
+| `attraccess_plugin_ble_rejections_total` | Counter | `code` | Calls refused by the profile, the reader allowlist or a payload bound (`OPERATION_NOT_ALLOWED`, `UNKNOWN_CHARACTERISTIC`, `PAYLOAD_TOO_LARGE`) |
+| `attraccess_plugin_ble_notifications_total` | Counter | `outcome` | Notifications by outcome: `delivered` (handed to the plugin's stream), `overflow` (the reader's buffer or the API's per-subscription queue overflowed; the stream fails with `NOTIFICATION_OVERFLOW`), `oversized` (above the profile's `maxNotificationBytes`; `PAYLOAD_TOO_LARGE`), `malformed` (bad encoding or a sequence gap or duplicate from the reader; `INTERNAL`). Every outcome other than `delivered` fails that stream |
+| `attraccess_plugin_ble_watches_active` | Gauge | -- | Open advertisement watches (`context.ble.watch`) |
+| `attraccess_plugin_ble_watch_events_received_total` | Counter | -- | Advertisement watch events the API accepted from readers |
+| `attraccess_plugin_ble_watch_events_routed_total` | Counter | -- | Watch events handed to plugin watches; one event can reach several watches |
+| `attraccess_plugin_ble_watch_events_dropped_total` | Counter | `reason` | Watch events that reached no plugin: `malformed`, `batch-too-large` (more than 8 per message), `rate-limit` (far above the rate the reader announced), `stale-connection` (from a connection the set was not sent to), `access-denied` (reader not open for plugins), `no-watch` (no watch for the named filter), `filter-mismatch` (the profile filter does not match), `queue-full` (the oldest queued event of a busy watch) |
+
+**Operation duration buckets:** 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s, 30s, 60s
+
+### Example PromQL Queries
+
+```promql
+# Failed plugin BLE operations by code
+sum by (operation, outcome) (rate(attraccess_plugin_ble_operations_total{outcome!="ok"}[5m]))
+
+# Notification streams that failed instead of delivering
+sum by (outcome) (increase(attraccess_plugin_ble_notifications_total{outcome!="delivered"}[1h]))
 ```
 
 ## Cron Jobs

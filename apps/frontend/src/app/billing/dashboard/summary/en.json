@@ -10,8 +10,7 @@
         "dateTime": "Date",
         "status": "Status",
         "details": "Details",
-        "amount": "Amount",
-        "actions": "Actions"
+        "amount": "Amount"
       },
       "actions": {
         "refund": "Refund transaction"

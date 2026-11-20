@@ -10,7 +10,6 @@
     "type": "Typ",
     "value": "Wert",
     "updated": "Aktualisiert",
-    "actions": "Aktionen",
     "empty": "Noch keine Variablen."
   },
   "actions": {
@@ -21,8 +20,7 @@
     "cancel": "Abbrechen",
     "close": "Schließen",
     "confirmDelete": "Variable wirklich löschen?",
-    "confirmDeleteYes": "Löschen",
-    "confirmDeleteNo": "Abbrechen"
+    "confirmDeleteMessage": "Die Variable „{{{key}}}“ wird gelöscht. Das kann nicht rückgängig gemacht werden."
   },
   "editor": {
     "createTitle": "Variable hinzufügen",

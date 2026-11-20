@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import AccountPage from './index';
@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   success: vi.fn(),
   apiError: vi.fn(),
   options: {} as { onSuccess: () => void; onError: (error: unknown) => void },
+  mcp: undefined as undefined | { url: string; oauthEnabled: boolean },
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -26,9 +27,20 @@ vi.mock('../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: state.success, apiError: state.apiError }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useUsersServiceRequestDeleteAccount: (options: typeof state.options) => {
+  useGetMcpConnectionInfo: () => ({ data: state.mcp }),
+  useRequestDeleteAccount: (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
-    return { mutate: state.request };
+    return {
+      mutateAsync: async () => {
+        try {
+          await state.request();
+        } catch (error) {
+          state.options.onError(error);
+          throw error;
+        }
+        state.options.onSuccess();
+      },
+    };
   },
 }));
 vi.mock('./email', () => ({ EmailForm: () => <div>Email form</div> }));
@@ -39,6 +51,14 @@ vi.mock('./passkeys', () => ({ PasskeysCard: () => <div>Passkey settings</div> }
 vi.mock('./api-tokens', () => ({
   ApiTokensCard: ({ availablePermissions }: { availablePermissions: string[] }) => (
     <div>Token permissions: {availablePermissions.join(',')}</div>
+  ),
+}));
+vi.mock('./mcp', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./mcp')>()),
+  McpConnectionCard: ({ connection, canUseApiTokens }: { connection: { url: string }; canUseApiTokens: boolean }) => (
+    <div>
+      MCP {connection.url} tokens:{String(canUseApiTokens)}
+    </div>
   ),
 }));
 vi.mock('../user-management/details/components/setPasswordForm', () => ({
@@ -52,6 +72,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.user = undefined;
   state.permission = false;
+  state.mcp = undefined;
 });
 afterEach(cleanup);
 function open() {
@@ -94,12 +115,13 @@ it('requires confirmation for deletion, allows cancellation and closes after a s
   fireEvent.click(screen.getByRole('button', { name: 'deleteAccount.actions.request' }));
   fireEvent.click(await screen.findByRole('button', { name: 'deleteAccount.actions.confirm' }));
   expect(state.request).toHaveBeenCalledOnce();
-  act(() => state.options.onSuccess());
-  expect(state.success).toHaveBeenCalledWith({
-    title: 'deleteAccount.toast.title',
-    description: 'deleteAccount.toast.description',
-  });
-  expect(screen.queryByRole('button', { name: 'deleteAccount.actions.confirm' })).toBeNull();
+  await waitFor(() =>
+    expect(state.success).toHaveBeenCalledWith({
+      title: 'deleteAccount.toast.title',
+      description: 'deleteAccount.toast.description',
+    }),
+  );
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'deleteAccount.actions.confirm' })).toBeNull());
 });
 it('retains deletion confirmation and reports an unsuccessful request', async () => {
   open();
@@ -107,10 +129,32 @@ it('retains deletion confirmation and reports an unsuccessful request', async ()
   fireEvent.click(screen.getByRole('button', { name: 'deleteAccount.actions.request' }));
   await screen.findByText('deleteAccount.modal.description');
   const failure = new Error('Unavailable');
-  act(() => state.options.onError(failure));
-  expect(state.apiError).toHaveBeenCalledWith(
-    expect.objectContaining({ error: failure, baseTranslationKey: 'apiErrors' }),
+  state.request.mockRejectedValueOnce(failure);
+  fireEvent.click(screen.getByRole('button', { name: 'deleteAccount.actions.confirm' }));
+  await waitFor(() =>
+    expect(state.apiError).toHaveBeenCalledWith(
+      expect.objectContaining({ error: failure, baseTranslationKey: 'apiErrors' }),
+    ),
   );
   expect(screen.getByRole('button', { name: 'deleteAccount.actions.confirm' })).toBeTruthy();
   expect(state.success).not.toHaveBeenCalled();
+});
+it('offers the MCP topic only when the user can sign in to it with OAuth or an API token', () => {
+  state.user = { id: 7, username: 'member', effectivePermissions: [] };
+  state.mcp = { url: 'http://192.168.1.50:3000/api/mcp', oauthEnabled: false };
+  const lanView = open();
+  expect(screen.queryByRole('button', { name: /topics.mcp.title/ })).toBeNull();
+  lanView.unmount();
+
+  state.permission = true;
+  const tokenView = open();
+  fireEvent.click(screen.getByRole('button', { name: /topics.mcp.title/ }));
+  expect(screen.getByText('MCP http://192.168.1.50:3000/api/mcp tokens:true')).toBeTruthy();
+  tokenView.unmount();
+
+  state.permission = false;
+  state.mcp = { url: 'https://attraccess.example/api/mcp', oauthEnabled: true };
+  open();
+  fireEvent.click(screen.getByRole('button', { name: /topics.mcp.title/ }));
+  expect(screen.getByText('MCP https://attraccess.example/api/mcp tokens:false')).toBeTruthy();
 });

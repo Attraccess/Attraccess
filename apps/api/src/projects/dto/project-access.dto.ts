@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Project, ProjectMemberRole } from '@attraccess/database-entities';
+import { ProjectDto } from './project.dto';
+import { ProjectMemberRole } from '@attraccess/application-models';
 
 export class ProjectAccessInfoDto {
   @ApiProperty({ description: 'Whether the authenticated user owns the project' })
@@ -18,7 +19,7 @@ export class ProjectAccessInfoDto {
   canManageProject!: boolean;
 }
 
-export class ProjectWithAccessDto extends Project {
+export class ProjectWithAccessDto extends ProjectDto {
   @ApiProperty({ type: ProjectAccessInfoDto })
   access!: ProjectAccessInfoDto;
 }

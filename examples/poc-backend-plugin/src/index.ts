@@ -1,15 +1,14 @@
 // Standalone example backend plugin built OUTSIDE the api app to prove ATT-454
 // real-world dynamic loading: separate package, own bundler, externalized peers.
 import type { PluginBackendModule, PluginContext, SystemEvent } from '@attraccess/plugins-backend-sdk';
+import { definePluginStorage, f, step, table } from '@attraccess/plugins-backend-sdk';
 import { DynamicModule, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DataSource } from 'typeorm';
 
 /**
- * Recreated locally (NOT imported as a runtime value) so the built artifact has
- * zero runtime dependency on the SDK package. Safe because Symbol.for() resolves
- * against the process-global symbol registry, so this is the exact same symbol
- * the host uses as the PLUGIN_CONTEXT injection token.
+ * Recreated locally (NOT imported as a runtime value from the SDK root) so the plugin does not depend on the SDK
+ * root at runtime. Safe because Symbol.for() resolves against the process-global symbol registry, so this is the
+ * exact same symbol the host uses as the PLUGIN_CONTEXT injection token.
  */
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 
@@ -18,9 +17,8 @@ export const POC_PONG_EVENT = 'poc.plugin.pong';
 
 /**
  * Typed host SystemEvent this plugin subscribes to. SystemEvent is imported as a
- * TYPE only (erased at build time) so the artifact keeps zero runtime dependency
- * on the SDK; the enum value is supplied as a string literal cast. Subscribing
- * requires the LISTEN_EVENTS permission in plugin.json.
+ * TYPE only (erased at build time); the enum value is supplied as a string literal
+ * cast. Subscribing requires the LISTEN_EVENTS permission in plugin.json.
  */
 const RESOURCE_USAGE_STARTED = 'RESOURCE_USAGE_STARTED' as SystemEvent;
 
@@ -31,11 +29,26 @@ const RESOURCE_USAGE_STARTED = 'RESOURCE_USAGE_STARTED' as SystemEvent;
  */
 export interface PocPongPayload {
   eventsInstanceMatch: boolean;
-  dataSourceInstanceMatch: boolean;
+  /** True when the record port served the plugin's declared `notes` table (the row came back with its generated key). */
+  entityMetadataResolved: boolean;
   savedId: number;
   savedMessage: string;
   hostGreeting: string;
 }
+
+/**
+ * The plugin's own storage: one declared table plus a neutral migration. The host creates the table in the plugin's
+ * namespace and migrates it; the plugin has no database access and reads and writes through `context.storage`.
+ */
+const notes = table({
+  id: f.id(),
+  message: f.string(),
+});
+
+const pocStorage = definePluginStorage({
+  tables: { notes },
+  migrations: [{ version: 1, name: 'create-notes', steps: [step.createTable('notes', notes)] }],
+});
 
 @Injectable()
 class PocPluginService implements OnModuleInit {
@@ -46,22 +59,20 @@ class PocPluginService implements OnModuleInit {
 
     // Typed plugin event API: payload is type-checked against the SystemEvent.
     this.context.onEvent(RESOURCE_USAGE_STARTED, (payload) => {
-      this.context.logger.log(
-        `Resource ${payload.resource.id} usage started by user ${payload.user.id}`
-      );
+      this.context.logger.log(`Resource ${payload.resource.id} usage started by user ${payload.user.id}`);
     });
   }
 
   private async handlePing(message: string): Promise<void> {
-    const repository = this.context.dataSource.getRepository('PocNote');
-    const saved = await repository.save({ message: `${this.context.manifest.name}:${message}` });
+    const { notes } = this.context.storage.open(pocStorage);
+    const saved = await notes.insert({ message: `${this.context.manifest.name}:${message}` });
     const host = this.context.get<{ greet(): string }>('POC_HOST_GREETER');
 
     const payload: PocPongPayload = {
       eventsInstanceMatch: this.context.events instanceof EventEmitter2,
-      dataSourceInstanceMatch: this.context.dataSource instanceof DataSource,
-      savedId: Number(saved.id),
-      savedMessage: String(saved.message),
+      entityMetadataResolved: typeof saved.id === 'number',
+      savedId: saved.id,
+      savedMessage: saved.message,
       hostGreeting: host.greet(),
     };
     this.context.events.emit(POC_PONG_EVENT, payload);
@@ -71,6 +82,7 @@ class PocPluginService implements OnModuleInit {
 class PocBackendPluginModule {}
 
 const plugin: PluginBackendModule = {
+  storage: pocStorage,
   register(context: PluginContext): DynamicModule {
     return {
       module: PocBackendPluginModule,

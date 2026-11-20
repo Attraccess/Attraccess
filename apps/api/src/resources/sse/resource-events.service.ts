@@ -1,9 +1,6 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit, OnModuleDestroy, NotFoundException } from '@nestjs/common';
 import { Observable, Subject } from 'rxjs';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Resource, ResourceUsage } from '@attraccess/database-entities';
 import {
   ResourceSessionStartedEvent,
   ResourceUsageSessionEndedEvent,
@@ -15,7 +12,9 @@ import {
   START_BLOCKED_LIVE_EVENT_TYPE,
   type PluginStartBlockedChanged,
 } from '../../plugin-system/start-blocked/start-blocked.events';
-import { activeUsageWhere, getSessionCapacity } from '../usage/sessions/active-usage';
+import { getSessionCapacity } from '../usage/sessions/active-usage';
+import { toUsageSessionResponse } from '../usage/dtos/usage-session-response';
+import { RESOURCE_STORE, type ResourceStore } from '../resource-store.port';
 
 interface MessageEvent {
   data: object;
@@ -29,12 +28,7 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
   // Create subjects for each resource id
   private resourceSubjects: Map<number, Subject<MessageEvent>> = new Map();
 
-  constructor(
-    @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(ResourceUsage)
-    private readonly resourceUsageRepository: Repository<ResourceUsage>,
-  ) {}
+  constructor(@Inject(RESOURCE_STORE) private readonly resources: ResourceStore) {}
 
   onModuleInit() {
     // Send keep-alive messages every 10 seconds to prevent connection timeouts
@@ -60,8 +54,8 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async subscribeResource(resourceId: number): Promise<Observable<MessageEvent>> {
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
-    if (!resource) throw new NotFoundException(`Resource with ID ${resourceId} not found`);
+    if ((await this.resources.existingIds([resourceId])).length === 0)
+      throw new NotFoundException(`Resource with ID ${resourceId} not found`);
 
     // Allocate lazily: validation can finish after a connection has disconnected.
     return new Observable<MessageEvent>((subscriber) => {
@@ -103,11 +97,8 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
     resourceId: number,
   ): Promise<{ inUse: boolean; activeSessionCount: number; maxParallelSessions: number }> {
     const [resource, activeSessionCount] = await Promise.all([
-      this.resourceRepository.findOne({
-        where: { id: resourceId },
-        select: { id: true, type: true, maxParallelSessions: true },
-      }),
-      this.resourceUsageRepository.count({ where: { resourceId, ...activeUsageWhere() } }),
+      this.resources.findCapacity(resourceId),
+      this.resources.countActiveSessions(resourceId),
     ]);
     const maxParallelSessions = resource ? getSessionCapacity(resource, activeSessionCount).maxParallelSessions : 1;
 
@@ -154,7 +145,11 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
   @OnEvent(ResourceSessionStartedEvent.EVENT_NAME)
   handleResourceUsage(event: ResourceSessionStartedEvent) {
     const resourceId = event.usage.resource.id;
-    this.emitWithSessionStatus(resourceId, { ...event, eventType: ResourceSessionStartedEvent.EVENT_NAME });
+    // The live feed carries the session as responses do: users as their public profile only.
+    this.emitWithSessionStatus(resourceId, {
+      usage: toUsageSessionResponse(event.usage),
+      eventType: ResourceSessionStartedEvent.EVENT_NAME,
+    });
     this.logger.debug(`Queued ${ResourceSessionStartedEvent.EVENT_NAME} event for resource ${resourceId}`);
   }
 

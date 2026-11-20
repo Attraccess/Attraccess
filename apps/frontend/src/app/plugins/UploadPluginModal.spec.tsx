@@ -18,7 +18,7 @@ const hoisted = vi.hoisted(() => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  usePluginsServiceUploadPlugin: (options: UploadOptions) => {
+  useUploadPlugin: (_mutationKey: unknown, options: UploadOptions) => {
     hoisted.uploadOptions = options;
     return { mutate: hoisted.uploadMutateMock, isPending: false };
   },
@@ -120,7 +120,7 @@ describe('UploadPluginModal', () => {
     await user.click(uploadButton());
 
     expect(hoisted.uploadMutateMock).toHaveBeenCalledWith({
-      formData: { pluginZip: file },
+      body: { pluginZip: file },
     });
   });
 
@@ -155,6 +155,29 @@ describe('UploadPluginModal', () => {
 
     expect(hoisted.errorToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Error' }));
     expect(consoleError).toHaveBeenCalled();
+  });
+
+  it("shows the server's reason when the upload is refused", () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    render(<UploadPluginModal isOpen onClose={vi.fn()} />);
+    const message =
+      'Plugin legacy-plugin targets Attraccess 1.11.0 and the plugin SDK 1.x. ' +
+      'Migration guide: https://docs.attraccess.org/#/en/plugins/migrating-to-2';
+
+    hoisted.uploadOptions?.onError?.({ status: 400, body: { statusCode: 400, message } });
+
+    expect(hoisted.errorToast).toHaveBeenCalledWith({ title: 'Error', description: message });
+  });
+
+  it('falls back to the generic hint when the server gives no reason', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    render(<UploadPluginModal isOpen onClose={vi.fn()} />);
+
+    hoisted.uploadOptions?.onError?.(new Error('network down'));
+
+    expect(hoisted.errorToast).toHaveBeenCalledWith(
+      expect.objectContaining({ description: expect.stringContaining('Failed to upload plugin') }),
+    );
   });
 
   it('invokes onClose when cancel is pressed', async () => {

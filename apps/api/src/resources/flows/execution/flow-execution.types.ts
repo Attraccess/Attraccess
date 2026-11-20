@@ -1,4 +1,4 @@
-import { Resource } from '@attraccess/database-entities';
+import type { ResourceType } from '@attraccess/application-models';
 import { MeteringRunContext } from '../node-executors';
 
 export interface FlowExecutionOptions {
@@ -42,6 +42,6 @@ export interface UsageEventData {
 export interface FlowResourceContext {
   id: number;
   name?: string;
-  type?: Resource['type'];
-  metadata?: Resource['metadata'];
+  type?: ResourceType;
+  metadata?: Record<string, unknown> | null;
 }

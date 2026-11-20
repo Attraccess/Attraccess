@@ -1,14 +1,21 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { SSOProviderType } from '@attraccess/react-query-client';
+import { SsoProviderType } from '@attraccess/react-query-client';
 import { UserManagementDetailsPage } from './index';
 const state = vi.hoisted(() => ({
   user: undefined as Record<string, unknown> | undefined,
   me: 1,
   manageCards: false,
   roles: [] as { id: number; rolePermissions?: { permissionKey: string }[] }[],
-  permissions: [] as { key: string; label: string; description: string; category?: string }[],
+  permissions: [] as {
+    key: string;
+    label: string;
+    description: string;
+    category?: string;
+    pluginName?: string;
+    categoryLabel?: string;
+  }[],
   assignments: [] as { roleId: number }[],
   providers: [] as Record<string, unknown>[],
   loading: false,
@@ -24,15 +31,15 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useUsersServiceGetOneUserById: () => ({ data: state.user }),
-  useLicenseServiceGetLicenseInformation: () => ({ data: { modules: ['sso', 'attractap'] } }),
-  useAuthenticationServiceGetAllSsoProviders: () => ({ data: state.providers }),
-  useRbacServiceListRoles: () => ({ data: state.roles, isLoading: state.loading }),
-  useRbacServiceListPermissions: () => ({ data: state.permissions }),
-  useUsersServiceGetUserRoleAssignments: () => ({ data: state.assignments }),
-  useUsersServiceDeleteUser: (options: typeof state.options) => {
+  useGetOneUserById: () => ({ data: state.user }),
+  useGetLicenseInformation: () => ({ data: { modules: ['sso', 'attractap'] } }),
+  useGetAllSsoProviders: () => ({ data: state.providers }),
+  useListRoles: () => ({ data: state.roles, isLoading: state.loading }),
+  useListPermissions: () => ({ data: state.permissions }),
+  useGetUserRoleAssignments: () => ({ data: state.assignments }),
+  useDeleteUser: (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
-    return { mutate: state.remove, isPending: false };
+    return { mutateAsync: state.remove, isPending: false };
   },
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
@@ -48,7 +55,7 @@ vi.mock('../../../hooks/useRbacCatalogTranslations', () => ({
   useRbacCatalogTranslations: () => ({
     permissionLabel: (p: { label: string }) => p.label,
     permissionDescription: (p: { description: string }) => p.description,
-    permissionCategory: (category: string) => category,
+    permissionCategory: (category: string, p?: { categoryLabel?: string }) => p?.categoryLabel ?? category,
   }),
 }));
 vi.mock('../../../components/toastProvider', () => ({
@@ -119,6 +126,27 @@ it('combines assigned roles without exposing unassigned permissions, grouped by 
   expect(screen.queryByText('Secret admin')).toBeNull();
   expect(state.permissionProps.roleIdToAssign).toBe(3);
 });
+it('lists plugin categories by their label after the core categories', () => {
+  state.roles = [
+    { id: 1, rolePermissions: [{ permissionKey: 'matter.devices.read' }, { permissionKey: 'resources.read' }] },
+  ];
+  state.assignments = [{ roleId: 1 }];
+  state.permissions = [
+    {
+      key: 'matter.devices.read',
+      label: 'View Matter devices',
+      description: '',
+      category: 'plugin:matter',
+      pluginName: 'matter',
+      categoryLabel: 'Matter & Thread',
+    },
+    { key: 'resources.read', label: 'Read resources', description: '', category: 'resources' },
+  ];
+  show();
+  expect(screen.queryByText('plugin:matter')).toBeNull();
+  const headings = screen.getAllByText(/^(resources|Matter & Thread)$/).map((node) => node.textContent);
+  expect(headings).toEqual(['resources', 'Matter & Thread']);
+});
 it('shows loading and empty permissions and prevents self deletion', () => {
   state.loading = true;
   const view = show();
@@ -140,9 +168,9 @@ it('summarizes linked OIDC and SAML permission mappings, tolerating missing prov
     id: 7,
     username: 'Ada',
     authenticationDetails: [
-      { providerId: 1, providerType: SSOProviderType.OIDC, ssoSubject: 'subject-1' },
-      { providerId: 2, providerType: SSOProviderType.SAML, ssoSubject: 'subject-2' },
-      { providerId: 99, providerType: SSOProviderType.OIDC },
+      { providerId: 1, providerType: SsoProviderType.OIDC, ssoSubject: 'subject-1' },
+      { providerId: 2, providerType: SsoProviderType.SAML, ssoSubject: 'subject-2' },
+      { providerId: 99, providerType: SsoProviderType.OIDC },
       { ssoSubject: 'orphan' },
       { providerId: 1 },
       { type: 'password' },
@@ -159,7 +187,7 @@ it('confirms deletion and returns to the list after success', async () => {
   show();
   fireEvent.click(screen.getByRole('button', { name: 'delete.actions.open' }));
   fireEvent.click(await screen.findByRole('button', { name: 'delete.actions.confirm' }));
-  expect(state.remove).toHaveBeenCalledWith({ id: 7 });
+  expect(state.remove).toHaveBeenCalledWith({ path: { id: 7 } });
   act(() => state.options.onSuccess());
   expect(state.success).toHaveBeenCalledWith(expect.objectContaining({ title: 'delete.success.title' }));
   expect(screen.getByText('User list')).toBeTruthy();
@@ -182,4 +210,13 @@ it('shows the RFID management action only with the dedicated permission', () => 
   show();
   fireEvent.click(screen.getByRole('button', { name: 'rfidCards.manage' }));
   expect(screen.getByText('/users/7/rfid-cards')).toBeInTheDocument();
+});
+
+it('shows the external ID subtitle only when the user has one', () => {
+  const view = show();
+  expect(screen.queryByText('details.externalIdentifier')).toBeNull();
+  view.unmount();
+  state.user = { ...state.user, externalIdentifier: 'EXT-1' };
+  show();
+  expect(screen.getByText('details.externalIdentifier')).toBeInTheDocument();
 });

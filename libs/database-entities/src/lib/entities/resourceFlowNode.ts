@@ -12,59 +12,45 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
 import { Flow } from './flow.entity';
-import { ResourceFlowNodeType } from './resource-flow-node/node-type';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 
-export { ResourceFlowNodeType } from './resource-flow-node/node-type';
 export {
   ExternalEffectFailureBehaviorSchema,
   ExternalEffectPolicySchema,
-} from './resource-flow-node/external-effect-policy';
-export type { ExternalEffectFailureBehavior } from './resource-flow-node/external-effect-policy';
-export { HttpRequestNodeDataSchema } from './resource-flow-node/http-schema';
-export {
+  HttpRequestNodeDataSchema,
   MqttSendMessageNodeDataSchema,
   MqttMessageReceivedNodeDataSchema,
   MqttWaitForMessageNodeDataSchema,
-} from './resource-flow-node/mqtt-schemas';
-export {
   NodeWithoutDataSchema,
   ButtonNodeDataSchema,
   WaitNodeDataSchema,
   IfNodeDataSchema,
   SetPayloadNodeDataSchema,
   ErrorNodeDataSchema,
-} from './resource-flow-node/processing-schemas';
-export {
   BillingTransactionItemCreateSchema,
   ResourceActivityTrackActivityNodeDataSchema,
   ResourceOperatingTransitionNodeDataSchema,
   InputResourceActivityNoActivityNodeDataSchema,
   ResourceUsageEndSessionNodeDataSchema,
-} from './resource-flow-node/resource-schemas';
-export {
   VariableScopeSchema,
   SetVariablesNodeDataSchema,
   GetVariablesNodeDataSchema,
   VariableChangedNodeDataSchema,
-} from './resource-flow-node/variable-schemas';
-export {
   HealthStateOptionEnum,
   ResourceHealthHeartbeatNodeDataSchema,
   ResourceHealthSetNodeDataSchema,
-} from './resource-flow-node/health-schemas';
-export {
   CompanionLockNodeDataSchema,
   CompanionIdleActiveNodeDataSchema,
   CompanionForegroundAppNodeDataSchema,
   CompanionUsbDeviceNodeDataSchema,
-} from './resource-flow-node/companion-schemas';
-export {
   MeteringStartNodeDataSchema,
   MeteringCollectNodeDataSchema,
   MeteringReadyNodeDataSchema,
   MeteringReportNodeDataSchema,
-} from './resource-flow-node/metering-schemas';
-export { getNodeDataSchema, getExternalEffectFailureBehavior } from './resource-flow-node/schema-registry';
+  getNodeDataSchema,
+  getExternalEffectFailureBehavior,
+} from '@attraccess/application-models';
+export type { ExternalEffectFailureBehavior } from '@attraccess/application-models';
 
 export class ResourceFlowNodePosition {
   @Column({ type: 'integer' })

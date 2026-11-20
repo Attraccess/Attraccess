@@ -1,10 +1,13 @@
-import type { PluginContext, Repository } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import { flowNode, hostDataWithFlows } from '../persistence.test-utils';
+import { controllerRow } from '../rows.test-utils';
+import { spyOnWagoStorage } from '../storage-spy.test-utils';
+import { createWagoTestStorage } from '../storage/testing';
 import { WagoCommandHandler } from './handler';
-import { WagoController } from '../controllers/entity';
-import { WagoConfigurationRevision } from '../configuration/revision.entity';
+import type { WagoConfigurationRevision } from '../configuration/revision.entity';
 
 describe('WAGO command form', () => {
-  const revision = Object.assign(new WagoConfigurationRevision(), {
+  const revision = {
     revision: 3,
     snapshot: JSON.stringify({
       logicalChannels: [
@@ -13,34 +16,30 @@ describe('WAGO command form', () => {
         { id: 'lamp', profile: 'generic-digital-output', capabilities: ['output'] },
       ],
     }),
-  });
+  } as WagoConfigurationRevision;
   const appliedRevision = jest.fn();
-  const draftLookup = jest.fn().mockResolvedValue({
-    presetProvenance: JSON.stringify({ editor: { names: { 'door-lock': 'Workshop door lock' } } }),
-  });
-  const query = {
-    select: jest.fn().mockReturnThis(),
-    leftJoin: jest.fn().mockReturnThis(),
-    addSelect: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    andWhere: jest.fn().mockReturnThis(),
-    getMany: jest.fn().mockResolvedValue([{ resourceId: 7, id: 'other-node' }]),
-  };
+  const findNodes = jest.fn().mockResolvedValue([flowNode({ id: 'other-node', resourceId: 7 })]);
+  const storage = createWagoTestStorage();
+  const spy = spyOnWagoStorage(storage);
+  const draftLookup = spy.spied.configurationDrafts.findOne;
   const handler = new WagoCommandHandler({
-    context: {
-      dataSource: { getRepository: () => ({ createQueryBuilder: () => query }) },
-      getRepository: () => ({
-        findOneBy: draftLookup,
-      }),
-    } as unknown as PluginContext,
-    controllers: () =>
-      ({
-        find: async () => [{ id: 1, name: 'Workshop' }],
-        findOneBy: async () => ({ id: 1, trustState: 'claimed' }),
-      }) as unknown as Repository<WagoController>,
+    context: { hostData: hostDataWithFlows(findNodes), ...spy.context } as unknown as PluginContext,
+    controllers: () => storage.tables.controllers,
     claimedController: jest.fn(),
     getSettings: jest.fn(),
     appliedRevision,
+  });
+
+  beforeAll(async () => {
+    await storage.tables.controllers.insert(
+      controllerRow({ id: 1, name: 'Workshop', hardwareId: 'workshop', trustState: 'claimed' }),
+    );
+    await storage.tables.configurationDrafts.insert({
+      controllerId: 1,
+      snapshot: '{}',
+      presetProvenance: JSON.stringify({ editor: { names: { 'door-lock': 'Workshop door lock' } } }),
+      updatedAt: '2026-09-05T12:00:00.000Z',
+    });
   });
 
   beforeEach(() => appliedRevision.mockResolvedValue(revision));
@@ -65,7 +64,7 @@ describe('WAGO command form', () => {
 
   it('resolves canvas summaries without draft or cross-resource reference queries', async () => {
     draftLookup.mockClear();
-    query.getMany.mockClear();
+    findNodes.mockClear();
     appliedRevision.mockResolvedValueOnce({
       ...revision,
       presetProvenance: JSON.stringify({ editor: { names: { 'door-lock': 'Applied door' } } }),
@@ -78,7 +77,7 @@ describe('WAGO command form', () => {
       { label: 'Action', value: 'Pulse · 500 ms' },
     ]);
     expect(draftLookup).not.toHaveBeenCalled();
-    expect(query.getMany).not.toHaveBeenCalled();
+    expect(findNodes).not.toHaveBeenCalled();
   });
 
   it('lists only output channels and shows cross-resource conflict help', async () => {
@@ -165,31 +164,25 @@ describe('WAGO command form', () => {
     };
 
     beforeEach(() => {
-      query.andWhere.mockClear();
-      query.getMany.mockResolvedValue([{ resourceId: 7, flowId: null, id: 'other-node' }]);
+      findNodes.mockClear();
+      findNodes.mockResolvedValue([flowNode({ id: 'other-node', resourceId: 7 })]);
     });
 
     it('does not skip rows with a NULL resourceId when checking resource flows', async () => {
-      query.getMany.mockResolvedValue([{ resourceId: null, flowId: 5, id: 'global-node' }]);
+      findNodes.mockResolvedValue([flowNode({ id: 'global-node', flowId: 5 })]);
       expect(await description(2, false, null)).toContain('global flow 5 / node global-node');
-      expect(query.andWhere).toHaveBeenCalledWith('(node.resourceId IS NULL OR node.resourceId <> :resourceId)', {
-        resourceId: 2,
-      });
+      expect(findNodes).toHaveBeenCalledWith(expect.objectContaining({ excludeResourceId: 2 }));
     });
 
     it('names the global flow that also controls the channel', async () => {
-      query.getMany.mockResolvedValue([
-        { resourceId: null, flowId: 5, flow: { id: 5, name: 'Power off all' }, id: 'global-node' },
-      ]);
+      findNodes.mockResolvedValue([flowNode({ id: 'global-node', flowId: 5, flowName: 'Power off all' })]);
       expect(await description(2, false, null)).toContain('global flow "Power off all" / node global-node');
-      expect(query.leftJoin).toHaveBeenCalledWith('node.flow', 'flow');
-      expect(query.addSelect).toHaveBeenCalledWith(['flow.id', 'flow.name']);
     });
 
     it('treats a global flow as its own owner and excludes only its own nodes', async () => {
       expect(await description(null, false, 5)).toContain('resource 7 / node other-node');
-      expect(query.andWhere).toHaveBeenCalledWith('(node.flowId IS NULL OR node.flowId <> :flowId)', { flowId: 5 });
-      expect(query.andWhere).not.toHaveBeenCalledWith(expect.stringContaining('node.resourceId'), expect.anything());
+      expect(findNodes).toHaveBeenCalledWith(expect.objectContaining({ excludeFlowId: 5 }));
+      expect(findNodes).not.toHaveBeenCalledWith(expect.objectContaining({ excludeResourceId: expect.anything() }));
     });
   });
 });

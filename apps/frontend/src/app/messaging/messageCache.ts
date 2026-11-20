@@ -6,9 +6,9 @@ import {
   ListMessagesResponseDto,
   Message,
   UnreadCountResponseDto,
-  UseMessagingServiceMessagingGetUnreadCountKeyFn,
-  UseMessagingServiceMessagingListConversationsKeyFn,
-  useMessagingServiceMessagingListMessagesKey,
+  UseMessagingGetUnreadCountKeyFn,
+  UseMessagingListConversationsKeyFn,
+  useMessagingListMessagesKey,
 } from '@attraccess/react-query-client';
 
 export function applyIncomingMessage(queryClient: QueryClient, message: Message, currentUserId: number) {
@@ -18,8 +18,8 @@ export function applyIncomingMessage(queryClient: QueryClient, message: Message,
   queryClient.setQueriesData<ListMessagesResponseDto>(
     {
       predicate: (query) =>
-        query.queryKey[0] === useMessagingServiceMessagingListMessagesKey &&
-        (query.queryKey[1] as { id?: number } | undefined)?.id === message.conversationId,
+        query.queryKey[0] === useMessagingListMessagesKey &&
+        (query.queryKey[1] as { path?: { id?: number } } | undefined)?.path?.id === message.conversationId,
     },
     (current) => {
       if (!current || current.data.some((existing) => existing.id === message.id)) {
@@ -29,25 +29,22 @@ export function applyIncomingMessage(queryClient: QueryClient, message: Message,
     },
   );
 
-  queryClient.setQueryData<ConversationListItemDto[]>(
-    UseMessagingServiceMessagingListConversationsKeyFn(),
-    (current) => {
-      if (!current) {
-        return current;
-      }
-      const index = current.findIndex((conversation) => conversation.id === message.conversationId);
-      if (index === -1) {
-        queryClient.invalidateQueries({ queryKey: UseMessagingServiceMessagingListConversationsKeyFn() });
-        return current;
-      }
-      const updated = {
-        ...current[index],
-        lastMessage: message,
-        unreadCount: (current[index].unreadCount ?? 0) + (isOwnMessage ? 0 : 1),
-      };
-      return [updated, ...current.slice(0, index), ...current.slice(index + 1)];
-    },
-  );
+  queryClient.setQueryData<ConversationListItemDto[]>(UseMessagingListConversationsKeyFn(), (current) => {
+    if (!current) {
+      return current;
+    }
+    const index = current.findIndex((conversation) => conversation.id === message.conversationId);
+    if (index === -1) {
+      queryClient.invalidateQueries({ queryKey: UseMessagingListConversationsKeyFn() });
+      return current;
+    }
+    const updated = {
+      ...current[index],
+      lastMessage: message,
+      unreadCount: (current[index].unreadCount ?? 0) + (isOwnMessage ? 0 : 1),
+    };
+    return [updated, ...current.slice(0, index), ...current.slice(index + 1)];
+  });
 
   if (!isOwnMessage) {
     bumpTotalUnread(queryClient, 1);
@@ -55,20 +52,17 @@ export function applyIncomingMessage(queryClient: QueryClient, message: Message,
 }
 
 export function markConversationReadInCache(queryClient: QueryClient, conversationId: number, total: number) {
-  queryClient.setQueryData<ConversationListItemDto[]>(
-    UseMessagingServiceMessagingListConversationsKeyFn(),
-    (current) =>
-      current?.map((conversation) =>
-        conversation.id === conversationId ? { ...conversation, unreadCount: 0 } : conversation,
-      ),
+  queryClient.setQueryData<ConversationListItemDto[]>(UseMessagingListConversationsKeyFn(), (current) =>
+    current?.map((conversation) =>
+      conversation.id === conversationId ? { ...conversation, unreadCount: 0 } : conversation,
+    ),
   );
 
-  queryClient.setQueryData<UnreadCountResponseDto>(UseMessagingServiceMessagingGetUnreadCountKeyFn(), { total });
+  queryClient.setQueryData<UnreadCountResponseDto>(UseMessagingGetUnreadCountKeyFn(), { total });
 }
 
 function bumpTotalUnread(queryClient: QueryClient, delta: number) {
-  queryClient.setQueryData<UnreadCountResponseDto>(
-    UseMessagingServiceMessagingGetUnreadCountKeyFn(),
-    (current) => ({ total: Math.max(0, (current?.total ?? 0) + delta) }),
-  );
+  queryClient.setQueryData<UnreadCountResponseDto>(UseMessagingGetUnreadCountKeyFn(), (current) => ({
+    total: Math.max(0, (current?.total ?? 0) + delta),
+  }));
 }

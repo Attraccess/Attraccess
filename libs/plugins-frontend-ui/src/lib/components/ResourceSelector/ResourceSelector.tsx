@@ -1,7 +1,7 @@
 // Resource selector table with search and selection state
 // FEATURE: Resource selection for plugins using HeroUI v3 Table compound
 import { useTranslations } from '../../i18n';
-import { useResourcesServiceGetAllResources } from '@attraccess/react-query-client';
+import { useGetAllResources } from '@attraccess/react-query-client';
 import {
   Checkbox,
   TextField,
@@ -43,10 +43,8 @@ export function ResourceSelector(props: Readonly<Props>) {
 
   const { t } = useTranslations({ de, en });
 
-  const { data: resourceSearchResults, isLoading: isResourceSearchLoading } = useResourcesServiceGetAllResources({
-    limit: 15,
-    page: 1,
-    search,
+  const { data: resourceSearchResults, isLoading: isResourceSearchLoading } = useGetAllResources({
+    query: { limit: 15, page: 1, search },
   });
 
   return (

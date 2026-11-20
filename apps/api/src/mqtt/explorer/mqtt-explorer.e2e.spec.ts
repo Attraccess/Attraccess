@@ -119,7 +119,7 @@ describe.each(BROKERS)('MQTT message explorer against $name (e2e)', (broker) => 
     };
     const badServer = { ...server, id: BAD_SERVER_ID, username: 'nobody', password: 'wrong', clientId: 'bad' };
     const repository = {
-      findOneBy: jest.fn(async ({ id }: { id: number }) => (id === BAD_SERVER_ID ? badServer : server)),
+      findServer: jest.fn(async (id: number) => (id === BAD_SERVER_ID ? badServer : server)),
       update: jest.fn(),
     };
     shared = new MqttClientService(

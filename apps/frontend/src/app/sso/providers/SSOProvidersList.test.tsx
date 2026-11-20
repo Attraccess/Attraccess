@@ -14,18 +14,18 @@ const mocks = vi.hoisted(() => ({
 vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAuthenticationServiceGetAllSsoProviders: () => ({ data: [{ id: 7, name: 'Company', type: 'OIDC' }] }),
-  useAuthenticationServiceGetAllSsoProvidersKey: 'sso-providers',
-  useAuthenticationServiceDeleteOneSsoProvider: () => ({ mutateAsync: mocks.mutateAsync, isPending: false }),
+  useGetAllSsoProviders: () => ({ data: [{ id: 7, name: 'Company', type: 'OIDC' }] }),
+  useGetAllSsoProvidersKey: 'sso-providers',
+  useDeleteOneSsoProvider: () => ({ mutateAsync: mocks.mutateAsync, isPending: false }),
 }));
 vi.mock('../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: mocks.success, error: mocks.error }),
 }));
-vi.mock('./SSOProvidersTable', () => ({
-  SSOProvidersTable: ({ onDelete }: { onDelete: (id: number) => void }) => (
-    <button onClick={() => onDelete(7)}>Delete row</button>
-  ),
-}));
+
+async function startDelete() {
+  await userEvent.click(screen.getByRole('button', { name: 'Actions for Company' }));
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+}
 
 describe('SSOProvidersList', () => {
   beforeEach(() => {
@@ -40,8 +40,8 @@ describe('SSOProvidersList', () => {
   it('asks in an in-app dialog before deleting and only deletes after confirmation', async () => {
     render(<SSOProvidersList />);
 
-    await userEvent.click(screen.getByText('Delete row'));
-    expect(await screen.findByRole('alertdialog', { name: 'Delete Provider' })).toBeInTheDocument();
+    await startDelete();
+    expect(await screen.findByRole('alertdialog', { name: 'Delete Company?' })).toBeInTheDocument();
     expect(mocks.mutateAsync).not.toHaveBeenCalled();
     expect(mocks.browserConfirm).not.toHaveBeenCalled();
 
@@ -49,9 +49,9 @@ describe('SSOProvidersList', () => {
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(mocks.mutateAsync).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByText('Delete row'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
-    expect(mocks.mutateAsync).toHaveBeenCalledWith({ id: 7 });
+    await startDelete();
+    await userEvent.click(document.querySelector('[data-cy="sso-provider-delete-confirm-button"]') as HTMLElement);
+    expect(mocks.mutateAsync).toHaveBeenCalledWith({ path: { id: 7 } });
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(mocks.success).toHaveBeenCalled();
   });
@@ -60,8 +60,8 @@ describe('SSOProvidersList', () => {
     mocks.mutateAsync.mockRejectedValueOnce(new Error('Nope'));
     render(<SSOProvidersList />);
 
-    await userEvent.click(screen.getByText('Delete row'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    await startDelete();
+    await userEvent.click(document.querySelector('[data-cy="sso-provider-delete-confirm-button"]') as HTMLElement);
 
     await waitFor(() => expect(mocks.error).toHaveBeenCalledWith(expect.objectContaining({ description: 'Nope' })));
     expect(screen.getByRole('alertdialog')).toBeInTheDocument();

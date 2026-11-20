@@ -3,9 +3,14 @@
   "version": "0.1.0",
   "main": {
     "backend": { "directory": "dist", "entryPoint": "index.js" },
-    "migrations": { "directory": "dist", "entryPoint": "migrations.js" },
-    "frontend": { "directory": "frontend", "entryPoint": "remoteEntry.js", "styles": "style.css" }
+    "frontend": {
+      "directory": "frontend",
+      "entryPoint": "remoteEntry.js",
+      "styles": "style.css",
+      "dashboardPaths": ["/wago"]
+    }
   },
-  "attraccessVersion": { "min": "1.11.0" },
-  "permissions": ["DATABASE_ACCESS", "ACCESS_MQTT_SERVERS", "TRIGGER_FLOWS", "MANAGE_SECRETS"]
+  "attraccessVersion": { "min": "2.0.0-0" },
+  "license": { "required": true, "modules": ["wago"] },
+  "permissions": ["PLUGIN_STORAGE", "ACCESS_MQTT_SERVERS", "TRIGGER_FLOWS", "MANAGE_SECRETS"]
 }

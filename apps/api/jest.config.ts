@@ -6,12 +6,12 @@ module.exports = {
   testMatch: ['**/*.spec.ts', '!**/*.real-api.spec.ts', '!**/*.alerting.spec.ts', '!**/*.browser.spec.ts'],
   setupFiles: ['<rootDir>/src/test/jest.setup.ts'],
   transform: {
-    '^.+\\.js$': '<rootDir>/src/test/jose-transformer.cjs',
     '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json', isolatedModules: true }],
   },
-  // ESM-only packages: JOSE, and otplib's @scure/@noble dependencies (mass-introduction QR codes).
-  transformIgnorePatterns: ['node_modules/(?!jose/|\\.pnpm/jose@|@scure/|\\.pnpm/@scure\\+|@noble/|\\.pnpm/@noble\\+)'],
-  moduleFileExtensions: ['ts', 'js', 'html'],
+  // ESM-only packages (Nest, JOSE, @scure/@noble, …) load natively: the Nx test targets run Jest with
+  // NODE_OPTIONS=--experimental-vm-modules, which enables Jest's require(esm) support.
+  // json: nestjs-asyncapi's dependency chain requires spdx-license-ids, whose entry point is index.json.
+  moduleFileExtensions: ['ts', 'js', 'json', 'html'],
   // Unit coverage feeds the project's crap-score target.
   collectCoverage: true,
   coverageReporters: ['json'],

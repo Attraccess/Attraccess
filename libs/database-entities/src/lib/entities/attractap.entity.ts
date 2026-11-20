@@ -1,6 +1,11 @@
 import { Column, Entity, JoinTable, ManyToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-import { Exclude } from 'class-transformer';
+import {
+  ATTRACTAP_FIRMWARE_PROFILES,
+  ATTRACTAP_SECURITY_PROBLEMS,
+  type AttractapFirmwareProfile,
+  type AttractapSecurityProblem,
+} from '@attraccess/application-models';
 import { Resource } from './resource.entity';
 
 class AttractapCapabilities {
@@ -124,20 +129,13 @@ export class Attractap {
   @ApiProperty({ description: 'The name of the reader' })
   name!: string;
 
-  @Column({
-    type: 'text',
-    nullable: false,
-  })
-  @Exclude()
-  apiTokenHash!: string;
-
-  @Column({ type: 'text', nullable: false, default: 'unpaired' })
+  @Column({ type: 'text', nullable: false, default: 'revoked' })
   @ApiProperty({
-    description: 'Pairing state: unpaired (legacy token sign-in), paired (TLS identity) or revoked',
-    enum: ['unpaired', 'paired', 'revoked'],
-    default: 'unpaired',
+    description: 'Pairing state: paired (TLS identity) or revoked (no active credential)',
+    enum: ['paired', 'revoked'],
+    default: 'revoked',
   })
-  pairingState!: 'unpaired' | 'paired' | 'revoked';
+  pairingState!: 'paired' | 'revoked';
 
   @Column({ type: 'text', nullable: true })
   @ApiProperty({ description: 'SHA-256 fingerprint of the current reader public key', nullable: true })
@@ -169,6 +167,50 @@ export class Attractap {
   @Column({ type: 'text', nullable: true })
   @ApiProperty({ description: 'Serial number of the current reader certificate', nullable: true })
   certificateSerial!: string | null;
+
+  @Column({ type: 'boolean', nullable: false, default: false })
+  @ApiProperty({
+    description:
+      'True when the last eFuse report matched the secure profile on a release build and the paired P-256 session. Set by the server only.',
+    default: false,
+  })
+  secured!: boolean;
+
+  @Column({ type: 'datetime', nullable: true })
+  @ApiProperty({ description: 'When the reader last became secured', nullable: true })
+  securedAt!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'Firmware profile the reader reported',
+    enum: ATTRACTAP_FIRMWARE_PROFILES,
+    nullable: true,
+  })
+  firmwareProfile!: AttractapFirmwareProfile | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'Anti-rollback secure_version of the running app image, as the reader reported it',
+    nullable: true,
+  })
+  secureVersion!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({ description: "The chip's eFuse SECURE_VERSION from the reader's last eFuse report", nullable: true })
+  efuseSecureVersion!: number | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  @ApiProperty({ description: 'When the server last checked an eFuse report of the reader', nullable: true })
+  securityReportCheckedAt!: Date | null;
+
+  @Column({ type: 'simple-json', nullable: true })
+  @ApiProperty({
+    description: 'Problem codes of the last security check (empty when it passed)',
+    enum: ATTRACTAP_SECURITY_PROBLEMS,
+    isArray: true,
+    nullable: true,
+  })
+  securityReportProblems!: AttractapSecurityProblem[] | null;
 
   @ManyToMany(() => Resource, (resource) => resource.attractapReaders)
   @JoinTable()
@@ -202,6 +244,15 @@ export class Attractap {
     maximum: 255,
   })
   ledBrightness!: number;
+
+  @Column({ type: 'boolean', nullable: false, default: false })
+  @ApiProperty({
+    description:
+      'Whether backend plugins with the BLE_TRANSPORT permission may scan for and connect to Bluetooth devices through this reader',
+    example: false,
+    default: false,
+  })
+  allowPluginBle!: boolean;
 
   @Column(() => AttractapFirmwareVersion, { prefix: 'firmware' })
   @ApiProperty({ description: 'The firmware of the reader', type: () => AttractapFirmwareVersion })

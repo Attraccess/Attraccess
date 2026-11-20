@@ -4,15 +4,23 @@ import {
   AttractapCrashReport,
   AttractapCredentialEvent,
   AttractapInstallation,
+  PluginBleEndpointEntity,
+  PluginReaderEntity,
   ReaderUiAlert,
   ReaderUiPluginSettings,
   ReaderUiReaderSettings,
   ReaderUiResourceSettings,
   Resource,
   ResourceBillingConfiguration,
+  ResourceType,
 } from '@attraccess/database-entities';
 import { ensureEntity } from '../seed-storage.test-fixture';
-export async function migrationReaderSeeds(dataSource: DataSource, seedTag: string, resource: Resource) {
+export async function migrationReaderSeeds(
+  dataSource: DataSource,
+  seedTag: string,
+  resource: Resource,
+  accessOnlyDoor: Resource,
+) {
   const attractapRepo = dataSource.getRepository(Attractap);
 
   const billingConfigRepo = dataSource.getRepository(ResourceBillingConfiguration);
@@ -21,7 +29,6 @@ export async function migrationReaderSeeds(dataSource: DataSource, seedTag: stri
 
   const attractap = await ensureEntity(attractapRepo, () => ({
     name: `Seed Reader ${seedTag}`,
-    apiTokenHash: `seed-token-${seedTag}`,
     firmware: {
       name: 'Seed Firmware',
       variant: 'seed',
@@ -87,6 +94,23 @@ export async function migrationReaderSeeds(dataSource: DataSource, seedTag: stri
     serverCertificatePem: 'seed-server-certificate',
     serverPrivateKeyEncrypted: 'seed-server-key',
     serverCertificateNotAfter: new Date('2030-01-01T00:00:00Z'),
+  }));
+
+  await ensureEntity(dataSource.getRepository(PluginBleEndpointEntity), () => ({
+    pluginId: `seed-plugin-${seedTag}`,
+    readerId: attractap.id,
+    address: 'AA:BB:CC:DD:EE:FF',
+    addressType: 'public' as const,
+    profileId: 'seed-profile',
+    label: null,
+  }));
+
+  await ensureEntity(dataSource.getRepository(PluginReaderEntity), () => ({
+    pluginId: `seed-plugin-${seedTag}`,
+    deviceId: 'seed-device',
+    name: 'Seed plugin reader',
+    capabilities: { resourceTypes: [ResourceType.Door], actions: ['open'] },
+    resourceId: accessOnlyDoor.id,
   }));
 
   await ensureEntity(billingConfigRepo, () => ({

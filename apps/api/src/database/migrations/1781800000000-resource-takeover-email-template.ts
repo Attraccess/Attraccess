@@ -58,7 +58,7 @@ export class ResourceTakeoverEmailTemplate1781800000000 implements MigrationInte
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES ($1, $2, $3, $4)`,
+      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES (?, ?, ?, ?)`,
       ['resource-takeover', '{{resource.name}} was taken over', RESOURCE_TAKEOVER_MJML, RESOURCE_TAKEOVER_VARIABLES],
     );
   }

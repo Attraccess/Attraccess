@@ -25,7 +25,7 @@ describe('NpmPluginService', () => {
       const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
       const query = { list: jest.fn().mockResolvedValue({ items: [] }) };
       const service = new NpmPluginService(settings as never, undefined, audit as never, query as never);
-      jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+      jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('2.0.0');
       jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
         versions: {
           '1.2.3': {
@@ -83,7 +83,7 @@ describe('NpmPluginService', () => {
     );
     const tarballs = new Map(packages);
 
-    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('2.0.0');
     jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockImplementation(async (name) => {
       const tarball = tarballs.get(name);
       if (!tarball) throw new Error(`Unexpected package ${name}`);
@@ -125,7 +125,7 @@ describe('NpmPluginService', () => {
       setSecretSetting: jest.fn(),
     };
     const service = new NpmPluginService(settings as unknown as never);
-    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('2.0.0');
     jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: {
         '1.2.3': {
@@ -148,7 +148,7 @@ describe('NpmPluginService', () => {
     const tarball = await fixture.packageTarball(name);
     const service = new NpmPluginService({} as never);
 
-    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('2.0.0');
     jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       maintainers: [{ name: 'attraccess' }],
       versions: {
@@ -172,7 +172,7 @@ describe('NpmPluginService', () => {
     const tarball = await fixture.packageTarball(name);
     const service = new NpmPluginService({} as never);
 
-    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('2.0.0');
     jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: {
         '1.2.3': {
@@ -198,7 +198,7 @@ describe('NpmPluginService', () => {
     const name = '@attraccess/plugin';
     const tarball = await fixture.packageTarball(name);
     const service = new NpmPluginService({} as never);
-    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('2.0.0');
     jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: {
         '1.0.0': {
@@ -300,7 +300,7 @@ describe('NpmPluginService', () => {
         name,
         version: '1.2.3',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       }),
     );
     const [plugin] = PluginService.getPlugins();
@@ -329,13 +329,13 @@ describe('NpmPluginService', () => {
         name,
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
         permissions: [],
       }),
     );
     const service = new NpmPluginService({} as never);
 
-    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('2.0.0');
     jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: {
         '1.2.3': {
@@ -364,7 +364,7 @@ describe('NpmPluginService', () => {
     const tarball = await fixture.packageTarball(name);
     const service = new NpmPluginService({} as never);
 
-    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('2.0.0');
     jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: {
         '1.2.3': {
@@ -407,7 +407,7 @@ describe('NpmPluginService', () => {
     const tarball = await fixture.packageTarball(name);
     const service = new NpmPluginService({} as never);
 
-    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('2.0.0');
     jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: {
         '1.2.3': {
@@ -437,7 +437,7 @@ describe('NpmPluginService', () => {
     const tarball = await fixture.packageTarball(name);
     const service = new NpmPluginService({} as never);
 
-    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('2.0.0');
     jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: {
         '1.2.3': {
@@ -474,7 +474,7 @@ describe('NpmPluginService', () => {
     const tarball = await fixture.packageTarball(name);
     const service = new NpmPluginService({} as never);
 
-    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('2.0.0');
     jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: {
         '1.2.3': {

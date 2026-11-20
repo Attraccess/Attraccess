@@ -1,6 +1,7 @@
+import { controllerRow } from '../../backend/rows.test-utils';
+import { createWagoTestStorage } from '../../backend/storage/testing';
 import 'reflect-metadata';
 import { createCipheriv, createDecipheriv, generateKeyPairSync, randomBytes } from 'node:crypto';
-import { WagoManagementEntity } from '../../backend/management/entity';
 import { managementKeyCommand } from '../../backend/management/shell';
 import type { ManagementRecord } from '../../backend/management/model';
 import { EventEmitter } from 'node:events';
@@ -9,21 +10,19 @@ import * as processes from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { DataSource } from 'typeorm';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { DualAuthGuard, type PluginContext } from '@attraccess/plugins-backend-sdk';
 import type { Request, Response, NextFunction } from 'express';
-import plugin from '../../backend/plugin';
-import { WagoRuntimeArtifactCatalog, WagoRuntimeArtifactsService } from '../../backend/runtime/artifacts/catalog';
+import { WagoRuntimeArtifactCatalog } from '../../backend/runtime/artifacts/catalog';
+import { WagoRuntimeArtifactsService } from '../../backend/runtime/artifacts/service';
 import { WagoArtifactsController } from '../../backend/runtime/artifacts/controller';
 import { WagoControllerApi } from '../../backend/controllers/controller';
 import { WagoCommissioningService } from '../../backend/commissioning/service';
 import { WagoCredentialRotationService } from '../../backend/credentials/service';
 import { WAGO_PRESETS } from '../../backend/configuration/model';
 import { fw31IdentityOutput } from '../../backend/fixtures/fw31-identity';
-import { WagoCommissioningSession } from '../../backend/commissioning/sessions/session.entity';
-import { WagoController } from '../../backend/controllers/entity';
+import type { WagoController } from '../../backend/controllers/entity';
 import { WagoService } from '../../backend/controllers/service';
 import { MANAGEMENT_INSPECTION_COMMAND } from '../../backend/management/inspection';
 import { CLOCK_INSPECTION_SCRIPT } from '../../backend/commissioning/delivery/clock';
@@ -42,12 +41,7 @@ export async function commissioningFixture() {
   const first = releases.release('0.1.0');
   const second = releases.release('0.2.0');
   const catalog = new WagoRuntimeArtifactCatalog(join(directory, 'catalog'));
-  const database = new DataSource({
-    type: 'sqlite',
-    database: ':memory:',
-    entities: plugin.entities,
-    synchronize: true,
-  });
+  const storage = createWagoTestStorage();
   let app: INestApplication | undefined;
   let spawn: jest.SpyInstance | undefined;
   async function close() {
@@ -56,7 +50,6 @@ export async function commissioningFixture() {
     } finally {
       try {
         await catalog.onModuleDestroy();
-        if (database.isInitialized) await database.destroy();
       } finally {
         spawn?.mockRestore();
         await rm(directory, { recursive: true, force: true });
@@ -64,7 +57,6 @@ export async function commissioningFixture() {
     }
   }
   try {
-    await database.initialize();
     await catalog.import({ bundle: Readable.from([first.bundle]), checksum: Readable.from([first.checksum]) });
     const fingerprint = `SHA256:${'A'.repeat(43)}`;
     const processesSeen: string[] = [];
@@ -94,7 +86,7 @@ export async function commissioningFixture() {
       registerCommissioningDiscoveryHandler: (handler: typeof discovery) => {
         discovery = handler;
       },
-      list: () => database.getRepository(WagoController).find(),
+      list: () => storage.tables.controllers.find(),
       getSettings: async () => ({ defaultMqttServerId: 1 }),
       // The full-page configuration workspace (post-modal era) loads draft,
       // baseline and preset data before it enables channel editing.
@@ -127,7 +119,8 @@ export async function commissioningFixture() {
       },
     };
     const context = {
-      getRepository: ((entity) => database.getRepository(entity)) as PluginContext['getRepository'],
+      storage: storage.storage,
+      persistence: storage.persistence,
       secrets,
       logger: { warn: jest.fn() },
       // Audit persistence belongs to the separate audit acceptance owner.
@@ -167,8 +160,8 @@ export async function commissioningFixture() {
     };
     service['run'] = async (_host, _fingerprint, _credential, command) => {
       if (command !== MANAGEMENT_INSPECTION_COMMAND) {
-        const row = await database.getRepository(WagoManagementEntity).findOneByOrFail({ controllerId: 91058 });
-        if (!row.metadataJson) throw new Error('Missing durable management metadata');
+        const row = await storage.tables.management.get(91058);
+        if (!row?.metadataJson) throw new Error('Missing durable management metadata');
         const record: ManagementRecord = JSON.parse(row.metadataJson);
         const tx = record.transaction;
         if (!tx) throw new Error('Missing durable management transaction');
@@ -212,25 +205,24 @@ export async function commissioningFixture() {
       next();
     });
     async function discover() {
-      const session = await database.getRepository(WagoCommissioningSession).findOneByOrFail({ id: 1 });
+      const session = await storage.tables.commissioningSessions.get(1);
+      if (!session) throw new Error('The fixture commissioning session is missing');
       const now = new Date().toISOString();
-      const controller = await database.getRepository(WagoController).save({
-        id: 91058,
-        hardwareId: session.hardwareId,
-        name: session.controllerName,
-        mqttServerId: 1,
-        enrollmentId: session.enrollmentId,
-        trustState: 'claimed',
-        pairingCodeHash: 'fixture',
-        protocolVersion: '1.0.0',
-        runtimeVersion: '0.1.0',
-        capabilities: '[]',
-        lastSequence: 0,
-        lastSeenAt: now,
-        lastHeartbeatAt: now,
-        createdAt: now,
-        updatedAt: now,
-      });
+      const controller = await storage.tables.controllers.insert(
+        controllerRow({
+          id: 91058,
+          hardwareId: session.hardwareId,
+          name: session.controllerName,
+          mqttServerId: 1,
+          enrollmentId: session.enrollmentId,
+          trustState: 'claimed',
+          pairingCodeHash: 'fixture',
+          lastSeenAt: now,
+          lastHeartbeatAt: now,
+          createdAt: now,
+          updatedAt: now,
+        }),
+      );
       if (!discovery) throw new Error('Discovery transport was not registered');
       await discovery(controller);
     }
@@ -241,7 +233,7 @@ export async function commissioningFixture() {
           await catalog.onModuleDestroy();
           await rm(join(directory, 'catalog'), { recursive: true, force: true });
           await catalog.import({ bundle: Readable.from([first.bundle]), checksum: Readable.from([first.checksum]) });
-          await database.synchronize(true);
+          storage.reset();
           transport.failDelivery = true;
           transport.failRecovery = true;
           transport.failManagementRecovery = true;
@@ -264,7 +256,7 @@ export async function commissioningFixture() {
       directory,
       catalog,
       service,
-      database,
+      storage,
       transport,
       first,
       second,

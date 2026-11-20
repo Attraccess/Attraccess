@@ -1,7 +1,8 @@
 import type { PluginAuditEvent } from '@attraccess/plugins-backend-sdk';
 import { CompiledPluginAuditField, getPluginAuditDomain } from '../../plugin-system/audit/audit-registry';
 import { AUDIT_DOMAIN_QUERY_PATTERN } from './domains';
-import { dataFields, positive, uuid, withinDetailsLimit } from './projection';
+import { dataFields, positive, uuid, withinDetailsLimit, isAuthenticationMethod } from './projection';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 export interface ProjectedPluginAuditEvent {
   domain: string;
@@ -9,8 +10,9 @@ export interface ProjectedPluginAuditEvent {
   action: string;
   operationId: string;
   outcome: 'attempted' | 'succeeded' | 'failed';
-  actorId: number;
-  authenticationMethod: 'session' | 'api-token';
+  /** null with authenticationMethod null: a system event (the SDK's `{ kind: 'system' }` principal). */
+  actorId: number | null;
+  authenticationMethod: AuthenticationMethod | null;
   apiTokenId?: number;
   subjectType: string;
   subjectId: number;
@@ -39,10 +41,14 @@ function matchesField(field: CompiledPluginAuditField, value: unknown): boolean 
 function pluginPrincipal(
   value: unknown,
 ): Pick<ProjectedPluginAuditEvent, 'actorId' | 'authenticationMethod' | 'apiTokenId'> | null {
+  const system = dataFields(value, ['kind']);
+  if (system && Object.keys(system).length === 1 && system.kind === 'system') {
+    return { actorId: null, authenticationMethod: null };
+  }
   const principal = dataFields(value, ['userId', 'authenticationMethod', 'apiTokenId']);
   if (!principal || !positive(principal.userId)) return null;
   const method = principal.authenticationMethod;
-  if (method !== 'session' && method !== 'api-token') return null;
+  if (!isAuthenticationMethod(method)) return null;
   const apiTokenId = principal.apiTokenId;
   if (method === 'api-token' ? !positive(apiTokenId) : apiTokenId !== undefined) return null;
   return {

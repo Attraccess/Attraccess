@@ -53,17 +53,16 @@ export function registerAttractapFirmwareHandlerFixture() {
       debug: jest.fn(),
     };
 
-    mockAttractapService = { updateReaderFirmware: jest.fn().mockResolvedValue(undefined) };
+    mockAttractapService = {
+      updateReaderFirmware: jest.fn().mockResolvedValue(undefined),
+      recordReaderBuild: jest.fn().mockResolvedValue(undefined),
+    };
     mockFirmwareService = { getFirmwareDefinition: jest.fn() };
     mockMetricsService = { attractapFirmwareUpdatesTotal: { inc: jest.fn() } };
 
     (handler as any).attractapService = mockAttractapService;
     (handler as any).firmwareService = mockFirmwareService;
     (handler as any).metricsService = mockMetricsService;
-    (handler as any).pairingService = {
-      issueBindingTicket: jest.fn(() => 'ticket-1'),
-      claimAutoPrompt: jest.fn(() => true),
-    };
     (handler as any).uiHandler = { onFirmwareInfo: jest.fn().mockResolvedValue(undefined) };
 
     socket = makeSocket();

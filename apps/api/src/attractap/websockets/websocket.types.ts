@@ -16,6 +16,9 @@ export {
   FirmwareRequestChunkPayload,
   FirmwareUpdateResponse,
   FirmwareUpdateStartPayload,
+  ReaderCoredumpBeginPayload,
+  ReaderCoredumpChunkPayload,
+  ReaderCoredumpCompletePayload,
   ReaderCrashReportPayload,
   ResourceThumbnailDescriptorPayload,
 } from './websocket-reader-payloads';

@@ -14,7 +14,7 @@ const { query, refetch } = vi.hoisted(() => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourcesServiceResourceUsageStartBlocked: (_params: unknown, _key: unknown, options: Record<string, unknown>) => {
+  useResourceUsageStartBlocked: (_params: unknown, _key: unknown, options: Record<string, unknown>) => {
     query.options = options;
     return { data: query.data, isPending: query.pending, isError: query.error, refetch };
   },

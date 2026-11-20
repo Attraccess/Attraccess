@@ -1,3 +1,5 @@
+import type { ResetReportWindow } from './metrics-readers.port';
+
 /** Reset reasons that count as a confirmed crash or watchdog reset. */
 export const CRASH_WATCHDOG_REASONS = ['PANIC', 'INT_WDT', 'TASK_WDT', 'WDT'] as const;
 /** Reset reasons that count as a power-on reset. */
@@ -19,18 +21,10 @@ export function categoryOf(resetReason: string): ResetReportCategory | null {
   return null;
 }
 
-/** SQLite stores createdAt as UTC "YYYY-MM-DD HH:MM:SS" (optionally with ".mmm"). */
-function sqliteTimestamp(epochSeconds: number, fraction: string): string {
-  return `${new Date(epochSeconds * 1000).toISOString().slice(0, 19).replace('T', ' ')}${fraction}`;
-}
-
-/**
- * Window (now - 3600s, now] in whole seconds. The ".999" suffix makes a stored value at
- * the boundary second compare as "not newer", with or without milliseconds.
- */
-export function hourWindow(nowMs: number): { from: string; to: string } {
+/** Window (now - 3600s, now] in whole seconds. */
+export function hourWindow(nowMs: number): ResetReportWindow {
   const nowSeconds = Math.floor(nowMs / 1000);
-  return { from: sqliteTimestamp(nowSeconds - 3600, '.999'), to: sqliteTimestamp(nowSeconds, '.999') };
+  return { fromSeconds: nowSeconds - 3600, toSeconds: nowSeconds };
 }
 
 /** Longest reader name kept in the alert text. */
@@ -46,7 +40,8 @@ export const MAX_READERS_TEXT_LENGTH = 200;
 function readerLabel(row: ResetReportRow): string {
   const name = (row.readerName ?? 'unknown').replace(/[<>]/g, '').trim() || 'unknown';
   const chars = Array.from(name);
-  const short = chars.length > MAX_READER_NAME_LENGTH ? `${chars.slice(0, MAX_READER_NAME_LENGTH - 1).join('')}…` : name;
+  const short =
+    chars.length > MAX_READER_NAME_LENGTH ? `${chars.slice(0, MAX_READER_NAME_LENGTH - 1).join('')}…` : name;
   return `${short} (#${row.attractapId})`;
 }
 

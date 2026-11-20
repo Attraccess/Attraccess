@@ -1,92 +1,156 @@
 import { registerUsersServiceFixture } from './users.service.users-service.test-fixture';
-import { User } from '@attraccess/database-entities';
-import { EntityManager, QueryFailedError } from 'typeorm';
+import { registerPersistenceErrorClassifier } from '../../database/persistence-errors';
 import { ForbiddenException, BadRequestException } from '@nestjs/common';
+
+// The driver specific codes are covered where the adapter maps them; here a neutral category is enough.
+registerPersistenceErrorClassifier({
+  classify: (error) => ((error as { code?: string })?.code === 'UNIQUE' ? 'unique-violation' : undefined),
+  diagnosticCode: () => undefined,
+});
 
 describe('UsersService', () => {
   const fixture = registerUsersServiceFixture();
 
   describe('email changes', () => {
-    const actor = Object.assign(new User(), { id: 1, email: 'old@example.com' });
-    beforeEach(() => {
-      jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(actor).mockResolvedValue(null);
-    });
-    it('changes and reverifies an email inside the transaction', async () => {
-      const updated = Object.assign(new User(), { id: 1, email: 'new@example.com' });
-      jest
-        .mocked(fixture.accounts.findOne)
-        .mockReset()
-        .mockResolvedValueOnce(actor)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(updated);
-      const manager = new EntityManager(fixture.dataSource);
-      jest.spyOn(manager, 'getRepository').mockReturnValue(fixture.userRepository);
-      fixture.dataSource.transaction.mockImplementation(async (workOrIsolation, work) => {
-        const callback = typeof workOrIsolation === 'function' ? workOrIsolation : work;
-        if (!callback) throw new Error('Missing transaction callback');
-        return callback(manager);
+    const seedOwner = (overrides = {}) =>
+      fixture.store.seed({
+        id: 1,
+        username: 'owner',
+        email: 'old@example.com',
+        isEmailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationTokenExpiresAt: null,
+        ...overrides,
+      })[0];
+
+    it('changes and reverifies an email in a unit of work, then sends the verification email after the commit', async () => {
+      const owner = seedOwner();
+      fixture.emailService.sendVerificationEmail.mockImplementation(async () => {
+        fixture.uow.events.push('send');
       });
-      expect(await fixture.service.changeEmail(1, ' New@Example.COM ', actor)).toBe(updated);
-      expect(fixture.userRepository.update).toHaveBeenCalledWith(
-        1,
-        expect.objectContaining({
-          email: 'new@example.com',
-          isEmailVerified: false,
-          emailVerificationToken: expect.any(String),
-          emailVerificationTokenExpiresAt: expect.any(Date),
-        }),
+
+      const updated = await fixture.service.changeEmail(owner.id, ' New@Example.COM ', owner);
+
+      expect(updated).toMatchObject({
+        id: 1,
+        email: 'new@example.com',
+        isEmailVerified: false,
+        emailVerificationToken: expect.any(String),
+        emailVerificationTokenExpiresAt: expect.any(Date),
+      });
+      expect(fixture.emailService.sendVerificationEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'new@example.com' }),
+        updated.emailVerificationToken,
       );
-      expect(fixture.accounts.findOne).toHaveBeenLastCalledWith({ id: 1 }, undefined, manager);
-      expect(fixture.emailService.sendVerificationEmail).toHaveBeenCalledWith(updated, expect.any(String));
+      expect(fixture.uow.events).toEqual(['begin', 'commit', 'send']);
     });
-    it('treats a case-only change of the own email as unchanged', async () => {
-      expect(await fixture.service.changeEmail(1, ' OLD@Example.com ', actor)).toBe(actor);
-      expect(fixture.dataSource.transaction).not.toHaveBeenCalled();
+
+    it('never sends the mail when the change rolls back', async () => {
+      const owner = seedOwner();
+      fixture.store.failNextUpdateWith = new Error('database unavailable');
+
+      await expect(fixture.service.changeEmail(owner.id, 'new@example.com', owner)).rejects.toThrow(
+        'database unavailable',
+      );
+
+      expect(fixture.uow.events).toEqual(['begin', 'rollback']);
       expect(fixture.emailService.sendVerificationEmail).not.toHaveBeenCalled();
     });
+
+    it('takes the email change back when the verification email cannot be sent', async () => {
+      const owner = seedOwner();
+      const smtpDown = new Error('SMTP down');
+      fixture.emailService.sendVerificationEmail.mockRejectedValueOnce(smtpDown);
+
+      await expect(fixture.service.changeEmail(owner.id, 'new@example.com', owner)).rejects.toBe(smtpDown);
+
+      expect(fixture.store.users[0]).toMatchObject({
+        email: 'old@example.com',
+        isEmailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationTokenExpiresAt: null,
+      });
+    });
+
+    it('does not undo a newer change when taking the failed one back', async () => {
+      const owner = seedOwner();
+      fixture.emailService.sendVerificationEmail.mockImplementationOnce(async () => {
+        // a second change replaced the pending verification while the mail was being sent
+        Object.assign(fixture.store.users[0], { email: 'newer@example.com', emailVerificationToken: 'newer-token' });
+        throw new Error('SMTP down');
+      });
+
+      await expect(fixture.service.changeEmail(owner.id, 'new@example.com', owner)).rejects.toThrow('SMTP down');
+
+      expect(fixture.store.users[0]).toMatchObject({
+        email: 'newer@example.com',
+        emailVerificationToken: 'newer-token',
+      });
+    });
+
+    it('still reports the mail failure when taking the change back fails too', async () => {
+      const owner = seedOwner();
+      const smtpDown = new Error('SMTP down');
+      fixture.emailService.sendVerificationEmail.mockRejectedValueOnce(smtpDown);
+      jest.spyOn(fixture.store, 'revertEmailChange').mockRejectedValueOnce(new Error('database gone'));
+
+      await expect(fixture.service.changeEmail(owner.id, 'new@example.com', owner)).rejects.toBe(smtpDown);
+    });
+
+    it('treats a case-only change of the own email as unchanged', async () => {
+      const owner = seedOwner();
+      expect(await fixture.service.changeEmail(1, ' OLD@Example.com ', owner)).toMatchObject({ id: 1 });
+      expect(fixture.uow.events).toEqual([]);
+      expect(fixture.emailService.sendVerificationEmail).not.toHaveBeenCalled();
+    });
+
     it("rejects a case-variant of another user's email", async () => {
-      jest
-        .mocked(fixture.accounts.findOne)
-        .mockReset()
-        .mockResolvedValueOnce(actor)
-        .mockResolvedValueOnce(Object.assign(new User(), { id: 2, email: 'taken@example.com' }));
-      await expect(fixture.service.changeEmail(1, ' TAKEN@Example.com ', actor)).rejects.toThrow(
+      const owner = seedOwner();
+      fixture.store.seed({ id: 2, username: 'other', email: 'taken@example.com' });
+
+      await expect(fixture.service.changeEmail(1, ' TAKEN@Example.com ', owner)).rejects.toThrow(
         new BadRequestException('Email already exists'),
       );
-      expect(fixture.accounts.findOne).toHaveBeenLastCalledWith({ email: 'taken@example.com' });
-      expect(fixture.dataSource.transaction).not.toHaveBeenCalled();
+      expect(fixture.uow.events).toEqual([]);
     });
-    it('leaves an unchanged email verified without a transaction', async () => {
-      expect(await fixture.service.changeEmail(1, ' old@example.com ', actor)).toBe(actor);
-      expect(fixture.dataSource.transaction).not.toHaveBeenCalled();
-    });
+
     it.each(['', 'invalid'])('rejects invalid email %p before reading users', async (email) => {
-      await expect(fixture.service.changeEmail(1, email, actor)).rejects.toThrow(BadRequestException);
-      expect(fixture.accounts.findOne).not.toHaveBeenCalled();
+      const spy = jest.spyOn(fixture.store, 'findUser');
+      await expect(fixture.service.changeEmail(1, email, { id: 1 })).rejects.toThrow(BadRequestException);
+      expect(spy).not.toHaveBeenCalled();
     });
+
     it('rejects editing another user without permission', async () => {
-      await expect(fixture.service.changeEmail(2, 'new@example.com', actor)).rejects.toThrow(ForbiddenException);
-      expect(fixture.dataSource.transaction).not.toHaveBeenCalled();
+      const owner = seedOwner();
+      fixture.store.seed({ id: 2, username: 'other', email: 'other@example.com' });
+
+      await expect(fixture.service.changeEmail(2, 'new@example.com', owner)).rejects.toThrow(ForbiddenException);
+      expect(fixture.uow.events).toEqual([]);
     });
-    it.each(['23505', 'SQLITE_CONSTRAINT', 'SQLITE_CONSTRAINT_UNIQUE', 'ER_DUP_ENTRY', 1062])(
-      'translates a concurrent unique constraint failure (%p)',
-      async (code) => {
-        fixture.dataSource.transaction.mockRejectedValue(
-          new QueryFailedError('UPDATE users', [], Object.assign(new Error('duplicate'), { code })),
-        );
-        await expect(fixture.service.changeEmail(1, 'new@example.com', actor)).rejects.toThrow('Email already exists');
-      },
-    );
-    it.each([
-      [
-        new QueryFailedError('UPDATE users', [], new Error('UNIQUE constraint failed: user.email')),
-        'Email already exists',
-      ],
-      [new QueryFailedError('UPDATE users', [], new Error('database unavailable')), 'database unavailable'],
-      [new Error('mail delivery failed'), 'mail delivery failed'],
-    ])('preserves unrelated failures and recognizes email uniqueness by message', async (error, message) => {
-      fixture.dataSource.transaction.mockRejectedValue(error);
-      await expect(fixture.service.changeEmail(1, 'new@example.com', actor)).rejects.toThrow(message);
+
+    it('lets an administrator change another users email', async () => {
+      fixture.store.seed({ id: 2, username: 'other', email: 'other@example.com' });
+      const admin = { id: 1, effectivePermissions: new Set(['users.update']) };
+
+      await expect(fixture.service.changeEmail(2, 'changed@example.com', admin)).resolves.toMatchObject({
+        id: 2,
+        email: 'changed@example.com',
+      });
+    });
+
+    it('translates a concurrent unique constraint failure', async () => {
+      const owner = seedOwner();
+      fixture.store.failNextUpdateWith = Object.assign(new Error('duplicate'), { code: 'UNIQUE' });
+
+      await expect(fixture.service.changeEmail(1, 'new@example.com', owner)).rejects.toThrow('Email already exists');
+      expect(fixture.emailService.sendVerificationEmail).not.toHaveBeenCalled();
+    });
+
+    it('preserves unrelated failures', async () => {
+      const owner = seedOwner();
+      fixture.store.failNextUpdateWith = new Error('database unavailable');
+
+      await expect(fixture.service.changeEmail(1, 'new@example.com', owner)).rejects.toThrow('database unavailable');
     });
   });
 });

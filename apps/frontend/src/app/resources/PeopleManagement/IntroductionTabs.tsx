@@ -2,21 +2,17 @@
 // FEATURE: ATT-1151 Mass introduction
 import { Key, ReactNode, useEffect, useState } from 'react';
 import { DrawerBody, DrawerFooter, Tab, TabList, TabPanel, Tabs } from '@heroui/react';
-import { TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useMassIntroductionSession } from './massIntroduction/useMassIntroductionSession';
-import {
-  INITIAL_MASS_INTRODUCTION_SETUP,
-  MassIntroductionActions,
-  MassIntroductionContent,
-} from './massIntroduction/MassIntroductionPanel';
+import { INITIAL_MASS_INTRODUCTION_SETUP, MassIntroductionContent } from './massIntroduction/MassIntroductionPanel';
+import { MassIntroductionActions } from './massIntroduction/MassIntroductionActions';
 import { PeopleTarget } from './types';
-import massEn from './massIntroduction/en.json';
-import massDe from './massIntroduction/de.json';
+import en from './en.json';
+import de from './de.json';
 
 type IntroductionTab = 'individual' | 'mass';
 
 interface IntroductionTabsProps {
-  t: TFunction;
   target: PeopleTarget;
   individualFields: ReactNode;
   individualActions: ReactNode;
@@ -27,8 +23,8 @@ interface IntroductionTabsProps {
 
 /** Mount only while the drawer is open: unmounting ends a running mass introduction. */
 export function IntroductionTabs(props: Readonly<IntroductionTabsProps>) {
-  const { t, target, individualFields, individualActions, onClose, onMassIntroductionRunningChange } = props;
-  const { t: tMass } = useTranslations({ en: massEn, de: massDe });
+  const { target, individualFields, individualActions, onClose, onMassIntroductionRunningChange } = props;
+  const { t } = useTranslations({ en, de });
   const [tab, setTab] = useState<IntroductionTab>('individual');
   const [setup, setSetup] = useState(INITIAL_MASS_INTRODUCTION_SETUP);
   const massIntroduction = useMassIntroductionSession(target);
@@ -66,7 +62,6 @@ export function IntroductionTabs(props: Readonly<IntroductionTabsProps>) {
           </TabPanel>
           <TabPanel id="mass" className="pt-4">
             <MassIntroductionContent
-              t={tMass}
               target={target}
               state={massIntroduction}
               setup={setup}
@@ -79,7 +74,7 @@ export function IntroductionTabs(props: Readonly<IntroductionTabsProps>) {
         {tab === 'individual' ? (
           individualActions
         ) : (
-          <MassIntroductionActions t={tMass} state={massIntroduction} setup={setup} onClose={onClose} />
+          <MassIntroductionActions state={massIntroduction} setup={setup} onClose={onClose} />
         )}
       </DrawerFooter>
     </>

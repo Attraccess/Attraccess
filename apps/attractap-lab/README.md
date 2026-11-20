@@ -239,9 +239,13 @@ power.off()  # two presses, then waits for it to disappear
 Native `labgrid-client power on|off|cycle|get` uses the same driver. A reader
 already in the requested state is left alone, so `on()` is safe on any reader.
 A V1 switched on from parking runs the dark parking image, so it switches
-itself off again about 30 s later, which a slow flash can outlast.
+itself off again about 36 s later (measured in the lab), which a slow flash
+can outlast. A reader being flashed draws little too, so the cut can also come
+a few seconds after the flash's reset, before the new image lights the screen.
 `flash_reader` therefore flashes it once more if it went off mid-flash, and
-presses the button again if it is off after the reset.
+watches it for 15 s after the reset (`POWER_CUT_WATCH_SECONDS`), pressing the
+button again whenever it is off. Once the new image has lit the screen, the
+chip keeps the power on.
 
 ### USB power switch (Touch V2)
 
@@ -367,7 +371,29 @@ through `pnpm serve` and nx to the API) and exports `WIRETAP_FILE`
 (`hil-artifacts/wiretap.jsonl`, emptied at the start of each run). Against an
 API started by hand without the preload, the tests that need the wire
 (`test_z_matrix_extra.py`) skip. The file holds card APDUs in full: lab
-evidence only, never commit it.
+evidence only, never commit it. Plugin BLE bytes are the exception: for
+`BLE_*` messages the wiretap keeps the structure but replaces every byte field
+(`value`, advertisement `data`) with `{"redacted": true, "bytes": <length>}`,
+because they carry device credentials (a lock's user code and crypt token) and
+CI uploads `hil-artifacts/` as an artifact.
+
+One reader serves the whole run, so every test that uses it starts from an
+idle reader (`hil/reader_reset.py`, autouse fixtures in `hil/conftest.py`):
+before each test, and before a module's own fixtures, the run checks that the
+reader is connected and shows the signed-out resource list, and that no usage
+session is open. Only what it finds is cleaned up: open sessions are ended
+through the API, notices dismissed, armed enroll/reset/supervision/mass
+introduction screens cancelled, the user signed out, a revoked reader approved
+again, and as the last resort the reader is rebooted. A clean check costs
+about 0.2 s. Each cleanup is logged to `reader-resets.jsonl` with the test
+that left the state behind. If even a reboot fails, the later tests fail at
+setup at once instead of rebooting again.
+
+The end of the pytest output (section "HIL failure order and reader resets")
+names the first failure, lists the later ones in order, marks failures that
+repeat one shared fixture error, and shows the resets. On GitHub Actions the
+first failure is also an error annotation and the summary goes to the job
+summary.
 
 The tests in `test_nfc_cards.py` build on each other: one whose prerequisite
 (an enrolled card from an earlier test) is missing fails and names it, so
@@ -407,6 +433,12 @@ READER_PROFILE=secure-lab pnpm nx run attractap-lab:hil
   profile (`efuse.check`). Then they erase the chip and write the image
   encrypted (`ESPToolDriver.erase_and_flash_encrypted`), the same write the
   janitor uses to park this reader.
+- `hil/test_efuse_report.py` checks the eFuse report the reader sends after its
+  session is up: the server must keep this development-mode reader *not
+  secured* and list `profile-not-secure` and `flash-encryption-not-release`.
+  That is the expected result. Nothing in the lab burns eFuses or puts a
+  release secure image on the reader; the reader identity is the P-256 key it
+  pairs with.
 - When the run ends, also after a failed setup, the tests write the image
   again, so no Wi-Fi, PIN or pairing stays on the reader even where the place
   has no janitor. With `janitor=park`, the janitor then parks it with the
@@ -440,7 +472,9 @@ Off the readers' LAN, add the relay variables from "In CI".
 
 **Update tests (`test_ota.py`).** The API under test offers a lab image through
 the real path (firmware info, `READER_FIRMWARE_UPDATE_REQUIRED`, chunked
-download over the websocket, `esp_ota_*`). `run.sh` builds the reader image
+download over the websocket, `esp_ota_*`). The download that installs the image
+loses its Wi-Fi once: the reader has to reconnect and continue where it stopped.
+`run.sh` builds the reader image
 twice from the same directory, the second time with
 `-DATTRACTAP_VERSION_OVERRIDE=<version>-hilota`, and starts the API with
 `ATTRACTAP_FIRMWARE_ASSETS_DIR` pointing at a scratch directory whose
@@ -468,18 +502,128 @@ deployments). With a prebuilt `READER_IMAGE` the tests skip unless
   (rejecting a lower `secure_version` needs the SECURE_VERSION eFuse raised
   first, and the tests never burn eFuses).
 
+**Crash report test (`test_crash_upload.py`, plain place only).** Plain reader
+images are built with the lab-only crash trigger (`-DATTRACTAP_CRASH_TRIGGER=ON`,
+firmware README "Crash trigger"). The test panics the reader with 64 KiB of
+filled stacks (an ~83 KB coredump) and makes it rejoin Wi-Fi as soon as the API
+logs the start of the chunked upload (a crash whose upload finished first is
+repeated, at most three times). After the reconnect the upload must restart for
+the same report and complete: one new report, the stored dump's
+size and CRC-32 equal to what the reader announced, the crash firmware version,
+and a symbolicated backtrace (`run.sh` publishes the reader's ELF as a
+symbol-only firmware entry). It also fails on a watchdog, panic, allocation
+failure or `LCD underrun` line, on a widget list slower than 3 s during the
+upload, and on the heap high-water marks. `crash-upload.json` and
+`crash-upload-backtrace.txt` hold the results.
+
 **RAM tests (`test_ram.py`).** Each workload resets the reader's heap high-water
 window (`system.heap.reset`), runs, and checks the lowest free internal heap and
 the smallest largest free block (`windowMinFree`, `windowMinLargest`) against
 `hil/heap_floors.py`, plus that the free heap comes back afterwards. Workloads:
 cards the server does not know in a loop (NFC read, API round trip, error
 screen), Wi-Fi reconnects that re-open the websocket and the encrypted session,
-and a resource list of dozens of long names. The OTA download measures the
-same marks in `ota-update.json`. `HIL_RAM_ITERATIONS` scales the loops (default
+a resource list of 20 long names (the most a real reader plausibly gets; the
+API sends it the 10 it shows), and a busy day (`test_busy_day`), the plausible
+worst case in one heap window: 20 resources, members signing in by card and
+starting and ending a session by touch, strangers' cards, an administrator
+editing the reader and one Wi-Fi drop. With `HIL_BLE=1` and a test peripheral,
+each session also runs a lock-sized plugin BLE exchange; that busy day is the
+workload `busy-day-ble` with its own floor, because the BLE stack takes about
+24 KB while it is up. Every window starts once the reader has released the BLE
+stack, so the other floors hold with and without `HIL_BLE` (numbers in
+`heap_floors.py`). The OTA download measures the same marks in `ota-update.json`. `HIL_RAM_ITERATIONS` scales the loops (default
 20). Results of every run are in `ram-<workload>.json` and `reader-heap.jsonl`.
 
 `test_touch_controller_answers` (`test_hardware.py`) checks that the GT911 answers
 its polling (register reads grow, none fail).
+
+### Plugin Bluetooth (opt-in)
+
+`hil/test_ble.py` checks plugin BLE through the reader (ATT-1033, ATT-1036). It is not part of the CI matrix and
+skips unless `HIL_BLE=1`. With it, `run.sh` builds the lab fixture plugin (`ble-fixture-plugin/`, never shipped;
+it only uses `context.ble` and offers REST routes that run step scripts inside one session) into the plugin
+directory of the API it starts. Its routes require the `system.plugins.manage` permission (the suite calls them as
+the admin). The devices come from the environment:
+
+- `BLE_PERIPHERAL_ADDRESS`: the generic GATT test peripheral (`ble-test-peripheral/`, see its README) in range of
+  the reader, for example a second lab place flashed with it inside its own labgrid session for the duration of the
+  run. It prints its address at boot (`ready address=...`).
+- `SOLO_USER_CODE` (and optionally `SOLO_ADDRESS`, else the first lock the scan finds): a PS Locks SOLO BT in
+  factory `CRYPT_OFF` mode for the real-lock smoke. The
+  code is only ever passed through the environment. It stays out of the artifacts: `ble-solo.json` drops the step
+  values, the wiretap records only byte lengths for BLE, and the test fails if `wiretap.jsonl` contains the bytes
+  of the unlock write. Vendor names like this one belong in the lab only, never in core docs or code.
+- `HIL_BLE_LONG=1` adds the 10-minute transfer (at least 256 KiB of MTU-sized writes without response, each
+  acknowledged by a notification).
+- `test_ble_bulk_throughput` runs with every `HIL_BLE=1` run: 256 KiB of MTU-sized writes without response at
+  window 1 and window 8 (the fixture `transfer` step's `window`: unacknowledged chunks in flight). It asserts
+  in-order acks and window 8 at 6 KiB/s or more; the 8 KiB/s target is recorded as `meetsTarget` in
+  `ble-bulk-throughput.json`. `HIL_BLE_BULK_RUNS` repeats each window in a new session (default 1; use 3 for
+  measurements), and `HIL_BLE_BULK_WINDOWS` picks the windows (default `1,8`; the floor applies to the largest).
+
+```sh
+HIL_BLE=1 BLE_PERIPHERAL_ADDRESS=AA:BB:CC:DD:EE:FF apps/attractap-lab/hil/run.sh -k ble
+```
+
+Throughput, notification rates and the internal heap before and after the first BLE init land in `ble-*.json`
+in the artifacts directory.
+
+### Reader over wss:// (opt-in)
+
+By default the reader reaches the lab API over plain `ws://`. A production reader
+on an HTTPS server uses `wss://`, and that outer TLS session takes reader RAM the
+default run never measures (most on the secure profile, whose mbedTLS memory is
+internal RAM). `HIL_WSS=1` runs every test, the RAM tests included, over a
+validated `wss://` connection:
+
+```sh
+. .tools/esp-idf/export.sh
+HIL_WSS=1 pnpm nx run attractap-lab:hil -- -k ram
+HIL_WSS=1 READER_PROFILE=secure-lab pnpm nx run attractap-lab:hil -- -k ram
+```
+
+- **Lab CA.** On first use `src/attractap_lab/lab_tls.py` creates a device-lab
+  root (RSA-4096, like ISRG Root X1) and an intermediate (RSA-2048) in
+  `apps/attractap-lab/lab-tls/` (gitignored, `LAB_TLS_DIR` overrides it; it needs
+  the `openssl` command). The CA is per checkout: delete the directory to start
+  over; the next run then needs a new reader image.
+- **Reader image.** `run.sh` builds the reader (and the update image) with
+  `-DATTRACTAP_LAB_CA=lab-tls/ca.pem`, which puts the lab CA first in the
+  firmware's certificate list (firmware README "Device-lab TLS CA"). It then
+  checks that the image it flashes (`READER_IMAGE`, or the signed HEX of a
+  `READER_SECURE_BUILD`) and the update image contain that same CA, and stops if
+  one does not. Only lab builds (`ATTRACTAP_TEST_HOOKS=ON`) take the option, and
+  the release build gate fails an image that has it.
+- **TLS front.** The `api_tls` fixture issues a server certificate for the address
+  the reader is given (the subjectAltName is an IP address, or a DNS name with
+  `API_HOST`) and terminates TLS on `API_TLS_PORT` (a free port by default),
+  forwarding the bytes to the API. The leaf and its key live in a temporary
+  directory only until the front has loaded them. The reader is configured with
+  `useSSL` and that port; off the readers' LAN the relay carries it. Each
+  handshake's version and cipher land in `api-tls.jsonl`.
+- **TLS parameters.** The front serves leaf, intermediate and root, about 4.2 KB
+  in DER (production: a Let's Encrypt 3-certificate chain of about 4.3 KB), RSA
+  keys (ECDHE-RSA), and session tickets, with TLS 1.2 and 1.3 on offer like a
+  common reverse proxy. The firmware offers both, so a default run negotiates
+  TLS 1.3, as a production reader does against such a server.
+  `HIL_WSS_TLS_MAX=1.2` pins TLS 1.2 (servers without TLS 1.3); run the RAM
+  tests both ways.
+- **Differences from production.** The certificate list entry the reader locks
+  onto is the lab CA, not ISRG Root X1 (both RSA-4096). The cipher suite and key
+  exchange group are what Python's OpenSSL picks (AES-256-GCM), not your
+  proxy's; an ECDSA server certificate would make the handshake cheaper. The
+  reader ignores certificate dates (`CONFIG_MBEDTLS_HAVE_TIME_DATE` is off), so a
+  reader without server time connects as in production.
+- `test_ota_from_main_firmware_to_head` skips: main's firmware does not trust the
+  lab CA.
+- **RAM floors.** The plain reader keeps its `ws://` floors. The secure-lab reader
+  has its own for `wss://` (`WSS_FLOORS` in `hil/heap_floors.py`): the outer TLS
+  session takes another 10 to 15 KB of internal RAM there.
+- **BLE notification bursts.** On the secure-lab reader a `wss://` send takes about
+  8 ms, so it forwards about 120 notifications a second (150 over `ws://`).
+  `test_ble_notification_burst_and_overflow` sends 200 as fast as the link allows;
+  over `wss://` up to 77 of them waited in the reader's buffer of 128 (a buffer of 64
+  overflowed in 1 of 4 runs).
 
 ### In CI
 
@@ -664,11 +808,20 @@ also compares every raw eFuse block with the first dump recorded for the chip
 `SECURE_VERSION` bits of BLOCK0 are left out and may only grow (anti-rollback
 burns them when the reader boots an image with a higher secure version). A park image older than that version no
 longer boots, so rebuild it from a branch with the new version. A mismatch
-quarantines the reader immediately, also on a `power=switch` place; other
-failures retry, then quarantine after `janitor.attempts`. On a `power=switch`
-place the janitor power-cycles the reader before each retry (switch off for
-10 s, on, then it waits for the reader's port) and quarantines it only once an
-attempt after a power cycle failed as well. Quarantined readers stay claimed by the janitor without a
+quarantines the reader immediately, also on a `power=switch` or `power=button`
+place; other failures retry, then quarantine after `janitor.attempts`. On a
+`power=switch` or `power=button` place the janitor power-cycles the reader
+before each retry and quarantines it only once an attempt after a power cycle
+failed as well. A switch is off for 10 s. A button reader (Touch V1) is
+switched off with its power button through the NFC emulator and stays off for
+at least 30 s; one that already switched itself off is not pressed. Then the
+reader is switched on and the janitor waits for its port. If it does not come
+back, or the attempt is stopped during the cycle (job timeout or service
+stop), the janitor tries switching it on once more, logs the final state, and
+the attempt fails. The quarantine reason then names the failed cycle, for
+example `parking failed 3 times (last exit 1), also after a power cycle that
+failed: The place has no switchable reader power to cycle` when the place's NFC
+emulator is missing. Quarantined readers stay claimed by the janitor without a
 reservation, so sessions skip them and maintenance does not wait for them:
 
 ```sh
@@ -688,10 +841,13 @@ answer, for example `line=io-expander err=ESP_ERR_TIMEOUT sda=1 scl=0
 expander=ESP_ERR_TIMEOUT pn532=ESP_ERR_TIMEOUT`. An idle bus reads `sda=1
 scl=1`. A line still low after the bus clear is held by a slave (on the Touch
 V2 most likely the CH32 I/O expander MCU), which only lets go when the reader
-loses power for at least 10 s. On a `power=switch` place the janitor's power
-cycle does that. Elsewhere, unplug the reader's USB cable for at least 10 s,
-then `clear` the place. The janitor reaches the local exporter over SSH like any
-client, with a host-local key authorized only for the `labgrid` account.
+loses power for at least 10 s; a Touch V1's bus stuck with `scl=0` needed about
+30 s off. On a `power=switch` or `power=button` place the janitor's power cycle
+does that. On a place the janitor does not power-cycle (`power=always-on` or no
+`power` tag), unplug the reader's USB cable for at least 30 s, then `clear` the
+place.
+The janitor reaches the local exporter over SSH like any client, with a
+host-local key authorized only for the `labgrid` account.
 
 The parking image never deep-sleeps: that would power down USB-Serial-JTAG and
 make the reader unreachable until someone presses reset.

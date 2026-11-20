@@ -1,16 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import {
-  User,
-  Resource,
-  Project,
-  ResourceGroup,
-  MqttServer,
-  ResourceUsage,
-  Session,
-  AttractapCrashReport,
-} from '@attraccess/database-entities';
+import { MetricsPersistenceModule } from '../database/adapters/metrics/metrics-persistence.module';
 import { MetricsService } from './metrics.service';
 import { MetricsController } from './metrics.controller';
 import { ResetReportMetricsCollector } from './reset-report-metrics.collector';
@@ -28,6 +18,7 @@ import {
   FLOW_METRICS,
   OPERATING_METRICS,
   AUDIT_METRICS,
+  PLUGIN_BLE_METRICS,
 } from './definitions/tokens';
 import { createHttpMetrics } from './definitions/http.metrics';
 import { createWsMetrics } from './definitions/ws.metrics';
@@ -38,10 +29,11 @@ import { createSseMetrics } from './definitions/sse.metrics';
 import { createFlowMetrics } from './definitions/flow.metrics';
 import { createOperatingMetrics } from './definitions/operating.metrics';
 import { createAuditMetrics } from './definitions/audit.metrics';
+import { createPluginBleMetrics } from './definitions/plugin-ble.metrics';
 import { HttpMetricsInterceptor } from './instrumentation/http/http.interceptor';
 import { WsMetricsInterceptor } from './instrumentation/ws/ws.interceptor';
 import { CronTimer } from './instrumentation/cron/cron.helper';
-import { DbMetricsInstrumentation } from './instrumentation/db/db.instrumentation';
+import { DbMetricsInstrumentation } from '../database/adapters/metrics/db.instrumentation';
 import { ExternalCallTimer } from './instrumentation/external/external.helper';
 import { SseInstrumentation } from './instrumentation/sse/sse.helper';
 import { FlowTimer } from './instrumentation/flow/flow.helper';
@@ -69,23 +61,16 @@ const definitionProviders = [
     useFactory: (m: MetricsService) => createAuditMetrics(m.registry),
     inject: [MetricsService],
   },
+  {
+    provide: PLUGIN_BLE_METRICS,
+    useFactory: (m: MetricsService) => createPluginBleMetrics(m.registry),
+    inject: [MetricsService],
+  },
 ];
 
 @Global()
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([
-      User,
-      Resource,
-      Project,
-      ResourceGroup,
-      MqttServer,
-      ResourceUsage,
-      Session,
-      AttractapCrashReport,
-    ]),
-    SettingsModule,
-  ],
+  imports: [MetricsPersistenceModule, SettingsModule],
   controllers: [MetricsController],
   providers: [
     MetricsService,
@@ -127,6 +112,7 @@ const definitionProviders = [
     FLOW_METRICS,
     OPERATING_METRICS,
     AUDIT_METRICS,
+    PLUGIN_BLE_METRICS,
     METRICS_TOGGLE_INVALIDATOR,
   ],
 })

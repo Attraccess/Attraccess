@@ -40,25 +40,6 @@ export interface WagoController {
   connectivity: 'online' | 'stale' | 'untrusted' | 'runtime_check' | 'runtime_update';
 }
 
-export interface WagoPreset {
-  id:
-    | 'metered-switched-load'
-    | 'pulsed-lock-bank'
-    | 'guarded-enable-request'
-    | 'generic-digital-output'
-    | 'generic-monitored-input';
-  name: string;
-  description: string;
-}
-
-export interface WagoPresetApplication {
-  presetId: WagoPreset['id'];
-  channelId: string;
-  physicalPointId: string;
-  guardChannelId?: string;
-  feedbackChannelId?: string;
-}
-
 export interface WagoSettings {
   defaultMqttServerId: number | null;
 }
@@ -146,6 +127,17 @@ export interface ConfigurationRevision {
   reportedAt: string | null;
 }
 
+export interface ConfigurationValidationResult {
+  valid: boolean;
+  errors: ConfigurationValidationError[];
+}
+
+export interface ConfigurationRevisionPage {
+  revisions: ConfigurationRevision[];
+  offset: number;
+  limit: number;
+}
+
 export interface ConfigurationReview {
   draft: WagoConfigurationDraft;
   previous: (ConfigurationRevision & { snapshot: string }) | null;
@@ -183,13 +175,6 @@ export interface NetworkChangeStatus {
     failure: string | null;
     running: boolean;
   } | null;
-}
-
-export interface PresetPreview {
-  draftHash: string;
-  diff: ConfigurationDiff[];
-  snapshot: WagoConfigurationSnapshot;
-  errors: ConfigurationValidationError[];
 }
 
 export interface RevisionPreview {
@@ -257,18 +242,6 @@ export const acknowledgeConfigurationRejection = (
     body: { contentHash, reportedAt },
   });
 
-export const applyPreset = (
-  id: number,
-  application: WagoPresetApplication,
-  selectedPaths: string[],
-  previewedDraftHash: string,
-  snapshot: WagoConfigurationSnapshot,
-) =>
-  api.request<WagoConfigurationDraft>(`/controllers/${id}/configuration/presets/apply`, {
-    method: 'POST',
-    body: { application, selectedPaths, previewedDraftHash, snapshot },
-  });
-
 export const changeControllerNetwork = (id: number, input: { targetHost: string; mqttServerId: number | null }) =>
   api.request<NetworkChangeStatus>(`/controllers/${id}/network-change`, { method: 'POST', body: input });
 
@@ -331,24 +304,14 @@ export const listCommissioningSessions = (limit = 100, offset = 0, signal?: Abor
   api.request<CommissioningSession[]>(`/commissioning/sessions?limit=${limit}&offset=${offset}`, { signal });
 
 export const listConfigurationRevisions = (id: number, offset: number) =>
-  api.request<{ revisions: ConfigurationRevision[]; offset: number; limit: number }>(
-    `/controllers/${id}/configuration/revisions?offset=${offset}&limit=20`,
-  );
+  api.request<ConfigurationRevisionPage>(`/controllers/${id}/configuration/revisions?offset=${offset}&limit=20`);
 
 export const listControllers = () => api.request<WagoController[]>('/controllers');
 
 export const listMqttServers = () => hostApi.request<MqttServer[]>('/mqtt/servers');
 
-export const listPresets = () => api.request<WagoPreset[]>('/configuration/presets');
-
 export const previewConfigurationRevision = (id: number, revision: number) =>
   api.request<RevisionPreview>(`/controllers/${id}/configuration/revisions/${revision}/preview`);
-
-export const previewPreset = (id: number, application: WagoPresetApplication, snapshot?: WagoConfigurationSnapshot) =>
-  api.request<PresetPreview>(`/controllers/${id}/configuration/presets/preview`, {
-    method: 'POST',
-    body: { application, snapshot },
-  });
 
 export const publishConfiguration = (id: number, force: boolean, reviewedHash: string) =>
   api.request<ConfigurationRevision>(`/controllers/${id}/configuration/publish`, {
@@ -430,7 +393,7 @@ export const setSettings = (defaultMqttServerId: number | null) =>
   api.request<WagoSettings>('/settings', { method: 'POST', body: { defaultMqttServerId } });
 
 export const validateConfiguration = (id: number, snapshot: WagoConfigurationSnapshot) =>
-  api.request<{ valid: boolean; errors: ConfigurationValidationError[] }>(`/controllers/${id}/configuration/validate`, {
+  api.request<ConfigurationValidationResult>(`/controllers/${id}/configuration/validate`, {
     method: 'POST',
     body: { snapshot },
   });

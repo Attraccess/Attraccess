@@ -6,7 +6,8 @@ import de from './translations/de.json';
 
 interface SessionTimerProps {
   startTime: string;
-  variant?: 'default' | 'hero';
+  /** `compact`: only the elapsed time, for tight rows such as dashboard tiles. */
+  variant?: 'default' | 'hero' | 'compact';
 }
 
 function useElapsedTime(startTime: string) {
@@ -44,6 +45,15 @@ function useElapsedTime(startTime: string) {
 export function SessionTimer({ startTime, variant = 'default' }: SessionTimerProps) {
   const { t } = useTranslations({ en, de });
   const elapsedTime = useElapsedTime(startTime);
+
+  if (variant === 'compact') {
+    return (
+      <span className="text-xs tabular-nums text-muted">
+        <span className="sr-only">{t('elapsedTime')}: </span>
+        {elapsedTime}
+      </span>
+    );
+  }
 
   if (variant === 'hero') {
     return (

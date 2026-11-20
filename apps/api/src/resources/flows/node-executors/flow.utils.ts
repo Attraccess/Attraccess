@@ -1,4 +1,4 @@
-import { ResourceType } from '@attraccess/database-entities';
+import { ResourceType } from '@attraccess/application-models';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 
 /**

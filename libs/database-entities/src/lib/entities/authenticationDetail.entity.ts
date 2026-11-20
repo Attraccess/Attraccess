@@ -2,12 +2,14 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index } 
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 import { User } from './user.entity';
-import { AuthenticationType } from '../types/authenticationType.enum';
-import { SSOProviderType } from './ssoProvider.entity';
+import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
 
 @Entity()
 @Index(['userId', 'type'], { unique: true })
-@Index(['providerType', 'providerId', 'ssoSubject'], { unique: true, where: '"providerType" IS NOT NULL AND "providerId" IS NOT NULL AND "ssoSubject" IS NOT NULL' })
+@Index(['providerType', 'providerId', 'ssoSubject'], {
+  unique: true,
+  where: '"providerType" IS NOT NULL AND "providerId" IS NOT NULL AND "ssoSubject" IS NOT NULL',
+})
 export class AuthenticationDetail {
   @PrimaryGeneratedColumn()
   @ApiProperty({

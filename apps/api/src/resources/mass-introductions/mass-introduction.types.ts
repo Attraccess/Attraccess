@@ -4,6 +4,7 @@ import {
   MassIntroductionTargetType,
 } from './dtos/massIntroductionSession.dto';
 import { MassIntroductionEndReason } from './dtos/massIntroductionLiveEvent.dto';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 export interface MassIntroductionTarget {
   type: MassIntroductionTargetType;
@@ -31,7 +32,7 @@ export interface ActiveMassIntroduction {
   introducer: {
     id: number;
     username: string;
-    authenticationMethod: 'session' | 'api-token' | null;
+    authenticationMethod: AuthenticationMethod | null;
     apiTokenId: number | null;
     /**
      * Authorized through the `resources.access.manage` permission rather than an introducer role.

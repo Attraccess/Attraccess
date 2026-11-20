@@ -1,4 +1,5 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ResourceFlowVariableScope as Scope } from '@attraccess/react-query-client';
 import { VariablesModal } from './index';
@@ -25,15 +26,15 @@ vi.mock('../../../../../components/toastProvider', () => ({
 }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  UseFlowVariablesServiceListFlowVariablesKeyFn: ({ resourceId }: { resourceId: number }) => ['variables', resourceId],
-  useFlowVariablesServiceListFlowVariables: () => ({ data: state.rows }),
-  useFlowVariablesServiceUpsertFlowVariable: (options: typeof state.upsertOptions) => {
+  UseListFlowVariablesKeyFn: ({ path: { resourceId } }: { path: { resourceId: number } }) => ['variables', resourceId],
+  useListFlowVariables: () => ({ data: state.rows }),
+  useUpsertFlowVariable: (_mutationKey: unknown, options: typeof state.upsertOptions) => {
     state.upsertOptions = options;
     return { mutate: state.upsert };
   },
-  useFlowVariablesServiceDeleteFlowVariable: (options: typeof state.removeOptions) => {
+  useDeleteFlowVariable: (_mutationKey: unknown, options: typeof state.removeOptions) => {
     state.removeOptions = options;
-    return { mutate: state.remove };
+    return { mutateAsync: state.remove };
   },
 }));
 beforeEach(() => {
@@ -41,6 +42,10 @@ beforeEach(() => {
   state.rows = [];
 });
 afterEach(cleanup);
+async function chooseAction(row: string, action: string) {
+  await userEvent.click(screen.getByRole('button', { name: `Actions for ${row}` }));
+  await userEvent.click(await screen.findByRole('menuitem', { name: action }));
+}
 async function open() {
   render(<VariablesModal resourceId={7}>{(open) => <button onClick={open}>Variables</button>}</VariablesModal>);
   fireEvent.click(screen.getByText('Variables'));
@@ -73,10 +78,8 @@ it('creates a variable through the real editor and refreshes its resource cache'
   fireEvent.change(screen.getByRole('textbox', { name: 'editor.value' }), { target: { value: 'Hello' } });
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   expect(state.upsert).toHaveBeenCalledWith({
-    resourceId: 7,
-    scope: Scope.RESOURCE,
-    key: 'greeting',
-    requestBody: { value: 'Hello' },
+    path: { resourceId: 7, scope: Scope.RESOURCE, key: 'greeting' },
+    body: { value: 'Hello' },
   });
   act(() => state.upsertOptions.onSuccess());
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['variables', 7] });
@@ -86,15 +89,13 @@ it('creates a variable through the real editor and refreshes its resource cache'
 it('edits existing values without changing their key and reports save failures', async () => {
   state.rows = [{ scope: Scope.RESOURCE, key: 'greeting', valueType: 'string', value: 'Hello', updatedAt: 'Today' }];
   await open();
-  fireEvent.click(screen.getByRole('button', { name: 'actions.edit' }));
+  await chooseAction('greeting', 'actions.edit');
   expect(screen.getByRole('textbox', { name: 'editor.key' })).toBeDisabled();
   fireEvent.change(screen.getByRole('textbox', { name: 'editor.value' }), { target: { value: 'Welcome' } });
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   expect(state.upsert).toHaveBeenCalledWith({
-    resourceId: 7,
-    scope: Scope.RESOURCE,
-    key: 'greeting',
-    requestBody: { value: 'Welcome' },
+    path: { resourceId: 7, scope: Scope.RESOURCE, key: 'greeting' },
+    body: { value: 'Welcome' },
   });
   const error = new Error('Denied');
   act(() => state.upsertOptions.onError(error));
@@ -102,15 +103,26 @@ it('edits existing values without changing their key and reports save failures',
   fireEvent.click(screen.getByRole('button', { name: 'actions.cancel' }));
   expect(screen.getByText('greeting')).toBeTruthy();
 });
+it('keeps the placeholder row without actions while there are no variables', async () => {
+  await open();
+  expect(screen.getByText('table.empty')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: /^Actions for/ })).toBeNull();
+});
 it('requires confirmation before deletion and handles its success and error callbacks', async () => {
   state.rows = [{ scope: Scope.RESOURCE, key: 'old', valueType: 'number', value: 42, updatedAt: 'Today' }];
+  state.remove.mockResolvedValue(undefined);
   await open();
-  fireEvent.click(screen.getByRole('button', { name: 'actions.delete' }));
-  fireEvent.click(screen.getByRole('button', { name: 'actions.confirmDeleteNo' }));
+  await chooseAction('old', 'actions.delete');
+  let dialog = await screen.findByRole('alertdialog');
+  expect(within(dialog).getByText('actions.confirmDeleteMessage')).toBeTruthy();
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
   expect(state.remove).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button', { name: 'actions.delete' }));
-  fireEvent.click(screen.getByRole('button', { name: 'actions.confirmDeleteYes' }));
-  expect(state.remove).toHaveBeenCalledWith({ resourceId: 7, scope: Scope.RESOURCE, key: 'old' });
+  await chooseAction('old', 'actions.delete');
+  dialog = await screen.findByRole('alertdialog');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'actions.delete' }));
+  expect(state.remove).toHaveBeenCalledWith({ path: { resourceId: 7, scope: Scope.RESOURCE, key: 'old' } });
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
   const error = new Error('Denied');
   act(() => state.removeOptions.onError(error));
   expect(state.error).toHaveBeenCalledWith(expect.objectContaining({ error }));

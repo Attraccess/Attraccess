@@ -8,9 +8,9 @@ vi.mock('../api', () => ({
 
 vi.mock('@attraccess/react-query-client', () => ({
   OpenAPI: { BASE: '', TOKEN: '', WITH_CREDENTIALS: false },
-  useUsersServiceGetCurrent: () => ({ data: null }),
-  useAuthenticationServiceEndSession: () => ({ mutate: vi.fn() }),
-  useAuthenticationServiceCreateSession: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
+  useGetCurrent: () => ({ data: null }),
+  useEndSession: () => ({ mutate: vi.fn() }),
+  useCreateSession: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
 }));
 
 vi.mock('react-router-dom', () => ({

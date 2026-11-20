@@ -1,15 +1,12 @@
-import { AuditLog, ResourceHealthStatus, SSOProviderType } from '@attraccess/database-entities';
+import { AuditLog } from '@attraccess/database-entities';
+import { ResourceHealthStatus, SSOProviderType } from '@attraccess/application-models';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { WebSocket } from 'ws';
 import { AttractapPairingController } from '../attractap/pairing.controller';
 import { PairingService } from '../attractap/security/pairing.service';
-import { AttractapAuthHandler } from '../attractap/websockets/handlers/auth/auth.handler';
-import { readerTimeZoneStub } from '../attractap/websockets/reader-time-zone.test-fixture';
-import { WebsocketService } from '../attractap/websockets/websocket.service';
-import { AttractapEvent, AttractapEventType } from '../attractap/websockets/websocket.types';
 import { BillingService } from '../billing/charges/billing.service';
 import { MqttServerController } from '../mqtt/servers/mqtt-server.controller';
+import { FixedIdMqttServerStore } from './fixed-id-mqtt-store.test-fixture';
 import { MqttServerService } from '../mqtt/servers/mqtt-server.service';
 import { ProjectsController } from '../projects/projects.controller';
 import { ProjectsService } from '../projects/projects.service';
@@ -17,7 +14,7 @@ import { ResourceHealthController } from '../resources/health/resource-health.co
 import { ResourceHealthService } from '../resources/health/resource-health.service';
 import { SessionService } from '../users-and-auth/auth/session.service';
 import { SsoProvisioningService } from '../users-and-auth/auth/sso/provisioning/sso-provisioning.service';
-import { setupAuditDatabase } from './audit.test-fixture';
+import { setupAuditDatabase } from '../database/adapters/audit/audit.test-fixture';
 import { auditActorOf } from './recorder/audit-event';
 
 /**
@@ -61,22 +58,8 @@ describe('audit recorded by the owning services, without the HTTP layer', () => 
   });
 
   it('administration: creating an MQTT server through the service records the same row as the HTTP route', async () => {
-    // Entity defaults, as a saved row carries them.
-    const server = {
-      id: 7,
-      name: 'Workshop',
-      host: 'mqtt.example',
-      port: 1883,
-      useTls: false,
-      defaultPublishQos: 0,
-      defaultPublishRetain: false,
-      defaultSubscribeQos: 0,
-    };
     const service = new MqttServerService(
-      {
-        create: (value: object) => ({ ...server, ...value }),
-        save: async (value: object) => ({ ...value, id: 7 }),
-      } as never,
+      new FixedIdMqttServerStore(),
       { encrypt: (value: string) => `enc:${value}` } as never,
       { mqttServersTotal: { inc: jest.fn() } } as never,
       { emit: jest.fn() } as never,
@@ -128,11 +111,10 @@ describe('audit recorded by the owning services, without the HTTP layer', () => 
     }));
     const health = new ResourceHealthService(
       {
-        findOne: async ({ where }: { where: { id: number; resourceId: number } }) =>
-          entries.find((entry) => entry.id === where.id && entry.resourceId === where.resourceId) ?? null,
-        remove: async (entry: object) => entry,
+        findEntry: async (resourceId: number, entryId: number) =>
+          entries.find((entry) => entry.id === entryId && entry.resourceId === resourceId) ?? null,
+        removeEntry: async () => undefined,
       } as never,
-      {} as never,
       { emit: jest.fn() } as never,
       fixture.service,
     );
@@ -170,7 +152,7 @@ describe('audit recorded by the owning services, without the HTTP layer', () => 
         {} as never,
       );
 
-      await new AttractapPairingController(pairing, registry as never, new WebsocketService()).revoke(9, req);
+      await new AttractapPairingController(pairing, registry as never).revoke(9, req);
       await pairing.revoke(9, { userId: 42, authenticationMethod: 'api-token', apiTokenId: 9 });
 
       expect(registry.revoke).toHaveBeenCalledTimes(2);
@@ -189,50 +171,11 @@ describe('audit recorded by the owning services, without the HTTP layer', () => 
       );
       expect(direct).toEqual(http);
     });
-
-    it('a paired reader signing in with a token over the reader websocket records the rejection as the device', async () => {
-      const handler = new AttractapAuthHandler();
-      Object.assign(handler, {
-        logger: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() },
-        attractapService: { findReaderById: async (id: number) => ({ id, name: 'Lathe', pairingState: 'paired' }) },
-        metricsService: { attractapReaderConnected: { set: jest.fn() } },
-        audit: fixture.service,
-        readerTimeZone: readerTimeZoneStub(),
-        settingsService: { getDefaultLanguage: async () => 'en' },
-        websocketService: new WebsocketService(),
-      });
-      const socket = {
-        id: 'socket-1',
-        readerId: null,
-        readerName: null,
-        readyState: WebSocket.OPEN,
-        state: {},
-        sendMessage: jest.fn(async () => undefined),
-      };
-
-      await handler.handleAuthentication(socket as never, { payload: { id: 9, token: 'stolen-token' } } as never);
-
-      expect(socket.sendMessage).toHaveBeenCalledWith(
-        new AttractapEvent(AttractapEventType.READER_UNAUTHORIZED, { message: 'PAIRING_REQUIRED' }),
-      );
-      expect(await rows()).toEqual([
-        row({
-          domain: 'attractap',
-          action: 'attractap.reader.token_rejected',
-          subjectType: 'attractap.reader',
-          subjectId: 9,
-          details: { reason: 'paired' },
-        }),
-      ]);
-      expect(JSON.stringify(await rows())).not.toContain('stolen-token');
-    });
   });
 
   it('project: creating a project through the service records the same row as the HTTP route', async () => {
     const projects = new ProjectsService(
-      { save: async (value: object) => ({ ...value, id: 3 }) } as never,
-      {} as never,
-      {} as never,
+      { create: async (value: object) => ({ ...value, id: 3 }) } as never,
       {} as never,
       {} as never,
       {} as never,
@@ -270,17 +213,18 @@ describe('audit recorded by the owning services, without the HTTP layer', () => 
 
   it('billing: a manual transaction records the deterministic billing operation', async () => {
     const billing = new BillingService(
-      { save: async (value: object) => ({ ...value, id: 11 }) } as never,
-      { findOneBy: async () => ({ id: 5, creditBalance: 100 }) } as never,
+      {
+        getBalance: async () => 100,
+        insertTransaction: async (value: object) => ({ ...value, id: 11 }),
+      } as never,
       {} as never,
       { notifyTransactionUpdate: jest.fn() } as never,
       {} as never,
       {} as never,
       {} as never,
-      {} as never,
-      {} as never,
       { billingTransactionsTotal: { inc: jest.fn() }, billingTransactionAmount: { observe: jest.fn() } } as never,
       fixture.service,
+      {} as never,
     );
 
     await billing.createManualTransaction(5, 42, 25);

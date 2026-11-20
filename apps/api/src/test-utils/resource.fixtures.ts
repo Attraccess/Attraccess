@@ -1,4 +1,5 @@
-import { DocumentationType, Resource, ResourceType, SupervisionMode } from '@attraccess/database-entities';
+import { Resource } from '@attraccess/database-entities';
+import { DocumentationType, ResourceType, SupervisionMode } from '@attraccess/application-models';
 
 export function createMockResource(overrides: Partial<Resource> = {}): Resource {
   const now = new Date();
@@ -7,6 +8,7 @@ export function createMockResource(overrides: Partial<Resource> = {}): Resource 
     name: 'Test Resource',
     type: ResourceType.Machine,
     separateUnlockAndUnlatch: false,
+    accessOnly: false,
     description: 'Test Description',
     imageFilename: null,
     documentationType: DocumentationType.MARKDOWN,

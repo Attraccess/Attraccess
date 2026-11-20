@@ -47,7 +47,7 @@ export class ShellyProbeService {
       json = (await res.json()) as ShellyInfoResponse;
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
-      throw new Error(`probe of ${url} failed: ${reason}`);
+      throw new Error(`probe of ${url} failed: ${reason}`, { cause: err });
     }
 
     return this.interpret(json);

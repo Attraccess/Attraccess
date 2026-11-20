@@ -1,16 +1,12 @@
-import { type PluginMqttSubscription, type PluginContext, type Repository } from '@attraccess/plugins-backend-sdk';
+import { type PluginMqttSubscription, type PluginContext } from '@attraccess/plugins-backend-sdk';
+import { openWagoStorage, type WagoControllerRow, type WagoStorage } from '../storage';
+import { type WagoConfigurationRevision } from '../configuration/revision.entity';
 
 import { Inject } from '@nestjs/common';
-
-import { WagoConfigurationRevision } from '../configuration/revision.entity';
-
-import { WagoController } from '../controllers/entity';
 
 import { WagoService } from '../controllers/service';
 
 import { type WagoConfigurationSnapshot } from '../configuration/model';
-
-import { WagoSettings } from '../controllers/settings.entity';
 
 import { PLUGIN_CONTEXT } from './model';
 
@@ -26,7 +22,7 @@ export abstract class WagoFlowServiceState {
 
   protected readonly cache = new Map<string, CachedState>();
 
-  protected controllerByHardwareId = new Map<string, { controller: WagoController; serverId: number }>();
+  protected controllerByHardwareId = new Map<string, { controller: WagoControllerRow; serverId: number }>();
 
   protected readonly streams = new Map<number, OperationalStream>();
 
@@ -59,17 +55,17 @@ export abstract class WagoFlowServiceState {
 
   protected refreshTimer: ReturnType<typeof setInterval> | null = null;
 
-  // Plugin registration precedes the host datasource; resolve repositories only when used.
-  protected get controllers(): Repository<WagoController> {
-    return this.context.getRepository(WagoController);
+  // Plugin registration precedes the host storage; open the tables only when used.
+  protected get controllers(): WagoStorage['controllers'] {
+    return openWagoStorage(this.context).controllers;
   }
 
-  protected get revisions(): Repository<WagoConfigurationRevision> {
-    return this.context.getRepository(WagoConfigurationRevision);
+  protected get revisions(): WagoStorage['configurationRevisions'] {
+    return openWagoStorage(this.context).configurationRevisions;
   }
 
-  protected get settings(): Repository<WagoSettings> {
-    return this.context.getRepository(WagoSettings);
+  protected get settings(): WagoStorage['settings'] {
+    return openWagoStorage(this.context).settings;
   }
 
   abstract onModuleInit(): Promise<void>;
@@ -102,13 +98,13 @@ export abstract class WagoFlowServiceState {
   protected abstract processMessage(serverId: number, prefix: string, topic: string, payload: Buffer): Promise<void>;
 
   protected abstract admitEvent(
-    controller: WagoController,
+    controller: WagoControllerRow,
     event: WagoOperationalMessage,
     eventTime: number,
   ): OperationalStream | undefined;
 
   protected abstract applyState(
-    controller: WagoController,
+    controller: WagoControllerRow,
     event: Extract<WagoOperationalMessage, { category: 'state' }>,
     eventTime: number,
     stream: OperationalStream,
@@ -116,7 +112,7 @@ export abstract class WagoFlowServiceState {
   ): void;
 
   protected abstract store(
-    controller: WagoController,
+    controller: WagoControllerRow,
     channelId: string,
     event: WagoOperationalMessage,
     value: unknown,

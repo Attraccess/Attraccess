@@ -25,7 +25,10 @@ vi.mock('../../../components/toastProvider', () => ({
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('../../../hooks/useAuth', () => ({
-  useAuth: () => ({ hasPermission: (key: string) => key === 'resources.view' }),
+  useAuth: () => ({
+    hasPermission: (key: string) => key === 'resources.view',
+    hasPermissionKey: (key: string) => key === 'resources.view',
+  }),
 }));
 vi.mock('../../../hooks/useRbacCatalogTranslations', () => ({
   useRbacCatalogTranslations: () => ({
@@ -54,19 +57,19 @@ vi.mock('../../../components/permissionPicker', () => ({
   ),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useRbacServiceListRolesKey: 'roles',
-  useRbacServiceListPermissions: () => ({
+  useListRolesKey: 'roles',
+  useListPermissions: () => ({
     data: [
       { key: 'resources.view', category: 'resources' },
       { key: 'users.delete', category: 'users' },
       { key: 'plugin.custom', category: 'custom' },
     ],
   }),
-  useRbacServiceCreateRole: (options: typeof state.createOptions) => {
+  useCreateRole: (_mutationKey: unknown, options: typeof state.createOptions) => {
     state.createOptions = options;
     return { mutate: state.create };
   },
-  useRbacServiceUpdateRole: (options: typeof state.updateOptions) => {
+  useUpdateRole: (_mutationKey: unknown, options: typeof state.updateOptions) => {
     state.updateOptions = options;
     return { mutate: state.update };
   },
@@ -93,7 +96,7 @@ it('creates a role with trimmed values and prevents granting permissions the act
   expect(screen.getByText('Selected: resources.view')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'actions.create' }));
   expect(state.create).toHaveBeenCalledWith({
-    requestBody: { name: 'Operators', description: 'Workshop members', permissionKeys: ['resources.view'] },
+    body: { name: 'Operators', description: 'Workshop members', permissionKeys: ['resources.view'] },
   });
   act(() => state.createOptions.onSuccess());
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['roles'] });
@@ -108,8 +111,8 @@ it('preserves existing locked permissions when clearing selection and saves an e
   expect(screen.getByText('Selected: users.delete')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   expect(state.update).toHaveBeenCalledWith({
-    id: 7,
-    requestBody: { name: 'Operators', description: 'Existing', permissionKeys: ['users.delete'] },
+    path: { id: 7 },
+    body: { name: 'Operators', description: 'Existing', permissionKeys: ['users.delete'] },
   });
   const failure = new Error('Denied');
   act(() => state.updateOptions.onError(failure));

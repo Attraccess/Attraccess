@@ -1,5 +1,11 @@
 import { Button, LabeledSwitch, StandardModal } from '@attraccess/plugins-frontend-ui';
 import {
+  useDeletePlugin,
+  useGetPlugins,
+  usePluginControllerRemovalPlan,
+  usePluginControllerRemovePackageGraph,
+} from '@attraccess/react-query-client';
+import {
   Alert,
   AlertContent,
   AlertDescription,
@@ -9,49 +15,97 @@ import {
   ModalHeader,
   ModalHeading,
 } from '@heroui/react';
-import { dependencyError } from '../dependencies/DependencyPlan';
-import { usePluginsSectionState } from '../state/usePluginSettings';
-type Props = Pick<
-  ReturnType<typeof usePluginsSectionState>,
-  | 'pluginToDelete'
-  | 'setPluginToDelete'
-  | 't'
-  | 'deletingPlugin'
-  | 'deletingNpm'
-  | 'isResolvingRemoval'
-  | 'dependantsToRemove'
-  | 'removeDependantsApproved'
-  | 'setApprovedRemovalPlan'
-  | 'removalApprovalToken'
-  | 'removalPlanError'
-  | 'removeFailure'
-  | 'isDeleting'
-  | 'isRemovingGraph'
-  | 'deleteConfirmedPlugin'
-  | 'removalPlan'
->;
-export function RemovePluginModal({
-  pluginToDelete,
-  setPluginToDelete,
-  t,
-  deletingPlugin,
-  deletingNpm,
-  isResolvingRemoval,
-  dependantsToRemove,
-  removeDependantsApproved,
-  setApprovedRemovalPlan,
-  removalApprovalToken,
-  removalPlanError,
-  removeFailure,
-  isDeleting,
-  isRemovingGraph,
-  deleteConfirmedPlugin,
-  removalPlan,
-}: Props) {
+import { useState } from 'react';
+import { useToastMessage } from '../../../../../components/toastProvider';
+import { dependencyError } from '../dependencies/dependencyError';
+import { usePluginsTranslations } from '../usePluginsTranslations';
+import { useInstalledNpmPlugins } from './useInstalledNpmPlugins';
+
+interface Props {
+  /** The id of the plugin to remove; the dialog is open while this is set. */
+  pluginId: string | null;
+  onClose: () => void;
+}
+
+export function RemovePluginModal({ pluginId, onClose }: Props) {
+  const { t } = usePluginsTranslations();
+  const toast = useToastMessage();
+  const { data: plugins } = useGetPlugins();
+  const { installedByDirectory } = useInstalledNpmPlugins();
+  const [approvedRemovalPlan, setApprovedRemovalPlan] = useState<string | null>(null);
+  const [removeFailure, setRemoveFailure] = useState<string | null>(null);
+
+  const dismiss = () => {
+    setApprovedRemovalPlan(null);
+    setRemoveFailure(null);
+    onClose();
+  };
+
+  const { mutate: deletePlugin, isPending: isDeleting } = useDeletePlugin(undefined, {
+    onSuccess: () => {
+      // The server drops the plugin's bundle from the served asset set, so the running frontend is
+      // holding modules that no longer exist — a reload is the only way back to a consistent app.
+      setTimeout(() => window.location.reload(), 5000);
+      dismiss();
+      toast.success({
+        title: t('success.delete.title'),
+        description: t('success.delete.description'),
+      });
+    },
+    onError: () => {
+      toast.error({ title: t('error.delete.title'), description: t('error.delete.description') });
+    },
+  });
+  const { mutateAsync: removePackageGraph, isPending: isRemovingGraph } = usePluginControllerRemovePackageGraph();
+
+  const deletingPlugin = plugins?.find((plugin) => plugin.id === pluginId);
+  const deletingNpm = Boolean(deletingPlugin && installedByDirectory.has(deletingPlugin.pluginDirectory));
+  // What happens to the data depends on the path: npm keeps it, a refused plugin's tables stay (its code never
+  // runs), and deleting an uploaded plugin drops its tables.
+  const removalMessage = deletingNpm
+    ? 'deleteConfirmation.messageRegistry'
+    : deletingPlugin?.refused
+      ? 'deleteConfirmation.messageRefused'
+      : 'deleteConfirmation.messageUploaded';
+  const {
+    data: removalPlan,
+    error: removalPlanError,
+    isFetching: isResolvingRemoval,
+  } = usePluginControllerRemovalPlan({ path: { packageName: deletingPlugin?.name ?? '' } }, undefined, {
+    enabled: deletingNpm,
+    staleTime: 0,
+    retry: false,
+  });
+  const dependantsToRemove = removalPlan?.filter((plugin) => plugin.name !== deletingPlugin?.name) ?? [];
+  const removalApprovalToken = JSON.stringify(removalPlan?.map(({ name, version }) => ({ name, version })));
+  const removeDependantsApproved = Boolean(removalApprovalToken && approvedRemovalPlan === removalApprovalToken);
+
+  const deleteConfirmedPlugin = async () => {
+    if (!pluginId) return;
+    if (!deletingNpm) {
+      deletePlugin({ path: { pluginId } });
+      return;
+    }
+    try {
+      await removePackageGraph({
+        path: { packageName: deletingPlugin.name },
+        body: { approvedDependants: dependantsToRemove.map(({ name }) => name) },
+      });
+      dismiss();
+      toast.success({
+        title: t('success.delete.title'),
+        description: t('success.delete.description'),
+      });
+      setTimeout(() => window.location.reload(), 5000);
+    } catch (error) {
+      setRemoveFailure(dependencyError(error));
+    }
+  };
+
   return (
     <StandardModal
-      isOpen={pluginToDelete !== null}
-      onOpenChange={(open) => !open && setPluginToDelete(null)}
+      isOpen={pluginId !== null}
+      onOpenChange={(open) => !open && dismiss()}
       data-cy="plugins-list-delete-confirmation-modal"
       size="sm"
     >
@@ -61,7 +115,9 @@ export function RemovePluginModal({
             <ModalHeading>{t('deleteConfirmation.title')}</ModalHeading>
           </ModalHeader>
           <ModalBody>
-            <p>{t('deleteConfirmation.message', { pluginName: deletingPlugin?.name ?? '' })}</p>
+            <p data-cy="plugins-list-delete-confirmation-message">
+              {t(removalMessage, { pluginName: deletingPlugin?.name ?? '' })}
+            </p>
             {deletingNpm && isResolvingRemoval ? <p role="status">{t('dependencies.loading')}</p> : null}
             {dependantsToRemove.length ? (
               <Alert status="warning">
@@ -104,7 +160,7 @@ export function RemovePluginModal({
               onPress={() => void deleteConfirmedPlugin()}
               isPending={isDeleting || isRemovingGraph}
               isDisabled={
-                Boolean(deletingNpm) &&
+                deletingNpm &&
                 (isResolvingRemoval ||
                   !removalPlan ||
                   Boolean(removalPlanError) ||

@@ -32,8 +32,11 @@ type Notice = { title: string; message: string } | null;
  *
  * The recovery key lives only in `reveal` state while the reveal modal is open; it is never put into the status,
  * a cache or storage, and is dropped as soon as the administrator acknowledged it.
+ *
+ * Shown with `matter.devices.read`. Every action, the recovery panel and the downloads need `canManage`
+ * (`matter.devices.manage`) and are hidden without it.
  */
-export function FabricBackupSection() {
+export function FabricBackupSection({ canManage }: Readonly<{ canManage: boolean }>) {
   const { t } = useMatterTranslations();
   const errorText = useErrorText();
   const formatDateTime = useDateTimeFormatter({ showSeconds: true });
@@ -43,7 +46,6 @@ export function FabricBackupSection() {
   const [pending, setPending] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [restoring, setRestoring] = useState(false);
-  const [rotating, setRotating] = useState(false);
 
   const act = async (name: string, title: string, action: () => Promise<void>, keyOf?: ErrorKeyOf) => {
     setPending(name);
@@ -71,12 +73,9 @@ export function FabricBackupSection() {
     });
   const rotate = () =>
     act('rotate', t('fabric.key.rotateError'), async () => {
-      try {
-        showKey(await rotateRecoveryKey());
-      } finally {
-        setRotating(false);
-      }
-      await refresh();
+      showKey(await rotateRecoveryKey());
+      // The confirmation closes as the reveal opens; the status catches up behind it.
+      void refresh();
     });
   const backup = () =>
     act(
@@ -110,10 +109,11 @@ export function FabricBackupSection() {
           status={status}
           busy={busy}
           creating={pending === 'create'}
+          canManage={canManage}
           onCreate={() => void create()}
           onRestore={openRestore}
         />
-        {status.recovery.required && (
+        {canManage && status.recovery.required && (
           <RecoveryPanel
             status={status}
             pending={pending}
@@ -126,8 +126,10 @@ export function FabricBackupSection() {
           status={status}
           busy={busy}
           generating={pending === 'generateKey'}
+          rotating={pending === 'rotate'}
+          canManage={canManage}
           onGenerateKey={() => void generateKey()}
-          onRotate={() => setRotating(true)}
+          onRotate={rotate}
           formatDateTime={formatDateTime}
         />
         <BackupsCard
@@ -136,6 +138,7 @@ export function FabricBackupSection() {
           onBackup={() => void backup()}
           onDownload={(item) => void download(item)}
           onRestore={openRestore}
+          canManage={canManage}
           formatDateTime={formatDateTime}
         />
       </>
@@ -154,7 +157,7 @@ export function FabricBackupSection() {
       {body}
 
       {reveal && <RecoveryKeyModal reveal={reveal} onAcknowledge={acknowledge} onDone={() => setReveal(null)} />}
-      {restoring && status && (
+      {canManage && restoring && status && (
         <RestoreWizard
           stored={status.backups.stored}
           onClose={() => {
@@ -164,21 +167,6 @@ export function FabricBackupSection() {
           onRestored={setStatus}
         />
       )}
-      <StatusDialog
-        isOpen={rotating}
-        status="warning"
-        title={t('fabric.key.rotateTitle')}
-        onClose={() => setRotating(false)}
-        action={{
-          label: t('fabric.key.rotateConfirm'),
-          isPending: pending === 'rotate',
-          onPress: rotate,
-          'data-cy': 'matter-rotate-confirm',
-        }}
-        data-cy="matter-rotate-dialog"
-      >
-        {t('fabric.key.rotateText')}
-      </StatusDialog>
       <StatusDialog
         isOpen={notice !== null}
         status="error"

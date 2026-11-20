@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { MatterPermissions } from './permissions';
 import {
   getSettings,
   getStatus,
@@ -30,8 +31,11 @@ function withTimeout<T>(request: Promise<T>): Promise<T> {
  *
  * A poll tick is skipped while an earlier request is still pending, so a hanging API does not pile up requests, and
  * only the newest status request may update the page, so a late answer never overwrites a newer one.
+ *
+ * Nothing is requested that the API would refuse: the status needs `canRead`, the settings need `canManage`. Until the
+ * host has pushed the auth state (`known`), nothing is requested and the page keeps loading.
  */
-export function useMatterPage() {
+export function useMatterPage({ known, canRead, canManage }: MatterPermissions) {
   const [settings, setSettings] = useState<ConnectionSettings | null>(null);
   const [status, setStatus] = useState<ConnectionStatus | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
@@ -75,16 +79,28 @@ export function useMatterPage() {
 
   useEffect(() => {
     mounted.current = true;
-    void Promise.all([refreshSettings(), refreshStatus()]).finally(() => mounted.current && setLoading(false));
-    const timer = setInterval(() => {
-      if (statusPending.current === 0) void refreshStatus();
-      if (!settingsLoaded.current && !settingsPending.current) void refreshSettings();
-    }, STATUS_POLL_MS);
     return () => {
       mounted.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!known) return;
+    // Per run: when the permissions change, the previous run's late answer must not end the new run's loading.
+    let cancelled = false;
+    setLoading(canRead || canManage);
+    void Promise.all([canManage && refreshSettings(), canRead && refreshStatus()]).finally(
+      () => !cancelled && setLoading(false),
+    );
+    const timer = setInterval(() => {
+      if (canRead && statusPending.current === 0) void refreshStatus();
+      if (canManage && !settingsLoaded.current && !settingsPending.current) void refreshSettings();
+    }, STATUS_POLL_MS);
+    return () => {
+      cancelled = true;
       clearInterval(timer);
     };
-  }, [refreshSettings, refreshStatus]);
+  }, [known, canRead, canManage, refreshSettings, refreshStatus]);
 
   const save = useCallback(
     async (input: SettingsInput) => {

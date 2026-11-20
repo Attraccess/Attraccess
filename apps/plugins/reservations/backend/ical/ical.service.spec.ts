@@ -1,7 +1,6 @@
 import { DualAuthGuard } from '@attraccess/plugins-backend-sdk';
 import { createHash } from 'node:crypto';
-import { IcalFeedEntity } from '../entities/ical-feed.entity';
-import { ReservationEntity } from '../entities/reservation.entity';
+import { ReservationRow } from '../storage/reservation-table';
 import { ReservationError } from '../reservations/errors';
 import { Harness, createHarness, principal } from '../testing/harness.test-utils';
 import {
@@ -39,18 +38,16 @@ describe('IcalService', () => {
     if (source === null) throw new Error('feed not found');
     return validateIcal(source);
   };
-  const insert = (patch: Partial<ReservationEntity>) =>
-    h.dataSource.getRepository(ReservationEntity).save(
-      Object.assign(new ReservationEntity(), {
-        resourceId: 1,
-        userId: 10,
-        bufferBeforeMinutes: 0,
-        bufferAfterMinutes: 0,
-        status: 'confirmed',
-        createdAt: new Date('2026-05-01T00:00:00Z'),
-        ...patch,
-      }),
-    );
+  const insert = (patch: Pick<ReservationRow, 'startTime' | 'endTime'> & Partial<ReservationRow>) =>
+    h.tables.reservations.insert({
+      resourceId: 1,
+      userId: 10,
+      bufferBeforeMinutes: 0,
+      bufferAfterMinutes: 0,
+      status: 'confirmed',
+      createdAt: new Date('2026-05-01T00:00:00Z'),
+      ...patch,
+    });
 
   beforeEach(async () => {
     hidden.clear();
@@ -87,7 +84,7 @@ describe('IcalService', () => {
       expect(created.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
       expect(created.url).toBe(`https://app.test/api/reservations/ical/${created.token}.ics`);
       expect(created.feed).toMatchObject({ name: 'Work', tokenPrefix: created.token.slice(0, 6) });
-      const stored = await h.dataSource.getRepository(IcalFeedEntity).findOneByOrFail({ id: created.feed.id });
+      const stored = await h.tables.icalFeeds.findOne({ where: { id: created.feed.id } });
       expect(stored.tokenHash).toBe(createHash('sha256').update(created.token).digest('hex'));
       expect(JSON.stringify(stored)).not.toContain(created.token);
       const listed = await ical.list(10);
@@ -143,7 +140,7 @@ describe('IcalService', () => {
       expect(await ical.list(10)).toEqual([]);
       expect(h.audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'reservations.feed_revoked' }));
       await expect(ical.regenerate(principal(10), created.feed.id)).rejects.toMatchObject({ status: 404 });
-      const row = await h.dataSource.getRepository(IcalFeedEntity).findOneByOrFail({ id: created.feed.id });
+      const row = await h.tables.icalFeeds.findOne({ where: { id: created.feed.id } });
       expect(row.revokedAt).toBeInstanceOf(Date);
     });
 
@@ -237,9 +234,10 @@ describe('IcalService', () => {
         selection: selection({ resourceIds: [1] }),
       });
       const booking = await p.book(10, 1, '2026-06-02T08:00:00', '2026-06-02T09:00:00');
-      await h.dataSource
-        .getRepository(ReservationEntity)
-        .update({ id: booking.id }, { note: 'Notiz; mit, Komma\nund Zeile 日本語 🙂'.repeat(5) });
+      await h.tables.reservations.update(
+        { id: booking.id },
+        { note: 'Notiz; mit, Komma\nund Zeile 日本語 🙂'.repeat(5) },
+      );
       const calendar = await render(long.token);
       expect(calendar.events[0].description).toContain('Notiz; mit, Komma\nund Zeile 日本語 🙂');
     });
@@ -248,9 +246,9 @@ describe('IcalService', () => {
   describe('visibility and redaction', () => {
     it('names the holder only to the holder and to managers', async () => {
       const mine = await p.book(10, 1, '2026-06-02T08:00:00', '2026-06-02T09:00:00');
-      await h.dataSource.getRepository(ReservationEntity).update({ id: mine.id }, { note: 'my note' });
+      await h.tables.reservations.update({ id: mine.id }, { note: 'my note' });
       const others = await p.book(11, 1, '2026-06-03T08:00:00', '2026-06-03T09:00:00');
-      await h.dataSource.getRepository(ReservationEntity).update({ id: others.id }, { note: 'secret' });
+      await h.tables.reservations.update({ id: others.id }, { note: 'secret' });
       const user = await ical.create(principal(10), { name: 'u', selection: selection({ resourceIds: [1] }) });
       const asUser = await render(user.token);
       expect(asUser.events.map((e) => e.summary)).toEqual(['Resource 1 – user10', 'Resource 1 – Reserved']);
@@ -264,7 +262,7 @@ describe('IcalService', () => {
 
     it("names the holder to viewers who may see the machine's current user, but never shows the note", async () => {
       const others = await p.book(11, 1, '2026-06-03T08:00:00', '2026-06-03T09:00:00');
-      await h.dataSource.getRepository(ReservationEntity).update({ id: others.id }, { note: 'secret' });
+      await h.tables.reservations.update({ id: others.id }, { note: 'secret' });
       h.allowAttribution(10, 1);
       const user = await ical.create(principal(10), { name: 'u', selection: selection({ resourceIds: [1] }) });
       const rendered = await render(user.token);

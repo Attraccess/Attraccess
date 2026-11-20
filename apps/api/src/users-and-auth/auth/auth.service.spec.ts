@@ -1,12 +1,30 @@
 import { registerAuthServiceFixture } from './auth.service.auth-service.test-fixture';
-import { User, AuthenticationDetail, AuthenticationType, SSOProviderType } from '@attraccess/database-entities';
+import { UserEmailInvalidVerificationTokenException } from './auth.service';
+import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
+import { ForbiddenException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { UpdateResult } from 'typeorm';
+import { fakeTransactionScope } from '../../database/fake-transaction-scope.test-fixture';
 
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),
   hash: jest.fn().mockResolvedValue('hashed-password'),
 }));
+
+const accountOf = (overrides: Record<string, unknown> = {}) =>
+  ({
+    id: 1,
+    username: 'testuser',
+    email: 'test@example.com',
+    isEmailVerified: true,
+    emailVerificationToken: null,
+    emailVerificationTokenExpiresAt: null,
+    passwordResetToken: null,
+    passwordResetTokenExpiresAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  }) as never;
+
 describe('AuthService', () => {
   const fixture = registerAuthServiceFixture();
 
@@ -15,31 +33,40 @@ describe('AuthService', () => {
       type: AuthenticationType.LOCAL_PASSWORD,
       details: { password: 'secret' },
     });
-    expect(local).toMatchObject({ userId: 7, password: 'hashed-password', type: AuthenticationType.LOCAL_PASSWORD });
+    expect(local).toEqual({ id: 1, userId: 7, type: AuthenticationType.LOCAL_PASSWORD });
     expect(bcrypt.hash).toHaveBeenCalledWith('secret', expect.any(Number));
-    const manager = { save: jest.fn(async (value) => value) };
+    expect(fixture.credentials.add).toHaveBeenLastCalledWith(
+      7,
+      { type: AuthenticationType.LOCAL_PASSWORD, passwordHash: 'hashed-password' },
+      undefined,
+    );
+    const transaction = fakeTransactionScope();
     const sso = await fixture.authService.addAuthenticationDetails(
       7,
       {
         type: AuthenticationType.SSO,
         details: { providerType: SSOProviderType.SAML, providerId: 3, subject: 'external-subject' },
       },
-      manager as never,
+      transaction,
     );
-    expect(sso).toMatchObject({
-      userId: 7,
-      providerId: 3,
-      providerType: SSOProviderType.SAML,
-      ssoSubject: 'external-subject',
-    });
+    expect(sso).toEqual({ id: 1, userId: 7, type: AuthenticationType.SSO });
+    expect(fixture.credentials.add).toHaveBeenLastCalledWith(
+      7,
+      { type: AuthenticationType.SSO, providerType: SSOProviderType.SAML, providerId: 3, subject: 'external-subject' },
+      transaction,
+    );
     (bcrypt.hash as jest.Mock).mockClear();
-    const prehashed = await fixture.authService.addAuthenticationDetails(
+    await fixture.authService.addAuthenticationDetails(
       7,
       { type: AuthenticationType.LOCAL_PASSWORD, details: { password: 'unused' } },
-      manager as never,
+      transaction,
       'prepared-hash',
     );
-    expect(prehashed.password).toBe('prepared-hash');
+    expect(fixture.credentials.add).toHaveBeenLastCalledWith(
+      7,
+      { type: AuthenticationType.LOCAL_PASSWORD, passwordHash: 'prepared-hash' },
+      transaction,
+    );
     expect(bcrypt.hash).not.toHaveBeenCalled();
   });
 
@@ -50,15 +77,23 @@ describe('AuthService', () => {
         id: 7,
         emailVerificationToken: stored,
         emailVerificationTokenExpiresAt: new Date(Date.now() + 60000),
-      } as User);
+      } as never);
       await fixture.authService.verifyEmail('user@example.com', 'token');
-      expect(fixture.usersService.updateOne).toHaveBeenCalledWith(7, {
-        isEmailVerified: true,
-        emailVerificationToken: null,
-        emailVerificationTokenExpiresAt: null,
-      });
+      expect(fixture.usersService.consumeEmailVerificationToken).toHaveBeenCalledWith(7, stored);
     },
   );
+
+  it('rejects a verification token that a concurrent request consumed first', async () => {
+    jest.spyOn(fixture.usersService, 'findOne').mockResolvedValue({
+      id: 7,
+      emailVerificationToken: 'hashed:token',
+      emailVerificationTokenExpiresAt: new Date(Date.now() + 60000),
+    } as never);
+    jest.spyOn(fixture.usersService, 'consumeEmailVerificationToken').mockResolvedValue(false);
+    await expect(fixture.authService.verifyEmail('user@example.com', 'token')).rejects.toBeInstanceOf(
+      UserEmailInvalidVerificationTokenException,
+    );
+  });
 
   it('rejects missing users, invalid tokens and expired verification links without modifying the account', async () => {
     jest.spyOn(fixture.usersService, 'findOne').mockResolvedValue(null);
@@ -67,15 +102,15 @@ describe('AuthService', () => {
       id: 7,
       emailVerificationToken: 'other',
       emailVerificationTokenExpiresAt: new Date(Date.now() + 60000),
-    } as User);
+    } as never);
     await expect(fixture.authService.verifyEmail('user@example.com', 'token')).rejects.toThrow();
     jest.spyOn(fixture.usersService, 'findOne').mockResolvedValue({
       id: 7,
       emailVerificationToken: 'hashed:token',
       emailVerificationTokenExpiresAt: new Date(0),
-    } as User);
+    } as never);
     await expect(fixture.authService.verifyEmail('user@example.com', 'token')).rejects.toThrow();
-    expect(fixture.usersService.updateOne).not.toHaveBeenCalled();
+    expect(fixture.usersService.consumeEmailVerificationToken).not.toHaveBeenCalled();
   });
 
   it('should be defined', () => {
@@ -83,32 +118,9 @@ describe('AuthService', () => {
   });
 
   it('should authenticate user with correct credentials', async () => {
-    const user = {
-      id: 1,
-      username: 'testuser',
-      email: 'test@example.com',
-      isEmailVerified: true,
-      emailVerificationToken: null,
-      emailVerificationTokenExpiresAt: null,
-      passwordResetToken: null,
-      passwordResetTokenExpiresAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      resourceIntroductions: [],
-      resourceUsages: [],
-      authenticationDetails: [],
-      resourceIntroducerPermissions: [],
-    } as User;
+    const user = accountOf();
     jest.spyOn(fixture.usersService, 'findByLoginIdentifier').mockResolvedValue(user);
-
-    const authenticationDetail: Partial<AuthenticationDetail> = {
-      userId: 1,
-      type: AuthenticationType.LOCAL_PASSWORD,
-      password: 'hashed-password',
-    };
-    jest
-      .spyOn(fixture.authenticationDetailRepository, 'findOne')
-      .mockResolvedValue(authenticationDetail as AuthenticationDetail);
+    fixture.credentials.findLocalPasswordHash.mockResolvedValue('hashed-password');
 
     // Mock bcrypt.compare to return true for correct password
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
@@ -120,33 +132,12 @@ describe('AuthService', () => {
 
     expect(isAuthenticated).toBe(user);
     expect(bcrypt.compare).toHaveBeenCalledWith('correct-password', 'hashed-password');
+    expect(fixture.credentials.findLocalPasswordHash).toHaveBeenCalledWith(1);
   });
 
   it('should not authenticate user with incorrect credentials', async () => {
-    const user = {
-      id: 1,
-      username: 'testuser',
-      email: 'test@example.com',
-      isEmailVerified: true,
-      emailVerificationToken: null,
-      emailVerificationTokenExpiresAt: null,
-      passwordResetToken: null,
-      passwordResetTokenExpiresAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      resourceIntroductions: [],
-      resourceUsages: [],
-      authenticationDetails: [],
-      resourceIntroducerPermissions: [],
-    } as User;
-    jest.spyOn(fixture.usersService, 'findByLoginIdentifier').mockResolvedValue(user);
-
-    jest.spyOn(fixture.authenticationDetailRepository, 'findOne').mockResolvedValue({
-      id: 1,
-      userId: user.id,
-      type: AuthenticationType.LOCAL_PASSWORD,
-      password: 'hashed-password',
-    } as AuthenticationDetail);
+    jest.spyOn(fixture.usersService, 'findByLoginIdentifier').mockResolvedValue(accountOf());
+    fixture.credentials.findLocalPasswordHash.mockResolvedValue('hashed-password');
 
     // Mock bcrypt.compare to return false for incorrect password
     (bcrypt.compare as jest.Mock).mockResolvedValue(false);
@@ -158,6 +149,33 @@ describe('AuthService', () => {
 
     expect(isAuthenticated).toBeNull();
     expect(bcrypt.compare).toHaveBeenCalledWith('wrong-password', 'hashed-password');
+    expect(fixture.mockMetricsService.authLoginTotal.inc).toHaveBeenCalledWith({ method: 'local', status: 'fail' });
+  });
+
+  it('should not authenticate a user without a local password', async () => {
+    jest.spyOn(fixture.usersService, 'findByLoginIdentifier').mockResolvedValue(accountOf());
+    fixture.credentials.findLocalPasswordHash.mockResolvedValue(null);
+
+    await expect(
+      fixture.authService.getUserByLoginIdentifierAndAuthenticationDetails('testuser', {
+        type: AuthenticationType.LOCAL_PASSWORD,
+        details: { password: 'anything' },
+      }),
+    ).resolves.toBeNull();
+    expect(bcrypt.compare).not.toHaveBeenCalled();
+  });
+
+  it('refuses a local password login for a user that signs in with SSO', async () => {
+    fixture.credentials.findLocalPasswordHash.mockResolvedValue('hashed-password');
+    jest.spyOn(fixture.usersService, 'isSSOUser').mockResolvedValue(true);
+
+    await expect(
+      fixture.authService.validateAuthenticationDetails(1, {
+        type: AuthenticationType.LOCAL_PASSWORD,
+        details: { password: 'x' },
+      }),
+    ).rejects.toThrow('LOCAL_LOGIN_FOR_SSO_FORBIDDEN');
+    expect(bcrypt.compare).not.toHaveBeenCalled();
   });
 
   it('should not authenticate a non-existent user', async () => {
@@ -180,10 +198,8 @@ describe('AuthService', () => {
   it.each([true, false])('checks the password before rejecting unverified email (valid=%s)', async (valid) => {
     jest
       .spyOn(fixture.usersService, 'findByLoginIdentifier')
-      .mockResolvedValue({ id: 1, isEmailVerified: false } as User);
-    jest
-      .spyOn(fixture.authenticationDetailRepository, 'findOne')
-      .mockResolvedValue({ password: 'hash' } as AuthenticationDetail);
+      .mockResolvedValue({ id: 1, isEmailVerified: false } as never);
+    fixture.credentials.findLocalPasswordHash.mockResolvedValue('hash');
     (bcrypt.compare as jest.Mock).mockResolvedValue(valid);
     const result = fixture.authService.getUserByLoginIdentifierAndAuthenticationDetails('user@example.com', {
       type: AuthenticationType.LOCAL_PASSWORD,
@@ -195,6 +211,37 @@ describe('AuthService', () => {
     expect(fixture.usersService.findByLoginIdentifier).toHaveBeenCalledWith('user@example.com');
   });
 
+  describe('SSO credentials', () => {
+    it('matches the provider, the provider id and the subject', async () => {
+      fixture.credentials.findSso.mockResolvedValue({
+        id: 5,
+        userId: 1,
+        type: AuthenticationType.SSO,
+        providerType: SSOProviderType.OIDC,
+        providerId: 10,
+        ssoSubject: 'sub-abc',
+      });
+      const options = (subject: string, providerId = 10) => ({
+        type: AuthenticationType.SSO as const,
+        details: { providerType: SSOProviderType.OIDC, providerId, subject },
+      });
+
+      await expect(fixture.authService.validateAuthenticationDetails(1, options('sub-abc'))).resolves.toBe(true);
+      await expect(fixture.authService.validateAuthenticationDetails(1, options('other'))).resolves.toBe(false);
+      await expect(fixture.authService.validateAuthenticationDetails(1, options('sub-abc', 11))).resolves.toBe(false);
+    });
+
+    it('does not validate a user without an SSO credential', async () => {
+      fixture.credentials.findSso.mockResolvedValue(null);
+      await expect(
+        fixture.authService.validateAuthenticationDetails(1, {
+          type: AuthenticationType.SSO,
+          details: { providerType: SSOProviderType.OIDC, providerId: 10, subject: 's' },
+        }),
+      ).resolves.toBe(false);
+    });
+  });
+
   describe('findSSOAuthenticationDetail', () => {
     it('returns the SSO detail when one exists for the user', async () => {
       const ssoDetail = {
@@ -204,20 +251,18 @@ describe('AuthService', () => {
         providerType: SSOProviderType.OIDC,
         providerId: 10,
         ssoSubject: 'sub-abc',
-      } as AuthenticationDetail;
+      };
 
-      jest.spyOn(fixture.authenticationDetailRepository, 'findOne').mockResolvedValue(ssoDetail);
+      fixture.credentials.findSso.mockResolvedValue(ssoDetail);
 
       const result = await fixture.authService.findSSOAuthenticationDetail(1);
 
       expect(result).toEqual(ssoDetail);
-      expect(fixture.authenticationDetailRepository.findOne).toHaveBeenCalledWith({
-        where: { userId: 1, type: AuthenticationType.SSO },
-      });
+      expect(fixture.credentials.findSso).toHaveBeenCalledWith(1);
     });
 
     it('returns null when no SSO detail exists for the user', async () => {
-      jest.spyOn(fixture.authenticationDetailRepository, 'findOne').mockResolvedValue(null);
+      fixture.credentials.findSso.mockResolvedValue(null);
 
       const result = await fixture.authService.findSSOAuthenticationDetail(99);
 
@@ -227,29 +272,64 @@ describe('AuthService', () => {
 
   describe('updateSSOSubject', () => {
     it('updates the ssoSubject on the given detail row', async () => {
-      jest.spyOn(fixture.authenticationDetailRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
-
       await fixture.authService.updateSSOSubject(5, 'new-sub-xyz');
 
-      expect(fixture.authenticationDetailRepository.update).toHaveBeenCalledWith(5, { ssoSubject: 'new-sub-xyz' });
+      expect(fixture.credentials.updateSsoSubject).toHaveBeenCalledWith(5, 'new-sub-xyz');
     });
   });
 
   describe('userHasSSOAuthentication', () => {
     it('returns true when user has an SSO authentication detail', async () => {
-      (fixture.authenticationDetailRepository.count as jest.Mock).mockResolvedValue(1);
+      fixture.credentials.findSso.mockResolvedValue({ id: 1, userId: 1, type: AuthenticationType.SSO });
 
-      const result = await fixture.authService.userHasSSOAuthentication(1);
-
-      expect(result).toBe(true);
+      expect(await fixture.authService.userHasSSOAuthentication(1)).toBe(true);
     });
 
     it('returns false when user has no SSO authentication detail', async () => {
-      (fixture.authenticationDetailRepository.count as jest.Mock).mockResolvedValue(0);
+      fixture.credentials.findSso.mockResolvedValue(null);
 
-      const result = await fixture.authService.userHasSSOAuthentication(1);
+      expect(await fixture.authService.userHasSSOAuthentication(1)).toBe(false);
+    });
+  });
 
-      expect(result).toBe(false);
+  describe('changePassword', () => {
+    const recipient = { id: 7, username: 'user', email: 'user@example.com', locale: 'en' };
+
+    it('replaces the password and archives the old one in a single store call, then notifies the user', async () => {
+      fixture.passwordPolicy.getPolicy.mockResolvedValue({ historySize: 5 });
+
+      await fixture.authService.changePassword(recipient, 'new-secret');
+
+      expect(fixture.credentials.replaceLocalPassword).toHaveBeenCalledTimes(1);
+      expect(fixture.credentials.replaceLocalPassword).toHaveBeenCalledWith(7, 'hashed-password', {
+        rememberPrevious: 5,
+      });
+      expect(fixture.emailService.sendPasswordChangedEmail).toHaveBeenCalledWith(recipient);
+    });
+
+    it('sends no notification and changes nothing when the store fails', async () => {
+      fixture.credentials.replaceLocalPassword.mockRejectedValue(new Error('database failure'));
+
+      await expect(fixture.authService.changePassword(recipient, 'new-secret')).rejects.toThrow('database failure');
+      expect(fixture.emailService.sendPasswordChangedEmail).not.toHaveBeenCalled();
+    });
+
+    it('refuses the password change of an SSO user', async () => {
+      jest.spyOn(fixture.usersService, 'isSSOUser').mockResolvedValue(true);
+
+      await expect(fixture.authService.changePassword(recipient, 'new-secret')).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(fixture.credentials.replaceLocalPassword).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('removal', () => {
+    it('removes the local password or a credential by id', async () => {
+      await fixture.authService.removeLocalPasswordAuthentication(4);
+      await fixture.authService.removeAuthenticationDetails(8);
+      expect(fixture.credentials.removeLocalPassword).toHaveBeenCalledWith(4);
+      expect(fixture.credentials.remove).toHaveBeenCalledWith(8);
     });
   });
 });

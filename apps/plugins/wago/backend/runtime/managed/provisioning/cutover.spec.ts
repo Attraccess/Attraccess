@@ -1,19 +1,17 @@
 import { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { createHash } from 'node:crypto';
-import { DataSource } from 'typeorm';
 import { BuildRuntimeArtifact } from '../../artifacts/build';
 import { WagoCommissioningReadiness } from '../../../commissioning/readiness/readiness';
-import { WagoCommissioningSession } from '../../../commissioning/sessions/session.entity';
+import type { WagoCommissioningSessionRow } from '../../../storage';
+import type { WagoTestStorage } from '../../../storage/testing';
 import { commissioningVerification } from '../../../commissioning/sessions/verification';
-import { WagoController } from '../../../controllers/entity';
 import { initializeCutover } from '../../../wago-cutover.setup.test-fixture';
-import { WagoManagedAccess } from '../access.entity';
 import { managedHostHelper } from './helper';
 import { MANAGED_HELPER_PROTOCOL, signInstaller } from './installer';
 import { WagoManagedRuntimeService } from '../service';
-import { resetTestFixture } from '../setup.test-fixture';
+import { required, resetTestFixture, seedClaimedController, storedEnvelope } from '../setup.test-fixture';
 import { managedSsh } from '../transport/ssh';
-import { WagoRuntimeArtifactsService } from '../../artifacts/catalog';
+import { WagoRuntimeArtifactsService } from '../../artifacts/service';
 import { RuntimeUpdateError } from '../../update/coordinator';
 import { WagoService } from '../../../controllers/service';
 
@@ -40,11 +38,9 @@ const artifact: BuildRuntimeArtifact = {
 
 const principal = { userId: 7, authenticationMethod: 'session' as const };
 
-jest.mock('@attraccess/plugins-backend-sdk', () => jest.requireActual('typeorm'));
-
 jest.mock('../../../controllers/service', () => ({ WagoService: class {} }));
 
-jest.mock('../../artifacts/catalog', () => ({ WagoRuntimeArtifactsService: class {} }));
+jest.mock('../../artifacts/service', () => ({ WagoRuntimeArtifactsService: class {} }));
 
 jest.mock('../../../commissioning/readiness/readiness', () => ({ WagoCommissioningReadiness: class {} }));
 
@@ -53,7 +49,7 @@ jest.mock('../transport/ssh', () => ({ ...jest.requireActual('../transport/ssh')
 jest.mock('../../../commissioning/sessions/verification', () => ({ commissioningVerification: jest.fn() }));
 
 describe('managed cutover and reboot evidence', () => {
-  let db: DataSource;
+  let store: WagoTestStorage;
 
   let service: WagoManagedRuntimeService;
 
@@ -68,12 +64,12 @@ describe('managed cutover and reboot evidence', () => {
   let context: PluginContext;
 
   const session = (id = 1) =>
-    Object.assign(new WagoCommissioningSession(), {
+    ({
       id,
       targetHost: '10.77.0.7',
       hostKeyFingerprint: `SHA256:${'a'.repeat(43)}`,
       hardwareId: `cc100-${id}`,
-    });
+    }) as WagoCommissioningSessionRow;
 
   beforeEach(async () => {
     await resetTestFixture(scope);
@@ -82,7 +78,6 @@ describe('managed cutover and reboot evidence', () => {
   afterEach(async () => {
     await service.onModuleDestroy();
     await new Promise(setImmediate);
-    await db.destroy();
     jest.clearAllMocks();
   });
 
@@ -102,11 +97,11 @@ describe('managed cutover and reboot evidence', () => {
     get artifact() {
       return artifact;
     },
-    get db() {
-      return db;
+    get store() {
+      return store;
     },
-    set db(value: typeof db) {
-      db = value;
+    set store(value: typeof store) {
+      store = value;
     },
     get decrypt() {
       return decrypt;
@@ -187,7 +182,7 @@ describe('managed cutover and reboot evidence', () => {
         const operations = service['operations'];
         const acquire = operations.acquire.bind(operations);
         jest.spyOn(operations, 'acquire').mockImplementation(async (...args) => {
-          await db.getRepository(WagoManagedAccess).update(1, { state: 'retiring' });
+          await store.tables.managedAccess.update({ sessionId: 1 }, { state: 'retiring' });
           return acquire(...args);
         });
         jest.mocked(managedSsh).mockClear();
@@ -298,7 +293,7 @@ describe('managed cutover and reboot evidence', () => {
           management: 'recovery_required',
           managementFailure: expect.stringContaining('Automatic SSH setup failed (rollback).'),
         });
-        expect((await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: 1 })).failureReason).toContain(
+        expect(required(await store.tables.commissioningSessions.get(1)).failureReason).toContain(
           'lock option unsupported',
         );
         expect(jest.mocked(managedSsh).mock.calls.some((call) => call[2].startsWith('access-commit '))).toBe(false);
@@ -306,7 +301,7 @@ describe('managed cutover and reboot evidence', () => {
       }
       if (remoteStatus === 'acceptance-failed') {
         expect(await service['completeEnrolment'](current)).toBe(false);
-        const failure = (await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: 1 })).failureReason;
+        const failure = required(await store.tables.commissioningSessions.get(1)).failureReason;
         expect(failure).toContain('Automatic SSH setup failed (acceptance).');
         expect(failure).toContain('retained transaction records');
         expect(failure).not.toContain('secret');
@@ -319,12 +314,10 @@ describe('managed cutover and reboot evidence', () => {
         // the useful failure from the last audited setup attempt.
         jest.mocked(managedSsh).mockRejectedValue(new RuntimeUpdateError('offline'));
         expect(await service['completeEnrolment'](current)).toBe(false);
-        expect((await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: 1 })).failureReason).toBe(
-          failure,
-        );
+        expect(required(await store.tables.commissioningSessions.get(1)).failureReason).toBe(failure);
         jest.mocked(managedSsh).mockRejectedValue(new RuntimeUpdateError('host_identity'));
         expect(await service['completeEnrolment'](current)).toBe(false);
-        expect((await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: 1 })).failureReason).toContain(
+        expect(required(await store.tables.commissioningSessions.get(1)).failureReason).toContain(
           'SSH host key differs',
         );
         return;
@@ -381,10 +374,10 @@ describe('managed cutover and reboot evidence', () => {
         );
       }
       expect(await service.status(1)).not.toHaveProperty('managementSetup');
-      expect(await db.getRepository(WagoManagedAccess).findOneByOrFail({ sessionId: 1 })).toMatchObject({
+      expect(required(await store.tables.managedAccess.get(1))).toMatchObject({
         state: 'managed',
       });
-      expect(await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: 1 })).toMatchObject({
+      expect(required(await store.tables.commissioningSessions.get(1))).toMatchObject({
         state: 'completed',
         deliveryToken: null,
       });
@@ -417,41 +410,25 @@ describe('managed cutover and reboot evidence', () => {
     async (priorHeartbeat) => {
       await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
       const now = new Date().toISOString();
-      const current = await db.getRepository(WagoController).save(
-        Object.assign(new WagoController(), {
-          id: 1,
-          hardwareId: 'cc100-1',
-          trustState: 'claimed',
-          mqttServerId: 7,
-          pairingCodeHash: 'fixture',
-          protocolVersion: '1',
-          runtimeVersion: '1',
-          capabilities: '[]',
-          lastSeenAt: now,
-          createdAt: now,
-          updatedAt: now,
-        }),
-      );
+      const current = await seedClaimedController(store);
       for (const [id, state] of [
         [1, 'completed'],
         [2, 'awaiting_confirmation'],
       ] as const)
-        await db.getRepository(WagoCommissioningSession).save(
-          Object.assign(session(id), {
-            hardwareId: current.hardwareId,
-            mqttServerId: 7,
-            firmwareBaseline: '31',
-            state,
-            initiatingPrincipal: JSON.stringify(principal),
-            auditLog: '[]',
-            createdAt: now,
-            updatedAt: now,
-          }),
-        );
-      await db.getRepository(WagoManagedAccess).update(1, { controllerId: 1, state: 'managed' });
-      const envelope = (
-        await db.query('SELECT encrypted_credentials FROM plugin_wago_managed_access WHERE session_id = 1')
-      )[0].encrypted_credentials;
+        await store.tables.commissioningSessions.insert({
+          ...session(id),
+          hardwareId: current.hardwareId,
+          mqttServerId: 7,
+          firmwareBaseline: '31',
+          // 'awaiting_confirmation' is deliberately outside the session vocabulary.
+          state: state as never,
+          initiatingPrincipal: JSON.stringify(principal),
+          auditLog: '[]',
+          createdAt: now,
+          updatedAt: now,
+        });
+      await store.tables.managedAccess.update({ sessionId: 1 }, { controllerId: 1, state: 'managed' });
+      const envelope = await storedEnvelope(store);
       const credentials = JSON.parse(decrypt(envelope));
       await service.onModuleDestroy();
       let heartbeat: Parameters<WagoService['registerRuntimeStatusHandler']>[0] = () => undefined;
@@ -552,10 +529,7 @@ describe('managed cutover and reboot evidence', () => {
         expect(jest.mocked(managedSsh).mock.calls.map((call) => call[2].split(' ')[0])).toEqual(
           expect.arrayContaining(['installer-publish', 'stage', 'activate', 'accept', 'acknowledge']),
         );
-        expect(
-          (await db.query('SELECT encrypted_credentials FROM plugin_wago_managed_access WHERE session_id = 1'))[0]
-            .encrypted_credentials,
-        ).toBe(envelope);
+        expect(await storedEnvelope(store)).toBe(envelope);
       } finally {
         await restarted.onModuleDestroy();
         await new Promise(setImmediate);
@@ -575,23 +549,8 @@ describe('managed cutover and reboot evidence', () => {
     'wrong activation target',
   ])('rejects %s as replacement readiness without relying on a live old runtime', async (invalidProof) => {
     await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
-    const timestamp = new Date().toISOString();
-    await db.getRepository(WagoController).save(
-      Object.assign(new WagoController(), {
-        id: 1,
-        hardwareId: 'cc100-1',
-        trustState: 'claimed',
-        mqttServerId: 7,
-        pairingCodeHash: 'fixture',
-        protocolVersion: '1.0.0',
-        runtimeVersion: '0.2.0',
-        capabilities: '[]',
-        lastSeenAt: timestamp,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      }),
-    );
-    await db.getRepository(WagoManagedAccess).update(1, { controllerId: 1, state: 'managed' });
+    await seedClaimedController(store, { protocolVersion: '1.0.0', runtimeVersion: '0.2.0' });
+    await store.tables.managedAccess.update({ sessionId: 1 }, { controllerId: 1, state: 'managed' });
     const oldBoot = '00000000-0000-4000-8000-000000000001';
     const newBoot = '00000000-0000-4000-8000-000000000002';
     if (invalidProof === 'previous boot') {

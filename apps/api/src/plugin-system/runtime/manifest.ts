@@ -1,5 +1,6 @@
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { ApiProperty } from '@nestjs/swagger';
+import { PluginLicenseDeclaration } from '../license/plugin-license';
 import { PluginDependency } from './dependencies';
 
 export class PluginMainFrontend {
@@ -22,6 +23,22 @@ export class PluginMainFrontend {
     required: false,
   })
   styles?: string;
+  @ApiProperty({
+    description:
+      'Sidebar route paths of the plugin that users may pin to their dashboard. Each must also be a path returned by getSidebarItems() and getRoutes().',
+    example: ['/hello-world'],
+    required: false,
+    type: [String],
+  })
+  dashboardPaths?: string[];
+  @ApiProperty({
+    description:
+      'Ids of the dashboard widgets the plugin contributes through getDashboardWidgets(). Lowercase kebab-case; a built-in widget id always wins over a clashing plugin id.',
+    example: ['hello-world'],
+    required: false,
+    type: [String],
+  })
+  dashboardWidgets?: string[];
 }
 
 export class PluginMainBackend {
@@ -110,6 +127,25 @@ export class PluginDependencyInfo {
   required: boolean;
 }
 
+export class PluginManifestLicense implements PluginLicenseDeclaration {
+  @ApiProperty({
+    description:
+      'The plugin needs a valid Attraccess license (the non-profit key counts), but no specific module. Implied by a non-empty modules list.',
+    required: false,
+    example: true,
+  })
+  required?: boolean;
+
+  @ApiProperty({
+    description:
+      'License modules without which the plugin does not load at all. Plugin modules are never granted by the non-profit key.',
+    type: [String],
+    required: false,
+    example: ['wago'],
+  })
+  modules?: string[];
+}
+
 export class PluginManifest {
   @ApiProperty({ type: [PluginDependencyInfo], required: false })
   dependencies?: PluginDependency[];
@@ -143,6 +179,13 @@ export class PluginManifest {
     example: [PluginPermission.EMIT_EVENTS, PluginPermission.READ_SETTINGS],
   })
   permissions: PluginPermission[];
+
+  @ApiProperty({
+    description: 'License requirements the host enforces before it loads the plugin.',
+    type: PluginManifestLicense,
+    required: false,
+  })
+  license?: PluginManifestLicense;
 }
 
 // inheritance: data shape; a loaded manifest is the declared manifest plus runtime fields.
@@ -161,17 +204,36 @@ export class LoadedPluginManifest extends PluginManifest {
 
   @ApiProperty({
     description:
-      'Backend load status: "loaded" if the plugin backend was imported successfully, "error" if it failed to load, "unknown" if it has no backend or plugins are disabled.',
-    enum: ['loaded', 'error', 'unknown'],
+      'Backend load status: "loaded" if the plugin backend was imported successfully, "error" if it failed to load, "license_missing" if the license does not satisfy the plugin\'s license requirements (not an error: the plugin is simply not loaded), "unknown" if it has no backend or plugins are disabled.',
+    enum: ['loaded', 'error', 'license_missing', 'unknown'],
     example: 'loaded',
   })
-  status: 'loaded' | 'error' | 'unknown';
+  status: 'loaded' | 'error' | 'license_missing' | 'unknown';
 
   @ApiProperty({
-    description: 'The error message if the plugin backend failed to load, otherwise null.',
+    description:
+      'The error message if the plugin backend failed to load, or what the license is missing for status "license_missing"; otherwise null.',
     nullable: true,
     type: String,
     example: "Cannot find module '@nestjs/common'",
   })
   error: string | null;
+
+  @ApiProperty({
+    description:
+      'True when the host refused the plugin at discovery (SDK 1.x, a removed database contract, a database import in ' +
+      'the bundle, invalid permissions or license block). A refused plugin has status "error", never loads and cannot ' +
+      'be retried: install a compatible build or delete it. Deleting it keeps its tables.',
+    example: false,
+  })
+  refused: boolean;
+
+  @ApiProperty({
+    description:
+      'For status "license_missing": the declared license modules the license does not grant. Empty when the plugin only needs a valid license.',
+    type: [String],
+    required: false,
+    example: ['wago'],
+  })
+  missingLicenseModules?: string[];
 }

@@ -21,12 +21,12 @@ The starting data depends on the trigger. For object payloads, Attraccess adds `
 | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Button**, **No Activity**            | Resource context only; no user or message data                                                                                                                                         |
 | **Usage Started / Stopped**            | Usage fields at the root: `id`, `startTime`, `endTime`, `startNotes`, `endNotes`, `user.id`, `user.username`, `formSubmissions`, `activeSessions`                                      |
-| **Usage Takeover**                     | Outgoing usage fields, plus `newUser`, `oldUser`, `takeOverTime` and `activeSessions`                                                                                                  |
+| **Usage Takeover**                     | Outgoing usage fields (`id` is the outgoing session), plus `newUser`, `oldUser`, `takeOverTime` and `activeSessions`                                                                   |
 | **Door Unlocked / Locked / Unlatched** | `event.timestamp`, `usage.start`, `usage.end`, `user.id`, `user.username`, `user.externalIdentifier`                                                                                   |
 | **MQTT Message Received**              | `serverId`, `topic`, `payload`                                                                                                                                                         |
 | **Variable Changed**                   | `change.scope`, `change.key`, `change.previousValue`, `change.newValue`, `change.changedAt`, `change.sourceResourceId`; watched values under `variables.resource` / `variables.global` |
 | **Companion events**                   | Event fields at the root, such as `idleSeconds`, `appName` or `vendorId`; see the [node reference](flows/node-types.md)                                                                |
-| **Metering Start / Collection**        | `metering.sessionId`, `metering.operationId`, `metering.resourceId`, `metering.usageId`, `metering.kind`, `metering.requestedAt`                                                       |
+| **Metering Start / Collection**        | `metering.sessionId`, `metering.operationId`, `metering.resourceId`, `metering.usageId`, `metering.userId`, `metering.kind`, `metering.requestedAt`                                    |
 
 Usage form answers are addressed by form ID and field ID, for example `formSubmissions.12.answers.34.value`. Only submitted forms are present. Notes, end times and optional user fields may be empty or absent. Usage and door triggers have different shapes; inspect the actual run before choosing paths.
 

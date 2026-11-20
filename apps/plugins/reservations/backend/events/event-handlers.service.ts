@@ -6,11 +6,13 @@ import {
 } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK } from '../constants';
-import type { ReservationEntity } from '../entities/reservation.entity';
+import type { ReservationRow } from '../storage/reservation-table';
 import { PendingDecisionStore } from '../hooks/pending-decisions';
 import { HostInfoService } from '../notifications/host-info.service';
 import { ReservationNotifications } from '../notifications/notifier.service';
 import { AccessService } from '../reservations/access.service';
+import { heldBookings } from '../reservations/capacity';
+import { DirectoryService } from '../reservations/directory.service';
 import { ReservationService } from '../reservations/reservation.service';
 import { ReservationStore } from '../reservations/reservation.store';
 import { ResourceSettingsService } from '../settings/resource-settings.service';
@@ -40,6 +42,7 @@ export class ReservationEventHandlers implements OnModuleInit, OnModuleDestroy {
     @Inject(HostInfoService) private readonly hostInfo: HostInfoService,
     @Inject(PendingDecisionStore) private readonly decisions: PendingDecisionStore,
     @Inject(RESERVATION_CLOCK) private readonly clock: Clock,
+    @Inject(DirectoryService) private readonly directory: DirectoryService,
   ) {}
 
   onModuleInit(): void {
@@ -67,6 +70,7 @@ export class ReservationEventHandlers implements OnModuleInit, OnModuleDestroy {
       on(SystemEvent.RESOURCE_USAGE_SESSION_ENDED, (p) => this.onSessionEnded(p)),
       on(SystemEvent.MAINTENANCE_CHANGED, (p) => this.onMaintenance(p)),
       on(SystemEvent.RESOURCE_HEALTH_CHANGED, (p) => this.onHealth(p)),
+      on(SystemEvent.RESOURCE_SESSION_LIMIT_CHANGED, (p) => this.onSessionLimitChanged(p)),
     ];
   }
 
@@ -95,7 +99,7 @@ export class ReservationEventHandlers implements OnModuleInit, OnModuleDestroy {
     );
     if (candidate) await this.reservations.markCheckedIn(candidate.id, usageId, startTime);
 
-    const active = (await this.store.findActiveForResource(resourceId, startTime)).find((r) => r.userId !== userId);
+    const active = await this.overriddenBooking(resourceId, userId, startTime);
     if (!active) return;
     // Only a manager can start during someone else's booking (via the override confirmation).
     if (!(await this.access.isManager(userId, resourceId))) return;
@@ -107,6 +111,30 @@ export class ReservationEventHandlers implements OnModuleInit, OnModuleDestroy {
       { resourceId, holderUserId: active.userId, byManager: true },
     );
     await this.notifications.notifyOverrideStart(active, userId);
+  }
+
+  /**
+   * The booking a start of `userId` overrode, if any. On a single-slot machine every running booking of someone else.
+   * On a shared machine anyone may start while a slot is free, so only a start that took a held slot overrode one:
+   * the other sessions plus the slots held at the start fill the machine. It names the first held booking, the one the
+   * gate's override question asks about first.
+   */
+  private async overriddenBooking(
+    resourceId: number,
+    userId: number,
+    startTime: Date,
+  ): Promise<ReservationRow | undefined> {
+    const running = await this.store.findActiveForResource(resourceId, startTime);
+    const active = running.find((r) => r.userId !== userId);
+    if (!active) return undefined;
+    const limit = await this.directory.getSessionLimit(resourceId);
+    if (limit <= 1) return active;
+    // The starter's own running booking is their slot (the gate never asks for an override then).
+    if (running.some((r) => r.userId === userId)) return undefined;
+    const sessions = (await this.directory.getActiveSessions(resourceId)).filter((s) => s.userId !== userId);
+    const inSession = new Set(sessions.map((session) => session.userId));
+    const held = heldBookings({ confirmed: running, starterId: userId, inSession, at: startTime });
+    return sessions.length + held.length >= limit ? held[0] : undefined;
   }
 
   /**
@@ -133,6 +161,17 @@ export class ReservationEventHandlers implements OnModuleInit, OnModuleDestroy {
     if (own) this.decisions.record(event.userId, event.resourceId, own.id, now.getTime());
   }
 
+  // ------------------------------------------------------------ session limit
+
+  /**
+   * The machine lost slots: cancel the newest not-yet-started bookings that no longer fit (see
+   * `ReservationService.cancelExcessBookings`). A higher limit cancels nothing.
+   */
+  async onSessionLimitChanged(event: SystemEventPayload[SystemEvent.RESOURCE_SESSION_LIMIT_CHANGED]): Promise<void> {
+    if (event.newLimit >= event.previousLimit) return;
+    await this.reservations.cancelExcessBookings(event.resourceId, event.actorUserId);
+  }
+
   // ------------------------------------------------------------- maintenance
 
   /**
@@ -149,7 +188,7 @@ export class ReservationEventHandlers implements OnModuleInit, OnModuleDestroy {
       'maintenance',
     );
     const told = new Set(notices.filter((notice) => notice.refKey === refKey).map((notice) => notice.reservationId));
-    const byHolder = new Map<number, ReservationEntity[]>();
+    const byHolder = new Map<number, ReservationRow[]>();
     for (const reservation of overlapping) {
       if (told.has(reservation.id)) continue;
       if (!(await this.store.claimNotice(reservation.id, 'maintenance', refKey, this.clock()))) continue;
@@ -201,7 +240,7 @@ export class ReservationEventHandlers implements OnModuleInit, OnModuleDestroy {
 
   /** Claims the notice and, only for the call that inserted it, sends. */
   private async once(
-    reservation: ReservationEntity,
+    reservation: ReservationRow,
     kind: string,
     refKey: string,
     send: () => Promise<boolean>,

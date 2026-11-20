@@ -1,4 +1,4 @@
-import { EmailTemplateType } from '@attraccess/database-entities';
+import { EmailTemplateType } from '@attraccess/application-models';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { accessChangeTranslations } from './defaults/accounts-translations';
@@ -100,6 +100,19 @@ export const emailResourceDefaults = {
       'items[].durationMs',
       'items[].hasDuration',
       'items[].durationSeconds',
+      'items[].isSharePending',
+      'items[].isShared',
+      'items[].isSharedMeter',
+      'items[].isSharedOperatingTime',
+      'items[].shareQuantity',
+      'items[].totalQuantity',
+      'items[].segments[].startedAt',
+      'items[].segments[].endedAt',
+      'items[].segments[].participants',
+      'items[].segments[].totalQuantity',
+      'items[].segments[].totalCredits',
+      'items[].segments[].shareQuantity',
+      'items[].segments[].shareCredits',
       'totalCredits',
       'newBalance',
     ],

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ProjectDetailsPage } from './index';
@@ -26,21 +26,21 @@ const state = vi.hoisted(() => ({
   callbacks: {} as Record<string, { onSuccess: () => void; onError: (error: Error) => void }>,
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useProjectsServiceFindOneProject: (...args: unknown[]) => {
+  useFindOneProject: (...args: unknown[]) => {
     state.query(...args);
     return { data: state.project };
   },
-  useProjectsServiceFindManyProjectsKey: 'projects',
-  useProjectsServiceFindOneProjectKey: 'project',
-  useProjectsServiceDeleteOneProject: (options: (typeof state.callbacks)[string]) => {
+  useFindManyProjectsKey: 'projects',
+  useFindOneProjectKey: 'project',
+  useDeleteOneProject: (_mutationKey: unknown, options: (typeof state.callbacks)[string]) => {
     state.callbacks.remove = options;
-    return { mutate: state.remove, isPending: false };
+    return { mutateAsync: state.remove, isPending: false };
   },
-  useProjectsServiceArchiveProject: (options: (typeof state.callbacks)[string]) => {
+  useArchiveProject: (_mutationKey: unknown, options: (typeof state.callbacks)[string]) => {
     state.callbacks.archive = options;
     return { mutate: state.archive, isPending: false };
   },
-  useProjectsServiceUnarchiveProject: (options: (typeof state.callbacks)[string]) => {
+  useUnarchiveProject: (_mutationKey: unknown, options: (typeof state.callbacks)[string]) => {
     state.callbacks.unarchive = options;
     return { mutate: state.unarchive, isPending: false };
   },
@@ -117,13 +117,13 @@ async function action(name: string) {
 }
 it('scopes summary content and allows owners to edit and archive a project', async () => {
   mount();
-  expect(state.query).toHaveBeenCalledWith({ id: 7 }, undefined, { enabled: true });
+  expect(state.query).toHaveBeenCalledWith({ path: { id: 7 } }, undefined, { enabled: true });
   expect(screen.getByAltText('Workshop')).toHaveAttribute('src', expect.stringContaining('logo.png'));
   expect(screen.getByText('Summary 7')).toBeTruthy();
   await action('Update Project');
   expect(state.openEditor).toHaveBeenCalledOnce();
   await action('Archive Project');
-  expect(state.archive).toHaveBeenCalledWith({ id: 7 });
+  expect(state.archive).toHaveBeenCalledWith({ path: { id: 7 } });
   act(() => state.callbacks.archive.onSuccess());
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['projects'] });
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['project'] });
@@ -134,7 +134,7 @@ it('unarchives archived projects and confirms deletion before navigating away', 
   mount();
   expect(screen.getByText('Archived')).toBeTruthy();
   await action('Unarchive Project');
-  expect(state.unarchive).toHaveBeenCalledWith({ id: 7 });
+  expect(state.unarchive).toHaveBeenCalledWith({ path: { id: 7 } });
   act(() => state.callbacks.unarchive.onSuccess());
   expect(state.success).toHaveBeenCalledWith(expect.objectContaining({ title: 'Project unarchived' }));
   await action('Delete Project');
@@ -142,8 +142,8 @@ it('unarchives archived projects and confirms deletion before navigating away', 
   fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
   await action('Delete Project');
-  fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
-  expect(state.remove).toHaveBeenCalledWith({ id: 7 });
+  fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete Project' }));
+  expect(state.remove).toHaveBeenCalledWith({ path: { id: 7 } });
   act(() => state.callbacks.remove.onSuccess());
   expect(screen.getByText('Project list')).toBeTruthy();
   expect(state.success).toHaveBeenCalledWith(expect.objectContaining({ title: 'Project successfully deleted' }));
@@ -170,7 +170,7 @@ it('hides owner actions for members and forwards read-only team state', () => {
 it('disables invalid-id queries, shows loading placeholders and reports all mutation errors', () => {
   state.project = undefined;
   const view = mount('/projects/invalid');
-  expect(state.query).toHaveBeenCalledWith({ id: NaN }, undefined, { enabled: false });
+  expect(state.query).toHaveBeenCalledWith({ path: { id: NaN } }, undefined, { enabled: false });
   expect(screen.queryByText(/Summary/)).toBeNull();
   expect(view.container.querySelector('.skeleton')).toBeTruthy();
   const error = new Error('Forbidden');

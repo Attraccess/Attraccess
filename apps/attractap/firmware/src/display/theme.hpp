@@ -11,7 +11,7 @@ namespace DisplayTheme
     inline lv_color_t text() { return lv_color_hex(0xF4F8F8); }
     inline lv_color_t muted() { return lv_color_hex(0xAFC0C3); }
     inline lv_color_t border() { return lv_color_hex(0x42575C); }
-    inline lv_color_t fieldBorder() { return lv_color_hex(0x64787C); }
+    inline lv_color_t fieldBorder() { return lv_color_hex(0x7F9599); }
     inline lv_color_t primary() { return lv_color_hex(0x82C4CE); }
     inline lv_color_t primaryPressed() { return lv_color_hex(0xA1D5DC); }
     inline lv_color_t onPrimary() { return lv_color_hex(0x142E34); }

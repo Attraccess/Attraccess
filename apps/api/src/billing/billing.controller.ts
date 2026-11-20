@@ -1,11 +1,6 @@
 import { AllowCrossSiteWrite } from '../common/security/cross-site-write.guard';
-import {
-  Auth,
-  AuthenticatedRequest,
-  BillingTransaction,
-  ResourceBillingConfiguration,
-  ResourceFlowNodeType,
-} from '@attraccess/plugins-backend-sdk';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 import {
   Body,
@@ -27,7 +22,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { Observable } from 'rxjs';
 
-import { finalize } from 'rxjs/operators';
+import { finalize, map } from 'rxjs/operators';
 
 import { LicenseModuleType } from '../license/license.service';
 
@@ -43,7 +38,16 @@ import { BalanceDto } from './dto/balance.dto';
 
 import { BillingConfigurationDto } from './dto/configuration.dto';
 
-import { ResourceBillingConfigurationDto } from './dto/resource-billing-configuration.dto';
+import {
+  ResourceBillingConfigurationDto,
+  ResourceBillingConfigurationValuesDto,
+} from './dto/resource-billing-configuration.dto';
+import { BillingTransactionDto } from './dto/billing-transaction.dto';
+import {
+  toBillingTransactionDto,
+  toResourceBillingConfigurationValuesDto,
+  toTransactionsDto,
+} from './dto/billing-dto.mapper';
 
 import { SetBillingConfigurationDto } from './dto/set-configuration.dto';
 
@@ -126,7 +130,7 @@ export class BillingController {
     );
 
     return {
-      configuration: config,
+      configuration: toResourceBillingConfigurationValuesDto(config),
       additionalItems: additionalItemsFlowNodes.map((node) => ({
         name: (node.data.name ?? '') as string,
         unitPrice: (node.data.unitPrice ?? 0) as number,
@@ -145,13 +149,15 @@ export class BillingController {
   @ApiResponse({
     status: 200,
     description: 'The billing configuration for the resource has been updated.',
-    type: ResourceBillingConfiguration,
+    type: ResourceBillingConfigurationValuesDto,
   })
   async updateResourceBillingConfiguration(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Body() body: UpdateResourceBillingConfigurationDto,
-  ): Promise<ResourceBillingConfiguration> {
-    return await this.billingService.updateResourceBillingConfiguration(resourceId, body);
+  ): Promise<ResourceBillingConfigurationValuesDto> {
+    return toResourceBillingConfigurationValuesDto(
+      await this.billingService.updateResourceBillingConfiguration(resourceId, body),
+    );
   }
 
   @Post('/billing/configuration')
@@ -178,14 +184,17 @@ export class BillingController {
 
   @Sse('/billing/transactions/live')
   @Auth()
-  async streamEvents(@Request() request: AuthenticatedRequest): Promise<Observable<{ data: BillingTransaction }>> {
+  async streamEvents(@Request() request: AuthenticatedRequest): Promise<Observable<{ data: BillingTransactionDto }>> {
     this.logger.log(`Client connected to SSE for user ${request.user.id}`);
 
     const { id: userId } = request.user;
     const subject = this.liveNotificationsService.getTransactionSubject(userId);
     return this.sse.wrap(
       'billing',
-      subject.asObservable().pipe(finalize(() => this.liveNotificationsService.deleteSubjectIfUnobserved(userId))),
+      subject.asObservable().pipe(
+        map(({ data }) => ({ data: toBillingTransactionDto(data) })),
+        finalize(() => this.liveNotificationsService.deleteSubjectIfUnobserved(userId)),
+      ),
     );
   }
 
@@ -206,7 +215,7 @@ export class BillingController {
       throw new ForbiddenException('You are not allowed to get the billing transactions for this user.');
     }
 
-    return await this.billingService.getHistory(userId, query);
+    return toTransactionsDto(await this.billingService.getHistory(userId, query));
   }
 
   @Get('/billing/transactions/for-usage/:usageId')
@@ -230,12 +239,13 @@ export class BillingController {
   @Get('/users/:userId/billing/transactions/:transactionId')
   @Auth()
   @ApiOperation({ summary: 'Get a billing transaction for a user', operationId: 'getBillingTransaction' })
-  @ApiResponse({ status: 200, description: 'The billing transaction for the user.', type: BillingTransaction })
+  @ApiResponse({ status: 200, description: 'The billing transaction for the user.', type: BillingTransactionDto })
   async getBillingTransaction(
     @Param('transactionId', ParseIntPipe) transactionId: number,
     @Req() request: AuthenticatedRequest,
-  ): Promise<BillingTransaction> {
-    return await this.billingService.getTransaction(transactionId, request.user.id);
+  ): Promise<BillingTransactionDto> {
+    const transaction = await this.billingService.getTransaction(transactionId, request.user.id);
+    return transaction ? toBillingTransactionDto(transaction) : (transaction as null);
   }
 
   @Post('/users/:userId/billing/transactions')
@@ -246,8 +256,10 @@ export class BillingController {
     @Param('userId', ParseIntPipe) userId: number,
     @Req() request: AuthenticatedRequest,
     @Body() body: ModifyBalanceDto,
-  ): Promise<BillingTransaction> {
-    return await this.billingService.createManualTransaction(userId, request.user.id, body.amount);
+  ): Promise<BillingTransactionDto> {
+    return toBillingTransactionDto(
+      await this.billingService.createManualTransaction(userId, request.user.id, body.amount),
+    );
   }
 
   @Post('/billing/transactions/:transactionId/refund')
@@ -256,13 +268,14 @@ export class BillingController {
     summary: 'Refund a billing transaction',
     operationId: 'refundTransaction',
   })
-  @ApiResponse({ status: 200, description: 'The billing transaction has been refunded.', type: BillingTransaction })
+  @ApiResponse({ status: 200, description: 'The billing transaction has been refunded.', type: BillingTransactionDto })
   async refundTransaction(
     @Request() request: AuthenticatedRequest,
     @Param('transactionId', ParseIntPipe) transactionId: number,
     @Body() data: RefundTransactionDto,
-  ) {
-    return await this.billingService.refundTransaction(request.user.id, transactionId, data);
+  ): Promise<BillingTransactionDto> {
+    const refund = await this.billingService.refundTransaction(request.user.id, transactionId, data);
+    return refund ? toBillingTransactionDto(refund) : (refund as null);
   }
 
   @Post('/billing/sumup/configuration/api-key')
@@ -329,13 +342,15 @@ export class BillingController {
   @ApiResponse({
     status: 200,
     description: 'The billing transaction for the user has been topped up.',
-    type: BillingTransaction,
+    type: BillingTransactionDto,
   })
   async topUpWithSumUpReader(
     @Body() body: SumupTopUpDto,
     @Req() request: AuthenticatedRequest,
-  ): Promise<BillingTransaction> {
-    return await this.sumUpService.topUpWithReader(request.user.id, body.readerId, body.amount);
+  ): Promise<BillingTransactionDto> {
+    return toBillingTransactionDto(
+      await this.sumUpService.topUpWithReader(request.user.id, body.readerId, body.amount),
+    );
   }
 
   @AllowCrossSiteWrite()

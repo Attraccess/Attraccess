@@ -9,8 +9,7 @@
       "platform": "Platform",
       "lastSeen": "Last Seen",
       "status": "Status",
-      "version": "Version",
-      "actions": "Actions"
+      "version": "Version"
     },
     "status": {
       "online": "Online",

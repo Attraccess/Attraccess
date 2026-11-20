@@ -7,15 +7,15 @@ import { SessionNotesModal, SessionModalMode } from '../SessionNotesModal/index'
 import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  useResourcesServiceResourceUsageGetActiveSession,
-  useResourcesServiceResourceUsageCanControl,
-  useResourcesServiceGetOneResourceById,
-  useAccessControlServiceResourceIntroducersIsIntroducer,
-  useResourcesServiceResourceUsageEndSession,
-  useMessagingServiceMessagingContactResourceHolder,
+  useResourceUsageGetActiveSession,
+  useResourceUsageCanControl,
+  useGetOneResourceById,
+  useResourceIntroducersIsIntroducer,
+  useResourceUsageEndSession,
+  useMessagingContactResourceHolder,
   FormSubmissionRequestDto,
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
-  UseResourcesServiceResourceUsageGetHistoryKeyFn,
+  UseResourceUsageGetActiveSessionKeyFn,
+  UseResourceUsageGetHistoryKeyFn,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
 import { useToastMessage } from '../../../../../components/toastProvider';
@@ -31,12 +31,12 @@ export function useInvalidateSessionHistory(resourceId: number) {
   return () => {
     // Invalidate the active session query to refetch data
     queryClient.invalidateQueries({
-      queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId }),
+      queryKey: UseResourceUsageGetActiveSessionKeyFn({ path: { resourceId } }),
     });
     // Invalidate all history queries for this resource (regardless of pagination/user filters)
     queryClient.invalidateQueries({
       predicate: (query) => {
-        const baseHistoryKey = UseResourcesServiceResourceUsageGetHistoryKeyFn({ resourceId });
+        const baseHistoryKey = UseResourceUsageGetHistoryKeyFn({ path: { resourceId } });
         return (
           query.queryKey[0] === baseHistoryKey[0] &&
           query.queryKey.length > 1 &&
@@ -47,7 +47,11 @@ export function useInvalidateSessionHistory(resourceId: number) {
   };
 }
 
-export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSessionDisplayProps) {
+export interface OtherUserSessionDisplayProps {
+  resourceId: number;
+}
+
+export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayProps) {
   const { t } = useTranslations({ en, de });
   const { hasPermission, user } = useAuth();
   const { success, error: showError } = useToastMessage();
@@ -57,20 +61,20 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
   const [isStopOtherUserSessionNotesModalOpen, setIsStopOtherUserSessionNotesModalOpen] = useState(false);
   const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(resourceId);
 
-  const { data: activeSessionResponse } = useResourcesServiceResourceUsageGetActiveSession({ resourceId });
+  const { data: activeSessionResponse } = useResourceUsageGetActiveSession({ path: { resourceId } });
   const activeSession = useMemo(() => activeSessionResponse?.usage, [activeSessionResponse]);
 
-  const { data: access } = useResourcesServiceResourceUsageCanControl({ resourceId });
+  const { data: access } = useResourceUsageCanControl({ path: { resourceId } });
 
-  const { data: permissions } = useAccessControlServiceResourceIntroducersIsIntroducer(
-    { resourceId, userId: user?.id as number, includeGroups: true },
+  const { data: permissions } = useResourceIntroducersIsIntroducer(
+    { path: { resourceId, userId: user?.id as number }, query: { includeGroups: true } },
     undefined,
     {
       enabled: !!user?.id,
     },
   );
 
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  const { data: resource } = useGetOneResourceById({ path: { id: resourceId } });
   const { canEndSession } = useCanEndOtherSessions(resourceId);
 
   const canUpdateResources = hasPermission('resources.update');
@@ -103,7 +107,7 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
 
   const { start: startTakeover } = startSession;
 
-  const stopSession = useResourcesServiceResourceUsageEndSession({
+  const stopSession = useResourceUsageEndSession(undefined, {
     onSuccess: () => {
       clearFormsDraft();
       setIsTakeoverNotesModalOpen(false);
@@ -117,7 +121,7 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
     },
   });
 
-  const contactHolder = useMessagingServiceMessagingContactResourceHolder({
+  const contactHolder = useMessagingContactResourceHolder(undefined, {
     onSuccess: ({ conversationId }) => {
       navigate(`/messages?conversation=${conversationId}&resourceRef=${resourceId}`);
     },
@@ -128,12 +132,12 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
 
   const handleContactHolder = useCallback(() => {
     // Name the shown holder, so the message never goes to someone who started after the shown session ended.
-    contactHolder.mutate({ resourceId, userId: activeSession?.userId });
+    contactHolder.mutate({ path: { resourceId }, query: { userId: activeSession?.userId } });
   }, [activeSession?.userId, contactHolder, resourceId]);
 
   const runTakeover = useCallback(
     async (body: { notes?: string }) => {
-      let formSubmissions: FormSubmissionRequestDto[] = [];
+      let formSubmissions: FormSubmissionRequestDto[];
       try {
         formSubmissions = await requestForms('takeover');
       } catch (error) {
@@ -154,7 +158,7 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
       // started next.
       const usageId = activeSession?.id;
       if (usageId === undefined) return;
-      let formSubmissions: FormSubmissionRequestDto[] = [];
+      let formSubmissions: FormSubmissionRequestDto[];
       try {
         formSubmissions = await requestForms('end');
       } catch (error) {
@@ -164,10 +168,7 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
         throw error;
       }
 
-      stopSession.mutate({
-        resourceId,
-        requestBody: { ...body, usageId, formSubmissions },
-      });
+      stopSession.mutate({ path: { resourceId }, body: { ...body, usageId, formSubmissions } });
     },
     [activeSession?.id, requestForms, resourceId, stopSession],
   );
@@ -195,57 +196,6 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
   const handleImmediateStopOtherUserSession = useCallback(() => {
     void runStopOtherSession({});
   }, [runStopOtherSession]);
-  return {
-    t,
-    user,
-    isTakeoverNotesModalOpen,
-    setIsTakeoverNotesModalOpen,
-    isStopOtherUserSessionNotesModalOpen,
-    setIsStopOtherUserSessionNotesModalOpen,
-    formsModal,
-    activeSession,
-    canTakeover,
-    canStopOtherUserSession,
-    startSession,
-    stopSession,
-    contactHolder,
-    handleContactHolder,
-    handleStopOtherUserSessionWithNotes,
-    handleTakeoverWithNotes,
-    handleImmediateTakeover,
-    handleOpenTakeoverModal,
-    handleOpenStopOtherUserSessionModal,
-    handleImmediateStopOtherUserSession,
-  } as const;
-}
-
-export interface OtherUserSessionDisplayProps {
-  resourceId: number;
-}
-
-export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayProps) {
-  const {
-    t,
-    user,
-    isTakeoverNotesModalOpen,
-    setIsTakeoverNotesModalOpen,
-    isStopOtherUserSessionNotesModalOpen,
-    setIsStopOtherUserSessionNotesModalOpen,
-    formsModal,
-    activeSession,
-    canTakeover,
-    canStopOtherUserSession,
-    startSession,
-    stopSession,
-    contactHolder,
-    handleContactHolder,
-    handleStopOtherUserSessionWithNotes,
-    handleTakeoverWithNotes,
-    handleImmediateTakeover,
-    handleOpenTakeoverModal,
-    handleOpenStopOtherUserSessionModal,
-    handleImmediateStopOtherUserSession,
-  } = useOtherUserSessionDisplayState({ resourceId });
 
   // Early return if no active session or it belongs to current user
   if (!activeSession || activeSession.userId === user?.id) {

@@ -21,8 +21,9 @@ import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../../shared/clock';
 import { type WagoConfigurationSnapshot } from '../configuration/model';
 
 import { WagoConfigurationRevision } from '../configuration/revision.entity';
+import { loadLatestAppliedRevisions } from '../configuration/latest-applied';
 
-import { WagoController } from '../controllers/entity';
+import { type WagoControllerRow } from '../storage';
 
 import { type WagoOperationalMessage, parseOperationalMessage } from '../protocol/index';
 
@@ -183,24 +184,7 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
   }
 
   protected async loadLatestAppliedRevisions(controllerIds: number[]): Promise<WagoConfigurationRevision[]> {
-    if (!controllerIds.length) return [];
-    return this.revisions
-      .createQueryBuilder('revision')
-      .innerJoin(
-        (query) =>
-          query
-            .subQuery()
-            .select('latest.controllerId', 'controllerId')
-            .addSelect('MAX(latest.revision)', 'revision')
-            .from(WagoConfigurationRevision, 'latest')
-            .where('latest.controllerId IN (:...controllerIds)', { controllerIds })
-            .andWhere('latest.state = :state', { state: 'applied' })
-            .groupBy('latest.controllerId'),
-        'latest',
-        'latest.controllerId = revision.controllerId AND latest.revision = revision.revision',
-      )
-      .where('revision.state = :state', { state: 'applied' })
-      .getMany();
+    return loadLatestAppliedRevisions(this.revisions, controllerIds);
   }
 
   protected async channels(controllerId: number): Promise<WagoConfigurationSnapshot['logicalChannels']> {
@@ -208,8 +192,8 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
     if (cached) return cached;
     const [revision] = await this.revisions.find({
       where: { controllerId, state: 'applied' },
-      order: { revision: 'DESC' },
-      take: 1,
+      orderBy: [{ field: 'revision', direction: 'desc' }],
+      limit: 1,
     });
     if (!revision) {
       this.channelCache.set(controllerId, []);
@@ -219,7 +203,12 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
     return this.cacheChannels(revision);
   }
 
-  protected store(controller: WagoController, channelId: string, event: WagoOperationalMessage, value: unknown): void {
+  protected store(
+    controller: WagoControllerRow,
+    channelId: string,
+    event: WagoOperationalMessage,
+    value: unknown,
+  ): void {
     const state: CachedState = {
       controllerId: controller.id,
       hardwareId: controller.hardwareId,
@@ -255,7 +244,7 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
   }
 
   protected applyState(
-    controller: WagoController,
+    controller: WagoControllerRow,
     event: Extract<WagoOperationalMessage, { category: 'state' }>,
     eventTime: number,
     stream: OperationalStream,
@@ -299,7 +288,7 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
   }
 
   protected admitEvent(
-    controller: WagoController,
+    controller: WagoControllerRow,
     event: WagoOperationalMessage,
     eventTime: number,
   ): OperationalStream | undefined {

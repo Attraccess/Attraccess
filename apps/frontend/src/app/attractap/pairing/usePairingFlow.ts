@@ -1,34 +1,34 @@
 import {
   Attractap,
   PairingDto,
-  useAttractapServiceApprovePairing,
-  useAttractapServiceCancelPairing,
-  useAttractapServiceGetPairing,
-  useAttractapServiceGetPairings,
-  useAttractapServiceGetPairingsKey,
-  useAttractapServiceGetReaderByIdKey,
-  useAttractapServiceGetReaderCredentialHistoryKey,
-  useAttractapServiceGetReaders,
-  useAttractapServiceGetReadersToPair,
-  useAttractapServiceGetReadersToPairKey,
-  useAttractapServiceGetReadersKey,
-  useAttractapServiceResolvePairing,
+  useApprovePairing,
+  useCancelPairing,
+  useGetPairing,
+  useGetPairings,
+  useGetPairingsKey,
+  useGetReaderByIdKey,
+  useGetReaderCredentialHistoryKey,
+  useGetReaders,
+  useGetReadersToPair,
+  useGetReadersToPairKey,
+  useGetReadersKey,
+  useResolvePairing,
 } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { normalizeEnrollmentCode } from './enrollmentCode';
+import { useRetryCountdown } from './useRetryCountdown';
 import { classifyPairingError, isPairingRunning, PairingError, TERMINAL_PAIRING_STATES } from './pairingUtils';
 import de from './de.json';
 import en from './en.json';
 
 export type Choice = 'new' | 'takeover';
-type Mode = 'new' | 'pair' | 'takeover';
+type Mode = 'new' | 'takeover';
 
 export interface PairingFlowProps {
   pairingId?: string;
-  waitForReaderId?: number;
   presetCode?: string;
   via?: 'flasher';
   presetTargetReaderId?: number;
@@ -37,8 +37,6 @@ export interface PairingFlowProps {
 }
 
 const POLL_INTERVAL_MS = 1000;
-const NO_RESPONSE_TIMEOUT_MS = 30_000;
-const COUNTDOWN_TICK_MS = 250;
 // After these the request moved on or ended: read it again so the dialog shows what the reader shows.
 const REREAD_ERRORS: ReadonlySet<string> = new Set(['stale', 'notWaiting', 'failed', 'readerGone']);
 // The request is over; once the dialog shows how it ended, the error would only repeat it.
@@ -48,18 +46,17 @@ export const isFinished = (pairing: PairingDto | null) =>
   pairing !== null && TERMINAL_PAIRING_STATES.includes(pairing.state);
 
 /**
- * Paired and not paired records in one list. A reader that was just paired can briefly be in both
- * lists; it is listed once, as the paired entry.
+ * Paired records and records whose pairing was removed in one list. A reader that was just paired can briefly be
+ * in both lists; it is listed once, as the paired entry.
  */
-export function mergeReaderLists(paired?: Attractap[], unpaired?: Attractap[]): Attractap[] | undefined {
-  if (!paired && !unpaired) return undefined;
+export function mergeReaderLists(paired?: Attractap[], removed?: Attractap[]): Attractap[] | undefined {
+  if (!paired && !removed) return undefined;
   const pairedIds = new Set((paired ?? []).map((reader) => reader.id));
-  return [...(paired ?? []), ...(unpaired ?? []).filter((reader) => !pairedIds.has(reader.id))];
+  return [...(paired ?? []), ...(removed ?? []).filter((reader) => !pairedIds.has(reader.id))];
 }
 
-/** What the reader is: its own record (token), a takeover of a chosen record, or a new record. */
-export function modeOf(bound: boolean, hasPresetTarget: boolean, choice: Choice): Mode {
-  if (bound) return 'pair';
+/** What the reader becomes: a takeover of a chosen record, or a new record. */
+export function modeOf(hasPresetTarget: boolean, choice: Choice): Mode {
   return hasPresetTarget || choice === 'takeover' ? 'takeover' : 'new';
 }
 
@@ -81,42 +78,13 @@ export function approvalBase({ mode, targetReaderId, name, via }: BodyInput) {
   };
 }
 
-/**
- * The request a token reader sends after it was asked to pair. Once seen it is kept, so the dialog can
- * show how it ended (the list of pairings only holds running ones).
- */
-function useArrivedPairing(props: PairingFlowProps, running: PairingDto[]) {
-  const { waitForReaderId, pairingId } = props;
-  const arrived = running.find((p) => waitForReaderId !== undefined && p.boundReaderId === waitForReaderId)?.id;
-  const [seenId, setSeenId] = useState<string | null>(null);
-  const [noResponse, setNoResponse] = useState(false);
-
-  useEffect(() => {
-    if (!arrived) return;
-    setSeenId(arrived);
-    // A reader that answers late can still be approved.
-    setNoResponse(false);
-  }, [arrived]);
-
-  // A reader that was asked to pair but never connects is off or runs software that cannot pair yet.
-  const waiting = waitForReaderId !== undefined && !pairingId && !arrived && !seenId;
-  useEffect(() => {
-    if (!waiting) return;
-    const timer = setTimeout(() => setNoResponse(true), NO_RESPONSE_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [waiting]);
-
-  return { arrivedId: arrived ?? seenId, noResponse };
-}
-
-/** Finds the request the dialog works on: given, announced by a token reader, picked, or found by code. */
+/** Finds the request the dialog works on: given, picked, or found by code. */
 function useActivePairing(props: PairingFlowProps, resolved: PairingDto | null, pickedId: string | null) {
-  const { data: allPairings } = useAttractapServiceGetPairings(undefined, { refetchInterval: POLL_INTERVAL_MS });
+  const { data: allPairings } = useGetPairings({}, undefined, { refetchInterval: POLL_INTERVAL_MS });
   const running = useMemo(() => (allPairings ?? []).filter((p) => isPairingRunning(p.state)), [allPairings]);
-  const { arrivedId, noResponse } = useArrivedPairing(props, running);
 
-  const activeId = props.pairingId ?? arrivedId ?? pickedId ?? resolved?.id ?? null;
-  const query = useAttractapServiceGetPairing({ pairingId: activeId ?? '' }, undefined, {
+  const activeId = props.pairingId ?? pickedId ?? resolved?.id ?? null;
+  const query = useGetPairing({ path: { pairingId: activeId ?? '' } }, undefined, {
     enabled: activeId !== null,
     // Nothing changes any more once the pairing ended.
     refetchInterval: (q) => (isFinished(q.state.data ?? null) ? false : POLL_INTERVAL_MS),
@@ -128,7 +96,6 @@ function useActivePairing(props: PairingFlowProps, resolved: PairingDto | null, 
     activeId,
     current,
     resolvedByCode,
-    noResponse,
     pollingFailed: query.isError,
     refetch: query.refetch,
   };
@@ -165,31 +132,6 @@ function useCodeInput(presetCode: string | undefined) {
   };
 }
 
-/** Counts down the wait the server asked for after too many attempts. */
-export function useRetryCountdown() {
-  const [deadline, setDeadline] = useState<number | null>(null);
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (deadline === null) return;
-    const timer = setInterval(() => {
-      const time = Date.now();
-      setNow(time);
-      if (time >= deadline) setDeadline(null);
-    }, COUNTDOWN_TICK_MS);
-    return () => clearInterval(timer);
-  }, [deadline]);
-
-  return {
-    secondsLeft: deadline === null ? 0 : Math.max(0, Math.ceil((deadline - now) / 1000)),
-    start: (seconds: number) => {
-      const time = Date.now();
-      setNow(time);
-      setDeadline(time + seconds * 1000);
-    },
-  };
-}
-
 /** The error to show: a rate limit counts down live and disappears when it is over; an ended request explains itself. */
 function visibleError(error: PairingError | null, secondsLeft: number, finished: boolean): PairingError | null {
   if (!error) return null;
@@ -209,14 +151,58 @@ function useCancelAndClose(
   onClose: () => void,
   refresh: () => unknown,
 ) {
-  const cancelPairing = useAttractapServiceCancelPairing({ onSettled: () => void refresh() });
+  const cancelPairing = useCancelPairing(undefined, { onSettled: () => void refresh() });
   return () => {
-    if (current && isPairingRunning(current.state) && !approving()) cancelPairing.mutate({ pairingId: current.id });
+    if (current && isPairingRunning(current.state) && !approving())
+      cancelPairing.mutate({ path: { pairingId: current.id } });
     onClose();
   };
 }
 
-export function usePairingFlow(props: PairingFlowProps) {
+/** Everything the pairing dialog and its steps read from, and call on, the pairing flow. */
+export interface PairingFlow {
+  running: PairingDto[];
+  activeId: string | null;
+  current: PairingDto | null;
+  resolvedByCode: boolean;
+  pollingFailed: boolean;
+  readers: Attractap[] | undefined;
+  codeInput: string;
+  codeRejected: boolean;
+  setCodeInput: (value: string) => void;
+  setCodeFromScan: (value: string) => void;
+  setPickedId: (id: string | null) => void;
+  /** Back to the list of waiting Lite readers after one was picked. */
+  pickedFromList: boolean;
+  backToList: () => void;
+  choice: Choice;
+  setChoice: (choice: Choice) => void;
+  pickedTarget: number | undefined;
+  setPickedTarget: (readerId: number | undefined) => void;
+  name: string;
+  setName: (name: string) => void;
+  error: PairingError | null;
+  notice: string | null;
+  idle: boolean;
+  normalizedCode: string | null;
+  byPattern: boolean;
+  finished: boolean;
+  canFind: boolean;
+  canApprove: boolean;
+  submit: () => Promise<void>;
+  findByCode: () => void;
+  /** Enter in the dialog: look the reader up while it is not known, otherwise approve. */
+  submitForm: () => void;
+  /** The dialog's Cancel button: ends the waiting request on the server, then closes. */
+  cancel: () => void;
+  resolvePending: boolean;
+  approvePending: boolean;
+  needsCodeToFind: boolean;
+  needsChoice: boolean;
+}
+
+/** Shared by PairingDialog and its step components: the pairing request, the admin's inputs and the approval. */
+export function usePairingFlow(props: PairingFlowProps): PairingFlow {
   const { onClose } = props;
   const { t } = useTranslations({ de, en });
   const toast = useToastMessage();
@@ -240,19 +226,19 @@ export function usePairingFlow(props: PairingFlowProps) {
 
   const active = useActivePairing(props, resolved, pickedId);
   const { current, resolvedByCode, refetch } = active;
-  // The pairing session sees every reader record: paired ones and the ones that are not paired yet.
-  const { data: pairedReaders } = useAttractapServiceGetReaders();
-  const { data: unpairedReaders } = useAttractapServiceGetReadersToPair();
-  const readers = useMemo(() => mergeReaderLists(pairedReaders, unpairedReaders), [pairedReaders, unpairedReaders]);
+  // The pairing session sees every reader record: paired ones and the ones whose pairing was removed.
+  const { data: pairedReaders } = useGetReaders();
+  const { data: removedReaders } = useGetReadersToPair();
+  const readers = useMemo(() => mergeReaderLists(pairedReaders, removedReaders), [pairedReaders, removedReaders]);
 
   const refreshLists = () =>
     Promise.all(
       [
-        useAttractapServiceGetReadersKey,
-        useAttractapServiceGetReadersToPairKey,
-        useAttractapServiceGetReaderByIdKey,
-        useAttractapServiceGetReaderCredentialHistoryKey,
-        useAttractapServiceGetPairingsKey,
+        useGetReadersKey,
+        useGetReadersToPairKey,
+        useGetReaderByIdKey,
+        useGetReaderCredentialHistoryKey,
+        useGetPairingsKey,
       ].map((key) => queryClient.invalidateQueries({ queryKey: [key] })),
     );
 
@@ -266,7 +252,7 @@ export function usePairingFlow(props: PairingFlowProps) {
   // on mount, and StrictMode's simulated unmount detaches the mutation observer, which then reports
   // "pending" forever and kept Approve disabled. The mutation's own callbacks always run.
   const [resolving, setResolving] = useState(false);
-  const resolve = useAttractapServiceResolvePairing({
+  const resolve = useResolvePairing(undefined, {
     onMutate: () => setResolving(true),
     onSettled: () => setResolving(false),
     onSuccess: (found) => {
@@ -277,14 +263,14 @@ export function usePairingFlow(props: PairingFlowProps) {
     onError: (failure) => failed(classifyPairingError(failure, true)),
   });
 
-  const approve = useAttractapServiceApprovePairing({
+  const approve = useApprovePairing(undefined, {
     onSuccess: async (done) => {
       await refreshLists();
       submitting.current = false;
       // A preset target means the record was paired before: it is paired again.
       const title = props.presetTargetReaderId === undefined ? 'dialog.paired' : 'security.pairedAgain';
       toast.success({ title: t(title), duration: 2500 });
-      const readerId = done.targetReaderId ?? done.boundReaderId;
+      const readerId = done.targetReaderId;
       if (readerId === null) onClose();
       else props.onPaired?.(readerId);
     },
@@ -305,8 +291,7 @@ export function usePairingFlow(props: PairingFlowProps) {
   );
   const blocked = countdown.secondsLeft > 0;
   const normalizedCode = normalizeEnrollmentCode(codeInput);
-  const bound = current?.boundReaderId != null;
-  const mode = modeOf(bound, !!props.presetTargetReaderId, choice);
+  const mode = modeOf(!!props.presetTargetReaderId, choice);
   const targetReaderId = props.presetTargetReaderId ?? pickedTarget;
   // A Lite reader that was not found by its code is compared by its colour pattern.
   const byPattern = current?.kind === 'lite' && !resolvedByCode;
@@ -317,7 +302,7 @@ export function usePairingFlow(props: PairingFlowProps) {
     if (!canFind || submitting.current) return;
     submitting.current = true;
     setError(null);
-    resolve.mutate({ requestBody: { code: normalizedCode } });
+    resolve.mutate({ body: { code: normalizedCode } });
   };
 
   // `?enroll=CODE` and the web flasher arrive with the code: look the reader up right away.
@@ -327,7 +312,7 @@ export function usePairingFlow(props: PairingFlowProps) {
   useEffect(() => {
     if (autoResolved.current || !presetCode || pairingId || !normalizedCode) return;
     autoResolved.current = true;
-    resolveMutate({ requestBody: { code: normalizedCode } });
+    resolveMutate({ body: { code: normalizedCode } });
   }, [presetCode, pairingId, normalizedCode, resolveMutate]);
 
   const hasProof = byPattern ? current?.round != null && current.pattern != null : normalizedCode !== null;
@@ -342,7 +327,7 @@ export function usePairingFlow(props: PairingFlowProps) {
     const base = approvalBase({ mode, targetReaderId, name, via: props.via });
     if (!byPattern) {
       sentCode.current = normalizedCode;
-      approve.mutate({ pairingId: current.id, requestBody: { ...base, code: normalizedCode ?? undefined } });
+      approve.mutate({ path: { pairingId: current.id }, body: { ...base, code: normalizedCode ?? undefined } });
       return;
     }
     // Read again right before approving: a pattern that rotated while the admin was comparing must be
@@ -353,19 +338,21 @@ export function usePairingFlow(props: PairingFlowProps) {
       setNotice(t('dialog.patternChanged'));
       return;
     }
-    approve.mutate({ pairingId: current.id, requestBody: { ...base, round: fresh.round } });
+    approve.mutate({ path: { pairingId: current.id }, body: { ...base, round: fresh.round } });
   };
 
   // The round on screen, so it always matches what the admin can see.
   shownRound.current = byPattern ? (current?.round ?? null) : null;
 
-  const waitingForReader = props.waitForReaderId !== undefined && !active.activeId && !active.noResponse;
-  const needsCodeToFind = !active.activeId && !waitingForReader && !active.noResponse;
+  const needsCodeToFind = !active.activeId;
   // Typing a new code answers an error about the old one, but not a wait the server asked for.
   const clearError = () => setError((previous) => (previous?.kind === 'rateLimited' ? previous : null));
   return {
-    ...active,
-    t,
+    running: active.running,
+    activeId: active.activeId,
+    current,
+    resolvedByCode,
+    pollingFailed: active.pollingFailed,
     readers,
     codeInput,
     codeRejected: code.codeRejected,
@@ -378,7 +365,6 @@ export function usePairingFlow(props: PairingFlowProps) {
       clearError();
     },
     setPickedId,
-    /** Back to the list of waiting Lite readers after one was picked. */
     pickedFromList: pickedId !== null && active.activeId === pickedId && !finished,
     backToList: () => {
       setPickedId(null);
@@ -395,23 +381,17 @@ export function usePairingFlow(props: PairingFlowProps) {
     notice,
     idle,
     normalizedCode,
-    bound,
     byPattern,
     finished,
     canFind,
     canApprove,
     submit,
     findByCode,
-    /** Enter in the dialog: look the reader up while it is not known, otherwise approve. */
     submitForm: () => (needsCodeToFind ? findByCode() : void submit()),
-    /** The dialog's Cancel button: ends the waiting request on the server, then closes. */
     cancel: cancelAndClose,
     resolvePending: resolving,
     approvePending: approve.isPending,
-    waitingForReader,
     needsCodeToFind,
-    needsChoice: current !== null && !finished && !bound && props.presetTargetReaderId === undefined,
+    needsChoice: current !== null && !finished && props.presetTargetReaderId === undefined,
   };
 }
-
-export type PairingFlow = ReturnType<typeof usePairingFlow>;

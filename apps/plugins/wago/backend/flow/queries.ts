@@ -128,12 +128,14 @@ export abstract class WagoFlowQueries extends WagoFlowServiceState {
     const controllerCacheKey = previewOnly
       ? `wago-flow-controllers:preview:${config.controllerId}`
       : 'wago-flow-controllers';
+    // A controller id that is not an integer (1.5, NaN) selects no controller; the integer filter would refuse it.
+    const controllerId = Number.isSafeInteger(config.controllerId) ? (config.controllerId as number) : null;
     const controllers = await this.cached(validationContext, controllerCacheKey, () =>
-      previewOnly && typeof config.controllerId !== 'number'
+      previewOnly && controllerId === null
         ? Promise.resolve([])
         : this.controllers.find({
-            where: { trustState: 'claimed', ...(previewOnly ? { id: config.controllerId as number } : {}) },
-            order: { name: 'ASC' },
+            where: { trustState: 'claimed', ...(previewOnly ? { id: controllerId as number } : {}) },
+            orderBy: [{ field: 'name', direction: 'asc' }],
           }),
     );
     const selected =
@@ -144,8 +146,8 @@ export abstract class WagoFlowQueries extends WagoFlowServiceState {
       ? await this.cached(validationContext, `wago-applied-revision:${selected.id}`, async () => {
           const [latest] = await this.revisions.find({
             where: { controllerId: selected.id, state: 'applied' },
-            order: { revision: 'DESC' },
-            take: 1,
+            orderBy: [{ field: 'revision', direction: 'desc' }],
+            limit: 1,
           });
           return latest ?? null;
         })
@@ -228,7 +230,7 @@ export abstract class WagoFlowQueries extends WagoFlowServiceState {
   }
 
   async refresh(): Promise<void> {
-    const settings = await this.settings.findOneBy({ id: 1 });
+    const settings = await this.settings.get(1);
     if (!settings) return;
     const controllers = await this.controllers.find({ where: { trustState: 'claimed' } });
     const controllerIds = new Set(controllers.map((controller) => controller.id));

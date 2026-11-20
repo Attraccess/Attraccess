@@ -1,12 +1,12 @@
 import { Chip } from '@heroui/react';
-import { Button, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, ConfirmableButton, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import type { SecureBootKeysStateDto } from '@attraccess/react-query-client';
 import { SettingsRow } from '../../components/SettingsRow';
 import de from './de.json';
 import en from './en.json';
 
 export type SecureBootKeys = SecureBootKeysStateDto;
-export type KeyDialog = 'recovery' | 'backup' | 'check' | 'restore' | 'regenerate' | null;
+export type KeyDialog = 'recovery' | 'backup' | 'check' | 'restore' | null;
 
 const STATUS_COLOR = { none: 'default', 'recovery-check-pending': 'warning', ready: 'success' } as const;
 
@@ -50,10 +50,12 @@ interface KeyActionsProps {
   isCreating: boolean;
   onCreate: () => void;
   onOpen: (dialog: KeyDialog) => void;
+  /** Runs after the admin confirmed; rejects to keep the confirmation open. */
+  onRegenerate: () => Promise<unknown>;
 }
 
 /** Buttons for what the admin can do with the keys in their current state. */
-export function KeyActions({ keys, isCreating, onCreate, onOpen }: KeyActionsProps) {
+export function KeyActions({ keys, isCreating, onCreate, onOpen, onRegenerate }: KeyActionsProps) {
   const { t } = useTranslations({ en, de });
   const hasKeys = keys.status !== 'none';
 
@@ -86,9 +88,20 @@ export function KeyActions({ keys, isCreating, onCreate, onOpen }: KeyActionsPro
           </Button>
         ) : null}
         {hasKeys && keys.readersWithBurnedDigests === 0 ? (
-          <Button variant="tertiary" onPress={() => onOpen('regenerate')} data-cy="reader-security-regenerate">
-            {t('actions.regenerate')}
-          </Button>
+          <ConfirmableButton
+            label={t('actions.regenerate')}
+            status="warning"
+            isPending={isCreating}
+            buttonProps={{ variant: 'tertiary' }}
+            confirm={{
+              title: t('regenerate.title'),
+              message: t('regenerate.description'),
+              confirmLabel: t('regenerate.confirm'),
+              confirmDataCy: 'reader-security-regenerate-confirm',
+            }}
+            onConfirm={onRegenerate}
+            data-cy="reader-security-regenerate"
+          />
         ) : null}
       </div>
       {hasKeys && keys.readersWithBurnedDigests > 0 ? (

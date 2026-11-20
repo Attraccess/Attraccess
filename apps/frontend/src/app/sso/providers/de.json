@@ -4,11 +4,9 @@
   "name": "Name",
   "type": "Typ",
   "configuration": "Konfiguration",
-  "actions": "Aktionen",
   "loading": "Wird geladen...",
   "errorLoading": "Fehler beim Laden der SSO-Anbieter",
-  "deleteConfirmation": "Sind Sie sicher, dass Sie diesen SSO-Anbieter löschen möchten?",
-  "deleteProvider": "Anbieter löschen",
+  "deleteConfirmation": "Möchten Sie den SSO-Anbieter „{{name}}“ wirklich löschen? Benutzer können sich dann nicht mehr damit anmelden.",
   "deleteProviderDesc": "Dies wird den SSO-Anbieter dauerhaft löschen.",
   "providerDeleted": "Anbieter gelöscht",
   "providerDeletedDesc": "Der SSO-Anbieter wurde erfolgreich gelöscht.",
@@ -106,7 +104,6 @@
   "roleMappingsRemove": "Zuordnung entfernen",
   "roleMappingsAttraccessRole": "Attraccess-Rolle",
   "roleMappingsSsoRole": "IdP-Gruppe / -Rolle",
-  "roleMappingsActions": "Aktionen",
   "roleMappingsDrawerTitle": "Rollenzuordnung hinzufügen",
   "roleMappingsDrawerDescription": "Wählen Sie eine Attraccess-Rolle und geben Sie den Gruppen- oder Rollenwert des Identity Providers ein, der sie gewähren soll.",
   "roleMappingsRolePlaceholder": "Rolle auswählen",
@@ -145,5 +142,6 @@
   "defaultsUsed": "Standardwerte: {{{defaults}}}",
   "scopesEmptyHint": "Standardwerte: openid · email · profile",
   "signingAlgorithmsEmptyHint": "Eine leere Liste wird als RS256 gespeichert",
-  "emailAttributeKeysEmptyHint": "Integrierte Namen: {{{defaults}}}"
+  "emailAttributeKeysEmptyHint": "Integrierte Namen: {{{defaults}}}",
+  "deleteConfirmTitle": "{{name}} löschen?"
 }

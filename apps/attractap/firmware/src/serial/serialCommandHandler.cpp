@@ -12,6 +12,7 @@
 #include <cstring>
 #include <string>
 
+#include "../settings/reader_credentials.hpp"
 #include "../settings/settings.hpp"
 #include "../network/wifi/wifi.hpp"
 #include "../state/state.hpp"
@@ -138,6 +139,7 @@ void SerialCommandHandler::sendErrorResponse(const std::string &topic, const cha
 #include <cstring>
 #include <string>
 
+#include "../settings/reader_credentials.hpp"
 #include "../settings/settings.hpp"
 #include "../network/wifi/wifi.hpp"
 #include "../state/state.hpp"
@@ -238,11 +240,68 @@ const char *SerialCommandHandler::encryptionTypeToString(wifi_auth_mode_t mode)
 #include <cstring>
 #include <string>
 
+#include "../settings/reader_credentials.hpp"
 #include "../settings/settings.hpp"
 #include "../network/wifi/wifi.hpp"
 #include "../state/state.hpp"
 #include "../utils.hpp"
 #include "../platform.hpp"
+
+#ifdef ATTRACTAP_CRASH_TRIGGER
+// Lab builds only (-DATTRACTAP_CRASH_TRIGGER=ON, see README "Crash trigger"): panics on purpose so
+// the crash report and coredump upload can be tested on hardware. stackBytes is spread over tasks
+// of at most 16 KiB stack fill each (internal RAM rarely has a larger free block); every task fills
+// its share and blocks, the last one panics. The coredump keeps each used stack, so the dump grows
+// by about stackBytes.
+namespace
+{
+constexpr uint32_t CRASH_TRIGGER_MAX_STACK_BYTES = 64 * 1024;
+constexpr uint32_t CRASH_TRIGGER_TASK_FILL_BYTES = 16 * 1024;
+constexpr uint32_t CRASH_TRIGGER_STACK_MARGIN_BYTES = 4096;
+
+void crashTriggerTask(void *argument)
+{
+    const uint32_t bytes = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(argument)) & 0x7FFFFFFFu;
+    const bool last = (static_cast<uint32_t>(reinterpret_cast<uintptr_t>(argument)) & 0x80000000u) != 0;
+    volatile uint8_t *fill = static_cast<volatile uint8_t *>(__builtin_alloca(bytes));
+    for (uint32_t i = 0; i < bytes; ++i)
+    {
+        fill[i] = static_cast<uint8_t>(i * 131u + 7u);
+    }
+    if (last)
+    {
+        vTaskDelay(pdMS_TO_TICKS(200)); // the other fillers are done by now
+        abort();
+    }
+    vTaskDelay(portMAX_DELAY);
+}
+} // namespace
+
+void SerialCommandHandler::triggerCrash(uint32_t stackBytes)
+{
+    uint32_t remaining = stackBytes > CRASH_TRIGGER_MAX_STACK_BYTES ? CRASH_TRIGGER_MAX_STACK_BYTES : stackBytes;
+    logger.errorf("debug.crash received - forcing a panic with %u stack bytes (crash report test)",
+                  (unsigned)remaining);
+    fflush(stdout);
+    while (remaining > 0)
+    {
+        const uint32_t bytes = remaining > CRASH_TRIGGER_TASK_FILL_BYTES ? CRASH_TRIGGER_TASK_FILL_BYTES : remaining;
+        remaining -= bytes;
+        const uintptr_t argument = bytes | (remaining == 0 ? 0x80000000u : 0u);
+        if (xTaskCreate(crashTriggerTask, "crash_trigger", bytes + CRASH_TRIGGER_STACK_MARGIN_BYTES,
+                        reinterpret_cast<void *>(argument), tskIDLE_PRIORITY + 5, nullptr) != pdPASS)
+        {
+            logger.errorf("debug.crash: no memory for another %u byte filler task; panicking now", (unsigned)bytes);
+            break;
+        }
+        if (remaining == 0)
+        {
+            vTaskDelay(portMAX_DELAY);
+        }
+    }
+    abort();
+}
+#endif
 
 void SerialCommandHandler::handleCommand(const std::string &topic, const std::string &payload)
 {
@@ -265,13 +324,13 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
         payloadObj = payloadDoc.to<JsonObject>(); // empty object
     }
 
+#ifdef ATTRACTAP_CRASH_TRIGGER
     if (topic == "debug.crash")
     {
-        logger.error("debug.crash received - forcing panic for crash-report e2e test (ATT-474)");
-        fflush(stdout);
-        abort();
+        triggerCrash(payloadObj["stackBytes"] | 0u);
         return;
     }
+#endif
 
     if (topic == "auth.status.get")
     {
@@ -346,6 +405,7 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
 #include <cstring>
 #include <string>
 
+#include "../settings/reader_credentials.hpp"
 #include "../settings/settings.hpp"
 #include "../network/wifi/wifi.hpp"
 #include "../state/state.hpp"
@@ -435,7 +495,6 @@ void SerialCommandHandler::handleAuthorizedCommand(const std::string &topic, Jso
         auto ws = State::getWebsocketState();
         auto api = State::getApiState();
         auto enrollment = State::getEnrollmentState();
-        AttraccessAuthConfig authCfg = Settings::getAttraccessAuthConfig();
 
         std::string status = "disconnected";
         if (ws.hostname.length() > 0 && ws.port > 0)
@@ -475,7 +534,7 @@ void SerialCommandHandler::handleAuthorizedCommand(const std::string &topic, Jso
         resp["hostname"] = ws.hostname;
         resp["port"] = ws.port;
         resp["useSSL"] = ws.useSSL;
-        resp["deviceId"] = std::to_string(authCfg.readerId);
+        resp["deviceId"] = std::to_string(CredentialStore::load().readerId);
 
         std::string json;
         serializeJson(resp, json);

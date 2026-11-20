@@ -1,10 +1,6 @@
-import {
-  AuditLog,
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  ResourceHealthState,
-  ResourceType,
-} from '@attraccess/database-entities';
+import { AuditLog, ResourceFlowNode } from '@attraccess/database-entities';
+import type { ResourceHealthRecord } from '@attraccess/application-models';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import {
   AuthenticatedRequest,
   PLUGIN_AUDIT_HOST_PROVIDER,
@@ -18,14 +14,19 @@ import { randomUUID } from 'node:crypto';
 import { DataSource } from 'typeorm';
 import { MqttMessageEvent } from '../mqtt/mqtt-message.event';
 import { MqttServerController } from '../mqtt/servers/mqtt-server.controller';
+import { FixedIdMqttServerStore } from './fixed-id-mqtt-store.test-fixture';
 import { MqttServerService } from '../mqtt/servers/mqtt-server.service';
 import { registerPluginFlowNodes } from '../plugin-system/flows/node-registry';
 import { LoadedPluginManifest } from '../plugin-system/plugin.manifest';
 import { PluginModule } from '../plugin-system/plugin.module';
+import {
+  createFakeFlowTriggerStore,
+  type FakeFlowEdge,
+} from '../resources/flows/execution/fixtures/fake-flow-trigger-store.test-fixture';
 import { ResourceFlowsExecutorService } from '../resources/flows/execution/resource-flows-executor.service';
 import { FlowLogRecorderService } from '../resources/flows/logs/flow-log-recorder.service';
 import { ResourceHealthService } from '../resources/health/resource-health.service';
-import { setupAuditDatabase } from './audit.test-fixture';
+import { setupAuditDatabase } from '../database/adapters/audit/audit.test-fixture';
 import { auditActorOf, AuditRecorder } from './recorder/audit-event';
 
 /**
@@ -80,19 +81,23 @@ describe('audit recorded through flows, MQTT and the plugin context', () => {
 
   /** The real health service over an in-memory state table. */
   function healthService(audit: AuditRecorder): ResourceHealthService {
-    const states: ResourceHealthState[] = [];
+    const states: ResourceHealthRecord[] = [];
     return new ResourceHealthService(
       {
-        findOne: async ({ where }: { where: Partial<ResourceHealthState> }) =>
-          states.find((state) => state.resourceId === where.resourceId && state.identifier === where.identifier) ??
-          null,
-        create: (value: Partial<ResourceHealthState>) => ({ ...value }),
-        save: async (value: ResourceHealthState) => {
-          if (!states.includes(value)) states.push(Object.assign(value, { id: states.length + 1 }));
-          return value;
+        upsertReport: async (report: Omit<ResourceHealthRecord, 'id'>) => {
+          const existing = states.find(
+            (state) => state.resourceId === report.resourceId && state.identifier === report.identifier,
+          );
+          if (existing) {
+            const previousStatus = existing.status;
+            Object.assign(existing, report);
+            return { record: existing, previousStatus };
+          }
+          const record = { id: states.length + 1, ...report };
+          states.push(record);
+          return { record, previousStatus: null };
         },
       } as never,
-      {} as never,
       new EventEmitter2(),
       audit,
     );
@@ -104,37 +109,18 @@ describe('audit recorded through flows, MQTT and the plugin context', () => {
     edges: { source: string; target: string; sourceHandle?: string }[],
     health: ResourceHealthService,
   ): ResourceFlowsExecutorService {
-    const ofType = (type: unknown) => nodes.filter((node) => node.type === type);
-    const flowNodeRepository = {
-      find: async ({ where }: { where: { type?: string } | { type?: string }[] }) =>
-        (Array.isArray(where) ? where : [where])
-          .flatMap(({ type }) => ofType(type))
-          .filter((node, index, all) => all.indexOf(node) === index),
-      findOne: async ({ where }: { where: { id: string } }) => nodes.find((node) => node.id === where.id) ?? null,
-      // The plugin trigger page query: one page of nodes of the requested type.
-      createQueryBuilder: () => {
-        let type: unknown;
-        const builder = {
-          leftJoin: () => builder,
-          where: (_sql: string, values: { type: string }) => ((type = values.type), builder),
-          andWhere: () => builder,
-          orderBy: () => builder,
-          limit: () => builder,
-          getMany: async () => ofType(type),
-        };
-        return builder;
-      },
-    };
-    const flowEdgeRepository = {
-      find: async ({ where }: { where: { source: string; sourceHandle?: string } }) =>
-        edges.filter(
-          (edge) => edge.source === where.source && (edge.sourceHandle ?? '') === (where.sourceHandle ?? ''),
-        ),
-    };
+    const edgesBySourceAndHandle: Record<string, FakeFlowEdge[]> = {};
+    for (const edge of edges) {
+      const key = `${edge.source}|${edge.sourceHandle ?? ''}`;
+      (edgesBySourceAndHandle[key] ??= []).push(edge);
+    }
+    const flowStore = createFakeFlowTriggerStore({
+      initialNodes: nodes,
+      nodesById: Object.fromEntries(nodes.map((node) => [node.id, node])),
+      edgesBySourceAndHandle,
+    });
     return new ResourceFlowsExecutorService(
-      flowNodeRepository as never,
-      flowEdgeRepository as never,
-      { findOne: async () => ({ id: 1, name: 'Lathe', type: ResourceType.Machine, metadata: {} }) } as never,
+      flowStore,
       new FlowLogRecorderService(),
       { publish: jest.fn(), subscribe: jest.fn() } as never,
       {} as never,
@@ -147,7 +133,6 @@ describe('audit recorded through flows, MQTT and the plugin context', () => {
         timeFlow: (_t: string, run: () => unknown) => run(),
         timeNode: (_n: string, run: () => unknown) => run(),
       } as never,
-      {} as never,
       {} as never,
       {} as never,
     );
@@ -201,7 +186,7 @@ describe('audit recorded through flows, MQTT and the plugin context', () => {
         pluginDirectory: pluginName,
         permissions,
         main: { backend: { directory: `${pluginName}/dist`, entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       } as LoadedPluginManifest);
     }
 
@@ -225,17 +210,7 @@ describe('audit recorded through flows, MQTT and the plugin context', () => {
 
     it('a plugin calling a core service it resolved records the same row as the HTTP route', async () => {
       const servers = new MqttServerService(
-        {
-          create: (value: object) => ({
-            id: 7,
-            useTls: false,
-            defaultPublishQos: 0,
-            defaultPublishRetain: false,
-            defaultSubscribeQos: 0,
-            ...value,
-          }),
-          save: async (value: object) => ({ ...value, id: 7 }),
-        } as never,
+        new FixedIdMqttServerStore(),
         { encrypt: (value: string) => `enc:${value}` } as never,
         { mqttServersTotal: { inc: jest.fn() } } as never,
         { emit: jest.fn() } as never,

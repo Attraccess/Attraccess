@@ -24,6 +24,7 @@ vi.mock('../hooks/useAuth', () => ({
     isTwoFactorStatusLoading: state.twoFactorLoading,
     user: state.authenticated ? { id: 1 } : null,
     hasPermission: () => true,
+    hasPermissionKey: () => true,
   }),
 }));
 vi.mock('../utils/live-updates', () => ({
@@ -35,7 +36,9 @@ vi.mock('../utils/live-updates', () => ({
 vi.mock('../hooks/useLocaleSync', () => ({ useLocaleSync: state.sync }));
 vi.mock('../stores/ptr.store', () => ({ usePtrStore: () => ({ pullToRefreshIsEnabled: state.ptr }) }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
-vi.mock('@attraccess/react-query-client', () => ({ OpenAPI: {} }));
+vi.mock('@attraccess/react-query-client', () => ({
+  client: { setConfig: () => undefined, interceptors: { request: { use: () => 0 } } },
+}));
 vi.mock('./routes', () => ({ useAllRoutes: () => [{ path: '/', element: <p>Home route</p>, authRequired: false }] }));
 vi.mock('./layout/layout', () => ({ Layout: ({ children }: PropsWithChildren) => <main>{children}</main> }));
 vi.mock('../components/toastProvider', () => ({ ToastProvider: ({ children }: PropsWithChildren) => children }));
@@ -53,16 +56,27 @@ vi.mock('../components/themeToggle', () => ({ ThemeToggle: () => <button>Theme</
 vi.mock('../components/bootScreen', () => ({ BootScreen: () => <p>Starting app</p> }));
 vi.mock('./unauthorized/unauthorized', () => ({ Unauthorized: () => <p>Sign in</p> }));
 vi.mock('./unauthorized/unauthorized-layout/layout', () => ({
-  UnauthorizedLayout: ({ children }: PropsWithChildren) => children,
+  UnauthorizedLayout: ({ children }: PropsWithChildren) => <div data-testid="unauthorized-layout">{children}</div>,
 }));
-vi.mock('./verify-email', () => ({ VerifyEmail: () => null }));
+vi.mock('./verify-email', () => ({ VerifyEmail: () => <p>Verify email page</p> }));
 vi.mock('./reset-password/resetPassword', () => ({ ResetPassword: () => null }));
 vi.mock('./accept-invitation', () => ({ AcceptInvitation: () => null }));
 vi.mock('./two-factor-gate', () => ({ TwoFactorGate: ({ children }: PropsWithChildren) => children }));
 vi.mock('./kiosk/KioskGuard', () => ({ KioskGuard: () => null }));
+vi.mock('./dashboard/pinnablePages', () => ({
+  PinnablePagesProvider: ({ children }: PropsWithChildren) => children,
+}));
+vi.mock('./dashboard/widgets/DashboardWidgetsProvider', () => ({
+  DashboardWidgetsProvider: ({ children }: PropsWithChildren) => children,
+}));
+vi.mock('./dashboard/DashboardPinToggle', () => ({ DashboardPinHeaderAccessory: () => null }));
 vi.mock('./not-found', () => ({ NotFound: () => <p>Not found</p> }));
-vi.mock('react-simple-pull-to-refresh', () => ({
-  default: ({ children, onRefresh }: PropsWithChildren<{ onRefresh: () => void }>) => (
+vi.mock('../pwa-install', () => ({
+  InstallAppButton: () => <button>Install app</button>,
+  InstallAppPrompts: () => <p>Install prompts</p>,
+}));
+vi.mock('../components/pullToRefresh', () => ({
+  PullToRefresh: ({ children, onRefresh }: PropsWithChildren<{ onRefresh: () => void }>) => (
     <>
       <button onClick={onRefresh}>Refresh gesture</button>
       {children}
@@ -116,6 +130,15 @@ it('shows boot and theme controls before initialization, then routes the authent
   expect(screen.getByText('Session billing listener')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Theme' })).toBeNull();
   expect(state.sync).toHaveBeenCalled();
+});
+it('renders /verify-email inside the unauthorized layout so its actions stay scrollable on small phones', () => {
+  state.initialized = true;
+  render(
+    <MemoryRouter initialEntries={['/verify-email?token=t&email=a%40b.c']}>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(screen.getByTestId('unauthorized-layout')).toContainElement(screen.getByText('Verify email page'));
 });
 it('allows theme switching during two-factor setup and refreshes queries only for touch devices', () => {
   state.authenticated = true;
@@ -172,4 +195,36 @@ it('waits for two-factor status and required setup before enabling the live tran
     </MemoryRouter>,
   );
   expect(state.liveUserId).toBe(1);
+});
+
+it('offers the install action next to the theme toggle when signed out, but not in kiosk mode', () => {
+  const view = render(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole('button', { name: 'Install app' })).toBeInTheDocument();
+  expect(screen.getByText('Install prompts')).toBeInTheDocument();
+  view.unmount();
+
+  render(
+    <MemoryRouter initialEntries={['/kiosk/resources/1']}>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole('button', { name: 'Theme' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Install app' })).toBeNull();
+  expect(screen.queryByText('Install prompts')).toBeNull();
+});
+
+it('keeps the install action out of the signed-in shell, which offers it in the user menu', () => {
+  state.initialized = true;
+  state.authenticated = true;
+  render(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByRole('button', { name: 'Install app' })).toBeNull();
+  expect(screen.getByText('Install prompts')).toBeInTheDocument();
 });

@@ -2,7 +2,8 @@ import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { act, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CSV_ROW_ERROR_REASON_KEYS, CsvInvite, type CsvRowError, getCsvRowErrorReasonKey } from './index';
+import { CsvInvite } from './index';
+import { CSV_ROW_ERROR_REASON_KEYS, type CsvRowError, getCsvRowErrorReasonKey } from './csvRowErrors';
 import en from './en.json';
 import de from './de.json';
 import { TestWrapper } from '../../../../test-utils/wrappers';
@@ -20,12 +21,12 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useRbacServiceListRoles: () => ({ data: [] }),
-  useUsersServiceInviteUsersFromCsv: (options: typeof inviteFromCsvOptions) => {
+  useListRoles: () => ({ data: [] }),
+  useInviteUsersFromCsv: (_mutationKey: unknown, options: typeof inviteFromCsvOptions) => {
     inviteFromCsvOptions = options;
     return { mutate: vi.fn(), isPending: false };
   },
-  useUsersServiceFindManyKey: 'useUsersServiceFindManyKey',
+  useFindManyKey: 'useFindManyKey',
 }));
 
 describe('CsvInvite', () => {

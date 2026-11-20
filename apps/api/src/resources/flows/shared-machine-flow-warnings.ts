@@ -1,9 +1,4 @@
-import {
-  IfNodeDataSchema,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-} from '@attraccess/database-entities';
+import { FlowEdgeRecord, FlowNodeRecord, IfNodeDataSchema, ResourceFlowNodeType } from '@attraccess/application-models';
 import { getPluginFlowNode } from '../../plugin-system/flows/node-registry';
 import { coreNodeHasExternalEffect } from './schemas/core-node-schemas';
 
@@ -34,7 +29,7 @@ function hasExternalEffect(type: string): boolean {
 const CHECKS_SESSION_COUNT = /^activeSessions\.(before|after)$/;
 
 /** An IF node checks the count when it reads `activeSessions.before/after` or compares against such a path. */
-function checksSessionCount(node: ResourceFlowNode): boolean {
+function checksSessionCount(node: FlowNodeRecord): boolean {
   if (node.type !== ResourceFlowNodeType.PROCESSING_IF) return false;
   const parsed = IfNodeDataSchema.safeParse(node.data ?? {});
   if (!parsed.success) return false;
@@ -48,8 +43,8 @@ function checksSessionCount(node: ResourceFlowNode): boolean {
  * checking `activeSessions`. On a machine shared by several people such a flow runs for every single session.
  */
 export function findFlowsWithoutSessionCountCheck(
-  nodes: ResourceFlowNode[],
-  edges: ResourceFlowEdge[],
+  nodes: FlowNodeRecord[],
+  edges: FlowEdgeRecord[],
   flow: { id: number; name: string } | null = null,
 ): SharedMachineFlowWarning[] {
   const nodesById = new Map(nodes.map((node) => [node.id, node]));

@@ -8,6 +8,7 @@ export function createMockResource(overrides?: Partial<Resource>): Resource {
     id: 1,
     type: ResourceType.MACHINE,
     separateUnlockAndUnlatch: false,
+    accessOnly: false,
     name: 'Test Resource',
     description: 'Test Description',
     imageFilename: 'test.jpg',

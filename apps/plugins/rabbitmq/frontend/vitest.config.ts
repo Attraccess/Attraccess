@@ -17,6 +17,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    setupFiles: [fileURLToPath(new URL('../../scripts/css-escape.test-setup.ts', import.meta.url))],
     testTimeout: 30_000,
     include: ['apps/plugins/rabbitmq/frontend/src/**/*.test.tsx'],
     coverage: {

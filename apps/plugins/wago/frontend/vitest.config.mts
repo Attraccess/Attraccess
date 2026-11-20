@@ -14,6 +14,9 @@ export default defineConfig({
       '@attraccess/plugins-frontend-sdk': fileURLToPath(
         new URL('../../../../libs/plugins-frontend-sdk/src/index.ts', import.meta.url),
       ),
+      '@attraccess/application-models': fileURLToPath(
+        new URL('../../../../libs/application-models/src/index.ts', import.meta.url),
+      ),
       '@attraccess/database-entities': fileURLToPath(
         new URL('../../../../libs/database-entities/src/index.ts', import.meta.url),
       ),
@@ -21,12 +24,14 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    setupFiles: [fileURLToPath(new URL('../../scripts/css-escape.test-setup.ts', import.meta.url))],
     include: ['apps/plugins/wago/frontend/tests/*.test.tsx', 'apps/plugins/wago/frontend/src/**/*.{test,spec}.tsx'],
-    // The visual editor and Modbus form tests both render into jsdom's global document.
-    // Running files concurrently allows user-event interactions in one file to target
-    // another file's DOM, producing intermittent input corruption and timeouts.
-    fileParallelism: false,
-    // The user-event editor flows take ~15 s on loaded hosts and CI runners.
+    // Large jsdom renders of the 879-3020 register map set the pace: the meter dialog in tests/front-panel.test.tsx
+    // ("meter readings") and the built-in profile in tests/modbus-profile-form.test.tsx. Measured for ATT-1216 with
+    // coverage: "adds a meter with the recommended readings and switches readings per register and section" takes
+    // 4.6-5.2 s on a quiet host and 7.8 s in the full parallel run, and the slowest front-panel tests reach 11-25 s on
+    // a loaded host; modbus-profile-form tests reach 5.2 s in the full run. The 5 s default is too tight for both
+    // files. File parallelism needs no override: each test file runs in its own worker with its own jsdom.
     testTimeout: 30_000,
     coverage: {
       // Unit coverage feeds the project's crap-score target.

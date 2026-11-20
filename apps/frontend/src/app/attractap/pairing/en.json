@@ -1,6 +1,5 @@
 {
   "state": {
-    "unpaired": "Not paired",
     "paired": "Paired",
     "revoked": "Pairing removed",
     "waiting": "Pairing…"
@@ -11,7 +10,8 @@
     "chooseMode": "What is this reader?",
     "mode": {
       "new": "A new reader",
-      "takeover": "A reader that takes over one I already have (after a reset or as a replacement)"
+      "takeover": "A reader that takes over one I already have (after a reset or as a replacement)",
+      "takeoverUnavailable": "There is no reader yet that it could take over."
     },
     "targetReader": "Which reader?",
     "connectionLost": "Connection to the server lost. The status shown here may be out of date.",
@@ -37,7 +37,6 @@
       "internal": "An error occurred on the server.",
       "expired": "The reader was not approved within 10 minutes."
     },
-    "waitingForReader": "Waiting for the reader…",
     "findHint": "Enter the code shown on the reader.",
     "codeLabel": "Code on the reader",
     "typeCode": "Enter the code the reader shows right now.",
@@ -55,7 +54,6 @@
     "patternHint": "Segment 1 is marked on the reader. Approve only if all eight colours match. The colours change about every 30 seconds.",
     "patternChanged": "The colours changed while you were checking. Compare them again and then approve.",
     "segmentStart": "1 (start)",
-    "noResponse": "The reader did not respond. Check that it is switched on and has the latest software, then try again.",
     "error": {
       "wrongCode": "This code does not match the reader. Check the code on the reader and try again.",
       "codeNotFound": "No waiting reader shows this code. Check the code on the reader; it changes about every 30 seconds.",
@@ -69,8 +67,7 @@
       "readerGone": "The reader disconnected before pairing finished. It will show a new code.",
       "keyInUse": "This reader is already paired with another record. Choose that record to take over, or remove its pairing first.",
       "targetNotFound": "The reader to take over no longer exists. Choose another one.",
-      "targetMissing": "Choose which reader this one takes over.",
-      "wrongMode": "This reader cannot be paired this way. Close this window and start again from the reader list."
+      "targetMissing": "Choose which reader this one takes over."
     },
     "backToList": "Choose another reader",
     "scanFallback": "Type the code instead."
@@ -100,17 +97,16 @@
   },
   "toPair": {
     "title": "Not paired",
-    "description": "A new reader shows a code on its screen (Lite: colours on its ring). Press Pair, then type the code or compare the colours. Pair these readers before you can set them up. Readers that sign in with a token do nothing until they are paired: no card taps, no enrolling or resetting cards, no supervision or mass introduction. Once the server asks them to pair (after any firmware update that is due), they show their code like a new reader, and they are not listed anywhere else until they are paired. The reader must be switched on and connected.",
+    "description": "A new reader shows a code on its screen (Lite: colours on its ring). Press Pair, then type the code or compare the colours. A reader whose pairing was removed shows its code like a new reader and takes over its old record when you choose it. The reader must be switched on and connected.",
     "resources": "Resources: {{names}}",
-    "neverPaired": "Not paired yet",
     "pairingRemoved": "Pairing was removed",
     "newReader": "New reader",
     "waitingSince": "Waiting since {{time}}",
     "pair": "Pair",
-    "resume": "Continue",
-    "requestFailed": "Could not start pairing",
-    "notConnected": "The reader is not connected right now. Switch it on and try again.",
-    "delete": "Delete"
+    "delete": "Delete",
+    "deleteTitle": "Delete {{name}}?",
+    "deleteMessage": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+    "deleteFailed": "The reader could not be deleted"
   },
   "kind": {
     "touch": "Touch",
@@ -119,5 +115,43 @@
   "enrollLink": {
     "noPermissionTitle": "You can't approve readers",
     "noPermission": "Your account does not have permission to approve readers. Ask an administrator to approve this reader."
+  },
+  "secured": {
+    "title": "Secure reader",
+    "hint": "The server checks the report this reader sends about its security settings. The check runs each time the reader connects.",
+    "secured": "Secured",
+    "notSecured": "Not secured",
+    "notChecked": "No report received yet",
+    "checkedAt": "Last checked",
+    "problems": "What does not match",
+    "profile": {
+      "secure": "Secure build",
+      "secure-lab": "Lab build (development mode)"
+    },
+    "problem": {
+      "firmware-info-missing": "The reader has not reported its firmware.",
+      "profile-not-secure": "The firmware is not a secure build.",
+      "not-release-build": "The firmware is not a release build.",
+      "demo-or-debug-variant": "The firmware is a demo or debug variant.",
+      "secure-boot-disabled": "Secure Boot is not enabled.",
+      "key0-purpose": "Key slot 0 is not set up for Secure Boot.",
+      "key1-purpose": "Key slot 1 is not set up for Secure Boot.",
+      "digest0-not-recorded": "The server has no signing key fingerprint for this reader.",
+      "digest0-mismatch": "The first signing key fingerprint differs from the recorded one.",
+      "digest1-not-recorded": "The server has no recovery key fingerprint for this reader.",
+      "digest1-mismatch": "The recovery key fingerprint differs from the recorded one.",
+      "signing-key-revoked": "A Secure Boot key was revoked.",
+      "slot2-not-revoked": "The unused Secure Boot key slot is not revoked.",
+      "flash-encryption-not-release": "Flash encryption is not in release mode.",
+      "flash-encryption-not-final": "The flash encryption setting is not locked.",
+      "manual-encrypt-enabled": "Manual flash encryption is still allowed.",
+      "key2-not-xts": "The flash encryption key is missing.",
+      "key4-not-nvs-hmac": "The key for encrypted settings is missing.",
+      "rd-dis-incomplete": "Not all keys are protected from reading.",
+      "rd-dis-writable": "The read protection can still be changed.",
+      "jtag-enabled": "The debug interface (JTAG) is enabled.",
+      "rom-download-open": "The ROM download mode is open.",
+      "secure-version-below-floor": "The anti-rollback version is below the required one."
+    }
   }
 }

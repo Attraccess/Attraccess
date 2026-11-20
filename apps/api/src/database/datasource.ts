@@ -1,26 +1,15 @@
 // typeorm.config.ts
 
-import { DataSource, DataSourceOptions } from 'typeorm';
-import { resolveDatabasePath } from '../config/storage-path';
-import { entities } from '@attraccess/database-entities';
-import * as migrations from './migrations';
 import { Logger } from '@nestjs/common';
+import { resolveDatabaseBackend } from './backend';
 
-const dbFile = resolveDatabasePath();
+// Resolving the backend first makes an unsupported DATABASE_TYPE fail before any connection or migration.
+const backend = resolveDatabaseBackend();
+const dbConfig = backend.createDataSourceOptions();
 
-new Logger('Database').log(`dbFile ${dbFile}`);
+new Logger('Database').log(`backend ${backend.type}`);
 
-const dbConfig: Partial<DataSourceOptions> = {
-  synchronize: false,
-  migrations: Object.values(migrations),
-  migrationsTableName: 'migrations',
-  // Providers access database-backed settings while Nest constructs AppModule.
-  migrationsRun: true,
-  entities: Object.values(entities),
-  type: 'sqlite',
-  database: dbFile,
-} as DataSourceOptions;
-
+export const databaseBackend = backend;
 export const dataSourceConfig = dbConfig;
 
-export default new DataSource(dataSourceConfig as DataSourceOptions);
+export default backend.createDataSource(dataSourceConfig);

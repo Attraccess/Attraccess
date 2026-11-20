@@ -1,12 +1,10 @@
-import type { PluginContext, Repository } from '@attraccess/plugins-backend-sdk';
-import { ResourceFlowNode } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { randomUUID } from 'node:crypto';
 import { outputBehavior, supportsOutputAction } from '../../channel-behavior';
 import { type WagoConfigurationSnapshot } from '../configuration/model';
 import { commandTopic, parseControllerJson } from '../protocol/index';
-import { WagoConfigurationDraft } from '../configuration/draft.entity';
 import { WagoConfigurationRevision } from '../configuration/revision.entity';
-import { WagoController } from '../controllers/entity';
+import { openWagoStorage, type WagoControllerRow, type WagoStorage } from '../storage';
 import { wagoFlowPreview } from '../flow/preview';
 
 export const DEFAULT_COMMAND_TIMEOUT_SECONDS = 30;
@@ -28,8 +26,8 @@ export function positiveInteger(value: unknown): number | undefined {
 
 export type Dependencies = {
   context: PluginContext;
-  controllers: () => Repository<WagoController>;
-  claimedController: (id: number) => Promise<WagoController>;
+  controllers: () => WagoStorage['controllers'];
+  claimedController: (id: number) => Promise<WagoControllerRow>;
   getSettings: () => Promise<{ operationalPrefix: string }>;
   appliedRevision: (controllerId: number) => Promise<WagoConfigurationRevision | null>;
   onCommand?: (controllerId: number, channelId: string, id: string) => void;
@@ -200,25 +198,15 @@ export class WagoCommandHandler {
     resourceId: number | null,
     flowId: number | null = null,
   ): Promise<string[]> {
-    const query = this.dependencies.context.dataSource
-      .getRepository(ResourceFlowNode)
-      .createQueryBuilder('node')
-      .select(['node.id', 'node.resourceId', 'node.flowId'])
-      .leftJoin('node.flow', 'flow')
-      .addSelect(['flow.id', 'flow.name'])
-      .where('node.type = :type', { type: 'plugin.wago.command' })
-      .andWhere("node.data ->> 'controllerId' = :controllerId", { controllerId })
-      .andWhere("node.data ->> 'channelId' = :channelId", { channelId });
-    if (flowId !== null) {
-      query.andWhere('(node.flowId IS NULL OR node.flowId <> :flowId)', { flowId });
-    } else if (resourceId !== null) {
-      query.andWhere('(node.resourceId IS NULL OR node.resourceId <> :resourceId)', { resourceId });
-    }
-    const nodes = await query.getMany();
+    const nodes = await this.dependencies.context.hostData.flows.findNodes({
+      type: 'plugin.wago.command',
+      dataEquals: { controllerId, channelId },
+      ...(flowId !== null ? { excludeFlowId: flowId } : resourceId !== null ? { excludeResourceId: resourceId } : {}),
+    });
     // A global flow is named for the reader; the id is only the fallback.
     return nodes.map((node) =>
       node.flowId !== null && node.flowId !== undefined
-        ? `global flow ${node.flow?.name ? JSON.stringify(node.flow.name) : node.flowId} / node ${node.id}`
+        ? `global flow ${node.flowName ? JSON.stringify(node.flowName) : node.flowId} / node ${node.id}`
         : `resource ${node.resourceId} / node ${node.id}`,
     );
   }
@@ -342,7 +330,7 @@ export class WagoCommandHandler {
     if ('errors' in parsed) return parsed.errors;
     const { controllerId, channelId, action, expectedConfigurationRevision } = parsed.value;
     const controller = await this.cached(validationContext, `wago-controller:${controllerId}`, () =>
-      this.dependencies.controllers().findOneBy({ id: controllerId }),
+      this.dependencies.controllers().get(controllerId),
     );
     if (!controller || controller.trustState !== 'claimed')
       return [{ field: 'controllerId', message: 'Select a claimed WAGO controller.' }];
@@ -389,7 +377,7 @@ export class WagoCommandHandler {
         ? []
         : await this.dependencies.controllers().find({
             where: { trustState: 'claimed', ...(previewOnly ? { id: controllerId } : {}) },
-            order: { name: 'ASC' },
+            orderBy: [{ field: 'name', direction: 'asc' }],
           });
     const revision = controllerId ? await this.dependencies.appliedRevision(controllerId) : null;
     const snapshot = revision ? (JSON.parse(revision.snapshot) as WagoConfigurationSnapshot) : null;
@@ -529,7 +517,7 @@ export class WagoCommandHandler {
     if (controllerId) {
       const draft = appliedOnly
         ? null
-        : await this.dependencies.context.getRepository(WagoConfigurationDraft).findOneBy({ controllerId });
+        : await openWagoStorage(this.dependencies.context).configurationDrafts.findOne({ where: { controllerId } });
       try {
         const storedNames = JSON.parse(revision?.presetProvenance ?? draft?.presetProvenance ?? 'null')?.editor?.names;
         if (storedNames && typeof storedNames === 'object' && !Array.isArray(storedNames)) names = storedNames;

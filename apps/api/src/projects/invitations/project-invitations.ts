@@ -1,26 +1,31 @@
 import {
-  Project,
-  ProjectInvitation,
   ProjectInvitationStatus,
-  ProjectMember,
   ProjectMemberRole,
-  User,
-} from '@attraccess/database-entities';
+  type ProjectInvitationRecord,
+  type ProjectMemberRecord,
+  type ProjectRecord,
+  type UserContact,
+} from '@attraccess/application-models';
 
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 import { NotificationCategory } from '../../notifications/notification-types';
-
-import { Repository } from 'typeorm';
 
 import { AuditRecorder } from '../../audit/recorder/audit-event';
 import { EmailService } from '../../email/email.service';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 
 import { ProjectAccessService } from '../project-access.service';
+import type { ProjectInvitationStore, ProjectStore } from '../project.port';
+import type { AuthenticationMethod } from '@attraccess/application-models';
+
+// The mail and notification services still take the ORM shapes; their migration is tracked outside this area.
+type MailUser = Parameters<EmailService['sendProjectInvitationEmail']>[0];
+type MailProject = Parameters<EmailService['sendProjectInvitationEmail']>[1];
+type MailInvitation = Parameters<EmailService['sendProjectInvitationEmail']>[2];
 
 /** Audit details of an invitation. */
-export function invitationDetails(invitation: ProjectInvitation): Record<string, string | number> {
+export function invitationDetails(invitation: ProjectInvitationRecord): Record<string, string | number> {
   return {
     projectId: invitation.projectId,
     invitationId: invitation.id,
@@ -34,27 +39,22 @@ export class ProjectInvitations {
   constructor(
     private readonly audit: AuditRecorder,
     private readonly projectAccessService: ProjectAccessService,
-    private readonly userRepository: Repository<User>,
-    private readonly projectMemberRepository: Repository<ProjectMember>,
-    private readonly projectInvitationRepository: Repository<ProjectInvitation>,
+    private readonly projects: ProjectStore,
+    private readonly invitations: ProjectInvitationStore,
     private readonly notifications: NotificationDispatchService,
     private readonly emailService: EmailService,
   ) {}
 
-  public async listPendingInvitationsForUser(userId: number): Promise<ProjectInvitation[]> {
-    return await this.projectInvitationRepository.find({
-      where: { invitedUser: { id: userId }, status: ProjectInvitationStatus.PENDING },
-      relations: { invitedUser: true, inviter: true, project: { owner: true } },
-      order: { createdAt: 'DESC' },
-    });
+  public async listPendingInvitationsForUser(userId: number): Promise<ProjectInvitationRecord[]> {
+    return await this.invitations.listPendingForUser(userId);
   }
 
   public async acceptInvitation(
     userId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
-  ): Promise<ProjectInvitation> {
+  ): Promise<ProjectInvitationRecord> {
     return await this.respondToInvitation(
       userId,
       invitationId,
@@ -67,9 +67,9 @@ export class ProjectInvitations {
   public async declineInvitation(
     userId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
-  ): Promise<ProjectInvitation> {
+  ): Promise<ProjectInvitationRecord> {
     return await this.respondToInvitation(
       userId,
       invitationId,
@@ -83,9 +83,9 @@ export class ProjectInvitations {
     userId: number,
     invitationId: number,
     status: ProjectInvitationStatus,
-    authenticationMethod: 'session' | 'api-token',
+    authenticationMethod: AuthenticationMethod,
     apiTokenId?: number,
-  ): Promise<ProjectInvitation> {
+  ): Promise<ProjectInvitationRecord> {
     const invitation = await this.getInvitationWithRelations(invitationId);
 
     if (invitation.invitedUserId !== userId) {
@@ -96,9 +96,7 @@ export class ProjectInvitations {
       throw new BadRequestException('Invitation has already been processed');
     }
 
-    invitation.status = status;
-    invitation.respondedAt = new Date();
-    await this.projectInvitationRepository.save(invitation);
+    await this.invitations.recordResponse(invitation.id, status, new Date());
 
     await this.audit.record({
       domain: 'project',
@@ -129,30 +127,12 @@ export class ProjectInvitations {
     projectId: number,
     userId: number,
     role: ProjectMemberRole = ProjectMemberRole.VIEWER,
-  ): Promise<ProjectMember | null> {
-    const existingMembership = await this.projectMemberRepository.findOne({
-      where: {
-        project: { id: projectId },
-        user: { id: userId },
-      },
-    });
-
-    if (existingMembership) {
-      return null;
-    }
-
-    return await this.projectMemberRepository.save({
-      project: { id: projectId },
-      user: { id: userId },
-      role,
-    });
+  ): Promise<ProjectMemberRecord | null> {
+    return await this.invitations.addMemberIfMissing(projectId, userId, role);
   }
 
-  public async getInvitationWithRelations(invitationId: number): Promise<ProjectInvitation> {
-    const invitation = await this.projectInvitationRepository.findOne({
-      where: { id: invitationId },
-      relations: { invitedUser: true, inviter: true, project: { owner: true } },
-    });
+  public async getInvitationWithRelations(invitationId: number): Promise<ProjectInvitationRecord> {
+    const invitation = await this.invitations.findById(invitationId);
 
     if (!invitation) {
       throw new NotFoundException('Project invitation not found');
@@ -162,18 +142,23 @@ export class ProjectInvitations {
   }
 
   public async dispatchProjectInvitationNotification(
-    invitedUser: User,
-    project: Project,
-    invitation: ProjectInvitation,
+    invitedUser: UserContact,
+    project: ProjectRecord,
+    invitation: ProjectInvitationRecord,
   ): Promise<void> {
     await this.notifications.dispatch({
       category: NotificationCategory.PROJECT_INVITATIONS,
-      recipients: [invitedUser],
+      recipients: [invitedUser as unknown as MailUser],
       actorId: invitation.inviterId,
       title: `You have been invited to ${project.name}`,
       body: `${invitation.inviter?.username ?? 'A project owner'} invited you to join ${project.name}.`,
       url: `/projects?invitation=${invitation.id}`,
-      sendEmail: (recipient) => this.emailService.sendProjectInvitationEmail(recipient, project, invitation),
+      sendEmail: (recipient) =>
+        this.emailService.sendProjectInvitationEmail(
+          recipient,
+          project as unknown as MailProject,
+          invitation as unknown as MailInvitation,
+        ),
     });
   }
 
@@ -182,11 +167,11 @@ export class ProjectInvitations {
     projectId: number,
     invitedUserId: number,
     role: ProjectMemberRole = ProjectMemberRole.VIEWER,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
-  ): Promise<ProjectInvitation> {
+  ): Promise<ProjectInvitationRecord> {
     const project = await this.projectAccessService.ensureOwner(ownerId, projectId);
-    const invitedUser = await this.userRepository.findOne({ where: { id: invitedUserId } });
+    const invitedUser = await this.invitations.findInvitee(invitedUserId);
 
     if (!invitedUser) {
       throw new NotFoundException('User not found');
@@ -196,32 +181,20 @@ export class ProjectInvitations {
       throw new BadRequestException('Project owner already has access');
     }
 
-    const existingMember = await this.projectMemberRepository.findOne({
-      where: {
-        project: { id: projectId },
-        user: { id: invitedUserId },
-      },
-    });
+    const existingMember = await this.projects.findMembership(projectId, invitedUserId);
     if (existingMember) {
       throw new BadRequestException('User is already a project member');
     }
 
-    const existingInvitation = await this.projectInvitationRepository.findOne({
-      where: {
-        project: { id: projectId },
-        invitedUser: { id: invitedUserId },
-        status: ProjectInvitationStatus.PENDING,
-      },
-    });
+    const existingInvitation = await this.invitations.findPending(projectId, invitedUserId);
     if (existingInvitation) {
       throw new BadRequestException('User already has a pending invitation');
     }
 
-    const invitation = await this.projectInvitationRepository.save({
-      project: { id: projectId },
-      inviter: { id: ownerId },
-      invitedUser: { id: invitedUserId },
-      status: ProjectInvitationStatus.PENDING,
+    const invitation = await this.invitations.create({
+      projectId,
+      inviterId: ownerId,
+      invitedUserId,
       requestedRole: role,
     });
 
@@ -241,9 +214,9 @@ export class ProjectInvitations {
     ownerId: number,
     projectId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
-  ): Promise<ProjectInvitation> {
+  ): Promise<ProjectInvitationRecord> {
     await this.projectAccessService.ensureOwner(ownerId, projectId);
     const invitation = await this.getInvitationWithRelations(invitationId);
 
@@ -255,8 +228,7 @@ export class ProjectInvitations {
       throw new BadRequestException('Only pending invitations can be resent');
     }
 
-    invitation.updatedAt = new Date();
-    await this.projectInvitationRepository.save(invitation);
+    await this.invitations.touch(invitation.id, new Date());
     await this.audit.record({
       domain: 'project',
       action: 'project.invitation.sent',
@@ -264,7 +236,11 @@ export class ProjectInvitations {
       subject: { type: 'project.invitation', id: invitation.id },
       details: invitationDetails(invitation),
     });
-    await this.dispatchProjectInvitationNotification(invitation.invitedUser, invitation.project, invitation);
+    await this.dispatchProjectInvitationNotification(
+      invitation.invitedUser as UserContact,
+      invitation.project as ProjectRecord,
+      invitation,
+    );
 
     return this.getInvitationWithRelations(invitation.id);
   }
@@ -273,9 +249,9 @@ export class ProjectInvitations {
     ownerId: number,
     projectId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
-  ): Promise<ProjectInvitation> {
+  ): Promise<ProjectInvitationRecord> {
     await this.projectAccessService.ensureOwner(ownerId, projectId);
     const invitation = await this.getInvitationWithRelations(invitationId);
 
@@ -287,9 +263,7 @@ export class ProjectInvitations {
       return invitation;
     }
 
-    invitation.status = ProjectInvitationStatus.CANCELED;
-    invitation.respondedAt = new Date();
-    await this.projectInvitationRepository.save(invitation);
+    await this.invitations.recordResponse(invitation.id, ProjectInvitationStatus.CANCELED, new Date());
 
     await this.audit.record({
       domain: 'project',

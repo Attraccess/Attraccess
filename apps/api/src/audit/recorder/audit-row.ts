@@ -1,4 +1,4 @@
-import type { AuditLog } from '@attraccess/database-entities';
+import type { AuditEntryDraft } from '@attraccess/application-models';
 import { randomUUID } from 'crypto';
 import { getPluginAuditDomain } from '../../plugin-system/audit/audit-registry';
 import { projectAdministrationAuditEvent } from '../policies/administration';
@@ -13,7 +13,7 @@ import { projectSsoAuditEvent } from '../policies/sso';
 import { dataFields } from '../policies/projection';
 import type { AuditEvent } from './audit-event';
 
-export type AuditRow = Omit<AuditLog, 'id' | 'at'>;
+export type AuditRow = AuditEntryDraft;
 
 type CoreEvent<D extends CoreAuditDomain> = AuditEvent<D> & { operationId: string };
 
@@ -277,7 +277,11 @@ function pluginRow(event: AuditEvent & { operationId: string }): AuditRow | null
   const snapshot = projectPluginAuditEvent({
     action: event.action,
     operationId: event.operationId,
-    principal: { userId: id, authenticationMethod, ...(apiTokenId === undefined ? {} : { apiTokenId }) },
+    // The system actor (no user, no authentication) is the SDK's system principal.
+    principal:
+      id === null && authenticationMethod === null
+        ? { kind: 'system' }
+        : { userId: id, authenticationMethod, ...(apiTokenId === undefined ? {} : { apiTokenId }) },
     outcome: event.outcome ?? 'succeeded',
     subject: event.subject,
     details: event.details,

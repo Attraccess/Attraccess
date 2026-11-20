@@ -1,7 +1,7 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
-import { OpenAPI, UseUsersServiceGetCurrentKeyFn } from '@attraccess/react-query-client';
+import { client as apiClient, UseGetCurrentKeyFn } from '@attraccess/react-query-client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useAuth } from './useAuth';
 import { useDateTimePreferences } from '@attraccess/plugins-frontend-ui';
@@ -31,7 +31,7 @@ function restoreStorage() {
   }
 }
 
-const originalBase = OpenAPI.BASE;
+const originalBase = apiClient.getConfig().baseUrl;
 const json = (data: unknown) => new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
 
 beforeEach(async () => {
@@ -39,18 +39,20 @@ beforeEach(async () => {
   vi.spyOn(liveUpdates, 'stopLiveUpdates');
   window.history.replaceState(null, '', '/');
   requestLog = [];
-  OpenAPI.BASE = 'http://localhost';
+  apiClient.setConfig({ baseUrl: 'http://localhost' });
   client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  client.setQueryData(UseUsersServiceGetCurrentKeyFn(), { id: 7, username: 'fixture' });
+  client.setQueryData(UseGetCurrentKeyFn(), { id: 7, username: 'fixture' });
   const mutation = client.getMutationCache().build(client, {
     mutationFn: async (variables: { secret: string }) => ({ secret: variables.secret }),
   });
   await mutation.execute({ secret: 'private-mutation-data' });
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (url: string, init?: RequestInit) => {
+    // The generated client passes a Request; direct fetch calls pass a URL and init.
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input instanceof Request ? input.url : String(input);
       const path = new URL(url).pathname;
-      requestLog.push({ path, method: init?.method ?? 'GET' });
+      requestLog.push({ path, method: init?.method ?? (input instanceof Request ? input.method : 'GET') });
       if (path === '/api/users/me') return json({ id: 7, username: 'fixture' });
       if (path === '/api/auth/two-factor') return json({ required: false, enabled: false });
       if (path === '/api/auth/session/logout-capability') return json({ available: true });
@@ -67,7 +69,7 @@ afterEach(() => {
   cleanup();
   client.clear();
   useDateTimePreferences.setState({ userId: null, dateTimeLocale: null });
-  OpenAPI.BASE = originalBase;
+  apiClient.setConfig({ baseUrl: originalBase });
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   restoreStorage();
@@ -97,8 +99,6 @@ it.each(['localStorage', 'sessionStorage'] as const)(
     await waitFor(() => expect(hook.result.current.every((auth) => auth.isInitialized)).toBe(true));
     await waitFor(() => expect(requestLog.some(({ path }) => path === '/api/users/me')).toBe(true));
     expect(other.getItem('auth')).toBeNull();
-    expect(OpenAPI.TOKEN).toBe('');
-    expect(OpenAPI.WITH_CREDENTIALS).toBe(true);
   },
 );
 
@@ -177,9 +177,11 @@ const resultToken = 'r'.repeat(43);
 function mockReturn(outcome: string, authenticated: boolean, valid = true) {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (url: string, init?: RequestInit) => {
+    // The generated client passes a Request; direct fetch calls pass a URL and init.
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input instanceof Request ? input.url : String(input);
       const path = new URL(url).pathname;
-      requestLog.push({ path, method: init?.method ?? 'GET' });
+      requestLog.push({ path, method: init?.method ?? (input instanceof Request ? input.method : 'GET') });
       if (path === '/api/auth/sso/logout-result')
         return valid ? json({ result: outcome }) : new Response('{}', { status: 400 });
       if (path === '/api/users/me')
@@ -231,12 +233,13 @@ it.each([false, true])(
   'keeps shared formatting reset during logout and after failure (central: %s)',
   async (central) => {
     const user = { id: 7, username: 'fixture', dateTimeLocale: 'en-GB' };
-    client.setQueryData(UseUsersServiceGetCurrentKeyFn(), user);
+    client.setQueryData(UseGetCurrentKeyFn(), user);
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (url: string, init?: RequestInit) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = input instanceof Request ? input.url : String(input);
         const path = new URL(url).pathname;
-        requestLog.push({ path, method: init?.method ?? 'GET' });
+        requestLog.push({ path, method: init?.method ?? (input instanceof Request ? input.method : 'GET') });
         if (path === '/api/auth/session' || path === '/api/auth/session/logout-everywhere') {
           return new Promise<Response>((resolve) => {
             finish = resolve;
@@ -267,9 +270,9 @@ it.each([false, true])(
     act(() => (central ? hook.result.current[0].logoutEverywhere() : hook.result.current[0].logout()));
     expect(liveUpdates.stopLiveUpdates).toHaveBeenCalledOnce();
     await waitFor(() => expect(useDateTimePreferences.getState()).toEqual({ userId: null, dateTimeLocale: null }));
-    act(() => client.setQueryData(UseUsersServiceGetCurrentKeyFn(), user));
+    act(() => client.setQueryData(UseGetCurrentKeyFn(), user));
     await act(async () => {
-      await client.invalidateQueries({ queryKey: UseUsersServiceGetCurrentKeyFn() });
+      await client.invalidateQueries({ queryKey: UseGetCurrentKeyFn() });
     });
     expect(hook.result.current.every((auth) => auth.user === null && !auth.isAuthenticated)).toBe(true);
     expect(useDateTimePreferences.getState()).toEqual({ userId: null, dateTimeLocale: null });

@@ -1,4 +1,5 @@
 # Knotentypen
+
 <!-- llms-description: Referenz aller eingebauten Flow-Knoten, gegliedert in Eingabe-Trigger, Verarbeitungs-Knoten und Ausgabe-Aktionen. -->
 
 Diese Referenz beschreibt alle eingebauten Flow-Knoten. Der Editor gruppiert sie nach Zweck, etwa Abrechnung, Nachrichten und Flow-Steuerung, und zeigt die vom Ressourcentyp unterstützten Knoten. Nutzungs-, Aktivitäts- und Abrechnungsknoten sind für **Maschinen**; Tür-Trigger für **Türen**. Plugins können weitere Knoten mit eigenen Einstellungen ergänzen.
@@ -31,19 +32,21 @@ Läuft während eines Nutzungsstarts. Keine Einstellungen. Die Payload enthält 
 
 Typ: `input.resource.usage.stopped` · Maschinen
 
-Läuft während eines Nutzungsendes. Keine Einstellungen. Die Payload enthält die bisherige Sitzung, eingereichte Formulare und Endfelder wie `endTime`, `endNotes` sowie [`activeSessions`](flows/payloads-variables-templates.md#aktive-sitzungen-auf-gemeinsam-genutzten-maschinen). Beispiel: Relais ausschalten oder vor der Abrechnung einen Posten ergänzen.
+Läuft während eines Nutzungsendes. Keine Einstellungen. Die Payload enthält die bisherige Sitzung, eingereichte Formulare und Endfelder wie `endTime`, `endNotes` sowie [`activeSessions`](flows/payloads-variables-templates.md#aktive-sitzungen-auf-gemeinsam-genutzten-maschinen). Beispiel: Relais ausschalten oder vor der Abrechnung einen Posten ergänzen. Läuft nicht für eine Sitzung, die durch eine Übernahme endet; siehe [Nutzung übernommen](flows/node-types.md#nutzung-übernommen).
 
 ### Nutzung übernommen
 
 Typ: `input.resource.usage.takeover` · Maschinen
 
-Läuft bei Übernahme einer aktiven Sitzung. Keine Einstellungen. Die Payload enthält die bisherige Sitzung sowie `newUser`, `oldUser`, `takeOverTime` und `activeSessions` (immer 1 zu 1). `{{newUser.username}}` liest den neuen Besitzer. Eine Übernahme verwendet diesen Trigger anstelle von **Nutzung gestartet**.
+Läuft bei Übernahme einer aktiven Sitzung. Keine Einstellungen. Die Payload enthält die bisherige Sitzung sowie `newUser`, `oldUser`, `takeOverTime` und `activeSessions` (immer 1 zu 1). `{{newUser.username}}` liest den neuen Besitzer. Eine Übernahme verwendet diesen Trigger anstelle von **Nutzung gestartet**. Die bisherige Sitzung endet hier, und **Nutzung beendet** läuft für sie nicht. Posten für die bisherige Sitzung (z. B. Verbrauchsmaterial, das Sie sonst beim Beenden ergänzen) erfassen Sie in diesem Flow mit dem Knoten [**Abrechnungs Position hinzufügen**](flows/node-types.md#abrechnungsposten-setzen); sie werden mit der bisherigen Sitzung abgerechnet. Sollen Posten vom Beenden auch bei Übernahmen anfallen, fügen Sie denselben Abrechnungszweig an beiden Triggern hinzu. Die Payload der Übernahme enthält kein `endTime` und kein `endNotes` (verwenden Sie `takeOverTime`), und ihre `formSubmissions` sind die Antworten des neuen Benutzers auf das Übernahmeformular, nicht auf das Beendigungsformular; ein kopierter Zweig muss seine Werte von dort lesen. Physische Effekte wie das Ausschalten eines Relais gehören nicht an diesen Trigger, denn die Maschine bleibt beim neuen Benutzer in Nutzung.
 
 ### Tür entriegelt
 
 Typ: `input.resource.door.unlocked` · Türen
 
 Läuft bei einer Entriegelungsaktion. Keine Einstellungen. Die Payload enthält `event.timestamp`, `usage.start`, `usage.end`, `user.id`, `user.username`, `user.externalIdentifier`. Beispiel: Entriegelungsbefehl mit **MQTT-Nachricht senden** versenden.
+
+Eine Türaktion wartet auf ihre Flows. Schlägt ein Knoten mit **Flow abbrechen** fehl oder läuft ein **Fehler**-Knoten, sieht die Person an der Tür den Fehler in der Web-App, am Attractap oder am Leser des Plugins. Die Aktion bleibt im Nutzungsverlauf. Das gilt ebenso für **Tür verriegelt** und **Tür-Falle geöffnet**.
 
 ### Tür verriegelt
 
@@ -164,7 +167,7 @@ Typ: `input.resource.metering.start` · Maschinen · Nur Ressourcen-Flows
 
 Einen vordefinierten **Zähler** auswählen oder einen mit einem Namen erstellen. Bereitet diesen Zähler vor, bevor eine erfasste Sitzung startet oder übernommen wird. **Zeitlimit (Sekunden)**: 1–600, Standard **30**. Der Zweig muss **Messung bereit** erreichen. Kann ein kostenpflichtiger Zähler nicht initialisiert werden, startet die Sitzung nicht.
 
-Die Payload enthält `metering: { sessionId, meterId, operationId, resourceId, usageId, kind, requestedAt }` mit `kind: "start"`. Beispiel: Lifetime-Zähler per HTTP lesen und dessen Basiswert melden. Siehe [Zähler](flows/energy-metering.md).
+Die Payload enthält `metering: { sessionId, meterId, operationId, resourceId, usageId, userId, kind, requestedAt }` mit `kind: "start"`. `userId` ist die Person der Sitzung. Beispiel: Lifetime-Zähler per HTTP lesen und dessen Basiswert melden. Siehe [Zähler](flows/energy-metering.md).
 
 ### Messwert abfragen
 
@@ -178,7 +181,7 @@ Typ: `input.resource.metering.collect` · Maschinen · Nur Ressourcen-Flows
 | **Versuche für den Endwert**                    | 1–10 / **3**                                         |
 | **Pause zwischen Endwert-Versuchen (Sekunden)** | 0–120 / **5**                                        |
 
-Läuft regelmäßig, auch außerhalb von Sitzungen, und für Endwerte beim Sitzungsende. Die Payload enthält dieselben Messfelder wie **Messung starten**, mit `kind: "interim"` oder `"final"`. Ohne Sitzung sind `sessionId` und `usageId` null. Mit **Zähler melden** für denselben Zähler verbinden. Regelmäßige Messungen aktualisieren Gesamtverbrauch und laufende Sitzung; nur Sitzungsverbrauch wird abgerechnet. Siehe [Zähler](flows/energy-metering.md) für Aktualität und ausstehende Gebühren.
+Läuft regelmäßig, auch außerhalb von Sitzungen, und für Endwerte beim Sitzungsende. Die Payload enthält dieselben Messfelder wie **Messung starten**, mit `kind: "interim"`, `"final"` oder `"boundary"` (eine Messung eines geteilten Zählers beim Start oder Ende einer Sitzung auf einer gemeinsam genutzten Maschine). Ohne Sitzung sind `sessionId` und `usageId` null. Mit **Zähler melden** für denselben Zähler verbinden. Regelmäßige Messungen aktualisieren Gesamtverbrauch und laufende Sitzung; nur Sitzungsverbrauch wird abgerechnet. Siehe [Zähler](flows/energy-metering.md) für Aktualität und ausstehende Gebühren.
 
 ## Verarbeitungs-Knoten
 
@@ -253,13 +256,13 @@ Aktionen mit **Ausgang** können nachfolgende Knoten ausführen. Abrechnungspost
 
 ### Fehlerverhalten
 
-**HTTP-Anfrage**, **MQTT-Nachricht senden**, **Auf MQTT-Nachricht warten** und **Nutzungssitzung beenden** bieten **Bei Fehler** (`failureBehavior`):
+**HTTP-Anfrage**, **MQTT-Nachricht senden**, **Auf MQTT-Nachricht warten** und **Nutzungssitzung beenden** bieten **Bei Fehler** (`failureBehavior`). Plugin-Knoten können dieselbe Auswahl anbieten:
 
-| Auswahl                                                          | Ergebnis                                                                                   |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| **Flow abbrechen** (`fail-flow`)                                 | Löst einen Fehler aus und stoppt diesen Pfad; kann die auslösende Nutzungsaktion abbrechen |
-| **Über Fehlerausgang fortfahren** (`failure-output`)             | Gibt den ursprünglichen Eingang plus `flowError: { kind, message }` über **Fehler** weiter |
-| **Protokollieren und fortfahren** (`log-and-continue`, Standard) | Protokolliert den Fehler und gibt den ursprünglichen Eingang über **Ausgang** weiter       |
+| Auswahl                                                          | Ergebnis                                                                                                                          |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Flow abbrechen** (`fail-flow`)                                 | Löst einen Fehler aus und stoppt diesen Pfad; kann die auslösende Nutzungsaktion abbrechen oder die Türaktion fehlschlagen lassen |
+| **Über Fehlerausgang fortfahren** (`failure-output`)             | Gibt den ursprünglichen Eingang plus `flowError: { kind, message }` über **Fehler** weiter                                        |
+| **Protokollieren und fortfahren** (`log-and-continue`, Standard) | Protokolliert den Fehler und gibt den ursprünglichen Eingang über **Ausgang** weiter                                              |
 
 `flowError.kind` ist `transport-dispatch`, `acknowledgement-timeout`, `controller-rejection` oder `node-failure`. `{{flowError.message}}` liest die Meldung im Fehlerzweig. Ein angeschlossener Fehlerausgang allein aktiviert die Weiterleitung nicht.
 
@@ -318,7 +321,7 @@ Verwendet die Nutzungs-ID im Wurzelfeld `id`, falls vorhanden, sonst die aktive 
 
 Die externe Referenz verwendet ein Wurzelfeld `externalReference` vom Typ Text als Override, falls vorhanden. Ist dieses Feld vorhanden **und** eine nicht leere Referenz am Knoten konfiguriert, wird stattdessen die konfigurierte Referenz als Vorlage gerendert. Ohne das Payload-Feld bleibt die konfigurierte Referenz wörtlich. Name, Beschreibung und Einzelpreis rendern keine Vorlagen.
 
-Beispiel: Formularantwort mit **Payload setzen** nach `quantity` übertragen, dann bei **Nutzung beendet** einen Verbrauchsmaterialposten ergänzen.
+Beispiel: Formularantwort mit **Payload setzen** nach `quantity` übertragen, dann bei **Nutzung beendet** einen Verbrauchsmaterialposten ergänzen. Eine Übernahme führt **Nutzung beendet** nicht aus; ergänzen Sie denselben Knoten im Flow [**Nutzung übernommen**](flows/node-types.md#nutzung-übernommen), wenn auch übernommene Sitzungen abgerechnet werden sollen. Seine Posten werden mit der bisherigen Sitzung abgerechnet.
 
 ### Nutzungssitzung beenden
 
@@ -414,15 +417,18 @@ Beispiel nach HTTP-Antwort `{"counter":1500}`: Basiswert `{{counter}}`. Eine Ein
 
 Typ: `output.resource.metering.report` · Nur Ressourcen-Flows
 
-| Einstellung  | Beschreibung                                                           |
-| ------------ | ---------------------------------------------------------------------- |
-| **Zähler**   | Vordefinierten Zähler auswählen oder einen mit einem Namen erstellen   |
-| **Modus**    | **total** für kumulierten Zählerstand; **increment** für einen Zuwachs |
-| **Wert**     | Erforderlicher nichtnegativer Zahlenwert oder Vorlage                  |
-| **Messzeit** | Optionale ISO-Zeitstempel-Vorlage; Standard ist der Meldezeitpunkt     |
-| **Quelle**   | Optionale Vorlage mit dem Namen des Zählers                            |
+| Einstellung     | Beschreibung                                                           |
+| --------------- | ---------------------------------------------------------------------- |
+| **Zähler**      | Vordefinierten Zähler auswählen oder einen mit einem Namen erstellen   |
+| **Modus**       | **total** für kumulierten Zählerstand; **increment** für einen Zuwachs |
+| **Wert**        | Erforderlicher nichtnegativer Zahlenwert oder Vorlage                  |
+| **Messzeit**    | Optionale ISO-Zeitstempel-Vorlage; Standard ist der Meldezeitpunkt     |
+| **Quelle**      | Optionale Vorlage mit dem Namen des Zählers                            |
+| **Nutzungs-ID** | Optionale Vorlage mit der Nutzungs-ID, zu der die Messung gehört       |
 
 Meldet Werte in Abfragezweigen und gewöhnlichen Flows, auch ohne Sitzung. Eine Antwort im Abfragezweig muss zum angefragten Zähler passen. Eine Einheit ist nicht erforderlich. Der erste unaufgeforderte Gesamtstand legt einen Basiswert fest; spätere Zuwächse erhöhen den Gesamtverbrauch. Inkremente erhöhen den Verbrauch direkt. Während einer laufenden Sitzung aktualisieren akzeptierte Zuwächse auch deren Verbrauch. Eine konfigurierte Messzeit-Vorlage, die leer gerendert wird, führt zum Fehler; Endwerte müssen aktuell sein. Der Katalog bietet keinen ausgehenden Anschluss.
+
+Eine außerhalb eines Messlaufs gesendete Messung an einen Zähler mit **Pro Sitzung gemessen** muss die Nutzung benennen, zu der sie gehört: In einem Flow des Sitzungsablaufs (Start, Ende, Übernahme) wird die Nutzung des Ablaufs verwendet, andernfalls setzen Sie **Nutzungs-ID** auf eine Vorlage, die eine Nutzungs-ID ergibt, etwa `{{ id }}` in einem Flow, den **Nutzung gestartet** oder **Nutzung beendet** auslöst, oder `{{ metering.usageId }}` in einem Mess-Flow. Eine **Nutzungs-ID**, die eine andere Nutzung als die des laufenden Sitzungsablaufs benennt, wird abgelehnt. Bei mehr als einer laufenden Sitzung wird eine Messung ohne Nutzung mit einem Flow-Fehler abgelehnt und nie geraten. Messungen eines Zählers mit **Geteilt und aufgeteilt** gehören zum Zähler und benötigen keine Nutzungs-ID. Siehe [Zähler bei gemeinsam genutzten Maschinen](flows/energy-metering.md#zähler-bei-gemeinsam-genutzten-maschinen).
 
 Beispiel nach **Auf MQTT-Nachricht warten** mit Inhalt `{"heartbeats":1500}`: **Heartbeats** auswählen, Modus **total**, Wert `{{payload.heartbeats}}`. Siehe [Zähler](flows/energy-metering.md) für Basiswerte und Wiederholungsversuche.
 

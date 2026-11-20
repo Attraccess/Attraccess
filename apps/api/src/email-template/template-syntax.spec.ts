@@ -1,4 +1,4 @@
-import { EmailTemplateType } from '@attraccess/database-entities';
+import { EmailTemplateType } from '@attraccess/application-models';
 import { EMAIL_TEMPLATE_DEFAULTS, readDefaultTemplateBody } from './email-defaults';
 import { BadRequestException } from '@nestjs/common';
 import { assertRenderableTemplate, checkTemplateSyntax, TemplateSyntaxError } from './template-syntax';

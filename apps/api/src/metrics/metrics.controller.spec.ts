@@ -8,7 +8,9 @@ describe('MetricsController', () => {
 
   beforeEach(() => {
     metricsService = {
-      getMetrics: jest.fn().mockResolvedValue('# HELP attraccess_http_requests_total\nattraccess_http_requests_total 42\n'),
+      getMetrics: jest
+        .fn()
+        .mockResolvedValue('# HELP attraccess_http_requests_total\nattraccess_http_requests_total 42\n'),
       getContentType: jest.fn().mockReturnValue('text/plain; version=0.0.4; charset=utf-8'),
     };
     controller = new MetricsController(metricsService as unknown as MetricsService);
@@ -52,7 +54,10 @@ describe('MetricsController', () => {
 
       await controller.getMetrics(mockRes);
 
-      expect(mockRes.set).toHaveBeenCalledWith('Content-Type', 'application/openmetrics-text; version=1.0.0; charset=utf-8');
+      expect(mockRes.set).toHaveBeenCalledWith(
+        'Content-Type',
+        'application/openmetrics-text; version=1.0.0; charset=utf-8',
+      );
     });
   });
 });

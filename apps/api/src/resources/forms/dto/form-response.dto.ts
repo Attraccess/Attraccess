@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiSchema } from '@nestjs/swagger';
 import { FormFieldResponseDto } from './form-field.dto';
 
 export class FormResponseDto {
@@ -29,3 +29,7 @@ export class FormResponseDto {
   @ApiProperty({ type: () => FormFieldResponseDto, isArray: true })
   fields!: FormFieldResponseDto[];
 }
+
+/** The form as the resource embeds it. Schema name stays `Form` so the published API description does not change. */
+@ApiSchema({ name: 'Form' })
+export class ResourceFormDto extends FormResponseDto {}

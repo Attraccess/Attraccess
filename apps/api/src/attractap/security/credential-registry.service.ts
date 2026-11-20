@@ -1,13 +1,20 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Attractap, AttractapCredentialEvent } from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
-import { runSerializedTransaction } from '../../database/run-serialized-transaction';
+import type {
+  AttractapCredentialEventRecord,
+  AttractapCredentialSnapshot,
+  AttractapPairingState,
+} from '@attraccess/application-models';
+import { UNIT_OF_WORK, type UnitOfWork } from '../../database/unit-of-work';
 import { ReaderDeletedEvent } from '../events';
+import {
+  ATTRACTAP_CREDENTIAL_STORE,
+  type AttractapCredentialStore,
+  type CredentialSecurityPatch,
+} from './credential-store.port';
 
 export interface ActiveCredential {
-  state: 'unpaired' | 'paired' | 'revoked';
+  state: AttractapPairingState;
   fingerprint: string | null;
 }
 
@@ -16,30 +23,25 @@ export interface IssuedCertificate {
   notAfter: Date;
 }
 
+/**
+ * What a credential change does to the eFuse report result: it described the previous key, so the admin UI shows
+ * "no report received yet" until the new session's report is checked.
+ */
+const NO_SECURITY_REPORT: CredentialSecurityPatch = {
+  secured: false,
+  securedAt: null,
+  efuseSecureVersion: null,
+  securityReportCheckedAt: null,
+  securityReportProblems: null,
+};
+
 /** The credential columns of a reader row as `markPaired` found them, so an undo can put them back. */
-export interface CredentialSnapshot {
-  pairingState: Attractap['pairingState'];
-  credentialFingerprint: string | null;
-  pairedAt: Date | null;
-  certificateNotAfter: Date | null;
-  certificateSerial: string | null;
-  apiTokenHash: string;
-}
-
-const SNAPSHOT = {
-  id: true,
-  name: true,
-  pairingState: true,
-  credentialFingerprint: true,
-  certificateSerial: true,
-} as const;
-
-const FULL_SNAPSHOT = { ...SNAPSHOT, pairedAt: true, certificateNotAfter: true, apiTokenHash: true } as const;
+export type CredentialSnapshot = AttractapCredentialSnapshot;
 
 /**
  * Owns every change to a reader's credential. Each change writes the reader row and the
- * append-only history in one transaction and then clears the cache, so a session handshake
- * never needs a SQLite write and normally no read.
+ * append-only history in one unit of work and then clears the cache, so a session handshake
+ * never needs a database write and normally no read.
  */
 @Injectable()
 export class CredentialRegistryService {
@@ -48,18 +50,14 @@ export class CredentialRegistryService {
   private readonly generations = new Map<number, number>();
 
   public constructor(
-    @InjectRepository(Attractap) private readonly readers: Repository<Attractap>,
-    @InjectRepository(AttractapCredentialEvent) private readonly events: Repository<AttractapCredentialEvent>,
+    @Inject(ATTRACTAP_CREDENTIAL_STORE) private readonly store: AttractapCredentialStore,
+    @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {}
 
   public async get(readerId: number): Promise<ActiveCredential | null> {
     if (this.cache.has(readerId)) return this.cache.get(readerId) ?? null;
     const generation = this.generations.get(readerId) ?? 0;
-    const reader = await this.readers.findOne({
-      where: { id: readerId },
-      select: { id: true, pairingState: true, credentialFingerprint: true },
-    });
-    const value = reader ? { state: reader.pairingState, fingerprint: reader.credentialFingerprint } : null;
+    const value = await this.store.findState(readerId);
     if ((this.generations.get(readerId) ?? 0) === generation) this.cache.set(readerId, value);
     return value;
   }
@@ -82,11 +80,7 @@ export class CredentialRegistryService {
 
   /** The paired reader whose current credential is this key, if any. */
   public async findPairedReaderByFingerprint(fingerprint: string): Promise<number | null> {
-    const reader = await this.readers.findOne({
-      where: { credentialFingerprint: fingerprint, pairingState: 'paired' },
-      select: { id: true },
-    });
-    return reader?.id ?? null;
+    return await this.store.findPairedReaderIdByFingerprint(fingerprint);
   }
 
   /**
@@ -104,15 +98,12 @@ export class CredentialRegistryService {
   }): Promise<{ previousFingerprint: string | null; before: CredentialSnapshot }> {
     const { readerId, fingerprint, certificate, actorId } = input;
     try {
-      return await runSerializedTransaction(this.readers.manager, async (manager) => {
-        const reader = await manager.findOne(Attractap, { where: { id: readerId }, select: FULL_SNAPSHOT });
+      return await this.unitOfWork.run(async (scope) => {
+        const reader = await this.store.readCredential(scope, readerId);
         if (!reader) throw new NotFoundException('Reader not found');
         // One key, one reader: two records must never share an active credential.
-        const holder = await manager.findOne(Attractap, {
-          where: { credentialFingerprint: fingerprint, pairingState: 'paired' },
-          select: { id: true },
-        });
-        if (holder && holder.id !== reader.id) throw new ConflictException('PairingKeyInUse');
+        const holderId = await this.store.findPairedReaderIdByFingerprint(fingerprint, scope);
+        if (holderId !== null && holderId !== reader.id) throw new ConflictException('PairingKeyInUse');
         const previous =
           reader.pairingState === 'paired' &&
           reader.credentialFingerprint &&
@@ -120,7 +111,7 @@ export class CredentialRegistryService {
             ? reader.credentialFingerprint
             : null;
         if (previous) {
-          await manager.insert(AttractapCredentialEvent, {
+          await this.store.appendEvent(scope, {
             readerId: reader.id,
             readerName: reader.name,
             keyFingerprint: previous,
@@ -129,15 +120,16 @@ export class CredentialRegistryService {
             actorId,
           });
         }
-        await manager.update(Attractap, reader.id, {
+        await this.store.updateCredential(scope, reader.id, {
           pairingState: 'paired',
           credentialFingerprint: fingerprint,
           pairedAt: new Date(),
           certificateNotAfter: certificate.notAfter,
           certificateSerial: certificate.serial,
-          apiTokenHash: '', // token sign-in is over for this reader
+          // A new credential has to pass the eFuse report check again.
+          ...NO_SECURITY_REPORT,
         });
-        await manager.insert(AttractapCredentialEvent, {
+        await this.store.appendEvent(scope, {
           readerId: reader.id,
           readerName: reader.name,
           keyFingerprint: fingerprint,
@@ -154,7 +146,7 @@ export class CredentialRegistryService {
 
   /**
    * Takes back a pairing the reader never learned about: the row gets the credential columns
-   * `markPaired` found (`before`) again, with the token hash, so a working reader keeps working.
+   * `markPaired` found (`before`) again.
    * Applied only while `fingerprint` is still the reader's active credential; a change that
    * happened since wins. The history is appended to, never rewritten: the undone key is closed as
    * revoked and a credential that becomes active again is recorded as paired. Returns whether it
@@ -168,13 +160,13 @@ export class CredentialRegistryService {
   }): Promise<boolean> {
     const { readerId, fingerprint, before, actorId } = input;
     try {
-      return await runSerializedTransaction(this.readers.manager, async (manager) => {
-        const reader = await manager.findOne(Attractap, { where: { id: readerId }, select: SNAPSHOT });
+      return await this.unitOfWork.run(async (scope) => {
+        const reader = await this.store.readCredential(scope, readerId);
         if (!reader || reader.pairingState !== 'paired' || reader.credentialFingerprint !== fingerprint) return false;
         const restored = before.pairingState === 'paired' ? before.credentialFingerprint : null;
         const event = { readerId: reader.id, readerName: reader.name, actorId };
         if (restored !== fingerprint) {
-          await manager.insert(AttractapCredentialEvent, {
+          await this.store.appendEvent(scope, {
             ...event,
             keyFingerprint: fingerprint,
             certificateSerial: reader.certificateSerial,
@@ -182,14 +174,14 @@ export class CredentialRegistryService {
           });
         }
         if (restored) {
-          await manager.insert(AttractapCredentialEvent, {
+          await this.store.appendEvent(scope, {
             ...event,
             keyFingerprint: restored,
             certificateSerial: before.certificateSerial,
             state: 'paired',
           });
         }
-        await manager.update(Attractap, reader.id, { ...before });
+        await this.store.updateCredential(scope, reader.id, { ...before });
         return true;
       });
     } finally {
@@ -200,13 +192,13 @@ export class CredentialRegistryService {
   /** Revokes the reader's current credential. Throws when the reader is not paired (any more). */
   public async revoke(readerId: number, actorId: number): Promise<void> {
     try {
-      await runSerializedTransaction(this.readers.manager, async (manager) => {
-        const reader = await manager.findOne(Attractap, { where: { id: readerId }, select: SNAPSHOT });
+      await this.unitOfWork.run(async (scope) => {
+        const reader = await this.store.readCredential(scope, readerId);
         if (!reader) throw new NotFoundException('Reader not found');
         if (reader.pairingState !== 'paired' || !reader.credentialFingerprint) {
           throw new ConflictException('Reader is not paired');
         }
-        await manager.insert(AttractapCredentialEvent, {
+        await this.store.appendEvent(scope, {
           readerId: reader.id,
           readerName: reader.name,
           keyFingerprint: reader.credentialFingerprint,
@@ -214,7 +206,11 @@ export class CredentialRegistryService {
           state: 'revoked',
           actorId,
         });
-        await manager.update(Attractap, reader.id, { pairingState: 'revoked', certificateNotAfter: null });
+        await this.store.updateCredential(scope, reader.id, {
+          pairingState: 'revoked',
+          certificateNotAfter: null,
+          ...NO_SECURITY_REPORT,
+        });
       });
     } finally {
       this.invalidate(readerId);
@@ -226,24 +222,20 @@ export class CredentialRegistryService {
    * Applied only while that key is still the reader's active credential.
    */
   public async recordCertificate(readerId: number, fingerprint: string, certificate: IssuedCertificate): Promise<void> {
-    await this.readers.update(
-      { id: readerId, pairingState: 'paired', credentialFingerprint: fingerprint },
-      { certificateNotAfter: certificate.notAfter, certificateSerial: certificate.serial },
-    );
+    await this.store.updateCertificateIfActive(readerId, fingerprint, certificate);
   }
 
-  public async history(readerId: number): Promise<AttractapCredentialEvent[]> {
-    return await this.events.find({ where: { readerId }, order: { createdAt: 'DESC', id: 'DESC' } });
+  public async history(readerId: number): Promise<AttractapCredentialEventRecord[]> {
+    return await this.store.history(readerId);
   }
 }
 
-function snapshotOf(reader: Attractap): CredentialSnapshot {
+function snapshotOf(reader: AttractapCredentialSnapshot): CredentialSnapshot {
   return {
     pairingState: reader.pairingState,
     credentialFingerprint: reader.credentialFingerprint,
     pairedAt: reader.pairedAt ?? null,
     certificateNotAfter: reader.certificateNotAfter ?? null,
     certificateSerial: reader.certificateSerial ?? null,
-    apiTokenHash: reader.apiTokenHash ?? '',
   };
 }

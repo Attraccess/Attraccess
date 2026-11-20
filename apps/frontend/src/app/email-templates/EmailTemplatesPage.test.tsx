@@ -1,13 +1,14 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EmailTemplatesPage } from './EmailTemplatesPage';
 
 const state = vi.hoisted(() => ({ templates: [] as Record<string, unknown>[], language: 'en' }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useEmailTemplatesServiceEmailTemplateControllerFindAll: () => ({ data: state.templates }),
+  useEmailTemplateControllerFindAll: () => ({ data: state.templates }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -58,6 +59,21 @@ describe('EmailTemplatesPage', () => {
     expect(text[4]).toContain('No-show');
     expect(text[3]).toContain('pluginChip:reservations');
     expect(text[0]).not.toContain('pluginChip');
+  });
+
+  it('opens the editor from the row actions', async () => {
+    state.templates = [core('verify-email'), core('reset-password')];
+    render(
+      <MemoryRouter initialEntries={['/settings/email/templates']}>
+        <Routes>
+          <Route path="/settings/email/templates" element={<EmailTemplatesPage />} />
+          <Route path="/settings/email/templates/:type" element={<p>editor</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Actions for templateTypes.verify-email' }));
+    await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'editButton' }));
+    expect(await screen.findByText('editor')).toBeInTheDocument();
   });
 
   it('shows the plugin label in the interface language', () => {

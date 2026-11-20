@@ -14,12 +14,11 @@ themselves: nobody can add a reader without an admin approving it.
 
 ## Reader states
 
-| State               | Meaning                                                                                                                                                                              |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Waiting**         | A new reader shows its code and waits for an admin. It appears as a **New reader** row in the **Not paired** list while it is waiting.                                               |
-| **Not paired**      | A reader registered with a token before this version. It does nothing until an admin pairs it: it gets the firmware update, then shows its code and waits. Its settings stay locked. |
-| **Paired**          | The reader has its own key and certificate and can be used and set up.                                                                                                               |
-| **Pairing removed** | An admin removed the pairing. The reader disconnects within a second, shows "Pairing removed" and waits for approval again with a new key.                                           |
+| State               | Meaning                                                                                                                                                                                 |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Waiting**         | A new reader shows its code and waits for an admin. It appears as a **New reader** row in the **Not paired** list while it is waiting.                                                  |
+| **Paired**          | The reader has its own key and certificate and can be used and set up.                                                                                                                  |
+| **Pairing removed** | An admin removed the pairing. The reader disconnects within a second, shows "Pairing removed" and waits for approval again with a new key. Its record stays in the **Not paired** list. |
 
 Only paired readers are listed in the **Active Attractaps** and **Stale Attractaps** tables and can be edited.
 
@@ -75,36 +74,28 @@ Lite readers also derive the normal code. Open the web flasher, connect the read
 **Approve** next to the shown code, or read the line `Enrollment: code=XXX-XXX` on the serial
 console.
 
-## Pairing a reader that already exists
+## After the upgrade: every reader pairs again
 
-Readers that registered with a token before this version are blocked until they are paired. When
-such a reader connects, the server first offers it a firmware update if one is due, then asks it to
-pair, and the reader shows a code. A reader on firmware 1.8.0 or newer for which the server has no
-update pairs on its current firmware. A reader on 1.7.x shows its code only after the update; if the
-server has no update for it, update it with the web flasher.
+Readers no longer sign in with a token. The server version that introduces this removes every reader
+record when it starts for the first time: the reader list is empty afterwards, and the server behaves as if
+it had never known a reader. This also applies to readers that were already paired. **Every reader has
+to be paired again** with the steps above; resources, names and per-reader settings have to be set up
+again, and the card writer setting no longer names any reader. Cards, users and resources are not touched.
 
-Their row in the **Not paired** list has a **Pair** button, which asks the connected reader to show
-its code right away (readers on firmware before 1.8.0 ignore it). If a pairing does not finish, the
-reader is asked again on its own about two minutes later. Approve the code as above. The
-pairing is bound to the existing record, so name, machines and settings stay. If the reader is not
-connected, **Pair** cannot reach it; switch it on first. Settings of a reader that is not paired
-stay locked.
+A reader on firmware 2.6.0 or newer with no certificate goes straight to pairing and shows its code. A
+reader that was already paired over the encrypted connection (firmware 1.8.0 to 2.5.x) keeps its key, but
+the server no longer knows it. At its next connection the server tells it that its pairing is no longer
+valid, and it shows its code again.
 
-Until it is paired, such a reader signs nobody in and starts and stops no machines. It appears only
-in the **Not paired** list, where its row shows the machines it is assigned to. It cannot enroll or
-reset cards, supervise a start or run a mass introduction.
+**Readers on firmware older than 2.6.0 that only know a token cannot be updated over the air any more**:
+the update runs over the encrypted connection. Flash them over USB with the web flasher; they then start
+with firmware 2.6.0 and pair like a new reader. Such a reader that still tries to sign in with a token is
+refused at the connection: the server logs `token sign-in no longer supported` and creates nothing.
 
-A token reader keeps its token until the first encrypted session has delivered its certificate.
-If that session never reaches a server the reader can verify (three attempts in a row), the
-approval may have come from someone posing as your server: the reader forgets the server it
-remembered (not its own key) and goes back to its token, or to pairing if it has no token, so you
-can pair it again.
-
-After pairing, a reader never falls back to its token or to an unencrypted channel, and it never
-deletes its stored certificate authority or key because of a message that is not authenticated.
 If the server cannot prove it is your installation, a Touch reader shows **Server could not be
 verified** on its connecting screen and tries again every 30 seconds; a Lite reader flashes
-**red** on every failed attempt. It does not enrol again by itself.
+**red** on every failed attempt. It does not enrol again by itself, and it never deletes its stored
+certificate authority or key because of a message that is not authenticated.
 
 ## Remove pairing, pair again
 
@@ -114,8 +105,8 @@ These actions are in the **Pairing** tab of a paired reader's settings.
   example after a defect). The new reader shows its code, you approve it for the existing record.
   Name, machines and settings stay; the old pairing stops working right away.
 - **Remove pairing**: asks for confirmation, then disconnects the reader within a second. It shows
-  "Pairing removed", creates a **new key** and waits for approval again. It never uses its old
-  sign-in. Afterwards the reader appears in the **Not paired** list; click **Pair** to pair it again.
+  "Pairing removed", creates a **new key** and waits for approval again. Afterwards the reader appears
+  in the **Not paired** list; click **Pair** to pair it again.
 
 The **History** in the Pairing tab lists every pairing, replacement and removal with the user who
 did it and when. It is kept even after the reader is deleted.
@@ -127,6 +118,20 @@ did it and when. It is kept even after the reader is deleted.
 If the admin page is opened over plain HTTP (not HTTPS and not localhost), the pairing page
 shows a warning: someone who controls the network could show you fake information, including a
 fake reader that is not yours. Use HTTPS or a network you trust. Pairing is not blocked.
+
+### Secure readers
+
+A reader that runs a secure build of the firmware (Secure Boot and flash encryption) sends the server
+a report of its security settings each time it connects. The server compares the report with the secure
+profile and shows **Secured** or **Not secured**, with the settings that do not match, in the **Pairing**
+tab of the reader. Only a release build of a regular variant, connected with its paired key, can become
+secured; a lab build (development mode), a plain build, a demo or a debug build never does, whatever its
+report says. A failing report and removing the pairing both clear the state. The report is the reader's
+own statement and no hardware attestation; plain readers show nothing here.
+
+**Secured** also needs the fingerprints of the reader's Secure Boot keys, which the server records only
+when it secures the reader. That procedure is not available yet, so secure readers show **Not secured**
+for now. See [Reader Security](attractap/reader-security.md#reader-identity-and-the-secured-status).
 
 ### What an attacker can and cannot do
 
@@ -154,7 +159,7 @@ derived from `AUTH_SESSION_SECRET`; the certificates themselves are not secret.
 **Back up the database and `AUTH_SESSION_SECRET` together.** If the secret is lost, or changed
 without converting the stored keys, the keys cannot be decrypted and every reader has to be paired
 again. To change the secret, follow the rotation steps in
-[Security settings](../settings/security.md), which convert these keys too.
+[Security settings](settings/security.md), which convert these keys too.
 
 ### Reverse proxies
 
@@ -186,11 +191,11 @@ there is no button or command for it. The server certificate renews itself.
 
 ### Older firmware
 
-| Reader firmware             | Behaviour with this server                                                                                                                                                                                         |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1.7.x and older, registered | Is updated over the air automatically (the only thing it can do with its token). Afterwards it shows its code and must be paired from its row (**Pair**). It does nothing and its settings stay locked until then. |
-| 1.7.x and older, new        | Cannot enrol. It sends the old registration request and gets **no reply**; it waits. Update it with the web flasher first.                                                                                         |
-| 1.8.0 and newer             | Pairs with the flow on this page.                                                                                                                                                                                  |
+| Reader firmware   | Behaviour with this server                                                                                                                                              |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| older than 1.8.0  | Cannot connect: it only knows token sign-in or the old registration request. Flash it with the web flasher (USB).                                                       |
+| 1.8.0 up to 2.5.x | Paired over the encrypted connection: shows its code again after the upgrade and pairs again. Still signing in with a token (never paired): flash 2.6.0 over USB first. |
+| 2.6.0 and newer   | Pairs with the flow on this page and never offers a token.                                                                                                              |
 
 ### Metrics
 

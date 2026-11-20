@@ -1,25 +1,30 @@
-import { createHostDb } from '../testing/host-db.test-utils';
+import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { HostInfoService, normalizeLanguage } from './host-info.service';
 
-describe('HostInfoService (real host entities)', () => {
-  let db: Awaited<ReturnType<typeof createHostDb>>;
-  let info: HostInfoService;
+/** The queries run in the host's `hostData` adapter (tested there on real host tables); this covers the mapping. */
+describe('HostInfoService', () => {
+  const settings = new Map<string, string>();
+  const locales = new Map<number, string | null>();
+  const hostData = {
+    settings: { getApp: jest.fn(async (key: string) => settings.get(key) ?? null) },
+    users: {
+      getLocales: jest.fn(
+        async (ids: number[]) =>
+          new Map(ids.filter((id) => locales.has(id)).map((id) => [id, locales.get(id) ?? null] as const)),
+      ),
+      listIdsWithAnyPermission: jest.fn(async (_keys: string[]) => [1, 4]),
+    },
+    resources: {
+      countUnhealthyEntries: jest.fn(async (id: number) => (id === 1 ? 1 : 0)),
+      listIntroducerUserIds: jest.fn(async (_id: number) => [3, 4]),
+    },
+  };
+  const info = new HostInfoService({ hostData } as unknown as PluginContext);
 
-  const user = (id: number, locale = 'en') =>
-    db.sql(
-      `INSERT INTO "user" (id, username, email, locale, isEmailVerified, isDisabled, createdAt, updatedAt) VALUES (?, ?, ?, ?, 1, 0, datetime('now'), datetime('now'))`,
-      [id, `user${id}`, `u${id}@test`, locale],
-    );
-
-  beforeEach(async () => {
-    db = await createHostDb();
-    info = new HostInfoService(db.context);
-    for (let id = 1; id <= 7; id += 1) await user(id);
-    await db.sql(`INSERT INTO resource (id, name, type) VALUES (1, 'Laser', 'machine'), (2, 'Printer', 'machine')`);
-    await db.sql(`INSERT INTO resource_group (id, name, isHidden) VALUES (10, 'Wood', 0), (11, 'Secret', 1)`);
-    await db.sql(`INSERT INTO resource_groups_resource_group (resourceId, resourceGroupId) VALUES (1, 10)`);
+  beforeEach(() => {
+    settings.clear();
+    locales.clear();
   });
-  afterEach(() => db.dataSource.destroy());
 
   it('normalizes locales', () => {
     expect(normalizeLanguage('de-AT', 'en')).toBe('de');
@@ -30,60 +35,29 @@ describe('HostInfoService (real host entities)', () => {
 
   it('reads the public base URL like core and trims the trailing slash', async () => {
     expect(await info.getBaseUrl()).toBeNull();
-    await db.sql(
-      `INSERT INTO setting (parent, key, value, createdAt, updatedAt) VALUES ('app', 'backend_url', 'https://makerspace.test/', datetime('now'), datetime('now'))`,
-    );
+    settings.set('backend_url', 'https://makerspace.test/');
     expect(await info.getBaseUrl()).toBe('https://makerspace.test');
   });
 
   it('resolves languages: supported locale first, then the installation default (German when never configured)', async () => {
-    await user(8, 'de-AT');
-    await user(9, 'fr');
+    locales.set(1, 'en').set(8, 'de-AT').set(9, 'fr');
     expect([...(await info.languagesOf([1, 8, 9, 404]))]).toEqual([
       [1, 'en'],
       [8, 'de'],
       [9, 'de'],
       [404, 'de'],
     ]);
-    await db.sql(
-      `INSERT INTO setting (parent, key, value, createdAt, updatedAt) VALUES ('app', 'default_language', 'en', datetime('now'), datetime('now'))`,
-    );
+    settings.set('default_language', 'en');
     expect((await info.languagesOf([9])).get(9)).toBe('en');
+    expect((await info.languagesOf([])).size).toBe(0);
   });
 
-  it('finds managers: resources.update holders plus resource and group introducers/maintainers', async () => {
-    await db.sql(
-      `INSERT INTO role (id, key, name, description, isSystemManaged, isDefault, createdAt, updatedAt) VALUES (1, 'admin', 'Admin', '', 0, 0, datetime('now'), datetime('now')), (2, 'maint', 'Maint', '', 0, 0, datetime('now'), datetime('now')), (3, 'other', 'Other', '', 0, 0, datetime('now'), datetime('now'))`,
-    );
-    await db.sql(
-      `INSERT INTO permission (key, label, description, category, createdAt, updatedAt) VALUES ('resources.update', 'u', '', 'r', datetime('now'), datetime('now')), ('resources.maintenance.manage', 'm', '', 'r', datetime('now'), datetime('now')), ('resources.view', 'v', '', 'r', datetime('now'), datetime('now'))`,
-    );
-    await db.sql(
-      `INSERT INTO role_permission (roleId, permissionKey, createdAt) VALUES (1, 'resources.update', datetime('now')), (2, 'resources.maintenance.manage', datetime('now')), (3, 'resources.view', datetime('now'))`,
-    );
-    await db.sql(
-      `INSERT INTO user_role (userId, roleId, source, createdAt, updatedAt) VALUES (1, 1, 'manual', datetime('now'), datetime('now')), (2, 2, 'manual', datetime('now'), datetime('now')), (6, 3, 'manual', datetime('now'), datetime('now'))`,
-    );
-    await db.sql(
-      `INSERT INTO resource_introducer (type, resourceId, userId, grantedAt) VALUES ('introducer', 1, 3, datetime('now')), ('maintainer', 2, 5, datetime('now'))`,
-    );
-    await db.sql(
-      `INSERT INTO resource_introducer (type, resourceGroupId, userId, grantedAt) VALUES ('maintainer', 10, 4, datetime('now')), ('introducer', 11, 7, datetime('now'))`,
-    );
-    // User 2 only holds the global maintenance permission: no reservation manager (like AccessService.isManager).
+  it('merges permission holders and introducers into the manager set', async () => {
     expect((await info.managerIdsOf(1)).sort()).toEqual([1, 3, 4]);
-    expect((await info.managerIdsOf(2)).sort()).toEqual([1, 5]);
-
-    // soft-deleted users keep their role and introducer rows but are no managers anymore
-    await db.sql(`UPDATE "user" SET deletedAt = datetime('now') WHERE id IN (1, 3, 5)`);
-    expect((await info.managerIdsOf(1)).sort()).toEqual([4]);
-    expect((await info.managerIdsOf(2)).sort()).toEqual([]);
+    expect(hostData.users.listIdsWithAnyPermission).toHaveBeenCalledWith(['resources.update']);
   });
 
   it('counts unhealthy health entries', async () => {
-    await db.sql(
-      `INSERT INTO resource_health_state (resourceId, identifier, status, source, lastReportedAt, createdAt, updatedAt) VALUES (1, 'a', 'unhealthy', 'manual', datetime('now'), datetime('now'), datetime('now')), (1, 'b', 'healthy', 'manual', datetime('now'), datetime('now'), datetime('now'))`,
-    );
     expect(await info.countUnhealthyEntries(1)).toBe(1);
     expect(await info.countUnhealthyEntries(2)).toBe(0);
   });

@@ -1,3 +1,5 @@
+import { controllerRow, revisionRow } from '../../backend/rows.test-utils';
+import { createWagoTestStorage } from '../../backend/storage/testing';
 /* eslint-disable @nx/enforce-module-boundaries -- Acceptance deliberately connects the standalone runtime, plugin and real host graph executor. */
 import { randomUUID } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -18,14 +20,10 @@ import {
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { connectAsync } from 'mqtt';
-import { DataSource } from 'typeorm';
 import { registerPluginFlowNodes } from '../../../../api/src/plugin-system/flows/node-registry';
 import { ResourceFlowsExecutorService } from '../../../../api/src/resources/flows/execution/resource-flows-executor.service';
 import plugin from '../../backend/plugin';
-import { WagoConfigurationRevision } from '../../backend/configuration/revision.entity';
-import { WagoController } from '../../backend/controllers/entity';
 import { WagoFlowService } from '../../backend/flow/service';
-import { WagoSettings } from '../../backend/controllers/settings.entity';
 import { WagoService } from '../../backend/controllers/service';
 import { Cc100OnboardIoAdapter } from '../../cc100-runtime/src/io/adapters';
 import { ModbusDeviceRouter } from '../../cc100-runtime/src/modbus/routing/adapter';
@@ -34,39 +32,33 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
   const state = new FleetFixtureState();
   beforeAll(async () => {
     const url = await prepareFleetHardware(state);
-    state.database = new DataSource({
-      type: 'sqlite',
-      database: ':memory:',
-      entities: plugin.entities,
-      synchronize: true,
-    });
-    await state.database.initialize();
+    state.storage = createWagoTestStorage();
     const now = new Date().toISOString();
-    const controller = await state.database.getRepository(WagoController).save({
-      hardwareId,
-      trustState: 'claimed',
-      name: 'Fixture',
-      mqttServerId: 1,
-      pairingCodeHash: 'fixture',
-      protocolVersion: '1.0.0',
-      runtimeVersion: '0.1.0',
-      capabilities: '[]',
-      lastSequence: 0,
-      lastHeartbeatAt: now,
-      lastSeenAt: now,
-      createdAt: now,
-      updatedAt: now,
-    });
+    const controller = await state.storage.tables.controllers.insert(
+      controllerRow({
+        hardwareId,
+        trustState: 'claimed',
+        name: 'Fixture',
+        mqttServerId: 1,
+        pairingCodeHash: 'fixture',
+        lastHeartbeatAt: now,
+        lastSeenAt: now,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
     state.controllerId = controller.id;
-    await state.database.getRepository(WagoSettings).save({ id: 1, defaultMqttServerId: 1, operationalPrefix: prefix });
-    await state.database.getRepository(WagoConfigurationRevision).save({
-      controllerId: state.controllerId,
-      revision: 1,
-      contentHash: hash(state.snapshot),
-      snapshot: JSON.stringify(state.snapshot),
-      state: 'applied',
-      publishedAt: now,
-    });
+    await state.storage.tables.settings.insert({ id: 1, defaultMqttServerId: 1, operationalPrefix: prefix });
+    await state.storage.tables.configurationRevisions.insert(
+      revisionRow({
+        controllerId: state.controllerId,
+        revision: 1,
+        contentHash: hash(state.snapshot),
+        snapshot: JSON.stringify(state.snapshot),
+        state: 'applied',
+        publishedAt: now,
+      }),
+    );
     const mqttOptions = {
       username: 'fixture',
       password: process.env.WAGO_FLEET_MQTT_PASSWORD,
@@ -83,7 +75,8 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
     );
     await state.observer.subscribeAsync(`${base}/#`, { qos: 1 });
     const context = {
-      getRepository: (entity) => state.database.getRepository(entity),
+      storage: state.storage.storage,
+      persistence: state.storage.persistence,
       get: (service) => {
         if (service === WagoService) return state.backend;
         throw new Error(`Unexpected service lookup: ${service.name}`);
@@ -233,7 +226,6 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
     );
     for (const socket of state.sockets) socket.destroy();
     if (state.server) await new Promise<void>((resolve) => state.server.close(() => resolve()));
-    if (state.database?.isInitialized) await state.database.destroy();
     jest.restoreAllMocks();
   });
   it('routes canonical DI1 through the production graph and waits for the correlated production acknowledgement', async () => {

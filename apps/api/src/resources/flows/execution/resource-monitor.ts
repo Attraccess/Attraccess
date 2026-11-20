@@ -1,14 +1,12 @@
 import { Logger } from '@nestjs/common';
 import {
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  ResourceUsage,
+  FlowNodeRecord,
   ResourceHealthHeartbeatNodeDataSchema,
+  InputResourceActivityNoActivityNodeDataSchema,
+  ResourceFlowNodeType,
   ResourceHealthSource,
   ResourceHealthStatus,
-  InputResourceActivityNoActivityNodeDataSchema,
-} from '@attraccess/database-entities';
-import { IsNull, Repository } from 'typeorm';
+} from '@attraccess/application-models';
 import { ResourceHealthService } from '../../health/resource-health.service';
 import { CronTimer } from '../../../metrics/instrumentation/cron/cron.helper';
 import {
@@ -18,22 +16,22 @@ import {
   heartbeatKey,
   parseGlobalHeartbeatKey,
 } from '../node-executors';
-import { FlowExecutionOptions } from './flow-execution.types';
-import { activeUsageSql } from '../../usage/sessions/active-usage';
-import { enabledGlobalNodesWhere, isGlobalFlowNode } from './flow-node-queries';
+import type { FlowExecutionOptions } from './flow-execution.types';
+import type { FlowTriggerStore, InactivityTarget } from '../flow-trigger-store.port';
+import { isGlobalFlowNode } from './flow-node-queries';
 
 const NO_ACTIVITY_CONCURRENCY = 10;
 
 /** Minute-based activity triggers and heartbeat expiry share the executor's live state. */
 export class FlowResourceMonitor {
   constructor(
-    private readonly flowNodeRepository: Repository<ResourceFlowNode>,
+    private readonly store: Pick<FlowTriggerStore, 'findTriggerNodes' | 'findInactivityTargets'>,
     private readonly resourceActivity: Map<number, Date>,
     private readonly heartbeatLastSeen: Map<string, Date>,
     private readonly resourceHealthService: ResourceHealthService,
     private readonly cronTimer: CronTimer,
     private readonly startFlow: (
-      node: ResourceFlowNode,
+      node: FlowNodeRecord,
       data: NodeProcessingResult,
       options?: FlowExecutionOptions,
     ) => Promise<NodeProcessingResult[]>,
@@ -44,12 +42,7 @@ export class FlowResourceMonitor {
   private readonly noActivityFiredAt = new Map<string, Date>();
 
   private async heartbeatNodes() {
-    return this.flowNodeRepository.find({
-      where: [
-        { type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT, flowId: IsNull() },
-        enabledGlobalNodesWhere(ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT),
-      ],
-    });
+    return this.store.findTriggerNodes(ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT);
   }
 
   public async checkHealthHeartbeats() {
@@ -137,40 +130,11 @@ export class FlowResourceMonitor {
     );
   }
 
-  /** Every (no-activity node, machine with an active session) pair: the resource's own nodes and global ones. */
-  private async noActivityPairs(): Promise<Array<{ node: ResourceFlowNode; resourceId: number }>> {
-    const resourceNodes = await this.flowNodeRepository
-      .createQueryBuilder('node')
-      .innerJoin(ResourceUsage, 'usage', `usage.resourceId = node.resourceId AND ${activeUsageSql('usage')}`)
-      .where('node.type = :type', { type: ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY })
-      .distinct(true)
-      .getMany();
-    const pairs = resourceNodes.map((node) => ({ node, resourceId: node.resourceId as number }));
-
-    const globalNodes = await this.flowNodeRepository.find({
-      where: enabledGlobalNodesWhere(ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY),
-    });
-    if (globalNodes.length > 0) {
-      const active: Array<{ resourceId: number }> = await this.flowNodeRepository.manager
-        .createQueryBuilder(ResourceUsage, 'usage')
-        .select('usage.resourceId', 'resourceId')
-        .where(activeUsageSql('usage'))
-        .distinct(true)
-        .getRawMany();
-      for (const node of globalNodes) {
-        for (const { resourceId } of active) {
-          pairs.push({ node, resourceId: Number(resourceId) });
-        }
-      }
-    }
-    return pairs;
-  }
-
   public async checkResourceActivity() {
     await this.cronTimer.time('flow_minute_tick', async () => {
       const now = new Date();
 
-      const pairs = await this.noActivityPairs();
+      const pairs: InactivityTarget[] = await this.store.findInactivityTargets();
 
       const currentKeys = new Set(pairs.map(({ node, resourceId }) => noActivityKey(node.id, resourceId)));
       for (const key of this.noActivityFiredAt.keys()) {

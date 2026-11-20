@@ -1,17 +1,7 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Param,
-  Body,
-  ParseIntPipe,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, ParseIntPipe, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
-import { ResourceMaintenanceSchedule } from '@attraccess/database-entities';
+import { ResourceMaintenanceSchedule } from './dtos/maintenance-records.dto';
+import { toMaintenanceScheduleDto } from './dtos/maintenance-records.mapper';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { Req } from '@nestjs/common';
 import { CanManageMaintenance } from './canManageMaintenance.decorator';
@@ -26,7 +16,7 @@ import { RequiresLicense } from '../../license/require-license.decorator';
 @Controller('resources/:resourceId/maintenance-schedules')
 @Auth()
 export class MaintenanceScheduleController {
-  constructor(private readonly scheduleService: MaintenanceScheduleService) { }
+  constructor(private readonly scheduleService: MaintenanceScheduleService) {}
 
   @Get()
   @ApiOperation({
@@ -38,10 +28,8 @@ export class MaintenanceScheduleController {
   @ApiResponse({ status: 200, description: 'List of schedules', type: [ResourceMaintenanceSchedule] })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Resource not found' })
-  async findSchedules(
-    @Param('resourceId', ParseIntPipe) resourceId: number,
-  ): Promise<ResourceMaintenanceSchedule[]> {
-    return this.scheduleService.findAllByResourceId(resourceId);
+  async findSchedules(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<ResourceMaintenanceSchedule[]> {
+    return (await this.scheduleService.findAllByResourceId(resourceId)).map(toMaintenanceScheduleDto);
   }
 
   @Get(':scheduleId')
@@ -59,7 +47,7 @@ export class MaintenanceScheduleController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('scheduleId', ParseIntPipe) scheduleId: number,
   ): Promise<ResourceMaintenanceSchedule> {
-    return this.scheduleService.getOne(resourceId, scheduleId);
+    return toMaintenanceScheduleDto(await this.scheduleService.getOne(resourceId, scheduleId));
   }
 
   @Post()
@@ -80,12 +68,14 @@ export class MaintenanceScheduleController {
     @Body() dto: CreateMaintenanceScheduleDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceMaintenanceSchedule> {
-    return this.scheduleService.create(
-      resourceId,
-      dto,
-      req.user.id,
-      req.user.authenticationMethod ?? 'session',
-      req.user.apiTokenId,
+    return toMaintenanceScheduleDto(
+      await this.scheduleService.create(
+        resourceId,
+        dto,
+        req.user.id,
+        req.user.authenticationMethod ?? 'session',
+        req.user.apiTokenId,
+      ),
     );
   }
 
@@ -109,13 +99,15 @@ export class MaintenanceScheduleController {
     @Body() dto: UpdateMaintenanceScheduleDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceMaintenanceSchedule> {
-    return this.scheduleService.update(
-      resourceId,
-      scheduleId,
-      dto,
-      req.user.id,
-      req.user.authenticationMethod ?? 'session',
-      req.user.apiTokenId,
+    return toMaintenanceScheduleDto(
+      await this.scheduleService.update(
+        resourceId,
+        scheduleId,
+        dto,
+        req.user.id,
+        req.user.authenticationMethod ?? 'session',
+        req.user.apiTokenId,
+      ),
     );
   }
 

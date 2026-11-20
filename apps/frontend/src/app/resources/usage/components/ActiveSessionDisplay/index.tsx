@@ -11,10 +11,10 @@ import { SessionNotesModal, SessionModalMode } from '../SessionNotesModal';
 import {
   ApiError,
   FormSubmissionRequestDto,
-  useResourcesServiceResourceUsageEndSession,
-  useResourcesServiceResourceUsageGetActiveSession,
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
-  UseResourcesServiceResourceUsageGetHistoryKeyFn,
+  useResourceUsageEndSession,
+  useResourceUsageGetActiveSession,
+  UseResourceUsageGetActiveSessionKeyFn,
+  UseResourceUsageGetHistoryKeyFn,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import en from './translations/en.json';
@@ -49,7 +49,7 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
 
   const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(resourceId);
 
-  const endSession = useResourcesServiceResourceUsageEndSession({
+  const endSession = useResourceUsageEndSession(undefined, {
     onSuccess: () => {
       clearFormsDraft();
       recordUsefulAction();
@@ -58,7 +58,7 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
       // Invalidate all history queries for this resource (regardless of pagination/user filters)
       queryClient.invalidateQueries({
         predicate: (query) => {
-          const baseHistoryKey = UseResourcesServiceResourceUsageGetHistoryKeyFn({ resourceId });
+          const baseHistoryKey = UseResourceUsageGetHistoryKeyFn({ path: { resourceId } });
           return (
             query.queryKey[0] === baseHistoryKey[0] &&
             query.queryKey.length > 1 &&
@@ -68,7 +68,7 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
       });
       // Reset active session query instead of just invalidating
       queryClient.resetQueries({
-        queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId }),
+        queryKey: UseResourceUsageGetActiveSessionKeyFn({ path: { resourceId } }),
       });
       toast.success({
         title: t('sessionEnded.success.title'),
@@ -88,7 +88,7 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
 
   const runEndSession = useCallback(
     async (body: { notes?: string }) => {
-      let formSubmissions: FormSubmissionRequestDto[] = [];
+      let formSubmissions: FormSubmissionRequestDto[];
       try {
         formSubmissions = await requestForms('end');
       } catch (error) {
@@ -98,10 +98,7 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
         throw error;
       }
 
-      endSession.mutate({
-        resourceId,
-        requestBody: { ...body, usageId, formSubmissions },
-      });
+      endSession.mutate({ path: { resourceId }, body: { ...body, usageId, formSubmissions } });
     },
     [endSession, requestForms, resourceId, usageId],
   );
@@ -118,7 +115,7 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
     setIsNotesModalOpen(true);
   };
 
-  const { data: activeSessionResponse } = useResourcesServiceResourceUsageGetActiveSession({ resourceId });
+  const { data: activeSessionResponse } = useResourceUsageGetActiveSession({ path: { resourceId } });
   // my own session by id: with parallel sessions `usage` may not be the one shown here
   const myUsage =
     activeSessionResponse?.usages?.find((usage) => usage.id === usageId) ??

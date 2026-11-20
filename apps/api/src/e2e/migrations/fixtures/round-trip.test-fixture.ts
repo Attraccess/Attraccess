@@ -6,6 +6,7 @@ import type { DataSource } from 'typeorm';
 import { migrationCsvExportSeeds } from './seeds/csv-export.test-fixture';
 import { migrationFlowUsageSeeds } from './seeds/flow-usage.test-fixture';
 import { migrationIdentityNotificationSeeds } from './seeds/identity-notification.test-fixture';
+import { migrationMcpOAuthSeeds } from './seeds/mcp-oauth.test-fixture';
 import { migrationMaintenanceSeeds } from './seeds/maintenance.test-fixture';
 import { migrationMembershipFormSeeds } from './seeds/membership-form.test-fixture';
 import { migrationReaderSeeds } from './seeds/reader.test-fixture';
@@ -27,9 +28,13 @@ const getTestStorageRoot = async () => {
 const seedDatabase = async (dataSource: DataSource) => {
   const seedTag = Date.now().toString(36);
   const { primaryUser, secondaryUser } = await ensureUsers(dataSource, seedTag);
-  const { resourceGroup, resource, project } = await migrationResourceSeeds(dataSource, seedTag, primaryUser);
+  const { resourceGroup, resource, accessOnlyDoor, project } = await migrationResourceSeeds(
+    dataSource,
+    seedTag,
+    primaryUser,
+  );
   await migrationSsoSeeds(dataSource, seedTag, primaryUser);
-  await migrationReaderSeeds(dataSource, seedTag, resource);
+  await migrationReaderSeeds(dataSource, seedTag, resource, accessOnlyDoor);
   await migrationMaintenanceSeeds(dataSource, seedTag, primaryUser, resource);
   const { usage } = await migrationFlowUsageSeeds(dataSource, seedTag, primaryUser, secondaryUser, resource, project);
   await migrationMembershipFormSeeds(
@@ -45,6 +50,7 @@ const seedDatabase = async (dataSource: DataSource) => {
   await migrationIdentityNotificationSeeds(dataSource, seedTag, primaryUser);
   await migrationCsvExportSeeds(dataSource, seedTag);
   await migrationSecureBootSeeds(dataSource, seedTag);
+  await migrationMcpOAuthSeeds(dataSource, seedTag, primaryUser);
 };
 
 const assertAllEntitiesHaveRows = async (dataSource: DataSource) => {

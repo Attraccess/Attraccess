@@ -16,7 +16,9 @@ import { RabbitmqUserPanel } from './users/RabbitmqUserPanel';
 import { useCapabilities } from './capabilities';
 import { useDetection } from './detection/detection';
 import { usePolledResource } from './usePolledResource';
-import { RabbitmqDetailSlot } from './plugin';
+import RabbitmqPlugin, { RabbitmqDetailSlot } from './plugin';
+import { RabbitmqListBadge } from './users/RabbitmqListBadge';
+import { setRabbitmqAuthData } from './access';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 
 // Coverage instrumentation plus parallel nx tasks make renders slow.
@@ -27,6 +29,8 @@ vi.mock('@attraccess/plugins-frontend-sdk', () => ({
   createPluginApiClient: (base: string) => ({
     request: (path: string, options: unknown) => request(base + path, options),
   }),
+  hasPluginAuthPermission: (auth: { effectivePermissions?: string[] } | null, key: string) =>
+    auth?.effectivePermissions?.includes(key) ?? false,
 }));
 
 // Lets every pending promise (including rejections) settle.
@@ -54,8 +58,12 @@ const connection = {
   sendRate: null,
 };
 
+const signIn = (...effectivePermissions: string[]) =>
+  setRabbitmqAuthData({ authToken: '', user: {} as never, effectivePermissions });
+
 beforeEach(() => {
   request.mockReset();
+  signIn('rabbitmq.broker.read');
 });
 afterEach(() => {
   cleanup();
@@ -85,7 +93,7 @@ it('hides force-close for view-only users', async () => {
   request.mockResolvedValue({ mqttServerId: 2, total: 1, truncated: false, connections: [connection] });
   render(<RabbitmqConnectionsPanel mqttServerId={2} canManage={false} />);
   await screen.findByText('sensor-1');
-  expect(screen.queryByRole('button', { name: /Close connection/ })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Actions for sensor-1' })).toBeNull();
 });
 
 it('confirms before closing a connection, sends the reason and refreshes the list afterwards', async () => {
@@ -98,7 +106,8 @@ it('confirms before closing a connection, sends the reason and refreshes the lis
     return { mqttServerId: 3, total: 1, truncated: false, connections: closed ? [] : [connection] };
   });
   render(<RabbitmqConnectionsPanel mqttServerId={3} canManage />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Close connection sensor-1' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Actions for sensor-1' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Close connection' }));
   const dialog = await screen.findByRole('alertdialog');
   expect(request.mock.calls.some(([, options]) => options?.method === 'DELETE')).toBe(false);
   fireEvent.change(within(dialog).getByLabelText('Reason (optional)'), { target: { value: 'maintenance' } });
@@ -123,7 +132,8 @@ it('keeps the close dialog open and shows the error when closing fails', async (
     return { mqttServerId: 4, total: 1, truncated: false, connections: [connection] };
   });
   render(<RabbitmqConnectionsPanel mqttServerId={4} canManage />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Close connection sensor-1' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Actions for sensor-1' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Close connection' }));
   const dialog = await screen.findByRole('alertdialog');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Close connection' }));
   expect(await within(dialog).findByText('Broker refused')).toBeTruthy();
@@ -253,7 +263,8 @@ it('renders overview, nodes and queues and tolerates missing fields', async () =
   useTranslationState.setState({ language: 'de' });
   render(<RabbitmqStatsPanel mqttServerId={6} />);
   expect(await screen.findByText('1,5 /s')).toBeTruthy();
-  expect(screen.getByText('1,0 MiB / 4,0 MiB')).toBeTruthy();
+  // The nodes table renders its rows after the overview; under CI load that can take a moment.
+  expect(await screen.findByText('1,0 MiB / 4,0 MiB')).toBeTruthy();
   expect(screen.getByText('Alarm aktiv')).toBeTruthy();
 });
 
@@ -341,9 +352,7 @@ it('hides the user write actions without the manage tier', async () => {
   render(<RabbitmqUserPanel mqttServerId={8} canManage={false} />);
   await screen.findByRole('row', { name: /sensor/ });
   expect(screen.queryByRole('button', { name: 'Add user' })).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Edit user sensor' })).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Delete user sensor' })).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Edit permissions of sensor' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Actions for sensor' })).toBeNull();
 });
 
 const slotRequest = (options: { isRabbitMQ: boolean; authOk: boolean; canManage: boolean }) => async (path: string) => {
@@ -383,6 +392,28 @@ it('composes the detail slot per detection result and permission tier', async ()
   render(<RabbitmqDetailSlot mqttServerId={23} />);
   expect(await screen.findByText('Connections')).toBeTruthy();
   expect(screen.queryByText('Message explorer')).toBeNull();
+});
+
+it('renders and requests nothing without rabbitmq.broker.read, even with the old core keys', async () => {
+  request.mockImplementation(slotRequest({ isRabbitMQ: true, authOk: true, canManage: true }));
+  // The host pushes the auth state through the plugin.
+  new RabbitmqPlugin().onApiAuthStateChange({
+    authToken: '',
+    user: {} as never,
+    effectivePermissions: ['resources.update', 'system.settings.manage'],
+  });
+  const slot = render(<RabbitmqDetailSlot mqttServerId={26} />);
+  const badge = render(<RabbitmqListBadge mqttServerId={26} />);
+  await settle();
+  expect(slot.container.textContent).toBe('');
+  expect(badge.container.textContent).toBe('');
+  expect(request).not.toHaveBeenCalled();
+
+  act(() => signIn('rabbitmq.broker.read'));
+  expect(await screen.findAllByText('RabbitMQ')).not.toHaveLength(0);
+  act(() => setRabbitmqAuthData(null));
+  await settle();
+  expect(screen.queryByText('RabbitMQ')).toBeNull();
 });
 
 it('remounts the panels when the slot switches servers', async () => {

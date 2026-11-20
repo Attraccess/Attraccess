@@ -1,20 +1,24 @@
 import { Button } from '@attraccess/plugins-frontend-ui';
 import { Card } from '@heroui/react';
 import { PlusIcon, RefreshCwIcon, UsersIcon } from 'lucide-react';
-import { useRabbitmqUserPanelState } from './useRabbitmqUserPanelState';
-type Props = Pick<
-  ReturnType<typeof useRabbitmqUserPanelState>,
-  't' | 'reload' | 'loading' | 'mqttServerId' | 'setFormUser' | 'setFormOpen'
-> & { canManage: boolean };
+import { useRabbitmqTranslations } from '../i18n';
+
+interface RabbitmqUserPanelCardHeaderProps {
+  reload: () => Promise<void>;
+  loading: boolean;
+  mqttServerId: number;
+  onCreate: () => void;
+  canManage: boolean;
+}
+
 export function RabbitmqUserPanelCardHeader({
-  t,
   reload,
   loading,
   mqttServerId,
-  setFormUser,
-  setFormOpen,
+  onCreate,
   canManage,
-}: Props) {
+}: RabbitmqUserPanelCardHeaderProps) {
+  const { t } = useRabbitmqTranslations();
   return (
     <Card.Header className="rmq:flex rmq:flex-row rmq:items-center rmq:justify-between rmq:gap-2">
       <div className="rmq:flex rmq:items-center rmq:gap-2">
@@ -37,10 +41,7 @@ export function RabbitmqUserPanelCardHeader({
           <Button
             size="sm"
             variant="primary"
-            onPress={() => {
-              setFormUser(null);
-              setFormOpen(true);
-            }}
+            onPress={onCreate}
             data-cy={`rabbitmq-user-panel-create-button-${mqttServerId}`}
           >
             <PlusIcon className="rmq:w-4 rmq:h-4" />

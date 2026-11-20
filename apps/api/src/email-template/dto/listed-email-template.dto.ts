@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { EmailTemplate } from '@attraccess/database-entities';
+import { EmailTemplate } from './email-template.dto';
 
 export class LocalizedLabelDto {
   @ApiProperty({ example: 'Booking confirmed' })

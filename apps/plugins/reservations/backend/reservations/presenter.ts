@@ -1,5 +1,5 @@
 import type { ReservationDto } from '../api/dto.response';
-import type { ReservationEntity } from '../entities/reservation.entity';
+import type { ReservationRow } from '../storage/reservation-table';
 
 export interface Viewer {
   userId: number;
@@ -18,7 +18,7 @@ const iso = (date: Date | null): string | null => (date ? date.toISOString() : n
  * single redaction point for the API (iCal applies the same rules).
  */
 export function presentReservation(
-  reservation: ReservationEntity,
+  reservation: ReservationRow,
   viewer: Viewer,
   context: { now: Date; resourceName: string | null; userName: string | null },
 ): ReservationDto {

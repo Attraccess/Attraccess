@@ -1,10 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ProjectMember, User } from '@attraccess/database-entities';
+import { UserDto } from '../../users-and-auth/users/dtos/user.dto';
+import { ProjectMemberDto } from './project.dto';
 
 export class ProjectMembersResponseDto {
-  @ApiProperty({ type: () => User })
-  owner!: User;
+  @ApiProperty({ type: () => UserDto })
+  owner!: UserDto;
 
-  @ApiProperty({ type: () => ProjectMember, isArray: true })
-  members!: ProjectMember[];
+  @ApiProperty({ type: () => ProjectMemberDto, isArray: true })
+  members!: ProjectMemberDto[];
 }

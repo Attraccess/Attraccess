@@ -7,7 +7,7 @@ import { EmailService } from '../../email/email.service';
 import { SignupDomainService } from './signup-domain.service';
 import { PasswordPolicyService } from '../password-policy/password-policy.service';
 import { ServiceUnavailableException } from '@nestjs/common';
-import { User } from '@attraccess/database-entities';
+import type { UserAccount as User } from '@attraccess/application-models';
 
 describe('UserRegistrationService – resendVerificationEmail', () => {
   let service: UserRegistrationService;

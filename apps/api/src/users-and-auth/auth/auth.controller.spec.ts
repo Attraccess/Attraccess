@@ -1,11 +1,12 @@
 import { approvedOriginsFor, registerAuthControllerFixture } from './auth.controller.auth-controller.test-fixture';
+import { expectNoPrivateAccountFields, privateAccount } from './private-account.test-fixture';
 import { SsoLogoutService } from './sso/sso-logout.service';
 import { SessionPermissionSync } from './sso/session-permission-sync';
 import { AuthController } from './auth.controller';
 import { Response } from 'express';
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { User } from '@attraccess/database-entities';
+import type { AuthenticatedSessionUser } from '@attraccess/application-models';
 
 const noStore = () => ({ setHeader: jest.fn() }) as unknown as Response;
 
@@ -17,7 +18,7 @@ describe('AuthController', () => {
   });
 
   it('should create a session for programmatic client', async () => {
-    const user: Partial<User> = {
+    const user: Partial<AuthenticatedSessionUser> = {
       id: 1,
       username: 'testuser',
     };
@@ -56,8 +57,69 @@ describe('AuthController', () => {
     expect(mockResponse.cookie).not.toHaveBeenCalled();
   });
 
+  it.each(['body', 'cookie'] as const)(
+    'never serializes the email, tokens or lockout state of the signed-in account (token in %s)',
+    async (tokenLocation) => {
+      const request = {
+        user: privateAccount(),
+        headers: { 'user-agent': 'curl' },
+        ip: '127.0.0.1',
+        connection: {},
+      } as unknown as AuthenticatedRequest;
+
+      const result = await fixture.authController.createSession(
+        request,
+        { setHeader: jest.fn(), cookie: jest.fn() } as never,
+        { tokenLocation },
+      );
+
+      expect(Object.keys(result.user).sort()).toEqual(
+        [
+          'billingFactor',
+          'createdAt',
+          'creditBalance',
+          'dateTimeLocale',
+          'deletedAt',
+          'externalIdentifier',
+          'id',
+          'isDisabled',
+          'isEmailVerified',
+          'locale',
+          'updatedAt',
+          'username',
+        ].sort(),
+      );
+      expectNoPrivateAccountFields(result);
+    },
+  );
+
+  it('keeps the permissions and the way of authentication of a session principal in a refresh response', async () => {
+    const request = {
+      user: {
+        id: 1,
+        username: 'testuser',
+        email: 'secret@example.com',
+        effectivePermissions: new Set(['resources.read']),
+        authenticationMethod: 'session',
+      },
+      headers: { authorization: 'Bearer old-token' },
+      cookies: {},
+    } as unknown as AuthenticatedRequest;
+    fixture.sessionService.refreshSession.mockResolvedValue('new-token');
+
+    const result = await fixture.authController.refreshSession(request, noStore());
+
+    expect(result.authToken).toBe('new-token');
+    expect(result.user).toMatchObject({
+      id: 1,
+      effectivePermissions: ['resources.read'],
+      authenticationMethod: 'session',
+    });
+    expect(JSON.stringify(result)).not.toContain('secret@example.com');
+  });
+
   it('should create a session for web browser and set cookie', async () => {
-    const user: Partial<User> = {
+    const user: Partial<AuthenticatedSessionUser> = {
       id: 1,
       username: 'testuser',
     };

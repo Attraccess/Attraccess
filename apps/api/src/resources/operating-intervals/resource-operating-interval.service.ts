@@ -1,18 +1,18 @@
-import { ConflictException, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { ResourceOperatingInterval } from '@attraccess/database-entities';
-import { EntityManager, QueryFailedError, Repository } from 'typeorm';
+import { ConflictException, Inject, Injectable } from '@nestjs/common';
+import type { OperatingIntervalRecord } from '@attraccess/application-models';
 import { OperatingMetricsRecorder } from '../../metrics/instrumentation/operating/operating.helper';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceOperatingStateChangedEvent } from './events/resource-operating-state-changed.event';
-import { runSerializedTransaction } from '../../database/run-serialized-transaction';
+import {
+  OPERATING_TIMELINE_STORE,
+  OperatingClockRegressionError,
+  OperatingState,
+  OperatingTimelineStore,
+  OperatingTransitionProvenance,
+} from './operating-timeline.port';
 
-export type ResourceOperatingState = 'operating' | 'idle';
-
-export interface OperatingTransitionProvenance {
-  flowNodeId: string;
-  flowRunId?: string;
-}
+export type ResourceOperatingState = OperatingState;
+export type { OperatingTransitionProvenance } from './operating-timeline.port';
 
 /**
  * Writes the authoritative machine operating timeline: one interval row per operating stretch.
@@ -26,8 +26,7 @@ export class ResourceOperatingIntervalService {
   private readonly transitionChains = new Map<number, Promise<unknown>>();
 
   constructor(
-    @InjectRepository(ResourceOperatingInterval)
-    private readonly intervalRepository: Repository<ResourceOperatingInterval>,
+    @Inject(OPERATING_TIMELINE_STORE) private readonly timeline: OperatingTimelineStore,
     private readonly operatingMetrics: OperatingMetricsRecorder,
     private readonly eventEmitter: EventEmitter2,
   ) {}
@@ -36,7 +35,7 @@ export class ResourceOperatingIntervalService {
     resourceId: number,
     state: ResourceOperatingState,
     provenance?: OperatingTransitionProvenance,
-  ): Promise<ResourceOperatingInterval | null> {
+  ): Promise<OperatingIntervalRecord | null> {
     const result = await this.runSerialized(resourceId, state, provenance);
 
     // A null result means the resource was already in the target state (or a duplicate operating
@@ -56,15 +55,9 @@ export class ResourceOperatingIntervalService {
     resourceId: number,
     state: ResourceOperatingState,
     provenance?: OperatingTransitionProvenance,
-  ): Promise<ResourceOperatingInterval | null> {
+  ): Promise<OperatingIntervalRecord | null> {
     const previous = this.transitionChains.get(resourceId) ?? Promise.resolve();
-    const next = previous
-      .catch(() => undefined)
-      .then(() =>
-        runSerializedTransaction(this.intervalRepository.manager, (manager) =>
-          this.persistTransitionWithConflictHandling(resourceId, state, manager, provenance),
-        ),
-      );
+    const next = previous.catch(() => undefined).then(() => this.record(resourceId, state, provenance));
     this.transitionChains.set(resourceId, next);
 
     try {
@@ -76,79 +69,16 @@ export class ResourceOperatingIntervalService {
     }
   }
 
-  private async persistTransitionWithConflictHandling(
+  private async record(
     resourceId: number,
     state: ResourceOperatingState,
-    manager: EntityManager,
     provenance?: OperatingTransitionProvenance,
-  ): Promise<ResourceOperatingInterval | null> {
+  ): Promise<OperatingIntervalRecord | null> {
     try {
-      return await this.persistTransition(resourceId, state, manager, provenance);
+      return await this.timeline.recordTransition(resourceId, state, provenance);
     } catch (error) {
-      if (state === 'operating' && this.isOpenIntervalUniqueConflict(error)) {
-        return null;
-      }
+      if (error instanceof OperatingClockRegressionError) throw new ConflictException(error.message);
       throw error;
     }
-  }
-
-  private async persistTransition(
-    resourceId: number,
-    state: ResourceOperatingState,
-    manager: EntityManager,
-    provenance?: OperatingTransitionProvenance,
-  ): Promise<ResourceOperatingInterval | null> {
-    // Updating the parent row acquires a database-backed per-resource write lock.
-    await manager.query('UPDATE "resource" SET "id" = "id" WHERE "id" = ?', [resourceId]);
-
-    const repository = manager.getRepository(ResourceOperatingInterval);
-    const latestInterval = await repository.findOne({
-      where: { resourceId },
-      order: { startTime: 'DESC', id: 'DESC' },
-    });
-    // Read the clock after obtaining the write lock so queued assignments use their application time.
-    const transitionTime = new Date();
-    const lastTransitionTime = latestInterval?.endTime ?? latestInterval?.startTime;
-    if (lastTransitionTime && transitionTime < lastTransitionTime) {
-      throw new ConflictException('Server clock precedes the last operating transition');
-    }
-    const openInterval = latestInterval?.endTime === null ? latestInterval : null;
-
-    if (state === 'idle') {
-      if (!openInterval) {
-        return null;
-      }
-
-      openInterval.endTime = transitionTime;
-      openInterval.endFlowNodeId = provenance?.flowNodeId ?? null;
-      openInterval.endFlowRunId = provenance?.flowRunId ?? null;
-      return repository.save(openInterval);
-    }
-
-    if (openInterval) {
-      return null;
-    }
-
-    // The transition timestamp is deliberately taken inside the server-side transaction.
-    return repository.save(
-      repository.create({
-        resourceId,
-        startTime: transitionTime,
-        endTime: null,
-        startFlowNodeId: provenance?.flowNodeId ?? null,
-        startFlowRunId: provenance?.flowRunId ?? null,
-        endFlowNodeId: null,
-        endFlowRunId: null,
-      }),
-    );
-  }
-
-  private isOpenIntervalUniqueConflict(error: unknown): boolean {
-    if (!(error instanceof QueryFailedError)) {
-      return false;
-    }
-
-    const code = (error as QueryFailedError & { code?: string | number }).code;
-    return code === '23505' || (code === 'SQLITE_CONSTRAINT' && error.message.includes('UNIQUE constraint failed'));
   }
 }

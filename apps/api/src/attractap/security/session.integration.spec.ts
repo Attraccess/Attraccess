@@ -1,8 +1,6 @@
-import { Attractap } from '@attraccess/database-entities';
 import { INestApplication } from '@nestjs/common';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { createWsAdapter } from '../../common/text-frame-ws-adapter';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test } from '@nestjs/testing';
 import { AddressInfo } from 'net';
 import { WebSocket } from 'ws';
@@ -19,7 +17,9 @@ import { CredentialRegistryService } from './credential-registry.service';
 import { HandshakeLimiter } from './handshake-limiter';
 import { InstallationIdentityService } from './installation-identity.service';
 import { CREDENTIAL_CHANGED_EVENT, PairingService } from './pairing.service';
+import { ReaderControlService } from './reader-control.service';
 import { ReaderSessionService } from './reader-session.service';
+import type { EfuseReportService } from './efuse-report.service';
 import { FrameType, SESSION_SUBPROTOCOL } from './session-framing';
 import { SessionMetrics } from './session-metrics';
 import { EmulatedReader } from './testing/emulated-reader';
@@ -38,6 +38,8 @@ describe('reader session through the real gateway', () => {
   /** 0: the registry answers from its cache; otherwise it reads the database first. */
   let registryReadMs = 0;
   const recordCertificate = jest.fn(async () => undefined);
+  // The eFuse report check has its own specs; here only the wiring of the control channel counts.
+  const efuse = { handle: jest.fn(async () => 'recorded') } as unknown as EfuseReportService;
   const issueReaderCertificate = jest.fn(async () => ({
     pem: 'RENEWED-CERT-PEM',
     serial: '0b',
@@ -56,7 +58,6 @@ describe('reader session through the real gateway', () => {
       })),
     };
     const security = [
-      { provide: getRepositoryToken(Attractap), useValue: { update: jest.fn() } },
       { provide: HandshakeLimiter, useFactory: () => new HandshakeLimiter() },
       {
         provide: InstallationIdentityService,
@@ -92,6 +93,7 @@ describe('reader session through the real gateway', () => {
         provide: SessionMetrics,
         useValue: { activeSessions: { inc: jest.fn(), dec: jest.fn() }, handshakeFailures: { inc: jest.fn() } },
       },
+      { provide: ReaderControlService, useFactory: () => new ReaderControlService(efuse) },
       ReaderSessionService,
     ];
     const module = await Test.createTestingModule({
@@ -342,19 +344,47 @@ describe('reader session through the real gateway', () => {
     expect(reader.frames.map((f) => json(f))).toEqual([{ t: 'session.rejected', reason: 'inactive-credential' }]);
   });
 
-  it('refuses unknown subprotocol versions at upgrade and still serves legacy connections', async () => {
-    const unknown = new WebSocket(url, ['attractap-session.v2']);
-    const status = await new Promise<number>((resolve) => {
-      unknown.on('unexpected-response', (_req, res) => resolve(res.statusCode ?? 0));
-      unknown.on('open', () => resolve(101));
-      unknown.on('error', () => undefined);
-    });
-    expect(status).toBe(400);
-
-    const legacy = new WebSocket(url);
-    const first = await new Promise<string>((resolve) => legacy.once('message', (d) => resolve(d.toString())));
-    expect(JSON.parse(first).data.type).toBe('READER_REQUEST_AUTHENTICATION');
-    legacy.close();
+  it('refuses unknown subprotocol versions and connections without a subprotocol (token readers) at upgrade', async () => {
+    const statusOf = (socket: WebSocket) =>
+      new Promise<number>((resolve) => {
+        socket.on('unexpected-response', (_req, res) => resolve(res.statusCode ?? 0));
+        socket.on('open', () => resolve(101));
+        socket.on('error', () => undefined);
+      });
+    expect(await statusOf(new WebSocket(url, ['attractap-session.v2']))).toBe(400);
+    // A token reader offers no subprotocol: it gets no connection, so nothing is created for it.
+    expect(await statusOf(new WebSocket(url))).toBe(400);
     expect(SESSION_SUBPROTOCOL).toBe('attractap-session.v1');
+  });
+
+  describe('the reader control channel', () => {
+    const control = (reader: EmulatedReader, message: unknown) =>
+      reader.send(FrameType.CONTROL, typeof message === 'string' ? message : JSON.stringify(message));
+
+    it('hands an eFuse report to the checker with the credential of the session', async () => {
+      const { reader, identity } = await connectPaired(24);
+      await reader.nextFrame((f) => f.type === FrameType.JSON);
+      control(reader, { t: 'efuse.report', mac: 'dc:b4:d9:21:71:c8' });
+      await new Promise((r) => setTimeout(r, 200));
+      const [state, body] = (efuse.handle as jest.Mock).mock.calls.at(-1) as [
+        { readerId: number; fingerprint: string },
+        unknown,
+      ];
+      expect(state).toMatchObject({ readerId: 24, fingerprint: identity.fingerprint });
+      expect(body).toMatchObject({ mac: 'dc:b4:d9:21:71:c8' });
+    });
+
+    it.each([
+      ['an unknown type', { t: 'session.hello' }],
+      ['another unknown type', { t: 'reader.hello' }],
+      ['no type', { nonce: 'x' }],
+      ['not JSON', 'not json'],
+      ['a JSON array', '[]'],
+    ])('closes the session on a control message with %s', async (_name, message) => {
+      const { reader } = await connectPaired(25);
+      await reader.nextFrame((f) => f.type === FrameType.JSON);
+      control(reader, message);
+      await reader.closed;
+    });
   });
 });

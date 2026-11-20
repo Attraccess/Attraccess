@@ -1,10 +1,10 @@
 import {
   ResourceFlowNodeType,
-  ResourceUsage,
   ResourceHealthStatus,
   ResourceIntroducerType,
+  ResourceType,
   SupervisionMode,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
 import { getSessionCapacity } from '../../../../resources/usage/sessions/active-usage';
 import type { ResourceListService } from './resource-list.service';
@@ -23,7 +23,17 @@ interface ResourceListServiceResourceListPayloadContext {
   rbacService: ResourceListService['rbacService'];
   logger: ResourceListService['logger'];
 }
-function toReaderSession(session: ResourceUsage, offsetMinutes: (at: Date) => number) {
+/** What the reader's session list reads of a running usage session. */
+interface ReaderSessionSource {
+  id: number;
+  userId: number;
+  startTime: Date;
+  /** Always loaded for the active sessions the reader lists. */
+  user?: { username: string } | null;
+  supervisorUser?: { username: string } | null;
+}
+
+function toReaderSession(session: ReaderSessionSource, offsetMinutes: (at: Date) => number) {
   return {
     id: session.id,
     user: {
@@ -45,13 +55,19 @@ export const MAX_LISTED_READER_SESSIONS = 16;
 
 /** The card holder's own session first, then the others earliest first, capped for the reader's memory. */
 function listedReaderSessions(
-  sessions: ResourceUsage[],
+  sessions: ReaderSessionSource[],
   offsetMinutes: (at: Date) => number,
-  own?: ResourceUsage,
+  own?: ReaderSessionSource,
 ): ReaderSession[] {
   const ordered = own ? [own, ...sessions.filter((session) => session !== own)] : sessions;
   return ordered.slice(0, MAX_LISTED_READER_SESSIONS).map((session) => toReaderSession(session, offsetMinutes));
 }
+
+/**
+ * Readers keep only the first this many resources of the list (firmware API::MAX_RESOURCES in
+ * src/api/api_types.hpp) and drop the rest, so the surplus is never sent.
+ */
+export const MAX_READER_RESOURCES = 10;
 
 export async function sendResourceListToSockets(
   context: ResourceListServiceResourceListPayloadContext,
@@ -66,14 +82,17 @@ export async function sendResourceListToSockets(
     throw new Error(`Reader not found: ${sockets[0].readerId}`);
   }
 
-  const resources = [...reader.resources].sort((a, b) => a.name.localeCompare(b.name));
+  const attachedResources = [...reader.resources].sort((a, b) => a.name.localeCompare(b.name));
 
+  // Matched against every attached resource: a rename can move a resource into or out of the listed ones.
   const resourceIdsToMatch = onlyIfResourceMatches?.resourceIds;
   if (resourceIdsToMatch?.size) {
-    if (!resources.some((resource) => resourceIdsToMatch.has(resource.id))) {
+    if (!attachedResources.some((resource) => resourceIdsToMatch.has(resource.id))) {
       return;
     }
   }
+
+  const resources = attachedResources.slice(0, MAX_READER_RESOURCES);
 
   const resourceIds = resources.map((resource) => resource.id);
   const [introducersByResourceId, healthMap, activeSessionMap, activeMaintenanceIds, flowButtonMap] = await Promise.all(
@@ -106,6 +125,8 @@ export async function sendResourceListToSockets(
         name: resource.name,
         type: resource.type,
         separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch,
+        // Doors only; old firmware ignores it and shows unlock, which the API takes as the Open of the door.
+        accessOnly: resource.type === ResourceType.Door && resource.accessOnly === true,
         description: resource.description,
         allowTakeOver: resource.allowTakeOver,
         introducers: (introducersByResourceId.get(resource.id) ?? []).flatMap((introducer) =>

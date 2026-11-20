@@ -1,6 +1,9 @@
 export const APP_PARENT = 'app';
 export const SMTP_PARENT = 'smtp';
 
+/** Emitted after the license key was saved (changed or removed). The plugin system re-evaluates its license gates. */
+export const LICENSE_KEY_CHANGED_EVENT = 'settings.license-key-changed';
+
 export const APP_KEYS = {
   url: 'backend_url',
   publicInternetUrl: 'public_internet_url',

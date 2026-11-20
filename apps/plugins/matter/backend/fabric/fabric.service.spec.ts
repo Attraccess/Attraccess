@@ -1,12 +1,15 @@
 import { ConflictException } from '@nestjs/common';
-import { MatterRecoveryKey } from '../backup/entities';
-import { MatterFabric, MatterNode } from '../devices/entities';
-import { ADMIN, createFabricHarness, type FabricHarness } from '../testing/fabric-harness.test-utils';
+import { ADMIN, createFabricHarness, nodeRow, type FabricHarness } from '../testing/fabric-harness.test-utils';
 import { parseRecoveryKey, recoveryKeyId } from '../backup/recovery-key';
 import { SidecarUnavailableError } from '../client/errors';
 import { auditSubjectId } from '../devices/audit.service';
 
-type AuditCall = { action: string; subject: { type: string; id: number }; details: Record<string, unknown> };
+type AuditCall = {
+  action: string;
+  operationId: string;
+  subject: { type: string; id: number };
+  details: Record<string, unknown>;
+};
 const callsOf = (h: FabricHarness, action: string) =>
   h.audit.mock.calls.map((call) => (call as unknown as [AuditCall])[0]).filter((entry) => entry.action === action);
 
@@ -61,9 +64,26 @@ describe('MatterFabricService', () => {
       expect(h.connection.bodies['fabric.create']).toEqual({ label: 'Home' });
     });
 
+    it('gives the key, the fabric and the first backup of one create the same operation ID', async () => {
+      await h.fabric.create('Home', ADMIN);
+      const entries = h.audit.mock.calls.map((call) => (call as unknown as [AuditCall])[0]);
+      expect(entries.map((entry) => entry.action)).toEqual([
+        'matter.recovery_key_generated',
+        'matter.fabric_created',
+        'matter.backup_succeeded',
+      ]);
+      expect(new Set(entries.map((entry) => entry.operationId)).size).toBe(1);
+      // A second operation gets an ID of its own.
+      h.audit.mockClear();
+      await h.fabric.rotateRecoveryKey(ADMIN);
+      const rotation = h.audit.mock.calls.map((call) => (call as unknown as [AuditCall])[0].operationId);
+      expect(new Set(rotation).size).toBe(1);
+      expect(rotation[0]).not.toBe(entries[0].operationId);
+    });
+
     it('stores the key only encrypted and never returns it again', async () => {
       const { recoveryKey } = await h.fabric.create(undefined, ADMIN);
-      const [row] = await h.dataSource.getRepository(MatterRecoveryKey).find();
+      const [row] = await h.tables.recoveryKeys.find();
       const key = recoveryKey?.key ?? '';
       const raw = parseRecoveryKey(key);
       expect(row.encryptedKey).toMatch(/^enc:/);
@@ -92,7 +112,7 @@ describe('MatterFabricService', () => {
       await h.keys.generate(ADMIN);
       const { recoveryKey } = await h.fabric.create(undefined, ADMIN);
       expect(recoveryKey).toBeNull();
-      expect(await h.dataSource.getRepository(MatterRecoveryKey).count()).toBe(1);
+      expect(await h.tables.recoveryKeys.count()).toBe(1);
     });
 
     it('refuses to create while the fabric needs recovery', async () => {
@@ -133,7 +153,7 @@ describe('MatterFabricService', () => {
       );
       // The old key is retired but kept, so older backups stay readable.
       expect(await h.keys.keyById(recoveryKey?.keyId ?? '')).not.toBeNull();
-      expect(await h.dataSource.getRepository(MatterRecoveryKey).count()).toBe(2);
+      expect(await h.tables.recoveryKeys.count()).toBe(2);
     });
 
     it('rotating during a running backup takes a new backup under the new key instead of joining the old one', async () => {
@@ -179,7 +199,7 @@ describe('MatterFabricService', () => {
   });
 
   describe('mismatch detection on connect and fabric.changed', () => {
-    const rowOf = (id: string) => h.dataSource.getRepository(MatterFabric).findOneByOrFail({ fabricId: id });
+    const rowOf = (id: string) => h.one('fabrics', { fabricId: id });
 
     beforeEach(async () => {
       await h.fabric.create(undefined, ADMIN);
@@ -231,7 +251,7 @@ describe('MatterFabricService', () => {
       expect(status.recovery).toEqual({ required: true, mismatch: expected });
       expect(h.actions()).toEqual(['matter.fabric_recovery_required']);
       // The #2173 convention: the recorded row's UUID is the subject, and travels in full as `fabricRef`.
-      const [recorded] = await h.dataSource.getRepository(MatterFabric).find();
+      const [recorded] = await h.tables.fabrics.find();
       expect(callsOf(h, 'matter.fabric_recovery_required')[0]).toMatchObject({
         subject: { type: 'matter.fabric', id: auditSubjectId(recorded.id) },
         details: { fabricRef: recorded.id, mismatch: expected },
@@ -239,7 +259,7 @@ describe('MatterFabricService', () => {
     });
 
     it('audits a mismatch without a recorded fabric on the fixed "no fabric" subject, without a fabricRef', async () => {
-      await h.dataSource.query('DELETE FROM plugin_matter_fabrics');
+      await h.clear('fabrics');
       h.backend.enterRecovery();
       expect(await h.fabric.detect('connect')).toBe('sidecar_recovery_required');
       expect(callsOf(h, 'matter.fabric_recovery_required')[0]).toMatchObject({
@@ -287,7 +307,7 @@ describe('MatterFabricService', () => {
     });
 
     it('adopts the sidecar fabric when the plugin has recorded nothing', async () => {
-      await h.dataSource.query('UPDATE plugin_matter_fabrics SET fabric_generation = NULL');
+      await h.tables.fabrics.update({ id: { isNull: false } }, { fabricGeneration: null });
       expect(await h.fabric.detect('connect')).toBeNull();
       expect((await h.fabric.status()).recorded?.fabricId).toBe(h.backend.storage?.fabricId);
       expect(await rowOf(h.backend.storage?.fabricId ?? '')).toMatchObject({ fabricGeneration: 1 });
@@ -418,7 +438,7 @@ describe('MatterFabricService', () => {
       expect(status.backups.stored[0]).toMatchObject({ fabricId: '4242', trigger: 'fabric_changed' });
       expect(h.actions()).toEqual(expect.arrayContaining(['matter.recovery_action_chosen', 'matter.backup_succeeded']));
       // Audited on the row of the fabric the plugin had recorded when the administrator chose.
-      const old = await h.dataSource.getRepository(MatterFabric).findOneByOrFail({ fabricId: original });
+      const old = await h.one('fabrics', { fabricId: original });
       expect(callsOf(h, 'matter.recovery_action_chosen')).toEqual([
         expect.objectContaining({
           subject: { type: 'matter.fabric', id: auditSubjectId(old.id) },
@@ -455,7 +475,7 @@ describe('MatterFabricService', () => {
       });
       expect(h.actions()).toEqual(expect.arrayContaining(['matter.recovery_action_chosen', 'matter.fabric_created']));
       const [chosen] = callsOf(h, 'matter.recovery_action_chosen');
-      const oldRow = await h.dataSource.getRepository(MatterFabric).findOneByOrFail({ fabricId: oldFabricId });
+      const oldRow = await h.one('fabrics', { fabricId: oldFabricId });
       expect(chosen).toMatchObject({
         subject: { type: 'matter.fabric', id: auditSubjectId(oldRow.id) },
         details: { fabricRef: oldRow.id, choice: 'start_new' },
@@ -463,12 +483,12 @@ describe('MatterFabricService', () => {
     });
 
     it('start-new audits the choice on the new fabric row when no old one was recorded', async () => {
-      await h.dataSource.query('DELETE FROM plugin_matter_fabrics');
+      await h.clear('fabrics');
       h.backend.enterRecovery();
       await h.fabric.detect('connect');
       h.backend.clear();
       await h.fabric.startNew(undefined, ADMIN);
-      const created = await h.dataSource.getRepository(MatterFabric).findOneByOrFail({
+      const created = await h.one('fabrics', {
         fabricId: h.backend.storage?.fabricId,
       });
       expect(callsOf(h, 'matter.recovery_action_chosen')[0]).toMatchObject({
@@ -478,56 +498,38 @@ describe('MatterFabricService', () => {
     });
 
     it('start-new detaches the old fabric nodes as a fabric mismatch, even after a run saw the empty sidecar', async () => {
-      const old = await h.dataSource.getRepository(MatterFabric).findOneByOrFail({ retiredAt: undefined });
-      await h.dataSource.getRepository(MatterNode).save({
-        id: 'n-1',
-        fabricRef: old.id,
-        nodeId: '5',
-        lifecycleState: 'claimed',
-        firstSeenAt: 't',
-        lastSeenAt: 't',
-        createdAt: 't',
-        updatedAt: 't',
-      } as MatterNode);
+      const old = await h.one('fabrics', { retiredAt: null });
+      await h.tables.nodes.insert(nodeRow({ id: 'n-1', fabricRef: old.id, nodeId: '5', lifecycleState: 'claimed' }));
       h.backend.clear();
       // A run saw the empty sidecar before the mismatch was detected: the node is detached for that reason.
       await h.reconciliation.request();
-      expect(await h.dataSource.getRepository(MatterNode).findOneByOrFail({ id: 'n-1' })).toMatchObject({
+      expect(await h.one('nodes', { id: 'n-1' })).toMatchObject({
         lifecycleState: 'detached',
         detachedReason: 'fabric_absent',
       });
       await h.fabric.detect('connect');
 
       await h.fabric.startNew(undefined, ADMIN);
-      expect(await h.dataSource.getRepository(MatterNode).findOneByOrFail({ id: 'n-1' })).toMatchObject({
+      expect(await h.one('nodes', { id: 'n-1' })).toMatchObject({
         lifecycleState: 'detached',
         detachedReason: 'fabric_mismatch',
       });
     });
 
     it('no other reconciliation applies anything while recovery waits for the administrator', async () => {
-      const old = await h.dataSource.getRepository(MatterFabric).findOneByOrFail({ retiredAt: undefined });
-      await h.dataSource.getRepository(MatterNode).save({
-        id: 'n-1',
-        fabricRef: old.id,
-        nodeId: '5',
-        lifecycleState: 'claimed',
-        firstSeenAt: 't',
-        lastSeenAt: 't',
-        createdAt: 't',
-        updatedAt: 't',
-      } as MatterNode);
+      const old = await h.one('fabrics', { retiredAt: null });
+      await h.tables.nodes.insert(nodeRow({ id: 'n-1', fabricRef: old.id, nodeId: '5', lifecycleState: 'claimed' }));
       h.backend.seedFabric('4242', 7);
       await h.fabric.detect('connect');
       const status = await h.reconciliation.request(ADMIN);
       expect(status).toMatchObject({ lastResult: 'skipped_unavailable', lastSummary: { reason: 'recovery_required' } });
       expect(h.connection.requests).not.toContain('inventory.list');
-      expect(await h.dataSource.getRepository(MatterNode).findOneByOrFail({ id: 'n-1' })).toMatchObject({
+      expect(await h.one('nodes', { id: 'n-1' })).toMatchObject({
         lifecycleState: 'claimed',
       });
       // The administrator's choice reconciles while the plugin is still in recovery.
       await h.fabric.acceptSidecar(ADMIN);
-      expect(await h.dataSource.getRepository(MatterNode).findOneByOrFail({ id: 'n-1' })).toMatchObject({
+      expect(await h.one('nodes', { id: 'n-1' })).toMatchObject({
         lifecycleState: 'detached',
       });
     });

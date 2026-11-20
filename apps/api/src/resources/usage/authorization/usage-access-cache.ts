@@ -1,4 +1,4 @@
-import { User } from '@attraccess/database-entities';
+import type { UsageSessionUser } from '@attraccess/application-models';
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
@@ -8,7 +8,7 @@ import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 
 import { Redis } from 'ioredis';
 
-import { EntityManager } from 'typeorm';
+import type { TransactionScope } from '../../../database/unit-of-work';
 
 import { MetricsService } from '../../../metrics/metrics.service';
 
@@ -17,6 +17,8 @@ import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 import { UserPermissionsChangedEvent } from '../../../users-and-auth/rbac/events/user-permissions-changed.event';
 
 import { VALKEY_CLIENT } from '../../../valkey/valkey.module';
+
+import { describeValkeyError, logValkeyOutages } from '../../../valkey/valkey-outage-logging';
 
 import { ResourceChangedEvent } from '../../events/resource-changed.event';
 
@@ -75,11 +77,7 @@ export class UsageAccessCache {
     @Inject(VALKEY_CLIENT) private readonly valkeyClient: Redis | null,
   ) {}
 
-  async canControllResource(
-    resourceId: number,
-    user: User,
-    transactionalEntityManager?: EntityManager,
-  ): Promise<boolean> {
+  async canControllResource(resourceId: number, user: UsageSessionUser, scope?: TransactionScope): Promise<boolean> {
     const requestPermissions = (user as AuthenticatedUser).effectivePermissions;
     // API tokens may have a narrower effective permission set than their owning user session.
     // Keep users without request-scoped permissions separate so their RBAC lookup can be cached too.
@@ -106,14 +104,7 @@ export class UsageAccessCache {
       const canUpdateResource = (requestPermissions ?? (await this.rbacService.getEffectivePermissions(user.id))).has(
         'resources.update',
       );
-      return this.resolveAuthorizationCacheMiss(
-        key,
-        resourceId,
-        user,
-        canUpdateResource,
-        transactionalEntityManager,
-        generation,
-      );
+      return this.resolveAuthorizationCacheMiss(key, resourceId, user, canUpdateResource, scope, generation);
     })();
     this.accessCacheInFlight.set(key, { generation, result });
     try {
@@ -151,12 +142,12 @@ export class UsageAccessCache {
   private async resolveAuthorizationCacheMiss(
     key: string,
     resourceId: number,
-    user: User,
+    user: UsageSessionUser,
     canUpdateResource: boolean,
-    transactionalEntityManager: EntityManager | undefined,
+    scope: TransactionScope | undefined,
     generation: number,
   ): Promise<boolean> {
-    const result = await this.rules.canControl(resourceId, user, canUpdateResource, transactionalEntityManager);
+    const result = await this.rules.canControl(resourceId, user, canUpdateResource, scope);
     let expiresAt = Date.now() + this.ACCESS_CACHE_TTL_MS;
     if (result && !canUpdateResource) {
       const retrainingStatus = await this.resourceRetrainingService.getResourceRetrainingStatus(resourceId, user.id);
@@ -226,32 +217,23 @@ export class UsageAccessCache {
     }
   }
 
-  /** Permission changes on other API instances arrive through Valkey and invalidate this cache too. */
-  async subscribe(): Promise<void> {
+  /**
+   * Permission changes on other API instances arrive through Valkey and invalidate this cache too. Returns at once:
+   * while Valkey is unreachable the subscription waits in the background and starts when Valkey is back.
+   */
+  subscribe(): void {
     if (!this.valkeyClient) {
       return;
     }
-    this.authorizationCacheSubscriber = this.valkeyClient.duplicate();
-    // ioredis emits `error` on every reconnect attempt; log each outage once. Log only error messages here: AUTH
-    // errors carry the password in `error.command.args`.
-    let disconnected = false;
-    this.authorizationCacheSubscriber.on('error', (error: NodeJS.ErrnoException) => {
-      if (disconnected) {
-        return;
-      }
-      disconnected = true;
-      this.logger.warn(
-        `Authorization cache invalidation subscriber lost its Valkey connection (${error.message || error.code}); ` +
-          'permission changes on other API instances are not seen until it reconnects (cached answers still expire ' +
-          `within ${this.ACCESS_CACHE_TTL_MS / 1000} s)`,
-      );
-    });
-    this.authorizationCacheSubscriber.on('ready', () => {
-      if (!disconnected) {
-        return;
-      }
-      disconnected = false;
-      this.logger.log('Authorization cache invalidation subscriber reconnected to Valkey');
+    // Without a retry limit SUBSCRIBE waits in the offline queue until Valkey is reachable, instead of failing for
+    // good when Valkey is down at startup. Once subscribed, ioredis subscribes again after every reconnect.
+    this.authorizationCacheSubscriber = this.valkeyClient.duplicate({ maxRetriesPerRequest: null });
+    logValkeyOutages(this.authorizationCacheSubscriber, this.logger, {
+      lost: (reason) =>
+        `Authorization cache invalidation subscriber lost its Valkey connection (${reason}); ` +
+        'permission changes on other API instances are not seen until it reconnects (cached answers still expire ' +
+        `within ${this.ACCESS_CACHE_TTL_MS / 1000} s)`,
+      reconnected: 'Authorization cache invalidation subscriber reconnected to Valkey',
     });
     this.authorizationCacheSubscriber.on('message', (channel, message) => {
       if (channel !== AUTHORIZATION_CACHE_INVALIDATION_CHANNEL) {
@@ -266,19 +248,31 @@ export class UsageAccessCache {
         this.logger.warn('Ignoring invalid authorization cache invalidation message', error);
       }
     });
-    try {
-      await this.authorizationCacheSubscriber.subscribe(AUTHORIZATION_CACHE_INVALIDATION_CHANNEL);
-    } catch (error) {
-      const { message, code } = error as NodeJS.ErrnoException;
-      this.logger.error(`Failed to subscribe to authorization cache invalidations (${message || code})`);
-      this.authorizationCacheSubscriber.disconnect();
-      this.authorizationCacheSubscriber = null;
-    }
+    this.listenForInvalidations(this.authorizationCacheSubscriber);
   }
 
   unsubscribe(): void {
     this.authorizationCacheSubscriber?.disconnect();
     this.authorizationCacheSubscriber = null;
+  }
+
+  /** Subscribes, and when Valkey rejects the subscription tries again the next time the connection is ready. */
+  private listenForInvalidations(subscriber: Redis): void {
+    subscriber.subscribe(AUTHORIZATION_CACHE_INVALIDATION_CHANNEL).catch((error: unknown) => {
+      // After unsubscribe() the queued SUBSCRIBE either fails with "Connection is closed." or never settles.
+      if (subscriber !== this.authorizationCacheSubscriber) {
+        return;
+      }
+      this.logger.warn(
+        `Could not subscribe to authorization cache invalidations (${describeValkeyError(error)}); ` +
+          'trying again after the next reconnect to Valkey',
+      );
+      subscriber.once('ready', () => {
+        if (subscriber === this.authorizationCacheSubscriber) {
+          this.listenForInvalidations(subscriber);
+        }
+      });
+    });
   }
 
   private deleteAccessCacheEntry(key: string): void {

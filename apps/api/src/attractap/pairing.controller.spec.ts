@@ -1,13 +1,13 @@
 import { ExecutionContext, INestApplication, UnauthorizedException, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { AuthenticatedRequest, DualAuthGuard, User } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, DualAuthGuard } from '@attraccess/plugins-backend-sdk';
+import type { PluginUserModel } from '@attraccess/application-models';
 import request from 'supertest';
 import { LicenseGuard } from '../license/license.guard';
 import { EnrollmentRateLimitedException } from '../device-enrollment/enrollment-rate-limited.exception';
 import { AttractapPairingController } from './pairing.controller';
 import { CredentialRegistryService } from './security/credential-registry.service';
 import { PairingService } from './security/pairing.service';
-import { WebsocketService } from './websockets/websocket.service';
 
 describe('AttractapPairingController authorization and throttling', () => {
   let app: INestApplication;
@@ -26,7 +26,6 @@ describe('AttractapPairingController authorization and throttling', () => {
       providers: [
         { provide: PairingService, useValue: pairing },
         { provide: CredentialRegistryService, useValue: { history: jest.fn() } },
-        { provide: WebsocketService, useValue: { sockets: new Map() } },
       ],
     })
       .overrideGuard(LicenseGuard)
@@ -37,7 +36,7 @@ describe('AttractapPairingController authorization and throttling', () => {
           const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
           if (!req.headers['x-test-user']) throw new UnauthorizedException();
           const viaToken = req.headers['x-test-token'] === '1';
-          req.user = Object.assign(new User(), {
+          req.user = Object.assign({} as PluginUserModel, {
             id: Number(req.headers['x-test-user']),
             jwtTokenId: 'test',
             authenticationMethod: viaToken ? 'api-token' : 'session',
@@ -64,7 +63,6 @@ describe('AttractapPairingController authorization and throttling', () => {
     ['post', '/attractap/pairings/abc/approve'],
     ['delete', '/attractap/pairings/abc'],
     ['post', '/attractap/readers/4/revoke'],
-    ['post', '/attractap/readers/4/pair'],
     ['get', '/attractap/readers/4/credentials'],
   ];
 
@@ -138,7 +136,10 @@ describe('AttractapPairingController authorization and throttling', () => {
     });
     pairing.approve.mockRejectedValue(new EnrollmentRateLimitedException(42));
     const headers = { 'x-test-user': '1', 'x-test-permissions': 'resources.update' };
-    const resolved = await call('post', '/attractap/pairings/resolve').set(headers).send({ code: 'AAAAAA' }).expect(429);
+    const resolved = await call('post', '/attractap/pairings/resolve')
+      .set(headers)
+      .send({ code: 'AAAAAA' })
+      .expect(429);
     expect(resolved.body).toMatchObject({ message: 'EnrollmentRateLimited', retryAfterSeconds: 42 });
     await call('post', '/attractap/pairings/p1/approve').set(headers).send({ code: 'AAAAAA', mode: 'new' }).expect(429);
   });

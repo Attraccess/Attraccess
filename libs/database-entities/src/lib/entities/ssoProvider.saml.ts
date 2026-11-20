@@ -124,6 +124,9 @@ export class SSOProviderSAMLConfiguration {
   @ApiProperty({
     description: 'Mapping between Attraccess role keys and SAML role/group attribute values',
     required: false,
+    nullable: true,
+    type: Object,
+    additionalProperties: { type: 'array', items: { type: 'string' } },
     example: {
       'system-admin': ['attraccess_config_admin'],
       'billing-manager': ['attraccess_billing'],

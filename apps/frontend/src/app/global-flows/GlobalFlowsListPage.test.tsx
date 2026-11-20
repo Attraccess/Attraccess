@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import userEvent, { UserEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GlobalFlowsListPage } from './GlobalFlowsListPage';
 import { TestWrapper } from '../../test-utils/wrappers';
@@ -24,10 +24,10 @@ vi.mock('../../hooks/useAuth', () => ({
 
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/react-query-client')>()),
-  useGlobalFlowsServiceListGlobalFlows: () => ({ data: state.flows, isLoading: false, isError: false }),
-  useGlobalFlowsServiceUpdateGlobalFlow: () => ({ mutate: state.update, isPending: false }),
-  useGlobalFlowsServiceDeleteGlobalFlow: () => ({ mutate: state.remove, isPending: false }),
-  useGlobalFlowsServiceCreateGlobalFlow: (options: { onSuccess: (flow: { id: number }) => void }) => ({
+  useListGlobalFlows: () => ({ data: state.flows, isLoading: false, isError: false }),
+  useUpdateGlobalFlow: () => ({ mutate: state.update, isPending: false }),
+  useDeleteGlobalFlow: () => ({ mutateAsync: state.remove, isPending: false }),
+  useCreateGlobalFlow: (_mutationKey: unknown, options: { onSuccess: (flow: { id: number }) => void }) => ({
     mutate: (variables: unknown) => {
       state.create(variables);
       options.onSuccess({ id: 42 });
@@ -35,6 +35,11 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
     isPending: false,
   }),
 }));
+
+async function chooseAction(user: UserEvent, flowName: string, action: string) {
+  await user.click(screen.getByRole('button', { name: `Actions for ${flowName}` }));
+  await user.click(await screen.findByRole('menuitem', { name: action }));
+}
 
 function renderPage() {
   return render(
@@ -78,10 +83,10 @@ describe('GlobalFlowsListPage', () => {
     renderPage();
 
     await user.click(within(screen.getByRole('row', { name: /Power off all/ })).getByRole('switch'));
-    expect(state.update).toHaveBeenCalledWith({ flowId: 1, requestBody: { enabled: false } });
+    expect(state.update).toHaveBeenCalledWith({ path: { flowId: 1 }, body: { enabled: false } });
 
     await user.click(within(screen.getByRole('row', { name: /Notify/ })).getByRole('switch'));
-    expect(state.update).toHaveBeenCalledWith({ flowId: 2, requestBody: { enabled: true } });
+    expect(state.update).toHaveBeenCalledWith({ path: { flowId: 2 }, body: { enabled: true } });
   });
 
   it('names each switch by the state it shows', () => {
@@ -106,7 +111,7 @@ describe('GlobalFlowsListPage', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole('button', { name: 'Edit Notify' }));
+    await chooseAction(user, 'Notify', 'Open in editor');
     expect(state.navigate).toHaveBeenCalledWith('/devices/flows/2');
   });
 
@@ -114,14 +119,28 @@ describe('GlobalFlowsListPage', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole('button', { name: 'Delete Power off all' }));
+    await chooseAction(user, 'Power off all', 'Delete');
     expect(state.remove).not.toHaveBeenCalled();
 
     const dialog = await screen.findByRole('alertdialog');
     expect(within(dialog).getByText(/Delete the flow "Power off all"/)).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
-    expect(state.remove).toHaveBeenCalledWith({ flowId: 1 });
+    expect(state.remove).toHaveBeenCalledWith({ path: { flowId: 1 } });
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+  });
+
+  it('keeps the confirmation open when deleting fails', async () => {
+    state.remove.mockRejectedValueOnce(new Error('nope'));
+    const user = userEvent.setup();
+    renderPage();
+
+    await chooseAction(user, 'Power off all', 'Delete');
+    const dialog = await screen.findByRole('alertdialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+    expect(state.remove).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
   });
 
   it('creates a flow from the modal and opens its editor', async () => {
@@ -137,7 +156,7 @@ describe('GlobalFlowsListPage', () => {
     await user.type(within(dialog).getByRole('textbox', { name: 'Description' }), 'Turn lights off');
     await user.click(submit);
 
-    expect(state.create).toHaveBeenCalledWith({ requestBody: { name: 'Lights', description: 'Turn lights off' } });
+    expect(state.create).toHaveBeenCalledWith({ body: { name: 'Lights', description: 'Turn lights off' } });
     expect(state.navigate).toHaveBeenCalledWith('/devices/flows/42');
   });
 
@@ -149,7 +168,7 @@ describe('GlobalFlowsListPage', () => {
     const dialog = await screen.findByRole('dialog');
     await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Lights{Enter}');
 
-    expect(state.create).toHaveBeenCalledWith({ requestBody: { name: 'Lights', description: undefined } });
+    expect(state.create).toHaveBeenCalledWith({ body: { name: 'Lights', description: undefined } });
   });
 
   it('starts every opening of the create modal empty, even after a cancelled attempt', async () => {
@@ -182,7 +201,7 @@ describe('GlobalFlowsListPage', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole('button', { name: 'Edit details of Power off all' }));
+    await chooseAction(user, 'Power off all', 'Edit details');
     const dialog = await screen.findByRole('dialog');
     const name = within(dialog).getByRole('textbox', { name: 'Name' });
     const description = within(dialog).getByRole('textbox', { name: 'Description' });
@@ -195,8 +214,8 @@ describe('GlobalFlowsListPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     expect(state.update).toHaveBeenCalledWith({
-      flowId: 1,
-      requestBody: { name: 'Power off everything', description: null },
+      path: { flowId: 1 },
+      body: { name: 'Power off everything', description: null },
     });
     expect(state.create).not.toHaveBeenCalled();
   });
@@ -205,7 +224,7 @@ describe('GlobalFlowsListPage', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole('button', { name: 'Edit details of Notify' }));
+    await chooseAction(user, 'Notify', 'Edit details');
     const dialog = await screen.findByRole('dialog');
     await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), ' changed');
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));

@@ -1,9 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { CompanionDevice, ResourceFlowNode } from '@attraccess/database-entities';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { CompanionEventType, CompanionForegroundAppDto, CompanionIdleDto, CompanionUsbDeviceDto, CompanionSocket } from './companion.types';
+import { COMPANION_DEVICE_STORE, type CompanionDeviceStore } from './companion-device.port';
+import {
+  CompanionEventType,
+  CompanionForegroundAppDto,
+  CompanionIdleDto,
+  CompanionUsbDeviceDto,
+  CompanionSocket,
+} from './companion.types';
 
 @Injectable()
 export class CompanionGatewayService {
@@ -13,55 +17,30 @@ export class CompanionGatewayService {
   readonly sockets = new Map<string, CompanionSocket>();
 
   public constructor(
-    @InjectRepository(CompanionDevice)
-    private readonly deviceRepository: Repository<CompanionDevice>,
-    @InjectRepository(ResourceFlowNode)
-    private readonly flowNodeRepository: Repository<ResourceFlowNode>,
+    @Inject(COMPANION_DEVICE_STORE)
+    private readonly devices: CompanionDeviceStore,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  public getConnectedDevices(): CompanionDevice[] {
-    const deviceIds = [...new Set([...this.sockets.values()].map((s) => s.deviceId).filter((id): id is number => id !== null))];
-    return deviceIds.map((id) => ({ id }) as CompanionDevice);
+  public getConnectedDevices(): Array<{ id: number }> {
+    const deviceIds = [
+      ...new Set([...this.sockets.values()].map((s) => s.deviceId).filter((id): id is number => id !== null)),
+    ];
+    return deviceIds.map((id) => ({ id }));
   }
 
   public async getResourcesForDevice(deviceId: number): Promise<Array<{ id: number; name: string }>> {
-    const nodes = await this.flowNodeRepository
-      .createQueryBuilder('node')
-      .innerJoinAndSelect('node.resource', 'resource')
-      .where('node.type IN (:...types)', {
-        types: ['output.companion.lock-pc', 'output.companion.unlock-pc'],
-      })
-      .getMany();
-
-    const matchingNodes = nodes.filter((node) => {
-      try {
-        const data = typeof node.data === 'string' ? JSON.parse(node.data as unknown as string) : node.data;
-        return data?.deviceId === deviceId;
-      } catch {
-        return false;
-      }
-    });
-
-    const seen = new Set<number>();
-    const resources: Array<{ id: number; name: string }> = [];
-    for (const node of matchingNodes) {
-      if (node.resource && !seen.has(node.resource.id)) {
-        seen.add(node.resource.id);
-        resources.push({ id: node.resource.id, name: node.resource.name });
-      }
-    }
-    return resources;
+    return this.devices.findResourcesControlledBy(deviceId);
   }
 
   public async sendLockCommand(deviceId: number): Promise<boolean> {
     // persist first so a restarted/offline device re-locks on next authenticate
-    await this.deviceRepository.update(deviceId, { locked: true });
+    await this.devices.setLocked(deviceId, true);
     return this.sendCommandToDevice(deviceId, CompanionEventType.COMPANION_LOCK_PC);
   }
 
   public async sendUnlockCommand(deviceId: number): Promise<boolean> {
-    await this.deviceRepository.update(deviceId, { locked: false });
+    await this.devices.setLocked(deviceId, false);
     return this.sendCommandToDevice(deviceId, CompanionEventType.COMPANION_UNLOCK_PC);
   }
 

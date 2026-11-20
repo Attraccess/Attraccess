@@ -1,15 +1,15 @@
 import { ArrowRight } from 'lucide-react';
-import { Input, Label, TextField, useOverlayState } from '@heroui/react';
+import { Input, Label, TextField } from '@heroui/react';
 import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../components/UsernameInput/index';
 import { PasswordField } from '../../components/PasswordField/index';
-import React, { useCallback, useMemo, useState } from 'react';
-import { Button, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './registrationForm.en.json';
 import de from './registrationForm.de.json';
 import {
-  useUsersServiceCreateOneUser,
-  useUsersServiceFindManyKey,
-  usePasswordPolicyServiceGetPublicPasswordPolicy,
+  useCreateOneUser,
+  useFindManyKey,
+  useGetPublicPasswordPolicy,
   ApiError,
   AuthenticationType,
 } from '@attraccess/react-query-client';
@@ -19,6 +19,7 @@ import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.j
 import { useToastMessage } from '../../components/toastProvider';
 import { PolicyError, PublicPasswordPolicy, validatePassword } from '@attraccess/shared';
 import { extractPolicyErrors } from '../../utils/policyErrors';
+import { RegistrationConfirmation } from './RegistrationConfirmation';
 
 export interface RegisterFormProps {
   onHasAccount: () => void;
@@ -35,7 +36,7 @@ export const FALLBACK_POLICY: PublicPasswordPolicy = {
   minZxcvbnScore: 3,
 };
 
-export function useRegistrationFormState({ onHasAccount }: RegisterFormProps) {
+export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -48,8 +49,10 @@ export function useRegistrationFormState({ onHasAccount }: RegisterFormProps) {
   });
 
   const queryClient = useQueryClient();
-  const [registeredEmail, setRegisteredEmail] = useState<string>('');
-  const { isOpen, open, setOpen } = useOverlayState();
+  // Held in memory only: the confirmation screen needs them to prove the account when the address is changed.
+  const [registered, setRegistered] = useState<{ email: string; username: string; password: string } | null>(null);
+  // What the request was sent with: the fields stay editable while it runs.
+  const submitted = useRef<{ email: string; username: string; password: string } | null>(null);
   const toast = useToastMessage();
 
   const [username, setUsername] = useState<string>('');
@@ -58,7 +61,7 @@ export function useRegistrationFormState({ onHasAccount }: RegisterFormProps) {
   const [passwordConfirmation, setPasswordConfirmation] = useState<string>('');
   const [serverErrors, setServerErrors] = useState<PolicyError[]>([]);
 
-  const { data: policyData } = usePasswordPolicyServiceGetPublicPasswordPolicy();
+  const { data: policyData } = useGetPublicPasswordPolicy();
   const policy = useMemo<PublicPasswordPolicy>(
     () => (policyData as PublicPasswordPolicy | undefined) ?? FALLBACK_POLICY,
     [policyData],
@@ -115,13 +118,13 @@ export function useRegistrationFormState({ onHasAccount }: RegisterFormProps) {
     [isUsernameValid, trimmedEmail, password, passwordConfirmation, passwordsDontMatch, localPolicyResult.ok],
   );
 
-  const { mutate: createUserMutate, isPending } = useUsersServiceCreateOneUser({
+  const { mutate: createUserMutate, isPending } = useCreateOneUser(undefined, {
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [useUsersServiceFindManyKey],
+        queryKey: [useFindManyKey],
       });
       setServerErrors([]);
-      open();
+      setRegistered(submitted.current);
     },
     onError: (error) => {
       const policyErrors = extractPolicyErrors(error);
@@ -146,9 +149,9 @@ export function useRegistrationFormState({ onHasAccount }: RegisterFormProps) {
         return;
       }
       setServerErrors([]);
-      setRegisteredEmail(trimmedEmail);
+      submitted.current = { email: trimmedEmail, username: trimmedUsername, password };
       createUserMutate({
-        requestBody: {
+        body: {
           username: trimmedUsername,
           password,
           email: trimmedEmail,
@@ -159,64 +162,9 @@ export function useRegistrationFormState({ onHasAccount }: RegisterFormProps) {
     [canSubmit, createUserMutate, password, trimmedEmail, trimmedUsername],
   );
 
-  const markTwoFactorSetupIntent = useCallback(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    sessionStorage.setItem('twoFactorSetupIntent', 'true');
-  }, []);
-  return {
-    t,
-    registeredEmail,
-    isOpen,
-    setOpen,
-    username,
-    setUsername,
-    email,
-    setEmail,
-    password,
-    setPassword,
-    passwordConfirmation,
-    setPasswordConfirmation,
-    serverErrors,
-    setServerErrors,
-    policy,
-    usernameValidationMessages,
-    trimmedUsername,
-    trimmedEmail,
-    canSubmit,
-    isPending,
-    handleSubmit,
-    markTwoFactorSetupIntent,
-    onHasAccount,
-  } as const;
-}
-
-export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
-  const {
-    t,
-    registeredEmail,
-    isOpen,
-    setOpen,
-    username,
-    setUsername,
-    email,
-    setEmail,
-    password,
-    setPassword,
-    passwordConfirmation,
-    setPasswordConfirmation,
-    serverErrors,
-    setServerErrors,
-    policy,
-    usernameValidationMessages,
-    trimmedUsername,
-    trimmedEmail,
-    canSubmit,
-    isPending,
-    handleSubmit,
-    markTwoFactorSetupIntent,
-  } = useRegistrationFormState({ onHasAccount });
+  if (registered) {
+    return <RegistrationConfirmation {...registered} onBackToSignIn={onHasAccount} />;
+  }
 
   return (
     <>
@@ -283,33 +231,6 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           <ArrowRight className="group-hover:translate-x-1 transition-transform" />
         </Button>
       </form>
-
-      <StatusDialog
-        isOpen={isOpen}
-        onClose={() => setOpen(false)}
-        status="success"
-        title={t('success.title')}
-        closeLabel={t('success.closeButton')}
-        closeDataCy="registration-form-success-modal-close-button"
-        action={{
-          label: t('twoFactor.action'),
-          onPress: () => {
-            markTwoFactorSetupIntent();
-            setOpen(false);
-            onHasAccount();
-          },
-          'data-cy': 'registration-form-success-modal-two-factor-button',
-        }}
-        data-cy="registration-form-success-modal"
-      >
-        <div className="flex flex-col gap-3">
-          <p>{t('success.message').replace('{email}', registeredEmail)}</p>
-          <div>
-            <p className="font-medium">{t('twoFactor.title')}</p>
-            <p>{t('twoFactor.description')}</p>
-          </div>
-        </div>
-      </StatusDialog>
     </>
   );
 }

@@ -1,36 +1,82 @@
-import { AUDIT_RECORDER } from '../../../audit/recorder/audit-event';
-import {
-  SSOProvider,
-  SSOProviderOIDCConfiguration,
-  SSOProviderSAMLConfiguration,
-  SSOProviderType,
-} from '@attraccess/database-entities';
+import { AUDIT_RECORDER, type AuditEvent } from '../../../audit/recorder/audit-event';
+import { SSOProviderType } from '@attraccess/application-models';
+import type {
+  SsoOidcConfigurationRecord,
+  SsoProviderRecord,
+  SsoSamlConfigurationRecord,
+} from '@attraccess/application-models';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { EncryptionService } from '../../../encryption/encryption.service';
 import { LicenseService } from '../../../license/license.service';
+import {
+  SSO_PROVIDER_STORE,
+  type SsoProviderChanges,
+  type SsoProviderDraft,
+  type SsoProviderStore,
+} from './providers/sso-provider.port';
 import { SSOService } from './sso.service';
 
 const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
 
-const SSOProviderRepository = getRepositoryToken(SSOProvider);
+/** Stands in for the transaction the real store opens: the audit row is recorded with it. */
+export const PROVIDER_TRANSACTION = { transaction: 'sso-provider' };
 
-const SSOProviderOIDCConfigurationRepository = getRepositoryToken(SSOProviderOIDCConfiguration);
+/**
+ * An in-memory SsoProviderStore with the contract of the real one: the plan runs against the stored provider, the
+ * audit callback runs once the change is applied and its event is recorded with the unit's transaction.
+ */
+export class FakeSsoProviderStore implements SsoProviderStore {
+  /** The provider as stored, and (when an update changes it) as stored afterwards. */
+  provider: SsoProviderRecord;
+  updatedProvider: SsoProviderRecord | undefined;
+  readonly drafts: SsoProviderDraft[] = [];
+  readonly changes: SsoProviderChanges[] = [];
+  readonly removed: number[] = [];
 
-const SSOProviderSAMLConfigurationRepository = getRepositoryToken(SSOProviderSAMLConfiguration);
+  constructor(provider: SsoProviderRecord) {
+    this.provider = provider;
+  }
+
+  get lastChanges(): SsoProviderChanges | undefined {
+    return this.changes[this.changes.length - 1];
+  }
+
+  findAll = jest.fn(async (): Promise<SsoProviderRecord[]> => [this.provider]);
+  findById = jest.fn(async (): Promise<SsoProviderRecord | null> => this.provider);
+  findByTypeAndId = jest.fn(async (): Promise<SsoProviderRecord | null> => this.provider);
+
+  create = jest.fn(async (draft: SsoProviderDraft, auditEvent: (created: SsoProviderRecord) => AuditEvent) => {
+    this.drafts.push(draft);
+    await audit.record(auditEvent(this.provider), PROVIDER_TRANSACTION as never);
+    return this.provider;
+  });
+
+  update = jest.fn(
+    async (
+      _id: number,
+      plan: (current: SsoProviderRecord) => SsoProviderChanges,
+      auditEvent: (updated: SsoProviderRecord) => AuditEvent | null,
+    ) => {
+      this.changes.push(plan(this.provider));
+      const after = this.updatedProvider ?? this.provider;
+      const event = auditEvent(after);
+      if (event) await audit.record(event, PROVIDER_TRANSACTION as never);
+      return after as SsoProviderRecord | null;
+    },
+  );
+
+  remove = jest.fn(async (id: number, auditEvent: (removed: SsoProviderRecord) => AuditEvent) => {
+    this.removed.push(id);
+    await audit.record(auditEvent(this.provider), PROVIDER_TRANSACTION as never);
+  });
+}
+
 export function registerSsoServiceFixture() {
   let service: SSOService;
-
-  let ssoProviderRepository: Repository<SSOProvider>;
-
-  let oidcConfigRepository: Repository<SSOProviderOIDCConfiguration>;
-
-  let samlConfigRepository: Repository<SSOProviderSAMLConfiguration>;
-
+  let store: FakeSsoProviderStore;
   let encryptionService: EncryptionService;
 
-  const mockOIDCConfig = {
+  const mockOIDCConfig: SsoOidcConfigurationRecord = {
     id: 1,
     ssoProviderId: 1,
     issuer: 'https://test-issuer.com',
@@ -39,74 +85,50 @@ export function registerSsoServiceFixture() {
     userInfoURL: 'https://test-issuer.com/userinfo',
     clientId: 'test-client-id',
     clientSecret: 'test-client-secret',
+    scopes: null,
+    usernameClaimPaths: null,
+    emailClaimPaths: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-    ssoProvider: null,
-  } as SSOProviderOIDCConfiguration;
+  };
 
-  const mockSSOProvider = {
+  const mockSSOProvider: SsoProviderRecord = {
     id: 1,
     name: 'Test Provider',
     type: SSOProviderType.OIDC,
     createdAt: new Date(),
     updatedAt: new Date(),
     oidcConfiguration: mockOIDCConfig,
-  } as SSOProvider;
+  };
 
-  mockOIDCConfig.ssoProvider = mockSSOProvider;
+  const mockSSOProviderWithOIDCConfig = mockSSOProvider;
 
-  const mockSSOProviderWithOIDCConfig = { ...mockSSOProvider };
+  const storedSamlConfig: SsoSamlConfigurationRecord = {
+    id: 99,
+    ssoProviderId: 1,
+    entryPoint: 'https://idp',
+    issuer: 'https://sp',
+    certificate: 'CERT',
+    signRequest: false,
+    wantAssertionsSigned: false,
+    wantAuthnResponseSigned: true,
+    forceAuthn: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
 
   beforeEach(async () => {
+    store = new FakeSsoProviderStore(mockSSOProvider);
+    audit.record.mockClear();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         { provide: AUDIT_RECORDER, useValue: audit },
         SSOService,
+        { provide: SSO_PROVIDER_STORE, useValue: store },
         {
           provide: LicenseService,
           useValue: {
             verifyLicense: jest.fn().mockResolvedValue(undefined),
-          },
-        },
-        {
-          provide: SSOProviderRepository,
-          useValue: {
-            find: jest.fn().mockResolvedValue([mockSSOProvider]),
-            findOne: jest.fn().mockResolvedValue(mockSSOProviderWithOIDCConfig),
-            create: jest.fn().mockReturnValue(mockSSOProvider),
-            save: jest.fn().mockResolvedValue(mockSSOProvider),
-            delete: jest.fn().mockResolvedValue({ affected: 1 }),
-            update: jest.fn().mockResolvedValue(undefined),
-          },
-        },
-        {
-          provide: SSOProviderOIDCConfigurationRepository,
-          useValue: {
-            create: jest.fn().mockReturnValue(mockOIDCConfig),
-            save: jest.fn().mockResolvedValue(mockOIDCConfig),
-            findOne: jest.fn().mockResolvedValue(mockOIDCConfig),
-            delete: jest.fn().mockResolvedValue({ affected: 1 }),
-            update: jest.fn().mockResolvedValue(undefined),
-          },
-        },
-        {
-          provide: SSOProviderSAMLConfigurationRepository,
-          useValue: {
-            create: jest.fn().mockReturnValue({}),
-            save: jest.fn().mockResolvedValue({}),
-            findOne: jest.fn().mockResolvedValue({
-              id: 99,
-              ssoProviderId: 1,
-              entryPoint: 'https://idp',
-              issuer: 'https://sp',
-              certificate: 'CERT',
-              signRequest: false,
-              wantAssertionsSigned: false,
-              wantAuthnResponseSigned: true,
-              forceAuthn: false,
-            }),
-            update: jest.fn().mockResolvedValue(undefined),
-            delete: jest.fn().mockResolvedValue({ affected: 1 }),
           },
         },
         {
@@ -125,24 +147,6 @@ export function registerSsoServiceFixture() {
     }).compile();
 
     service = module.get<SSOService>(SSOService);
-    ssoProviderRepository = module.get<Repository<SSOProvider>>(SSOProviderRepository);
-    oidcConfigRepository = module.get<Repository<SSOProviderOIDCConfiguration>>(SSOProviderOIDCConfigurationRepository);
-    samlConfigRepository = module.get<Repository<SSOProviderSAMLConfiguration>>(SSOProviderSAMLConfigurationRepository);
-    Object.assign(ssoProviderRepository, {
-      manager: {
-        transaction: jest.fn(
-          (callback: (manager: { getRepository: (entity: unknown) => unknown }) => Promise<unknown>) =>
-            callback({
-              getRepository: (entity) =>
-                entity === SSOProvider
-                  ? ssoProviderRepository
-                  : entity === SSOProviderOIDCConfiguration
-                    ? oidcConfigRepository
-                    : samlConfigRepository,
-            }),
-        ),
-      },
-    });
     encryptionService = module.get<EncryptionService>(EncryptionService);
   });
   return {
@@ -152,14 +156,8 @@ export function registerSsoServiceFixture() {
     get service() {
       return service;
     },
-    get ssoProviderRepository() {
-      return ssoProviderRepository;
-    },
-    get oidcConfigRepository() {
-      return oidcConfigRepository;
-    },
-    get samlConfigRepository() {
-      return samlConfigRepository;
+    get store() {
+      return store;
     },
     get encryptionService() {
       return encryptionService;
@@ -172,6 +170,9 @@ export function registerSsoServiceFixture() {
     },
     get mockSSOProviderWithOIDCConfig() {
       return mockSSOProviderWithOIDCConfig;
+    },
+    get storedSamlConfig() {
+      return storedSamlConfig;
     },
   };
 }

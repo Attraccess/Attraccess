@@ -1,4 +1,4 @@
-import { EmailTemplateType } from '@attraccess/database-entities';
+import { EmailTemplateType } from '@attraccess/application-models';
 import type { ShippedTranslation } from '../email-defaults';
 
 const COPY_LINK_DE = 'Oder kopiere diesen Link in deinen Browser:<br /><a href="{url}">{url}</a>';
@@ -243,6 +243,50 @@ export const resourceUsageBillingTransactionSummaryTranslations: ShippedTranslat
     locale: 'de',
     key: 'quantity_unavailable',
     value: 'Nicht verfügbar',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'shared_marker',
+    value: 'Geteilt',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'share_of_meter',
+    value: '{share} — dein Anteil an {total}',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'share_of_time',
+    value: '{share} s — dein Anteil an {total} s',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'segment_meter',
+    value:
+      '{start} – {end}: Personen: {people}, gesamt {total} ({totalCredits} Credits), dein Anteil {share} ({shareCredits} Credits)',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'segment_time',
+    value:
+      '{start} – {end}: Personen: {people}, gesamt {total} s ({totalCredits} Credits), dein Anteil {share} s ({shareCredits} Credits)',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'meter_share_pending',
+    value: 'Ausstehend: Dein Anteil wird separat abgerechnet, sobald der Zähler wieder gelesen werden kann.',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'quantity_pending',
+    value: 'Ausstehend',
   },
 ];
 

@@ -1,12 +1,12 @@
-import { Resource, ResourceUsage, SupervisionMode } from '@attraccess/database-entities';
+import { SupervisionMode } from '@attraccess/application-models';
+import type { UsageSession } from '@attraccess/application-models';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Inject, Injectable } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { concatMap, filter } from 'rxjs/operators';
 import { SettingsService } from '../../../settings/settings.service';
 import { ResourceUsageService } from '../sessions/resource-usage.service';
+import { USAGE_SESSION_STORE, UsageSessionStore } from '../usage-session-store.port';
 
 /** What a viewer without full access gets from a live event: free or in use, and the machine's health. */
 const LIVE_EVENT_ANONYMOUS_KEYS = new Set([
@@ -39,7 +39,7 @@ export type ResourceActivityAccess = 'full' | 'anonymous' | 'none';
 export class ResourceActivityVisibilityService {
   constructor(
     private readonly settings: SettingsService,
-    @InjectRepository(Resource) private readonly resources: Repository<Resource>,
+    @Inject(USAGE_SESSION_STORE) private readonly sessions: UsageSessionStore,
     private readonly usage: ResourceUsageService,
   ) {}
 
@@ -73,16 +73,9 @@ export class ResourceActivityVisibilityService {
     // Only the machines the viewer may not use need their supervision mode.
     const hidden = ids.filter((id) => access.get(id) === 'none');
     if (hidden.length > 0) {
-      const resources = await this.resources.find({
-        where: { id: In(hidden) },
-        select: { id: true, supervisionMode: true },
-      });
-      for (const resource of resources) {
-        if (
-          resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED ||
-          resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED
-        ) {
-          access.set(resource.id, 'anonymous');
+      for (const [id, mode] of await this.sessions.findSupervisionModes(hidden)) {
+        if (mode === SupervisionMode.SUPERVISION_ALLOWED || mode === SupervisionMode.SUPERVISION_REQUIRED) {
+          access.set(id, 'anonymous');
         }
       }
     }
@@ -127,30 +120,34 @@ export class ResourceActivityVisibilityService {
   }
 
   /** The "free or in use" view for viewers who may not see who is using the machine. */
-  redactUsage(usage: ResourceUsage): ResourceUsage {
+  redactUsage(usage: UsageSession): UsageSession {
     return {
       id: usage.id,
       resourceId: usage.resourceId,
       usageAction: usage.usageAction,
       startTime: usage.startTime,
       endTime: usage.endTime,
-    } as ResourceUsage;
+    } as UsageSession;
   }
 
   /** Returns the usage as the viewer may see it, or null when they may not see it at all. */
-  viewUsage(usage: ResourceUsage, access: ResourceActivityAccess, viewerId: number): ResourceUsage | null {
+  viewUsage(usage: UsageSession, access: ResourceActivityAccess, viewerId: number): UsageSession | null {
     if (usage.userId === viewerId || access === 'full') return usage;
     return access === 'anonymous' ? this.redactUsage(usage) : null;
   }
 
   /** Applies {@link viewUsage} to every usage embedded in resources. */
-  applyToResources(resources: Resource[], access: Map<number, ResourceActivityAccess>, viewerId: number): Resource[] {
+  applyToResources<T extends { id: number; usages?: UsageSession[] }>(
+    resources: T[],
+    access: Map<number, ResourceActivityAccess>,
+    viewerId: number,
+  ): T[] {
     return resources.map((resource) => {
       if (!resource.usages) return resource;
       const resourceAccess = access.get(resource.id) ?? 'none';
       const usages = resource.usages
         .map((usage) => this.viewUsage(usage, resourceAccess, viewerId))
-        .filter((usage): usage is ResourceUsage => usage !== null);
+        .filter((usage): usage is UsageSession => usage !== null);
       return { ...resource, usages };
     });
   }
@@ -160,7 +157,7 @@ export class ResourceActivityVisibilityService {
    * Anything short of full access is reduced to an allowlist, so a new event field never leaks a name by default.
    */
   viewLiveEvent(event: { data: object }, access: ResourceActivityAccess, viewerId: number): { data: object } | null {
-    const data = event.data as { usage?: ResourceUsage; keepalive?: unknown; [key: string]: unknown };
+    const data = event.data as { usage?: UsageSession; keepalive?: unknown; [key: string]: unknown };
     if ('keepalive' in data) return event;
     if (access === 'full' || (data.usage && data.usage.userId === viewerId)) return event;
     // Ended and taken-over events carry no usage, only the session owner's id: that owner still hears the change.

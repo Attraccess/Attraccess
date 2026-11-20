@@ -1,92 +1,92 @@
 import { Button, Card } from '@heroui/react';
 import { Trash2Icon } from 'lucide-react';
-import { PageHeader, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { ConfirmableButton, PageHeader, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Attractap,
-  useAttractapServiceGetPairings,
-  useAttractapServiceRequestReaderPairing,
+  useDeleteReader,
+  useGetPairings,
+  UseGetReadersKeyFn,
+  UseGetReadersToPairKeyFn,
 } from '@attraccess/react-query-client';
+import { useQueryClient } from '@tanstack/react-query';
 import { ReactNode, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
-import { AttractapDeleteModal } from '../AttractapList/delete';
 import { PairingDialog, PairingDialogProps } from './PairingDialog';
 import { PairingRow, readerKindOf } from './PairingRow';
 import { apiErrorMessage, isPairingRunning } from './pairingUtils';
 import de from './de.json';
 import en from './en.json';
 
-type OpenDialog = Pick<PairingDialogProps, 'pairingId' | 'waitForReaderId' | 'presetTargetReaderId'>;
+type OpenDialog = Pick<PairingDialogProps, 'pairingId' | 'presetTargetReaderId'>;
 
-/** Actions of a reader record that is not paired: pair it or delete it. Its diagnostics wait until it is paired. */
-function RecordActions(props: Readonly<{ readerId: number; pair: ReactNode }>) {
-  const { t } = useTranslations({ de, en });
-  const { readerId } = props;
+/** Actions of a reader record whose pairing was removed: pair it again or delete it. */
+function RecordActions(props: Readonly<{ reader: Attractap; pair: ReactNode }>) {
+  // React escapes the output; escaping the reader name again would show `&amp;` in the confirmation.
+  const { t } = useTranslations({ de, en }, { escapeValues: false });
+  const { reader } = props;
+  const queryClient = useQueryClient();
+  const toast = useToastMessage();
+  const deleteReader = useDeleteReader(undefined, {
+    onSuccess: () => {
+      // The deleted record can be in either list.
+      queryClient.invalidateQueries({ queryKey: UseGetReadersKeyFn() });
+      queryClient.invalidateQueries({ queryKey: UseGetReadersToPairKeyFn() });
+    },
+    onError: (error) => toast.error({ title: t('toPair.deleteFailed'), description: apiErrorMessage(error) }),
+  });
   return (
     <div className="flex items-center gap-1">
       {props.pair}
-      <AttractapDeleteModal readerId={readerId}>
-        {(onOpen) => (
+      <ConfirmableButton
+        label={t('toPair.delete')}
+        status="error"
+        confirm={{
+          title: t('toPair.deleteTitle', { name: reader.name }),
+          message: t('toPair.deleteMessage', { name: reader.name }),
+        }}
+        isPending={deleteReader.isPending}
+        onConfirm={() => deleteReader.mutateAsync({ path: { readerId: reader.id } })}
+        renderActivator={(open) => (
           <Button
             size="sm"
             variant="danger-soft"
             isIconOnly
             aria-label={t('toPair.delete')}
-            onPress={onOpen}
-            data-cy={`attractap-to-pair-delete-${readerId}`}
+            onPress={open}
+            data-cy={`attractap-to-pair-delete-${reader.id}`}
           >
             <Trash2Icon className="size-4" />
           </Button>
         )}
-      </AttractapDeleteModal>
+      />
     </div>
   );
 }
 
 /**
- * Everything that must be paired before it can be used: readers that were never paired, readers
- * whose pairing was removed, and new readers that wait for approval. Reader records can also be
- * deleted; a new reader can only be paired. Codes are never shown here; the admin reads them from
- * the reader.
+ * Everything that must be paired before it can be used: readers whose pairing was removed and new readers that
+ * wait for approval. Reader records can also be deleted; a new reader can only be paired. Codes are never shown
+ * here; the admin reads them from the reader.
  */
 export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: (readerId: number) => void }>) {
   const { t } = useTranslations({ de, en });
   const format = useDateTimeFormatter();
-  const toast = useToastMessage();
   const [dialog, setDialog] = useState<OpenDialog | null>(null);
 
-  const { data: pairings } = useAttractapServiceGetPairings(undefined, { refetchInterval: 3000 });
+  const { data: pairings } = useGetPairings({}, undefined, { refetchInterval: 3000 });
+  // Every waiting request is a reader that asks to be paired; a request only gets a record once it is approved.
   const running = (pairings ?? []).filter((p) => isPairingRunning(p.state));
-  const runningFor = (readerId: number) => running.find((p) => p.boundReaderId === readerId);
-
   const readers = props.readers.filter((reader) => reader.pairingState !== 'paired');
-  // Readers bound to a record are listed with that record.
-  const devices = running.filter((p) => p.boundReaderId === null);
 
-  const requestPairing = useAttractapServiceRequestReaderPairing({
-    onSuccess: (result, { readerId }) => {
-      if (result.requested) setDialog({ waitForReaderId: readerId });
-      else toast.error({ title: t('toPair.notConnected') });
-    },
-    onError: (error) => toast.error({ title: t('toPair.requestFailed'), description: apiErrorMessage(error) }),
-  });
-
-  // A token reader still controls these machines until it is paired.
+  // The machines the record was linked to before its pairing was removed.
   const resourcesOf = (reader: Attractap) => {
     const names = (reader.resources ?? []).map((resource) => resource.name);
     return names.length > 0 ? t('toPair.resources', { names: names.join(', ') }) : undefined;
   };
 
-  const pair = (reader: Attractap) => {
-    const pairing = runningFor(reader.id);
-    if (pairing) setDialog({ pairingId: pairing.id });
-    // A reader whose pairing was removed comes back as a new reader; the admin says which record it takes over.
-    else if (reader.pairingState === 'revoked') setDialog({ presetTargetReaderId: reader.id });
-    else requestPairing.mutate({ readerId: reader.id });
-  };
-
   return (
     <>
-      {(readers.length > 0 || devices.length > 0) && (
+      {(readers.length > 0 || running.length > 0) && (
         <Card data-cy="attractap-readers-to-pair">
           <Card.Header>
             <PageHeader noMargin title={t('toPair.title')} subtitle={t('toPair.description')} />
@@ -97,27 +97,26 @@ export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: 
                 key={`reader-${reader.id}`}
                 kind={readerKindOf(reader.firmware)}
                 name={reader.name}
-                detail={t(reader.pairingState === 'revoked' ? 'toPair.pairingRemoved' : 'toPair.neverPaired')}
+                detail={t('toPair.pairingRemoved')}
                 note={resourcesOf(reader)}
                 noteCy={`attractap-to-pair-resources-${reader.id}`}
                 action={
                   <RecordActions
-                    readerId={reader.id}
+                    reader={reader}
                     pair={
                       <Button
                         size="sm"
-                        isPending={requestPairing.isPending && requestPairing.variables?.readerId === reader.id}
-                        onPress={() => pair(reader)}
+                        onPress={() => setDialog({ presetTargetReaderId: reader.id })}
                         data-cy={`attractap-pair-reader-${reader.id}`}
                       >
-                        {runningFor(reader.id) ? t('toPair.resume') : t('toPair.pair')}
+                        {t('toPair.pair')}
                       </Button>
                     }
                   />
                 }
               />
             ))}
-            {devices.map((pairing) => (
+            {running.map((pairing) => (
               <PairingRow
                 key={pairing.id}
                 kind={pairing.kind}

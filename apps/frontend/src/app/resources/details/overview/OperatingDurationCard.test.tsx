@@ -12,7 +12,7 @@ vi.mock('../../operatingDuration', () => ({
 }));
 vi.mock('../../../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: () => canConfigure() }) }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourcesServiceResourceOperatingDiagnosticsGetDataQuality: (...args: unknown[]) => getDataQuality(...args),
+  useResourceOperatingDiagnosticsGetDataQuality: (...args: unknown[]) => getDataQuality(...args),
 }));
 
 describe('OperatingDurationCard', () => {
@@ -24,6 +24,7 @@ describe('OperatingDurationCard', () => {
     useOperatingDuration.mockReturnValue({
       data: {
         sessionDurationMs: 0,
+        personDurationMs: 0,
         operatingDurationMs: null,
         unattributedOperatingDurationMs: null,
         operatingDataAvailable: false,
@@ -40,7 +41,8 @@ describe('OperatingDurationCard', () => {
     expect(screen.getByText('Tracking not configured')).toBeInTheDocument();
     expect(useOperatingDuration).toHaveBeenCalledTimes(1);
     expect(screen.getAllByText('Unavailable')).toHaveLength(2);
-    expect(screen.getByText('0:00:00')).toBeInTheDocument();
+    // machine hours with a session and person hours
+    expect(screen.getAllByText('0:00:00')).toHaveLength(2);
     expect(screen.getByRole('link')).toHaveAttribute('href', '/resources/11/flows');
   });
 
@@ -61,13 +63,14 @@ describe('OperatingDurationCard', () => {
     expect(screen.getByText('Operating data unavailable')).toBeInTheDocument();
     expect(screen.queryByText('Tracking not configured')).not.toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
-    expect(getDataQuality).toHaveBeenCalledWith({ resourceId: 11 }, undefined, { enabled: false });
+    expect(getDataQuality).toHaveBeenCalledWith({ path: { resourceId: 11 } }, undefined, { enabled: false });
   });
 
   it('retains provisional live values and removes the missing data explanation', () => {
     useOperatingDuration.mockReturnValue({
       data: {
         sessionDurationMs: 60000,
+        personDurationMs: 90000,
         operatingDurationMs: 30000,
         unattributedOperatingDurationMs: 0,
         operatingDataAvailable: true,
@@ -78,8 +81,12 @@ describe('OperatingDurationCard', () => {
     });
     render(<OperatingDurationCard resourceId={11} />);
     expect(screen.getByText('Live values are provisional.')).toBeInTheDocument();
-    expect(getDataQuality).toHaveBeenCalledWith({ resourceId: 11 }, undefined, { enabled: false });
+    expect(getDataQuality).toHaveBeenCalledWith({ path: { resourceId: 11 } }, undefined, { enabled: false });
     expect(screen.getByText('0:00:30')).toBeInTheDocument();
+    expect(screen.getByText('Machine hours with a session')).toBeInTheDocument();
+    expect(screen.getByText('0:01:00')).toBeInTheDocument();
+    expect(screen.getByText('Person hours')).toBeInTheDocument();
+    expect(screen.getByText('0:01:30')).toBeInTheDocument();
     expect(screen.queryByText('Unavailable')).not.toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });

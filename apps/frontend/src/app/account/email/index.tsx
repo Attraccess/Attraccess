@@ -1,35 +1,28 @@
-import {
-  ApiError,
-  useUsersServiceChangeMyEmail,
-  useUsersServiceGetCurrent,
-  useUsersServiceGetCurrentKey,
-} from '@attraccess/react-query-client';
-import { Input, Label, TextField, useOverlayState } from '@heroui/react';
+import { ApiError, useChangeMyEmail, useGetCurrent, useGetCurrentKey } from '@attraccess/react-query-client';
+import { Input, Label, TextField } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
-import { Button, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { ConfirmableButton, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 
 export function EmailForm() {
   const { t } = useTranslations({ en, de });
 
-  const { data: me, isLoading: isLoadingMe } = useUsersServiceGetCurrent();
+  const { data: me, isLoading: isLoadingMe } = useGetCurrent();
   const [email, setEmail] = useState('');
-  const { isOpen, open, close } = useOverlayState();
   const queryClient = useQueryClient();
   const trimmedEmail = email.trim();
   const isEmailValid = trimmedEmail.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail);
   const { success: showSuccess, error: showError } = useToastMessage();
 
-  const { mutate, isPending } = useUsersServiceChangeMyEmail({
+  const { mutateAsync, isPending } = useChangeMyEmail(undefined, {
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [useUsersServiceGetCurrentKey],
+        queryKey: [useGetCurrentKey],
       });
       showSuccess({ title: t('messages.updated') });
-      close();
     },
     onError: (rawError) => {
       let messageToDisplay = t('errors.updateFailed');
@@ -46,44 +39,30 @@ export function EmailForm() {
     },
   });
 
-  const onSubmit = useCallback(() => {
-    if (!isEmailValid) {
-      return;
-    }
-    open();
-  }, [isEmailValid, open]);
-
-  const confirmEmailChange = useCallback(() => {
-    mutate({
-      requestBody: { email: trimmedEmail },
-    });
-  }, [mutate, trimmedEmail]);
-
   return (
-    <>
-      <div className="flex flex-col gap-4">
-        <TextField value={me?.email ?? ''} isDisabled={isLoadingMe} isReadOnly>
-          <Label>{t('email.currentLabel')}</Label>
-          <Input type="email" />
-        </TextField>
-        <TextField value={email} onChange={setEmail}>
-          <Label>{t('email.newLabel')}</Label>
-          <Input type="email" />
-        </TextField>
-        <Button variant="primary" isPending={isPending} onPress={onSubmit} isDisabled={!isEmailValid || isPending}>
-          {t('actions.save')}
-        </Button>
-      </div>
-      <StatusDialog
-        isOpen={isOpen}
-        onClose={close}
+    <div className="flex flex-col gap-4">
+      <TextField value={me?.email ?? ''} isDisabled={isLoadingMe} isReadOnly>
+        <Label>{t('email.currentLabel')}</Label>
+        <Input type="email" />
+      </TextField>
+      <TextField value={email} onChange={setEmail}>
+        <Label>{t('email.newLabel')}</Label>
+        <Input type="email" />
+      </TextField>
+      <ConfirmableButton
+        label={t('actions.save')}
         status="warning"
-        title={t('modal.title')}
-        closeLabel={t('actions.cancel')}
-        action={{ label: t('actions.confirm'), onPress: confirmEmailChange, isPending }}
-      >
-        {t('modal.warning')}
-      </StatusDialog>
-    </>
+        buttonProps={{ variant: 'primary' }}
+        isPending={isPending}
+        isDisabled={!isEmailValid || isPending}
+        confirm={{
+          title: t('modal.title'),
+          message: t('modal.warning'),
+          confirmLabel: t('actions.confirm'),
+          cancelLabel: t('actions.cancel'),
+        }}
+        onConfirm={() => mutateAsync({ body: { email: trimmedEmail } })}
+      />
+    </div>
   );
 }

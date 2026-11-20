@@ -1,5 +1,5 @@
 import { ResourceRetrainingService } from './resourceRetraining.service';
-import { IntroductionHistoryAction } from '@attraccess/database-entities';
+import { IntroductionHistoryAction } from '@attraccess/application-models';
 
 export function registerResourceRetrainingServiceStatusAggregationFixture() {
   const trainedAt = new Date('2020-01-01T00:00:00Z');
@@ -17,12 +17,22 @@ export function registerResourceRetrainingServiceStatusAggregationFixture() {
       findOne: jest.fn().mockResolvedValue({ action: IntroductionHistoryAction.GRANT, createdAt: trainedAt }),
     };
     const resourceGroups = { getGroupsOfResource: jest.fn().mockResolvedValue([{ id: 2 }]) };
+    const retrainingStore = {
+      findResourceTarget: jest.fn(() => resources.findOne()),
+      findGroupTarget: jest.fn(() => groups.findOne()),
+      lastResourceUseAt: jest.fn(() => usage.findOne()),
+      lastGroupUseAt: jest.fn(() => usage.findOne()),
+    };
+    const introductionStore = {
+      findOfUser: jest.fn(() => introductions.findOne()),
+      findOfGroupUser: jest.fn(() => introductions.findOne()),
+      findById: jest.fn(() => introductions.findOne()),
+      lastHistoryItem: jest.fn(() => history.findOne()),
+      latestGrant: jest.fn(() => history.findOne()),
+    };
     const service = new ResourceRetrainingService(
-      resources as never,
-      groups as never,
-      usage as never,
-      introductions as never,
-      history as never,
+      retrainingStore as never,
+      introductionStore as never,
       resourceGroups as never,
       {} as never,
       {} as never,

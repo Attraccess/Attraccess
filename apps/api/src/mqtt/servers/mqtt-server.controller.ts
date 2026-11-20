@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { MqttServer } from '@attraccess/database-entities';
 import { MqttServerService } from './mqtt-server.service';
+import { MqttServerDto, toMqttServerDto } from './dtos/mqtt-server-response.dto';
 import { CreateMqttServerDto, UpdateMqttServerDto } from './dtos/mqtt-server.dto';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { auditActorOf } from '../../audit/recorder/audit-event';
@@ -17,10 +17,10 @@ export class MqttServerController {
   @ApiResponse({
     status: 200,
     description: 'Returns all MQTT servers',
-    type: [MqttServer],
+    type: [MqttServerDto],
   })
-  async getAll(): Promise<MqttServer[]> {
-    return this.mqttServerService.findAll();
+  async getAll(): Promise<MqttServerDto[]> {
+    return (await this.mqttServerService.findAll()).map(toMqttServerDto);
   }
 
   @Get(':id')
@@ -28,11 +28,11 @@ export class MqttServerController {
   @ApiResponse({
     status: 200,
     description: 'Returns the MQTT server with the specified ID',
-    type: MqttServer,
+    type: MqttServerDto,
   })
   @ApiResponse({ status: 404, description: 'MQTT server not found' })
-  async getOneById(@Param('id', ParseIntPipe) id: number): Promise<MqttServer> {
-    return this.mqttServerService.findOne(id);
+  async getOneById(@Param('id', ParseIntPipe) id: number): Promise<MqttServerDto> {
+    return toMqttServerDto(await this.mqttServerService.findOne(id));
   }
 
   @Post()
@@ -40,13 +40,13 @@ export class MqttServerController {
   @ApiResponse({
     status: 201,
     description: 'MQTT server created successfully',
-    type: MqttServer,
+    type: MqttServerDto,
   })
   async createOne(
     @Body() createMqttServerDto: CreateMqttServerDto,
     @Req() req: AuthenticatedRequest,
-  ): Promise<MqttServer> {
-    return this.mqttServerService.create(createMqttServerDto, auditActorOf(req.user));
+  ): Promise<MqttServerDto> {
+    return toMqttServerDto(await this.mqttServerService.create(createMqttServerDto, auditActorOf(req.user)));
   }
 
   @Put(':id')
@@ -54,15 +54,15 @@ export class MqttServerController {
   @ApiResponse({
     status: 200,
     description: 'MQTT server updated successfully',
-    type: MqttServer,
+    type: MqttServerDto,
   })
   @ApiResponse({ status: 404, description: 'MQTT server not found' })
   async updateOne(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateMqttServerDto: UpdateMqttServerDto,
     @Req() req: AuthenticatedRequest,
-  ): Promise<MqttServer> {
-    return this.mqttServerService.update(id, updateMqttServerDto, auditActorOf(req.user));
+  ): Promise<MqttServerDto> {
+    return toMqttServerDto(await this.mqttServerService.update(id, updateMqttServerDto, auditActorOf(req.user)));
   }
 
   @Delete(':id')

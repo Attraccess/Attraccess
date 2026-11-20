@@ -4,6 +4,15 @@
   "projectType": "application",
   "sourceRoot": "apps/matter-sidecar/src",
   "tags": ["type:app", "scope:matter"],
+  "namedInputs": {
+    "jestShared": [
+      "default",
+      "{workspaceRoot}/jest.preset.js",
+      "{workspaceRoot}/package.json",
+      "{projectRoot}/jest.base.config.ts"
+    ],
+    "contractSources": ["{workspaceRoot}/libs/matter-contract/src/**/*"]
+  },
   "targets": {
     "build": {
       "executor": "nx:run-commands",
@@ -61,22 +70,16 @@
       }
     },
     "test": {
-      "executor": "@nx/jest:jest",
-      "cache": true,
       "inputs": [
         "jestShared",
         "contractSources",
         {
           "externalDependencies": ["jest"]
         }
-      ],
-      "outputs": ["{workspaceRoot}/coverage/apps/matter-sidecar/test"],
-      "options": {
-        "jestConfig": "apps/matter-sidecar/jest.config.ts"
-      }
+      ]
     },
     "test-integration": {
-      "executor": "@nx/jest:jest",
+      "executor": "nx:run-commands",
       "cache": true,
       "inputs": [
         "jestShared",
@@ -87,17 +90,25 @@
       ],
       "outputs": ["{workspaceRoot}/coverage/apps/matter-sidecar/test-integration"],
       "options": {
-        "jestConfig": "apps/matter-sidecar/jest.integration.config.ts"
+        "command": "jest --config ./apps/matter-sidecar/jest.integration.config.ts",
+        "cwd": ".",
+        "env": {
+          "TS_NODE_COMPILER_OPTIONS": "{\"moduleResolution\":\"node10\",\"module\":\"commonjs\",\"customConditions\":null}",
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        }
       }
     },
     "test-built": {
-      "executor": "@nx/jest:jest",
+      "executor": "nx:run-commands",
       "cache": true,
       "dependsOn": ["build"],
       "inputs": [
         "jestShared",
         "contractSources",
-        { "dependentTasksOutputFiles": "**/*", "transitive": true },
+        {
+          "dependentTasksOutputFiles": "**/*",
+          "transitive": true
+        },
         {
           "externalDependencies": ["jest", "ws"]
         },
@@ -107,7 +118,12 @@
       ],
       "outputs": ["{workspaceRoot}/coverage/apps/matter-sidecar/test-built"],
       "options": {
-        "jestConfig": "apps/matter-sidecar/jest.built.config.ts"
+        "command": "jest --config ./apps/matter-sidecar/jest.built.config.ts",
+        "cwd": ".",
+        "env": {
+          "TS_NODE_COMPILER_OPTIONS": "{\"moduleResolution\":\"node10\",\"module\":\"commonjs\",\"customConditions\":null}",
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        }
       }
     },
     "crap-score": {
@@ -117,14 +133,5 @@
         "command": "node scripts/crap-score/run.mjs apps/matter-sidecar"
       }
     }
-  },
-  "namedInputs": {
-    "jestShared": [
-      "default",
-      "{workspaceRoot}/jest.preset.js",
-      "{workspaceRoot}/package.json",
-      "{projectRoot}/jest.base.config.ts"
-    ],
-    "contractSources": ["{workspaceRoot}/libs/matter-contract/src/**/*"]
   }
 }

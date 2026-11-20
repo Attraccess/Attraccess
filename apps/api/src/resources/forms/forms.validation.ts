@@ -1,4 +1,4 @@
-import { FormFieldType } from '@attraccess/database-entities';
+import { FormFieldType } from '@attraccess/application-models';
 import { BadRequestException } from '@nestjs/common';
 import { z, ZodError, ZodIssueCode } from 'zod';
 

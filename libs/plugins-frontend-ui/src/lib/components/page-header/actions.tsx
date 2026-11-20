@@ -4,6 +4,12 @@ import { buttonVariants } from '@heroui/styles';
 import { Button } from '../button';
 import { MoreVerticalIcon } from 'lucide-react';
 import { useTranslations } from '../../i18n';
+import {
+  ConfirmableButton,
+  ConfirmableConfirmOptions,
+  ConfirmableHost,
+  ConfirmableStatus,
+} from '../confirmable-button';
 
 export type PageActionVariant = 'primary' | 'secondary' | 'destructive';
 
@@ -31,7 +37,10 @@ export interface PageActionTriggerProps {
 }
 
 export interface PageActionPress extends PageActionBase {
-  onPress: () => void;
+  /** With `confirm`, runs after the user confirms; return a promise to keep the dialog pending. */
+  onPress: () => unknown;
+  /** Asks for confirmation first; status defaults to `error` for destructive actions, `warning` otherwise. */
+  confirm?: ConfirmableConfirmOptions & { status?: ConfirmableStatus };
   renderTrigger?: undefined;
 }
 
@@ -70,6 +79,21 @@ function buildTriggerProps(action: PageAction): PageActionTriggerProps {
   };
 }
 
+function withConfirm(action: PageActionPress, renderActivator: (open: () => void) => ReactNode) {
+  if (!action.confirm) return renderActivator(action.onPress);
+  const { status, ...confirm } = action.confirm;
+  return (
+    <ConfirmableButton
+      key={action.key}
+      label={action.label}
+      status={status ?? (action.variant === 'destructive' ? 'error' : 'warning')}
+      confirm={confirm}
+      onConfirm={action.onPress}
+      renderActivator={renderActivator}
+    />
+  );
+}
+
 function renderInlineAction(action: PageAction) {
   const triggerProps = buildTriggerProps(action);
 
@@ -77,15 +101,15 @@ function renderInlineAction(action: PageAction) {
     return <span key={action.key}>{action.renderTrigger(triggerProps)}</span>;
   }
 
-  return <Button key={action.key} {...triggerProps} onPress={(action as PageActionPress).onPress} />;
+  return withConfirm(action as PageActionPress, (open) => <Button key={action.key} {...triggerProps} onPress={open} />);
 }
 
 function renderOverflowItem(action: PageActionPress) {
-  return (
+  return withConfirm(action, (open) => (
     <DropdownItem
       key={action.key}
       id={action.key}
-      onPress={action.onPress}
+      onPress={open}
       isDisabled={action.isDisabled || action.isPending}
       data-cy={action.dataCy}
       className={action.variant === 'destructive' ? 'text-danger' : undefined}
@@ -93,7 +117,7 @@ function renderOverflowItem(action: PageActionPress) {
       {action.icon && <span className="inline-flex mr-2">{action.icon}</span>}
       {action.label}
     </DropdownItem>
-  );
+  ));
 }
 
 export function PageHeaderActions({ actions, maxVisible = DEFAULT_MAX_VISIBLE, moreLabel }: PageHeaderActionsProps) {
@@ -135,24 +159,26 @@ export function PageHeaderActions({ actions, maxVisible = DEFAULT_MAX_VISIBLE, m
     <>
       {inline.map(renderInlineAction)}
       {hasOverflow && (
-        <Dropdown>
-          {/* HeroUI's .dropdown__trigger sets display:inline-block, which beats the
+        <ConfirmableHost>
+          <Dropdown>
+            {/* HeroUI's .dropdown__trigger sets display:inline-block, which beats the
               inline-flex from .button and leaves the icon stuck at the left edge.
               Re-assert the centering as utilities, which do win. */}
-          <DropdownTrigger
-            className={cn(
-              buttonVariants({ variant: 'outline', size: 'sm', isIconOnly: true }),
-              'inline-flex items-center justify-center',
-            )}
-            aria-label={triggerLabel}
-            data-cy="page-header-overflow-trigger"
-          >
-            <MoreVerticalIcon className="w-4 h-4" />
-          </DropdownTrigger>
-          <DropdownPopover>
-            <DropdownMenu aria-label={triggerLabel}>{overflowItems.map(renderOverflowItem)}</DropdownMenu>
-          </DropdownPopover>
-        </Dropdown>
+            <DropdownTrigger
+              className={cn(
+                buttonVariants({ variant: 'outline', size: 'sm', isIconOnly: true }),
+                'inline-flex items-center justify-center',
+              )}
+              aria-label={triggerLabel}
+              data-cy="page-header-overflow-trigger"
+            >
+              <MoreVerticalIcon className="w-4 h-4" />
+            </DropdownTrigger>
+            <DropdownPopover>
+              <DropdownMenu aria-label={triggerLabel}>{overflowItems.map(renderOverflowItem)}</DropdownMenu>
+            </DropdownPopover>
+          </Dropdown>
+        </ConfirmableHost>
       )}
     </>
   );

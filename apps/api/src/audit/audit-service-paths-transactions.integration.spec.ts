@@ -1,3 +1,4 @@
+import { createSqliteAuditService } from '../database/adapters/audit/sqlite-audit-service.test-fixture';
 import {
   AuditLog,
   BillingTransaction,
@@ -5,28 +6,33 @@ import {
   entities,
   Resource,
   ResourceBillingConfiguration,
-  ResourceType,
   ResourceUsage,
-  ResourceUsageAction,
   Setting,
   SSOProvider,
   SSOProviderOIDCConfiguration,
   SSOProviderSAMLConfiguration,
-  SSOProviderType,
   User,
 } from '@attraccess/database-entities';
+import { ResourceType, ResourceUsageAction, SSOProviderType } from '@attraccess/application-models';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource, EntityManager } from 'typeorm';
 import { BillingService } from '../billing/charges/billing.service';
+import { TransactionContextResolver } from '../database/adapters/transaction-context';
+import { TypeOrmBillingConfigurationStore } from '../database/adapters/billing/typeorm-billing-configuration.store';
+import { TypeOrmBillingLedgerStore } from '../database/adapters/billing/typeorm-billing-ledger.store';
+import { createSqliteUnitOfWork } from '../database/sqlite/sqlite-unit-of-work';
 import * as migrations from '../database/migrations';
 import { SettingsStoreService } from '../settings/settings-store.service';
+import { TypeOrmSsoProviderStore } from '../database/adapters/sso/typeorm-sso-provider-store';
 import { SSOService } from '../users-and-auth/auth/sso/sso.service';
 import { AuditService } from './audit.service';
-import { createTestAuditMetrics, droppedRecords } from './audit.test-fixture';
+import { createTestAuditMetrics, droppedRecords } from '../database/adapters/audit/audit.test-fixture';
 import { AuditMetrics } from '../metrics/definitions/audit.metrics';
+import { TypeOrmSettingsRows } from '../database/adapters/settings/typeorm-settings-rows';
+import { legacyEngineTransactionScope } from '../database/adapters/common/legacy-engine-transaction';
 
 /**
  * A service that owns a transactional change records its audit row with the same EntityManager, so the row commits
@@ -43,13 +49,14 @@ describe('audit recorded by an owning service inside its transaction', () => {
   beforeAll(async () => {
     directory = await mkdtemp(join(tmpdir(), 'audit-service-transactions-'));
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: join(directory, 'audit.sqlite'),
       entities: Object.values(entities),
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
-    store = new SettingsStoreService(source.getRepository(Setting), null);
+    store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(source.getRepository(Setting)), null);
     await store.setPlainSetting('audit', 'domains', JSON.stringify(['billing', 'sso']));
   }, 120_000);
 
@@ -68,7 +75,7 @@ describe('audit recorded by an owning service inside its transaction', () => {
     ])
       await source.query(`DELETE FROM "${source.getMetadata(entity).tableName}"`);
     metrics = createTestAuditMetrics();
-    audit = new AuditService(source, store, metrics);
+    audit = createSqliteAuditService(source, store, metrics);
     await audit.onModuleInit();
   });
 
@@ -103,25 +110,34 @@ describe('audit recorded by an owning service inside its transaction', () => {
         startTime: new Date('2026-11-13T09:00:00.000Z'),
         lifecyclePending: true,
       });
+      const unitOfWork = createSqliteUnitOfWork(source);
+      const contexts = new TransactionContextResolver(source, unitOfWork);
       billing = new BillingService(
-        source.getRepository(BillingTransaction),
-        source.getRepository(User),
-        source.getRepository(ResourceBillingConfiguration),
+        new TypeOrmBillingLedgerStore(
+          source.getRepository(BillingTransaction),
+          source.getRepository(User),
+          audit,
+          contexts,
+        ),
+        new TypeOrmBillingConfigurationStore(
+          source.getRepository(Setting),
+          source.getRepository(ResourceBillingConfiguration),
+          contexts,
+        ),
         {} as never,
-        source.getRepository(Setting),
-        source.getRepository(BillingTransactionItem),
         { getNodes: async () => [] } as never,
         {} as never,
         new EventEmitter2(),
         {} as never,
         audit,
+        unitOfWork,
       );
     });
 
     /** The usage-start path: the resource usage service hands its own manager to the billing service. */
     const startUsage = (afterStart: (manager: EntityManager) => Promise<void> = async () => undefined) =>
       source.transaction(async (manager) => {
-        await billing.handleResourceUsageStart(usage.resourceId, usage, user, manager);
+        await billing.handleResourceUsageStart(usage.resourceId, usage, user, legacyEngineTransactionScope(manager));
         await afterStart(manager);
       });
 
@@ -188,9 +204,7 @@ describe('audit recorded by an owning service inside its transaction', () => {
 
     beforeEach(() => {
       sso = new SSOService(
-        source.getRepository(SSOProvider),
-        source.getRepository(SSOProviderOIDCConfiguration),
-        source.getRepository(SSOProviderSAMLConfiguration),
+        new TypeOrmSsoProviderStore(source, audit),
         { verifyLicense: async () => undefined } as never,
         {
           encrypt: (value: string) => `enc:${value}`,

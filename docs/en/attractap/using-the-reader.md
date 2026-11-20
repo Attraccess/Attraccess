@@ -1,4 +1,5 @@
 # Using the Attractap Reader
+
 <!-- llms-description: How to use an Attractap touch reader: sign in with a card, start or stop machines, open doors, view usage and complete forms. -->
 
 Use your RFID card and the Attractap touch display to start or stop a machine, open a door, or request supervision. The reader shows the machines and doors assigned to it and the actions available to you.
@@ -21,7 +22,7 @@ You can also choose a resource **before** signing in. Tap its name, then hold yo
 
 ### Time and date
 
-While nobody is signed in, the reader doubles as a clock. The card prompt shows the current time and date in large type with **RFID-Karte auflegen** (Hold your RFID card here) below it, and the resource list shows them at the top. The reader shows the time in its own [time zone](attractap/reader-ui.md#time-and-time-zone): the zone of a plugin such as Reservations when one sets it, otherwise that of your Attraccess server. While you are signed in, a small clock in the footer bar shows the current time. After a restart, the clock appears once the reader has connected to the server; until then, the reader shows its usual sign-in text. If the connection drops later, the clock continues advancing internally, but the display shows the initialization screen until the reader reconnects.
+While nobody is signed in, the reader doubles as a clock. The card prompt shows the current time and date in large type with **RFID-Karte auflegen** (Hold your RFID card here) below it, and the resource list shows them at the top. The reader shows the time in its own [time zone](attractap/reader-ui.md#time-and-time-zone): the zone of a plugin such as [Reservations](plugins/reservations/overview.md) when one sets it, otherwise that of your Attraccess server. While you are signed in, a small clock in the footer bar shows the current time. After a restart, the clock appears once the reader has connected to the server; until then, the reader shows its usual sign-in text. If the connection drops later, the clock continues advancing internally, but the display shows the initialization screen until the reader reconnects.
 
 During an outage, UTC continues advancing with the last time zone offset the server sent. That offset stays fixed: daylight-saving changes or a change of the reader's time zone take effect only after another valid server time sample arrives.
 
@@ -30,6 +31,8 @@ The signed-out card prompt keeps showing the clock when the selected resource is
 ## Start a machine or open a door
 
 In the resource list, tap **Start** next to a machine or **Öffnen** (Open) next to a door. Complete any form or supervision step that appears, then wait for the result on the display.
+
+A door with the [access only](resources/creating-resources.md#door-options) option has a single action: its details show one **Öffnen** (Open) button instead of lock, unlock and unlatch. On an Attractap Lite reader (without a display), any tap of your card opens such a door, short or long, and the reader gives no long-tap signal there.
 
 While the reader processes an action, the controls are temporarily unavailable. Wait until the resource status has updated before tapping again. After a machine starts, its row shows your name and a **Stop** button.
 
@@ -161,6 +164,33 @@ After signing out, you can scan your card again to continue. Any running machine
 | Your card does not sign you in     | Try again and keep the card in place until sign-in finishes. If it still fails, ask your administrator to check that the card is registered to your account. |
 | A start, stop or door action fails | Read the message and check the resource's current status before trying again. If the problem continues, contact the resource maintainer or resource manager. |
 | The reader loses its connection    | Wait for the connection to return, then sign in again. A lost connection does not end running machine usage.                                                 |
+
+### Network badge and connection status
+
+While the connection to the server is good, the reader shows no network badge. A badge in the top right corner appears only when there is a problem:
+
+| Badge     | Meaning                                                                                                                                     |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **! NET** | The connection is degraded: messages arrive late, pings are slow or lost, or sending failed. The reader keeps working but may react slowly. |
+| **x NET** | The reader is offline and cannot reach the server. It reconnects automatically.                                                             |
+
+For details, open the maintenance drawer (pull down the handle at the top edge), tap **Network** and enter the device PIN. The **Network status** screen shows the live connection health and refreshes every second. The reader stays connected while it is open, so you can watch the connection change. The back arrow returns to the previous screen, or to the start screen if the connection dropped in the meantime:
+
+| Value                       | Meaning                                                                                  |
+| --------------------------- | ---------------------------------------------------------------------------------------- |
+| Connection quality          | **Good**, **Degraded** or **Offline**, the same assessment as the badge.                 |
+| Time since last message     | How long ago the reader last received anything from the server or connected to it.       |
+| Latest ping / Average ping  | Round-trip time of the most recent ping and the average over the last minute.            |
+| Ping trend                  | Change between the oldest and newest ping of the last minute; positive means slower.     |
+| Reconnects (1 min)          | How often the connection was re-established in the last minute.                          |
+| Send queue                  | Messages waiting to be sent.                                                             |
+| Queue full (1 min)          | How often a message could not be queued because the send queue was full.                 |
+| Send failures (1 min)       | Messages that could not be sent.                                                         |
+| Connection timeouts (1 min) | Times the server stayed silent for too long and the reader dropped the connection.       |
+| Ping timeouts / Ping loss   | Pings without an answer, as a count and as a share of all pings sent in the last minute. |
+| Missed heartbeats (1 min)   | Heartbeats the reader could not send on time.                                            |
+
+**Not available** means there is no measurement: the pings show it until the first ping is answered after the reader starts, and the average and trend also show it when no ping was answered in the last minute.
 
 > [!NOTE]
 > Reader firmware and server ship together. The server updates readers automatically to its bundled firmware version (see [Firmware Updates](attractap/firmware-updates.md)).

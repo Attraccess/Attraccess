@@ -1,6 +1,6 @@
-import { useOverlayState } from '@heroui/react';
 import {
   BellIcon,
+  BotIcon,
   CalendarClockIcon,
   KeyRoundIcon,
   LockKeyholeIcon,
@@ -8,7 +8,7 @@ import {
   Trash2Icon,
   UserIcon,
 } from 'lucide-react';
-import { Button, PageHeader, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { ConfirmableButton, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { UserAccountPluginSlot } from '../plugins/PluginSettingsSlots';
@@ -19,9 +19,10 @@ import { useAuth } from '../../hooks/useAuth';
 import { TwoFactorCard } from './two-factor';
 import { PasskeysCard } from './passkeys';
 import { ApiTokensCard } from './api-tokens';
+import { McpConnectionCard, useMcpConnection } from './mcp';
 import { DateTimePreferencesForm } from './date-time';
 import { NotificationPreferencesForm } from './notifications';
-import { useUsersServiceRequestDeleteAccount, ApiError } from '@attraccess/react-query-client';
+import { useRequestDeleteAccount, ApiError } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
 import { SettingsDirectory, type SettingsDirectoryGroup } from '../../components/settingsDirectory';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
@@ -35,15 +36,15 @@ export default function AccountPage() {
 
   const { user: me, hasPermission } = useAuth();
   const toast = useToastMessage();
-  const { isOpen, open, close } = useOverlayState();
+  const canUseApiTokens = Boolean(me && hasPermission('users.api-tokens.manage'));
+  const mcpConnection = useMcpConnection(canUseApiTokens);
 
-  const { mutate: requestDelete, isPending: isRequestingDelete } = useUsersServiceRequestDeleteAccount({
+  const { mutateAsync: requestDelete, isPending: isRequestingDelete } = useRequestDeleteAccount(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('deleteAccount.toast.title'),
         description: t('deleteAccount.toast.description'),
       });
-      close();
     },
     onError: (error) => {
       toast.apiError({
@@ -134,7 +135,7 @@ export default function AccountPage() {
       key: 'advanced',
       label: t('groups.advanced'),
       items: [
-        ...(me && hasPermission('users.api-tokens.manage')
+        ...(me && canUseApiTokens
           ? [
               {
                 key: 'tokens',
@@ -142,6 +143,18 @@ export default function AccountPage() {
                 description: t('topics.tokens.description'),
                 icon: <KeyRoundIcon size={19} />,
                 content: <ApiTokensCard availablePermissions={me.effectivePermissions ?? []} />,
+              },
+            ]
+          : []),
+        ...(me && mcpConnection
+          ? [
+              {
+                key: 'mcp',
+                title: t('topics.mcp.title'),
+                description: t('topics.mcp.description'),
+                icon: <BotIcon size={19} />,
+                searchTerms: [t('searchTerms.mcp')],
+                content: <McpConnectionCard connection={mcpConnection} canUseApiTokens={canUseApiTokens} />,
               },
             ]
           : []),
@@ -153,9 +166,20 @@ export default function AccountPage() {
           content: (
             <div className="flex flex-col items-start gap-4">
               <p className="text-sm text-muted">{t('deleteAccount.description')}</p>
-              <Button variant="danger" onPress={open} data-cy="delete-account-open-modal">
-                {t('deleteAccount.actions.request')}
-              </Button>
+              <ConfirmableButton
+                label={t('deleteAccount.actions.request')}
+                status="error"
+                data-cy="delete-account-open-modal"
+                confirm={{
+                  title: t('deleteAccount.modal.title'),
+                  message: t('deleteAccount.modal.description'),
+                  confirmLabel: t('deleteAccount.actions.confirm'),
+                  cancelLabel: t('deleteAccount.actions.cancel'),
+                  confirmDataCy: 'delete-account-confirm-button',
+                }}
+                isPending={isRequestingDelete}
+                onConfirm={() => requestDelete()}
+              />
             </div>
           ),
         },
@@ -172,22 +196,6 @@ export default function AccountPage() {
           <UserAccountPluginSlot userId={me.id} />
         </div>
       )}
-
-      <StatusDialog
-        isOpen={isOpen}
-        onClose={close}
-        status="error"
-        title={t('deleteAccount.modal.title')}
-        closeLabel={t('deleteAccount.actions.cancel')}
-        action={{
-          label: t('deleteAccount.actions.confirm'),
-          onPress: () => requestDelete(),
-          isPending: isRequestingDelete,
-          'data-cy': 'delete-account-confirm-button',
-        }}
-      >
-        {t('deleteAccount.modal.description')}
-      </StatusDialog>
     </div>
   );
 }

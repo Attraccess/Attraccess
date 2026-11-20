@@ -29,7 +29,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  usePasswordPolicyServiceGetPublicPasswordPolicy: () => ({ data: undefined }),
+  useGetPublicPasswordPolicy: () => ({ data: undefined }),
 }));
 
 vi.mock('../toastProvider', () => ({

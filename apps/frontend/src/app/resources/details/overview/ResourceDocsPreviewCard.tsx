@@ -5,7 +5,7 @@ import { Button } from '@heroui/react';
 import { BookOpen, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
+import { useGetOneResourceById } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../hooks/useAuth';
 import { FlatSection } from '../../../../components/flatSection';
 import { Markdown } from '../../../../components/markdown';
@@ -26,7 +26,7 @@ export function ResourceDocsPreviewCard({ resourceId, className }: ResourceDocsP
   const canUpdateResources = hasPermission('resources.update');
   const navigate = useNavigate();
 
-  const { data: resource, isLoading } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  const { data: resource, isLoading } = useGetOneResourceById({ path: { id: resourceId } });
 
   const documentationType = resource?.documentationType;
   const markdown = documentationType === 'markdown' ? (resource?.documentationMarkdown ?? '') : '';
@@ -34,16 +34,19 @@ export function ResourceDocsPreviewCard({ resourceId, className }: ResourceDocsP
 
   const previewText = useMemo(() => {
     if (!markdown) return '';
-    return markdown.length > PREVIEW_CHAR_COUNT
-      ? markdown.slice(0, PREVIEW_CHAR_COUNT).trimEnd() + '…'
-      : markdown;
+    return markdown.length > PREVIEW_CHAR_COUNT ? markdown.slice(0, PREVIEW_CHAR_COUNT).trimEnd() + '…' : markdown;
   }, [markdown]);
 
   const hasContent = Boolean(previewText) || Boolean(url);
 
   if (isLoading) {
     return (
-      <FlatSection className={className} icon={<BookOpen className="w-4 h-4" />} title={t('title')} data-cy="docs-preview-card">
+      <FlatSection
+        className={className}
+        icon={<BookOpen className="w-4 h-4" />}
+        title={t('title')}
+        data-cy="docs-preview-card"
+      >
         <div className="h-8" />
       </FlatSection>
     );

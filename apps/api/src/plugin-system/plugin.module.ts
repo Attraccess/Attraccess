@@ -1,28 +1,22 @@
-import { Global, Module, DynamicModule, Type, Logger } from '@nestjs/common';
+import { Global, Inject, Module, DynamicModule, Type, Logger } from '@nestjs/common';
 
 import { ModuleRef } from '@nestjs/core';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { DataSource as HostDataSource } from 'typeorm';
-
 import {
   PluginBackendModule,
-  EntityTarget,
   MQTT_CREDENTIAL_PROVISIONING_HOST_PROVIDER,
   MQTT_SERVER_HOST_PROVIDER,
   MqttCredentialProvisioningHostProvider,
   MqttServerConnectionConfig,
   MqttServerHostProvider,
-  ObjectLiteral,
   PLUGIN_AUDIT_HOST_PROVIDER,
   PluginAuditHostProvider,
   PluginContext,
-  PluginEntityClass,
   PluginFlowsContext,
   PluginPermission,
   PluginSecretsContext,
-  Repository,
   SystemEvent,
   SystemEventHandler,
   SystemEventPayload,
@@ -73,31 +67,46 @@ import { PluginSandboxService } from './plugin-sandbox.service';
 import { PluginController } from './plugin.controller';
 import { PluginAdministrationService } from './plugin-administration.service';
 
+import { PluginUninstallService } from './plugin-uninstall.service';
+
 import { LoadedPluginManifest } from './plugin.manifest';
 
 import { PluginService } from './plugin.service';
 
-import { dataSourceConfig } from '../database/datasource';
+import { PluginPersistenceModule } from '../database/adapters/plugins/plugin-persistence.module';
+import { createPluginPersistenceHost } from '../database/adapters/plugins/plugin-persistence-host';
+import { PLUGIN_HOST_CONNECTION } from './persistence/plugin-host-data.port';
+import type { PluginPersistenceHost } from './persistence/plugin-persistence-host.port';
+import { assertModuleHasNoDatabaseInjection } from './runtime/module-injection';
+import { compileModuleStorage, storagePluginNames } from './plugin-storage/storage-loader';
+import { claimStorageNames } from './plugin-storage/storage-registry';
+import type { CompiledPluginStorage } from './plugin-storage/storage-model';
+import { PluginLicenseWatcher } from './license/plugin-license-watcher.service';
 
 import { EncryptionService } from '../encryption/encryption.service';
 
 import { ResourceFlowsExecutorService } from '../resources/flows/execution/resource-flows-executor.service';
 
 import { createPluginAuditContext } from './runtime/audit-context';
-
+import { closePluginBleSessions, createPluginBleContext } from './ble/plugin-ble-context';
+import { READER_PROVIDERS, createHostCardsContext, createHostReadersContext } from './readers/plugin-readers-host';
+import { cancelPluginCardConversations } from './cards/plugin-cards-context';
+import { PluginBleService } from './ble/plugin-ble.service';
 import { preparePluginNotifications } from './runtime/plugin-notifications';
+import { preparePluginPermissions } from './runtime/plugin-permissions';
 import {
   PLUGIN_START_BLOCKED_CHANGED_EVENT,
   type PluginStartBlockedChanged,
 } from './start-blocked/start-blocked.events';
-
 import {
+  createHostDataContext,
   createHostNotificationsContext,
   createHostResourceAccessContext,
   PluginHostRefs,
 } from './runtime/host-contexts';
-
-import { createPluginRunSerialized } from './runtime/plugin-serialized';
+import { LicenseService } from '../license/license.service';
+import { createPluginLicenseContext } from './runtime/plugin-license-context';
+import { arePluginsDisabled, setPluginsDisabled } from './plugins-disabled';
 
 function getImplementationClass(): typeof PluginModule {
   return require('./plugin.module').PluginModule;
@@ -110,13 +119,11 @@ export class PluginModule {
   // after forRoot() has already built the plugin modules. The context exposes
   // them through these holders, populated by the module constructor below.
 
-  constructor(dataSource: HostDataSource, events: EventEmitter2, moduleRef: ModuleRef) {
-    PluginModule.dataSourceRef = dataSource;
+  constructor(@Inject(PLUGIN_HOST_CONNECTION) connection: object, events: EventEmitter2, moduleRef: ModuleRef) {
+    PluginModule.connectionRef = connection;
     PluginModule.eventsRef = events;
     PluginModule.moduleRef = moduleRef;
   }
-
-  protected static DISABLE_PLUGINS_FLAG = false;
 
   protected static logger = new Logger('PluginModule');
 
@@ -126,15 +133,18 @@ export class PluginModule {
 
   protected static eventsRef: EventEmitter2 | null = null;
 
-  protected static dataSourceRef: HostDataSource | null = null;
+  /** The host's database connection, opaque here: only the persistence adapter knows its type. */
+  protected static connectionRef: object | null = null;
+
+  protected static persistenceHostInstance: PluginPersistenceHost | null = null;
 
   public static forRoot(): DynamicModule {
-    if (getImplementationClass().DISABLE_PLUGINS_FLAG) {
+    if (arePluginsDisabled()) {
       getImplementationClass().logger.log('Plugins are disabled');
 
       return {
         module: PluginModule,
-        imports: [SettingsModule, MqttModule, LiveTopicsModule],
+        imports: [SettingsModule, MqttModule, LiveTopicsModule, PluginPersistenceModule],
         providers: [
           PluginService,
           PluginSandboxService,
@@ -142,9 +152,12 @@ export class PluginModule {
           PluginMqttService,
           NpmPluginService,
           PluginAdministrationService,
+          PluginUninstallService,
           PluginClassificationService,
           PluginLiveUpdatesService,
           PluginSystemEventsBridge,
+          PluginBleService,
+          ...READER_PROVIDERS,
         ],
         exports: [PluginEventsService],
         controllers: [PluginController],
@@ -162,9 +175,18 @@ export class PluginModule {
     const modulesByName = new Map<string, DynamicModule>();
     const active = new Set<string>();
     for (const manifest of ordered) {
+      // Not a failure: no quarantine, no boot-guard entry. The plugin loads after a restart once it is licensed.
+      const licenseMissing = PluginService.getLicenseMissingReason(manifest);
+      if (licenseMissing) {
+        getImplementationClass().logger.log(`Plugin ${manifest.name} is not loaded: ${licenseMissing}`);
+        continue;
+      }
       if (
         PluginService.isPluginQuarantined(manifest) ||
-        PluginService.getPluginsWithLoadStatus().find((plugin) => plugin.name === manifest.name)?.status === 'error'
+        // Matched by directory: a refused copy of the same plugin name (an old 1.x upload next to its 2.x build) must
+        // not disable the compatible one.
+        PluginService.getPluginsWithLoadStatus().find((plugin) => plugin.pluginDirectory === manifest.pluginDirectory)
+          ?.status === 'error'
       )
         continue;
       const failedDependency = manifest.dependencies?.find(
@@ -211,7 +233,7 @@ export class PluginModule {
 
     return {
       module: PluginModule,
-      imports: [SettingsModule, MqttModule, LiveTopicsModule, ...pluginModules],
+      imports: [SettingsModule, MqttModule, LiveTopicsModule, PluginPersistenceModule, ...pluginModules],
       providers: [
         PluginService,
         PluginSandboxService,
@@ -219,9 +241,13 @@ export class PluginModule {
         PluginMqttService,
         NpmPluginService,
         PluginAdministrationService,
+        PluginUninstallService,
         PluginClassificationService,
         PluginLiveUpdatesService,
         PluginSystemEventsBridge,
+        PluginLicenseWatcher,
+        PluginBleService,
+        ...READER_PROVIDERS,
         ReaderUiWiring,
       ],
       exports: [PluginEventsService],
@@ -245,13 +271,19 @@ export class PluginModule {
 
     const exported = importedModule.default as PluginBackendModule | DynamicModule;
 
-    // Register any entities the plugin owns into the shared DataSource BEFORE it
-    // initialises (which happens later, at NestFactory.create). The schema is
-    // owned by the plugin's migrations — this only makes the entity metadata
-    // resolvable so the plugin can use context.getRepository(Entity).
-    getImplementationClass().registerPluginEntities(manifest, (exported as PluginBackendModule)?.entities);
+    // The plugin's storage declaration is validated before anything of it is registered: every table and index name
+    // must stay in the plugin's namespace and the migrations must produce the declared tables. A plugin that declares
+    // storage without PLUGIN_STORAGE, or leaves its namespace, does not load. Its names were claimed before its
+    // migrations ran (PluginMigrationService); claiming again is a no-op for the same plugin and covers a boot that
+    // skipped migrations.
+    const storage = compileModuleStorage(
+      manifest,
+      exported as Partial<PluginBackendModule>,
+      storagePluginNames(PluginService.getPlugins()),
+    );
+    if (storage) claimStorageNames(storage);
 
-    const context = getImplementationClass().createPluginContext(manifest);
+    const context = getImplementationClass().createPluginContext(manifest, storage);
 
     // Register any custom flow nodes contributed by this plugin.
     const configuredFlowNodes = (exported as PluginBackendModule)?.flowNodes;
@@ -295,24 +327,32 @@ export class PluginModule {
       (exported as PluginBackendModule)?.notificationCategories,
       (exported as PluginBackendModule)?.emailTemplates,
     );
-    const registerCategories = () => categories.register();
+    // RBAC keys are validated (shape, core and cross-plugin ownership) before anything is queued; a violation
+    // quarantines only this plugin. They are registered once the module was built.
+    const permissions = preparePluginPermissions(manifest.name, (exported as PluginBackendModule)?.permissions);
+    const registerDeclarations = () => {
+      categories.register();
+      permissions.register();
+    };
 
     if (typeof (exported as PluginBackendModule)?.register !== 'function') {
       this.logger.warn(
         `Plugin ${manifest.name} does not export a register(context) factory; loading its default export as a static module.`,
       );
-      registerCategories();
+      registerDeclarations();
       queueReaderUi();
       return exported as DynamicModule;
     }
 
     const pluginModule = (exported as PluginBackendModule).register(context);
+    // A plugin has no database access: its module may not inject the host connection, a manager or a repository.
+    assertModuleHasNoDatabaseInjection(manifest.name, pluginModule);
     const credentialProvider = (exported as PluginBackendModule).credentialProvisioningProvider;
     if (credentialProvider) {
       MqttCredentialProvisioningService.register(credentialProvider(context));
       this.logger.log(`Registered MQTT credential provider from plugin ${manifest.name}.`);
     }
-    registerCategories();
+    registerDeclarations();
     queueReaderUi();
     return {
       ...pluginModule,
@@ -322,12 +362,20 @@ export class PluginModule {
           provide: `plugin-mqtt-cleanup:${manifest.id}`,
           useFactory: () => ({
             // Closing the bootstrap's throwaway app unregisters the categories, so each app registers them again.
-            onModuleInit: () => registerCategories(),
+            onModuleInit: () => registerDeclarations(),
             onModuleDestroy: () => {
               getImplementationClass().pluginMqtt().clearPlugin(manifest.id);
               getImplementationClass().pluginLiveUpdates().clearPlugin(manifest.id);
               unregisterReaderUi(manifest.name);
               categories.unregister();
+              // Ends its card conversations (CANCELLED), drops its card authentications; none without host refs.
+              cancelPluginCardConversations(getImplementationClass().moduleRef, manifest.id);
+              // Closes this plugin's BLE sessions with `shutdown`; a plugin that never got host refs has none.
+              return closePluginBleSessions(
+                getImplementationClass().moduleRef,
+                manifest.id,
+                getImplementationClass().logger,
+              );
             },
           }),
         },
@@ -335,50 +383,20 @@ export class PluginModule {
     };
   }
 
-  /**
-   * Adds a plugin's declared entities to the host DataSource's entity set so
-   * `context.getRepository(Entity)` resolves their metadata. The host runs with
-   * `synchronize: false`, so this never alters the schema — the table is owned
-   * by the plugin's migration. Gated on DATABASE_ACCESS (the same permission
-   * getRepository requires); a plugin without it could not use the entity anyway.
-   *
-   * Mutates the shared `dataSourceConfig.entities` array in place: this runs at
-   * AppModule import time (when `@Module` evaluates its `imports`), before the
-   * TypeORM DataSource is constructed at NestFactory.create — so the additions
-   * are picked up. Deduped because AppModule is imported once but instantiated
-   * more than once during bootstrap.
-   */
-  protected static registerPluginEntities(
-    manifest: LoadedPluginManifest,
-    entities: PluginEntityClass[] | undefined,
-  ): void {
-    if (!entities || entities.length === 0) {
-      return;
-    }
-
-    if (!(manifest.permissions ?? []).includes(PluginPermission.DATABASE_ACCESS)) {
-      this.logger.warn(
-        `Plugin ${manifest.name} declares ${entities.length} entit(y/ies) but lacks the DATABASE_ACCESS ` +
-          `permission; skipping entity registration (getRepository would be denied anyway).`,
-      );
-      return;
-    }
-
-    const registry = dataSourceConfig.entities as unknown[];
-    let added = 0;
-    for (const entity of entities) {
-      if (!registry.includes(entity)) {
-        registry.push(entity);
-        added++;
-      }
-    }
-
-    if (added > 0) {
-      this.logger.log(`Registered ${added} entit(y/ies) from plugin ${manifest.name} into the host DataSource.`);
-    }
+  /** The persistence host of the active database backend, resolving the host connection lazily. */
+  protected static persistenceHost(): PluginPersistenceHost {
+    const owner = getImplementationClass();
+    return (owner.persistenceHostInstance ??= createPluginPersistenceHost(() =>
+      owner.requireRef(owner.connectionRef, 'DataSource'),
+    ));
   }
 
-  protected static createPluginContext(manifest: LoadedPluginManifest): PluginContext {
+  protected static createPluginContext(
+    manifest: LoadedPluginManifest,
+    storage: CompiledPluginStorage | null = null,
+  ): PluginContext {
+    // Both contexts are built on the host connection when first used; the plugin never receives the connection.
+    const contexts = getImplementationClass().persistenceHost().createContexts(manifest.name, storage);
     const base: PluginContext = {
       // The same version the host uses to check plugin compatibility.
       hostVersion: resolveAppVersion(),
@@ -393,6 +411,11 @@ export class PluginModule {
       ),
       manifest: PluginService.toManifestInfo(manifest),
       readerUi: { invalidate: (scope) => invalidateReaderUi(manifest.name, scope) },
+      ble: createPluginBleContext({ id: manifest.id, logger: new Logger(`Plugin:${manifest.name}`) }, () =>
+        getImplementationClass().hostRefs().get(PluginBleService),
+      ),
+      cards: createHostCardsContext(manifest, getImplementationClass().hostRefs()),
+      readers: createHostReadersContext(manifest.id, getImplementationClass().hostRefs()),
       startBlocked: {
         invalidate: ({ resourceId }) => {
           if (!Number.isInteger(resourceId)) return;
@@ -416,43 +439,6 @@ export class PluginModule {
       },
       get events(): EventEmitter2 {
         return getImplementationClass().requireRef(getImplementationClass().eventsRef, 'EventEmitter2');
-      },
-      get dataSource(): PluginContext['dataSource'] {
-        return getImplementationClass().requireRef(
-          getImplementationClass().dataSourceRef,
-          'DataSource',
-        ) as unknown as PluginContext['dataSource'];
-      },
-      getRepository<T extends ObjectLiteral>(entity: EntityTarget<T>): Repository<T> {
-        const resolveRepository = (): Repository<T> =>
-          getImplementationClass()
-            .requireRef(getImplementationClass().dataSourceRef, 'DataSource')
-            .getRepository(entity as never) as unknown as Repository<T>;
-        if (getImplementationClass().dataSourceRef) return resolveRepository();
-
-        // Nest constructs plugin providers before it constructs PluginModule and
-        // injects the host DataSource. Older shipped plugins retain repositories
-        // in their constructors; defer only the repository's use until the host
-        // reference is ready. Bind methods to the real TypeORM Repository.
-        let resolved: Repository<T> | undefined;
-        const repository = (): Repository<T> => {
-          if (!resolved) {
-            // The initial sandbox check may have fallen back to DATABASE_ACCESS
-            // because metadata was unavailable before host injection. Resolve
-            // the entity permission again against the live DataSource.
-            PluginSandboxService.assertRepositoryPermission(base, manifest.permissions ?? [], entity);
-            resolved = resolveRepository();
-          }
-          return resolved;
-        };
-        return new Proxy({} as Repository<T>, {
-          get: (_, property) => {
-            const actual = repository();
-            const value = Reflect.get(actual, property, actual);
-            return typeof value === 'function' ? value.bind(actual) : value;
-          },
-          set: (_, property, value) => Reflect.set(repository(), property, value),
-        });
       },
       get<T>(token: Type<T> | string | symbol): T {
         return getImplementationClass()
@@ -498,12 +484,12 @@ export class PluginModule {
           decrypt: (ciphertext) => encryption.decryptForPlugin(manifest.id, ciphertext),
         };
       },
+      license: createPluginLicenseContext(() => getImplementationClass().hostRefs().get(LicenseService)),
       notifications: createHostNotificationsContext(manifest.name, getImplementationClass().hostRefs()),
       resourceAccess: createHostResourceAccessContext(getImplementationClass().hostRefs()),
-      runSerialized: createPluginRunSerialized(
-        manifest.name,
-        () => getImplementationClass().hostRefs().dataSource().manager,
-      ),
+      hostData: createHostDataContext(getImplementationClass().hostRefs()),
+      persistence: contexts.persistence,
+      storage: contexts.storage,
     };
 
     return PluginSandboxService.createGuardedContext(base, manifest.permissions ?? []);
@@ -516,26 +502,19 @@ export class PluginModule {
         getImplementationClass()
           .requireRef(getImplementationClass().moduleRef, 'ModuleRef')
           .get(token, { strict: false }),
-      dataSource: () => getImplementationClass().requireRef(getImplementationClass().dataSourceRef, 'DataSource'),
     };
   }
 
   /** Discard host instances when the temporary configuration app is closed. */
   public static resetHostReferences(): void {
-    getImplementationClass().dataSourceRef = null;
+    getImplementationClass().connectionRef = null;
     getImplementationClass().eventsRef = null;
     getImplementationClass().moduleRef = null;
   }
 
   public static configure(config: { DISABLE_PLUGINS: boolean }): void {
-    getImplementationClass().DISABLE_PLUGINS_FLAG = config.DISABLE_PLUGINS;
-    getImplementationClass().logger.log(
-      `PluginModule configured. DisablePlugins: ${getImplementationClass().DISABLE_PLUGINS_FLAG}`,
-    );
-  }
-
-  public static arePluginsDisabled(): boolean {
-    return getImplementationClass().DISABLE_PLUGINS_FLAG;
+    setPluginsDisabled(config.DISABLE_PLUGINS);
+    getImplementationClass().logger.log(`PluginModule configured. DisablePlugins: ${arePluginsDisabled()}`);
   }
 
   protected static pluginEvents(): PluginEventsService {

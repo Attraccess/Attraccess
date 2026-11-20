@@ -4,13 +4,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ApiError,
-  useSettingsServiceApplyFirstTimeSetupSettings,
-  UseSettingsServiceGetFirstTimeSetupStatusKeyFn,
-  useSettingsServiceGetSystemSettings,
-  useSettingsServiceGetSystemLanguage,
-  UseSettingsServiceGetSystemSettingsKeyFn,
-  UseSettingsServiceGetSystemLanguageKeyFn,
-  useSettingsServiceUpdateSystemSettings,
+  useApplyFirstTimeSetupSettings,
+  UseGetFirstTimeSetupStatusKeyFn,
+  useGetSystemSettings,
+  useGetSystemLanguage,
+  UseGetSystemSettingsKeyFn,
+  UseGetSystemLanguageKeyFn,
+  useUpdateSystemSettings,
 } from '@attraccess/react-query-client';
 import { Form, TextField, Label, Input, Description, Spinner } from '@heroui/react';
 import { Button, PasswordInput, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -48,11 +48,11 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
     normalizeDeviceLanguage(navigator.language),
   );
 
-  const { data: settings, isLoading } = useSettingsServiceGetSystemSettings(undefined, {
+  const { data: settings, isLoading } = useGetSystemSettings({}, undefined, {
     enabled: variant === 'standalone',
   });
 
-  const { data: systemLanguage } = useSettingsServiceGetSystemLanguage(undefined, { enabled: variant === 'wizard' });
+  const { data: systemLanguage } = useGetSystemLanguage({}, undefined, { enabled: variant === 'wizard' });
   useEffect(() => {
     if (variant === 'wizard' && systemLanguage?.configured && !hasEditedLanguage.current) {
       setDefaultLanguage(systemLanguage.defaultLanguage);
@@ -73,10 +73,10 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
           title: t('success.title'),
           description: t('success.description'),
         });
-        queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetSystemSettingsKeyFn() });
-        queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetSystemLanguageKeyFn() });
+        queryClient.invalidateQueries({ queryKey: UseGetSystemSettingsKeyFn() });
+        queryClient.invalidateQueries({ queryKey: UseGetSystemLanguageKeyFn() });
         if (endpoint === 'first-time-setup') {
-          queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetFirstTimeSetupStatusKeyFn() });
+          queryClient.invalidateQueries({ queryKey: UseGetFirstTimeSetupStatusKeyFn() });
         }
         hasEditedLanguage.current = false;
         hasEditedUrl.current = false;
@@ -95,9 +95,11 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
     };
   }, [endpoint, variant, t, tExists, toast, queryClient, onNext]);
 
-  const { mutate: saveSettings, isPending: isSavingNormal } = useSettingsServiceUpdateSystemSettings(mutateConfig);
-  const { mutate: saveSettingsFirstTimeSetup, isPending: isSavingFirstTimeSetup } =
-    useSettingsServiceApplyFirstTimeSetupSettings(mutateConfig);
+  const { mutate: saveSettings, isPending: isSavingNormal } = useUpdateSystemSettings(undefined, mutateConfig);
+  const { mutate: saveSettingsFirstTimeSetup, isPending: isSavingFirstTimeSetup } = useApplyFirstTimeSetupSettings(
+    undefined,
+    mutateConfig,
+  );
 
   const isSaving = endpoint === 'first-time-setup' ? isSavingFirstTimeSetup : isSavingNormal;
 
@@ -105,7 +107,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
     if (isSaving || !formRef.current?.checkValidity()) return;
 
     const payload = {
-      requestBody: {
+      body: {
         app: {
           url: url.trim(),
           publicInternetUrl: publicInternetUrl.trim() ? publicInternetUrl.trim() : undefined,

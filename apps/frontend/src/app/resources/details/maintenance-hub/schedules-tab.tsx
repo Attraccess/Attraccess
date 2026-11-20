@@ -1,16 +1,16 @@
 import { Accordion, Skeleton } from '@heroui/react';
-import { Button, DeleteConfirmationModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PlusIcon, CalendarClockIcon } from 'lucide-react';
-import { useState } from 'react';
 import {
-  useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey,
-  useResourceMaintenanceSchedulesServiceDeleteMaintenanceSchedule,
+  useFindMaintenanceSchedulesKey,
+  useDeleteMaintenanceSchedule,
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleTriggerType,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { ScheduleAccordionItem } from './schedule-accordion-item';
 import { SectionCard } from './section-card';
+import { useToastMessage } from '../../../../components/toastProvider';
 import { OperatingTrackingNotice, useOperatingTrackingReadiness } from '../operating-readiness';
 import de from './de.json';
 import en from './en.json';
@@ -27,6 +27,7 @@ export function SchedulesTab(props: Props) {
   const { resourceId, schedules, isLoading, onCreate, onEdit } = props;
   const { t } = useTranslations({ de, en });
   const queryClient = useQueryClient();
+  const toast = useToastMessage();
   const hasOperatingSchedule = schedules.some(
     (schedule) =>
       schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS &&
@@ -34,17 +35,15 @@ export function SchedulesTab(props: Props) {
   );
   const trackingReadiness = useOperatingTrackingReadiness(resourceId, hasOperatingSchedule);
 
-  const [deleteTarget, setDeleteTarget] = useState<ResourceMaintenanceSchedule | null>(null);
-
-  const { mutate: deleteSchedule, isPending: isDeleting } =
-    useResourceMaintenanceSchedulesServiceDeleteMaintenanceSchedule({
-      onSuccess: () => {
-        queryClient.invalidateQueries({
-          queryKey: [useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey],
-        });
-        setDeleteTarget(null);
-      },
-    });
+  const { mutateAsync: deleteSchedule } = useDeleteMaintenanceSchedule(undefined, {
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [useFindMaintenanceSchedulesKey],
+      });
+      toast.success({ title: t('schedules.deleted') });
+    },
+    onError: (error) => toast.error({ title: t('schedules.deleteFailed'), description: (error as Error).message }),
+  });
 
   const renderBody = () => {
     if (isLoading) {
@@ -79,7 +78,7 @@ export function SchedulesTab(props: Props) {
             resourceId={resourceId}
             trackingReadiness={trackingReadiness}
             onEdit={() => onEdit(schedule.id)}
-            onDelete={() => setDeleteTarget(schedule)}
+            onDelete={() => deleteSchedule({ path: { resourceId, scheduleId: schedule.id } })}
           />
         ))}
       </Accordion>
@@ -96,18 +95,6 @@ export function SchedulesTab(props: Props) {
         <OperatingTrackingNotice resourceId={resourceId} readiness={trackingReadiness} schedule />
       )}
       {renderBody()}
-
-      <DeleteConfirmationModal
-        isOpen={deleteTarget != null}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={() => {
-          if (deleteTarget) {
-            deleteSchedule({ resourceId, scheduleId: deleteTarget.id });
-          }
-        }}
-        itemName={deleteTarget?.name ?? ''}
-        isDeleting={isDeleting}
-      />
     </SectionCard>
   );
 }

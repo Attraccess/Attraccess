@@ -38,10 +38,12 @@ import { ResourceListService } from '../resource-list/resource-list.service';
 
 import { formatCredits, dbCurrencyToUserCurrency } from '@attraccess/shared';
 
-import { ResourceFormAction } from '@attraccess/database-entities';
+import { ResourceFormAction } from '@attraccess/application-models';
 
 import { InsufficientBalanceError } from '../../../../billing/errors/insufficient-balance.error';
 
+import { StartBlockedException } from '../../../../resources/usage/pre-start/start-confirmation.errors';
+import type { PluginBlockReason } from '@attraccess/plugins-backend-sdk';
 import { ResourceInUseError } from '../../../../resources/usage/errors/resource-in-use.error';
 import { ResourceFullError } from '../../../../resources/usage/errors/resource-full.error';
 import { SessionChangeInterruptedError } from '../../../../resources/usage/errors/session-change-interrupted.error';
@@ -131,15 +133,20 @@ export class AttractapSessionHandler {
           isOperating: operating.operatingDataAvailable ? operating.isOperating : null,
           // Catalog entries include captured terms with unavailable values for skipped free meters.
           // Never attach a new session's meter reading to an earlier usage snapshot.
-          meters: meter.meters
-            .filter((entry) => entry.session?.usageId === usage.id)
-            .map((entry) => ({
-              id: entry.id,
-              name: entry.session.meterName,
-              creditsPerUnit: entry.session.creditsPerUnit,
-              formattedRate: this.formatMeterRate(entry.session.creditsPerUnit, billingConfiguration),
-              value: entry.session.latestValue,
-            })),
+          meters: meter.meters.flatMap((entry) => {
+            const own = (entry.sessions ?? [entry.session]).find((session) => session?.usageId === usage.id);
+            return own
+              ? [
+                  {
+                    id: entry.id,
+                    name: own.meterName,
+                    creditsPerUnit: own.creditsPerUnit,
+                    formattedRate: this.formatMeterRate(own.creditsPerUnit, billingConfiguration),
+                    value: own.latestValue,
+                  },
+                ]
+              : [];
+          }),
         },
       } satisfies ResourceUsageStatsPayload);
     } catch (error) {
@@ -389,6 +396,9 @@ export class AttractapSessionHandler {
           {
             ...(supervisorUserId ? { supervisorUserId } : {}),
             auditOrigin: { id: user.id, authenticationMethod: null },
+            origin: supervisorUserId ? 'supervision' : 'reader',
+            confirmedStepKeys: gate.satisfied,
+            ...(gate.language ? { language: gate.language } : {}),
           },
         );
       } finally {
@@ -414,6 +424,16 @@ export class AttractapSessionHandler {
       ) {
         // Resolve the pending action before refreshing an occupied row.
         await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: error.message });
+        await this.resourceListService.sendResourceListToSocket(socket, { resourceIds: new Set([resourceId]) });
+        return;
+      }
+      if (error instanceof StartBlockedException) {
+        // A plugin held back the free slot inside the start transaction: shown like the pre-start gate's block.
+        const { reason } = error.getResponse() as { reason: PluginBlockReason };
+        await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, {
+          error: 'START_BLOCKED',
+          reason,
+        });
         await this.resourceListService.sendResourceListToSocket(socket, { resourceIds: new Set([resourceId]) });
         return;
       }

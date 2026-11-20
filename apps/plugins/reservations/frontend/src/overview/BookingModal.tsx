@@ -19,7 +19,8 @@ import { validDurations, validStarts } from '../lib/slots';
 import { addLocalDays, fromDateKey, localDateOf, startOfLocalDay, toDateKey } from '../lib/time';
 import type { Availability, Reservation } from '../lib/types';
 import { useFormatters } from '../lib/useFormatters';
-import { SelectField, TextInput } from '../shared/fields';
+import { SelectField } from '../shared/SelectField';
+import { TextInput } from '../shared/TextInput';
 import { CheckInRules } from './CheckInRules';
 
 const DAY_MS = 86_400_000;
@@ -64,8 +65,9 @@ export function BookingModal(props: Readonly<Props>) {
       reservations: dayAvailability.data?.reservations ?? [],
       maintenance: dayAvailability.data?.maintenance ?? [],
       now: new Date(),
+      slots: dayAvailability.data?.slots ?? availability.slots,
     }),
-    [availability.rules, zone, dayAvailability.data],
+    [availability.rules, availability.slots, zone, dayAvailability.data],
   );
 
   const starts = useMemo(
@@ -104,7 +106,7 @@ export function BookingModal(props: Readonly<Props>) {
       setOpen(false);
     },
     onError: (failure) => {
-      setError(describeError(failure, t));
+      setError(describeError(failure, t, { slots: context.slots }));
       void invalidate();
     },
   });

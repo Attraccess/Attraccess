@@ -2,10 +2,13 @@ import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { READER_UI_TIMING } from '@attraccess/plugins-backend-sdk';
 import { AUDIT_RECORDER, AuditRecorder } from '../../../audit/recorder/audit-event';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 export interface WebStepBinding {
   userId: number;
   apiTokenId?: number;
+  /** How the principal authenticated; recorded in the audit log. */
+  authenticationMethod?: AuthenticationMethod;
   resourceId: number;
   action: 'start' | 'takeover';
   projectId?: number;
@@ -30,6 +33,7 @@ const samePrincipal = (a: WebStepBinding, b: WebStepBinding) => a.userId === b.u
 const sameBinding = (a: WebStepBinding, b: WebStepBinding) =>
   a.userId === b.userId &&
   a.apiTokenId === b.apiTokenId &&
+  a.authenticationMethod === b.authenticationMethod &&
   a.resourceId === b.resourceId &&
   a.action === b.action &&
   a.projectId === b.projectId &&
@@ -127,7 +131,7 @@ export class WebStartStepStore {
       action: `attractap.${action}` as const,
       actor: {
         id: step.userId,
-        authenticationMethod: viaToken ? 'api-token' : 'session',
+        authenticationMethod: step.authenticationMethod ?? (viaToken ? 'api-token' : 'session'),
         ...(viaToken ? { apiTokenId: step.apiTokenId } : {}),
       },
       subject: { type: 'resource', id: step.resourceId },

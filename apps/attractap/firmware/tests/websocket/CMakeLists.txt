@@ -8,3 +8,8 @@ target_compile_definitions(websocket-pong-probe PRIVATE ESP_PLATFORM=1 LOGGER_LE
 enable_testing()
 add_test(NAME websocket-pong-probe COMMAND websocket-pong-probe)
 set_tests_properties(websocket-pong-probe PROPERTIES TIMEOUT 5)
+add_executable(websocket-network-quality network_quality_test.cpp "${FIRMWARE_DIR}/src/websocket/websocket_network_quality.cpp")
+target_include_directories(websocket-network-quality PRIVATE shims "${FIRMWARE_DIR}/src")
+target_compile_definitions(websocket-network-quality PRIVATE ESP_PLATFORM=1 LOGGER_LEVEL_NUM=0)
+add_test(NAME websocket-network-quality COMMAND websocket-network-quality)
+set_tests_properties(websocket-network-quality PROPERTIES TIMEOUT 5)

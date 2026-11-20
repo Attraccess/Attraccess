@@ -10,15 +10,16 @@ import { UsageSessionNotifications } from '../usage-session-notifications';
 import { UsageSessionRecords } from '../usage-session-records';
 import { UsageSessionStartPreparation } from '../usage-session-start-preparation';
 import { UsageSessionStarts } from '../usage-session-starts';
+import { usagePersistenceFor } from '../../../../database/adapters/usage/sqlite-usage-persistence.test-fixture';
 
 /**
  * Builds ResourceUsageService and its collaborators without Nest, taking the dependencies in the order the
  * service's constructor took them before it was split into collaborators.
  */
 export function composeResourceUsageService(
-  resourceRepository: unknown,
+  _resourceRepository: unknown,
   resourceUsageRepository: unknown,
-  userRepository: unknown,
+  _userRepository: unknown,
   resourceIntroductionService: unknown,
   resourceIntroducersService: unknown,
   resourceGroupsIntroductionsService: unknown,
@@ -39,7 +40,8 @@ export function composeResourceUsageService(
   valkeyClient: unknown,
   metering?: unknown,
 ): ResourceUsageService {
-  const turns = new SessionChangeTurns(resourceRepository as never, valkeyClient as never);
+  const { unitOfWork, store } = usagePersistenceFor({ usage: resourceUsageRepository });
+  const turns = new SessionChangeTurns(store, valkeyClient as never);
   const rules = new UsageAccessRules(
     resourceIntroductionService as never,
     resourceIntroducersService as never,
@@ -56,8 +58,7 @@ export function composeResourceUsageService(
     valkeyClient as never,
   );
   const gate = new UsageResourceGate(
-    resourceRepository as never,
-    userRepository as never,
+    store,
     resourceMaintenanceService as never,
     resourceHealthService as never,
     resourceIntroducersService as never,
@@ -65,7 +66,8 @@ export function composeResourceUsageService(
     access,
   );
   const lifecycle = new UsageLifecycle(
-    resourceUsageRepository as never,
+    store,
+    unitOfWork,
     eventEmitter as never,
     billingService as never,
     turns,
@@ -73,22 +75,19 @@ export function composeResourceUsageService(
     flowExecutorService as never,
     metering as never,
   );
-  const records = new UsageSessionRecords(
-    resourceRepository as never,
-    resourceUsageRepository as never,
-    projectsService as never,
-  );
+  const records = new UsageSessionRecords(store, projectsService as never);
   const notifications = new UsageSessionNotifications(
-    resourceUsageRepository as never,
+    store,
     eventEmitter as never,
     billingService as never,
     metricsService as never,
     pluginEvents as never,
     flowExecutorService as never,
   );
-  const doors = new UsageDoorActions(resourceUsageRepository as never, gate, notifications);
+  const doors = new UsageDoorActions(store, gate, notifications);
   const preparation = new UsageSessionStartPreparation(
     lifecycle,
+    store,
     gate,
     access,
     records,

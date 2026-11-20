@@ -60,8 +60,8 @@ vi.mock('./KioskScreensaver', () => ({
 }));
 vi.mock('../../components/themeToggle', () => ({ ThemeToggle: () => <button>Theme</button> }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourcesServiceGetOneResourceById: () => ({ data: state.resource, isLoading: state.loading }),
-  useCompanionDevicesServiceGetCompanionDeviceResources: (...args: unknown[]) => {
+  useGetOneResourceById: () => ({ data: state.resource, isLoading: state.loading }),
+  useGetCompanionDeviceResources: (...args: unknown[]) => {
     state.query(...args);
     return { data: state.resources, isLoading: state.loading, error: state.error };
   },
@@ -130,7 +130,7 @@ it('handles missing resources and navigates back with companion and logoff param
 it('handles missing companion identifiers, loading, errors and empty assignments', () => {
   const missing = open('/kiosk/companion');
   expect(screen.getByText('noDeviceId')).toBeTruthy();
-  expect(state.query).toHaveBeenCalledWith({ id: 0 }, undefined, { enabled: false, refetchInterval: 10000 });
+  expect(state.query).toHaveBeenCalledWith({ path: { id: 0 } }, undefined, { enabled: false, refetchInterval: 10000 });
   missing.unmount();
   state.loading = true;
   const loading = open('/kiosk/companion?deviceId=4');

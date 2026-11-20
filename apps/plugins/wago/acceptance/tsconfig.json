@@ -1,4 +1,8 @@
 {
   "extends": "../tsconfig.spec.json",
-  "include": ["**/*.spec.ts", "reliability/*.ts"]
+  "include": [
+    "**/*.spec.ts",
+    "reliability/*.ts",
+    "../../../api/src/database/adapters/plugins/authenticated-user.augmentation.ts"
+  ]
 }

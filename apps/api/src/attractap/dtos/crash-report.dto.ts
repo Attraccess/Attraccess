@@ -1,3 +1,4 @@
+import type { AttractapCoredumpStatus as CoredumpStatus } from '@attraccess/application-models';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class AttractapCrashReportDto {
@@ -73,6 +74,23 @@ export class AttractapCrashReportDto {
 
   @ApiProperty({ description: 'Size of the attached coredump blob in bytes, if any', example: 16384, nullable: true })
   coredumpSize!: number | null;
+
+  @ApiProperty({
+    description:
+      'Coredump upload state: awaiting while the reader still owes its chunked upload (or it never arrived), stored once the whole dump was verified and saved, rejected when the server refused the announced dump (too large or invalid)',
+    example: 'awaiting',
+    enum: ['awaiting', 'stored', 'rejected'],
+    nullable: true,
+  })
+  coredumpStatus!: CoredumpStatus | null;
+
+  @ApiProperty({
+    description:
+      'Size in bytes of the coredump the reader announced, while its upload is awaited or after it was rejected',
+    example: 43776,
+    nullable: true,
+  })
+  coredumpExpectedSize!: number | null;
 
   @ApiProperty({ description: 'Build id extracted from the coredump', example: 'f6899cb1067e5043', nullable: true })
   coredumpBuildId!: string | null;

@@ -135,6 +135,7 @@ class ReleaseBuildRunsTheSecureGate(unittest.TestCase):
         with mock.patch.object(b.shutil, "which", return_value="/usr/bin/idf.py"), \
                 mock.patch.object(b, "resolve_esptool_command", return_value=["esptool"]), \
                 mock.patch.object(b, "generate_certificates"), \
+                mock.patch.object(b, "check_release_build"), \
                 mock.patch.object(b, "prepare_output", return_value=out), \
                 mock.patch.object(b, "build_variant", side_effect=build_variant), \
                 mock.patch.object(b, "run_merge_bin"), \

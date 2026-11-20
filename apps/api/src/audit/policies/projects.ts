@@ -1,11 +1,12 @@
 import { PROJECT_AUDIT_ACTIONS } from './domains';
-import { dataFields, oneOf, positive, uuid } from './projection';
+import { dataFields, oneOf, positive, uuid, isAuthenticationMethod } from './projection';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 /** Projection input of a project-domain event. */
 export interface ProjectAuditInput {
   action: (typeof PROJECT_AUDIT_ACTIONS)[number];
   operationId: string;
   actorId: number;
-  authenticationMethod?: 'session' | 'api-token';
+  authenticationMethod?: AuthenticationMethod;
   apiTokenId?: number;
   subjectType: 'project' | 'project.member' | 'project.invitation';
   subjectId: number;
@@ -74,11 +75,9 @@ export function projectProjectAuditEvent(input: ProjectAuditInput): ProjectAudit
   }
   const authenticationMethod = input.authenticationMethod ?? 'session';
   if (
-    (input.authenticationMethod !== undefined &&
-      input.authenticationMethod !== 'session' &&
-      input.authenticationMethod !== 'api-token') ||
+    (input.authenticationMethod !== undefined && !isAuthenticationMethod(input.authenticationMethod)) ||
     (authenticationMethod === 'api-token' && !positive(input.apiTokenId)) ||
-    (authenticationMethod === 'session' && input.apiTokenId !== undefined)
+    (authenticationMethod !== 'api-token' && input.apiTokenId !== undefined)
   ) {
     return null;
   }

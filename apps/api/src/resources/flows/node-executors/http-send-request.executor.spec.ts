@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode } from '@attraccess/database-entities';
+import { FlowNodeRecord } from '@attraccess/application-models';
 import axios from 'axios';
 import { HttpSendRequestExecutor } from './http-send-request.executor';
 import { NodeExecutionContext } from './node-executor.interface';
@@ -10,8 +10,8 @@ describe('HttpSendRequestExecutor', () => {
   let executor: HttpSendRequestExecutor;
   let ctx: NodeExecutionContext;
 
-  const makeNode = (data: object): ResourceFlowNode =>
-    ({ id: 'n1', type: 'OUTPUT_HTTP_SEND_REQUEST', resourceId: 1, data }) as unknown as ResourceFlowNode;
+  const makeNode = (data: object): FlowNodeRecord =>
+    ({ id: 'n1', type: 'OUTPUT_HTTP_SEND_REQUEST', resourceId: 1, data }) as unknown as FlowNodeRecord;
 
   beforeEach(() => {
     jest.clearAllMocks();

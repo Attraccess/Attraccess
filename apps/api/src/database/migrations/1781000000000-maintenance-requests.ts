@@ -85,7 +85,7 @@ export class MaintenanceRequests1781000000000 implements MigrationInterface {
     );
 
     await queryRunner.query(
-      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES ($1, $2, $3, $4)`,
+      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES (?, ?, ?, ?)`,
       [
         'maintenance-request-created',
         'Maintenance requested: {{resource.name}}',

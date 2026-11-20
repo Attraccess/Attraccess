@@ -6,10 +6,10 @@ import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import {
   TwoFactorSetupResponseDto,
-  useTwoFactorAuthenticationServiceDisableTwoFactor,
-  useTwoFactorAuthenticationServiceGetTwoFactorStatus,
-  useTwoFactorAuthenticationServiceSetupTwoFactor,
-  useTwoFactorAuthenticationServiceVerifyTwoFactor,
+  useDisableTwoFactor,
+  useGetTwoFactorStatus,
+  useSetupTwoFactor,
+  useVerifyTwoFactor,
 } from '@attraccess/react-query-client';
 
 import en from './en.json';
@@ -18,15 +18,15 @@ import de from './de.json';
 export function TwoFactorCard() {
   const { t } = useTranslations({ en, de });
   const { showToast } = useToastMessage();
-  const { data: status, isLoading, refetch } = useTwoFactorAuthenticationServiceGetTwoFactorStatus();
+  const { data: status, isLoading, refetch } = useGetTwoFactorStatus();
 
   const [setupData, setSetupData] = useState<TwoFactorSetupResponseDto | null>(null);
   const [setupCode, setSetupCode] = useState('');
   const [disableCode, setDisableCode] = useState('');
 
-  const { mutateAsync: startSetup, isPending: isSettingUp } = useTwoFactorAuthenticationServiceSetupTwoFactor();
-  const { mutateAsync: verifySetup, isPending: isVerifying } = useTwoFactorAuthenticationServiceVerifyTwoFactor();
-  const { mutateAsync: disableTwoFactor, isPending: isDisabling } = useTwoFactorAuthenticationServiceDisableTwoFactor();
+  const { mutateAsync: startSetup, isPending: isSettingUp } = useSetupTwoFactor();
+  const { mutateAsync: verifySetup, isPending: isVerifying } = useVerifyTwoFactor();
+  const { mutateAsync: disableTwoFactor, isPending: isDisabling } = useDisableTwoFactor();
 
   const refreshStatus = useCallback(async () => {
     await refetch();
@@ -49,7 +49,7 @@ export function TwoFactorCard() {
     }
 
     try {
-      await verifySetup({ requestBody: { code: setupCode.trim() } });
+      await verifySetup({ body: { code: setupCode.trim() } });
       setSetupData(null);
       setSetupCode('');
       await refreshStatus();
@@ -66,7 +66,7 @@ export function TwoFactorCard() {
     }
 
     try {
-      await disableTwoFactor({ requestBody: { code: disableCode.trim() } });
+      await disableTwoFactor({ body: { code: disableCode.trim() } });
       setDisableCode('');
       await refreshStatus();
       showToast({ title: t('success.disabled'), type: 'success' });

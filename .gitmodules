@@ -1,0 +1,4 @@
+[submodule "apps/cesentry"]
+	path = apps/cesentry
+	url = https://github.com/Attraccess/cesentry.git
+	update = none

@@ -1,7 +1,9 @@
+import type { OperatingIntervalRecord } from '@attraccess/application-models';
 import { registerResourceOperatingDiagnosticsServiceFixture } from './resource-operating-diagnostics.service.resource-operating-diagnostics-service.test-fixture';
-import { ResourceType } from '@attraccess/database-entities';
-import { In } from 'typeorm';
-import { TRACKING_NODE_TYPES, unionDurationMs } from './resource-operating-diagnostics.service';
+import { TRACKING_NODE_TYPES } from './resource-operating-diagnostics.service';
+import { unionDurationMs } from './operating-duration-union';
+
+const pageOf = (intervals: OperatingIntervalRecord[], total: number) => ({ intervals, total });
 
 describe('ResourceOperatingDiagnosticsService', () => {
   const fixture = registerResourceOperatingDiagnosticsServiceFixture();
@@ -9,7 +11,7 @@ describe('ResourceOperatingDiagnosticsService', () => {
   describe('getCurrentState', () => {
     it('reports operating with the open interval when one exists', async () => {
       const open = fixture.interval(5, fixture.at(18, '08:00:00'), null);
-      fixture.intervalRepository.findOne.mockResolvedValueOnce(open).mockResolvedValueOnce(open);
+      fixture.timeline.findCurrentState.mockResolvedValue({ open, latest: open });
 
       const state = await fixture.service.getCurrentState(1);
 
@@ -22,7 +24,7 @@ describe('ResourceOperatingDiagnosticsService', () => {
 
     it('reports idle with the last closed transition when no interval is open', async () => {
       const closed = fixture.interval(4, fixture.at(17, '08:00:00'), fixture.at(17, '10:30:00'));
-      fixture.intervalRepository.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(closed);
+      fixture.timeline.findCurrentState.mockResolvedValue({ open: null, latest: closed });
 
       const state = await fixture.service.getCurrentState(1);
 
@@ -34,8 +36,6 @@ describe('ResourceOperatingDiagnosticsService', () => {
     });
 
     it('reports idle without a last transition for a resource that never operated', async () => {
-      fixture.intervalRepository.findOne.mockResolvedValue(null);
-
       await expect(fixture.service.getCurrentState(1)).resolves.toEqual({
         state: 'idle',
         openInterval: null,
@@ -46,19 +46,21 @@ describe('ResourceOperatingDiagnosticsService', () => {
 
   describe('getTransitionHistory', () => {
     it('exposes recorded provenance for each boundary and leaves legacy provenance unknown', async () => {
-      fixture.intervalRepository.findAndCount.mockResolvedValue([
-        [
-          {
-            ...fixture.interval(2, fixture.at(12, '09:00:00'), fixture.at(12, '11:00:00')),
-            startFlowNodeId: 'start-node',
-            startFlowRunId: 'start-run',
-            endFlowNodeId: 'stop-node',
-            endFlowRunId: 'stop-run',
-          },
-          fixture.interval(1, fixture.at(10, '08:00:00'), null),
-        ],
-        2,
-      ]);
+      fixture.timeline.pageIntervals.mockResolvedValue(
+        pageOf(
+          [
+            {
+              ...fixture.interval(2, fixture.at(12, '09:00:00'), fixture.at(12, '11:00:00')),
+              startFlowNodeId: 'start-node',
+              startFlowRunId: 'start-run',
+              endFlowNodeId: 'stop-node',
+              endFlowRunId: 'stop-run',
+            },
+            fixture.interval(1, fixture.at(10, '08:00:00'), null),
+          ],
+          2,
+        ),
+      );
 
       const page = await fixture.service.getTransitionHistory(1, 1, 20);
 
@@ -70,13 +72,15 @@ describe('ResourceOperatingDiagnosticsService', () => {
     });
 
     it('derives descending transitions from interval rows and paginates over rows', async () => {
-      fixture.intervalRepository.findAndCount.mockResolvedValue([
-        [
-          fixture.interval(2, fixture.at(12, '09:00:00'), fixture.at(12, '11:00:00')),
-          fixture.interval(1, fixture.at(10, '08:00:00'), null),
-        ],
-        2,
-      ]);
+      fixture.timeline.pageIntervals.mockResolvedValue(
+        pageOf(
+          [
+            fixture.interval(2, fixture.at(12, '09:00:00'), fixture.at(12, '11:00:00')),
+            fixture.interval(1, fixture.at(10, '08:00:00'), null),
+          ],
+          2,
+        ),
+      );
 
       const page = await fixture.service.getTransitionHistory(1, 1, 20);
 
@@ -87,24 +91,20 @@ describe('ResourceOperatingDiagnosticsService', () => {
         [fixture.at(10, '08:00:00').toISOString(), 'operating', 1],
       ]);
       expect(page.items.every((item) => item.source === 'flow-signal')).toBe(true);
-      expect(fixture.intervalRepository.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({ skip: 0, take: 20, order: { startTime: 'DESC' } }),
-      );
+      expect(fixture.timeline.pageIntervals).toHaveBeenCalledWith(1, 1, 20);
     });
 
     it('skips interval rows for later pages', async () => {
       await fixture.service.getTransitionHistory(1, 3, 5);
 
-      expect(fixture.intervalRepository.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({ skip: 10, take: 5 }),
-      );
+      expect(fixture.timeline.pageIntervals).toHaveBeenCalledWith(1, 3, 5);
     });
   });
 
   describe('getDataQualityReport', () => {
     it('reports a clean timeline without issues', async () => {
-      fixture.flowNodeRepository.count.mockResolvedValue(2);
-      fixture.intervalRepository.find.mockResolvedValue([
+      fixture.timeline.countTrackingNodes.mockResolvedValue(2);
+      fixture.timeline.findIntervalsActiveSince.mockResolvedValue([
         fixture.interval(1, fixture.at(18, '08:00:00'), fixture.at(18, '10:00:00')),
       ]);
 
@@ -116,9 +116,9 @@ describe('ResourceOperatingDiagnosticsService', () => {
     });
 
     it('flags tracking configured but no signal in the window', async () => {
-      fixture.flowNodeRepository.count.mockResolvedValue(1);
-      fixture.intervalRepository.find.mockResolvedValue([]);
-      fixture.intervalRepository.count.mockResolvedValue(0);
+      fixture.timeline.countTrackingNodes.mockResolvedValue(1);
+      fixture.timeline.findIntervalsActiveSince.mockResolvedValue([]);
+      fixture.timeline.countOpenIntervals.mockResolvedValue(0);
 
       const report = await fixture.service.getDataQualityReport(1, fixture.at(20, '00:00:00'));
 
@@ -127,9 +127,9 @@ describe('ResourceOperatingDiagnosticsService', () => {
     });
 
     it('does not flag a long-running open interval as stale', async () => {
-      fixture.flowNodeRepository.count.mockResolvedValue(1);
-      fixture.intervalRepository.find.mockResolvedValue([]);
-      fixture.intervalRepository.count.mockResolvedValue(1);
+      fixture.timeline.countTrackingNodes.mockResolvedValue(1);
+      fixture.timeline.findIntervalsActiveSince.mockResolvedValue([]);
+      fixture.timeline.countOpenIntervals.mockResolvedValue(1);
 
       const report = await fixture.service.getDataQualityReport(1, fixture.at(20, '00:00:00'));
 
@@ -137,7 +137,7 @@ describe('ResourceOperatingDiagnosticsService', () => {
     });
 
     it('flags overlapping intervals as out-of-order transitions', async () => {
-      fixture.intervalRepository.find.mockResolvedValue([
+      fixture.timeline.findIntervalsActiveSince.mockResolvedValue([
         fixture.interval(1, fixture.at(18, '08:00:00'), fixture.at(18, '12:00:00')),
         fixture.interval(2, fixture.at(18, '10:00:00'), fixture.at(18, '14:00:00')),
       ]);
@@ -150,7 +150,7 @@ describe('ResourceOperatingDiagnosticsService', () => {
     });
 
     it('flags closed intervals whose end is not after their start', async () => {
-      fixture.intervalRepository.find.mockResolvedValue([
+      fixture.timeline.findIntervalsActiveSince.mockResolvedValue([
         fixture.interval(1, fixture.at(18, '08:00:00'), fixture.at(18, '08:00:00')),
       ]);
 
@@ -160,36 +160,28 @@ describe('ResourceOperatingDiagnosticsService', () => {
     });
 
     it('flags more than one open interval', async () => {
-      fixture.intervalRepository.count.mockResolvedValue(2);
+      fixture.timeline.countOpenIntervals.mockResolvedValue(2);
 
       const report = await fixture.service.getDataQualityReport(1, fixture.at(20, '00:00:00'));
 
       expect(report.issues).toEqual([expect.objectContaining({ kind: 'multiple-open-intervals', count: 2 })]);
     });
 
-    it('counts operating and idle nodes of enabled global flows for a machine', async () => {
-      fixture.flowNodeRepository.count.mockResolvedValue(1);
+    it('asks the store for the tracking nodes that act on the resource', async () => {
+      fixture.timeline.countTrackingNodes.mockResolvedValue(1);
 
       const report = await fixture.service.getDataQualityReport(1, fixture.at(20, '00:00:00'));
 
       expect(report.trackingConfigured).toBe(true);
-      expect(fixture.flowNodeRepository.count).toHaveBeenCalledWith({
-        where: [
-          { resourceId: 1, type: In(TRACKING_NODE_TYPES) },
-          { type: In(TRACKING_NODE_TYPES), flow: { enabled: true, scope: 'global' } },
-        ],
-      });
+      expect(fixture.timeline.countTrackingNodes).toHaveBeenCalledWith(1, TRACKING_NODE_TYPES);
     });
 
-    it('ignores global tracking nodes for a door: they only act on machines', async () => {
-      fixture.flowNodeRepository.manager.findOne.mockResolvedValue({ id: 1, type: ResourceType.Door });
+    it('is not configured when no tracking node acts on the resource', async () => {
+      fixture.timeline.countTrackingNodes.mockResolvedValue(0);
 
       const report = await fixture.service.getDataQualityReport(1, fixture.at(20, '00:00:00'));
 
       expect(report.trackingConfigured).toBe(false);
-      expect(fixture.flowNodeRepository.count).toHaveBeenCalledWith({
-        where: { resourceId: 1, type: In(TRACKING_NODE_TYPES) },
-      });
     });
   });
 
@@ -198,7 +190,7 @@ describe('ResourceOperatingDiagnosticsService', () => {
     const to = fixture.at(20, '00:00:00');
 
     it('recomputes operating duration from interval rows and confirms a consistent derived view', async () => {
-      fixture.intervalRepository.find.mockResolvedValue([
+      fixture.timeline.findIntervals.mockResolvedValue([
         fixture.interval(1, fixture.at(10, '08:00:00'), fixture.at(10, '10:00:00')),
         fixture.interval(2, fixture.at(12, '09:00:00'), null),
       ]);
@@ -224,7 +216,7 @@ describe('ResourceOperatingDiagnosticsService', () => {
     });
 
     it('reports inconsistency when the derived view disagrees with the timeline', async () => {
-      fixture.intervalRepository.find.mockResolvedValue([
+      fixture.timeline.findIntervals.mockResolvedValue([
         fixture.interval(1, fixture.at(10, '08:00:00'), fixture.at(10, '10:00:00')),
       ]);
       fixture.attributionService.getForResource.mockResolvedValue(
@@ -244,7 +236,7 @@ describe('ResourceOperatingDiagnosticsService', () => {
     });
 
     it('reports a broken attributed/unattributed partition', async () => {
-      fixture.intervalRepository.find.mockResolvedValue([
+      fixture.timeline.findIntervals.mockResolvedValue([
         fixture.interval(1, fixture.at(10, '08:00:00'), fixture.at(10, '10:00:00')),
       ]);
       fixture.attributionService.getForResource.mockResolvedValue(
@@ -262,7 +254,7 @@ describe('ResourceOperatingDiagnosticsService', () => {
     });
 
     it('treats an unavailable operating view (null, not 0) as consistent with an empty timeline', async () => {
-      fixture.intervalRepository.find.mockResolvedValue([]);
+      fixture.timeline.findIntervals.mockResolvedValue([]);
       fixture.attributionService.getForResource.mockResolvedValue(
         fixture.summary({
           operatingDataAvailable: false,
@@ -280,7 +272,7 @@ describe('ResourceOperatingDiagnosticsService', () => {
     });
 
     it('flags an unavailable view that hides existing interval rows', async () => {
-      fixture.intervalRepository.find.mockResolvedValue([
+      fixture.timeline.findIntervals.mockResolvedValue([
         fixture.interval(1, fixture.at(10, '08:00:00'), fixture.at(10, '10:00:00')),
       ]);
       fixture.attributionService.getForResource.mockResolvedValue(
@@ -303,7 +295,7 @@ describe('ResourceOperatingDiagnosticsService', () => {
     it('clips intervals that straddle the range boundaries', async () => {
       const before = new Date(from.getTime() - 60 * 60_000);
       const after = new Date(to.getTime() + 60 * 60_000);
-      fixture.intervalRepository.find.mockResolvedValue([
+      fixture.timeline.findIntervals.mockResolvedValue([
         fixture.interval(1, before, fixture.at(2, '00:00:00')),
         fixture.interval(2, fixture.at(19, '00:00:00'), after),
       ]);

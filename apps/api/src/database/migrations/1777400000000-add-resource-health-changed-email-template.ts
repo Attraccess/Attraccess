@@ -99,7 +99,7 @@ export class AddResourceHealthChangedEmailTemplate1777400000000 implements Migra
     await queryRunner.query(`DROP TABLE "temporary_email_templates"`);
 
     await queryRunner.query(
-      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES ($1, $2, $3, $4)`,
+      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES (?, ?, ?, ?)`,
       [
         'resource-health-changed',
         '{{health.headline}}: {{resource.name}}',

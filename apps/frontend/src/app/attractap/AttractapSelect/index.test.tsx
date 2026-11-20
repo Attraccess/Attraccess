@@ -2,15 +2,12 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  useAttractapServiceGetCardWriterSettings,
-  useAttractapServiceGetReaders,
-} from '@attraccess/react-query-client';
+import { useGetCardWriterSettings, useGetReaders } from '@attraccess/react-query-client';
 import { AttractapSelect } from './index';
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useAttractapServiceGetReaders: vi.fn(),
-  useAttractapServiceGetCardWriterSettings: vi.fn(),
+  useGetReaders: vi.fn(),
+  useGetCardWriterSettings: vi.fn(),
 }));
 
 const reader = (
@@ -28,16 +25,16 @@ const reader = (
 });
 
 const readersQuery = (data: ReturnType<typeof reader>[]) =>
-  vi.mocked(useAttractapServiceGetReaders).mockReturnValue({
+  vi.mocked(useGetReaders).mockReturnValue({
     data,
     isLoading: false,
-  } as unknown as ReturnType<typeof useAttractapServiceGetReaders>);
+  } as unknown as ReturnType<typeof useGetReaders>);
 
 const settingsQuery = (data: { mode: 'all' | 'selected'; readerIds: number[] } | undefined, isLoading = false) =>
-  vi.mocked(useAttractapServiceGetCardWriterSettings).mockReturnValue({
+  vi.mocked(useGetCardWriterSettings).mockReturnValue({
     data,
     isLoading,
-  } as ReturnType<typeof useAttractapServiceGetCardWriterSettings>);
+  } as ReturnType<typeof useGetCardWriterSettings>);
 
 describe('AttractapSelect for card writing', () => {
   beforeEach(() => {
@@ -55,26 +52,26 @@ describe('AttractapSelect for card writing', () => {
   };
 
   it('offers only readers with current firmware that can enroll cards', async () => {
-    vi.mocked(useAttractapServiceGetCardWriterSettings).mockReturnValue({
+    vi.mocked(useGetCardWriterSettings).mockReturnValue({
       data: { mode: 'all', readerIds: [] },
-    } as ReturnType<typeof useAttractapServiceGetCardWriterSettings>);
+    } as ReturnType<typeof useGetCardWriterSettings>);
     render(<AttractapSelect selection={null} onSelectionChange={vi.fn()} forCardWriting />);
     expect(await options()).toEqual(['Entrance', 'Workshop']);
   });
 
   it('offers only the readers the administrator selected', async () => {
-    vi.mocked(useAttractapServiceGetCardWriterSettings).mockReturnValue({
+    vi.mocked(useGetCardWriterSettings).mockReturnValue({
       data: { mode: 'selected', readerIds: [2, 3] },
-    } as ReturnType<typeof useAttractapServiceGetCardWriterSettings>);
+    } as ReturnType<typeof useGetCardWriterSettings>);
     render(<AttractapSelect selection={null} onSelectionChange={vi.fn()} forCardWriting />);
     // Reader 3 is selected but runs old firmware, so it still cannot take part.
     expect(await options()).toEqual(['Workshop']);
   });
 
   it('does not apply the card writer rules to other pickers', async () => {
-    vi.mocked(useAttractapServiceGetCardWriterSettings).mockReturnValue({
+    vi.mocked(useGetCardWriterSettings).mockReturnValue({
       data: { mode: 'selected', readerIds: [2] },
-    } as ReturnType<typeof useAttractapServiceGetCardWriterSettings>);
+    } as ReturnType<typeof useGetCardWriterSettings>);
     render(<AttractapSelect selection={null} onSelectionChange={vi.fn()} />);
     expect(await options()).toHaveLength(4);
   });
@@ -122,7 +119,7 @@ describe('AttractapSelect for card writing', () => {
     expect(screen.getByRole('button')).toBeDisabled();
   });
 
-  // After an upgrade every reader is unpaired until an administrator pairs it: say where that happens.
+  // After the upgrade every reader has to be paired again by an administrator: say where that happens.
   it('points to pairing when no paired reader is connected', () => {
     readersQuery([reader(1, 'Entrance', {}, new Date(Date.now() - 60_000))]);
     settingsQuery({ mode: 'all', readerIds: [] });
@@ -137,11 +134,7 @@ describe('AttractapSelect for card writing', () => {
   });
 
   it('never offers a reader that is not paired, in any picker', async () => {
-    readersQuery([
-      reader(1, 'Entrance', {}),
-      reader(5, 'Legacy', {}, new Date(), 'unpaired'),
-      reader(6, 'Removed', {}, new Date(), 'revoked'),
-    ]);
+    readersQuery([reader(1, 'Entrance', {}), reader(6, 'Removed', {}, new Date(), 'revoked')]);
     settingsQuery({ mode: 'all', readerIds: [] });
     const writing = render(<AttractapSelect selection={null} onSelectionChange={vi.fn()} forCardWriting />);
     expect(await options()).toEqual(['Entrance']);
@@ -151,7 +144,7 @@ describe('AttractapSelect for card writing', () => {
   });
 
   it('does not show a picked reader that is not paired', () => {
-    readersQuery([reader(5, 'Legacy', {}, new Date(), 'unpaired')]);
+    readersQuery([reader(5, 'Legacy', {}, new Date(), 'revoked')]);
     settingsQuery({ mode: 'all', readerIds: [] });
     render(<AttractapSelect selection={5} onSelectionChange={vi.fn()} forCardWriting />);
     expect(screen.queryByText('Legacy')).toBeNull();

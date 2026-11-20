@@ -1,0 +1,85 @@
+{
+  "loadError": "This widget could not be loaded.",
+  "crashed": "This widget stopped working. Reload the page to try again.",
+  "loading": "Loading…",
+  "more": "+{{count}} more",
+  "groups": {
+    "messages": "Messages",
+    "resources": "Resources",
+    "users": "Users",
+    "billing": "Billing",
+    "attractap": "Attractap",
+    "other": "Other pages"
+  },
+  "messages": {
+    "title": "Messages",
+    "description": "Your latest conversations and unread messages",
+    "keywords": "inbox, chat, unread",
+    "unread": "{{count}} unread",
+    "unreadLabel": "unread",
+    "latestFrom": "Latest from {{name}}",
+    "empty": "No conversations yet.",
+    "unknownUser": "Unknown user",
+    "noMessages": "No messages yet",
+    "online": "Online"
+  },
+  "resources": {
+    "title": "Find a resource",
+    "description": "Search resources and open one",
+    "keywords": "search, machines, equipment",
+    "searchLabel": "Search resources",
+    "noMatch": "No resources match.",
+    "create": "Create resource"
+  },
+  "resources-in-use": {
+    "title": "In use now",
+    "description": "Which resources are busy right now, and by whom",
+    "keywords": "busy, running, sessions, occupied",
+    "empty": "Nothing is in use right now.",
+    "countLabel": "in use"
+  },
+  "users": {
+    "title": "Users",
+    "description": "Search users, invite someone, see who has not verified their email",
+    "keywords": "people, members, accounts, invite",
+    "searchLabel": "Search users",
+    "noMatch": "No users match.",
+    "invite": "Invite user",
+    "unverified": "{{count}} unverified"
+  },
+  "my-sessions": {
+    "title": "My sessions",
+    "description": "Your running sessions, with a button to stop each",
+    "keywords": "timer, running, stop",
+    "empty": "No running sessions",
+    "browse": "Browse resources",
+    "stop": "Stop",
+    "stopLabel": "Stop {{name}}",
+    "confirmTitle": "Stop your session?",
+    "confirmDescription": "Your session at {{name}} ends now.",
+    "stopped": "Your session at {{name}} was stopped."
+  },
+  "billing-balance": {
+    "title": "Balance",
+    "description": "Your credit balance and latest transactions",
+    "keywords": "credits, money, wallet, transactions",
+    "balance": "{{balance}} {{currency}}",
+    "noTransactions": "No transactions yet.",
+    "transaction": {
+      "usage": "Usage of {{name}}",
+      "refund": "Refund",
+      "correction": "Correction",
+      "manual": "Manual transaction",
+      "topUp": "Top-up",
+      "other": "Transaction"
+    }
+  },
+  "readers": {
+    "title": "Reader health",
+    "description": "Readers that have not connected for 24 hours",
+    "keywords": "attractap, offline, nfc, devices",
+    "offlineLabel": "offline",
+    "allConnected": "All readers connected",
+    "noPaired": "No paired readers yet"
+  }
+}

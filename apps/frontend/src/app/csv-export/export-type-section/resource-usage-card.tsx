@@ -1,7 +1,7 @@
 // Resource usage export card — fetches row count when range is set
 // FEATURE: CSV export — step 2 of new export flow
 import { DateValue, RangeValue } from '@heroui/react';
-import { useAnalyticsServiceGetResourceUsageHoursInDateRange } from '@attraccess/react-query-client';
+import { useGetResourceUsageHoursInDateRange } from '@attraccess/react-query-client';
 import { DatabaseIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { ExportTypeCard } from './export-type-card';
@@ -23,7 +23,7 @@ export function ResourceUsageCard(props: Props) {
     return { start: bounds.start.toISOString(), end: bounds.end.toISOString() };
   }, [range, hasRange]);
 
-  const { data, status } = useAnalyticsServiceGetResourceUsageHoursInDateRange({ start, end }, [start, end], {
+  const { data, status } = useGetResourceUsageHoursInDateRange({ query: { start, end } }, [start, end], {
     enabled: hasRange,
   });
 

@@ -2,8 +2,9 @@
 // FEATURE: CSV export — step 2 of new export flow
 import { Card, DateValue, RangeValue } from '@heroui/react';
 import { FileSpreadsheetIcon } from 'lucide-react';
-import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
+import { useGetLicenseInformation } from '@attraccess/react-query-client';
 import { ResourceUsageCard } from './resource-usage-card';
+import { ResourceHoursSummaryCard } from './resource-hours-summary-card';
 import { BillingTransactionsCard } from './billing-transactions-card';
 import { useAuth } from '../../../hooks/useAuth';
 
@@ -17,7 +18,7 @@ interface Props {
 
 export function ExportTypeSection(props: Props) {
   const { range, onOpen, t } = props;
-  const { data: license } = useLicenseServiceGetLicenseInformation();
+  const { data: license } = useGetLicenseInformation();
   const { hasPermission } = useAuth();
 
   return (
@@ -36,6 +37,9 @@ export function ExportTypeSection(props: Props) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {hasPermission('resources.reports.export') && (
             <ResourceUsageCard range={range} onPress={() => onOpen('resourceUsageHours')} t={t} />
+          )}
+          {hasPermission('resources.reports.export') && (
+            <ResourceHoursSummaryCard range={range} onPress={() => onOpen('resourceHoursSummary')} t={t} />
           )}
           {license?.modules.includes('billing') && hasPermission('billing.manage') && (
             <BillingTransactionsCard range={range} onPress={() => onOpen('billingTransactions')} t={t} />

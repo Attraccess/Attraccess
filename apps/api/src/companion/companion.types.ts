@@ -1,4 +1,3 @@
-import { CompanionDevice } from '@attraccess/database-entities';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
@@ -161,7 +160,7 @@ export interface CompanionAuthenticatePayload {
 
 export interface CompanionSocket extends Omit<WebSocket, 'send'> {
   id: string;
-  deviceId: CompanionDevice['id'] | null;
+  deviceId: number | null;
   platform: string | null;
   arch: string | null;
   send: (data: string) => void;

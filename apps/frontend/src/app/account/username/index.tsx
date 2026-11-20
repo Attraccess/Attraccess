@@ -1,9 +1,4 @@
-import {
-  ApiError,
-  useUsersServiceChangeMyUsername,
-  useUsersServiceGetCurrent,
-  useUsersServiceGetCurrentKey,
-} from '@attraccess/react-query-client';
+import { ApiError, useChangeMyUsername, useGetCurrent, useGetCurrentKey } from '@attraccess/react-query-client';
 import { TextField, Label, Input } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
@@ -15,7 +10,7 @@ import de from './de.json';
 export function UsernameForm() {
   const { t } = useTranslations({ en, de });
 
-  const { data: me, isLoading: isLoadingMe } = useUsersServiceGetCurrent();
+  const { data: me, isLoading: isLoadingMe } = useGetCurrent();
   const [username, setUsername] = useState('');
   const queryClient = useQueryClient();
   const { success: showSuccess, error: showError } = useToastMessage();
@@ -24,10 +19,10 @@ export function UsernameForm() {
     if (me?.username) setUsername(me.username);
   }, [me?.username]);
 
-  const { mutate, isPending } = useUsersServiceChangeMyUsername({
+  const { mutate, isPending } = useChangeMyUsername(undefined, {
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [useUsersServiceGetCurrentKey],
+        queryKey: [useGetCurrentKey],
       });
       showSuccess({ title: t('messages.updated') });
     },
@@ -52,9 +47,7 @@ export function UsernameForm() {
   });
 
   const onSubmit = useCallback(() => {
-    mutate({
-      requestBody: { username },
-    });
+    mutate({ body: { username } });
   }, [mutate, username]);
 
   return (

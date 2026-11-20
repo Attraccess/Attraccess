@@ -2,13 +2,15 @@
 // snapshot, not the decrypted content, not the stored (encrypted) key.
 import { validatePluginAuditDomainDeclaration, type PluginAuditFieldPolicy } from '@attraccess/plugins-backend-sdk';
 import { MATTER_AUDIT_DOMAIN } from '../connection/audit';
+import { decodeBlob } from '../plugin-storage/blob';
 import { ADMIN, createFabricHarness, type FabricHarness } from '../testing/fabric-harness.test-utils';
-import { MatterBackup, MatterRecoveryKey } from './entities';
 import { parseRecoveryKey } from './recovery-key';
 import { encryptBackup } from './format';
 
 type AuditEvent = {
   action: string;
+  operationId: string;
+  principal: Record<string, unknown>;
   subject: { type: string; id: number };
   details: Record<string, unknown>;
   outcome: string;
@@ -33,6 +35,7 @@ describe('secrets never leave the plugin', () => {
   let h: FabricHarness;
   let keyForms: string[];
   let secretForms: string[];
+  let cancelledValidationId: string;
   const responses: unknown[] = [];
 
   const attempt = async (promise: Promise<unknown>) => {
@@ -60,13 +63,19 @@ describe('secrets never leave the plugin', () => {
     // Backups, restores, and every failure path, with logging and auditing on.
     const backup = await h.backups.backup('manual', ADMIN);
     responses.push(backup, await h.backups.list(), await h.fabric.status());
-    const file = (await h.dataSource.getRepository(MatterBackup).findOneByOrFail({ id: backup.id })).blob as Buffer;
+    const file = decodeBlob((await h.one('backups', { id: backup.id })).blob) as Buffer;
     secretForms = [
       h.backend.storage?.secret as string,
       Buffer.from(JSON.stringify({ ...h.backend.storage })).toString('base64'),
       file.toString('base64').slice(100, 160),
-      (await h.dataSource.getRepository(MatterRecoveryKey).find()).map((row) => row.encryptedKey)[0],
+      (await h.tables.recoveryKeys.find()).map((row) => row.encryptedKey)[0],
     ];
+    // Downloading the file and cancelling a checked restore are audited too (ATT-1003).
+    await h.backups.download(backup.id, ADMIN);
+    const cancelled = await h.restore.validate({ type: 'stored', backupId: backup.id }, undefined, ADMIN);
+    responses.push(cancelled);
+    await h.restore.cancel(cancelled.validationId, ADMIN);
+    cancelledValidationId = cancelled.validationId;
     const validation = await h.restore.validate({ type: 'stored', backupId: backup.id }, undefined, ADMIN);
     responses.push(validation);
     await attempt(h.restore.confirm(validation.validationId, 'wrong', ADMIN));
@@ -134,6 +143,41 @@ describe('secrets never leave the plugin', () => {
     }
   });
 
+  it('gives every entry an actor, a target, an operation, a result and a correlation ID', () => {
+    const events = h.audit.mock.calls.map((call) => (call as unknown as [AuditEvent])[0]);
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+    for (const event of events) {
+      expect(event.principal).toEqual(
+        event.principal.kind === 'system' ? { kind: 'system' } : { userId: 7, authenticationMethod: 'session' },
+      );
+      expect(event.subject.type).toMatch(/^matter\./);
+      expect(event.action).toMatch(/^matter\./);
+      expect(['attempted', 'succeeded', 'failed']).toContain(event.outcome);
+      expect(event.operationId).toMatch(uuid);
+    }
+    // A scheduled backup is the system's, never a user's.
+    const daily = events.find((e) => e.action === 'matter.backup_failed' && e.details['trigger'] === 'daily');
+    expect(daily?.principal).toEqual({ kind: 'system' });
+    // The check and the cancel of one restore share its validation ID.
+    const cancelled = events.filter((e) => e.operationId === cancelledValidationId).map((e) => e.action);
+    expect(cancelled).toEqual(['matter.restore_validated', 'matter.restore_cancelled']);
+  });
+
+  it('declares no detail field that could carry a credential, key, setup code, payload or backup content', () => {
+    // Booleans and numbers cannot carry a secret; strings are bounded IDs and enums, named so they never hold one.
+    const strings = MATTER_AUDIT_DOMAIN.actions.flatMap((action) =>
+      Object.entries(action.details ?? {})
+        .filter(([, policy]) => policy.type === 'string')
+        .map(([field, policy]) => ({ field, policy })),
+    );
+    const publicKeyIds = new Set(['keyId', 'previousKeyId']);
+    for (const { field, policy } of strings) {
+      expect(policy.pattern !== undefined || policy.oneOf !== undefined).toBe(true);
+      if (publicKeyIds.has(field)) continue;
+      expect(field).not.toMatch(/credential|secret|password|token|key|code|payload|dataset|content|blob|bytes/i);
+    }
+  });
+
   it('audits every step of the backup and restore flows, with failures marked as failed', () => {
     const events = h.audit.mock.calls.map((call) => (call as unknown as [AuditEvent])[0]);
     const actions = new Set(events.map((event) => event.action));
@@ -143,6 +187,8 @@ describe('secrets never leave the plugin', () => {
       'matter.recovery_key_rotated',
       'matter.backup_succeeded',
       'matter.backup_failed',
+      'matter.backup_downloaded',
+      'matter.restore_cancelled',
       'matter.restore_validated',
       'matter.restore_refused',
       'matter.restore_confirmed',

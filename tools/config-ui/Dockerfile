@@ -1,4 +1,4 @@
-ARG NODE_VERSION=24.22.1
+ARG NODE_VERSION=26.13.0
 FROM node:${NODE_VERSION}-alpine
 
 RUN apk add --no-cache dnsmasq procps

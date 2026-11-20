@@ -11,17 +11,19 @@ const mocks = vi.hoisted(() => ({
   owner: { kind: 'resource', resourceId: 1 } as const,
 }));
 vi.mock('@xyflow/react', () => ({ useNodeId: () => 'node', useNodesData: () => mocks.current }));
-vi.mock('../../context/index', () => ({ useFlowContext: () => ({ updateNodeData: mocks.update, resourceId: 1, owner: mocks.owner }) }));
+vi.mock('../../context/flowContext', () => ({
+  useFlowContext: () => ({ updateNodeData: mocks.update, resourceId: 1, owner: mocks.owner }),
+}));
 vi.mock('@attraccess/react-query-client', () => ({
-  useBillingServiceGetBillingConfiguration: () => ({ data: { minorUnit: 2 } }),
-  useGlobalFlowsServiceResolveGlobalFlowNodeSchema: () => ({ mutateAsync: mocks.resolveGlobalNodeSchema }),
-  useResourceFlowsServiceResolveNodeSchema: () => ({
+  useGetBillingConfiguration: () => ({ data: { minorUnit: 2 } }),
+  useResolveGlobalFlowNodeSchema: () => ({ mutateAsync: mocks.resolveGlobalNodeSchema }),
+  useResolveNodeSchema: () => ({
     mutateAsync: mocks.resolveNodeSchema,
   }),
 }));
 vi.mock('../../../../../../../components/mqttServerSelect', () => ({ MqttServerSelect: () => null }));
 vi.mock('../../../../../../../components/companionDeviceSelect', () => ({ CompanionDeviceSelect: () => null }));
-vi.mock('../../../../../../mqtt/servers/CreateMqttServerPage', () => ({ CreateMqttServerForm: () => null }));
+vi.mock('../../../../../../mqtt/servers/CreateMqttServerForm', () => ({ CreateMqttServerForm: () => null }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   ...(await (() => ({
@@ -143,7 +145,7 @@ describe('dynamic node editor', () => {
       submit();
       expect(mocks.update).not.toHaveBeenCalled();
       await waitFor(() => expect(mocks.resolveNodeSchema).toHaveBeenCalledTimes(requestCount));
-      return mocks.resolveNodeSchema.mock.calls[requestCount - 1][0].requestBody.config;
+      return mocks.resolveNodeSchema.mock.calls[requestCount - 1][0].body.config;
     }
 
     render(editor(commandSchema(false)));
@@ -235,7 +237,7 @@ describe('dynamic node editor', () => {
     mocks.current = { data: { command: 'first', nested: { saved: 'keep' }, removed: 'old' } };
     render(editor());
     fireEvent.click(screen.getByText('Open'));
-    expect(mocks.resolveNodeSchema.mock.calls[0][0].requestBody.config.nested).toEqual({ saved: 'keep' });
+    expect(mocks.resolveNodeSchema.mock.calls[0][0].body.config.nested).toEqual({ saved: 'keep' });
     await respond(0, {
       ...base,
       configSchema: {
@@ -264,7 +266,7 @@ describe('dynamic node editor', () => {
     submit();
     expect(mocks.update).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText('Retry'));
-    expect(mocks.resolveNodeSchema.mock.calls[2][0].requestBody).toEqual({ config: { command: 'second' } });
+    expect(mocks.resolveNodeSchema.mock.calls[2][0].body).toEqual({ config: { command: 'second' } });
     await respond(2);
     submit();
     expect(mocks.update).toHaveBeenCalledWith('node', { command: 'second' });

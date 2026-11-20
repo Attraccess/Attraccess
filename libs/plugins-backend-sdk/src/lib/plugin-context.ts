@@ -1,12 +1,18 @@
 import { LoggerService, Type } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DataSource, EntityManager, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
 import type { MqttCredentialProvisioningHostProvider } from './mqtt-credential-provisioning';
 import type { PluginAuditContext } from './plugin-audit';
 import type { PluginReaderUiApi, PluginStartBlockedApi } from './reader-ui';
 import type { PluginNotificationsContext } from './plugin-notifications';
 import type { PluginResourceAccessContext } from './plugin-resource-access';
+import type { PluginHostDataContext } from './plugin-host-data';
+import type { PluginPersistenceContext } from './plugin-persistence';
+import type { PluginStorageContext } from './plugin-storage';
 import type { PluginLiveUpdatesContext } from './plugin-live-updates';
+import type { PluginLicenseContext } from './plugin-license';
+import type { PluginBleContext } from './plugin-ble';
+import type { PluginCardsContext } from './plugin-cards';
+import type { PluginReadersContext } from './plugin-readers';
 import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscription } from './plugin.interface';
 /**
  * DI token under which the host registers its MqttServerHostProvider
@@ -142,23 +148,32 @@ export interface PluginContext {
   readonly audit?: PluginAuditContext;
   /** Reader UI helpers. Guarded getter: throws PluginPermissionError without READER_UI. */
   readonly readerUi?: PluginReaderUiApi;
+  /**
+   * BLE transport through administrator-approved Attractap readers. Guarded getter: throws PluginPermissionError
+   * without BLE_TRANSPORT. Optional so plugins still type-check against hosts predating it.
+   */
+  readonly ble?: PluginBleContext;
+  /**
+   * Card authentication over the plugin's own NFC devices. Guarded getter: throws PluginPermissionError without
+   * CARD_AUTHENTICATION. Optional so plugins still type-check against hosts predating it.
+   */
+  readonly cards?: PluginCardsContext;
+  /**
+   * The plugin's own card readers. Guarded getter: throws PluginPermissionError without READER_DEVICES. Optional so
+   * plugins still type-check against hosts predating it.
+   */
+  readonly readers?: PluginReadersContext;
   /** This plugin's own manifest (name, version, directory, id). */
   readonly manifest: PluginManifestInfo;
 
   /** Shared application event bus — the same EventEmitter2 instance the host uses. */
   readonly events: EventEmitter2;
 
-  /** Shared TypeORM connection. Plugins must never re-initialise TypeOrmModule. */
-  readonly dataSource: DataSource;
-
   /** Scoped logger, prefixed with the plugin name. */
   readonly logger: LoggerService;
 
   /** Shared MQTT connection access. Requires ACCESS_MQTT_SERVERS. */
   readonly mqtt: PluginMqttClient;
-
-  /** Typed repository accessor over the shared DataSource. */
-  getRepository<T extends ObjectLiteral>(entity: EntityTarget<T>): Repository<T>;
 
   /**
    * Escape hatch to resolve an arbitrary host provider by token. Privileged:
@@ -207,17 +222,25 @@ export interface PluginContext {
   readonly resourceAccess: PluginResourceAccessContext;
 
   /**
-   * Run `fn` in a serialized database transaction. Concurrent callers (core lifecycle writes included)
-   * run one at a time on SQLite, so check-then-write sequences such as overlap checks are race-free.
-   * The transaction commits when `fn` resolves and rolls back when it throws. Requires DATABASE_ACCESS.
-   *
-   * The queue is shared with every core session start and end, so keep `fn` short and limited to database
-   * work through the given manager: no HTTP, MQTT, email or other I/O inside. Do not nest calls: a
-   * runSerialized started inside `fn` would wait for `fn` itself, so the host rejects it with an error;
-   * pass the manager down instead. Core services that write through the same queue (session start/end)
-   * must not be awaited inside `fn` either.
+   * Atomic transactions with a post-commit hook. A transaction scope joins `storage` and host port calls into one
+   * unit. Requires PLUGIN_STORAGE.
    */
-  runSerialized<T>(fn: (manager: EntityManager) => Promise<T>): Promise<T>;
+  readonly persistence: PluginPersistenceContext;
+
+  /** Record port for the plugin's own declared tables. Requires PLUGIN_STORAGE. See `plugin-storage.ts`. */
+  readonly storage: PluginStorageContext;
+
+  /**
+   * Read-only lookups of host data (resources, users, settings, flow nodes) as neutral models. Each group has its own
+   * permission (ACCESS_RESOURCES, READ_USERS, READ_SETTINGS, TRIGGER_FLOWS).
+   */
+  readonly hostData: PluginHostDataContext;
+
+  /**
+   * Query the license at runtime (see {@link PluginLicenseContext}). Needs no permission. Optional because hosts
+   * older than the plugin license support do not provide it; check before use when the plugin supports them.
+   */
+  readonly license?: PluginLicenseContext;
 }
 
 export { PluginBackendModule } from './plugin-backend-module';

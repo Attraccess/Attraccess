@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Card, Spinner } from '@heroui/react';
 import { Button, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowLeft, Edit, RefreshCw } from 'lucide-react';
-import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
+import { useGetOneResourceById } from '@attraccess/react-query-client';
 import en from './documentationModal.en.json';
 import de from './documentationModal.de.json';
 import { useAuth } from '../../../hooks/useAuth';
@@ -27,7 +27,7 @@ function DocumentationViewComponent() {
     error: resourceError,
     refetch: refetchResource,
     isFetching,
-  } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  } = useGetOneResourceById({ path: { id: resourceId } });
 
   const handleEditDocumentation = useCallback(() => {
     navigate(`/resources/${resourceId}/documentation/edit`);

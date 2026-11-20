@@ -6,7 +6,7 @@ import { startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/br
 import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
-import { ApiError, PasskeysService } from '@attraccess/react-query-client';
+import { ApiError, createSessionWithPasskey, getPasskeyAuthenticationOptions } from '@attraccess/react-query-client';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import { getTranslationKeyForApiError } from '../../utils/apiError';
@@ -16,10 +16,17 @@ import de from './passkeyLogin.de.json';
 export function PasskeyLogin() {
   // `api.generic` is the fallback the helper picks when the server message has no translation,
   // so pointing it at the passkey copy keeps browser/unknown failures on the passkey wording
-  // while a known error like UserEmailNotVerifiedException explains itself.
+  // while a known error like UserEmailNotVerifiedException explains itself. That one has its own wording: the
+  // shared text points to a resend form "below", which only appears after a password sign-in attempt.
   const { t, tExists } = useTranslations({
-    en: { ...en, api: { ...API_ERROR_TRANSLATIONS_EN, generic: en.error } },
-    de: { ...de, api: { ...API_ERROR_TRANSLATIONS_DE, generic: de.error } },
+    en: {
+      ...en,
+      api: { ...API_ERROR_TRANSLATIONS_EN, generic: en.error, UserEmailNotVerifiedException: en.emailNotVerified },
+    },
+    de: {
+      ...de,
+      api: { ...API_ERROR_TRANSLATIONS_DE, generic: de.error, UserEmailNotVerifiedException: de.emailNotVerified },
+    },
   });
   const queryClient = useQueryClient();
   const [isPending, setIsPending] = useState(false);
@@ -30,14 +37,15 @@ export function PasskeyLogin() {
     setError(null);
 
     try {
-      const { options } = await PasskeysService.getPasskeyAuthenticationOptions();
+      const { options } = await getPasskeyAuthenticationOptions({ throwOnError: true }).then(({ data }) => data);
       const response = await startAuthentication({
         optionsJSON: options as unknown as PublicKeyCredentialRequestOptionsJSON,
       });
 
-      await PasskeysService.createSessionWithPasskey({
-        requestBody: { response: response as unknown as Record<string, unknown>, tokenLocation: 'cookie' },
-      });
+      await createSessionWithPasskey({
+        body: { response: response as unknown as Record<string, unknown>, tokenLocation: 'cookie' },
+        throwOnError: true,
+      }).then(({ data }) => data);
 
       await restoreAuthentication(queryClient);
     } catch (caught) {

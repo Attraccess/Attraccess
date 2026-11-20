@@ -1,4 +1,4 @@
-import { ResourceFormAction } from '@attraccess/database-entities';
+import { ResourceFormAction } from '@attraccess/application-models';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { confirmation, lastSent, makeSocket, makeStepServices, sentTypes } from './ui-test-helpers.test-fixture';
 

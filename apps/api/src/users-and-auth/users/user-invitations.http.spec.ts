@@ -1,7 +1,8 @@
 import { ExecutionContext, INestApplication, UnauthorizedException, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { AuthenticatedRequest, DualAuthGuard, User } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, DualAuthGuard } from '@attraccess/plugins-backend-sdk';
 import request from 'supertest';
+import { LicenseError } from '../../license/license.service';
 import { EmailService } from '../../email/email.service';
 import { AuthService } from '../auth/auth.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
@@ -17,7 +18,15 @@ describe('user invitation endpoints (HTTP)', () => {
     validateUsernameOrThrow: jest.fn(),
     findByEmailsOrUsernames: jest.fn(),
     ensureLicenseForNewUsers: jest.fn(),
-    withTransaction: jest.fn(async (run) => run({})),
+    withTransaction: jest.fn(async (run) => {
+      const callbacks: Array<() => Promise<void>> = [];
+      const result = await run({
+        isOpen: true,
+        afterCommit: (callback: () => Promise<void>) => callbacks.push(callback),
+      });
+      for (const callback of callbacks) await callback();
+      return result;
+    }),
     createMany: jest.fn(),
   };
   const csv = Buffer.from('email,username,role\nalex@example.com,Alex,operator\n');
@@ -40,10 +49,13 @@ describe('user invitation endpoints (HTTP)', () => {
         canActivate: (context: ExecutionContext) => {
           const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
           if (!req.headers['x-test-user']) throw new UnauthorizedException();
-          req.user = Object.assign(new User(), {
-            id: Number(req.headers['x-test-user']),
-            effectivePermissions: new Set(String(req.headers['x-test-permissions'] ?? '').split(',')),
-          });
+          req.user = Object.assign(
+            {},
+            {
+              id: Number(req.headers['x-test-user']),
+              effectivePermissions: new Set(String(req.headers['x-test-permissions'] ?? '').split(',')),
+            },
+          );
           return true;
         },
       })
@@ -55,6 +67,7 @@ describe('user invitation endpoints (HTTP)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    users.ensureLicenseForNewUsers.mockReset();
     users.findByEmailsOrUsernames.mockResolvedValue([]);
     users.createMany.mockResolvedValue([{ id: 7, username: 'alex', email: 'alex@example.com' }]);
   });
@@ -96,11 +109,35 @@ describe('user invitation endpoints (HTTP)', () => {
 
   it('invites the users of a valid CSV', async () => {
     const response = await post().attach('file', csv, 'users.csv').field('config', JSON.stringify(config)).expect(201);
-    expect(response.body).toEqual([{ id: 7, username: 'alex', email: 'alex@example.com' }]);
+    // the response is the public user shape: the email address is never part of it
+    expect(response.body).toEqual([{ id: 7, username: 'alex' }]);
     expect(users.createMany).toHaveBeenCalledWith(
       [{ email: 'alex@example.com', username: 'alex', row: 1, locale: undefined }],
-      expect.objectContaining({ actorId: 1 }),
+      expect.objectContaining({ actor: expect.objectContaining({ id: 1 }) }),
     );
+  });
+
+  it('returns 403 with the license reason when the CSV invites exceed the license', async () => {
+    users.ensureLicenseForNewUsers.mockRejectedValue(
+      new LicenseError('Trying to use more than the allowed amount of users'),
+    );
+    const response = await post().attach('file', csv, 'users.csv').field('config', JSON.stringify(config)).expect(403);
+    expect(response.body).toEqual({
+      statusCode: 403,
+      message: 'Trying to use more than the allowed amount of users',
+      error: 'Forbidden',
+    });
+    expect(users.createMany).not.toHaveBeenCalled();
+  });
+
+  it('reports database duplicates before the license refusal', async () => {
+    users.findByEmailsOrUsernames.mockResolvedValue([{ id: 3, username: 'alex', email: 'alex@example.com' }]);
+    users.ensureLicenseForNewUsers.mockRejectedValue(
+      new LicenseError('Trying to use more than the allowed amount of users'),
+    );
+    const response = await post().attach('file', csv, 'users.csv').field('config', JSON.stringify(config)).expect(400);
+    expect(response.body.message).toBe('DUPLICATE_IN_DB');
+    expect(users.ensureLicenseForNewUsers).not.toHaveBeenCalled();
   });
 
   it('requires users.roles.manage to assign roles from a column', async () => {
@@ -126,6 +163,16 @@ describe('user invitation endpoints (HTTP)', () => {
       expect(users.createMany).not.toHaveBeenCalled();
     });
 
+    it('reports a taken email before the license refusal', async () => {
+      users.findByEmailsOrUsernames.mockResolvedValue([{ id: 3, username: 'someone', email: 'alex@example.com' }]);
+      users.ensureLicenseForNewUsers.mockRejectedValue(
+        new LicenseError('Trying to use more than the allowed amount of users'),
+      );
+      const response = await invite({ username: 'alex', email: 'alex@example.com' }).expect(400);
+      expect(response.body.message).toBe('Email already exists');
+      expect(users.ensureLicenseForNewUsers).not.toHaveBeenCalled();
+    });
+
     it('returns 400 when the username is already taken', async () => {
       users.findByEmailsOrUsernames.mockResolvedValue([{ id: 3, username: 'alex', email: 'other@example.com' }]);
       const response = await invite({ username: 'Alex', email: 'alex@example.com' }).expect(400);
@@ -133,9 +180,22 @@ describe('user invitation endpoints (HTTP)', () => {
       expect(users.createMany).not.toHaveBeenCalled();
     });
 
+    it('returns 403 with the license reason when the invite exceeds the license', async () => {
+      users.ensureLicenseForNewUsers.mockRejectedValue(
+        new LicenseError('Trying to use more than the allowed amount of users'),
+      );
+      const response = await invite({ username: 'alex', email: 'alex@example.com' }).expect(403);
+      expect(response.body).toEqual({
+        statusCode: 403,
+        message: 'Trying to use more than the allowed amount of users',
+        error: 'Forbidden',
+      });
+      expect(users.createMany).not.toHaveBeenCalled();
+    });
+
     it('invites a user whose email and username are free', async () => {
       const response = await invite({ username: 'alex', email: 'alex@example.com' }).expect(201);
-      expect(response.body).toEqual({ id: 7, username: 'alex', email: 'alex@example.com' });
+      expect(response.body).toEqual({ id: 7, username: 'alex' });
       expect(users.findByEmailsOrUsernames).toHaveBeenCalledWith(['alex@example.com'], ['alex']);
     });
   });

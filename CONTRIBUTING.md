@@ -8,8 +8,8 @@ lines and comments; a final newline does not add an extra line. CRLF and LF coun
 
 Run `pnpm lint:files` to check tracked files and unignored new files in your working
 tree. `pnpm lint:files --staged` checks the Git index, including partially staged
-files. Both run before the existing `pnpm precommit` and `pnpm precommit:all`
-checks. The PR and merge-queue workflow runs the check in the required
+files. The pre-commit hook (`pnpm precommit`) runs the staged check, and
+`pnpm precommit:all` runs both. The PR and merge-queue workflow runs the check in the required
 `lint-and-typecheck` job, independently of Nx's affected-project selection.
 
 The limits apply to every covered file, including unchanged files and renames.
@@ -40,8 +40,72 @@ and Dockerfiles), and binary assets have no line limit. Their natural structure
 often needs larger files, so splitting them just to satisfy a line count adds
 little value. Generated/build output, generated API/WebSocket clients, dependency
 directories, and the vendored OpenSCAD WebAssembly runtime are excluded. Maintained
-public scripts and firmware headers remain covered. Exclusions are centralized
-in `scripts/check-file-size.mjs`.
+public scripts and firmware headers remain covered. The directory exclusions are
+shared with the import-cycle check in `scripts/lib/repo-files.mjs`.
+
+## Import cycles
+
+`pnpm lint:files` (and `--staged`) also rejects runtime import cycles between
+TypeScript files in `apps/` and `libs/`, tests included, and prints each cycle
+as a file chain. It always checks the whole repository and resolves relative
+imports and the `@attraccess/*` aliases from `tsconfig.base.json`.
+
+Every runtime import counts, including `require()` and dynamic `import()`, even
+inside a function. `import type`, `export type`, imports whose specifiers are all
+inline `type`, and a module loading itself are ignored. Cycles made only of
+entity files (files in `libs/database-entities/src/lib/entities` that declare an
+`@Entity`, `@ChildEntity` or `@ViewEntity` class) are allowed, because TypeORM
+relations resolve through lazy `() => Entity` thunks. A cycle that also
+passes through any other file, including a helper in the entities directory, is
+reported. Declaration files, build output (`dist`, `build`), `generated`
+directories and the generated API clients are not checked.
+
+To break a cycle, move the shared type, constant, context or helper into a leaf
+file that both sides import, pass the dependency in as a prop or callback, or use
+`import type` when only types are needed. Do not add NestJS `forwardRef`: extract
+the shared provider into its own module instead. Deferring one side to a
+`require()` or `import()` inside a function does not break a cycle either. Move
+the code that needs both sides into a third file that imports them, as
+`plugin-uninstall.service.ts` does for `plugin.service.ts` and
+`plugin-migration.service.ts`.
+
+## Private submodule
+
+`apps/cesentry` is a git submodule pointing at a private repository. It is
+optional: `.gitmodules` sets `update = none`, so `git clone
+--recurse-submodules` and `git submodule update` skip it, the directory stays
+empty, and every command, hook and CI job works without it. Public CI never
+checks it out. `git clone --recurse-submodules` prints `Skipping submodule
+'apps/cesentry'`, and `git submodule status` lists it with a leading `-`. Both
+are expected.
+
+If you have no access and set `submodule.recurse=true`, pulls and checkouts that
+move the pointer try to fetch it and fail. Mark it inactive once per clone:
+
+```sh
+git config submodule.apps/cesentry.active false
+```
+
+Maintainers with access fill it in each checkout or worktree with:
+
+```sh
+git submodule update --init --checkout apps/cesentry
+```
+
+Rerun that command after pulling a commit that moves the pointer: plain `git
+submodule update` skips it. Before committing, check `git diff --submodule`, so
+that a stale checkout does not move the pointer back. Nx picks up its projects
+like any other. Its own README covers the rest, including its commit hook.
+
+Rules for this repository:
+
+- Nothing public refers to the private projects: no imports, no
+  `tsconfig.base.json` paths, no `implicitDependencies`, and no project names in
+  workflows or scripts. Generic tag-based exclusions are fine.
+- `apps/cesentry` holds only the submodule pointer.
+  `node scripts/check-private-submodule.mjs` (run in PR CI) fails if files are
+  committed under it or `update = none` is removed.
+- Commit a new pointer only for a commit that exists in the private repository.
 
 ## Commit Messages
 

@@ -112,6 +112,57 @@ void testIntroducerDetails(Renderer &renderer)
     expect(!findObject(guard.root, &lv_label_class, expected.c_str()), "Refresh replaces old introducers");
 }
 
+namespace
+{
+bool shownOnScreen(lv_obj_t *object)
+{
+    for (; object; object = lv_obj_get_parent(object))
+        if (lv_obj_has_flag(object, LV_OBJ_FLAG_HIDDEN)) return false;
+    return true;
+}
+}
+
+// An access-only door offers one Open button (an unlock on the wire); a regular door keeps lock, unlock and unlatch.
+void testAccessOnlyDoorDetails(Renderer &renderer)
+{
+    ResourceDetailsScreen details;
+    ResourceDetailsScreen::ButtonClickEventData clicked{};
+    details.setButtonClickCallback([&](ResourceDetailsScreen::ButtonClickEventData event) { clicked = event; });
+    API::ResourceBrief door{};
+    door.id = 7;
+    door.type = 1;
+    door.accessOnly = true;
+    door.isHealthy = true;
+    door.accessKnown = true;
+    door.hasIntroduction = true;
+    std::strcpy(door.name, "Workshop entrance");
+    details.setResourceAndUsageDetails(door);
+    details.setUserDetails({Fixtures::userName, false, true, false, false});
+    details.init();
+    ScreenGuard guard(details.getScreen(), &details);
+    settle();
+    auto *open = requireObject(guard.root, &lv_label_class, "Öffnen");
+    expect(shownOnScreen(open), "Access-only door shows Open");
+    expect(!shownOnScreen(requireObject(guard.root, &lv_label_class, "Abschliessen")), "Access-only door hides Lock");
+    expect(!shownOnScreen(requireObject(guard.root, &lv_label_class, "Falle öffnen")), "Access-only door hides Unlatch");
+    expect(!findObject(guard.root, &lv_label_class, "Aufschliessen"), "Access-only door shows no Unlock");
+    renderer.capture("access-only-door");
+    FirmwareI18n::refreshTree(guard.root, "en");
+    requireObject(guard.root, &lv_label_class, "Open");
+    FirmwareI18n::refreshTree(guard.root, "de");
+    lv_obj_send_event(lv_obj_get_parent(open), LV_EVENT_CLICKED, nullptr);
+    expect(clicked.buttonClickType == ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR, "Open sends the unlock action");
+    details.hideActionProgress();
+
+    door.accessOnly = false;
+    details.setResourceAndUsageDetails(door);
+    settle();
+    expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Aufschliessen")), "Regular door shows Unlock");
+    expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Abschliessen")), "Regular door shows Lock");
+    expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Falle öffnen")), "Regular door shows Unlatch");
+    expect(!findObject(guard.root, &lv_label_class, "Öffnen"), "Regular door shows no Open");
+}
+
 // ATT-1188: the reservations plugin splits a clause with a long holder name (16 characters) between the name and
 // its times. Built by the production UI builder at the details content width, every clause stays on one line, so
 // no time or half of a range is left alone; the session lines also leave room for the countdown beside them.

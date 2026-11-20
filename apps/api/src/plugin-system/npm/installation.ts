@@ -277,6 +277,7 @@ export class NpmInstallation {
                 throw new AggregateError(
                   [error, quarantineError, rollbackError, isolationError],
                   `Failed to safely activate ${name}`,
+                  { cause: isolationError },
                 );
               }
             }
@@ -287,6 +288,7 @@ export class NpmInstallation {
               throw new AggregateError(
                 [error, quarantineError, stateError],
                 `Failed to restore installation state for ${name}`,
+                { cause: stateError },
               );
             }
           }

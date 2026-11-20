@@ -1,17 +1,10 @@
 // Persisted Shelly device registry.
 //
-// The `plugin_shelly_devices` table is owned by a plugin migration
-// (backend/migrations/*-create-shelly-devices.ts), which the host runs on boot
-// before this service initialises and reverts on uninstall.
-//
-// CRUD goes through a real TypeORM repository over the shared connection. The
-// host registers the `ShellyDevice` entity (declared via the `entities` export
-// in plugin.ts) into its DataSource at load time, so `context.getRepository`
-// resolves the entity's metadata — no hand-written SQL or snake_case row mapping.
-// Requires the `DATABASE_ACCESS` permission (declared in plugin.json).
+// The `plugin_shelly_devices` table is declared in ./storage.ts; the host creates, adopts and migrates it. CRUD goes
+// through the record port (`context.storage`, requires the PLUGIN_STORAGE permission declared in plugin.json).
 import { Inject, Injectable } from '@nestjs/common';
-import type { PluginContext, Repository } from '@attraccess/plugins-backend-sdk';
-import { ShellyDevice } from './device.entity';
+import type { PluginContext, PluginStorageTablesApi } from '@attraccess/plugins-backend-sdk';
+import { shellyStorage, type ShellyDevice } from './storage';
 import type { AuthState } from '../types';
 
 // The host hands each plugin its PluginContext under this token. Recreate it
@@ -30,38 +23,40 @@ export interface DeviceProbeFields {
 
 @Injectable()
 export class DeviceRegistryService {
-  private repository: Repository<ShellyDevice> | null = null;
+  private tables: PluginStorageTablesApi<typeof shellyStorage.tables> | null = null;
 
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
-  // Resolve the repository lazily, not in the constructor: plugin providers are
-  // instantiated during the host's DI pass, before the host DataSource ref is
-  // wired up (PluginContext.getRepository throws "Host DataSource is not
-  // available yet" until bootstrap completes). The first query happens on an
-  // HTTP request, well after bootstrap, so resolving on demand is safe; cache it
-  // once resolved.
-  private get devices(): Repository<ShellyDevice> {
-    if (this.repository === null) {
-      this.repository = this.context.getRepository(ShellyDevice);
+  // Open the tables lazily, not in the constructor: plugin providers are instantiated during the host's DI pass,
+  // before the storage is served. The first query happens on an HTTP request, well after bootstrap.
+  private get devices() {
+    if (this.tables === null) {
+      this.tables = this.context.storage.open(shellyStorage);
     }
-    return this.repository;
+    return this.tables.devices;
   }
 
-  list(): Promise<ShellyDevice[]> {
-    return this.devices.find({ order: { createdAt: 'ASC', id: 'ASC' } });
+  async list(): Promise<ShellyDevice[]> {
+    const rows = await this.devices.find({
+      orderBy: [
+        { field: 'createdAt', direction: 'asc' },
+        { field: 'id', direction: 'asc' },
+      ],
+    });
+    return rows as ShellyDevice[];
   }
 
-  findById(id: number): Promise<ShellyDevice | null> {
-    return this.devices.findOne({ where: { id } });
+  async findById(id: number): Promise<ShellyDevice | null> {
+    return (await this.devices.findOne({ where: { id } })) as ShellyDevice | null;
   }
 
-  findByIp(ipAddress: string): Promise<ShellyDevice | null> {
-    return this.devices.findOne({ where: { ipAddress } });
+  async findByIp(ipAddress: string): Promise<ShellyDevice | null> {
+    return (await this.devices.findOne({ where: { ipAddress } })) as ShellyDevice | null;
   }
 
-  create(input: { name: string; ipAddress: string } & DeviceProbeFields): Promise<ShellyDevice> {
+  async create(input: { name: string; ipAddress: string } & DeviceProbeFields): Promise<ShellyDevice> {
     const now = new Date().toISOString();
-    const device = this.devices.create({
+    const row = await this.devices.insert({
       name: input.name,
       ipAddress: input.ipAddress,
       generation: input.generation,
@@ -72,28 +67,28 @@ export class DeviceRegistryService {
       createdAt: now,
       updatedAt: now,
     });
-    return this.devices.save(device);
+    return row as ShellyDevice;
   }
 
   async updateProbe(id: number, patch: DeviceProbeFields): Promise<void> {
-    await this.devices.update(id, {
-      generation: patch.generation,
-      model: patch.model,
-      authState: patch.authState,
-      lastProbeAt: patch.lastProbeAt,
-      lastProbeError: patch.lastProbeError,
-      updatedAt: new Date().toISOString(),
-    });
+    await this.devices.update(
+      { id },
+      {
+        generation: patch.generation,
+        model: patch.model,
+        authState: patch.authState,
+        lastProbeAt: patch.lastProbeAt,
+        lastProbeError: patch.lastProbeError,
+        updatedAt: new Date().toISOString(),
+      },
+    );
   }
 
   async updateAuthState(id: number, authState: AuthState): Promise<void> {
-    await this.devices.update(id, {
-      authState,
-      updatedAt: new Date().toISOString(),
-    });
+    await this.devices.update({ id }, { authState, updatedAt: new Date().toISOString() });
   }
 
   async delete(id: number): Promise<void> {
-    await this.devices.delete(id);
+    await this.devices.delete({ id });
   }
 }

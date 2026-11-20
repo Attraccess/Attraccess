@@ -1,7 +1,10 @@
 import { Label, Radio, RadioGroup, TextField, Input } from '@heroui/react';
-import { AutoIntroductionTarget, SupervisionMode, useResourcesServiceResourceGroupsGetMany } from '@attraccess/react-query-client';
+import { AutoIntroductionTarget, SupervisionMode, useResourceGroupsGetMany } from '@attraccess/react-query-client';
 import { Select } from '../../../../components/select';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { EditorTabProps } from './props';
+import en from '../resourceEditModal.en.json';
+import de from '../resourceEditModal.de.json';
 
 const SUPERVISION_MODES: SupervisionMode[] = [
   SupervisionMode.INTRODUCTION_REQUIRED,
@@ -10,20 +13,19 @@ const SUPERVISION_MODES: SupervisionMode[] = [
 ];
 
 export function SupervisionTab(props: EditorTabProps) {
-  const { t, formData, setField } = props;
+  const { formData, setField } = props;
+  const { t } = useTranslations({ en, de });
 
   const supervisionMode = formData.supervisionMode ?? SupervisionMode.INTRODUCTION_REQUIRED;
   const supervisionAllowed =
-    supervisionMode === SupervisionMode.SUPERVISION_ALLOWED ||
-    supervisionMode === SupervisionMode.SUPERVISION_REQUIRED;
+    supervisionMode === SupervisionMode.SUPERVISION_ALLOWED || supervisionMode === SupervisionMode.SUPERVISION_REQUIRED;
 
   const autoPromotionEnabled =
-    formData.supervisedUsagesUntilIntroduction !== null &&
-    formData.supervisedUsagesUntilIntroduction !== undefined;
+    formData.supervisedUsagesUntilIntroduction !== null && formData.supervisedUsagesUntilIntroduction !== undefined;
 
   const target = formData.autoIntroductionTarget ?? AutoIntroductionTarget.RESOURCE;
 
-  const { data: groups, isLoading: groupsLoading } = useResourcesServiceResourceGroupsGetMany(undefined, {
+  const { data: groups, isLoading: groupsLoading } = useResourceGroupsGetMany({}, undefined, {
     enabled: supervisionAllowed && autoPromotionEnabled && target === AutoIntroductionTarget.GROUP,
   });
 

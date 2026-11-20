@@ -1,15 +1,18 @@
 import {
   BillingTransaction,
-  BillingTransactionStatus,
   FormSubmission,
   Resource,
-  ResourceFormAction,
   ResourceOperatingInterval,
   ResourceUsage,
-  ResourceUsageAction,
   ResourceUsageLifecycleAttempt,
   User,
 } from '@attraccess/database-entities';
+import {
+  BillingTransactionStatus,
+  ResourceFlowNodeType,
+  ResourceFormAction,
+  ResourceUsageAction,
+} from '@attraccess/application-models';
 import { rm } from 'node:fs/promises';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { InsufficientBalanceError } from '../../../billing/errors/insufficient-balance.error';
@@ -17,10 +20,11 @@ import { dataSourceConfig } from '../../../database/datasource';
 import { ResourceUsageIntegrity1790100000000 } from '../../../database/migrations/1790100000000-resource-usage-integrity';
 import { ParallelMachineSessions1792000000000 } from '../../../database/migrations/1792000000000-parallel-machine-sessions';
 import { recoverOrphanedUsages } from '../../../database/resource-usage-integrity';
-import { closeResourceTransactionConnection } from '../../../database/run-serialized-transaction';
+import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
 import { ResourceInUseError } from '../errors/resource-in-use.error';
-import { resetTestFixture } from './fixtures/setup.test-fixture';
-import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from './fixtures/state.test-fixture';
+import { resetTestFixture } from '../../../database/adapters/usage/lifecycle-fixtures/setup.test-fixture';
+import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
+import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../../../database/adapters/usage/lifecycle-fixtures/state.test-fixture';
 
 // Real repositories and relations for the lifecycle boundary; peripheral domain tables are omitted.
 describe('Usage lifecycle persistence around external flows', () => {
@@ -378,8 +382,8 @@ describe('Usage lifecycle persistence around external flows', () => {
   });
 
   it('publishes neither the session nor its bill if pending transaction creation fails', async () => {
-    scope.billing.handleResourceUsageStart.mockImplementation(async (_resourceId, session, user, manager) => {
-      await manager.save(BillingTransaction, {
+    scope.billing.handleResourceUsageStart.mockImplementation(async (_resourceId, session, user, tx) => {
+      await unitOfWorkFor(scope.source).handleOf(tx).save(BillingTransaction, {
         resourceUsageId: session.id,
         userId: user.id,
         amount: 0,
@@ -436,19 +440,43 @@ describe('Usage lifecycle persistence around external flows', () => {
     await scope.expectObservationAndNoAttempt();
   });
 
+  it('bills items staged by the takeover flow on the outgoing session and never runs the stopped trigger', async () => {
+    const outgoing = await scope.seedActiveSession();
+    const takeoverItem = { ...scope.draftItem, name: 'Takeover consumable', quantity: 1 };
+    scope.flow.runFlow.mockImplementation(async (resourceId, _trigger, payload, _manager, { lifecycleAttemptId }) => {
+      await scope.usage.stageLifecycleBillingItem(lifecycleAttemptId, resourceId, payload.id, takeoverItem);
+    });
+
+    const incoming = await scope.usage.startSession(1, scope.users[1], { forceTakeOver: true });
+
+    const triggers = scope.flow.runFlow.mock.calls.map((call) => call[1]);
+    expect(triggers).toEqual([ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER]);
+    const { transactions, items } = await scope.publishedState();
+    const itemsOf = (resourceUsageId: number) => {
+      const transaction = transactions.find((candidate) => candidate.resourceUsageId === resourceUsageId);
+      return items.filter((item) => item.billingTransactionId === transaction?.id);
+    };
+    // Exactly one takeover item: applying the drafts twice would merge into quantity 2 and double-bill.
+    expect(itemsOf(outgoing.id).filter((item) => item.name === takeoverItem.name)).toEqual([
+      expect.objectContaining({ quantity: 1, unitPrice: takeoverItem.unitPrice }),
+    ]);
+    expect(transactions.some((transaction) => transaction.resourceUsageId === incoming.id)).toBe(true);
+    expect(itemsOf(incoming.id)).toEqual([]);
+  });
+
   it('rejects same-user takeover when the outgoing charge leaves too little balance for replacement', async () => {
     await scope.seedActiveSession();
     await scope.source.getRepository(User).update(scope.users[0].id, { creditBalance: 23 });
     const before = await scope.publishedState();
     const checkedBalances: number[] = [];
-    scope.billing.validateResourceUsageStart.mockImplementation(async (_resourceId, session, user, manager) => {
-      const storedUser = await manager.findOneByOrFail(User, { id: user.id });
+    scope.billing.validateResourceUsageStart.mockImplementation(async (_resourceId, session, user, tx) => {
+      const storedUser = await unitOfWorkFor(scope.source).handleOf(tx).findOneByOrFail(User, { id: user.id });
       checkedBalances.push(storedUser.creditBalance);
       if (storedUser.creditBalance < session.sessionDurationCreditsPerMinute) throw new InsufficientBalanceError();
     });
-    scope.billing.handleResourceUsageStart.mockImplementation(async (resourceId, session, user, manager) => {
-      await scope.billing.validateResourceUsageStart(resourceId, session, user, manager);
-      return manager.save(BillingTransaction, {
+    scope.billing.handleResourceUsageStart.mockImplementation(async (resourceId, session, user, tx) => {
+      await scope.billing.validateResourceUsageStart(resourceId, session, user, tx);
+      return unitOfWorkFor(scope.source).handleOf(tx).save(BillingTransaction, {
         resourceUsageId: session.id,
         userId: user.id,
         amount: 0,

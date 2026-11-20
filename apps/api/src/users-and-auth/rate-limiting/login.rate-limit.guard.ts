@@ -2,6 +2,7 @@ import { ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/com
 import { Request, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { Observable } from 'rxjs';
+import { isDatabaseBusyError } from '../../database/persistence-errors';
 import { UsersService } from '../users/users.service';
 import { AuthAuditLogger, AuthAuditOutcome } from './auth-audit.logger';
 import { BruteForceProtectionService } from './brute-force.service';
@@ -57,7 +58,8 @@ export class LoginRateLimitGuard extends AuthGuard(['local']) {
         activated = result instanceof Observable ? await observableToPromise(result) : Boolean(result);
       } catch (error) {
         const outcome = classifyLoginFailure(error);
-        if (outcome !== 'two_factor_required') {
+        // A database that stayed busy says nothing about the password: it must not count toward a lockout.
+        if (outcome !== 'two_factor_required' && outcome !== 'dependency_failure') {
           await this.bruteForce.recordFailure('login', ip, preCheckedUserId, username);
         }
         await this.audit.log({
@@ -93,6 +95,7 @@ function classifyLoginFailure(error: unknown): AuthAuditOutcome {
   if (name === 'TooManyAuthAttemptsException' || error instanceof TooManyAuthAttemptsException) {
     return 'rate_limited';
   }
+  if (isDatabaseBusyError(error)) return 'dependency_failure';
   const message = errorMessage(error);
   if (message === 'TwoFactorRequired') return 'two_factor_required';
   if (message === 'TwoFactorInvalidCode') return 'two_factor_invalid';

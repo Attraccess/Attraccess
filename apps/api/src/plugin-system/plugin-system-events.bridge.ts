@@ -1,11 +1,14 @@
-import { ResourceMaintenance } from '@attraccess/database-entities';
 import { SystemEvent } from '@attraccess/plugins-backend-sdk';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { DataSource } from 'typeorm';
 import { ResourceHealthChangedEvent } from '../resources/health/events/resource-health-changed.event';
 import { ResourceMaintenanceChangedEvent } from '../resources/maintenances/events/resource-maintenance-changed.event';
+import { ResourceSessionLimitChangedEvent } from '../resources/events/resource-session-limit-changed.event';
 import { PluginEventsService } from './plugin-events.service';
+import {
+  PLUGIN_MAINTENANCE_WINDOWS,
+  type PluginMaintenanceWindowPort,
+} from './persistence/plugin-maintenance-window.port';
 
 /**
  * Forwards core domain events to plugins as typed SystemEvents. The core events are emitted after the
@@ -17,7 +20,7 @@ export class PluginSystemEventsBridge {
 
   constructor(
     private readonly pluginEvents: PluginEventsService,
-    private readonly dataSource: DataSource,
+    @Inject(PLUGIN_MAINTENANCE_WINDOWS) private readonly maintenanceWindows: PluginMaintenanceWindowPort,
   ) {}
 
   @OnEvent(ResourceHealthChangedEvent.EVENT_NAME)
@@ -38,9 +41,7 @@ export class PluginSystemEventsBridge {
   @OnEvent(ResourceMaintenanceChangedEvent.EVENT_NAME)
   public async onMaintenanceChanged(event: ResourceMaintenanceChangedEvent): Promise<void> {
     try {
-      const maintenance = await this.dataSource
-        .getRepository(ResourceMaintenance)
-        .findOne({ where: { id: event.maintenanceId } });
+      const maintenance = await this.maintenanceWindows.findWindow(event.maintenanceId);
       if (!maintenance) return;
       this.pluginEvents.emit(SystemEvent.MAINTENANCE_CHANGED, {
         resourceId: event.resourceId,
@@ -51,6 +52,20 @@ export class PluginSystemEventsBridge {
       });
     } catch (error) {
       this.logger.error(`Failed to emit ${SystemEvent.MAINTENANCE_CHANGED}`, (error as Error).stack);
+    }
+  }
+
+  @OnEvent(ResourceSessionLimitChangedEvent.EVENT_NAME)
+  public onSessionLimitChanged(event: ResourceSessionLimitChangedEvent): void {
+    try {
+      this.pluginEvents.emit(SystemEvent.RESOURCE_SESSION_LIMIT_CHANGED, {
+        resourceId: event.resourceId,
+        previousLimit: event.previousLimit,
+        newLimit: event.newLimit,
+        actorUserId: event.actorUserId,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to emit ${SystemEvent.RESOURCE_SESSION_LIMIT_CHANGED}`, (error as Error).stack);
     }
   }
 }

@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import { useResourcesServiceResourceGroupsGetOne } from '@attraccess/react-query-client';
+import { useResourceGroupsGetOne } from '@attraccess/react-query-client';
 import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { GroupDetailsForm } from './GroupDetailsForm';
 import { PeopleManagement } from '../resources/PeopleManagement';
@@ -17,7 +17,7 @@ export function ResourceGroupEditPage() {
     data: group,
     isLoading,
     error,
-  } = useResourcesServiceResourceGroupsGetOne({ id: numericGroupId }, undefined, { enabled: !!groupId });
+  } = useResourceGroupsGetOne({ path: { id: numericGroupId } }, undefined, { enabled: !!groupId });
 
   if (isLoading) {
     return <Spinner />;

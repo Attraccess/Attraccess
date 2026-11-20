@@ -1,11 +1,11 @@
 import type { ComponentProps } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { cleanup, render, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, vi, expect, it } from 'vitest';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { PeopleManagement } from './index';
 import type { AddPersonDrawer } from './AddPersonDrawer';
-import type { IntroductionCommentModal } from './IntroductionCommentModal';
 import type { HistoryModalLoader } from './HistoryModalLoader';
 const state = vi.hoisted(() => ({
   error: false,
@@ -102,22 +102,6 @@ vi.mock('./AddPersonDrawer', () => ({
       </section>
     ) : null,
 }));
-vi.mock('./IntroductionCommentModal', () => ({
-  IntroductionCommentModal: ({
-    isOpen,
-    comment,
-    onCommentChange,
-    onSubmit,
-    onClose,
-  }: ComponentProps<typeof IntroductionCommentModal>) =>
-    isOpen ? (
-      <section aria-label="Introduction comment">
-        <input aria-label="Reason" value={comment} onChange={(e) => onCommentChange(e.target.value)} />
-        <button onClick={onSubmit}>Submit reason</button>
-        <button onClick={onClose}>Cancel reason</button>
-      </section>
-    ) : null,
-}));
 vi.mock('./HistoryModalLoader', () => ({
   HistoryModalLoader: ({ userId, isOpen, onClose }: ComponentProps<typeof HistoryModalLoader>) =>
     isOpen ? (
@@ -149,6 +133,25 @@ function mount(props: Partial<ComponentProps<typeof PeopleManagement>> = {}) {
       <PeopleManagement target={{ type: 'resource', id: 7 }} canManageIntroducers canManageIntroductions {...props} />
     </MemoryRouter>,
   );
+}
+
+async function openActions(name: string) {
+  await userEvent.click(screen.getByRole('button', { name: `Actions for ${name}` }));
+  return screen.getByRole('menu');
+}
+function menuItemNames(menu: HTMLElement) {
+  return within(menu)
+    .getAllByRole('menuitem')
+    .map((item) => item.textContent);
+}
+async function chooseAction(name: string, action: string) {
+  const menu = await openActions(name);
+  await userEvent.click(within(menu).getByRole('menuitem', { name: action }));
+  return screen.findByRole('alertdialog');
+}
+async function closeMenu() {
+  await userEvent.keyboard('{Escape}');
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
 }
 
 const subtitleCases = [
@@ -191,24 +194,53 @@ it('renders people, limits inherited-role removal, and handles history and intro
   mount();
   expect(screen.getByText('Alex')).toBeTruthy();
   expect(screen.getByText('Maintainer')).toBeTruthy();
-  expect(screen.getAllByRole('button', { name: 'Revoke introducer status' })).toHaveLength(1);
-  fireEvent.click(screen.getByRole('button', { name: 'Revoke maintainer status' }));
-  expect(state.revokeIntroducer).toHaveBeenCalledWith(1, 'maintainer');
-  fireEvent.click(screen.getByRole('button', { name: 'Revoke introducer status' }));
-  expect(state.revokeIntroducer).toHaveBeenCalledWith(1, 'introducer');
-  fireEvent.click(screen.getAllByRole('button', { name: 'View history' })[0]);
+  const menu = await openActions('Alex');
+  expect(menuItemNames(menu)).toEqual([
+    'View history',
+    'Revoke direct introduction',
+    'Revoke introducer status',
+    'Revoke maintainer status',
+  ]);
+  expect(within(menu).getByRole('group', { name: 'Introduction' })).toBeTruthy();
+  expect(within(menu).getByRole('group', { name: 'Introducer' })).toBeTruthy();
+  await closeMenu();
+
+  let dialog = await chooseAction('Alex', 'Revoke maintainer status');
+  expect(within(dialog).getByText('Alex will lose maintainer privileges.')).toBeTruthy();
+  expect(state.revokeIntroducer).not.toHaveBeenCalled();
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Revoke maintainer status' }));
+  await waitFor(() => expect(state.revokeIntroducer).toHaveBeenCalledWith(1, 'maintainer'));
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+
+  dialog = await chooseAction('Alex', 'Revoke introducer status');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Revoke introducer status' }));
+  await waitFor(() => expect(state.revokeIntroducer).toHaveBeenCalledWith(1, 'introducer'));
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+
+  await userEvent.click(within(await openActions('Alex')).getByRole('menuitem', { name: 'View history' }));
   expect(screen.getByText('History for 1')).toBeTruthy();
   fireEvent.click(screen.getByText('Close history'));
   expect(screen.queryByText('History for 1')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'Revoke direct introduction' }));
-  fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Refresher required' } });
-  fireEvent.click(screen.getByText('Submit reason'));
+
+  dialog = await chooseAction('Alex', 'Revoke direct introduction');
+  await userEvent.type(within(dialog).getByRole('textbox', { name: 'Comment (optional)' }), 'Refresher required');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Revoke direct introduction' }));
   await waitFor(() => expect(state.revokeIntroduction).toHaveBeenCalledWith(1, 'Refresher required'));
-  await waitFor(() => expect(screen.queryByLabelText('Reason')).toBeNull());
-  fireEvent.click(screen.getByRole('button', { name: 'Re-grant introduction' }));
-  expect(screen.getByLabelText('Reason')).toHaveValue('');
-  fireEvent.click(screen.getByText('Submit reason'));
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+
+  dialog = await chooseAction('Blair', 'Re-grant introduction');
+  expect(within(dialog).getByRole('textbox', { name: 'Comment (optional)' })).toHaveValue('');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Re-grant introduction' }));
   await waitFor(() => expect(state.grantIntroduction).toHaveBeenCalledWith(2, ''));
+});
+
+it('keeps a revoke confirmation open when revoking fails', async () => {
+  state.revokeIntroducer.mockRejectedValueOnce(new Error('nope'));
+  mount();
+  const dialog = await chooseAction('Alex', 'Revoke maintainer status');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Revoke maintainer status' }));
+  await waitFor(() => expect(state.revokeIntroducer).toHaveBeenCalledTimes(1));
+  expect(screen.getByRole('alertdialog')).toBeTruthy();
 });
 
 it.each([false, true])('dispatches all add modes and clears comment drafts (hideHeader=%s)', async (hideHeader) => {
@@ -276,23 +308,31 @@ it('filters roles and introduced users with distinct memberships', async () => {
   }
 });
 
-it('hides modification controls for read-only viewers while retaining history', () => {
+it('hides modification controls for read-only viewers while retaining history', async () => {
   mount({ canManageIntroducers: false, canManageIntroductions: false });
   expect(screen.queryByRole('button', { name: 'Grant introduction' })).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Revoke direct introduction' })).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Revoke maintainer status' })).toBeNull();
-  expect(screen.getAllByRole('button', { name: 'View history' })).toHaveLength(2);
+  expect(screen.queryByRole('button', { name: 'Actions for Casey' })).toBeNull();
+  expect(menuItemNames(await openActions('Alex'))).toEqual(['View history']);
+  await closeMenu();
+  expect(menuItemNames(await openActions('Blair'))).toEqual(['View history']);
 });
 
-it('allows group-scoped role removal and cancelling an introduction change', () => {
+it('allows group-scoped role removal and cancelling an introduction change', async () => {
   mount({ target: { type: 'group', id: 4 }, canManageIntroductions: true, canManageIntroducers: true });
-  expect(screen.getAllByRole('button', { name: 'Revoke introducer status' })).toHaveLength(2);
-  fireEvent.click(screen.getByRole('button', { name: 'Revoke introduction' }));
-  fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Discard' } });
-  fireEvent.click(screen.getByText('Cancel reason'));
-  fireEvent.click(screen.getByRole('button', { name: 'Revoke introduction' }));
-  expect(screen.getByLabelText('Reason')).toHaveValue('');
+  const menu = await openActions('Alex');
+  expect(within(menu).getAllByRole('menuitem', { name: 'Revoke introducer status' })).toHaveLength(2);
+  await closeMenu();
+
+  let dialog = await chooseAction('Alex', 'Revoke introduction');
+  await userEvent.type(within(dialog).getByRole('textbox', { name: 'Comment (optional)' }), 'Discard');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
   expect(state.revokeIntroduction).not.toHaveBeenCalled();
+
+  dialog = await chooseAction('Alex', 'Revoke introduction');
+  expect(within(dialog).getByRole('textbox', { name: 'Comment (optional)' })).toHaveValue('');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Revoke introduction' }));
+  await waitFor(() => expect(state.revokeIntroduction).toHaveBeenCalledWith(1, ''));
 });
 
 it('shows loading and fetch failure states without stale people', () => {
@@ -331,8 +371,7 @@ it('shows group-only users in All and Introduced with group links and no resourc
       'href',
       '/resource-groups/11',
     );
-    expect(screen.queryByRole('button', { name: 'Revoke direct introduction' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'View history' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Actions for Group trainee' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /All/ }));
     fireEvent.click(await screen.findByRole('option', { name: 'Only introduced' }));
     expect(screen.getByText('Group trainee')).toBeTruthy();
@@ -341,7 +380,7 @@ it('shows group-only users in All and Introduced with group links and no resourc
   }
 });
 
-it('keeps inherited access and navigation visible after direct revocation', () => {
+it('keeps inherited access and navigation visible after direct revocation', async () => {
   const original = state.rows;
   const trainee = {
     ...original[0],
@@ -351,7 +390,8 @@ it('keeps inherited access and navigation visible after direct revocation', () =
   try {
     const view = mount();
     expect(screen.getByText('Direct introduction')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Revoke direct introduction' })).toBeTruthy();
+    expect(menuItemNames(await openActions('Alex'))).toContain('Revoke direct introduction');
+    await closeMenu();
     state.rows = [{ ...trainee, hasValidDirectIntroduction: false }];
     view.rerender(
       <MemoryRouter>
@@ -359,8 +399,9 @@ it('keeps inherited access and navigation visible after direct revocation', () =
       </MemoryRouter>,
     );
     expect(screen.getByRole('link', { name: 'Introduced via Etch' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Revoke direct introduction' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Re-grant introduction' })).toBeTruthy();
+    const items = menuItemNames(await openActions('Alex'));
+    expect(items).not.toContain('Revoke direct introduction');
+    expect(items).toContain('Re-grant introduction');
   } finally {
     state.rows = original;
   }

@@ -1,10 +1,9 @@
-import { MqttServer } from '@attraccess/database-entities';
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TestingModule } from '@nestjs/testing';
 import * as mqtt from 'mqtt';
 import { EventEmitter } from 'node:events';
-import { Repository } from 'typeorm';
+import type { MqttServerStore } from './mqtt-server-store.port';
 import { inheritTestScope } from './../test-utils/inherit-test-scope';
 import { MqttClientService } from './mqtt-client.service';
 import { resetTestFixture } from './mqtt-client.service.setup.test-fixture';
@@ -66,7 +65,7 @@ jest.mock('mqtt', () => {
 describe('MqttClientService', () => {
   let service: MqttClientService;
   let moduleRef: TestingModule;
-  let mockRepository: Partial<Repository<MqttServer>>;
+  let mockRepository: Partial<MqttServerStore>;
   let mockMetricsService: { mqttServersHealthy: { set: jest.Mock } };
   let mockExternalCallTimer: { time: jest.Mock };
 
@@ -172,7 +171,7 @@ describe('MqttClientService', () => {
       jest.restoreAllMocks();
       jest.spyOn(Logger.prototype, 'log').mockImplementation(jest.fn());
       jest.spyOn(Logger.prototype, 'warn').mockImplementation(jest.fn());
-      (scope.mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+      (scope.mockRepository.findServer as jest.Mock).mockResolvedValue({
         ...scope.mockServer,
         ...serverOverrides,
       });
@@ -405,7 +404,7 @@ describe('MqttClientService', () => {
 
     it('should use server defaults when no options are provided', async () => {
       // Arrange
-      (publishScope.mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+      (publishScope.mockRepository.findServer as jest.Mock).mockResolvedValue({
         ...publishScope.mockServer,
         defaultPublishQos: 1,
         defaultPublishRetain: true,
@@ -433,7 +432,7 @@ describe('MqttClientService', () => {
 
     it('should prefer per-call options over server defaults', async () => {
       // Arrange
-      (publishScope.mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+      (publishScope.mockRepository.findServer as jest.Mock).mockResolvedValue({
         ...publishScope.mockServer,
         defaultPublishQos: 0,
         defaultPublishRetain: true,
@@ -533,7 +532,7 @@ describe('MqttClientService', () => {
     });
 
     it('retains a server default QoS that is higher than a later request', async () => {
-      (subscribeScope.mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+      (subscribeScope.mockRepository.findServer as jest.Mock).mockResolvedValue({
         ...subscribeScope.mockServer,
         defaultSubscribeQos: 2,
       });
@@ -617,7 +616,7 @@ describe('MqttClientService', () => {
       const internal = refreshConnectionScope.useRealConnections();
       const previous = await internal.getOrCreateClient(1);
       await refreshConnectionScope.service.subscribe(1, 'devices/#', 2);
-      (refreshConnectionScope.mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+      (refreshConnectionScope.mockRepository.findServer as jest.Mock).mockResolvedValue({
         ...refreshConnectionScope.mockServer,
         host: 'new-broker.test',
         port: 8883,
@@ -704,7 +703,7 @@ describe('MqttClientService', () => {
       const pending = internal.getOrCreateClient(1, true);
       const rejected = pending.catch((error) => error);
       await new Promise(setImmediate);
-      (refreshConnectionScope.mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+      (refreshConnectionScope.mockRepository.findServer as jest.Mock).mockResolvedValue({
         ...refreshConnectionScope.mockServer,
         host: 'new-broker.test',
       });
@@ -840,7 +839,7 @@ describe('MqttClientService', () => {
     it('does not re-subscribe after the final consumer unsubscribes during the server lookup', async () => {
       const mockClient = mqtt.connect({});
       let resolveServerLookup!: (server: typeof unsubscribeScope.mockServer) => void;
-      (unsubscribeScope.mockRepository.findOneBy as jest.Mock).mockImplementationOnce(
+      (unsubscribeScope.mockRepository.findServer as jest.Mock).mockImplementationOnce(
         () =>
           new Promise<typeof unsubscribeScope.mockServer>((resolve) => {
             resolveServerLookup = resolve;
@@ -908,7 +907,7 @@ export type MqttClientServiceTestScope = {
   service: MqttClientService;
   mockMetricsService: { mqttServersHealthy: { set: jest.Mock } };
   moduleRef: TestingModule;
-  mockRepository: Partial<Repository<MqttServer>>;
+  mockRepository: Partial<MqttServerStore>;
   mockExternalCallTimer: { time: jest.Mock };
   mockServer: {
     id: number;

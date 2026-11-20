@@ -12,10 +12,10 @@ import de from './de.json';
 import { ComponentPropsWithoutRef, useCallback, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 import {
-  useBillingServiceCreateManualTransaction,
-  UseBillingServiceGetBillingBalanceKeyFn,
-  useBillingServiceGetBillingConfiguration,
-  useBillingServiceGetBillingTransactionsKey,
+  useCreateManualTransaction,
+  UseGetBillingBalanceKeyFn,
+  useGetBillingConfiguration,
+  useGetBillingTransactionsKey,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
@@ -44,10 +44,11 @@ export function ManualTransactionsCard(props: Props & Omit<ComponentPropsWithout
 
   const queryClient = useQueryClient();
   const toast = useToastMessage();
-  const { data: configuration } = useBillingServiceGetBillingConfiguration();
+  const { data: configuration } = useGetBillingConfiguration();
 
-  const { mutate: createManualTransaction, isPending: isCreatingManualTransaction } =
-    useBillingServiceCreateManualTransaction({
+  const { mutate: createManualTransaction, isPending: isCreatingManualTransaction } = useCreateManualTransaction(
+    undefined,
+    {
       onSuccess: () => {
         toast.success({
           title: t('toast.success.title'),
@@ -55,10 +56,10 @@ export function ManualTransactionsCard(props: Props & Omit<ComponentPropsWithout
         });
 
         queryClient.invalidateQueries({
-          queryKey: [useBillingServiceGetBillingTransactionsKey],
+          queryKey: [useGetBillingTransactionsKey],
         });
         queryClient.invalidateQueries({
-          queryKey: UseBillingServiceGetBillingBalanceKeyFn({ userId: userId as number }),
+          queryKey: UseGetBillingBalanceKeyFn({ path: { userId: userId as number } }),
         });
       },
       onError: (error: Error) => {
@@ -69,7 +70,8 @@ export function ManualTransactionsCard(props: Props & Omit<ComponentPropsWithout
           baseTranslationKey: 'api',
         });
       },
-    });
+    },
+  );
 
   const handleCreateTransaction = useCallback(() => {
     if (!userId) {
@@ -82,7 +84,7 @@ export function ManualTransactionsCard(props: Props & Omit<ComponentPropsWithout
 
     const adjustedAmount = userCurrencyToDbCurrency(amount, configuration.minorUnit);
 
-    createManualTransaction({ userId: userId, requestBody: { amount: adjustedAmount } });
+    createManualTransaction({ path: { userId: userId }, body: { amount: adjustedAmount } });
   }, [userId, amount, createManualTransaction, configuration]);
 
   return (

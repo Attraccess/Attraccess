@@ -3,19 +3,16 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerHeading,
-  Form,
-  TextField,
-  Label,
-  Input,
   Tab,
   TabList,
   TabPanel,
   Tabs,
   useOverlayState,
 } from '@heroui/react';
-import { ApiError, useUsersServiceFindManyKey, useUsersServiceInviteUser } from '@attraccess/react-query-client';
+import { ApiError, useFindManyKey, useInviteUser } from '@attraccess/react-query-client';
 import { CsvInvite } from './csv-invite/index';
-import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../../components/UsernameInput/index';
+import { USERNAME_RULES, useUsernameValidation } from '../../../components/UsernameInput/index';
+import { SingleInviteForm } from './SingleInviteForm';
 import { Button, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -25,8 +22,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 
-export function useInviteUserModalState(props: Props) {
-  const { children } = props;
+export interface Props {
+  children: (onOpen: () => void) => React.ReactNode;
+}
+
+export function InviteUserModal({ children }: Readonly<Props>) {
   const { isOpen, open, close } = useOverlayState();
   const { t, tExists } = useTranslations({
     en: {
@@ -44,6 +44,7 @@ export function useInviteUserModalState(props: Props) {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
+  const [tab, setTab] = useState<'single' | 'csv'>('single');
 
   const usernameValidationMessages = useMemo(
     () => ({
@@ -70,26 +71,27 @@ export function useInviteUserModalState(props: Props) {
     setEmail('');
   }, [setEmail, setUsername]);
 
-  const { mutate: inviteUser, isPending } = useUsersServiceInviteUser({
+  const showApiError = (error: unknown) =>
+    toast.apiError({
+      error: error as ApiError,
+      t,
+      tExists,
+      baseTranslationKey: 'api',
+    });
+
+  const { mutate: inviteUser, isPending } = useInviteUser(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('success.title'),
         description: t('success.description'),
       });
       queryClient.invalidateQueries({
-        queryKey: [useUsersServiceFindManyKey],
+        queryKey: [useFindManyKey],
       });
       resetSingleInviteForm();
       close();
     },
-    onError: (error) => {
-      toast.apiError({
-        error: error as ApiError,
-        t,
-        tExists,
-        baseTranslationKey: 'api',
-      });
-    },
+    onError: showApiError,
   });
 
   const onSubmit = useCallback(() => {
@@ -106,61 +108,12 @@ export function useInviteUserModalState(props: Props) {
     }
 
     inviteUser({
-      requestBody: {
+      body: {
         username: trimmedUsername,
         email: trimmedEmail,
       },
     });
   }, [inviteUser, trimmedEmail, trimmedUsername, usernameError]);
-
-  const [tab, setTab] = useState<'single' | 'csv'>('single');
-  return {
-    children,
-    isOpen,
-    open,
-    close,
-    t,
-    tExists,
-    toast,
-    username,
-    setUsername,
-    email,
-    setEmail,
-    formRef,
-    usernameValidationMessages,
-    canSubmit,
-    isPending,
-    onSubmit,
-    tab,
-    setTab,
-  } as const;
-}
-
-export interface Props {
-  children: (onOpen: () => void) => React.ReactNode;
-}
-
-export function InviteUserModal(props: Props) {
-  const {
-    children,
-    isOpen,
-    open,
-    close,
-    t,
-    tExists,
-    toast,
-    username,
-    setUsername,
-    email,
-    setEmail,
-    formRef,
-    usernameValidationMessages,
-    canSubmit,
-    isPending,
-    onSubmit,
-    tab,
-    setTab,
-  } = useInviteUserModalState(props);
 
   return (
     <>
@@ -190,44 +143,18 @@ export function InviteUserModal(props: Props) {
               </TabList>
             </Tabs.ListContainer>
             <TabPanel id="single">
-              <Form
-                ref={formRef}
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  onSubmit();
-                }}
-                className="flex flex-col gap-4"
-              >
-                <UsernameInput
-                  label={t('inputs.username.label')}
-                  name="username"
-                  isRequired
-                  value={username}
-                  onChange={setUsername}
-                  validationMessages={usernameValidationMessages}
-                  description={t('inputs.username.description', {
-                    min: USERNAME_RULES.minLength,
-                    max: USERNAME_RULES.maxLength,
-                  })}
-                />
-                <TextField isRequired value={email} onChange={setEmail}>
-                  <Label>{t('inputs.email.label')}</Label>
-                  <Input name="email" type="email" required />
-                </TextField>
-              </Form>
+              <SingleInviteForm
+                formRef={formRef}
+                username={username}
+                onUsernameChange={setUsername}
+                email={email}
+                onEmailChange={setEmail}
+                usernameValidationMessages={usernameValidationMessages}
+                onSubmit={onSubmit}
+              />
             </TabPanel>
             <TabPanel id="csv">
-              <CsvInvite
-                onSuccess={close}
-                onError={(error) =>
-                  toast.apiError({
-                    error: error as ApiError,
-                    t,
-                    tExists,
-                    baseTranslationKey: 'api',
-                  })
-                }
-              />
+              <CsvInvite onSuccess={close} onError={showApiError} />
             </TabPanel>
           </Tabs>
         </DrawerBody>

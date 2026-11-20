@@ -3,8 +3,8 @@
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "sourceRoot": "apps/plugins/shelly",
-  "tags": ["type:plugin", "scope:plugin"],
   "// lint": "lint runs from the workspace root on purpose: @nx/enforce-module-boundaries no-ops when eslint runs from inside a project directory. See eslint.config.cjs for the plugin isolation rules.",
+  "tags": ["type:plugin", "scope:plugin"],
   "targets": {
     "install-dev": {
       "executor": "nx:run-commands",
@@ -38,20 +38,8 @@
       }
     },
     "test": {
-      "executor": "@nx/jest:jest",
-      "cache": true,
       "dependsOn": ["test-frontend"],
-      "inputs": [
-        "default",
-        "^production",
-        "{workspaceRoot}/jest.preset.js",
-        {
-          "externalDependencies": ["jest"]
-        }
-      ],
-      "outputs": ["{workspaceRoot}/coverage/apps/plugins/shelly/test"],
       "options": {
-        "jestConfig": "apps/plugins/shelly/jest.config.ts",
         "passWithNoTests": true
       }
     },
@@ -62,7 +50,7 @@
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/shelly",
-        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js"
+        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js"
       }
     },
     "build-frontend": {
@@ -84,11 +72,15 @@
       "executor": "nx:run-commands",
       "cache": true,
       "dependsOn": ["build-backend", "build-frontend"],
-      "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json"],
-      "outputs": ["{projectRoot}/package/package.json", "{projectRoot}/package/plugin.json"],
+      "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json", "{projectRoot}/LICENSE.md"],
+      "outputs": [
+        "{projectRoot}/package/package.json",
+        "{projectRoot}/package/plugin.json",
+        "{projectRoot}/package/LICENSE.md"
+      ],
       "options": {
         "cwd": "apps/plugins/shelly",
-        "command": "node -e \"for (const file of ['package.json', 'plugin.json']) require('fs').copyFileSync(file, 'package/' + file)\""
+        "command": "node -e \"for (const file of ['package.json', 'plugin.json', 'LICENSE.md']) require('fs').copyFileSync(file, 'package/' + file)\""
       }
     },
     "zip": {
@@ -124,9 +116,9 @@
       ],
       "options": {
         "cwd": "apps/plugins/shelly",
-        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js dist/migrations.js frontend/remoteEntry.js frontend/style.css",
+        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js frontend/remoteEntry.js frontend/style.css",
         "env": {
-          "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "1.11.0"
+          "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "2.0.0"
         }
       }
     },
@@ -141,10 +133,10 @@
     },
     "crap-score": {
       "executor": "nx:run-commands",
+      "dependsOn": ["test", "test-frontend"],
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/plugins/shelly"
-      },
-      "dependsOn": ["test", "test-frontend"]
+      }
     }
   }
 }

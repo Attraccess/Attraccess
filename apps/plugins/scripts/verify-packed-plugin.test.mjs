@@ -3,7 +3,14 @@ import { test } from 'node:test';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
-import { resolvePluginTestHostVersion, validatePackageContract, verifyPackedPlugin } from './verify-packed-plugin.mjs';
+import {
+  assertNoForbiddenBackendImports,
+  resolvePluginTestHostVersion,
+  validateLicenseFile,
+  validatePackageContract,
+  validatePermissionsMatch,
+  verifyPackedPlugin,
+} from './verify-packed-plugin.mjs';
 
 const fixture = () => ({
   name: '@example/plugin',
@@ -35,6 +42,12 @@ test('requires package identity, discoverability, and complete host metadata', (
     assert.throws(() => validatePackageContract(pkg, '1.2.0'), /required Attraccess metadata/);
   }
   assert.throws(() => validatePackageContract({ ...fixture(), version: 'latest' }, '1.2.0'), /strict semver/);
+});
+test('requires the file a SEE LICENSE IN license field points to', () => {
+  const pkg = { ...fixture(), license: 'SEE LICENSE IN LICENSE.md' };
+  assert.doesNotThrow(() => validateLicenseFile(pkg, ['package/package.json', 'package/LICENSE.md']));
+  assert.throws(() => validateLicenseFile(pkg, ['package/package.json']), /missing its license file LICENSE.md/);
+  assert.doesNotThrow(() => validateLicenseFile(fixture(), ['package/package.json']));
 });
 test('rejects incompatible host or SDK contracts for every declared entry', () => {
   for (const range of ['invalid', '^2.0.0']) {
@@ -84,7 +97,7 @@ test('verifies actual packed entries and removes archives after success or failu
     for (const directory of [
       'plugin/frontend',
       'dist/libs/plugins-backend-sdk',
-      'dist/libs/database-entities',
+      'dist/libs/application-models',
       'dist/libs/shared',
       'node_modules',
     ])
@@ -118,4 +131,52 @@ test('verifies actual packed entries and removes archives after success or failu
   } finally {
     rmSync(workspace, { recursive: true, force: true });
   }
+});
+
+test('rejects a backend bundle that imports TypeORM, host entities or an SDK subpath', () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'attraccess-backend-imports-'));
+  try {
+    const entry = path.join(directory, 'index.js');
+    writeFileSync(
+      entry,
+      'const { Module } = require("@nestjs/common"); import x from "@attraccess/plugins-backend-sdk";',
+    );
+    assert.doesNotThrow(() => assertNoForbiddenBackendImports(entry));
+    writeFileSync(
+      path.join(directory, 'chunk.js'),
+      'require("pgp-helper"); require("@attraccess/plugins-backend-sdk/package.json");',
+    );
+    assert.doesNotThrow(() => assertNoForbiddenBackendImports(entry));
+    for (const source of [
+      'const t = require("typeorm");',
+      'import { Entity } from "typeorm";',
+      'const t = await import("typeorm/driver/sqlite/SqliteDriver");',
+      'const e = require("@attraccess/database-entities");',
+      'import { Column } from "@attraccess/plugins-backend-sdk/sqlite";',
+      'const t = require("@nestjs/typeorm");',
+      'const d = require("sqlite3");',
+      'const d = require("better-sqlite3");',
+      'const d = require("pg");',
+      'const d = require("mysql2/promise");',
+      'const d = await import("node:sqlite");',
+      'import { MikroORM } from "@mikro-orm/core";',
+      'const x = require("@attraccess/plugins-backend-sdk/internal");',
+    ]) {
+      writeFileSync(path.join(directory, 'chunk.js'), source);
+      assert.throws(() => assertNoForbiddenBackendImports(entry), /plugins have no database access/, source);
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('rejects plugin.json and package.json permissions that diverge', () => {
+  const pkg = fixture();
+  pkg.attraccess.permissions = ['PLUGIN_STORAGE'];
+  assert.doesNotThrow(() => validatePermissionsMatch(pkg, { permissions: ['PLUGIN_STORAGE'] }));
+  assert.throws(
+    () => validatePermissionsMatch(pkg, { permissions: ['PLUGIN_STORAGE', 'READER_UI'] }),
+    /missing in package.json: READER_UI/,
+  );
+  assert.throws(() => validatePermissionsMatch(pkg, { permissions: [] }), /only in package.json: PLUGIN_STORAGE/);
 });

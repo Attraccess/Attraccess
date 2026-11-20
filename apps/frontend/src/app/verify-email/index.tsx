@@ -7,12 +7,7 @@ import { Alert, AlertContent, AlertDescription, AlertTitle, Card, Input, Label, 
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import {
-  useUsersServiceVerifyEmail,
-  useUsersServiceResendVerificationEmail,
-  useUsersServiceGetCurrentKey,
-  ApiError,
-} from '@attraccess/react-query-client';
+import { useVerifyEmail, useResendVerificationEmail, useGetCurrentKey, ApiError } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { getTranslationKeyForApiError } from '../../utils/apiError';
 
@@ -31,12 +26,12 @@ export function VerifyEmail() {
   const queryClient = useQueryClient();
   const didSendRequest = useRef(false);
 
-  const verifyEmail = useUsersServiceVerifyEmail({
+  const verifyEmail = useVerifyEmail(undefined, {
     onSuccess: () => {
       setIsSuccess(true);
       setError(null);
       queryClient.invalidateQueries({
-        queryKey: [useUsersServiceGetCurrentKey],
+        queryKey: [useGetCurrentKey],
       });
     },
     onError: (error) => {
@@ -52,7 +47,7 @@ export function VerifyEmail() {
     },
   });
 
-  const resendVerification = useUsersServiceResendVerificationEmail({
+  const resendVerification = useResendVerificationEmail(undefined, {
     onSuccess: () => {
       setResendSuccess(true);
     },
@@ -81,7 +76,7 @@ export function VerifyEmail() {
     }
 
     didSendRequest.current = true;
-    verifyEmail.mutate({ requestBody: { token, email } });
+    verifyEmail.mutate({ body: { token, email } });
   }, [token, email, t, verifyEmail]);
 
   useEffect(() => {
@@ -99,84 +94,82 @@ export function VerifyEmail() {
       return () => {
         cancelled = true;
       };
-    } else if (token !== null && email !== null) {
-      setError(t('apiErrors.invalidLink'));
-      didSendRequest.current = true;
+    } else {
+      // This effect reruns on every render; keep a resend error that is already showing.
+      setError((current) => current ?? t('apiErrors.invalidLink'));
     }
   }, [activateEmail, token, email, t]);
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="max-w-md w-full" data-cy="verify-email-success-card">
-          <Card.Header className="text-center">
-            <h2 className="text-3xl font-bold">{t('success.title')}</h2>
-          </Card.Header>
-          <Card.Content>
-            <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{t('success.message')}</p>
-          </Card.Content>
-          <Card.Footer>
-            <Button
-              variant="primary"
-              className="w-full"
-              onPress={() => navigate('/')}
-              data-cy="verify-email-success-login-button"
-            >
-              {t('success.goToLogin')}
-            </Button>
-          </Card.Footer>
-        </Card>
-      </div>
+      <Card className="max-w-md w-full" data-cy="verify-email-success-card">
+        <Card.Header className="text-center">
+          <h2 className="text-3xl font-bold">{t('success.title')}</h2>
+        </Card.Header>
+        <Card.Content>
+          <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{t('success.message')}</p>
+        </Card.Content>
+        <Card.Footer>
+          <Button
+            variant="primary"
+            className="w-full"
+            onPress={() => navigate('/')}
+            data-cy="verify-email-success-login-button"
+          >
+            {t('success.goToLogin')}
+          </Button>
+        </Card.Footer>
+      </Card>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 py-8">
-        <div className="max-w-md w-full flex flex-col gap-4" data-cy="verify-email-error-card">
-          <h2 className="text-3xl font-bold text-center">{t('error.title')}</h2>
+      <div className="max-w-md w-full flex flex-col gap-4" data-cy="verify-email-error-card">
+        <h2 className="text-3xl font-bold text-center">{t('error.title')}</h2>
 
-          <Alert status="danger" data-cy="verify-email-error-alert">
+        <Alert status="danger" data-cy="verify-email-error-alert">
+          <AlertContent>
+            <AlertTitle>{t('error.errorTitle')}</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </AlertContent>
+        </Alert>
+
+        {resendSuccess ? (
+          <Alert status="success" data-testid="resend-success-alert">
             <AlertContent>
-              <AlertTitle>{t('error.errorTitle')}</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
+              <AlertTitle>{t('resend.successTitle')}</AlertTitle>
+              <AlertDescription>{t('resend.successMessage')}</AlertDescription>
             </AlertContent>
           </Alert>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600 dark:text-gray-400">{t('resend.prompt')}</p>
+            <TextField value={resendEmail} onChange={setResendEmail}>
+              <Label>{t('resend.emailLabel')}</Label>
+              <Input type="email" data-testid="resend-email-input" />
+            </TextField>
+            <Button
+              variant="secondary"
+              className="w-full"
+              onPress={() => {
+                const trimmed = resendEmail.trim();
+                if (!isValidEmail(trimmed)) {
+                  return;
+                }
+                resendVerification.mutate({ body: { email: trimmed } });
+              }}
+              isPending={resendVerification.isPending}
+              isDisabled={!isValidEmail(resendEmail.trim()) || resendVerification.isPending}
+              data-testid="resend-verification-button"
+            >
+              {t('resend.button')}
+            </Button>
+          </div>
+        )}
 
-          {resendSuccess ? (
-            <Alert status="success" data-testid="resend-success-alert">
-              <AlertContent>
-                <AlertTitle>{t('resend.successTitle')}</AlertTitle>
-                <AlertDescription>{t('resend.successMessage')}</AlertDescription>
-              </AlertContent>
-            </Alert>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-sm text-gray-600 dark:text-gray-400">{t('resend.prompt')}</p>
-              <TextField value={resendEmail} onChange={setResendEmail}>
-                <Label>{t('resend.emailLabel')}</Label>
-                <Input type="email" data-testid="resend-email-input" />
-              </TextField>
-              <Button
-                variant="secondary"
-                className="w-full"
-                onPress={() => {
-                  const trimmed = resendEmail.trim();
-                  if (!isValidEmail(trimmed)) {
-                    return;
-                  }
-                  resendVerification.mutate({ requestBody: { email: trimmed } });
-                }}
-                isPending={resendVerification.isPending}
-                isDisabled={!isValidEmail(resendEmail.trim()) || resendVerification.isPending}
-                data-testid="resend-verification-button"
-              >
-                {t('resend.button')}
-              </Button>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
+          {token && email && (
             <Button
               variant="primary"
               className="w-full"
@@ -190,15 +183,15 @@ export function VerifyEmail() {
             >
               {t('error.tryAgain')}
             </Button>
-            <Button
-              variant="outline"
-              className="w-full"
-              onPress={() => navigate('/')}
-              data-cy="verify-email-error-back-to-login-button"
-            >
-              {t('error.backToLogin')}
-            </Button>
-          </div>
+          )}
+          <Button
+            variant="outline"
+            className="w-full"
+            onPress={() => navigate('/')}
+            data-cy="verify-email-error-back-to-login-button"
+          >
+            {t('error.backToLogin')}
+          </Button>
         </div>
       </div>
     );

@@ -1,11 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import axios from 'axios';
-import { User, Resource, Project, ResourceUsage, ResourceUsageAction, Session } from '@attraccess/database-entities';
 import { VersionService } from './version.service';
-import { IsNull } from 'typeorm';
-import { buildRelease, makeRepo } from './version.test-fixture';
+import { SYSTEM_STATS_STORE } from './system-stats.port';
+import { buildRelease } from './version.test-fixture';
 
 jest.mock('axios');
 
@@ -14,24 +12,28 @@ describe('VersionService', () => {
   let service: VersionService;
   let configService: { get: jest.Mock };
   let httpGet: jest.Mock;
-  let usageRepository: ReturnType<typeof makeRepo>;
+  let stats: { readCounts: jest.Mock };
 
   beforeEach(async () => {
     httpGet = jest.fn();
     axiosMock.create.mockReturnValue({ get: httpGet } as unknown as ReturnType<typeof axios.create>);
 
     configService = { get: jest.fn().mockReturnValue({ VERSION: '0.0.16' }) };
-    usageRepository = makeRepo(2);
+    stats = {
+      readCounts: jest.fn().mockResolvedValue({
+        usersTotal: 5,
+        resourcesTotal: 10,
+        projectsTotal: 3,
+        activeResourceUsageSessions: 2,
+        activeAuthSessions: 7,
+      }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VersionService,
         { provide: ConfigService, useValue: configService },
-        { provide: getRepositoryToken(User), useValue: makeRepo(5) },
-        { provide: getRepositoryToken(Resource), useValue: makeRepo(10) },
-        { provide: getRepositoryToken(Project), useValue: makeRepo(3) },
-        { provide: getRepositoryToken(ResourceUsage), useValue: usageRepository },
-        { provide: getRepositoryToken(Session), useValue: makeRepo(7) },
+        { provide: SYSTEM_STATS_STORE, useValue: stats },
       ],
     }).compile();
 
@@ -83,14 +85,6 @@ describe('VersionService', () => {
       expect(result.resourcesTotal).toBe(10);
       expect(result.projectsTotal).toBe(3);
       expect(result.activeResourceUsageSessions).toBe(2);
-      expect(usageRepository.count).toHaveBeenCalledWith({
-        where: {
-          endTime: IsNull(),
-          lifecyclePending: false,
-          isFinalized: true,
-          usageAction: ResourceUsageAction.Usage,
-        },
-      });
       expect(result.activeAuthSessions).toBe(7);
     });
   });

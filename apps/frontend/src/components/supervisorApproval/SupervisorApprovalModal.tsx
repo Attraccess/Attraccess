@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Description, ModalBody, ModalFooter, ModalHeader, ModalHeading, Spinner } from '@heroui/react';
 import { AttraccessUser, Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { SupervisionRequestDto, User, useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
+import { SupervisionRequestDto, User, useGetOneResourceById } from '@attraccess/react-query-client';
 import en from './translations/en.json';
 import de from './translations/de.json';
 
@@ -32,7 +32,7 @@ export function SupervisorApprovalModal({
   const { t } = useTranslations({ en, de });
   const [secondsLeft, setSecondsLeft] = useState(() => secondsUntil(request.expiresAt));
 
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: request.resourceId });
+  const { data: resource } = useGetOneResourceById({ path: { id: request.resourceId } });
 
   useEffect(() => {
     setSecondsLeft(secondsUntil(request.expiresAt));

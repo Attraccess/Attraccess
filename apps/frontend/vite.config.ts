@@ -1,14 +1,14 @@
 /// <reference types='vitest' />
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
-import { nxCopyAssetsPlugin } from '@nx/vite/plugins/nx-copy-assets.plugin';
 import federation from '@originjs/vite-plugin-federation';
 import { VitePWA } from 'vite-plugin-pwa';
 // @ts-expect-error - site.webmanifest.json is not a module
 import siteWebManifest from './src/service-worker/site.webmanifest.json';
 import tailwindcss from '@tailwindcss/vite';
 import frontendPackage from './package.json';
+import { nxReadySignal } from '@nx/vite/plugins/nx-ready-signal.plugin';
+import { workspaceAliases } from '../../tools/vite/workspace-aliases';
 
 export function normalizeFederationFsUrlsPlugin(): Plugin {
   return {
@@ -30,6 +30,9 @@ export default defineConfig(({ command }) => {
   const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000';
 
   return {
+    resolve: {
+      alias: workspaceAliases(),
+    },
     root: __dirname,
     cacheDir: '../../node_modules/.vite/apps/frontend',
     server: {
@@ -44,6 +47,11 @@ export default defineConfig(({ command }) => {
                 // approves it as the app's own website (any port, 127.0.0.1 or LAN address).
                 changeOrigin: false,
                 ws: true,
+              },
+              // OAuth discovery for MCP clients is served by the API at the origin root.
+              '/.well-known': {
+                target: apiProxyTarget,
+                changeOrigin: false,
               },
               '/cdn': {
                 target: apiProxyTarget,
@@ -60,8 +68,6 @@ export default defineConfig(({ command }) => {
     plugins: [
       tailwindcss(),
       react(),
-      nxViteTsPaths(),
-      nxCopyAssetsPlugin([]),
       federation({
         name: 'attraccess',
         remotes: {
@@ -117,10 +123,10 @@ export default defineConfig(({ command }) => {
           type: 'module',
         },
       }),
+      nxReadySignal(),
     ],
     worker: {
       format: 'es',
-      plugins: () => [nxViteTsPaths()],
     },
     build: {
       outDir: '../../dist/apps/frontend',

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@attraccess/react-query-client';
 import type { AuditEntryDto, AuditMetaDto } from '@attraccess/react-query-client';
 import {
   auditCsv,
@@ -8,6 +9,8 @@ import {
   emptyFilters,
   exportAuditEntries,
   filterRequest,
+  filterVocabulary,
+  rejectsEventPrefix,
   pluginDomainLabel,
   pluginDomains,
   togglePluginDomain,
@@ -79,24 +82,60 @@ describe('audit export and filtering', () => {
     expect(filterRequest({ ...emptyFilters, eventPrefix: 'resource..updated' })).toEqual({
       error: 'invalidEventPrefix',
     });
-    expect(filterRequest({ ...emptyFilters, subjectType: 'transaction' }, subjectTypes)).toEqual({
+    expect(filterRequest({ ...emptyFilters, subjectType: 'transaction' }, { subjectTypes })).toEqual({
       error: 'invalidSubjectType',
     });
     expect(filterRequest({ ...emptyFilters, eventPrefix: 'billing.transaction.' })).toEqual({
       request: { eventPrefix: 'billing.transaction.' },
     });
-    expect(filterRequest({ ...emptyFilters, subjectType: 'billing.transaction' }, subjectTypes)).toEqual({
+    expect(filterRequest({ ...emptyFilters, subjectType: 'billing.transaction' }, { subjectTypes })).toEqual({
       request: { subjectType: 'billing.transaction' },
     });
   });
   it('accepts plugin subject types from meta and falls back to the API shape', () => {
-    expect(filterRequest({ ...emptyFilters, subjectType: 'demo.device' }, ['demo.device'])).toEqual({
+    expect(filterRequest({ ...emptyFilters, subjectType: 'demo.device' }, { subjectTypes: ['demo.device'] })).toEqual({
       request: { subjectType: 'demo.device' },
     });
     expect(filterRequest({ ...emptyFilters, subjectType: 'demo.device' })).toEqual({
       request: { subjectType: 'demo.device' },
     });
     expect(filterRequest({ ...emptyFilters, subjectType: 'Demo..Device' })).toEqual({ error: 'invalidSubjectType' });
+  });
+  it('accepts only event prefixes that start with a known action segment once meta loaded', () => {
+    const vocabulary = filterVocabulary({
+      domains: [],
+      subjectTypes: [],
+      actions: ['resource.updated', 'maintenance_schedule.created', 'demo.publication'],
+    });
+    expect(vocabulary.eventPrefixes).toEqual(['resource', 'maintenance_schedule', 'demo']);
+    for (const prefix of ['resource', 'resource.', 'maintenance_schedule', 'demo.publication'])
+      expect(filterRequest({ ...emptyFilters, eventPrefix: prefix }, vocabulary)).toEqual({
+        request: { eventPrefix: prefix },
+      });
+    for (const prefix of ['foo', 'nonsense.created', 'resources'])
+      expect(filterRequest({ ...emptyFilters, eventPrefix: prefix }, vocabulary)).toEqual({
+        error: 'invalidEventPrefix',
+      });
+    // Before meta loaded, only the API's shape check applies; the server still rejects unknown prefixes.
+    expect(filterVocabulary(undefined)).toEqual({});
+    expect(filterRequest({ ...emptyFilters, eventPrefix: 'foo' })).toEqual({ request: { eventPrefix: 'foo' } });
+  });
+  it.each([
+    ['a string message naming eventPrefix', 400, 'eventPrefix must start with a recognized audit event prefix', true],
+    ['a message list naming eventPrefix', 400, ['limit must be positive', 'eventPrefix must start with…'], true],
+    ['a 400 about another field', 400, ['actorId must be a positive integer'], false],
+    ['a server error naming eventPrefix', 500, 'eventPrefix lookup failed', false],
+    ['a body without a message', 400, undefined, false],
+  ])('recognises an API rejection of the event prefix: %s', (_case, status, message, rejected) => {
+    const error = new ApiError(
+      { method: 'GET', url: '/api/audit' },
+      { body: message === undefined ? {} : { message }, ok: false, status, statusText: '', url: '/api/audit' },
+      'Request failed',
+    );
+    expect(rejectsEventPrefix(error)).toBe(rejected);
+  });
+  it('does not treat a transport error as a rejected event prefix', () => {
+    expect(rejectsEventPrefix(new Error('eventPrefix offline'))).toBe(false);
   });
   it('exposes plugin-contributed domains and localized labels from meta only', () => {
     const meta: AuditMetaDto = {
@@ -107,7 +146,9 @@ describe('audit export and filtering', () => {
       subjectTypes: ['resource', 'demo.device'],
       actions: ['resource.updated', 'demo.publication'],
     };
-    expect(pluginDomains(meta)).toEqual([{ id: 'demo', source: 'plugin', labels: { en: 'Demo devices', de: 'Demo-Geräte' } }]);
+    expect(pluginDomains(meta)).toEqual([
+      { id: 'demo', source: 'plugin', labels: { en: 'Demo devices', de: 'Demo-Geräte' } },
+    ]);
     expect(pluginDomains(undefined)).toEqual([]);
     expect(pluginDomainLabel(pluginDomains(meta)[0].labels, 'de')).toBe('Demo-Geräte');
     expect(pluginDomainLabel(pluginDomains(meta)[0].labels, 'en')).toBe('Demo devices');

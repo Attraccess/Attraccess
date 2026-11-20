@@ -86,13 +86,13 @@ vi.mock('@attraccess/react-query-client', () => ({
     PROJECT_INVITATIONS: 'project_invitations',
     ACCESS_CHANGES: 'access_changes',
   },
-  UseNotificationsServiceNotificationsGetPreferencesKeyFn: () => ['NotificationsServiceNotificationsGetPreferences'],
-  useNotificationsServiceNotificationsGetPreferences: () => ({ data: hoisted.preferences, isLoading: false }),
-  useNotificationsServiceNotificationsUpdatePreferences: (options: typeof hoisted.mutationOptions) => {
+  UseNotificationsGetPreferencesKeyFn: () => ['NotificationsServiceNotificationsGetPreferences'],
+  useNotificationsGetPreferences: () => ({ data: hoisted.preferences, isLoading: false }),
+  useNotificationsUpdatePreferences: (_mutationKey: unknown, options: typeof hoisted.mutationOptions) => {
     hoisted.mutationOptions = options;
     return { mutate: hoisted.mutate, isPending: hoisted.isPending };
   },
-  useLicenseServiceGetLicenseInformation: () => ({ data: { modules: ['maintenance'] } }),
+  useGetLicenseInformation: () => ({ data: { modules: ['maintenance'] } }),
 }));
 
 vi.mock('../../../components/toastProvider', () => ({
@@ -213,7 +213,7 @@ describe('NotificationPreferencesForm', () => {
     await user.click(screen.getByTestId('notifications-maintenance_requests-email'));
 
     expect(hoisted.mutate).toHaveBeenCalledWith({
-      requestBody: { category: 'maintenance_requests', channels: { email: false } },
+      body: { category: 'maintenance_requests', channels: { email: false } },
     });
   });
 
@@ -244,7 +244,7 @@ describe('NotificationPreferencesForm', () => {
       await user.click(screen.getByTestId('notifications-plugin.reservations.bookings-email'));
 
       expect(hoisted.mutate).toHaveBeenCalledWith({
-        requestBody: { category: 'plugin.reservations.bookings', channels: { email: false } },
+        body: { category: 'plugin.reservations.bookings', channels: { email: false } },
       });
     } finally {
       hoisted.preferences = original;
@@ -260,7 +260,7 @@ describe('NotificationPreferencesForm', () => {
     await waitFor(() => expect(hoisted.mutate).toHaveBeenCalled());
     expect(hoisted.subscribe).not.toHaveBeenCalled();
     expect(hoisted.mutate).toHaveBeenCalledWith({
-      requestBody: { category: 'maintenance_requests', channels: { push: true } },
+      body: { category: 'maintenance_requests', channels: { push: true } },
     });
   });
 

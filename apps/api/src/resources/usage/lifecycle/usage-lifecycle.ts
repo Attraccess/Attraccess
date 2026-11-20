@@ -1,30 +1,18 @@
-import {
-  BillingTransaction,
-  BillingTransactionItem,
-  FormSubmission,
-  ResourceFlowNodeType,
-  ResourceUsage,
-  ResourceUsageLifecycleAttempt,
-  LifecycleBillingItem,
-  Resource,
-  ResourceUsageAction,
-  User,
-  Project,
-} from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
+import type {
+  UsageBillingItemDraft,
+  UsageLifecycleAttempt,
+  UsageSession,
+  UsageSessionWithParties,
+} from '@attraccess/application-models';
 
-import { ConflictException, forwardRef, Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { EntityManager, In, IsNull, Repository } from 'typeorm';
-
-import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
+import { TransactionScope, UNIT_OF_WORK, UnitOfWork } from '../../../database/unit-of-work';
 
 import { ResourceUsageLifecycleAbortedEvent } from '../events/resource-usage.events';
-
-import { recoverOrphanedUsages } from '../../../database/resource-usage-integrity';
 
 import { SessionChangeInterruptedError } from '../errors/session-change-interrupted.error';
 
@@ -41,11 +29,15 @@ import { FinalCollection, ResourceMeteringService } from '../../metering/resourc
 
 import { ResourceOperatingAttributionService } from '../../operating-intervals/resource-operating-attribution.service';
 
+import { OperatingShare } from '../../operating-intervals/operating-share';
+
 import { LOCK_TTL_MS, SWEEP_EVERY_MS } from '../sessions/session-change-coordination';
 import { SessionChangeTurns } from '../sessions/session-change-turns';
-import { activeUsageWhere, sessionLimitOf } from '../sessions/active-usage';
 import { AuditActor } from '../../../audit/recorder/audit-event';
+import type { PreStartOrigin } from '@attraccess/plugins-backend-sdk';
+import type { ReaderUiLanguage } from '../../../plugin-system/reader-ui/host-texts';
 import { usageFlowPayload } from './usage-flow-payload';
+import { MissingBillingTransactionError, USAGE_SESSION_STORE, UsageSessionStore } from '../usage-session-store.port';
 
 /** Log context shared by the usage collaborators, so their log lines read as before the split. */
 export const RESOURCE_USAGE_LOG_CONTEXT = 'ResourceUsageService';
@@ -69,6 +61,15 @@ export interface StartSessionOptions {
    */
   supervisorUserId?: number;
   auditOrigin?: AuditActor;
+  /**
+   * Where the start came from, for the plugins' atomic capacity hook. Defaults to `supervision` for a supervised
+   * start and `web` otherwise.
+   */
+  origin?: PreStartOrigin;
+  /** Language of the refusal text on a reader (the card session's); otherwise the user's language is resolved. */
+  language?: ReaderUiLanguage;
+  /** plugin -> step keys the user confirmed in this start attempt (from the pre-start gate). */
+  confirmedStepKeys?: Record<string, string[]>;
 }
 
 /** Published usage sessions on the machine around a start, stop or takeover, handed to flows as `activeSessions`. */
@@ -78,36 +79,6 @@ export interface ActiveSessionCounts {
   limit: number;
 }
 
-export type UsageFlowPayload = {
-  resource: Partial<Resource>;
-  user: Partial<User> & Pick<User, 'id'>;
-  formSubmissions: {
-    [key: string]: { formName: string; answers: { [key: number]: { value: string; name: string } } };
-  };
-  id: number;
-  usageAction: ResourceUsageAction;
-  resourceId: number;
-  userId: number | null;
-  startTime: Date;
-  startNotes: string | null;
-  endTime: Date | null;
-  endNotes: string | null;
-  usageInMinutes: number;
-  billingTransaction: BillingTransaction | null;
-  projectId: number | null;
-  project: Project | null;
-  isFinalized: boolean;
-  lifecyclePending: boolean;
-  supervisorUserId: number | null;
-  supervisorUser: User | null;
-  sessionDurationCreditsPerMinute: number | null;
-  operatingDurationCreditsPerMinute: number | null;
-  creditsPerUsage: number | null;
-  billingFactor: number | null;
-  meterRates: ResourceUsage['meterRates'];
-  attributedOperatingDurationInMinutes: number | null;
-};
-
 /** Lifecycle attempts of starts, stops and takeovers: their drafts, flows, metering, recovery and abort. */
 @Injectable()
 export class UsageLifecycle {
@@ -116,22 +87,24 @@ export class UsageLifecycle {
   private lifecycleSweepInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(
-    @InjectRepository(ResourceUsage)
-    private readonly resourceUsageRepository: Repository<ResourceUsage>,
+    @Inject(USAGE_SESSION_STORE) readonly sessions: UsageSessionStore,
+    @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
     private readonly eventEmitter: EventEmitter2,
     private readonly billingService: BillingService,
     private readonly turns: SessionChangeTurns,
     @Optional() private readonly operatingAttributionService: ResourceOperatingAttributionService | undefined,
-    @Inject(forwardRef(() => ResourceFlowsExecutorService))
     private readonly flowExecutorService: ResourceFlowsExecutorService,
     @Optional()
-    @Inject(forwardRef(() => ResourceMeteringService))
     private readonly metering?: ResourceMeteringService,
   ) {}
 
-  /** The manager every serialized usage transaction runs on. */
-  get manager(): EntityManager {
-    return this.resourceUsageRepository.manager;
+  /**
+   * Runs one short, atomic database phase of a session change. External effects (device commands, payments, mails)
+   * never belong in `work`: it runs again when the database asks for a retry. They go through `scope.afterCommit` or
+   * run after the phase returned.
+   */
+  transaction<T>(work: (scope: TransactionScope) => Promise<T>): Promise<T> {
+    return this.unitOfWork.run(work);
   }
 
   /** Whether sessions are metered at all, so their meter rates are worth recording. */
@@ -150,52 +123,33 @@ export class UsageLifecycle {
 
   /** Attributes operating time, settles the meter and charges an ended session; returns the charge transaction id. */
   async settleEndedSession(
-    manager: EntityManager,
-    endedSession: ResourceUsage,
+    scope: TransactionScope,
+    endedSession: UsageSessionWithParties,
     final: FinalCollection,
   ): Promise<number | undefined> {
-    await this.persistAttributedOperatingDuration(endedSession, manager);
-    await this.metering?.settleInTransaction(manager, endedSession.id, final);
-    return (await this.billingService.chargeForResourceUsage(endedSession, manager))?.id;
+    const operatingShare = await this.persistAttributedOperatingDuration(endedSession, scope);
+    await this.metering?.settleInTransaction(scope, endedSession.id, final);
+    const charge = operatingShare?.shared
+      ? await this.billingService.chargeForResourceUsage(endedSession, scope, operatingShare)
+      : await this.billingService.chargeForResourceUsage(endedSession, scope);
+    return charge?.id;
   }
 
-  async applyLifecycleDrafts(manager: EntityManager, attempt: ResourceUsageLifecycleAttempt): Promise<void> {
-    for (const submission of attempt.formSubmissions) {
-      await manager.save(FormSubmission, {
-        formId: submission.formId,
-        resourceUsageId: submission.resourceUsageId,
-        userId: submission.userId,
-        action: submission.action,
-        data: submission.data,
-      });
-    }
-    for (const { usageId, quantity, ...item } of attempt.billingItems) {
-      const transaction = await manager.findOne(BillingTransaction, { where: { resourceUsageId: usageId } });
-      if (!transaction) throw new ConflictException('The usage billing transaction is missing');
-      const where = {
-        billingTransactionId: transaction.id,
-        ...item,
-        description: item.description === null ? IsNull() : item.description,
-        externalReference: item.externalReference === null ? IsNull() : item.externalReference,
-      };
-      const existing = await manager.findOne(BillingTransactionItem, { where });
-      if (existing) {
-        await manager.update(BillingTransactionItem, existing.id, { quantity: existing.quantity + quantity });
-      } else {
-        await manager.save(BillingTransactionItem, { billingTransactionId: transaction.id, ...item, quantity });
-      }
+  async applyLifecycleDrafts(context: TransactionScope, attempt: UsageLifecycleAttempt): Promise<void> {
+    try {
+      await this.sessions.applyAttemptDrafts(attempt, context);
+    } catch (error) {
+      if (error instanceof MissingBillingTransactionError) throw new ConflictException(error.message);
+      throw error;
     }
   }
 
   async abortLifecycleAttempt(attemptId: string, resourceId: number): Promise<void> {
-    const aborted = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
-      const attempt = await manager.findOne(ResourceUsageLifecycleAttempt, { where: { id: attemptId, resourceId } });
+    const aborted = await this.transaction(async (scope) => {
+      const attempt = await this.sessions.findAttempt(attemptId, resourceId, scope);
       if (!attempt) return false;
-      if (attempt.candidateUsageId !== null) {
-        await this.metering?.discardCandidate(manager, attempt.candidateUsageId);
-        await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
-      }
-      await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
+      await this.discardAttemptState(scope, attempt);
+      await this.sessions.deleteAttempt(attemptId, resourceId, scope);
       return true;
     });
     if (aborted)
@@ -205,17 +159,28 @@ export class UsageLifecycle {
       );
   }
 
+  /** Removes the tentative session of an attempt and gives the session it was about to end back to the meter. */
+  private async discardAttemptState(scope: TransactionScope, attempt: UsageLifecycleAttempt): Promise<void> {
+    if (attempt.candidateUsageId !== null) {
+      await this.metering?.discardCandidate(scope, attempt.candidateUsageId);
+      await this.sessions.deletePendingSession(attempt.candidateUsageId, scope);
+    }
+    // The session a stop or takeover was about to end keeps running, so it still shares the meter.
+    if (attempt.previousUsageId !== null) await this.metering?.restoreParticipant(scope, attempt.previousUsageId);
+  }
+
   /** A flow may end the tentative session it was started for before it becomes visible. */
   async cancelLifecycleCandidate(attemptId: string, resourceId: number): Promise<void> {
-    await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
-      const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
+    await this.transaction(async (scope) => {
+      const attempt = await this.getLifecycleAttempt(scope, attemptId, resourceId);
       if (attempt.candidateUsageId === null) {
         throw new ConflictException('The usage lifecycle attempt has no candidate session');
       }
-      const result = await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
-      if (result.affected === 0) throw new ConflictException('The tentative usage session no longer exists');
+      if (!(await this.sessions.deletePendingSession(attempt.candidateUsageId, scope))) {
+        throw new ConflictException('The tentative usage session no longer exists');
+      }
       // Keep the reservation until the owning flow has settled all of its branches.
-      await manager.update(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId }, { candidateUsageId: null });
+      await this.sessions.clearAttemptCandidate(attemptId, resourceId, scope);
     });
   }
 
@@ -229,32 +194,28 @@ export class UsageLifecycle {
     endNotes: string,
     actorUserId?: number,
   ): Promise<void> {
-    const { candidate, activeSessions } = await runSerializedTransaction(
-      this.resourceUsageRepository.manager,
-      async (manager) => {
-        const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
-        if (attempt.candidateUsageId === null) {
-          throw new ConflictException('The usage lifecycle attempt has no candidate session');
-        }
-        const candidate = await manager.findOneOrFail(ResourceUsage, {
-          where: { id: attempt.candidateUsageId, lifecyclePending: true },
-          relations: ['resource', 'user', 'project'],
-        });
-        const result = await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
-        if (result.affected === 0) throw new ConflictException('The tentative usage session no longer exists');
-        // Keep the reservation until the owning flow has settled all of its branches.
-        await manager.update(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId }, { candidateUsageId: null });
-        // The start flow counted the candidate as a session; taking it back leaves the published sessions.
-        // A takeover counted it in place of the session it replaces, which keeps running now.
-        const published = await manager.count(ResourceUsage, { where: { resourceId, ...activeUsageWhere() } });
-        const activeSessions: ActiveSessionCounts = {
-          before: attempt.kind === 'takeover' ? published : published + 1,
-          after: published,
-          limit: await this.getSessionLimit(manager, resourceId),
-        };
-        return { candidate, activeSessions };
-      },
-    );
+    const { candidate, activeSessions } = await this.transaction(async (scope) => {
+      const attempt = await this.getLifecycleAttempt(scope, attemptId, resourceId);
+      if (attempt.candidateUsageId === null) {
+        throw new ConflictException('The usage lifecycle attempt has no candidate session');
+      }
+      const candidate = await this.sessions.findPendingSession(attempt.candidateUsageId, scope);
+      if (!candidate) throw new ConflictException('The tentative usage session no longer exists');
+      if (!(await this.sessions.deletePendingSession(attempt.candidateUsageId, scope))) {
+        throw new ConflictException('The tentative usage session no longer exists');
+      }
+      // Keep the reservation until the owning flow has settled all of its branches.
+      await this.sessions.clearAttemptCandidate(attemptId, resourceId, scope);
+      // The start flow counted the candidate as a session; taking it back leaves the published sessions.
+      // A takeover counted it in place of the session it replaces, which keeps running now.
+      const published = await this.sessions.countActiveSessions(resourceId, scope);
+      const activeSessions: ActiveSessionCounts = {
+        before: attempt.kind === 'takeover' ? published : published + 1,
+        after: published,
+        limit: await this.getSessionLimit(scope, resourceId),
+      };
+      return { candidate, activeSessions };
+    });
 
     await this.runUsageFlow(
       undefined,
@@ -277,27 +238,20 @@ export class UsageLifecycle {
    */
   public async recoverInterruptedLifecycles(sweep = false): Promise<void> {
     const oldEnough = new Date(Date.now() - LOCK_TTL_MS);
-    const attempts = await this.resourceUsageRepository.manager.find(ResourceUsageLifecycleAttempt, {
-      select: { id: true, createdAt: true },
-    });
+    const attempts = await this.sessions.listAttemptIds();
     const gone = await this.turns.coordination.findGone(
       attempts.filter(({ createdAt }) => !sweep || createdAt <= oldEnough).map(({ id }) => id),
       !sweep,
     );
     if (sweep && gone.size === 0) return;
-    const resourceIds = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
-      const recovered = sweep ? 0 : await recoverOrphanedUsages(manager);
+    const resourceIds = await this.transaction(async (scope) => {
+      const recovered = sweep ? 0 : await this.sessions.recoverOrphanedSessions(scope);
       if (recovered)
         this.logger.warn(`Cancelled ${recovered} orphan unfinalized usage sessions; see resource_usage_recovery`);
-      const attempts = gone.size
-        ? await manager.find(ResourceUsageLifecycleAttempt, { where: { id: In([...gone]) } })
-        : [];
+      const attempts = await this.sessions.findAttemptsByIds([...gone], scope);
       for (const attempt of attempts) {
-        if (attempt.candidateUsageId !== null) {
-          await this.metering?.discardCandidate(manager, attempt.candidateUsageId);
-          await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
-        }
-        await manager.delete(ResourceUsageLifecycleAttempt, attempt.id);
+        await this.discardAttemptState(scope, attempt);
+        await this.sessions.deleteAttempt(attempt.id, attempt.resourceId, scope);
       }
       return attempts.map((attempt) => attempt.resourceId);
     });
@@ -333,7 +287,7 @@ export class UsageLifecycle {
   }
 
   async runUsageFlow(
-    manager: EntityManager | undefined,
+    scope: TransactionScope | undefined,
     resourceId: number,
     triggerNodeType: ResourceFlowNodeType,
     payload: object,
@@ -341,7 +295,7 @@ export class UsageLifecycle {
     options: Pick<FlowExecutionOptions, 'lifecycleAttemptId' | 'lifecycleCandidateCancellation' | 'actorUserId'>,
   ): Promise<void> {
     try {
-      await this.flowExecutorService.runFlow(resourceId, triggerNodeType, payload, manager, options);
+      await this.flowExecutorService.runFlow(resourceId, triggerNodeType, payload, scope, options);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Usage ${description} flow failed for resource ${resourceId}: ${message}`, error);
@@ -351,21 +305,21 @@ export class UsageLifecycle {
     }
   }
 
-  private async persistAttributedOperatingDuration(usage: ResourceUsage, manager: EntityManager): Promise<void> {
-    const attributedOperatingDurationInMinutes = this.operatingAttributionService
-      ? await this.operatingAttributionService.getForUsage(usage, manager)
-      : 0;
-    await manager.update(ResourceUsage, usage.id, { attributedOperatingDurationInMinutes });
+  /** Stores the running time attributed to the session and returns how it was split with the sessions it shared the machine with. */
+  private async persistAttributedOperatingDuration(
+    usage: UsageSession,
+    context: TransactionScope,
+  ): Promise<OperatingShare | null> {
+    const share = (await this.operatingAttributionService?.getShareForUsage(usage, context)) ?? null;
+    const attributedOperatingDurationInMinutes = share ? share.shareMs / 60_000 : 0;
+    await this.sessions.setAttributedOperatingDuration(usage.id, attributedOperatingDurationInMinutes, context);
     usage.attributedOperatingDurationInMinutes = attributedOperatingDurationInMinutes;
+    return share;
   }
 
   /** Effective number of parallel sessions. Doors and unknown resources behave like a limit of 1. */
-  async getSessionLimit(manager: EntityManager, resourceId: number): Promise<number> {
-    const resource = await manager.findOne(Resource, {
-      where: { id: resourceId },
-      select: { id: true, type: true, maxParallelSessions: true },
-    });
-    return sessionLimitOf(resource);
+  getSessionLimit(context: TransactionScope | undefined, resourceId: number): Promise<number> {
+    return this.sessions.findSessionLimit(resourceId, context);
   }
 
   /**
@@ -373,27 +327,18 @@ export class UsageLifecycle {
    * sessions only a takeover reservation (exclusive) blocks; capacity and one-session-per-person are
    * enforced by the caller, and the same session cannot be ended twice (unique attempt index).
    */
-  async assertLifecycleAvailable(manager: EntityManager, resourceId: number, sharedMachine = false): Promise<void> {
-    if (sharedMachine) {
-      if (await manager.findOne(ResourceUsageLifecycleAttempt, { where: { resourceId, kind: 'takeover' } })) {
-        throw new ConflictException('A usage lifecycle operation is already in progress for this resource');
-      }
-      return;
-    }
-    if (
-      (await manager.findOne(ResourceUsageLifecycleAttempt, { where: { resourceId } })) ||
-      (await manager.findOne(ResourceUsage, { where: { resourceId, endTime: IsNull(), lifecyclePending: true } }))
-    ) {
+  async assertLifecycleAvailable(
+    context: TransactionScope | undefined,
+    resourceId: number,
+    sharedMachine = false,
+  ): Promise<void> {
+    if (await this.sessions.isLifecycleBlocked(resourceId, sharedMachine, context)) {
       throw new ConflictException('A usage lifecycle operation is already in progress for this resource');
     }
   }
 
-  async getLifecycleAttempt(
-    manager: EntityManager,
-    id: string,
-    resourceId: number,
-  ): Promise<ResourceUsageLifecycleAttempt> {
-    const attempt = await manager.findOne(ResourceUsageLifecycleAttempt, { where: { id, resourceId } });
+  async getLifecycleAttempt(context: TransactionScope, id: string, resourceId: number): Promise<UsageLifecycleAttempt> {
+    const attempt = await this.sessions.findAttempt(id, resourceId, context);
     if (!attempt) throw new SessionChangeInterruptedError();
     return attempt;
   }
@@ -403,17 +348,19 @@ export class UsageLifecycle {
     attemptId: string,
     resourceId: number,
     usageId: number | undefined,
-    item: Omit<LifecycleBillingItem, 'usageId'>,
+    item: Omit<UsageBillingItemDraft, 'usageId'>,
   ): Promise<void> {
-    await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
-      const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
+    await this.transaction(async (scope) => {
+      const attempt = await this.getLifecycleAttempt(scope, attemptId, resourceId);
       const targetUsageId = attempt.previousUsageId ?? attempt.candidateUsageId;
       if (targetUsageId === null || (usageId !== undefined && usageId !== targetUsageId)) {
         throw new ConflictException('Billing item does not belong to this usage lifecycle attempt');
       }
-      await manager.update(ResourceUsageLifecycleAttempt, attempt.id, {
-        billingItems: [...attempt.billingItems, { ...item, usageId: targetUsageId }],
-      });
+      await this.sessions.setBillingItems(
+        attempt.id,
+        [...attempt.billingItems, { ...item, usageId: targetUsageId }],
+        scope,
+      );
     });
   }
 }

@@ -1,39 +1,147 @@
-import { Button, DeleteConfirmationModal, LabeledSwitch, PageHeader } from '@attraccess/plugins-frontend-ui';
-import { Accordion, Input, Label, Spinner, TextField } from '@heroui/react';
+import { Button, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Spinner } from '@heroui/react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ApiError,
+  useResourceFormsCreate,
+  UseResourceFormsGetOneKeyFn,
+  useResourceFormsDelete,
+  useResourceFormsGetOne,
+  useResourceFormsUpdate,
+  useGetOneResourceById,
+} from '@attraccess/react-query-client';
+import { useToastMessage } from '../../../../components/toastProvider';
 import { FormPreview } from './components/FormPreview';
-import { DndContext, closestCenter } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { SortableField } from './editor/useFormEditor';
-import { useFormEditor } from './editor/useFormEditor';
+import { EditableForm, parseFieldFromResponse } from './types';
+import { FormFieldsSection } from './editor/FormFieldsSection';
+import { FormSettingsSections } from './editor/FormSettingsSections';
+import { EMPTY_FORM, buildRequestBody, invalidateFormQueries, sanitizeFormPayload } from './editor/formPayloads';
+import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
+import en from './en.json';
+import de from './de.json';
 
 export function FormEditorPage() {
-  const {
-    resourceId,
-    isCreateMode,
-    t,
-    resource,
-    formResponse,
-    isLoadingForm,
-    form,
-    setForm,
-    deleteModalOpen,
-    setDeleteModalOpen,
-    expandedFieldKeys,
-    setExpandedFieldKeys,
-    createForm,
-    updateForm,
-    deleteForm,
-    lastLabelInputRef,
-    addField,
-    updateField,
-    removeField,
-    sensors,
-    handleDragEnd,
-    fieldSortableIds,
-    hasUnsavedChanges,
-    handleSave,
-    handleDelete,
-  } = useFormEditor();
+  const { id, formId } = useParams<{ id: string; formId: string }>();
+  const resourceId = Number(id);
+  const isCreateMode = !formId || formId === 'new';
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const toast = useToastMessage();
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  const { t, tExists } = useTranslations(
+    {
+      en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
+      de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
+    },
+    { escapeValues: false },
+  );
+
+  const { data: resource } = useGetOneResourceById({ path: { id: resourceId } });
+  const { data: formResponse, isLoading: isLoadingForm } = useResourceFormsGetOne(
+    { path: { resourceId, formId: Number(formId) } },
+    undefined,
+    { enabled: !isCreateMode && Number.isFinite(resourceId) },
+  );
+
+  const [form, setForm] = useState<EditableForm>({ ...EMPTY_FORM, fields: [] });
+
+  useEffect(() => {
+    if (formResponse) {
+      setForm({
+        name: formResponse.name,
+        isRequiredOnResourceUsageStart: formResponse.isRequiredOnResourceUsageStart,
+        isRequiredOnResourceUsageTakeOver: formResponse.isRequiredOnResourceUsageTakeOver,
+        isRequiredOnResourceUsageEnd: formResponse.isRequiredOnResourceUsageEnd,
+        fields: formResponse.fields.map((field) => parseFieldFromResponse(field)),
+      });
+    } else if (isCreateMode) {
+      setForm({ ...EMPTY_FORM, fields: [] });
+    }
+  }, [formResponse, isCreateMode]);
+
+  const mutationVariables = useMemo(
+    () => ({
+      resourceId,
+      formId: formResponse?.id ?? Number(formId),
+    }),
+    [resourceId, formId, formResponse?.id],
+  );
+
+  const createForm = useResourceFormsCreate(undefined, {
+    onSuccess: async (data) => {
+      toast.success({ title: t('editor.createSuccess') });
+      await invalidateFormQueries(resourceId, queryClient, data.id);
+      navigate(`/resources/${resourceId}/forms/${data.id}`, { replace: true });
+    },
+    onError: (error) => {
+      toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' });
+    },
+  });
+
+  const updateForm = useResourceFormsUpdate(undefined, {
+    onSuccess: async () => {
+      toast.success({ title: t('editor.updateSuccess') });
+      await invalidateFormQueries(resourceId, queryClient, mutationVariables.formId);
+    },
+    onError: (error) => {
+      toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' });
+    },
+  });
+
+  const deleteForm = useResourceFormsDelete(undefined, {
+    onSuccess: async () => {
+      toast.success({ title: t('editor.deleteSuccess') });
+      // Refetching the deleted form would 404 through every retry and keep the confirmation pending.
+      navigate(`/resources/${resourceId}/forms`, { replace: true });
+      queryClient.removeQueries({
+        queryKey: UseResourceFormsGetOneKeyFn({ path: { resourceId, formId: mutationVariables.formId } }),
+      });
+      await invalidateFormQueries(resourceId, queryClient);
+    },
+    onError: (error) => {
+      toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' });
+    },
+  });
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (isCreateMode && form.fields.length === 0 && form.name === '') {
+      return false;
+    }
+    if (!formResponse) {
+      return true;
+    }
+    const normalize = (value: EditableForm) => JSON.stringify(sanitizeFormPayload(value));
+    const referenceForm: EditableForm = {
+      name: formResponse.name,
+      isRequiredOnResourceUsageStart: formResponse.isRequiredOnResourceUsageStart,
+      isRequiredOnResourceUsageTakeOver: formResponse.isRequiredOnResourceUsageTakeOver,
+      isRequiredOnResourceUsageEnd: formResponse.isRequiredOnResourceUsageEnd,
+      fields: formResponse.fields.map((field) => parseFieldFromResponse(field)),
+    };
+    return normalize(form) !== normalize(referenceForm);
+  }, [form, formResponse, isCreateMode]);
+
+  const handleSave = async () => {
+    if (form.fields.some((field) => !field.name.trim())) {
+      toast.error({ title: t('editor.validation.missingFieldName') });
+      return;
+    }
+
+    const payload = buildRequestBody(form);
+    if (isCreateMode) {
+      await createForm.mutateAsync({ path: { resourceId }, body: payload });
+      return;
+    }
+
+    await updateForm.mutateAsync({ path: { resourceId, formId: mutationVariables.formId }, body: payload });
+  };
+
+  const handleDelete = async () => {
+    await deleteForm.mutateAsync({ path: { resourceId, formId: mutationVariables.formId } });
+  };
 
   if (!isCreateMode && isLoadingForm) {
     return (
@@ -55,92 +163,25 @@ export function FormEditorPage() {
             label: t('editor.delete'),
             variant: 'destructive',
             isHidden: isCreateMode,
-            onPress: () => setDeleteModalOpen(true),
+            onPress: handleDelete,
+            confirm: {
+              title: t('editor.deleteConfirmTitle', { formName: formResponse?.name ?? '' }),
+              message: t('editor.deleteConfirmDescription'),
+              confirmDataCy: 'delete-button',
+              cancelDataCy: 'cancel-button',
+            },
           },
         ]}
       />
 
       <div className="grid gap-8 lg:grid-cols-[2fr_1fr]" data-cy="form-editor-page">
         <div className="flex flex-col gap-8">
-          <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
-            <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-              {t('editor.sections.identity')}
-            </h3>
-            <div className="grid gap-4 md:grid-cols-2">
-              <TextField isRequired value={form.name} onChange={(v) => setForm((prev) => ({ ...prev, name: v }))}>
-                <Label>{t('editor.nameLabel')}</Label>
-                <Input placeholder={t('editor.namePlaceholder')} data-cy="form-editor-name-input" />
-              </TextField>
-            </div>
-          </section>
+          <FormSettingsSections form={form} setForm={setForm} />
 
-          <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
-            <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-              {t('editor.sections.behavior')}
-            </h3>
-            <div className="divide-y divide-default-200/60 rounded-lg border border-default-200">
-              <div className="px-4 py-3">
-                <LabeledSwitch
-                  isSelected={form.isRequiredOnResourceUsageStart}
-                  onChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageStart: value }))}
-                >
-                  {t('editor.resourceUsageStart')}
-                </LabeledSwitch>
-              </div>
-              <div className="px-4 py-3">
-                <LabeledSwitch
-                  isSelected={form.isRequiredOnResourceUsageTakeOver}
-                  onChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageTakeOver: value }))}
-                >
-                  {t('editor.resourceUsageTakeover')}
-                </LabeledSwitch>
-              </div>
-              <div className="px-4 py-3">
-                <LabeledSwitch
-                  isSelected={form.isRequiredOnResourceUsageEnd}
-                  onChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageEnd: value }))}
-                >
-                  {t('editor.resourceUsageEnd')}
-                </LabeledSwitch>
-              </div>
-            </div>
-          </section>
-
-          <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-                {t('editor.sections.fields')}
-              </h3>
-              <Button variant="secondary" onPress={addField} data-cy="form-editor-add-field-button">
-                {t('editor.addField')}
-              </Button>
-            </div>
-
-            {form.fields.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-default-200 p-6 text-center">
-                <p className="font-medium text-default-600">{t('editor.emptyFieldsTitle')}</p>
-                <p className="text-sm text-default-400">{t('editor.emptyFieldsDescription')}</p>
-              </div>
-            ) : (
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={fieldSortableIds} strategy={verticalListSortingStrategy}>
-                  <Accordion variant="surface" expandedKeys={expandedFieldKeys} onExpandedChange={setExpandedFieldKeys}>
-                    {form.fields.map((field, index) => (
-                      <SortableField
-                        key={field._id ?? `field-${field.id}`}
-                        field={field}
-                        index={index}
-                        onChange={(value) => updateField(index, value)}
-                        onRemove={() => removeField(index)}
-                        t={t}
-                        labelInputRef={index === form.fields.length - 1 ? lastLabelInputRef : undefined}
-                      />
-                    ))}
-                  </Accordion>
-                </SortableContext>
-              </DndContext>
-            )}
-          </section>
+          <FormFieldsSection
+            fields={form.fields}
+            onFieldsChange={(update) => setForm((prev) => ({ ...prev, fields: update(prev.fields) }))}
+          />
 
           <div className="flex items-center justify-between pt-6 border-t border-default-200">
             {hasUnsavedChanges ? <span className="text-sm text-warning-500">{t('editor.unsaved')}</span> : <span />}
@@ -160,17 +201,9 @@ export function FormEditorPage() {
           <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
             {t('editor.sections.preview')}
           </h3>
-          <FormPreview fields={form.fields} t={t} />
+          <FormPreview fields={form.fields} />
         </aside>
       </div>
-
-      <DeleteConfirmationModal
-        isOpen={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
-        onConfirm={handleDelete}
-        itemName={formResponse?.name ?? ''}
-        isDeleting={deleteForm.isPending}
-      />
     </div>
   );
 }

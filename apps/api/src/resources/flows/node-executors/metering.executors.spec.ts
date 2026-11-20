@@ -1,8 +1,10 @@
 import { compileFlowTemplate } from '../execution/flow-template';
-import { ResourceFlowNode } from '@attraccess/database-entities';
+import { FlowNodeRecord } from '@attraccess/application-models';
 import { MeteringReadyExecutor } from './metering-ready.executor';
 import { MeteringReportExecutor } from './metering-report.executor';
 import { MeteringRunContext, NodeExecutionContext } from './node-executor.interface';
+import { MeteringOperationError } from '../../metering/metering-readings';
+import { FlowExecutionError } from '../errors/flow-execution.error';
 
 const context = (metering?: Partial<MeteringRunContext>): NodeExecutionContext & { complete: jest.Mock } => {
   const complete = jest.fn().mockResolvedValue(undefined);
@@ -13,7 +15,7 @@ const context = (metering?: Partial<MeteringRunContext>): NodeExecutionContext &
   } as never;
 };
 
-const node = (data: object) => ({ resourceId: 1, data: { meterId: 1, ...data } }) as unknown as ResourceFlowNode;
+const node = (data: object) => ({ resourceId: 1, data: { meterId: 1, ...data } }) as unknown as FlowNodeRecord;
 
 describe('metering completion nodes', () => {
   it('report renders a converted value, time and source from the flow payload and replies once', async () => {
@@ -53,7 +55,33 @@ describe('metering completion nodes', () => {
       undefined,
       undefined,
       undefined,
+      undefined,
     );
+  });
+
+  it('report passes the rendered usage ID of the session the reading belongs to', async () => {
+    const report = jest.fn().mockResolvedValue(undefined);
+    await new MeteringReportExecutor({ report } as never).execute(
+      node({ value: '3', usageId: '{{session.id}}' }),
+      { session: { id: 42 } },
+      context(),
+    );
+    expect(report).toHaveBeenCalledWith(1, 1, expect.anything(), undefined, undefined, undefined, 42);
+  });
+
+  it('report refuses a usage ID that is not a session ID', async () => {
+    const report = jest.fn();
+    await expect(
+      new MeteringReportExecutor({ report } as never).execute(node({ value: '3', usageId: 'abc' }), {}, context()),
+    ).rejects.toThrow('FLOW_EXECUTION_ERROR: The usage ID "abc" is not a session ID');
+    expect(report).not.toHaveBeenCalled();
+  });
+
+  it('report turns a reading the meter refuses into a flow error', async () => {
+    const report = jest.fn().mockRejectedValue(new MeteringOperationError('Several sessions are running'));
+    await expect(
+      new MeteringReportExecutor({ report } as never).execute(node({ value: '3' }), {}, context()),
+    ).rejects.toThrow(new FlowExecutionError('Several sessions are running'));
   });
 
   it('ready acknowledges a resettable source without a baseline', async () => {

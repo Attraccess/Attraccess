@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { RfidCardList } from './index';
@@ -14,7 +15,7 @@ const state = vi.hoisted(() => ({
   resetFails: null as unknown,
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAttractapServiceGetAllCards: (params: unknown) => {
+  useGetAllCards: (params: unknown) => {
     state.cardsQuery(params);
     return {
       data: [
@@ -23,23 +24,28 @@ vi.mock('@attraccess/react-query-client', () => ({
       ],
     };
   },
-  useAttractapServiceResetNfcCard: (options: { onSuccess: () => void; onError: (error: unknown) => void }) => ({
+  useResetNfcCard: (_mutationKey: unknown, options: { onSuccess: () => void; onError: (error: unknown) => void }) => ({
     mutate: (data: unknown) => {
       state.reset(data);
       if (state.resetFails) options.onError(state.resetFails);
     },
   }),
-  useAttractapServiceEnrollNfcCard: (options: { onSuccess: () => void; onError: (error: unknown) => void }) => ({
+  useEnrollNfcCard: (_mutationKey: unknown, options: { onSuccess: () => void; onError: (error: unknown) => void }) => ({
     mutate: (data: unknown) => {
       state.enroll(data);
       if (state.enrollFails) options.onError(state.enrollFails);
       else options.onSuccess();
     },
   }),
-  useAttractapServiceToggleCardActive: () => ({ mutate: state.toggle }),
-  UseAttractapServiceGetAllCardsKeyFn: () => ['cards'],
-  useUsersServiceGetOneUserById: () => ({ data: undefined }),
-  useLicenseServiceGetLicenseInformation: () => ({ data: { modules: state.licensed ? ['attractap'] : [] } }),
+  useToggleCardActive: (_mutationKey: unknown, options: { onSuccess: () => void }) => ({
+    mutateAsync: async (data: unknown) => {
+      state.toggle(data);
+      options.onSuccess();
+    },
+  }),
+  UseGetAllCardsKeyFn: () => ['cards'],
+  useGetOneUserById: () => ({ data: undefined }),
+  useGetLicenseInformation: () => ({ data: { modules: state.licensed ? ['attractap'] : [] } }),
 }));
 vi.mock('../AttractapSelect', () => ({
   AttractapSelect: ({
@@ -86,7 +92,11 @@ beforeEach(() => {
   state.resetFails = null;
 });
 afterEach(cleanup);
-it('renders card identities and requires a reader before deleting a card', () => {
+const openRowMenu = async (uid: string) => {
+  await userEvent.click(screen.getByRole('button', { name: `Actions for ${uid}` }));
+  return screen.getByRole('menu');
+};
+it('renders card identities and requires a reader before deleting a card', async () => {
   render(
     <MemoryRouter>
       <RfidCardList />
@@ -94,30 +104,38 @@ it('renders card identities and requires a reader before deleting a card', () =>
   );
   expect(screen.getByText('AA-BB')).toBeInTheDocument();
   expect(screen.getByText('CC-DD')).toBeInTheDocument();
-  const row = screen.getByText('AA-BB').closest('tr');
-  if (!row) throw new Error('Card row not found');
-  fireEvent.click(within(row).getByRole('button', { name: 'Delete' }));
+  expect(within(screen.getByText('AA-BB').closest('tr') as HTMLElement).getByText('Active')).toBeInTheDocument();
+  expect(within(screen.getByText('CC-DD').closest('tr') as HTMLElement).getByText('Inactive')).toBeInTheDocument();
+  await userEvent.click(within(await openRowMenu('AA-BB')).getByRole('menuitem', { name: 'Delete' }));
   expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' })).toBeDisabled();
   fireEvent.change(screen.getByRole('combobox', { name: 'Select Attractap' }), { target: { value: '4' } });
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
-  expect(state.reset).toHaveBeenCalledWith({ requestBody: { readerId: 4, cardId: 7 } });
+  expect(state.reset).toHaveBeenCalledWith({ body: { readerId: 4, cardId: 7 } });
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(screen.queryByRole('dialog')).toBeNull();
 });
 it.each([
   { uid: 'AA-BB', action: 'Deactivate', id: 7, active: false },
   { uid: 'CC-DD', action: 'Activate', id: 8, active: true },
-])('confirms $action for the correct card', ({ uid, action, id, active }) => {
+])('confirms $action for the correct card', async ({ uid, action, id, active }) => {
   render(
     <MemoryRouter>
       <RfidCardList />
     </MemoryRouter>,
   );
-  const row = screen.getByText(uid).closest('tr');
-  if (!row) throw new Error('Card row not found');
-  fireEvent.click(within(row).getByRole('button', { name: action }));
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: action }));
-  expect(state.toggle).toHaveBeenCalledWith({ id, requestBody: { active } });
+  const menu = await openRowMenu(uid);
+  expect(
+    within(menu)
+      .getAllByRole('menuitem')
+      .map((item) => item.textContent),
+  ).toEqual([action, 'Delete']);
+  await userEvent.click(within(menu).getByRole('menuitem', { name: action }));
+  const dialog = await screen.findByRole('alertdialog');
+  expect(state.toggle).not.toHaveBeenCalled();
+  await userEvent.click(within(dialog).getByRole('button', { name: action }));
+  expect(state.toggle).toHaveBeenCalledWith({ path: { id }, body: { active } });
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['cards'] });
 });
 it('enrolls on the selected reader and hides the page without a license', () => {
   const view = render(
@@ -129,7 +147,7 @@ it('enrolls on the selected reader and hides the page without a license', () => 
   expect(screen.getByRole('button', { name: 'Enroll' })).toBeDisabled();
   fireEvent.change(screen.getByRole('combobox'), { target: { value: '4' } });
   fireEvent.click(screen.getByRole('button', { name: 'Enroll' }));
-  expect(state.enroll).toHaveBeenCalledWith({ requestBody: { readerId: 4 } });
+  expect(state.enroll).toHaveBeenCalledWith({ body: { readerId: 4 } });
   expect(screen.queryByRole('dialog')).toBeNull();
   view.unmount();
   state.licensed = false;
@@ -147,12 +165,12 @@ it('lists and enrolls cards for the selected user instead of the acting admin', 
       <RfidCardList userId={23} />
     </MemoryRouter>,
   );
-  expect(state.cardsQuery).toHaveBeenCalledWith({ userId: 23 });
+  expect(state.cardsQuery).toHaveBeenCalledWith({ query: { userId: 23 } });
   expect(screen.getByRole('heading', { name: 'RFID Cards — #23' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Enroll RFID Card' }));
   fireEvent.change(screen.getByRole('combobox'), { target: { value: '4' } });
   fireEvent.click(screen.getByRole('button', { name: 'Enroll' }));
-  expect(state.enroll).toHaveBeenCalledWith({ requestBody: { readerId: 4, userId: 23 } });
+  expect(state.enroll).toHaveBeenCalledWith({ body: { readerId: 4, userId: 23 } });
 });
 
 it.each([
@@ -176,16 +194,14 @@ it.each([
   expect(description).not.toContain(code);
 });
 
-it('reports a failed reset through the same translated reasons', () => {
+it('reports a failed reset through the same translated reasons', async () => {
   state.resetFails = Object.assign(new Error('Refused'), { body: { message: 'READER_BUSY' } });
   render(
     <MemoryRouter>
       <RfidCardList />
     </MemoryRouter>,
   );
-  const row = screen.getByText('AA-BB').closest('tr');
-  if (!row) throw new Error('Card row not found');
-  fireEvent.click(within(row).getByRole('button', { name: 'Delete' }));
+  await userEvent.click(within(await openRowMenu('AA-BB')).getByRole('menuitem', { name: 'Delete' }));
   fireEvent.change(screen.getByRole('combobox', { name: 'Select Attractap' }), { target: { value: '4' } });
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
   expect(state.toastError).toHaveBeenCalledWith(expect.objectContaining({ title: 'Reader busy' }));

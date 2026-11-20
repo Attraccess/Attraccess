@@ -7,6 +7,7 @@ import {
   type ReaderUiProvider,
   type SessionEndHook,
   type StartBlockedQuery,
+  type StartCapacityHook,
 } from '@attraccess/plugins-backend-sdk';
 
 export interface ReaderUiContributions {
@@ -14,6 +15,7 @@ export interface ReaderUiContributions {
   preStartHook?: PreStartHook;
   sessionEndHook?: SessionEndHook;
   startBlockedQuery?: StartBlockedQuery;
+  startCapacityHook?: StartCapacityHook;
 }
 
 /**
@@ -41,6 +43,7 @@ export function collectReaderUiContributions(
     ['preStartHook', exported.preStartHook],
     ['sessionEndHook', exported.sessionEndHook],
     ['startBlockedQuery', exported.startBlockedQuery],
+    ['startCapacityHook', exported.startCapacityHook],
   ] as const) {
     if (!hook) continue;
     if (!granted.has(PluginPermission.ACCESS_HOOKS)) {
@@ -55,5 +58,7 @@ export function collectReaderUiContributions(
   if (out.readerUi && out.readerUi.getTimeZone !== undefined && typeof out.readerUi.getTimeZone !== 'function') {
     throw new Error(`Plugin ${pluginName}: readerUi.getTimeZone must be a function`);
   }
-  return out.readerUi || out.preStartHook || out.sessionEndHook || out.startBlockedQuery ? out : null;
+  return out.readerUi || out.preStartHook || out.sessionEndHook || out.startBlockedQuery || out.startCapacityHook
+    ? out
+    : null;
 }

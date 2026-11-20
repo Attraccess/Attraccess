@@ -1,10 +1,24 @@
 import '@testing-library/jest-dom/vitest';
-import { vi } from 'vitest';
-import type { DeleteOptions } from './types';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, waitFor } from '@testing-library/react';
+import type { UserEvent } from '@testing-library/user-event';
+import type { PropsWithChildren, ReactElement } from 'react';
+import { afterEach, beforeEach, vi } from 'vitest';
 
-import { afterEach, beforeEach } from 'vitest';
+interface DeleteOptions {
+  onSuccess?: () => void;
+  onError?: (error: unknown) => void;
+}
+
+/** What the fake API answers for a GET: a failed request has `ok: false`. */
+interface ApiResponse {
+  ok: boolean;
+  json?: () => Promise<unknown>;
+}
 
 const hoisted = vi.hoisted(() => ({
+  /** The fake API behind the mocked query hooks: answers a GET request path. */
+  apiMock: vi.fn<(path: string) => Promise<ApiResponse>>(),
   deleteMutateMock: vi.fn(),
   dependencyPlan: undefined as unknown,
   dependencyPlanError: null as unknown,
@@ -27,51 +41,105 @@ const hoisted = vi.hoisted(() => ({
   deleteOptions: undefined as DeleteOptions | undefined,
 }));
 
-vi.mock('@attraccess/react-query-client', () => ({
-  usePluginsServicePluginControllerDependencyPlan: () => ({
-    data: hoisted.dependencyPlan,
-    error: hoisted.dependencyPlanError,
-    isFetching: false,
-  }),
-  usePluginsServicePluginControllerRemovalPlan: () => ({ data: hoisted.removalPlan, isFetching: false }),
-  usePluginsServicePluginControllerRemovePackageGraph: () => ({
-    mutateAsync: hoisted.removeGraphMock,
-    isPending: false,
-  }),
-  usePluginsServiceGetPlugins: () => ({ data: hoisted.plugins }),
-  usePluginsServiceGetPluginSystemStatus: () => ({
-    data: hoisted.pluginSystemStatus,
-    refetch: hoisted.statusRefetchMock,
-  }),
-  usePluginsServicePluginControllerCheckAllInstalledPackages: () => ({
-    mutateAsync: hoisted.checkAllInstalledPackagesMock,
-    isPending: false,
-  }),
-  usePluginsServicePluginControllerAddRegistry: () => ({ mutateAsync: hoisted.addRegistryMock, isPending: false }),
-  usePluginsServicePluginControllerTestRegistry: () => ({ mutateAsync: hoisted.testRegistryMock, isPending: false }),
-  usePluginsServicePluginControllerRemoveRegistry: () => ({
-    mutateAsync: hoisted.removeRegistryMock,
-    isPending: false,
-  }),
-  usePluginsServicePluginControllerInstallPackage: () => ({
-    mutateAsync: hoisted.installPackageMock,
-    isPending: false,
-  }),
-  usePluginsServicePluginControllerReplaceInstalledPackage: () => ({
-    mutateAsync: hoisted.replaceInstalledPackageMock,
-    isPending: false,
-  }),
-  usePluginsServicePluginControllerUpdateInstalledPackagePolicy: () => ({
-    mutateAsync: hoisted.updateInstalledPackagePolicyMock,
-    isPending: false,
-  }),
-  usePluginsServiceRetryPlugin: () => ({ mutateAsync: hoisted.retryMutateAsyncMock, isPending: false }),
-  usePluginsServiceDeletePlugin: (options: DeleteOptions) => {
-    hoisted.deleteOptions = options;
-    return { mutate: hoisted.deleteMutateMock, isPending: false };
-  },
-  usePluginsServiceUploadPlugin: () => ({ mutate: vi.fn(), isPending: false }),
-}));
+vi.mock('@attraccess/react-query-client', async () => {
+  const { useQuery } = await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query');
+  // The generated query hooks read from the fake API, so tests describe the API as HTTP-like responses per path.
+  const fetchJson = async (path: string) => {
+    const response = await hoisted.apiMock(path);
+    if (!response.ok || !response.json) throw new Error(`Request failed: ${path}`);
+    return response.json();
+  };
+  const withRegistry = (registryId?: string, separator = '?') =>
+    registryId ? `${separator}registryId=${encodeURIComponent(registryId)}` : '';
+  return {
+    UsePluginControllerInstalledPackagesKeyFn: () => ['installed'],
+    UsePluginControllerListRegistriesKeyFn: () => ['registries'],
+    usePluginControllerInstalledPackages: (_clientOptions: unknown, _key: unknown, options: object) =>
+      useQuery({ queryKey: ['installed'], queryFn: () => fetchJson('/api/plugins/installed'), ...options }),
+    usePluginControllerListRegistries: (_clientOptions: unknown, _key: unknown, options: object) =>
+      useQuery({ queryKey: ['registries'], queryFn: () => fetchJson('/api/plugins/registries'), ...options }),
+    usePluginControllerSearchMarketplace: (
+      { query: { query, registryId } }: { query: { query: string; registryId?: string } },
+      _key: unknown,
+      options: object,
+    ) =>
+      useQuery({
+        queryKey: ['search', query, registryId],
+        queryFn: () =>
+          fetchJson(
+            `/api/plugins/marketplace/search?query=${encodeURIComponent(query)}${withRegistry(registryId, '&')}`,
+          ),
+        ...options,
+      }),
+    usePluginControllerMarketplacePackage: (
+      {
+        path: { packageName },
+        query: { registryId } = {},
+      }: { path: { packageName: string }; query?: { registryId?: string } },
+      _key: unknown,
+      options: object,
+    ) =>
+      useQuery({
+        queryKey: ['package', packageName, registryId],
+        queryFn: () =>
+          fetchJson(`/api/plugins/marketplace/${encodeURIComponent(packageName)}${withRegistry(registryId)}`),
+        ...options,
+      }),
+    usePluginControllerInstalledPackageVersions: (
+      { path: { packageName } }: { path: { packageName: string } },
+      _key: unknown,
+      options: object,
+    ) =>
+      useQuery({
+        queryKey: ['versions', packageName],
+        queryFn: () => fetchJson(`/api/plugins/installed/${encodeURIComponent(packageName)}/versions`),
+        ...options,
+      }),
+    usePluginControllerDependencyPlan: () => ({
+      data: hoisted.dependencyPlan,
+      error: hoisted.dependencyPlanError,
+      isFetching: false,
+    }),
+    usePluginControllerRemovalPlan: () => ({ data: hoisted.removalPlan, isFetching: false }),
+    usePluginControllerRemovePackageGraph: () => ({
+      mutateAsync: hoisted.removeGraphMock,
+      isPending: false,
+    }),
+    useGetPlugins: () => ({ data: hoisted.plugins }),
+    useGetPluginSystemStatus: () => ({
+      data: hoisted.pluginSystemStatus,
+      refetch: hoisted.statusRefetchMock,
+    }),
+    usePluginControllerCheckAllInstalledPackages: () => ({
+      mutateAsync: hoisted.checkAllInstalledPackagesMock,
+      isPending: false,
+    }),
+    usePluginControllerAddRegistry: () => ({ mutateAsync: hoisted.addRegistryMock, isPending: false }),
+    usePluginControllerTestRegistry: () => ({ mutateAsync: hoisted.testRegistryMock, isPending: false }),
+    usePluginControllerRemoveRegistry: () => ({
+      mutateAsync: hoisted.removeRegistryMock,
+      isPending: false,
+    }),
+    usePluginControllerInstallPackage: () => ({
+      mutateAsync: hoisted.installPackageMock,
+      isPending: false,
+    }),
+    usePluginControllerReplaceInstalledPackage: () => ({
+      mutateAsync: hoisted.replaceInstalledPackageMock,
+      isPending: false,
+    }),
+    usePluginControllerUpdateInstalledPackagePolicy: () => ({
+      mutateAsync: hoisted.updateInstalledPackagePolicyMock,
+      isPending: false,
+    }),
+    useRetryPlugin: () => ({ mutateAsync: hoisted.retryMutateAsyncMock, isPending: false }),
+    useDeletePlugin: (_mutationKey: unknown, options: DeleteOptions) => {
+      hoisted.deleteOptions = options;
+      return { mutate: hoisted.deleteMutateMock, isPending: false };
+    },
+    useUploadPlugin: () => ({ mutate: vi.fn(), isPending: false }),
+  };
+});
 
 vi.mock('../../../readerUi/ReaderUiAlerts', () => ({ ReaderUiAlerts: () => null }));
 vi.mock('../../../../components/toastProvider', () => ({
@@ -83,7 +151,18 @@ vi.mock('../../../../components/toastProvider', () => ({
 }));
 
 export { hoisted };
+
+let queryClient = new QueryClient();
+function QueryWrapper({ children }: PropsWithChildren) {
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+}
+/** Renders with a fresh query client per test; rerender keeps the same wrapper. */
+export function renderWithQuery(ui: ReactElement) {
+  return render(ui, { wrapper: QueryWrapper });
+}
+
 export function resetTestFixture() {
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   hoisted.deleteMutateMock.mockReset();
   hoisted.dependencyPlan = undefined;
   hoisted.dependencyPlanError = null;
@@ -113,39 +192,36 @@ export function resetTestFixture() {
   hoisted.installPackageMock.mockResolvedValue({});
   hoisted.replaceInstalledPackageMock.mockResolvedValue({});
   hoisted.updateInstalledPackagePolicyMock.mockResolvedValue({});
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((input: { url?: string } | string) => {
-      const url = typeof input === 'string' ? input : (input.url ?? '');
-      const plugin = {
-        name: '@attraccess/plugin-example',
-        version: '1.0.0',
-        displayName: 'Example',
-        description: 'Official integration',
-        permissions: [],
-        hostRange: '^1.0.0',
-        sdkCompatibility: { backend: '^1.0.0', frontend: null },
-        repository: null,
-        homepage: null,
-        license: 'MIT',
-        publisher: 'attraccess',
-        deprecated: false,
-        registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
-        classification: 'official' as const,
-        classificationReason: 'Published by Attraccess on npm',
-        installable: true,
-        incompatibilityReason: null,
-        integrity: 'sha512-test',
-        provenance: null,
-      };
-      if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
-      if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
-      return Promise.resolve({
-        ok: true,
-        json: async () => (url.includes('/marketplace/search') ? { results: [plugin], errors: [] } : plugin),
-      });
-    }),
-  );
+  hoisted.apiMock.mockReset();
+  hoisted.apiMock.mockImplementation((url) => {
+    const plugin = {
+      name: '@attraccess/plugin-example',
+      version: '1.0.0',
+      displayName: 'Example',
+      description: 'Official integration',
+      permissions: [],
+      hostRange: '^1.0.0',
+      sdkCompatibility: { backend: '^1.0.0', frontend: null },
+      repository: null,
+      homepage: null,
+      license: 'MIT',
+      publisher: 'attraccess',
+      deprecated: false,
+      registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
+      classification: 'official' as const,
+      classificationReason: 'Published by Attraccess on npm',
+      installable: true,
+      incompatibilityReason: null,
+      integrity: 'sha512-test',
+      provenance: null,
+    };
+    if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+    if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+    return Promise.resolve({
+      ok: true,
+      json: async () => (url.includes('/marketplace/search') ? { results: [plugin], errors: [] } : plugin),
+    });
+  });
 }
 export function deferred<T>() {
   let resolve: (value: T) => void;
@@ -164,8 +240,28 @@ export function makePlugin(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+/** Picks an item from a plugin row's actions menu, where Details, Manage version and Remove plugin live. */
+export async function chooseRowAction(user: UserEvent, pluginId: string, item: string) {
+  const trigger = await waitFor(() => {
+    const element = document.querySelector(`[data-cy="plugins-list-actions-button-${pluginId}"]`);
+    if (!element) throw new Error(`No actions menu for ${pluginId}`);
+    return element;
+  });
+  await user.click(trigger);
+  await user.click(await screen.findByRole('menuitem', { name: item }));
+}
 beforeEach(resetTestFixture);
 afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
 });
+
+/** Opens the marketplace registry select and picks a registry by its visible name. */
+export async function pickRegistry(user: { click: (element: Element) => Promise<void> }, name: string) {
+  const trigger = document.querySelector(
+    '[data-cy="marketplace-registry-select"] button, button[data-cy="marketplace-registry-select"]',
+  );
+  if (!trigger) throw new Error('registry select missing');
+  await user.click(trigger);
+  await user.click(await screen.findByRole('option', { name }));
+}

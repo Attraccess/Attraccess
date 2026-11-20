@@ -4,6 +4,7 @@ import { READER_UI_TIMING } from '@attraccess/plugins-backend-sdk';
 import { logDestinationsSchema, logLevelsSchema } from '../logging/logging.config';
 import { join } from 'path';
 import { DEFAULT_STORAGE_ROOT } from './storage.config';
+import { parseDatabaseTypeValue } from '../database/backend/database-type';
 
 const PLACEHOLDER_VERSIONS = new Set(['', '0.0.0', 'undefined', 'null']);
 export const DEFAULT_PLUGIN_DIR = join(DEFAULT_STORAGE_ROOT, 'plugins');
@@ -29,10 +30,28 @@ export function resolvePluginDir(env: NodeJS.ProcessEnv = process.env): string {
   return env.PLUGIN_DIR ?? join(env.STORAGE_ROOT ?? DEFAULT_STORAGE_ROOT, 'plugins');
 }
 
+/**
+ * DATABASE_TYPE as the backend registry reads it (blanks and case ignored, unset or empty selects sqlite), with the
+ * same message for an unsupported value. The message never echoes a value that is not a plain name.
+ */
+const databaseTypeSchema = z
+  .unknown()
+  .optional()
+  .transform((value, context) => {
+    try {
+      return parseDatabaseTypeValue(value);
+    } catch (error) {
+      context.addIssue({ code: 'custom', message: (error as Error).message });
+      return z.NEVER;
+    }
+  });
+
 export const AppEnvSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     PORT: z.coerce.number().default(3000),
+    /** Database engine. Only `sqlite` is supported; validated before any connection (see database/backend). */
+    DATABASE_TYPE: databaseTypeSchema,
     LOG_LEVELS: logLevelsSchema,
     LOG_DESTINATIONS: logDestinationsSchema,
     LOG_FILE_PATH: z.string().optional(),
@@ -41,6 +60,8 @@ export const AppEnvSchema = z
     ATTRACCESS_FRONTEND_URL: z.string().url().optional(),
     ATTRACCESS_PUBLIC_INTERNET_URL: z.string().url().optional(),
     ATTRACCESS_TRUSTED_ORIGINS: z.string().optional(),
+    /** Optional static MCP OAuth clients (JSON array of { client_id, client_name?, redirect_uris }); most clients register themselves. */
+    MCP_OAUTH_CLIENTS: z.string().optional(),
     VERSION: z.string().default(resolveAppVersion()),
     COMMIT_SHA: z.string().optional(),
     STATIC_FRONTEND_FILE_PATH: z.string().optional(),
@@ -100,8 +121,9 @@ const appConfigFactory = (): AppConfigType => {
       LICENSO_PUBLIC_KEY: 'oPN_IZFgPiWDNcfHfXwVoDZ7DAm8JcezucY3EVy1wTI',
     };
   } catch (e) {
-    const zodErrors = Array.isArray(e?.errors)
-      ? e.errors
+    const issues = e?.issues ?? e?.errors;
+    const zodErrors = Array.isArray(issues)
+      ? issues
           .map((err) => {
             const path = Array.isArray(err?.path) ? err.path.join('.') : '';
             return path ? `${path}: ${err?.message}` : `${err?.message}`;
@@ -111,7 +133,7 @@ const appConfigFactory = (): AppConfigType => {
 
     // eslint-disable-next-line no-console
     console.error('Failed to parse App Environment Variables:', zodErrors);
-    throw new Error(zodErrors);
+    throw new Error(zodErrors, { cause: e });
   }
 };
 

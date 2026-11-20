@@ -6,7 +6,7 @@ describe('Energy metering migration', () => {
   let runner: QueryRunner;
 
   beforeEach(async () => {
-    source = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    source = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
     runner = source.createQueryRunner();
     await runner.query('CREATE TABLE resource (id integer PRIMARY KEY)');
     await runner.query('CREATE TABLE resource_usage (id integer PRIMARY KEY)');

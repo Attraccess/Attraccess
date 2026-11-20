@@ -31,9 +31,10 @@ permissions:
   pull-requests: write
 
 # A push to a PR cancels that PR's previous run. A superseded run can never
-# count toward a merge, yet it holds its three macOS runners, which a few
+# count toward a merge, yet it holds its macOS runners, which a few
 # busy PRs are enough to exhaust. Merge-queue runs each get their own group
 # (github.ref is the queue entry's branch) and are never cancelled.
+# Abandoned merge-queue runs are cancelled by merge-queue-cleanup.yml.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -82,7 +83,6 @@ jobs:
         crap-score,
         build-companion,
         build-attractap-firmware,
-        build-attractap-desktop,
         plugins,
         attractap-firmware-version,
         wago-runtime-version,
@@ -149,7 +149,7 @@ jobs:
       # pnpm and Node are only used when the gate has to build the runtime at the merge-base and at HEAD; it installs
       # each checkout itself, so no workspace install happens here. No `cache: pnpm`: without an install on the fast
       # path the store never exists, and setup-node then fails its post step ("Path Validation Error").
-      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
@@ -168,8 +168,27 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
-      - name: Enforce file size limits
+      # Always repo-wide: an import cycle can close through a project the change does not touch.
+      - name: Enforce file size limits and reject import cycles
         run: pnpm lint:files
+      # apps/cesentry may only hold the pointer to the private submodule (CONTRIBUTING.md, "Private submodule").
+      - name: Check the private submodule pointer
+        run: node scripts/check-private-submodule.mjs
+      # Public clones have no access to it: `update = none` must make them skip it, with this runner's git.
+      - name: Clone with submodules, without access to the private submodule
+        run: |
+          # The default `bash -e` would ignore the clone's exit status behind `tee`.
+          set -o pipefail
+          git --version
+          clone="$RUNNER_TEMP/public-clone"
+          GIT_TERMINAL_PROMPT=0 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+            git -c protocol.file.allow=always clone --quiet --depth 1 --recurse-submodules "file://$PWD" "$clone" 2>&1 \
+            | tee "$RUNNER_TEMP/public-clone.log"
+          grep -q "Skipping submodule 'apps/cesentry'" "$RUNNER_TEMP/public-clone.log" ||
+            { echo "::error::git did not skip apps/cesentry; .gitmodules must keep update = none"; exit 1; }
+          test -d "$clone/apps/cesentry" && test -z "$(ls -A "$clone/apps/cesentry")" ||
+            { echo "::error::apps/cesentry must exist and stay empty in a clone without access"; exit 1; }
+          rm -rf "$clone"
       # Every project, not just the affected ones: a change can break a project it
       # does not touch (e.g. plugins-frontend-sdk re-exports plugins-frontend-ui
       # through an edge `implicitDependencies` hides from the project graph).
@@ -185,6 +204,12 @@ jobs:
           exclude="$(node scripts/ci-nx-exclude.mjs lint)"
           echo "Excluding: $exclude"
           pnpm nx affected --target=lint --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude="$exclude"
+      # Blocking, all severities, prod and dev: only GHSAs listed (with a reason) under auditConfig.ignoreGhsas in
+      # pnpm-workspace.yaml may stay open. Last, and also after a failed step: a newly published advisory must not
+      # hide the change's own lint and typecheck results, nor they the advisory.
+      - name: Audit dependencies
+        if: ${{ !cancelled() }}
+        run: pnpm audit
 
   build-all:
     # A fresh job on purpose: typecheck and build in one job would share a warm
@@ -219,6 +244,8 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
+      # Runs every test target, api:test-conformance included: the backend-parameterised persistence contract
+      # (ATT-1146) on real SQLite files with independent connections. api:test leaves those specs to it.
       - name: Test all core projects
         run: node scripts/ci-test-projects.mjs --group=core
 
@@ -257,7 +284,7 @@ jobs:
         run: pnpm crap-score:affected --base=${{ env.NX_AFFECTED_BASE }}
       - name: Upload CRAP reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: crap-score-reports
           path: coverage/crap/
@@ -267,7 +294,7 @@ jobs:
   plugins:
     # RabbitMQ plugin E2E tests use Testcontainers and require Docker, which is
     # available on the stable Ubuntu runner image.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -334,7 +361,7 @@ jobs:
         run: ./scripts/grafana-provisioning-prepare.spec.sh
       - name: Test managed Grafana provisioning sync
         run: ./scripts/grafana-managed-sync.spec.sh
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
       - name: Test legacy Pushover contact point cleanup
@@ -358,9 +385,6 @@ jobs:
   build-attractap-firmware:
     uses: ./.github/workflows/attractap-firmware.yml
     secrets: inherit
-
-  build-attractap-desktop:
-    uses: ./.github/workflows/build-attractap-desktop.yml
 
   containerize:
     # Build the preview image while core/plugin/simulator checks run. The

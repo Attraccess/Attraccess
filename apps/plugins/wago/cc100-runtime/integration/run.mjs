@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { build } from 'esbuild';
+import { usesLegacySdkPersistence } from '../../scripts/legacy-sdk-persistence.mjs';
 
 // Broker dependencies and every simulator identity live outside the checkout.
 const temporary = await mkdtemp(join(tmpdir(), 'wago-simulator-integration-'));
@@ -20,6 +21,10 @@ function backendSource(sourceRoot, currentPath, legacyPath) {
   const current = join(sourceRoot, 'apps/plugins/wago/backend', currentPath);
   return existsSync(current) ? current : join(sourceRoot, 'apps/plugins/wago/backend', legacyPath);
 }
+// Plugin SDK 2.0 has no TypeORM entities or repositories: the service talks to the record port (`context.storage`) that
+// the harness fakes in memory. A base revision that still persists through the old surface cannot load against the SDK
+// or the harness of the revision under test, so the "main" service falls back to the current service until the base
+// revision uses the record port too. The simulator itself does not use the SDK.
 async function snapshot(ref, label, directories) {
   const commit = execFileSync('git', ['rev-parse', '--verify', `${ref}^{commit}`], {
     cwd: root,
@@ -52,6 +57,12 @@ try {
   ];
   const flowRoot = argument('flow-ref') ? await snapshot(argument('flow-ref'), 'flow', [backend, ...contracts]) : root;
   const mainRoot = await snapshot(argument('main-ref') ?? 'origin/main', 'main', [runtime, backend, ...contracts]);
+  const mainServiceRoot = (await usesLegacySdkPersistence(join(mainRoot, backend))) ? root : mainRoot;
+  if (mainServiceRoot === root) {
+    process.stdout.write(
+      'The main revision predates the plugin record port (context.storage): using the current service as "main".\n',
+    );
+  }
   const runtimeRoot = argument('runtime-ref')
     ? await snapshot(argument('runtime-ref'), 'runtime', [runtime, backend, ...contracts])
     : root;
@@ -124,7 +135,7 @@ try {
       WAGO_INTEGRATION_TEMP: temporary,
       WAGO_INTEGRATION_FLOW_SOURCE: backendSource(flowRoot, 'flow/service.ts', 'wago-flow.service.ts'),
       WAGO_INTEGRATION_PROTOCOL_SOURCE: backendSource(flowRoot, 'protocol/index.ts', 'protocol.ts'),
-      WAGO_INTEGRATION_MAIN_SOURCE: backendSource(mainRoot, 'controllers/service.ts', 'wago.service.ts'),
+      WAGO_INTEGRATION_MAIN_SOURCE: backendSource(mainServiceRoot, 'controllers/service.ts', 'wago.service.ts'),
       WAGO_INTEGRATION_LIFECYCLE_ONLY: process.argv.includes('--lifecycle-only') ? '1' : '0',
     },
   );

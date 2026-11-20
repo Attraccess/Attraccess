@@ -1,5 +1,6 @@
 #include "application.hpp"
 #include "../platform.hpp"
+#include "lite_door_tap.hpp"
 
 void Application::processState() {
   // OTA owns the UI even across disconnects and late card-flow callbacks.
@@ -204,6 +205,15 @@ bool Application::processConnectionState()
       return true;
     }
 
+#ifdef HAS_LVGL_DISPLAY
+        // The network status shows the drop to whoever watches it; the init screen follows
+        // once it is closed.
+        if (Display::isActive(&Display::networkStatusScreen))
+        {
+            return true;
+        }
+#endif
+
         if (this->state == APPLICATION_STATE_INIT)
         {
             return true;
@@ -356,10 +366,12 @@ bool Application::processAuthenticationState()
         millis() - this->cardDetectionTimeMs;
     if (currentPresentationDurationMs > NFC_CARD_LONG_PRESENTATION_TIME_MS &&
         !this->cardPresentationWasLong) {
-      this->beeper.indicateBeep();
+      if (liteLongTapCue(this->resourceIsDoor && this->resourceIsAccessOnlyDoor)) {
+        this->beeper.indicateBeep();
 #ifdef HAS_WS2812_LED
-      this->led.triggerIndicate();
+        this->led.triggerIndicate();
 #endif
+      }
       this->cardPresentationWasLong = true;
     }
   }
@@ -377,7 +389,6 @@ bool Application::processAuthenticationState()
     this->showSignInFailed(FirmwareI18n::Message::PleaseTapTheNfcCardAgain);
   }
 #endif
-
 
   // A late or duplicate card-auth response (double-tap on the lockscreen sends
   // two requests; the websocket task sets the trigger asynchronously) must not
@@ -542,7 +553,7 @@ void Application::renderResourceState()
     this->cardRemoved = false;
 
     if (this->resourceIsDoor) {
-      if (this->cardPresentationWasLong) {
+      if (liteDoorAction(this->resourceIsAccessOnlyDoor, this->cardPresentationWasLong) == LiteDoorAction::Lock) {
         this->api.lockDoor(this->selectedResourceId);
       } else {
         this->api.unlockDoor(this->selectedResourceId);

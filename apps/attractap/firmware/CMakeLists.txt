@@ -17,6 +17,11 @@ set(ATTRACTAP_LOG_LEVEL "INFO" CACHE STRING "Runtime log level (ERROR/WARN/INFO/
 # them: build_firmwares.py forces this OFF. See README "Test hooks".
 option(ATTRACTAP_TEST_HOOKS "Compile the ui.* serial test hooks (display variants only)" OFF)
 
+# Lab/test-only `debug.crash` serial topic that panics on purpose (crash report and
+# coredump upload tests, ATT-1144). Never ship it: build_firmwares.py forces this OFF
+# and tools/check_release_build.py fails a release image that contains it.
+option(ATTRACTAP_CRASH_TRIGGER "Compile the debug.crash serial crash trigger (lab builds only)" OFF)
+
 # Beeper state of a reader that has no saved beeper setting yet (fresh or
 # erased). Lab builds set it OFF; the setting itself still works.
 # Reader UI self-test (ATT-1187): fills every plugin slot, opens a step and the keyboard, runs the hostile
@@ -25,6 +30,11 @@ option(ATTRACTAP_TEST_HOOKS "Compile the ui.* serial test hooks (display variant
 option(ATTRACTAP_UI_SELFTEST "Compile the reader UI self-test scenario (lab builds only)" OFF)
 
 option(ATTRACTAP_BEEPER_DEFAULT "Enable the beeper on readers without a saved beeper setting" ON)
+
+# Device-lab TLS CA (PEM path) that a lab image also trusts for wss://, so HIL runs can measure the
+# reader over a validated TLS connection (HIL_WSS in apps/attractap-lab). Never ship it:
+# build_firmwares.py clears it and tools/check_release_build.py fails an image that contains it.
+set(ATTRACTAP_LAB_CA "" CACHE STRING "Device-lab CA certificate (PEM) a lab image trusts (needs ATTRACTAP_TEST_HOOKS)")
 
 set(ATTRACTAP_VARIANT_FILE "${CMAKE_CURRENT_LIST_DIR}/variants/${ATTRACTAP_VARIANT}.cmake")
 if(NOT EXISTS "${ATTRACTAP_VARIANT_FILE}")
@@ -42,6 +52,18 @@ option(ATTRACTAP_SECURE_LAB "Build the lab-only secure test reader profile (need
 if(ATTRACTAP_SECURE_LAB AND NOT ATTRACTAP_SECURE_PROFILE)
     message(FATAL_ERROR "ATTRACTAP_SECURE_LAB=ON needs ATTRACTAP_SECURE_PROFILE=ON")
 endif()
+if(ATTRACTAP_CRASH_TRIGGER AND ATTRACTAP_SECURE_PROFILE)
+    message(FATAL_ERROR "ATTRACTAP_CRASH_TRIGGER=ON is not available with the secure profile (coredumps are off there)")
+endif()
+if(NOT "${ATTRACTAP_LAB_CA}" STREQUAL "")
+    if(NOT ATTRACTAP_TEST_HOOKS OR (ATTRACTAP_SECURE_PROFILE AND NOT ATTRACTAP_SECURE_LAB))
+        message(FATAL_ERROR "ATTRACTAP_LAB_CA is for lab images only: it needs ATTRACTAP_TEST_HOOKS=ON and no release secure profile")
+    endif()
+    get_filename_component(ATTRACTAP_LAB_CA "${ATTRACTAP_LAB_CA}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_LIST_DIR}")
+    if(NOT EXISTS "${ATTRACTAP_LAB_CA}")
+        message(FATAL_ERROR "ATTRACTAP_LAB_CA: ${ATTRACTAP_LAB_CA} does not exist")
+    endif()
+endif()
 if(ATTRACTAP_SECURE_PROFILE)
     if(ATTRACTAP_FIRMWARE_VARIANT STREQUAL "demo")
         message(FATAL_ERROR "The secure profile is not available for demo variant '${ATTRACTAP_VARIANT}'")
@@ -54,9 +76,12 @@ if(ATTRACTAP_SECURE_PROFILE)
         set(SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults")
     endif()
     list(APPEND SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.secure")
+    # The eFuse report (ATT-1207) is compiled only into secure builds.
+    list(APPEND ATTRACTAP_DEFINES ATTRACTAP_SECURE_BUILD=1)
     if(ATTRACTAP_SECURE_LAB)
         # Lab readers keep the console and serial config handler for provisioning.
         list(APPEND SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.secure-lab")
+        list(APPEND ATTRACTAP_DEFINES ATTRACTAP_SECURE_LAB=1)
     else()
         # Compiles out the USB serial config handler and console driver.
         list(APPEND ATTRACTAP_DEFINES ATTRACTAP_SECURE_PROFILE=1)
@@ -66,6 +91,14 @@ if(ATTRACTAP_SECURE_PROFILE)
             set(ATTRACTAP_EXCLUDE_REGEX "src/serial/")
         endif()
     endif()
+endif()
+
+# A release build reports `release: true` in READER_FIRMWARE_INFO (ATT-1207): not a lab-only variant
+# (ATTRACTAP_RELEASE OFF), no secure lab overlay, no test hooks or crash trigger. The server still
+# treats it as a claim.
+if((NOT DEFINED ATTRACTAP_RELEASE OR ATTRACTAP_RELEASE) AND NOT ATTRACTAP_SECURE_LAB AND NOT ATTRACTAP_TEST_HOOKS
+   AND NOT ATTRACTAP_CRASH_TRIGGER AND NOT ATTRACTAP_UI_SELFTEST)
+    list(APPEND ATTRACTAP_DEFINES ATTRACTAP_RELEASE=1)
 endif()
 
 # Single source of truth for the firmware version (also read by
@@ -93,7 +126,7 @@ project(attractap)
 if(ATTRACTAP_SECURE_PROFILE AND NOT (CONFIG_SECURE_BOOT AND CONFIG_SECURE_FLASH_ENC_ENABLED))
     message(FATAL_ERROR "ATTRACTAP_SECURE_PROFILE=ON but ${SDKCONFIG} lacks Secure Boot / flash encryption. "
                         "It predates the secure profile; build in a clean directory with its own -DSDKCONFIG.")
-elseif(ATTRACTAP_SECURE_PROFILE AND NOT (CONFIG_ESP_COREDUMP_ENABLE_TO_NONE AND CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC))
+elseif(ATTRACTAP_SECURE_PROFILE AND NOT (CONFIG_ESP_COREDUMP_ENABLE_TO_NONE AND CONFIG_MBEDTLS_CUSTOM_MEM_ALLOC))
     # ESP-IDF enables the fuse options of a stale standard sdkconfig but keeps its explicit
     # coredump/MbedTLS choices, so the profile is only half applied. Check the options
     # that differ between the standard and the secure profile (tools/check_secure_profile.py

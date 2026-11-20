@@ -1,11 +1,11 @@
-import { AuditLog, Project, Resource, ResourceGroup, User } from '@attraccess/database-entities';
-import { DataSource } from 'typeorm';
+import type { AuditEntry, AuditSubjectNameKind } from '@attraccess/application-models';
+import type { AuditEntryReader } from '../audit-persistence.port';
 import { AuditEntryDto } from '../dto/audit-response.dto';
 
 const name = (value: unknown): string | undefined =>
   typeof value === 'string' && value.trim().length > 0 ? value : undefined;
 
-function recordedSubjectLabel(entry: AuditLog): string | undefined {
+function recordedSubjectLabel(entry: AuditEntry): string | undefined {
   const details = entry.details;
   if (name(details.subjectLabel)) return name(details.subjectLabel);
   if (entry.domain === 'administration' && entry.subjectType === 'mqtt-server') return name(details.serverName);
@@ -35,23 +35,15 @@ function recordedSubjectLabel(entry: AuditLog): string | undefined {
 }
 
 async function currentNames(
-  source: DataSource,
-  entity: typeof User | typeof Resource | typeof ResourceGroup | typeof Project,
+  reader: AuditEntryReader,
+  kind: AuditSubjectNameKind,
   ids: Array<number | null>,
-  field: 'username' | 'name',
 ): Promise<Map<number, string>> {
   const uniqueIds = [...new Set(ids.filter((id): id is number => Number.isSafeInteger(id) && Number(id) > 0))];
-  if (!uniqueIds.length || !source.hasMetadata(entity)) return new Map();
+  if (!uniqueIds.length) return new Map();
   try {
-    // At most one bounded query per entity kind, selecting no credentials, relations, or configuration.
-    const rows = await source
-      .createQueryBuilder()
-      .select('subject.id', 'id')
-      .addSelect(`subject.${field}`, 'label')
-      .from(entity, 'subject')
-      .where('subject.id IN (:...ids)', { ids: uniqueIds })
-      .getRawMany<{ id: number; label: string }>();
-    return new Map(rows.filter((row) => name(row.label)).map((row) => [row.id, row.label]));
+    const names = await reader.findCurrentNames(kind, uniqueIds);
+    return new Map([...names].filter(([, label]) => name(label)));
   } catch {
     // Readable history must remain available when optional current-name lookup fails.
     return new Map();
@@ -59,25 +51,23 @@ async function currentNames(
 }
 
 /** Adds explicitly labelled read-time names without mutating immutable historical rows. */
-export async function auditEntriesWithLabels(source: DataSource, entries: AuditLog[]): Promise<AuditEntryDto[]> {
+export async function auditEntriesWithLabels(
+  reader: AuditEntryReader,
+  entries: AuditEntry[],
+): Promise<AuditEntryDto[]> {
   const subjects = (domain: string, type: string) =>
     entries
       .filter((entry) => entry.domain === domain && entry.subjectType === type && !recordedSubjectLabel(entry))
       .map((entry) => entry.subjectId);
   const [users, resources, groups, projects] = await Promise.all([
-    currentNames(
-      source,
-      User,
-      [
-        ...entries.filter((entry) => !name(entry.details.actorUsername)).map((entry) => entry.actorId),
-        ...subjects('identity', 'identity.user'),
-        ...subjects('sso', 'user'),
-      ],
-      'username',
-    ),
-    currentNames(source, Resource, subjects('resource', 'resource'), 'name'),
-    currentNames(source, ResourceGroup, subjects('resource', 'resource_group'), 'name'),
-    currentNames(source, Project, subjects('project', 'project'), 'name'),
+    currentNames(reader, 'user', [
+      ...entries.filter((entry) => !name(entry.details.actorUsername)).map((entry) => entry.actorId),
+      ...subjects('identity', 'identity.user'),
+      ...subjects('sso', 'user'),
+    ]),
+    currentNames(reader, 'resource', subjects('resource', 'resource')),
+    currentNames(reader, 'resource-group', subjects('resource', 'resource_group')),
+    currentNames(reader, 'project', subjects('project', 'project')),
   ]);
   return entries.map((entry) => {
     const recordedActor = name(entry.details.actorUsername);

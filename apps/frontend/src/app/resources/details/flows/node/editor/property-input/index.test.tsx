@@ -5,11 +5,11 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { PropertyInput, type Property } from './index';
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useBillingServiceGetBillingConfiguration: () => ({ data: { minorUnit: 2 } }),
+  useGetBillingConfiguration: () => ({ data: { minorUnit: 2 } }),
 }));
 vi.mock('../../../../../../../components/mqttServerSelect', () => ({ MqttServerSelect: () => null }));
 vi.mock('../../../../../../../components/companionDeviceSelect', () => ({ CompanionDeviceSelect: () => null }));
-vi.mock('../../../../../../mqtt/servers/CreateMqttServerPage', () => ({ CreateMqttServerForm: () => null }));
+vi.mock('../../../../../../mqtt/servers/CreateMqttServerForm', () => ({ CreateMqttServerForm: () => null }));
 afterEach(cleanup);
 
 function Editor({ schema, initial }: { schema: Property<unknown>; initial: unknown }) {

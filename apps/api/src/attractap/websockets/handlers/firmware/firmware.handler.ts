@@ -6,9 +6,9 @@ import { AttractapFirmwareService } from '../../../firmware.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { AttractapFirmware } from '../../../dtos/firmware.dto';
 import { validateReaderUiCapabilities } from '../../../../resources/forms/reader-ui.validation';
-import { promptPairing } from '../../../reader-pairing';
-import { PairingService } from '../../../security/pairing.service';
+import { parseReportedBuild } from '../../../security/session-security-state';
 import { AttractapUiHandler } from '../ui/ui.handler';
+import { parseBleCapability } from '../ble/ble-wire';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
 
 @Injectable()
@@ -24,9 +24,6 @@ export class AttractapFirmwareHandler {
   @Inject(MetricsService)
   private metricsService: MetricsService;
 
-  @Inject(PairingService)
-  private pairingService: PairingService;
-
   @Inject(AttractapUiHandler)
   private uiHandler: AttractapUiHandler;
 
@@ -41,6 +38,14 @@ export class AttractapFirmwareHandler {
       const total = socket.state.ota.size;
       if (typeof offset !== 'number' || typeof length !== 'number' || offset < 0 || length <= 0 || offset >= total) {
         this.logger.error(`Invalid chunk request from client ${socket.id}: offset=${offset} length=${length}`);
+        return;
+      }
+
+      // A chunk answer carries no offset: the reader writes whatever arrives next. On one connection it never
+      // needs the same bytes twice (after a lost answer it reconnects), so a repeated request is a duplicate,
+      // and answering it too would corrupt the image.
+      if (offset < (socket.state.ota.servedUntil ?? 0)) {
+        this.logger.warn(`Ignoring repeated chunk request from client ${socket.id}: offset=${offset}`);
         return;
       }
 
@@ -69,6 +74,7 @@ export class AttractapFirmwareHandler {
 
       if (bytesRead > 0) {
         socket.sendBinaryData(buffer.subarray(0, bytesRead));
+        socket.state.ota.servedUntil = offset + bytesRead;
         const progressPct = Math.round(((offset + bytesRead) / total) * 100);
         const pctBucket = Math.floor(progressPct / 10) * 10;
         const lastLogged = socket.state.ota.lastLoggedPct ?? -1;
@@ -86,19 +92,20 @@ export class AttractapFirmwareHandler {
     // Only readers that relay card APDUs (firmware 2.0.0+) get card functions. Set before the
     // database write so a card tapped right after connecting is not refused.
     socket.state.cardRelay = data.payload?.capabilities?.cardRelay === true;
+    // Plugin BLE (protocol v1): older or incompatible firmware makes plugins see READER_UNSUPPORTED.
+    socket.state.ble = parseBleCapability(data.payload?.capabilities?.ble);
+    // The eFuse report on the control channel waits for the build: hand it over before the database writes,
+    // so a slow write cannot run it into its wait limit.
+    const build = parseReportedBuild(data.payload);
+    socket.sessionSecurity?.setBuild(build);
+    await this.attractapService.recordReaderBuild(socket.readerId, build);
     await this.attractapService.updateReaderFirmware(socket.readerId, this.withValidatedUi(data.payload));
     // Initial full slot sync and crash-loop protection, in the background: it must not stop or delay the OTA check.
-    // A reader that is not paired shows nothing from the server.
-    if (!socket.state.pairingRequired)
-      void this.uiHandler.onFirmwareInfo(socket, data.payload).catch((error) => {
-        this.logger.warn(`Reader UI sync after firmware info failed: ${(error as Error).message}`);
-      });
+    void this.uiHandler.onFirmwareInfo(socket, data.payload).catch((error) => {
+      this.logger.warn(`Reader UI sync after firmware info failed: ${(error as Error).message}`);
+    });
 
-    // Firmware gate first: a reader that needs the update gets it. Then the pairing gate: a reader that
-    // is not paired starts pairing, also when no update could be offered.
-    if (!(await this.isFirmwareLatest(data.payload)) && (await this.offerFirmwareUpdate(socket, data.payload))) return;
-    socket.state.updateCheckDone = true;
-    if (socket.state.pairingRequired) await promptPairing(socket, this.pairingService);
+    if (!(await this.isFirmwareLatest(data.payload))) await this.offerFirmwareUpdate(socket, data.payload);
   }
 
   /** Sends READER_FIRMWARE_UPDATE_REQUIRED; false when no update can be offered. */

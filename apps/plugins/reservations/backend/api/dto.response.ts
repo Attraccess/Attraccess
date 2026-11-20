@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { RESERVATION_STATUSES, ReservationStatus } from '../entities/reservation.entity';
+import { RESERVATION_STATUSES, ReservationStatus } from '../storage/reservation-table';
 import { BOOKING_CONFLICT_CODES, STATE_CONFLICT_CODES } from '../reservations/errors';
 import { INTEGER_RANGES, WHO_CAN_BOOK, WhoCanBook } from '../settings/settings.model';
 
@@ -317,6 +317,13 @@ export class AvailabilityDto {
 
   @ApiProperty({ type: () => PublicBookingRulesDto })
   rules!: PublicBookingRulesDto;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Effective session limit N of the resource: how many bookings may overlap (each takes one slot). 1 for doors, machines without parallel sessions and while reservations are disabled',
+  })
+  slots!: number;
 
   @ApiProperty({
     type: () => [ReservationDto],

@@ -5,8 +5,8 @@ import {
   CompanionDevice,
   Conversation,
   ConversationParticipant,
+  DashboardPin,
   EmailTemplate,
-  EmailTemplateType,
   Message,
   NFCCard,
   NFCCardPendingChange,
@@ -15,14 +15,13 @@ import {
   PasskeyChallenge,
   PasswordHistory,
   PasswordPolicyOverride,
-  PasswordPolicyRole,
   Permission,
   PushSubscription,
   Role,
   User,
   UserRole,
-  UserRoleSource,
 } from '@attraccess/database-entities';
+import { EmailTemplateType, PasswordPolicyRole, UserRoleSource } from '@attraccess/application-models';
 import { ensureEntity } from '../seed-storage.test-fixture';
 export async function migrationIdentityNotificationSeeds(dataSource: DataSource, seedTag: string, primaryUser: User) {
   const nfcCardRepo = dataSource.getRepository(NFCCard);
@@ -128,6 +127,13 @@ export async function migrationIdentityNotificationSeeds(dataSource: DataSource,
     userId: primaryUser.id,
     messagesEmailOnOffline: true,
     messagesPushEnabled: true,
+  }));
+
+  await ensureEntity(dataSource.getRepository(DashboardPin), () => ({
+    userId: primaryUser.id,
+    itemType: 'page' as const,
+    itemId: '/resources',
+    position: 0,
   }));
 
   await ensureEntity(pushSubscriptionRepo, () => ({

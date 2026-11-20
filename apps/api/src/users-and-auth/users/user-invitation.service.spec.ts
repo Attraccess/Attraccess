@@ -1,10 +1,28 @@
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ForbiddenException, Logger } from '@nestjs/common';
+import { LicenseError } from '../../license/license.service';
 import { UserInvitationService } from './user-invitation.service';
 import { UsersService } from './users.service';
 import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
 import { CsvInviteConfigDto } from './dtos/csvInvite.dto';
 import { FileUpload } from '../../common/types/file-upload.types';
+
+/** A unit of work that commits when the work resolves, then runs the registered post-commit callbacks. */
+const committingTransaction = (events: string[] = []) => {
+  const scope = { isOpen: true, afterCommit: jest.fn() };
+  const run = jest.fn(async (work: (scope: typeof scope) => Promise<unknown>) => {
+    const callbacks: Array<() => Promise<void>> = [];
+    scope.afterCommit.mockImplementation((callback: () => Promise<void>) => callbacks.push(callback));
+    events.push('begin');
+    const result = await work(scope);
+    events.push('commit');
+    for (const callback of callbacks) await callback();
+    return result;
+  });
+  return { scope, run };
+};
 
 describe('UserInvitationService – parseCsvFile', () => {
   let service: UserInvitationService;
@@ -77,36 +95,43 @@ describe('CSV invitations', () => {
   const config = { emailKey: 'email', usernameKey: 'username', roleKeyColumn: 'role' };
   const file = (csv: string) => ({ buffer: Buffer.from(csv) }) as FileUpload;
   const setup = () => {
-    const manager = {};
+    const events: string[] = [];
+    const { scope: manager, run: withTransaction } = committingTransaction(events);
     const users = {
       cleanupUsername: jest.fn((value: string) => value.toLowerCase()),
       validateUsernameOrThrow: jest.fn(),
       findByEmailsOrUsernames: jest.fn().mockResolvedValue([]),
       ensureLicenseForNewUsers: jest.fn(),
-      withTransaction: jest.fn(async (run) => run(manager)),
+      withTransaction,
       createMany: jest.fn().mockResolvedValue([{ id: 7, username: 'alex', email: 'alex@example.com' }]),
     };
     const auth = { generateEmailVerificationToken: jest.fn().mockResolvedValue('verification-token') };
     const email = { sendUserInvitationEmail: jest.fn() };
     const service = new UserInvitationService(users as never, auth as never, email as never);
-    return { service, users, auth, email, manager };
+    email.sendUserInvitationEmail.mockImplementation(async () => {
+      events.push('send');
+    });
+    return { service, users, auth, email, manager, events };
   };
-  it('parses the config and sends invitations in the user creation transaction', async () => {
-    const { service, users, auth, email, manager } = setup();
+  it('parses the config and sends invitations after the user creation transaction', async () => {
+    const actor = { id: 9 } as AuthenticatedUser;
+    const { service, users, auth, email, manager, events } = setup();
     const result = await service.inviteUsersFromCsv(
       file('email,username,role\nalex@example.com,Alex,operator\n'),
       JSON.stringify(config),
       'de',
-      9,
+      actor,
     );
     expect(result).toEqual([{ id: 7, username: 'alex', email: 'alex@example.com' }]);
     expect(users.ensureLicenseForNewUsers).toHaveBeenCalledWith(1);
     expect(users.createMany).toHaveBeenCalledWith(
       [{ email: 'alex@example.com', username: 'alex', row: 1, roleKey: 'operator', locale: 'de' }],
-      { grantAllPermissionsToFirst: true, manager, actorId: 9 },
+      { grantAllPermissionsToFirst: true, context: manager, actor },
     );
     expect(auth.generateEmailVerificationToken).toHaveBeenCalledWith(result[0], manager);
-    expect(email.sendUserInvitationEmail).toHaveBeenCalledWith(result[0], 'verification-token', manager);
+    expect(email.sendUserInvitationEmail).toHaveBeenCalledWith(result[0], 'verification-token');
+    // the mail goes out only after the commit
+    expect(events).toEqual(['begin', 'commit', 'send']);
   });
   it('flags CSV rows whose emails differ only by case', async () => {
     const { service, users } = setup();
@@ -123,6 +148,29 @@ describe('CSV invitations', () => {
       },
     });
     expect(users.createMany).not.toHaveBeenCalled();
+  });
+  it('maps a LicenseError to a ForbiddenException with the reason', async () => {
+    const { service, users } = setup();
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    users.ensureLicenseForNewUsers.mockRejectedValue(
+      new LicenseError('Trying to use more than the allowed amount of users'),
+    );
+    const promise = service.inviteUsersFromCsv(file('email,username,role\nalex@example.com,Alex,\n'), config);
+    await expect(promise).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(promise).rejects.toMatchObject({ message: 'Trying to use more than the allowed amount of users' });
+    expect(users.createMany).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(
+      'Blocking user invitation due to license: Trying to use more than the allowed amount of users',
+    );
+    warn.mockRestore();
+  });
+  it('re-throws non-license errors from the license check unchanged', async () => {
+    const { service, users } = setup();
+    const failure = new Error('database down');
+    users.ensureLicenseForNewUsers.mockRejectedValue(failure);
+    await expect(
+      service.inviteUsersFromCsv(file('email,username,role\nalex@example.com,Alex,\n'), config),
+    ).rejects.toBe(failure);
   });
   it('reports database email and username collisions at their source row', async () => {
     const { service, users } = setup();
@@ -192,8 +240,9 @@ describe('single invitations', () => {
       cleanupUsername: jest.fn((value: string) => value.trim().toLowerCase()),
       findByEmailsOrUsernames: jest.fn().mockResolvedValue([]),
       ensureLicenseForNewUsers: jest.fn(),
-      withTransaction: jest.fn(async (run) => run({})),
+      withTransaction: committingTransaction().run,
       createMany: jest.fn().mockResolvedValue([{ id: 7, username: 'alex', email: 'alex@example.com' }]),
+      deleteUnacceptedInvitations: jest.fn().mockResolvedValue(undefined),
     };
     const auth = { generateEmailVerificationToken: jest.fn().mockResolvedValue('verification-token') };
     const email = { sendUserInvitationEmail: jest.fn() };
@@ -240,5 +289,79 @@ describe('single invitations', () => {
     });
     expect(users.createMany).toHaveBeenCalledTimes(1);
     expect(email.sendUserInvitationEmail).toHaveBeenCalledTimes(1);
+    expect(users.deleteUnacceptedInvitations).not.toHaveBeenCalled();
+  });
+
+  it('takes the invitation back when its email cannot be sent', async () => {
+    const { service, users, email } = setup();
+    email.sendUserInvitationEmail.mockRejectedValue(Object.assign(new Error('connect'), { code: 'ECONNREFUSED' }));
+    await expect(service.inviteUser({ username: 'alex', email: 'alex@example.com' })).rejects.toThrow(
+      'EmailSendFailed',
+    );
+    expect(users.deleteUnacceptedInvitations).toHaveBeenCalledWith([7]);
+  });
+
+  it('still reports the email failure when taking the invitation back fails', async () => {
+    const { service, users, email } = setup();
+    email.sendUserInvitationEmail.mockRejectedValue(new Error('SMTP configuration not set'));
+    users.deleteUnacceptedInvitations.mockRejectedValue(new Error('database gone'));
+    await expect(service.inviteUser({ username: 'alex', email: 'alex@example.com' })).rejects.toThrow(
+      'SMTP is not configured',
+    );
+  });
+});
+
+describe('invitations that cannot be sent', () => {
+  const invitedUsers = [
+    { id: 7, username: 'alex', email: 'alex@example.com' },
+    { id: 8, username: 'sam', email: 'sam@example.com' },
+  ];
+  const setup = () => {
+    const events: string[] = [];
+    const { run: withTransaction } = committingTransaction(events);
+    const users = {
+      cleanupUsername: jest.fn((value: string) => value.trim().toLowerCase()),
+      validateUsernameOrThrow: jest.fn(),
+      findByEmailsOrUsernames: jest.fn().mockResolvedValue([]),
+      ensureLicenseForNewUsers: jest.fn(),
+      withTransaction,
+      createMany: jest.fn().mockResolvedValue(invitedUsers),
+      deleteUnacceptedInvitations: jest.fn(async () => {
+        events.push('take-back');
+      }),
+    };
+    const auth = { generateEmailVerificationToken: jest.fn().mockResolvedValue('verification-token') };
+    const email = { sendUserInvitationEmail: jest.fn() };
+    const service = new UserInvitationService(users as never, auth as never, email as never);
+    return { service, users, email, events };
+  };
+  const csv = 'email,username\nalex@example.com,alex\nsam@example.com,sam\n';
+  const config = { emailKey: 'email', usernameKey: 'username' };
+
+  it('takes every invitation of the batch back when a later mail fails, after the commit', async () => {
+    const { service, users, email, events } = setup();
+    email.sendUserInvitationEmail
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(Object.assign(new Error('connect'), { code: 'ECONNREFUSED' }));
+
+    await expect(service.inviteUsersFromCsv({ buffer: Buffer.from(csv) } as FileUpload, config)).rejects.toThrow(
+      'EmailSendFailed',
+    );
+
+    expect(email.sendUserInvitationEmail).toHaveBeenCalledTimes(2);
+    expect(users.deleteUnacceptedInvitations).toHaveBeenCalledWith([7, 8]);
+    expect(events).toEqual(['begin', 'commit', 'take-back']);
+  });
+
+  it('sends nothing and takes nothing back when creating the users fails', async () => {
+    const { service, users, email } = setup();
+    users.createMany.mockRejectedValue(new Error('database unavailable'));
+
+    await expect(service.inviteUsersFromCsv({ buffer: Buffer.from(csv) } as FileUpload, config)).rejects.toThrow(
+      'database unavailable',
+    );
+
+    expect(email.sendUserInvitationEmail).not.toHaveBeenCalled();
+    expect(users.deleteUnacceptedInvitations).not.toHaveBeenCalled();
   });
 });

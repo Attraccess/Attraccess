@@ -1,7 +1,6 @@
 import { Injectable, Logger, OnModuleInit, Inject } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
-import { ReaderUiAlert, ReaderUiAlertKind } from '@attraccess/database-entities';
+import type { ReaderUiAlertKind, ReaderUiAlertRecord } from '@attraccess/application-models';
+import { READER_UI_ALERT_STORE, type ReaderUiAlertScope, type ReaderUiAlertStore } from './reader-ui-alerts.port';
 import { AUDIT_RECORDER, AuditRecorder, SYSTEM_AUDIT_ACTOR } from '../../audit/recorder/audit-event';
 import { auditActorFields, type AuditActor } from './audit-actor';
 import { MetricsService } from '../../metrics/metrics.service';
@@ -16,10 +15,10 @@ export class ReaderUiAlertsService implements OnModuleInit {
   /** Hot-path lookup for crash-loop suspension; mirrors the open crash-loop rows. */
   private readonly suspendedReaders = new Map<number, number>();
   private readonly suspendTimers = new Map<number, NodeJS.Timeout>();
-  private readonly listeners = new Set<(alert: ReaderUiAlert) => void>();
+  private readonly listeners = new Set<(alert: ReaderUiAlertRecord) => void>();
 
   constructor(
-    @InjectRepository(ReaderUiAlert) private readonly repository: Repository<ReaderUiAlert>,
+    @Inject(READER_UI_ALERT_STORE) private readonly store: ReaderUiAlertStore,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly metrics: MetricsService,
   ) {}
@@ -42,48 +41,38 @@ export class ReaderUiAlertsService implements OnModuleInit {
     }
   }
 
-  onCleared(listener: (alert: ReaderUiAlert) => void): void {
+  onCleared(listener: (alert: ReaderUiAlertRecord) => void): void {
     this.listeners.add(listener);
   }
 
-  listOpen(): Promise<ReaderUiAlert[]> {
-    return this.repository.find({ where: { clearedAt: IsNull() }, order: { createdAt: 'DESC' } });
+  listOpen(): Promise<ReaderUiAlertRecord[]> {
+    return this.store.listOpen();
   }
 
-  async raise(
-    kind: ReaderUiAlertKind,
-    message: string,
-    scope: { plugin?: string; readerId?: number },
-  ): Promise<ReaderUiAlert> {
-    const existing = await this.repository.findOne({
-      where: { kind, plugin: scope.plugin ?? IsNull(), readerId: scope.readerId ?? IsNull(), clearedAt: IsNull() },
-    });
+  async raise(kind: ReaderUiAlertKind, message: string, scope: ReaderUiAlertScope): Promise<ReaderUiAlertRecord> {
+    const [existing] = await this.store.listOpenInScope(kind, scope);
     if (existing) return existing;
-    const alert = await this.repository.save(
-      this.repository.create({
-        kind,
-        message: message.slice(0, 300),
-        plugin: scope.plugin ?? null,
-        readerId: scope.readerId ?? null,
-      }),
-    );
+    const alert = await this.store.open({
+      kind,
+      message: message.slice(0, 300),
+      plugin: scope.plugin ?? null,
+      readerId: scope.readerId ?? null,
+    });
     if (kind === 'crash-loop' && scope.readerId) this.suspend(scope.readerId);
     await this.record(alert, 'created', undefined);
     await this.refreshGauge();
     return alert;
   }
 
-  findOpen(id: number): Promise<ReaderUiAlert | null> {
-    return this.repository.findOne({ where: { id, clearedAt: IsNull() } });
+  findOpen(id: number): Promise<ReaderUiAlertRecord | null> {
+    return this.store.findOpen(id);
   }
 
   /** `actor` is the admin who cleared it; none when the host clears it itself (e.g. a breaker closed). */
-  async clear(id: number, actor: AuditActor | undefined): Promise<ReaderUiAlert | null> {
-    const alert = await this.findOpen(id);
-    if (!alert) return null;
-    alert.clearedAt = new Date();
-    alert.clearedByUserId = actor?.id ?? null;
-    await this.repository.save(alert);
+  async clear(id: number, actor: AuditActor | undefined): Promise<ReaderUiAlertRecord | null> {
+    const open = await this.findOpen(id);
+    if (!open) return null;
+    const alert = await this.store.clear(id, actor?.id ?? null);
     if (alert.kind === 'crash-loop' && alert.readerId) this.unsuspend(alert.readerId);
     await this.record(alert, 'cleared', actor);
     await this.refreshGauge();
@@ -92,10 +81,8 @@ export class ReaderUiAlertsService implements OnModuleInit {
   }
 
   /** Clears every open alert matching a scope, e.g. when a breaker closes by itself. */
-  async clearWhere(kind: ReaderUiAlertKind, scope: { plugin?: string; readerId?: number }): Promise<void> {
-    const open = await this.repository.find({
-      where: { kind, plugin: scope.plugin ?? IsNull(), readerId: scope.readerId ?? IsNull(), clearedAt: IsNull() },
-    });
+  async clearWhere(kind: ReaderUiAlertKind, scope: ReaderUiAlertScope): Promise<void> {
+    const open = await this.store.listOpenInScope(kind, scope);
     for (const alert of open) await this.clear(alert.id, undefined);
   }
 
@@ -140,7 +127,7 @@ export class ReaderUiAlertsService implements OnModuleInit {
     }
   }
 
-  private async record(alert: ReaderUiAlert, state: 'created' | 'cleared', actor: AuditActor | undefined) {
+  private async record(alert: ReaderUiAlertRecord, state: 'created' | 'cleared', actor: AuditActor | undefined) {
     await this.audit.record({
       domain: 'attractap',
       action: 'attractap.ui.alert_changed',

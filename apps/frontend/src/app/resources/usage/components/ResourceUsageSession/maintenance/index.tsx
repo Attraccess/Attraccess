@@ -1,7 +1,4 @@
-import {
-  useResourceMaintenancesServiceCanManageMaintenance,
-  useResourceMaintenancesServiceFindMaintenances,
-} from '@attraccess/react-query-client';
+import { useCanManageMaintenance, useFindMaintenances } from '@attraccess/react-query-client';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { MaintenanceReasonDisplay } from '../../../../../../components/MaintenanceReasonDisplay';
 import { ResourceIntroducersList } from '../../../../../../components/ResourceIntroducersList';
@@ -22,22 +19,15 @@ export function MaintenanceInProgressDisplay(props: Props) {
 
   const { t } = useTranslations({ en, de });
 
-  const { data: activeMaintenances } = useResourceMaintenancesServiceFindMaintenances(
-    {
-      resourceId,
-      includeActive: true,
-      includeUpcoming: false,
-      includePast: false,
-    },
+  const { data: activeMaintenances } = useFindMaintenances(
+    { path: { resourceId }, query: { includeActive: true, includeUpcoming: false, includePast: false } },
     undefined,
     {
       refetchInterval: 5000,
     },
   );
 
-  const { data: permissions } = useResourceMaintenancesServiceCanManageMaintenance({
-    resourceId,
-  });
+  const { data: permissions } = useCanManageMaintenance({ path: { resourceId } });
 
   const formatDateTime = useDateTimeFormatter({ showDate: true, showTime: true });
 

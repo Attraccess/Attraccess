@@ -13,11 +13,7 @@ import {
 } from '@heroui/react';
 import { WrenchIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import {
-  useResourceMaintenancesServiceCanManageMaintenance,
-  useResourceMaintenancesServiceCreateMaintenance,
-  useResourceMaintenancesServiceFindMaintenancesKey,
-} from '@attraccess/react-query-client';
+import { useCanManageMaintenance, useCreateMaintenance, useFindMaintenancesKey } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import de from './de.json';
 import en from './en.json';
@@ -34,24 +30,20 @@ export function InstantMaintenanceButton(props: Props) {
   const queryClient = useQueryClient();
   const [reason, setReason] = useState('');
 
-  const { data: permissions } = useResourceMaintenancesServiceCanManageMaintenance({ resourceId });
+  const { data: permissions } = useCanManageMaintenance({ path: { resourceId } });
 
   const onSuccess = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: [useResourceMaintenancesServiceFindMaintenancesKey] });
+    queryClient.invalidateQueries({ queryKey: [useFindMaintenancesKey] });
     setReason('');
     close();
   }, [queryClient, close]);
 
-  const {
-    mutate: createMaintenance,
-    isPending,
-    error,
-  } = useResourceMaintenancesServiceCreateMaintenance({ onSuccess });
+  const { mutate: createMaintenance, isPending, error } = useCreateMaintenance(undefined, { onSuccess });
 
   const onSubmit = useCallback(() => {
     createMaintenance({
-      resourceId,
-      requestBody: {
+      path: { resourceId },
+      body: {
         startTime: new Date().toISOString(),
         reason: reason.trim() || undefined,
       },

@@ -4,9 +4,9 @@ import { UserPlusIcon } from 'lucide-react';
 import { Button, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  useUsersServiceCreateOneUser,
-  UseUsersServiceFindManyKeyFn,
-  UseSettingsServiceGetFirstTimeSetupStatusKeyFn,
+  useCreateOneUser,
+  UseFindManyKeyFn,
+  UseGetFirstTimeSetupStatusKeyFn,
   ApiError,
   AuthenticationType,
 } from '@attraccess/react-query-client';
@@ -72,10 +72,10 @@ export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps
     [isUsernameValid, trimmedEmail, password, passwordConfirmation, passwordsDontMatch],
   );
 
-  const { mutate: createUser, isPending } = useUsersServiceCreateOneUser({
+  const { mutate: createUser, isPending } = useCreateOneUser(undefined, {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: UseUsersServiceFindManyKeyFn() });
-      queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetFirstTimeSetupStatusKeyFn() });
+      queryClient.invalidateQueries({ queryKey: UseFindManyKeyFn() });
+      queryClient.invalidateQueries({ queryKey: UseGetFirstTimeSetupStatusKeyFn() });
       setServerErrors([]);
       onSuccess?.();
     },
@@ -99,7 +99,7 @@ export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps
     if (!formRef.current?.checkValidity() || !canSubmit) return;
     setServerErrors([]);
     createUser({
-      requestBody: {
+      body: {
         username: trimmedUsername,
         email: trimmedEmail,
         password,

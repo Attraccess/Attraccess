@@ -74,6 +74,9 @@ describe('plugin usage events', () => {
       throw new Error('bus down');
     });
     expect(() => emitPluginSessionEnded(pluginEvents, logger, oldSession, null, 'ended')).not.toThrow();
-    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('RESOURCE_USAGE_SESSION_ENDED'), expect.any(String));
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('RESOURCE_USAGE_SESSION_ENDED'),
+      expect.any(String),
+    );
   });
 });

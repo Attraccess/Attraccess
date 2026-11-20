@@ -1,3 +1,4 @@
+import { ProjectInvitationStatus, ProjectMemberRole } from '@attraccess/application-models';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -11,14 +12,6 @@ import {
 } from 'typeorm';
 import { Project } from './project';
 import { User } from './user.entity';
-import { ProjectMemberRole } from './project-member.entity';
-
-export enum ProjectInvitationStatus {
-  PENDING = 'pending',
-  ACCEPTED = 'accepted',
-  DECLINED = 'declined',
-  CANCELED = 'canceled',
-}
 
 @Entity('project_invitations')
 @Index('IDX_project_invitation_unique_by_user_and_status', ['invitedUserId', 'status'])

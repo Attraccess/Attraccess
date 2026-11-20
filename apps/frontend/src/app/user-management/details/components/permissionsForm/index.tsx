@@ -1,14 +1,15 @@
-import { Separator, Chip } from '@heroui/react';
+import { Separator } from '@heroui/react';
+import { SsoAssignmentBadges } from './SsoAssignmentBadges';
 import { Button, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  SSOProvider,
+  SsoProvider,
   UserRole,
   ApiError,
-  useRbacServiceListRoles,
-  useUsersServiceGetUserRoleAssignments,
-  useUsersServiceAssignRoleToUser,
-  useUsersServiceRevokeRoleFromUser,
-  useUsersServiceGetUserRoleAssignmentsKey,
+  useListRoles,
+  useGetUserRoleAssignments,
+  useAssignRoleToUser,
+  useRevokeRoleFromUser,
+  useGetUserRoleAssignmentsKey,
   User,
 } from '@attraccess/react-query-client';
 import { useEffect, useState } from 'react';
@@ -20,45 +21,18 @@ import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 
-export function SsoAssignmentBadges({
-  assignments,
-  providersById,
-  t,
-}: {
-  assignments: UserRole[];
-  providersById?: Map<number, SSOProvider>;
-  t: ReturnType<typeof useTranslations>['t'];
-}) {
-  if (assignments.length === 0) return null;
-  return (
-    <div className="flex flex-wrap gap-1 mt-1 ml-1">
-      {assignments.map((ur) => {
-        const providerName = ur.ssoProviderId
-          ? (providersById?.get(ur.ssoProviderId)?.name ?? `#${ur.ssoProviderId}`)
-          : (ur.ssoProviderType ?? 'SSO');
-        const label = ur.externalValue ? `${providerName} · ${ur.externalValue}` : providerName;
-        return (
-          <Chip key={`${ur.ssoProviderId}-${ur.externalValue}`} size="sm" color="warning" variant="soft">
-            {t('ssoAssignment.assignedBy')}: {label}
-          </Chip>
-        );
-      })}
-    </div>
-  );
-}
-
-export // 'user' is auto-assigned to all users; 'administrator' is the initial system administrator — neither should be toggled manually
-const NON_MANAGEABLE_ROLE_KEYS = ['user', 'administrator'];
+// 'user' is auto-assigned to all users; 'administrator' is the initial system administrator — neither should be toggled manually
+export const NON_MANAGEABLE_ROLE_KEYS = ['user', 'administrator'];
 
 export interface UserPermissionFormProps {
   user: User;
   ssoManagedProviders?: string[];
   ssoManagedPermissionKeys?: Set<string>;
-  providersById?: Map<number, SSOProvider>;
+  providersById?: Map<number, SsoProvider>;
   roleIdToAssign?: number;
 }
 
-export function useUserPermissionFormState({
+export function UserPermissionForm({
   user,
   ssoManagedProviders,
   ssoManagedPermissionKeys,
@@ -80,11 +54,11 @@ export function useUserPermissionFormState({
   };
   const ssoProvidersLabel = isSsoManaged ? (ssoManagedProviders ?? []).join(', ') : t('ssoManaged.providerFallback');
 
-  const { data: allRoles, isLoading: isLoadingRoles } = useRbacServiceListRoles();
-  const { data: userRoles, isLoading: isLoadingUserRoles } = useUsersServiceGetUserRoleAssignments({ id: user.id });
+  const { data: allRoles, isLoading: isLoadingRoles } = useListRoles();
+  const { data: userRoles, isLoading: isLoadingUserRoles } = useGetUserRoleAssignments({ path: { id: user.id } });
 
-  const { mutateAsync: assignRole, isPending: isAssigning } = useUsersServiceAssignRoleToUser();
-  const { mutateAsync: revokeRole, isPending: isRevoking } = useUsersServiceRevokeRoleFromUser();
+  const { mutateAsync: assignRole, isPending: isAssigning } = useAssignRoleToUser();
+  const { mutateAsync: revokeRole, isPending: isRevoking } = useRevokeRoleFromUser();
   const isSaving = isAssigning || isRevoking;
 
   const manageableRoles = (allRoles ?? []).filter((r) => !NON_MANAGEABLE_ROLE_KEYS.includes(r.key));
@@ -150,12 +124,12 @@ export function useUserPermissionFormState({
     });
 
     const results = await Promise.allSettled([
-      ...toAssign.map((roleId) => assignRole({ id: user.id, requestBody: { roleId } })),
-      ...toRevoke.map((roleId) => revokeRole({ id: user.id, roleId })),
+      ...toAssign.map((roleId) => assignRole({ path: { id: user.id }, body: { roleId } })),
+      ...toRevoke.map((roleId) => revokeRole({ path: { id: user.id, roleId } })),
     ]);
 
     // Always refetch so the UI reflects the true server state, even on partial failure.
-    await queryClient.invalidateQueries({ queryKey: [useUsersServiceGetUserRoleAssignmentsKey] });
+    await queryClient.invalidateQueries({ queryKey: [useGetUserRoleAssignmentsKey] });
 
     const failures = results.filter((r) => r.status === 'rejected');
     if (failures.length > 0) {
@@ -170,57 +144,6 @@ export function useUserPermissionFormState({
       toast.success({ title: t('messages.updated') });
     }
   };
-  return {
-    t,
-    roleName,
-    isSsoManaged,
-    isRoleSsoManaged,
-    ssoProvidersLabel,
-    isLoadingRoles,
-    isLoadingUserRoles,
-    isSaving,
-    manageableRoles,
-    selectedRoleIds,
-    ssoAssignmentsByRoleId,
-    ssoOnlyRoles,
-    allManageableSsoManaged,
-    handleRoleToggle,
-    handleSave,
-    providersById,
-  };
-}
-
-// 'user' is auto-assigned to all users; 'administrator' is the initial system administrator — neither should be toggled manually
-export function UserPermissionForm({
-  user,
-  ssoManagedProviders,
-  ssoManagedPermissionKeys,
-  providersById,
-  roleIdToAssign,
-}: UserPermissionFormProps) {
-  const {
-    t,
-    roleName,
-    isSsoManaged,
-    isRoleSsoManaged,
-    ssoProvidersLabel,
-    isLoadingRoles,
-    isLoadingUserRoles,
-    isSaving,
-    manageableRoles,
-    selectedRoleIds,
-    ssoAssignmentsByRoleId,
-    ssoOnlyRoles,
-    allManageableSsoManaged,
-    handleRoleToggle,
-    handleSave,
-  } = useUserPermissionFormState({
-    user,
-    ssoManagedProviders,
-    ssoManagedPermissionKeys,
-    providersById,
-    roleIdToAssign,
-  });
 
   if (isLoadingRoles || isLoadingUserRoles) {
     return (
@@ -256,7 +179,7 @@ export function UserPermissionForm({
               >
                 {roleName(role)}
               </LabeledSwitch>
-              <SsoAssignmentBadges assignments={ssoAssignments} providersById={providersById} t={t} />
+              <SsoAssignmentBadges assignments={ssoAssignments} providersById={providersById} />
             </div>
           );
         })}
@@ -274,7 +197,7 @@ export function UserPermissionForm({
               return (
                 <div key={role?.id ?? assignments[0]?.roleId} className="flex flex-col gap-1">
                   <span className="text-sm text-default-700 font-medium">{label}</span>
-                  <SsoAssignmentBadges assignments={assignments} providersById={providersById} t={t} />
+                  <SsoAssignmentBadges assignments={assignments} providersById={providersById} />
                 </div>
               );
             })}

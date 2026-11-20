@@ -1,7 +1,6 @@
 import { LoginRateLimitGuard, resolveIp } from './login.rate-limit.guard';
 import { Request, Response } from 'express';
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { User } from '@attraccess/database-entities';
 import { BruteForceProtectionService } from './brute-force.service';
 import { SettingsService } from '../../settings/settings.service';
 import { UsersService } from '../users/users.service';
@@ -10,9 +9,9 @@ import { AccountLockedException } from './exceptions';
 
 describe('concurrent account login attempts', () => {
   it('admits only the remaining guess across email/username and different IPs', async () => {
-    const user = { id: 7, lockedUntil: null } as User;
+    const user = { id: 7, lockedUntil: null };
     const bruteForce = new BruteForceProtectionService(
-      { update: jest.fn().mockResolvedValue(undefined) } as never,
+      { recordFailureStreak: jest.fn(), lockAccount: jest.fn(), clearLockout: jest.fn() },
       {
         getRateLimitPolicy: async () => ({
           maxAttempts: 3,
@@ -61,6 +60,41 @@ describe('concurrent account login attempts', () => {
       for (const response of responses.slice(1)) {
         expect(response.setHeader).toHaveBeenCalledWith('Retry-After', expect.any(String));
       }
+    } finally {
+      authenticate.mockRestore();
+    }
+  });
+});
+
+describe('login with a busy database', () => {
+  it('neither counts the attempt toward a lockout nor audits it as invalid credentials', async () => {
+    const recordFailure = jest.fn();
+    const bruteForce = {
+      assertIpAllowed: jest.fn().mockResolvedValue(undefined),
+      assertAccountAllowed: jest.fn().mockResolvedValue(undefined),
+      runAccountAttempt: (_userId: number | null, attempt: () => Promise<boolean>) => attempt(),
+      recordFailure,
+    } as unknown as BruteForceProtectionService;
+    const log = jest.fn().mockResolvedValue(undefined);
+    const guard = new LoginRateLimitGuard(
+      bruteForce,
+      { findByLoginIdentifier: jest.fn().mockResolvedValue({ id: 7, lockedUntil: null }) } as unknown as UsersService,
+      { log } as unknown as AuthAuditLogger,
+    );
+    const busy = Object.assign(new Error('SQLITE_BUSY: waited 5000 ms'), { code: 'SQLITE_BUSY' });
+    const authenticate = jest
+      .spyOn(Object.getPrototypeOf(LoginRateLimitGuard.prototype), 'canActivate')
+      .mockRejectedValue(busy);
+    const context = {
+      switchToHttp: () => ({
+        getRequest: () => ({ ip: '203.0.113.1', body: { username: 'alice' } }) as Request,
+        getResponse: () => ({ setHeader: jest.fn() }) as unknown as Response,
+      }),
+    } as ExecutionContext;
+    try {
+      await expect(guard.canActivate(context)).rejects.toBe(busy);
+      expect(recordFailure).not.toHaveBeenCalled();
+      expect(log).toHaveBeenCalledWith(expect.objectContaining({ type: 'login', outcome: 'dependency_failure' }));
     } finally {
       authenticate.mockRestore();
     }

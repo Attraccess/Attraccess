@@ -155,35 +155,182 @@ and reports success only after the card proved the new key or its factory state.
 `CARD_APDU_RESPONSE` without an INFO serial line (DEBUG only); every other event is logged as
 `Sending reader event: <TYPE>`.
 
-## Pairing and session protocol (1.8.0)
+## Access-only doors (2.6.0)
 
-Firmware 1.8.0 no longer registers itself with a token (ATT-1165, ATT-1168, ATT-1170,
-ATT-1171). A new reader joins through one approval by an admin of a rotating code, then talks to
-the server only inside mutually authenticated TLS 1.3. Both run inside the WebSocket at
-`/api/attractap/websocket`; the server selects them by WebSocket subprotocol, so a reverse proxy
-must pass `Sec-WebSocket-Protocol`.
+The resource list marks a door `accessOnly: true` when its only action is Open (a door the reader
+can open but never lock or unlatch). A Touch reader shows one full-width Open button for it instead
+of Lock, Unlock and Release latch, and a Lite reader opens it on any tap, short or long. Open is sent
+as the existing unlock request; the server records it as the door being opened. A resource list
+without the field (an older server) means a regular door.
 
-| Protocol / firmware            | Subprotocol            | Behaviour                                                                                                                                                                                                                                                                    |
+## BLE proxy protocol (2.5.0)
+
+Firmware 2.5.0 lets server plugins with the `BLE_TRANSPORT` permission talk to Bluetooth Low Energy
+devices through the reader (ATT-1033, ATT-1036). The reader is a bounded proxy, not a raw GATT
+gateway: the server opens a session for one device and sends the profile with it as an allowlist,
+and the reader refuses everything outside it before it touches the radio. The reader announces
+`capabilities.ble` (protocol `version: 1`, the supported operations and its limits) in its firmware
+info; the server answers readers without it, or with another version, with `READER_UNSUPPORTED`.
+Demo variants, park images and the desktop simulator announce no `ble`. BLE works only on paired
+readers: the reader accepts BLE requests only on the secure link (see "Pairing and session
+protocol" below) after it signed in, and refuses them on the pairing channel and before
+sign-in. A reader without a certificate cannot connect except to pair, so the server never
+sends BLE requests to a reader that is not on the secure link.
+
+| Direction       | Event               | Payload (besides `v: 1` and `sessionId`)                                                                                   |
+| --------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Server → reader | `BLE_SCAN`          | `requestId`, `durationMs` (≤ 15 s), `filter` (`serviceUuids`, `manufacturerIds`, `namePrefix`), `maxResults` (≤ 32)        |
+| Server → reader | `BLE_SESSION_OPEN`  | `requestId`, `address`, `addressType`, `connectTimeoutMs`, `leaseMs`, `allowlist` (≤ 16 entries `{s, c, ops, r, w, n}`)    |
+| Server → reader | `BLE_READ`          | `requestId`, `s`, `c`, `timeoutMs`                                                                                         |
+| Server → reader | `BLE_WRITE`         | `requestId`, `s`, `c`, `value` (base64, ≤ 512 bytes), `withoutResponse`, `timeoutMs`                                       |
+| Server → reader | `BLE_SUBSCRIBE`     | `requestId`, `s`, `c`, `indicate`, `timeoutMs` (the reader writes the CCCD)                                                |
+| Server → reader | `BLE_UNSUBSCRIBE`   | `requestId`, `s`, `c`, `timeoutMs`                                                                                         |
+| Server → reader | `BLE_CANCEL`        | `requestId` of the request to abandon (no answer of its own)                                                               |
+| Server → reader | `BLE_SESSION_CLOSE` | `requestId`                                                                                                                |
+| Reader → server | `BLE_RESULT`        | `requestId`, `ok`, then `value` (read) or `mtu` (open), or `error` `{code, detail}`                                        |
+| Reader → server | `BLE_SCAN_RESULT`   | `requestId`, `ok`, `advertisements` (deduplicated by address) or `error`                                                   |
+| Reader → server | `BLE_NOTIFICATION`  | `subscriptionId` (the subscribe's `requestId`), `seq` (1, 2, … without gaps), `value` or a stream-ending `error`           |
+| Reader → server | `BLE_SESSION_ENDED` | `reason` (`disconnected`, `lease-expired`, `timeout`, `ota`, …), `detail`                                                  |
+| Server → reader | `BLE_WATCH_SET`     | no `sessionId`: `requestId`, `filters` (≤ 8 `{id, serviceUuids, manufacturerIds, namePrefix}`), `keepaliveMs` (1 s to 1 h) |
+| Reader → server | `BLE_WATCH_STATE`   | no `sessionId`: `requestId` (none when unsolicited), `ok`, then `active` and `detail`, or `error`                          |
+| Reader → server | `BLE_WATCH_EVENT`   | no `sessionId`: `events` (≤ 8), each `filters` (matching ids), the `BLE_SCAN_RESULT` advertisement fields and `changed`    |
+
+None of these is acknowledged. Every request gets exactly one answer (`BLE_WATCH_SET` gets a
+`BLE_WATCH_STATE`); error codes are the plugin codes of the SDK (`READER_BUSY`,
+`OPERATION_NOT_ALLOWED`, `GATT_ERROR`, …) and `detail` carries the raw radio reason as text (`nimble:rc=<n>`, `hci:0x<xx>`, `att:0x<xx>`, `reason:0x<xx>`),
+never payload bytes. Requests with another `v` are refused.
+
+**Architecture.** `src/ble_proxy/`: the websocket task only parses a request and queues it (bounded
+queue) for the `ble_proxy` task, which runs the state machine (`ble_core*.cpp`); NimBLE's host task
+reports radio events back through a second queue. The state machine, allowlist, codec, deadlines,
+notification buffer, advertisement watch (`ble_watch.cpp`) and error mapping are free of NimBLE and FreeRTOS and covered by host tests
+(`tests/ble-proxy`); `ble_radio_nimble*.cpp` is the only NimBLE code.
+
+**Rules.** One owner at a time: a scan or one session (`CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1`); a
+second open or scan gets `READER_BUSY`. Operations run one at a time in order, at most 16 queued
+per session (announced as `maxPendingRequests`; more get `READER_BUSY` `queue-full`). The reader
+keeps its own deadlines: the lease plus 10 s (counted from when the connection was established),
+each operation's `timeoutMs` plus 2 s, and the connect timeout. An operation past its deadline is
+answered `TIMEOUT` and the session stays open. A GATT procedure NimBLE cannot abort is answered
+`CANCELLED` or `TIMEOUT` at once; its late result is discarded and the next operation waits until
+NimBLE finished. The reader ends the session itself only when the lease expires or NimBLE has not
+finished a GATT procedure after about 35 s. Writes without response
+retry on full controller buffers until their deadline. The reader requests MTU 517 and reports the
+negotiated MTU; writes with response above `mtu - 3` use long writes. Notifications are buffered per
+session (128 entries, 32 KiB) and forwarded with `seq`; overflow (`NOTIFICATION_OVERFLOW`,
+`reader-buffer`) or an oversized notification (`PAYLOAD_TOO_LARGE`, `max-notification`) ends that
+stream with an `error` instead of dropping data. A read result above its bound is answered
+`PAYLOAD_TOO_LARGE` (`max-read`). Scans deduplicate by address; a scan filter takes at most 8
+service UUIDs, 8 manufacturer ids and a name prefix of 64 bytes (larger filters get
+`INVALID_ARGUMENT`); advertised names are at most 31 bytes, so longer prefixes never match. Losing the websocket, switching to pairing or
+the secure link, re-authenticating, and starting an OTA end the session and disconnect the device at
+once; BLE requests during an OTA get `READER_BUSY` (`ota`).
+
+**Link (2.5.1).** For bulk transfers (ATT-1296) the reader connects with a 15 ms connection
+interval (NimBLE's default is 30–50 ms; latency 0, supervision timeout 2.56 s; a 15–30 ms range
+ended at 30 ms, because the controller picks its top), then asks for the largest LE data length
+(251 bytes) (`src/ble_proxy/ble_link.hpp`). These are requests: a peripheral that refuses them, or
+later asks for other connection parameters (accepted as they are), keeps a working session with
+whatever it ends up with. Every change logs the negotiated values at info
+(`ble link <what> interval=… latency=… timeout=… data=tx…/rx… phy=tx…/rx…`), a refused request at
+warn. The reader does not ask for the 2M PHY: on the lab reader the request changed nothing and
+throughput stayed the same, because the round trip is the websocket's, not the radio's. Each
+session end also logs `retries` (writes without response NimBLE refused for lack of buffers) and
+`queued` (answers that waited for room in the websocket send queue). A write waiting for
+controller buffers is retried every 2 ms (NimBLE reports no buffers freeing); the proxy task wakes
+as soon as the websocket frees a send slot while it waits for one
+(`IReaderTransport::setSendSlotFreedCallback`). Otherwise it polls every 20 ms only for deadlines,
+and without BLE work it still sleeps until a request arrives.
+
+**Advertisement watch.** Since 2.6.0 the reader also announces `capabilities.ble.watch`
+(`version: 1`, `maxFilters: 8`, `maxDevices: 32`, `maxEventsPerSecond: 20`) and can watch
+advertisements continuously for the server. `BLE_WATCH_SET` replaces the reader's whole filter set
+(the server sends the union of all watches on the reader); `filters: []` stops the watch. A filter
+matches like the scan filter, under the `id` the server chose. While at least one filter is set, the
+reader scans passively (no scan requests, so names only from the advertising data) and keeps a table
+of at most 32 matching devices (the device seen longest ago makes room). Per device it compares the
+manufacturer data, name and service UUIDs, never the RSSI: a device that first matches or whose data
+changed is reported at once with `changed: true`, and one that is still seen and unchanged is reported
+again every `keepaliveMs` with `changed: false`. Events go out at most every 50 ms, at most 8 per
+message and at most 20 per second per reader; changes go before keepalives. Like notifications,
+events only use room the websocket send queue has to spare: while it is full, keepalives are dropped
+and changes wait. The watch is no owner: it runs beside a session (scanning 30 ms of every 200 ms
+while a device is connected, 30 ms of every 100 ms otherwise, which leaves air time for the
+connection and Wi-Fi), pauses while a connection is being established (NimBLE cannot scan and connect
+at once) and while an on-demand `BLE_SCAN` runs (whose reports it still uses), and resumes
+afterwards. `BLE_WATCH_STATE` answers whether it scans right now (`active`, with the reason in
+`detail` when not, e.g. `connecting`); the reader also sends one without `requestId` when the watch
+stops or runs again for its own reasons (`ota`, a radio failure, which it retries every 2 s). An OTA
+pauses the watch; losing the websocket ends it, and the server sends its filter set again on the
+next connection. A first non-empty filter set brings NimBLE up like any other BLE request; an empty
+one never does.
+
+**Memory.** NimBLE (central and observer roles only, no security) starts lazily on the first BLE
+request, so readers that never use BLE keep their RAM and radio as before. It is released again
+after 30 s without BLE work (`STACK_IDLE_SHUTDOWN_MS` in `ble_types.hpp`): no scan or session, no
+request or answer waiting, no undelivered notification, and nothing the controller still runs (a
+scan, a connect, or a link it has not let go yet). The release stops the host (`nimble_port_stop`),
+ends NimBLE's host task and deinitialises host and controller (`nimble_port_deinit`), which gives the
+controller's ~24 KB of internal RAM back; the next request brings a fresh stack up first, so it
+takes the init time on top. A lock plugin's exchange when a usage session starts holds the RAM for
+the exchange plus 30 s, and the one when it ends brings the stack up again. The reader never calls
+`esp_bt_controller_mem_release`: it is one-way and would keep the controller from starting again.
+The stack starts only with at least 40 KB of DMA-capable internal RAM free
+(`STACK_MIN_FREE_INTERNAL` in `ble_radio_nimble.cpp`); with less the request fails with
+`READER_OFFLINE` (`ble init failed detail=low-memory` in the log) and the next one tries again.
+Espressif's controller does not check every allocation: started with 20 KB free it asserted and the
+reader restarted.
+Host memory and the proxy task stack live in PSRAM; the controller runs from flash
+(`CONFIG_BT_CTRL_RUN_IN_FLASH_ONLY`). The proxy logs the internal heap and its largest free block at
+boot, after every BLE init (`Heap after BLE init`) and after every release (`Heap after BLE
+shutdown`). Init failure is reported as `READER_OFFLINE` (`ble-init-failed`), never stops the
+reader, and the next request tries again.
+
+**Logs.** Each scan, operation and session end logs the session id, operation, outcome, NimBLE code
+and duration, never payload bytes. The watch logs its filter count, starts, stops and radio failures,
+never advertisement data. Successful operations log at debug level, cancels and expected session ends at info, failures,
+allowlist rejections and notification failures at warn, and an init failure at error.
+
+**Trust boundary.** The allowlist protects devices against bugs in the server, not against a
+compromised server, which can send any allowlist. The reader stores no device credentials. The
+BLE link itself has no Bluetooth-level security: NimBLE is built without it
+(`CONFIG_BT_NIMBLE_SECURITY_ENABLE` off), so the reader never pairs or bonds and the radio traffic
+is not encrypted. Plugins must encrypt and authenticate sensitive payloads in their own protocol.
+Only the reader-server hop is protected, by the secure link.
+
+## Pairing and session protocol (2.6.0: the only way in)
+
+A reader joins through one approval by an admin of a rotating code, then talks to the server only
+inside mutually authenticated TLS 1.3 with its own P-256 key (ATT-1165, ATT-1168, ATT-1170,
+ATT-1171). Both run inside the WebSocket at `/api/attractap/websocket`; the server selects them by
+WebSocket subprotocol, so a reverse proxy must pass `Sec-WebSocket-Protocol`.
+
+**Firmware 2.6.0 has no token sign-in at all** (ATT-1207). There is no token to enter, store or
+send, no serial command or screen field for one, and no plain-text channel. A reader without a
+certificate starts pairing; a paired reader only uses the session. The server no longer knows
+readers that signed in with a token or that paired with an older server: after the upgrade every
+reader pairs again, from the pairing screen, like a new reader.
+
+| Protocol                       | Subprotocol            | Behaviour                                                                                                                                                                                                                                                                    |
 | ------------------------------ | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Token (up to 1.7.x)            | none                   | Plain-text events, token sign-in. Existing token readers keep working and are updated over the air. New readers cannot enroll.                                                                                                                                               |
-| `attractap-pairing.v1` (1.8.0) | `attractap-pairing.v1` | Plain-text JSON frames of at most 4 KiB: `hello`, `round`, `nonce`, `reveal`, `accepted`, `failed`, `cancel`. Used only while pairing.                                                                                                                                       |
-| `attractap-session.v1` (1.8.0) | `attractap-session.v1` | TLS 1.3 only, mutual authentication, AEAD (AES-128-GCM preferred), no resumption, 0-RTT or renegotiation. Binary WebSocket frames with inner length-prefixed framing, 64 KiB messages. The server is identified by the installation ID in the certificate, not by host name. |
-| Legacy `READER_REGISTER`       | none                   | Creates nothing and gets **no reply**, for old and new firmware alike. New firmware without credentials goes straight to pairing.                                                                                                                                            |
+| `attractap-pairing.v1`         | `attractap-pairing.v1` | Plain-text JSON frames of at most 4 KiB: `hello`, `round`, `nonce`, `reveal`, `accepted`, `failed`, `cancel`. Used only while pairing.                                                                                                                                       |
+| `attractap-session.v1`         | `attractap-session.v1` | TLS 1.3 only, mutual authentication, AEAD (AES-128-GCM preferred), no resumption, 0-RTT or renegotiation. Binary WebSocket frames with inner length-prefixed framing, 64 KiB messages. The server is identified by the installation ID in the certificate, not by host name. |
 
-| Reader firmware                   | Server with pairing                                                                                                | Older server                              |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
-| 1.7.x and older, token registered | Works with its token and updates over the air; must then be paired from its row (settings stay locked until then). | Unchanged.                                |
-| 1.7.x and older, never registered | Registration gets no reply; update it with the web flasher first.                                                  | Registers as before.                      |
-| 1.8.0 and newer, no credentials   | Pairing, then the TLS session.                                                                                     | Cannot pair; needs a server with pairing. |
-| 1.8.0 and newer, paired           | TLS session. Never falls back to token or plain channel.                                                           | Cannot connect.                           |
+| Reader firmware                       | Server (2.6.0 generation)                                       |
+| ------------------------------------- | --------------------------------------------------------------- |
+| 2.6.0 and newer, no credentials       | Pairing, then the TLS session.                                  |
+| 2.6.0 and newer, paired               | TLS session. Never falls back to another channel.               |
+| Older than 2.6.0, token registered    | Cannot connect. It cannot update over the air either (the update runs over the authenticated connection): flash 2.6.0 over USB (web flasher), then pair it. |
+| 1.8.0 to 2.5.x, paired with the old server | The server no longer knows its certificate and ends the session (`session.rejected`); the reader shows "Pairing removed" and pairs again. It keeps updating over the air as before. |
+
+A reader moved to another server pairs there with its existing key; clear it on the old server
+and pair it again (pairing screen), nothing else is needed.
 
 Pairing sequence:
 
 1. The reader opens a WebSocket with `attractap-pairing.v1` and sends `hello` within 30 s: kind
    (`touch` or `lite`), its public key (canonical uncompressed P-256 SubjectPublicKeyInfo,
-   91 bytes), firmware name, variant and version. A reader that signed in with a token may add
-   the one-time `ticket` it received through `READER_START_PAIRING` when an admin clicked **Pair**
-   on its row; that binds the pairing to the existing record.
+   91 bytes), firmware name, variant and version.
 2. The server sends a `round` immediately and then every 30 s: the installation CA public key,
    a commitment to the server nonce, the app URL (or `null`) and the times until rotation and
    expiry. The reader answers with its own `nonce` (at least 16 random bytes); the server
@@ -204,9 +351,7 @@ Pairing sequence:
 4. An admin approves the code once. The server issues the reader certificate, sends `accepted`,
    and the reader pins the CA and opens `attractap-session.v1`. The reader takes `accepted` only
    after a round whose reveal it verified (a code was derived). The first session grant carries
-   its reader ID, installation ID and certificate; the reader stores them and the token hash is
-   deleted on the server. A token reader keeps its stored token until that grant is verified and
-   stored, and only then deletes it. A pending request lasts at most 10 minutes; then the server
+   its reader ID, installation ID and certificate; the reader stores them. A pending request lasts at most 10 minutes; then the server
    sends `failed` (`expired`) and the reader asks again with the same key. Expiry is not shown as
    a failure (no "Request failed", no red flash); the screen waits for the next code and the Lite
    ring breathes white until the next round.
@@ -215,16 +360,15 @@ After pairing (once the reader holds its certificate) the reader never erases it
 key because of an unauthenticated message. A TLS failure against the pinned CA shows "Server could
 not be verified" on the connecting screen (Lite: a red error flash per attempt) and retries every
 30 s; the reader does not enroll again by itself. Two failed handshakes in a row (timeouts,
-errors, or a text frame from a server that took the connection for a token reader, as when a
+errors, or a text frame from a server that did not speak TLS to the reader, as when a
 proxy strips `Sec-WebSocket-Protocol`) show "Secure connection failed. Check the server or proxy."
 (Lite: red error flash). Both messages clear when a session opens.
 
 A reader that pinned a CA but never completed the first session (no certificate yet) handles an
 unverifiable server differently: after 3 such handshakes in a row it forgets the pinned CA (not
-its own key) and goes back to its token if it still has one, or to pairing otherwise. The
+its own key) and asks to be paired again. The
 approval may have come from someone posing as the server, and the reader would otherwise stay
-stuck. The channel at boot follows the stored state: a pin means the session, otherwise the token,
-otherwise pairing. When an admin removes the pairing, the session ends within 1 s, the reader shows
+stuck. The channel at boot follows the stored state: a pin means the session, otherwise pairing. When an admin removes the pairing, the session ends within 1 s, the reader shows
 "Pairing removed", generates a **new** key and returns to pending approval.
 
 Touch variants show the code on the pending-approval screen with a countdown and a QR code of
@@ -247,7 +391,7 @@ for its **Approve** button. Each new code is also logged on the UART as
 `Enrollment: code=K7P-3XQ`. Treat that line as a stable contract: the lab tool
 (`apps/attractap-lab/src/attractap_lab/enrollment.py`) parses the `Enrollment: code=` marker
 (`ENROLLMENT_LOG_MARKER`) to approve readers without a screen, so do not reword it. Codes, keys,
-nonces and tokens are never logged otherwise.
+nonces are never logged otherwise.
 
 ## Secure profile (ATT-1166)
 
@@ -268,6 +412,17 @@ API signs them per installation. It is never available for demo variants.
   encryption, anti-rollback), so a web-flashable image can never burn eFuses.
 - `secure-version-floor.txt` must equal `CONFIG_BOOTLOADER_APP_SECURE_VERSION`; CI
   fails if either decreases. The eFuse field has 16 steps: bump only for security fixes.
+- No TLS key material in PSRAM: mbedTLS keys, secrets, bignums, PK and cipher contexts
+  and handshake state stay in internal RAM. Only the two fixed record buffers of each TLS
+  session (ciphertext and decrypted application data, about 13 KB per session) go to
+  PSRAM, which flash encryption also encrypts, and fall back to internal RAM when PSRAM
+  is full. Standard builds keep all mbedTLS memory in PSRAM
+  (`CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC`). The secure profile uses
+  `CONFIG_MBEDTLS_CUSTOM_MEM_ALLOC` with the allocator in `src/api/security/tls_memory.c`,
+  which matches the exact record buffer lengths (`tests/tls-memory` checks this through
+  real handshakes). The link fails without the allocator, and
+  `tools/check_secure_profile.py` keeps the option set, the dynamic and variable-length
+  buffer options off and the allocator compiled in and linked.
 
 Build the secure profile locally (always in its own build directory and sdkconfig;
 CMake refuses a reused one):
@@ -286,16 +441,29 @@ python3 tools/check_secure_profile.py build/attractap-touch-v2-secure
 | KEY0 | Secure Boot digest: per-installation signing key |
 | KEY1 | Secure Boot digest: recovery key |
 | KEY2 | Flash encryption key (XTS-AES-128) |
-| KEY3 | DS identity (HMAC key, read-protected) |
+| KEY3 | Spare (no Digital Signature key: the reader identity is a P-256 key) |
 | KEY4 | NVS encryption (HMAC key, read-protected) |
 | KEY5 | Spare |
 
 ### eFuse read protection (RD_DIS)
 
-The bootloader leaves RD_DIS writable. The secure app burns the DS key (KEY3) and the
-NVS key (KEY4) read-protected on first boot and then MUST write-protect RD_DIS
-(`WR_DIS_RD_DIS`). The server marks a reader secured only after its eFuse report
-shows that lock.
+The bootloader leaves RD_DIS writable so the NVS key (KEY4) can be burned read-protected
+after Secure Boot is on; RD_DIS then MUST be write-protected (`WR_DIS_RD_DIS`). The server
+marks a reader secured only after its eFuse report shows that lock.
+
+### eFuse report and profile claims (ATT-1207)
+
+The firmware never writes an eFuse. Secure builds only read them: once per session, right after
+`READER_FIRMWARE_INFO`, the reader sends one `efuse.report` control frame inside the TLS session
+(`src/api/security/efuse_report.cpp`, `efuse_snapshot.cpp`). It lists, per key block, the purpose
+and whether it is used or read-protected, the two public Secure Boot digests (never any key
+material), the revoke bits, the flash-encryption counters and mode, the JTAG and download
+protections, `RD_DIS` and its write protection, and the eFuse `SECURE_VERSION`. Plain builds send
+no report. `READER_FIRMWARE_INFO` adds the build's claims `profile` (`plain`, `secure`,
+`secure-lab`), `release` and, on secure builds, `secureVersion`. The server treats all of it as a
+claim; only a release secure build whose report passes and whose session uses the paired
+certificate counts as secured. The lab reader (`secure-lab`, development-mode flash encryption)
+is expected to report *not secured*. `tests/efuse-report` checks the message format on the host.
 
 Lab secure readers use public keys and development-mode flash encryption; see
 `lab/secure-boot/README.md`.
@@ -349,6 +517,28 @@ idf.py -B build/dbg -DATTRACTAP_VARIANT=attractap-touch \
 Note: `tools/build_individual_ca_certs.py` needs network access on the first
 run (it downloads Mozilla's CA bundle, cached for 7 days). Run it once before
 `idf.py` when building without `build_firmwares.py`.
+
+### Internal RAM and PSRAM
+
+Internal RAM is the scarce resource; PSRAM has megabytes to spare. `sdkconfig.defaults` sets:
+
+- `CONFIG_SPIRAM_XIP_FROM_PSRAM`: code and read-only data run from PSRAM, so NVS and OTA flash
+  writes no longer disable the cache.
+- `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=1024`: plain `malloc()` tries internal RAM first only for
+  blocks up to 1 KB; larger ones (JSON documents, message buffers, lwIP packet buffers, the Wi-Fi
+  driver's non-DMA blocks) go to PSRAM first. Memory that must be internal (DMA buffers, task
+  stacks, FreeRTOS objects, mbedTLS on the secure profile) is requested with `MALLOC_CAP_INTERNAL`
+  or `MALLOC_CAP_DMA`.
+
+Task stacks in PSRAM (`createPsramTask()` in `src/psram_task.hpp`, or
+`xTaskCreatePinnedToCoreWithCaps` directly): `ws_conn`, `ws_tx`, `NetworkTask`, `rl_tls`,
+`ble_proxy` and `nimble_host`. `ws_conn` and `NetworkTask` read and write NVS, which is
+only safe with XIP from PSRAM (the sources refuse to build without it). A task on a PSRAM stack
+must never map flash (`esp_partition_mmap`, OTA image verification, reads of an encrypted
+partition such as `otadata` on the secure profile): ESP-IDF asserts that the stack is in internal
+RAM while the cache is frozen for the mapping. The main task, `LvglTask`, `LedTask`, `Beeper` and
+the `esp_websocket_client` task (`websocket_task`, 16 KB, created by the component with plain
+`xTaskCreate`; no released component version can put it in PSRAM) keep internal stacks.
 
 ## Display Theme
 
@@ -452,18 +642,18 @@ maintenance drawer and touch timeouts behave as with a finger. Touch commands
 reply after LVGL has processed the whole gesture. Coordinates are display
 pixels (480 x 480, origin top left as shown on screen).
 
-| Topic               | Payload (besides `authCode`)                                                                          | Reply                                                       |
-| ------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `ui.widgets.get`    | —                                                                                                     | `{"screen","width","height","widgets":[...]}`               |
-| `ui.widgets.tap`    | `text`, optional `match` (`exact`/`contains`), `index` (default 0), `holdMs` (default 60)             | `{"success":true,"widget":{...}}`                           |
-| `ui.touch.tap`      | `x`, `y`, optional `holdMs` (1-60000, default 60)                                                     | `{"success":true}`                                          |
-| `ui.touch.press`    | `x`, `y`, optional `holdMs`; without it the finger stays down until `ui.touch.release` (at most 60 s) | `{"success":true}` once pressed or, with `holdMs`, released |
-| `ui.touch.release`  | —                                                                                                     | `{"success":true}`                                          |
-| `ui.touch.swipe`    | `x1`, `y1`, `x2`, `y2`, optional `durationMs` (1-10000, default 300)                                  | `{"success":true}`                                          |
-| `ui.screenshot.get` | —                                                                                                     | header, data lines and end line (below)                     |
-| `system.heap.get`   | —                                                                                                     | `{"internalFree","internalLargest","internalMinFree","windowMinFree","windowMinLargest","psramFree"}` |
-| `system.heap.reset` | —                                                                                                     | same as `system.heap.get`, then restarts the `window*` high-water marks |
-| `ui.touch.controller.get` | — (GT911 displays only)                                                                         | `{"reads","failures"}`: GT911 register reads since boot       |
+| Topic                     | Payload (besides `authCode`)                                                                          | Reply                                                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `ui.widgets.get`          | —                                                                                                     | `{"screen","width","height","widgets":[...]}`                                                         |
+| `ui.widgets.tap`          | `text`, optional `match` (`exact`/`contains`), `index` (default 0), `holdMs` (default 60)             | `{"success":true,"widget":{...}}`                                                                     |
+| `ui.touch.tap`            | `x`, `y`, optional `holdMs` (1-60000, default 60)                                                     | `{"success":true}`                                                                                    |
+| `ui.touch.press`          | `x`, `y`, optional `holdMs`; without it the finger stays down until `ui.touch.release` (at most 60 s) | `{"success":true}` once pressed or, with `holdMs`, released                                           |
+| `ui.touch.release`        | —                                                                                                     | `{"success":true}`                                                                                    |
+| `ui.touch.swipe`          | `x1`, `y1`, `x2`, `y2`, optional `durationMs` (1-10000, default 300)                                  | `{"success":true}`                                                                                    |
+| `ui.screenshot.get`       | —                                                                                                     | header, data lines and end line (below)                                                               |
+| `system.heap.get`         | —                                                                                                     | `{"internalFree","internalLargest","internalMinFree","windowMinFree","windowMinLargest","psramFree"}` |
+| `system.heap.reset`       | —                                                                                                     | same as `system.heap.get`, then restarts the `window*` high-water marks                               |
+| `ui.touch.controller.get` | — (GT911 displays only)                                                                               | `{"reads","failures"}`: GT911 register reads since boot                                               |
 
 `system.heap.*` report the internal (8-bit capable) heap in bytes.
 `internalMinFree` is ESP-IDF's lowest free size since boot. ESP-IDF keeps no
@@ -545,6 +735,91 @@ Errors: `INVALID_PAYLOAD` (missing or out-of-range value), `WIDGET_NOT_FOUND`,
 The lookup reads LVGL objects only: text drawn without a label (images, canvas
 content, button-matrix keys without text) cannot be matched, and keys are
 reported without separate hit-testing of overlapping keys.
+
+## Crash reports and coredump upload (ATT-474, ATT-1144)
+
+After a panic, watchdog or lockup reset (and after a long-running reader was
+power-cycled while hung), the next boot stores a pending crash record in NVS
+(`bootdiag/pending`, version 2). It holds the last heap snapshot, the reset
+reason, the firmware version that crashed and, when this crash wrote the
+coredump in the `coredump` partition (128 KiB), the dump's size and zlib CRC-32.
+A dump is attached only to the crash that wrote it: a dump an earlier record
+already claimed (`bootdiag/cdclaimed`) or that is finished (`bootdiag/cddone`)
+stays out of it. Version 1 and older records follow the same rule when they are
+read. A later reset without a dump of its own (a silent hang, or a crash whose
+dump write failed) does not replace a record that owns the dump in flash and
+has not reported its metadata yet; that reset is only logged. Once the report
+exists on the server, the new reset replaces the record and the dump follows as
+an orphan, which the server matches to the report awaiting it by size and CRC.
+
+After each sign-in the reader uploads the record, then its dump, from the API
+loop with one message in flight. Each 4 KiB chunk is read from flash in 512-byte
+pieces (the RGB panel shares the flash bus), so the upload's own buffers take
+about 10 KiB whatever the dump size. A chunk goes out only while internal RAM has
+room for the chunk, three copies of its ~5.6 KB message (sending on the secure
+session copies it about 2.4 times) and 24 KiB headroom, about 44 KiB in all,
+with a large enough internal block; otherwise the upload waits, as it does
+while an OTA update runs.
+
+| Direction       | Event                      | Payload                                                                                                                                |
+| --------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Reader → server | `READER_CRASH_REPORT`      | crash metadata, `firmwareVersion` (null if unknown), `coredumpSize`, `coredumpCrc32`                                                   |
+| Server → reader | `READER_CRASH_REPORT`      | `received`, `id`, `coredumpUpload: {reportId, chunkSize}` or `coredumpRejected` (`COREDUMP_TOO_LARGE`, `INVALID_COREDUMP`); or `error` |
+| Reader → server | `READER_COREDUMP_BEGIN`    | `reportId`, `size`, `crc32`; also after a reconnect or reboot, for the same report                                                     |
+| Server → reader | `READER_COREDUMP_BEGIN`    | `reportId`, `chunkSize`, `nextOffset`, or `coredumpStored: true` when an earlier upload was stored, or `error`                         |
+| Reader → server | `READER_COREDUMP_CHUNK`    | `reportId`, `offset`, `data` (base64 of at most `chunkSize` bytes)                                                                     |
+| Server → reader | `READER_COREDUMP_CHUNK`    | `reportId`, `nextOffset`, or `error` (`COREDUMP_OUT_OF_ORDER` comes with `expectedOffset` to resync)                                   |
+| Reader → server | `READER_COREDUMP_COMPLETE` | `reportId`, `totalSize`, `crc32`                                                                                                       |
+| Server → reader | `READER_COREDUMP_COMPLETE` | `reportId`, `coredumpStored: true` once the verified dump is stored and symbolicated, or `error`                                       |
+
+The `READER_COREDUMP_*` replies are not acknowledged; the reader retries a
+step after 20 s without a reply (120 s for the completion). The record and the
+dump stay until the server confirms `coredumpStored`; only then is the dump
+erased and the record cleared. A record without a dump is cleared after the
+metadata acknowledgement. A disconnect, low heap or a reboot only delays the
+upload: it restarts for the same `reportId` after the next sign-in. A failed
+attempt is retried after 10 s; after three failures in a row the reader pauses
+for 5 minutes and then starts over. A chunk reply that makes no progress (an
+acknowledgement that does not move past the chunk, or `COREDUMP_OUT_OF_ORDER`
+asking for the chunk just sent) counts as a failure. A metadata reply that
+neither offers an upload nor sets `coredumpRejected` counts as a failure too;
+only `coredumpRejected` gives the dump up. When the metadata acknowledgement is
+lost, the reader sends the metadata again and the server answers with the
+report that still awaits the same dump.
+
+A valid dump in flash that no pending record owns (for example one left by
+firmware before ATT-1144 after a metadata-only acknowledgement) is uploaded as
+a report of its own, with reset reason `UNKNOWN`, no firmware version and
+`rebootReason: COREDUMP_ORPHAN`; symbolication reads the build id from the
+dump. A dump the server refuses for good is kept in flash for a USB readout
+but never offered again (`bootdiag/cddone`); its report shows the dump as
+rejected. A metadata `error` reply and a temporary server error on
+`READER_COREDUMP_BEGIN` (`CRASH_REPORT_STORE_FAILED`) count as failed attempts:
+the record stays and is retried. Firmware before ATT-1144 sent the
+dump inline as `coredumpBase64` (32 KiB at most); the server still accepts it.
+The secure profile has no coredumps and uploads the record only.
+
+### Crash trigger (lab builds only)
+
+Firmware built with `-DATTRACTAP_CRASH_TRIGGER=ON` accepts
+`CMND debug.crash {"stackBytes":<n>}` on the serial console (no PIN): it fills
+`n` bytes (at most 64 KiB) of task stacks (16 KiB per task) and panics, so the
+coredump grows by about that much. Without `stackBytes` it panics right away. The option is
+`OFF` by default, the secure profile refuses it, `build_firmwares.py` passes
+`-DATTRACTAP_CRASH_TRIGGER=OFF`, and `tools/check_release_build.py` fails a
+release build whose sources were compiled with a lab-only define or whose app
+image contains the `debug.crash` topic.
+
+### Device-lab TLS CA (lab builds only)
+
+`-DATTRACTAP_LAB_CA=<ca.pem>` embeds a device-lab CA certificate and puts it
+first in the certificate manager's list, so a lab reader validates the lab
+API's wss:// certificate (the HIL suite's `HIL_WSS=1` mode, see
+`apps/attractap-lab/README.md`). It needs `-DATTRACTAP_TEST_HOOKS=ON` and is
+refused for a release secure profile. `build_firmwares.py` passes
+`-DATTRACTAP_LAB_CA=`, and `tools/check_release_build.py` fails a release build
+compiled with `ATTRACTAP_LAB_CA=1` or whose app image contains the
+"Attractap Device Lab CA" list entry.
 
 ## Attractap Lite LED Animations
 

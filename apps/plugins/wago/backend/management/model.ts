@@ -204,14 +204,6 @@ export class ManagementError extends Error {
   }
 }
 
-export { WagoManagementService as WagoManagementServiceEnforceBaselineOperation } from './service';
-
-export { WagoManagementService as WagoManagementServiceInspectOperation } from './service';
-
-export { WagoManagementService as WagoManagementServiceLockedOperation } from './service';
-
-export { WagoManagementService as WagoManagementServiceRecoverOperation } from './service';
-
 export const exceptionNames: ManagementException[] = [
   'wbm_exposed',
   'other_services_exposed',
@@ -238,8 +230,8 @@ export function pick<T extends string>(value: T, options: readonly T[]): T {
   return value;
 }
 
-export /** Structural allowlist: discard even unexpected extra adapter properties rather than spreading them. */
-function cleanInspection(value: ManagementInspection): ManagementInspection {
+/** Structural allowlist: discard even unexpected extra adapter properties rather than spreading them. */
+export function cleanInspection(value: ManagementInspection): ManagementInspection {
   if (value.uid !== null && (!Number.isSafeInteger(value.uid) || value.uid < 0 || value.uid > 4294967294))
     throw new ManagementError('operation_failed');
   return {

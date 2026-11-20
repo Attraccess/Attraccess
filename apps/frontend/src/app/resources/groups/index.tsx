@@ -1,179 +1,39 @@
 import { HTMLAttributes, useCallback, useMemo, useState } from 'react';
-import { GroupIcon, ChevronRightIcon, MinusIcon, PlusIcon } from 'lucide-react';
+import { GroupIcon } from 'lucide-react';
 import { FlatSection } from '../../../components/flatSection';
 import { ResourceGroupUpsertModal } from '../../resource-groups/upsertModal/resourceGroupUpsertModal';
-import {
-  Link,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableContent,
-  TableHeader,
-  TableRow,
-  TableScrollContainer,
-} from '@heroui/react';
 import { GroupsToolbar } from './GroupsToolbar';
+import { ResourceGroupsTable } from './ResourceGroupsTable';
 import {
-  UseAccessControlServiceResourceIntroductionsGetPeopleKeyFn,
+  UseResourceIntroductionsGetPeopleKeyFn,
   Resource,
   ResourceGroup,
-  useResourcesServiceGetAllResourcesKey,
-  useResourcesServiceGetOneResourceById,
-  UseResourcesServiceGetOneResourceByIdKeyFn,
-  useResourcesServiceResourceGroupsAddResource,
-  useResourcesServiceResourceGroupsGetMany,
-  useResourcesServiceResourceGroupsRemoveResource,
+  useGetAllResourcesKey,
+  useGetOneResourceById,
+  UseGetOneResourceByIdKeyFn,
+  useResourceGroupsAddResource,
+  useResourceGroupsGetMany,
+  useResourceGroupsRemoveResource,
 } from '@attraccess/react-query-client';
-import { Button, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
 import en from './en.json';
 import de from './de.json';
 import { useToastMessage } from '../../../components/toastProvider';
 import { filterAndSortGroups, GroupFilter } from './groupsFilter';
 
-export function useManageResourceGroupsStateContent(model: ReturnType<typeof useManageResourceGroupsStateRenderTable>) {
-  const content = (
-    <ResourceGroupUpsertModal onUpserted={model.onGroupCreated}>
-      {(onOpen: () => void) => (
-        <>
-          {model.renderToolbar(onOpen)}
-          {model.renderTable()}
-        </>
-      )}
-    </ResourceGroupUpsertModal>
-  );
-  return { t: model.t, content, hideHeader: model.hideHeader, rest: model.rest } as const;
-}
+export type ManageResourceGroupsProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
+  resourceId: number;
+  hideHeader?: boolean;
+};
 
-export function useManageResourceGroupsState({ resourceId, hideHeader, ...rest }: Readonly<ManageResourceGroupsProps>) {
-  const useManageResourceGroupsStateInputsModel = useManageResourceGroupsStateInputs({
-    resourceId,
-    hideHeader,
-    ...rest,
-  });
-  const useManageResourceGroupsStateRenderTableModel = useManageResourceGroupsStateRenderTable(
-    useManageResourceGroupsStateInputsModel,
-  );
-  return useManageResourceGroupsStateContent(useManageResourceGroupsStateRenderTableModel);
-}
-
-export function useManageResourceGroupsStateRenderTable(model: ReturnType<typeof useManageResourceGroupsStateInputs>) {
-  const renderTable = () => (
-    <Table data-cy="resource-groups-list">
-      <TableScrollContainer>
-        <TableContent aria-label={model.t('table.ariaLabel')}>
-          <TableHeader>
-            <TableColumn isRowHeader>{model.t('columns.name')}</TableColumn>
-            <TableColumn>{model.t('columns.assigned')}</TableColumn>
-            <TableColumn>{model.t('columns.actions')}</TableColumn>
-          </TableHeader>
-          <TableBody
-            items={model.visibleGroups}
-            dependencies={[model.assignedIds, model.pendingGroupIds]}
-            renderEmptyState={() => <EmptyState message={model.emptyMessage} />}
-          >
-            {(group) => {
-              const isAssigned = model.assignedIds.has(group.id);
-              const dotClass = isAssigned ? 'bg-success' : 'bg-default-300';
-              const ringClass = isAssigned ? 'ring-success/30' : 'ring-default-300/30';
-              const actionLabel = model.t(isAssigned ? 'row.toggleOff' : 'row.toggleOn', {
-                resource: model.resourceName,
-                group: group.name,
-              });
-              const buttonLabel = model.t(isAssigned ? 'row.remove' : 'row.add');
-              const isPending = model.pendingGroupIds.has(group.id);
-              return (
-                <TableRow
-                  key={group.id}
-                  id={group.id}
-                  data-cy={`resource-group-row-${group.id}`}
-                  data-assigned={isAssigned ? 'true' : 'false'}
-                >
-                  <TableCell>
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        aria-hidden
-                        className={`inline-block w-2.5 h-2.5 rounded-full ring-2 shrink-0 ${dotClass} ${ringClass}`}
-                      />
-                      <div className="min-w-0">
-                        <p className="truncate" title={group.name}>
-                          {group.name}
-                        </p>
-                        {group.description ? (
-                          <p className="text-xs text-default-500 truncate max-w-md" title={group.description}>
-                            {group.description}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      size="sm"
-                      variant={isAssigned ? 'danger-soft' : 'primary'}
-                      isDisabled={isPending}
-                      isPending={isPending}
-                      onPress={() => model.handleToggle(group)}
-                      aria-label={actionLabel}
-                      data-cy={`resource-group-row-${group.id}-toggle`}
-                    >
-                      {isPending ? null : isAssigned ? <MinusIcon size={14} /> : <PlusIcon size={14} />}
-                      {buttonLabel}
-                    </Button>
-                  </TableCell>
-                  <TableCell>
-                    <Link
-                      href={`/resource-groups/${group.id}`}
-                      className="text-xs inline-flex items-center gap-0.5"
-                      data-cy={`resource-group-row-${group.id}-open`}
-                      aria-label={`${model.t('row.openGroup')}: ${group.name}`}
-                    >
-                      {model.t('row.openGroup')}
-                      <ChevronRightIcon size={14} />
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              );
-            }}
-          </TableBody>
-        </TableContent>
-      </TableScrollContainer>
-    </Table>
-  );
-
-  const renderToolbar = (onNewGroup: () => void) => (
-    <GroupsToolbar
-      search={model.search}
-      onSearchChange={model.setSearch}
-      searchPlaceholder={model.t('search.placeholder')}
-      filter={model.filter}
-      onFilterChange={model.setFilter}
-      filterLabels={{
-        all: model.t('filter.all'),
-        assigned: model.t('filter.assigned'),
-        available: model.t('filter.available'),
-      }}
-      assignedCount={model.counts.assigned}
-      availableCount={model.counts.available}
-      newGroupLabel={model.t('newGroup')}
-      onNewGroup={onNewGroup}
-    />
-  );
-  return { ...model, renderTable, renderToolbar } as const;
-}
-
-export function useManageResourceGroupsStateInputs({
-  resourceId,
-  hideHeader,
-  ...rest
-}: Readonly<ManageResourceGroupsProps>) {
+export function ManageResourceGroups({ resourceId, hideHeader, ...rest }: Readonly<ManageResourceGroupsProps>) {
   const { t } = useTranslations({ de, en });
   const queryClient = useQueryClient();
   const toast = useToastMessage();
 
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
-  const { data: groups } = useResourcesServiceResourceGroupsGetMany();
+  const { data: resource } = useGetOneResourceById({ path: { id: resourceId } });
+  const { data: groups } = useResourceGroupsGetMany();
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<GroupFilter>('all');
@@ -188,11 +48,11 @@ export function useManageResourceGroupsStateInputs({
 
   const invalidateAll = useCallback(() => {
     queryClient.invalidateQueries({
-      queryKey: UseAccessControlServiceResourceIntroductionsGetPeopleKeyFn({ resourceId }),
+      queryKey: UseResourceIntroductionsGetPeopleKeyFn({ path: { resourceId } }),
     });
-    queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
+    queryClient.invalidateQueries({ queryKey: [useGetAllResourcesKey] });
     queryClient.invalidateQueries({
-      queryKey: UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId }),
+      queryKey: UseGetOneResourceByIdKeyFn({ path: { id: resourceId } }),
     });
   }, [queryClient, resourceId]);
 
@@ -205,15 +65,15 @@ export function useManageResourceGroupsStateInputs({
     });
   }, []);
 
-  const { mutateAsync: addResourceToGroup } = useResourcesServiceResourceGroupsAddResource();
-  const { mutateAsync: removeResourceFromGroup } = useResourcesServiceResourceGroupsRemoveResource();
+  const { mutateAsync: addResourceToGroup } = useResourceGroupsAddResource();
+  const { mutateAsync: removeResourceFromGroup } = useResourceGroupsRemoveResource();
 
   const handleToggle = useCallback(
     async (group: ResourceGroup) => {
       const wasAssigned = assignedIds.has(group.id);
       markPending(group.id, true);
 
-      const resourceKey = UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId });
+      const resourceKey = UseGetOneResourceByIdKeyFn({ path: { id: resourceId } });
       const previous = queryClient.getQueryData<Resource>(resourceKey);
       if (previous) {
         const nextGroups = wasAssigned
@@ -224,9 +84,9 @@ export function useManageResourceGroupsStateInputs({
 
       try {
         if (wasAssigned) {
-          await removeResourceFromGroup({ groupId: group.id, resourceId });
+          await removeResourceFromGroup({ path: { groupId: group.id, resourceId } });
         } else {
-          await addResourceToGroup({ groupId: group.id, resourceId });
+          await addResourceToGroup({ path: { groupId: group.id, resourceId } });
         }
         invalidateAll();
       } catch {
@@ -270,43 +130,39 @@ export function useManageResourceGroupsStateInputs({
   const resourceName = resource?.name ?? '';
 
   const emptyMessage = allGroups.length === 0 ? t('empty.noGroups') : t('empty.noMatch');
-  return {
-    t,
-    queryClient,
-    toast,
-    resource,
-    groups,
-    search,
-    setSearch,
-    filter,
-    setFilter,
-    pendingGroupIds,
-    setPendingGroupIds,
-    assignedIds,
-    allGroups,
-    invalidateAll,
-    markPending,
-    addResourceToGroup,
-    removeResourceFromGroup,
-    handleToggle,
-    onGroupCreated,
-    visibleGroups,
-    counts,
-    resourceName,
-    emptyMessage,
-    resourceId,
-    hideHeader,
-    rest,
-  } as const;
-}
 
-export type ManageResourceGroupsProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
-  resourceId: number;
-  hideHeader?: boolean;
-};
-
-export function ManageResourceGroups({ resourceId, hideHeader, ...rest }: Readonly<ManageResourceGroupsProps>) {
-  const { t, content } = useManageResourceGroupsState({ resourceId, hideHeader, ...rest });
+  const content = (
+    <ResourceGroupUpsertModal onUpserted={onGroupCreated}>
+      {(onOpen: () => void) => (
+        <>
+          <GroupsToolbar
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder={t('search.placeholder')}
+            filter={filter}
+            onFilterChange={setFilter}
+            filterLabels={{
+              all: t('filter.all'),
+              assigned: t('filter.assigned'),
+              available: t('filter.available'),
+            }}
+            assignedCount={counts.assigned}
+            availableCount={counts.available}
+            newGroupLabel={t('newGroup')}
+            onNewGroup={onOpen}
+          />
+          <ResourceGroupsTable
+            groups={visibleGroups}
+            assignedIds={assignedIds}
+            pendingGroupIds={pendingGroupIds}
+            resourceName={resourceName}
+            emptyMessage={emptyMessage}
+            onToggle={handleToggle}
+          />
+        </>
+      )}
+    </ResourceGroupUpsertModal>
+  );
 
   if (hideHeader) {
     return <section {...rest}>{content}</section>;

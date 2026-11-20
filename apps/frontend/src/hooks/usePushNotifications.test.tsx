@@ -7,9 +7,9 @@ import { usePushNotifications } from './usePushNotifications';
 const upsertSubscription = vi.fn();
 
 vi.mock('@attraccess/react-query-client', () => ({
-  usePushServicePushGetVapidPublicKey: () => ({ data: { publicKey: 'AQID' }, isLoading: false }),
-  usePushServicePushUpsertSubscription: () => ({ mutateAsync: upsertSubscription }),
-  usePushServicePushDeleteSubscription: () => ({ mutateAsync: vi.fn() }),
+  usePushGetVapidPublicKey: () => ({ data: { publicKey: 'AQID' }, isLoading: false }),
+  usePushUpsertSubscription: () => ({ mutateAsync: upsertSubscription }),
+  usePushDeleteSubscription: () => ({ mutateAsync: vi.fn() }),
 }));
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -73,7 +73,7 @@ describe('usePushNotifications', () => {
       applicationServerKey: expect.any(Uint8Array),
     });
     expect(upsertSubscription).toHaveBeenCalledWith({
-      requestBody: {
+      body: {
         endpoint: 'https://push.example/subscription',
         keys: { p256dh: 'p256dh-key', auth: 'auth-secret' },
         userAgent: navigator.userAgent,

@@ -2,17 +2,17 @@
 // auto-generated on first use; admins can override them (which invalidates all subscriptions).
 // FEATURE: Push notification foundation
 
-import { PushSubscription } from '@attraccess/database-entities';
+import type { PushSubscriptionRecord } from '@attraccess/application-models';
 import * as webpush from 'web-push';
 import type { PushService } from './push.service';
 
 interface PushServicePushDeliveryContext {
   logger: PushService['logger'];
-  subscriptionRepository: PushService['subscriptionRepository'];
+  subscriptions: PushService['subscriptions'];
 }
 export async function sendToSubscription(
   context: PushServicePushDeliveryContext,
-  subscription: PushSubscription,
+  subscription: PushSubscriptionRecord,
   serializedPayload: string,
   vapidDetails: { subject: string; publicKey: string; privateKey: string },
 ): Promise<void> {
@@ -34,7 +34,7 @@ export async function sendToSubscription(
     // 404/410 mean the subscription is gone (browser unsubscribed / expired) - prune it.
     if (statusCode === 404 || statusCode === 410) {
       context.logger.debug(`Pruning stale push subscription ${subscription.id} (status ${statusCode})`);
-      await context.subscriptionRepository.delete({ id: subscription.id });
+      await context.subscriptions.deleteById(subscription.id);
       return;
     }
 

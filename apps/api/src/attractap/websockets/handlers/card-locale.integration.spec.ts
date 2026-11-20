@@ -1,5 +1,8 @@
-import { entities, NFCCard, Resource, ResourceType, User } from '@attraccess/database-entities';
+import { entities, NFCCard, NFCCardPendingChange, Resource, ResourceUsage, User } from '@attraccess/database-entities';
+import { ResourceType } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
+import { TypeOrmAttractapCardStore } from '../../../database/adapters/attractap/typeorm-card.store';
+import { TypeOrmAttractapResourceReads } from '../../../database/adapters/attractap/typeorm-resource-reads';
 import * as migrations from '../../../database/migrations';
 import { UserProfileController } from '../../../users-and-auth/users/user-profile.controller';
 import { UsersService } from '../../../users-and-auth/users/users.service';
@@ -16,7 +19,8 @@ describe('persisted web UI locale at card authentication', () => {
 
   beforeAll(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: ':memory:',
       entities: Object.values(entities),
       migrations: Object.values(migrations),
@@ -62,7 +66,7 @@ describe('persisted web UI locale at card authentication', () => {
     );
     const profile = new UserProfileController(usersService);
     const attractapService: AttractapService = Object.assign(Object.create(AttractapService.prototype), {
-      nfcCardRepository: cardRepository,
+      cardStore: new TypeOrmAttractapCardStore(cardRepository, source.getRepository(NFCCardPendingChange)),
       encryptionService: { decryptIfEncrypted: (value: string) => value },
     });
     let defaultLanguage = 'de';
@@ -72,7 +76,7 @@ describe('persisted web UI locale at card authentication', () => {
     const handler: AttractapCardHandler = Object.assign(new AttractapCardHandler(), {
       attractapService,
       settingsService,
-      resourceRepository,
+      resourceReads: new TypeOrmAttractapResourceReads(resourceRepository, source.getRepository(ResourceUsage)),
       metricsService: { attractapNfcTapsTotal: { inc: jest.fn() } },
       resourceUsageService: { canControllResource: async () => true },
       resourceIntroducersService: { isIntroducer: async () => false },

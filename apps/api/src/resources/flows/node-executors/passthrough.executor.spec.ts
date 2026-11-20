@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 import { PassthroughExecutor } from './passthrough.executor';
 import { NodeExecutionContext } from './node-executor.interface';
 
@@ -18,7 +18,7 @@ describe('PassthroughExecutor', () => {
     type: ResourceFlowNodeType.INPUT_BUTTON,
     resourceId: 1,
     data: {},
-  } as unknown as ResourceFlowNode;
+  } as unknown as FlowNodeRecord;
 
   beforeEach(() => {
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
@@ -69,7 +69,7 @@ describe('PassthroughExecutor', () => {
   it('ignores the node argument', async () => {
     const input = { value: 42 };
 
-    const result = await executor.execute(undefined as unknown as ResourceFlowNode, input);
+    const result = await executor.execute(undefined as unknown as FlowNodeRecord, input);
 
     expect(result.payload).toBe(input);
   });

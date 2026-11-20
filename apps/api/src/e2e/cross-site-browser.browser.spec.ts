@@ -4,11 +4,13 @@ import type { AddressInfo } from 'node:net';
 import { Browser, BrowserContext, Page, Response, chromium } from 'playwright';
 import { DataSource } from 'typeorm';
 import WebSocket from 'ws';
-import { Resource, ResourceType, User } from '@attraccess/database-entities';
+import { Resource, User } from '@attraccess/database-entities';
+import { ResourceType } from '@attraccess/application-models';
 import { bootstrap } from '../main.bootstrap';
 import { AUTH_COOKIE_NAME } from '../common/services/cookie-config.service';
 import { SessionService } from '../users-and-auth/auth/session.service';
 import { disposeStorage } from '../test/desktop-real-api.test-fixture';
+import { SESSION_SUBPROTOCOL } from '../attractap/security/session-framing';
 
 /**
  * Sibling hostnames share one registrable domain, so the browser treats them
@@ -39,7 +41,9 @@ describe('sibling website against a real API in headless Chromium', () => {
 
   beforeAll(async () => {
     // One plain page server answers for the sibling and the portal hostnames.
-    pages = createServer((_req, res) => res.setHeader('content-type', 'text/html').end('<!doctype html><title>x</title>'));
+    pages = createServer((_req, res) =>
+      res.setHeader('content-type', 'text/html').end('<!doctype html><title>x</title>'),
+    );
     await new Promise<void>((resolve) => pages.listen(0, '127.0.0.1', resolve));
     const pagesPort = (pages.address() as AddressInfo).port;
     siblingUrl = `http://${SIBLING_HOST}:${pagesPort}`;
@@ -57,7 +61,9 @@ describe('sibling website against a real API in headless Chromium', () => {
       const record = () =>
         answers.push({
           method: req.method ?? '',
-          url: req.url ?? '',
+          // Express rewrites req.url while a router mounted at the global prefix handles it (Nest 12 sends 404s
+          // from there); originalUrl keeps the path the browser requested.
+          url: (req as IncomingMessage & { originalUrl?: string }).originalUrl ?? req.url ?? '',
           status: res.statusCode,
           cookie: (req.headers.cookie ?? '').includes(`${AUTH_COOKIE_NAME}=`),
         });
@@ -312,10 +318,13 @@ describe('sibling website against a real API in headless Chromium', () => {
   });
 
   it('accepts device websockets that send a foreign Origin', async () => {
-    // Readers authenticate inside the socket; the upgrade itself must not depend on the Origin.
-    const socket = new WebSocket(`${appUrl.replace(`http://${APP_HOST}`, 'ws://127.0.0.1')}/api/attractap/websocket`, {
-      origin: siblingUrl,
-    });
+    // Readers authenticate with their certificate inside the session; the upgrade itself must not depend on the
+    // Origin. (A socket without the session or pairing subprotocol is refused: token sign-in is gone.)
+    const socket = new WebSocket(
+      `${appUrl.replace(`http://${APP_HOST}`, 'ws://127.0.0.1')}/api/attractap/websocket`,
+      [SESSION_SUBPROTOCOL],
+      { origin: siblingUrl },
+    );
     try {
       await new Promise<void>((resolve, reject) => {
         socket.once('open', () => resolve());

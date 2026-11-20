@@ -7,7 +7,7 @@
   },
   "installPlugin": "Plugin installieren",
   "uploadButton": "ZIP-Datei hochladen",
-  "docsButton": "Dokumentation",
+  "docsButton": "Entwicklerleitfaden",
   "manageVersion": "Version verwalten",
   "classification": {
     "official": {
@@ -99,12 +99,18 @@
     "directory": "Verzeichnis",
     "permissions": "Berechtigungen",
     "source": "Quelle",
-    "status": "Status",
-    "actions": "Aktionen"
+    "status": "Status"
   },
   "status": {
     "loaded": "Geladen",
     "error": "Laden fehlgeschlagen",
+    "licenseMissing": "Lizenz fehlt",
+    "licenseMissingModules": {
+      "one": "Benötigt das Lizenzmodul: {{modules}}",
+      "many": "Benötigt die Lizenzmodule: {{modules}}"
+    },
+    "licenseMissingRequired": "Benötigt eine gültige Attraccess-Lizenz",
+    "licenseMissingTooltip": "Nicht geladen: Beim Start deckte die Lizenz dieses Plugin nicht ab oder konnte nicht geprüft werden. Nach dem Speichern eines passenden Lizenzschlüssels startet der Server neu und lädt es.",
     "unknown": "Nur Frontend",
     "errorTooltip": "Serverfehler beim Laden anzeigen",
     "viewError": "Ladefehler für {{pluginName}} anzeigen",
@@ -113,7 +119,11 @@
     "close": "Schließen",
     "retry": "Erneut versuchen und neu starten",
     "retrySuccess": "Das Plugin wird beim Neustart der App erneut geladen.",
-    "retryError": "Das Plugin konnte nicht erneut geladen werden."
+    "retryError": "Das Plugin konnte nicht erneut geladen werden.",
+    "refused": "Abgelehnt",
+    "refusedTitle": "Attraccess hat {{pluginName}} abgelehnt",
+    "refusedDescription": "Dieses Plugin ist mit dieser Attraccess-Version nicht kompatibel (es wurde etwa für ein älteres Plugin-SDK gebaut) und wird nie geladen; ein erneuter Versuch ist daher nicht möglich. Installieren Sie eine kompatible Version oder entfernen Sie es; beim Entfernen bleiben seine gespeicherten Daten erhalten. Der Server meldete:",
+    "remove": "Plugin entfernen"
   },
   "noPermissions": "Keine angefordert",
   "updatePolicy": {
@@ -142,15 +152,13 @@
     }
   },
   "deleteTooltip": "Plugin entfernen",
-  "aside": {
-    "title": "Ein Plugin schreiben",
-    "description": "Plugins erweitern API und Frontend aus einem einzigen Bundle. Der Entwicklerleitfaden beschreibt Manifest, Berechtigungsmodell und lokale Entwicklung."
-  },
   "deleteConfirmation": {
     "title": "Plugin entfernen?",
-    "message": "Das Plugin {{pluginName}} entfernen? Sein Code und seine Laufzeitregistrierungen werden entfernt und die App wird neu geladen. Plugin-Daten und Geheimnisse bleiben zur Wiederherstellung erhalten.",
     "cancel": "Abbrechen",
-    "delete": "Entfernen"
+    "delete": "Entfernen",
+    "messageRegistry": "Das Plugin {{pluginName}} entfernen? Sein Code und seine Laufzeitregistrierungen werden entfernt und die App wird neu geladen. Seine Daten und Geheimnisse bleiben erhalten; eine erneute Installation setzt mit ihnen fort.",
+    "messageUploaded": "Das Plugin {{pluginName}} entfernen? Sein Code, seine Laufzeitregistrierungen und alle gespeicherten Daten werden dauerhaft gelöscht, und die App wird neu geladen. Erstellen Sie vorher ein Backup, wenn Sie die Daten noch brauchen könnten.",
+    "messageRefused": "Das abgelehnte Plugin {{pluginName}} entfernen? Seine Dateien werden entfernt, ohne seinen Code auszuführen, und die App wird neu geladen. Seine gespeicherten Daten bleiben in der Datenbank, bis eine kompatible Version sie übernimmt."
   },
   "error": {
     "versions": {

@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
-import { MessageReferenceType } from '@attraccess/database-entities';
+import { MessageReferenceType } from '@attraccess/application-models';
 
 export class SendMessageDto {
   @IsString()

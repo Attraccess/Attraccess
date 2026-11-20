@@ -1,10 +1,11 @@
-import { User } from '@attraccess/database-entities';
+import type { UserRecord } from '@attraccess/application-models';
+import type { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
-import { Inject, Injectable, Logger, forwardRef, BadRequestException } from '@nestjs/common';
-
-import { EntityManager } from 'typeorm';
+import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 
 import { EmailService } from '../../email/email.service';
+
+import { LicenseError } from '../../license/license.service';
 
 import { AuthService } from '../auth/auth.service';
 
@@ -31,7 +32,6 @@ import { Readable } from 'stream';
 export class UserInvitationService {
   constructor(
     protected readonly usersService: UsersService,
-    @Inject(forwardRef(() => AuthService))
     protected readonly authService: AuthService,
     protected readonly emailService: EmailService,
   ) {}
@@ -40,29 +40,60 @@ export class UserInvitationService {
 
   protected async inviteUsersTransactional(
     candidates: Array<{ username: string; email: string; locale?: string; roleKey?: string }>,
-    options?: { grantAllPermissionsToFirst?: boolean; actorId?: number },
-  ): Promise<User[]> {
-    await this.usersService.ensureLicenseForNewUsers(candidates.length);
+    options?: { grantAllPermissionsToFirst?: boolean; actor?: AuthenticatedUser },
+  ): Promise<UserRecord[]> {
+    try {
+      await this.usersService.ensureLicenseForNewUsers(candidates.length);
+    } catch (error) {
+      if (error instanceof LicenseError) {
+        this.logger.warn(`Blocking user invitation due to license: ${error.reason}`);
+        throw new ForbiddenException(error.reason);
+      }
+      throw error;
+    }
 
-    return this.usersService
-      .withTransaction(async (manager: EntityManager) => {
+    // SMTP can take seconds, and while a transaction is open every other request waits for the connection: the mails
+    // go out after the commit. A failed send takes the invitation back, as the rollback did when sending ran inside it.
+    const send: { failure?: { error: unknown } } = {};
+    const invitations = await this.usersService
+      .withTransaction(async (scope) => {
         const createdUsers = await this.usersService.createMany(candidates, {
           grantAllPermissionsToFirst: options?.grantAllPermissionsToFirst ?? false,
-          manager,
-          actorId: options?.actorId,
+          context: scope,
+          actor: options?.actor,
         });
 
+        const invited: Array<{ user: UserRecord; token: string }> = [];
         for (const user of createdUsers) {
-          const verificationToken = await this.authService.generateEmailVerificationToken(user, manager);
-          await this.emailService.sendUserInvitationEmail(user, verificationToken, manager);
+          invited.push({ user, token: await this.authService.generateEmailVerificationToken(user, scope) });
         }
-
-        return createdUsers;
+        scope.afterCommit(async () => {
+          try {
+            for (const { user, token } of invited) {
+              await this.emailService.sendUserInvitationEmail(user, token);
+            }
+          } catch (error) {
+            send.failure = { error };
+            await this.takeBackInvitations(invited.map(({ user }) => user.id));
+          }
+        });
+        return invited;
       })
       .catch((error) => mapEmailSendError(error));
+
+    if (send.failure) mapEmailSendError(send.failure.error);
+    return invitations.map(({ user }) => user);
   }
 
-  public async inviteUser(body: InviteUserDto, adminLocale?: string): Promise<User> {
+  private async takeBackInvitations(userIds: number[]): Promise<void> {
+    try {
+      await this.usersService.deleteUnacceptedInvitations(userIds);
+    } catch (revertError) {
+      this.logger.error('Failed to take back invitations after an email failure', (revertError as Error).stack);
+    }
+  }
+
+  public async inviteUser(body: InviteUserDto, adminLocale?: string): Promise<UserRecord> {
     // createMany does not check for taken identities and the unique constraints would surface as a 500
     const email = normalizeEmail(body.email);
     const username = this.usersService.cleanupUsername(body.username);
@@ -90,8 +121,8 @@ export class UserInvitationService {
     file: FileUpload | undefined,
     rawConfig: string | CsvInviteConfigDto | undefined,
     adminLocale?: string,
-    actorId?: number,
-  ): Promise<User[]> {
+    actor?: AuthenticatedUser,
+  ): Promise<UserRecord[]> {
     let configPayload: unknown;
     try {
       configPayload = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
@@ -158,7 +189,7 @@ export class UserInvitationService {
     try {
       const invitedUsers = await this.inviteUsersTransactional(
         candidates.map((c) => ({ ...c, locale: adminLocale })),
-        { grantAllPermissionsToFirst: true, actorId },
+        { grantAllPermissionsToFirst: true, actor },
       );
       return invitedUsers;
     } catch (error) {

@@ -57,7 +57,7 @@ async function call<T>(client: ReturnType<typeof createPluginApiClient>, path: s
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
   const text = await response.text();
-  let parsed: unknown = null;
+  let parsed: unknown;
   try {
     parsed = text ? JSON.parse(text) : null;
   } catch {

@@ -72,6 +72,8 @@ private:
     // Demo-mode card scan for the settings screen (register card → role)
 #endif
 
+    // Runs on a PSRAM stack: it reaches NVS through Settings and esp_wifi, and must never map flash
+    // (psram_task.hpp).
     static void
     networkTask(void *parameter);
 

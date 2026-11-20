@@ -1,9 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Setting } from '@attraccess/database-entities';
-import { EntityManager, Repository } from 'typeorm';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EncryptionService } from '../encryption/encryption.service';
 import { APP_PARENT, SETTINGS_CACHE_TTL_MS } from './constants';
+import { SETTINGS_ROWS, SettingsReadContext, SettingsRows } from './settings-rows.port';
 
 type CachedSetting = {
   value: string | null;
@@ -17,8 +15,8 @@ export class SettingsStoreService {
   private readonly cache = new Map<string, CachedSetting>();
 
   constructor(
-    @InjectRepository(Setting)
-    private readonly settingRepository: Repository<Setting>,
+    @Inject(SETTINGS_ROWS)
+    private readonly rows: SettingsRows,
     private readonly encryptionService: EncryptionService,
   ) {}
 
@@ -30,7 +28,7 @@ export class SettingsStoreService {
    * With a transaction, a cache miss reads through it (no wait on another connection) and is not cached,
    * because the transaction may still roll back.
    */
-  async getPlainSetting(parent: string, key: string, transaction?: EntityManager): Promise<string | null> {
+  async getPlainSetting(parent: string, key: string, transaction?: SettingsReadContext): Promise<string | null> {
     const cacheKey = this.getCacheKey(parent, key);
     const cached = this.getCached(cacheKey);
     if (cached) {
@@ -38,14 +36,13 @@ export class SettingsStoreService {
     }
 
     if (transaction) {
-      const row = await transaction.getRepository(Setting).findOneBy({ parent, key });
-      return row?.value ?? null;
+      return this.rows.findValue(parent, key, transaction);
     }
 
-    const existing = await this.settingRepository.findOneBy({ parent, key });
-    if (existing) {
-      this.setCache(cacheKey, existing.value, true);
-      return existing.value;
+    const existing = await this.rows.findValue(parent, key);
+    if (existing !== null) {
+      this.setCache(cacheKey, existing, true);
+      return existing;
     }
     this.setCache(cacheKey, null, false);
     return null;
@@ -58,9 +55,9 @@ export class SettingsStoreService {
       return { value: cached.value, configured: cached.configured };
     }
 
-    const existing = await this.settingRepository.findOneBy({ parent, key });
-    if (existing?.value) {
-      const decrypted = this.decryptSecret(parent, key, existing.value);
+    const existing = await this.rows.findValue(parent, key);
+    if (existing) {
+      const decrypted = this.decryptSecret(parent, key, existing);
       this.setCache(cacheKey, decrypted, true);
       return { value: decrypted, configured: true };
     }
@@ -72,7 +69,7 @@ export class SettingsStoreService {
     const cacheKey = this.getCacheKey(parent, key);
     const normalized = this.normalizeString(value);
     if (!normalized) {
-      await this.settingRepository.delete({ parent, key });
+      await this.rows.remove(parent, key);
       this.setCache(cacheKey, null, false);
       return;
     }
@@ -85,7 +82,7 @@ export class SettingsStoreService {
     const cacheKey = this.getCacheKey(parent, key);
     const normalized = this.normalizeString(value);
     if (!normalized) {
-      await this.settingRepository.delete({ parent, key });
+      await this.rows.remove(parent, key);
       this.setCache(cacheKey, null, false);
       return;
     }
@@ -127,17 +124,8 @@ export class SettingsStoreService {
     return trimmed.length > 0 ? trimmed : null;
   }
 
-  /**
-   * Single-statement writes: save() would wrap the change in a deferred read-then-write transaction, which SQLite
-   * fails with SQLITE_BUSY at once (no busy wait) when another connection holds the write lock.
-   */
   private async upsertSetting(parent: string, key: string, value: string): Promise<void> {
-    const existing = await this.settingRepository.findOneBy({ parent, key });
-    if (existing) {
-      await this.settingRepository.update(existing.id, { value });
-    } else {
-      await this.settingRepository.insert({ parent, key, value });
-    }
+    await this.rows.upsertValue(parent, key, value);
   }
 
   private decryptSecret(parent: string, key: string, value: string): string {

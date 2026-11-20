@@ -1,7 +1,14 @@
 {
   "title": "Reservations",
-  "sidebar": { "my": "My reservations", "manage": "Manage reservations" },
-  "slots": { "settings": "Reservations", "admin": "Reservations", "account": "Calendar feeds (iCal)" },
+  "sidebar": {
+    "my": "My reservations",
+    "manage": "Manage reservations"
+  },
+  "slots": {
+    "settings": "Reservations",
+    "admin": "Reservations",
+    "account": "Calendar feeds (iCal)"
+  },
   "common": {
     "cancel": "Cancel",
     "close": "Close",
@@ -48,6 +55,8 @@
     "OUTSIDE_BOOKABLE_HOURS": "The slot is outside the bookable hours.",
     "USER_BOOKING_LIMIT": "You have reached the maximum number of active bookings for this resource.",
     "OVERLAP": "The slot overlaps another booking. Please choose a different time.",
+    "OVERLAP_FULL": "All slots are booked at this time. Please choose a different time.",
+    "OWN_OVERLAP": "You already have a booking that overlaps this time. Please choose a different time.",
     "MAINTENANCE": "The resource is in maintenance during this time.",
     "NOT_PENDING": "This booking is no longer waiting for approval.",
     "NOT_ACTIVE": "This booking is not active.",
@@ -86,6 +95,7 @@
     "free": "No bookings",
     "reserved": "Reserved",
     "reservedPending": "Reserved (pending approval)",
+    "slotsBooked": "{{booked}} of {{total}} slots reserved",
     "yours": "Your booking",
     "maintenance": "Maintenance",
     "openEnd": "open end"
@@ -265,7 +275,10 @@
         "one": "{{count}} upcoming booking exists. Disabling reservations cancels it and notifies the holder.",
         "many": "{{count}} upcoming bookings exist. Disabling reservations cancels them and notifies the holders."
       },
-      "confirm": { "one": "Disable and cancel {{count}} booking", "many": "Disable and cancel {{count}} bookings" }
+      "confirm": {
+        "one": "Disable and cancel {{count}} booking",
+        "many": "Disable and cancel {{count}} bookings"
+      }
     },
     "saved": {
       "title": "Settings saved",
@@ -305,8 +318,14 @@
       "ownOnly": "Only my own bookings",
       "introduced": "Resources I am introduced to",
       "maintained": "Resources I maintain",
-      "groups": { "one": "{{count}} group", "many": "{{count}} groups" },
-      "resources": { "one": "{{count}} resource", "many": "{{count}} resources" }
+      "groups": {
+        "one": "{{count}} group",
+        "many": "{{count}} groups"
+      },
+      "resources": {
+        "one": "{{count}} resource",
+        "many": "{{count}} resources"
+      }
     },
     "form": {
       "createTitle": "New calendar feed",
@@ -342,5 +361,17 @@
       "body": "The link stops working for good. This cannot be undone.",
       "confirm": "Revoke"
     }
+  },
+  "dashboard": {
+    "title": "Upcoming reservations",
+    "description": "Your next bookings",
+    "empty": "No upcoming reservations.",
+    "unknownResource": "Unknown resource",
+    "manage": "Manage",
+    "loadError": "Your reservations could not be loaded.",
+    "next": "Next",
+    "now": "Now",
+    "group": "Reservations",
+    "keywords": ["booking", "calendar"]
   }
 }

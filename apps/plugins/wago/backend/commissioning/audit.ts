@@ -1,12 +1,13 @@
 import { UnauthorizedException } from '@nestjs/common';
 import type { AuthenticatedRequest, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { randomUUID } from 'node:crypto';
+import type { AuthenticationMethod } from '@attraccess/plugins-backend-sdk';
 
 // Structurally identical to ATT-983's PluginAuditPrincipal. The commissioning
 // stack can load before that SDK addition; it never supplies a second sink.
 export interface CommissioningPrincipal {
   userId: number;
-  authenticationMethod: 'session' | 'api-token';
+  authenticationMethod: AuthenticationMethod;
   apiTokenId?: number;
 }
 

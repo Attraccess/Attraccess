@@ -1,4 +1,8 @@
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { AUTHENTICATION_METHODS, type AuthenticationMethod } from '@attraccess/application-models';
+
+export { AUTHENTICATION_METHODS };
+export type { AuthenticationMethod };
 
 /** Historical identifiers deliberately have no foreign keys or cascade relations. */
 @Entity('audit_log')
@@ -31,7 +35,7 @@ export class AuditLog {
   actorId!: number | null;
 
   @Column({ type: 'varchar', nullable: true })
-  authenticationMethod!: 'session' | 'api-token' | null;
+  authenticationMethod!: AuthenticationMethod | null;
 
   @Column({ type: 'integer', nullable: true })
   apiTokenId!: number | null;

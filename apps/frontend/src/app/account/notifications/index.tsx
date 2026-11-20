@@ -1,10 +1,10 @@
 import {
   ApiError,
   NotificationCategory,
-  UseNotificationsServiceNotificationsGetPreferencesKeyFn,
-  useLicenseServiceGetLicenseInformation,
-  useNotificationsServiceNotificationsGetPreferences,
-  useNotificationsServiceNotificationsUpdatePreferences,
+  UseNotificationsGetPreferencesKeyFn,
+  useGetLicenseInformation,
+  useNotificationsGetPreferences,
+  useNotificationsUpdatePreferences,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -32,12 +32,12 @@ export interface PreferenceGroup {
   rows: PreferenceRow[];
 }
 
-export function useNotificationPreferencesFormState() {
+export function NotificationPreferencesForm() {
   const { t } = useTranslations({ en, de });
   const queryClient = useQueryClient();
   const push = usePushNotifications();
   const { success: showSuccess, error: showError } = useToastMessage();
-  const { data: license } = useLicenseServiceGetLicenseInformation();
+  const { data: license } = useGetLicenseInformation();
   const hasMaintenance = license?.modules.includes('maintenance') ?? true;
   const isBulkUpdatingRef = useRef(false);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
@@ -70,7 +70,7 @@ export function useNotificationPreferencesFormState() {
     [hasMaintenance],
   );
 
-  const { data: preferences, isLoading } = useNotificationsServiceNotificationsGetPreferences();
+  const { data: preferences, isLoading } = useNotificationsGetPreferences();
   const language = useTranslationState((state) => state.language);
 
   const groups: PreferenceGroup[] = useMemo(() => {
@@ -109,9 +109,9 @@ export function useNotificationPreferencesFormState() {
     [preferences],
   );
 
-  const { mutate, mutateAsync } = useNotificationsServiceNotificationsUpdatePreferences({
+  const { mutate, mutateAsync } = useNotificationsUpdatePreferences(undefined, {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: UseNotificationsServiceNotificationsGetPreferencesKeyFn() });
+      queryClient.invalidateQueries({ queryKey: UseNotificationsGetPreferencesKeyFn() });
       if (!isBulkUpdatingRef.current) showSuccess({ title: t('messages.updated') });
     },
     onError: (rawError) => {
@@ -131,14 +131,14 @@ export function useNotificationPreferencesFormState() {
 
   const updateChannel = useCallback(
     (category: string, channel: NotificationChannel, value: boolean) => {
-      mutate({ requestBody: { category, channels: { [channel]: value } } });
+      mutate({ body: { category, channels: { [channel]: value } } });
     },
     [mutate],
   );
 
   const toggleCategory = useCallback(
     (category: string, value: boolean) => {
-      mutate({ requestBody: { category, channels: { email: value, push: value, toast: value } } });
+      mutate({ body: { category, channels: { email: value, push: value, toast: value } } });
     },
     [mutate],
   );
@@ -149,9 +149,7 @@ export function useNotificationPreferencesFormState() {
       setIsBulkUpdating(true);
       try {
         const results = await Promise.allSettled(
-          updates.map(({ category, channelValues }) =>
-            mutateAsync({ requestBody: { category, channels: channelValues } }),
-          ),
+          updates.map(({ category, channelValues }) => mutateAsync({ body: { category, channels: channelValues } })),
         );
         const hasError = results.some((r) => r.status === 'rejected');
         if (hasError) {
@@ -221,39 +219,6 @@ export function useNotificationPreferencesFormState() {
       />
     );
   };
-  return {
-    t,
-    push,
-    showSuccess,
-    showError,
-    groups,
-    toggleCategory,
-    toggleGroupChannel,
-    toggleAll,
-    isCategoryAllEnabled,
-    isGroupChannelAllEnabled,
-    isAllEnabled,
-    disabled,
-    renderChannelSwitch,
-  } as const;
-}
-
-export function NotificationPreferencesForm() {
-  const {
-    t,
-    push,
-    showSuccess,
-    showError,
-    groups,
-    toggleCategory,
-    toggleGroupChannel,
-    toggleAll,
-    isCategoryAllEnabled,
-    isGroupChannelAllEnabled,
-    isAllEnabled,
-    disabled,
-    renderChannelSwitch,
-  } = useNotificationPreferencesFormState();
 
   return (
     <div className="flex flex-col gap-4">

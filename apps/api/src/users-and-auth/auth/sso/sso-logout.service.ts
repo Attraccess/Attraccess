@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { AppConfigType } from '../../../config/app.config';
 import { BadRequestException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
-import { SSOProviderType, SsoSessionContext } from '@attraccess/database-entities';
+import { SSOProviderType, SsoSessionContext } from '@attraccess/application-models';
 import { randomBytes, createHash } from 'node:crypto';
 import { SamlConfig } from '@node-saml/node-saml';
 import { SettingsService } from '../../../settings/settings.service';
@@ -14,6 +14,7 @@ import { OidcTokenVerifier } from './oidc/oidc-token-verifier.service';
 import { SamlLogoutAdapter } from './saml/saml-logout-adapter';
 import { SSOSamlStrategy } from './saml/saml.strategy';
 import { trustedEndpoint } from './logout-endpoints';
+import { isValkeyUnavailableError } from '../../../valkey/valkey-unavailable';
 import { CentralLogoutResult, LogoutCapability, LogoutReturnResult } from './logout.types';
 
 const TTL_MS = 300000;
@@ -192,7 +193,9 @@ export class SsoLogoutService {
         },
         { key: receiptKey('OIDC', providerId, claims.jti), expiresAt: (claims.exp + 30) * 1000 },
       );
-    } catch {
+    } catch (error) {
+      // Valkey being down is not an invalid notification: let it answer 503 so the identity provider retries.
+      if (isValkeyUnavailableError(error)) throw error;
       throw new BadRequestException('Invalid OIDC logout notification');
     }
   }
@@ -311,7 +314,8 @@ export class SsoLogoutService {
       );
       if (!fresh) throw new Error('Replayed request');
       return adapter.response(message.id, container.RelayState);
-    } catch {
+    } catch (error) {
+      if (isValkeyUnavailableError(error)) throw error;
       throw new BadRequestException('Invalid SAML logout exchange');
     }
   }

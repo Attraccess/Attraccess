@@ -1,25 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { firstValueFrom, take, toArray } from 'rxjs';
-import { ConversationParticipant, Message } from '@attraccess/database-entities';
+import type { MessageRecord } from '@attraccess/application-models';
+import { CONVERSATION_STORE } from './conversation-store.port';
 import { MessagingLiveService } from './messaging-live.service';
 import { MessageCreatedEvent } from './events/message-created.event';
 
 describe('MessagingLiveService', () => {
   let service: MessagingLiveService;
-  let participantRepository: { find: jest.Mock };
-  let messageRepository: { findOne: jest.Mock };
+  let store: { participantUserIds: jest.Mock; findMessageWithSender: jest.Mock };
 
   beforeEach(async () => {
-    participantRepository = { find: jest.fn() };
-    messageRepository = { findOne: jest.fn() };
+    store = { participantUserIds: jest.fn(), findMessageWithSender: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        MessagingLiveService,
-        { provide: getRepositoryToken(ConversationParticipant), useValue: participantRepository },
-        { provide: getRepositoryToken(Message), useValue: messageRepository },
-      ],
+      providers: [MessagingLiveService, { provide: CONVERSATION_STORE, useValue: store }],
     }).compile();
 
     service = module.get(MessagingLiveService);
@@ -46,25 +40,20 @@ describe('MessagingLiveService', () => {
   });
 
   it('pushes the new message to every recipient except the sender', async () => {
-    participantRepository.find.mockResolvedValue([
-      { userId: 5 } as ConversationParticipant,
-      { userId: 9 } as ConversationParticipant,
-    ]);
+    store.participantUserIds.mockResolvedValue([5, 9]);
 
-    const message = { id: 3, conversationId: 1, senderId: 5 } as Message;
-    const messageWithSender = { ...message, sender: { id: 5, username: 'sender' } } as Message;
-    messageRepository.findOne.mockResolvedValue(messageWithSender);
+    const message = { id: 3, conversationId: 1, senderId: 5 } as MessageRecord;
+    const messageWithSender = { ...message, sender: { id: 5, username: 'sender' } } as MessageRecord;
+    store.findMessageWithSender.mockResolvedValue(messageWithSender);
 
-    const recipientEvents = firstValueFrom(
-      service.getUserMessageSubject(9).pipe(take(1), toArray()),
-    );
+    const recipientEvents = firstValueFrom(service.getUserMessageSubject(9).pipe(take(1), toArray()));
 
-    const senderEvents: { data: Message }[] = [];
+    const senderEvents: { data: MessageRecord }[] = [];
     service.getUserMessageSubject(5).subscribe((event) => senderEvents.push(event));
 
     await service.notifyNewMessage(new MessageCreatedEvent(message));
 
-    expect(messageRepository.findOne).toHaveBeenCalledWith({ where: { id: 3 }, relations: ['sender'] });
+    expect(store.findMessageWithSender).toHaveBeenCalledWith(3);
     await expect(recipientEvents).resolves.toEqual([{ data: messageWithSender }]);
     expect(senderEvents).toHaveLength(0);
   });

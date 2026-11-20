@@ -104,7 +104,7 @@ export class UserInvitationEmail1763122777587 implements MigrationInterface {
     await queryRunner.query(`ALTER TABLE "temporary_email_templates" RENAME TO "email_templates"`);
 
     await queryRunner.query(
-      `INSERT INTO "email_templates" ("type", "subject", "body", "variables") VALUES ($1, $2, $3, $4)`,
+      `INSERT INTO "email_templates" ("type", "subject", "body", "variables") VALUES (?, ?, ?, ?)`,
       [
         'user-invitation',
         'You have been invited to join Attraccess!',

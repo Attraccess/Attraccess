@@ -18,8 +18,8 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   }))()),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAccessControlServiceResourceIntroducersGetNames: () => ({ data: state.introducers, isLoading: state.loading }),
-  useResourcesServiceResourceRetrainingGetStatus: () => ({ data: state.status }),
+  useResourceIntroducersGetNames: () => ({ data: state.introducers, isLoading: state.loading }),
+  useResourceRetrainingGetStatus: () => ({ data: state.status }),
 }));
 beforeEach(() => {
   state.loading = false;

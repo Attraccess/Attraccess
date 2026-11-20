@@ -1,67 +1,84 @@
 import { Button } from '@attraccess/plugins-frontend-ui';
 import { Accordion } from '@heroui/react';
-import type { useRuntimeUpdateDetailsState } from './useRuntimeUpdateDetailsState';
-export function RuntimeRecoveryControls({ model }: { model: ReturnType<typeof useRuntimeUpdateDetailsState> }) {
-  if (!model.status) return null;
+import type { RuntimeUpdateStatus } from '../api/client';
+import { useWagoTranslations } from '../i18n';
+
+export type RuntimeRecoveryAction = 'password' | 'retry' | 'restore' | 'runtime';
+
+interface RuntimeRecoveryControlsProps {
+  status: RuntimeUpdateStatus;
+  /** Set for an enrolled controller; recovery then also offers retrying the runtime update. */
+  controllerId: number | null;
+  /** The revealed root recovery password, if any. */
+  password: string | null;
+  /** A recovery action is running; RuntimeUpdateDetails owns it so it survives a status-query error. */
+  pending: boolean;
+  onAction: (kind: RuntimeRecoveryAction) => void;
+  onHidePassword: () => void;
+  onExpandedChange: (expanded: boolean) => void;
+}
+
+export function RuntimeRecoveryControls({
+  status,
+  controllerId,
+  password,
+  pending,
+  onAction,
+  onHidePassword,
+  onExpandedChange,
+}: RuntimeRecoveryControlsProps) {
+  const { t } = useWagoTranslations();
   return (
     <Accordion>
-      <Accordion.Item
-        onExpandedChange={(expanded) => {
-          model.lifetime.recoveryExpanded = expanded;
-          if (!expanded) {
-            model.lifetime.recoveryGeneration++;
-            model.setPassword(null);
-          }
-        }}
-      >
+      <Accordion.Item onExpandedChange={onExpandedChange}>
         <Accordion.Heading>
           <Accordion.Trigger>
-            {model.t('runtimeManagement.administratorRecovery')}
+            {t('runtimeManagement.administratorRecovery')}
             <Accordion.Indicator />
           </Accordion.Trigger>
         </Accordion.Heading>
         <Accordion.Panel>
           <Accordion.Body>
-            {model.status.management === 'recovery_required' && (
-              <Button variant="secondary" isPending={model.pending} onPress={() => void model.action('retry')}>
-                {model.t('runtimeManagement.retryAccess')}
+            {status.management === 'recovery_required' && (
+              <Button variant="secondary" isPending={pending} onPress={() => onAction('retry')}>
+                {t('runtimeManagement.retryAccess')}
               </Button>
             )}
-            {model.controllerId &&
-              model.status.management === 'managed' &&
-              model.status.update &&
-              (['failed', 'blocked', 'recovery_required'].includes(model.status.update.phase) ||
-                !!model.status.update.cleanupRetryAt) && (
-                <Button variant="secondary" isPending={model.pending} onPress={() => void model.action('runtime')}>
-                  {model.t('runtimeManagement.retryRuntime')}
+            {controllerId &&
+              status.management === 'managed' &&
+              status.update &&
+              (['failed', 'blocked', 'recovery_required'].includes(status.update.phase) ||
+                !!status.update.cleanupRetryAt) && (
+                <Button variant="secondary" isPending={pending} onPress={() => onAction('runtime')}>
+                  {t('runtimeManagement.retryRuntime')}
                 </Button>
               )}
-            <p className="wg:mb-3 wg:text-sm wg:text-muted">{model.t('runtimeManagement.recoveryDescription')}</p>
+            <p className="wg:mb-3 wg:text-sm wg:text-muted">{t('runtimeManagement.recoveryDescription')}</p>
             <Button
               fullWidth
               className="wg:h-auto wg:min-h-8 wg:whitespace-normal wg:py-2"
               size="sm"
               variant="secondary"
-              isDisabled={model.pending || !model.status.sessionId}
-              onPress={() => (model.password ? model.setPassword(null) : void model.action('password'))}
+              isDisabled={pending || !status.sessionId}
+              onPress={() => (password ? onHidePassword() : onAction('password'))}
             >
-              {model.t(model.password ? 'runtimeManagement.hidePassword' : 'runtimeManagement.revealPassword')}
+              {t(password ? 'runtimeManagement.hidePassword' : 'runtimeManagement.revealPassword')}
             </Button>
-            {model.password && (
-              <code className="wg:break-all" aria-label={model.t('runtimeManagement.passwordLabel')}>
-                {model.password}
+            {password && (
+              <code className="wg:break-all" aria-label={t('runtimeManagement.passwordLabel')}>
+                {password}
               </code>
             )}
-            <p className="wg:text-sm wg:text-muted">{model.t('runtimeManagement.restoreDescription')}</p>
+            <p className="wg:text-sm wg:text-muted">{t('runtimeManagement.restoreDescription')}</p>
             <Button
               fullWidth
               className="wg:h-auto wg:min-h-8 wg:whitespace-normal wg:py-2"
               size="sm"
               variant="secondary"
-              isDisabled={model.pending || !model.status.sessionId}
-              onPress={() => void model.action('restore')}
+              isDisabled={pending || !status.sessionId}
+              onPress={() => onAction('restore')}
             >
-              {model.t('runtimeManagement.restore')}
+              {t('runtimeManagement.restore')}
             </Button>
           </Accordion.Body>
         </Accordion.Panel>

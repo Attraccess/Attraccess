@@ -1,0 +1,8 @@
+{
+  "disabledTitle": "Plugin \"{{name}}\" is disabled",
+  "refused": "Attraccess refused this plugin: it was built for an older plugin SDK or breaks its rules. Open Settings > Plugins to remove it or install a compatible version.",
+  "failed": "The plugin failed to load. Open Settings > Plugins for details.",
+  "frontendFailed": "The plugin's user interface failed to load.",
+  "dependencyFailed": "Required plugin {{dependency}} failed to load, so {{name}} is inactive.",
+  "dependencyCycle": "Plugin dependency cycle: {{cycle}}"
+}

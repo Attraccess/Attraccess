@@ -10,18 +10,20 @@ import { IntroductionRequiredDisplay } from '../IntroductionRequiredDisplay';
 import { RetrainingStatusBanner } from '../RetrainingStatusBanner';
 import { StartSessionControls } from '../StartSessionControls';
 import {
-  useAccessControlServiceResourceIntroducersGetNames,
-  useResourcesServiceResourceUsageGetActiveSession,
-  useResourcesServiceResourceUsageGetActiveSessionKey,
-  useResourcesServiceResourceUsageCanControlKey,
-  UseResourcesServiceResourceUsageStartBlockedKeyFn,
+  useResourceIntroducersGetNames,
+  useResourceUsageGetActiveSession,
+  UseResourceUsageGetActiveSessionKeyFn,
+  UseResourceUsageCanControlKeyFn,
+  UseResourceUsageStartBlockedKeyFn,
   Resource,
-  useResourcesServiceResourceUsageCanControl,
-  useResourceMaintenancesServiceFindMaintenances,
+  useResourceUsageCanControl,
+  useFindMaintenances,
   SupervisionMode,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLiveUpdates } from '../../../../../utils/live-updates';
+import { SESSION_EVENTS } from '../../sessionEvents';
+import { mySessionsQueryKey } from '../../../../resourceOverview/activeUsageSessionsBanner/mySessionsQuery';
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { MaintenanceInProgressDisplay } from './maintenance';
@@ -29,12 +31,6 @@ import { FlatSection } from '../../../../../components/flatSection';
 import { RequestMaintenanceButton } from '../../../details/maintenance-management/request';
 import { InstantMaintenanceButton } from '../../../details/maintenance-management/instant';
 
-// ponytail: only these events affect session/control state; health and other events don't need a refetch.
-const SESSION_EVENTS = new Set([
-  'resource.usage.session_started',
-  'resource.usage.session_ended',
-  'resource.usage.session_taken_over',
-]);
 // A plugin's start-blocked answer may have changed (e.g. a booking began or ended). Only that one query depends on
 // it, so it must not refetch the session state of every viewer.
 const START_BLOCKED_CHANGED_EVENT = 'resource.start_blocked_changed';
@@ -58,14 +54,17 @@ export function ResourceUsageSession({
 
   // The gate inside StartSessionControls reads this query; a session starting or ending can change its answer too.
   const invalidateStartBlocked = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: UseResourcesServiceResourceUsageStartBlockedKeyFn({ resourceId }) });
+    queryClient.invalidateQueries({ queryKey: UseResourceUsageStartBlockedKeyFn({ path: { resourceId } }) });
   }, [queryClient, resourceId]);
 
   const invalidateSessionQueries = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: [useResourcesServiceResourceUsageGetActiveSessionKey] });
-    queryClient.invalidateQueries({ queryKey: [useResourcesServiceResourceUsageCanControlKey] });
+    // Only this resource: the dashboard renders one of these per pinned resource.
+    queryClient.invalidateQueries({ queryKey: UseResourceUsageGetActiveSessionKeyFn({ path: { resourceId } }) });
+    queryClient.invalidateQueries({ queryKey: UseResourceUsageCanControlKeyFn({ path: { resourceId } }) });
+    // The dashboard's "My sessions" list; refetched only while it is shown.
+    queryClient.invalidateQueries({ queryKey: mySessionsQueryKey(), exact: true });
     invalidateStartBlocked();
-  }, [queryClient, invalidateStartBlocked]);
+  }, [queryClient, resourceId, invalidateStartBlocked]);
 
   useLiveUpdates({
     topic: 'resource',
@@ -79,17 +78,17 @@ export function ResourceUsageSession({
     },
   });
 
-  const { data: access, isLoading: isLoadingIntroStatus } = useResourcesServiceResourceUsageCanControl(
-    { resourceId },
+  const { data: access, isLoading: isLoadingIntroStatus } = useResourceUsageCanControl(
+    { path: { resourceId } },
     undefined,
   );
 
-  const { data: introducers, isLoading: isLoadingIntroducers } = useAccessControlServiceResourceIntroducersGetNames({
-    resourceId,
+  const { data: introducers, isLoading: isLoadingIntroducers } = useResourceIntroducersGetNames({
+    path: { resourceId },
   });
 
-  const { data: activeSessionResponse, isLoading: isLoadingSession } = useResourcesServiceResourceUsageGetActiveSession(
-    { resourceId },
+  const { data: activeSessionResponse, isLoading: isLoadingSession } = useResourceUsageGetActiveSession(
+    { path: { resourceId } },
     undefined,
   );
 
@@ -127,10 +126,7 @@ export function ResourceUsageSession({
     resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED ||
     resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED;
 
-  const { data: activeMaintenances } = useResourceMaintenancesServiceFindMaintenances({
-    resourceId,
-    includeActive: true,
-  });
+  const { data: activeMaintenances } = useFindMaintenances({ path: { resourceId }, query: { includeActive: true } });
 
   const renderStartArea = () => {
     if (!canStartSession && !supervisionEnabled) {

@@ -1,5 +1,6 @@
 # Aktualisierung
-<!-- llms-description: So prüfen Sie auf neue Attraccess-Versionen und aktualisieren mit Docker Compose, Docker oder Portainer oder legen eine feste Version fest. -->
+
+<!-- llms-description: So prüfen Sie auf neue Attraccess-Versionen und aktualisieren mit Docker Compose, Docker oder Portainer, legen eine feste Version fest und gehen über 1.11 auf 2.0. -->
 
 So aktualisieren Sie Attraccess auf die neueste Version.
 
@@ -19,6 +20,33 @@ Sie können den Stand auch jederzeit manuell prüfen, indem Sie Ihre laufende Ve
 
 Überprüfen Sie die [Release-Notes](https://github.com/Attraccess/Attraccess/releases) auf Breaking Changes, bevor Sie aktualisieren.
 
+> [!WARNING]
+> **Attractap-Lesegeräte koppeln nach dem Release, das die Token-Anmeldung entfernt (Attractap-Firmware 2.6.0), neu.**
+> Sein erster Start löscht alle Einträge der Lesegeräte, samt Namen, Ressourcen-Verknüpfungen, Einstellungen
+> pro Lesegerät und der Auswahl der Lesegeräte für das Schreiben von Karten. Jedes Lesegerät muss neu gekoppelt
+> werden. Lesegeräte, die sich noch mit einem Token anmelden, lassen sich nicht per Funk aktualisieren; flashen
+> Sie sie zuerst per USB mit dem Web-Flasher auf Firmware 2.6.0. Siehe
+> [Nach dem Upgrade: jeder Reader koppelt neu](attractap/pairing.md#nach-dem-upgrade-jeder-reader-koppelt-neu).
+
+## Upgrade auf Attraccess 2.0
+
+Attraccess 2.0 übernimmt die Daten von Plugins (WAGO, Matter, Shelly, Reservierungen und andere) nur vom letzten
+1.x-Release, **Attraccess 1.11**. Aktualisieren Sie in zwei Schritten:
+
+1. Erstellen Sie ein [Backup](installation/backup-restore.md).
+2. Aktualisieren Sie auf Attraccess 1.11 (fixieren Sie das neueste `v1.11.x`-Tag, siehe
+   [Eine feste Version festlegen](#eine-feste-version-festlegen)) und starten Sie es **einmal**, damit jedes Plugin seine
+   Migrationen abschließt. Prüfen Sie unter **Einstellungen → Plugins**, dass alle Plugins laden.
+3. Erstellen Sie ein weiteres Backup und aktualisieren Sie dann auf 2.0.
+
+Überspringen Sie Schritt 2, etwa von 1.10 aus, lehnt Attraccess 2.0 jedes betroffene Plugin mit einer (englischen)
+Meldung ab: Attraccess 2.0 übernehme die Daten des Plugins nur vom letzten 1.x-Release (1.11); spielen Sie das Backup
+von vor dem Upgrade zurück, aktualisieren Sie auf Attraccess 1.11, starten Sie es einmal und aktualisieren Sie dann auf
+2.0. In diesem Fall wurde nichts geändert: Folgen Sie der Meldung.
+
+Für 1.x gebaute Plugins laden unter 2.0 gar nicht; installieren Sie deren 2.0-Builds (siehe
+[Upgrade auf Attraccess 2.0](plugins/installing-plugins.md#upgrade-auf-attraccess-20) in der Plugin-Anleitung).
+
 ## Docker Compose
 
 ```bash
@@ -31,7 +59,9 @@ docker compose pull
 docker compose up -d
 ```
 
-Attraccess führt Datenbankmigrationen automatisch beim Start durch. Es sind keine manuellen Schritte nötig.
+Attraccess führt Datenbankmigrationen automatisch beim Start durch. Innerhalb einer Hauptversion sind keine manuellen
+Schritte nötig. Das Upgrade von 1.x auf 2.0 braucht einen zusätzlichen Schritt, siehe
+[Upgrade auf Attraccess 2.0](#upgrade-auf-attraccess-20).
 
 ## Klassisches Docker
 

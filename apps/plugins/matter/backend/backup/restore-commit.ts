@@ -1,11 +1,11 @@
-import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { InternalServerErrorException, type HttpException } from '@nestjs/common';
 import type { MatterConnectionService } from '../connection/connection.service';
-import type { DeviceAuditService } from '../devices/audit.service';
-import { runTransaction } from '../fabric/db';
+import type { AuditActor, DeviceAuditService } from '../devices/audit.service';
 import { conflict, sidecarCode } from '../fabric/errors';
 import { factsOf, recordFacts, recordedFabricRow, type FabricFacts } from '../fabric/facts';
 import type { MatterFabricGuard } from '../fabric/guard';
+import { matterStorage } from '../plugin-storage/access';
 import { BACKUP_TIMEOUT_MS } from './backup.service';
 import { LEFT_UNCHANGED, type Pending, type RestorePreflight } from './restore.types';
 import { replaceTables, tablesAreAcceptable } from './tables';
@@ -54,7 +54,7 @@ export class RestoreCommitter {
   async commitAndRecord(
     staged: StagedRestore,
     from: RestorePreflight['sidecarState'],
-    principal: PluginAuditPrincipal,
+    actor: AuditActor,
   ): Promise<void> {
     const ref = staged.header.backupId;
     const { stageId } = staged;
@@ -62,15 +62,15 @@ export class RestoreCommitter {
     this.guard.busy = true;
     this.guard.restoring = true;
     try {
-      const facts = await this.commit(stageId, principal, ref);
-      await this.replaceTables(staged, facts, principal);
+      const facts = await this.commit(stageId, actor, ref);
+      await this.replaceTables(staged, facts, actor);
       this.guard.outcomeUnknown = false;
       await this.connection
         .request('backup.restore.finalize', { body: { stageId } })
         .catch(() => this.context.logger.warn?.('The Matter sidecar did not confirm cleaning up after a restore.'));
       await this.audit.record(
         'matter.restore_succeeded',
-        principal,
+        actor,
         { type: 'matter.backup', ref },
         { backupRef: ref, fabricGeneration: facts.fabricGeneration },
       );
@@ -84,7 +84,7 @@ export class RestoreCommitter {
     await this.connection.request('backup.restore.abort', { body: { stageId } }).catch(() => undefined);
   }
 
-  private async commit(stageId: string, principal: PluginAuditPrincipal, ref: string): Promise<FabricFacts> {
+  private async commit(stageId: string, actor: AuditActor, ref: string): Promise<FabricFacts> {
     let committed;
     try {
       committed = await this.connection.request('backup.restore.commit', {
@@ -94,12 +94,12 @@ export class RestoreCommitter {
     } catch (error) {
       const outcome = await this.afterFailedCommit(sidecarCode(error), stageId);
       await this.abortStage(stageId);
-      throw await this.notRestored(outcome, principal, ref, 'The Matter sidecar could not apply the backup.');
+      throw await this.notRestored(outcome, actor, ref, 'The Matter sidecar could not apply the backup.');
     }
     const facts = factsOf(committed.fabric);
     if (committed.state === 'committed' && facts) return facts;
     const outcome = await this.rollback(stageId);
-    throw await this.notRestored(outcome, principal, ref, 'The restored fabric could not be verified.');
+    throw await this.notRestored(outcome, actor, ref, 'The restored fabric could not be verified.');
   }
 
   /**
@@ -117,24 +117,20 @@ export class RestoreCommitter {
    * Replaces the plugin tables and records the fabric the sidecar committed. A backup marked inconsistent keeps the
    * fabric record of its own tables instead, so the detection afterwards finds the mismatch it was taken in.
    */
-  private async replaceTables(
-    staged: StagedRestore,
-    facts: FabricFacts,
-    principal: PluginAuditPrincipal,
-  ): Promise<void> {
+  private async replaceTables(staged: StagedRestore, facts: FabricFacts, actor: AuditActor): Promise<void> {
     const ref = staged.header.backupId;
     try {
-      await runTransaction(this.context, async (manager) => {
-        if (!tablesAreAcceptable(manager, staged.body.tables)) throw new Error('unacceptable tables');
-        await replaceTables(manager, staged.body.tables);
-        if (staged.header.consistent !== false) await recordFacts(manager, facts);
+      await matterStorage(this.context).transaction(async (tables) => {
+        if (!tablesAreAcceptable(staged.body.tables)) throw new Error('unacceptable tables');
+        await replaceTables(tables, staged.body.tables);
+        if (staged.header.consistent !== false) await recordFacts(tables, facts);
       });
     } catch {
       // The sidecar committed, so `not_committed` here means it lost track of the restore: not "unchanged" either.
-      if ((await this.rollback(staged.stageId)) !== 'rolled_back') throw await this.rollbackFailed(principal, ref);
+      if ((await this.rollback(staged.stageId)) !== 'rolled_back') throw await this.rollbackFailed(actor, ref);
       await this.audit.record(
         'matter.restore_rolled_back',
-        principal,
+        actor,
         { type: 'matter.backup', ref },
         { backupRef: ref },
         'failed',
@@ -146,14 +142,14 @@ export class RestoreCommitter {
   /** The answer for a commit that did not go through, by what the rollback achieved. */
   private async notRestored(
     outcome: RollbackOutcome,
-    principal: PluginAuditPrincipal,
+    actor: AuditActor,
     ref: string,
     what: string,
   ): Promise<HttpException> {
-    if (outcome === 'failed') return this.rollbackFailed(principal, ref);
+    if (outcome === 'failed') return this.rollbackFailed(actor, ref);
     await this.audit.record(
       outcome === 'rolled_back' ? 'matter.restore_rolled_back' : 'matter.restore_failed',
-      principal,
+      actor,
       { type: 'matter.backup', ref },
       { backupRef: ref },
       'failed',
@@ -165,11 +161,11 @@ export class RestoreCommitter {
    * The sidecar's state is unknown: it may still finish the restore. Until the plugin records a fabric itself, a
    * later `fabric.changed` is judged like a reconnect, so that restore cannot be taken for the plugin's own change.
    */
-  private async rollbackFailed(principal: PluginAuditPrincipal, ref: string): Promise<HttpException> {
+  private async rollbackFailed(actor: AuditActor, ref: string): Promise<HttpException> {
     this.guard.outcomeUnknown = true;
     await this.audit.record(
       'matter.restore_failed',
-      principal,
+      actor,
       { type: 'matter.backup', ref },
       { backupRef: ref },
       'failed',
@@ -229,9 +225,9 @@ export class RestoreCommitter {
   private async recordRolledBack(facts: FabricFacts | null): Promise<void> {
     if (!facts) return;
     try {
-      await runTransaction(this.context, async (manager) => {
-        const recorded = await recordedFabricRow(manager);
-        if (recorded?.fabricId === facts.fabricId) await recordFacts(manager, facts);
+      await matterStorage(this.context).transaction(async (tables) => {
+        const recorded = await recordedFabricRow(tables);
+        if (recorded?.fabricId === facts.fabricId) await recordFacts(tables, facts);
       });
     } catch {
       // The next comparison reports the generation the plugin missed as a mismatch.

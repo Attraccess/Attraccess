@@ -1,11 +1,13 @@
-import { AuditLog, entities, Resource, ResourceType, Setting, User } from '@attraccess/database-entities';
+import { createSqliteAuditService } from '../database/adapters/audit/sqlite-audit-service.test-fixture';
+import { AuditLog, entities, Resource, Setting, User } from '@attraccess/database-entities';
+import { ResourceType } from '@attraccess/application-models';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import * as migrations from '../database/migrations';
-import { createTestAuditMetrics } from './audit.test-fixture';
+import { createTestAuditMetrics } from '../database/adapters/audit/audit.test-fixture';
 import { registerPluginAuditDomains, resetPluginAuditRegistry } from '../plugin-system/audit/audit-registry';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { AuditController } from './audit.controller';
@@ -13,6 +15,7 @@ import { AuditQueryService } from './audit-query.service';
 import { PluginAuditHost } from './plugin-audit-host';
 import { AuditService } from './audit.service';
 import { canvasDetails, canvasSaveDetails, diffCanvas } from '../resources/flows/flow-audit';
+import { TypeOrmSettingsRows } from '../database/adapters/settings/typeorm-settings-rows';
 
 const fixturePluginId = 'abcdefghijklmnopqrstu';
 
@@ -37,16 +40,17 @@ describe('persisted audit names', () => {
     ]);
     directory = await mkdtemp(join(tmpdir(), 'audit-labels-'));
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: join(directory, 'fixture.sqlite'),
       entities: Object.values(entities),
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
-    const store = new SettingsStoreService(source.getRepository(Setting), null);
-    service = new AuditService(source, store, createTestAuditMetrics());
+    const store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(source.getRepository(Setting)), null);
+    service = createSqliteAuditService(source, store, createTestAuditMetrics());
     await service.onModuleInit();
-    controller = new AuditController(new AuditQueryService(service, source, store));
+    controller = new AuditController(new AuditQueryService(service, store));
     await source.getRepository(User).insert({
       id: 7,
       username: 'Current admin',
@@ -239,6 +243,24 @@ describe('persisted audit names', () => {
         subjectLabelSource: 'recorded',
       }),
     ]);
+  });
+
+  it('labels deleted plugin archives and retries with the recorded plugin name', async () => {
+    for (const action of ['plugin.zip_deleted', 'plugin.retry_requested']) {
+      await service.record({
+        domain: 'administration',
+        action,
+        actor: { id: 7, authenticationMethod: 'session' },
+        subject: { type: 'plugin-package', id: 4242 },
+        details: { pluginId: 'my-plugin-dir', pluginName: 'my-plugin', pluginVersion: '1.2.3', restartRequested: 1 },
+      });
+    }
+    const { items } = await controller.list({ domain: 'administration' });
+    expect(items).toHaveLength(2);
+    for (const item of items) {
+      expect(item).toMatchObject({ subjectLabel: 'my-plugin', subjectLabelSource: 'recorded' });
+      expect(item.details).toMatchObject({ pluginName: 'my-plugin', pluginVersion: '1.2.3' });
+    }
   });
 
   it('keeps recorded SSO provider names after deletion and labels provisioning targets as users', async () => {

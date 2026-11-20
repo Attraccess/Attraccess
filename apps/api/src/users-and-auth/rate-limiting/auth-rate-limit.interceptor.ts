@@ -11,7 +11,9 @@ import {
 import { Reflector } from '@nestjs/core';
 import { catchError, from, mergeMap, Observable, throwError } from 'rxjs';
 import { Request, Response } from 'express';
-import { BruteForceProtectionService, RateLimitScope } from './brute-force.service';
+import { isDatabaseBusyError } from '../../database/persistence-errors';
+import { BruteForceProtectionService } from './brute-force.service';
+import type { RateLimitScope } from './brute-force-policy';
 import { AuthAuditLogger, AuthAuditOutcome, AuthAuditType } from './auth-audit.logger';
 import { AccountLockedException, TooManyAuthAttemptsException } from './exceptions';
 import {
@@ -65,9 +67,12 @@ export class AuthRateLimitInterceptor implements NestInterceptor {
         );
       }),
       catchError((err: unknown) => {
-        this.bruteForce
-          .recordFailure(scope, ip, userId)
-          .catch((recErr) => this.logger.error(`recordFailure failed for scope=${scope}`, recErr as Error));
+        // A database that stayed busy says nothing about the attempt: it must not count toward a lockout.
+        if (!isDatabaseBusyError(err)) {
+          this.bruteForce
+            .recordFailure(scope, ip, userId)
+            .catch((recErr) => this.logger.error(`recordFailure failed for scope=${scope}`, recErr as Error));
+        }
         setRetryAfter(response, err);
         return from(
           Promise.resolve(
@@ -90,6 +95,8 @@ const SCOPE_AUDIT_TYPES: Record<RateLimitScope, AuthAuditType> = {
   login: 'login',
   register: 'register',
   password_reset_request: 'password_reset_request',
+  verification_email_resend: 'verification_email_resend',
+  unverified_email_change: 'unverified_email_change',
   password_reset_complete: 'password_reset_complete',
   delete_account_confirm: 'delete_account_confirm',
   sso_link_account: 'sso_link_account',
@@ -113,7 +120,7 @@ function classifyOutcome(error: unknown): AuthAuditOutcome {
   if (error instanceof AccountLockedException) return 'account_locked';
   if (error instanceof UnauthorizedException) return 'invalid_credentials';
   if (error instanceof ForbiddenException) return 'invalid_token';
-  if (error instanceof ServiceUnavailableException) return 'dependency_failure';
+  if (error instanceof ServiceUnavailableException || isDatabaseBusyError(error)) return 'dependency_failure';
   return 'invalid_input';
 }
 

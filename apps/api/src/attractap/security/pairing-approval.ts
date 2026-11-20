@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Logger, NotFoundException, Inject } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Attractap } from '@attraccess/database-entities';
+import type { AttractapReader } from '@attraccess/application-models';
 import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 import { AttractapService } from '../attractap.service';
 import { BootstrapGrants } from './bootstrap-grants';
@@ -63,7 +63,7 @@ export class PairingApproval {
       throw new ConflictException('PairingReaderGone');
     }
     // Remaining window: `accepted` reached the operating system, but the connection may still drop
-    // before the reader reads it. The reader then stays unpaired and asks again with the same key;
+    // before the reader reads it. The reader then asks again with the same key;
     // that key is this record's credential now, so the admin approves it as a takeover of this
     // record (or removes the pairing first). Nothing is paired that the admin did not approve.
     await this.recordApproval(commit.readerId, input.mode, method, actor, commit.hadPrevious);
@@ -72,17 +72,9 @@ export class PairingApproval {
 
   private async resolveTarget(request: PairingRequest, input: ApproveInput): Promise<number | null> {
     if (input.mode === 'new') {
-      if (request.boundReaderId) throw new BadRequestException('This reader already has a record; use pair');
       return null;
     }
-    if (input.mode === 'pair') {
-      if (!request.boundReaderId) throw new BadRequestException('Only readers signed in with a token can be paired');
-      return request.boundReaderId;
-    }
     if (!input.targetReaderId) throw new BadRequestException('targetReaderId is required');
-    if (request.boundReaderId && request.boundReaderId !== input.targetReaderId) {
-      throw new BadRequestException('This reader is bound to a different record');
-    }
     if (!(await this.attractap.findReaderById(input.targetReaderId))) throw new NotFoundException('Reader not found');
     return input.targetReaderId;
   }
@@ -101,13 +93,13 @@ export class PairingApproval {
     const holder = await this.registry.findPairedReaderByFingerprint(fingerprint);
     if (holder !== null && holder !== targetId) throw new ConflictException('PairingKeyInUse');
 
-    let created: Attractap | null = null;
+    let created: AttractapReader | null = null;
     try {
-      let reader: Attractap | null;
+      let reader: AttractapReader | null;
       if (targetId) {
         reader = await this.attractap.findReaderById(targetId);
       } else {
-        created = (await this.attractap.createNewReader()).reader;
+        created = await this.attractap.createNewReader();
         reader = created;
         const name = input.name?.trim();
         if (name) reader = await this.attractap.updateReader(created.id, { name: name.slice(0, MAX_NAME_LENGTH) });
@@ -171,7 +163,7 @@ export class PairingApproval {
 
   /**
    * The commit happened but the reader never got `accepted`. The record gets back what it had
-   * (a replaced reader its credential, a token reader its token), but only while it still holds
+   * (a replaced reader its credential), but only while it still holds
    * the key this approval wrote: a pairing committed meanwhile is left alone. A record created for
    * this approval is deleted again. One audit event explains it; best effort.
    */
@@ -197,7 +189,7 @@ export class PairingApproval {
    * Before the commit: removes a record created for this approval. The request ends, unless the key
    * turned out to be in use (the admin may still approve it as a takeover of that record).
    */
-  private async rollBack(request: PairingRequest, created: Attractap | null, error: Error): Promise<void> {
+  private async rollBack(request: PairingRequest, created: AttractapReader | null, error: Error): Promise<void> {
     const conflict = error instanceof ConflictException ? error.message : null;
     if (conflict !== 'PairingReaderGone' && conflict !== 'PairingKeyInUse') {
       this.logger.error(`Completing pairing failed: ${error.message}`);

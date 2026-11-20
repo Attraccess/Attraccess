@@ -1,18 +1,5 @@
-import { Button, StatusAlert, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
-import {
-  Form,
-  Label,
-  ListBox,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  Select,
-} from '@heroui/react';
+import { Button, StandardModal, StatusAlert, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
+import { Form, Label, ListBox, ModalBody, ModalFooter, ModalHeader, ModalHeading, Select } from '@heroui/react';
 import type { Key } from '@heroui/react';
 import { useEffect, useState } from 'react';
 import { useMqttServersQuery, useSettingsQuery, useUpdateSettingsMutation } from '../api/queries';
@@ -48,80 +35,70 @@ export function MqttSettingsModal({ isOpen, onOpenChange }: MqttSettingsModalPro
   const errorMessage = (value: unknown) => (value instanceof Error ? value.message : t('common.retry'));
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={(open) => !open && close()}>
-      <ModalBackdrop>
-        <ModalContainer size="sm">
-          <ModalDialog>
-            <ModalHeader>
-              <ModalHeading>{t('settings.title')}</ModalHeading>
-            </ModalHeader>
-            <Form
-              onSubmit={(event) => {
-                event.preventDefault();
-                save();
-              }}
+    <StandardModal size="sm" isOpen={isOpen} onOpenChange={(open) => !open && close()}>
+      <ModalHeader>
+        <ModalHeading>{t('settings.title')}</ModalHeading>
+      </ModalHeader>
+      <Form
+        onSubmit={(event) => {
+          event.preventDefault();
+          save();
+        }}
+      >
+        <ModalBody>
+          <p className="wg:text-sm wg:text-muted">{t('settings.description')}</p>
+          {isLoading ? (
+            <TableDataLoadingIndicator />
+          ) : error ? (
+            <StatusAlert status="danger">{errorMessage(error)}</StatusAlert>
+          ) : (
+            <Select
+              className="wg:w-full"
+              name="defaultMqttServerId"
+              placeholder={t('settings.select')}
+              value={defaultServerId}
+              onChange={setDefaultServerId}
             >
-              <ModalBody>
-                <p className="wg:text-sm wg:text-muted">{t('settings.description')}</p>
-                {isLoading ? (
-                  <TableDataLoadingIndicator />
-                ) : error ? (
-                  <StatusAlert status="danger">{errorMessage(error)}</StatusAlert>
-                ) : (
-                  <Select
-                    className="wg:w-full"
-                    name="defaultMqttServerId"
-                    placeholder={t('settings.select')}
-                    value={defaultServerId}
-                    onChange={setDefaultServerId}
-                  >
-                    <Label>{t('settings.server')}</Label>
-                    <Select.Trigger>
-                      <Select.Value />
-                      <Select.Indicator />
-                    </Select.Trigger>
-                    <Select.Popover>
-                      <ListBox
-                        renderEmptyState={() => (
-                          <span className="wg:block wg:p-3 wg:text-sm wg:text-muted">{t('settings.empty')}</span>
-                        )}
-                      >
-                        {(serversQuery.data ?? []).map((server) => (
-                          <ListBox.Item key={server.id} id={server.id.toString()} textValue={server.name}>
-                            <div className="wg:flex wg:flex-col">
-                              <span>{server.name}</span>
-                              <span className="wg:text-xs wg:text-muted">
-                                {server.host}:{server.port}
-                                {server.useTls ? ' (TLS)' : ''}
-                              </span>
-                            </div>
-                            <ListBox.ItemIndicator />
-                          </ListBox.Item>
-                        ))}
-                      </ListBox>
-                    </Select.Popover>
-                  </Select>
-                )}
-                {updateSettingsMutation.isError && (
-                  <StatusAlert status="danger">{errorMessage(updateSettingsMutation.error)}</StatusAlert>
-                )}
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="secondary" onPress={close}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  type="submit"
-                  isDisabled={isLoading || error !== null}
-                  isPending={updateSettingsMutation.isPending}
+              <Label>{t('settings.server')}</Label>
+              <Select.Trigger>
+                <Select.Value />
+                <Select.Indicator />
+              </Select.Trigger>
+              <Select.Popover>
+                <ListBox
+                  renderEmptyState={() => (
+                    <span className="wg:block wg:p-3 wg:text-sm wg:text-muted">{t('settings.empty')}</span>
+                  )}
                 >
-                  {t('settings.save')}
-                </Button>
-              </ModalFooter>
-            </Form>
-          </ModalDialog>
-        </ModalContainer>
-      </ModalBackdrop>
-    </Modal>
+                  {(serversQuery.data ?? []).map((server) => (
+                    <ListBox.Item key={server.id} id={server.id.toString()} textValue={server.name}>
+                      <div className="wg:flex wg:flex-col">
+                        <span>{server.name}</span>
+                        <span className="wg:text-xs wg:text-muted">
+                          {server.host}:{server.port}
+                          {server.useTls ? ' (TLS)' : ''}
+                        </span>
+                      </div>
+                      <ListBox.ItemIndicator />
+                    </ListBox.Item>
+                  ))}
+                </ListBox>
+              </Select.Popover>
+            </Select>
+          )}
+          {updateSettingsMutation.isError && (
+            <StatusAlert status="danger">{errorMessage(updateSettingsMutation.error)}</StatusAlert>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="secondary" onPress={close}>
+            {t('common.cancel')}
+          </Button>
+          <Button type="submit" isDisabled={isLoading || error !== null} isPending={updateSettingsMutation.isPending}>
+            {t('settings.save')}
+          </Button>
+        </ModalFooter>
+      </Form>
+    </StandardModal>
   );
 }

@@ -14,7 +14,7 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
-import { CsvExportTemplateColumnType, CsvExportType } from '@attraccess/database-entities';
+import { CsvExportTemplateColumnType, CsvExportType } from '@attraccess/application-models';
 
 export const CSV_EXPORT_TEMPLATE_MAX_COLUMNS = 200;
 export const CSV_EXPORT_TEMPLATE_NAME_MAX_LENGTH = 120;

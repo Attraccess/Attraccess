@@ -397,6 +397,7 @@ def reader_firmware_version(api, admin, reader_id):
 
 @pytest.mark.skipif(not OTA_FROM_IMAGE, reason="needs OTA_FROM_IMAGE (a merged image of main's current reader firmware) "
                                                "and the API serving the HEAD OTA image (run-hil prepares both)")
+@pytest.mark.skipif(os.environ.get("HIL_WSS") == "1", reason="main's firmware does not trust the HIL_WSS lab CA")
 def test_ota_from_main_firmware_to_head(request, target, api, admin, reader, hooks, wire, artifacts):
     """A reader on main's current firmware pairs, is updated over its secure session and then relays cards.
 

@@ -42,7 +42,7 @@ jest.setTimeout(30_000);
 
 describe('global flows migration', () => {
   it('keeps resource flows, enforces exactly one owner, and drops global flows on revert', async () => {
-    const source = await new DataSource({ type: 'sqlite', database: ':memory:', entities: [] }).initialize();
+    const source = await new DataSource({ type: 'better-sqlite3', database: ':memory:', entities: [] }).initialize();
     const runner = source.createQueryRunner();
     try {
       await runner.query('PRAGMA foreign_keys = ON');

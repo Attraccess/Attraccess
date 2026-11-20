@@ -1,18 +1,21 @@
 import { PluginContext } from '@attraccess/plugins-backend-sdk';
-import { DataSource } from 'typeorm';
 import { BuildRuntimeArtifact } from '../artifacts/build';
 import { WagoCommissioningReadiness } from '../../commissioning/readiness/readiness';
-import { WagoCommissioningSession } from '../../commissioning/sessions/session.entity';
+import type { WagoCommissioningSessionRow } from '../../storage';
+import type { WagoTestStorage } from '../../storage/testing';
 import { commissioningVerification } from '../../commissioning/sessions/verification';
-import { WagoController } from '../../controllers/entity';
 import { WagoDeviceOperations } from '../device-operations';
-import { WagoDeviceOperation, WagoManagedAccess } from './access.entity';
 import { WagoManagedRuntimeService } from './service';
-import { resetTestFixture } from './setup.test-fixture';
+import {
+  required,
+  resetTestFixture,
+  seedAwaitingVerificationSession,
+  seedClaimedController,
+  storedEnvelope,
+} from './setup.test-fixture';
 import { managedSsh } from './transport/ssh';
-import { WagoRuntimeArtifactsService } from '../artifacts/catalog';
+import { WagoRuntimeArtifactsService } from '../artifacts/service';
 import { WagoService } from '../../controllers/service';
-import { WagoNetworkChange } from '../../network/entity';
 
 const artifact: BuildRuntimeArtifact = {
   imageId: `sha256:${'1'.repeat(64)}`,
@@ -37,11 +40,9 @@ const artifact: BuildRuntimeArtifact = {
 
 const principal = { userId: 7, authenticationMethod: 'session' as const };
 
-jest.mock('@attraccess/plugins-backend-sdk', () => jest.requireActual('typeorm'));
-
 jest.mock('../../controllers/service', () => ({ WagoService: class {} }));
 
-jest.mock('../artifacts/catalog', () => ({ WagoRuntimeArtifactsService: class {} }));
+jest.mock('../artifacts/service', () => ({ WagoRuntimeArtifactsService: class {} }));
 
 jest.mock('../../commissioning/readiness/readiness', () => ({ WagoCommissioningReadiness: class {} }));
 
@@ -50,7 +51,7 @@ jest.mock('./transport/ssh', () => ({ ...jest.requireActual('./transport/ssh'), 
 jest.mock('../../commissioning/sessions/verification', () => ({ commissioningVerification: jest.fn() }));
 
 describe('managed enrolment and durable credential lifecycle', () => {
-  let db: DataSource;
+  let store: WagoTestStorage;
 
   let service: WagoManagedRuntimeService;
 
@@ -65,12 +66,12 @@ describe('managed enrolment and durable credential lifecycle', () => {
   let context: PluginContext;
 
   const session = (id = 1) =>
-    Object.assign(new WagoCommissioningSession(), {
+    ({
       id,
       targetHost: '10.77.0.7',
       hostKeyFingerprint: `SHA256:${'a'.repeat(43)}`,
       hardwareId: `cc100-${id}`,
-    });
+    }) as WagoCommissioningSessionRow;
 
   beforeEach(async () => {
     await resetTestFixture(scope);
@@ -79,7 +80,6 @@ describe('managed enrolment and durable credential lifecycle', () => {
   afterEach(async () => {
     await service.onModuleDestroy();
     await new Promise(setImmediate);
-    await db.destroy();
     jest.clearAllMocks();
   });
 
@@ -99,11 +99,11 @@ describe('managed enrolment and durable credential lifecycle', () => {
     get artifact() {
       return artifact;
     },
-    get db() {
-      return db;
+    get store() {
+      return store;
     },
-    set db(value: typeof db) {
-      db = value;
+    set store(value: typeof store) {
+      store = value;
     },
     get decrypt() {
       return decrypt;
@@ -201,20 +201,18 @@ describe('managed enrolment and durable credential lifecycle', () => {
   it('confirms the installed image policy for a rebuilt release of the same version', async () => {
     const imageId = `sha256:${'0'.repeat(64)}`;
     const timestamp = new Date().toISOString();
-    await db.getRepository(WagoController).save(
-      Object.assign(new WagoController(), {
-        id: 1,
-        hardwareId: 'cc100-1',
-        trustState: 'claimed',
-        pairingCodeHash: 'fixture',
-        protocolVersion: '1.0.0',
-        runtimeVersion: artifact.manifest.runtimeVersion,
-        capabilities: '[]',
-        lastSeenAt: timestamp,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      }),
-    );
+    await store.tables.controllers.insert({
+      id: 1,
+      hardwareId: 'cc100-1',
+      trustState: 'claimed',
+      pairingCodeHash: 'fixture',
+      protocolVersion: '1.0.0',
+      runtimeVersion: artifact.manifest.runtimeVersion,
+      capabilities: '[]',
+      lastSeenAt: timestamp,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
     service['heartbeats'].set(1, {
       imageId,
       runtimeVersion: artifact.manifest.runtimeVersion,
@@ -238,24 +236,20 @@ describe('managed enrolment and durable credential lifecycle', () => {
 
   it('persists authenticated ciphertext before remote mutation and rotates per enrolment', async () => {
     const execute = jest.fn(async (_script: string) => {
-      const rows = await db.query('SELECT encrypted_credentials FROM plugin_wago_managed_access');
-      expect(rows[0].encrypted_credentials).not.toContain('PRIVATE KEY');
-      expect(JSON.parse(decrypt(rows[0].encrypted_credentials))).toMatchObject({ sessionId: 1 });
+      const envelope = await storedEnvelope(store);
+      expect(envelope).not.toContain('PRIVATE KEY');
+      expect(JSON.parse(decrypt(envelope))).toMatchObject({ sessionId: 1 });
       return 'OK\n';
     });
     await service.enrol(session(), execute, new AbortController().signal);
     await service.enrol(session(2), async () => 'OK\n', new AbortController().signal);
-    const rows = await db.query(
-      'SELECT encrypted_credentials, key_fingerprint FROM plugin_wago_managed_access ORDER BY session_id',
-    );
-    const first = JSON.parse(decrypt(rows[0].encrypted_credentials)),
-      second = JSON.parse(decrypt(rows[1].encrypted_credentials));
+    const first = JSON.parse(decrypt(await storedEnvelope(store, 1))),
+      second = JSON.parse(decrypt(await storedEnvelope(store, 2)));
     expect(first.privateKey).not.toEqual(second.privateKey);
     expect(first.recoveryPassword).not.toEqual(second.recoveryPassword);
     expect(rootProbe).toHaveBeenCalledWith(session().targetHost, session().hostKeyFingerprint, first.recoveryPassword);
-    expect(await db.getRepository(WagoManagedAccess).findOneByOrFail({ sessionId: 1 })).not.toHaveProperty(
-      'encryptedCredentials',
-    );
+    // The public status never carries the stored envelope.
+    expect(JSON.stringify(await service.sessionStatus(1))).not.toContain(await storedEnvelope(store, 1));
     expect(await service.recoverPassword(1, principal)).toEqual({ password: first.recoveryPassword });
     expect(await service.status(100)).toEqual({
       sessionId: null,
@@ -271,15 +265,15 @@ describe('managed enrolment and durable credential lifecycle', () => {
     const execute = jest.fn();
     await expect(service.enrol(session(), execute, new AbortController().signal)).rejects.toThrow('encryption');
     expect(execute).not.toHaveBeenCalled();
-    expect(await db.getRepository(WagoManagedAccess).count()).toBe(0);
+    expect(await store.tables.managedAccess.count()).toBe(0);
   });
 
   it('verifies the encrypted database round trip and fails before remote changes when storage is corrupt', async () => {
-    const repository = db.getRepository(WagoManagedAccess);
-    const save = repository.save.bind(repository);
-    jest.spyOn(repository, 'save').mockImplementationOnce(async (value) => {
-      const row = await save(value);
-      await repository.update(1, { encryptedCredentials: 'corrupted-ciphertext' });
+    const table = service['access'];
+    const insert = table.insert.bind(table);
+    jest.spyOn(table, 'insert').mockImplementationOnce(async (value) => {
+      const row = await insert(value);
+      await table.update({ sessionId: 1 }, { encryptedCredentials: 'corrupted-ciphertext' });
       return row;
     });
     const execute = jest.fn();
@@ -291,7 +285,7 @@ describe('managed enrolment and durable credential lifecycle', () => {
   it('retains the pending identity after lost key cleanup and retries without generating replacement secrets', async () => {
     jest.mocked(managedSsh).mockImplementation(async (_access, _key, header) => {
       if (header.startsWith('access-key-commit')) {
-        expect(await db.getRepository(WagoManagedAccess).findOneByOrFail({ sessionId: 1 })).toMatchObject({
+        expect(required(await store.tables.managedAccess.get(1))).toMatchObject({
           state: 'verified',
         });
         throw new Error('lost receipt');
@@ -301,17 +295,14 @@ describe('managed enrolment and durable credential lifecycle', () => {
     await expect(service.enrol(session(), async () => 'OK\n', new AbortController().signal)).rejects.toThrow(
       'Managed SSH setup failed (commit)',
     );
-    const before = (await db.query('SELECT encrypted_credentials FROM plugin_wago_managed_access'))[0]
-      .encrypted_credentials;
+    const before = await storedEnvelope(store);
     jest
       .mocked(managedSsh)
       .mockImplementation(async (_access, _key, header) =>
         header.startsWith('proof ') ? `OK ${header.split(' ')[1]}\n` : 'OK\n',
       );
     await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
-    expect(
-      (await db.query('SELECT encrypted_credentials FROM plugin_wago_managed_access'))[0].encrypted_credentials,
-    ).toBe(before);
+    expect(await storedEnvelope(store)).toBe(before);
   });
 
   it('retains recovery intent on failed second key connection without disabling SSH policy', async () => {
@@ -320,7 +311,7 @@ describe('managed enrolment and durable credential lifecycle', () => {
     await expect(service.enrol(session(), execute, new AbortController().signal)).rejects.toThrow(
       'Managed SSH setup failed (proof)',
     );
-    expect(await db.getRepository(WagoManagedAccess).findOneByOrFail({ sessionId: 1 })).toMatchObject({
+    expect(required(await store.tables.managedAccess.get(1))).toMatchObject({
       state: 'recovery_required',
     });
     expect(execute).toHaveBeenCalledTimes(1);
@@ -343,8 +334,7 @@ describe('managed enrolment and durable credential lifecycle', () => {
 
   it('selects encrypted recovery access only after proving the pinned root login', async () => {
     await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
-    const row = (await db.query('SELECT encrypted_credentials FROM plugin_wago_managed_access'))[0];
-    const credentials = JSON.parse(decrypt(row.encrypted_credentials));
+    const credentials = JSON.parse(decrypt(await storedEnvelope(store)));
     expect(await service.commissioningRecoveryPassword(session())).toBe(credentials.recoveryPassword);
     rootProbe.mockResolvedValue(false);
     expect(await service.commissioningRecoveryPassword(session())).toBeNull();
@@ -356,17 +346,20 @@ describe('managed enrolment and durable credential lifecycle', () => {
 
   it('rejects encrypted envelopes copied to another controller/session', async () => {
     await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
-    await db.getRepository(WagoManagedAccess).update(1, { fingerprint: `SHA256:${'b'.repeat(43)}` });
+    await store.tables.managedAccess.update({ sessionId: 1 }, { fingerprint: `SHA256:${'b'.repeat(43)}` });
     await expect(service.recoverPassword(1, principal)).rejects.toThrow('does not match');
   });
 
   it('visibly blocks unreadable managed credentials without exposing the envelope', async () => {
     await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
-    await db.getRepository(WagoManagedAccess).update(1, {
-      controllerId: 1,
-      state: 'managed',
-      encryptedCredentials: 'corrupt-secret-envelope',
-    });
+    await store.tables.managedAccess.update(
+      { sessionId: 1 },
+      {
+        controllerId: 1,
+        state: 'managed',
+        encryptedCredentials: 'corrupt-secret-envelope',
+      },
+    );
     const status = await service.status(1);
     expect(status.management).toBe('recovery_required');
     expect(JSON.stringify(status)).not.toContain('corrupt-secret-envelope');
@@ -375,7 +368,7 @@ describe('managed enrolment and durable credential lifecycle', () => {
 
   it('retains retirement intent and recovery secrets until remote key removal is independently verified', async () => {
     await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
-    await db.getRepository(WagoManagedAccess).update(1, { controllerId: 1, state: 'managed' });
+    await store.tables.managedAccess.update({ sessionId: 1 }, { controllerId: 1, state: 'managed' });
     await expect(service.assertRemovable(1)).rejects.toThrow('retire managed');
     const probe = jest.fn(async () => false);
     service.registerRetirementProbe(probe);
@@ -391,8 +384,8 @@ describe('managed enrolment and durable credential lifecycle', () => {
   });
 
   it('shares device ownership across processes and fences expired owners without releasing a successor', async () => {
-    const first = new WagoDeviceOperations(db.getRepository(WagoDeviceOperation));
-    const second = new WagoDeviceOperations(db.getRepository(WagoDeviceOperation));
+    const first = new WagoDeviceOperations(store.tables.deviceOperations);
+    const second = new WagoDeviceOperations(store.tables.deviceOperations);
     expect(await first.acquire('device-a', 'commissioning', 100, 200)).toBe(true);
     expect(await second.acquire('device-a', 'update', 150, 300)).toBe(false);
     expect(await second.acquire('device-b', 'update-b', 150, 300)).toBe(true);
@@ -407,68 +400,39 @@ describe('managed enrolment and durable credential lifecycle', () => {
     const operations = service['operations'];
     const acquire = operations.acquire.bind(operations);
     jest.spyOn(operations, 'acquire').mockImplementation(async (...args) => {
-      await db.getRepository(WagoManagedAccess).update(1, { state: 'retiring' });
+      await store.tables.managedAccess.update({ sessionId: 1 }, { state: 'retiring' });
       return acquire(...args);
     });
     jest.mocked(managedSsh).mockClear();
     await expect(service.retryAccess(1)).rejects.toThrow('cannot be retried');
     expect(jest.mocked(managedSsh)).not.toHaveBeenCalled();
     expect((await service.sessionStatus(1)).management).toBe('retiring');
-    expect(
-      await db.getRepository(WagoDeviceOperation).findOneBy({ fingerprint: session().hostKeyFingerprint }),
-    ).toMatchObject({ owner: null });
+    expect(await store.tables.deviceOperations.get(session().hostKeyFingerprint)).toMatchObject({ owner: null });
   });
 
   it('fences runtime retries when retirement wins ownership and retains pending recovery metadata', async () => {
     await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
-    await db.getRepository(WagoManagedAccess).update(1, { controllerId: 1, state: 'managed' });
+    await store.tables.managedAccess.update({ sessionId: 1 }, { controllerId: 1, state: 'managed' });
     const operations = service['operations'];
     const acquire = operations.acquire.bind(operations);
     jest.spyOn(operations, 'acquire').mockImplementation(async (...args) => {
-      await db.getRepository(WagoManagedAccess).update(1, { state: 'retiring' });
+      await store.tables.managedAccess.update({ sessionId: 1 }, { state: 'retiring' });
       return acquire(...args);
     });
     jest.mocked(managedSsh).mockClear();
     await expect(service.retryRuntime(1)).rejects.toThrow('management_required');
     expect(jest.mocked(managedSsh)).not.toHaveBeenCalled();
     expect((await service.sessionStatus(1)).management).toBe('retiring');
-    expect(
-      await db.getRepository(WagoDeviceOperation).findOneBy({ fingerprint: session().hostKeyFingerprint }),
-    ).toMatchObject({ owner: null });
+    expect(await store.tables.deviceOperations.get(session().hostKeyFingerprint)).toMatchObject({ owner: null });
   });
 
   it.each(['connection', 'runtime_state', 'enrollment_credentials', 'configuration', 'readiness'] as const)(
     'explains the %s prerequisite holding up automatic SSH completion without touching SSH',
     async (reason) => {
-      const now = new Date().toISOString();
-      const current = await db.getRepository(WagoController).save(
-        Object.assign(new WagoController(), {
-          id: 1,
-          hardwareId: 'cc100-1',
-          trustState: 'claimed',
-          mqttServerId: 7,
-          pairingCodeHash: 'fixture',
-          protocolVersion: '1',
-          runtimeVersion: '1',
-          capabilities: '[]',
-          lastSeenAt: now,
-          createdAt: now,
-          updatedAt: now,
-        }),
-      );
-      await db.getRepository(WagoCommissioningSession).save(
-        Object.assign(session(), {
-          mqttServerId: 7,
-          firmwareBaseline: '31',
-          state: 'awaiting_verification',
-          initiatingPrincipal: JSON.stringify(principal),
-          auditLog: '[]',
-          createdAt: now,
-          updatedAt: now,
-        }),
-      );
+      const current = await seedClaimedController(store);
+      await seedAwaitingVerificationSession({ store, session, principal });
       await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
-      await db.getRepository(WagoManagedAccess).update(1, { controllerId: 1, state: 'verified' });
+      await store.tables.managedAccess.update({ sessionId: 1 }, { controllerId: 1, state: 'verified' });
       if (reason !== 'connection')
         service['heartbeats'].set(1, {
           imageId: artifact.imageId,
@@ -514,8 +478,7 @@ describe('managed enrolment and durable credential lifecycle', () => {
   describe('managed access retry', () => {
     const headers = () => jest.mocked(managedSsh).mock.calls.map(([, , header]) => header.split(' ')[0]);
 
-    const leaseOwner = async () =>
-      (await db.getRepository(WagoDeviceOperation).findOneBy({ fingerprint: session().hostKeyFingerprint }))?.owner;
+    const leaseOwner = async () => (await store.tables.deviceOperations.get(session().hostKeyFingerprint))?.owner;
 
     const answer = (replies: Record<string, string>) =>
       jest.mocked(managedSsh).mockImplementation(async (_access, _key, header) => {
@@ -525,7 +488,7 @@ describe('managed enrolment and durable credential lifecycle', () => {
 
     beforeEach(async () => {
       await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
-      await db.getRepository(WagoManagedAccess).update(1, { state: 'recovery_required' });
+      await store.tables.managedAccess.update({ sessionId: 1 }, { state: 'recovery_required' });
       jest.mocked(managedSsh).mockClear();
       rootProbe.mockClear();
     });
@@ -549,11 +512,10 @@ describe('managed enrolment and durable credential lifecycle', () => {
     it('recommits the managed key through the proven root login while the receipt is open', async () => {
       answer({ 'access-status': 'open\n' });
       await service.retryAccess(1);
-      const row = (await db.query('SELECT encrypted_credentials FROM plugin_wago_managed_access'))[0];
       expect(rootProbe).toHaveBeenCalledWith(
         session().targetHost,
         session().hostKeyFingerprint,
-        JSON.parse(decrypt(row.encrypted_credentials)).recoveryPassword,
+        JSON.parse(decrypt(await storedEnvelope(store))).recoveryPassword,
       );
       expect(headers()).toEqual(['proof', 'access-status', 'access-key-commit', 'proof']);
       expect((await service.sessionStatus(1)).management).toBe('verified');
@@ -582,19 +544,18 @@ describe('managed enrolment and durable credential lifecycle', () => {
 
     it('refuses unknown sessions and pending address changes before contacting the controller', async () => {
       await expect(service.retryAccess(2)).rejects.toThrow('cannot be retried');
-      await db.getRepository(WagoManagedAccess).update(1, { controllerId: 1 });
-      await db.getRepository(WagoNetworkChange).save(
-        Object.assign(new WagoNetworkChange(), {
-          controllerId: 1,
-          sessionId: 1,
-          fingerprint: session().hostKeyFingerprint,
-          targetHost: '10.77.0.8',
-          mqttServerId: null,
-          phase: 'applying',
-          failure: null,
-          updatedAt: new Date().toISOString(),
-        }),
-      );
+      await store.tables.managedAccess.update({ sessionId: 1 }, { controllerId: 1 });
+      await seedClaimedController(store);
+      await store.tables.networkChanges.insert({
+        controllerId: 1,
+        sessionId: 1,
+        fingerprint: session().hostKeyFingerprint,
+        targetHost: '10.77.0.8',
+        mqttServerId: null,
+        phase: 'applying',
+        failure: null,
+        updatedAt: new Date().toISOString(),
+      });
       await expect(service.retryAccess(1)).rejects.toThrow('pending MQTT/address change');
       expect(managedSsh).not.toHaveBeenCalled();
       expect((await service.sessionStatus(1)).management).toBe('recovery_required');

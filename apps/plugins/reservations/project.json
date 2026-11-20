@@ -3,8 +3,9 @@
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "sourceRoot": "apps/plugins/reservations",
-  "tags": ["type:plugin", "scope:plugin"],
   "// lint": "lint runs from the workspace root on purpose: @nx/enforce-module-boundaries no-ops when eslint runs from inside a project directory. See eslint.config.cjs for the plugin isolation rules.",
+  "tags": ["type:plugin", "scope:plugin"],
+  "// typecheck": "ts-jest only transpiles (isolatedModules), so the specs are type-checked here. The spec config keeps module commonjs for ts-jest; tsc gets bundler resolution on the command line because node16 resolution needs module node16.",
   "targets": {
     "install-dev": {
       "executor": "nx:run-commands",
@@ -28,7 +29,6 @@
         "command": "eslint apps/plugins/reservations/backend apps/plugins/reservations/frontend/src apps/plugins/reservations/acceptance --max-warnings=0 && prettier --check apps/plugins/reservations/backend apps/plugins/reservations/frontend/src apps/plugins/reservations/acceptance"
       }
     },
-    "// typecheck": "ts-jest only transpiles (isolatedModules), so the specs are type-checked here. The spec config keeps module commonjs for ts-jest; tsc gets bundler resolution on the command line because node16 resolution needs module node16.",
     "typecheck": {
       "executor": "nx:run-commands",
       "cache": true,
@@ -63,25 +63,13 @@
       }
     },
     "test": {
-      "executor": "@nx/jest:jest",
-      "cache": true,
       "dependsOn": ["test-frontend"],
-      "inputs": [
-        "default",
-        "^production",
-        "{workspaceRoot}/jest.preset.js",
-        {
-          "externalDependencies": ["jest"]
-        }
-      ],
-      "outputs": ["{workspaceRoot}/coverage/apps/plugins/reservations/test"],
       "options": {
-        "jestConfig": "apps/plugins/reservations/jest.config.ts",
         "passWithNoTests": true
       }
     },
     "test-acceptance": {
-      "executor": "@nx/jest:jest",
+      "executor": "nx:run-commands",
       "cache": true,
       "inputs": [
         "default",
@@ -94,7 +82,12 @@
       ],
       "outputs": [],
       "options": {
-        "jestConfig": "apps/plugins/reservations/jest.acceptance.config.ts"
+        "command": "jest --config ./apps/plugins/reservations/jest.acceptance.config.ts",
+        "cwd": ".",
+        "env": {
+          "TS_NODE_COMPILER_OPTIONS": "{\"moduleResolution\":\"node10\",\"module\":\"commonjs\",\"customConditions\":null}",
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        }
       }
     },
     "build-backend": {
@@ -104,7 +97,7 @@
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/reservations",
-        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js"
+        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js"
       }
     },
     "build-frontend": {
@@ -126,11 +119,15 @@
       "executor": "nx:run-commands",
       "cache": true,
       "dependsOn": ["build-backend", "build-frontend"],
-      "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json"],
-      "outputs": ["{projectRoot}/package/package.json", "{projectRoot}/package/plugin.json"],
+      "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json", "{projectRoot}/LICENSE.md"],
+      "outputs": [
+        "{projectRoot}/package/package.json",
+        "{projectRoot}/package/plugin.json",
+        "{projectRoot}/package/LICENSE.md"
+      ],
       "options": {
         "cwd": "apps/plugins/reservations",
-        "command": "node -e \"for (const file of ['package.json', 'plugin.json']) require('fs').copyFileSync(file, 'package/' + file)\""
+        "command": "node -e \"for (const file of ['package.json', 'plugin.json', 'LICENSE.md']) require('fs').copyFileSync(file, 'package/' + file)\""
       }
     },
     "zip": {
@@ -166,9 +163,9 @@
       ],
       "options": {
         "cwd": "apps/plugins/reservations",
-        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js dist/migrations.js frontend/remoteEntry.js frontend/style.css",
+        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js frontend/remoteEntry.js frontend/style.css",
         "env": {
-          "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "1.11.0"
+          "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "2.0.0"
         }
       }
     },
@@ -183,10 +180,10 @@
     },
     "crap-score": {
       "executor": "nx:run-commands",
+      "dependsOn": ["test", "test-frontend"],
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/plugins/reservations"
-      },
-      "dependsOn": ["test", "test-frontend"]
+      }
     }
   }
 }

@@ -15,9 +15,9 @@ The documentation pages are plain Markdown files. English pages live under https
 ## English: Installation
 - [Docker Compose](https://docs.attraccess.org/en/installation/docker-compose.md): Recommended production installation of Attraccess with Docker Compose, including project directory, environment variables and first start.
 - [Portainer](https://docs.attraccess.org/en/installation/portainer.md): Installs Attraccess as a stack in Portainer, including environment variables, deployment, first-time setup and stack updates.
-- [Environment Variables](https://docs.attraccess.org/en/installation/environment-variables.md): Reference of all environment variables that configure Attraccess: required settings, application, logging, storage, SMTP and TLS.
+- [Environment Variables](https://docs.attraccess.org/en/installation/environment-variables.md): Reference of all environment variables that configure Attraccess: required settings, application, logging, database, storage, SMTP and TLS.
 - [SSL Setup](https://docs.attraccess.org/en/installation/ssl-setup.md): How to serve Attraccess over HTTPS using a reverse proxy, self-signed or custom certificates, and what SSO requires.
-- [Updating](https://docs.attraccess.org/en/installation/updating.md): How to check for new Attraccess versions and update with Docker Compose, plain Docker or Portainer, or pin a specific version.
+- [Updating](https://docs.attraccess.org/en/installation/updating.md): How to check for new Attraccess versions and update with Docker Compose, plain Docker or Portainer, pin a specific version, and upgrade to 2.0 through 1.11.
 - [Backup & Restore](https://docs.attraccess.org/en/installation/backup-restore.md): Explains what Attraccess data to back up, how to create a backup and how to restore it.
 
 ## English: First-Time Setup
@@ -29,7 +29,7 @@ The documentation pages are plain Markdown files. English pages live under https
 ## English: User Management
 - [Overview](https://docs.attraccess.org/en/user-management/overview.md): Overview of user management: creating accounts, assigning permissions and configuring login methods as an administrator.
 - [Creating Users](https://docs.attraccess.org/en/user-management/creating-users.md): The ways users get an account: self-registration, SSO registration, project invitations and creation by an administrator.
-- [Permissions](https://docs.attraccess.org/en/user-management/permissions.md): Explains the role-based permission model, default roles, permission keys, assigning roles and SSO-managed roles.
+- [Permissions](https://docs.attraccess.org/en/user-management/permissions.md): Explains the role-based permission model, default roles, permission keys, plugin-declared permissions, assigning roles and SSO-managed roles.
 - [SSO Overview](https://docs.attraccess.org/en/user-management/sso-overview.md): Overview of Single Sign-On with OIDC and SAML: prerequisites, providers, auto-discovery, permission mapping and account linking.
 - [OIDC Setup](https://docs.attraccess.org/en/user-management/sso-oidc.md): How to create and configure an OpenID Connect SSO provider, including the callback URL and testing the login.
 - [SAML Setup](https://docs.attraccess.org/en/user-management/sso-saml.md): How to create and configure a SAML SSO provider, including service provider metadata and testing the login.
@@ -43,9 +43,8 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Documentation](https://docs.attraccess.org/en/resources/documentation.md): How to attach documentation to a resource so users can operate it safely, including documentation types and viewing them.
 - [Introductions](https://docs.attraccess.org/en/resources/introductions.md): Explains introductions (safety briefings that grant access to a resource), their roles, and how to grant, revoke and manage them.
 - [Maintenance](https://docs.attraccess.org/en/resources/maintenance.md): Track resource maintenance with manual records and automated maintenance schedules, including the required permissions.
-- [Reservations](https://docs.attraccess.org/en/resources/reservations.md): The Reservations plugin lets members book a resource for a time window; covers member use, administration and the API.
 - [Usage Tracking](https://docs.attraccess.org/en/resources/usage-tracking.md): How usage sessions are started, ended, shared between users, linked to projects and reviewed in the usage history.
-- [CSV Export](https://docs.attraccess.org/en/resources/csv-export.md): Export resource usage and billing data as CSV: permissions, choosing columns, templates, available fields and file format.
+- [CSV Export](https://docs.attraccess.org/en/resources/csv-export.md): Export resource usage, resource hours and billing data as CSV: permissions, choosing columns, templates, available fields and file format.
 
 ## English: Flows & Automation
 - [Overview](https://docs.attraccess.org/en/flows/overview.md): Introduces flows, visual automations for resources, with use cases, resource versus global flows and creating a first flow.
@@ -81,16 +80,6 @@ The documentation pages are plain Markdown files. English pages live under https
 - [MQTT Server Setup](https://docs.attraccess.org/en/devices/mqtt/server-setup.md): How to add and test an MQTT broker connection in Attraccess, including common brokers, multiple servers and connection status.
 - [MQTT Message Explorer](https://docs.attraccess.org/en/devices/mqtt/message-explorer.md): How to watch live MQTT messages and publish test messages for any configured MQTT server, who may use the explorer and where to find it.
 - [MQTT Examples](https://docs.attraccess.org/en/devices/mqtt/examples.md): Practical MQTT examples: relay power control, receiving sensor data and using MQTT in flows for resource usage events.
-- [Guided WAGO CC100 Commissioning](https://docs.attraccess.org/en/devices/wago-cc100-commissioning.md): Guide to commission a WAGO CC100 controller in an on-premises, air-gapped installation, including MQTT claim and recovery.
-- [WAGO CC100 Docker Runtime](https://docs.attraccess.org/en/devices/wago-cc100-runtime.md): Configure the WAGO CC100 Docker runtime: terminals and live controls, MQTT server or SSH address changes, and deployment paths.
-- [WAGO Production Support](https://docs.attraccess.org/en/devices/wago-production-support.md): States tested WAGO CC100 compatibility, broker settings, enforced and measured limits, runbooks and what is not promised.
-- [WAGO Recovery Runbooks](https://docs.attraccess.org/en/devices/wago-recovery-runbooks.md): Six runbooks for operating the WAGO CC100 integration, such as credential compromise, broker outage and controller replacement.
-- [WAGO Threat Model and Pen-Test Brief](https://docs.attraccess.org/en/devices/wago-threat-model.md): Threat model and pen-test brief for the WAGO CC100 integration, covering actors, trust boundaries and attack surfaces.
-- [WAGO Safety Boundary](https://docs.attraccess.org/en/devices/wago-safety-boundary.md): States that the WAGO integration is for operational control, not a safety function, with a wording checklist for reviewers.
-- [Matter: Architecture](https://docs.attraccess.org/en/devices/matter/architecture.md): Architecture of the Matter integration: a plugin plus a sidecar, versioned REST and WebSocket contract, errors and events.
-- [Matter: Operator Guide](https://docs.attraccess.org/en/devices/matter/operator.md): Operator guide for the Matter sidecar: build and start, configuration, connecting Attraccess, topologies and credential rotation.
-- [Matter: Data Model and Lifecycle](https://docs.attraccess.org/en/devices/matter/data-model.md): Matter device data model: terminology, nodes, endpoints, lifecycle, state semantics, reconciliation, admin actions and data retention.
-- [Matter: Backup and Recovery](https://docs.attraccess.org/en/devices/matter/backup-restore.md): Matter fabric backup and recovery: what a backup contains, automatic and manual backups, the recovery key, restore and disaster recovery, degraded states and safety guarantees.
 
 ## English: Billing
 - [Overview](https://docs.attraccess.org/en/billing/overview.md): Introduces billing: how credits are deducted for resource usage, the credit system, payment integration and required permission.
@@ -101,7 +90,40 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Overview](https://docs.attraccess.org/en/plugins/overview.md): Introduces the plugin system that extends Attraccess with frontend pages and backend endpoints, plugin management and SDKs.
 - [Installing Plugins](https://docs.attraccess.org/en/plugins/installing-plugins.md): How to upload, enable, disable and remove plugins in the web interface, with troubleshooting.
 - [Developing Plugins](https://docs.attraccess.org/en/plugins/developing-plugins.md): Developer guide to building Attraccess plugins: anatomy, SDKs, backend plugins, dependencies and reader UI integration.
-- [Database Migrations](https://docs.attraccess.org/en/plugins/database-migrations.md): How a plugin ships TypeORM migrations for its own tables: declaring, writing and bundling the migrations entry.
+- [Migrating Plugins to SDK 2.0](https://docs.attraccess.org/en/plugins/migrating-to-2.md): Migrating plugins to Attraccess 2.0: no database access, host ports instead of host entities, declared tables with neutral migrations and the record port, a porting guide and the refusal rules.
+- [Bluetooth Transport for Plugins](https://docs.attraccess.org/en/plugins/ble-transport.md): The BLE transport contract for backend plugins on Attractap readers: profiles, endpoints, sessions, advertisement watches, errors, limits and testing with the fake.
+- [Plugin Storage](https://docs.attraccess.org/en/plugins/plugin-storage.md): How a plugin keeps data of its own without database access: declaring tables, shipping neutral migrations, using the record port context.storage, transactions, errors and test fakes.
+- [Card Authentication for Plugins](https://docs.attraccess.org/en/plugins/card-authentication.md): How backend plugins with CARD_AUTHENTICATION let Attraccess authenticate an NFC card on their own device over a card channel: limits, failure reasons, BLE example.
+- [Plugin Readers](https://docs.attraccess.org/en/plugins/plugin-readers.md): How backend plugins with READER_DEVICES register card readers, assign an access-only door and open it with a card authenticated on the device.
+
+## English: Reservations
+- [Overview](https://docs.attraccess.org/en/plugins/reservations/overview.md): The Reservations plugin lets members book a resource for a time window; overview, prerequisites and links to member, administrator and API pages.
+- [Using Reservations](https://docs.attraccess.org/en/plugins/reservations/using-reservations.md): How members book resources, check in, handle approvals and use calendar feeds with the Reservations plugin.
+- [Administering Reservations](https://docs.attraccess.org/en/plugins/reservations/administration.md): How administrators install, configure and operate the Reservations plugin: timezone, email templates, start checks and audit log.
+- [Reservations API](https://docs.attraccess.org/en/plugins/reservations/api.md): Reference for the Reservations plugin API, including error codes.
+
+## English: WAGO
+- [Overview](https://docs.attraccess.org/en/plugins/wago/overview.md): The WAGO plugin connects WAGO CC100 controllers over MQTT to switch outputs, read inputs and Modbus meters and trigger flows; overview and prerequisites.
+- [Guided WAGO CC100 Commissioning](https://docs.attraccess.org/en/plugins/wago/cc100-commissioning.md): Guide to commission a WAGO CC100 controller in an on-premises, air-gapped installation, including MQTT claim and recovery.
+- [WAGO CC100 Docker Runtime](https://docs.attraccess.org/en/plugins/wago/cc100-runtime.md): Configure the WAGO CC100 Docker runtime: terminals and live controls, MQTT server or SSH address changes, and deployment paths.
+- [WAGO Production Support](https://docs.attraccess.org/en/plugins/wago/production-support.md): States tested WAGO CC100 compatibility, broker settings, enforced and measured limits, runbooks and what is not promised.
+- [WAGO Recovery Runbooks](https://docs.attraccess.org/en/plugins/wago/recovery-runbooks.md): Six runbooks for operating the WAGO CC100 integration, such as credential compromise, broker outage and controller replacement.
+- [WAGO Threat Model and Pen-Test Brief](https://docs.attraccess.org/en/plugins/wago/threat-model.md): Threat model and pen-test brief for the WAGO CC100 integration, covering actors, trust boundaries and attack surfaces.
+- [WAGO Safety Boundary](https://docs.attraccess.org/en/plugins/wago/safety-boundary.md): States that the WAGO integration is for operational control, not a safety function, with a wording checklist for reviewers.
+
+## English: Matter
+- [Overview](https://docs.attraccess.org/en/plugins/matter/overview.md): The Matter plugin connects Attraccess to a separate Matter sidecar that holds the Matter fabric; overview, prerequisites and links to the guides.
+- [Matter: Architecture](https://docs.attraccess.org/en/plugins/matter/architecture.md): Architecture of the Matter integration: a plugin plus a sidecar, versioned REST and WebSocket contract, errors and events.
+- [Matter: Operator Guide](https://docs.attraccess.org/en/plugins/matter/operator.md): Operator guide for the Matter sidecar: build and start, configuration, connecting Attraccess, topologies and credential rotation.
+- [Matter: Data Model and Lifecycle](https://docs.attraccess.org/en/plugins/matter/data-model.md): Matter device data model: terminology, nodes, endpoints, lifecycle, state semantics, reconciliation, admin actions and data retention.
+- [Matter: Backup and Recovery](https://docs.attraccess.org/en/plugins/matter/backup-restore.md): Matter fabric backup and recovery: what a backup contains, automatic and manual backups, the recovery key, restore and disaster recovery, degraded states and safety guarantees.
+- [Matter: Permissions](https://docs.attraccess.org/en/plugins/matter/permissions.md): Matter and Thread permission keys, their default roles, which key each Matter operation needs, the direct-command confirmation rule, audit behaviour and upgrade notes.
+
+## English: RabbitMQ
+- [Overview](https://docs.attraccess.org/en/plugins/rabbitmq/overview.md): The RabbitMQ plugin adds status, user, connection and statistics panels for RabbitMQ brokers to an MQTT server's detail page; prerequisites and permissions.
+
+## English: Shelly
+- [Overview](https://docs.attraccess.org/en/plugins/shelly/overview.md): The Shelly plugin keeps a registry of Shelly devices on your network, with discovery, device info, admin password management and firmware updates.
 
 ## English: Monitoring & Metrics
 - [Overview](https://docs.attraccess.org/en/monitoring/overview.md): Overview of built-in Prometheus metrics and Grafana dashboards for monitoring Attraccess, with security notes.
@@ -117,8 +139,12 @@ The documentation pages are plain Markdown files. English pages live under https
 ## English: Developer Guide
 - [Overview](https://docs.attraccess.org/en/developer/overview.md): Developer entry point: tech stack, prerequisites, getting started, development workflow, project structure and useful commands.
 - [Architecture](https://docs.attraccess.org/en/developer/architecture.md): Describes the Attraccess NX monorepo: applications, libraries, database, authentication and NestJS API conventions.
+- [Persistence Architecture](https://docs.attraccess.org/en/developer/persistence-architecture.md): Who owns database access in Attraccess: neutral models, SQLite schema, backend seam, ports and adapters, the enforced import boundary and ownership per feature area.
+- [Persistence Guarantees](https://docs.attraccess.org/en/developer/persistence-guarantees.md): The transaction and concurrency contract of the persistence layer, which guarantee is tested where, and which assumptions only hold for a single API instance.
+- [Adding a Database Backend](https://docs.attraccess.org/en/developer/adding-a-database-backend.md): Exact steps to add another relational backend to Attraccess, the export, import and backup contract, and the concrete deliverables that remain for PostgreSQL (ATT-584).
 - [API Log Destinations](https://docs.attraccess.org/en/developer/logging.md): How the API routes logs to destinations with RoutedLogger, including registering a driver and startup ownership.
 - [API Reference](https://docs.attraccess.org/en/developer/api-reference.md): Describes the REST API and its OpenAPI docs, the generated API client and React Query hooks, authentication and key modules.
+- [MCP Server (AI Clients)](https://docs.attraccess.org/en/developer/mcp.md): Explains how to connect MCP clients to Attraccess with API tokens or OAuth, which tools are exposed, how permissions apply and how the reviewed manifest is maintained.
 - [AI Agents (llms.txt & WebMCP)](https://docs.attraccess.org/en/developer/ai-agents.md): Explains the llms.txt index and the experimental WebMCP tools of the docs site, how to try them in Chrome and how to add pages.
 - [Contributing](https://docs.attraccess.org/en/developer/contributing.md): How to contribute to Attraccess: forking, branching, code style, testing, issue tracking and reporting bugs.
 
@@ -127,6 +153,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Logging In](https://docs.attraccess.org/en/end-user/login.md): The ways to log in to Attraccess: password, SSO, two-factor authentication, registration and password reset.
 - [My Account](https://docs.attraccess.org/en/end-user/account.md): How to manage your own account: profile, security, RFID cards and account deletion.
 - [Using Resources](https://docs.attraccess.org/en/end-user/using-resources.md): How to find resources, get introduced, start supervised sessions and start and end usage sessions.
+- [Dashboard](https://docs.attraccess.org/en/end-user/dashboard.md): How to build your personal dashboard from widgets, page shortcuts and resources in three sizes, edit, resize and reorder it, and start or stop sessions from it.
 - [Mobile Usage (PWA)](https://docs.attraccess.org/en/end-user/mobile-pwa.md): How to install Attraccess as a Progressive Web App on iOS and Android, with updates and offline support.
 
 ## English: FAQ & Help
@@ -144,9 +171,9 @@ The documentation pages are plain Markdown files. English pages live under https
 ## Deutsch: Installation
 - [Docker Compose](https://docs.attraccess.org/de/installation/docker-compose.md): Empfohlene Produktivinstallation von Attraccess mit Docker Compose, inklusive Projektverzeichnis, Umgebungsvariablen und erstem Start.
 - [Portainer](https://docs.attraccess.org/de/installation/portainer.md): Installation von Attraccess als Stack in Portainer, inklusive Umgebungsvariablen, Deployment, Ersteinrichtung und Stack-Update.
-- [Umgebungsvariablen](https://docs.attraccess.org/de/installation/environment-variables.md): Referenz aller Umgebungsvariablen zur Konfiguration von Attraccess: Pflichteinstellungen, Anwendung, Logs, Speicher, SMTP und TLS.
+- [Umgebungsvariablen](https://docs.attraccess.org/de/installation/environment-variables.md): Referenz aller Umgebungsvariablen zur Konfiguration von Attraccess: Pflichteinstellungen, Anwendung, Logs, Datenbank, Speicher, SMTP und TLS.
 - [SSL einrichten](https://docs.attraccess.org/de/installation/ssl-setup.md): Wie Attraccess per HTTPS bereitgestellt wird: Reverse Proxy, selbst-signierte oder eigene Zertifikate und Anforderungen für SSO.
-- [Aktualisierung](https://docs.attraccess.org/de/installation/updating.md): So prüfen Sie auf neue Attraccess-Versionen und aktualisieren mit Docker Compose, Docker oder Portainer oder legen eine feste Version fest.
+- [Aktualisierung](https://docs.attraccess.org/de/installation/updating.md): So prüfen Sie auf neue Attraccess-Versionen und aktualisieren mit Docker Compose, Docker oder Portainer, legen eine feste Version fest und gehen über 1.11 auf 2.0.
 - [Backup & Wiederherstellung](https://docs.attraccess.org/de/installation/backup-restore.md): Erklärt, welche Attraccess-Daten gesichert werden, wie Sie ein Backup erstellen und wiederherstellen.
 
 ## Deutsch: Ersteinrichtung
@@ -158,7 +185,7 @@ The documentation pages are plain Markdown files. English pages live under https
 ## Deutsch: Benutzerverwaltung
 - [Überblick](https://docs.attraccess.org/de/user-management/overview.md): Überblick über die Benutzerverwaltung: Konten anlegen, Berechtigungen vergeben und Anmeldemethoden als Administrator konfigurieren.
 - [Benutzer anlegen](https://docs.attraccess.org/de/user-management/creating-users.md): Die Wege zu einem Benutzerkonto: Selbstregistrierung, SSO-Registrierung, Projekteinladungen und Anlegen durch einen Administrator.
-- [Berechtigungen](https://docs.attraccess.org/de/user-management/permissions.md): Erklärt die vier Systemberechtigungen, wie Administratoren sie vergeben, SSO-verwaltete Berechtigungen und Zugriff auf fremde RFID-Karten.
+- [Berechtigungen](https://docs.attraccess.org/de/user-management/permissions.md): Erklärt das rollenbasierte Berechtigungsmodell, Standardrollen, Berechtigungsschlüssel, Plugin-Berechtigungen, die Vergabe von Rollen und SSO-verwaltete Rollen.
 - [SSO Überblick](https://docs.attraccess.org/de/user-management/sso-overview.md): Überblick über Single Sign-On mit OIDC und SAML: Voraussetzungen, Anbieter, automatische Erkennung, Berechtigungszuordnung und Kontoverknüpfung.
 - [OIDC einrichten](https://docs.attraccess.org/de/user-management/sso-oidc.md): So legen Sie einen OpenID-Connect-SSO-Anbieter an und konfigurieren ihn, inklusive Callback-URL und Test der Anmeldung.
 - [SAML einrichten](https://docs.attraccess.org/de/user-management/sso-saml.md): So legen Sie einen SAML-SSO-Anbieter an und konfigurieren ihn, inklusive Service-Provider-Metadaten und Test der Anmeldung.
@@ -172,9 +199,8 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Dokumentation](https://docs.attraccess.org/de/resources/documentation.md): Wie Sie einer Ressource Dokumentation für die sichere Bedienung hinzufügen, inklusive Dokumentationstypen und Anzeige.
 - [Einweisungen](https://docs.attraccess.org/de/resources/introductions.md): Erklärt Einweisungen (Sicherheitsunterweisungen für den Zugang zu einer Ressource), ihre Rollen sowie Erteilen, Entziehen und Verwalten.
 - [Wartung](https://docs.attraccess.org/de/resources/maintenance.md): Wartung von Ressourcen mit manuellen Einträgen und automatisierten Wartungsplänen nachverfolgen, inklusive nötiger Berechtigungen.
-- [Reservierungen](https://docs.attraccess.org/de/resources/reservations.md): Das Plugin Reservierungen lässt Mitglieder eine Ressource für ein Zeitfenster buchen; behandelt Nutzung, Administration und API.
 - [Nutzungsverfolgung](https://docs.attraccess.org/de/resources/usage-tracking.md): Wie Nutzungssitzungen gestartet, beendet, gemeinsam genutzt, mit Projekten verknüpft und in der Nutzungshistorie eingesehen werden.
-- [CSV-Export](https://docs.attraccess.org/de/resources/csv-export.md): Nutzungs- und Abrechnungsdaten als CSV exportieren: Berechtigungen, Spalten, Vorlagen, verfügbare Felder und Dateiformat.
+- [CSV-Export](https://docs.attraccess.org/de/resources/csv-export.md): Nutzungs-, Stunden- und Abrechnungsdaten als CSV exportieren: Berechtigungen, Spalten, Vorlagen, verfügbare Felder und Dateiformat.
 
 ## Deutsch: Flows & Automatisierung
 - [Überblick](https://docs.attraccess.org/de/flows/overview.md): Stellt Flows als visuelle Automatisierungen vor, mit Anwendungsfällen, Ressourcen- und globalen Flows und dem ersten Flow.
@@ -201,7 +227,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Reader koppeln](https://docs.attraccess.org/de/attractap/pairing.md): Wie ein Leser mit einer Admin-Freigabe in die Installation aufgenommen wird: Status, erneutes Koppeln und verschlüsselte Verbindung.
 - [RFID-Karten](https://docs.attraccess.org/de/attractap/rfid-cards.md): Wie RFID-Karten mit Benutzerkonten verknüpft sind, Kartenverwaltung, Kartentypen und welche Leser Karten registrieren oder zurücksetzen dürfen.
 - [Firmware-Updates](https://docs.attraccess.org/de/attractap/firmware-updates.md): Wie Attractap-Leser Over-the-Air-Firmware-Updates vom Attraccess-Backend erhalten, inklusive Firmware-Varianten und Fehlerbehebung.
-- [Reader-Sicherheit](https://docs.attraccess.org/de/attractap/reader-security.md): Wie Attractap-Touch-V2-Leser abgesichert werden, damit sie nur mit Ihren eigenen Secure-Boot-Schlüsseln signierte Firmware akzeptieren, inklusive Sichern und Wiederherstellen.
+- [Reader-Sicherheit](https://docs.attraccess.org/de/attractap/reader-security.md): Wie Attractap-Touch-V2-Reader gesichert werden, damit sie nur mit deinen eigenen Secure-Boot-Schlüsseln signierte Firmware akzeptieren, inklusive Backup und Wiederherstellung der Schlüssel.
 - [Reader-Anzeige](https://docs.attraccess.org/de/attractap/reader-ui.md): Wie Plugins Hinweise und Abfragen auf Attractap-Bildschirmen anzeigen, welche Leser das können, sowie Admin-Einstellungen und Alarme.
 
 ## Deutsch: MQTT & IoT
@@ -209,12 +235,6 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Server einrichten](https://docs.attraccess.org/de/mqtt/server-setup.md): So verbinden Sie Attraccess mit einem MQTT-Broker und testen die Verbindung, inklusive gängiger Broker und mehrerer Server.
 - [Nachrichten-Explorer](https://docs.attraccess.org/de/mqtt/message-explorer.md): Wie Sie MQTT-Nachrichten live ansehen und Testnachrichten für jeden eingerichteten MQTT-Server senden, wer den Explorer nutzen darf und wo Sie ihn finden.
 - [Beispiele](https://docs.attraccess.org/de/mqtt/examples.md): Praktische MQTT-Beispiele: Maschinensteuerung über Relais, Sensordaten empfangen und MQTT in Flows für Nutzungsereignisse.
-
-## Deutsch: Geräte
-- [Matter: Architektur](https://docs.attraccess.org/de/devices/matter/architecture.md): Architektur der Matter-Integration: Plugin plus Sidecar, versionierter REST- und WebSocket-Vertrag, Fehler und Events.
-- [Matter: Betriebsanleitung](https://docs.attraccess.org/de/devices/matter/operator.md): Betriebsanleitung für den Matter-Sidecar: Bauen und starten, Konfiguration, Anbindung an Attraccess, Topologien und Token-Rotation.
-- [Matter: Datenmodell und Lebenszyklus](https://docs.attraccess.org/de/devices/matter/data-model.md): Matter-Gerätedatenmodell: Begriffe, Nodes, Endpoints, Lebenszyklus, Zustandssemantik, Abgleich, Admin-Aktionen und Datenaufbewahrung.
-- [Matter: Backup und Wiederherstellung](https://docs.attraccess.org/de/devices/matter/backup-restore.md): Backup und Wiederherstellung der Matter-Fabric: Inhalt, automatische und manuelle Backups, Wiederherstellungsschlüssel, Restore, Disaster Recovery, degradierte Zustände und Garantien.
 
 ## Deutsch: Abrechnung
 - [Überblick](https://docs.attraccess.org/de/billing/overview.md): Stellt die Abrechnung vor: Credits werden bei Ressourcennutzung abgezogen; Credit-System, Zahlungsintegration und nötige Berechtigung.
@@ -225,6 +245,40 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Überblick](https://docs.attraccess.org/de/plugins/overview.md): Stellt das Plugin-System vor, das Attraccess um Frontend-Seiten und Backend-Endpunkte erweitert, mit Verwaltung und SDKs.
 - [Plugins installieren](https://docs.attraccess.org/de/plugins/installing-plugins.md): Plugins über die Weboberfläche hochladen, aktivieren, deaktivieren und entfernen, mit Fehlerbehebung.
 - [Plugins entwickeln](https://docs.attraccess.org/de/plugins/developing-plugins.md): Entwicklerleitfaden für Attraccess-Plugins: SDKs, Frontend- und Backend-Plugins, Abhängigkeiten, Reader-UI und Start-Hooks.
+- [Plugins auf SDK 2.0 umstellen](https://docs.attraccess.org/de/plugins/migrating-to-2.md): Plugins auf Attraccess 2.0 umstellen: kein Datenbankzugriff, Host-Ports statt Host-Entitäten, deklarierte Tabellen mit neutralen Migrationen und Record-Port, Portierungsanleitung und Ablehnungsregeln.
+- [Bluetooth-Transport für Plugins](https://docs.attraccess.org/de/plugins/ble-transport.md): Der BLE-Transportvertrag für Backend-Plugins auf Attractap-Readern: Profile, Endpunkte, Sitzungen, Advertisement-Beobachtungen, Fehler, Grenzwerte und Tests mit dem Fake.
+- [Plugin-Speicher](https://docs.attraccess.org/de/plugins/plugin-storage.md): Wie ein Plugin eigene Daten ohne Datenbankzugriff hält: Tabellen deklarieren, neutrale Migrationen mitliefern, den Record-Port context.storage nutzen, Transaktionen, Fehler und Test-Fakes.
+- [Kartenauthentifizierung für Plugins](https://docs.attraccess.org/de/plugins/card-authentication.md): Wie Backend-Plugins mit CARD_AUTHENTICATION eine NFC-Karte an ihrem Gerät über einen Kartenkanal authentifizieren lassen: Grenzwerte, Fehlergründe, BLE-Beispiel.
+- [Plugin-Reader](https://docs.attraccess.org/de/plugins/plugin-readers.md): Wie Backend-Plugins mit READER_DEVICES eigene Kartenleser registrieren, ihnen eine Tür mit der Option „Nur Zutritt“ zuweisen und sie per Karte öffnen.
+
+## Deutsch: Reservierungen
+- [Überblick](https://docs.attraccess.org/de/plugins/reservations/overview.md): Das Plugin Reservierungen lässt Mitglieder eine Ressource für ein Zeitfenster buchen; Überblick, Voraussetzungen und Links zu Mitglieder-, Administrations- und API-Seiten.
+- [Reservierungen nutzen](https://docs.attraccess.org/de/plugins/reservations/using-reservations.md): Wie Mitglieder mit dem Plugin Reservierungen Ressourcen buchen, einchecken, Genehmigungen abwickeln und Kalender-Feeds nutzen.
+- [Reservierungen administrieren](https://docs.attraccess.org/de/plugins/reservations/administration.md): Wie Administratoren das Plugin Reservierungen installieren, konfigurieren und betreiben: Zeitzone, E-Mail-Vorlagen, Startprüfung und Audit-Log.
+- [Reservierungs-API](https://docs.attraccess.org/de/plugins/reservations/api.md): Referenz der API des Plugins Reservierungen, einschließlich Fehlercodes.
+
+## Deutsch: WAGO
+- [Überblick](https://docs.attraccess.org/de/plugins/wago/overview.md): Das Plugin WAGO verbindet WAGO-CC100-Controller über MQTT, um Ausgänge zu schalten, Eingänge und Modbus-Zähler zu lesen und Flows auszulösen; Überblick und Voraussetzungen.
+- [Geführte WAGO-CC100-Inbetriebnahme](https://docs.attraccess.org/de/plugins/wago/cc100-commissioning.md): Anleitung zur Inbetriebnahme eines WAGO-CC100-Controllers in einer lokalen, vom Internet getrennten Installation, einschließlich MQTT-Claim und Wiederherstellung.
+- [WAGO-CC100-Docker-Laufzeit](https://docs.attraccess.org/de/plugins/wago/cc100-runtime.md): WAGO-CC100-Docker-Laufzeitumgebung konfigurieren: Klemmen und Live-Steuerung, Wechsel von MQTT-Server oder SSH-Adresse sowie Bereitstellungswege.
+- [WAGO-Produktivbetrieb und Kompatibilität](https://docs.attraccess.org/de/plugins/wago/production-support.md): Nennt die getestete WAGO-CC100-Kompatibilität, Broker-Einstellungen, erzwungene und gemessene Grenzen, Runbooks und was nicht zugesagt wird.
+- [WAGO-Wiederherstellungs-Runbooks](https://docs.attraccess.org/de/plugins/wago/recovery-runbooks.md): Sechs Runbooks für den Betrieb der WAGO-CC100-Integration, etwa bei Zugangsdaten-Kompromittierung, Broker-Ausfall und Controller-Austausch.
+- [WAGO-Bedrohungsmodell und Pen-Test-Briefing](https://docs.attraccess.org/de/plugins/wago/threat-model.md): Bedrohungsmodell und Pen-Test-Briefing für die WAGO-CC100-Integration mit Akteuren, Vertrauensgrenzen und Angriffsflächen.
+- [WAGO-Sicherheitsgrenze](https://docs.attraccess.org/de/plugins/wago/safety-boundary.md): Legt fest, dass die WAGO-Integration der betrieblichen Steuerung und keiner Sicherheitsfunktion dient, mit einer Formulierungs-Checkliste für Prüfer.
+
+## Deutsch: Matter
+- [Überblick](https://docs.attraccess.org/de/plugins/matter/overview.md): Das Plugin Matter verbindet Attraccess mit einem separaten Matter-Sidecar, der die Matter-Fabric hält; Überblick, Voraussetzungen und Links zu den Anleitungen.
+- [Matter: Architektur](https://docs.attraccess.org/de/plugins/matter/architecture.md): Architektur der Matter-Integration: Plugin plus Sidecar, versionierter REST- und WebSocket-Vertrag, Fehler und Events.
+- [Matter: Betriebsanleitung](https://docs.attraccess.org/de/plugins/matter/operator.md): Betriebsanleitung für den Matter-Sidecar: Bauen und starten, Konfiguration, Anbindung an Attraccess, Topologien und Token-Rotation.
+- [Matter: Datenmodell und Lebenszyklus](https://docs.attraccess.org/de/plugins/matter/data-model.md): Matter-Gerätedatenmodell: Begriffe, Nodes, Endpoints, Lebenszyklus, Zustandssemantik, Abgleich, Admin-Aktionen und Datenaufbewahrung.
+- [Matter: Backup und Wiederherstellung](https://docs.attraccess.org/de/plugins/matter/backup-restore.md): Backup und Wiederherstellung der Matter-Fabric: Inhalt, automatische und manuelle Backups, Wiederherstellungsschlüssel, Restore, Disaster Recovery, degradierte Zustände und Garantien.
+- [Matter: Berechtigungen](https://docs.attraccess.org/de/plugins/matter/permissions.md): Matter- und Thread-Berechtigungsschlüssel mit Standardrollen, welcher Schlüssel für welche Aktion nötig ist, Bestätigungsregel für direkte Befehle, Audit und Upgrade-Hinweise.
+
+## Deutsch: RabbitMQ
+- [Überblick](https://docs.attraccess.org/de/plugins/rabbitmq/overview.md): Das Plugin RabbitMQ ergänzt die Detailseite eines MQTT-Servers um Status-, Benutzer-, Verbindungs- und Statistik-Bereiche für RabbitMQ-Broker; Voraussetzungen und Berechtigungen.
+
+## Deutsch: Shelly
+- [Überblick](https://docs.attraccess.org/de/plugins/shelly/overview.md): Das Plugin Shelly führt ein Register der Shelly-Geräte in Ihrem Netzwerk mit Suche, Geräteinformationen, Admin-Passwort-Verwaltung und Firmware-Updates.
 
 ## Deutsch: Monitoring & Metriken
 - [Überblick](https://docs.attraccess.org/de/monitoring/overview.md): Überblick über integrierte Prometheus-Metriken und Grafana-Dashboards zur Überwachung von Attraccess, inklusive Sicherheitshinweisen.
@@ -240,8 +294,12 @@ The documentation pages are plain Markdown files. English pages live under https
 ## Deutsch: Für Entwickler
 - [Überblick](https://docs.attraccess.org/de/developer/overview.md): Einstieg für Entwickler: Technologie-Stack, Voraussetzungen, erste Schritte, Entwicklungsablauf, Projektstruktur und nützliche Befehle.
 - [Architektur](https://docs.attraccess.org/de/developer/architecture.md): Beschreibt das Attraccess-NX-Monorepo: Anwendungen, Bibliotheken, Datenbank und Authentifizierung.
+- [Persistenz-Architektur](https://docs.attraccess.org/de/developer/persistence-architecture.md): Wer in Attraccess den Datenbankzugriff besitzt: neutrale Modelle, SQLite-Schema, Backend-Naht, Ports und Adapter, die erzwungene Importgrenze und die Zuständigkeit je Bereich.
+- [Persistenz-Garantien](https://docs.attraccess.org/de/developer/persistence-guarantees.md): Der Transaktions- und Nebenläufigkeitsvertrag der Persistenzschicht, wo welche Garantie getestet wird und welche Annahmen nur für eine einzelne API-Instanz gelten.
+- [Datenbank-Backend hinzufügen](https://docs.attraccess.org/de/developer/adding-a-database-backend.md): Genaue Schritte, um Attraccess ein weiteres relationales Backend hinzuzufügen, der Export-, Import- und Backup-Vertrag und die verbleibenden konkreten Lieferungen für PostgreSQL (ATT-584).
 - [API-Log-Ziele](https://docs.attraccess.org/de/developer/logging.md): Wie die API Logs mit RoutedLogger an Ziele leitet, inklusive Treiber-Registrierung und Start-Lebenszyklus.
 - [API-Referenz](https://docs.attraccess.org/de/developer/api-reference.md): Beschreibt die REST-API mit OpenAPI-Dokumentation, generiertem API-Client und React-Query-Hooks, Authentifizierung und wichtigen Modulen.
+- [MCP-Server (KI-Clients)](https://docs.attraccess.org/de/developer/mcp.md): Erklärt, wie MCP-Clients per API-Token oder OAuth mit Attraccess verbunden werden, welche Tools es gibt, wie Berechtigungen wirken und wie das geprüfte Manifest gepflegt wird.
 - [KI-Agenten (llms.txt & WebMCP)](https://docs.attraccess.org/de/developer/ai-agents.md): Erklärt den llms.txt-Index und die experimentellen WebMCP-Tools der Dokumentation, das Ausprobieren in Chrome und das Hinzufügen von Seiten.
 - [Mitwirken](https://docs.attraccess.org/de/developer/contributing.md): Wie Sie zu Attraccess beitragen: Fork, Branch, Code-Stil, Tests, Issue-Tracking und Fehlermeldungen.
 
@@ -250,6 +308,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Anmeldung](https://docs.attraccess.org/de/end-user/login.md): Die Anmeldemöglichkeiten bei Attraccess: Passwort, SSO, Zwei-Faktor-Authentifizierung, Registrierung und Passwort zurücksetzen.
 - [Mein Konto](https://docs.attraccess.org/de/end-user/account.md): So verwalten Sie Ihr eigenes Konto: Profil, Sicherheit, RFID-Karten und Konto löschen.
 - [Ressourcen nutzen](https://docs.attraccess.org/de/end-user/using-resources.md): Wie Sie Ressourcen finden, eingewiesen werden, beaufsichtigte Sitzungen starten sowie Nutzungssitzungen starten und beenden.
+- [Dashboard](https://docs.attraccess.org/de/end-user/dashboard.md): Wie Sie Ihr Dashboard aus Widgets, Seitenverknüpfungen und Ressourcen in drei Größen zusammenstellen, bearbeiten, in der Größe ändern und anordnen und von dort Sitzungen starten oder beenden.
 - [Mobile Nutzung (PWA)](https://docs.attraccess.org/de/end-user/mobile-pwa.md): Wie Sie Attraccess als Progressive Web App auf iOS und Android installieren, inklusive Updates und Offline-Unterstützung.
 
 ## Deutsch: FAQ & Hilfe

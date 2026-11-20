@@ -56,11 +56,11 @@ export function createHandleCardAuthenticationRequestFixture(parentScope: Attrac
       set rbacService(value: typeof parentScope.rbacService) {
         parentScope.rbacService = value;
       },
-      get resourceRepository() {
-        return parentScope.resourceRepository;
+      get resourceReads() {
+        return parentScope.resourceReads;
       },
-      set resourceRepository(value: typeof parentScope.resourceRepository) {
-        parentScope.resourceRepository = value;
+      set resourceReads(value: typeof parentScope.resourceReads) {
+        parentScope.resourceReads = value;
       },
     },
     parentScope,

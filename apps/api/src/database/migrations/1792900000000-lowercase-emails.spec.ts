@@ -23,7 +23,7 @@ describe('LowercaseEmails migration', () => {
   };
 
   beforeEach(async () => {
-    database = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    database = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
     runner = database.createQueryRunner();
     await runner.query(
       `CREATE TABLE "user" (id integer PRIMARY KEY, email text NOT NULL UNIQUE, isEmailVerified boolean NOT NULL DEFAULT 0, deletedAt datetime NULL)`,

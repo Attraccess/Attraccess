@@ -1,4 +1,5 @@
 # Den Attractap-Leser benutzen
+
 <!-- llms-description: So bedienen Sie den Attractap-Touchleser: mit Karte anmelden, Maschinen starten oder beenden, Türen öffnen und Formulare ausfüllen. -->
 
 Mit Ihrer RFID-Karte und dem Attractap-Touchdisplay können Sie die Nutzung einer Maschine starten oder beenden, eine Tür öffnen oder eine Aufsicht anfordern. Der Leser zeigt die ihm zugeordneten Maschinen und Türen sowie die für Sie verfügbaren Aktionen.
@@ -21,7 +22,7 @@ Sie können eine Ressource auch **vor der Anmeldung** auswählen. Tippen Sie auf
 
 ### Uhrzeit und Datum
 
-Solange niemand angemeldet ist, dient der Leser auch als Uhr. Die Kartenaufforderung zeigt die aktuelle Uhrzeit und das Datum in großer Schrift, darunter **RFID-Karte auflegen**. Die Ressourcenliste zeigt beides oben an. Der Leser zeigt die Zeit in seiner eigenen [Zeitzone](attractap/reader-ui.md#uhrzeit-und-zeitzone): der Zone eines Plugins wie Reservierungen, sofern eines sie festlegt, sonst der Ihres Attraccess-Servers. Solange Sie angemeldet sind, zeigt eine kleine Uhr in der Fußleiste die aktuelle Zeit. Nach einem Neustart erscheint die Uhr, sobald der Leser mit dem Server verbunden ist; bis dahin zeigt er den gewohnten Anmeldetext. Bricht die Verbindung später ab, läuft die Uhr intern weiter. Das Display zeigt jedoch bis zur erneuten Verbindung den Initialisierungsbildschirm.
+Solange niemand angemeldet ist, dient der Leser auch als Uhr. Die Kartenaufforderung zeigt die aktuelle Uhrzeit und das Datum in großer Schrift, darunter **RFID-Karte auflegen**. Die Ressourcenliste zeigt beides oben an. Der Leser zeigt die Zeit in seiner eigenen [Zeitzone](attractap/reader-ui.md#uhrzeit-und-zeitzone): der Zone eines Plugins wie [Reservierungen](plugins/reservations/overview.md), sofern eines sie festlegt, sonst der Ihres Attraccess-Servers. Solange Sie angemeldet sind, zeigt eine kleine Uhr in der Fußleiste die aktuelle Zeit. Nach einem Neustart erscheint die Uhr, sobald der Leser mit dem Server verbunden ist; bis dahin zeigt er den gewohnten Anmeldetext. Bricht die Verbindung später ab, läuft die Uhr intern weiter. Das Display zeigt jedoch bis zur erneuten Verbindung den Initialisierungsbildschirm.
 
 Während einer Unterbrechung läuft die UTC-Zeit mit dem zuletzt vom Server empfangenen Zeitzonenversatz weiter. Dieser Versatz bleibt unverändert: Sommerzeit- und Winterzeitwechsel oder eine Änderung der Zeitzone des Lesers werden erst nach dem nächsten gültigen Zeitwert vom Server berücksichtigt.
 
@@ -30,6 +31,8 @@ Die Kartenaufforderung zeigt die Uhr auch dann, wenn die ausgewählte Ressource 
 ## Eine Maschine starten oder eine Tür öffnen
 
 Tippen Sie in der Ressourcenliste neben einer Maschine auf **Start** oder neben einer Tür auf **Öffnen**. Füllen Sie gegebenenfalls ein Formular aus oder lassen Sie die angeforderte Aufsicht bestätigen. Warten Sie anschließend auf das Ergebnis auf dem Display.
+
+Eine Tür mit der Option [„Nur Zutritt“](resources/creating-resources.md#tür-optionen) hat eine einzige Aktion: Ihre Details zeigen statt Abschließen, Aufschließen und Falle öffnen eine einzige Schaltfläche **Öffnen**. An einem Attractap-Lite-Leser (ohne Display) öffnet jedes Auflegen Ihrer Karte eine solche Tür, ob kurz oder lang; der Leser signalisiert dort kein langes Auflegen.
 
 Während der Leser eine Aktion verarbeitet, sind die Bedienelemente kurzzeitig nicht verfügbar. Warten Sie, bis der Status der Ressource aktualisiert wurde, bevor Sie erneut tippen. Nach dem Start einer Maschine zeigt deren Zeile Ihren Namen und die Schaltfläche **Stop**.
 
@@ -161,6 +164,33 @@ Nach der Abmeldung können Sie sich mit Ihrer Karte erneut anmelden. Eine laufen
 | Die Anmeldung mit Ihrer Karte klappt nicht | Versuchen Sie es erneut und lassen Sie die Karte am Leser, bis die Anmeldung abgeschlossen ist. Falls es weiterhin nicht klappt, bitten Sie Ihre Administration zu prüfen, ob die Karte Ihrem Konto zugeordnet ist. |
 | Start, Stop oder Türöffnung schlägt fehl   | Lesen Sie die Meldung und prüfen Sie vor einem erneuten Versuch den aktuellen Status der Ressource. Wenden Sie sich bei anhaltenden Problemen an einen Wartenden oder Ressourcenverwalter für diese Ressource.      |
 | Der Leser verliert die Verbindung          | Warten Sie, bis die Verbindung wiederhergestellt ist, und melden Sie sich erneut an. Ein Verbindungsabbruch beendet keine laufende Maschinennutzung.                                                                |
+
+### Netzwerk-Hinweis und Verbindungsstatus
+
+Solange die Verbindung zum Server gut ist, zeigt der Leser keinen Netzwerk-Hinweis. Ein Hinweis oben rechts erscheint nur bei einem Problem:
+
+| Hinweis   | Bedeutung                                                                                                                                                                                                      |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **! NET** | Die Verbindung ist eingeschränkt: Nachrichten kommen verspätet an, Pings sind langsam oder gehen verloren, oder das Senden ist fehlgeschlagen. Der Leser funktioniert weiter, reagiert aber eventuell langsam. |
+| **x NET** | Der Leser ist offline und erreicht den Server nicht. Er verbindet sich automatisch neu.                                                                                                                        |
+
+Für Details öffnen Sie das Wartungsmenü (den Griff am oberen Rand herunterziehen), tippen auf **Netzwerk** und geben die Geräte-PIN ein. Der Bildschirm **Netzwerkstatus** zeigt den aktuellen Verbindungszustand und aktualisiert sich jede Sekunde. Der Leser bleibt dabei verbunden, sodass Sie Änderungen der Verbindung direkt verfolgen können. Der Pfeil zurück führt zum vorherigen Bildschirm, oder zum Startbildschirm, wenn die Verbindung zwischendurch abgebrochen ist:
+
+| Wert                                   | Bedeutung                                                                                            |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Verbindungsqualität                    | **Gut**, **Eingeschränkt** oder **Offline**, dieselbe Einschätzung wie beim Hinweis.                 |
+| Zeit seit letzter Nachricht            | Wie lange der Leser nichts mehr vom Server empfangen oder sich zuletzt mit ihm verbunden hat.        |
+| Letzter Ping / Durchschnittlicher Ping | Antwortzeit des letzten Pings und der Durchschnitt der letzten Minute.                               |
+| Ping-Trend                             | Unterschied zwischen dem ältesten und dem neuesten Ping der letzten Minute; positiv heißt langsamer. |
+| Neuverbindungen (1 Min.)               | Wie oft die Verbindung in der letzten Minute neu aufgebaut wurde.                                    |
+| Sendewarteschlange                     | Nachrichten, die auf das Senden warten.                                                              |
+| Warteschlange voll (1 Min.)            | Wie oft eine Nachricht nicht eingereiht werden konnte, weil die Warteschlange voll war.              |
+| Sendefehler (1 Min.)                   | Nachrichten, die nicht gesendet werden konnten.                                                      |
+| Verbindungs-Timeouts (1 Min.)          | Wie oft der Server zu lange schwieg und der Leser die Verbindung trennte.                            |
+| Ping-Timeouts / Ping-Verlust           | Pings ohne Antwort, als Anzahl und als Anteil aller Pings der letzten Minute.                        |
+| Verpasste Heartbeats (1 Min.)          | Heartbeats, die der Leser nicht rechtzeitig senden konnte.                                           |
+
+**Nicht verfügbar** bedeutet, dass es keinen Messwert gibt: Die Pings zeigen es, bis nach dem Start des Lesers der erste Ping beantwortet wurde, Durchschnitt und Trend zusätzlich, wenn in der letzten Minute kein Ping beantwortet wurde.
 
 > [!NOTE]
 > Leser-Firmware und Server werden gemeinsam ausgeliefert. Der Server aktualisiert die Leser automatisch auf die mitgelieferte Firmware-Version (siehe [Firmware-Updates](attractap/firmware-updates.md)).

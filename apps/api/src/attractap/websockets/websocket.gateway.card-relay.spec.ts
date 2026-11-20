@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- partial socket and service mocks */
 import { Logger } from '@nestjs/common';
+import { crc32 } from 'zlib';
 import { WebSocket } from 'ws';
 import { registerAttractapGatewayFixture } from './websocket.gateway.attractap-gateway.test-fixture';
 import { createReaderSenders, READER_SEND_LIMITS } from './reader-socket-send';
-import { securelyHashToken } from './websocket.utils';
+import { SESSION_SUBPROTOCOL } from '../security/session-framing';
 import { CARD_CONVERSATION_LIMITS } from './card-conversation.service';
 import { CardSessionService } from './handlers/ui/card-session.service';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
@@ -168,30 +169,21 @@ describe('AttractapGateway card relay rules', () => {
       expect(massIntroductionService.detachReader).toHaveBeenCalledWith('mass-1', 7);
     });
 
-    it('authenticating again on the same connection starts from nothing', async () => {
-      const socket = loggedInReader();
-      // Even a successful re-authentication as the same reader must not inherit the old login.
-      const token = 'reader-token-for-reauth';
-      const apiTokenHash = await securelyHashToken(token);
-      let stateWhileCheckingCredentials: unknown;
-      fixture.attractapService.findReaderById.mockImplementation(async () => {
-        stateWhileCheckingCredentials = { ...socket.state };
-        return { id: 7, name: 'Lathe', apiTokenHash, pairingState: 'unpaired', resources: [] };
-      });
-      jest.spyOn(fixture.gateway['resourceListService'], 'sendResourceListToSocket').mockResolvedValue(undefined);
+    it.each(['READER_AUTHENTICATE', 'READER_REGISTER'])(
+      'closes the connection on the removed token sign-in (%s) and logs nothing of it',
+      async (type) => {
+        const socket = loggedInReader();
+        const warned = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
 
-      await send(socket, AttractapEventType.READER_AUTHENTICATE, { id: 7, token });
+        await fixture.gateway.onClientEvent({ type, payload: { id: 7, token: 'tok-secret-value' } } as any, socket);
 
-      // Cleared before the credentials are even checked.
-      expect(stateWhileCheckingCredentials).toEqual(
-        expect.objectContaining({ verifiedUserId: null, enrollment: null }),
-      );
-
-      expect(abort).toHaveBeenCalledWith(socket, 'READER_SESSION_ENDED');
-      expect(massIntroductionService.detachReader).toHaveBeenCalledWith('mass-1', 7);
-      expect(socket.readerId).toBe(7);
-      expectConnectionStateCleared(socket);
-    });
+        expect(socket.terminate).toHaveBeenCalledTimes(1);
+        expect(warned).toHaveBeenCalledTimes(1);
+        expect(JSON.stringify(warned.mock.calls)).toContain('token sign-in no longer supported');
+        expect(JSON.stringify(warned.mock.calls)).not.toContain('tok-secret-value');
+        expect(replies(socket)).toEqual([]);
+      },
+    );
 
     it('READER_SESSION_ENDED ends the card session', async () => {
       const socket = loggedInReader();
@@ -306,13 +298,67 @@ describe('AttractapGateway card relay rules', () => {
     });
   });
 
+  describe('coredump upload (ATT-1144)', () => {
+    it('answers BEGIN and CHUNK without an ACK round trip, skips the activity write per chunk and drops the upload on disconnect', async () => {
+      const dump = Buffer.alloc(6000, 3);
+      const findCrashReportOfReader = jest.fn().mockResolvedValue({
+        id: 3,
+        attractapId: 7,
+        coredumpStatus: 'awaiting',
+        coredumpExpectedSize: dump.length,
+        coredumpExpectedCrc32: crc32(dump),
+      });
+      Object.assign(fixture.attractapService, { findCrashReportOfReader });
+      const socket = loggedInReader({ sendRaw: jest.fn().mockReturnValue(true) });
+      const raw = (reader: AuthenticatedWebSocket) =>
+        (reader.sendRaw as jest.Mock).mock.calls.map(([message]) => message.data);
+
+      await send(socket, AttractapEventType.READER_COREDUMP_BEGIN, {
+        reportId: 3,
+        size: dump.length,
+        crc32: crc32(dump),
+      });
+      expect(raw(socket)).toEqual([
+        {
+          type: AttractapEventType.READER_COREDUMP_BEGIN,
+          payload: { reportId: 3, chunkSize: 4096, nextOffset: 0 },
+        },
+      ]);
+      expect(findCrashReportOfReader).toHaveBeenCalledWith(3, 7);
+
+      fixture.attractapService.updateLastReaderConnection.mockClear();
+      await send(socket, AttractapEventType.READER_COREDUMP_CHUNK, {
+        reportId: 3,
+        offset: 0,
+        data: dump.subarray(0, 4096).toString('base64'),
+      });
+      expect(raw(socket).at(-1)).toEqual({
+        type: AttractapEventType.READER_COREDUMP_CHUNK,
+        payload: { reportId: 3, nextOffset: 4096 },
+      });
+      expect(fixture.attractapService.updateLastReaderConnection).not.toHaveBeenCalled();
+      expect(socket.sendMessage).not.toHaveBeenCalled();
+
+      await fixture.gateway.handleDisconnect(socket);
+      // The reader reconnects and continues where it was: the server no longer holds the partial upload.
+      const reconnected = loggedInReader({ id: 'reader-2', sendRaw: jest.fn().mockReturnValue(true) });
+      await send(reconnected, AttractapEventType.READER_COREDUMP_CHUNK, {
+        reportId: 3,
+        offset: 4096,
+        data: dump.subarray(4096).toString('base64'),
+      });
+      expect(raw(reconnected)).toEqual([
+        { type: AttractapEventType.READER_COREDUMP_CHUNK, payload: { reportId: 3, error: 'COREDUMP_NO_UPLOAD' } },
+      ]);
+    });
+  });
+
   describe('send limits of a paired reader (session transport)', () => {
     /** A session socket as ReaderSessionService.attach leaves it: queued bytes live in the session. */
     function sessionSenders(options: { queued?: () => number; refuse?: boolean } = {}) {
       const client: any = {
         readyState: WebSocket.OPEN,
         bufferedAmount: 0,
-        transport: 'session',
         readerId: 7,
         state: { verifiedUserId: null },
         pendingSendBytes: options.queued ?? (() => 0),
@@ -347,7 +393,7 @@ describe('AttractapGateway card relay rules', () => {
 
     it("cuts the reader off at the session's queue limit, not the WebSocket's", async () => {
       const errors = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
-      const { client, socket } = sessionSenders({ queued: () => READER_SEND_LIMITS.session.maxQueuedBytes + 1 });
+      const { client, socket } = sessionSenders({ queued: () => READER_SEND_LIMITS.maxQueuedBytes + 1 });
 
       expect(socket.sendRaw(apdu())).toBe(false);
 
@@ -357,7 +403,7 @@ describe('AttractapGateway card relay rules', () => {
     });
 
     it('accepts a large message while the session queue is below its limit', () => {
-      const { client, socket } = sessionSenders({ queued: () => READER_SEND_LIMITS.session.maxQueuedBytes });
+      const { client, socket } = sessionSenders({ queued: () => READER_SEND_LIMITS.maxQueuedBytes });
       socket.sendBinaryData(Buffer.alloc(60 * 1024));
       expect(client.send).toHaveBeenCalledTimes(1);
       expect(client.terminate).not.toHaveBeenCalled();
@@ -367,7 +413,7 @@ describe('AttractapGateway card relay rules', () => {
       let queued = 0;
       const { client, socket, waitForAck } = sessionSenders({ queued: () => queued });
       waitForAck.mockImplementation(async () => {
-        queued = READER_SEND_LIMITS.session.retryMaxQueuedBytes + 1;
+        queued = READER_SEND_LIMITS.retryMaxQueuedBytes + 1;
         throw new Error('timeout');
       });
 
@@ -386,6 +432,7 @@ describe('AttractapGateway card relay rules', () => {
   describe('bounded send queue', () => {
     function connect(bufferedAmount = 0) {
       const client: any = {
+        protocol: SESSION_SUBPROTOCOL,
         readyState: WebSocket.OPEN,
         bufferedAmount,
         send: jest.fn(),
@@ -397,8 +444,7 @@ describe('AttractapGateway card relay rules', () => {
       return { client, socket: client as AuthenticatedWebSocket, connection };
     }
 
-    async function settle(socket: AuthenticatedWebSocket, connection: Promise<void>) {
-      await fixture.gateway.onClientEvent({ type: 'ACK_READER_REQUEST_AUTHENTICATION' } as any, socket);
+    async function settle(_socket: AuthenticatedWebSocket, connection: Promise<void>) {
       await connection;
     }
 
@@ -408,7 +454,7 @@ describe('AttractapGateway card relay rules', () => {
       await settle(socket, connection);
       const errors = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
       client.send.mockClear();
-      client.bufferedAmount = READER_SEND_LIMITS.maxBufferedBytes;
+      client.bufferedAmount = READER_SEND_LIMITS.maxQueuedBytes + 1;
 
       const apdu = new AttractapEvent(AttractapEventType.CARD_APDU, { apdu: '90af000000' });
       expect(socket.sendRaw(apdu)).toBe(false);
@@ -423,7 +469,7 @@ describe('AttractapGateway card relay rules', () => {
       await new Promise((resolve) => setImmediate(resolve));
       await settle(socket, connection);
       client.send.mockClear();
-      client.bufferedAmount = READER_SEND_LIMITS.maxBufferedBytes - 10;
+      client.bufferedAmount = READER_SEND_LIMITS.maxQueuedBytes + 1;
 
       await expect(
         socket.sendMessage(new AttractapEvent(AttractapEventType.RESOURCE_LIST, { resources: [] })),
@@ -438,7 +484,7 @@ describe('AttractapGateway card relay rules', () => {
       client.state = {};
       const waitForAck = jest.fn(async () => {
         // The first copy is still queued: the reader is slow, not deaf.
-        client.bufferedAmount = READER_SEND_LIMITS.retryMaxBufferedBytes + 1;
+        client.bufferedAmount = READER_SEND_LIMITS.retryMaxQueuedBytes + 1;
         throw new Error('timeout');
       });
       const { sendMessage } = createReaderSenders({
@@ -470,7 +516,7 @@ describe('AttractapGateway card relay rules', () => {
     });
   });
 
-  it('never logs the reader token or card bytes during authentication and a card exchange', async () => {
+  it('never logs a token or card bytes during a refused token sign-in and a card exchange', async () => {
     const token = 'tok-' + 'c0ffee'.repeat(8);
     const cardBytes = '0123456789abcdef0123456789abcdef';
     const logged: unknown[] = [];
@@ -481,42 +527,9 @@ describe('AttractapGateway card relay rules', () => {
     for (const method of ['log', 'error', 'warn', 'debug', 'info'] as const) {
       jest.spyOn(console, method).mockImplementation((...args: unknown[]) => void logged.push(args));
     }
-    fixture.attractapService.findReaderById.mockResolvedValue({
-      id: 7,
-      name: 'Lathe',
-      apiTokenHash: await securelyHashToken(token),
-      pairingState: 'unpaired',
-      resources: [],
-    });
-    jest.spyOn(fixture.gateway['resourceListService'], 'sendResourceListToSocket').mockResolvedValue(undefined);
-    const client: any = {
-      readyState: WebSocket.OPEN,
-      bufferedAmount: 0,
-      send: jest.fn(),
-      close: jest.fn(),
-      on: jest.fn(),
-    };
-    const socket = client as AuthenticatedWebSocket;
-    const connection = fixture.gateway.handleConnection(client);
-    await new Promise((resolve) => setImmediate(resolve));
-    await fixture.gateway.onClientEvent({ type: 'ACK_READER_REQUEST_AUTHENTICATION' } as any, socket);
-    await connection;
-
-    const authentication = send(socket, AttractapEventType.READER_AUTHENTICATE, { id: 7, token });
-    for (
-      let i = 0;
-      i < 20 && !client.send.mock.calls.some(([m]: [string]) => m.includes('READER_AUTHENTICATED'));
-      i++
-    ) {
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    }
-    await fixture.gateway.onClientEvent({ type: 'ACK_READER_AUTHENTICATED' } as any, socket);
-    await authentication;
-    expect(socket.readerId).toBe(7);
-    // A token sign-in is an unpaired reader and gets no card functions; this test logs the card
-    // traffic of a paired one, so lift the gate that the pairing flow would have lifted.
-    expect(socket.state.pairingRequired).toBe(true);
-    socket.state.pairingRequired = false;
+    const rejected = loggedInReader({ id: 'reader-2' });
+    await send(rejected, 'READER_AUTHENTICATE' as AttractapEventType, { id: 7, token });
+    const socket = loggedInReader({ sendRaw: jest.fn(() => true) });
 
     // Card traffic both ways, including answers to a conversation that does not exist (logged as ignored).
     socket.sendRaw(new AttractapEvent(AttractapEventType.CARD_APDU, { conversationId: 'c', seq: 1, apdu: cardBytes }));
@@ -528,118 +541,9 @@ describe('AttractapGateway card relay rules', () => {
 
     const text = JSON.stringify(logged);
     expect(logged.length).toBeGreaterThan(0);
+    expect(text).toContain('token sign-in no longer supported');
     expect(text).not.toContain(token);
     expect(text).not.toContain(cardBytes);
     expect(text).not.toMatch(/[0-9a-f]{32}/i);
-  });
-
-  describe('a reader that is not paired', () => {
-    // The only events it may send. Any other event, including one added later, is gated.
-    const ALLOWED = new Set<string>([
-      AttractapEventType.READER_AUTHENTICATE,
-      AttractapEventType.READER_REGISTER,
-      AttractapEventType.READER_FIRMWARE_INFO,
-      AttractapEventType.FIRMWARE_REQUEST_CHUNK,
-      AttractapEventType.READER_CRASH_REPORT,
-      AttractapEventType.READER_SESSION_ENDED,
-    ]);
-    const gatedEvents = () =>
-      (Object.keys(fixture.gateway['eventHandlers']) as AttractapEventType[]).filter((type) => !ALLOWED.has(type));
-
-    const unpairedReader = (state: Record<string, unknown> = { cardRelay: true }) => {
-      const socket = loggedInReader();
-      Object.assign(socket.state, { pairingRequired: true, ...state });
-      return socket;
-    };
-    const startPairing = (socket: AuthenticatedWebSocket) =>
-      replies(socket).filter((data) => data.type === AttractapEventType.READER_START_PAIRING);
-
-    it('gates every event but signing in, the firmware update, crash reports and the end of a login', async () => {
-      const types = gatedEvents();
-      expect(types).toEqual(
-        expect.arrayContaining([
-          AttractapEventType.CARD_DETECTED,
-          AttractapEventType.START_RESOURCE_USAGE_SESSION,
-          AttractapEventType.STOP_RESOURCE_USAGE_SESSION,
-          AttractapEventType.SUPERVISION_REQUEST,
-          AttractapEventType.REQUEST_RESOURCE_LIST,
-        ]),
-      );
-      for (const type of types) {
-        const socket = unpairedReader();
-        const handler = jest.spyOn(fixture.gateway['eventHandlers'], type).mockResolvedValue(undefined);
-
-        await send(socket, type);
-
-        expect({ type, handled: handler.mock.calls.length }).toEqual({ type, handled: 0 });
-        expect({ type, replies: replies(socket) }).toEqual({
-          type,
-          replies: [
-            expect.objectContaining({
-              type: AttractapEventType.READER_START_PAIRING,
-              payload: { ticket: 'ticket-1' },
-            }),
-          ],
-        });
-      }
-      expect(fixture.pairingService.issueBindingTicket).toHaveBeenCalledWith(7);
-    });
-
-    it('sends nothing when the pairing service says this reader was asked a moment ago', async () => {
-      fixture.pairingService.claimAutoPrompt.mockReturnValueOnce(false);
-      const socket = unpairedReader();
-
-      await send(socket, AttractapEventType.CARD_DETECTED);
-
-      expect(fixture.pairingService.claimAutoPrompt).toHaveBeenCalledWith(7);
-      expect(replies(socket)).toEqual([]);
-      expect(fixture.pairingService.issueBindingTicket).not.toHaveBeenCalled();
-    });
-
-    it('does not interrupt a firmware update running on this connection', async () => {
-      const socket = unpairedReader({ cardRelay: false, ota: { path: '/tmp/fw.bin', size: 4096 } });
-
-      await send(socket, AttractapEventType.REQUEST_RESOURCE_LIST);
-
-      expect(startPairing(socket)).toHaveLength(0);
-      expect(fixture.pairingService.claimAutoPrompt).not.toHaveBeenCalled();
-    });
-
-    it('asks again from its heartbeats, since a reader whose pairing failed sends little else', async () => {
-      const socket = unpairedReader();
-      (socket as unknown as { send: jest.Mock }).send = jest.fn();
-      await fixture.gateway.onHeartbeat(socket);
-      expect(startPairing(socket)).toHaveLength(0); // its firmware info was not handled yet
-      socket.state.updateCheckDone = true;
-
-      await fixture.gateway.onHeartbeat(socket);
-      fixture.pairingService.claimAutoPrompt.mockReturnValueOnce(false);
-      await fixture.gateway.onHeartbeat(socket);
-
-      expect(startPairing(socket)).toHaveLength(1);
-      expect(fixture.pairingService.claimAutoPrompt).toHaveBeenCalledTimes(2);
-    });
-
-    it('asks a reader on firmware before 2.0.0 to pair as well, never telling it to drop its token', async () => {
-      // Firmware 1.8.0+ pairs with the ticket; older firmware ignores it. READER_UNAUTHORIZED would
-      // make either drop its token and lose its record.
-      const socket = unpairedReader({ cardRelay: false });
-
-      await send(socket, AttractapEventType.CARD_DETECTED);
-
-      expect(replies(socket)).toEqual([
-        expect.objectContaining({ type: AttractapEventType.READER_START_PAIRING, payload: { ticket: 'ticket-1' } }),
-      ]);
-    });
-
-    it('still serves a firmware chunk request', async () => {
-      const socket = unpairedReader();
-      const handler = jest.spyOn(fixture.gateway['firmwareHandler'], 'handleFirmwareChunkRequest').mockResolvedValue();
-
-      await send(socket, AttractapEventType.FIRMWARE_REQUEST_CHUNK, { offset: 0, length: 1 });
-
-      expect(handler).toHaveBeenCalled();
-      expect(startPairing(socket)).toHaveLength(0);
-    });
   });
 });

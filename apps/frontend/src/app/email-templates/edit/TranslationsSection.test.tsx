@@ -59,8 +59,8 @@ it('keeps per-language drafts and saves only nonblank values while preserving ot
   fireEvent.click(screen.getByRole('button', { name: 'Save translations' }));
   await waitFor(() =>
     expect(state.save).toHaveBeenCalledWith({
-      type,
-      requestBody: { locale: 'en', translations: { greeting: 'Welcome', unused: 'Preserve' } },
+      path: { type },
+      body: { locale: 'en', translations: { greeting: 'Welcome', unused: 'Preserve' } },
     }),
   );
   expect(state.success).toHaveBeenCalledWith({ title: 'Translations saved' });
@@ -100,7 +100,7 @@ it('adds a common locale and deletes an existing language only after confirmatio
   await user.click(screen.getByRole('button', { name: 'Remove' }));
   await waitFor(() => expect(state.toastError).toHaveBeenCalledWith({ title: 'Failed to delete translations' }));
   await user.click(screen.getByRole('button', { name: 'Remove' }));
-  expect(state.remove).toHaveBeenCalledWith({ type, locale: 'de' });
+  expect(state.remove).toHaveBeenCalledWith({ path: { type, locale: 'de' } });
   await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
 });
 it.each(['empty', 'loading', 'error', 'no-keys'])('renders the %s state safely', (kind) => {

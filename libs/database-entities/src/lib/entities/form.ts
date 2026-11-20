@@ -1,3 +1,4 @@
+import { FormFieldType, ResourceFormAction } from '@attraccess/application-models';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -12,19 +13,6 @@ import {
 import { Resource } from './resource.entity';
 import { User } from './user.entity';
 import { ResourceUsage } from './resourceUsage.entity';
-
-export enum FormFieldType {
-  TEXT = 'text',
-  NUMBER = 'number',
-  BOOLEAN = 'boolean',
-  SELECT = 'select',
-}
-
-export enum ResourceFormAction {
-  START = 'start',
-  TAKEOVER = 'takeover',
-  END = 'end',
-}
 
 @Entity()
 export class Form {

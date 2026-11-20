@@ -54,6 +54,22 @@ docker run --rm \
 find $BACKUP_DIR -name "attraccess-*.tar.gz" -mtime +$DAYS_TO_KEEP -delete
 ```
 
+## Inhalt und Voraussetzungen eines Backups
+
+Die SQLite-Datenbank enthält die Kerndaten **und die Tabellen aller Plugins** samt Migrationsstand (die Kern-Tabelle
+`migrations` und je eine Migrationstabelle pro Plugin). Ein Backup ist daher eine konsistente Einheit:
+
+- Container stoppen oder eine konsistente SQLite-Kopie verwenden, damit die Datei nicht mitten im Schreiben kopiert wird.
+- Datenbank zusammen mit dem Ordner `plugins/` wiederherstellen und die Attraccess-Version starten, mit der das Backup
+  erstellt wurde, oder eine neuere. Neuere Versionen aktualisieren die Datenbank beim Start; eine ältere Version kann
+  eine von einer neueren migrierte Datenbank nicht öffnen.
+- Guthaben, Preis-Snapshots und Zählerwerte liegen als exakte Werte vor und kommen unverändert zurück.
+- Ein 1.x-Backup behält unter Attraccess 2.0 oder neuer die Daten seiner Plugins, die 1.x-Plugins werden aber abgelehnt,
+  bis ihre 2.0-Builds installiert sind (siehe [Plugins installieren](plugins/installing-plugins.md#upgrade-auf-attraccess-20)).
+
+Dieselben Anforderungen (stabile Bezeichner, Zeitstempel, exakte Werte, Plugin-Daten und Migrationsstand) bilden den
+[Export-/Import-Vertrag](developer/adding-a-database-backend.md) für andere Datenbank-Engines.
+
 ## Backup wiederherstellen
 
 ```bash
@@ -75,7 +91,7 @@ docker compose start attraccess
 
 ## Speicher des Matter-Sidecars
 
-Nutzen Sie die Matter-Integration, liegt die Matter-Fabric im **eigenen Speicher-Volume des Sidecars** (`MATTER_SIDECAR_STORAGE_DIR`), das **nicht** zum Attraccess-Volume gehört. Sichern Sie sie über die verschlüsselten Backups des Matter-Plugins und bewahren Sie den Wiederherstellungsschlüssel außerhalb des Servers auf. Siehe die Anleitung [Matter: Backup und Wiederherstellung](devices/matter/backup-restore.md).
+Ist das Matter-Plugin installiert, liegt die Matter-Fabric im **eigenen Speicher-Volume des Sidecars** (`MATTER_SIDECAR_STORAGE_DIR`), das **nicht** zum Attraccess-Volume gehört. Sichern Sie sie über die verschlüsselten Backups des Matter-Plugins und bewahren Sie den Wiederherstellungsschlüssel außerhalb des Servers auf. Siehe [Matter: Backup und Wiederherstellung](plugins/matter/backup-restore.md).
 
 ## Tipps
 
@@ -85,6 +101,6 @@ Nutzen Sie die Matter-Integration, liegt die Matter-Fabric im **eigenen Speicher
 
 ## Siehe auch
 
-- [Matter: Backup und Wiederherstellung](devices/matter/backup-restore.md)
+- [Matter: Backup und Wiederherstellung](plugins/matter/backup-restore.md)
 - [Aktualisierung](installation/updating.md)
 - [Docker Compose Installation](installation/docker-compose.md)

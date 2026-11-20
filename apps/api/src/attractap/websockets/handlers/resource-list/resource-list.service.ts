@@ -60,6 +60,8 @@ export class ResourceListService {
     if (resourceIds) {
       await this.sendResourceListToSockets(sockets, { resourceIds });
     } else {
+      // This full list is read after the changes a pending debounced send waits for, so that send would repeat it.
+      this.cancelPendingSend(readerId);
       await this.sendResourceListToSockets(sockets);
     }
   }
@@ -97,6 +99,13 @@ export class ResourceListService {
     this.pendingSends.set(readerId, { timer, resourceIds: pendingResourceIds });
   }
 
+  private cancelPendingSend(readerId: number): void {
+    const pending = this.pendingSends.get(readerId);
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    this.pendingSends.delete(readerId);
+  }
+
   public async sendResourceListToSocket(
     socket: AuthenticatedWebSocket,
     onlyIfResourceMatches?: { resourceIds?: Set<number>; requestId?: number },
@@ -108,8 +117,6 @@ export class ResourceListService {
     sockets: AuthenticatedWebSocket[],
     onlyIfResourceMatches?: { resourceIds?: Set<number>; requestId?: number },
   ) {
-    // A reader that is not paired gets no resources, whatever triggered the push.
-    sockets = sockets.filter((socket) => !socket.state?.pairingRequired);
     if (sockets.length === 0) return;
     const getContextOwner = () => this;
     return sendResourceListToSocketsImplementation(

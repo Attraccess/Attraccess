@@ -1,4 +1,4 @@
-import { useBillingServiceGetBillingConfiguration } from '@attraccess/react-query-client';
+import { useGetBillingConfiguration } from '@attraccess/react-query-client';
 import { Description, Input, Label, TextArea, TextField, Button } from '@heroui/react';
 import { CompanionDeviceSelect } from '../../../../../../../components/companionDeviceSelect/index';
 import { useCallback, useMemo } from 'react';
@@ -31,7 +31,7 @@ export function ObjectPropertyInput<TValue>(props: PropertyViewProps<TValue>) {
     tNodeExists,
   } = props;
   if (schema.additionalProperties) {
-    let content = null;
+    let content;
     if (Object.entries((value ?? {}) as Record<string, unknown>)?.length === 0) {
       content = <p className="text-sm text-default-500">{t('nodes.' + nodeType + '.config.' + name + '.empty')}</p>;
     } else {
@@ -129,7 +129,7 @@ export function ArrayPropertyInput<TValue>(props: PropertyViewProps<TValue>) {
   const emptyText = t('nodes.' + nodeType + '.config.' + name + '.empty');
   const addText = t('nodes.' + nodeType + '.config.' + name + '.add');
 
-  let content = null;
+  let content;
   if (arrayValue.length === 0) {
     content = <p className="text-sm text-default-500">{emptyText}</p>;
   } else {
@@ -241,7 +241,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
     return item.title ?? (tNodeExists?.(key) ? t(key) : String(item.const));
   };
 
-  const { data: configuration } = useBillingServiceGetBillingConfiguration();
+  const { data: configuration } = useGetBillingConfiguration();
 
   const parsedValue = useMemo(() => {
     if (schema.isCurrency) {

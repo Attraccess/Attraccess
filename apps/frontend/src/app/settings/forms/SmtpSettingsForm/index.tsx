@@ -1,11 +1,11 @@
 import {
   SmtpServiceType,
   ApiError,
-  useSettingsServiceApplyFirstTimeSetupSettings,
-  useSettingsServiceGetSystemSettings,
-  UseSettingsServiceGetFirstTimeSetupStatusKeyFn,
-  useSettingsServiceUpdateSystemSettings,
-  useSettingsServiceGetSystemSettingsKey,
+  useApplyFirstTimeSetupSettings,
+  useGetSystemSettings,
+  UseGetFirstTimeSetupStatusKeyFn,
+  useUpdateSystemSettings,
+  useGetSystemSettingsKey,
 } from '@attraccess/react-query-client';
 import { Form, TextField, Label, Input, Description, Spinner } from '@heroui/react';
 import { Select } from '../../../../components/select/index';
@@ -26,7 +26,7 @@ export type SmtpSettingsFormProps = {
   endpoint: 'first-time-setup' | 'settings';
 };
 
-export function useSmtpSettingsFormState({ variant, endpoint, onNext }: SmtpSettingsFormProps) {
+export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsFormProps) {
   const { t, tExists } = useTranslations({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
@@ -43,7 +43,7 @@ export function useSmtpSettingsFormState({ variant, endpoint, onNext }: SmtpSett
   const [smtpFrom, setSmtpFrom] = useState('');
   const [smtpPass, setSmtpPass] = useState('');
 
-  const { data: settings, isLoading } = useSettingsServiceGetSystemSettings(undefined, {
+  const { data: settings, isLoading } = useGetSystemSettings({}, undefined, {
     enabled: variant === 'standalone',
   });
 
@@ -73,9 +73,9 @@ export function useSmtpSettingsFormState({ variant, endpoint, onNext }: SmtpSett
           title: t('success.title'),
           description: t('success.description'),
         });
-        queryClient.invalidateQueries({ queryKey: [useSettingsServiceGetSystemSettingsKey] });
+        queryClient.invalidateQueries({ queryKey: [useGetSystemSettingsKey] });
         if (endpoint === 'first-time-setup') {
-          queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetFirstTimeSetupStatusKeyFn() });
+          queryClient.invalidateQueries({ queryKey: UseGetFirstTimeSetupStatusKeyFn() });
         }
         setSmtpPass('');
         if (variant === 'wizard') onNext?.();
@@ -91,9 +91,11 @@ export function useSmtpSettingsFormState({ variant, endpoint, onNext }: SmtpSett
     };
   }, [endpoint, variant, t, tExists, toast, queryClient, onNext]);
 
-  const { mutate: saveSettings, isPending: isSavingNormal } = useSettingsServiceUpdateSystemSettings(mutateConfig);
-  const { mutate: saveSettingsFirstTimeSetup, isPending: isSavingFirstTimeSetup } =
-    useSettingsServiceApplyFirstTimeSetupSettings(mutateConfig);
+  const { mutate: saveSettings, isPending: isSavingNormal } = useUpdateSystemSettings(undefined, mutateConfig);
+  const { mutate: saveSettingsFirstTimeSetup, isPending: isSavingFirstTimeSetup } = useApplyFirstTimeSetupSettings(
+    undefined,
+    mutateConfig,
+  );
 
   const isSaving = endpoint === 'first-time-setup' ? isSavingFirstTimeSetup : isSavingNormal;
 
@@ -102,7 +104,7 @@ export function useSmtpSettingsFormState({ variant, endpoint, onNext }: SmtpSett
     if (smtpService !== SmtpServiceType.SMTP && smtpService !== SmtpServiceType.OUTLOOK365) return;
 
     const payload = {
-      requestBody: {
+      body: {
         smtp: {
           service: smtpService,
           host: smtpHost,
@@ -139,54 +141,6 @@ export function useSmtpSettingsFormState({ variant, endpoint, onNext }: SmtpSett
   ];
 
   const showLoading = variant === 'standalone' && isLoading;
-  return {
-    t,
-    formRef,
-    smtpService,
-    setSmtpService,
-    smtpHost,
-    setSmtpHost,
-    smtpPort,
-    setSmtpPort,
-    smtpSecure,
-    setSmtpSecure,
-    smtpUser,
-    setSmtpUser,
-    smtpFrom,
-    setSmtpFrom,
-    smtpPass,
-    setSmtpPass,
-    isSaving,
-    handleSubmit,
-    smtpServiceOptions,
-    showLoading,
-    variant,
-  } as const;
-}
-
-export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsFormProps) {
-  const {
-    t,
-    formRef,
-    smtpService,
-    setSmtpService,
-    smtpHost,
-    setSmtpHost,
-    smtpPort,
-    setSmtpPort,
-    smtpSecure,
-    setSmtpSecure,
-    smtpUser,
-    setSmtpUser,
-    smtpFrom,
-    setSmtpFrom,
-    smtpPass,
-    setSmtpPass,
-    isSaving,
-    handleSubmit,
-    smtpServiceOptions,
-    showLoading,
-  } = useSmtpSettingsFormState({ variant, endpoint, onNext });
 
   if (showLoading) {
     return (

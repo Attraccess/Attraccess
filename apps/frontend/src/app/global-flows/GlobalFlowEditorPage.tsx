@@ -5,14 +5,14 @@ import { Alert, AlertContent, AlertDescription, AlertTitle, Spinner, useOverlayS
 import { AlertStatusIcon, LabeledSwitch, PageHeader } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
-  UseGlobalFlowsServiceGetGlobalFlowKeyFn,
-  useGlobalFlowsServiceGetGlobalFlow,
-  useGlobalFlowsServiceListGlobalFlowsKey,
-  useGlobalFlowsServiceUpdateGlobalFlow,
+  UseGetGlobalFlowKeyFn,
+  useGetGlobalFlow,
+  useListGlobalFlowsKey,
+  useUpdateGlobalFlow,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../hooks/useAuth';
 import { useToastMessage } from '../../components/toastProvider';
-import { FlowEditor } from '../resources/details/flows/index';
+import { FlowEditor } from '../resources/details/flows/FlowEditor';
 import { GlobalFlowDetailsModal } from './GlobalFlowDetailsModal';
 import { useGlobalFlowsTranslations } from './useGlobalFlowsTranslations';
 
@@ -25,14 +25,14 @@ export function GlobalFlowEditorPage() {
   const flowId = Number(flowIdParam);
   const detailsModal = useOverlayState();
 
-  const { data: flow, isError } = useGlobalFlowsServiceGetGlobalFlow({ flowId }, undefined, {
+  const { data: flow, isError } = useGetGlobalFlow({ path: { flowId } }, undefined, {
     enabled: Number.isInteger(flowId) && flowId > 0,
   });
 
-  const update = useGlobalFlowsServiceUpdateGlobalFlow({
+  const update = useUpdateGlobalFlow(undefined, {
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: UseGlobalFlowsServiceGetGlobalFlowKeyFn({ flowId }) });
-      void queryClient.invalidateQueries({ queryKey: [useGlobalFlowsServiceListGlobalFlowsKey] });
+      void queryClient.invalidateQueries({ queryKey: UseGetGlobalFlowKeyFn({ path: { flowId } }) });
+      void queryClient.invalidateQueries({ queryKey: [useListGlobalFlowsKey] });
     },
     onError: (error) => toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' }),
   });
@@ -75,7 +75,7 @@ export function GlobalFlowEditorPage() {
               <LabeledSwitch
                 isSelected={flow.enabled}
                 isDisabled={update.isPending}
-                onChange={(enabled) => update.mutate({ flowId, requestBody: { enabled } })}
+                onChange={(enabled) => update.mutate({ path: { flowId }, body: { enabled } })}
                 data-cy="global-flow-enabled-switch"
               >
                 {t('editor.enabled')}

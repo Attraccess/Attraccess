@@ -1,7 +1,6 @@
 import { resolveDateTimePreferences } from '@attraccess/shared';
 import { Body, Controller, Get, Patch, Post, Req, UseInterceptors } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { User } from '@attraccess/database-entities';
 import { AuthenticatedRequest, AuthenticatedUser, SessionAuth } from '@attraccess/plugins-backend-sdk';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
 import { AuthRateLimit } from '../rate-limiting/rate-limit.decorator';
@@ -13,6 +12,7 @@ import { UpdateLocaleDto } from './dtos/updateLocale.dto';
 import { mapEmailSendError } from './email-send-error.util';
 import { UpdateDateTimePreferencesDto } from './dtos/updateDateTimePreferences.dto';
 import { CurrentUserDto } from './dtos/current-user.dto';
+import { UserDto, toUserAccountDto } from './dtos/user.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -84,18 +84,18 @@ export class UserProfileController {
   @SessionAuth()
   @Patch('me/username')
   @ApiOperation({ summary: 'Change current user username (limit once per day)', operationId: 'changeMyUsername' })
-  @ApiResponse({ status: 200, description: 'Username changed.', type: User })
-  async changeMyUsername(@Req() request: AuthenticatedRequest, @Body() body: ChangeUsernameDto): Promise<User> {
-    return await this.usersService.changeUsername(request.user.id, body.username, request.user);
+  @ApiResponse({ status: 200, description: 'Username changed.', type: UserDto })
+  async changeMyUsername(@Req() request: AuthenticatedRequest, @Body() body: ChangeUsernameDto): Promise<UserDto> {
+    return toUserAccountDto(await this.usersService.changeUsername(request.user.id, body.username, request.user));
   }
 
   @SessionAuth()
   @Patch('me/email')
   @ApiOperation({ summary: 'Change current user email address', operationId: 'changeMyEmail' })
-  @ApiResponse({ status: 200, description: 'Email changed.', type: User })
-  async changeMyEmail(@Req() request: AuthenticatedRequest, @Body() body: ChangeEmailDto): Promise<User> {
+  @ApiResponse({ status: 200, description: 'Email changed.', type: UserDto })
+  async changeMyEmail(@Req() request: AuthenticatedRequest, @Body() body: ChangeEmailDto): Promise<UserDto> {
     try {
-      return await this.usersService.changeEmail(request.user.id, body.email, request.user);
+      return toUserAccountDto(await this.usersService.changeEmail(request.user.id, body.email, request.user));
     } catch (error) {
       throw mapEmailSendError(error);
     }
@@ -122,8 +122,8 @@ export class UserProfileController {
     summary: 'Update preferred locale',
     operationId: 'updateMyLocale',
   })
-  @ApiResponse({ status: 200, description: 'Locale updated.', type: User })
-  async updateMyLocale(@Req() request: AuthenticatedRequest, @Body() body: UpdateLocaleDto): Promise<User> {
-    return this.usersService.updateLocale(request.user.id, body.locale);
+  @ApiResponse({ status: 200, description: 'Locale updated.', type: UserDto })
+  async updateMyLocale(@Req() request: AuthenticatedRequest, @Body() body: UpdateLocaleDto): Promise<UserDto> {
+    return toUserAccountDto(await this.usersService.updateLocale(request.user.id, body.locale));
   }
 }

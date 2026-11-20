@@ -9,6 +9,17 @@
 
 #include "resourceDetailsCopy.hpp"
 
+void ResourceDetailsScreen::showDoorButtons(bool accessOnly)
+{
+   if (!this->lockDoorButton || !this->unlockDoorButton || !this->unlatchDoorButton) return;
+   lv_obj_set_flag(this->lockDoorButton, LV_OBJ_FLAG_HIDDEN, accessOnly);
+   lv_obj_set_flag(this->unlatchDoorButton, LV_OBJ_FLAG_HIDDEN, accessOnly);
+   lv_obj_set_width(this->unlockDoorButton, accessOnly ? lv_pct(100) : lv_pct(30));
+   // The same unlock action: the server treats an unlock of an access-only door as Open.
+   FirmwareI18n::setLabel(lv_obj_get_child(this->unlockDoorButton, 0),
+                          accessOnly ? FirmwareI18n::Message::Open : FirmwareI18n::Message::Unlock);
+}
+
 void ResourceDetailsScreen::createDoorControls()
 {
    this->doorControls = lv_obj_create(this->sessionControls);

@@ -4,17 +4,19 @@ import {
   Body,
   Delete,
   Get,
+  Header,
   NotFoundException,
   Param,
   Post,
   Req,
+  Res,
   StreamableFile,
   UploadedFile,
   UseInterceptors,
   Query,
 } from '@nestjs/common';
 
-import { ApiTags, ApiConsumes, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiConsumes, ApiOperation, ApiParam, ApiResponse, ApiQuery } from '@nestjs/swagger';
 
 import { auditActorOf } from '../audit/recorder/audit-event';
 
@@ -30,9 +32,9 @@ import { randomUUID } from 'crypto';
 
 import { FileInterceptor } from '@nestjs/platform-express';
 
-import { createReadStream, existsSync } from 'fs';
-
-import { join } from 'path';
+import { createReadStream } from 'fs';
+import { finished } from 'stream';
+import { Response } from 'express';
 
 import { FileUpload } from '../common/types/file-upload.types';
 
@@ -44,7 +46,14 @@ import { UploadPluginDto } from './dto/uploadPlugin.dto';
 
 import { LoadedPluginManifest } from './plugin.manifest';
 
-import { PluginModule } from './plugin.module';
+import { arePluginsDisabled } from './plugins-disabled';
+
+import {
+  frontendAssetSegments,
+  isMissingFrontendAsset,
+  openFrontendAsset,
+  sanitizedPathPrefix,
+} from './frontend-asset-path';
 import {
   AddPluginRegistryDto,
   RemoveInstalledPluginDto,
@@ -53,6 +62,9 @@ import {
   ReplaceInstalledPluginDto,
 } from './dto/npm-plugin-request.dto';
 import { PluginDependencyPlanDto, PluginRemovalItemDto } from './dto/plugin-dependency-plan.dto';
+import { PluginRegistryDto } from './dto/plugin-registry.dto';
+import { MarketplacePluginDto, MarketplaceSearchResponseDto } from './dto/marketplace-plugin.dto';
+import { InstalledNpmPluginDto, InstalledPluginVersionDto } from './dto/installed-npm-plugin.dto';
 
 export const PLUGIN_SYSTEM_INSTANCE_ID = randomUUID();
 
@@ -67,12 +79,14 @@ export class PluginController {
   private readonly logger = new Logger(PluginController.name);
 
   @Get('registries')
+  @ApiResponse({ status: 200, type: PluginRegistryDto, isArray: true })
   @Auth('system.plugins.manage')
   listRegistries() {
     return this.npmPluginService.listRegistries();
   }
 
   @Post('registries')
+  @ApiResponse({ status: 201, type: PluginRegistryDto })
   @Auth('system.plugins.manage')
   addRegistry(@Body() body: AddPluginRegistryDto, @Req() req: AuthenticatedRequest) {
     return this.pluginAdministration.addRegistry(body, auditActorOf(req.user));
@@ -106,6 +120,7 @@ export class PluginController {
   }
 
   @Get('marketplace/search')
+  @ApiResponse({ status: 200, type: MarketplaceSearchResponseDto })
   @Auth('system.plugins.manage')
   @ApiQuery({ name: 'query', required: false, type: String })
   @ApiQuery({ name: 'registryId', required: false, type: String })
@@ -114,6 +129,7 @@ export class PluginController {
   }
 
   @Get('marketplace/:packageName')
+  @ApiResponse({ status: 200, type: MarketplacePluginDto })
   @Auth('system.plugins.manage')
   @ApiQuery({ name: 'registryId', required: false, type: String })
   marketplacePackage(@Param('packageName') packageName: string, @Query('registryId') registryId?: string) {
@@ -192,6 +208,7 @@ export class PluginController {
   }
 
   @Get('installed')
+  @ApiResponse({ status: 200, type: InstalledNpmPluginDto, isArray: true })
   @Auth('system.plugins.manage')
   installedPackages() {
     return this.npmPluginService.listInstalled();
@@ -210,6 +227,7 @@ export class PluginController {
   }
 
   @Post('installed/check')
+  @ApiResponse({ status: 201, type: InstalledNpmPluginDto, isArray: true })
   @Auth('system.plugins.manage')
   checkAllInstalledPackages(@Req() req: AuthenticatedRequest) {
     return this.pluginAdministration.checkAllInstalled(auditActorOf(req.user));
@@ -242,6 +260,7 @@ export class PluginController {
   }
 
   @Post('installed/:packageName/update-policy')
+  @ApiResponse({ status: 201, type: InstalledNpmPluginDto })
   @Auth('system.plugins.manage')
   updateInstalledPackagePolicy(
     @Param('packageName') packageName: string,
@@ -257,12 +276,14 @@ export class PluginController {
   }
 
   @Get('installed/:packageName/versions')
+  @ApiResponse({ status: 200, type: InstalledPluginVersionDto, isArray: true })
   @Auth('system.plugins.manage')
   installedPackageVersions(@Param('packageName') packageName: string) {
     return this.npmPluginService.installedVersionCandidates(packageName);
   }
 
   @Post('installed/:packageName/versions/:version')
+  @ApiResponse({ status: 201, type: InstalledNpmPluginDto })
   @Auth('system.plugins.manage')
   replaceInstalledPackage(
     @Param('packageName') packageName: string,
@@ -289,7 +310,7 @@ export class PluginController {
   @ApiOperation({ summary: 'Get plugin system status', operationId: 'getPluginSystemStatus' })
   @ApiResponse({ status: 200, type: PluginSystemStatusDto })
   getPluginSystemStatus(): PluginSystemStatusDto {
-    return { disabled: PluginModule.arePluginsDisabled(), instanceId: PLUGIN_SYSTEM_INSTANCE_ID };
+    return { disabled: arePluginsDisabled(), instanceId: PLUGIN_SYSTEM_INSTANCE_ID };
   }
 
   @Post(':pluginId/retry')
@@ -307,12 +328,19 @@ export class PluginController {
   // Also add support for loading the index.js file
   @Get(':pluginName/frontend/module-federation/*filePath')
   @ApiOperation({ summary: 'Get any frontend plugin file', operationId: 'getFrontendPluginFile' })
+  @ApiParam({ name: 'filePath', type: String })
+  @Header('X-Content-Type-Options', 'nosniff')
   @ApiResponse({
     status: 200,
     description: 'The requested frontend plugin file',
     type: String,
   })
-  getFrontendPluginFile(@Param('pluginName') pluginName: string, @Param('filePath') filePath?: string) {
+  getFrontendPluginFile(
+    @Param('pluginName') pluginName: string,
+    // keep the union: a plain `string` lets the global ValidationPipe comma-join the segments
+    @Param('filePath') filePath: string | string[] | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const plugins = PluginService.getPlugins();
     const plugin = plugins.find((plugin) => plugin.name === pluginName);
     if (!plugin) {
@@ -322,23 +350,35 @@ export class PluginController {
       throw new NotFoundException(`Plugin ${pluginName} has no frontend assets`);
     }
 
-    const fileName = join(...filePath.split(','));
+    const segments = frontendAssetSegments(filePath);
+    const opened = openFrontendAsset(
+      PluginService.PLUGIN_PATH,
+      plugin.pluginDirectory,
+      plugin.main.frontend.directory,
+      segments,
+    );
 
-    // Path should point to the requested file in the plugin directory
-    const pluginDir = join(PluginService.PLUGIN_PATH, plugin.main.frontend.directory);
-    const fullFilePath = join(pluginDir, fileName);
-
-    if (!existsSync(fullFilePath)) {
-      this.logger.warn(`Frontend file ${fullFilePath} not found for plugin ${pluginName}`);
-      throw new NotFoundException(`Frontend file ${fileName} not found for plugin ${pluginName}`);
+    if ('reason' in opened) {
+      // never echo the requested or resolved path: every rejection looks like a plain missing file
+      const detail = `frontend file for plugin ${pluginName} (${opened.reason}): ${sanitizedPathPrefix(segments)}`;
+      if (isMissingFrontendAsset(opened.reason)) {
+        this.logger.debug(`Missing ${detail}`);
+      } else {
+        this.logger.warn(`Refused ${detail}`);
+      }
+      throw new NotFoundException(`Frontend file not found for plugin ${pluginName}`);
     }
 
-    this.logger.log(`Serving frontend file ${fileName} for plugin ${pluginName} from ${fullFilePath}`);
+    this.logger.debug(`Serving frontend file for plugin ${pluginName}`);
 
-    // stream the file — browsers enforce strict MIME checking for stylesheets
-    const fileStream = createReadStream(fullFilePath);
+    // stream the already opened file: a failed open inside the stream would answer with its absolute path.
+    // Browsers enforce strict MIME checking for stylesheets.
+    const fileStream = createReadStream('', { fd: opened.fd });
+    // Nest pipes the stream into the response; a client that disconnects early, even before
+    // this handler runs, would leave it paused with the file open
+    finished(res, () => fileStream.destroy());
     return new StreamableFile(fileStream, {
-      type: fileName.endsWith('.css') ? 'text/css' : 'application/javascript',
+      type: segments[segments.length - 1].endsWith('.css') ? 'text/css' : 'application/javascript',
     });
   }
 

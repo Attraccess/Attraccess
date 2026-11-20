@@ -5,6 +5,8 @@ import { DataSource, EntityManager } from 'typeorm';
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 import { ResourceMaintenanceSchedule } from '@attraccess/database-entities';
 import { MaintenanceResourceEvaluation } from './evaluation/resource-evaluation';
+import { TypeOrmMaintenanceEvaluationStore } from '../../database/adapters/resources/maintenance-evaluation-store.adapter';
+import { unitOfWorkFor } from '../../database/adapters/shared-unit-of-work';
 
 describe('Scheduled maintenance commit notification', () => {
   let directory: string;
@@ -18,7 +20,7 @@ describe('Scheduled maintenance commit notification', () => {
 
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'maintenance-commit-'));
-    const options = { type: 'sqlite' as const, database: join(directory, 'test.sqlite') };
+    const options = { type: 'better-sqlite3' as const, database: join(directory, 'test.sqlite') };
     writer = await new DataSource(options).initialize();
     observer = await new DataSource(options).initialize();
     await writer.query('CREATE TABLE maintenance (id INTEGER PRIMARY KEY, resourceId INTEGER)');
@@ -34,29 +36,38 @@ describe('Scheduled maintenance commit notification', () => {
     const publish = () => {
       reads.push(observer.query('SELECT COUNT(*) AS count FROM maintenance'));
     };
-    const manager = {
-      transaction: (work: (em: EntityManager) => Promise<void>) =>
-        writer.transaction(async (em) => {
-          expect(em.queryRunner?.isTransactionActive).toBe(true);
-          // Only schedule discovery is a fixture; writes and commit boundaries use real SQLite.
-          jest.spyOn(em, 'getRepository').mockImplementation((entity) => {
-            expect(entity).toBe(ResourceMaintenanceSchedule);
-            return { find: scheduleReads } as never;
-          });
-          await work(em);
-          if (rollback) throw new Error('Commit rejected');
-        }),
-    };
+    // Only schedule discovery is a fixture; writes and commit boundaries use real SQLite.
+    const getRepository = EntityManager.prototype.getRepository;
+    jest.spyOn(EntityManager.prototype, 'getRepository').mockImplementation(function (this: EntityManager, target) {
+      if (target !== ResourceMaintenanceSchedule) return getRepository.call(this, target) as never;
+      // Executed by the repository owned by the live transaction.
+      expect(this.queryRunner?.isTransactionActive).toBe(true);
+      return { find: scheduleReads } as never;
+    });
+    const store = new TypeOrmMaintenanceEvaluationStore(writer, unitOfWorkFor(writer));
+    // This spec covers the engine-neutral path: the whole evaluation runs inside one transaction.
+    Object.defineProperty(store, 'snapshotReads', { get: () => false });
+    jest.spyOn(store, 'hasEnabledSchedules').mockResolvedValue(true);
+    const inTransaction = store.inTransaction.bind(store);
+    jest.spyOn(store, 'inTransaction').mockImplementation((work) =>
+      inTransaction(async (view) => {
+        const result = await work(view);
+        if (rollback) throw new Error('Commit rejected');
+        return result;
+      }),
+    );
+    const handle = (context: object) =>
+      context instanceof EntityManager ? context : unitOfWorkFor(writer).handleOf(context as never);
     const maintenance = {
       hasActiveMaintenance: async () => false,
       createMaintenanceFromSchedule: async (
         resourceId: number,
         _scheduleId: number,
         _reason: string,
-        em: EntityManager,
+        context: object,
         notify = true,
       ) => {
-        await em.query('INSERT INTO maintenance (id, resourceId) VALUES (1, ?)', [resourceId]);
+        await handle(context).query('INSERT INTO maintenance (id, resourceId) VALUES (1, ?)', [resourceId]);
         if (notify) {
           publish();
           await reads[reads.length - 1];
@@ -66,10 +77,7 @@ describe('Scheduled maintenance commit notification', () => {
       emitScheduledMaintenanceCreated: publish,
     };
     service = new MaintenanceScheduleEvaluatorService(
-      { manager, existsBy: async () => true } as never,
-      {} as never,
-      {} as never,
-      {} as never,
+      store,
       maintenance as never,
       {} as never,
       {} as never,

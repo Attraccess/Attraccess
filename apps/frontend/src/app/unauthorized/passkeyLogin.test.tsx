@@ -38,11 +38,9 @@ function apiError(message: string): Error {
 
 vi.mock('@attraccess/react-query-client', () => ({
   ApiError: class ApiError extends Error {},
-  UseUsersServiceGetCurrentKeyFn: () => ['currentUser'],
-  PasskeysService: {
-    getPasskeyAuthenticationOptions: () => Promise.resolve({ options: { challenge: 'c' } }),
-    createSessionWithPasskey: (...args: unknown[]) => createSessionWithPasskey(...args),
-  },
+  UseGetCurrentKeyFn: () => ['currentUser'],
+  getPasskeyAuthenticationOptions: () => Promise.resolve({ data: { options: { challenge: 'c' } } }),
+  createSessionWithPasskey: async (...args: unknown[]) => ({ data: await createSessionWithPasskey(...args) }),
 }));
 
 async function clickSignIn() {
@@ -67,6 +65,9 @@ describe('PasskeyLogin – error reporting', () => {
 
     await waitFor(() => expect(errorAlert()).toHaveTextContent('Email not verified'));
     expect(errorAlert()).not.toHaveTextContent('Passkey sign in failed');
+    // Nothing is rendered below the passkey button, so the copy must not send the user there.
+    expect(errorAlert()).not.toHaveTextContent('below');
+    expect(errorAlert()).toHaveTextContent('sign in with your password to request a new one');
   });
 
   it('falls back to the passkey wording for a failure the server does not name', async () => {

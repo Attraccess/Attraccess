@@ -19,6 +19,8 @@ module.exports = {
       },
     ],
   },
-  moduleNameMapper: { '^@attraccess/(.*)$': '<rootDir>/libs/$1/src/index.ts' },
+  moduleNameMapper: {
+    '^@attraccess/(.*)$': '<rootDir>/libs/$1/src/index.ts',
+  },
   testTimeout: 20000,
 };

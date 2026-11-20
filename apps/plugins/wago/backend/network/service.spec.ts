@@ -1,25 +1,18 @@
 import type { PluginContext, PluginMqttMessage } from '@attraccess/plugins-backend-sdk';
-import { DataSource } from 'typeorm';
+import { createWagoTestStorage, type WagoTestStorage } from '../storage/testing';
 import { WagoNetworkChangeService, networkChangeInput } from './service';
-import { WagoDeviceOperation, WagoManagedAccess } from '../runtime/managed/access.entity';
 import { WagoManagedRuntimeService } from '../runtime/managed/service';
 import { managedSsh } from '../runtime/managed/transport/ssh';
 import { createHash } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
-import { WagoNetworkChanges1780010660000 } from '../migrations/1780010660000-add-wago-network-changes';
 import type { BuildRuntimeArtifact } from '../runtime/artifacts/build';
-import { WagoCommissioningSession } from '../commissioning/sessions/session.entity';
-import { WagoController } from '../controllers/entity';
-import { WagoCredentialRotationEntity } from '../credentials/service';
 import { WagoDeviceOperations } from '../runtime/device-operations';
-import { WagoNetworkChange } from './entity';
 import { resetTestFixture } from './setup.test-fixture';
 import { RuntimeUpdateError } from '../runtime/update/coordinator';
 import { WagoService } from '../controllers/service';
 
-jest.mock('@attraccess/plugins-backend-sdk', () => jest.requireActual('typeorm'));
 jest.mock('../controllers/service', () => ({ WagoService: class {} }));
-jest.mock('../runtime/artifacts/catalog', () => ({ WagoRuntimeArtifactsService: class {} }));
+jest.mock('../runtime/artifacts/service', () => ({ WagoRuntimeArtifactsService: class {} }));
 jest.mock('../commissioning/readiness/readiness', () => ({ WagoCommissioningReadiness: class {} }));
 jest.mock('../runtime/managed/transport/ssh', () => ({ managedSsh: jest.fn() }));
 jest.mock('node:dns/promises', () => ({ lookup: jest.fn() }));
@@ -49,7 +42,10 @@ const oldHost = '10.77.0.7',
   fingerprint = `SHA256:${'a'.repeat(43)}`;
 
 describe('SSH MQTT/address changes with disconnected previous destinations', () => {
-  let db: DataSource, managed: WagoManagedRuntimeService, service: WagoNetworkChangeService, context: PluginContext;
+  let test: WagoTestStorage,
+    managed: WagoManagedRuntimeService,
+    service: WagoNetworkChangeService,
+    context: PluginContext;
   let listener: (message: PluginMqttMessage) => void,
     payloads: Buffer[],
     provision: jest.Mock,
@@ -67,7 +63,6 @@ describe('SSH MQTT/address changes with disconnected previous destinations', () 
   });
   afterEach(async () => {
     await managed.onModuleDestroy();
-    await db.destroy();
     jest.restoreAllMocks();
     jest.clearAllMocks();
   });
@@ -111,11 +106,11 @@ describe('SSH MQTT/address changes with disconnected previous destinations', () 
     get fingerprint() {
       return fingerprint;
     },
-    get db() {
-      return db;
+    get test() {
+      return test;
     },
-    set db(value: typeof db) {
-      db = value;
+    set test(value: typeof test) {
+      test = value;
     },
     get oldHost() {
       return oldHost;
@@ -177,16 +172,12 @@ describe('SSH MQTT/address changes with disconnected previous destinations', () 
     expect(payloads).toEqual([]);
     for (const [access] of jest.mocked(managedSsh).mock.calls)
       expect(access).toMatchObject({ host: newHost, fingerprint: fingerprint });
-    expect(await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: 1 })).toMatchObject({
+    expect(await test.tables.commissioningSessions.get(1)).toMatchObject({
       targetHost: newHost,
       mqttServerId: 1,
       state: 'completed',
     });
-    const envelope = await db
-      .getRepository(WagoManagedAccess)
-      .createQueryBuilder('a')
-      .addSelect('a.encryptedCredentials')
-      .getOne();
+    const envelope = await test.tables.managedAccess.findOne();
     if (!envelope) throw new Error('Missing managed envelope');
     expect(JSON.parse(context.secrets.decrypt(envelope.encryptedCredentials)).host).toBe(newHost);
   });
@@ -225,7 +216,7 @@ describe('SSH MQTT/address changes with disconnected previous destinations', () 
         expect.objectContaining({ mqttServerId, identity: 'wago-controller-cc100-1' }),
       );
       expect(context.mqtt.refreshConnection).toHaveBeenCalledWith(mqttServerId);
-      expect(await db.getRepository(WagoController).findOneByOrFail({ id: 1 })).toMatchObject({
+      expect(await test.tables.controllers.get(1)).toMatchObject({
         mqttServerId,
         credentialMqttServerId: mqttServerId,
         credentialEpoch: payload.credentialEpoch,
@@ -233,12 +224,12 @@ describe('SSH MQTT/address changes with disconnected previous destinations', () 
         name: 'Workshop',
         lastSequence: 300,
       });
-      expect(await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: 1 })).toMatchObject({
+      expect(await test.tables.commissioningSessions.get(1)).toMatchObject({
         mqttServerId,
         targetHost: newHost,
         state: 'completed',
       });
-      expect(await db.getRepository(WagoCredentialRotationEntity).findOneByOrFail({ controllerId: 1 })).toMatchObject({
+      expect(await test.tables.credentialRotations.get(1)).toMatchObject({
         mqttServerId,
         phase: 'completed',
         credentialEpoch: payload.credentialEpoch,
@@ -347,13 +338,26 @@ describe('SSH MQTT/address changes with disconnected previous destinations', () 
     await service.apply(1, null, principal, true);
     expect(payloads).toHaveLength(1);
     expect(provision).toHaveBeenCalledTimes(1);
-    expect(await db.getRepository(WagoNetworkChange).findOneByOrFail({ controllerId: 1 })).toMatchObject({
+    expect(await test.tables.networkChanges.get(1)).toMatchObject({
       phase: 'completed',
     });
   });
 
+  it('rolls the whole binding update back when the device lease is lost inside the transaction', async () => {
+    const lease = jest.spyOn(service as unknown as { assertLeaseIn(): Promise<void> }, 'assertLeaseIn');
+    lease.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('Controller operation ownership lost'));
+    await expect(service.apply(1, { targetHost: newHost, mqttServerId: null }, principal)).rejects.toThrow(
+      'incomplete',
+    );
+    expect(await test.tables.commissioningSessions.get(1)).toMatchObject({ targetHost: oldHost });
+    expect(
+      JSON.parse(context.secrets.decrypt((await test.tables.managedAccess.get(1))?.encryptedCredentials ?? '')).host,
+    ).not.toBe(newHost);
+    expect(await service.status(1)).toMatchObject({ targetHost: oldHost });
+  });
+
   it('excludes commissioning, updates, rotation and recovery using the shared device lease', async () => {
-    const operations = new WagoDeviceOperations(db.getRepository(WagoDeviceOperation));
+    const operations = new WagoDeviceOperations(test.tables.deviceOperations);
     await operations.acquire(fingerprint, 'other-operation', Date.now(), Date.now() + 60000);
     await expect(service.apply(1, { targetHost: newHost, mqttServerId: 2 }, principal)).rejects.toThrow('active');
     expect(jest.mocked(managedSsh)).not.toHaveBeenCalled();
@@ -423,7 +427,7 @@ describe('SSH MQTT/address changes with disconnected previous destinations', () 
   it('clears redundant broker aliases without revoking the active credentials', async () => {
     await service.apply(1, { targetHost: newHost, mqttServerId: 2 }, principal);
     jest.mocked(lookup).mockResolvedValue([{ address: '192.168.4.10', family: 4 }] as never);
-    await db.getRepository(WagoManagedAccess).update(1, { state: 'retired' });
+    await test.tables.managedAccess.update({ sessionId: 1 }, { state: 'retired' });
     expect(await service.retirePreviousCredentials(1, principal)).toMatchObject({
       pendingCredentialRetirements: 0,
     });
@@ -495,7 +499,7 @@ describe('SSH MQTT/address changes with disconnected previous destinations', () 
 
   it('keeps old-credential retirement available after SSH management has been retired', async () => {
     await service.apply(1, { targetHost: newHost, mqttServerId: 2 }, principal);
-    await db.getRepository(WagoManagedAccess).update(1, { state: 'retired' });
+    await test.tables.managedAccess.update({ sessionId: 1 }, { state: 'retired' });
     revoke.mockResolvedValue(undefined);
     expect(await service.retirePreviousCredentials(1, principal)).toMatchObject({
       available: false,
@@ -510,30 +514,33 @@ it.each(['192.168.1.10;reboot', '127.0.0.1', '8.8.8.8', '10.0.0.999', '10.0.00.1
     expect(() => networkChangeInput({ targetHost, mqttServerId: 1 })).toThrow();
   },
 );
-it('migrates recovery storage and refuses to discard pending device changes or previous broker identities', async () => {
-  const db = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
-  const runner = db.createQueryRunner(),
-    migration = new WagoNetworkChanges1780010660000();
-  try {
-    await runner.query('CREATE TABLE plugin_wago_controllers (id integer PRIMARY KEY)');
-    await runner.query('INSERT INTO plugin_wago_controllers VALUES (1)');
-    await migration.up(runner);
-    await runner.query(
-      `INSERT INTO plugin_wago_network_changes
-      (controller_id, session_id, fingerprint, target_host, mqtt_server_id, phase, encrypted_payload, updated_at)
-      VALUES (1, 1, ?, ?, 2, 'applying', 'encrypted-intent', ?)`,
-      [fingerprint, newHost, new Date().toISOString()],
-    );
-    await expect(migration.down(runner)).rejects.toThrow('Finish controller network changes');
-    await runner.query("UPDATE plugin_wago_network_changes SET phase = 'completed'");
-    await runner.query('INSERT INTO plugin_wago_mqtt_credential_retirements VALUES (1, 1)');
-    await expect(migration.down(runner)).rejects.toThrow('Retire old broker credentials');
-    await runner.query('DELETE FROM plugin_wago_controllers WHERE id = 1');
-    expect(await runner.query('SELECT * FROM plugin_wago_network_changes')).toEqual([]);
-    expect(await runner.query('SELECT * FROM plugin_wago_mqtt_credential_retirements')).toEqual([]);
-    await migration.down(runner);
-  } finally {
-    await runner.release();
-    await db.destroy();
-  }
+it('removes the recovery records of a controller when the controller is deleted', async () => {
+  const { tables } = createWagoTestStorage();
+  const now = new Date().toISOString();
+  await tables.controllers.insert({
+    id: 1,
+    hardwareId: 'cc100-1',
+    trustState: 'claimed',
+    pairingCodeHash: 'pin',
+    protocolVersion: '1.0.0',
+    runtimeVersion: '0.1.0',
+    capabilities: '[]',
+    lastSeenAt: now,
+    createdAt: now,
+    updatedAt: now,
+  });
+  await tables.networkChanges.insert({
+    controllerId: 1,
+    sessionId: 1,
+    fingerprint,
+    targetHost: newHost,
+    mqttServerId: 2,
+    phase: 'applying',
+    encryptedPayload: 'encrypted-intent',
+    updatedAt: now,
+  });
+  await tables.mqttCredentialRetirements.insert({ controllerId: 1, mqttServerId: 1 });
+  await tables.controllers.delete({ id: 1 });
+  expect(await tables.networkChanges.find()).toEqual([]);
+  expect(await tables.mqttCredentialRetirements.find()).toEqual([]);
 });

@@ -1,4 +1,4 @@
-import { SsoSessionContext } from '@attraccess/database-entities';
+import { SsoSessionContext } from '@attraccess/application-models';
 import { matchesSsoSession, SsoSessionSelector } from './sso-session-selector';
 
 describe('matchesSsoSession', () => {

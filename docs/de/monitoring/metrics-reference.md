@@ -100,10 +100,10 @@ attraccess_resource_maintenance_overdue > 0
 | `attraccess_attractap_devices_connected` | Gauge | -- | Anzahl verbundener Attractap-RFID-Leser |
 | `attraccess_attractap_nfc_taps_total` | Counter | -- | Gesamtanzahl der RFID-Tap-Ereignisse |
 | `attraccess_attractap_firmware_updates_total` | Counter | -- | Gesamtanzahl der Firmware-Update-Ereignisse |
-| `attraccess_attractap_crash_reports_total` | Counter | `reader_id`, `reset_reason` | Von Lesegeräten empfangene Reset-Berichte für jede Reset-Ursache (auch `POWERON` und `SW`), also keine reine Crash-Zählung. `reset_reason` ist eine normalisierte Reset-Ursache (z. B. `PANIC`, `INT_WDT`, `BROWNOUT`, `UNKNOWN`). Unverändert; wird von den Dashboards genutzt |
+| `attraccess_attractap_crash_reports_total` | Counter | `reader_id`, `reset_reason` | Von Lesegeräten empfangene Reset-Berichte für jede Reset-Ursache (auch `POWERON` und `SW`), also keine reine Crash-Zählung. `reset_reason` ist eine normalisierte Reset-Ursache (z. B. `PANIC`, `INT_WDT`, `BROWNOUT`, `UNKNOWN`). Ein wiederhergestellter Coredump (ein Coredump, den das Lesegerät ohne seinen Boot-Eintrag im Flash gefunden hat) wird mit `UNKNOWN` gemeldet. Unverändert; wird von den Dashboards genutzt |
 | `attraccess_attractap_reset_reports_last_hour` | Gauge | `category` | Exakte Anzahl gespeicherter Reset-Berichte der letzten Stunde. `category` ist `crash_watchdog` (`PANIC`, `INT_WDT`, `TASK_WDT`, `WDT`) oder `power_on` (`POWERON`). Andere Ursachen (`SW`, `BROWNOUT`, `UNKNOWN`, ...) werden nicht gezählt |
 | `attraccess_attractap_reset_report_readers_last_hour` | Gauge | `category`, `readers` | Dieselbe Anzahl, mit den beteiligten Lesegeräten und Reset-Ursachen als Text im Label `readers` (z. B. `Door (#1): PANIC x2; Laser (#2): WDT x2`). Wird nur für den Text der Warnung verwendet. Namen von Lesegeräten werden auf 40 Zeichen gekürzt und `<` sowie `>` entfernt; die Liste ist auf etwa 200 Zeichen begrenzt (`; +N more`) |
-| `attraccess_attractap_sessions_active` | Gauge | -- | Offene verschlüsselte Sitzungen von Lesegeräten (TLS 1.3 im WebSocket). Lesegeräte, die noch mit einem Token angemeldet sind, zählen nicht |
+| `attraccess_attractap_sessions_active` | Gauge | -- | Offene verschlüsselte Sitzungen von Lesegeräten (TLS 1.3 im WebSocket) |
 | `attraccess_attractap_handshake_queue_depth` | Gauge | -- | TLS-Handshakes von Lesegeräten, die auf einen freien Platz warten (32 gleichzeitig, bis zu 256 wartend). Bleibt die Warteschlange hoch, verbinden sich viele Lesegeräte gleichzeitig neu |
 | `attraccess_attractap_handshake_failures_total` | Counter | `reason` | Sitzungs-Handshakes von Lesegeräten, die nicht zu einer Sitzung geführt haben. `reason` ist `handshake-refused` (Warteschlange voll), `handshake-timeout`, `handshake-failed` (TLS-Fehler), `closed` (Lesegerät hat die Verbindung beendet) oder der Grund, aus dem der Server das Lesegerät abgewiesen hat: `unknown-credential`, `inactive-credential` (Kopplung entfernt oder ersetzt), `invalid-certificate` (abgelaufen oder noch nicht gültig, z. B. bei falscher Uhrzeit), `no-reader-id`, `no-client-certificate` |
 
@@ -111,7 +111,7 @@ attraccess_resource_maintenance_overdue > 0
 
 Die beiden `..._last_hour`-Gauges werden bei jedem Abruf von `/api/metrics` aus der Datenbank gezählt, über die letzten 3600 ganzen Sekunden, gemessen am Speicherzeitpunkt auf dem Server. Ein Bericht, der genau eine Stunde alt ist, zählt nicht mehr; ein Bericht, der zum Abrufzeitpunkt gespeichert wurde, zählt. Hinweise:
 
-- Gezählt werden **gespeicherte Berichte**. Lädt ein Lesegerät einen Bericht nach einer verlorenen Bestätigung erneut hoch, wird er doppelt gezählt.
+- Gezählt werden **gespeicherte Berichte**. Lädt ein Lesegerät einen Bericht nach einer verlorenen Bestätigung erneut hoch, wird er doppelt gezählt – außer der Bericht kündigt einen Coredump an, auf den der Server noch wartet: Dann bestätigt der Server den vorhandenen Bericht erneut.
 - Die Zählung hat ein Zeitlimit von 5 Sekunden. Schlägt die Abfrage fehl oder überschreitet sie das Zeitlimit, antwortet `/api/metrics` mit einem Fehler statt mit null; Prometheus markiert das Ziel dann als nicht erreichbar (`AttractapServiceDown` und `ScrapeFailures` können auslösen). Das Zeitlimit bricht die zugrunde liegende SQLite-Abfrage nicht ab.
 - Die Alarmregeln verwenden `max` über alle Scrape-Ziele, daher werden mehrere Ziele **einer** Installation (eine gemeinsame Datenbank) nicht doppelt gezählt. Mehrere unabhängige Installationen in einer Prometheus-/Grafana-Instanz zu kombinieren ergibt falsche Summen und wird nicht unterstützt.
 - Die Zähler nutzen einen Index auf `attractap_crash_report.createdAt`, der per Datenbank-Migration angelegt wird.
@@ -173,6 +173,35 @@ histogram_quantile(0.95, sum by (event, le) (rate(attraccess_ws_message_duration
 
 # Nachrichten-Fehlerrate pro Event
 sum by (event) (rate(attraccess_ws_messages_total{status="error"}[5m]))
+```
+
+## Plugin-Bluetooth (BLE)
+
+Plugins mit der Berechtigung `BLE_TRANSPORT` sprechen über Attractap-Reader mit Bluetooth-Geräten. Die Labels haben wenige Ausprägungen: Reader-, Endpunkt- und Sitzungs-IDs stehen nur in den API-Logs, in Zeilen der Form `ble op=<Operation> ... outcome=<ok oder Code> detail=<sicheres Detail> <Dauer>ms`. Erfolgreiche Operationen werden auf Debug-Ebene protokolliert, fehlgeschlagene auf Info-Ebene (`log`); um jede Operation zu sehen, aktivieren Sie das Debug-Logging. Die Zeilen enthalten nie Nutzdaten-Bytes.
+
+| Metrik | Typ | Labels | Beschreibung |
+|--------|-----|--------|--------------|
+| `attraccess_plugin_ble_operations_total` | Counter | `operation`, `outcome` | Plugin-BLE-Operationen (`scan`, `connect`, `read`, `write`, `subscribe`, `unsubscribe`, ...); `outcome` ist `ok` oder der Fehlercode |
+| `attraccess_plugin_ble_operation_duration_seconds` | Histogram | `operation` | Dauer nur erfolgreicher Operationen, einschließlich des Roundtrips zum Reader; fehlgeschlagene Operationen zählen nur in `attraccess_plugin_ble_operations_total` |
+| `attraccess_plugin_ble_sessions_active` | Gauge | -- | Offene Plugin-BLE-Sitzungen |
+| `attraccess_plugin_ble_session_closes_total` | Counter | `reason` | Geschlossene Sitzungen nach Grund (`closed`, `lease-expired`, `disconnected`, `cancelled`, ...) |
+| `attraccess_plugin_ble_rejections_total` | Counter | `code` | Aufrufe, die Profil, Reader-Allowlist oder ein Größenlimit abgelehnt haben (`OPERATION_NOT_ALLOWED`, `UNKNOWN_CHARACTERISTIC`, `PAYLOAD_TOO_LARGE`) |
+| `attraccess_plugin_ble_notifications_total` | Counter | `outcome` | Benachrichtigungen nach Ergebnis: `delivered` (an den Stream des Plugins übergeben), `overflow` (der Puffer des Readers oder die Warteschlange der API pro Abonnement ist übergelaufen; der Stream scheitert mit `NOTIFICATION_OVERFLOW`), `oversized` (über `maxNotificationBytes` des Profils; `PAYLOAD_TOO_LARGE`), `malformed` (fehlerhafte Kodierung oder eine Lücke oder ein Duplikat in der Sequenz des Readers; `INTERNAL`). Jedes Ergebnis außer `delivered` lässt diesen Stream scheitern |
+| `attraccess_plugin_ble_watches_active` | Gauge | -- | Offene Advertisement-Beobachtungen (`context.ble.watch`) |
+| `attraccess_plugin_ble_watch_events_received_total` | Counter | -- | Ereignisse der Advertisement-Beobachtung, die die API von Readern angenommen hat |
+| `attraccess_plugin_ble_watch_events_routed_total` | Counter | -- | An Beobachtungen von Plugins übergebene Ereignisse; ein Ereignis kann mehrere Beobachtungen erreichen |
+| `attraccess_plugin_ble_watch_events_dropped_total` | Counter | `reason` | Ereignisse, die kein Plugin erreicht haben: `malformed`, `batch-too-large` (mehr als 8 pro Nachricht), `rate-limit` (weit über der Rate, die der Reader meldet), `stale-connection` (von einer Verbindung, an die der Filtersatz nicht ging), `access-denied` (Reader nicht für Plugins freigegeben), `no-watch` (keine Beobachtung für den genannten Filter), `filter-mismatch` (der Profilfilter passt nicht), `queue-full` (das älteste wartende Ereignis einer beschäftigten Beobachtung) |
+
+**Buckets der Operationsdauer:** 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s, 30s, 60s
+
+### Beispiel-PromQL-Abfragen
+
+```promql
+# Fehlgeschlagene Plugin-BLE-Operationen nach Code
+sum by (operation, outcome) (rate(attraccess_plugin_ble_operations_total{outcome!="ok"}[5m]))
+
+# Benachrichtigungs-Streams, die gescheitert sind, statt zuzustellen
+sum by (outcome) (increase(attraccess_plugin_ble_notifications_total{outcome!="delivered"}[1h]))
 ```
 
 ## Cron-Jobs

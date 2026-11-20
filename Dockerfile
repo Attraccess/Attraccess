@@ -1,13 +1,13 @@
-ARG NODE_VERSION=24.22.1
+ARG NODE_VERSION=26.13.0
 ARG NODE_VERSION_NAME=trixie
 
 FROM node:${NODE_VERSION}-${NODE_VERSION_NAME} AS builder
 
 # System deps required for native Node modules and tooling
 # - python3/py3-pip: node-gyp and Python-based tooling
-# - python3-setuptools: provides the distutils shim on Python 3.12+; sqlite3's
-#   pinned node-gyp 8 imports distutils when compiling from source (the
-#   fallback when the prebuild download fails)
+# - python3-setuptools: provides the distutils shim on Python 3.12+ for
+#   node-gyp source builds of native modules (better-sqlite3, bcrypt) when no
+#   prebuilt binary matches the Node version
 # - build-base (make, g++, etc.): compile native deps when prebuilds are unavailable
 # - libstdc++: runtime for some native modules (e.g., sharp)
 RUN apt-get update && apt-get install -y \
@@ -22,12 +22,13 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy package.json, lockfile, patches (required for pnpm patchedDependencies), and .npmrc first for better layer caching
-COPY package.json pnpm-lock.yaml .npmrc ./
+# Copy package.json, lockfile, pnpm settings and patches first for better layer caching
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY patches/ patches/
 
-# Install dependencies (Corepack resolves pnpm from root package.json packageManager)
-RUN corepack enable && pnpm install --frozen-lockfile
+# Install dependencies (Corepack resolves pnpm from root package.json packageManager;
+# Node 25 and later no longer bundle it)
+RUN npm install -g corepack@0.36.0 && corepack enable && pnpm install --frozen-lockfile
 
 # Copy the rest of the application
 COPY . .
@@ -43,21 +44,10 @@ RUN node apps/api/copy-companion-into-assets.js && \
 # breaks OTA updates and the /api/attractap/firmwares endpoint (ATT-715).
 RUN node scripts/validate-api-assets.mjs --assets-dir=dist/apps/api/assets --companion=all --attractap --compare-to=apps/api/src/assets
 
-# Strip stray pnpm config Nx copies into generated dist package.json files;
-# pnpm 10 only respects pnpm.overrides / pnpm.onlyBuiltDependencies at the workspace root.
-RUN node -e "for (const p of ['dist/apps/api/package.json','dist/apps/api-swagger/package.json']) { const fs = require('fs'); if (!fs.existsSync(p)) continue; const j = JSON.parse(fs.readFileSync(p, 'utf8')); delete j.pnpm; fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n'); }"
-
-# pnpm 10 errors on unused patches during deploy; @swc-node/register,
-# ts-api-utils and crap-score are dev-only tools absent from the API's production dep tree.
-# Strip them from both pnpm-lock.yaml (patchedDependencies block) and from the
-# root package.json so pnpm deploy sees no stale patch declarations.
-RUN node -e "const fs=require('fs'); let l=fs.readFileSync('pnpm-lock.yaml','utf8'); const pivot='\nimporters:'; const [hdr,rest]=l.split(pivot); const cleaned=hdr.replace(/\n  '@swc-node\/register@[^']+':(?:\n    [^\n]+)*/g,'').replace(/\n  (?:ts-api-utils|crap-score)@[^\n:]+:(?:\n    [^\n]+)*/g,''); fs.writeFileSync('pnpm-lock.yaml',cleaned+pivot+rest);" && \
-    node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package.json','utf8')); const d=p.pnpm.patchedDependencies; for (const k of Object.keys(d)) if (k.startsWith('@swc-node/register@') || k.startsWith('ts-api-utils@') || k.startsWith('crap-score@')) delete d[k]; fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
-
-# pnpm 10's new deploy requires a workspace shared lockfile; --ignore-workspace
-# strips that, so use --legacy for the self-contained dist/apps/api package.
-RUN pnpm --ignore-workspace --filter ./dist/apps/api deploy --legacy --prod /app/deploy/api
-RUN cd /app/deploy/api && npm rebuild bcrypt sqlite3
+# Nx writes a pruned pnpm-lock.yaml, a pnpm-workspace.yaml (allowBuilds, patchedDependencies) and the
+# patches it needs next to the generated package.json, so the API installs as a project of its own.
+RUN mkdir -p /app/deploy && cp -R dist/apps/api /app/deploy/api && \
+    cd /app/deploy/api && pnpm install --prod --frozen-lockfile
 
 
 FROM node:${NODE_VERSION}-${NODE_VERSION_NAME}
@@ -105,8 +95,9 @@ COPY --from=builder /app/docs docs
 COPY --from=builder /app/deploy/api /app/dist/apps/api
 
 # Operator command to move stored card keys to a new AUTH_SESSION_SECRET (docs/en/settings/security.md).
-# Plain Node script; placed inside the API package so it resolves sqlite3 from the API's node_modules.
+# Plain Node script; placed inside the API package so it resolves better-sqlite3 from the API's node_modules.
 COPY --from=builder /app/apps/api/scripts/reencrypt-card-keys.mjs /app/dist/apps/api/scripts/reencrypt-card-keys.mjs
+COPY --from=builder /app/apps/api/scripts/lib/database-provider.mjs /app/dist/apps/api/scripts/lib/database-provider.mjs
 
 # Large controller assets are server-owned, never embedded in the 50 MiB npm
 # plugin package. Missing/mismatched assets fail the server image build.

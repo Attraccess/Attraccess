@@ -2,23 +2,25 @@ import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import {
   Resource,
-  ResourceType,
   Attractap,
   User,
   NFCCard,
   ResourceIntroduction,
   ResourceIntroductionHistoryItem,
-  IntroductionHistoryAction,
   Project,
   ProjectMember,
   Form,
   FormField,
-  FormFieldType,
   FormSubmission,
   ResourceUsage,
-  SupervisionMode,
   ResourceIntroducer,
 } from '@attraccess/database-entities';
+import {
+  FormFieldType,
+  IntroductionHistoryAction,
+  ResourceType,
+  SupervisionMode,
+} from '@attraccess/application-models';
 import { SettingsService } from '../settings/settings.service';
 import { AttractapGateway } from '../attractap/websockets/websocket.gateway';
 import { WebsocketService } from '../attractap/websockets/websocket.service';
@@ -487,7 +489,7 @@ describe('desktop simulator against an isolated real API', () => {
     expect(socket().state.verifiedUserId).toBe(owner.id);
     const persistedReader = await db
       .getRepository(Attractap)
-      .findOneOrFail({ where: { id: reader.id }, relations: ['resources'] });
+      .findOneOrFail({ where: { id: reader.id }, relations: { resources: true } });
     expect(persistedReader.resources.map((item) => item.id)).toContain(usage.resourceId);
     await desktop().text('Sitzung beenden');
     await desktop().snapshot('project-session');

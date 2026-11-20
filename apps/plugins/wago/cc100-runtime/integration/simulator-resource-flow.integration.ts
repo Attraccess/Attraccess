@@ -2,9 +2,7 @@ import { writeFile } from 'node:fs/promises';
 
 import { join } from 'node:path';
 
-import { WagoController } from '../../backend/controllers/entity';
-
-import { WagoConfigurationRevision } from '../../backend/configuration/revision.entity';
+import { controllerRow, revisionRow } from '../../backend/rows.test-utils';
 
 import { hash } from '../src/runtime';
 import { temporary } from './simulator-fixtures.test-utils';
@@ -42,22 +40,26 @@ describe('isolated broker / executable simulator', () => {
         publish: [`${base}/#`],
         subscribe: [`${base}/commands`, `${base}/configuration/desired`],
       });
-      fixture.repositories.get(WagoController)!.rows.push({
-        id: 1,
-        hardwareId,
-        trustState: 'claimed',
-        mqttServerId: 1,
-        lastHeartbeatAt: new Date().toISOString(),
-        compatibilityError: null,
-      });
-      fixture.repositories.get(WagoConfigurationRevision)!.rows.push({
-        id: 1,
-        controllerId: 1,
-        revision: 1,
-        state: 'applied',
-        snapshot: JSON.stringify(snapshot),
-        contentHash: hash(snapshot),
-      });
+      await fixture.storage.tables.controllers.insert(
+        controllerRow({
+          id: 1,
+          hardwareId,
+          trustState: 'claimed',
+          mqttServerId: 1,
+          lastHeartbeatAt: new Date().toISOString(),
+          compatibilityError: null,
+        }),
+      );
+      await fixture.storage.tables.configurationRevisions.insert(
+        revisionRow({
+          id: 1,
+          controllerId: 1,
+          revision: 1,
+          state: 'applied',
+          snapshot: JSON.stringify(snapshot),
+          contentHash: hash(snapshot),
+        }),
+      );
       await writeFile(
         statePath,
         JSON.stringify({

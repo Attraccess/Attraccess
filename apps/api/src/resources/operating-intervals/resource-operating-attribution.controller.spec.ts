@@ -5,13 +5,8 @@ import {
   ResourceOperatingAttributionSummary,
 } from './resource-operating-attribution.service';
 import { ResourceMaintenanceService } from '../maintenances/maintenance.service';
-import {
-  ResourceOperatingInterval,
-  ResourceUsage,
-  ResourceUsageAction,
-  ResourceUsageLifecycleAttempt,
-} from '@attraccess/database-entities';
-import { IsNull, LessThan, MoreThan, Repository } from 'typeorm';
+import { ResourceUsageAction } from '@attraccess/application-models';
+import type { OperatingTimelineStore } from './operating-timeline.port';
 
 describe('ResourceOperatingAttributionController', () => {
   it('returns the current attribution for the requested resource', async () => {
@@ -32,29 +27,22 @@ describe('ResourceOperatingAttributionController', () => {
     const asOf = new Date('2026-10-05T12:00:00.000Z');
     const windowStart = new Date('2026-09-04T12:00:00.000Z');
     const startTime = new Date('2026-08-01T12:00:00.000Z');
-    const intervalRepository = {
-      find: jest.fn().mockResolvedValue([{ id: 1, resourceId: 12, startTime, endTime: null }]),
-      existsBy: jest.fn().mockResolvedValue(true),
-    };
-    const usageRepository = {
-      find: jest.fn().mockResolvedValue([
+    const timeline = {
+      findIntervals: jest.fn().mockResolvedValue([{ id: 1, resourceId: 12, startTime, endTime: null }]),
+      findSessions: jest.fn().mockResolvedValue([
         {
           id: 2,
           resourceId: 12,
           usageAction: ResourceUsageAction.Usage,
-          isFinalized: true,
           lifecyclePending: false,
           startTime,
           endTime: null,
         },
       ]),
+      findResourcesWithIntervals: jest.fn().mockResolvedValue(new Set([12])),
+      findPendingSessionEnds: jest.fn().mockResolvedValue(new Map()),
     };
-    const lifecycleAttemptRepository = { find: jest.fn().mockResolvedValue([]) };
-    const service = new ResourceOperatingAttributionService(
-      intervalRepository as unknown as Repository<ResourceOperatingInterval>,
-      usageRepository as unknown as Repository<ResourceUsage>,
-      lifecycleAttemptRepository as unknown as Repository<ResourceUsageLifecycleAttempt>,
-    );
+    const service = new ResourceOperatingAttributionService(timeline as unknown as OperatingTimelineStore);
     const maintenanceService = {
       canManageMaintenance: jest.fn().mockResolvedValue(true),
     } as unknown as ResourceMaintenanceService;
@@ -64,23 +52,9 @@ describe('ResourceOperatingAttributionController', () => {
     try {
       const result = await controller.getForResource(12, { user: {} } as AuthenticatedRequest, {});
 
-      expect(intervalRepository.find).toHaveBeenCalledWith({
-        where: [
-          { resourceId: 12, startTime: LessThan(asOf), endTime: IsNull() },
-          { resourceId: 12, startTime: LessThan(asOf), endTime: MoreThan(windowStart) },
-        ],
-        order: { startTime: 'ASC' },
-      });
-      expect(usageRepository.find).toHaveBeenCalledWith({
-        where: [IsNull(), MoreThan(windowStart)].map((endTime) => ({
-          resourceId: 12,
-          usageAction: ResourceUsageAction.Usage,
-          lifecyclePending: false,
-          startTime: LessThan(asOf),
-          endTime,
-        })),
-        order: { startTime: 'ASC' },
-      });
+      const windows = [{ resourceId: 12, from: windowStart }];
+      expect(timeline.findIntervals).toHaveBeenCalledWith(windows, asOf);
+      expect(timeline.findSessions).toHaveBeenCalledWith(windows, asOf);
       const durationMs = asOf.getTime() - windowStart.getTime();
       expect(result).toMatchObject({
         asOf,

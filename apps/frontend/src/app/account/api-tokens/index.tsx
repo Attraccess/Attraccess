@@ -14,17 +14,24 @@ import {
   TextField,
 } from '@heroui/react';
 import { Copy, KeyRound, Trash2, X } from 'lucide-react';
-import { Button, DateTimeDisplay, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  DateTimeDisplay,
+  EmptyState,
+  TableActionsColumnHeader,
+  TableRowActions,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import { PermissionPicker } from '../../../components/permissionPicker/index';
 import { SimplePagination } from '../../../components/simplePagination/index';
 import { useEffect, useMemo, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
 import {
-  useApiTokensServiceCreateApiToken,
-  useApiTokensServiceListApiTokens,
-  useApiTokensServiceRevokeApiToken,
-  useRbacServiceListPermissions,
+  useCreateApiToken,
+  useListApiTokens,
+  useRevokeApiToken,
+  useListPermissions,
 } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
@@ -51,11 +58,12 @@ export interface CreatedApiToken extends ApiToken {
 
 export const PAGE_SIZE = 10;
 
-export function useApiTokensCardState({ availablePermissions }: { availablePermissions: string[] }) {
-  const { t } = useTranslations({ en, de });
+export function ApiTokensCard({ availablePermissions }: { availablePermissions: string[] }) {
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  const { t } = useTranslations({ en, de }, { escapeValues: false });
   const { showToast } = useToastMessage();
   const { permissionLabel, permissionDescription, permissionCategory } = useRbacCatalogTranslations();
-  const { data: allPermissions } = useRbacServiceListPermissions();
+  const { data: allPermissions } = useListPermissions();
   const [page, setPage] = useState(1);
   const [name, setName] = useState('');
   const [permissionKeys, setPermissionKeys] = useState<Set<string>>(() => new Set());
@@ -67,9 +75,9 @@ export function useApiTokensCardState({ availablePermissions }: { availablePermi
     isPending: isLoadingTokens,
     isError: isTokenListError,
     refetch: refetchTokens,
-  } = useApiTokensServiceListApiTokens<ApiTokenPage>({ limit: PAGE_SIZE, page });
-  const { mutateAsync: createApiToken, isPending: isCreating } = useApiTokensServiceCreateApiToken<CreatedApiToken>();
-  const { mutateAsync: revokeApiToken, isPending: isRevoking } = useApiTokensServiceRevokeApiToken();
+  } = useListApiTokens<ApiTokenPage>({ query: { limit: PAGE_SIZE, page } });
+  const { mutateAsync: createApiToken, isPending: isCreating } = useCreateApiToken<CreatedApiToken>();
+  const { mutateAsync: revokeApiToken, isPending: isRevoking } = useRevokeApiToken();
   const availablePermissionDetails = useMemo(
     () => (allPermissions ?? []).filter((permission) => availablePermissions.includes(permission.key)),
     [allPermissions, availablePermissions],
@@ -83,7 +91,7 @@ export function useApiTokensCardState({ availablePermissions }: { availablePermi
     if (!expiryValid) return;
     try {
       const created = await createApiToken({
-        requestBody: {
+        body: {
           name: name.trim(),
           permissionKeys: [...permissionKeys],
           expiresAt: expiresAt ? new Date(`${expiresAt}T00:00:00`).toISOString() : undefined,
@@ -103,12 +111,13 @@ export function useApiTokensCardState({ availablePermissions }: { availablePermi
 
   const revokeToken = async (token: ApiToken) => {
     try {
-      await revokeApiToken({ id: token.id });
+      await revokeApiToken({ path: { id: token.id } });
       if (tokenPage?.data.length === 1 && page > 1) setPage(page - 1);
       else void refetchTokens();
       showToast({ title: t('success.revoked'), type: 'success' });
-    } catch {
+    } catch (error) {
       showToast({ title: t('errors.revokeFailed'), type: 'error' });
+      throw error;
     }
   };
 
@@ -117,61 +126,6 @@ export function useApiTokensCardState({ availablePermissions }: { availablePermi
     await navigator.clipboard.writeText(secret);
     showToast({ title: t('success.copied'), type: 'success' });
   };
-  return {
-    t,
-    permissionLabel,
-    permissionDescription,
-    permissionCategory,
-    page,
-    setPage,
-    name,
-    setName,
-    permissionKeys,
-    setPermissionKeys,
-    expiresAt,
-    setExpiresAt,
-    expiryValid,
-    setExpiryValid,
-    secret,
-    setSecret,
-    tokenPage,
-    isLoadingTokens,
-    isCreating,
-    isRevoking,
-    availablePermissionDetails,
-    createToken,
-    revokeToken,
-    copySecret,
-  } as const;
-}
-
-export function ApiTokensCard({ availablePermissions }: { availablePermissions: string[] }) {
-  const {
-    t,
-    permissionLabel,
-    permissionDescription,
-    permissionCategory,
-    page,
-    setPage,
-    name,
-    setName,
-    permissionKeys,
-    setPermissionKeys,
-    expiresAt,
-    setExpiresAt,
-    expiryValid,
-    setExpiryValid,
-    secret,
-    setSecret,
-    tokenPage,
-    isLoadingTokens,
-    isCreating,
-    isRevoking,
-    availablePermissionDetails,
-    createToken,
-    revokeToken,
-    copySecret,
-  } = useApiTokensCardState({ availablePermissions });
 
   if (isLoadingTokens) return <Skeleton className="w-full h-10" />;
   const apiTokens = tokenPage?.data ?? [];
@@ -210,7 +164,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
               <TableColumn id="lastUsed">{t('columns.lastUsed')}</TableColumn>
               <TableColumn id="expires">{t('columns.expires')}</TableColumn>
               <TableColumn id="actions">
-                <span className="sr-only">{t('columns.actions')}</span>
+                <TableActionsColumnHeader />
               </TableColumn>
             </TableHeader>
             <TableBody items={apiTokens} renderEmptyState={() => <EmptyState message={t('empty')} />}>
@@ -225,15 +179,23 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
                     {apiToken.expiresAt ? <DateTimeDisplay date={apiToken.expiresAt} /> : t('neverExpires')}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      isIconOnly
-                      aria-label={t('actions.revoke', { name: apiToken.name })}
-                      onPress={() => revokeToken(apiToken)}
-                      isDisabled={isRevoking}
-                    >
-                      <Trash2 size={16} className="text-danger" />
-                    </Button>
+                    <TableRowActions
+                      itemName={apiToken.name}
+                      actions={[
+                        {
+                          key: 'revoke',
+                          label: t('actions.revoke'),
+                          icon: Trash2,
+                          tone: 'danger',
+                          isDisabled: isRevoking,
+                          onPress: () => revokeToken(apiToken),
+                          confirm: {
+                            title: t('revokeConfirm.title', { name: apiToken.name }),
+                            message: t('revokeConfirm.message'),
+                          },
+                        },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               )}

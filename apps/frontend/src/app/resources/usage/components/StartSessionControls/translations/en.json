@@ -19,9 +19,10 @@
     }
   },
   "door": {
-    "unlock": "unlock",
-    "lock": "lock",
-    "unlatch": "unlatch",
+    "unlock": "Unlock",
+    "lock": "Lock",
+    "unlatch": "Unlatch",
+    "open": "Open",
     "success": {
       "title": "Success",
       "description": "The door was controlled successfully."

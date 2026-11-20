@@ -15,10 +15,10 @@ vi.mock('../../../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: (
 
 vi.mock('react-router-dom', () => ({ useParams: () => ({ id: '11' }) }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourcesServiceResourceOperatingDiagnosticsGetState: (...args: unknown[]) => getState(...args),
-  useResourcesServiceResourceOperatingDiagnosticsGetTransitions: (...args: unknown[]) => getTransitions(...args),
-  useResourcesServiceResourceOperatingDiagnosticsGetDataQuality: (...args: unknown[]) => getDataQuality(...args),
-  useResourcesServiceResourceOperatingDiagnosticsVerifyTimeline: (...args: unknown[]) => verifyTimeline(...args),
+  useResourceOperatingDiagnosticsGetState: (...args: unknown[]) => getState(...args),
+  useResourceOperatingDiagnosticsGetTransitions: (...args: unknown[]) => getTransitions(...args),
+  useResourceOperatingDiagnosticsGetDataQuality: (...args: unknown[]) => getDataQuality(...args),
+  useResourceOperatingDiagnosticsVerifyTimeline: (...args: unknown[]) => verifyTimeline(...args),
 }));
 vi.mock('../../operatingDuration', () => ({
   useOperatingDuration: (...args: unknown[]) => useOperatingDurationMock(...args),
@@ -52,6 +52,7 @@ describe('ResourceDiagnosticsTab', () => {
     useOperatingDurationMock.mockReturnValue({
       data: {
         sessionDurationMs: 100 * MINUTE,
+        personDurationMs: 100 * MINUTE,
         operatingDataAvailable: true,
         operatingDurationMs: 120 * MINUTE,
         unattributedOperatingDurationMs: 30 * MINUTE,
@@ -75,7 +76,7 @@ describe('ResourceDiagnosticsTab', () => {
     render(<ResourceDiagnosticsTab />);
 
     expect(screen.getByTestId('diagnostics-state-chip')).toHaveTextContent('Operating');
-    expect(getState).toHaveBeenCalledWith({ resourceId: 11 });
+    expect(getState).toHaveBeenCalledWith({ path: { resourceId: 11 } });
   });
 
   it('renders data-quality issues as warnings', () => {
@@ -104,6 +105,7 @@ describe('ResourceDiagnosticsTab', () => {
     useOperatingDurationMock.mockReturnValue({
       data: {
         sessionDurationMs: 60 * MINUTE,
+        personDurationMs: 60 * MINUTE,
         operatingDataAvailable: false,
         operatingDurationMs: null,
         unattributedOperatingDurationMs: null,
@@ -193,7 +195,7 @@ describe('ResourceDiagnosticsTab', () => {
     render(<ResourceDiagnosticsTab />);
 
     expect(verifyTimeline).toHaveBeenCalledWith(
-      expect.objectContaining({ resourceId: 11 }),
+      expect.objectContaining({ path: { resourceId: 11 } }),
       undefined,
       expect.objectContaining({ enabled: false }),
     );
@@ -238,9 +240,9 @@ describe('ResourceDiagnosticsTab', () => {
     const user = userEvent.setup();
     render(<ResourceDiagnosticsTab />);
     await user.click(screen.getByRole('button', { name: 'Next' }));
-    expect(getTransitions).toHaveBeenLastCalledWith({ resourceId: 11, page: 2, limit: 10 });
+    expect(getTransitions).toHaveBeenLastCalledWith({ path: { resourceId: 11 }, query: { page: 2, limit: 10 } });
     await user.click(screen.getByRole('button', { name: 'Previous' }));
-    expect(getTransitions).toHaveBeenLastCalledWith({ resourceId: 11, page: 1, limit: 10 });
+    expect(getTransitions).toHaveBeenLastCalledWith({ path: { resourceId: 11 }, query: { page: 1, limit: 10 } });
     await user.click(screen.getByRole('button', { name: /Range$/ }));
     await user.click(await screen.findByRole('option', { name: 'Last 7 days' }));
     const bounds = useOperatingDurationMock.mock.calls.at(-1)?.[2];

@@ -1,7 +1,7 @@
 import { DrawerHeader, DrawerHeading, DrawerBody } from '@heroui/react';
 import { StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ScheduleForm } from './schedule-form';
-import { useResourceMaintenanceSchedulesServiceGetMaintenanceSchedule } from '@attraccess/react-query-client';
+import { useGetMaintenanceSchedule } from '@attraccess/react-query-client';
 import de from './de.json';
 import en from './en.json';
 
@@ -17,8 +17,8 @@ export function ScheduleFormDrawer(props: Props) {
   const { resourceId, supportsOperatingDuration, scheduleId, isOpen, onClose } = props;
   const { t } = useTranslations({ de, en });
 
-  const { data: existing } = useResourceMaintenanceSchedulesServiceGetMaintenanceSchedule(
-    { resourceId, scheduleId: scheduleId ?? 0 },
+  const { data: existing } = useGetMaintenanceSchedule(
+    { path: { resourceId, scheduleId: scheduleId ?? 0 } },
     undefined,
     { enabled: isOpen && scheduleId != null },
   );

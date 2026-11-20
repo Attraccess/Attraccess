@@ -1,4 +1,4 @@
-import { ResourceFlowNode, SetVariablesNodeDataSchema, ResourceFlowVariableScope } from '@attraccess/database-entities';
+import { FlowNodeRecord, ResourceFlowVariableScope, SetVariablesNodeDataSchema } from '@attraccess/application-models';
 import { ResourceFlowVariablesService } from '../variables/resource-flow-variables.service';
 import { runResourceId, requireRunResourceId } from './flow.utils';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
@@ -6,7 +6,7 @@ import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node
 export class SetVariablesExecutor implements NodeExecutor {
   constructor(private readonly variablesService: ResourceFlowVariablesService) {}
 
-  async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+  async execute(node: FlowNodeRecord, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
     const data = SetVariablesNodeDataSchema.parse(node.data);
     for (const item of data.variables) {
       const renderedKey = ctx.compileTemplate(item.key, input);

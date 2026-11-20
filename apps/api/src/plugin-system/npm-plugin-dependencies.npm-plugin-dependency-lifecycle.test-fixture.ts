@@ -16,7 +16,7 @@ function pkg(name: string, dependencies: PluginDependency[] = [], version = '1.0
     peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
     attraccess: {
       displayName: name === 'core' ? '3D Printer Core' : name,
-      host: '*',
+      host: '>=2.0.0-0',
       backend: 'dist/index.js',
       sdk: { backend: '*' },
       permissions: ['READ_USERS'],
@@ -57,7 +57,7 @@ export function registerNpmPluginDependencyLifecycleFixture() {
     jest.spyOn(PluginService.prototype, 'requestRestart').mockImplementation(() => undefined);
     service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
     internals = npmInternals(service);
-    jest.spyOn(internals.catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(internals.catalog, 'hostVersion').mockReturnValue('2.0.0');
     metadata = {};
     archives = new Map();
     jest

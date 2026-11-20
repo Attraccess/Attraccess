@@ -10,7 +10,6 @@ import {
   TableHeader,
   TableRow,
   TableScrollContainer,
-  cn,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
@@ -29,15 +28,16 @@ import {
   PageHeader,
   StandardDrawer,
   StandardModal,
+  TableActionsColumnHeader,
   useTranslations,
 } from '@attraccess/plugins-frontend-ui';
 import {
-  useAttractapServiceGetAllCards,
-  NFCCard,
-  useUsersServiceGetOneUserById,
-  useLicenseServiceGetLicenseInformation,
-  useAttractapServiceEnrollNfcCard,
-  useAttractapServiceResetNfcCard,
+  useGetAllCards,
+  NfcCard,
+  useGetOneUserById,
+  useGetLicenseInformation,
+  useEnrollNfcCard,
+  useResetNfcCard,
   ApiError,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -45,11 +45,11 @@ import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.d
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import de from './de.json';
 import en from './en.json';
-import { PlusIcon, ServerIcon, XIcon, CheckIcon, Trash2Icon } from 'lucide-react';
+import { PlusIcon, ServerIcon, XIcon } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import { AttractapSelect } from '../AttractapSelect/index';
-import { NfcCardDeactivateModal } from './deactivate/index';
-import { NfcCardActivateModal } from './activate/index';
+import { NfcCardRowActions } from './NfcCardRowActions';
+import { NfcCardStatusChip } from './NfcCardStatusChip';
 
 export interface EnrollNfcCardProps {
   children: (onOpen: () => void) => React.ReactNode;
@@ -84,7 +84,7 @@ export const EnrollNfcCard = ({ children, userId }: EnrollNfcCardProps) => {
 
   const close = useCallback(() => setShow(false), []);
   const showError = useCardOperationErrorToast();
-  const { mutate: enrollNfcCardMutation, isPending } = useAttractapServiceEnrollNfcCard({
+  const { mutate: enrollNfcCardMutation, isPending } = useEnrollNfcCard(undefined, {
     onSuccess: close,
     onError: showError,
   });
@@ -94,7 +94,7 @@ export const EnrollNfcCard = ({ children, userId }: EnrollNfcCardProps) => {
       return;
     }
 
-    enrollNfcCardMutation({ requestBody: { readerId, ...(userId !== undefined ? { userId } : {}) } });
+    enrollNfcCardMutation({ body: { readerId, ...(userId !== undefined ? { userId } : {}) } });
   }, [readerId, enrollNfcCardMutation, userId]);
 
   return (
@@ -161,7 +161,7 @@ export const NfcCardDeleteModal = (props: DeleteModalProps) => {
   const [readerId, setReaderId] = useState<number | null>(null);
 
   const showError = useCardOperationErrorToast();
-  const { mutate: resetNfcCard, isPending } = useAttractapServiceResetNfcCard({
+  const { mutate: resetNfcCard, isPending } = useResetNfcCard(undefined, {
     onSuccess: props.close,
     onError: showError,
   });
@@ -171,7 +171,7 @@ export const NfcCardDeleteModal = (props: DeleteModalProps) => {
       return;
     }
 
-    resetNfcCard({ requestBody: { readerId, cardId: props.cardId } });
+    resetNfcCard({ body: { readerId, cardId: props.cardId } });
   }, [props.cardId, resetNfcCard, readerId]);
 
   return (
@@ -222,17 +222,12 @@ export const NfcCardDeleteModal = (props: DeleteModalProps) => {
 
 export interface NfcCardTableCellProps {
   header: string;
-  card: NFCCard;
+  card: NfcCard;
   onDeleteClick: () => void;
 }
 
 export const NfcCardTableCell = (props: NfcCardTableCellProps) => {
-  const { t } = useTranslations({
-    de,
-    en,
-  });
-
-  const { data: user } = useUsersServiceGetOneUserById({ id: props.card.user?.id }, undefined, {
+  const { data: user } = useGetOneUserById({ path: { id: props.card.user?.id } }, undefined, {
     enabled: props.header === 'userId',
   });
 
@@ -241,49 +236,15 @@ export const NfcCardTableCell = (props: NfcCardTableCellProps) => {
   }
 
   if (props.header === 'actions') {
-    return (
-      <div className="flex gap-2 flex-row flex-wrap">
-        <Button
-          variant="danger-soft"
-          onPress={() => props.onDeleteClick()}
-          data-cy={`nfc-card-table-cell-delete-button-${props.card.id}`}
-        >
-          <Trash2Icon />
-          {t('nfcCardsTable.actions.delete')}
-        </Button>
-        {props.card.isActive ? (
-          <NfcCardDeactivateModal cardId={props.card.id}>
-            {(onOpen) => (
-              <Button
-                variant="tertiary"
-                onPress={onOpen}
-                data-cy={`nfc-card-table-cell-deactivate-button-${props.card.id}`}
-              >
-                <XIcon />
-                {t('nfcCardsTable.actions.deactivate')}
-              </Button>
-            )}
-          </NfcCardDeactivateModal>
-        ) : (
-          <NfcCardActivateModal cardId={props.card.id}>
-            {(onOpen) => (
-              <Button
-                variant="tertiary"
-                onPress={onOpen}
-                data-cy={`nfc-card-table-cell-activate-button-${props.card.id}`}
-              >
-                <CheckIcon />
-                {t('nfcCardsTable.actions.activate')}
-              </Button>
-            )}
-          </NfcCardActivateModal>
-        )}
-      </div>
-    );
+    return <NfcCardRowActions card={props.card} onDeleteClick={props.onDeleteClick} />;
   }
 
   if (props.header === 'uid') {
     return props.card.uid;
+  }
+
+  if (props.header === 'status') {
+    return <NfcCardStatusChip isActive={props.card.isActive} />;
   }
 
   if (props.header === 'id') {
@@ -302,7 +263,7 @@ export const NfcCardTableCell = (props: NfcCardTableCellProps) => {
     return <AttraccessUser user={props.card.user} />;
   }
 
-  return props.card[props.header as keyof NFCCard] as React.ReactNode;
+  return props.card[props.header as keyof NfcCard] as React.ReactNode;
 };
 
 export function RfidCardList({ userId }: { userId?: number }) {
@@ -311,14 +272,14 @@ export function RfidCardList({ userId }: { userId?: number }) {
     en,
   });
 
-  const { data: license } = useLicenseServiceGetLicenseInformation();
+  const { data: license } = useGetLicenseInformation();
   const { hasPermission } = useAuth();
   const canReadUser = hasPermission('users.read');
-  const { data: owner } = useUsersServiceGetOneUserById({ id: userId }, undefined, {
+  const { data: owner } = useGetOneUserById({ path: { id: userId } }, undefined, {
     enabled: userId !== undefined && canReadUser,
   });
 
-  const { data: cards, error: cardsError } = useAttractapServiceGetAllCards({ userId }, undefined, {
+  const { data: cards, error: cardsError } = useGetAllCards({ query: { userId } }, undefined, {
     refetchInterval: 5000,
     enabled:
       (!license || license.modules.includes('attractap')) &&
@@ -337,7 +298,14 @@ export function RfidCardList({ userId }: { userId?: number }) {
   }, [cardsError, toast, t]);
 
   const headers = useMemo(() => {
-    const headers: Array<keyof NFCCard | 'actions'> = ['id', 'createdAt', 'uid', 'lastSeen', 'actions'];
+    const headers: Array<keyof NfcCard | 'status' | 'actions'> = [
+      'id',
+      'createdAt',
+      'uid',
+      'lastSeen',
+      'status',
+      'actions',
+    ];
 
     return headers;
   }, []);
@@ -392,17 +360,13 @@ export function RfidCardList({ userId }: { userId?: number }) {
             <TableHeader>
               {headers.map((header, idx) => (
                 <TableColumn key={header} id={header} isRowHeader={idx === 0}>
-                  {t('nfcCardsTable.headers.' + header)}
+                  {header === 'actions' ? <TableActionsColumnHeader /> : t('nfcCardsTable.headers.' + header)}
                 </TableColumn>
               ))}
             </TableHeader>
             <TableBody items={cards ?? []} renderEmptyState={() => <EmptyState />}>
               {(card) => (
-                <TableRow
-                  key={card.id}
-                  id={card.id}
-                  className={cn('border-l-4', card.isActive ? 'border-l-success' : 'border-l-warning')}
-                >
+                <TableRow key={card.id} id={card.id}>
                   {headers.map((header) => (
                     <TableCell key={header}>
                       <NfcCardTableCell header={header} card={card} onDeleteClick={() => setCardToDeleteId(card.id)} />

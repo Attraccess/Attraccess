@@ -19,6 +19,8 @@
     "title": "API Key Removed",
     "description": "The metrics endpoint is now disabled."
   },
+  "keyGenerateFailed": "Could not generate the API key",
+  "keyRemoveFailed": "Could not remove the API key",
   "warning": "This key will only be shown once. If you lose it, you must regenerate.",
   "apiKeyLabel": "API Key",
   "copyButton": "Copy",

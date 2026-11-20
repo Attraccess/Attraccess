@@ -12,7 +12,7 @@ import {
   useTranslations,
 } from '@attraccess/plugins-frontend-ui';
 import { Checkbox, FieldError, Input, Label, ListBox, Select, TextArea, TextField } from '@heroui/react';
-import { useMqttServiceMqttExplorerPublish } from '@attraccess/react-query-client';
+import { useMqttExplorerPublish } from '@attraccess/react-query-client';
 import { MessagesSquareIcon, PauseIcon, PlayIcon, SendIcon, Trash2Icon } from 'lucide-react';
 import { memo, useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useLiveUpdates } from '../../../utils/live-updates';
@@ -148,7 +148,7 @@ const PublishForm = memo(function PublishForm({
   const [qos, setQos] = useState<0 | 1 | 2>(0);
   const [retain, setRetain] = useState(false);
   const [publishResult, setPublishResult] = useState<{ ok: boolean; message: string } | null>(null);
-  const publishMessage = useMqttServiceMqttExplorerPublish();
+  const publishMessage = useMqttExplorerPublish();
   const qosItems = useMemo(
     () =>
       QOS_LEVELS.map((value) => (
@@ -167,7 +167,7 @@ const PublishForm = memo(function PublishForm({
   const publish = async () => {
     setPublishResult(null);
     try {
-      await publishMessage.mutateAsync({ id: mqttServerId, requestBody: { topic, payload, qos, retain } });
+      await publishMessage.mutateAsync({ path: { id: mqttServerId }, body: { topic, payload, qos, retain } });
       setPublishResult({ ok: true, message: t('published') });
     } catch {
       // The API's own error text is English and generic; show the translated one.

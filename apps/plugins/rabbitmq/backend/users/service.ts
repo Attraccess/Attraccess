@@ -79,9 +79,9 @@ export const DEFAULT_MQTT_PERMISSIONS = {
   read: '^(amq\\.topic|mqtt-subscription-.*)$',
 } as const;
 
-export // Body of PUT /api/users/:name. RabbitMQ replaces the whole user record, so an
+// Body of PUT /api/users/:name. RabbitMQ replaces the whole user record, so an
 // update that should keep the password re-sends the stored hash.
-interface PutUserBody {
+export interface PutUserBody {
   tags: string;
   password?: string;
   password_hash?: string;
@@ -96,8 +96,8 @@ export interface RawPermission {
   read: string;
 }
 
-export // Raw shapes returned by the RabbitMQ management API. Only the fields we read.
-interface RawUser {
+// Raw shapes returned by the RabbitMQ management API. Only the fields we read.
+export interface RawUser {
   name: string;
   // Array on RabbitMQ >= 3.9, comma-separated string on older brokers.
   tags?: string[] | string;

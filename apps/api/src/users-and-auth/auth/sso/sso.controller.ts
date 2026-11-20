@@ -33,17 +33,12 @@ import { CookieConfigService } from '../../../common/services/cookie-config.serv
 import { LicenseModuleType } from '../../../license/license.service';
 
 import { RequiresLicense, SkipLicenseCheck } from '../../../license/require-license.decorator';
-
 import { MetricsService } from '../../../metrics/metrics.service';
-
 import { SettingsService } from '../../../settings/settings.service';
-
-import { SSOProvider, SSOProviderType } from '@attraccess/database-entities';
-
+import { SsoProviderResponseDto, toSsoProviderResponse } from './dto/sso-provider-response.dto';
+import { SSOProviderType } from '@attraccess/application-models';
 import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
-
 import { Request, Response } from 'express';
-
 import { SSOProvisioningPermissionsDto, SSOProvisioningUserDto } from './dto/sso-provisioning.dto';
 
 import { LinkUserToExternalAccountRequestDto } from './dto/link-user-to-external-account-request.dto';
@@ -79,15 +74,18 @@ import { ApiProvisioningRoute } from './provisioning/provisioning-route.decorato
 import { SsoProvisioningService, SsoProvisioningTarget } from './provisioning/sso-provisioning.service';
 
 import { SsoLoginService } from './sso-login.service';
+import { toSessionUser } from '../session-user';
 
 import { SsoIpThrottleService } from './sso-ip-throttle.service';
 
-import { RateLimitScope } from '../../rate-limiting/brute-force.service';
+import type { RateLimitScope } from '../../rate-limiting/brute-force-policy';
 
 import { resolveIp, setRetryAfter } from '../../rate-limiting/login.rate-limit.guard';
 
 const CLIENT_SECRET = 'SSO client secret';
 const PROVISIONING_SECRET = 'SSO provisioning secret';
+const DISCOVERY_BAD_GATEWAY =
+  'Discovery URL could not be reached, has an untrusted TLS certificate, answered with a non-success status or returned an invalid response';
 
 @ApiTags('Authentication')
 @Controller('auth/sso')
@@ -112,11 +110,11 @@ export class SSOController {
   @ApiResponse({
     status: 200,
     description: 'The list of SSO providers',
-    type: SSOProvider,
+    type: SsoProviderResponseDto,
     isArray: true,
   })
-  async getAll(): Promise<SSOProvider[]> {
-    return this.providers.getAll();
+  async getAll(): Promise<SsoProviderResponseDto[]> {
+    return (await this.providers.getAll()).map(toSsoProviderResponse);
   }
 
   @Post('/link-account')
@@ -172,7 +170,7 @@ export class SSOController {
   @ApiResponse({
     status: 200,
     description: 'The SSO provider with full configuration',
-    type: SSOProvider,
+    type: SsoProviderResponseDto,
   })
   @ApiResponse({
     status: 403,
@@ -182,8 +180,8 @@ export class SSOController {
     status: 404,
     description: 'Provider not found',
   })
-  async getOneById(@Param('id') id: string): Promise<SSOProvider> {
-    return this.providers.getOneWithConfiguration(parseInt(id, 10));
+  async getOneById(@Param('id') id: string): Promise<SsoProviderResponseDto> {
+    return toSsoProviderResponse(await this.providers.getOneWithConfiguration(parseInt(id, 10)));
   }
 
   @Post('providers')
@@ -193,14 +191,17 @@ export class SSOController {
   @ApiResponse({
     status: 201,
     description: 'The SSO provider has been created',
-    type: SSOProvider,
+    type: SsoProviderResponseDto,
   })
   @ApiResponse({
     status: 403,
     description: 'Forbidden - Insufficient permissions',
   })
-  async createOne(@Body() createDto: CreateSSOProviderDto, @Req() request: AuthenticatedRequest): Promise<SSOProvider> {
-    return this.providers.create(createDto, request.user as AuthenticatedUser);
+  async createOne(
+    @Body() createDto: CreateSSOProviderDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<SsoProviderResponseDto> {
+    return toSsoProviderResponse(await this.providers.create(createDto, request.user as AuthenticatedUser));
   }
 
   @Put('providers/:id')
@@ -215,7 +216,7 @@ export class SSOController {
   @ApiResponse({
     status: 200,
     description: 'The SSO provider has been updated',
-    type: SSOProvider,
+    type: SsoProviderResponseDto,
   })
   @ApiResponse({
     status: 403,
@@ -229,8 +230,10 @@ export class SSOController {
     @Param('id') id: string,
     @Body() updateDto: UpdateSSOProviderDto,
     @Req() request: AuthenticatedRequest,
-  ): Promise<SSOProvider> {
-    return this.providers.update(parseInt(id, 10), updateDto, request.user as AuthenticatedUser);
+  ): Promise<SsoProviderResponseDto> {
+    return toSsoProviderResponse(
+      await this.providers.update(parseInt(id, 10), updateDto, request.user as AuthenticatedUser),
+    );
   }
 
   @Delete('providers/:id')
@@ -264,7 +267,7 @@ export class SSOController {
   @ApiQuery({ name: 'applicationName', required: true, description: 'Authentik application slug' })
   @ApiResponse({ status: 200, description: 'OIDC configuration JSON' })
   @ApiBadRequestResponse({ description: 'Invalid host or applicationName' })
-  @ApiBadGatewayResponse({ description: 'Discovery URL could not be reached or returned an invalid response' })
+  @ApiBadGatewayResponse({ description: DISCOVERY_BAD_GATEWAY })
   async discoverAuthentik(@Query('host') host: string, @Query('applicationName') applicationName: string) {
     if (typeof host !== 'string' || typeof applicationName !== 'string' || !host || !applicationName) {
       throw new BadRequestException('Missing required parameters');
@@ -284,7 +287,7 @@ export class SSOController {
   @ApiQuery({ name: 'realm', required: true, description: 'Keycloak realm name' })
   @ApiResponse({ status: 200, description: 'OIDC configuration JSON' })
   @ApiBadRequestResponse({ description: 'Invalid host or realm' })
-  @ApiBadGatewayResponse({ description: 'Discovery URL could not be reached or returned an invalid response' })
+  @ApiBadGatewayResponse({ description: DISCOVERY_BAD_GATEWAY })
   async discoverKeycloak(@Query('host') host: string, @Query('realm') realm: string) {
     if (typeof host !== 'string' || typeof realm !== 'string' || !host || !realm) {
       throw new BadRequestException('Missing required parameters');
@@ -546,7 +549,7 @@ export class SSOController {
     await this.cookieConfigService.setAuthCookie(response, sessionToken);
 
     const auth: CreateSessionResponse = {
-      user: request.user,
+      user: toSessionUser(request.user),
       authToken: sessionToken,
     };
 

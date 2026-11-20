@@ -1,10 +1,16 @@
-import { ResourceUsage, User } from '@attraccess/database-entities';
+import type { UsageSession } from '@attraccess/application-models';
 import { StartUsageSessionDto } from '../usage/dtos/startUsageSession.dto';
+
+/** Who asks for or approves a supervised session. */
+export interface SupervisionUser {
+  id: number;
+  username: string;
+}
 
 export interface PendingSupervisionRequest {
   id: string;
   resourceId: number;
-  requester: User;
+  requester: SupervisionUser;
   /**
    * The single supervisor whose approval is required (web flow, ATT-487), or `null` for a
    * reader-originated request (ATT-493) that any currently authorized introducer may approve — by
@@ -17,7 +23,7 @@ export interface PendingSupervisionRequest {
   createdAt: Date;
   expiresAt: Date;
   timeout: ReturnType<typeof setTimeout>;
-  resolve: (session: ResourceUsage) => void;
+  resolve: (session: UsageSession) => void;
   reject: (error: Error) => void;
   settled: boolean;
   removeAbortListener?: () => void;
@@ -35,7 +41,7 @@ export interface PendingSupervisionRequest {
  * HTTP caller — resolution side effects (notifying the reader websocket) run through these instead.
  */
 export interface ReaderSupervisionCallbacks {
-  onResolved: (session: ResourceUsage, supervisor: { id: number; username: string }) => void;
+  onResolved: (session: UsageSession, supervisor: { id: number; username: string }) => void;
   onFailed: (error: Error) => void;
 }
 
@@ -55,7 +61,7 @@ export interface ReaderSupervisionArmer {
   arm(params: {
     readerId: number;
     resourceId: number;
-    requester: User;
+    requester: SupervisionUser;
     requestId: string;
   }): Promise<ReaderSupervisionCallbacks>;
 }

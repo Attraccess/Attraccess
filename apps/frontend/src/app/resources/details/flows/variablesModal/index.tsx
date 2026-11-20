@@ -22,15 +22,22 @@ import {
   ResourceFlowVariableScope,
   ApiError,
   FlowVariableDto,
-  UseFlowVariablesServiceListFlowVariablesKeyFn,
-  useFlowVariablesServiceDeleteFlowVariable,
-  useFlowVariablesServiceListFlowVariables,
-  useFlowVariablesServiceUpsertFlowVariable,
+  UseListFlowVariablesKeyFn,
+  useDeleteFlowVariable,
+  useListFlowVariables,
+  useUpsertFlowVariable,
 } from '@attraccess/react-query-client';
 import { VariableEditor, EditorMode, VariableFormValues, ValueType } from './editor';
 import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button, StandardModal, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  StandardModal,
+  TableActionsColumnHeader,
+  TableRowActions,
+  useDateTimeFormatter,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
@@ -61,34 +68,37 @@ export interface Props {
   children: (open: () => void) => React.ReactNode;
 }
 
-export function useVariablesModalState(props: Props) {
+export function VariablesModal(props: Props) {
   const { resourceId } = props;
   const { isOpen, open, setOpen, close } = useOverlayState();
-  const { t, tExists } = useTranslations({
-    en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
-    de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
-  });
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  const { t, tExists } = useTranslations(
+    {
+      en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
+      de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
+    },
+    { escapeValues: false },
+  );
   const formatDateTime = useDateTimeFormatter({ showSeconds: false });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
   const [activeScope, setActiveScope] = useState<ResourceFlowVariableScope>(ResourceFlowVariableScope.RESOURCE);
-  const [pendingDeleteKey, setPendingDeleteKey] = useState<string | null>(null);
   const [editor, setEditor] = useState<
     { open: false } | { open: true; mode: EditorMode; initial?: VariableFormValues }
   >({ open: false });
 
-  const { data: variables } = useFlowVariablesServiceListFlowVariables({ resourceId }, undefined, {
+  const { data: variables } = useListFlowVariables({ path: { resourceId } }, undefined, {
     enabled: isOpen,
   });
 
   const invalidate = useCallback(() => {
     queryClient.invalidateQueries({
-      queryKey: UseFlowVariablesServiceListFlowVariablesKeyFn({ resourceId }),
+      queryKey: UseListFlowVariablesKeyFn({ path: { resourceId } }),
     });
   }, [queryClient, resourceId]);
 
-  const upsert = useFlowVariablesServiceUpsertFlowVariable({
+  const upsert = useUpsertFlowVariable(undefined, {
     onSuccess: () => {
       invalidate();
       toast.success({ title: t('toast.saved.title') });
@@ -99,11 +109,10 @@ export function useVariablesModalState(props: Props) {
     },
   });
 
-  const remove = useFlowVariablesServiceDeleteFlowVariable({
+  const remove = useDeleteFlowVariable(undefined, {
     onSuccess: () => {
       invalidate();
       toast.success({ title: t('toast.deleted.title') });
-      setPendingDeleteKey(null);
     },
     onError: (error) => {
       toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' });
@@ -144,71 +153,19 @@ export function useVariablesModalState(props: Props) {
   const handleSubmit = useCallback(
     (values: VariableFormValues) => {
       upsert.mutate({
-        resourceId,
-        scope: values.scope,
-        key: values.key,
-        requestBody: { value: values.value as never },
+        path: { resourceId, scope: values.scope, key: values.key },
+        body: { value: values.value as never },
       });
     },
     [upsert, resourceId],
   );
 
   const handleDelete = useCallback(
-    (row: FlowVariableDto) => {
-      remove.mutate({ resourceId, scope: row.scope, key: row.key });
-    },
+    (row: FlowVariableDto) => remove.mutateAsync({ path: { resourceId, scope: row.scope, key: row.key } }),
     [remove, resourceId],
   );
 
   const rowKey = (row: FlowVariableDto) => `${row.scope}:${row.key}`;
-  return {
-    isOpen,
-    open,
-    setOpen,
-    close,
-    t,
-    formatDateTime,
-    activeScope,
-    setActiveScope,
-    pendingDeleteKey,
-    setPendingDeleteKey,
-    editor,
-    setEditor,
-    upsert,
-    remove,
-    rows,
-    handleAdd,
-    handleEdit,
-    handleSubmit,
-    handleDelete,
-    rowKey,
-    props,
-  } as const;
-}
-
-export function VariablesModal(props: Props) {
-  const {
-    isOpen,
-    open,
-    setOpen,
-    close,
-    t,
-    formatDateTime,
-    activeScope,
-    setActiveScope,
-    pendingDeleteKey,
-    setPendingDeleteKey,
-    editor,
-    setEditor,
-    upsert,
-    remove,
-    rows,
-    handleAdd,
-    handleEdit,
-    handleSubmit,
-    handleDelete,
-    rowKey,
-  } = useVariablesModalState(props);
 
   return (
     <>
@@ -226,7 +183,6 @@ export function VariablesModal(props: Props) {
               isSaving={upsert.isPending}
               onCancel={() => setEditor({ open: false })}
               onSubmit={handleSubmit}
-              t={t}
             />
           ) : (
             <div className="flex flex-col gap-3">
@@ -259,7 +215,9 @@ export function VariablesModal(props: Props) {
                       <TableColumn>{t('table.type')}</TableColumn>
                       <TableColumn>{t('table.value')}</TableColumn>
                       <TableColumn>{t('table.updated')}</TableColumn>
-                      <TableColumn>{t('table.actions')}</TableColumn>
+                      <TableColumn>
+                        <TableActionsColumnHeader />
+                      </TableColumn>
                     </TableHeader>
                     <TableBody>
                       {rows.length === 0 ? (
@@ -289,39 +247,28 @@ export function VariablesModal(props: Props) {
                             </TableCell>
                             <TableCell className="text-sm text-default-500">{formatDateTime(row.updatedAt)}</TableCell>
                             <TableCell>
-                              <div className="flex flex-row justify-end gap-1">
-                                <Button
-                                  isIconOnly
-                                  variant="ghost"
-                                  aria-label={t('actions.edit')}
-                                  onPress={() => handleEdit(row)}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                {pendingDeleteKey === rowKey(row) ? (
-                                  <>
-                                    <Button variant="ghost" onPress={() => setPendingDeleteKey(null)}>
-                                      {t('actions.confirmDeleteNo')}
-                                    </Button>
-                                    <Button
-                                      variant="danger"
-                                      isPending={remove.isPending}
-                                      onPress={() => handleDelete(row)}
-                                    >
-                                      {t('actions.confirmDeleteYes')}
-                                    </Button>
-                                  </>
-                                ) : (
-                                  <Button
-                                    isIconOnly
-                                    variant="danger-soft"
-                                    aria-label={t('actions.delete')}
-                                    onPress={() => setPendingDeleteKey(rowKey(row))}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </div>
+                              <TableRowActions
+                                itemName={row.key}
+                                actions={[
+                                  {
+                                    key: 'edit',
+                                    label: t('actions.edit'),
+                                    icon: Pencil,
+                                    onPress: () => handleEdit(row),
+                                  },
+                                  {
+                                    key: 'delete',
+                                    label: t('actions.delete'),
+                                    icon: Trash2,
+                                    tone: 'danger',
+                                    onPress: () => handleDelete(row),
+                                    confirm: {
+                                      title: t('actions.confirmDelete'),
+                                      message: t('actions.confirmDeleteMessage', { key: row.key }),
+                                    },
+                                  },
+                                ]}
+                              />
                             </TableCell>
                           </TableRow>
                         ))

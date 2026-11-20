@@ -12,12 +12,13 @@
 // Stop the API first and keep a copy of attraccess.sqlite.
 //
 // Plain Node only: the production image has no TypeScript sources, so nothing here may import a .ts
-// file. The only dependency is sqlite3, which the deployed API package ships.
+// file (./lib/database-provider.mjs ships beside it). The only dependency is better-sqlite3, which the deployed API
+// package ships; the provider selected by DATABASE_TYPE opens the database.
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto';
 import { existsSync, realpathSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import sqlite3pkg from 'sqlite3';
+import { resolveDatabaseProvider, sqliteProvider } from './lib/database-provider.mjs';
 
 const SALT = Buffer.from('attraccess.encryption.salt', 'utf8');
 const INFO = Buffer.from('attraccess|aes-256-gcm|content-encryption', 'utf8');
@@ -60,8 +61,7 @@ export function decrypt(key, token) {
 
 /** Same rule as resolveDatabasePath() in apps/api/src/config/storage-path.ts (a test keeps them in step). */
 export function resolveDatabasePath(env = process.env, cwd = process.cwd()) {
-  const storageRoot = resolve(cwd, env.STORAGE_ROOT ?? join(cwd, 'storage'));
-  return join(storageRoot, 'attraccess.sqlite');
+  return resolveDatabaseProvider(env).defaultLocation(env, cwd);
 }
 
 export function parseArgs(argv, env = process.env, cwd = process.cwd()) {
@@ -80,26 +80,19 @@ export function parseArgs(argv, env = process.env, cwd = process.cwd()) {
   return { dryRun, databasePath: db ? resolve(cwd, db) : resolveDatabasePath(env, cwd) };
 }
 
-const call = (db, method, sql, params = []) =>
-  new Promise((resolve, reject) =>
-    db[method](sql, params, (error, result) => (error ? reject(error) : resolve(result))),
-  );
-
 /** Returns how many values were re-encrypted per table (column). Throws (and rolls back) when any value does not decrypt with the old secret. */
-export async function reencryptCardKeys(db, oldSecret, newSecret, { dryRun = false } = {}) {
+export async function reencryptCardKeys(db, oldSecret, newSecret, { dryRun = false, provider = sqliteProvider } = {}) {
   if (!oldSecret || !newSecret) throw new Error('OLD_AUTH_SESSION_SECRET and NEW_AUTH_SESSION_SECRET are required');
   if (oldSecret.trim() === newSecret.trim()) throw new Error('the old and the new secret are the same');
   const oldKey = deriveKey(oldSecret);
   const newKey = deriveKey(newSecret);
   const counts = {};
-  await call(db, 'run', 'BEGIN IMMEDIATE');
+  await provider.begin(db, { writeLock: true });
   try {
     for (const { name, table, column } of TABLES) {
-      const exists = await call(db, 'get', "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", [table]);
-      if (!exists) continue;
-      const rows = await call(
+      if (!(await provider.hasTable(db, table))) continue;
+      const rows = await provider.all(
         db,
-        'all',
         `SELECT id, "${column}" AS value FROM "${table}" WHERE "${column}" IS NOT NULL AND "${column}" != ''`,
       );
       counts[name] = 0;
@@ -115,35 +108,37 @@ export async function reencryptCardKeys(db, oldSecret, newSecret, { dryRun = fal
             );
           }
         }
-        await call(db, 'run', `UPDATE "${table}" SET "${column}" = ? WHERE id = ?`, [encrypt(newKey, plain), row.id]);
+        await provider.run(db, `UPDATE "${table}" SET "${column}" = ? WHERE id = ?`, [encrypt(newKey, plain), row.id]);
         counts[name]++;
       }
     }
-    await call(db, 'run', dryRun ? 'ROLLBACK' : 'COMMIT');
+    await (dryRun ? provider.rollback(db) : provider.commit(db));
   } catch (error) {
-    await call(db, 'run', 'ROLLBACK').catch(() => undefined);
+    await provider.rollback(db).catch(() => undefined);
     throw error;
   }
   return counts;
 }
 
 async function main() {
+  // Selecting the provider validates DATABASE_TYPE before the database is located or opened.
+  const provider = resolveDatabaseProvider(process.env);
   const { dryRun, databasePath } = parseArgs(process.argv.slice(2));
   if (!existsSync(databasePath)) throw new Error(`database not found: ${databasePath}`);
-  const db = new (sqlite3pkg.verbose().Database)(databasePath);
+  const db = await provider.open(databasePath);
   try {
     const counts = await reencryptCardKeys(
       db,
       process.env.OLD_AUTH_SESSION_SECRET,
       process.env.NEW_AUTH_SESSION_SECRET,
-      { dryRun },
+      { dryRun, provider },
     );
     console.log(
       `${dryRun ? 'Checked (nothing written)' : 'Re-encrypted'} card keys and reader pairing keys in ${databasePath}: ${JSON.stringify(counts)}`,
     );
     if (!dryRun) console.log('Now set AUTH_SESSION_SECRET to the new secret and start the API.');
   } finally {
-    db.close();
+    await provider.close(db);
   }
 }
 

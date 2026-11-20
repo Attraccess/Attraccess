@@ -2,14 +2,15 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  usePasswordPolicyAdminServiceGetAdminPasswordPolicy,
-  usePasswordPolicyAdminServiceUpdateAdminPasswordPolicy,
-  useSettingsServiceGetAuthRateLimitSettings,
-  useSettingsServiceUpdateAuthRateLimitSettings,
-  useTwoFactorAuthenticationServiceGetTwoFactorPolicy,
-  useTwoFactorAuthenticationServiceSetTwoFactorPolicy,
-  useUsersServiceGetLocalSignupDomainWhitelist,
-  useUsersServiceSetLocalSignupDomainWhitelist,
+  useGetAdminPasswordPolicy,
+  useListPasswordPolicyOverrides,
+  useUpdateAdminPasswordPolicy,
+  useGetAuthRateLimitSettings,
+  useUpdateAuthRateLimitSettings,
+  useGetTwoFactorPolicy,
+  useSetTwoFactorPolicy,
+  useGetLocalSignupDomainWhitelist,
+  useSetLocalSignupDomainWhitelist,
 } from '@attraccess/react-query-client';
 import { SecuritySection } from './index';
 import userEvent from '@testing-library/user-event';
@@ -28,22 +29,22 @@ vi.mock('@attraccess/react-query-client', () => ({
       Object.assign(Promise.resolve({ ok: true, errors: [] }), { cancel: vi.fn() }),
     ),
   },
-  usePasswordPolicyAdminServiceGetAdminPasswordPolicy: vi.fn(),
-  usePasswordPolicyAdminServiceUpdateAdminPasswordPolicy: vi.fn(),
-  usePasswordPolicyAdminServiceListPasswordPolicyOverrides: vi.fn(() => ({ data: [] })),
-  usePasswordPolicyAdminServiceUpsertPasswordPolicyOverride: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
-  usePasswordPolicyAdminServiceDeletePasswordPolicyOverride: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
-  useSettingsServiceGetAuthRateLimitSettings: vi.fn(),
-  useSettingsServiceUpdateAuthRateLimitSettings: vi.fn(),
-  useTwoFactorAuthenticationServiceGetTwoFactorPolicy: vi.fn(),
-  useTwoFactorAuthenticationServiceSetTwoFactorPolicy: vi.fn(),
-  useUsersServiceGetLocalSignupDomainWhitelist: vi.fn(),
-  useUsersServiceSetLocalSignupDomainWhitelist: vi.fn(),
-  UsePasswordPolicyAdminServiceGetAdminPasswordPolicyKeyFn: () => ['policy'],
-  UsePasswordPolicyAdminServiceListPasswordPolicyOverridesKeyFn: () => ['overrides'],
-  UseSettingsServiceGetAuthRateLimitSettingsKeyFn: () => ['rate-limit'],
-  UseTwoFactorAuthenticationServiceGetTwoFactorPolicyKeyFn: () => ['two-factor'],
-  UseUsersServiceGetLocalSignupDomainWhitelistKeyFn: () => ['domains'],
+  useGetAdminPasswordPolicy: vi.fn(),
+  useUpdateAdminPasswordPolicy: vi.fn(),
+  useListPasswordPolicyOverrides: vi.fn(() => ({ data: [] })),
+  useUpsertPasswordPolicyOverride: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useDeletePasswordPolicyOverride: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useGetAuthRateLimitSettings: vi.fn(),
+  useUpdateAuthRateLimitSettings: vi.fn(),
+  useGetTwoFactorPolicy: vi.fn(),
+  useSetTwoFactorPolicy: vi.fn(),
+  useGetLocalSignupDomainWhitelist: vi.fn(),
+  useSetLocalSignupDomainWhitelist: vi.fn(),
+  UseGetAdminPasswordPolicyKeyFn: () => ['policy'],
+  UseListPasswordPolicyOverridesKeyFn: () => ['overrides'],
+  UseGetAuthRateLimitSettingsKeyFn: () => ['rate-limit'],
+  UseGetTwoFactorPolicyKeyFn: () => ['two-factor'],
+  UseGetLocalSignupDomainWhitelistKeyFn: () => ['domains'],
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -91,33 +92,33 @@ const idle = (mutate: unknown) => ({ mutate, isPending: false });
 describe('SecuritySection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(usePasswordPolicyAdminServiceGetAdminPasswordPolicy).mockReturnValue({
+    vi.mocked(useGetAdminPasswordPolicy).mockReturnValue({
       data: POLICY,
       isLoading: false,
-    } as ReturnType<typeof usePasswordPolicyAdminServiceGetAdminPasswordPolicy>);
-    vi.mocked(useSettingsServiceGetAuthRateLimitSettings).mockReturnValue({
+    } as ReturnType<typeof useGetAdminPasswordPolicy>);
+    vi.mocked(useGetAuthRateLimitSettings).mockReturnValue({
       data: RATE_LIMIT,
       isLoading: false,
-    } as ReturnType<typeof useSettingsServiceGetAuthRateLimitSettings>);
-    vi.mocked(useTwoFactorAuthenticationServiceGetTwoFactorPolicy).mockReturnValue({
+    } as ReturnType<typeof useGetAuthRateLimitSettings>);
+    vi.mocked(useGetTwoFactorPolicy).mockReturnValue({
       data: { policy: 'optional' },
-    } as ReturnType<typeof useTwoFactorAuthenticationServiceGetTwoFactorPolicy>);
-    vi.mocked(useUsersServiceGetLocalSignupDomainWhitelist).mockReturnValue({
+    } as ReturnType<typeof useGetTwoFactorPolicy>);
+    vi.mocked(useGetLocalSignupDomainWhitelist).mockReturnValue({
       data: ['example.org'],
       isLoading: false,
-    } as unknown as ReturnType<typeof useUsersServiceGetLocalSignupDomainWhitelist>);
+    } as unknown as ReturnType<typeof useGetLocalSignupDomainWhitelist>);
 
-    vi.mocked(usePasswordPolicyAdminServiceUpdateAdminPasswordPolicy).mockReturnValue(
-      idle(savePolicy) as unknown as ReturnType<typeof usePasswordPolicyAdminServiceUpdateAdminPasswordPolicy>,
+    vi.mocked(useUpdateAdminPasswordPolicy).mockReturnValue(
+      idle(savePolicy) as unknown as ReturnType<typeof useUpdateAdminPasswordPolicy>,
     );
-    vi.mocked(useSettingsServiceUpdateAuthRateLimitSettings).mockReturnValue(
-      idle(saveRateLimit) as unknown as ReturnType<typeof useSettingsServiceUpdateAuthRateLimitSettings>,
+    vi.mocked(useUpdateAuthRateLimitSettings).mockReturnValue(
+      idle(saveRateLimit) as unknown as ReturnType<typeof useUpdateAuthRateLimitSettings>,
     );
-    vi.mocked(useTwoFactorAuthenticationServiceSetTwoFactorPolicy).mockReturnValue(
-      idle(saveTwoFactor) as unknown as ReturnType<typeof useTwoFactorAuthenticationServiceSetTwoFactorPolicy>,
+    vi.mocked(useSetTwoFactorPolicy).mockReturnValue(
+      idle(saveTwoFactor) as unknown as ReturnType<typeof useSetTwoFactorPolicy>,
     );
-    vi.mocked(useUsersServiceSetLocalSignupDomainWhitelist).mockReturnValue(
-      idle(saveDomains) as unknown as ReturnType<typeof useUsersServiceSetLocalSignupDomainWhitelist>,
+    vi.mocked(useSetLocalSignupDomainWhitelist).mockReturnValue(
+      idle(saveDomains) as unknown as ReturnType<typeof useSetLocalSignupDomainWhitelist>,
     );
   });
 
@@ -141,10 +142,10 @@ describe('SecuritySection', () => {
     // On error `isLoading` goes false while the data stays undefined. Folding `!policy` into the
     // loading gate rendered the *loading* state permanently — and took 2FA, the domain whitelist and
     // throttling down with it, none of which come from this query.
-    vi.mocked(usePasswordPolicyAdminServiceGetAdminPasswordPolicy).mockReturnValue({
+    vi.mocked(useGetAdminPasswordPolicy).mockReturnValue({
       data: undefined,
       isLoading: false,
-    } as ReturnType<typeof usePasswordPolicyAdminServiceGetAdminPasswordPolicy>);
+    } as ReturnType<typeof useGetAdminPasswordPolicy>);
 
     render(<SecuritySection />);
 
@@ -163,10 +164,10 @@ describe('SecuritySection', () => {
     // `!isPolicySavable` on the bar was unconditionally true with no policy (`Number.isInteger(
     // undefined)` is false), so the bar came up on a 2FA edit with Save greyed out and nothing
     // saying why, and Discard was the only way out.
-    vi.mocked(usePasswordPolicyAdminServiceGetAdminPasswordPolicy).mockReturnValue({
+    vi.mocked(useGetAdminPasswordPolicy).mockReturnValue({
       data: undefined,
       isLoading: false,
-    } as ReturnType<typeof usePasswordPolicyAdminServiceGetAdminPasswordPolicy>);
+    } as ReturnType<typeof useGetAdminPasswordPolicy>);
 
     const { container } = render(<SecuritySection />);
 
@@ -177,15 +178,15 @@ describe('SecuritySection', () => {
     expect(saveButton()).not.toBeDisabled();
 
     await userEvent.click(saveButton());
-    expect(saveTwoFactor).toHaveBeenCalledWith({ requestBody: { policy: 'all' } });
+    expect(saveTwoFactor).toHaveBeenCalledWith({ body: { policy: 'all' } });
     expect(savePolicy).not.toHaveBeenCalled();
   });
 
   it('reports a failed throttling query without taking the password policy with it', () => {
-    vi.mocked(useSettingsServiceGetAuthRateLimitSettings).mockReturnValue({
+    vi.mocked(useGetAuthRateLimitSettings).mockReturnValue({
       data: undefined,
       isLoading: false,
-    } as ReturnType<typeof useSettingsServiceGetAuthRateLimitSettings>);
+    } as ReturnType<typeof useGetAuthRateLimitSettings>);
 
     render(<SecuritySection />);
 
@@ -196,15 +197,43 @@ describe('SecuritySection', () => {
   });
 
   it('still shows the spinner while the queries are genuinely in flight', () => {
-    vi.mocked(usePasswordPolicyAdminServiceGetAdminPasswordPolicy).mockReturnValue({
+    vi.mocked(useGetAdminPasswordPolicy).mockReturnValue({
       data: undefined,
       isLoading: true,
-    } as ReturnType<typeof usePasswordPolicyAdminServiceGetAdminPasswordPolicy>);
+    } as ReturnType<typeof useGetAdminPasswordPolicy>);
 
     render(<SecuritySection />);
 
     expect(screen.getByText('loading')).toBeInTheDocument();
     expect(screen.queryByTestId('policy-load-failed')).not.toBeInTheDocument();
+  });
+
+  it('starts every query while the gating ones are still in flight, in one parallel round', () => {
+    // 2FA, the whitelist and the overrides do not depend on the policy or the throttling settings,
+    // so they must not wait for the spinner to clear before they are requested.
+    vi.mocked(useGetAdminPasswordPolicy).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    } as ReturnType<typeof useGetAdminPasswordPolicy>);
+
+    render(<SecuritySection />);
+
+    expect(screen.getByText('loading')).toBeInTheDocument();
+    expect(useGetTwoFactorPolicy).toHaveBeenCalled();
+    expect(useGetLocalSignupDomainWhitelist).toHaveBeenCalled();
+    expect(useListPasswordPolicyOverrides).toHaveBeenCalled();
+  });
+
+  it('subscribes to each query once, so the rows do not refetch it on mount', () => {
+    // The shared client has no `staleTime`: a second subscriber mounting after the data arrived
+    // would send the same request again.
+    render(<SecuritySection />);
+
+    expect(useGetAdminPasswordPolicy).toHaveBeenCalledTimes(1);
+    expect(useGetAuthRateLimitSettings).toHaveBeenCalledTimes(1);
+    expect(useGetTwoFactorPolicy).toHaveBeenCalledTimes(1);
+    expect(useGetLocalSignupDomainWhitelist).toHaveBeenCalledTimes(1);
+    expect(useListPasswordPolicyOverrides).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the strength preview in the aside, not the content column', () => {
@@ -234,9 +263,7 @@ describe('SecuritySection', () => {
     expect(saveBar(container)).toBeInTheDocument();
     await userEvent.click(saveButton());
 
-    expect(saveRateLimit).toHaveBeenCalledWith({
-      requestBody: { ...RATE_LIMIT, maxAttempts: 9 },
-    });
+    expect(saveRateLimit).toHaveBeenCalledWith({ body: { ...RATE_LIMIT, maxAttempts: 9 } });
     expect(savePolicy).not.toHaveBeenCalled();
     expect(saveTwoFactor).not.toHaveBeenCalled();
     expect(saveDomains).not.toHaveBeenCalled();
@@ -260,7 +287,7 @@ describe('SecuritySection', () => {
     expect(diff).toHaveTextContent('16');
 
     await userEvent.click(screen.getByTestId('policy-diff-confirm'));
-    expect(savePolicy).toHaveBeenCalledWith({ requestBody: { minLength: 16 } });
+    expect(savePolicy).toHaveBeenCalledWith({ body: { minLength: 16 } });
   });
 
   it('seeds the overrides editor from the saved policy, not an unsaved edit', async () => {
@@ -274,7 +301,8 @@ describe('SecuritySection', () => {
     await userEvent.type(minLength, '16');
     await userEvent.tab();
 
-    await userEvent.click(screen.getByTestId('policy-override-edit-admin'));
+    await userEvent.click(document.querySelector('[data-cy="policy-override-actions-admin"]') as HTMLElement);
+    await userEvent.click(document.querySelector('[data-cy="policy-override-edit-admin"]') as HTMLElement);
     fireEvent.click(
       screen
         .getByTestId('override-admin-minLength-toggle')
@@ -310,16 +338,16 @@ describe('SecuritySection', () => {
     expect(saveDomains).not.toHaveBeenCalled();
 
     await userEvent.click(saveButton());
-    expect(saveDomains).toHaveBeenCalledWith({ requestBody: ['example.org', 'new.example'] });
+    expect(saveDomains).toHaveBeenCalledWith({ body: ['example.org', 'new.example'] });
   });
 
   it('refuses to edit the domain list before it has loaded', async () => {
     // PUT is a full replace. While the whitelist is undefined the fallback is `[]`, so an add would
     // stage a one-element draft that pins — and Save would delete every domain the instance has.
-    vi.mocked(useUsersServiceGetLocalSignupDomainWhitelist).mockReturnValue({
+    vi.mocked(useGetLocalSignupDomainWhitelist).mockReturnValue({
       data: undefined,
       isLoading: true,
-    } as unknown as ReturnType<typeof useUsersServiceGetLocalSignupDomainWhitelist>);
+    } as unknown as ReturnType<typeof useGetLocalSignupDomainWhitelist>);
 
     const { container } = render(<SecuritySection />);
 
@@ -332,10 +360,10 @@ describe('SecuritySection', () => {
     // An errored query leaves `data` undefined too. Rendering that as "no domains configured" is a
     // lie that one add and a Save turns into data loss — and blocking the whole section behind a
     // spinner that will never resolve is no better.
-    vi.mocked(useUsersServiceGetLocalSignupDomainWhitelist).mockReturnValue({
+    vi.mocked(useGetLocalSignupDomainWhitelist).mockReturnValue({
       data: undefined,
       isLoading: false,
-    } as unknown as ReturnType<typeof useUsersServiceGetLocalSignupDomainWhitelist>);
+    } as unknown as ReturnType<typeof useGetLocalSignupDomainWhitelist>);
 
     render(<SecuritySection />);
 
@@ -368,10 +396,10 @@ describe('SecuritySection', () => {
     await userEvent.type(attempts, '7');
     await userEvent.tab();
 
-    vi.mocked(useSettingsServiceGetAuthRateLimitSettings).mockReturnValue({
+    vi.mocked(useGetAuthRateLimitSettings).mockReturnValue({
       data: RATE_LIMIT,
       isLoading: false,
-    } as ReturnType<typeof useSettingsServiceGetAuthRateLimitSettings>);
+    } as ReturnType<typeof useGetAuthRateLimitSettings>);
     rerender(<SecuritySection />);
 
     expect(screen.getByLabelText('rateLimit.fields.maxAttempts.label')).toHaveValue('7');
@@ -380,37 +408,13 @@ describe('SecuritySection', () => {
   it('updates cached settings after saves and reports failures for each backend', async () => {
     render(<SecuritySection />);
     const cases = [
-      [
-        usePasswordPolicyAdminServiceUpdateAdminPasswordPolicy,
-        POLICY,
-        ['policy'],
-        'savedToast.title',
-        'errorToast.title',
-      ],
-      [
-        useSettingsServiceUpdateAuthRateLimitSettings,
-        RATE_LIMIT,
-        ['rate-limit'],
-        'rateLimit.saved.title',
-        'rateLimit.error.title',
-      ],
-      [
-        useTwoFactorAuthenticationServiceSetTwoFactorPolicy,
-        { policy: 'all' },
-        ['two-factor'],
-        'twoFactor.saved.title',
-        'twoFactor.error.title',
-      ],
-      [
-        useUsersServiceSetLocalSignupDomainWhitelist,
-        undefined,
-        ['domains'],
-        'domains.saved.title',
-        'domains.error.title',
-      ],
+      [useUpdateAdminPasswordPolicy, POLICY, ['policy'], 'savedToast.title', 'errorToast.title'],
+      [useUpdateAuthRateLimitSettings, RATE_LIMIT, ['rate-limit'], 'rateLimit.saved.title', 'rateLimit.error.title'],
+      [useSetTwoFactorPolicy, { policy: 'all' }, ['two-factor'], 'twoFactor.saved.title', 'twoFactor.error.title'],
+      [useSetLocalSignupDomainWhitelist, undefined, ['domains'], 'domains.saved.title', 'domains.error.title'],
     ] as const;
     for (const [hook, data, key, successTitle, errorTitle] of cases) {
-      const options = vi.mocked(hook).mock.calls.at(-1)?.[0] as {
+      const options = vi.mocked(hook).mock.calls.at(-1)?.[1] as {
         onSuccess: (data: unknown) => void;
         onError: () => void;
       };

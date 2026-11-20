@@ -1,16 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { ExecutionContext, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { DualAuthGuard } from './dual-auth.guard';
-import { User } from '@attraccess/database-entities';
+import type { PluginUserModel } from '@attraccess/application-models';
 
 describe('DualAuthGuard', () => {
   let guard: DualAuthGuard;
 
-  const mockUser: User = {
+  const mockUser: PluginUserModel = {
     id: 1,
     username: 'testuser',
-    email: 'test@example.com',
-  } as User;
+    locale: 'en',
+    isDisabled: false,
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -56,7 +57,7 @@ describe('DualAuthGuard', () => {
       parentCanActivate.mockResolvedValue(true);
 
       const result = await guard.canActivate(mockContext);
-      
+
       expect(result).toBe(true);
       expect(parentCanActivate).toHaveBeenCalledWith(mockContext);
     });
@@ -66,7 +67,7 @@ describe('DualAuthGuard', () => {
       parentCanActivate.mockRejectedValue(new UnauthorizedException('Original error'));
 
       await expect(guard.canActivate(mockContext)).rejects.toThrow(
-        new UnauthorizedException('Authentication required')
+        new UnauthorizedException('Authentication required'),
       );
     });
 
@@ -81,24 +82,24 @@ describe('DualAuthGuard', () => {
     describe('authentication scenarios', () => {
       it('should authenticate successfully with valid Authorization header', async () => {
         mockRequest.headers.authorization = 'Bearer valid-session-token';
-        
+
         const parentCanActivate = jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(guard)), 'canActivate');
         parentCanActivate.mockResolvedValue(true);
 
         const result = await guard.canActivate(mockContext);
-        
+
         expect(result).toBe(true);
         expect(parentCanActivate).toHaveBeenCalledWith(mockContext);
       });
 
       it('should authenticate successfully with valid session cookie', async () => {
         mockRequest.cookies['auth-session'] = 'valid-session-token';
-        
+
         const parentCanActivate = jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(guard)), 'canActivate');
         parentCanActivate.mockResolvedValue(true);
 
         const result = await guard.canActivate(mockContext);
-        
+
         expect(result).toBe(true);
         expect(parentCanActivate).toHaveBeenCalledWith(mockContext);
       });
@@ -106,12 +107,12 @@ describe('DualAuthGuard', () => {
       it('should prioritize Authorization header over cookie', async () => {
         mockRequest.headers.authorization = 'Bearer header-token';
         mockRequest.cookies['auth-session'] = 'cookie-token';
-        
+
         const parentCanActivate = jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(guard)), 'canActivate');
         parentCanActivate.mockResolvedValue(true);
 
         const result = await guard.canActivate(mockContext);
-        
+
         expect(result).toBe(true);
         expect(parentCanActivate).toHaveBeenCalledWith(mockContext);
       });
@@ -121,29 +122,29 @@ describe('DualAuthGuard', () => {
         parentCanActivate.mockRejectedValue(new UnauthorizedException('No session token provided'));
 
         await expect(guard.canActivate(mockContext)).rejects.toThrow(
-          new UnauthorizedException('Authentication required')
+          new UnauthorizedException('Authentication required'),
         );
       });
 
       it('should fail authentication with malformed Authorization header', async () => {
         mockRequest.headers.authorization = 'InvalidFormat token';
-        
+
         const parentCanActivate = jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(guard)), 'canActivate');
         parentCanActivate.mockRejectedValue(new UnauthorizedException('No session token provided'));
 
         await expect(guard.canActivate(mockContext)).rejects.toThrow(
-          new UnauthorizedException('Authentication required')
+          new UnauthorizedException('Authentication required'),
         );
       });
 
       it('should fail authentication with expired session token', async () => {
         mockRequest.headers.authorization = 'Bearer expired-token';
-        
+
         const parentCanActivate = jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(guard)), 'canActivate');
         parentCanActivate.mockRejectedValue(new UnauthorizedException('Invalid or expired session'));
 
         await expect(guard.canActivate(mockContext)).rejects.toThrow(
-          new UnauthorizedException('Authentication required')
+          new UnauthorizedException('Authentication required'),
         );
       });
     });
@@ -182,7 +183,7 @@ describe('DualAuthGuard', () => {
 
     it('should throw UnauthorizedException with specific message for invalid header token', () => {
       mockRequest.headers.authorization = 'Bearer invalid-token';
-      
+
       expect(() => {
         guard.handleRequest(new Error('Invalid token'), null, null, mockContext);
       }).toThrow(new UnauthorizedException('Invalid or expired authorization token'));
@@ -190,7 +191,7 @@ describe('DualAuthGuard', () => {
 
     it('should throw UnauthorizedException with specific message for invalid cookie', () => {
       mockRequest.cookies['auth-session'] = 'invalid-cookie-token';
-      
+
       expect(() => {
         guard.handleRequest(new Error('Invalid token'), null, null, mockContext);
       }).toThrow(new UnauthorizedException('Invalid or expired session cookie'));
@@ -200,6 +201,21 @@ describe('DualAuthGuard', () => {
       expect(() => {
         guard.handleRequest(new Error('No auth'), null, null, mockContext);
       }).toThrow(new UnauthorizedException('Authentication required'));
+    });
+
+    it('passes a server-side failure through instead of reporting a failed sign-in', () => {
+      mockRequest.headers.authorization = 'Bearer some-token';
+      const unavailable = new ServiceUnavailableException('Session storage (Valkey) is unavailable; try again shortly');
+
+      expect(() => guard.handleRequest(unavailable, null, null, mockContext)).toThrow(unavailable);
+    });
+
+    it('still reports a client-side failure as 401', () => {
+      mockRequest.headers.authorization = 'Bearer some-token';
+
+      expect(() =>
+        guard.handleRequest(new UnauthorizedException('Invalid or expired session'), null, null, mockContext),
+      ).toThrow(new UnauthorizedException('Invalid or expired authorization token'));
     });
 
     it('should throw UnauthorizedException when user is null', () => {
@@ -212,7 +228,7 @@ describe('DualAuthGuard', () => {
       it('should provide specific error for Authorization header when both header and cookie are present', () => {
         mockRequest.headers.authorization = 'Bearer invalid-token';
         mockRequest.cookies['auth-session'] = 'some-cookie-token';
-        
+
         expect(() => {
           guard.handleRequest(new Error('Invalid token'), null, null, mockContext);
         }).toThrow(new UnauthorizedException('Invalid or expired authorization token'));
@@ -220,7 +236,7 @@ describe('DualAuthGuard', () => {
 
       it('should provide cookie-specific error when only cookie is present', () => {
         mockRequest.cookies['auth-session'] = 'invalid-cookie-token';
-        
+
         expect(() => {
           guard.handleRequest(new Error('Invalid token'), null, null, mockContext);
         }).toThrow(new UnauthorizedException('Invalid or expired session cookie'));
@@ -229,7 +245,7 @@ describe('DualAuthGuard', () => {
       it('should handle empty Authorization header gracefully', () => {
         mockRequest.headers.authorization = '';
         mockRequest.cookies['auth-session'] = 'cookie-token';
-        
+
         expect(() => {
           guard.handleRequest(new Error('Invalid token'), null, null, mockContext);
         }).toThrow(new UnauthorizedException('Invalid or expired session cookie'));
@@ -238,7 +254,7 @@ describe('DualAuthGuard', () => {
       it('should handle malformed Authorization header gracefully', () => {
         mockRequest.headers.authorization = 'NotBearer token';
         mockRequest.cookies['auth-session'] = 'cookie-token';
-        
+
         expect(() => {
           guard.handleRequest(new Error('Invalid token'), null, null, mockContext);
         }).toThrow(new UnauthorizedException('Invalid or expired session cookie'));
@@ -247,7 +263,7 @@ describe('DualAuthGuard', () => {
       it('should handle empty cookie gracefully', () => {
         mockRequest.headers.authorization = 'Bearer valid-token';
         mockRequest.cookies['auth-session'] = '';
-        
+
         expect(() => {
           guard.handleRequest(new Error('Invalid token'), null, null, mockContext);
         }).toThrow(new UnauthorizedException('Invalid or expired authorization token'));
@@ -257,14 +273,14 @@ describe('DualAuthGuard', () => {
     describe('successful authentication scenarios', () => {
       it('should return user with valid Authorization header', () => {
         mockRequest.headers.authorization = 'Bearer valid-token';
-        
+
         const result = guard.handleRequest(null, mockUser, null, mockContext);
         expect(result).toBe(mockUser);
       });
 
       it('should return user with valid session cookie', () => {
         mockRequest.cookies['auth-session'] = 'valid-cookie-token';
-        
+
         const result = guard.handleRequest(null, mockUser, null, mockContext);
         expect(result).toBe(mockUser);
       });
@@ -272,7 +288,7 @@ describe('DualAuthGuard', () => {
       it('should return user when both header and cookie are valid (header takes priority)', () => {
         mockRequest.headers.authorization = 'Bearer valid-header-token';
         mockRequest.cookies['auth-session'] = 'valid-cookie-token';
-        
+
         const result = guard.handleRequest(null, mockUser, null, mockContext);
         expect(result).toBe(mockUser);
       });

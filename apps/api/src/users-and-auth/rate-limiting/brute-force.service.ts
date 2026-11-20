@@ -1,58 +1,22 @@
-import { User } from '@attraccess/database-entities';
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { FixedWindowCounterStore, WindowCounterEntry } from '../../common/rate-limiting/fixed-window-counter';
+import type { AuthenticatedSessionUser } from '@attraccess/application-models';
+import { Inject, Injectable } from '@nestjs/common';
+import { FixedWindowCounterStore } from '../../common/rate-limiting/fixed-window-counter';
 import { SettingsService } from '../../settings/settings.service';
 import {
+  recordAccountFailure as recordAccountFailureImplementation,
   recordFailure as recordFailureImplementation,
   recordIpFailure as recordIpFailureImplementation,
 } from './brute-force-failure';
+import { ACCOUNT_LOCKOUT_STORE, type AccountLockoutStore } from './account-lockout.port';
 import { AccountLockedException, TooManyAuthAttemptsException } from './exceptions';
-export type RateLimitScope =
-  | 'login'
-  | 'register'
-  | 'password_reset_request'
-  | 'password_reset_complete'
-  | 'delete_account_confirm'
-  | 'sso_link_account'
-  | 'sso_provisioning';
-
-export interface CounterEntry extends WindowCounterEntry {
-  lockoutUntil: number;
-  lockoutCount: number;
-}
-
-export const MAX_COUNTER_ENTRIES = 10_000;
-
-export // ponytail: coarse per-IP threshold = maxAttempts * 10; prevents username-spray bypass; tune multiplier if needed
-const COARSE_IP_MULTIPLIER = 10;
-
-export function isStale(entry: CounterEntry, now: number, windowMs: number): boolean {
-  if (entry.lockoutUntil > now) return false;
-  return now - entry.firstAt > windowMs;
-}
-
-export function ipKey(scope: RateLimitScope, ip: string, username: string | null = null): string {
-  return `${scope}:${ip}:${username ?? ''}`;
-}
-
-export function ipCoarseKey(scope: RateLimitScope, ip: string): string {
-  return `${scope}:${ip}`;
-}
-
-export function computeLockoutMs(
-  policy: { lockoutDurationSeconds: number; exponentialBackoff: boolean; backoffMultiplier: number },
-  priorLockouts: number,
-): number {
-  const baseMs = policy.lockoutDurationSeconds * 1000;
-  if (!policy.exponentialBackoff || priorLockouts <= 0) {
-    return baseMs;
-  }
-  return Math.floor(baseMs * Math.pow(policy.backoffMultiplier, priorLockouts));
-}
-
-// ponytail: coarse per-IP threshold = maxAttempts * 10; prevents username-spray bypass; tune multiplier if needed
+import {
+  type CounterEntry,
+  type RateLimitScope,
+  MAX_COUNTER_ENTRIES,
+  isStale,
+  ipKey,
+  ipCoarseKey,
+} from './brute-force-policy';
 
 @Injectable()
 export class BruteForceProtectionService {
@@ -63,8 +27,8 @@ export class BruteForceProtectionService {
   private readonly nowFn: () => number = () => Date.now();
 
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    @Inject(ACCOUNT_LOCKOUT_STORE)
+    private readonly lockoutStore: AccountLockoutStore,
     private readonly settingsService: SettingsService,
   ) {}
 
@@ -85,7 +49,7 @@ export class BruteForceProtectionService {
     }
   }
 
-  async assertAccountAllowed(user: User): Promise<void> {
+  async assertAccountAllowed(user: Pick<AuthenticatedSessionUser, 'id' | 'lockedUntil'>): Promise<void> {
     const entry = this.accountCounters.get(user.id);
     if (entry) {
       const remaining = this.remainingLockoutSeconds(entry);
@@ -129,6 +93,11 @@ export class BruteForceProtectionService {
     return recordFailureImplementation(this.failureContext(), scope, ip, userId, username);
   }
 
+  /** Counts a failed password check toward the account's lockout only; the IP counters are the caller's business. */
+  async recordAccountFailure(userId: number): Promise<void> {
+    return recordAccountFailureImplementation(this.failureContext(), userId);
+  }
+
   /**
    * Records a failure that names no account, e.g. a forged or spent token. Only the coarse per-IP counter moves, so
    * other accounts behind the same IP keep their own maxAttempts budget.
@@ -146,7 +115,7 @@ export class BruteForceProtectionService {
       ipCounters: this.ipCounters,
       ipCoarseCounters: this.ipCoarseCounters,
       accountCounters: this.accountCounters,
-      userRepository: this.userRepository,
+      lockoutStore: this.lockoutStore,
     };
   }
 
@@ -161,26 +130,12 @@ export class BruteForceProtectionService {
       return;
     }
     this.accountCounters.delete(userId);
-    await this.userRepository.update(
-      { id: userId },
-      {
-        lockedUntil: null,
-        failedLoginAttempts: 0,
-        firstFailedLoginAt: null,
-      },
-    );
+    await this.lockoutStore.clearLockout(userId);
   }
 
   async unlockAccount(userId: number): Promise<void> {
     this.accountCounters.delete(userId);
-    await this.userRepository.update(
-      { id: userId },
-      {
-        lockedUntil: null,
-        failedLoginAttempts: 0,
-        firstFailedLoginAt: null,
-      },
-    );
+    await this.lockoutStore.clearLockout(userId);
   }
 
   private upsertCounter<K>(

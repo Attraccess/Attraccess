@@ -1,6 +1,6 @@
 // CSV export landing page — date range picker and export type cards
 // FEATURE: CSV export — top level page for /csv-export route; each card opens its dedicated configuration page
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { DateValue, RangeValue } from '@heroui/react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -54,10 +54,7 @@ export function CsvExport() {
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 md:px-6 lg:px-8 py-6 flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">{t('title')}</h1>
-        <p className="text-sm text-muted">{t('subtitle')}</p>
-      </header>
+      <PageHeader title={t('title')} subtitle={t('subtitle')} noMargin />
 
       <DateRangeSection
         preset={preset}

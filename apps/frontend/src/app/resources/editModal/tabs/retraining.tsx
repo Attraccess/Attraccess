@@ -1,9 +1,12 @@
-import { LabeledSwitch } from '@attraccess/plugins-frontend-ui';
+import { LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { TextField, Label, Input } from '@heroui/react';
 import { EditorTabProps } from './props';
+import en from '../resourceEditModal.en.json';
+import de from '../resourceEditModal.de.json';
 
 export function RetrainingTab(props: EditorTabProps) {
-  const { t, formData, setField } = props;
+  const { formData, setField } = props;
+  const { t } = useTranslations({ en, de });
 
   const numberToValue = (value: number | null | undefined) =>
     value === null || value === undefined ? '' : String(value);

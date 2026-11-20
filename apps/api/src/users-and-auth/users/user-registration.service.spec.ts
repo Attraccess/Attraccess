@@ -1,8 +1,7 @@
 import { registerUserRegistrationServiceFixture } from './user-registration.service.user-registration-service.test-fixture';
-import { AuthenticationDetail, AuthenticationType, User } from '@attraccess/database-entities';
+import { AuthenticationType, type CredentialRecord, type UserRecord } from '@attraccess/application-models';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { CreateUserDto } from './dtos/createUser.dto';
-import { EntityManager } from 'typeorm';
 import { ForbiddenSignupDomainException } from './errors/forbiddenSignupDomain.exception';
 
 describe('UserRegistrationService', () => {
@@ -10,12 +9,12 @@ describe('UserRegistrationService', () => {
 
   describe('createOne', () => {
     it('should create a new user', async () => {
-      fixture.settingRepository.findOne.mockResolvedValue({ value: '*' });
+      fixture.settingsRows.findValue.mockResolvedValue('*');
       const user = {
         id: 1,
         username: 'testuser',
         email: 'test@example.com',
-      } as User;
+      } as UserRecord;
 
       jest.spyOn(fixture.usersService, 'createOne').mockResolvedValue(user);
       jest.spyOn(fixture.authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
@@ -24,7 +23,7 @@ describe('UserRegistrationService', () => {
         userId: 1,
         type: AuthenticationType.LOCAL_PASSWORD,
         password: 'hashed-password',
-        user: {} as User,
+        user: {} as UserRecord,
       });
 
       const createUserDto: CreateUserDto = {
@@ -48,13 +47,13 @@ describe('UserRegistrationService', () => {
     });
 
     it('sends the verification email after the registration transaction commits', async () => {
-      fixture.settingRepository.findOne.mockResolvedValue({ value: '*' });
-      const user = { id: 1, username: 'testuser', email: 'test@example.com' } as User;
+      fixture.settingsRows.findValue.mockResolvedValue('*');
+      const user = { id: 1, username: 'testuser', email: 'test@example.com' } as UserRecord;
       jest.spyOn(fixture.usersService, 'createOne').mockResolvedValue(user);
-      jest.spyOn(fixture.authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
+      jest.spyOn(fixture.authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as CredentialRecord);
       jest.spyOn(fixture.authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
       jest.spyOn(fixture.usersService, 'withTransaction').mockImplementation(async (handler) => {
-        const result = await handler({} as EntityManager);
+        const result = await handler({} as never);
         expect(fixture.emailService.sendVerificationEmail).not.toHaveBeenCalled();
         return result;
       });
@@ -70,7 +69,7 @@ describe('UserRegistrationService', () => {
     });
 
     it('should throw if email domain is not whitelisted', async () => {
-      fixture.settingRepository.findOne.mockResolvedValue({ value: 'example.com, allowed.com' });
+      fixture.settingsRows.findValue.mockResolvedValue('example.com, allowed.com');
 
       const createUserDto: CreateUserDto = {
         username: 'testuser',
@@ -83,12 +82,12 @@ describe('UserRegistrationService', () => {
     });
 
     it('should allow when email domain is whitelisted', async () => {
-      fixture.settingRepository.findOne.mockResolvedValue({ value: 'allowed.com' });
+      fixture.settingsRows.findValue.mockResolvedValue('allowed.com');
       const user = {
         id: 2,
         username: 'alice',
         email: 'alice@allowed.com',
-      } as User;
+      } as UserRecord;
 
       jest.spyOn(fixture.usersService, 'createOne').mockResolvedValue(user);
       jest.spyOn(fixture.authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
@@ -97,7 +96,7 @@ describe('UserRegistrationService', () => {
         userId: 2,
         type: AuthenticationType.LOCAL_PASSWORD,
         password: 'hashed',
-        user: {} as User,
+        user: {} as UserRecord,
       });
 
       const dto: CreateUserDto = {
@@ -113,7 +112,7 @@ describe('UserRegistrationService', () => {
     });
 
     it('fails before registration when SMTP is not configured', async () => {
-      fixture.settingRepository.findOne.mockResolvedValue({ value: '*' });
+      fixture.settingsRows.findValue.mockResolvedValue('*');
       jest
         .spyOn(fixture.emailService, 'assertSmtpConfigured')
         .mockRejectedValue(new Error('SMTP configuration not set'));
@@ -139,10 +138,10 @@ describe('UserRegistrationService', () => {
     });
 
     it('rolls back the registration when sending the verification email fails', async () => {
-      fixture.settingRepository.findOne.mockResolvedValue({ value: '*' });
-      const user = { id: 1, username: 'testuser', email: 'test@example.com' } as User;
+      fixture.settingsRows.findValue.mockResolvedValue('*');
+      const user = { id: 1, username: 'testuser', email: 'test@example.com' } as UserRecord;
       jest.spyOn(fixture.usersService, 'createOne').mockResolvedValue(user);
-      jest.spyOn(fixture.authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
+      jest.spyOn(fixture.authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as CredentialRecord);
       jest.spyOn(fixture.authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
       jest
         .spyOn(fixture.emailService, 'sendVerificationEmail')
@@ -161,7 +160,7 @@ describe('UserRegistrationService', () => {
     });
 
     it('does not map transaction failures as email-send failures', async () => {
-      fixture.settingRepository.findOne.mockResolvedValue({ value: '*' });
+      fixture.settingsRows.findValue.mockResolvedValue('*');
       const transactionError = Object.assign(new Error('Database unavailable'), { code: 'ECONNREFUSED' });
       jest.spyOn(fixture.usersService, 'withTransaction').mockRejectedValue(transactionError);
 
@@ -177,14 +176,14 @@ describe('UserRegistrationService', () => {
     });
 
     it('hashes the password before opening the registration transaction', async () => {
-      fixture.settingRepository.findOne.mockResolvedValue({ value: '*' });
-      const user = { id: 1, username: 'testuser', email: 'test@example.com' } as User;
+      fixture.settingsRows.findValue.mockResolvedValue('*');
+      const user = { id: 1, username: 'testuser', email: 'test@example.com' } as UserRecord;
       jest.spyOn(fixture.usersService, 'createOne').mockResolvedValue(user);
-      jest.spyOn(fixture.authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
+      jest.spyOn(fixture.authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as CredentialRecord);
       jest.spyOn(fixture.authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
       jest.spyOn(fixture.usersService, 'withTransaction').mockImplementation(async (handler) => {
         expect(fixture.authService.hashPassword).toHaveBeenCalledWith('password');
-        return handler({} as EntityManager);
+        return handler({} as never);
       });
 
       await fixture.service.createOne({
@@ -202,9 +201,9 @@ describe('UserRegistrationService', () => {
       username: 'admin',
       email: 'wrong@example.com',
       isEmailVerified: false,
-    } as User;
+    } as UserRecord;
 
-    const newAdmin = { ...unverifiedAdmin, id: 2, email: 'correct@example.com' } as User;
+    const newAdmin = { ...unverifiedAdmin, id: 2, email: 'correct@example.com' } as UserRecord;
 
     const dto: CreateUserDto & { overwriteFirstTimeAdmin: true } = {
       username: 'admin',
@@ -215,7 +214,7 @@ describe('UserRegistrationService', () => {
     };
 
     beforeEach(() => {
-      fixture.settingRepository.findOne.mockResolvedValue({ value: '*' });
+      fixture.settingsRows.findValue.mockResolvedValue('*');
     });
 
     it('creates the replacement administrator before deleting the existing unverified admin', async () => {
@@ -228,7 +227,7 @@ describe('UserRegistrationService', () => {
         userId: newAdmin.id,
         type: AuthenticationType.LOCAL_PASSWORD,
         password: 'hashed',
-        user: {} as User,
+        user: {} as UserRecord,
       });
 
       const result = await fixture.service.createOne(dto);
@@ -263,7 +262,7 @@ describe('UserRegistrationService', () => {
       jest.spyOn(fixture.usersService, 'releaseFirstTimeSetupAdminIdentifiers').mockResolvedValue(unverifiedAdmin);
       jest.spyOn(fixture.usersService, 'createOne').mockResolvedValue(newAdmin);
       jest.spyOn(fixture.authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
-      jest.spyOn(fixture.authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
+      jest.spyOn(fixture.authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as CredentialRecord);
       jest
         .spyOn(fixture.emailService, 'sendVerificationEmail')
         .mockRejectedValue(Object.assign(new Error('SMTP unavailable'), { code: 'ECONNREFUSED' }));
@@ -294,7 +293,7 @@ describe('UserRegistrationService', () => {
       jest.spyOn(fixture.usersService, 'releaseFirstTimeSetupAdminIdentifiers').mockResolvedValue(unverifiedAdmin);
       jest.spyOn(fixture.usersService, 'createOne').mockResolvedValue(newAdmin);
       jest.spyOn(fixture.authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
-      jest.spyOn(fixture.authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
+      jest.spyOn(fixture.authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as CredentialRecord);
       jest.spyOn(fixture.usersService, 'deleteOne').mockRejectedValue(deletionError);
 
       await expect(fixture.service.createOne(dto)).rejects.toBe(deletionError);
@@ -319,7 +318,7 @@ describe('UserRegistrationService', () => {
         .mockRejectedValueOnce(new ForbiddenException('First-time setup is already complete'));
       jest.spyOn(fixture.usersService, 'createOne').mockResolvedValue(newAdmin);
       jest.spyOn(fixture.authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
-      jest.spyOn(fixture.authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
+      jest.spyOn(fixture.authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as CredentialRecord);
       jest
         .spyOn(fixture.usersService, 'withTransaction')
         .mockImplementationOnce(async (handler) => {
@@ -327,9 +326,9 @@ describe('UserRegistrationService', () => {
           await new Promise<void>((resolve) => {
             releaseFirstTransaction = resolve;
           });
-          return handler({} as EntityManager);
+          return handler({} as never);
         })
-        .mockImplementationOnce(async (handler) => handler({} as EntityManager));
+        .mockImplementationOnce(async (handler) => handler({} as never));
 
       const firstRequest = fixture.service.createOne(dto);
       await firstTransactionStarted;
@@ -354,7 +353,7 @@ describe('UserRegistrationService', () => {
         userId: newAdmin.id,
         type: AuthenticationType.LOCAL_PASSWORD,
         password: 'hashed',
-        user: {} as User,
+        user: {} as UserRecord,
       });
 
       const regularDto: CreateUserDto = {

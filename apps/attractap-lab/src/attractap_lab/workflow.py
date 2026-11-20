@@ -172,7 +172,7 @@ def reader_power(target):
 def power_on(target):
     """Turn the reader on if it is off and the lab can switch it.
 
-    A Touch V1 turns itself off about 30 s after its screen goes dark, as when
+    A Touch V1 turns itself off about 36 s after its screen goes dark, as when
     parked; a reader behind a power switch is off when someone left it off.
     Readers that are on, and places without switchable power, are left alone.
     """
@@ -183,26 +183,51 @@ def power_on(target):
         power.on()
 
 
+# A Touch V1 whose I2C bus was stuck (SCL low, 2026-11-14, ATT-1265) parked
+# again only after about 30 s without power; the driver's 2 s is for manual cycles.
+BUTTON_CYCLE_OFF_SECONDS = 30.0
+
+
 def power_cycle(target, log):
-    """Cut the reader's power for the driver's delay, then wait until it is back.
+    """Cut the reader's power, then switch it on and wait until it is back.
 
     For a reader behind a power switch this is the unplugging that frees a
-    Touch V2's I/O expander. Appends what happened, with times, to the file ``log``.
+    Touch V2's I/O expander, off for the driver's delay. A reader on a place
+    tagged power=button is switched off with its button and stays off for at
+    least BUTTON_CYCLE_OFF_SECONDS, counted from when it is off; one that is
+    already off is not pressed. If switching back on fails, or the janitor
+    stops the attempt (SIGTERM) meanwhile, the reader is switched on once more
+    before the error propagates, so a cycle never leaves it off on purpose.
+    Appends what happened, with times, to the file ``log``, ending with the
+    reader's final state.
     """
-    power = reader_power(target)
-    if power is None:
-        raise RuntimeError("The place has no switchable reader power to cycle")
     with Path(log).open("a") as out:
         def note(message):
             out.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')} {message}\n")
             out.flush()
 
-        note(f"{type(power).__name__}: off for {power.delay:g}s, then on")
+        power = reader_power(target)
+        if power is None:
+            note("failed: The place has no switchable reader power to cycle")
+            raise RuntimeError("The place has no switchable reader power to cycle")
+        off_seconds = power.delay
+        if place_power(target) == POWER_BUTTON:
+            off_seconds = max(off_seconds, BUTTON_CYCLE_OFF_SECONDS)
+        note(f"{type(power).__name__}: off for {off_seconds:g}s, then on")
         with _switching(target, power):
             try:
-                power.cycle()
-            except Exception as error:
-                note(f"failed: {error}")
+                power.off()
+                note("reader is off")
+                time.sleep(off_seconds)
+                power.on()
+            except BaseException as error:
+                note(f"failed: {error}" if isinstance(error, Exception) else f"interrupted: {error!r}")
+                try:
+                    power.on()
+                except Exception as retry:
+                    note(f"reader is still off: {retry}")
+                else:
+                    note("reader is on again" if power.get() else "reader is still off: its port did not return")
                 raise
         note("reader is on again")
 
@@ -223,17 +248,44 @@ def _switching(target, power):
 # A flash ends with a reset; give a reader that lost power time to show as off.
 RESET_SETTLE_SECONDS = 3.0
 
+# A Touch V1's power-bank chip cuts the power once its load has stayed low for
+# about 36 s, and a reader being flashed draws little. A flash that ends near
+# that time can be cut a few seconds after its reset, before the new image
+# lights the screen: in two nightly runs on 2026-11-16 the cut came after the
+# check RESET_SETTLE_SECONDS after the reset, so the reader's port never came
+# back. Once the image has lit the screen the chip keeps the power on.
+POWER_CUT_WATCH_SECONDS = 15.0
+# How often a flashed Touch V1 is checked during that watch.
+POWER_WATCH_INTERVAL_SECONDS = 1.0
 
-def power_on_after_reset(target):
+
+def power_on_after_reset(target, watch=False):
     """Switch a reader back on if it went off at a flash's reset.
 
     A Touch V1 switched on from parking runs the dark parking image, so its
-    power-bank chip cuts the power about 30 s later. A flash that ends after
-    that leaves the new image in place but the reader off; the button boots it.
+    power-bank chip cuts the power about 36 s later. A flash that ends near
+    that time leaves the new image in place but the reader off; the button
+    boots it. With ``watch``, a reader that can switch itself off (one on its
+    power button) is checked for POWER_CUT_WATCH_SECONDS after the reset and
+    switched on again whenever it is off. A reader behind a power switch does
+    not switch itself off, so it is checked once.
     """
-    if reader_power(target) is not None:
-        time.sleep(RESET_SETTLE_SECONDS)
+    power = reader_power(target)
+    if power is None:
+        return
+    deadline = time.monotonic()
+    if watch and _cuts_own_power(target, power):
+        deadline += POWER_CUT_WATCH_SECONDS
+    time.sleep(RESET_SETTLE_SECONDS)
+    power_on(target)
+    while (left := deadline - time.monotonic()) > 0:
+        time.sleep(min(POWER_WATCH_INTERVAL_SECONDS, left))
         power_on(target)
+
+
+def _cuts_own_power(target, power):
+    """Whether the reader's power-bank chip may switch it off (a Touch V1 on its button)."""
+    return place_power(target) != POWER_SWITCH and not isinstance(power, SwitchPowerDriver)
 
 
 def flash_reader(target, image, *, erase=False):
@@ -241,7 +293,8 @@ def flash_reader(target, image, *, erase=False):
 
     A slow upload can let a Touch V1 switch itself off during the flash (see
     power_on_after_reset). It is then switched on and flashed once more; the
-    image is already on the exporter, so the second attempt is quick.
+    image is already on the exporter, so the second attempt is quick. After
+    the flash, a Touch V1 is watched until the new image keeps it on.
     """
     flash = target.get_driver(ESPToolDriver, activate=False)
     for attempt in range(2):
@@ -259,7 +312,7 @@ def flash_reader(target, image, *, erase=False):
                 raise
         finally:
             target.deactivate(flash)
-    power_on_after_reset(target)
+    power_on_after_reset(target, watch=True)
 
 
 def smoke(target, image, output, *, log_seconds=15.0, max_log_bytes=1_048_576, expect=None, check_ui_selftest=False):
@@ -317,9 +370,9 @@ def park(target, image, output, *, baseline_dir=None, marker_seconds=30.0, resou
          profile=efuse.PLAIN, cycle_power=False):
     """Check eFuses, erase the whole chip, flash a parking image and confirm it.
 
-    ``cycle_power`` first cuts the reader's power for its driver's delay (see
-    power_cycle), logging to power-cycle.log in output: the janitor's retry for
-    a reader behind a power switch whose I/O expander held the I2C bus.
+    ``cycle_power`` first cuts the reader's power (see power_cycle), logging to
+    power-cycle.log in output: the janitor's retry for a reader behind a power
+    switch or with a power button whose I2C bus was held low.
 
     Raises efuse.EfuseViolation before erasing if the eFuses do not match the
     reader profile or changed since first seen; such a reader must not be

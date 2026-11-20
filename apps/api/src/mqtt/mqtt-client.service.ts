@@ -1,16 +1,13 @@
-import { MqttServer } from '@attraccess/database-entities';
+import type { MqttServerRecord } from '@attraccess/application-models';
 
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { MQTT_SERVER_STORE, type MqttServerStore } from './mqtt-server-store.port';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
-
-import { InjectRepository } from '@nestjs/typeorm';
 
 import * as mqtt from 'mqtt';
 
 import { MqttClient } from 'mqtt';
-
-import { Repository } from 'typeorm';
 
 import { EncryptionService } from '../encryption/encryption.service';
 
@@ -34,8 +31,8 @@ export interface TopicSubscription {
 @Injectable()
 export class MqttClientService implements OnModuleDestroy {
   constructor(
-    @InjectRepository(MqttServer)
-    protected readonly mqttServerRepository: Repository<MqttServer>,
+    @Inject(MQTT_SERVER_STORE)
+    protected readonly mqttServers: MqttServerStore,
     protected readonly eventEmitter: EventEmitter2,
     protected readonly encryptionService: EncryptionService,
     protected readonly metricsService: MetricsService,
@@ -221,7 +218,7 @@ export class MqttClientService implements OnModuleDestroy {
           return;
         }
 
-        const server = await this.mqttServerRepository.findOneBy({ id: serverId });
+        const server = await this.mqttServers.findServer(serverId);
         // State may have changed while resolving the server or opening a connection.
         if (this.subscriptions.get(serverId)?.get(topic) !== subscription) {
           return;
@@ -271,7 +268,7 @@ export class MqttClientService implements OnModuleDestroy {
     try {
       const [client, server] = await Promise.all([
         this.getOrCreateClient(serverId),
-        this.mqttServerRepository.findOneBy({ id: serverId }),
+        this.mqttServers.findServer(serverId),
       ]);
 
       if (!server) {
@@ -330,7 +327,7 @@ export class MqttClientService implements OnModuleDestroy {
 
   protected async createClient(serverId: number, keepTryingToConnect = false): Promise<MqttClient> {
     const version = this.connectionVersions.get(serverId) ?? 0;
-    const server = await this.mqttServerRepository.findOneBy({ id: serverId });
+    const server = await this.mqttServers.findServer(serverId);
 
     if (!server) {
       throw new Error(`MQTT server with ID ${serverId} not found`);
@@ -468,7 +465,7 @@ export class MqttClientService implements OnModuleDestroy {
     this.metricsService.mqttServersHealthy.set(healthyCount);
   }
 
-  async resolveServerPassword(server: MqttServer): Promise<string | null> {
+  async resolveServerPassword(server: MqttServerRecord): Promise<string | null> {
     if (!server.password) {
       return null;
     }
@@ -479,7 +476,7 @@ export class MqttClientService implements OnModuleDestroy {
 
     const plaintext = server.password;
     const encrypted = this.encryptionService.encrypt(plaintext);
-    await this.mqttServerRepository.update(server.id, { password: encrypted });
+    await this.mqttServers.storeEncryptedPassword(server.id, encrypted);
     return plaintext;
   }
 }

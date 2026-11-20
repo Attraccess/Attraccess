@@ -3,7 +3,6 @@ import { AlertCircle, AwardIcon, ShieldCheckIcon, WrenchIcon } from 'lucide-reac
 import { Select } from '../../../components/select/index';
 import { AddPersonDrawer } from './AddPersonDrawer';
 import { HistoryModalLoader } from './HistoryModalLoader';
-import { IntroductionCommentModal } from './IntroductionCommentModal';
 import { PeopleHeader } from './PeopleHeader';
 import { PeopleTable } from './PeopleTable';
 import { FilterMode, PeopleManagementProps, AddMode } from './types';
@@ -16,7 +15,7 @@ import { usePeopleRows } from './usePeopleRows';
 import en from './en.json';
 import de from './de.json';
 
-export function usePeopleManagementState(
+export function PeopleManagement(
   props: Readonly<PeopleManagementProps & Omit<HTMLAttributes<HTMLElement>, 'children'>>,
 ) {
   const { target, canManageIntroducers, canManageIntroductions, hideHeader, className, ...rest } = props;
@@ -27,16 +26,12 @@ export function usePeopleManagementState(
   const [addComment, setAddComment] = useState('');
   const { isOpen: isAddOpen, open: openAdd, close: closeAdd } = useOverlayState();
 
-  const [revokeContext, setRevokeContext] = useState<{ user: User; action: 'grant' | 'revoke' } | null>(null);
-  const [revokeComment, setRevokeComment] = useState('');
-  const { isOpen: isRevokeOpen, open: openRevoke, close: closeRevoke } = useOverlayState();
-
   const [historyUserId, setHistoryUserId] = useState<number | null>(null);
   const { isOpen: isHistoryOpen, open: openHistory, close: closeHistory } = useOverlayState();
 
   const { rows, isLoading, hasError } = usePeopleRows({ target });
 
-  const mutations = usePeopleMutations({ target, t });
+  const mutations = usePeopleMutations({ target });
 
   const filteredRows = useMemo(() => {
     if (filter === 'introducers') return rows.filter((r) => r.isIntroducer);
@@ -73,27 +68,13 @@ export function usePeopleManagementState(
     [addMode, addComment, mutations],
   );
 
-  const handleIntroductionToggle = useCallback(
-    (user: User, action: 'grant' | 'revoke') => {
-      setRevokeContext({ user, action });
-      setRevokeComment('');
-      openRevoke();
-    },
-    [openRevoke],
+  const handleIntroductionChange = useCallback(
+    (user: User, action: 'grant' | 'revoke', comment: string) =>
+      action === 'grant'
+        ? mutations.grantIntroduction(user.id, comment)
+        : mutations.revokeIntroduction(user.id, comment),
+    [mutations],
   );
-
-  const handleRevokeSubmit = useCallback(async () => {
-    if (!revokeContext) return;
-    const { user, action } = revokeContext;
-    if (action === 'grant') {
-      await mutations.grantIntroduction(user.id, revokeComment);
-    } else {
-      await mutations.revokeIntroduction(user.id, revokeComment);
-    }
-    setRevokeContext(null);
-    setRevokeComment('');
-    closeRevoke();
-  }, [revokeContext, revokeComment, mutations, closeRevoke]);
 
   const handleHistoryOpen = useCallback(
     (userId: number) => {
@@ -102,82 +83,6 @@ export function usePeopleManagementState(
     },
     [openHistory],
   );
-  return {
-    target,
-    canManageIntroducers,
-    canManageIntroductions,
-    hideHeader,
-    className,
-    rest,
-    t,
-    filter,
-    setFilter,
-    addMode,
-    addComment,
-    setAddComment,
-    isAddOpen,
-    closeAdd,
-    setRevokeContext,
-    revokeComment,
-    setRevokeComment,
-    isRevokeOpen,
-    closeRevoke,
-    historyUserId,
-    setHistoryUserId,
-    isHistoryOpen,
-    closeHistory,
-    rows,
-    isLoading,
-    hasError,
-    mutations,
-    filteredRows,
-    handleAddOpen,
-    resetAddState,
-    handleAdd,
-    handleIntroductionToggle,
-    handleRevokeSubmit,
-    handleHistoryOpen,
-  } as const;
-}
-
-export function PeopleManagement(
-  props: Readonly<PeopleManagementProps & Omit<HTMLAttributes<HTMLElement>, 'children'>>,
-) {
-  const {
-    target,
-    canManageIntroducers,
-    canManageIntroductions,
-    hideHeader,
-    className,
-    rest,
-    t,
-    filter,
-    setFilter,
-    addMode,
-    addComment,
-    setAddComment,
-    isAddOpen,
-    closeAdd,
-    setRevokeContext,
-    revokeComment,
-    setRevokeComment,
-    isRevokeOpen,
-    closeRevoke,
-    historyUserId,
-    setHistoryUserId,
-    isHistoryOpen,
-    closeHistory,
-    isLoading,
-    hasError,
-    mutations,
-    filteredRows,
-    handleAddOpen,
-    resetAddState,
-    handleAdd,
-    handleIntroductionToggle,
-    handleRevokeSubmit,
-    handleHistoryOpen,
-  } = usePeopleManagementState(props);
 
   if (hasError) {
     return (
@@ -195,7 +100,6 @@ export function PeopleManagement(
 
   const header = (
     <PeopleHeader
-      t={t}
       targetType={target.type}
       canManageIntroducers={canManageIntroducers}
       canManageIntroductions={canManageIntroductions}
@@ -220,7 +124,6 @@ export function PeopleManagement(
       />
 
       <PeopleTable
-        t={t}
         target={target}
         rows={filteredRows}
         isLoading={isLoading}
@@ -232,7 +135,7 @@ export function PeopleManagement(
         isGrantingIntroduction={mutations.isGrantingIntroduction}
         isRevokingIntroduction={mutations.isRevokingIntroduction}
         onOpenHistory={handleHistoryOpen}
-        onToggleIntroduction={handleIntroductionToggle}
+        onChangeIntroduction={handleIntroductionChange}
         onRevokeIntroducer={mutations.revokeIntroducer}
       />
     </>
@@ -241,7 +144,6 @@ export function PeopleManagement(
   const modals = (
     <>
       <AddPersonDrawer
-        t={t}
         target={target}
         isOpen={isAddOpen}
         mode={addMode}
@@ -252,20 +154,6 @@ export function PeopleManagement(
         onClose={() => {
           closeAdd();
           resetAddState();
-        }}
-      />
-
-      <IntroductionCommentModal
-        t={t}
-        isOpen={isRevokeOpen}
-        comment={revokeComment}
-        isPending={mutations.isMutating}
-        onCommentChange={setRevokeComment}
-        onSubmit={handleRevokeSubmit}
-        onClose={() => {
-          closeRevoke();
-          setRevokeContext(null);
-          setRevokeComment('');
         }}
       />
 

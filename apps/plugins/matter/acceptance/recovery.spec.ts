@@ -188,7 +188,7 @@ describe('Matter backup and restore, end to end', () => {
     expect(device.fabricIds()).toContain(fabricId);
 
     // Audited, and no secret anywhere in the log or the audit trail.
-    const audit = JSON.stringify(await auditRows(second.host.db));
+    const audit = JSON.stringify(auditRows(second.host));
     expect(audit).toContain('restore');
     expect(audit).not.toContain(recoveryKey);
     expect(second.host.logs.join('\n')).not.toContain(recoveryKey);

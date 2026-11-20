@@ -1,0 +1,5 @@
+{
+  "column": "Aktionen",
+  "trigger": "Aktionen",
+  "triggerFor": "Aktionen für {{name}}"
+}

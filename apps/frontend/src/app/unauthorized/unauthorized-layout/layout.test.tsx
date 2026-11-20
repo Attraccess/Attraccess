@@ -3,10 +3,6 @@ import React from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { UnauthorizedLayout } from './layout';
 
-function classesOf(element: Element | null): Set<string> {
-  return new Set(element?.className.split(/\s+/).filter(Boolean) ?? []);
-}
-
 function renderLayout() {
   return render(
     <UnauthorizedLayout>
@@ -22,30 +18,30 @@ afterEach(() => {
 describe('UnauthorizedLayout', () => {
   it('renders its children', () => {
     renderLayout();
-    expect(screen.getByTestId('form-content')).toBeTruthy();
+    expect(screen.getByTestId('form-content')).toBeInTheDocument();
   });
 
   it('keeps the outer container scrollable at a dynamic viewport height', () => {
     const { container } = renderLayout();
     const outer = container.firstElementChild;
     expect(outer).not.toBeNull();
-    const classes = classesOf(outer);
-    expect(classes.has('overflow-y-auto')).toBe(true);
-    expect(classes.has('h-[var(--vvh,100dvh)]')).toBe(true);
+    expect(outer).toHaveClass('overflow-y-auto', 'h-[var(--vvh,100dvh)]');
 
     const content = outer?.firstElementChild ?? null;
-    expect(classesOf(content).has('flex')).toBe(true);
-    expect(classesOf(content).has('min-h-full')).toBe(true);
+    expect(content).toHaveClass('flex', 'min-h-full');
   });
 
-  it('top-aligns the form column below lg and centers it at lg and above', () => {
-    const { getByTestId } = renderLayout();
-    const formColumn = getByTestId('form-content').parentElement?.parentElement ?? null;
-    const classes = classesOf(formColumn);
-    expect(classes.has('flex')).toBe(true);
-    expect(classes.has('items-start')).toBe(true);
-    expect(classes.has('lg:items-center')).toBe(true);
-    expect(classes.has('justify-center')).toBe(true);
-    expect(classes.has('items-center')).toBe(false);
+  it('top-aligns the form column below lg so the auth CTA stays above the fold on small screens', () => {
+    const { container } = renderLayout();
+    const formColumn = container.querySelector('[data-cy="unauthorized-form-column"]');
+    expect(formColumn).not.toBeNull();
+    expect(formColumn).toContainElement(screen.getByTestId('form-content'));
+    expect(formColumn).toHaveClass('flex', 'items-start', 'lg:items-center', 'justify-center');
+    expect(formColumn).not.toHaveClass('items-center');
+
+    const alignmentClasses = Array.from(formColumn?.classList ?? [])
+      .filter((token) => /(^|:)items-/.test(token))
+      .sort();
+    expect(alignmentClasses).toEqual(['items-start', 'lg:items-center']);
   });
 });

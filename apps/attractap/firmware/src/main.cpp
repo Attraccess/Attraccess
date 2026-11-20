@@ -13,6 +13,7 @@
 #else
 #include "api/security/reader_link.hpp"
 #endif
+#include "api/security/build_profile.hpp"
 #include "logger/logger.hpp"
 #include "platform.hpp"
 #include "utils.hpp"
@@ -38,7 +39,7 @@ DemoWebsocket websocket;
 API api(websocket);
 #else
 Websocket websocket;
-// Pairing, the TLS 1.3 session and the token channel all run over the one WebSocket.
+// Pairing and the TLS 1.3 session run over the one WebSocket.
 ReaderLink readerLink(websocket, {
 #ifdef HAS_LVGL_DISPLAY
                                      false,
@@ -65,8 +66,9 @@ static void logLoopStackUsage()
     logger.debugf("main task high watermark: %u words (~%u bytes)",
                   watermarkWords, watermarkWords * sizeof(StackType_t));
     // The UI tasks and the LVGL pool (ATT-1187): LvglTask draws, the main task dispatches inbound messages on
-    // paired readers, rl_tls runs the TLS session.
-    for (const char *name : {"LvglTask", "rl_tls"})
+    // paired readers, rl_tls runs the TLS session. websocket_task (esp_websocket_client) parses inbound
+    // messages on its 16 KB internal stack; ws_conn, ws_tx and NetworkTask run on PSRAM stacks.
+    for (const char *name : {"LvglTask", "rl_tls", "websocket_task", "ws_conn", "ws_tx", "NetworkTask"})
     {
         TaskHandle_t handle = xTaskGetHandle(name);
         if (handle)
@@ -117,6 +119,12 @@ extern "C" void app_main(void)
     // log firmware info
     mainLogger.info("Welcome to Attractap");
     mainLogger.infof("Firmware: %s, Variant: %s, Version: %s", FIRMWARE_FRIENDLY_NAME, FIRMWARE_VARIANT_FRIENDLY_NAME, FIRMWARE_VERSION);
+
+    // Referencing the marker keeps it in the image: secure_packaging.py and SecureImageService look for it.
+    if (BuildProfile::secureBuild())
+    {
+        mainLogger.infof("Secure profile: %s", BuildProfile::secureProfileMarker());
+    }
 
     mainLogger.info("Console initialized");
 

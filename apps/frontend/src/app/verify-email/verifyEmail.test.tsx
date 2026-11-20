@@ -10,6 +10,7 @@ import { ToastProvider } from '../../components/toastProvider';
 import { Providers } from '@attraccess/ui';
 import en from './en.json';
 import de from './de.json';
+import { viewportHeightClasses } from '../../test-utils/helpers';
 
 const verifyMutateMock = vi.fn();
 const resendMutateMock = vi.fn();
@@ -19,6 +20,7 @@ const mutationMode = vi.hoisted(() => ({ reactive: false }));
 let verifyOnError: ((error: unknown) => void) | undefined;
 let verifyOnSuccess: (() => void) | undefined;
 let resendOnSuccess: (() => void) | undefined;
+let resendOnError: ((error: unknown) => void) | undefined;
 
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -47,7 +49,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useUsersServiceVerifyEmail: (options: { onSuccess?: () => void; onError?: (e: unknown) => void }) => {
+  useVerifyEmail: (_mutationKey: unknown, options: { onSuccess?: () => void; onError?: (e: unknown) => void }) => {
     verifyOnSuccess = options?.onSuccess;
     verifyOnError = options?.onError;
     const mutation = useMutation({
@@ -56,11 +58,15 @@ vi.mock('@attraccess/react-query-client', () => ({
     });
     return mutationMode.reactive ? mutation : { mutate: verifyMutateMock, isPending: pending.verify };
   },
-  useUsersServiceResendVerificationEmail: (options: { onSuccess?: () => void; onError?: (e: unknown) => void }) => {
+  useResendVerificationEmail: (
+    _mutationKey: unknown,
+    options: { onSuccess?: () => void; onError?: (e: unknown) => void },
+  ) => {
     resendOnSuccess = options?.onSuccess;
+    resendOnError = options?.onError;
     return { mutate: resendMutateMock, isPending: pending.resend };
   },
-  useUsersServiceGetCurrentKey: 'useUsersServiceGetCurrentKey',
+  useGetCurrentKey: 'useGetCurrentKey',
   ApiError: class ApiError extends Error {},
 }));
 
@@ -118,18 +124,14 @@ describe('VerifyEmail', () => {
     await user.click(retry);
     await waitFor(() => expect(retry).toBeEnabled());
     expect(verifyMutateMock).toHaveBeenCalledTimes(2);
-    expect(verifyMutateMock).toHaveBeenLastCalledWith({
-      requestBody: { token: 'expired', email: 'test@example.com' },
-    });
+    expect(verifyMutateMock).toHaveBeenLastCalledWith({ body: { token: 'expired', email: 'test@example.com' } });
   });
 
   it('calls verifyEmail mutation with token and email from URL params', async () => {
     renderWithRoute('/verify-email?email=test%40example.com&token=abc123');
 
     await waitFor(() =>
-      expect(verifyMutateMock).toHaveBeenCalledWith({
-        requestBody: { token: 'abc123', email: 'test@example.com' },
-      }),
+      expect(verifyMutateMock).toHaveBeenCalledWith({ body: { token: 'abc123', email: 'test@example.com' } }),
     );
   });
 
@@ -141,6 +143,22 @@ describe('VerifyEmail', () => {
       expect(screen.getByText(en.success.title)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Go to sign in' })).toBeInTheDocument();
     });
+  });
+
+  it('renders the success state without a viewport-height wrapper so the page can scroll', async () => {
+    const { container } = renderWithRoute('/verify-email?email=test%40example.com&token=abc123');
+    act(() => verifyOnSuccess?.());
+
+    await screen.findByRole('button', { name: 'Go to sign in' });
+    expect(viewportHeightClasses(container)).toEqual([]);
+  });
+
+  it('renders the error state without a viewport-height wrapper so the page can scroll', async () => {
+    const { container } = renderWithRoute('/verify-email?email=test%40example.com&token=expired');
+    act(() => verifyOnError?.(new Error('expired')));
+
+    await screen.findByText(en.error.title);
+    expect(viewportHeightClasses(container)).toEqual([]);
   });
 
   it('shows error card and resend form when verification fails', async () => {
@@ -169,9 +187,7 @@ describe('VerifyEmail', () => {
 
     await user.click(screen.getByRole('button', { name: 'Verify email again' }));
     expect(verifyMutateMock).toHaveBeenCalledTimes(2);
-    expect(verifyMutateMock).toHaveBeenLastCalledWith({
-      requestBody: { token: 'expired', email: 'test@example.com' },
-    });
+    expect(verifyMutateMock).toHaveBeenLastCalledWith({ body: { token: 'expired', email: 'test@example.com' } });
   });
 
   it('shows the German success action after successful verification', async () => {
@@ -225,9 +241,7 @@ describe('VerifyEmail', () => {
 
     await user.click(screen.getByTestId('resend-verification-button'));
 
-    expect(resendMutateMock).toHaveBeenCalledWith({
-      requestBody: { email: 'test@example.com' },
-    });
+    expect(resendMutateMock).toHaveBeenCalledWith({ body: { email: 'test@example.com' } });
   });
 
   it('shows success alert after resend succeeds', async () => {
@@ -252,6 +266,34 @@ describe('VerifyEmail', () => {
     renderWithRoute('/verify-email');
 
     expect(verifyMutateMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['/verify-email', '/verify-email?email=test%40example.com', '/verify-email?token=abc'])(
+    'shows the invalid-link error instead of loading forever for %s',
+    async (url) => {
+      renderWithRoute(url);
+
+      await waitFor(() => {
+        expect(screen.getByText(en.apiErrors.invalidLink)).toBeInTheDocument();
+      });
+      expect(verifyMutateMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('offers no verify retry for an incomplete link and keeps a failed resend error visible', async () => {
+    const user = userEvent.setup();
+    renderWithRoute('/verify-email');
+
+    await waitFor(() => {
+      expect(screen.getByText(en.apiErrors.invalidLink)).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: 'Verify email again' })).toBeNull();
+
+    act(() => resendOnError?.(new Error('down')));
+    await user.type(screen.getByTestId('resend-email-input'), 'a');
+
+    expect(screen.getByText(en.apiErrors.unexpectedError)).toBeInTheDocument();
+    expect(screen.queryByText(en.apiErrors.invalidLink)).toBeNull();
   });
 
   it('shows Try Again and Back to sign in buttons on error', async () => {
@@ -293,7 +335,7 @@ describe('VerifyEmail', () => {
     await user.clear(input);
     await user.type(input, 'replacement@example.com');
     await user.click(resend);
-    expect(resendMutateMock).toHaveBeenCalledWith({ requestBody: { email: 'replacement@example.com' } });
+    expect(resendMutateMock).toHaveBeenCalledWith({ body: { email: 'replacement@example.com' } });
   });
 
   it('disables resend button when email format is invalid', async () => {
@@ -318,9 +360,7 @@ describe('VerifyEmail', () => {
 
     await user.click(screen.getByTestId('resend-verification-button'));
 
-    expect(resendMutateMock).toHaveBeenCalledWith({
-      requestBody: { email: 'spaced@example.com' },
-    });
+    expect(resendMutateMock).toHaveBeenCalledWith({ body: { email: 'spaced@example.com' } });
   });
 
   it('hides resend form and shows success alert after resend succeeds (replaces form)', async () => {
@@ -363,9 +403,7 @@ describe('VerifyEmail', () => {
 
     expect(await screen.findByText('Loading...')).toBeInTheDocument();
     await waitFor(() =>
-      expect(verifyMutateMock).toHaveBeenCalledWith({
-        requestBody: { token: 'abc123', email: 'test@example.com' },
-      }),
+      expect(verifyMutateMock).toHaveBeenCalledWith({ body: { token: 'abc123', email: 'test@example.com' } }),
     );
   });
 });

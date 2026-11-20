@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { SSOProvider, SsoSessionContext } from '@attraccess/database-entities';
+import type { SsoProviderRecord } from '@attraccess/application-models';
+import { SsoSessionContext } from '@attraccess/application-models';
 import { MetricsService } from '../../../metrics/metrics.service';
 import { AUDIT_RECORDER, AuditRecorder } from '../../../audit/recorder/audit-event';
 import { SessionService } from '../session.service';
@@ -15,7 +16,7 @@ import {
   resolvePermissionSyncIntervalMinutes,
 } from './session-permission-sync';
 
-type LoadedProvider = { provider: SSOProvider; permissionSyncTtlMinutes?: number | null };
+type LoadedProvider = { provider: SsoProviderRecord; permissionSyncTtlMinutes?: number | null };
 
 const PROVIDER_CACHE_MS = 30_000;
 const RETRY_AFTER_FAILURE_MS = 60_000;
@@ -157,7 +158,7 @@ export class SsoSessionPermissionSyncService implements SessionPermissionSync {
 
   private async recordAudit(
     action: 'permissions_synced' | 'sessions_revoked',
-    provider: SSOProvider,
+    provider: SsoProviderRecord,
     userId: number,
     changes: RoleDelta | { sessionsRevoked: true },
   ): Promise<void> {

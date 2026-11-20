@@ -261,7 +261,7 @@ describe('conversation limits', () => {
     const reader = idle(conversations);
     // A session keeps queued bytes in TLS; `bufferedAmount` stays near 0.
     let queued = 0;
-    Object.assign(reader.socket, { transport: 'session', bufferedAmount: 0, pendingSendBytes: () => queued });
+    Object.assign(reader.socket, { bufferedAmount: 0, pendingSendBytes: () => queued });
 
     const first = run(conversations, reader.socket, async (channel) => {
       await channel.exchange(GET_VERSION);

@@ -30,11 +30,11 @@ vi.mock('../../../../components/toastProvider', () => ({
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('@attraccess/react-query-client', async (original) => ({
   ...(await original<typeof import('@attraccess/react-query-client')>()),
-  useResourcesServiceGetOneResourceById: () => ({ data: state.resource, isLoading: state.loading, error: state.error }),
-  useResourcesServiceDeleteOneResource: () => ({ mutateAsync: state.remove }),
-  useResourcesServiceGetAllResourcesKey: 'resources',
-  useAccessControlServiceResourceIntroducersIsIntroducer: () => ({ data: { isIntroducer: false } }),
-  useResourceMaintenancesServiceCanManageMaintenance: () => ({ data: { canManage: state.update } }),
+  useGetOneResourceById: () => ({ data: state.resource, isLoading: state.loading, error: state.error }),
+  useDeleteOneResource: () => ({ mutateAsync: state.remove }),
+  useGetAllResourcesKey: 'resources',
+  useResourceIntroducersIsIntroducer: () => ({ data: { isIntroducer: false } }),
+  useCanManageMaintenance: () => ({ data: { canManage: state.update } }),
 }));
 vi.mock('../useQrCodeAction', () => ({ useQrCodeAction: () => ({ confirmationDialog: null }) }));
 vi.mock('../health-state', () => ({ ResourceHealthWarning: () => null }));
@@ -96,7 +96,7 @@ it('navigates to settings, opens QR actions and confirms resource deletion with 
   await action('Delete');
   expect(state.remove).not.toHaveBeenCalled();
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
-  await waitFor(() => expect(state.remove).toHaveBeenCalledWith({ id: 7 }));
+  await waitFor(() => expect(state.remove).toHaveBeenCalledWith({ path: { id: 7 } }));
   expect(await screen.findByText('Resource list')).toBeTruthy();
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['resources'] });
   expect(state.success).toHaveBeenCalledWith({

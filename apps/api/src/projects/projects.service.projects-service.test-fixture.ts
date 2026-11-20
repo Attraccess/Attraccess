@@ -1,122 +1,89 @@
+import type { TransactionScope, UnitOfWork } from '../database/unit-of-work';
 import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
-import { Project, ProjectInvitation, ProjectMember, ResourceUsage, User } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { UNIT_OF_WORK } from '../database/unit-of-work';
 import { FileStorageService } from '../common/services/file-storage.service';
 import { EmailService } from '../email/email.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
 import { ProjectAccessService } from './project-access.service';
+import {
+  PROJECT_INVITATION_STORE,
+  PROJECT_STORE,
+  type ProjectInvitationStore,
+  type ProjectStore,
+} from './project.port';
 import { ProjectsService } from './projects.service';
 
 const mockMetricsService = {
   projectsTotal: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
 };
 
-export type MockQueryBuilder = {
-  leftJoinAndSelect: jest.Mock;
-  leftJoin: jest.Mock;
-  where: jest.Mock;
-  andWhere: jest.Mock;
-  orderBy: jest.Mock;
-  addOrderBy: jest.Mock;
-  skip: jest.Mock;
-  take: jest.Mock;
-  getMany: jest.Mock;
-  getCount: jest.Mock;
-};
+export type MockedStore<T> = { [K in keyof T]: jest.Mock };
 
-const createMockQueryBuilder = (): MockQueryBuilder => ({
-  leftJoinAndSelect: jest.fn().mockReturnThis(),
-  leftJoin: jest.fn().mockReturnThis(),
-  where: jest.fn().mockReturnThis(),
-  andWhere: jest.fn().mockReturnThis(),
-  orderBy: jest.fn().mockReturnThis(),
-  addOrderBy: jest.fn().mockReturnThis(),
-  skip: jest.fn().mockReturnThis(),
-  take: jest.fn().mockReturnThis(),
-  getMany: jest.fn().mockResolvedValue([]),
-  getCount: jest.fn().mockResolvedValue(0),
-});
+/** A unit of work whose scopes are plain objects; `scopes` lists every scope that was opened. */
+export function createFakeUnitOfWork(): UnitOfWork & { scopes: TransactionScope[] } {
+  const scopes: TransactionScope[] = [];
+  return {
+    scopes,
+    current: () => undefined,
+    run: async (work) => {
+      const scope: TransactionScope = { isOpen: true, afterCommit: jest.fn() };
+      scopes.push(scope);
+      return work(scope);
+    },
+  };
+}
+
 export function registerProjectsServiceFixture() {
   let service: ProjectsService;
-
-  let projectRepository: jest.Mocked<Repository<Project>>;
-
-  let resourceUsageRepository: jest.Mocked<Repository<ResourceUsage>>;
-
+  let projects: MockedStore<ProjectStore>;
+  let invitationStore: MockedStore<ProjectInvitationStore>;
+  let uow: ReturnType<typeof createFakeUnitOfWork>;
   let fileStorageService: { saveFile: jest.Mock; deleteFile: jest.Mock };
-
-  let projectAccessService: {
-    addAccessMetadata: jest.Mock;
-    ensureOwner: jest.Mock;
-    getAccessOrThrow: jest.Mock;
-  };
-
-  let projectMemberRepository: jest.Mocked<Repository<ProjectMember>>;
-
-  let projectInvitationRepository: jest.Mocked<Repository<ProjectInvitation>>;
-
-  let userRepository: jest.Mocked<Repository<User>>;
-
+  let projectAccessService: { addAccessMetadata: jest.Mock; ensureOwner: jest.Mock; getAccessOrThrow: jest.Mock };
   let audit: { record: jest.Mock };
 
   beforeEach(async () => {
-    const queryBuilder = createMockQueryBuilder();
-    projectRepository = {
-      createQueryBuilder: jest.fn().mockReturnValue(queryBuilder),
-      save: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      findOneByOrFail: jest.fn(),
-    } as unknown as jest.Mocked<Repository<Project>>;
-
-    resourceUsageRepository = {
-      update: jest.fn(),
-    } as unknown as jest.Mocked<Repository<ResourceUsage>>;
-    Object.assign(projectRepository, {
-      manager: {
-        transaction: jest.fn(async (work) =>
-          work({
-            getRepository: (entity: unknown) =>
-              entity === ResourceUsage ? resourceUsageRepository : projectRepository,
-          }),
-        ),
-      },
-    });
-
-    projectMemberRepository = {
-      findOne: jest.fn(),
-      save: jest.fn(),
-      delete: jest.fn(),
-    } as unknown as jest.Mocked<Repository<ProjectMember>>;
-    projectInvitationRepository = {
-      findOne: jest.fn(),
-      save: jest.fn(),
-    } as unknown as jest.Mocked<Repository<ProjectInvitation>>;
-    userRepository = { findOne: jest.fn() } as unknown as jest.Mocked<Repository<User>>;
+    projects = {
+      findWithOwner: jest.fn(),
+      findOwned: jest.fn(),
+      findMembership: jest.fn(),
+      findMembershipsOfUser: jest.fn(),
+      listAccessible: jest.fn().mockResolvedValue([]),
+      countAccessible: jest.fn().mockResolvedValue(0),
+      create: jest.fn(),
+      updateDetails: jest.fn(),
+      archive: jest.fn(),
+      unarchive: jest.fn(),
+      getById: jest.fn(),
+      deleteProject: jest.fn(),
+      listMembers: jest.fn(),
+      findMember: jest.fn(),
+      removeMember: jest.fn(),
+    };
+    invitationStore = {
+      listPendingForUser: jest.fn(),
+      listForProject: jest.fn(),
+      findById: jest.fn(),
+      findPending: jest.fn(),
+      findInvitee: jest.fn(),
+      create: jest.fn(),
+      recordResponse: jest.fn(),
+      touch: jest.fn(),
+      addMemberIfMissing: jest.fn(),
+    };
+    uow = createFakeUnitOfWork();
     audit = { record: jest.fn().mockResolvedValue(undefined) };
-
-    fileStorageService = {
-      saveFile: jest.fn(),
-      deleteFile: jest.fn(),
-    };
-
-    projectAccessService = {
-      addAccessMetadata: jest.fn(),
-      ensureOwner: jest.fn(),
-      getAccessOrThrow: jest.fn(),
-    };
+    fileStorageService = { saveFile: jest.fn(), deleteFile: jest.fn() };
+    projectAccessService = { addAccessMetadata: jest.fn(), ensureOwner: jest.fn(), getAccessOrThrow: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProjectsService,
-        { provide: getRepositoryToken(Project), useValue: projectRepository },
-        { provide: getRepositoryToken(ProjectMember), useValue: projectMemberRepository },
-        { provide: getRepositoryToken(ProjectInvitation), useValue: projectInvitationRepository },
-        { provide: getRepositoryToken(ResourceUsage), useValue: resourceUsageRepository },
-        { provide: getRepositoryToken(User), useValue: userRepository },
+        { provide: PROJECT_STORE, useValue: projects },
+        { provide: PROJECT_INVITATION_STORE, useValue: invitationStore },
+        { provide: UNIT_OF_WORK, useValue: uow },
         { provide: FileStorageService, useValue: fileStorageService },
         { provide: ProjectAccessService, useValue: projectAccessService },
         { provide: EmailService, useValue: { sendProjectInvitationEmail: jest.fn() } },
@@ -136,32 +103,23 @@ export function registerProjectsServiceFixture() {
     get mockMetricsService() {
       return mockMetricsService;
     },
-    get createMockQueryBuilder() {
-      return createMockQueryBuilder;
-    },
     get service() {
       return service;
     },
-    get projectRepository() {
-      return projectRepository;
+    get projects() {
+      return projects;
     },
-    get resourceUsageRepository() {
-      return resourceUsageRepository;
+    get invitationStore() {
+      return invitationStore;
+    },
+    get uow() {
+      return uow;
     },
     get fileStorageService() {
       return fileStorageService;
     },
     get projectAccessService() {
       return projectAccessService;
-    },
-    get projectMemberRepository() {
-      return projectMemberRepository;
-    },
-    get projectInvitationRepository() {
-      return projectInvitationRepository;
-    },
-    get userRepository() {
-      return userRepository;
     },
     get audit() {
       return audit;

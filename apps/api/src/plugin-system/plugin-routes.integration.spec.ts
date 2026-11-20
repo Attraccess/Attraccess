@@ -104,8 +104,8 @@ const PLUGIN_JSON = {
     frontend: { directory: 'frontend', entryPoint: 'index.mjs' },
     backend: { directory: 'dist', entryPoint: 'index.js' },
   },
-  attraccessVersion: { min: '1.0.0' },
-  // No DATABASE_ACCESS needed: the controller mounts without touching the DB,
+  attraccessVersion: { min: '2.0.0-0' },
+  // No PLUGIN_STORAGE needed: the controller mounts without touching the DB,
   // so nothing queries during the route-mount assertions below.
   permissions: [],
 };
@@ -159,7 +159,13 @@ describe('plugin-supplied REST controllers mount into the host API', () => {
     PluginService.configure({ PLUGIN_DIR: PLUGIN_PATH, RESTART_BY_EXIT: true });
     PluginModule.configure({ DISABLE_PLUGINS: false });
 
-    dataSource = new DataSource({ type: 'sqlite', database: ':memory:', synchronize: true, entities: [] });
+    dataSource = new DataSource({
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database: ':memory:',
+      synchronize: true,
+      entities: [],
+    });
     await dataSource.initialize();
     hostDataSource = dataSource;
 

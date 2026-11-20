@@ -1,5 +1,5 @@
 import type { BruteForceProtectionService } from './brute-force.service';
-import { COARSE_IP_MULTIPLIER, computeLockoutMs, ipCoarseKey, ipKey, RateLimitScope } from './brute-force.service';
+import { COARSE_IP_MULTIPLIER, computeLockoutMs, ipCoarseKey, ipKey, type RateLimitScope } from './brute-force-policy';
 
 interface BruteForceProtectionServiceBruteForceFailureContext {
   settingsService: BruteForceProtectionService['settingsService'];
@@ -9,7 +9,7 @@ interface BruteForceProtectionServiceBruteForceFailureContext {
   ipCounters: BruteForceProtectionService['ipCounters'];
   ipCoarseCounters: BruteForceProtectionService['ipCoarseCounters'];
   accountCounters: BruteForceProtectionService['accountCounters'];
-  userRepository: BruteForceProtectionService['userRepository'];
+  lockoutStore: BruteForceProtectionService['lockoutStore'];
 }
 type FailureContext = BruteForceProtectionServiceBruteForceFailureContext;
 type Policy = Awaited<ReturnType<FailureContext['settingsService']['getRateLimitPolicy']>>;
@@ -69,6 +69,25 @@ export async function recordFailure(
     return;
   }
 
+  await recordAccountFailureImplementation(context, policy, userId, now, windowMs);
+}
+
+/** A failure against one account that must not move the per-IP counters again (the caller counted the IP). */
+export async function recordAccountFailure(context: FailureContext, userId: number): Promise<void> {
+  const policy = await context.settingsService.getRateLimitPolicy();
+  const windowMs = policy.windowSeconds * 1000;
+  const now = context.nowFn();
+  context.evictStale(now, windowMs);
+  await recordAccountFailureImplementation(context, policy, userId, now, windowMs);
+}
+
+async function recordAccountFailureImplementation(
+  context: FailureContext,
+  policy: Policy,
+  userId: number,
+  now: number,
+  windowMs: number,
+): Promise<void> {
   const accountEntry = context.upsertCounter(context.accountCounters, userId, now, windowMs);
   if (accountEntry.count >= policy.maxAttempts) {
     const durationMs = computeLockoutMs(policy, accountEntry.lockoutCount);
@@ -77,22 +96,12 @@ export async function recordFailure(
     accountEntry.lockoutCount += 1;
     accountEntry.count = 0;
     accountEntry.firstAt = now;
-    await context.userRepository.update(
-      { id: userId },
-      {
-        lockedUntil,
-        failedLoginAttempts: 0,
-        firstFailedLoginAt: null,
-      },
-    );
+    await context.lockoutStore.lockAccount(userId, lockedUntil);
     return;
   }
 
-  await context.userRepository.update(
-    { id: userId },
-    {
-      failedLoginAttempts: accountEntry.count,
-      firstFailedLoginAt: new Date(accountEntry.firstAt),
-    },
-  );
+  await context.lockoutStore.recordFailureStreak(userId, {
+    failedAttempts: accountEntry.count,
+    firstFailedAt: new Date(accountEntry.firstAt),
+  });
 }

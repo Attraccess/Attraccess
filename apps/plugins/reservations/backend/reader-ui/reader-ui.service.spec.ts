@@ -7,7 +7,6 @@ import {
   type ReaderUiContext,
   type ReaderUiNode,
 } from '@attraccess/plugins-backend-sdk';
-import { ReservationEntity } from '../entities/reservation.entity';
 import { Harness, createHarness } from '../testing/harness.test-utils';
 import { BackgroundServices, createBackgroundServices } from '../testing/background-services.test-utils';
 import { READER_LINE_CHARS, nextLocalMidnight, readerName, readerTexts, readerTime } from './texts';
@@ -95,11 +94,11 @@ describe('ReaderUiService', () => {
 
   describe('nothing to show', () => {
     it('contributes nothing and never touches the database when reservations are disabled', async () => {
-      const getRepository = jest.spyOn(h.dataSource, 'getRepository');
+      h.storageCalls.length = 0;
       const query = jest.spyOn(h.store, 'findConfirmedOverlapping');
       expect(await slots({ resourceId: 2 })).toEqual([]);
       expect(await slots({ resourceId: 2, userId: MANAGER })).toEqual([]);
-      expect(getRepository).not.toHaveBeenCalled();
+      expect(h.storageCalls).toEqual([]);
       expect(query).not.toHaveBeenCalled();
     });
 
@@ -115,7 +114,7 @@ describe('ReaderUiService', () => {
     });
 
     it('ignores pending, cancelled, no-show, expired and ended-early bookings', async () => {
-      const rows = h.dataSource.getRepository(ReservationEntity);
+      const rows = h.tables.reservations;
       await h.enable(1, { approvalRequired: true });
       await book(HOLDER, '2026-06-01T12:00:00', '2026-06-01T14:00:00'); // stays pending
       await h.enable(1, { approvalRequired: false });
@@ -277,7 +276,7 @@ describe('ReaderUiService', () => {
           expect(dump).not.toContain('user');
           expect(dump).not.toContain(String(HOLDER) + '"');
         }
-        await h.dataSource.getRepository(ReservationEntity).delete({ id: booking.id });
+        await h.tables.reservations.delete({ id: booking.id });
       }
       expect(names).not.toHaveBeenCalled();
       expect(manager).not.toHaveBeenCalled();

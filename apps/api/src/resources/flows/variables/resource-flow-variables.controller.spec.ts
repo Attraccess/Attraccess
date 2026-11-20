@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { ResourceFlowVariableScope } from '@attraccess/database-entities';
+import { ResourceFlowVariableScope } from '@attraccess/application-models';
 import { ResourceFlowVariablesController } from './resource-flow-variables.controller';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 

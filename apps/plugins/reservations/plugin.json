@@ -6,21 +6,19 @@
       "directory": "dist",
       "entryPoint": "index.js"
     },
-    "migrations": {
-      "directory": "dist",
-      "entryPoint": "migrations.js"
-    },
     "frontend": {
       "directory": "frontend",
       "entryPoint": "remoteEntry.js",
-      "styles": "style.css"
+      "styles": "style.css",
+      "dashboardPaths": ["/reservations", "/reservations/manage"],
+      "dashboardWidgets": ["reservations-upcoming"]
     }
   },
   "attraccessVersion": {
-    "min": "1.11.0"
+    "min": "2.0.0-0"
   },
   "permissions": [
-    "DATABASE_ACCESS",
+    "PLUGIN_STORAGE",
     "ACCESS_HOOKS",
     "LISTEN_EVENTS",
     "ACCESS_RESOURCES",
@@ -28,5 +26,9 @@
     "READ_SETTINGS",
     "SEND_NOTIFICATIONS",
     "READER_UI"
-  ]
+  ],
+  "license": {
+    "required": true,
+    "modules": ["reservations"]
+  }
 }

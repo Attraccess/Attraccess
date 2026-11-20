@@ -6,9 +6,13 @@ import { RoleOverridesModal } from './RoleOverridesModal';
 
 vi.mock('@attraccess/react-query-client', () => ({
   PasswordPolicyRole: { ADMIN: 'admin' },
-  UsePasswordPolicyAdminServiceListPasswordPolicyOverridesKeyFn: () => ['overrides'],
-  usePasswordPolicyAdminServiceUpsertPasswordPolicyOverride: vi.fn(() => ({ mutate: upsert, isPending: false })),
-  usePasswordPolicyAdminServiceDeletePasswordPolicyOverride: vi.fn(() => ({ mutate: remove, isPending: false })),
+  UseListPasswordPolicyOverridesKeyFn: () => ['overrides'],
+  useUpsertPasswordPolicyOverride: vi.fn(() => ({ mutate: upsert, isPending: false })),
+  useDeletePasswordPolicyOverride: vi.fn(() => ({ mutate: remove, isPending: false })),
+}));
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  useTranslations: () => ({ t: (key: string) => key }),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('../../../../components/toastProvider', () => ({
@@ -32,8 +36,6 @@ const GLOBAL_POLICY = {
   checkCommonPasswords: true,
 } as never;
 
-const t = ((key: string) => key) as never;
-
 // Only Switch.Content is interactive under HeroUI 3.2 (ATT-729), so the test-id wrapper is not the
 // click target — the track inside it is. Same shape as labeledSwitch.test.tsx.
 const toggle = (testId: string) =>
@@ -50,7 +52,7 @@ describe('RoleOverridesModal', () => {
     const existing = { role: 'admin', minLength: null } as never;
 
     const { rerender } = render(
-      <RoleOverridesModal role={'admin' as never} existing={existing} globalPolicy={GLOBAL_POLICY} t={t} onClose={vi.fn()} />,
+      <RoleOverridesModal role={'admin' as never} existing={existing} globalPolicy={GLOBAL_POLICY} onClose={vi.fn()} />,
     );
 
     toggle('override-admin-minLength-toggle');
@@ -62,7 +64,7 @@ describe('RoleOverridesModal', () => {
         role={'admin' as never}
         existing={{ role: 'admin', minLength: null } as never}
         globalPolicy={GLOBAL_POLICY}
-        t={t}
+
         onClose={vi.fn()}
       />,
     );
@@ -74,7 +76,7 @@ describe('RoleOverridesModal', () => {
     const existing = { role: 'admin', minLength: 20, requireSpecial: null } as never;
 
     render(
-      <RoleOverridesModal role={'admin' as never} existing={existing} globalPolicy={GLOBAL_POLICY} t={t} onClose={vi.fn()} />,
+      <RoleOverridesModal role={'admin' as never} existing={existing} globalPolicy={GLOBAL_POLICY} onClose={vi.fn()} />,
     );
 
     // minLength is already overridden at 20 and is left alone; only requireSpecial is turned on.
@@ -84,8 +86,8 @@ describe('RoleOverridesModal', () => {
 
     expect(upsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        role: 'admin',
-        requestBody: expect.objectContaining({ minLength: 20, requireSpecial: false }),
+        path: { role: 'admin' },
+        body: expect.objectContaining({ minLength: 20, requireSpecial: false }),
       }),
     );
   });
@@ -97,7 +99,7 @@ describe('RoleOverridesModal', () => {
     const existing = { role: 'admin', minLength: 20 } as never;
 
     render(
-      <RoleOverridesModal role={'admin' as never} existing={existing} globalPolicy={GLOBAL_POLICY} t={t} onClose={vi.fn()} />,
+      <RoleOverridesModal role={'admin' as never} existing={existing} globalPolicy={GLOBAL_POLICY} onClose={vi.fn()} />,
     );
 
     await userEvent.clear(screen.getByTestId('override-admin-minLength-value'));
@@ -119,13 +121,13 @@ describe('RoleOverridesModal', () => {
     const onClose = vi.fn();
 
     render(
-      <RoleOverridesModal role={'admin' as never} existing={existing} globalPolicy={GLOBAL_POLICY} t={t} onClose={onClose} />,
+      <RoleOverridesModal role={'admin' as never} existing={existing} globalPolicy={GLOBAL_POLICY} onClose={onClose} />,
     );
 
     toggle('override-admin-minLength-toggle');
     await userEvent.click(screen.getByTestId('policy-override-save'));
 
-    expect(remove).toHaveBeenCalledWith({ role: 'admin' });
+    expect(remove).toHaveBeenCalledWith({ path: { role: 'admin' } });
     expect(upsert).not.toHaveBeenCalled();
   });
 });

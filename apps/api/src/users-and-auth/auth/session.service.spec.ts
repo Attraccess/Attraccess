@@ -5,9 +5,10 @@ jest.mock('crypto', () => ({
   randomBytes: mockRandomBytes,
 }));
 
+import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { SessionService, SessionMetadata } from './session.service';
-import { User } from '@attraccess/database-entities';
+import type { AuthenticatedSessionUser, UserSessionSummary } from '@attraccess/application-models';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
@@ -18,11 +19,11 @@ describe('SessionService', () => {
   let store: jest.Mocked<SessionStore>;
   let metrics: { authActiveSessions: { inc: jest.Mock; dec: jest.Mock; set: jest.Mock } };
 
-  const mockUser: User = {
+  const mockUser: AuthenticatedSessionUser = {
     id: 1,
     username: 'testuser',
     email: 'test@example.com',
-  } as User;
+  } as AuthenticatedSessionUser;
 
   function makeStore(): jest.Mocked<SessionStore> {
     return {
@@ -89,10 +90,48 @@ describe('SessionService', () => {
   });
 
   describe('onModuleInit', () => {
+    const settled = () => new Promise((resolve) => setImmediate(resolve));
+
+    afterEach(() => jest.restoreAllMocks());
+
     it('should set active sessions metric from store', async () => {
       store.countActive.mockResolvedValue(7);
-      await service.onModuleInit();
+      service.onModuleInit();
+      await settled();
       expect(metrics.authActiveSessions.set).toHaveBeenCalledWith(7);
+    });
+
+    it('does not wait for the store to count sessions (ATT-1244)', () => {
+      store.countActive.mockReturnValue(new Promise(() => undefined));
+      expect(service.onModuleInit()).toBeUndefined();
+    });
+
+    it('starts when the store is unreachable, warning that Valkey is unreachable without the error (ATT-1244)', async () => {
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      store.countActive.mockRejectedValue(
+        Object.assign(new Error('Reached the max retries per request limit (which is 3).'), {
+          name: 'MaxRetriesPerRequestError',
+          command: { name: 'auth', args: ['default', 'secret-password'] },
+        }),
+      );
+
+      service.onModuleInit();
+      await settled();
+
+      expect(metrics.authActiveSessions.set).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/Valkey is unreachable[\s\S]*503/));
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('secret-password');
+    });
+
+    it('warns with the message of any other store failure', async () => {
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      store.countActive.mockRejectedValue(new Error('NOSCRIPT No matching script'));
+
+      service.onModuleInit();
+      await settled();
+
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('NOSCRIPT No matching script'));
     });
   });
 
@@ -208,7 +247,7 @@ describe('SessionService', () => {
 
   describe('getUserSessions', () => {
     it('should delegate to store', async () => {
-      const sessions = [{ id: 1 }, { id: 2 }] as unknown as import('@attraccess/database-entities').Session[];
+      const sessions = [{ id: 1 }, { id: 2 }] as unknown as UserSessionSummary[];
       store.getUserSessions.mockResolvedValue(sessions);
       const result = await service.getUserSessions(1);
       expect(result).toBe(sessions);

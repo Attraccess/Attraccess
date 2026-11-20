@@ -1,13 +1,11 @@
-import {
-  useLicenseServiceGetLicenseInformation,
-  useMessagingServiceMessagingGetUnreadCount,
-} from '@attraccess/react-query-client';
+import { useGetLicenseInformation, useMessagingGetUnreadCount } from '@attraccess/react-query-client';
 import { useMemo } from 'react';
 import {
   CreditCardIcon,
   DatabaseIcon,
   FileSpreadsheetIcon,
   FolderIcon,
+  LayoutDashboardIcon,
   MessageSquareIcon,
   MonitorSmartphoneIcon,
   NfcIcon,
@@ -53,9 +51,9 @@ export type SidebarItemGroup = {
   licenseModule?: string;
 };
 
-export // Takes LucideProps like every other sidebar icon, so callers can size it the same way. `size` is
+// Takes LucideProps like every other sidebar icon, so callers can size it the same way. `size` is
 // lucide-only and would land on the <svg> as an invalid attribute, so it is translated here.
-const BalenaSidebarIcon = ({ size = 16, ...props }: LucideProps) => (
+export const BalenaSidebarIcon = ({ size = 16, ...props }: LucideProps) => (
   <BalenaIcon {...props} width={size} height={size} />
 );
 
@@ -177,6 +175,13 @@ export const useSidebarEndItems = () => {
  */
 export const SIDEBAR_ITEMS: (SidebarItem | SidebarItemGroup)[] = [
   {
+    // The user's own pinned pages and resources. Every other internal entry here and in
+    // buildSidebarEndItems can be pinned; the API keeps that list in dashboard-items.ts.
+    translationKey: 'dashboard',
+    path: '/dashboard',
+    icon: LayoutDashboardIcon,
+  },
+  {
     translationKey: 'resources',
     path: '/resources',
     icon: DatabaseIcon,
@@ -264,8 +269,8 @@ export const SIDEBAR_ITEMS: (SidebarItem | SidebarItemGroup)[] = [
 ];
 
 export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
-  const { data: license } = useLicenseServiceGetLicenseInformation();
-  const { data: unread } = useMessagingServiceMessagingGetUnreadCount();
+  const { data: license } = useGetLicenseInformation();
+  const { data: unread } = useMessagingGetUnreadCount();
 
   const allItems = useMemo(() => {
     return SIDEBAR_ITEMS.map((item) => ('showsUnreadCount' in item ? { ...item, badgeCount: unread?.total } : item));

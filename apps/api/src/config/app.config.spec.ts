@@ -1,3 +1,4 @@
+import { resolveDatabaseBackend } from '../database/backend';
 import appConfig, { AppEnvSchema, DEFAULT_PLUGIN_DIR, resolveAppVersion, resolvePluginDir } from './app.config';
 
 describe('plugin directory configuration', () => {
@@ -176,5 +177,64 @@ describe('application configuration factory', () => {
     const error = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     expect(() => appConfig()).toThrow();
     expect(error).toHaveBeenCalled();
+  });
+});
+
+describe('DATABASE_TYPE', () => {
+  const secret = 'postgres://user:hunter2@db.example/attraccess';
+  const parse = (value: string | undefined) => AppEnvSchema.shape.DATABASE_TYPE.safeParse(value);
+
+  it.each([undefined, '', '   ', 'sqlite', 'SQLite', ' sqlite ', 'SQLITE'])(
+    'reads %p as sqlite, like the backend',
+    (value) => {
+      expect(parse(value)).toMatchObject({ success: true, data: 'sqlite' });
+      expect(resolveDatabaseBackend({ DATABASE_TYPE: value }).type).toBe('sqlite');
+    },
+  );
+
+  it.each(['postgres', 'mysql', secret])('rejects %p with the backend message', (value) => {
+    const result = parse(value);
+    expect(result.success).toBe(false);
+    const expected = (() => {
+      try {
+        resolveDatabaseBackend({ DATABASE_TYPE: value });
+      } catch (error) {
+        return (error as Error).message;
+      }
+      throw new Error('expected the backend to reject the value');
+    })();
+    expect(result.error?.issues.map((issue) => issue.message)).toEqual([expected]);
+  });
+
+  describe('the app configuration factory', () => {
+    const previous = { ...process.env };
+    let consoleError: jest.SpyInstance;
+    beforeEach(() => {
+      process.env.AUTH_SESSION_SECRET = 'session-secret-for-test';
+      consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    });
+    afterEach(() => {
+      process.env = { ...previous };
+      jest.restoreAllMocks();
+    });
+
+    it('fails with a readable message that names the field and never echoes the value', () => {
+      process.env.DATABASE_TYPE = secret;
+      let message = '';
+      try {
+        appConfig();
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message).toBe(
+        'DATABASE_TYPE: Unsupported DATABASE_TYPE (redacted: not a database type name). Supported values: sqlite.',
+      );
+      expect(JSON.stringify(consoleError.mock.calls)).not.toContain('hunter2');
+    });
+
+    it('accepts a differently cased value', () => {
+      process.env.DATABASE_TYPE = ' SQLite ';
+      expect(appConfig().DATABASE_TYPE).toBe('sqlite');
+    });
   });
 });

@@ -1,19 +1,10 @@
 // Manages resource health state tracking with mutable status and source lifecycle tracking
 // FEATURE: Resource health monitoring system for subsystem-level status tracking
-import {
-  Resource,
-  ResourceHealthState,
-  ResourceHealthStatus,
-  ResourceHealthSource,
-} from '@attraccess/database-entities';
+import { ResourceHealthSource, ResourceHealthStatus, type ResourceHealthRecord } from '@attraccess/application-models';
 
 import { Injectable, Logger, NotFoundException, Inject } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
-
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { In, Repository } from 'typeorm';
 
 import { AuditActor } from '../../audit/recorder/audit-event';
 
@@ -24,6 +15,10 @@ import { ResourceHealthSummaryDto } from './dtos/resource-health-state.dto';
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
 
 import { clearEntry as clearEntryImplementation } from './resource-health-clear';
+
+import { RESOURCE_HEALTH_STORE, type ResourceHealthStore } from './resource-health-store.port';
+
+import type { ResourcePersistenceContext } from '../resource-persistence-context';
 
 export interface ReportInput {
   resourceId: number;
@@ -40,10 +35,8 @@ export class ResourceHealthService {
   private readonly logger = new Logger(ResourceHealthService.name);
 
   constructor(
-    @InjectRepository(ResourceHealthState)
-    private readonly healthRepository: Repository<ResourceHealthState>,
-    @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
+    @Inject(RESOURCE_HEALTH_STORE)
+    private readonly store: ResourceHealthStore,
     private readonly eventEmitter: EventEmitter2,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
@@ -60,35 +53,19 @@ export class ResourceHealthService {
     return trimmed.length > 0 ? trimmed : null;
   }
 
-  async reportHealth(input: ReportInput): Promise<ResourceHealthState> {
+  async reportHealth(input: ReportInput): Promise<ResourceHealthRecord> {
     const identifier = this.normalizeIdentifier(input.identifier);
     const reason = this.normalizeReason(input.status, input.reason);
     const reportedAt = input.reportedAt ?? new Date();
 
-    const existing = await this.healthRepository.findOne({
-      where: { resourceId: input.resourceId, identifier },
+    const { record: saved, previousStatus } = await this.store.upsertReport({
+      resourceId: input.resourceId,
+      identifier,
+      status: input.status,
+      reason,
+      source: input.source,
+      lastReportedAt: reportedAt,
     });
-
-    const previousStatus = existing?.status ?? null;
-
-    let saved: ResourceHealthState;
-    if (existing) {
-      existing.status = input.status;
-      existing.reason = reason;
-      existing.source = input.source;
-      existing.lastReportedAt = reportedAt;
-      saved = await this.healthRepository.save(existing);
-    } else {
-      const created = this.healthRepository.create({
-        resourceId: input.resourceId,
-        identifier,
-        status: input.status,
-        reason,
-        source: input.source,
-        lastReportedAt: reportedAt,
-      });
-      saved = await this.healthRepository.save(created);
-    }
 
     if (previousStatus !== input.status) {
       await this.audit.record({
@@ -116,21 +93,14 @@ export class ResourceHealthService {
     return saved;
   }
 
-  async listForResource(resourceId: number): Promise<ResourceHealthState[]> {
-    return await this.healthRepository.find({
-      where: { resourceId },
-      order: { identifier: 'ASC' },
-    });
+  async listForResource(resourceId: number): Promise<ResourceHealthRecord[]> {
+    return await this.store.listForResource(resourceId);
   }
 
-  async listForResources(resourceIds: number[]): Promise<Map<number, ResourceHealthState[]>> {
-    const map = new Map<number, ResourceHealthState[]>(resourceIds.map((id) => [id, []]));
+  async listForResources(resourceIds: number[]): Promise<Map<number, ResourceHealthRecord[]>> {
+    const map = new Map<number, ResourceHealthRecord[]>(resourceIds.map((id) => [id, []]));
     if (resourceIds.length === 0) return map;
-    const entries = await this.healthRepository.find({
-      where: { resourceId: In(resourceIds) },
-      order: { identifier: 'ASC' },
-    });
-    for (const entry of entries) {
+    for (const entry of await this.store.listForResources(resourceIds)) {
       const bucket = map.get(entry.resourceId);
       if (bucket) bucket.push(entry);
     }
@@ -138,8 +108,7 @@ export class ResourceHealthService {
   }
 
   async getSummary(resourceId: number): Promise<ResourceHealthSummaryDto> {
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
-    if (!resource) {
+    if (!(await this.store.resourceExists(resourceId))) {
       throw new NotFoundException(`Resource with ID ${resourceId} not found`);
     }
 
@@ -154,18 +123,16 @@ export class ResourceHealthService {
     };
   }
 
-  async isResourceUnhealthy(resourceId: number): Promise<boolean> {
-    const count = await this.healthRepository.count({
-      where: { resourceId, status: ResourceHealthStatus.UNHEALTHY },
-    });
-    return count > 0;
+  /** Pass the caller's transaction inside a serialized transaction: the main connection may wait for its lock. */
+  async isResourceUnhealthy(resourceId: number, context?: ResourcePersistenceContext): Promise<boolean> {
+    return this.store.hasUnhealthyEntry(resourceId, context);
   }
 
   async clearEntry(resourceId: number, entryId: number, auditOrigin: AuditActor = SYSTEM_AUDIT_ACTOR): Promise<void> {
     const getContextOwner = () => this;
     return clearEntryImplementation(
       {
-        healthRepository: getContextOwner().healthRepository,
+        store: getContextOwner().store,
         audit: getContextOwner().audit,
         logger: getContextOwner().logger,
         eventEmitter: getContextOwner().eventEmitter,
@@ -176,7 +143,7 @@ export class ResourceHealthService {
     );
   }
 
-  private toDto(entry: ResourceHealthState) {
+  private toDto(entry: ResourceHealthRecord) {
     return {
       id: entry.id,
       resourceId: entry.resourceId,

@@ -1,21 +1,11 @@
 import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import {
-  DocumentationType,
-  Resource,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceType,
-} from '@attraccess/database-entities';
+import { DocumentationType, ResourceType, type ResourceRecord } from '@attraccess/application-models';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { Test, TestingModule } from '@nestjs/testing';
-
-import { getRepositoryToken } from '@nestjs/typeorm';
-
-import { Repository } from 'typeorm';
 
 import { projectAuditRow } from './../audit/recorder/audit-row';
 
@@ -33,58 +23,38 @@ import { UpdateResourceDto } from './dtos/updateResource.dto';
 
 import { ResourceImageService } from './resourceImage.service';
 
+import { ResourceSessionLimitChangedEvent } from './events/resource-session-limit-changed.event';
+
 import { ResourcesService } from './resources.service';
+
+import { RESOURCE_STORE } from './resource-store.port';
+
+import { ACCESS_ONLY_DOORS_ONLY_MESSAGE, ACCESS_ONLY_WITH_SEPARATE_UNLATCH_MESSAGE } from './door-options';
 
 import { mockMetricsService } from './resources.service.spec.mock-metrics-service';
 
-export type ResourcesServiceTestScope = {
-  resourceRepository: jest.Mocked<Repository<Resource>>;
-  mockResourceImageService: { saveImage: any; deleteImage: any; getPublicPath: any };
-  service: ResourcesService;
-  audit: { record: any };
-  mockResourceRepository: () => {
-    find: any;
-    findOne: any;
-    findAndCount: any;
-    count: any;
-    create: any;
-    save: any;
-    delete: any;
-    softDelete: any;
-    createQueryBuilder: any;
-  };
-};
+type Resource = ResourceRecord;
+type ResourceStoreMock = Record<string, jest.Mock>;
 
 describe('ResourcesService', () => {
   let service: ResourcesService;
 
-  let resourceRepository: jest.Mocked<Repository<Resource>>;
+  let resourceRepository: ResourceStoreMock;
 
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
 
   // ResourceImageService is injected but not directly used in these tests
 
-  const mockResourceRepository = () => ({
-    find: jest.fn(),
-    findOne: jest.fn(),
-    findAndCount: jest.fn(),
+  const mockResourceRepository = (): ResourceStoreMock => ({
+    findDetailed: jest.fn(),
+    list: jest.fn(),
     count: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
-    delete: jest.fn(),
+    setImageFilename: jest.fn(),
+    hardDelete: jest.fn(),
     softDelete: jest.fn(),
-    createQueryBuilder: jest.fn(() => ({
-      leftJoinAndSelect: jest.fn().mockReturnThis(),
-      leftJoin: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      skip: jest.fn().mockReturnThis(),
-      take: jest.fn().mockReturnThis(),
-      getSql: jest.fn().mockReturnValue('SELECT * FROM resource'),
-      getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
-      getOne: jest.fn(),
-    })),
+    countFlowParts: jest.fn().mockResolvedValue({ nodes: 3, edges: 2 }),
   });
 
   const mockResourceImageService = {
@@ -122,7 +92,7 @@ describe('ResourcesService', () => {
       providers: [
         ResourcesService,
         {
-          provide: getRepositoryToken(Resource),
+          provide: RESOURCE_STORE,
           useFactory: mockResourceRepository,
         },
         {
@@ -148,7 +118,7 @@ describe('ResourcesService', () => {
     }).compile();
 
     service = module.get<ResourcesService>(ResourcesService);
-    resourceRepository = module.get(getRepositoryToken(Resource)) as jest.Mocked<Repository<Resource>>;
+    resourceRepository = module.get(RESOURCE_STORE);
     audit.record.mockClear();
     // ResourceImageService is available but not directly used in tests
   });
@@ -165,7 +135,7 @@ describe('ResourcesService', () => {
         get resourceRepository() {
           return scope.resourceRepository;
         },
-        set resourceRepository(value: typeof scope.resourceRepository) {
+        set resourceRepository(value: ResourceStoreMock) {
           scope.resourceRepository = value;
         },
         get audit() {
@@ -248,6 +218,48 @@ describe('ResourcesService', () => {
           },
         }),
       );
+    });
+
+    describe('session limit event', () => {
+      const emitted = () =>
+        ((updateResourceScope.service as any).eventEmitter.emit as jest.Mock).mock.calls.filter(
+          ([name]: [string]) => name === ResourceSessionLimitChangedEvent.EVENT_NAME,
+        );
+      const update = async (before: Partial<Resource>, after: Partial<Resource>, actor?: { id: number }) => {
+        ((updateResourceScope.service as any).eventEmitter.emit as jest.Mock).mockClear();
+        jest
+          .spyOn(updateResourceScope.service, 'getResourceById')
+          .mockResolvedValue(createMockResource({ id: 1, ...before }));
+        updateResourceScope.resourceRepository.save.mockResolvedValue(createMockResource({ id: 1, ...after }));
+        await updateResourceScope.service.updateResource(1, {}, undefined, actor);
+      };
+
+      it('announces a lowered limit with the actor', async () => {
+        await update(
+          { type: ResourceType.Machine, maxParallelSessions: 3 },
+          { type: ResourceType.Machine, maxParallelSessions: 2 },
+          { id: 9 },
+        );
+        expect(emitted()).toEqual([
+          [ResourceSessionLimitChangedEvent.EVENT_NAME, new ResourceSessionLimitChangedEvent(1, 3, 2, 9)],
+        ]);
+      });
+
+      it('announces a type change that changes the effective limit, without an actor', async () => {
+        await update(
+          { type: ResourceType.Machine, maxParallelSessions: 3 },
+          { type: ResourceType.Lock, maxParallelSessions: 3 },
+        );
+        expect(emitted()[0][1]).toMatchObject({ previousLimit: 3, newLimit: 1, actorUserId: null });
+      });
+
+      it('stays quiet when the effective limit is unchanged', async () => {
+        await update(
+          { type: ResourceType.Lock, maxParallelSessions: 3 },
+          { type: ResourceType.Lock, maxParallelSessions: 5 },
+        );
+        expect(emitted()).toEqual([]);
+      });
     });
 
     it('does not audit metadata that only normalized from absent to empty', async () => {
@@ -342,13 +354,65 @@ describe('ResourcesService', () => {
     });
   });
 
+  describe('access-only doors', () => {
+    const door = () => createMockResource({ id: 3, type: ResourceType.Door });
+
+    beforeEach(() => {
+      scope.resourceRepository.create.mockImplementation((value) => value as Resource);
+      scope.resourceRepository.save.mockImplementation(async (value) => value as Resource);
+    });
+
+    it('creates an access-only door', async () => {
+      const created = await scope.service.createResource({ name: 'Side', type: ResourceType.Door, accessOnly: true });
+
+      expect(created.accessOnly).toBe(true);
+    });
+
+    it.each([
+      [{ type: ResourceType.Machine, accessOnly: true }, ACCESS_ONLY_DOORS_ONLY_MESSAGE],
+      [
+        { type: ResourceType.Door, accessOnly: true, separateUnlockAndUnlatch: true },
+        ACCESS_ONLY_WITH_SEPARATE_UNLATCH_MESSAGE,
+      ],
+    ])('refuses to create %o', async (options, message) => {
+      await expect(scope.service.createResource({ name: 'X', ...options })).rejects.toThrow(message);
+      expect(scope.resourceRepository.save).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['access only on a door with separate unlatching', { separateUnlockAndUnlatch: true }, { accessOnly: true }],
+      ['separate unlatching on an access-only door', { accessOnly: true }, { separateUnlockAndUnlatch: true }],
+    ])('refuses to turn on %s', async (_name, stored, dto) => {
+      jest.spyOn(scope.service, 'getResourceById').mockResolvedValue({ ...door(), ...stored });
+
+      await expect(scope.service.updateResource(3, dto)).rejects.toThrow(ACCESS_ONLY_WITH_SEPARATE_UNLATCH_MESSAGE);
+      expect(scope.resourceRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('refuses to turn an access-only door into a machine', async () => {
+      jest.spyOn(scope.service, 'getResourceById').mockResolvedValue({ ...door(), accessOnly: true });
+
+      await expect(scope.service.updateResource(3, { type: ResourceType.Machine })).rejects.toThrow(
+        ACCESS_ONLY_DOORS_ONLY_MESSAGE,
+      );
+    });
+
+    it('switches a door from separate unlatching to access only in one update', async () => {
+      jest.spyOn(scope.service, 'getResourceById').mockResolvedValue({ ...door(), separateUnlockAndUnlatch: true });
+
+      const updated = await scope.service.updateResource(3, { accessOnly: true, separateUnlockAndUnlatch: false });
+
+      expect(updated).toMatchObject({ accessOnly: true, separateUnlockAndUnlatch: false });
+    });
+  });
+
   describe('deleteResource', () => {
     const deleteResourceScope = inheritTestScope(
       {
         get resourceRepository() {
           return scope.resourceRepository;
         },
-        set resourceRepository(value: typeof scope.resourceRepository) {
+        set resourceRepository(value: ResourceStoreMock) {
           scope.resourceRepository = value;
         },
         get service() {
@@ -365,27 +429,17 @@ describe('ResourcesService', () => {
     );
 
     it('should delete a resource', async () => {
-      (deleteResourceScope.resourceRepository.softDelete as jest.Mock).mockResolvedValue({
-        affected: 1,
-        raw: {},
-        generatedMaps: [],
-      });
+      deleteResourceScope.resourceRepository.softDelete.mockResolvedValue(1);
 
       await deleteResourceScope.service.deleteResource(1);
 
       expect(deleteResourceScope.resourceRepository.softDelete).toHaveBeenCalledWith(1);
     });
 
-    beforeEach(() => {
-      (deleteResourceScope.resourceRepository as { manager: unknown }).manager = {
-        count: jest.fn().mockResolvedValueOnce(3).mockResolvedValueOnce(2),
-      };
-    });
-
     it('audits deletion with the pre-delete safe projection and the flow it had', async () => {
       const resource = createMockResource({ id: 1, name: 'Lathe', type: ResourceType.Machine });
       jest.spyOn(deleteResourceScope.service, 'getResourceById').mockResolvedValue(resource);
-      deleteResourceScope.resourceRepository.softDelete.mockResolvedValue({ affected: 1 } as never);
+      deleteResourceScope.resourceRepository.softDelete.mockResolvedValue(1);
 
       await deleteResourceScope.service.deleteResource(1, { id: 9 });
 
@@ -397,12 +451,7 @@ describe('ResourcesService', () => {
           details: { 'before.name': 'Lathe', 'before.type': ResourceType.Machine, flowNodeCount: 3, flowEdgeCount: 2 },
         }),
       );
-      const { count } = (deleteResourceScope.resourceRepository as unknown as { manager: { count: jest.Mock } })
-        .manager;
-      expect(count.mock.calls).toEqual([
-        [ResourceFlowNode, { where: { resourceId: 1 } }],
-        [ResourceFlowEdge, { where: { resourceId: 1 } }],
-      ]);
+      expect(deleteResourceScope.resourceRepository.countFlowParts).toHaveBeenCalledWith(1);
     });
 
     it('bounds an oversized resource name in a deletion audit projection', async () => {
@@ -412,7 +461,7 @@ describe('ResourcesService', () => {
         type: ResourceType.Machine,
       });
       jest.spyOn(deleteResourceScope.service, 'getResourceById').mockResolvedValue(resource);
-      deleteResourceScope.resourceRepository.softDelete.mockResolvedValue({ affected: 1 } as never);
+      deleteResourceScope.resourceRepository.softDelete.mockResolvedValue(1);
 
       await deleteResourceScope.service.deleteResource(1, { id: 9 });
 
@@ -423,11 +472,7 @@ describe('ResourcesService', () => {
     });
 
     it('should throw ResourceNotFoundException if resource not found', async () => {
-      (deleteResourceScope.resourceRepository.softDelete as jest.Mock).mockResolvedValue({
-        affected: 0,
-        raw: {},
-        generatedMaps: [],
-      });
+      deleteResourceScope.resourceRepository.softDelete.mockResolvedValue(0);
 
       await expect(deleteResourceScope.service.deleteResource(999)).rejects.toThrow(ResourceNotFoundException);
     });

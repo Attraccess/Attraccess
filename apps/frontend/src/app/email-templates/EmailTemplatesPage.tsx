@@ -1,4 +1,4 @@
-import { useEmailTemplatesServiceEmailTemplateControllerFindAll } from '@attraccess/react-query-client';
+import { useEmailTemplateControllerFindAll } from '@attraccess/react-query-client';
 import {
   Table,
   TableScrollContainer,
@@ -8,11 +8,16 @@ import {
   TableBody,
   TableRow,
   TableCell,
-  Button,
   Chip,
 } from '@heroui/react';
-import { Edit3, Mail } from 'lucide-react';
-import { EmptyState, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Mail, Pencil } from 'lucide-react';
+import {
+  EmptyState,
+  PageHeader,
+  TableActionsColumnHeader,
+  TableRowActions,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 
 import en from './en.json';
@@ -25,7 +30,7 @@ export function EmailTemplatesPage() {
   // The Email settings section — these editors are sub-routes of it and navigate to its siblings.
   const basePath = '/settings/email';
 
-  const { data: emailTemplates } = useEmailTemplatesServiceEmailTemplateControllerFindAll();
+  const { data: emailTemplates } = useEmailTemplateControllerFindAll();
 
   const openEditor = useCallback(
     (type: string) => {
@@ -47,15 +52,8 @@ export function EmailTemplatesPage() {
     const fromPlugins = items
       .filter((item) => item.pluginName)
       .sort((a, b) => (a.pluginName as string).localeCompare(b.pluginName as string) || a.type.localeCompare(b.type));
-    return [...core, ...fromPlugins].map((item) => ({
-      ...item,
-      actions: (
-        <Button variant="ghost" isIconOnly aria-label={t('editButton')} onPress={() => openEditor(item.key)}>
-          <Edit3 size={18} />
-        </Button>
-      ),
-    }));
-  }, [emailTemplates, t, language, openEditor]);
+    return [...core, ...fromPlugins];
+  }, [emailTemplates, t, language]);
 
   return (
     <>
@@ -67,7 +65,9 @@ export function EmailTemplatesPage() {
             <TableHeader>
               <TableColumn isRowHeader>{t('columns.type')}</TableColumn>
               <TableColumn>{t('columns.subject')}</TableColumn>
-              <TableColumn>{t('columns.actions')}</TableColumn>
+              <TableColumn>
+                <TableActionsColumnHeader />
+              </TableColumn>
             </TableHeader>
             <TableBody items={tableItems} renderEmptyState={() => <EmptyState />}>
               {(item) => (
@@ -86,7 +86,14 @@ export function EmailTemplatesPage() {
                     )}
                   </TableCell>
                   <TableCell>{item.subject}</TableCell>
-                  <TableCell>{item.actions}</TableCell>
+                  <TableCell>
+                    <TableRowActions
+                      itemName={item.type}
+                      actions={[
+                        { key: 'edit', label: t('editButton'), icon: Pencil, onPress: () => openEditor(item.key) },
+                      ]}
+                    />
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>

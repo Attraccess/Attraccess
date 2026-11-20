@@ -18,7 +18,7 @@ Each resource in Attraccess has:
 | Type | Description |
 |------|-------------|
 | **Machine** | Standard resource (3D printer, laser cutter, CNC mill, etc.) |
-| **Door** | Access point with unlock function. Optional separate unlock and unlatch actions. |
+| **Door** | Access point with lock and unlock actions. Optional separate unlock and unlatch actions, or [access only](resources/creating-resources.md#door-options) with a single Open action. |
 
 ## Resource Overview
 
@@ -38,4 +38,4 @@ The Attraccess home page shows all available resources in an overview. You can:
 - [Groups](resources/resource-groups.md) – Organize resources
 - [Introductions](resources/introductions.md) – Manage access
 - [Maintenance](resources/maintenance.md) – Schedule maintenance
-- [Reservations](resources/reservations.md) – Book a resource in advance (plugin)
+- With the Reservations plugin installed (a paid add-on with the `reservations` license module), members can book resources in advance; see [Reservations](plugins/reservations/overview.md).

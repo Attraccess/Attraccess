@@ -1,5 +1,5 @@
 import { getSupportedDeviceLanguage } from '@attraccess/shared';
-import { Resource, SupervisionMode } from '@attraccess/database-entities';
+import { SupervisionMode } from '@attraccess/application-models';
 
 import { SettingsService } from '../../../../settings/settings.service';
 import {
@@ -11,8 +11,6 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { WebSocket } from 'ws';
 
 import { MetricsService } from '../../../../metrics/metrics.service';
@@ -26,6 +24,8 @@ import { RbacService } from '../../../../users-and-auth/rbac/rbac.service';
 import { UsersService } from '../../../../users-and-auth/users/users.service';
 
 import { AttractapService } from '../../../attractap.service';
+import { asCoreUser } from '../../../core-user';
+import { ATTRACTAP_RESOURCE_READS, type AttractapResourceReads } from '../../../reader-resource-reads.port';
 
 import { CardConversationService } from '../../card-conversation.service';
 import { CardOperationsService } from '../../card-operations.service';
@@ -39,6 +39,7 @@ import { AttractapSupervisionHandler } from '../supervision/supervision.handler'
 import { CardSessionService } from '../ui/card-session.service';
 import { CARD_WRITE_START_ERRORS, assertReaderRelaysCards } from './card-write-errors';
 import { assertReaderPaired } from '../../../reader-pairing';
+import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
 
 export { CARD_WRITE_START_ERRORS } from './card-write-errors';
 
@@ -79,8 +80,8 @@ export class AttractapCardHandler {
   @Inject(RbacService)
   protected rbacService: RbacService;
 
-  @InjectRepository(Resource)
-  protected resourceRepository: Repository<Resource>;
+  @Inject(ATTRACTAP_RESOURCE_READS)
+  protected resourceReads: AttractapResourceReads;
 
   @Inject(CardOperationsService)
   protected cardOperations: CardOperationsService;
@@ -132,10 +133,10 @@ export class AttractapCardHandler {
     // Steps and user-scoped slots are bound to this card session (ATT-1187); the reader carries the id.
     const cardSession = this.cardSessions.issue(socket, nfcCard.user.id, language === 'de' ? 'de' : 'en');
 
-    const hasIntroduction = await this.resourceUsageService.canControllResource(resourceId, nfcCard.user);
+    const hasIntroduction = await this.resourceUsageService.canControllResource(resourceId, asCoreUser(nfcCard.user));
     const isIntroducer = await this.resourceIntroducersService.isIntroducer(resourceId, nfcCard.user.id, true);
 
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    const resource = await this.resourceReads.findResource(resourceId);
     const supervisionMode = resource?.supervisionMode ?? SupervisionMode.INTRODUCTION_REQUIRED;
 
     // Whether this tap must be authorised by a supervisor before a session can start (ATT-493):
@@ -200,7 +201,7 @@ export class AttractapCardHandler {
     readerId: number;
     userId: number;
     cardId: number;
-    authenticationMethod?: 'session' | 'api-token';
+    authenticationMethod?: AuthenticationMethod;
     apiTokenId?: number;
   }) {
     const reader = await this.attractapService.findReaderById(data.readerId);
@@ -296,7 +297,7 @@ export class AttractapCardHandler {
     readerId: number;
     userId: number;
     actorId?: number;
-    authenticationMethod?: 'session' | 'api-token';
+    authenticationMethod?: AuthenticationMethod;
     apiTokenId?: number;
   }) {
     const reader = await this.attractapService.findReaderById(data.readerId);

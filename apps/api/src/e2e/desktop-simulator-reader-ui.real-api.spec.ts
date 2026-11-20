@@ -6,11 +6,10 @@ import {
   Resource,
   ResourceIntroduction,
   ResourceIntroductionHistoryItem,
-  ResourceType,
   ResourceUsage,
   User,
-  IntroductionHistoryAction,
 } from '@attraccess/database-entities';
+import { IntroductionHistoryAction, ResourceType } from '@attraccess/application-models';
 import type { NoScreenPolicy } from '@attraccess/plugins-backend-sdk';
 import { SettingsService } from '../settings/settings.service';
 import { AttractapGateway } from '../attractap/websockets/websocket.gateway';

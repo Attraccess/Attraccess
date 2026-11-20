@@ -25,8 +25,8 @@ class FixedGateway {
   }
 }
 
-@WebSocketGateway({ path: '/ws-broken' })
-class BrokenGateway {
+@WebSocketGateway({ path: '/ws-global' })
+class GlobalGateway {
   @SubscribeMessage('PING')
   onPing(): { ok: true } {
     return { ok: true };
@@ -34,9 +34,9 @@ class BrokenGateway {
 }
 
 const fixedRegistry = new Registry();
-const brokenRegistry = new Registry();
+const globalRegistry = new Registry();
 const fixedWsMetrics = createWsMetrics(fixedRegistry);
-const brokenWsMetrics = createWsMetrics(brokenRegistry);
+const globalWsMetrics = createWsMetrics(globalRegistry);
 
 @Module({
   controllers: [NoopController],
@@ -52,14 +52,14 @@ class FixedAppModule {}
 @Module({
   controllers: [NoopController],
   providers: [
-    BrokenGateway,
+    GlobalGateway,
     WsMetricsInterceptor,
     { provide: APP_INTERCEPTOR, useClass: WsMetricsInterceptor },
-    { provide: WS_METRICS, useValue: brokenWsMetrics },
+    { provide: WS_METRICS, useValue: globalWsMetrics },
     { provide: MetricsToggleService, useValue: toggleStub },
   ],
 })
-class BrokenAppModule {}
+class GlobalAppModule {}
 
 async function bootstrap(mod: unknown, path: string): Promise<{ app: INestApplication; url: string }> {
   const app = await NestFactory.create(mod as never, { logger: false });
@@ -97,7 +97,7 @@ async function pingCount(registry: Registry): Promise<number> {
 }
 
 describe('WsMetricsInterceptor (integration)', () => {
-  describe('@UseInterceptors on gateway (the fix)', () => {
+  describe('@UseInterceptors on gateway', () => {
     let app: INestApplication;
     let url: string;
 
@@ -122,29 +122,29 @@ describe('WsMetricsInterceptor (integration)', () => {
       expect(count).toBeGreaterThan(0);
 
       const exposition = await fixedRegistry.metrics();
-      expect(exposition).toMatch(
-        /attraccess_ws_message_duration_seconds_count\{[^}]*event="PING"[^}]*\}\s+[1-9]/,
-      );
+      expect(exposition).toMatch(/attraccess_ws_message_duration_seconds_count\{[^}]*event="PING"[^}]*\}\s+[1-9]/);
     }, 20000);
   });
 
-  describe('APP_INTERCEPTOR only (the bug)', () => {
+  // Nest 11 never applied APP_INTERCEPTOR to platform-ws gateways, hence @UseInterceptors on the gateway. Nest 12
+  // does, so registering the interceptor both ways would count every message twice.
+  describe('APP_INTERCEPTOR only', () => {
     let app: INestApplication;
     let url: string;
 
     beforeAll(async () => {
-      ({ app, url } = await bootstrap(BrokenAppModule, '/ws-broken'));
+      ({ app, url } = await bootstrap(GlobalAppModule, '/ws-global'));
     });
 
     afterAll(async () => {
       await app.close();
     });
 
-    it('does NOT record samples — proves APP_INTERCEPTOR is insufficient for platform-ws', async () => {
+    it('records each message once, so gateways must not also use @UseInterceptors with it', async () => {
       await sendPing(url);
       await new Promise((r) => setTimeout(r, 1000));
-      const count = await pingCount(brokenRegistry);
-      expect(count).toBe(0);
+      const count = await pingCount(globalRegistry);
+      expect(count).toBe(1);
     }, 20000);
   });
 });

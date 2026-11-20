@@ -68,7 +68,7 @@ export class ResourceSessionEndedEmailTemplate1781850000000 implements Migration
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES ($1, $2, $3, $4)`,
+      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES (?, ?, ?, ?)`,
       [
         'resource-session-ended',
         '{{resource.name}} session ended',

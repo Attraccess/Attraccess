@@ -3,22 +3,22 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  useSettingsServiceGetResourceVisibilitySettings,
-  useSettingsServiceGetSystemSettings,
-  useSettingsServiceUpdateResourceVisibilitySettings,
-  useSettingsServiceUpdateSystemSettings,
+  useGetResourceVisibilitySettings,
+  useGetSystemSettings,
+  useUpdateResourceVisibilitySettings,
+  useUpdateSystemSettings,
 } from '@attraccess/react-query-client';
 import { GeneralSection } from './index';
 
 vi.mock('@attraccess/react-query-client', () => ({
   ResourceActivityVisibility: { ALL: 'all', INTRODUCED: 'introduced' },
-  useSettingsServiceGetSystemSettings: vi.fn(),
-  UseSettingsServiceGetSystemSettingsKeyFn: () => ['settings'],
-  UseSettingsServiceGetSystemLanguageKeyFn: () => ['system-language'],
-  useSettingsServiceUpdateSystemSettings: vi.fn(),
-  useSettingsServiceGetResourceVisibilitySettings: vi.fn(),
-  UseSettingsServiceGetResourceVisibilitySettingsKeyFn: () => ['visibility'],
-  useSettingsServiceUpdateResourceVisibilitySettings: vi.fn(),
+  useGetSystemSettings: vi.fn(),
+  UseGetSystemSettingsKeyFn: () => ['settings'],
+  UseGetSystemLanguageKeyFn: () => ['system-language'],
+  useUpdateSystemSettings: vi.fn(),
+  useGetResourceVisibilitySettings: vi.fn(),
+  UseGetResourceVisibilitySettingsKeyFn: () => ['visibility'],
+  useUpdateResourceVisibilitySettings: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -48,28 +48,28 @@ const saveSettings = vi.fn();
 const saveVisibility = vi.fn();
 
 function mockVisibility(state: { data?: { activityVisibility: string }; isLoading?: boolean; isError?: boolean }) {
-  vi.mocked(useSettingsServiceGetResourceVisibilitySettings).mockReturnValue({
+  vi.mocked(useGetResourceVisibilitySettings).mockReturnValue({
     isLoading: false,
     isError: false,
     ...state,
-  } as ReturnType<typeof useSettingsServiceGetResourceVisibilitySettings>);
+  } as ReturnType<typeof useGetResourceVisibilitySettings>);
 }
 
 function mockSaves() {
   saveSettings.mockResolvedValue({});
   saveVisibility.mockResolvedValue({});
-  vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+  vi.mocked(useGetSystemSettings).mockReturnValue({
     data: { app: { url: 'https://example.org', publicInternetUrl: '' } },
     isLoading: false,
-  } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
-  vi.mocked(useSettingsServiceUpdateSystemSettings).mockReturnValue({
+  } as ReturnType<typeof useGetSystemSettings>);
+  vi.mocked(useUpdateSystemSettings).mockReturnValue({
     mutateAsync: saveSettings,
     isPending: false,
-  } as unknown as ReturnType<typeof useSettingsServiceUpdateSystemSettings>);
-  vi.mocked(useSettingsServiceUpdateResourceVisibilitySettings).mockReturnValue({
+  } as unknown as ReturnType<typeof useUpdateSystemSettings>);
+  vi.mocked(useUpdateResourceVisibilitySettings).mockReturnValue({
     mutateAsync: saveVisibility,
     isPending: false,
-  } as unknown as ReturnType<typeof useSettingsServiceUpdateResourceVisibilitySettings>);
+  } as unknown as ReturnType<typeof useUpdateResourceVisibilitySettings>);
   mockVisibility({ data: { activityVisibility: 'all' } });
 }
 
@@ -87,15 +87,15 @@ describe('GeneralSection', () => {
     await userEvent.click(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ }));
     await userEvent.click(await screen.findByRole('option', { name: 'English' }));
     expect(saveBar(view.container)).toBeInTheDocument();
-    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+    vi.mocked(useGetSystemSettings).mockReturnValue({
       data: { app: { url: 'https://example.org', publicInternetUrl: '', defaultLanguage: 'de' } },
       isLoading: false,
-    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
+    } as ReturnType<typeof useGetSystemSettings>);
     view.rerender(<GeneralSection />);
     expect(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ })).toHaveTextContent('English');
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: {
+      body: {
         app: {
           url: 'https://example.org',
           publicInternetUrl: null,
@@ -105,10 +105,10 @@ describe('GeneralSection', () => {
       },
     });
     view.unmount();
-    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+    vi.mocked(useGetSystemSettings).mockReturnValue({
       data: { app: { url: 'https://example.org', publicInternetUrl: '', defaultLanguage: 'en' } },
       isLoading: false,
-    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
+    } as ReturnType<typeof useGetSystemSettings>);
     const reloaded = render(<GeneralSection />);
     expect(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ })).toHaveTextContent('English');
     expect(saveBar(reloaded.container)).toBeNull();
@@ -122,11 +122,9 @@ describe('GeneralSection', () => {
         fail = () => reject(new Error('failed'));
       }),
     );
-    vi.mocked(useSettingsServiceUpdateSystemSettings).mockImplementation(
+    vi.mocked(useUpdateSystemSettings).mockImplementation(
       () =>
-        ({ mutateAsync: saveSettings, isPending: pending }) as unknown as ReturnType<
-          typeof useSettingsServiceUpdateSystemSettings
-        >,
+        ({ mutateAsync: saveSettings, isPending: pending }) as unknown as ReturnType<typeof useUpdateSystemSettings>,
     );
     const view = render(<GeneralSection />);
     await userEvent.type(urlField(), '/submitted');
@@ -227,7 +225,7 @@ describe('GeneralSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
 
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: {
+      body: {
         app: {
           url: 'https://example.org/app',
           publicInternetUrl: null,
@@ -242,10 +240,10 @@ describe('GeneralSection', () => {
     // `undefined` is dropped by JSON.stringify and the API only writes the key when it is present,
     // so emptying the field used to be a no-op that still reported success — and the old value came
     // straight back a frame later when the response primed the cache.
-    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+    vi.mocked(useGetSystemSettings).mockReturnValue({
       data: { app: { url: 'https://example.org', publicInternetUrl: 'https://public.example' } },
       isLoading: false,
-    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
+    } as ReturnType<typeof useGetSystemSettings>);
 
     render(<GeneralSection />);
 
@@ -253,7 +251,7 @@ describe('GeneralSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
 
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: {
+      body: {
         app: { url: 'https://example.org', publicInternetUrl: null, licenseKey: undefined, defaultLanguage: 'de' },
       },
     });
@@ -268,10 +266,10 @@ describe('GeneralSection', () => {
 
     await userEvent.type(urlField(), '/typing');
 
-    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+    vi.mocked(useGetSystemSettings).mockReturnValue({
       data: { app: { url: 'https://example.org', publicInternetUrl: '' } },
       isLoading: false,
-    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
+    } as ReturnType<typeof useGetSystemSettings>);
     rerender(<GeneralSection />);
 
     expect(urlField()).toHaveValue('https://example.org/typing');
@@ -282,12 +280,10 @@ describe('GeneralSection', () => {
     // for the lifetime of the mount, and someone else's change would surface as an "unsaved
     // changes" bar the operator never caused, whose Save reverts them.
     let onSuccess: ((data: unknown) => void) | undefined;
-    vi.mocked(useSettingsServiceUpdateSystemSettings).mockImplementation(
-      (options?: { onSuccess?: (data: unknown) => void }) => {
+    vi.mocked(useUpdateSystemSettings).mockImplementation(
+      (_mutationKey: unknown, options?: { onSuccess?: (data: unknown) => void }) => {
         onSuccess = options?.onSuccess;
-        return { mutateAsync: saveSettings, isPending: false } as unknown as ReturnType<
-          typeof useSettingsServiceUpdateSystemSettings
-        >;
+        return { mutateAsync: saveSettings, isPending: false } as unknown as ReturnType<typeof useUpdateSystemSettings>;
       },
     );
 
@@ -302,10 +298,10 @@ describe('GeneralSection', () => {
     expect(setQueryData).toHaveBeenCalledWith(['settings'], afterSave);
     expect(saveBar(container)).toBeNull();
 
-    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+    vi.mocked(useGetSystemSettings).mockReturnValue({
       data: { app: { url: 'https://elsewhere.example', publicInternetUrl: '' } },
       isLoading: false,
-    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
+    } as ReturnType<typeof useGetSystemSettings>);
     rerender(<GeneralSection />);
 
     expect(urlField()).toHaveValue('https://elsewhere.example');
@@ -342,7 +338,7 @@ describe('GeneralSection — Enter key', () => {
     await userEvent.type(field, '/app{Enter}');
 
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: {
+      body: {
         app: {
           url: 'https://example.org/app',
           publicInternetUrl: null,
@@ -378,7 +374,7 @@ describe('GeneralSection — activity visibility', () => {
     expect(screen.getByText('inputs.activityVisibility.introducedHint')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
-    expect(saveVisibility).toHaveBeenCalledWith({ requestBody: { activityVisibility: 'introduced' } });
+    expect(saveVisibility).toHaveBeenCalledWith({ body: { activityVisibility: 'introduced' } });
     expect(saveSettings).not.toHaveBeenCalled();
     expect(toast.success).toHaveBeenCalledOnce();
   });
@@ -393,16 +389,14 @@ describe('GeneralSection — activity visibility', () => {
 
   it('saves both stores with one success toast and primes both caches', async () => {
     const options: { settings?: (data: unknown) => void; visibility?: (data: unknown) => void } = {};
-    vi.mocked(useSettingsServiceUpdateSystemSettings).mockImplementation((hookOptions) => {
+    vi.mocked(useUpdateSystemSettings).mockImplementation((_mutationKey: unknown, hookOptions) => {
       options.settings = hookOptions?.onSuccess as (data: unknown) => void;
-      return { mutateAsync: saveSettings, isPending: false } as unknown as ReturnType<
-        typeof useSettingsServiceUpdateSystemSettings
-      >;
+      return { mutateAsync: saveSettings, isPending: false } as unknown as ReturnType<typeof useUpdateSystemSettings>;
     });
-    vi.mocked(useSettingsServiceUpdateResourceVisibilitySettings).mockImplementation((hookOptions) => {
+    vi.mocked(useUpdateResourceVisibilitySettings).mockImplementation((_mutationKey: unknown, hookOptions) => {
       options.visibility = hookOptions?.onSuccess as (data: unknown) => void;
       return { mutateAsync: saveVisibility, isPending: false } as unknown as ReturnType<
-        typeof useSettingsServiceUpdateResourceVisibilitySettings
+        typeof useUpdateResourceVisibilitySettings
       >;
     });
     const savedSettings = { app: { url: 'https://example.org/app', publicInternetUrl: '' } };
@@ -422,7 +416,7 @@ describe('GeneralSection — activity visibility', () => {
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
 
     expect(saveSettings).toHaveBeenCalledOnce();
-    expect(saveVisibility).toHaveBeenCalledWith({ requestBody: { activityVisibility: 'introduced' } });
+    expect(saveVisibility).toHaveBeenCalledWith({ body: { activityVisibility: 'introduced' } });
     expect(setQueryData).toHaveBeenCalledWith(['settings'], savedSettings);
     expect(setQueryData).toHaveBeenCalledWith(['visibility'], savedVisibility);
     expect(toast.success).toHaveBeenCalledOnce();

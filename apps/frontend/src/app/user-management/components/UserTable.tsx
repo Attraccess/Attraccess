@@ -1,4 +1,4 @@
-import { AttraccessUser, EmptyState } from '@attraccess/plugins-frontend-ui';
+import { AttraccessUser, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Chip,
   Table,
@@ -14,8 +14,13 @@ import {
   TooltipTrigger,
 } from '@heroui/react';
 import { KeyIcon, ShieldCheckIcon, ShieldOffIcon } from 'lucide-react';
-import { User, UserRole } from '@attraccess/react-query-client';
-import { useUserManagementPageState } from '../filters/types';
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { PaginatedUsersResponseDto, SsoProvider, useListRoles, User, UserRole } from '@attraccess/react-query-client';
+import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
+import { useSsoProviders } from '../useSsoProviders';
+import en from '../en.json';
+import de from '../de.json';
 
 export type AuthenticationDetailSummary = {
   providerId?: number | null;
@@ -27,15 +32,26 @@ export type AuthenticationDetailSummary = {
 export type UserWithAuthDetails = Omit<User, 'authenticationDetails'> & {
   authenticationDetails?: AuthenticationDetailSummary[];
 };
-export // Role keys that are considered "default" and not worth showing in the list
-const DEFAULT_ROLE_KEYS = new Set(['user']);
+// Role keys that are considered "default" and not worth showing in the list
+export const DEFAULT_ROLE_KEYS = new Set(['user']);
 
-type Props = Pick<
-  ReturnType<typeof useUserManagementPageState>,
-  't' | 'searchResult' | 'roleIds' | 'roles' | 'providersById' | 'navigate' | 'assignRoleId' | 'roleName'
->;
+interface UserTableProps {
+  searchResult: PaginatedUsersResponseDto | undefined;
+  roleIds: number[];
+  assignRoleId: number | undefined;
+}
 
-export function UserTable({ t, searchResult, roleIds, roles, providersById, navigate, assignRoleId, roleName }: Props) {
+export function UserTable({ searchResult, roleIds, assignRoleId }: UserTableProps) {
+  const { t } = useTranslations({ en, de });
+  const { roleName } = useRbacCatalogTranslations();
+  const navigate = useNavigate();
+  const { data: roles } = useListRoles();
+  const ssoProviders = useSsoProviders();
+  const providersById = useMemo(
+    () => new Map((ssoProviders ?? []).map((provider: SsoProvider) => [provider.id, provider])),
+    [ssoProviders],
+  );
+
   return (
     <Table>
       <TableScrollContainer>

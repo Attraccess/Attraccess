@@ -3,7 +3,8 @@ import { SignedXml } from 'xml-crypto';
 import { inflateRawSync } from 'node:zlib';
 import { Profile } from '@node-saml/node-saml';
 import { ModuleRef } from '@nestjs/core';
-import { SSOProviderSAMLConfiguration, SSOProviderType } from '@attraccess/database-entities';
+import { SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { SamlLogoutAdapter } from './saml-logout-adapter';
 import { SsoLogoutService } from '../sso-logout.service';
 import { SSOService } from '../sso.service';
@@ -239,6 +240,13 @@ describe('SAML Single Logout using real node-saml 5.1.0 signatures and XML', () 
       element.parentNode.removeChild(element);
     await service.samlMessage(2, { SAMLRequest: signedPost(new XMLSerializer().serializeToString(document)) }, null);
     expect(sessions.revokeSsoSessions).toHaveBeenLastCalledWith(expect.objectContaining({ sessionIndexes: [] }));
+  });
+
+  it('lets an unreachable Valkey surface (503) instead of calling the exchange invalid', async () => {
+    const request = decodeRedirect(await provider.request(context, 'state'));
+    const unavailable = new Error('Connection is closed.');
+    sessions.revokeSsoSessions.mockRejectedValueOnce(unavailable);
+    await expect(service.samlMessage(2, request.values, request.query)).rejects.toBe(unavailable);
   });
 
   it('rejects unsigned, tampered, misdirected, stale, wrong-provider and malformed requests before revocation', async () => {

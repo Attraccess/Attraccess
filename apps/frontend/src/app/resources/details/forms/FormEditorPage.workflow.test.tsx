@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { FormEditorPage } from './FormEditorPage';
@@ -14,30 +14,31 @@ const state = vi.hoisted(() => ({
   error: vi.fn(),
   apiError: vi.fn(),
   invalidate: vi.fn(),
+  removeQueries: vi.fn(),
   callbacks: {} as Record<
     string,
     { onSuccess: (data: { id: number }) => Promise<void>; onError: (error: Error) => void }
   >,
 }));
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
+vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate, removeQueries: state.removeQueries }) }));
 vi.mock('../../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: state.success, error: state.error, apiError: state.apiError }),
 }));
 vi.mock('@attraccess/react-query-client', async (original) => ({
   ...(await original<typeof import('@attraccess/react-query-client')>()),
-  useResourcesServiceGetOneResourceById: () => ({ data: { id: 7, name: 'Printer' } }),
-  useResourceFormsServiceResourceFormsGetOne: () => ({ data: state.form, isLoading: state.loading }),
-  UseResourceFormsServiceResourceFormsListKeyFn: (params: unknown) => ['forms', params],
-  UseResourceFormsServiceResourceFormsGetOneKeyFn: (params: unknown) => ['form', params],
-  useResourceFormsServiceResourceFormsCreate: (callbacks: (typeof state.callbacks)[string]) => {
+  useGetOneResourceById: () => ({ data: { id: 7, name: 'Printer' } }),
+  useResourceFormsGetOne: () => ({ data: state.form, isLoading: state.loading }),
+  UseResourceFormsListKeyFn: (params: unknown) => ['forms', params],
+  UseResourceFormsGetOneKeyFn: (params: unknown) => ['form', params],
+  useResourceFormsCreate: (_mutationKey: unknown, callbacks: (typeof state.callbacks)[string]) => {
     state.callbacks.create = callbacks;
     return { mutateAsync: state.create, isPending: false };
   },
-  useResourceFormsServiceResourceFormsUpdate: (callbacks: (typeof state.callbacks)[string]) => {
+  useResourceFormsUpdate: (_mutationKey: unknown, callbacks: (typeof state.callbacks)[string]) => {
     state.callbacks.update = callbacks;
     return { mutateAsync: state.update, isPending: false };
   },
-  useResourceFormsServiceResourceFormsDelete: (callbacks: (typeof state.callbacks)[string]) => {
+  useResourceFormsDelete: (_mutationKey: unknown, callbacks: (typeof state.callbacks)[string]) => {
     state.callbacks.remove = callbacks;
     return { mutateAsync: state.remove, isPending: false };
   },
@@ -116,8 +117,8 @@ it('validates blank field labels then creates a form with the selected lifecycle
   fireEvent.click(screen.getByRole('button', { name: 'Save form' }));
   await waitFor(() =>
     expect(state.create).toHaveBeenCalledWith({
-      resourceId: 7,
-      requestBody: expect.objectContaining({
+      path: { resourceId: 7 },
+      body: expect.objectContaining({
         name: 'Safety',
         isRequiredOnResourceUsageStart: true,
         isRequiredOnResourceUsageTakeOver: true,
@@ -126,8 +127,8 @@ it('validates blank field labels then creates a form with the selected lifecycle
       }),
     }),
   );
-  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['forms', { resourceId: 7 }] });
-  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['form', { resourceId: 7, formId: 11 }] });
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['forms', { path: { resourceId: 7 } }] });
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['form', { path: { resourceId: 7, formId: 11 } }] });
   expect(state.success).toHaveBeenCalledWith({ title: 'Form created' });
 });
 it('loads existing fields, saves edits, and removes draft fields', async () => {
@@ -140,9 +141,8 @@ it('loads existing fields, saves edits, and removes draft fields', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Save form' }));
   await waitFor(() =>
     expect(state.update).toHaveBeenCalledWith({
-      resourceId: 7,
-      formId: 11,
-      requestBody: expect.objectContaining({
+      path: { resourceId: 7, formId: 11 },
+      body: expect.objectContaining({
         name: 'Safety revision',
         fields: [expect.objectContaining({ id: 1, name: 'Confirm training', position: 0 })],
       }),
@@ -154,16 +154,19 @@ it('loads existing fields, saves edits, and removes draft fields', async () => {
   expect(screen.getByText('No fields')).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Save form' })).toBeDisabled();
 });
-it('confirms deletion and refreshes list and detail queries', async () => {
+it('confirms deletion, drops the deleted form from the cache and refreshes the list', async () => {
   state.form = saved;
   mount('11');
   fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
   fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete form' }));
-  fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
-  await waitFor(() => expect(state.remove).toHaveBeenCalledWith({ resourceId: 7, formId: 11 }));
+  fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete form' }));
+  await waitFor(() => expect(state.remove).toHaveBeenCalledWith({ path: { resourceId: 7, formId: 11 } }));
   expect(await screen.findByText('Form list')).toBeTruthy();
   expect(state.success).toHaveBeenCalledWith({ title: 'Form deleted' });
-  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['forms', { resourceId: 7 }] });
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['forms', { path: { resourceId: 7 } }] });
+  // Refetching the deleted form would 404 through every retry and keep the confirmation pending.
+  expect(state.removeQueries).toHaveBeenCalledWith({ queryKey: ['form', { path: { resourceId: 7, formId: 11 } }] });
+  expect(state.invalidate).not.toHaveBeenCalledWith({ queryKey: ['form', expect.anything()] });
 });
 it('forwards mutation errors to the API error presenter and shows edit loading', () => {
   state.loading = true;

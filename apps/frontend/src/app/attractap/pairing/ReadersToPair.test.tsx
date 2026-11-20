@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Attractap } from '@attraccess/react-query-client';
@@ -8,32 +8,33 @@ import { ReadersToPair } from './ReadersToPair';
 
 const mocks = vi.hoisted(() => ({
   pairings: { current: [] as unknown[] },
-  requestPairing: vi.fn(),
-  requestOptions: { current: undefined as undefined | { onSuccess?: (r: unknown, v: unknown) => void } },
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
   pairingDialog: vi.fn(),
   onPaired: vi.fn(),
   navigate: vi.fn(),
-  deleteModal: vi.fn(),
+  deleteReader: vi.fn(),
+  invalidateQueries: vi.fn(),
 }));
 
 vi.mock('react-router-dom', () => ({ useNavigate: () => mocks.navigate }));
-vi.mock('../AttractapList/delete', () => ({
-  AttractapDeleteModal: ({
-    readerId,
-    children,
-  }: {
-    readerId: number;
-    children: (open: () => void) => React.ReactNode;
-  }) => children(() => mocks.deleteModal(readerId)),
-}));
+vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }) }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useAttractapServiceGetPairings: () => ({ data: mocks.pairings.current }),
-  useAttractapServiceRequestReaderPairing: (options: { onSuccess?: (r: unknown, v: unknown) => void }) => {
-    mocks.requestOptions.current = options;
-    return { mutate: mocks.requestPairing, isPending: false, variables: undefined };
-  },
+  useGetPairings: () => ({ data: mocks.pairings.current }),
+  useDeleteReader: (_mutationKey: unknown, options: { onSuccess?: () => void; onError?: (e: unknown) => void }) => ({
+    mutateAsync: async (variables: unknown) => {
+      try {
+        await mocks.deleteReader(variables);
+      } catch (error) {
+        options.onError?.(error);
+        throw error;
+      }
+      options.onSuccess?.();
+    },
+    isPending: false,
+  }),
+  UseGetReadersKeyFn: () => ['readers'],
+  UseGetReadersToPairKeyFn: () => ['readers-to-pair'],
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -70,7 +71,6 @@ const pairing = (id: string, overrides: Record<string, unknown> = {}) => ({
   id,
   state: 'waiting',
   kind: 'touch',
-  boundReaderId: null,
   targetReaderId: null,
   mode: null,
   keyFingerprint: `key-${id}`,
@@ -81,11 +81,10 @@ const pairing = (id: string, overrides: Record<string, unknown> = {}) => ({
 describe('ReadersToPair', () => {
   beforeEach(() => {
     mocks.pairings.current = [];
-    mocks.requestPairing.mockClear();
     mocks.pairingDialog.mockClear();
     mocks.onPaired.mockClear();
     mocks.navigate.mockClear();
-    mocks.deleteModal.mockClear();
+    mocks.deleteReader.mockReset();
     Object.values(mocks.toast).forEach((fn) => fn.mockClear());
   });
 
@@ -94,12 +93,12 @@ describe('ReadersToPair', () => {
     expect(document.querySelector('[data-cy="attractap-readers-to-pair"]')).toBeNull();
   });
 
-  it('lists every reader that is not paired the same way; only reader records can be deleted', () => {
+  it('lists every reader whose pairing was removed the same way; only reader records can be deleted', () => {
     mocks.pairings.current = [pairing('dev', { kind: 'lite' })];
     render(
       <ReadersToPair
         onPaired={mocks.onPaired}
-        readers={[reader(1, 'unpaired'), reader(2, 'paired'), reader(3, 'revoked', 'attractap_lite')]}
+        readers={[reader(1, 'revoked'), reader(2, 'paired'), reader(3, 'revoked', 'attractap_lite')]}
       />,
     );
     const card = document.querySelector('[data-cy="attractap-readers-to-pair"]') as HTMLElement;
@@ -121,9 +120,9 @@ describe('ReadersToPair', () => {
     ).toEqual(['toPair.pair', 'toPair.delete', 'toPair.pair', 'toPair.delete', 'toPair.pair']);
   });
 
-  it('shows which resources a reader that is not paired still controls', () => {
+  it('shows which resources a record without pairing was linked to', () => {
     const withResources = {
-      ...reader(1, 'unpaired'),
+      ...reader(1, 'revoked'),
       resources: [{ name: 'Lathe' }, { name: 'Drill' }],
     } as unknown as Attractap;
     render(<ReadersToPair onPaired={mocks.onPaired} readers={[withResources, reader(3, 'revoked')]} />);
@@ -136,13 +135,25 @@ describe('ReadersToPair', () => {
 
   it('deletes a reader record that is not paired', async () => {
     const user = userEvent.setup();
-    render(<ReadersToPair onPaired={mocks.onPaired} readers={[reader(1, 'unpaired')]} />);
+    render(<ReadersToPair onPaired={mocks.onPaired} readers={[reader(1, 'revoked')]} />);
     await user.click(screen.getByRole('button', { name: 'toPair.delete' }));
-    expect(mocks.deleteModal).toHaveBeenCalledWith(1);
+    const dialog = await screen.findByRole('alertdialog');
+    expect(mocks.deleteReader).not.toHaveBeenCalled();
+
+    mocks.deleteReader.mockRejectedValueOnce(new Error('offline'));
+    await user.click(within(dialog).getByRole('button', { name: 'toPair.delete' }));
+    await waitFor(() => expect(mocks.toast.error).toHaveBeenCalled());
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'toPair.delete' }));
+    expect(mocks.deleteReader).toHaveBeenLastCalledWith({ path: { readerId: 1 } });
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['readers'] });
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['readers-to-pair'] });
   });
 
   it('offers no diagnostics for a reader that is not paired: those wait until it is paired', () => {
-    render(<ReadersToPair onPaired={mocks.onPaired} readers={[reader(3, 'revoked'), reader(1, 'unpaired')]} />);
+    render(<ReadersToPair onPaired={mocks.onPaired} readers={[reader(3, 'revoked'), reader(1, 'revoked')]} />);
     expect(screen.queryByRole('button', { name: 'toPair.diagnostics' })).toBeNull();
   });
 
@@ -150,7 +161,6 @@ describe('ReadersToPair', () => {
     const user = userEvent.setup();
     render(<ReadersToPair onPaired={mocks.onPaired} readers={[reader(3, 'revoked')]} />);
     await user.click(document.querySelector('[data-cy="attractap-pair-reader-3"]') as HTMLElement);
-    expect(mocks.requestPairing).not.toHaveBeenCalled();
     expect(mocks.pairingDialog).toHaveBeenLastCalledWith(
       expect.objectContaining({ isOpen: true, presetTargetReaderId: 3 }),
     );
@@ -167,35 +177,11 @@ describe('ReadersToPair', () => {
     expect(mocks.pairingDialog).toHaveBeenLastCalledWith(expect.objectContaining({ isOpen: false }));
   });
 
-  it('asks a token reader to pair and lets the dialog wait for it', async () => {
-    const user = userEvent.setup();
-    render(<ReadersToPair onPaired={mocks.onPaired} readers={[reader(1, 'unpaired')]} />);
-
-    await user.click(screen.getByRole('button', { name: 'toPair.pair' }));
-    expect(mocks.requestPairing).toHaveBeenCalledWith({ readerId: 1 });
-    act(() => mocks.requestOptions.current?.onSuccess?.({ requested: true }, { readerId: 1 }));
-    expect(mocks.pairingDialog).toHaveBeenLastCalledWith(expect.objectContaining({ isOpen: true, waitForReaderId: 1 }));
-  });
-
-  it('tells the admin when the reader is offline', async () => {
-    const user = userEvent.setup();
-    render(<ReadersToPair onPaired={mocks.onPaired} readers={[reader(1, 'unpaired')]} />);
-    await user.click(screen.getByRole('button', { name: 'toPair.pair' }));
-    act(() => mocks.requestOptions.current?.onSuccess?.({ requested: false }, { readerId: 1 }));
-    expect(mocks.toast.error).toHaveBeenCalledWith({ title: 'toPair.notConnected' });
-  });
-
   it('opens a waiting new reader by its request, without any code', async () => {
     const user = userEvent.setup();
     mocks.pairings.current = [pairing('dev')];
     render(<ReadersToPair onPaired={mocks.onPaired} readers={[]} />);
     await user.click(screen.getByRole('button', { name: 'toPair.pair' }));
     expect(mocks.pairingDialog).toHaveBeenLastCalledWith(expect.objectContaining({ isOpen: true, pairingId: 'dev' }));
-  });
-
-  it('offers Continue for a pairing that already runs', () => {
-    mocks.pairings.current = [pairing('p1', { boundReaderId: 1, state: 'waiting' })];
-    render(<ReadersToPair onPaired={mocks.onPaired} readers={[reader(1, 'unpaired')]} />);
-    expect(screen.getByRole('button', { name: 'toPair.resume' })).toBeInTheDocument();
   });
 });

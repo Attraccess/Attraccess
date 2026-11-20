@@ -16,11 +16,11 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...((await importOriginal()) as object),
-  useResourcesServiceGetOneResourceById: () => ({ data: { id: 7, name: 'Laser Cutter' } }),
-  useResourceFormsServiceResourceFormsGetOne: () => ({ data: undefined, isLoading: false }),
-  useResourceFormsServiceResourceFormsCreate: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useResourceFormsServiceResourceFormsUpdate: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useResourceFormsServiceResourceFormsDelete: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useGetOneResourceById: () => ({ data: { id: 7, name: 'Laser Cutter' } }),
+  useResourceFormsGetOne: () => ({ data: undefined, isLoading: false }),
+  useResourceFormsCreate: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useResourceFormsUpdate: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useResourceFormsDelete: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 function renderEditor() {

@@ -6,6 +6,8 @@ cd "$REPO_ROOT"
 
 if [[ "$#" -gt 1 ]]; then echo "Usage: $0 [--workspace-only]" >&2; exit 1; fi
 
+"$REPO_ROOT/scripts/check-database-type.sh" > /dev/null
+
 case "${1:-}" in
     "")
         . "$REPO_ROOT/scripts/setup-host-dependencies.sh"

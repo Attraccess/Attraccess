@@ -35,7 +35,18 @@ Standardmäßig kann eine Maschine jeweils von einer Person genutzt werden. Wenn
 Das Limit kann jederzeit gesenkt werden. Laufende Sitzungen werden nie automatisch beendet; neue Starts sind blockiert, bis weniger Sitzungen als das Limit aktiv sind. Liegt das neue Limit unter der Zahl der aktuell aktiven Sitzungen, zeigt die Einstellungsseite einen Hinweis an. Wird das Limit über 1 erhöht, erscheint außerdem eine Warnung zu Flows.
 
 > [!WARNING]
-> [Flows](flows/overview.md) und Abrechnung berücksichtigen nicht, wie viele Sitzungen laufen. Flows laufen bei jedem Sitzungsstart und -ende. Ein Flow, der beim Sitzungsende den Strom abschaltet, schaltet ihn daher für alle Nutzenden der Maschine ab. Zähler und Laufzeit werden nur einer einzigen Sitzung berechnet. Lesen Sie [Gemeinsam genutzte Maschinen](resources/usage-tracking.md#gemeinsam-genutzte-maschinen-parallele-sitzungen), bevor Sie parallele Sitzungen an einer Maschine mit Stromsteuerung oder Zählerabrechnung aktivieren.
+> [Flows](flows/overview.md) laufen bei jedem Sitzungsstart und -ende. Ein Flow, der beim Sitzungsende den Strom abschaltet, schaltet ihn daher für alle Nutzenden der Maschine ab, sofern er nicht die Anzahl aktiver Sitzungen prüft. Zähler und Laufzeit werden fair auf die Personen aufgeteilt, die die Maschine gleichzeitig nutzen; Nutzungsgebühr und Sitzungszeit bleiben pro Person. Lesen Sie [Gemeinsam genutzte Maschinen](resources/usage-tracking.md#gemeinsam-genutzte-maschinen-parallele-sitzungen), bevor Sie parallele Sitzungen an einer Maschine mit Stromsteuerung oder Zählerabrechnung aktivieren.
+
+### Tür-Optionen
+
+Eine Tür bietet standardmäßig **Abschließen** und **Aufschließen**. In den Ressourceneinstellungen unter **Ressourcentyp und Verhalten** (bei ausgewähltem Typ **Tür**) können Sie das ändern:
+
+- **Aufsperren und Falle öffnen separat** fügt die dritte Aktion **Falle öffnen** hinzu, für Türen, deren Schloss und Falle in zwei Schritten geöffnet werden.
+- **Nur Zutritt** ist für Türen gedacht, die nicht aufgeschlossen bleiben können, etwa eine Tür, die kurz öffnet und danach von selbst wieder schließt. Die Tür hat dann nur die Aktion **Öffnen**. Abschließen und Falle öffnen werden nicht angeboten und überall abgelehnt: in der Web-App, an Lesern und über die API.
+
+Die beiden Optionen lassen sich nicht kombinieren: Ist eine eingeschaltet, ist die andere gesperrt. Nur Türen können „Nur Zutritt“ sein.
+
+Ein Öffnen wird als Aufschließen gespeichert. Die Nutzungshistorie zeigt es als **Geöffnet**, und [Flows](flows/overview.md) mit dem Auslöser **Tür entriegelt** laufen auch dafür. Der Flow-Editor einer Nur-Zutritt-Tür bietet nur diesen Tür-Auslöser an: **Tür verriegelt** und **Tür-Falle geöffnet** würden nie ausgelöst. Die Bezeichnung in der Historie folgt der aktuellen Einstellung der Tür: Solange eine Tür „Nur Zutritt“ ist, erscheint auch ein früher gespeichertes Aufschließen als **Geöffnet**; ist die Option wieder aus, erscheint ihr Öffnen als **Aufgeschlossen**. Attractap-Leser mit älterer Firmware zeigen bei einer Nur-Zutritt-Tür **Aufschließen** an; das öffnet die Tür. Ihr **Abschließen** wird abgelehnt.
 
 ## Ressource bearbeiten
 

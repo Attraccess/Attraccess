@@ -1,14 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import {
-  Form,
-  FormField,
   FormFieldType,
-  FormSubmission,
-  Resource,
   ResourceFormAction,
-} from '@attraccess/database-entities';
+  type FormFieldRecord,
+  type FormRecord,
+} from '@attraccess/application-models';
+import { RESOURCE_FORM_STORE } from '../../../../resources/forms/forms-store.port';
 import { ResourceFormsService } from '../../../../resources/forms/forms.service';
 import { AttractapFormsHandler } from '../forms/forms.handler';
 import { ReaderStartGate } from './reader-start-gate.service';
@@ -35,7 +33,7 @@ import { ResourceOperatingAttributionService } from '../../../../resources/opera
 // draft as complete and does NOT re-request the form. The device-side guard
 // against a *duplicate/retried* form request lives in the firmware (handleFormsRequest).
 
-const makeField = (overrides: Partial<FormField>): FormField =>
+const makeField = (overrides: Partial<FormFieldRecord>): FormFieldRecord =>
   ({
     id: 1,
     formId: 1,
@@ -44,15 +42,16 @@ const makeField = (overrides: Partial<FormField>): FormField =>
     isRequired: false,
     description: null,
     options: null,
+    position: 0,
     ...overrides,
-  }) as FormField;
+  }) as FormFieldRecord;
 
 describe('ATT-545 attractap paged form session flow (server does not re-request a completed form)', () => {
   const RESOURCE_ID = 5;
   const FORM_ID = 7;
   const ACTION = ResourceFormAction.START;
 
-  const form: Form = {
+  const form: FormRecord = {
     id: FORM_ID,
     name: 'Safety',
     resourceId: RESOURCE_ID,
@@ -65,7 +64,7 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
       makeField({ id: 13, name: 'Confirm', type: FormFieldType.BOOLEAN, isRequired: true }),
       makeField({ id: 14, name: 'Color', type: FormFieldType.SELECT, isRequired: true, options: ['red', 'blue'] }),
     ],
-  } as Form;
+  } as FormRecord;
 
   let formsHandler: AttractapFormsHandler;
   let sessionHandler: AttractapSessionHandler;
@@ -79,18 +78,18 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
       .mockResolvedValue({ id: 999, userId: 7, startTime: new Date(0), endTime: new Date(1426999) });
     form.isRequiredOnResourceUsageEnd = false;
 
-    const formRepo = { find: jest.fn().mockResolvedValue([form]), findOne: jest.fn().mockResolvedValue(form) };
-    const resourceRepo = { findOne: jest.fn().mockResolvedValue({ id: RESOURCE_ID } as Resource) };
+    const formStore = {
+      resourceExists: jest.fn().mockResolvedValue(true),
+      findRequiredForAction: jest.fn().mockResolvedValue([form]),
+      findForm: jest.fn().mockResolvedValue(form),
+    };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         ResourceFormsService,
         AttractapFormsHandler,
         AttractapSessionHandler,
-        { provide: getRepositoryToken(Form), useValue: formRepo },
-        { provide: getRepositoryToken(FormField), useValue: { find: jest.fn() } },
-        { provide: getRepositoryToken(FormSubmission), useValue: { save: jest.fn() } },
-        { provide: getRepositoryToken(Resource), useValue: resourceRepo },
+        { provide: RESOURCE_FORM_STORE, useValue: formStore },
         { provide: ResourceActionGuard, useValue: { validateResourceAction: jest.fn().mockResolvedValue(true) } },
         { provide: AttractapService, useValue: { findReaderById: jest.fn().mockResolvedValue(null) } },
         { provide: UsersService, useValue: { findOne: jest.fn().mockResolvedValue({ id: 7 }) } },

@@ -3,7 +3,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { SidecarClientConfig } from '../client/rest-client';
 import { PLUGIN_CONTEXT } from '../plugin-context';
-import { CONNECTION_ROW_ID, MatterConnection } from './entity';
+import { matterStorage } from '../plugin-storage/access';
+import { CONNECTION_ROW_ID, type MatterConnection } from './entity';
 import { normalizeUrl, type SettingsInput } from './validation';
 
 export type PublicSettings = {
@@ -22,12 +23,12 @@ export class CredentialUnreadableError extends Error {}
 export class MatterSettingsService {
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
-  private get repository() {
-    return this.context.getRepository(MatterConnection);
+  private get storage() {
+    return matterStorage(this.context);
   }
 
   async publicView(): Promise<PublicSettings> {
-    const row = await this.repository.findOneBy({ id: CONNECTION_ROW_ID });
+    const row = await this.storage.tables.connection.get(CONNECTION_ROW_ID);
     if (!row) {
       return {
         url: null,
@@ -48,7 +49,7 @@ export class MatterSettingsService {
 
   /** The decrypted settings for the sidecar client, or null when nothing is configured. */
   async clientConfig(): Promise<SidecarClientConfig | null> {
-    const row = await this.repository.findOneBy({ id: CONNECTION_ROW_ID });
+    const row = await this.storage.tables.connection.get(CONNECTION_ROW_ID);
     if (!row) return null;
     try {
       return {
@@ -61,32 +62,48 @@ export class MatterSettingsService {
     }
   }
 
-  async save(input: SettingsInput, userId: number | null): Promise<{ credentialChanged: boolean; caChanged: boolean }> {
-    const existing = await this.repository.findOneBy({ id: CONNECTION_ROW_ID });
-    if (!existing && input.credential === undefined) {
-      throw new MissingCredentialError('credential: The credential is required for the first configuration.');
-    }
-    const now = new Date().toISOString();
-    const url = normalizeUrl(input.url) as string;
-    const caCertificate = input.caCertificate === undefined ? (existing?.caCertificate ?? null) : input.caCertificate;
-    const credentialChanged = input.credential !== undefined;
-    await this.repository.save({
-      id: CONNECTION_ROW_ID,
-      url,
-      encryptedCredential: credentialChanged
-        ? this.context.secrets.encrypt(input.credential as string)
-        : (existing as MatterConnection).encryptedCredential,
-      caCertificate,
-      credentialUpdatedAt: credentialChanged || !existing ? now : existing.credentialUpdatedAt,
-      updatedAt: now,
-      updatedBy: userId,
+  /** Read and write in one host transaction, so a concurrent save cannot slip between them. */
+  save(input: SettingsInput, userId: number | null): Promise<{ credentialChanged: boolean; caChanged: boolean }> {
+    return this.storage.transaction(async (tables) => {
+      const existing = await tables.connection.get(CONNECTION_ROW_ID);
+      if (!existing && input.credential === undefined) {
+        throw new MissingCredentialError('credential: The credential is required for the first configuration.');
+      }
+      const now = new Date().toISOString();
+      const url = normalizeUrl(input.url) as string;
+      const caCertificate = input.caCertificate === undefined ? (existing?.caCertificate ?? null) : input.caCertificate;
+      // The stored credential is only ever sent to the endpoint it was entered for. Otherwise anyone allowed to save
+      // the settings could point the URL (or the trusted CA) at their own server and capture the sidecar's token.
+      if (
+        existing &&
+        input.credential === undefined &&
+        (url !== existing.url || caCertificate !== existing.caCertificate)
+      ) {
+        throw new MissingCredentialError(
+          'credential: Enter the credential again when changing the URL or the CA certificate.',
+        );
+      }
+      const credentialChanged = input.credential !== undefined;
+      await tables.connection.upsert(
+        {
+          id: CONNECTION_ROW_ID,
+          url,
+          encryptedCredential: credentialChanged
+            ? this.context.secrets.encrypt(input.credential as string)
+            : (existing as MatterConnection).encryptedCredential,
+          caCertificate,
+          credentialUpdatedAt: credentialChanged || !existing ? now : existing.credentialUpdatedAt,
+          updatedAt: now,
+          updatedBy: userId,
+        },
+        { conflictOn: ['id'] },
+      );
+      return { credentialChanged, caChanged: caCertificate !== (existing?.caCertificate ?? null) };
     });
-    return { credentialChanged, caChanged: caCertificate !== (existing?.caCertificate ?? null) };
   }
 
-  async remove(): Promise<boolean> {
-    const result = await this.repository.delete({ id: CONNECTION_ROW_ID });
-    return (result.affected ?? 0) > 0;
+  remove(): Promise<boolean> {
+    return this.storage.transaction(async (tables) => (await tables.connection.delete({ id: CONNECTION_ROW_ID })) > 0);
   }
 
   /** Records a settings change. Details are flags only. A missing or failing audit sink never fails the request. */

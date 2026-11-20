@@ -1,24 +1,36 @@
-import {
-  MeteringCollectNodeDataSchema,
-  MeteringStartNodeDataSchema,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-} from '@attraccess/database-entities';
+import { z } from 'zod';
+import { MeteringDefinitionFlow, ResourceFlowNodeType } from '@attraccess/application-models';
+
+const MeterIdSchema = z.number().int().positive();
+
+const TimeoutSecondsSchema = z.number().int().positive().max(600).default(30);
+
+/**
+ * The settings of a meter's start and collect nodes. They mirror the node data schemas the flow editor validates
+ * against (`MeteringStartNodeDataSchema`, `MeteringCollectNodeDataSchema`); a persistence test keeps the two equal.
+ */
+export const MeteringStartSettingsSchema = z.object({
+  meterId: MeterIdSchema,
+  timeoutSeconds: TimeoutSecondsSchema,
+});
+
+export const MeteringCollectSettingsSchema = z.object({
+  meterId: MeterIdSchema,
+  timeoutSeconds: TimeoutSecondsSchema,
+  interimIntervalMinutes: z.number().int().min(0).max(1440).default(1),
+  finalAttempts: z.number().int().min(1).max(10).default(3),
+  finalRetryDelaySeconds: z.number().int().min(0).max(120).default(5),
+});
 
 export type MeterProblem =
-  'start-trigger-missing' | 'ready-unreachable' | 'collect-trigger-missing' | 'report-unreachable';
+  | 'start-trigger-missing'
+  | 'ready-unreachable'
+  | 'collect-trigger-missing'
+  | 'report-unreachable'
+  /** Several sessions share the machine, but the meter cannot be read on demand to split its consumption. */
+  | 'shared-needs-collect';
 
-export function meterDefinitionFromFlow(
-  meterId: number,
-  {
-    allNodes,
-    edges,
-  }: {
-    allNodes: ResourceFlowNode[];
-    edges: ResourceFlowEdge[];
-  },
-) {
+export function meterDefinitionFromFlow(meterId: number, { allNodes, edges }: MeteringDefinitionFlow) {
   const nodes = allNodes.filter((n) => !String(n.type).includes('.metering.') || n.data?.meterId === meterId);
   const reachable = (triggerType: ResourceFlowNodeType, sinkType: ResourceFlowNodeType): boolean => {
     const types = new Map(nodes.map((node) => [node.id, node.type]));
@@ -58,8 +70,8 @@ export function meterDefinitionFromFlow(
     configured: incrementOnly || problems.length === 0,
     problems: incrementOnly ? [] : problems,
     incrementOnly,
-    start: MeteringStartNodeDataSchema.parse(startNode?.data ?? { meterId }),
-    collect: MeteringCollectNodeDataSchema.parse(collectNode?.data ?? { meterId }),
+    start: MeteringStartSettingsSchema.parse(startNode?.data ?? { meterId }),
+    collect: MeteringCollectSettingsSchema.parse(collectNode?.data ?? { meterId }),
     hasCollection: !!collectNode,
   };
 }

@@ -1,9 +1,8 @@
-import { ResourceFlowEdge, ResourceFlowNode } from '@attraccess/database-entities';
 import type { MqttClient } from 'mqtt';
 import { type Server, type Socket, createServer } from 'node:net';
 import { join } from 'node:path';
 import 'reflect-metadata';
-import { DataSource } from 'typeorm';
+import type { WagoTestStorage } from '../../backend/storage/testing';
 import { WagoFlowService } from '../../backend/flow/service';
 import { WagoService } from '../../backend/controllers/service';
 import { WagoRuntime, type Snapshot, validateSnapshot } from '../../cc100-runtime/src/runtime';
@@ -12,6 +11,18 @@ import { Logger } from '@nestjs/common';
 import { writeFile } from 'node:fs/promises';
 import { validateSnapshot as validateBackend } from '../../backend/configuration/model';
 
+/** The saved-graph rows the host's flow executor reads: only the fields it traverses. */
+export type FixtureFlowNode = {
+  id: string;
+  type: string;
+  resourceId: number | null;
+  flowId: number | null;
+  data: object;
+  position: { x: number; y: number };
+  createdAt: Date;
+  updatedAt: Date;
+};
+export type FixtureFlowEdge = { source: string; target: string; sourceHandle: string };
 export const temporary = process.env.WAGO_FLEET_TEMP ?? '';
 export const prefix = `fixture/${randomUUID()}`;
 export const hardwareId = 'production-fleet-fixture';
@@ -51,7 +62,7 @@ export async function eventually(assertion: () => void | Promise<void>, timeout 
 }
 
 export class FleetFixtureState {
-  database!: DataSource;
+  storage!: WagoTestStorage;
   runtime!: WagoRuntime;
   backend!: WagoService;
   flow!: WagoFlowService;
@@ -72,8 +83,8 @@ export class FleetFixtureState {
   warnings: string[] = [];
   logs: Log[] = [];
   modbusRequests: Buffer[] = [];
-  nodes: ResourceFlowNode[] = [];
-  edges: ResourceFlowEdge[] = [];
+  nodes: FixtureFlowNode[] = [];
+  edges: FixtureFlowEdge[] = [];
   din = join(temporary ?? '', 'din');
   dout = join(temporary ?? '', 'dout');
   statePath = join(temporary ?? '', 'runtime.json');
@@ -100,25 +111,23 @@ export class FleetFixtureState {
       ],
     ] as const;
     definitions.forEach(([type, data], index) => {
-      this.nodes.push(
-        Object.assign(new ResourceFlowNode(), {
-          id: `${id}-${index}`,
-          type: `plugin.wago.${type}`,
-          // Resource-flow rows; a global-flow row would set flowId and leave resourceId null.
-          resourceId: 1,
-          flowId: null,
-          data,
-          position: { x: index * 100, y: 0 },
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }),
-      );
+      this.nodes.push({
+        id: `${id}-${index}`,
+        type: `plugin.wago.${type}`,
+        // Resource-flow rows; a global-flow row would set flowId and leave resourceId null.
+        resourceId: 1,
+        flowId: null,
+        data,
+        position: { x: index * 100, y: 0 },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
       if (index)
         this.edges.push({
           source: `${id}-${index - 1}`,
           target: `${id}-${index}`,
           sourceHandle: 'output',
-        } as ResourceFlowEdge);
+        });
     });
   }
 

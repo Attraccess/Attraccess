@@ -4,8 +4,8 @@ import {
   ConversationListItemDto,
   Message,
   UnreadCountResponseDto,
-  UseMessagingServiceMessagingGetUnreadCountKeyFn,
-  UseMessagingServiceMessagingListConversationsKeyFn,
+  UseMessagingGetUnreadCountKeyFn,
+  UseMessagingListConversationsKeyFn,
 } from '@attraccess/react-query-client';
 import { applyIncomingMessage } from './messageCache';
 
@@ -29,24 +29,20 @@ function makeMessage(senderId: number, overrides: Partial<Message> = {}): Messag
 }
 
 function seedCaches(queryClient: QueryClient) {
-  queryClient.setQueryData<ConversationListItemDto[]>(UseMessagingServiceMessagingListConversationsKeyFn(), [
+  queryClient.setQueryData<ConversationListItemDto[]>(UseMessagingListConversationsKeyFn(), [
     { id: CONVERSATION_ID, unreadCount: 0 } as unknown as ConversationListItemDto,
   ]);
-  queryClient.setQueryData<UnreadCountResponseDto>(UseMessagingServiceMessagingGetUnreadCountKeyFn(), { total: 0 });
+  queryClient.setQueryData<UnreadCountResponseDto>(UseMessagingGetUnreadCountKeyFn(), { total: 0 });
 }
 
 function readUnread(queryClient: QueryClient) {
-  const list = queryClient.getQueryData<ConversationListItemDto[]>(
-    UseMessagingServiceMessagingListConversationsKeyFn(),
-  );
-  const total = queryClient.getQueryData<UnreadCountResponseDto>(
-    UseMessagingServiceMessagingGetUnreadCountKeyFn(),
-  );
+  const list = queryClient.getQueryData<ConversationListItemDto[]>(UseMessagingListConversationsKeyFn());
+  const total = queryClient.getQueryData<UnreadCountResponseDto>(UseMessagingGetUnreadCountKeyFn());
   return { conversationUnread: list?.[0]?.unreadCount ?? 0, total: total?.total ?? 0 };
 }
 
 describe('applyIncomingMessage', () => {
-  it('does not increase unread counters for the sender\'s own message', () => {
+  it("does not increase unread counters for the sender's own message", () => {
     const queryClient = new QueryClient();
     seedCaches(queryClient);
 

@@ -11,7 +11,7 @@ import {
   TableScrollContainer,
 } from '@heroui/react';
 import { DateTimeDisplay, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useProjectsServiceGetProjectUsageHistory, ResourceUsage } from '@attraccess/react-query-client';
+import { useGetProjectUsageHistory, ResourceUsage } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
 import { UsageNotesModal } from '../../../../resources/usage/components/UsageNotesModal';
@@ -30,11 +30,7 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
   const [selectedSession, setSelectedSession] = useState<ResourceUsage | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { data } = useProjectsServiceGetProjectUsageHistory({
-    id: projectId,
-    page,
-    limit: ROWS_PER_PAGE,
-  });
+  const { data } = useGetProjectUsageHistory({ path: { id: projectId }, query: { page, limit: ROWS_PER_PAGE } });
 
   const handleRowAction = useCallback(
     (session: ResourceUsage) => {
@@ -73,6 +69,7 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
                 </TableHeader>
                 <TableBody
                   items={data?.data ?? []}
+                  dependencies={[t]}
                   renderEmptyState={() => <EmptyState message={t('history.empty')} />}
                 >
                   {(session: ResourceUsage) => (
@@ -80,7 +77,7 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
                       key={session.id}
                       id={session.id}
                       className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
-                      onClick={() => handleRowAction(session)}
+                      onAction={() => handleRowAction(session)}
                     >
                       <TableCell>{session.resource?.name ?? '—'}</TableCell>
                       <TableCell>

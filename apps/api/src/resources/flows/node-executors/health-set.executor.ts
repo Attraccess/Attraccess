@@ -1,10 +1,10 @@
 import {
-  ResourceFlowNode,
+  FlowNodeRecord,
+  HealthStateOptionEnum,
   ResourceHealthSetNodeDataSchema,
   ResourceHealthSource,
   ResourceHealthStatus,
-  HealthStateOptionEnum,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 import { get } from 'lodash-es';
 import { ResourceHealthService } from '../../health/resource-health.service';
 import { FlowExecutionError } from '../errors/flow-execution.error';
@@ -14,7 +14,7 @@ import { requireRunResourceId } from './flow.utils';
 export class HealthSetExecutor implements NodeExecutor {
   constructor(private readonly resourceHealthService: ResourceHealthService) {}
 
-  async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+  async execute(node: FlowNodeRecord, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
     const parsed = ResourceHealthSetNodeDataSchema.safeParse(node.data ?? {});
     if (!parsed.success) {
       throw new FlowExecutionError(`Invalid health-set node data: ${parsed.error.message}`);

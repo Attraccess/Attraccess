@@ -1,4 +1,4 @@
-import type { User } from '@attraccess/database-entities';
+import type { PluginNotificationRecipient } from '../persistence/plugin-host-data.port';
 import {
   registerPluginNotificationCategories,
   unregisterPluginNotificationCategories,
@@ -12,8 +12,8 @@ import {
 } from './plugin-notifications';
 
 describe('plugin notifications context', () => {
-  const alice = { id: 1, email: 'a@example.com' } as User;
-  const bob = { id: 2, email: 'b@example.com' } as User;
+  const alice = { id: 1, email: 'a@example.com' } as PluginNotificationRecipient;
+  const bob = { id: 2, email: 'b@example.com' } as PluginNotificationRecipient;
   let deps: jest.Mocked<{
     dispatch: jest.Mock;
     sendPluginEmail: jest.Mock;

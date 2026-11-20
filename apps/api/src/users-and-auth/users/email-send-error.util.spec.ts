@@ -14,6 +14,14 @@ describe('mapEmailSendError', () => {
     },
   );
 
+  it.each(['ECONNREFUSED', 'ENOTFOUND'])(
+    'maps a nodemailer socket error wrapping %s to a service-unavailable error',
+    (originalCode) => {
+      const error = Object.assign(new Error('connect failed'), { code: 'ESOCKET', originalCode });
+      expect(() => mapEmailSendError(error)).toThrow(ServiceUnavailableException);
+    },
+  );
+
   it('rethrows unrelated errors unchanged', () => {
     const error = new Error('unrelated');
     expect(() => mapEmailSendError(error)).toThrow(error);

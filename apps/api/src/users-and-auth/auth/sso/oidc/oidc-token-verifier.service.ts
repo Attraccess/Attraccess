@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { SSOProviderOIDCConfiguration } from '@attraccess/database-entities';
+import type { SsoOidcConfigurationRecord } from '@attraccess/application-models';
 import axios from 'axios';
 import { createLocalJWKSet, jwtVerify, JWTPayload, JSONWebKeySet } from 'jose';
 import { OIDC_SIGNING_ALGORITHMS, trustedEndpoint } from '../logout-endpoints';
@@ -18,7 +18,7 @@ export class OidcVerificationUnavailableError extends Error {}
 export class OidcTokenVerifier {
   private readonly cache = new Map<string, { expires: number; value: unknown }>();
 
-  private configKey(config: SSOProviderOIDCConfiguration): string {
+  private configKey(config: SsoOidcConfigurationRecord): string {
     return (
       JSON.stringify([
         config.ssoProviderId,
@@ -50,7 +50,7 @@ export class OidcTokenVerifier {
   }
 
   async metadata(
-    config: SSOProviderOIDCConfiguration,
+    config: SsoOidcConfigurationRecord,
     includeEndSession = false,
   ): Promise<{ jwksURL: string; endSessionURL?: string }> {
     // Configuration is read afresh per call. Changing explicit endpoints takes effect immediately.
@@ -76,7 +76,7 @@ export class OidcTokenVerifier {
     return { jwksURL, endSessionURL };
   }
 
-  async verify(token: string, config: SSOProviderOIDCConfiguration, logout = false): Promise<JWTPayload> {
+  async verify(token: string, config: SsoOidcConfigurationRecord, logout = false): Promise<JWTPayload> {
     if (typeof token !== 'string' || token.length > 32768) throw new BadRequestException('Invalid OIDC token');
     const algorithms = config.signingAlgorithms?.length ? config.signingAlgorithms : ['RS256'];
     if (algorithms.some((algorithm) => !OIDC_SIGNING_ALGORITHMS.includes(algorithm)))

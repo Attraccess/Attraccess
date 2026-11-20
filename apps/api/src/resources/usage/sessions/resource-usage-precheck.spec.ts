@@ -1,21 +1,22 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { Resource, ResourceType, SupervisionMode, User } from '@attraccess/database-entities';
+import { ResourceType, SupervisionMode } from '@attraccess/application-models';
+import type { UsageSessionResource, UsageSessionUser } from '@attraccess/application-models';
+import { AlreadyHasActiveSessionError } from '../errors/already-has-active-session.error';
 import { ResourceInUseError } from '../errors/resource-in-use.error';
-import { resetTestFixture } from './fixtures/setup.test-fixture';
-import { createResourceUsageServiceFixture } from './fixtures/service.test-fixture';
+import { createFakeStoreUsageScope } from './fixtures/fake-store.test-fixture';
 import { usageInternals } from './fixtures/compose.test-fixture';
 
 describe('ResourceUsageService.precheckStart', () => {
-  const scope = createResourceUsageServiceFixture();
-  const user = { id: 7 } as User;
-  const machine = (overrides: Partial<Resource> = {}) =>
+  let scope: Awaited<ReturnType<typeof createFakeStoreUsageScope>>;
+  const user = { id: 7 } as UsageSessionUser;
+  const machine = (overrides: Partial<UsageSessionResource> = {}) =>
     ({
       id: 3,
       type: ResourceType.Machine,
       supervisionMode: SupervisionMode.NONE,
       allowTakeOver: false,
       ...overrides,
-    }) as Resource;
+    }) as UsageSessionResource;
 
   // The mixed-in helpers are exercised elsewhere; here only the refusal order matters.
   type Internals = {
@@ -24,11 +25,12 @@ describe('ResourceUsageService.precheckStart', () => {
     validateSupervisedStart: jest.Mock;
     getActiveSession: jest.Mock;
     assertLifecycleAvailable: jest.Mock;
+    getSessionLimit: jest.Mock;
   };
   let internals: Internals;
 
   beforeEach(async () => {
-    await resetTestFixture(scope);
+    scope = await createFakeStoreUsageScope();
     const parts = usageInternals(scope.service);
     internals = {
       getResource: jest.spyOn(parts.gate as never, 'getResource').mockResolvedValue(machine() as never) as never,
@@ -44,6 +46,7 @@ describe('ResourceUsageService.precheckStart', () => {
       assertLifecycleAvailable: jest
         .spyOn(parts.lifecycle as never, 'assertLifecycleAvailable')
         .mockResolvedValue(undefined as never) as never,
+      getSessionLimit: jest.spyOn(parts.lifecycle as never, 'getSessionLimit').mockResolvedValue(1 as never) as never,
     };
   });
 
@@ -61,6 +64,19 @@ describe('ResourceUsageService.precheckStart', () => {
     internals.assertLifecycleAvailable.mockRejectedValue(new ConflictException('in progress'));
     await expect(scope.service.precheckStart(3, user, {})).rejects.toBeInstanceOf(ConflictException);
     expect(internals.getResource).not.toHaveBeenCalled();
+  });
+
+  it('tells the lifecycle check whether the machine is shared, like the real start', async () => {
+    await scope.service.precheckStart(3, user, {});
+    expect(internals.assertLifecycleAvailable).toHaveBeenLastCalledWith(undefined, 3, false);
+    internals.getSessionLimit.mockResolvedValue(2);
+    internals.getResource.mockResolvedValue(machine({ maxParallelSessions: 2 }));
+    // The caller's own session ends the shared-machine precheck before any slot is counted.
+    jest
+      .spyOn(usageInternals(scope.service).records as never, 'getActiveSessionsForResource')
+      .mockResolvedValue([{ userId: 7 }] as never);
+    await expect(scope.service.precheckStart(3, user, {})).rejects.toBeInstanceOf(AlreadyHasActiveSessionError);
+    expect(internals.assertLifecycleAvailable).toHaveBeenLastCalledWith(undefined, 3, true);
   });
 
   it('refuses a user who has not completed the introduction', async () => {

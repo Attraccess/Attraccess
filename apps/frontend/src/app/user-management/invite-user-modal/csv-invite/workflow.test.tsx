@@ -18,9 +18,9 @@ vi.mock('../../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: state.success, error: state.error }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useRbacServiceListRoles: () => ({ data: [{ key: 'member' }] }),
-  useUsersServiceFindManyKey: 'users',
-  useUsersServiceInviteUsersFromCsv: (options: typeof state.options) => {
+  useListRoles: () => ({ data: [{ key: 'member' }] }),
+  useFindManyKey: 'users',
+  useInviteUsersFromCsv: (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
     return { mutate: state.invite };
   },
@@ -66,7 +66,7 @@ it('parses a real CSV preview, maps identity and role columns, skips distinct re
   expect(screen.getByText('Ada')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'actions.invite' }));
   expect(state.invite).toHaveBeenLastCalledWith({
-    formData: {
+    body: {
       file: state.file,
       config: { emailKey: 'email', usernameKey: 'user', roleKeyColumn: 'role', ignoredRows: [] },
     },
@@ -85,7 +85,7 @@ it('parses a real CSV preview, maps identity and role columns, skips distinct re
   expect(screen.getByText('Invalid address')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'actions.inviteIgnore' }));
   expect(state.invite).toHaveBeenLastCalledWith({
-    formData: {
+    body: {
       file: state.file,
       config: { emailKey: 'email', usernameKey: 'user', roleKeyColumn: 'role', ignoredRows: [2, 3] },
     },

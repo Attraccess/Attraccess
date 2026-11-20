@@ -78,8 +78,7 @@ describe('settings services', () => {
     h.settings.invalidate(2);
     await h.settings.warmUp();
     expect(h.settings.isWarm).toBe(true);
-    const spy = jest.spyOn(h.dataSource, 'query');
-    const manager = jest.spyOn(h.dataSource, 'getRepository');
+    h.storageCalls.length = 0;
     expect(h.settings.getCachedSettings(1)).toMatchObject({
       enabled: true,
       confirmWindowMinutes: 45,
@@ -88,8 +87,7 @@ describe('settings services', () => {
     expect(h.settings.getCachedSettings(2).enabled).toBe(true);
     expect(h.settings.getCachedSettings(404)).toMatchObject({ enabled: false, resourceId: 404 });
     expect(h.settings.getEnabledResourceIds().sort()).toEqual([1, 2]);
-    expect(spy).not.toHaveBeenCalled();
-    expect(manager).not.toHaveBeenCalled();
+    expect(h.storageCalls).toEqual([]);
   });
 
   it('refreshes the cache on writes', async () => {

@@ -1,11 +1,11 @@
+import { controllerRow, revisionRow } from '../rows.test-utils';
+import { createWagoTestStorage } from '../storage/testing';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { encodeMeasurement } from '../../measurement-contract';
 import { parseOperationalMessage } from '../protocol/index';
-import { WagoConfigurationRevision } from '../configuration/revision.entity';
-import { WagoController } from '../controllers/entity';
+import type { WagoConfigurationRevision } from '../configuration/revision.entity';
 import { WagoFlowService } from './service';
 import { STREAM_A, STREAM_B } from './model';
-import { WagoSettings } from '../controllers/settings.entity';
 
 describe('WagoFlowService canonical protocol and freshness', () => {
   beforeEach(() => {
@@ -15,7 +15,7 @@ describe('WagoFlowService canonical protocol and freshness', () => {
 
   afterEach(() => jest.useRealTimers());
 
-  const controller = { id: 1, hardwareId: 'cc100-01', trustState: 'claimed', mqttServerId: null } as WagoController;
+  const controller = { id: 1, hardwareId: 'cc100-01', trustState: 'claimed', mqttServerId: null };
 
   const revision = {
     controllerId: 1,
@@ -25,43 +25,25 @@ describe('WagoFlowService canonical protocol and freshness', () => {
     snapshot: JSON.stringify({ logicalChannels: [{ id: 'door', capabilities: ['output'] }] }),
   } as WagoConfigurationRevision;
 
-  function createService() {
+  async function createService() {
     const trigger = jest.fn().mockResolvedValue(undefined);
-    const controllerRepository = { find: jest.fn().mockResolvedValue([controller]), findOneBy: jest.fn() };
-    const revisionQuery = {
-      innerJoin: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      getMany: jest.fn().mockResolvedValue([revision]),
+    const storage = createWagoTestStorage();
+    await storage.tables.controllers.insert(controllerRow({ ...controller }));
+    await storage.tables.settings.insert({ id: 1, defaultMqttServerId: 2, operationalPrefix: 'attraccess/wago' });
+    /** Replaces the controller's applied revisions, as a newly applied configuration does. */
+    const setApplied = async (revisions: WagoConfigurationRevision[]) => {
+      await storage.tables.configurationRevisions.delete({ controllerId: 1 });
+      await storage.tables.configurationRevisions.insertMany(revisions.map((item) => revisionRow({ ...item })));
     };
-    const revisionRepository = {
-      find: jest.fn().mockResolvedValue([revision]),
-      createQueryBuilder: jest.fn().mockReturnValue(revisionQuery),
-    };
-    const settingsRepository = {
-      findOneBy: jest
-        .fn()
-        .mockResolvedValue({ id: 1, defaultMqttServerId: 2, operationalPrefix: 'attraccess/wago' } as WagoSettings),
-    };
+    await setApplied([revision]);
     const context = {
-      getRepository: jest.fn((entity) =>
-        entity === WagoController
-          ? controllerRepository
-          : entity === WagoConfigurationRevision
-            ? revisionRepository
-            : settingsRepository,
-      ),
+      storage: storage.storage,
+      persistence: storage.persistence,
       logger: { warn: jest.fn() },
       flows: { trigger },
       mqtt: { subscribe: jest.fn().mockResolvedValue({ unsubscribe: jest.fn() }) },
     } as unknown as PluginContext;
-    return {
-      service: new WagoFlowService(context),
-      trigger,
-      context,
-      revisionQuery,
-      revisionRepository,
-      controllerRepository,
-    };
+    return { service: new WagoFlowService(context), trigger, context, setApplied };
   }
 
   describe('wait freshness', () => {
@@ -92,7 +74,7 @@ describe('WagoFlowService canonical protocol and freshness', () => {
         ['stale', { age: 90_001 }],
         ['offline', { connected: false }],
       ] as const)('does not complete from a %s cached match', async (_name, options) => {
-        const { service } = createService();
+        const { service } = await createService();
         await service.refresh();
         await stateMessage(service, 1, options);
         const cached = service.read(config);
@@ -106,7 +88,7 @@ describe('WagoFlowService canonical protocol and freshness', () => {
       });
 
       it('completes immediately from a fresh retained match', async () => {
-        const { service } = createService();
+        const { service } = await createService();
         await service.refresh();
         await stateMessage(service, 1);
         await expect(service.wait(config)).resolves.toMatchObject({ value: true });
@@ -116,7 +98,7 @@ describe('WagoFlowService canonical protocol and freshness', () => {
       it.each([42, 2100, 5000])(
         'keeps flow reads and waits available with %i ms of positive clock skew',
         async (skew) => {
-          const { service } = createService();
+          const { service } = await createService();
           await service.refresh();
           await stateMessage(service, 1, { age: -skew });
           const cached = service.read(config);
@@ -131,7 +113,7 @@ describe('WagoFlowService canonical protocol and freshness', () => {
       );
 
       it('does not let future-dated samples block fresh updates after clock correction', async () => {
-        const { service } = createService();
+        const { service } = await createService();
         await service.refresh();
         const waiting = service.wait(config);
         await stateMessage(service, 10, { age: -60_000 });
@@ -144,7 +126,7 @@ describe('WagoFlowService canonical protocol and freshness', () => {
       });
 
       it('keeps a pending wait through stale and replayed matches until fresh reconnect state', async () => {
-        const { service } = createService();
+        const { service } = await createService();
         await service.refresh();
         const waiting = service.wait(config);
         await stateMessage(service, 10, { age: 90_001 });
@@ -158,7 +140,7 @@ describe('WagoFlowService canonical protocol and freshness', () => {
       });
 
       it('does not revive cached values when disconnect and reconnect omit the channel', async () => {
-        const { service } = createService();
+        const { service } = await createService();
         await service.refresh();
         await stateMessage(service, 1);
         await stateMessage(service, 2, { connected: false, outputs: {} });
@@ -174,7 +156,7 @@ describe('WagoFlowService canonical protocol and freshness', () => {
       });
 
       it('ages a previously fresh value using source time, without erasing readable state', async () => {
-        const { service } = createService();
+        const { service } = await createService();
         await service.refresh();
         await stateMessage(service, 1);
         await jest.advanceTimersByTimeAsync(90_001);
@@ -186,8 +168,8 @@ describe('WagoFlowService canonical protocol and freshness', () => {
       });
 
       it('keeps measurement waits unavailable across interleaved offline telemetry until a new connected sample', async () => {
-        const { service, revisionQuery } = createService();
-        revisionQuery.getMany.mockResolvedValue([
+        const { service, setApplied } = await createService();
+        await setApplied([
           {
             ...revision,
             snapshot: JSON.stringify({ logicalChannels: [{ id: 'door', capabilities: ['measurement'] }] }),
@@ -226,12 +208,12 @@ describe('WagoFlowService canonical protocol and freshness', () => {
       });
 
       it('bounds cache and queued dispatches while still resolving waits under backpressure', async () => {
-        const { service, trigger, revisionQuery } = createService();
+        const { service, trigger, setApplied } = await createService();
         const logicalChannels = Array.from({ length: 2_001 }, (_, index) => ({
           id: `channel-${index}`,
           capabilities: ['output'],
         }));
-        revisionQuery.getMany.mockResolvedValue([{ ...revision, snapshot: JSON.stringify({ logicalChannels }) }]);
+        await setApplied([{ ...revision, snapshot: JSON.stringify({ logicalChannels }) }]);
         let releaseDispatch: () => void;
         trigger.mockImplementationOnce(
           () =>
@@ -264,10 +246,8 @@ describe('WagoFlowService canonical protocol and freshness', () => {
         { id: 'power', capabilities: ['measurement'] },
       ];
       async function setup() {
-        const fixture = createService();
-        fixture.revisionQuery.getMany.mockResolvedValue([
-          { ...revision, snapshot: JSON.stringify({ logicalChannels: channels }) },
-        ]);
+        const fixture = await createService();
+        await fixture.setApplied([{ ...revision, snapshot: JSON.stringify({ logicalChannels: channels }) }]);
         await fixture.service.refresh();
         return fixture;
       }
@@ -430,9 +410,9 @@ describe('WagoFlowService canonical protocol and freshness', () => {
       );
 
       it('invalidates samples when the applied physical mapping changes and requires its reported revision/hash', async () => {
-        const { service, revisionQuery } = await setup();
+        const { service, setApplied } = await setup();
         await snapshot(service, 1, { inputs: { sensor: true } });
-        revisionQuery.getMany.mockResolvedValue([
+        await setApplied([
           {
             ...revision,
             revision: 2,

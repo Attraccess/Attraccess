@@ -1,18 +1,19 @@
-import { Button } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chip, InputGroup, Spinner, TextField } from '@heroui/react';
 import { CheckIcon, EyeIcon, EyeOffIcon, XIcon } from 'lucide-react';
 import type { PolicyError } from '@attraccess/shared';
 import {
-  PasswordPolicyAdminService,
   PasswordPolicyDto,
   PreviewPasswordResultDto,
   UpdatePasswordPolicyDto,
+  previewAdminPasswordPolicy,
 } from '@attraccess/react-query-client';
 
-const DEBOUNCE_MS = 400;
+import en from './en.json';
+import de from './de.json';
 
-type Translate = (key: string, vars?: Record<string, string | number>) => string;
+const DEBOUNCE_MS = 400;
 
 function toDraftPolicy(p: PasswordPolicyDto): UpdatePasswordPolicyDto {
   return {
@@ -38,7 +39,8 @@ function toDraftPolicy(p: PasswordPolicyDto): UpdatePasswordPolicyDto {
  * the fields beside it, and it evaluates the *unsaved* form values — which is what makes it worth
  * the round trip, since HIBP, zxcvbn and the common-password list can only run server-side.
  */
-export function PasswordPreview({ policy, t }: { policy: PasswordPolicyDto; t: Translate }) {
+export function PasswordPreview({ policy }: { policy: PasswordPolicyDto }) {
+  const { t } = useTranslations({ en, de });
   const [candidate, setCandidate] = useState('');
   const [reveal, setReveal] = useState(false);
   const [result, setResult] = useState<PreviewPasswordResultDto | null>(null);
@@ -61,10 +63,13 @@ export function PasswordPreview({ policy, t }: { policy: PasswordPolicyDto; t: T
     setLoading(true);
     const timer = window.setTimeout(() => {
       inflight.current?.cancel();
-      const promise = PasswordPolicyAdminService.previewAdminPasswordPolicy({
-        requestBody: { password: candidate, draftPolicy: draft },
-      });
-      inflight.current = { cancel: () => promise.cancel() };
+      const controller = new AbortController();
+      inflight.current = { cancel: () => controller.abort() };
+      const promise = previewAdminPasswordPolicy({
+        body: { password: candidate, draftPolicy: draft },
+        signal: controller.signal,
+        throwOnError: true,
+      }).then(({ data }) => data);
       promise
         .then((next) => {
           if (id !== generation.current) return;

@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Attractap } from '@attraccess/react-query-client';
@@ -19,17 +19,23 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }) }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAttractapServiceGetPairings: () => ({ data: mocks.pairings.current }),
-  useAttractapServiceGetReaderCredentialHistory: () => ({ data: mocks.history.current }),
-  useAttractapServiceRevokeReader: (options: { onSuccess?: () => void }) => {
+  useGetPairings: () => ({ data: mocks.pairings.current }),
+  useGetReaderCredentialHistory: () => ({ data: mocks.history.current }),
+  useRevokeReader: (_mutationKey: unknown, options: { onSuccess?: () => void }) => {
     mocks.revokeOptions.current = options;
-    return { mutate: mocks.revoke, isPending: false };
+    return {
+      mutateAsync: async (variables: unknown) => {
+        await mocks.revoke(variables);
+        mocks.revokeOptions.current?.onSuccess?.();
+      },
+      isPending: false,
+    };
   },
-  useAttractapServiceGetReadersKey: 'readers',
-  useAttractapServiceGetReadersToPairKey: 'readers-to-pair',
-  useAttractapServiceGetReaderCredentialHistoryKey: 'history',
-  UseAttractapServiceGetReaderByIdKeyFn: () => ['reader'],
-  useUsersServiceGetOneUserById: ({ id }: { id: number }) => ({ data: { id, username: `user-${id}` } }),
+  useGetReadersKey: 'readers',
+  useGetReadersToPairKey: 'readers-to-pair',
+  useGetReaderCredentialHistoryKey: 'history',
+  UseGetReaderByIdKeyFn: () => ['reader'],
+  useGetOneUserById: ({ path: { id } }: { path: { id: number } }) => ({ data: { id, username: `user-${id}` } }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -65,7 +71,6 @@ const waitingDevice = (id: string, kind: 'touch' | 'lite', createdAt: string) =>
   id,
   state: 'waiting',
   kind,
-  boundReaderId: null,
   targetReaderId: null,
   mode: null,
   createdAt,
@@ -90,9 +95,9 @@ describe('ReaderSecurity', () => {
     expect(mocks.revoke).not.toHaveBeenCalled();
 
     await user.click(within(dialog).getByRole('button', { name: 'security.revoke' }));
-    expect(mocks.revoke).toHaveBeenCalledWith({ readerId: 7 });
+    expect(mocks.revoke).toHaveBeenCalledWith({ path: { readerId: 7 } });
 
-    act(() => mocks.revokeOptions.current?.onSuccess?.());
+    await waitFor(() => expect(mocks.toast.success).toHaveBeenCalled());
     expect(mocks.toast.success).toHaveBeenCalledWith({ title: 'security.revoked' });
     // The reader moves from the paired list to the one under Not paired: both are refreshed.
     expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['readers'] });
@@ -150,7 +155,7 @@ describe('ReaderSecurity', () => {
 
   it('shows the stored state when the pairing for this reader ended', () => {
     mocks.pairings.current = [
-      { ...waitingDevice('c', 'touch', '2026-10-30T07:00:00.000Z'), boundReaderId: 7, state: 'failed' },
+      { ...waitingDevice('c', 'touch', '2026-10-30T07:00:00.000Z'), targetReaderId: 7, state: 'failed' },
     ];
     render(<ReaderSecurity reader={reader} onPairingRemoved={mocks.pairingRemoved} />);
     expect(document.querySelector('[data-cy="attractap-pairing-state-paired"]')).not.toBeNull();

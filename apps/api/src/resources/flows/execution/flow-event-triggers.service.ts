@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ResourceFlowNodeType, ResourceMaintenance, ResourceMaintenanceRequest } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { ResourceHealthChangedEvent } from '../../health/events/resource-health-changed.event';
 import { ResourceMaintenanceChangedEvent } from '../../maintenances/events/resource-maintenance-changed.event';
 import { ResourceMaintenanceRequestCreatedEvent } from '../../maintenances/events/maintenance-request-created.event';
+import { RESOURCE_MAINTENANCE_STORE, ResourceMaintenanceStore } from '../../maintenances/maintenance-store.port';
+import { MAINTENANCE_REQUEST_STORE, MaintenanceRequestStore } from '../../maintenances/maintenance-request-store.port';
 import { ResourceFlowsExecutorService } from './resource-flows-executor.service';
 
 /**
@@ -18,8 +18,8 @@ export class FlowEventTriggersService {
 
   constructor(
     private readonly executor: ResourceFlowsExecutorService,
-    @InjectRepository(ResourceMaintenance) private readonly maintenances: Repository<ResourceMaintenance>,
-    @InjectRepository(ResourceMaintenanceRequest) private readonly requests: Repository<ResourceMaintenanceRequest>,
+    @Inject(RESOURCE_MAINTENANCE_STORE) private readonly maintenances: ResourceMaintenanceStore,
+    @Inject(MAINTENANCE_REQUEST_STORE) private readonly requests: MaintenanceRequestStore,
   ) {}
 
   @OnEvent(ResourceHealthChangedEvent.EVENT_NAME)
@@ -39,7 +39,7 @@ export class FlowEventTriggersService {
   @OnEvent(ResourceMaintenanceChangedEvent.EVENT_NAME)
   async onMaintenanceChanged(event: ResourceMaintenanceChangedEvent): Promise<void> {
     try {
-      const maintenance = await this.maintenances.findOne({ where: { id: event.maintenanceId } });
+      const maintenance = await this.maintenances.findById(event.maintenanceId);
       if (!maintenance) return;
       const finished = maintenance.completedAt != null;
       await this.run(
@@ -65,10 +65,7 @@ export class FlowEventTriggersService {
   @OnEvent(ResourceMaintenanceRequestCreatedEvent.EVENT_NAME)
   async onMaintenanceRequestCreated(event: ResourceMaintenanceRequestCreatedEvent): Promise<void> {
     try {
-      const request = await this.requests.findOne({
-        where: { id: event.requestId },
-        relations: ['createdByUser'],
-      });
+      const request = await this.requests.findById(event.requestId);
       if (!request) return;
       await this.run(event.resourceId, ResourceFlowNodeType.INPUT_RESOURCE_MAINTENANCE_REQUEST_CREATED, {
         event: { timestamp: new Date().toISOString() },

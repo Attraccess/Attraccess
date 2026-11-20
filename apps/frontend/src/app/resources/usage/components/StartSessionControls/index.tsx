@@ -7,14 +7,15 @@ import { StartBlockedGate } from '../StartBlockedGate';
 import { useCallback, useState } from 'react';
 import {
   StartUsageSessionDto,
-  useResourcesServiceUnlockDoor,
-  useResourcesServiceUnlatchDoor,
-  useResourcesServiceLockDoor,
+  useUnlockDoor,
+  useUnlatchDoor,
+  useLockDoor,
+  useOpenDoor,
   ApiError,
   FormSubmissionRequestDto,
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
-  UseResourcesServiceResourceUsageGetHistoryKeyFn,
-  useResourcesServiceGetOneResourceById,
+  UseResourceUsageGetActiveSessionKeyFn,
+  UseResourceUsageGetHistoryKeyFn,
+  useGetOneResourceById,
   ResourceType,
   SupervisionMode,
 } from '@attraccess/react-query-client';
@@ -30,220 +31,25 @@ import { getTranslationKeyForApiError } from '../../../../../utils/apiError';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 
-export function useStartSessionControlsStateOutput(
-  model: ReturnType<typeof useStartSessionControlsStateStartUsageSessionMutate>,
-) {
-  const {
-    gatherFormSubmissions,
-    selectedProjectId,
-    needsSupervisor,
-    setIsNotesModalOpen,
-    setSupervisedRequestBody,
-    submitStartSessionWithRetry,
-    lockDoorMutate,
-    resourceId,
-    unlockDoorMutate,
-    unlatchDoorMutate,
-  } = model;
-  const handleStartSession = useCallback(
-    async (opts?: StartUsageSessionDto) => {
-      const action: ResourceFormAction = opts?.forceTakeOver ? 'takeover' : 'start';
-      const formSubmissions = await gatherFormSubmissions(action);
-      if (formSubmissions === null) {
-        return;
-      }
-
-      const requestBody: StartUsageSessionDto = {
-        ...(opts ?? {}),
-        projectId: selectedProjectId,
-        formSubmissions,
-      };
-
-      // Not introduced but supervision is allowed: defer to supervisor approval
-      // instead of starting directly. The user-facing start flow is unchanged.
-      if (needsSupervisor) {
-        setIsNotesModalOpen(false);
-        setSupervisedRequestBody(requestBody);
-        return;
-      }
-
-      submitStartSessionWithRetry(action, requestBody);
-    },
-    [
-      gatherFormSubmissions,
-      needsSupervisor,
-      selectedProjectId,
-      submitStartSessionWithRetry,
-      setIsNotesModalOpen,
-      setSupervisedRequestBody,
-    ],
-  );
-
-  const handleOpenStartSessionModal = () => {
-    model.setIsNotesModalOpen(true);
-  };
-
-  const handleLockDoor = useCallback(() => lockDoorMutate({ resourceId: resourceId }), [lockDoorMutate, resourceId]);
-  const handleUnlockDoor = useCallback(
-    () => unlockDoorMutate({ resourceId: resourceId }),
-    [resourceId, unlockDoorMutate],
-  );
-  const handleUnlatchDoor = useCallback(
-    () => unlatchDoorMutate({ resourceId: resourceId }),
-    [resourceId, unlatchDoorMutate],
-  );
-  return {
-    resourceId: model.resourceId,
-    insufficientBalanceDesiredAmount: model.insufficientBalanceDesiredAmount,
-    divProps: model.divProps,
-    resource: model.resource,
-    t: model.t,
-    isNotesModalOpen: model.isNotesModalOpen,
-    setIsNotesModalOpen: model.setIsNotesModalOpen,
-    isInsufficientBalance: model.isInsufficientBalance,
-    setIsInsufficientBalance: model.setIsInsufficientBalance,
-    supervisedRequestBody: model.supervisedRequestBody,
-    setSupervisedRequestBody: model.setSupervisedRequestBody,
-    onStartSuccess: model.onStartSuccess,
-    startUsageSessionIsPending: model.startUsageSessionIsPending,
-    unlockDoorIsPending: model.unlockDoorIsPending,
-    lockDoorIsPending: model.lockDoorIsPending,
-    unlatchDoorIsPending: model.unlatchDoorIsPending,
-    selectedProjectId: model.selectedProjectId,
-    setSelectedProjectId: model.setSelectedProjectId,
-    formsModal: model.formsModal,
-    confirmationDialog: model.confirmationDialog,
-    handleStartSession,
-    handleOpenStartSessionModal,
-    handleLockDoor,
-    handleUnlockDoor,
-    handleUnlatchDoor,
-  } as const;
+export interface StartSessionControlsProps {
+  resourceId: number;
+  insufficientBalanceDesiredAmount?: number;
+  /**
+   * When true the user is not introduced but the resource allows supervision:
+   * starting opens the supervisor-selection popup instead of starting directly.
+   *
+   * Resources whose supervisionMode is SUPERVISION_REQUIRED are handled here regardless of this
+   * prop — see `needsSupervisor` below.
+   */
+  requiresSupervision?: boolean;
 }
 
-export function useStartSessionControlsState(
-  props: Readonly<StartSessionControlsProps> & React.HTMLAttributes<HTMLDivElement>,
-) {
-  const useStartSessionControlsStateInputsModel = useStartSessionControlsStateInputs(props);
-  const useStartSessionControlsStateStartUsageSessionMutateModel = useStartSessionControlsStateStartUsageSessionMutate(
-    useStartSessionControlsStateInputsModel,
-  );
-  return useStartSessionControlsStateOutput(useStartSessionControlsStateStartUsageSessionMutateModel);
-}
-
-export function useStartSessionControlsStateStartUsageSessionMutate(
-  model: ReturnType<typeof useStartSessionControlsStateInputs>,
-) {
-  const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(model.resourceId);
-  const notifyStartSuccess = model.onStartSuccess;
-  const onStartSuccess = useCallback(() => {
-    clearFormsDraft();
-    notifyStartSuccess();
-  }, [clearFormsDraft, notifyStartSuccess]);
-  const startSession = useStartSessionWithConfirmation(model.resourceId, {
-    onSuccess: onStartSuccess,
-    onError: (error) => model.onStartError(error),
-  });
-  const { start: startSessionWithConfirmation, isPending: startUsageSessionIsPending } = startSession;
-
-  const { mutate: unlockDoorMutate, isPending: unlockDoorIsPending } = useResourcesServiceUnlockDoor({
-    onSuccess: onStartSuccess,
-    onError: (error) => {
-      model.onStartError(error as ApiError);
-    },
-  });
-
-  const { mutate: lockDoorMutate, isPending: lockDoorIsPending } = useResourcesServiceLockDoor({
-    onSuccess: onStartSuccess,
-    onError: (error) => {
-      model.onStartError(error as ApiError);
-    },
-  });
-
-  const { mutate: unlatchDoorMutate, isPending: unlatchDoorIsPending } = useResourcesServiceUnlatchDoor({
-    onSuccess: onStartSuccess,
-    onError: (error) => {
-      model.onStartError(error as ApiError);
-    },
-  });
-
-  const [selectedProjectId, setSelectedProjectId] = useState<number | undefined>(undefined);
-
-  const isFormsMissingError = useCallback((error: unknown) => {
-    if (!(error instanceof ApiError)) {
-      return false;
-    }
-
-    if (error.status !== 400) {
-      return false;
-    }
-
-    const rawMessage = (error.body as { message?: string | string[] })?.message ?? error.message;
-    const message = Array.isArray(rawMessage) ? rawMessage.join(' ') : rawMessage;
-
-    return (
-      typeof message === 'string' && message.toLowerCase().includes('form') && message.toLowerCase().includes('submit')
-    );
-  }, []);
-
-  const gatherFormSubmissions = useCallback(
-    async (action: ResourceFormAction): Promise<FormSubmissionRequestDto[] | null> => {
-      try {
-        return await requestForms(action);
-      } catch (error) {
-        if ((error as Error).message === 'user_cancelled_forms') {
-          return null;
-        }
-        throw error;
-      }
-    },
-    [requestForms],
-  );
-
-  const submitStartSessionWithRetry = useCallback(
-    (action: ResourceFormAction, requestBody: StartUsageSessionDto) => {
-      startSessionWithConfirmation(requestBody, async (error) => {
-        if (!isFormsMissingError(error)) {
-          return;
-        }
-
-        const retrySubmissions = await gatherFormSubmissions(action);
-        if (!retrySubmissions) {
-          return;
-        }
-
-        startSessionWithConfirmation({ ...requestBody, formSubmissions: retrySubmissions });
-      });
-    },
-    [gatherFormSubmissions, isFormsMissingError, startSessionWithConfirmation],
-  );
-  return {
-    confirmationDialog: startSession.dialog,
-    ...model,
-    onStartSuccess,
-    startUsageSessionIsPending,
-    unlockDoorMutate,
-    unlockDoorIsPending,
-    lockDoorMutate,
-    lockDoorIsPending,
-    unlatchDoorMutate,
-    unlatchDoorIsPending,
-    selectedProjectId,
-    setSelectedProjectId,
-    requestForms,
-    formsModal,
-    isFormsMissingError,
-    gatherFormSubmissions,
-    submitStartSessionWithRetry,
-  } as const;
-}
-
-export function useStartSessionControlsStateInputs(
+export function StartSessionControls(
   props: Readonly<StartSessionControlsProps> & React.HTMLAttributes<HTMLDivElement>,
 ) {
   const { resourceId, insufficientBalanceDesiredAmount, requiresSupervision, ...divProps } = props;
 
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  const { data: resource } = useGetOneResourceById({ path: { id: resourceId } });
 
   // supervision_required forbids a solo start for everyone, introduced or not — the backend rejects
   // it outright. Deciding that here rather than at the call sites means no caller can forget it:
@@ -268,17 +74,17 @@ export function useStartSessionControlsStateInputs(
   const [isInsufficientBalance, setIsInsufficientBalance] = useState(false);
   const [supervisedRequestBody, setSupervisedRequestBody] = useState<StartUsageSessionDto | null>(null);
 
-  const onStartSuccess = useCallback(() => {
+  const onStartSuccessBase = useCallback(() => {
     setIsNotesModalOpen(false);
 
     // Invalidate the active session query to refetch data
     queryClient.invalidateQueries({
-      queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId }),
+      queryKey: UseResourceUsageGetActiveSessionKeyFn({ path: { resourceId } }),
     });
     // Invalidate all history queries for this resource (regardless of pagination/user filters)
     queryClient.invalidateQueries({
       predicate: (query) => {
-        const baseHistoryKey = UseResourcesServiceResourceUsageGetHistoryKeyFn({ resourceId });
+        const baseHistoryKey = UseResourceUsageGetHistoryKeyFn({ path: { resourceId } });
         return (
           query.queryKey[0] === baseHistoryKey[0] &&
           query.queryKey.length > 1 &&
@@ -339,86 +145,169 @@ export function useStartSessionControlsStateInputs(
     },
     [t, toast, resource, tExists],
   );
-  return {
-    resourceId,
-    insufficientBalanceDesiredAmount,
-    requiresSupervision,
-    divProps,
-    resource,
-    needsSupervisor,
-    t,
-    tExists,
-    queryClient,
-    toast,
-    isNotesModalOpen,
-    setIsNotesModalOpen,
-    isInsufficientBalance,
-    setIsInsufficientBalance,
-    supervisedRequestBody,
-    setSupervisedRequestBody,
-    onStartSuccess,
-    onStartError,
-    props,
-  } as const;
-}
 
-export interface StartSessionControlsProps {
-  resourceId: number;
-  insufficientBalanceDesiredAmount?: number;
-  /**
-   * When true the user is not introduced but the resource allows supervision:
-   * starting opens the supervisor-selection popup instead of starting directly.
-   *
-   * Resources whose supervisionMode is SUPERVISION_REQUIRED are handled here regardless of this
-   * prop — see `needsSupervisor` below.
-   */
-  requiresSupervision?: boolean;
-}
-
-export function StartSessionControls(
-  props: Readonly<StartSessionControlsProps> & React.HTMLAttributes<HTMLDivElement>,
-) {
+  const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(resourceId);
+  const notifyStartSuccess = onStartSuccessBase;
+  const onStartSuccess = useCallback(() => {
+    clearFormsDraft();
+    notifyStartSuccess();
+  }, [clearFormsDraft, notifyStartSuccess]);
+  const startSession = useStartSessionWithConfirmation(resourceId, {
+    onSuccess: onStartSuccess,
+    onError: (error) => onStartError(error),
+  });
   const {
-    resourceId,
-    insufficientBalanceDesiredAmount,
-    divProps,
-    resource,
-    t,
-    isNotesModalOpen,
-    setIsNotesModalOpen,
-    isInsufficientBalance,
-    setIsInsufficientBalance,
-    supervisedRequestBody,
-    setSupervisedRequestBody,
-    onStartSuccess,
-    startUsageSessionIsPending,
-    unlockDoorIsPending,
-    lockDoorIsPending,
-    unlatchDoorIsPending,
-    selectedProjectId,
-    setSelectedProjectId,
-    formsModal,
-    confirmationDialog,
-    handleStartSession,
-    handleOpenStartSessionModal,
-    handleLockDoor,
-    handleUnlockDoor,
-    handleUnlatchDoor,
-  } = useStartSessionControlsState(props);
+    start: startSessionWithConfirmation,
+    isPending: startUsageSessionIsPending,
+    dialog: confirmationDialog,
+  } = startSession;
+
+  const { mutate: unlockDoorMutate, isPending: unlockDoorIsPending } = useUnlockDoor(undefined, {
+    onSuccess: onStartSuccess,
+    onError: (error) => {
+      onStartError(error as ApiError);
+    },
+  });
+
+  const { mutate: lockDoorMutate, isPending: lockDoorIsPending } = useLockDoor(undefined, {
+    onSuccess: onStartSuccess,
+    onError: (error) => {
+      onStartError(error as ApiError);
+    },
+  });
+
+  const { mutate: unlatchDoorMutate, isPending: unlatchDoorIsPending } = useUnlatchDoor(undefined, {
+    onSuccess: onStartSuccess,
+    onError: (error) => {
+      onStartError(error as ApiError);
+    },
+  });
+
+  const { mutate: openDoorMutate, isPending: openDoorIsPending } = useOpenDoor(undefined, {
+    onSuccess: onStartSuccess,
+    onError: (error) => {
+      onStartError(error as ApiError);
+    },
+  });
+
+  const [selectedProjectId, setSelectedProjectId] = useState<number | undefined>(undefined);
+
+  const isFormsMissingError = useCallback((error: unknown) => {
+    if (!(error instanceof ApiError)) {
+      return false;
+    }
+
+    if (error.status !== 400) {
+      return false;
+    }
+
+    const rawMessage = (error.body as { message?: string | string[] })?.message ?? error.message;
+    const message = Array.isArray(rawMessage) ? rawMessage.join(' ') : rawMessage;
+
+    return (
+      typeof message === 'string' && message.toLowerCase().includes('form') && message.toLowerCase().includes('submit')
+    );
+  }, []);
+
+  const gatherFormSubmissions = useCallback(
+    async (action: ResourceFormAction): Promise<FormSubmissionRequestDto[] | null> => {
+      try {
+        return await requestForms(action);
+      } catch (error) {
+        if ((error as Error).message === 'user_cancelled_forms') {
+          return null;
+        }
+        throw error;
+      }
+    },
+    [requestForms],
+  );
+
+  const submitStartSessionWithRetry = useCallback(
+    (action: ResourceFormAction, requestBody: StartUsageSessionDto) => {
+      startSessionWithConfirmation(requestBody, async (error) => {
+        if (!isFormsMissingError(error)) {
+          return;
+        }
+
+        const retrySubmissions = await gatherFormSubmissions(action);
+        if (!retrySubmissions) {
+          return;
+        }
+
+        startSessionWithConfirmation({ ...requestBody, formSubmissions: retrySubmissions });
+      });
+    },
+    [gatherFormSubmissions, isFormsMissingError, startSessionWithConfirmation],
+  );
+
+  const handleStartSession = useCallback(
+    async (opts?: StartUsageSessionDto) => {
+      const action: ResourceFormAction = opts?.forceTakeOver ? 'takeover' : 'start';
+      const formSubmissions = await gatherFormSubmissions(action);
+      if (formSubmissions === null) {
+        return;
+      }
+
+      const requestBody: StartUsageSessionDto = {
+        ...(opts ?? {}),
+        projectId: selectedProjectId,
+        formSubmissions,
+      };
+
+      // Not introduced but supervision is allowed: defer to supervisor approval
+      // instead of starting directly. The user-facing start flow is unchanged.
+      if (needsSupervisor) {
+        setIsNotesModalOpen(false);
+        setSupervisedRequestBody(requestBody);
+        return;
+      }
+
+      submitStartSessionWithRetry(action, requestBody);
+    },
+    [
+      gatherFormSubmissions,
+      needsSupervisor,
+      selectedProjectId,
+      submitStartSessionWithRetry,
+      setIsNotesModalOpen,
+      setSupervisedRequestBody,
+    ],
+  );
+
+  const handleOpenStartSessionModal = () => {
+    setIsNotesModalOpen(true);
+  };
+
+  const handleLockDoor = useCallback(
+    () => lockDoorMutate({ path: { resourceId: resourceId } }),
+    [lockDoorMutate, resourceId],
+  );
+  const handleUnlockDoor = useCallback(
+    () => unlockDoorMutate({ path: { resourceId: resourceId } }),
+    [resourceId, unlockDoorMutate],
+  );
+  const handleUnlatchDoor = useCallback(
+    () => unlatchDoorMutate({ path: { resourceId: resourceId } }),
+    [resourceId, unlatchDoorMutate],
+  );
+  const handleOpenDoor = useCallback(() => openDoorMutate({ path: { resourceId: resourceId } }), [openDoorMutate, resourceId]);
 
   return (
     <div {...divProps}>
       <div className="space-y-4">
         {resource?.type === 'door' && (
           <DoorControls
-            t={t}
             onLock={handleLockDoor}
             onUnlock={handleUnlockDoor}
             onUnlatch={resource.separateUnlockAndUnlatch ? handleUnlatchDoor : undefined}
+            onOpen={handleOpenDoor}
             lockIsPending={lockDoorIsPending}
             unlockIsPending={unlockDoorIsPending}
             unlatchIsPending={unlatchDoorIsPending}
+            openIsPending={openDoorIsPending}
             separateUnlockAndUnlatch={resource.separateUnlockAndUnlatch}
+            accessOnly={resource.accessOnly}
           />
         )}
         {/* Plugins block session starts only (pre-start hook); door actions never pass that hook, so the door
@@ -426,7 +315,6 @@ export function StartSessionControls(
         {resource?.type === 'machine' && (
           <StartBlockedGate resourceId={resourceId}>
             <MachineStartControls
-              t={t}
               selectedProjectId={selectedProjectId}
               onProjectChange={setSelectedProjectId}
               onStart={() => void handleStartSession()}

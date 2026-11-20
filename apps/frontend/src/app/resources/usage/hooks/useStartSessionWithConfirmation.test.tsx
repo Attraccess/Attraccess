@@ -21,7 +21,7 @@ vi.mock('@attraccess/react-query-client', async (original) => {
   const { useMutation } = await import('@tanstack/react-query');
   return {
     ...(await original<typeof import('@attraccess/react-query-client')>()),
-    useResourcesServiceResourceUsageStartSession: (options: object) =>
+    useResourceUsageStartSession: (_mutationKey: unknown, options: object) =>
       useMutation({
         mutationFn: () =>
           new Promise((resolve, reject) => {
@@ -79,7 +79,7 @@ it('still reports a generic error after unmount, but never a plugin confirmation
   );
   await waitFor(() => expect(state.toastError).toHaveBeenCalledWith({ title: 'T', description: 'B' }));
   expect(options.onError).not.toHaveBeenCalled();
-  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['ResourcesServiceResourceUsageStartBlocked'] });
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['ResourceUsageStartBlocked'] });
 
   act(() => result.current.start({}));
   await waitFor(() => expect(client.isMutating()).toBe(1));

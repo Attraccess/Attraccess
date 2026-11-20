@@ -1,11 +1,12 @@
 import type { PluginContext } from './plugin-context';
 import { DynamicModule } from '@nestjs/common';
-import type { PluginEntityClass } from './entity';
+import type { PluginStorageDefinition } from './plugin-storage';
 import type { MqttCredentialProvisioningProviderFactory } from './mqtt-credential-provisioning';
 import type { PluginAuditDomainDeclaration } from './plugin-audit';
 import type { PluginFlowNodeDefinition } from './plugin-flow-node';
 import type { PluginEmailTemplate, PluginNotificationCategory } from './plugin-notifications';
-import type { PreStartHook, ReaderUiProvider, SessionEndHook, StartBlockedQuery } from './reader-ui';
+import type { PluginPermissionsDeclaration } from './plugin-permissions';
+import type { PreStartHook, ReaderUiProvider, SessionEndHook, StartBlockedQuery, StartCapacityHook } from './reader-ui';
 
 /**
  * Shape every backend plugin's default export must satisfy. The host calls
@@ -15,14 +16,11 @@ export interface PluginBackendModule {
   register(context: PluginContext): DynamicModule;
 
   /**
-   * Optional TypeORM entity classes this plugin owns. The host registers their
-   * metadata into the shared DataSource at load time so the plugin can query
-   * them through {@link PluginContext.getRepository}. The schema itself is owned
-   * by the plugin's migrations (the host runs with `synchronize: false`), so an
-   * entity here describes an existing table rather than creating one. Requires
-   * the DATABASE_ACCESS permission. See `docs/en/plugins/database-migrations.md`.
+   * The plugin's own storage: declared tables plus neutral migrations (see `definePluginStorage`). The host creates
+   * and migrates the tables in the plugin's namespace; the plugin reads and writes them through `context.storage`.
+   * Requires the PLUGIN_STORAGE permission.
    */
-  entities?: PluginEntityClass[];
+  storage?: PluginStorageDefinition;
 
   /**
    * Optional custom flow node types this plugin contributes. The host registers
@@ -58,6 +56,12 @@ export interface PluginBackendModule {
    */
   startBlockedQuery?: StartBlockedQuery;
 
+  /**
+   * Optional atomic capacity hook: tells the host how many slots of a shared machine the plugin holds back from the
+   * starter. The host evaluates it inside its serialized start transaction. Requires ACCESS_HOOKS.
+   */
+  startCapacityHook?: StartCapacityHook;
+
   /** Optional advisory hook after a session ended. Requires ACCESS_HOOKS. */
   sessionEndHook?: SessionEndHook;
 
@@ -74,4 +78,13 @@ export interface PluginBackendModule {
    * SEND_NOTIFICATIONS permission; without it the plugin is quarantined.
    */
   emailTemplates?: PluginEmailTemplate[];
+
+  /**
+   * Optional RBAC permission keys this plugin guards its routes and live topics with. The host validates them at
+   * load time (format, reserved core namespaces, collisions) and registers them in the permission catalog, so they
+   * appear in the role editor and the API-token picker. Declare them with {@link definePluginPermissions} to get
+   * typed keys for `@Auth`. A plugin that is uninstalled or fails to load keeps its keys and their grants, hidden
+   * and granting nothing until it loads again.
+   */
+  permissions?: PluginPermissionsDeclaration;
 }

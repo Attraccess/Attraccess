@@ -1,0 +1,168 @@
+import { createOperatingTimelineStore } from '../../operating-intervals/typeorm-operating-timeline.store';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Logger } from '@nestjs/common';
+import {
+  BillingTransaction,
+  BillingTransactionItem,
+  Resource,
+  ResourceMeter,
+  ResourceUsage,
+  User,
+} from '@attraccess/database-entities';
+import {
+  BillingTransactionStatus,
+  ResourceFlowNodeType,
+  ResourceType,
+  SupervisionMode,
+} from '@attraccess/application-models';
+import { DataSource } from 'typeorm';
+import type { TransactionScope } from '../../../unit-of-work';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { ResourceOperatingAttributionService } from '../../../../resources/operating-intervals/resource-operating-attribution.service';
+import { MeteringReport } from '../../../../resources/flows/node-executors';
+import { EntityManagerResolver } from '../../entity-manager-resolver';
+import { unitOfWorkFor } from '../../shared-unit-of-work';
+import { TypeOrmMeteringStore } from '../typeorm-metering.store';
+import { ResourceMeteringService } from '../../../../resources/metering/resource-metering.service';
+import type { FlowDefinedMeteringTestScope } from '../flow-defined-meters.persistence.spec';
+import { composeResourceUsageService } from '../../../../resources/usage/sessions/fixtures/compose.test-fixture';
+/** The metering port on a real connection, wired by hand with the connection's one unit of work. */
+export function createMeteringPersistence(source: DataSource) {
+  const unitOfWork = unitOfWorkFor(source);
+  return { unitOfWork, store: new TypeOrmMeteringStore(new EntityManagerResolver(unitOfWork, source)) };
+}
+
+export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
+  for (const method of ['debug', 'log', 'warn', 'error'] as const) {
+    jest.spyOn(Logger.prototype, method).mockImplementation(() => undefined);
+  }
+  scope.directory = await mkdtemp(join(tmpdir(), 'attraccess-metering-'));
+  scope.source = await new DataSource({
+    type: 'better-sqlite3',
+    invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+    database: join(scope.directory, 'test.sqlite'),
+    synchronize: true,
+    entities: scope.schemas,
+  }).initialize();
+  await scope.source.getRepository(Resource).save({
+    id: 1,
+    name: 'Laser',
+    type: ResourceType.Machine,
+    allowTakeOver: true,
+    supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED,
+  });
+  scope.users = await scope.source.getRepository(User).save([
+    { id: 1, username: 'owner' },
+    { id: 2, username: 'next-user' },
+  ]);
+  scope.users.forEach((user) => Object.assign(user, { effectivePermissions: new Set(['resources.update']) }));
+
+  scope.log = [];
+  scope.onStart = scope.ready;
+  scope.onCollect = scope.reading('1.5');
+  scope.startEffects = async () => undefined;
+  scope.flows = {
+    trackResourceActivity: jest.fn(),
+    runFlow: jest.fn(
+      async (
+        _resourceId: number,
+        type: ResourceFlowNodeType,
+        _payload: object,
+        _manager: unknown,
+        options: { metering: { kind: string; meterId: number; complete: (report: MeteringReport) => Promise<void> } },
+      ) => {
+        if (type === scope.T.INPUT_METERING_START) {
+          scope.log.push('meter:start');
+          await scope.onStart(options.metering);
+        } else if (type === scope.T.INPUT_METERING_COLLECT) {
+          scope.log.push(`meter:${options.metering.kind}`);
+          await scope.onCollect(options.metering);
+        } else {
+          scope.log.push(`flow:${type}`);
+          if (type === scope.T.INPUT_RESOURCE_USAGE_STARTED || type === scope.T.INPUT_RESOURCE_USAGE_TAKEOVER) {
+            await scope.startEffects();
+          }
+        }
+        return [];
+      },
+    ),
+  };
+  scope.audit = { record: jest.fn() };
+  scope.liveNotifications = { notifyTransactionUpdate: jest.fn().mockResolvedValue(undefined) };
+  await scope.source
+    .getRepository(ResourceMeter)
+    .save({ id: 1, resourceId: 1, name: 'Energy (kWh)', creditsPerUnit: 30 });
+  const { store, unitOfWork } = createMeteringPersistence(scope.source);
+  scope.metering = new ResourceMeteringService(
+    store,
+    unitOfWork,
+    scope.flows as never,
+    scope.audit as never,
+    scope.liveNotifications as never,
+  );
+  const billing = {
+    getResourceBillingConfiguration: jest.fn(async () => ({
+      creditsPerUsage: 0,
+      creditsPerMinute: 0,
+      creditsPerOperatingMinute: 0,
+    })),
+    validateResourceUsageStart: jest.fn().mockResolvedValue(undefined),
+    handleResourceUsageStart: jest.fn(async (_id: number, session: ResourceUsage, user: User, tx: TransactionScope) =>
+      unitOfWork.handleOf(tx).save(BillingTransaction, {
+        resourceUsageId: session.id,
+        userId: user.id,
+        amount: 0,
+        status: BillingTransactionStatus.Pending,
+      }),
+    ),
+    // The real charge sums the items already on the transaction; that is all these tests need from it.
+    chargeForResourceUsage: jest.fn(async (session: ResourceUsage, tx: TransactionScope) => {
+      const manager = unitOfWork.handleOf(tx);
+      scope.log.push('charge');
+      const transaction = await manager.findOneByOrFail(BillingTransaction, { resourceUsageId: session.id });
+      const rows = await manager.find(BillingTransactionItem, { where: { billingTransactionId: transaction.id } });
+      const total = rows.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+      await manager.update(BillingTransaction, transaction.id, {
+        amount: -total,
+        status: BillingTransactionStatus.Completed,
+      });
+      return transaction;
+    }),
+    notifyResourceUsageCharge: jest.fn().mockResolvedValue(undefined),
+  };
+  scope.usage = composeResourceUsageService(
+    scope.source.getRepository(Resource),
+    scope.source.getRepository(ResourceUsage),
+    scope.source.getRepository(User),
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    {
+      hasActiveMaintenance: jest.fn().mockResolvedValue(false),
+      canManageMaintenance: jest.fn().mockResolvedValue(false),
+    } as never,
+    new EventEmitter2(),
+    billing as never,
+    new ResourceOperatingAttributionService(createOperatingTimelineStore(scope.source)),
+    scope.flows as never,
+    {} as never,
+    { prepareRequiredSubmissions: jest.fn().mockResolvedValue([]) } as never,
+    {
+      authorizationCacheRequestsTotal: { inc: jest.fn() },
+      authorizationCacheSize: { set: jest.fn() },
+      resourceUsageSessionsTotal: { inc: jest.fn() },
+      resourceUsageSessionsActive: { inc: jest.fn(), dec: jest.fn() },
+      resourceUsageDurationSeconds: { observe: jest.fn() },
+    } as never,
+    { isResourceUnhealthy: jest.fn().mockResolvedValue(false) } as never,
+    { emit: jest.fn() } as never,
+    {} as never,
+    { record: jest.fn().mockResolvedValue(undefined) } as never,
+    null,
+    scope.metering,
+  );
+}

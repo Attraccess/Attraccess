@@ -45,12 +45,12 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 vi.mock('@attraccess/react-query-client', () => ({
   ApiError: ApiErrorMock,
   ResourceIntroducerType: { INTRODUCER: 'introducer', MAINTAINER: 'maintainer' },
-  useAccessControlServiceResourceIntroducersGetNames: () => ({
+  useResourceIntroducersGetNames: () => ({
     isLoading: false,
     data: candidates.value,
   }),
-  useResourcesServiceResourceUsageRequestSupervisedSession: () => ({ mutate: requestMutate }),
-  useAttractapServiceGetReaders: () => ({
+  useResourceUsageRequestSupervisedSession: () => ({ mutate: requestMutate }),
+  useGetReaders: () => ({
     data: [
       // Attached to this resource.
       {
@@ -135,7 +135,7 @@ describe('SupervisedStartModal', () => {
     await userEvent.click(screen.getByText('alice'));
 
     expect(requestMutate).toHaveBeenCalledWith(
-      { resourceId: 42, requestBody: { notes: 'hi', supervisorUserId: 2 } },
+      { path: { resourceId: 42 }, body: { notes: 'hi', supervisorUserId: 2 } },
       expect.any(Object),
     );
     expect(screen.getByText('waiting.description')).toBeInTheDocument();
@@ -199,7 +199,7 @@ describe('SupervisedStartModal', () => {
       await userEvent.click(screen.getByText('Workshop reader'));
 
       expect(requestMutate).toHaveBeenCalledWith(
-        { resourceId: 42, requestBody: { notes: 'hi', readerId: 5 } },
+        { path: { resourceId: 42 }, body: { notes: 'hi', readerId: 5 } },
         expect.any(Object),
       );
       expect(screen.getByText('waiting.atReader')).toBeInTheDocument();

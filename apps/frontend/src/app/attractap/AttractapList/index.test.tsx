@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { act, render, screen } from '@testing-library/react';
-import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { useGetLicenseInformation } from '@attraccess/react-query-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AttractapList } from './index';
 
@@ -12,14 +13,24 @@ const data = vi.hoisted(() => ({
   onPaired: undefined as undefined | ((readerId: number) => void),
   editor: vi.fn(),
   toast: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
+  deleteReader: vi.fn(),
+  deleteOptions: undefined as undefined | { onSuccess?: () => void; onError?: (error: unknown) => void },
+  invalidateQueries: vi.fn(),
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useLicenseServiceGetLicenseInformation: vi.fn(),
-  useAttractapServiceGetFirmwares: () => ({ data: [] }),
-  useAttractapServiceGetReaders: () => ({ data: data.readers, error: null }),
-  useAttractapServiceGetReadersToPair: () => ({ data: data.toPair }),
+  useGetLicenseInformation: vi.fn(),
+  useGetFirmwares: () => ({ data: [] }),
+  useGetReaders: () => ({ data: data.readers, error: null }),
+  useGetReadersToPair: () => ({ data: data.toPair }),
+  useDeleteReader: (_key: unknown, options: typeof data.deleteOptions) => {
+    data.deleteOptions = options;
+    return { mutateAsync: data.deleteReader };
+  },
+  UseGetReadersKeyFn: () => ['readers'],
+  UseGetReadersToPairKeyFn: () => ['readers-to-pair'],
 }));
+vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: data.invalidateQueries }) }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   ...(await (() => ({
@@ -70,13 +81,12 @@ vi.mock('../pairing/ReadersToPair', () => ({
     );
   },
 }));
-vi.mock('./delete', () => ({ AttractapDeleteModal: () => null }));
 vi.mock('../../../hooks/useNow', () => ({ useNow: () => new Date() }));
 
 function mockLicense(modules: string[] | undefined) {
-  vi.mocked(useLicenseServiceGetLicenseInformation).mockReturnValue({
+  vi.mocked(useGetLicenseInformation).mockReturnValue({
     data: modules !== undefined ? { modules } : undefined,
-  } as ReturnType<typeof useLicenseServiceGetLicenseInformation>);
+  } as ReturnType<typeof useGetLicenseInformation>);
 }
 
 describe('AttractapList license gate', () => {
@@ -111,7 +121,7 @@ describe('AttractapList pairing', () => {
   it('lists only paired readers in the tables; the others wait in the Not paired card', () => {
     mockLicense(['attractap']);
     data.readers = [reader(1, 'Paired door', 'paired')];
-    data.toPair = [reader(2, 'New lathe', 'unpaired'), reader(3, 'Old', 'revoked')];
+    data.toPair = [reader(2, 'New lathe', 'revoked'), reader(3, 'Old', 'revoked')];
     render(<AttractapList />);
     expect(screen.getByText('Paired door')).toBeInTheDocument();
     // They are listed in the pairing card, and the reader tables never show them, even if a stale
@@ -119,7 +129,7 @@ describe('AttractapList pairing', () => {
     expect(screen.getByTestId('to-pair')).toHaveTextContent('New lathe');
     expect(screen.getByTestId('to-pair')).toHaveTextContent('Old');
     expect(screen.queryAllByText('New lathe')).toHaveLength(1);
-    data.readers = [reader(1, 'Paired door', 'paired'), reader(5, 'Leaked', 'unpaired')];
+    data.readers = [reader(1, 'Paired door', 'paired'), reader(5, 'Leaked', 'revoked')];
     data.toPair = [];
     render(<AttractapList />);
     expect(screen.queryByText('Leaked')).toBeNull();
@@ -134,6 +144,25 @@ describe('AttractapList pairing', () => {
     expect(screen.getByText('–')).toBeInTheDocument();
   });
 
+  describe('empty list', () => {
+    beforeEach(() => {
+      mockLicense(['attractap']);
+      data.toPair = [];
+    });
+
+    it('says once where readers come from when no reader is paired (e.g. right after the upgrade)', () => {
+      data.readers = [];
+      render(<AttractapList />);
+      expect(screen.getAllByText('emptyHint')).toHaveLength(1);
+    });
+
+    it('drops the hint as soon as one reader is paired', () => {
+      data.readers = [reader(1, 'Paired door', 'paired')];
+      render(<AttractapList />);
+      expect(screen.queryByText('emptyHint')).toBeNull();
+    });
+  });
+
   describe('opening the settings', () => {
     beforeEach(() => {
       mockLicense(['attractap']);
@@ -145,9 +174,9 @@ describe('AttractapList pairing', () => {
       expect(data.editor).toHaveBeenLastCalledWith(expect.objectContaining({ readerId, isOpen: true }));
 
     it('opens the settings of a reader the web flasher just paired, although the list does not know it yet', () => {
-      // The token reader is still listed as not paired, and the new reader is not listed at all.
+      // The old record is still listed as not paired, and the new reader is not listed at all.
       data.readers = [];
-      data.toPair = [reader(2, 'Token reader', 'unpaired')];
+      data.toPair = [reader(2, 'Removed reader', 'revoked')];
       render(<AttractapList />);
       act(() => data.openDeviceSettings?.('2', true));
       editorOpenFor(2);
@@ -158,7 +187,7 @@ describe('AttractapList pairing', () => {
 
     it('asks to pair first when the settings of a reader that is not paired are opened', () => {
       data.readers = [];
-      data.toPair = [reader(2, 'Token reader', 'unpaired')];
+      data.toPair = [reader(2, 'Removed reader', 'revoked')];
       render(<AttractapList />);
       act(() => data.openDeviceSettings?.('2'));
       expect(data.toast.info).toHaveBeenCalledWith({ title: 'pairFirst' });
@@ -172,5 +201,60 @@ describe('AttractapList pairing', () => {
       editorOpenFor(9);
       expect(data.toast.success).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('AttractapList row actions', () => {
+  beforeEach(() => {
+    mockLicense(['attractap']);
+    data.toPair = [];
+    data.readers = [
+      {
+        id: 7,
+        name: 'Door',
+        pairingState: 'paired',
+        lastConnection: new Date().toISOString(),
+        firmware: { name: 'attractap', variant: 'touch', version: '1.0.0' },
+      },
+    ];
+    data.editor.mockClear();
+    data.deleteReader.mockReset().mockResolvedValue(undefined);
+    data.invalidateQueries.mockClear();
+  });
+
+  const openMenu = async () => {
+    await userEvent.click(screen.getByRole('button', { name: 'Actions for Door' }));
+    return screen.getByRole('menu');
+  };
+
+  it('offers edit, diagnostics and delete', async () => {
+    render(<AttractapList />);
+    const menu = await openMenu();
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent),
+    ).toEqual(['editReader', 'diagnostics', 'deleteReader']);
+    expect(within(menu).getByRole('menuitem', { name: 'diagnostics' })).toHaveAttribute(
+      'href',
+      '/attractap/readers/7/diagnostics',
+    );
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'editReader' }));
+    expect(data.editor).toHaveBeenLastCalledWith(expect.objectContaining({ readerId: 7, isOpen: true }));
+  });
+
+  it('deletes a reader after confirmation and refreshes both reader lists', async () => {
+    render(<AttractapList />);
+    await userEvent.click(within(await openMenu()).getByRole('menuitem', { name: 'deleteReader' }));
+    expect(data.deleteReader).not.toHaveBeenCalled();
+    await userEvent.click(document.querySelector('[data-cy="attractap-list-delete-reader-confirm-7"]') as HTMLElement);
+    expect(data.deleteReader).toHaveBeenCalledWith({ path: { readerId: 7 } });
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+
+    act(() => data.deleteOptions?.onSuccess?.());
+    expect(data.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['readers'] });
+    expect(data.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['readers-to-pair'] });
+    act(() => data.deleteOptions?.onError?.(new Error('Gone')));
+    expect(data.toast.error).toHaveBeenCalledWith({ title: 'deleteReader', description: 'Gone' });
   });
 });

@@ -1,8 +1,16 @@
-import { AlertStatusIcon, Button, EmptyState, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  AlertStatusIcon,
+  Button,
+  EmptyState,
+  StandardDrawer,
+  TableActionsColumnHeader,
+  TableRowActions,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
-  useUsersServiceGetLocalSignupDomainWhitelist,
-  useUsersServiceSetLocalSignupDomainWhitelist,
+  useGetLocalSignupDomainWhitelist,
+  useSetLocalSignupDomainWhitelist,
 } from '@attraccess/react-query-client';
 import {
   Alert,
@@ -50,7 +58,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
     },
   });
 
-  const { data: allowedSignupDomains } = useUsersServiceGetLocalSignupDomainWhitelist();
+  const { data: allowedSignupDomains } = useGetLocalSignupDomainWhitelist();
 
   const [domainToAdd, setDomainToAdd] = useState<string>('');
   const [editedDomains, setEditedDomains] = useState<string[]>(allowedSignupDomains ?? []);
@@ -91,7 +99,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
 
   const toast = useToastMessage();
 
-  const { mutate: saveAllowedSignupDomains, isPending: isSaving } = useUsersServiceSetLocalSignupDomainWhitelist({
+  const { mutate: saveAllowedSignupDomains, isPending: isSaving } = useSetLocalSignupDomainWhitelist(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('actions.save.success.title'),
@@ -110,7 +118,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
   });
 
   const onSave = useCallback(() => {
-    saveAllowedSignupDomains({ requestBody: editedDomains });
+    saveAllowedSignupDomains({ body: editedDomains });
   }, [editedDomains, saveAllowedSignupDomains]);
 
   return (
@@ -156,7 +164,9 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
               <TableContent aria-label={t('table.ariaLabel')}>
                 <TableHeader>
                   <TableColumn isRowHeader>{t('table.columns.domain')}</TableColumn>
-                  <TableColumn>{t('table.columns.actions')}</TableColumn>
+                  <TableColumn id="actions">
+                    <TableActionsColumnHeader />
+                  </TableColumn>
                 </TableHeader>
                 <TableBody
                   items={(editedDomains ?? []).map((domain) => ({ value: domain }))}
@@ -165,11 +175,19 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
                   {(domain) => (
                     <TableRow key={domain.value} id={domain.value}>
                       <TableCell className="w-full">{domain.value}</TableCell>
-                      <TableCell className="flex-row flex">
-                        <Button variant="danger-soft" onPress={() => onRemoveDomain(domain.value)}>
-                          <Trash2Icon className="w-4 h-4" />
-                          {t('table.actions.removeDomain')}
-                        </Button>
+                      <TableCell>
+                        <TableRowActions
+                          itemName={domain.value}
+                          actions={[
+                            {
+                              key: 'remove',
+                              label: t('table.actions.removeDomain'),
+                              icon: Trash2Icon,
+                              tone: 'danger',
+                              onPress: () => onRemoveDomain(domain.value),
+                            },
+                          ]}
+                        />
                       </TableCell>
                     </TableRow>
                   )}

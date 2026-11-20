@@ -2,7 +2,7 @@
   "name": "@attraccess/plugin-matter",
   "version": "0.4.0-alpha.0",
   "description": "Official Attraccess integration for Matter devices. Connects to the Matter sidecar; no device features yet.",
-  "license": "AGPL-3.0-only",
+  "license": "SEE LICENSE IN LICENSE.md",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Attraccess/Attraccess.git",
@@ -22,25 +22,27 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@attraccess/plugins-backend-sdk": "^1.9.0",
-    "@attraccess/plugins-frontend-sdk": "^1.9.0",
-    "@attraccess/plugins-frontend-ui": "^1.11.0"
+    "@attraccess/plugins-backend-sdk": "^2.0.0-0",
+    "@attraccess/plugins-frontend-sdk": "^2.0.0-0",
+    "@attraccess/plugins-frontend-ui": "^2.0.0-0"
   },
   "attraccess": {
     "displayName": "Matter",
     "description": "Matter device support for Attraccess. Secure connection to the Matter sidecar; device features follow.",
-    "host": "^1.11.0",
+    "host": "^2.0.0-0",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
-    "migrations": "dist/migrations.js",
     "styles": "frontend/style.css",
+    "dashboardPaths": [
+      "/matter"
+    ],
     "permissions": [
-      "DATABASE_ACCESS",
+      "PLUGIN_STORAGE",
       "MANAGE_SECRETS"
     ],
     "sdk": {
-      "backend": "^1.9.0",
-      "frontend": "^1.9.0"
+      "backend": "^2.0.0-0",
+      "frontend": "^2.0.0-0"
     }
   }
 }

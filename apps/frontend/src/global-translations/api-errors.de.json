@@ -43,6 +43,10 @@
     "title": "Zähler nicht gestartet",
     "description": "Die Sitzung wurde nicht gestartet, weil ein kostenpflichtiger Zähler nicht initialisiert werden konnte: {{error}}"
   },
+  "METER_SHARING_UNSUPPORTED": {
+    "title": "Zähler nicht teilbar",
+    "description": "Die Sitzung wurde nicht gestartet: Der Zähler „{{error}}“ kann nicht bei Bedarf gelesen werden und lässt sich daher nicht teilen, solange eine andere Sitzung läuft."
+  },
   "METER_SETTLEMENT_FAILED": {
     "title": "Zählerstand weiterhin nicht verfügbar",
     "description": "{{error}}"
@@ -97,19 +101,27 @@
   },
   "UserEmailNotVerifiedException": {
     "title": "E-Mail nicht verifiziert",
-    "description": "Bitte verifiziere deine E-Mail, bevor du dich anmeldest. Pruefe dein Postfach auf den Verifizierungslink oder bitte einen Administrator, ihn erneut zu senden."
+    "description": "Bitte bestätige deine E-Mail-Adresse, bevor du dich anmeldest. Öffne den Aktivierungslink, den wir dir geschickt haben, oder fordere unten einen neuen an."
+  },
+  "EmailAlreadyVerified": {
+    "title": "E-Mail bereits bestätigt",
+    "description": "Dieses Konto ist bereits bestätigt. Melde dich stattdessen an."
+  },
+  "UnverifiedEmailChangeNotAllowed": {
+    "title": "E-Mail-Adresse kann hier nicht geändert werden",
+    "description": "Die E-Mail-Adresse dieses Kontos kann vor der Aktivierung nicht geändert werden. Öffne den Aktivierungslink, den wir dir geschickt haben, oder fordere einen neuen an."
   },
   "UnkownUserOrPasswordException": {
     "title": "Unbekannter Benutzer oder Passwort",
     "description": "Der Benutzer oder das Passwort ist ungültig."
   },
   "TooManyAuthAttempts": {
-    "title": "Zu viele Anmeldeversuche",
-    "description": "Bitte warte {{retryAfterSeconds}} Sekunden, bevor du dich erneut anmeldest."
+    "title": "Zu viele Versuche",
+    "description": "Bitte warte {{retryAfterSeconds}} Sekunden, bevor du es erneut versuchst."
   },
   "EmailSendFailed": {
     "title": "E-Mail konnte nicht gesendet werden",
-    "description": "Die Einladung konnte nicht versendet werden. Bitte Mailserver-Konfiguration prüfen und erneut versuchen."
+    "description": "Wir konnten die E-Mail nicht senden. Versuche es in ein paar Minuten erneut. Wenn das Problem bleibt, muss die Mailserver-Konfiguration geprüft werden."
   },
   "You cannot update your own permissions": {
     "title": "Eigene Berechtigungen können nicht geändert werden",

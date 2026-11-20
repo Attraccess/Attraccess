@@ -38,9 +38,9 @@ export function stripScripts(mjml: string): string {
   return xml ? new XMLSerializer().serializeToString(document) : document.body.innerHTML;
 }
 
-export // Pure analysis of the initial value, shared between the mount effect (parser
+// Pure analysis of the initial value, shared between the mount effect (parser
 // selection) and render (warning banners).
-const analyzeInitialValue = (initialValue: string) => {
+export const analyzeInitialValue = (initialValue: string) => {
   const raw = decodeHtmlOnlyEntities(initialValue);
   const { head, body } = isFullMjmlDocument(raw) ? splitHead(raw) : { head: '', body: raw };
   const wrapped = wrapFragment(body);
@@ -49,9 +49,9 @@ const analyzeInitialValue = (initialValue: string) => {
   return { initialMjml, droppedHead: head, useXmlParser: isWellFormedXml(initialMjml), scriptsStripped };
 };
 
-export // grapesjs-mjml and the locale files ship as CJS; depending on the bundler's
+// grapesjs-mjml and the locale files ship as CJS; depending on the bundler's
 // interop the callable/plain export is either the module itself or `.default`.
-const unwrapDefault = <T,>(mod: T): T => (mod as { default?: T })?.default ?? mod;
+export const unwrapDefault = <T,>(mod: T): T => (mod as { default?: T })?.default ?? mod;
 
 export const grapesJSMJML = unwrapDefault(grapesJSMJMLModule);
 

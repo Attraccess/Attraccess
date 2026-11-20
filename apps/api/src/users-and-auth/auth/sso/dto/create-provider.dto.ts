@@ -1,4 +1,4 @@
-import { MAX_PERMISSION_SYNC_TTL_MINUTES, SSOProviderType } from '@attraccess/database-entities';
+import { MAX_PERMISSION_SYNC_TTL_MINUTES, SSOProviderType } from '@attraccess/application-models';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {

@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode, GetVariablesNodeDataSchema, ResourceFlowVariableScope } from '@attraccess/database-entities';
+import { FlowNodeRecord, GetVariablesNodeDataSchema, ResourceFlowVariableScope } from '@attraccess/application-models';
 import { set as lodashSet } from 'lodash-es';
 import { ResourceFlowVariablesService } from '../variables/resource-flow-variables.service';
 import { requireRunResourceId } from './flow.utils';
@@ -10,7 +10,7 @@ export class GetVariablesExecutor implements NodeExecutor {
 
   constructor(private readonly variablesService: ResourceFlowVariablesService) {}
 
-  async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+  async execute(node: FlowNodeRecord, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
     const data = GetVariablesNodeDataSchema.parse(node.data);
     const payload = JSON.parse(JSON.stringify(input)) as Record<string, unknown>;
     for (const item of data.variables) {

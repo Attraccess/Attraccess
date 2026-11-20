@@ -7,6 +7,7 @@
 #include "../display/ui/ui_step.hpp"
 
 #include "api_types.hpp"
+#include "../ble_proxy/ble_proxy.hpp"
 
 #include <functional>
 #include <atomic>
@@ -40,7 +41,7 @@ protected:
     std::function<void(const ProjectsOfUserResponse &)> projectsOfUserResponseCallback;
     static constexpr size_t JSON_INBUF = 4608;
     static constexpr size_t JSON_OUTBUF_SMALL = 256;
-    static constexpr size_t JSON_OUTBUF_AUTH = 1024;
+    static constexpr size_t JSON_OUTBUF_AUTH = 1536;
     uint32_t resourceListMessageCounter = 0;
     uint32_t resourceListRevision = 0;
     uint32_t nextRequestId = 0;
@@ -56,8 +57,6 @@ protected:
     std::function<void(const ResourceUsageFormRequest &)> resourceFormsRequestCallback;
     std::function<void(const ResourceUsageFormFieldsPage &)> resourceFormFieldsCallback;
     std::function<void(const ResourceUsageFormPageResult &)> resourceFormPageResultCallback;
-    bool crashReportAwaitingAck = false;
-    bool crashReportSentCoredump = false;
     std::function<void(std::string username)> enrollNewCardGetAvailableKeyNoCallback;
     std::function<void()> enrollNewCardSucceededCallback;
     std::function<void(std::string error)> enrollNewCardErrorCallback;
@@ -80,7 +79,9 @@ protected:
 #include "../state/state.hpp"
 #include "../logger/logger.hpp"
 #include "reader_transport.hpp"
+#include "diagnostics/coredump-upload.hpp"
 #include "../utils.hpp"
+#include <memory>
 #ifdef ATTRACTAP_HOST
 class HostOtaUpdater
 {
@@ -230,11 +231,14 @@ public:
 private:
     Logger logger;
     IReaderTransport &transport;
+    // Plugin BLE proxy (ATT-1033): BLE_* requests skip the ACK path like CARD_APDU.
+    BleProxy bleProxy;
+    // The authenticated connection BLE work is bound to; when it goes, BLE work ends.
+    bool bleLinkUp = false;
 
     void dispatchIncomingEvent(const char *eventType, uint32_t requestId);
     void updateSateInfo();
 
-    bool isRegistered();
 
     void onSupervisionStart(JsonObject data);
 
@@ -264,18 +268,9 @@ private:
 
     void sendHeartbeat();
 
-    void onUnauthorized(JsonObject data);
-    void onStartPairing(JsonObject data);
-    void sendAuthenticationRequest();
     void onReaderAuthenticated(JsonObject data);
     void onServerTime(JsonVariantConst serverTime);
     void sendFirmwareInfo();
-
-    // Persisted crash/boot diagnostics upload (ATT-474). On a successful
-    // connect the stored NVS record + (if present) the coredump blob are
-    // pushed to the server; both are cleared once the server confirms receipt.
-    void sendPendingCrashReport();
-    void onCrashReportResponse(JsonObject data);
 
     void onResourceList(JsonObject data);
     void onProjectsOfUserResponse(JsonObject data);
@@ -311,4 +306,10 @@ private:
 #else
     OtaUpdater firmware;
 #endif
+
+    // Persisted crash/boot diagnostics upload (ATT-474, ATT-1144). After each
+    // sign-in the stored NVS record goes up, then its coredump in chunks, one per
+    // loop iteration; both are cleared only once the server stored them.
+    std::unique_ptr<crashupload::Ports> crashUploadPorts;
+    crashupload::Uploader crashUploader;
 };

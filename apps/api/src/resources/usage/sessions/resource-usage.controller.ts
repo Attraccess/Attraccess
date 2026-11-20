@@ -1,5 +1,5 @@
 import { auditActorOf } from '../../../audit/recorder/audit-event';
-import { ResourceUsage } from '@attraccess/database-entities';
+import type { UsageSession } from '@attraccess/application-models';
 
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
@@ -13,6 +13,8 @@ import { StartBlockedResponseDto } from '../dtos/startBlocked.response.dto';
 
 import { GetResourceHistoryQueryDto } from '../dtos/getResourceHistoryQuery.dto';
 
+import { ResourceUsageResponseDto } from '../dtos/resource-usage-response.dto';
+
 import { GetResourceHistoryResponseDto } from '../dtos/GetResourceHistoryResponse.dto';
 
 import { ResourceUsageService } from './resource-usage.service';
@@ -22,6 +24,7 @@ import { ResourceActivityVisibilityService } from '../authorization/resource-act
 import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
 
 import { GetActiveUsageSessionDto } from '../dtos/getActiveUsageSession.dto';
+import { toUsageSessionResponse, type UsageSessionResponse } from '../dtos/usage-session-response';
 
 import { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
 
@@ -43,7 +46,7 @@ export class ResourceUsageController {
   @ApiResponse({
     status: 200,
     description: 'Door locked successfully.',
-    type: ResourceUsage,
+    type: ResourceUsageResponseDto,
   })
   @ApiResponse({
     status: 400,
@@ -60,8 +63,8 @@ export class ResourceUsageController {
   async lockDoor(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
-  ): Promise<ResourceUsage> {
-    return await this.resourceUsageService.lockDoor(resourceId, req.user);
+  ): Promise<UsageSessionResponse> {
+    return toUsageSessionResponse(await this.resourceUsageService.lockDoor(resourceId, req.user));
   }
 
   @Post('unlock')
@@ -70,7 +73,7 @@ export class ResourceUsageController {
   @ApiResponse({
     status: 200,
     description: 'Door unlocked successfully.',
-    type: ResourceUsage,
+    type: ResourceUsageResponseDto,
   })
   @ApiResponse({
     status: 400,
@@ -87,8 +90,8 @@ export class ResourceUsageController {
   async unlockDoor(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
-  ): Promise<ResourceUsage> {
-    return await this.resourceUsageService.unlockDoor(resourceId, req.user);
+  ): Promise<UsageSessionResponse> {
+    return toUsageSessionResponse(await this.resourceUsageService.unlockDoor(resourceId, req.user));
   }
 
   @Post('unlatch')
@@ -97,7 +100,7 @@ export class ResourceUsageController {
   @ApiResponse({
     status: 200,
     description: 'Door unlatch successfully.',
-    type: ResourceUsage,
+    type: ResourceUsageResponseDto,
   })
   @ApiResponse({
     status: 400,
@@ -114,8 +117,35 @@ export class ResourceUsageController {
   async unlatchDoor(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
-  ): Promise<ResourceUsage> {
-    return await this.resourceUsageService.unlatchDoor(resourceId, req.user);
+  ): Promise<UsageSessionResponse> {
+    return toUsageSessionResponse(await this.resourceUsageService.unlatchDoor(resourceId, req.user));
+  }
+
+  @Post('open')
+  @Auth()
+  @ApiOperation({ summary: 'Open an access-only door', operationId: 'openDoor' })
+  @ApiResponse({
+    status: 200,
+    description: 'Door opened successfully (recorded as a door unlock).',
+    type: ResourceUsageResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - The resource is not an access-only door',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - User is not authenticated',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Resource not found',
+  })
+  async openDoor(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<UsageSessionResponse> {
+    return toUsageSessionResponse(await this.resourceUsageService.openDoor(resourceId, req.user));
   }
 
   @Get('history')
@@ -163,7 +193,8 @@ export class ResourceUsageController {
     );
     const data = sessions
       .map((session) => this.activityVisibility.viewUsage(session, access, req.user.id))
-      .filter((session): session is ResourceUsage => session !== null);
+      .filter((session): session is UsageSession => session !== null)
+      .map(toUsageSessionResponse);
 
     return {
       data,
@@ -216,7 +247,7 @@ export class ResourceUsageController {
   @ApiResponse({
     status: 201,
     description: 'Usage session started successfully.',
-    type: ResourceUsage,
+    type: ResourceUsageResponseDto,
   })
   @ApiResponse({
     status: 400,
@@ -234,14 +265,21 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Body() dto: StartUsageSessionDto,
     @Req() req: AuthenticatedRequest,
-  ): Promise<ResourceUsage> {
-    await this.preStart.gateHttp(resourceId, req.user, dto, {
-      origin: req.user.authenticationMethod === 'api-token' ? 'api' : 'web',
+  ): Promise<UsageSessionResponse> {
+    // Only a browser session is "web"; API-token and MCP clients are programmatic.
+    const origin =
+      req.user.authenticationMethod === undefined || req.user.authenticationMethod === 'session' ? 'web' : 'api';
+    const confirmedStepKeys = await this.preStart.gateHttp(resourceId, req.user, dto, {
+      origin,
+      authenticationMethod: req.user.authenticationMethod,
       ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
     });
-    return this.resourceUsageService.startSession(resourceId, req.user, dto, {
+    const started = await this.resourceUsageService.startSession(resourceId, req.user, dto, {
       auditOrigin: auditActorOf(req.user),
+      origin,
+      confirmedStepKeys,
     });
+    return toUsageSessionResponse(started);
   }
 
   @Put('end')
@@ -250,7 +288,7 @@ export class ResourceUsageController {
   @ApiResponse({
     status: 200,
     description: 'Usage session ended successfully.',
-    type: ResourceUsage,
+    type: ResourceUsageResponseDto,
   })
   @ApiResponse({
     status: 400,
@@ -269,7 +307,7 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Body() dto: EndUsageSessionDto,
     @Req() req: AuthenticatedRequest,
-  ): Promise<ResourceUsage> {
+  ): Promise<UsageSessionResponse> {
     const ended = await this.resourceUsageService.endSession(resourceId, req.user, dto, {
       auditOrigin: auditActorOf(req.user),
     });
@@ -277,11 +315,11 @@ export class ResourceUsageController {
       // Nobody can answer an after-stop question on web/API, also when a manager ends someone else's session.
       void this.sessionEnd.applyDefault(
         { resourceId, userId: ended.userId, sessionId: ended.id },
-        req.user.authenticationMethod === 'api-token' ? 'api' : 'web',
+        req.user.authenticationMethod === undefined || req.user.authenticationMethod === 'session' ? 'web' : 'api',
         req.user.locale,
       );
     }
-    return ended;
+    return ended && toUsageSessionResponse(ended);
   }
 
   @Put('sessions/:usageId/project')
@@ -293,7 +331,7 @@ export class ResourceUsageController {
   @ApiResponse({
     status: 200,
     description: 'Usage session project updated successfully.',
-    type: ResourceUsage,
+    type: ResourceUsageResponseDto,
   })
   @ApiResponse({
     status: 400,
@@ -316,8 +354,10 @@ export class ResourceUsageController {
     @Param('usageId', ParseIntPipe) usageId: number,
     @Body() dto: UpdateUsageSessionProjectDto,
     @Req() req: AuthenticatedRequest,
-  ): Promise<ResourceUsage> {
-    return this.resourceUsageService.updateSessionProject(resourceId, usageId, req.user, dto);
+  ): Promise<UsageSessionResponse> {
+    return toUsageSessionResponse(
+      await this.resourceUsageService.updateSessionProject(resourceId, usageId, req.user, dto),
+    );
   }
 
   @Get('active')
@@ -350,7 +390,7 @@ export class ResourceUsageController {
     const access = await this.activityVisibility.resolve(req.user, resourceId);
     const overview = await this.resourceUsageService.getActiveSessionOverview(resourceId, req.user.id);
     // Hidden activity: a viewer sees only what the visibility rule allows (own session in full, others redacted).
-    const view = (usage: ResourceUsage) => this.activityVisibility.viewUsage(usage, access, req.user.id);
+    const view = (usage: UsageSession) => this.activityVisibility.viewUsage(usage, access, req.user.id);
     const usages = overview.usages.flatMap((usage) => view(usage) ?? []);
     if (overview.usages.length > 0 && usages.length === 0) {
       throw new ForbiddenException('You cannot view activity on this resource');
@@ -359,27 +399,33 @@ export class ResourceUsageController {
       throw new ForbiddenException('You cannot view activity on this resource');
     }
     const usage = overview.usage ? view(overview.usage) : null;
-    return { ...overview, usage: usage ?? usages[usages.length - 1] ?? null, usages };
+    const shown = usage ?? usages[usages.length - 1] ?? null;
+    return {
+      ...overview,
+      usage: shown && toUsageSessionResponse(shown),
+      usages: usages.map(toUsageSessionResponse),
+    };
   }
 
   @Get(':usageId')
   @Auth()
   @ApiOperation({ summary: 'Get a resource usage session', operationId: 'resourceUsageGetSession' })
-  @ApiResponse({ status: 200, description: 'The usage session details.', type: ResourceUsage })
+  @ApiResponse({ status: 200, description: 'The usage session details.', type: ResourceUsageResponseDto })
   @ApiResponse({ status: 404, description: 'Usage session not found or not accessible.' })
   async getSession(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('usageId', ParseIntPipe) usageId: number,
     @Req() req: AuthenticatedRequest,
-  ): Promise<ResourceUsage> {
+  ): Promise<UsageSessionResponse> {
     const access = await this.activityVisibility.resolveSessions(req.user, resourceId);
     // Other people's sessions open for full access or project members; anonymous access gets the redacted view.
-    return this.resourceUsageService.getSessionDetails(
+    const session = await this.resourceUsageService.getSessionDetails(
       resourceId,
       usageId,
       req.user,
       access === 'full',
       access === 'anonymous' ? (usage) => this.activityVisibility.redactUsage(usage) : undefined,
     );
+    return toUsageSessionResponse(session);
   }
 }

@@ -1,16 +1,20 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AttractapEditor } from './AttractapEditor';
 
-const state = vi.hoisted(() => ({ reader: undefined as unknown }));
+const state = vi.hoisted(() => ({
+  reader: undefined as unknown,
+  mutate: undefined as unknown as ReturnType<typeof vi.fn>,
+}));
 
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAttractapServiceGetReaderById: () => ({ data: state.reader }),
-  useAttractapServiceGetReadersKey: 'readers',
-  useAttractapServiceUpdateReader: () => ({ mutate: vi.fn(), isPending: false }),
+  useGetReaderById: () => ({ data: state.reader }),
+  useGetReadersKey: 'readers',
+  UseGetReaderByIdKeyFn: () => ['reader'],
+  useUpdateReader: () => ({ mutate: state.mutate, isPending: false }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -34,6 +38,7 @@ vi.mock('../pairing/ReaderSecurity', () => ({ ReaderSecurity: () => <div data-te
 describe('AttractapEditor security tab', () => {
   beforeEach(() => {
     state.reader = undefined;
+    state.mutate = vi.fn();
   });
 
   it('hides the Security tab while there is no reader', () => {
@@ -46,5 +51,58 @@ describe('AttractapEditor security tab', () => {
     state.reader = { id: 1, name: 'Door', ledBrightness: 255, resources: [], firmware: { capabilities: {} } };
     render(<AttractapEditor readerId={1} isOpen onSave={vi.fn()} onCancel={vi.fn()} />);
     expect(screen.getByRole('tab', { name: 'tabs.security' })).toBeInTheDocument();
+  });
+});
+
+describe('AttractapEditor plugin Bluetooth opt-in', () => {
+  const reader = (allowPluginBle?: boolean) => ({
+    id: 1,
+    name: 'Door',
+    ledBrightness: 255,
+    allowPluginBle,
+    resources: [],
+    firmware: { capabilities: {} },
+  });
+
+  beforeEach(() => {
+    state.mutate = vi.fn();
+  });
+
+  it('is off by default', () => {
+    state.reader = reader(undefined);
+    render(<AttractapEditor readerId={1} isOpen onSave={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.getByRole('switch', { name: 'allowPluginBle' })).not.toBeChecked();
+    expect(screen.getByText('allowPluginBleDescription')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'allowPluginBle' })).toHaveAccessibleDescription(
+      'allowPluginBleDescription',
+    );
+  });
+
+  it('shows the saved value', () => {
+    state.reader = reader(true);
+    render(<AttractapEditor readerId={1} isOpen onSave={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.getByRole('switch', { name: 'allowPluginBle' })).toBeChecked();
+  });
+
+  it('saves the switch through the reader update', () => {
+    state.reader = reader(false);
+    render(<AttractapEditor readerId={1} isOpen onSave={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.click(screen.getByRole('switch', { name: 'allowPluginBle' }));
+    fireEvent.click(screen.getByRole('button', { name: 'save' }));
+    expect(state.mutate).toHaveBeenCalledWith({
+      path: { readerId: 1 },
+      body: expect.objectContaining({ name: 'Door', allowPluginBle: true }),
+    });
+  });
+
+  it('does not send the opt-in on a name-only save', () => {
+    state.reader = reader(true);
+    render(<AttractapEditor readerId={1} isOpen onSave={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText('enterReaderName'), { target: { value: 'Front door' } });
+    fireEvent.click(screen.getByRole('button', { name: 'save' }));
+    expect(state.mutate).toHaveBeenCalledTimes(1);
+    const [{ body }] = state.mutate.mock.calls[0];
+    expect(body).toEqual(expect.objectContaining({ name: 'Front door' }));
+    expect(body).not.toHaveProperty('allowPluginBle');
   });
 });

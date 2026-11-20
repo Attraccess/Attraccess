@@ -1,13 +1,10 @@
 import { Logger } from '@nestjs/common';
 
-import {
-  ResourceFlowNode,
-  ResourceFlowEdge,
-  ResourceFlowNodeType,
-  getExternalEffectFailureBehavior,
-} from '@attraccess/database-entities';
+import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 
-import { Repository, EntityManager, FindOperator, IsNull } from 'typeorm';
+import type { TransactionContext } from '../../../database/transaction-context';
+
+import type { FlowTriggerStore } from '../flow-trigger-store.port';
 
 import { FlowLogRecorderService } from '../logs/flow-log-recorder.service';
 
@@ -15,15 +12,17 @@ import { FlowTimer } from '../../../metrics/instrumentation/flow/flow.helper';
 
 import { NodeExecutor, NodeProcessingResult } from '../node-executors/index';
 
-import { FlowExecutionContext, getFlowRepository } from './flow-execution-context';
+import { FlowExecutionContext } from './flow-execution-context';
 
-import { FlowExecutionOptions, FlowResourceContext } from './flow-execution.types';
+import type { FlowExecutionOptions, FlowResourceContext } from './flow-execution.types';
 import { ResourceFlowLogType } from '../dto/flow-log.dto';
 
 import { ExternalEffectFailureError } from '../errors/external-effect-failure.error';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 
 import { getPluginFlowNode } from '../../../plugin-system/flows/node-registry';
+
+import { resolveNodeFailurePolicy } from './node-failure-policy';
 
 import { randomBytes } from 'crypto';
 
@@ -52,45 +51,34 @@ export async function settleFlowBranches(branches: Promise<NodeProcessingResult[
   return results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
 }
 
-/** Edges and nodes of the canvas a node belongs to: its global flow, or its resource's own flow. */
-function sameOwnerWhere(
-  node: ResourceFlowNode,
-): { flowId: number } | { resourceId: number; flowId: FindOperator<null> } {
-  return node.flowId != null ? { flowId: node.flowId } : { resourceId: node.resourceId as number, flowId: IsNull() };
-}
+const CORE_NODE_TYPES: ReadonlySet<string> = new Set(Object.values(ResourceFlowNodeType));
 
 export class FlowExecutionEngine {
   public constructor(
-    protected readonly flowNodeRepository: Repository<ResourceFlowNode>,
-    protected readonly flowEdgeRepository: Repository<ResourceFlowEdge>,
+    protected readonly flowStore: Pick<FlowTriggerStore, 'findOutgoingEdges' | 'findNodeOnCanvasOf'>,
     protected readonly flowLogs: FlowLogRecorderService,
     protected readonly flowTimer: FlowTimer,
-    protected readonly nodeExecutors: Record<ResourceFlowNodeType, NodeExecutor>,
+    protected readonly nodeExecutors: Partial<Record<ResourceFlowNodeType, NodeExecutor>>,
     protected readonly context: FlowExecutionContext,
     protected readonly logger: Logger,
   ) {}
 
   protected async executeNextNodes(
     flowRunId: string,
-    node: ResourceFlowNode,
+    node: FlowNodeRecord,
     resultOfPreviousNode: NodeProcessingResult,
-    transactionManager?: EntityManager,
+    transactionManager?: TransactionContext,
     resourceContextCache?: Map<number, FlowResourceContext>,
     options: FlowExecutionOptions = {},
   ): Promise<NodeProcessingResult[]> {
     this.logger.debug(`Looking for outgoing edges from node ID: ${node.id} (Type: ${node.type})`);
 
-    const edgesRepository = getFlowRepository(ResourceFlowEdge, this.flowEdgeRepository, transactionManager);
-
     // Edges and targets must belong to the same canvas; another owner's nodes (e.g. a disabled flow) never run.
-    const owner = sameOwnerWhere(node);
-    const edgesFromThisNode = await edgesRepository.find({
-      where: {
-        source: node.id,
-        sourceHandle: resultOfPreviousNode.outputHandle,
-        ...owner,
-      },
-    });
+    const edgesFromThisNode = await this.flowStore.findOutgoingEdges(
+      node,
+      resultOfPreviousNode.outputHandle,
+      transactionManager,
+    );
 
     if (edgesFromThisNode.length === 0) {
       this.logger.debug(
@@ -103,13 +91,9 @@ export class FlowExecutionEngine {
       `Found ${edgesFromThisNode.length} outgoing edge(s) from node ID: ${node.id} (Type: ${node.type})`,
     );
 
-    const flowNodeRepository = getFlowRepository(ResourceFlowNode, this.flowNodeRepository, transactionManager);
-
     // Execute each edge individually instead of deduplicating target nodes
     const edgePromises = edgesFromThisNode.map(async (edge) => {
-      const targetNode = await flowNodeRepository.findOne({
-        where: { id: edge.target, ...owner },
-      });
+      const targetNode = await this.flowStore.findNodeOnCanvasOf(node, edge.target, transactionManager);
 
       if (!targetNode) {
         this.logger.warn(`Target node ${edge.target} not found for edge from node ${node.id}`);
@@ -152,9 +136,9 @@ export class FlowExecutionEngine {
 
   protected async processNode(
     flowRunId: string,
-    node: ResourceFlowNode,
+    node: FlowNodeRecord,
     resultOfPreviousNode: NodeProcessingResult,
-    transactionManager?: EntityManager,
+    transactionManager?: TransactionContext,
     resourceContextCache?: Map<number, FlowResourceContext>,
     options: FlowExecutionOptions = {},
   ): Promise<NodeProcessingResult[]> {
@@ -211,10 +195,9 @@ export class FlowExecutionEngine {
       });
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      const failureBehavior = dispatchStarted ? getExternalEffectFailureBehavior(node.type, node.data) : undefined;
-      const failureKind = dispatchStarted
-        ? (this.nodeExecutors[node.type]?.getFailureKind?.(error) ?? 'node-failure')
-        : 'node-failure';
+      const { behavior: failureBehavior, kind: failureKind } = dispatchStarted
+        ? resolveNodeFailurePolicy(node, error, this.nodeExecutors[node.type as ResourceFlowNodeType])
+        : { behavior: undefined, kind: 'node-failure' as const };
       const errorMessage = this.errorReason(error);
       this.logger.error(
         `Failed to process flow node ID: ${node.id} (Type: ${node.type}) after ${processingTime}ms`,
@@ -258,13 +241,13 @@ export class FlowExecutionEngine {
 
   protected async dispatchNode(
     flowRunId: string,
-    node: ResourceFlowNode,
+    node: FlowNodeRecord,
     input: object,
-    transactionManager?: EntityManager,
+    transactionManager?: TransactionContext,
     options: FlowExecutionOptions = {},
     runResourceId: number | null = this.context.resolveRunResourceId(node, options),
   ): Promise<NodeProcessingResult> {
-    // Core node types are looked up in the exhaustive record.
+    // Core node types are looked up in the executor record.
     const executor = this.nodeExecutors[node.type as ResourceFlowNodeType];
     if (executor) {
       return executor.execute(
@@ -272,6 +255,11 @@ export class FlowExecutionEngine {
         input,
         this.context.buildExecutionContext(flowRunId, transactionManager, options, runResourceId),
       );
+    }
+
+    // A core node without an executor means usage or metering was never attached; never hand it to a plugin.
+    if (CORE_NODE_TYPES.has(node.type)) {
+      throw new Error(`No executor attached for core flow node type: ${node.type}`);
     }
 
     // Plugin-contributed node types fall through to the plugin registry.
@@ -295,14 +283,14 @@ export class FlowExecutionEngine {
    * each flow with its own run id and log, and are settled together like parallel branches of one flow.
    */
   public async startFlow(
-    node: ResourceFlowNode | ResourceFlowNode[],
+    node: FlowNodeRecord | FlowNodeRecord[],
     data: NodeProcessingResult,
-    transactionManager?: EntityManager,
+    transactionManager?: TransactionContext,
     resourceContextCache: Map<number, FlowResourceContext> = new Map(),
     options: FlowExecutionOptions = {},
   ): Promise<NodeProcessingResult[]> {
     const nodes = Array.isArray(node) ? node : [node];
-    const flows = new Map<string, ResourceFlowNode[]>();
+    const flows = new Map<string, FlowNodeRecord[]>();
     for (const trigger of nodes) {
       const owner = trigger.flowId != null ? `flow:${trigger.flowId}` : `resource:${trigger.resourceId}`;
       flows.set(owner, [...(flows.get(owner) ?? []), trigger]);
@@ -316,9 +304,9 @@ export class FlowExecutionEngine {
   }
 
   protected async runFlowNodes(
-    nodes: ResourceFlowNode[],
+    nodes: FlowNodeRecord[],
     data: NodeProcessingResult,
-    transactionManager: EntityManager | undefined,
+    transactionManager: TransactionContext | undefined,
     resourceContextCache: Map<number, FlowResourceContext>,
     options: FlowExecutionOptions,
   ): Promise<NodeProcessingResult[]> {
@@ -332,7 +320,7 @@ export class FlowExecutionEngine {
 
       this.flowLogs.record({ flowRunId, nodeId: null, ...owner, type: ResourceFlowLogType.FLOW_START });
 
-      let leafResults: NodeProcessingResult[] = [];
+      let leafResults: NodeProcessingResult[];
       try {
         leafResults = await settleFlowBranches(
           nodes.map((node) => {

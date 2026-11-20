@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { DataSource, QueryRunner } from 'typeorm';
 import { EmailTemplate, EmailTemplateTranslation, EmailTemplateType } from '@attraccess/database-entities';
 import { readDefaultTemplateBody } from '../../email-template/email-defaults';
+import { TypeOrmEmailTemplateStore } from '../adapters/email/typeorm-email-template-store';
+import { TransactionHandles } from '../adapters/common/transaction-handles';
 import { EmailTemplateService } from '../../email-template/email-template.service';
 import { MjmlService } from '../../email-template/mjml.service';
 import { EmailTemplateTranslations1782500000000 } from './1782500000000-email-templates-locale';
@@ -18,15 +20,18 @@ describe('RefreshMeterEvidenceReceipt1791200000000', () => {
 
   beforeEach(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: [EmailTemplateTranslation],
     }).initialize();
     runner = source.createQueryRunner();
     await new EmailTemplateTranslations1782500000000().up(runner);
     service = new EmailTemplateService(
-      source.getRepository(EmailTemplate),
-      source.getRepository(EmailTemplateTranslation),
+      new TypeOrmEmailTemplateStore(
+        source.getRepository(EmailTemplate),
+        source.getRepository(EmailTemplateTranslation),
+        new TransactionHandles(undefined as never),
+      ),
       new MjmlService(),
     );
     await runner.query(

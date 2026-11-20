@@ -14,10 +14,12 @@
     "dark": "Dunkel",
     "system": "System"
   },
+  "installApp": "App installieren",
   "userMenu": "Benutzermenü",
   "groups": {
     "##default##": {
       "items": {
+        "dashboard": "Dashboard",
         "resources": "Ressourcen",
         "projects": "Projekte",
         "messages": "Nachrichten",

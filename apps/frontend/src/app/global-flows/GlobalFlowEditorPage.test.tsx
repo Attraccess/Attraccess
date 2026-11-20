@@ -9,7 +9,7 @@ import { TestWrapper } from '../../test-utils/wrappers';
 const state = vi.hoisted(() => ({ update: vi.fn(), owner: undefined as unknown }));
 
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: () => true }) }));
-vi.mock('../resources/details/flows/index', () => ({
+vi.mock('../resources/details/flows/FlowEditor', () => ({
   FlowEditor: ({ owner }: { owner: unknown }) => {
     state.owner = owner;
     return <div>editor</div>;
@@ -17,11 +17,11 @@ vi.mock('../resources/details/flows/index', () => ({
 }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/react-query-client')>()),
-  useGlobalFlowsServiceGetGlobalFlow: () => ({
+  useGetGlobalFlow: () => ({
     data: { id: 9, name: 'Power off all', description: null, enabled: true },
     isError: false,
   }),
-  useGlobalFlowsServiceUpdateGlobalFlow: () => ({ mutate: state.update, isPending: false }),
+  useUpdateGlobalFlow: () => ({ mutate: state.update, isPending: false }),
 }));
 
 describe('GlobalFlowEditorPage', () => {
@@ -43,7 +43,7 @@ describe('GlobalFlowEditorPage', () => {
     expect(toggle).toBeChecked();
 
     await userEvent.setup().click(toggle);
-    expect(state.update).toHaveBeenCalledWith({ flowId: 9, requestBody: { enabled: false } });
+    expect(state.update).toHaveBeenCalledWith({ path: { flowId: 9 }, body: { enabled: false } });
   });
 
   it('edits the flow name and description from the header', async () => {
@@ -65,8 +65,8 @@ describe('GlobalFlowEditorPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     expect(state.update).toHaveBeenCalledWith({
-      flowId: 9,
-      requestBody: { name: 'Power off the lab', description: null },
+      path: { flowId: 9 },
+      body: { name: 'Power off the lab', description: null },
     });
   });
 });

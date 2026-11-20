@@ -1,7 +1,7 @@
-import { ResourceUsage } from '@attraccess/database-entities';
-import { EntityManager } from 'typeorm';
+import type { UsageSession } from '@attraccess/application-models';
+import type { TransactionContext } from '../../../database/transaction-context';
 import { getSessionCapacity } from '../../usage/sessions/active-usage';
-import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
+import type { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 
 /** The usage id a flow payload names: `usageId` (button presses) wins over a usage payload's generic `id`. */
 export function triggeringUsageId(input: object): number | undefined {
@@ -16,7 +16,7 @@ export interface TriggeringUsage {
   /** The usage id named by the payload, whether or not it is still active. */
   triggeringId: number | undefined;
   /** The active session to act on; undefined when nothing must be touched. */
-  session: ResourceUsage | undefined;
+  session: UsageSession | undefined;
 }
 
 /**
@@ -31,7 +31,7 @@ export async function resolveTriggeringUsage(
   resourceUsageService: Pick<ResourceUsageService, 'getActiveSessionsForResource'>,
   resourceId: number,
   input: object,
-  manager?: EntityManager,
+  manager?: TransactionContext,
 ): Promise<TriggeringUsage> {
   const triggeringId = triggeringUsageId(input);
   const sessions = await resourceUsageService.getActiveSessionsForResource(resourceId, manager);

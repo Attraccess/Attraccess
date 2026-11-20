@@ -18,7 +18,6 @@ import { WsMetricsInterceptor } from '../../metrics/instrumentation/ws/ws.interc
 import { MetricsService } from '../../metrics/metrics.service';
 import { MetricsToggleService } from '../../metrics/settings/metrics-toggle.service';
 import { AttractapService } from '../attractap.service';
-import { promptPairing } from '../reader-pairing';
 import { AttractapAuthHandler } from './handlers/auth/auth.handler';
 import { AttractapBillingHandler } from './handlers/billing/billing.handler';
 import { AttractapCardHandler } from './handlers/card/card.handler';
@@ -33,6 +32,7 @@ import { AttractapMassIntroductionHandler } from './handlers/mass-introduction/m
 import { CardConversationService, CardConversationFailure } from './card-conversation.service';
 import { CardDetectedRouter } from './card-detected.router';
 import { AttractapUiHandler } from './handlers/ui/ui.handler';
+import { ReaderBleDriver } from './handlers/ble/reader-ble.driver';
 import { createReaderSenders } from './reader-socket-send';
 import { cleanupSocketState } from './websocket-disconnect-cleanup';
 import { buildEventHandlers, type EventHandlerDeps } from './websocket-event-handlers';
@@ -44,29 +44,13 @@ import { WebsocketService } from './websocket.service';
 import { ReaderTimeZoneService } from './reader-time-zone.service';
 import { readerHeartbeat } from './websocket-reader-payloads';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
+import { SKIPS_ACTIVITY_WRITE } from './websocket-activity';
 import { randomBytes } from 'crypto';
 import type { IncomingMessage } from 'http';
+import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
 
-/**
- * The only events a reader that is not paired may send: signing in again, the firmware update, its crash
- * report and the end of its login. Everything else runs no handler; the reader is asked to start pairing
- * (see promptPairing for how often).
- */
-const ALLOWED_WHILE_PAIRING_REQUIRED = new Set<AttractapEventType>([
-  AttractapEventType.READER_AUTHENTICATE,
-  AttractapEventType.READER_REGISTER,
-  AttractapEventType.READER_FIRMWARE_INFO,
-  AttractapEventType.FIRMWARE_REQUEST_CHUNK,
-  AttractapEventType.READER_CRASH_REPORT,
-  AttractapEventType.READER_SESSION_ENDED,
-]);
-
-/** Card relay events: a card conversation must not wait for the reader's lastConnection update. */
-const SKIPS_ACTIVITY_WRITE = new Set<AttractapEventType>([
-  AttractapEventType.CARD_DETECTED,
-  AttractapEventType.CARD_APDU_RESPONSE,
-  AttractapEventType.CARD_REMOVED,
-]);
+/** Events of the removed token sign-in; a reader that still sends one is closed. */
+const TOKEN_SIGN_IN_EVENTS = new Set<string>(['READER_REGISTER', 'READER_AUTHENTICATE']);
 
 @WebSocketGateway({
   path: '/api/attractap/websocket',
@@ -147,6 +131,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   @Inject(PairingService)
   protected pairingService: PairingService;
 
+  @Inject(ReaderBleDriver)
+  protected readerBleDriver: ReaderBleDriver;
+
   @Inject(ReaderSessionService)
   protected readerSessionService: ReaderSessionService;
 
@@ -177,13 +164,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   /**
-   * Tells a connected reader that is not paired to pair first: it starts pairing bound to its own record.
-   */
-  protected async requirePairing(socket: AuthenticatedWebSocket) {
-    await promptPairing(socket, this.pairingService);
-  }
-
-  /**
    * The reader's login ended (READER_SESSION_ENDED, or CARD_SESSION_ENDED for the verified user): forget
    * the verified user and stop what depended on them. The only place that does this.
    */
@@ -211,6 +191,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     reason: CardConversationFailure,
   ) {
     if (!socket.state) return;
+    // Plugin BLE sessions and pending calls are bound to this connection's reader identity.
+    this.readerBleDriver.socketClosed(socket);
     this.onReaderSessionEnded(socket, reason);
     if (socket.state.supervisionFlow) this.supervisionHandler.cancelForSocket(socket);
     if (socket.state.massIntroductionFlow) this.massIntroductionHandler.cancelForSocket(socket, readerId);
@@ -267,7 +249,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     readerId: number;
     userId: number;
     actorId?: number;
-    authenticationMethod?: 'session' | 'api-token';
+    authenticationMethod?: AuthenticationMethod;
     apiTokenId?: number;
   }) {
     return this.cardHandler.startEnrollOfNewNfcCard(data);
@@ -277,7 +259,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     readerId: number;
     userId: number;
     cardId: number;
-    authenticationMethod?: 'session' | 'api-token';
+    authenticationMethod?: AuthenticationMethod;
     apiTokenId?: number;
   }) {
     return this.cardHandler.startResetOfNfcCard(data);
@@ -364,11 +346,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     }
     // A zone that could not be resolved in time (e.g. right after an API restart) is asked for again.
     this.readerTimeZone.onHeartbeat(socket.readerId);
-    // A blocked reader whose pairing failed is back on its token and sends little else, so its
-    // heartbeats ask it again once the per-reader limit allows. Not before its update check: a reader
-    // that needs the update gets that first.
-    if (socket.state.pairingRequired && socket.state.updateCheckDone) await this.requirePairing(socket);
-
     await this.clientWasActive(socket);
   }
 
@@ -379,12 +356,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   ) {
     // No socket state = pairing connection; violation = plain text frame on a session.
     if (!socket.state || socket.sessionViolation) return;
-    if (
-      socket.transport === 'session' &&
-      [AttractapEventType.READER_REGISTER, AttractapEventType.READER_AUTHENTICATE].includes(eventData?.type)
-    ) {
-      // The certificate is the identity inside a session; token flows are not allowed.
-      this.logger.warn(`Closing session ${socket.id}: ${eventData.type} is not allowed inside a session`);
+    if (TOKEN_SIGN_IN_EVENTS.has(eventData?.type)) {
+      // The certificate is the identity; token sign-in is gone. Nothing of the message is logged: it carries a token.
+      this.logger.warn(`Closing session ${socket.id}: token sign-in no longer supported`);
       socket.terminate();
       return;
     }
@@ -399,10 +373,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
-    if (
-      !socket.readerId &&
-      ![AttractapEventType.READER_AUTHENTICATE, AttractapEventType.READER_REGISTER].includes(eventData.type)
-    ) {
+    if (!socket.readerId) {
       this.logger.error('Client has no reader attached. ignoring event.');
       return;
     }
@@ -417,11 +388,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     }
 
     this.logger.debug(`Received event ${eventData.type} from client ${socket.id}`);
-
-    // The same gate as old firmware, ahead of every handler: no tap, flow, resource or door action.
-    if (socket.state.pairingRequired && !ALLOWED_WHILE_PAIRING_REQUIRED.has(eventData.type)) {
-      return await this.requirePairing(socket);
-    }
 
     if (!Object.hasOwn(this.eventHandlers, eventData.type)) throw new Error(`Unknown event type: ${eventData.type}`);
     await this.eventHandlers[eventData.type](socket, eventData);
@@ -446,9 +412,15 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       );
       return;
     }
+    if (client.protocol !== SESSION_SUBPROTOCOL) {
+      // The upgrade check refuses these already. A reader that offers no subprotocol is a token reader.
+      this.logger.warn('Closing a connection without the session subprotocol: token sign-in no longer supported');
+      client.close();
+      return;
+    }
     // Taken over before the first await: early TLS bytes must not be missed and a stray text
     // frame must be flagged before the framework's own message listener sees it.
-    const session = client.protocol === SESSION_SUBPROTOCOL ? this.readerSessionService.open(client) : null;
+    const session = this.readerSessionService.open(client);
 
     this.connectedAt.set(client as unknown as object, process.hrtime.bigint());
     this.logger.log('Client connected via WebSocket');
@@ -460,7 +432,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     } catch (error) {
       this.logger.error('Closing connection due to license error');
       this.logger.error(error);
-      session?.close();
+      session.close();
       client.close();
       return;
     }
@@ -496,33 +468,11 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       },
     });
 
-    if (session) {
-      // The reader is registered only once its certificate has been accepted.
-      await this.readerSessionService.accept(client as unknown as AuthenticatedWebSocket, session, (socket) => {
-        this.websocketService.sockets.set(socket.id, socket);
-        this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
-      });
-      return;
-    }
-
-    this.websocketService.sockets.set(id, client as unknown as AuthenticatedWebSocket);
-    this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
-
-    await this.clientWasActive(client as unknown as AuthenticatedWebSocket);
-
-    this.logger.debug('Sending authentication request');
-    try {
-      await sendMessage(new AttractapEvent(AttractapEventType.READER_REQUEST_AUTHENTICATION, {}));
-    } catch (error) {
-      this.logger.error(`Initial authentication request failed for client ${id}. Closing connection.`);
-      this.logger.error(error as Error);
-      try {
-        client.close();
-      } catch {
-        // ignore error
-      }
-      return;
-    }
+    // The reader is registered only once its certificate has been accepted.
+    await this.readerSessionService.accept(client as unknown as AuthenticatedWebSocket, session, (socket) => {
+      this.websocketService.sockets.set(socket.id, socket);
+      this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
+    });
   }
 
   public async handleDisconnect(socket: AuthenticatedWebSocket) {
@@ -568,8 +518,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     // the supervisor's web popup) are torn down.
     this.resetReaderConnectionState(socket, readerId, 'READER_UNREACHABLE');
 
-    // Open reader UI steps, timers and the OTA file descriptor.
-    cleanupSocketState(socket, { uiHandler: this.uiHandler });
+    // Open reader UI steps, timers, the OTA file descriptor and a partial coredump upload.
+    cleanupSocketState(socket, { uiHandler: this.uiHandler, crashReportHandler: this.crashReportHandler });
     this.websocketService.sockets.delete(socket.id);
     this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
   }

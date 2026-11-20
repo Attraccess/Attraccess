@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useAttractapServiceGetSecureBootKeys } from '@attraccess/react-query-client';
+import { useGetSecureBootKeys } from '@attraccess/react-query-client';
 import { ReaderSecuritySection } from './index';
 
 const mutations = vi.hoisted(() => {
@@ -22,14 +22,14 @@ const mutations = vi.hoisted(() => {
 const license = vi.hoisted(() => ({ data: { modules: ['attractap'] } as { modules: string[] } | undefined }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useAttractapServiceGetSecureBootKeys: vi.fn(),
-  useAttractapServiceGetSecureBootKeysKey: 'keys',
-  useAttractapServiceCreateSecureBootKeys: () => mutations.create,
-  useAttractapServiceDownloadRecoveryKey: () => mutations.downloadRecovery,
-  useAttractapServiceDownloadSigningKeyBackup: () => mutations.downloadBackup,
-  useAttractapServiceCheckRecoveryKey: () => mutations.check,
-  useAttractapServiceRestoreSecureBootKeys: () => mutations.restore,
-  useLicenseServiceGetLicenseInformation: () => ({ data: license.data }),
+  useGetSecureBootKeys: vi.fn(),
+  useGetSecureBootKeysKey: 'keys',
+  useCreateSecureBootKeys: () => mutations.create,
+  useDownloadRecoveryKey: () => mutations.downloadRecovery,
+  useDownloadSigningKeyBackup: () => mutations.downloadBackup,
+  useCheckRecoveryKey: () => mutations.check,
+  useRestoreSecureBootKeys: () => mutations.restore,
+  useGetLicenseInformation: () => ({ data: license.data }),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('../../../../components/toastProvider', () => ({
@@ -44,7 +44,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 const key = { digest: 'd', fingerprint: 'f'.repeat(64), restoredAt: null };
 const pending = { status: 'recovery-check-pending', signingKey: key, recoveryKey: { ...key, verifiedAt: null } };
 function keys(overrides: object) {
-  vi.mocked(useAttractapServiceGetSecureBootKeys).mockReturnValue({
+  vi.mocked(useGetSecureBootKeys).mockReturnValue({
     data: {
       status: 'none',
       restored: false,
@@ -55,7 +55,7 @@ function keys(overrides: object) {
       ...overrides,
     },
     isLoading: false,
-  } as unknown as ReturnType<typeof useAttractapServiceGetSecureBootKeys>);
+  } as unknown as ReturnType<typeof useGetSecureBootKeys>);
 }
 
 /** A promise the test settles by hand, standing in for a request that is still running. */
@@ -179,12 +179,12 @@ describe('ReaderSecuritySection', () => {
 
   it('shows an error with a retry instead of an endless spinner when the status cannot be loaded', () => {
     const refetch = vi.fn();
-    vi.mocked(useAttractapServiceGetSecureBootKeys).mockReturnValue({
+    vi.mocked(useGetSecureBootKeys).mockReturnValue({
       data: undefined,
       isLoading: false,
       isError: true,
       refetch,
-    } as unknown as ReturnType<typeof useAttractapServiceGetSecureBootKeys>);
+    } as unknown as ReturnType<typeof useGetSecureBootKeys>);
     render(<ReaderSecuritySection />);
     expect(screen.getByText('loadFailed')).toBeInTheDocument();
     fireEvent.click(screen.getByText('retry'));
@@ -218,7 +218,7 @@ describe('ReaderSecuritySection', () => {
     fireEvent.change(repeat, { target: { value: 'long enough passphrase' } });
     fireEvent.submit(form);
     expect(mutations.downloadRecovery.mutateAsync).toHaveBeenCalledWith({
-      requestBody: { passphrase: 'long enough passphrase' },
+      body: { passphrase: 'long enough passphrase' },
     });
   });
 
@@ -243,7 +243,7 @@ describe('ReaderSecuritySection', () => {
     fireEvent.click(screen.getByText('restore.source.recovery-file'));
     await submitKeyFile('recovery passphrase');
     expect(mutations.restore.mutateAsync).toHaveBeenCalledWith({
-      requestBody: { pem: 'PEM', passphrase: 'recovery passphrase', source: 'recovery-file' },
+      body: { pem: 'PEM', passphrase: 'recovery passphrase', source: 'recovery-file' },
     });
   });
 
@@ -255,10 +255,11 @@ describe('ReaderSecuritySection', () => {
     expect(field('reader-security-restore-replaces')).toBeNull();
   });
 
-  it('regenerates the keys only after the confirmation', () => {
+  it('regenerates the keys only after the confirmation', async () => {
     keys({ status: 'ready', signingKey: key, recoveryKey: { ...key, verifiedAt: '2026-11-08T10:00:00Z' } });
     render(<ReaderSecuritySection />);
     fireEvent.click(screen.getByText('actions.regenerate'));
+    expect(await screen.findByRole('alertdialog', { name: 'regenerate.title' })).toBeInTheDocument();
     expect(mutations.create.mutateAsync).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText('regenerate.confirm'));
     expect(mutations.create.mutateAsync).toHaveBeenCalledTimes(1);

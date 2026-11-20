@@ -1,10 +1,9 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ResourceUsageController } from './sessions/resource-usage.controller';
 import { ResourceUsageService } from './sessions/resource-usage.service';
 import { ResourceActivityVisibilityService } from './authorization/resource-activity-visibility.service';
 import { SettingsModule } from '../../settings/settings.module';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { Resource, ResourceIntroducer, ResourceUsage, User } from '@attraccess/database-entities';
+import { HealthPersistenceModule } from '../../database/adapters/resources/health-persistence.module';
 import { RbacModule } from '../../users-and-auth/rbac/rbac.module';
 import { ResourceUsageNoteNotificationListener } from './notifications/notes.listener';
 import { ResourceSessionNotificationListener } from './notifications/session.listener';
@@ -22,17 +21,20 @@ import { ResourceHealthModule } from '../health/resource-health.module';
 import { ResourceRetrainingModule } from '../retraining/resourceRetraining.module';
 import { ResourceOperatingIntervalModule } from '../operating-intervals/resource-operating-interval.module';
 import { ResourceTransactionsModule } from '../../database/resource-transactions.module';
+import { UsagePersistenceModule } from '../../database/adapters/usage/usage-persistence.module';
 import { ResourceMeteringModule } from '../metering/resource-metering.module';
 import { ReaderUiModule } from '../../plugin-system/reader-ui/reader-ui.module';
 import { PreStartService } from './pre-start/pre-start.service';
 import { SessionEndNotifier } from './pre-start/session-end-notifier.service';
 import { WebStartStepStore } from './pre-start/web-start-step.store';
 import { RESOURCE_USAGE_COLLABORATORS } from './resource-usage.collaborators';
+import { ResourceUsageFlowsBridge } from './sessions/resource-usage-flows.bridge';
 
 @Module({
   imports: [
     ResourceTransactionsModule,
-    TypeOrmModule.forFeature([ResourceUsage, Resource, ResourceIntroducer, User]),
+    UsagePersistenceModule,
+    HealthPersistenceModule,
     RbacModule,
     SettingsModule,
     NotificationsModule,
@@ -41,10 +43,10 @@ import { RESOURCE_USAGE_COLLABORATORS } from './resource-usage.collaborators';
     ResourceGroupsModule,
     ResourceRetrainingModule,
     ResourceMaintenanceModule,
-    forwardRef(() => BillingModule),
-    forwardRef(() => ResourceFlowsModule),
-    forwardRef(() => ResourceMeteringModule),
-    forwardRef(() => ProjectsModule),
+    BillingModule,
+    ResourceFlowsModule,
+    ResourceMeteringModule,
+    ProjectsModule,
     ResourceFormsModule,
     ResourceHealthModule,
     ResourceOperatingIntervalModule,
@@ -61,6 +63,7 @@ import { RESOURCE_USAGE_COLLABORATORS } from './resource-usage.collaborators';
     PreStartService,
     WebStartStepStore,
     SessionEndNotifier,
+    ResourceUsageFlowsBridge,
   ],
   exports: [ResourceUsageService, ResourceActivityVisibilityService, PreStartService, SessionEndNotifier],
 })

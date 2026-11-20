@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { User, UserRole } from '@attraccess/database-entities';
+import type { UserRecord, UserRoleRecord } from '@attraccess/application-models';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { identityAuditEvent } from '../../audit/policies/identity';
 import { AUDIT_RECORDER, AuditOrigin, AuditRecorder } from '../../audit/recorder/audit-event';
@@ -21,8 +21,13 @@ export class UserPermissionsService {
   ) {}
 
   /** Assigns a role within the actor's own permissions, notifies the user and audits the assignment. */
-  async assignRole(userId: number, roleId: number, actor: AuthenticatedUser, origin: AuditOrigin): Promise<UserRole> {
-    const result = await this.rbacService.assignRole(userId, roleId, actor.effectivePermissions ?? new Set());
+  async assignRole(
+    userId: number,
+    roleId: number,
+    actor: AuthenticatedUser,
+    origin: AuditOrigin,
+  ): Promise<UserRoleRecord> {
+    const result = await this.rbacService.assignRole(userId, roleId, await this.rbacService.getGrantCeiling(actor));
     const user = await this.usersService.findOne({ id: userId });
     if (user) this.notifyPermissionsChanged(user, actor.id);
     await this.recordRoleChange('user_role_assigned', userId, roleId, origin);
@@ -30,7 +35,7 @@ export class UserPermissionsService {
   }
 
   async revokeRole(userId: number, roleId: number, actor: AuthenticatedUser, origin: AuditOrigin): Promise<void> {
-    await this.rbacService.revokeRole(userId, roleId, actor.effectivePermissions ?? new Set());
+    await this.rbacService.revokeRole(userId, roleId, await this.rbacService.getGrantCeiling(actor));
     const user = await this.usersService.findOne({ id: userId });
     if (!user) throw new UserNotFoundException(userId);
     this.notifyPermissionsChanged(user, actor.id);
@@ -55,7 +60,7 @@ export class UserPermissionsService {
     await this.audit.record(identityAuditEvent(action, origin, { id: userId }, { role: roleKey }));
   }
 
-  notifyPermissionsChanged(user: User, actorId: number): void {
+  notifyPermissionsChanged(user: UserRecord, actorId: number): void {
     const title = 'Your permissions changed';
     const body = 'Your RBAC role assignments were updated.';
 

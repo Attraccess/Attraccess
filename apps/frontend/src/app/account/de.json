@@ -20,13 +20,15 @@
     },
     "notifications": { "title": "Benachrichtigungen", "description": "Auswählen, was dich wo erreicht" },
     "tokens": { "title": "API-Tokens", "description": "Zugriff für Integrationen verwalten" },
+    "mcp": { "title": "KI-Clients (MCP)", "description": "Einen KI-Assistenten mit Attraccess verbinden" },
     "delete": { "title": "Konto löschen", "description": "Dauerhafte Kontolöschung anfordern" }
   },
   "searchTerms": {
     "email": "E-Mail",
     "username": "Benutzername",
     "authenticator": "Authenticator 2FA",
-    "push": "Push"
+    "push": "Push",
+    "mcp": "MCP KI Assistent"
   },
   "sections": {
     "profile": "Profil",

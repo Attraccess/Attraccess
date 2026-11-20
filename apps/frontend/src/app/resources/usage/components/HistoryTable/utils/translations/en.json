@@ -24,7 +24,8 @@
         "door": {
           "lock": "Locked",
           "unlock": "Unlocked",
-          "unlatch": "Latch Opened"
+          "unlatch": "Latch Opened",
+          "open": "Opened"
         }
       }
     },

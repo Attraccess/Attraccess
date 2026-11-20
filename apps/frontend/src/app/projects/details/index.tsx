@@ -7,30 +7,24 @@ import { ProjectUsageCharts } from './components/projectUsageCharts/index';
 import { ProjectUsageHistory } from './components/projectUsageHistory/index';
 import {
   ApiError,
-  useProjectsServiceArchiveProject,
-  useProjectsServiceDeleteOneProject,
-  useProjectsServiceFindManyProjectsKey,
-  useProjectsServiceFindOneProject,
-  useProjectsServiceFindOneProjectKey,
-  useProjectsServiceUnarchiveProject,
+  useArchiveProject,
+  useDeleteOneProject,
+  useFindManyProjectsKey,
+  useFindOneProject,
+  useFindOneProjectKey,
+  useUnarchiveProject,
 } from '@attraccess/react-query-client';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  Button,
-  DeleteConfirmationModal,
-  PageAction,
-  PageHeader,
-  useTranslations,
-} from '@attraccess/plugins-frontend-ui';
+import { Button, PageAction, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 
-export function useProjectDetailsPageState() {
+export function ProjectDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = parseInt(id || '', 10);
   const hasValidProjectId = Number.isFinite(projectId);
@@ -38,30 +32,33 @@ export function useProjectDetailsPageState() {
   const navigate = useNavigate();
   const toast = useToastMessage();
   const queryClient = useQueryClient();
-  const { t, tExists } = useTranslations({
-    en: {
-      ...en,
-      api: API_ERROR_TRANSLATIONS_EN,
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  const { t, tExists } = useTranslations(
+    {
+      en: {
+        ...en,
+        api: API_ERROR_TRANSLATIONS_EN,
+      },
+      de: {
+        ...de,
+        api: API_ERROR_TRANSLATIONS_DE,
+      },
     },
-    de: {
-      ...de,
-      api: API_ERROR_TRANSLATIONS_DE,
-    },
-  });
+    { escapeValues: false },
+  );
 
-  const { data: project } = useProjectsServiceFindOneProject({ id: projectId }, undefined, {
+  const { data: project } = useFindOneProject({ path: { id: projectId } }, undefined, {
     enabled: hasValidProjectId,
   });
-  const [showDeleteConfirmationModal, setShowDeleteConfirmationModal] = useState(false);
 
-  const { mutate: deleteProject } = useProjectsServiceDeleteOneProject({
+  const { mutateAsync: deleteProject } = useDeleteOneProject(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('actions.delete.success.title'),
         description: t('actions.delete.success.description', { name: project?.name ?? '' }),
       });
       queryClient.invalidateQueries({
-        queryKey: [useProjectsServiceFindManyProjectsKey],
+        queryKey: [useFindManyProjectsKey],
       });
       navigate('/projects');
     },
@@ -75,17 +72,17 @@ export function useProjectDetailsPageState() {
     },
   });
 
-  const { mutate: archiveProject, isPending: isArchiving } = useProjectsServiceArchiveProject({
+  const { mutate: archiveProject, isPending: isArchiving } = useArchiveProject(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('actions.archive.success.title'),
         description: t('actions.archive.success.description', { name: project?.name ?? '' }),
       });
       queryClient.invalidateQueries({
-        queryKey: [useProjectsServiceFindManyProjectsKey],
+        queryKey: [useFindManyProjectsKey],
       });
       queryClient.invalidateQueries({
-        queryKey: [useProjectsServiceFindOneProjectKey],
+        queryKey: [useFindOneProjectKey],
       });
     },
     onError: (error) => {
@@ -98,17 +95,17 @@ export function useProjectDetailsPageState() {
     },
   });
 
-  const { mutate: unarchiveProject, isPending: isUnarchiving } = useProjectsServiceUnarchiveProject({
+  const { mutate: unarchiveProject, isPending: isUnarchiving } = useUnarchiveProject(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('actions.unarchive.success.title'),
         description: t('actions.unarchive.success.description', { name: project?.name ?? '' }),
       });
       queryClient.invalidateQueries({
-        queryKey: [useProjectsServiceFindManyProjectsKey],
+        queryKey: [useFindManyProjectsKey],
       });
       queryClient.invalidateQueries({
-        queryKey: [useProjectsServiceFindOneProjectKey],
+        queryKey: [useFindOneProjectKey],
       });
     },
     onError: (error) => {
@@ -121,41 +118,7 @@ export function useProjectDetailsPageState() {
     },
   });
 
-  const onDeleteProject = useCallback(() => {
-    deleteProject({ id: projectId });
-  }, [deleteProject, projectId]);
-  return {
-    id,
-    projectId,
-    hasValidProjectId,
-    navigate,
-    t,
-    project,
-    showDeleteConfirmationModal,
-    setShowDeleteConfirmationModal,
-    archiveProject,
-    isArchiving,
-    unarchiveProject,
-    isUnarchiving,
-    onDeleteProject,
-  } as const;
-}
-
-export function ProjectDetailsPage() {
-  const {
-    projectId,
-    hasValidProjectId,
-    navigate,
-    t,
-    project,
-    showDeleteConfirmationModal,
-    setShowDeleteConfirmationModal,
-    archiveProject,
-    isArchiving,
-    unarchiveProject,
-    isUnarchiving,
-    onDeleteProject,
-  } = useProjectDetailsPageState();
+  const onDeleteProject = useCallback(() => deleteProject({ path: { id: projectId } }), [deleteProject, projectId]);
 
   return (
     <>
@@ -209,32 +172,31 @@ export function ProjectDetailsPage() {
                       label: t('actions.unarchive.label'),
                       icon: <ArchiveRestoreIcon className="size-4" />,
                       isPending: isUnarchiving,
-                      onPress: () => unarchiveProject({ id: projectId }),
+                      onPress: () => unarchiveProject({ path: { id: projectId } }),
                     }
                   : {
                       key: 'archive',
                       label: t('actions.archive.label'),
                       icon: <ArchiveIcon className="size-4" />,
                       isPending: isArchiving,
-                      onPress: () => archiveProject({ id: projectId }),
+                      onPress: () => archiveProject({ path: { id: projectId } }),
                     },
                 {
                   key: 'delete',
                   label: t('actions.delete.label'),
                   icon: <Trash2Icon className="size-4" />,
                   variant: 'destructive',
-                  onPress: () => setShowDeleteConfirmationModal(true),
+                  onPress: onDeleteProject,
+                  confirm: {
+                    title: t('actions.delete.confirm.title', { name: project?.name ?? '' }),
+                    message: t('actions.delete.confirm.message'),
+                    confirmDataCy: 'delete-button',
+                    cancelDataCy: 'cancel-button',
+                  },
                 },
               ] satisfies PageAction[])
             : undefined
         }
-      />
-
-      <DeleteConfirmationModal
-        isOpen={showDeleteConfirmationModal}
-        onClose={() => setShowDeleteConfirmationModal(false)}
-        onConfirm={onDeleteProject}
-        itemName={project?.name ?? ''}
       />
 
       {hasValidProjectId && (

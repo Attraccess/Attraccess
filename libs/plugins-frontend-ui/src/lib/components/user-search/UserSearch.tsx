@@ -22,7 +22,7 @@ import { useTranslations } from '../../i18n';
 import { StandardModal } from '../StandardModal';
 import { AttraccessUser } from '../attraccess-user/AttraccessUser';
 
-import { PaginatedUsersResponseDto, useUsersServiceFindManyInfinite } from '@attraccess/react-query-client';
+import { PaginatedUsersResponseDto, useFindManyInfinite } from '@attraccess/react-query-client';
 import { InfiniteData } from '@tanstack/react-query';
 import type { HTMLAttributes } from 'react';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -64,14 +64,13 @@ function useUserSearch({
   }, [resetSignal]);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isFetching, isLoading, isError, refetch } =
-    useUsersServiceFindManyInfinite<InfiniteData<PaginatedUsersResponseDto>>(
+    useFindManyInfinite<InfiniteData<PaginatedUsersResponseDto>>(
       // Gate on the picker being open AND the live input being non-empty: closing
       // resets `search` synchronously while the debounced copy lags ~300ms, so
       // without the live check a quick close+reopen could briefly refetch (or flash
       // cached results for) the previous filter.
       {
-        limit: PAGE_SIZE,
-        search: isOpen && search.trim() ? debouncedSearch.trim() || undefined : undefined,
+        query: { limit: PAGE_SIZE, search: isOpen && search.trim() ? debouncedSearch.trim() || undefined : undefined },
       },
       undefined,
       {
@@ -250,12 +249,6 @@ function UserSearchTrigger({
   );
 }
 
-// Field-contrast vars so fields inside this modal match the other modals in the app.
-const FIELD_CONTRAST_STYLE: React.CSSProperties = {
-  ['--field-border' as never]: 'var(--border-secondary)',
-  ['--border-width-field' as never]: '1px',
-};
-
 export function UserSearch(props: Readonly<UserSearchProps>) {
   const { label, placeholder, size, resetSignal, onSelectionChange, afterAutocomplete, wrapperProps, afterSelection } =
     props;
@@ -309,7 +302,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
         isOpen={isOpen}
         onOpenChange={handleOpenChange}
         size="md"
-        dialogProps={{ style: FIELD_CONTRAST_STYLE, 'aria-label': t('modalTitle') }}
+        dialogProps={{ 'aria-label': t('modalTitle') }}
       >
         {() => (
           <>

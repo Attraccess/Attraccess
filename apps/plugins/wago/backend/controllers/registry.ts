@@ -1,3 +1,5 @@
+import { PluginStorageUniqueViolation } from '@attraccess/plugins-backend-sdk';
+import { openWagoStorage } from '../storage';
 import { WagoSettings } from './settings.entity';
 
 import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
@@ -8,7 +10,7 @@ import {
   configurationDesiredTopic,
 } from '../protocol/index';
 
-import { WagoService } from './service';
+import type { WagoService } from './service';
 
 import { WagoController } from './entity';
 
@@ -21,12 +23,6 @@ import { WagoAudit, type WagoManualCommandAuditResult } from '../audit/index';
 import { randomUUID } from 'node:crypto';
 
 import { type PluginAuditPrincipal, type PluginMqttSubscription } from '@attraccess/plugins-backend-sdk';
-
-import { WagoEnrollment } from './enrollment.entity';
-
-import { WagoConfigurationDraft } from '../configuration/draft.entity';
-
-import { WagoConfigurationRevision } from '../configuration/revision.entity';
 
 import { MqttSubscriptionError } from './model';
 
@@ -44,18 +40,18 @@ export abstract class WagoRegistry extends WagoServiceState {
       throw new NotFoundException(`MQTT server ${serverId} not found`);
     const save = async (): Promise<WagoSettings> => {
       const settings = await this.getSettings();
-      if (serverId !== undefined) settings.defaultMqttServerId = serverId;
+      const patch: Partial<Pick<WagoSettings, 'defaultMqttServerId' | 'operationalPrefix'>> = {};
+      if (serverId !== undefined) patch.defaultMqttServerId = serverId;
       if (operationalPrefix !== undefined) {
         const normalizedPrefix = normalizeOperationalPrefix(operationalPrefix);
         if (normalizedPrefix !== settings.operationalPrefix) {
-          const controllers = await this.controllers.find({ where: { trustState: 'claimed' } });
-          if (controllers.length)
+          if (await this.controllers.count({ trustState: 'claimed' }))
             throw new ConflictException('operational MQTT prefix cannot change after a controller has been claimed');
-          settings.operationalPrefix = normalizedPrefix;
+          patch.operationalPrefix = normalizedPrefix;
         }
       }
-      await this.settings.save(settings);
-      return settings;
+      if (Object.keys(patch).length) await this.settings.update({ id: settings.id }, patch);
+      return { ...settings, ...patch };
     };
     const settings = operationalPrefix === undefined ? await save() : await this.withClaimConfigurationLock(save);
     await this.subscribeConfiguredServers();
@@ -63,15 +59,17 @@ export abstract class WagoRegistry extends WagoServiceState {
   }
 
   async getSettings(): Promise<WagoSettings> {
-    const settings = await this.settings.findOneBy({ id: 1 });
+    const settings = await this.settings.get(1);
     if (settings) return settings;
-    await this.settings
-      .createQueryBuilder()
-      .insert()
-      .values({ id: 1, defaultMqttServerId: null, operationalPrefix: 'attraccess/wago' })
-      .orIgnore()
-      .execute();
-    return this.settings.findOneByOrFail({ id: 1 });
+    try {
+      return await this.settings.insert({ id: 1, defaultMqttServerId: null, operationalPrefix: 'attraccess/wago' });
+    } catch (error) {
+      // Another caller created the single settings row first.
+      if (!(error instanceof PluginStorageUniqueViolation)) throw error;
+      const existing = await this.settings.get(1);
+      if (!existing) throw error;
+      return existing;
+    }
   }
 
   async setRuntimePolicy(
@@ -101,7 +99,10 @@ export abstract class WagoRegistry extends WagoServiceState {
     );
     // Replay configuration skipped by the boot-time runtime gate, without creating a revision. It passes
     // the same runtime gate as a publication: a runtime that cannot run it would only reject it.
-    const [revision] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
+    const revision = await this.revisions.findOne({
+      where: { controllerId },
+      orderBy: [{ field: 'revision', direction: 'desc' }],
+    });
     const replay = revision && (revision.state === 'published' || revision.state === 'applied') ? revision : null;
     const unsupported = replay ? runtimeSupportErrors(JSON.parse(replay.snapshot), controller.capabilities) : [];
     if (replay && unsupported.length)
@@ -147,7 +148,7 @@ export abstract class WagoRegistry extends WagoServiceState {
   }
 
   async list(): Promise<WagoControllerSummary[]> {
-    const controllers = await this.controllers.find({ order: { hardwareId: 'ASC' } });
+    const controllers = await this.controllers.find({ orderBy: [{ field: 'hardwareId' }] });
     return controllers.map((controller) => ({
       id: controller.id,
       hardwareId: controller.hardwareId,
@@ -251,16 +252,14 @@ export abstract class WagoRegistry extends WagoServiceState {
   }
 
   async onApplicationBootstrap(): Promise<void> {
-    // The host datasource is available only after plugin module construction completes.
-    this.controllers = this.context.getRepository(WagoController);
-    this.settings = this.context.getRepository(WagoSettings);
-    this.enrollments = this.context.getRepository(WagoEnrollment);
-    this.drafts = this.context.getRepository(WagoConfigurationDraft);
-    this.revisions = this.context.getRepository(WagoConfigurationRevision);
-    const enrollments = await this.enrollments
-      .createQueryBuilder('enrollment')
-      .where('enrollment.consumedAt IS NULL')
-      .getMany();
+    // The host storage is available only after plugin module construction completes.
+    this.storage = openWagoStorage(this.context);
+    this.controllers = this.storage.controllers;
+    this.settings = this.storage.settings;
+    this.enrollments = this.storage.enrollments;
+    this.drafts = this.storage.configurationDrafts;
+    this.revisions = this.storage.configurationRevisions;
+    const enrollments = await this.enrollments.find({ where: { consumedAt: null } });
     for (const enrollment of enrollments) this.scheduleEnrollmentExpiry(enrollment);
     try {
       await this.subscribeConfiguredServers();

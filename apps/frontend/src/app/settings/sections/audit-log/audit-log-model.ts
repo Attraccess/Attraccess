@@ -1,14 +1,19 @@
 import {
+  ApiError,
   AuditEntryDto,
   AuditControllerListData,
   AuditPageDto,
-  $AuditQueryDto,
-  $AuditSettingsDto,
+  AuditQueryDtoSchema,
+  AuditSettingsDtoSchema,
   AuditMetaDto,
   AuditSettingsDto,
 } from '@attraccess/react-query-client';
+import { getApiErrorMessage } from '../../../../utils/apiError';
 
 export type AuditDomain = AuditSettingsDto['domains'][number];
+
+/** Query parameters of the audit list endpoint. */
+export type AuditListQuery = NonNullable<AuditControllerListData['query']>;
 
 export type AuditFilters = {
   domain: string;
@@ -63,9 +68,9 @@ export function togglePluginDomain(disabled: string[], domain: string, selected:
 }
 
 /** Audit domains owned by the core app. Plugin domains arrive through the audit meta endpoint. */
-export const coreAuditDomains = $AuditSettingsDto.properties.domains.items.enum;
+export const coreAuditDomains = AuditSettingsDtoSchema.properties.domains.items.enum;
 
-export const eventPrefix = new RegExp($AuditQueryDto.properties.eventPrefix.pattern);
+export const eventPrefix = new RegExp(AuditQueryDtoSchema.properties.eventPrefix.pattern);
 
 export const emptyFilters: AuditFilters = {
   domain: '',
@@ -78,7 +83,7 @@ export const emptyFilters: AuditFilters = {
   to: '',
 };
 
-export const subjectTypePattern = new RegExp($AuditQueryDto.properties.subjectType.pattern);
+export const subjectTypePattern = new RegExp(AuditQueryDtoSchema.properties.subjectType.pattern);
 
 export function csvCell(value: unknown): string {
   const text =
@@ -185,8 +190,8 @@ export function displayValue(value: unknown): string {
 }
 
 export async function exportAuditEntries(
-  request: AuditControllerListData,
-  loadPage: (request: AuditControllerListData) => Promise<AuditPageDto>,
+  request: AuditListQuery,
+  loadPage: (request: AuditListQuery) => Promise<AuditPageDto>,
 ): Promise<AuditEntryDto[]> {
   const entries: AuditEntryDto[] = [];
   let beforeId: number | undefined;
@@ -205,11 +210,37 @@ export async function exportAuditEntries(
   return entries;
 }
 
+/** Vocabulary the API validates free-text filters against; undefined until the meta endpoint loaded. */
+export type AuditFilterVocabulary = {
+  subjectTypes?: readonly string[];
+  eventPrefixes?: readonly string[];
+};
+
+/** Leading action segments, the same list the API checks an eventPrefix against. */
+export function knownEventPrefixes(actions: readonly string[]): string[] {
+  return [...new Set(actions.map((action) => action.split('.')[0]))];
+}
+
+export function filterVocabulary(meta: AuditMetaDto | undefined): AuditFilterVocabulary {
+  return meta ? { subjectTypes: meta.subjectTypes, eventPrefixes: knownEventPrefixes(meta.actions) } : {};
+}
+
+/** The API rejected the event prefix, e.g. a plugin domain that was unloaded after meta loaded. */
+export function rejectsEventPrefix(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 400 && getApiErrorMessage(error).includes('eventPrefix');
+}
+
+function validEventPrefix(prefix: string, eventPrefixes: readonly string[] | undefined): boolean {
+  if (prefix.length > AuditQueryDtoSchema.properties.eventPrefix.maxLength || !eventPrefix.test(prefix)) return false;
+  // Once meta loaded, the leading segment must be a known one, as the API requires.
+  return !eventPrefixes || eventPrefixes.includes(prefix.split('.')[0]);
+}
+
 export function filterRequest(
   filters: AuditFilters,
-  subjectTypes?: readonly string[],
-): { request: AuditControllerListData; error?: never } | { error: string; request?: never } {
-  const request: AuditControllerListData = {};
+  { subjectTypes, eventPrefixes }: AuditFilterVocabulary = {},
+): { request: AuditListQuery; error?: never } | { error: string; request?: never } {
+  const request: AuditListQuery = {};
   for (const key of ['actorId', 'subjectId'] as const) {
     if (!filters[key].trim()) continue;
     const value = Number(filters[key]);
@@ -224,8 +255,7 @@ export function filterRequest(
   }
   if (request.from && request.to && request.from > request.to) return { error: 'invalidRange' };
   const prefix = filters.eventPrefix.trim();
-  if (prefix && (prefix.length > $AuditQueryDto.properties.eventPrefix.maxLength || !eventPrefix.test(prefix)))
-    return { error: 'invalidEventPrefix' };
+  if (prefix && !validEventPrefix(prefix, eventPrefixes)) return { error: 'invalidEventPrefix' };
   if (prefix) request.eventPrefix = prefix;
   const subjectType = filters.subjectType.trim();
   if (subjectType) {
@@ -234,8 +264,10 @@ export function filterRequest(
     if (!known) return { error: 'invalidSubjectType' };
   }
   if (subjectType) request.subjectType = subjectType;
-  for (const key of ['domain', 'outcome'] as const) {
-    if (filters[key].trim()) request[key] = filters[key].trim();
-  }
+  const domain = filters.domain.trim();
+  if (domain) request.domain = domain;
+  // The outcome select only offers the API's enum values.
+  const outcome = filters.outcome.trim();
+  if (outcome) request.outcome = outcome as typeof request.outcome;
   return { request };
 }

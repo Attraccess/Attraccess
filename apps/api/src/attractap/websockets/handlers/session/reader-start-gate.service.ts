@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { type User } from '@attraccess/database-entities';
 import type { PluginBlockReason, PluginConfirmation } from '@attraccess/plugins-backend-sdk';
 import { hostReason } from '../../../../plugin-system/reader-ui/host-texts';
 import { PreStartService } from '../../../../resources/usage/pre-start/pre-start.service';
@@ -7,6 +6,7 @@ import { SessionEndNotifier } from '../../../../resources/usage/pre-start/sessio
 import { ReaderUiAlertsService } from '../../../../plugin-system/reader-ui/reader-ui-alerts.service';
 import { ReaderUiSettingsService } from '../../../../plugin-system/reader-ui/reader-ui-settings.service';
 import { AttractapService } from '../../../attractap.service';
+import type { CoreUser } from '../../../core-user';
 import { type AuthenticatedWebSocket } from '../../websocket.types';
 import { CardSessionService } from '../ui/card-session.service';
 import { UiAuditService } from '../ui/ui-audit.service';
@@ -14,14 +14,14 @@ import { UiStepService } from '../ui/ui-step.service';
 import type { CardSessionState } from '../ui/ui-socket-state';
 
 export type StartGateResult =
-  | { kind: 'proceed'; warning?: boolean }
+  | { kind: 'proceed'; warning?: boolean; satisfied: Record<string, string[]>; language?: 'en' | 'de' }
   /** Reply to the START with this payload (the session does not start). */
   | { kind: 'reply'; payload: Record<string, unknown> }
   /** A step is open: the START stays unanswered until it is answered, cancelled or expires. */
   | { kind: 'held' };
 
 export interface StartGateInput {
-  user: User;
+  user: CoreUser;
   resourceId: number;
   projectId?: number;
   forceTakeOver?: boolean;
@@ -63,7 +63,7 @@ export class ReaderStartGate {
       if ('error' in used) return blocked(hostReason(used.error, card?.language));
       satisfied = used.satisfied;
     }
-    if (!this.preStart.hasHooks()) return { kind: 'proceed' };
+    if (!this.preStart.hasHooks()) return { kind: 'proceed', satisfied, language: card?.language };
 
     const outcome = await this.preStart.evaluate({
       resourceId: input.resourceId,
@@ -77,7 +77,7 @@ export class ReaderStartGate {
       language: card?.language,
       satisfied,
     });
-    if (outcome.decision === 'allow') return { kind: 'proceed' };
+    if (outcome.decision === 'allow') return { kind: 'proceed', satisfied, language: card?.language };
     if (outcome.decision === 'block') return blocked(outcome.reason);
     return this.confirm(socket, input, { ...outcome, action, satisfied, card });
   }
@@ -134,7 +134,14 @@ export class ReaderStartGate {
       reasonCode: usable ? 'no-screen' : 'no-ui',
       policy,
     });
-    if (policy === 'allow-with-warning') return { kind: 'proceed', warning: true };
+    if (policy === 'allow-with-warning') {
+      // The policy accepted the step in the user's place: later checks of this start see it as confirmed.
+      const satisfied = {
+        ...ctx.satisfied,
+        [ctx.plugin]: [...(ctx.satisfied[ctx.plugin] ?? []), confirmation.stepKey],
+      };
+      return { kind: 'proceed', warning: true, satisfied, language: card?.language };
+    }
     if (policy === 'card-confirm' && usable && caps.steps.includes('card-confirm')) {
       if (this.steps.issueStart(socket, { ...spec, cardConfirm: true })) return { kind: 'held' };
     }
@@ -167,7 +174,9 @@ export class ReaderStartGate {
   }
 
   /** Validated on READER_FIRMWARE_INFO; the stored firmware info only before that message arrived. */
-  private async capabilities(socket: AuthenticatedWebSocket): Promise<{ schemaVersion: number; steps: string[] } | null> {
+  private async capabilities(
+    socket: AuthenticatedWebSocket,
+  ): Promise<{ schemaVersion: number; steps: string[] } | null> {
     if (socket.state.uiSlots) return socket.state.uiSlots.capabilities;
     const reader = await this.attractapService.findReaderById(socket.readerId as number);
     const ui = reader?.firmware?.capabilities?.ui as { schemaVersion: number; steps: string[] } | null | undefined;

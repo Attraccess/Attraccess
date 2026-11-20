@@ -1,8 +1,6 @@
 import { Column, CreateDateColumn, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 
-export const EMAIL_LAYOUT_SINGLETON_ID = 'global';
-
 @Entity('email_layout')
 export class EmailLayout {
   @ApiProperty({ description: 'Layout identifier', example: 'global' })

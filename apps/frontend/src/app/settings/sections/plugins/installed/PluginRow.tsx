@@ -1,59 +1,59 @@
-import { Button } from '@attraccess/plugins-frontend-ui';
-import { Chip, TableCell, TableRow, Tooltip, TooltipContent } from '@heroui/react';
-import { AlertTriangle, CheckCircle2, Trash2 } from 'lucide-react';
+import { TableRowActions } from '@attraccess/plugins-frontend-ui';
+import type { InstalledNpmPluginDto, LoadedPluginManifest } from '@attraccess/react-query-client';
+import { Chip, TableCell, TableRow, Tooltip, TooltipContent, TooltipTrigger } from '@heroui/react';
+import { AlertTriangle, CheckCircle2, History, Info, KeyRound, Trash2 } from 'lucide-react';
 import { PluginClassificationBadge } from '../PluginClassificationBadge';
-import { usePluginsSectionState } from '../state/usePluginSettings';
-type Model = ReturnType<typeof usePluginsSectionState>;
-type Props = Pick<
-  Model,
-  | 'installedNpmPlugins'
-  | 't'
-  | 'setFailedPlugin'
-  | 'npmPluginNames'
-  | 'openMarketplacePlugin'
-  | 'openVersionManagement'
-  | 'setApprovedRemovalPlan'
-  | 'setRemoveFailure'
-  | 'setPluginToDelete'
->;
-export function renderPluginRow(
-  plugin: NonNullable<Model['plugins']>[number],
-  {
-    installedNpmPlugins,
-    t,
-    setFailedPlugin,
-    npmPluginNames,
-    openMarketplacePlugin,
-    openVersionManagement,
-    setApprovedRemovalPlan,
-    setRemoveFailure,
-    setPluginToDelete,
-  }: Props,
-) {
+import type { FailedPlugin, MarketplaceDetailRequest, VersionPlugin } from '../types';
+import { usePluginsTranslations } from '../usePluginsTranslations';
+
+interface Props {
+  plugin: LoadedPluginManifest;
+  /** The npm record of this plugin, when it was installed from a registry. */
+  installed: InstalledNpmPluginDto | undefined;
+  onShowError: (plugin: FailedPlugin) => void;
+  onShowDetails: (request: MarketplaceDetailRequest) => void;
+  onManageVersion: (plugin: VersionPlugin) => void;
+  onDelete: (pluginId: string) => void;
+}
+
+export function PluginRow({ plugin, installed, onShowError, onShowDetails, onManageVersion, onDelete }: Props) {
+  const { t } = usePluginsTranslations();
   return (
-    <TableRow key={plugin.name} id={plugin.name}>
+    // The id is per plugin directory: a refused 1.x copy and a valid 2.0 copy of the same name are both listed, and
+    // the table drops rows with a duplicate key.
+    <TableRow key={plugin.id} id={plugin.id}>
       <TableCell>
         <div className="flex flex-wrap items-center gap-2">
           <span>{plugin.name}</span>
-          <PluginClassificationBadge
-            classification={installedNpmPlugins.get(plugin.name)?.classification ?? 'community'}
-          />
+          <PluginClassificationBadge classification={installed?.classification ?? 'community'} />
         </div>
-        {installedNpmPlugins.get(plugin.name)?.registryUrl ? (
-          <p className="mt-1 text-xs text-muted md:hidden">{installedNpmPlugins.get(plugin.name)?.registryUrl}</p>
+        {plugin.status === 'license_missing' ? (
+          <p className="mt-1 text-xs text-muted" data-cy={`plugins-list-license-missing-${plugin.id}`}>
+            {plugin.missingLicenseModules?.length
+              ? t('status.licenseMissingModules', {
+                  count: plugin.missingLicenseModules.length,
+                  modules: plugin.missingLicenseModules.join(', '),
+                })
+              : t('status.licenseMissingRequired')}
+          </p>
+        ) : null}
+        {installed?.registryUrl ? (
+          <p className="mt-1 break-all text-xs text-muted md:hidden">{installed.registryUrl}</p>
         ) : null}
       </TableCell>
       <TableCell>
         <Chip variant="soft" color="accent">
           {plugin.version}
         </Chip>
-        {installedNpmPlugins.get(plugin.name)?.updateCheck?.state === 'available' ? (
+        {installed?.updateCheck?.state === 'available' ? (
           <Chip variant="soft" color="warning">
             {t('updatePolicy.available')}
           </Chip>
         ) : null}
       </TableCell>
-      <TableCell className="hidden sm:table-cell">{plugin.pluginDirectory || '-'}</TableCell>
+      {/* npm directories are an opaque `npm-<base64>` token and registry URLs have no spaces: let both break anywhere so
+          they do not set the column's minimum width. */}
+      <TableCell className="hidden sm:table-cell break-all">{plugin.pluginDirectory || '-'}</TableCell>
       <TableCell className="hidden sm:table-cell">
         {plugin.permissions && plugin.permissions.length > 0 ? (
           <div className="flex flex-wrap gap-1" data-cy={`plugins-list-permissions-${plugin.id}`}>
@@ -67,15 +67,22 @@ export function renderPluginRow(
           <span className="text-muted">{t('noPermissions')}</span>
         )}
       </TableCell>
-      <TableCell className="hidden md:table-cell text-xs text-muted">
-        {installedNpmPlugins.get(plugin.name)?.registryUrl ?? '-'}
+      <TableCell className="hidden md:table-cell break-all text-xs text-muted">
+        {installed?.registryUrl ?? '-'}
       </TableCell>
       <TableCell>
         {plugin.status === 'error' ? (
           <button
             type="button"
             className="rounded-medium outline-none focus-visible:ring-2 focus-visible:ring-focus"
-            onClick={() => setFailedPlugin({ id: plugin.id, name: plugin.name, error: plugin.error ?? '' })}
+            onClick={() =>
+              onShowError({
+                id: plugin.id,
+                name: plugin.name,
+                error: plugin.error ?? '',
+                refused: plugin.refused === true,
+              })
+            }
             aria-label={t('status.viewError', { pluginName: plugin.name })}
             data-cy={`plugins-list-status-${plugin.id}`}
           >
@@ -83,12 +90,25 @@ export function renderPluginRow(
               <Chip variant="soft" color="danger">
                 <span className="inline-flex items-center gap-1">
                   <AlertTriangle size={14} />
-                  {t('status.error')}
+                  {plugin.refused ? t('status.refused') : t('status.error')}
                 </span>
               </Chip>
               <TooltipContent>{t('status.errorTooltip')}</TooltipContent>
             </Tooltip>
           </button>
+        ) : plugin.status === 'license_missing' ? (
+          // An expected state, not a failure: the plugin needs a license the installation does not have.
+          <Tooltip>
+            <TooltipTrigger tabIndex={0}>
+              <Chip variant="soft" color="warning" data-cy={`plugins-list-status-${plugin.id}`}>
+                <span className="inline-flex items-center gap-1">
+                  <KeyRound size={14} />
+                  {t('status.licenseMissing')}
+                </span>
+              </Chip>
+            </TooltipTrigger>
+            <TooltipContent>{t('status.licenseMissingTooltip')}</TooltipContent>
+          </Tooltip>
         ) : plugin.status === 'loaded' ? (
           <Chip variant="soft" color="success" data-cy={`plugins-list-status-${plugin.id}`}>
             <span className="inline-flex items-center gap-1">
@@ -103,70 +123,36 @@ export function renderPluginRow(
         )}
       </TableCell>
       <TableCell>
-        <div className="flex justify-end">
-          {npmPluginNames.has(plugin.name) && installedNpmPlugins.get(plugin.name) ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onPress={() =>
-                void openMarketplacePlugin({
-                  name: plugin.name,
-                  version: installedNpmPlugins.get(plugin.name)?.version ?? plugin.version,
-                  displayName: plugin.name,
-                  description: null,
-                  permissions: installedNpmPlugins.get(plugin.name)?.permissions ?? [],
-                  hostRange: null,
-                  sdkCompatibility: { backend: null, frontend: null },
-                  repository: null,
-                  homepage: null,
-                  license: null,
-                  publisher: installedNpmPlugins.get(plugin.name)?.publisher ?? null,
-                  deprecated: false,
-                  registry: {
-                    id: installedNpmPlugins.get(plugin.name)?.registryId ?? 'npm',
-                    name: installedNpmPlugins.get(plugin.name)?.registryUrl ?? 'npm',
-                    url: installedNpmPlugins.get(plugin.name)?.registryUrl ?? '',
-                  },
-                  classification: installedNpmPlugins.get(plugin.name)?.classification ?? 'community',
-                  classificationReason: installedNpmPlugins.get(plugin.name)?.classificationReason ?? '',
-                  installable: true,
-                  incompatibilityReason: null,
-                  integrity: installedNpmPlugins.get(plugin.name)?.integrity ?? null,
-                  provenance: null,
-                })
-              }
-            >
-              {t('marketplace.details')}
-            </Button>
-          ) : null}
-          {npmPluginNames.has(plugin.name) ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onPress={() => void openVersionManagement({ name: plugin.name, version: plugin.version })}
-              data-cy={`plugins-list-manage-version-button-${plugin.id}`}
-            >
-              {t('manageVersion')}
-            </Button>
-          ) : null}
-          <Tooltip>
-            <Button
-              variant="danger-soft"
-              size="sm"
-              isIconOnly
-              aria-label={t('deleteTooltip')}
-              onPress={() => {
-                setApprovedRemovalPlan(null);
-                setRemoveFailure(null);
-                setPluginToDelete(plugin.id);
-              }}
-              data-cy={`plugins-list-delete-plugin-button-${plugin.id}`}
-            >
-              <Trash2 size={16} />
-            </Button>
-            <TooltipContent>{t('deleteTooltip')}</TooltipContent>
-          </Tooltip>
-        </div>
+        <TableRowActions
+          itemName={plugin.name}
+          data-cy={`plugins-list-actions-button-${plugin.id}`}
+          actions={[
+            {
+              key: 'details',
+              label: t('marketplace.details'),
+              icon: Info,
+              isHidden: !installed,
+              onPress: () => onShowDetails({ name: plugin.name, registryId: installed?.registryId ?? 'npm' }),
+              'data-cy': `plugins-list-details-button-${plugin.id}`,
+            },
+            {
+              key: 'manageVersion',
+              label: t('manageVersion'),
+              icon: History,
+              isHidden: !installed,
+              onPress: () => onManageVersion({ name: plugin.name, version: plugin.version }),
+              'data-cy': `plugins-list-manage-version-button-${plugin.id}`,
+            },
+            {
+              key: 'delete',
+              label: t('deleteTooltip'),
+              icon: Trash2,
+              tone: 'danger',
+              onPress: () => onDelete(plugin.id),
+              'data-cy': `plugins-list-delete-plugin-button-${plugin.id}`,
+            },
+          ]}
+        />
       </TableCell>
     </TableRow>
   );

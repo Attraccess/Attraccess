@@ -147,8 +147,10 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   StandardDrawer: ({ isOpen, children }: { isOpen: boolean; children: ReactNode }) =>
     isOpen ? <div>{children}</div> : null,
 }));
-vi.mock('../controllers/Table', () => ({
+vi.mock('../controllers/commissioningLabel', () => ({
   commissioningLabel: (state: string) => state,
+}));
+vi.mock('../runtime/RuntimeUpdateDetails', () => ({
   RuntimeUpdateDetails: () => <div>Managed recovery controls</div>,
 }));
 beforeEach(() => {
@@ -787,9 +789,10 @@ it('lets the operator keep enrollment after opening cancellation without sending
 it.each(['delivery_failed', 'claim_interrupted'] as const)(
   'switches saved commissioning failures without new requests: %s',
   async (state) => {
-    activeSession = { ...session, state, failureReason: 'Commissioning was interrupted.' };
+    const failureReason = 'Commissioning was interrupted.';
+    activeSession = { ...session, state, failureReason };
     mount();
-    await screen.findAllByText(activeSession.failureReason!);
+    await screen.findAllByText(failureReason);
     await waitFor(() => expect(requests.some(({ url }) => url.endsWith('/settings'))).toBe(true));
     const count = requests.length;
     act(() => useTranslationState.getState().setLanguage('de'));

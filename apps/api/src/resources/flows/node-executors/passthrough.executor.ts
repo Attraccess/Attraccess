@@ -1,4 +1,4 @@
-import { ResourceFlowNode } from '@attraccess/database-entities';
+import { FlowNodeRecord } from '@attraccess/application-models';
 import { NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 
 /**
@@ -6,7 +6,7 @@ import { NodeExecutor, NodeProcessingResult } from './node-executor.interface';
  * their payload through unchanged.
  */
 export class PassthroughExecutor implements NodeExecutor {
-  async execute(_node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
+  async execute(_node: FlowNodeRecord, input: object): Promise<NodeProcessingResult> {
     return { payload: input };
   }
 }

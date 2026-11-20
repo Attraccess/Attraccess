@@ -1,22 +1,26 @@
-import { HTMLAttributes, useState, useEffect, useCallback } from 'react';
+import { HTMLAttributes, useState, useEffect } from 'react';
 import { Form, Input, Label, Spinner, TextArea, TextField } from '@heroui/react';
 import { Save, Edit3, Trash2Icon } from 'lucide-react';
 import {
-  useAccessControlServiceResourceIntroductionsGetPeopleKey,
-  useResourcesServiceResourceGroupsGetOne,
-  useResourcesServiceResourceGroupsUpdateOne,
-  UseResourcesServiceResourceGroupsGetOneKeyFn,
-  useResourcesServiceResourceGroupsDeleteOne,
-  UseResourcesServiceResourceGroupsGetManyKeyFn,
+  useResourceIntroductionsGetPeopleKey,
+  useResourceGroupsGetOne,
+  useResourceGroupsUpdateOne,
+  UseResourceGroupsGetOneKeyFn,
+  useResourceGroupsDeleteOne,
+  UseResourceGroupsGetManyKeyFn,
 } from '@attraccess/react-query-client';
-import { Button, DeleteConfirmationModal, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, ConfirmableButton, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { useNavigate } from 'react-router-dom';
 
-export function useGroupDetailsFormState(
+export interface GroupDetailsFormProps {
+  groupId: number;
+}
+
+export function GroupDetailsForm(
   props: Readonly<GroupDetailsFormProps & Omit<HTMLAttributes<HTMLDivElement>, 'children'>>,
 ) {
   const { groupId, className, ...rest } = props;
@@ -29,17 +33,17 @@ export function useGroupDetailsFormState(
   const [isHidden, setIsHidden] = useState(false);
   const navigate = useNavigate();
 
-  const { data: group, isLoading, error } = useResourcesServiceResourceGroupsGetOne({ id: groupId });
+  const { data: group, isLoading, error } = useResourceGroupsGetOne({ path: { id: groupId } });
 
-  const { mutateAsync: updateGroup, isPending: isUpdating } = useResourcesServiceResourceGroupsUpdateOne({
+  const { mutateAsync: updateGroup, isPending: isUpdating } = useResourceGroupsUpdateOne(undefined, {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [useAccessControlServiceResourceIntroductionsGetPeopleKey] });
+      queryClient.invalidateQueries({ queryKey: [useResourceIntroductionsGetPeopleKey] });
       success({
         title: t('operations.update.success.title'),
         description: t('operations.update.success.description'),
       });
       queryClient.invalidateQueries({
-        queryKey: UseResourcesServiceResourceGroupsGetOneKeyFn({ id: groupId }),
+        queryKey: UseResourceGroupsGetOneKeyFn({ path: { id: groupId } }),
       });
     },
     onError: (err: Error) => {
@@ -63,20 +67,20 @@ export function useGroupDetailsFormState(
     if (!name.trim()) return;
 
     await updateGroup({
-      id: groupId,
-      requestBody: { name: name.trim(), description: description.trim() || undefined, isHidden },
+      path: { id: groupId },
+      body: { name: name.trim(), description: description.trim() || undefined, isHidden },
     });
   };
 
-  const { isPending: isDeleting, mutate: deleteGroupMutation } = useResourcesServiceResourceGroupsDeleteOne({
+  const { isPending: isDeleting, mutateAsync: deleteGroup } = useResourceGroupsDeleteOne(undefined, {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [useAccessControlServiceResourceIntroductionsGetPeopleKey] });
+      queryClient.invalidateQueries({ queryKey: [useResourceIntroductionsGetPeopleKey] });
       success({
         title: t('operations.delete.success.title'),
         description: t('operations.delete.success.description'),
       });
       queryClient.invalidateQueries({
-        queryKey: UseResourcesServiceResourceGroupsGetManyKeyFn(),
+        queryKey: UseResourceGroupsGetManyKeyFn(),
       });
       navigate('/');
     },
@@ -87,63 +91,6 @@ export function useGroupDetailsFormState(
       });
     },
   });
-
-  const handleDelete = useCallback(() => {
-    deleteGroupMutation({
-      groupId,
-    });
-  }, [deleteGroupMutation, groupId]);
-
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
-  return {
-    className,
-    rest,
-    t,
-    name,
-    setName,
-    description,
-    setDescription,
-    isHidden,
-    setIsHidden,
-    group,
-    isLoading,
-    error,
-    isUpdating,
-    handleSubmit,
-    isDeleting,
-    handleDelete,
-    showDeleteConfirmation,
-    setShowDeleteConfirmation,
-  } as const;
-}
-
-export interface GroupDetailsFormProps {
-  groupId: number;
-}
-
-export function GroupDetailsForm(
-  props: Readonly<GroupDetailsFormProps & Omit<HTMLAttributes<HTMLDivElement>, 'children'>>,
-) {
-  const {
-    className,
-    rest,
-    t,
-    name,
-    setName,
-    description,
-    setDescription,
-    isHidden,
-    setIsHidden,
-    group,
-    isLoading,
-    error,
-    isUpdating,
-    handleSubmit,
-    isDeleting,
-    handleDelete,
-    showDeleteConfirmation,
-    setShowDeleteConfirmation,
-  } = useGroupDetailsFormState(props);
 
   if (isLoading) {
     return (
@@ -211,24 +158,22 @@ export function GroupDetailsForm(
             {t('form.buttons.save')}
           </Button>
 
-          <Button
-            variant="danger"
-            className="w-full"
-            onPress={() => setShowDeleteConfirmation(true)}
+          <ConfirmableButton
+            label={t('form.buttons.delete')}
+            icon={<Trash2Icon className="w-4 h-4" />}
+            status="error"
+            buttonProps={{ className: 'w-full' }}
             data-cy="group-details-form-delete-button"
-          >
-            <Trash2Icon className="w-4 h-4" />
-            {t('form.buttons.delete')}
-          </Button>
+            confirm={{
+              title: t('deleteConfirm.title'),
+              message: t('deleteConfirm.message', { name: group.name }),
+              confirmLabel: t('deleteConfirm.confirm'),
+              cancelLabel: t('deleteConfirm.cancel'),
+            }}
+            isPending={isDeleting}
+            onConfirm={() => deleteGroup({ path: { groupId } })}
+          />
         </div>
-
-        <DeleteConfirmationModal
-          isOpen={showDeleteConfirmation}
-          onClose={() => setShowDeleteConfirmation(false)}
-          onConfirm={() => handleDelete()}
-          itemName={group.name}
-          isDeleting={isDeleting}
-        />
       </Form>
     </div>
   );

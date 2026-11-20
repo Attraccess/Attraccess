@@ -1,15 +1,34 @@
-import { Button, Card, Code, cn, Tooltip, TooltipContent, TooltipTrigger, useOverlayState } from '@heroui/react';
+import { Button, Card, Code, cn, Tooltip, TooltipContent, TooltipTrigger } from '@heroui/react';
 import { Handle, NodeToolbar, Position, useNodeId, NodeProps } from '@xyflow/react';
 import { Edit2Icon, Trash2Icon, TriangleAlertIcon } from 'lucide-react';
 import { NodeEditor } from './editor/index';
 import { ResourceFlowLogType, ResourceFlowLog, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
-import { useFlowContext } from '../context/index';
+import { useFlowContext } from '../context/flowContext';
 import { schemaSupportsOwner } from '../flowOwner';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNodePreviewRows } from './preview/index';
-import { DeleteConfirmationModal, TExists, TFunction } from '@attraccess/plugins-frontend-ui';
+import { ConfirmableButton, TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 
-export function useAttraccessNodeState(props: Props) {
+export interface Props {
+  tNodeTranslations: TFunction;
+  tNodeExists?: TExists;
+  schema: ResourceFlowNodeSchemaDto;
+  node?: NodeProps;
+  previewMode?: boolean;
+  data?: {
+    forceToolbarVisible?: boolean;
+    toolbarPosition?: Position;
+  };
+  validationError?: string;
+}
+export enum ProcessingState {
+  IDLE = 'idle',
+  PROCESSING = 'processing',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+}
+
+export function AttraccessNode(props: Props) {
   const { schema, previewMode, tNodeTranslations: t, tNodeExists, data, validationError } = props;
 
   const nodeId = useNodeId();
@@ -65,8 +84,6 @@ export function useAttraccessNodeState(props: Props) {
 
     removeNode(nodeId);
   }, [removeNode, nodeId]);
-
-  const { isOpen: showDeleteConfirmation, open: userWantsToDelete, close: userDoesNotWantToDelete } = useOverlayState();
 
   const isSelected = props.node?.selected ?? false;
 
@@ -148,84 +165,11 @@ export function useAttraccessNodeState(props: Props) {
   const descriptionKey = 'nodes.' + schema.type + '.description';
   const nodeTitle = tNodeExists?.(titleKey) ? t(titleKey) : (schema.label ?? schema.type);
   const nodeDescription = tNodeExists?.(descriptionKey) ? t(descriptionKey) : (schema.description ?? '');
-  return {
-    schema,
-    previewMode,
-    t,
-    tNodeExists,
-    data,
-    validationError,
-    processingState,
-    remove,
-    showDeleteConfirmation,
-    userWantsToDelete,
-    userDoesNotWantToDelete,
-    cardClasses,
-    targetHandlesWithStyles,
-    sourceHandlesWithStyles,
-    isEditable,
-    previewRows,
-    supportedByOwner,
-    unsupportedMessageKey,
-    nodeTitle,
-    nodeDescription,
-  } as const;
-}
-
-export interface Props {
-  tNodeTranslations: TFunction;
-  tNodeExists?: TExists;
-  schema: ResourceFlowNodeSchemaDto;
-  node?: NodeProps;
-  previewMode?: boolean;
-  data?: {
-    forceToolbarVisible?: boolean;
-    toolbarPosition?: Position;
-  };
-  validationError?: string;
-}
-export enum ProcessingState {
-  IDLE = 'idle',
-  PROCESSING = 'processing',
-  COMPLETED = 'completed',
-  FAILED = 'failed',
-}
-
-export function AttraccessNode(props: Props) {
-  const {
-    schema,
-    previewMode,
-    t,
-    tNodeExists,
-    data,
-    validationError,
-    processingState,
-    remove,
-    showDeleteConfirmation,
-    userWantsToDelete,
-    userDoesNotWantToDelete,
-    cardClasses,
-    targetHandlesWithStyles,
-    sourceHandlesWithStyles,
-    isEditable,
-    previewRows,
-    supportedByOwner,
-    unsupportedMessageKey,
-    nodeTitle,
-    nodeDescription,
-  } = useAttraccessNodeState(props);
 
   return (
     <NodeEditor schema={schema} tNodeTranslations={t} tNodeExists={tNodeExists}>
       {(openEditor) => (
         <div>
-          <DeleteConfirmationModal
-            isOpen={showDeleteConfirmation}
-            onClose={userDoesNotWantToDelete}
-            onConfirm={remove}
-            itemName={nodeTitle}
-          />
-
           <NodeToolbar isVisible={data?.forceToolbarVisible || undefined} position={data?.toolbarPosition}>
             <div className="flex flex-row gap-2">
               {isEditable && (
@@ -234,9 +178,21 @@ export function AttraccessNode(props: Props) {
                 </Button>
               )}
               {!previewMode && (
-                <Button variant="danger" isIconOnly onPress={userWantsToDelete}>
-                  <Trash2Icon size={12} />
-                </Button>
+                <ConfirmableButton
+                  label={t('deleteNode.confirm')}
+                  status="error"
+                  confirm={{
+                    title: t('deleteNode.title'),
+                    message: t('deleteNode.message', { name: nodeTitle }),
+                    cancelLabel: t('deleteNode.cancel'),
+                  }}
+                  onConfirm={remove}
+                  renderActivator={(open, { label }) => (
+                    <Button variant="danger" isIconOnly onPress={open} aria-label={String(label)}>
+                      <Trash2Icon size={12} />
+                    </Button>
+                  )}
+                />
               )}
             </div>
           </NodeToolbar>
@@ -283,8 +239,8 @@ export function AttraccessNode(props: Props) {
               {!previewMode && previewRows.length > 0 && (
                 <Card.Content className="pt-0">
                   <div className="flex flex-col gap-2">
-                    {previewRows.map((row) => (
-                      <div className="flex flex-col gap-1" key={row.label}>
+                    {previewRows.map((row, rowIdx) => (
+                      <div className="flex flex-col gap-1" key={`${rowIdx}-${row.label}`}>
                         <small className="text-muted">{row.label}</small>
                         {'entries' in row ? (
                           row.entries.length === 0 ? (
@@ -296,9 +252,9 @@ export function AttraccessNode(props: Props) {
                                   key={idx}
                                   className="flex flex-col gap-0.5 rounded-md border border-border px-2 py-1"
                                 >
-                                  {entry.fields.map((field) => (
+                                  {entry.fields.map((field, fieldIdx) => (
                                     <div
-                                      key={field.label}
+                                      key={`${fieldIdx}-${field.label}`}
                                       className="grid grid-cols-[auto_1fr] gap-x-2 items-baseline min-w-0"
                                     >
                                       <small className="text-muted whitespace-nowrap">{field.label}</small>

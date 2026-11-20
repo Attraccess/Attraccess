@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReactNode } from 'react';
@@ -20,6 +21,7 @@ const state = vi.hoisted(() => ({
   }[],
   balanceQuery: vi.fn(),
   transactionsQuery: vi.fn(),
+  refund: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -45,12 +47,12 @@ vi.mock('../../../../hooks/useAuth', () => ({
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   BillingTransactionStatus: { PENDING: 'pending', COMPLETED: 'completed', FAILED: 'failed' },
-  useBillingServiceGetBillingConfiguration: () => ({ data: state.configuration }),
-  useBillingServiceGetBillingBalance: (...args: unknown[]) => {
+  useGetBillingConfiguration: () => ({ data: state.configuration }),
+  useGetBillingBalance: (...args: unknown[]) => {
     state.balanceQuery(...args);
     return { data: { value: state.balance }, isLoading: state.loading };
   },
-  useBillingServiceGetBillingTransactions: (...args: unknown[]) => {
+  useGetBillingTransactions: (...args: unknown[]) => {
     state.transactionsQuery(...args);
     return { data: { data: state.transactions } };
   },
@@ -67,7 +69,7 @@ vi.mock('./transactionDetailsModal', () => ({
   }) => (isOpen ? <button onClick={onClose}>Details #{transactionId}</button> : null),
 }));
 vi.mock('./transactionDetailsModal/refund', () => ({
-  RefundModal: ({ children }: { children: (open: () => void) => ReactNode }) => children(() => undefined),
+  RefundModal: ({ children }: { children: (open: () => void) => ReactNode }) => children(state.refund),
 }));
 afterEach(() => {
   cleanup();
@@ -92,18 +94,26 @@ it('formats balance, renders empty transactions and scopes query requests', () =
   open({ userId: 9, transactionsPerPage: 20 });
   expect(screen.getByText('EUR 123.45')).toBeTruthy();
   expect(screen.getByText('transactions.table.empty')).toBeTruthy();
-  expect(state.balanceQuery).toHaveBeenCalledWith({ userId: 9 }, undefined, { enabled: true });
-  expect(state.transactionsQuery).toHaveBeenCalledWith({ userId: 9, page: 1, limit: 20 }, undefined, { enabled: true });
+  expect(state.balanceQuery).toHaveBeenCalledWith({ path: { userId: 9 } }, undefined, { enabled: true });
+  expect(state.transactionsQuery).toHaveBeenCalledWith(
+    { path: { userId: 9 }, query: { page: 1, limit: 20 } },
+    undefined,
+    { enabled: true },
+  );
 });
 it('disables fetching without a user or when the card is disabled', () => {
   state.userId = undefined;
   const view = open();
-  expect(state.balanceQuery).toHaveBeenLastCalledWith({ userId: 0 }, undefined, { enabled: false });
+  expect(state.balanceQuery).toHaveBeenLastCalledWith({ path: { userId: 0 } }, undefined, { enabled: false });
   view.unmount();
   open({ userId: 9, isDisabled: true });
-  expect(state.transactionsQuery).toHaveBeenLastCalledWith({ userId: 9, page: 1, limit: 5 }, undefined, {
-    enabled: false,
-  });
+  expect(state.transactionsQuery).toHaveBeenLastCalledWith(
+    { path: { userId: 9 }, query: { page: 1, limit: 5 } },
+    undefined,
+    {
+      enabled: false,
+    },
+  );
 });
 it('renders configuration and balance loading states', () => {
   state.configuration = undefined;
@@ -156,4 +166,15 @@ it('preserves every minor currency unit in settled transaction rows and balances
   open();
   expect(screen.getByText('EUR 90,071,992,547,409.91')).toBeTruthy();
   expect(screen.getByText('-90,071,992,547,409.91')).toBeTruthy();
+});
+
+it('opens the refund drawer from the row actions without opening the details', async () => {
+  state.transactions = [{ id: 1, amount: -123, status: 'completed', createdAt: '2026-09-01', resourceUsageId: 5 }];
+  open();
+  await userEvent.click(screen.getByRole('button', { name: 'Actions for #1' }));
+  await userEvent.click(
+    within(screen.getByRole('menu')).getByRole('menuitem', { name: 'transactions.table.actions.refund' }),
+  );
+  expect(state.refund).toHaveBeenCalledOnce();
+  expect(screen.queryByRole('button', { name: 'Details #1' })).toBeNull();
 });

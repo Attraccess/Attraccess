@@ -13,6 +13,9 @@
 //   WIRETAP_DROP   path of a control file; its content is an APDU hex prefix (e.g. "90c4"); the file
 //                  is removed when the drop fires (one shot). Written by the kit before a step.
 // It records everything the reader and the server exchange, including card APDUs: lab evidence only.
+// Plugin BLE bytes are the exception: BLE_* messages keep their structure, but every byte field (`value`,
+// advertisement `data`) is replaced by its length. They carry peripheral credentials (a lock's user code, its
+// crypt token), and CI uploads this file as an artifact.
 const fs = require('node:fs');
 const tls = require('node:tls');
 
@@ -67,12 +70,35 @@ function framesOf(socket, dir, chunk) {
   return decoder.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
 }
 
+// Base64 byte fields inside BLE_* payloads; everything else (ids, UUIDs, codes, details) stays readable.
+const BLE_BYTE_FIELDS = new Set(['value', 'data']);
+
+function byteLength(base64) {
+  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+  return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
+}
+
+function redactBle(node) {
+  if (Array.isArray(node)) return node.map(redactBle);
+  if (!node || typeof node !== 'object') return node;
+  const copy = {};
+  for (const [key, value] of Object.entries(node)) {
+    if (BLE_BYTE_FIELDS.has(key) && value !== null && value !== undefined) {
+      copy[key] = { redacted: true, bytes: typeof value === 'string' ? byteLength(value) : null };
+    } else {
+      copy[key] = redactBle(value);
+    }
+  }
+  return copy;
+}
+
 function describe(sock, dir, frame) {
   if (frame.type !== 1) return { sock, dir, ftype: frame.type, bytes: frame.payload.length };
   let message;
   try { message = JSON.parse(frame.payload.toString('utf8')); } catch (_) { return { sock, dir, ftype: 1, unparsable: frame.payload.length }; }
   const data = (message && message.data) || {};
-  return { sock, dir, type: data.type, payload: data.payload, bytes: frame.payload.length };
+  const payload = typeof data.type === 'string' && data.type.startsWith('BLE_') ? redactBle(data.payload) : data.payload;
+  return { sock, dir, type: data.type, payload, bytes: frame.payload.length };
 }
 
 function armedPrefix() {

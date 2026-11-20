@@ -1,10 +1,13 @@
-import { readFileSync } from 'node:fs';
+import {
+  validatePluginPermissionsDeclaration,
+  type PluginPermissionsDeclaration,
+} from '@attraccess/plugins-backend-sdk';
+import { existsSync, readFileSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 import { join } from 'node:path';
 
 // Needs `build-backend` first (the e2e target depends on it).
 const bundle = readFileSync(join(__dirname, '../package/dist/index.js'), 'utf8');
-const migrations = readFileSync(join(__dirname, '../package/dist/migrations.js'), 'utf8');
 
 const requiredModules = (source: string) => [...source.matchAll(/require\("([^"]+)"\)/g)].map((match) => match[1]);
 const nodeBuiltins = new Set([...builtinModules, ...builtinModules.map((name) => `node:${name}`)]);
@@ -14,7 +17,6 @@ const hostShared = new Set([
   '@nestjs/core',
   '@nestjs/event-emitter',
   'eventemitter2',
-  'typeorm',
   'reflect-metadata',
   '@attraccess/plugins-backend-sdk',
 ]);
@@ -74,30 +76,47 @@ describe('Matter plugin bundle', () => {
     }
     const expectUsable = (plugin: ReturnType<typeof loadWith>['plugin']) => {
       expect(plugin.register({}).controllers).toHaveLength(4);
-      expect((plugin as unknown as { entities: unknown[] }).entities).toHaveLength(11);
+      expect(Object.keys((plugin as unknown as { storage: { tables: object } }).storage.tables)).toHaveLength(11);
       expect((plugin as unknown as { auditDomains: { domain: string }[] }).auditDomains[0].domain).toBe('matter');
     };
 
-    // ws only asks for utf-8-validate when Node lacks buffer.isUtf8 (before 18.14), so on supported Node versions
-    // bufferutil is the accelerator that is actually looked up.
+    // ws only asks for utf-8-validate when Node lacks buffer.isUtf8 (before 18.14). Since ws 8.23 it also skips
+    // bufferutil when Node has native WebSocket masking (http.websocketMask), so only older runtimes look it up.
+    const looksUpBufferutil = typeof (require('node:http') as { websocketMask?: unknown }).websocketMask !== 'function';
     it('without the optional native modules installed', () => {
       const { plugin, requested } = loadWith((name) => {
         throw Object.assign(new Error(`Cannot find module '${name}'`), { code: 'MODULE_NOT_FOUND' });
       });
-      expect(requested).toContain('bufferutil');
+      expect(requested.includes('bufferutil')).toBe(looksUpBufferutil);
       expectUsable(plugin);
+    });
+
+    it('declares exactly the six Matter and Thread keys, in a declaration the SDK accepts', () => {
+      const { plugin } = loadWith(() => ({}));
+      const declaration = (plugin as unknown as { permissions: PluginPermissionsDeclaration }).permissions;
+      expect(validatePluginPermissionsDeclaration(declaration)).toBe(declaration);
+      expect(declaration.category).toEqual({ en: 'Matter & Thread', de: 'Matter & Thread' });
+      expect(declaration.permissions.map((permission) => permission.key).sort()).toEqual([
+        'matter.devices.command-direct',
+        'matter.devices.commission',
+        'matter.devices.manage',
+        'matter.devices.read',
+        'thread.network.manage',
+        'thread.network.read',
+      ]);
     });
 
     it('with the optional native modules installed', () => {
       const accelerator = { mask: jest.fn(), unmask: jest.fn(), isValidUTF8: jest.fn(() => true) };
       const { plugin, requested } = loadWith(() => accelerator);
-      expect(requested).toContain('bufferutil');
+      expect(requested.includes('bufferutil')).toBe(looksUpBufferutil);
       expectUsable(plugin);
     });
   });
 
-  it('ships the migration as a separate entry', () => {
-    expect(migrations).toContain('CreateMatterConnection1793900000000');
-    expect(requiredModules(migrations).filter((name) => !nodeBuiltins.has(name) && !hostShared.has(name))).toEqual([]);
+  it('has no database access of its own: no TypeORM, no engine subpath, no migrations entry', () => {
+    expect(requiredModules(bundle)).not.toContain('typeorm');
+    expect(bundle).not.toMatch(/plugins-backend-sdk\/sqlite|database-entities|sqlite3|better-sqlite3/);
+    expect(existsSync(join(__dirname, '../package/dist/migrations.js'))).toBe(false);
   });
 });

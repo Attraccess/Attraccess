@@ -16,7 +16,7 @@ vi.mock('@attraccess/react-query-client', async () => {
   const { useSyncExternalStore } = await import('react');
   return {
     ResourceIntroducerType: { INTRODUCER: 'introducer' },
-    useAccessControlServiceResourceIntroducersGetNames: (...args: unknown[]) => {
+    useResourceIntroducersGetNames: (...args: unknown[]) => {
       query.load(...args);
       const data = useSyncExternalStore(
         (listener) => {
@@ -52,7 +52,7 @@ describe('introduction required tutor contacts', () => {
     render(<IntroductionRequiredDisplay resourceId={1} />);
     expect(screen.getByText('needsIntroduction')).toBeInTheDocument();
     for (let i = 1; i <= 30; i++) expect(screen.getByText(`Tutor ${i}`)).toBeInTheDocument();
-    expect(query.load).toHaveBeenCalledWith({ resourceId: 1 }, undefined, {
+    expect(query.load).toHaveBeenCalledWith({ path: { resourceId: 1 } }, undefined, {
       refetchInterval: 10000,
     });
     act(() => {

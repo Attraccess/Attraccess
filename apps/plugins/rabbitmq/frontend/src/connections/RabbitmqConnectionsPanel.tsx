@@ -4,14 +4,13 @@ import {
   Button,
   EmptyState,
   StatusAlert,
-  StatusDialog,
+  TableActionsColumnHeader,
   TableDataLoadingIndicator,
+  TableRowActions,
 } from '@attraccess/plugins-frontend-ui';
 import {
   Card,
   Chip,
-  Input,
-  Label,
   Table,
   TableBody,
   TableCell,
@@ -20,13 +19,16 @@ import {
   TableHeader,
   TableRow,
   TableScrollContainer,
-  TextField,
 } from '@heroui/react';
 import { PlugZapIcon, RefreshCwIcon, UnplugIcon } from 'lucide-react';
-import { useState } from 'react';
-import { MISSING_VALUE, useRabbitmqFormatters } from '../format';
+import { useRef } from 'react';
+import { MISSING_VALUE, useRabbitmqFormatters } from '../useRabbitmqFormatters';
 import { useRabbitmqTranslations } from '../i18n';
 import { usePolledResource } from '../usePolledResource';
+import {
+  RabbitmqConnectionCloseMessage,
+  type RabbitmqConnectionCloseMessageHandle,
+} from './RabbitmqConnectionCloseMessage';
 import { closeConnection, fetchConnections, type RabbitmqConnection } from './connections-api';
 
 export const CONNECTIONS_POLL_INTERVAL_MS = 10_000;
@@ -39,31 +41,19 @@ export function RabbitmqConnectionsPanel({ mqttServerId, canManage }: { mqttServ
     CONNECTIONS_POLL_INTERVAL_MS,
     t('connections.loadError'),
   );
-  const [target, setTarget] = useState<RabbitmqConnection | null>(null);
-  const [reason, setReason] = useState('');
-  const [closing, setClosing] = useState(false);
-  const [closeError, setCloseError] = useState<string | null>(null);
+  const closeMessage = useRef<RabbitmqConnectionCloseMessageHandle>(null);
 
-  const dismiss = () => {
-    setTarget(null);
-    setReason('');
-    setCloseError(null);
-  };
-
-  const confirmClose = async () => {
-    if (!target) return;
-    setClosing(true);
-    setCloseError(null);
+  const confirmClose = async (connection: RabbitmqConnection) => {
+    const message = closeMessage.current;
+    message?.showError(null);
     try {
-      await closeConnection(mqttServerId, target.name, reason);
-      dismiss();
+      await closeConnection(mqttServerId, connection.name, message?.reason ?? '');
       void reload();
     } catch (err) {
-      setCloseError(err instanceof Error && err.message ? err.message : t('connections.closeError'));
+      message?.showError(err instanceof Error && err.message ? err.message : t('connections.closeError'));
       // The client may be gone already (or the broker changed): show the current list behind the dialog.
       void reload();
-    } finally {
-      setClosing(false);
+      throw err;
     }
   };
 
@@ -123,7 +113,11 @@ export function RabbitmqConnectionsPanel({ mqttServerId, canManage }: { mqttServ
                   <TableColumn>{t('connections.connectedSince')}</TableColumn>
                   <TableColumn>{t('connections.channels')}</TableColumn>
                   <TableColumn>{t('connections.traffic')}</TableColumn>
-                  {canManage && <TableColumn>{t('common.actions')}</TableColumn>}
+                  {canManage && (
+                    <TableColumn id="actions">
+                      <TableActionsColumnHeader />
+                    </TableColumn>
+                  )}
                 </TableHeader>
                 <TableBody items={data.connections}>
                   {(connection) => (
@@ -150,16 +144,32 @@ export function RabbitmqConnectionsPanel({ mqttServerId, canManage }: { mqttServ
                       </TableCell>
                       {canManage && (
                         <TableCell>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="ghost"
-                            aria-label={t('connections.close', { name: connection.clientId ?? connection.name })}
-                            onPress={() => setTarget(connection)}
-                            data-cy="rabbitmq-connection-close-button"
-                          >
-                            <UnplugIcon className="rmq:w-4 rmq:h-4 rmq:text-danger" />
-                          </Button>
+                          <TableRowActions
+                            itemName={connection.clientId ?? connection.name}
+                            actions={[
+                              {
+                                key: 'close',
+                                label: t('connections.closeTitle'),
+                                icon: UnplugIcon,
+                                tone: 'danger',
+                                onPress: () => confirmClose(connection),
+                                'data-cy': `rabbitmq-connection-close-button-${connection.name}`,
+                                confirm: {
+                                  title: t('connections.closeTitle'),
+                                  message: (
+                                    <RabbitmqConnectionCloseMessage
+                                      name={connection.clientId ?? connection.name}
+                                      ref={closeMessage}
+                                    />
+                                  ),
+                                  confirmLabel: t('connections.closeConfirm'),
+                                  cancelLabel: t('common.cancel'),
+                                  'data-cy': `rabbitmq-connection-close-modal-${mqttServerId}`,
+                                  confirmDataCy: 'rabbitmq-connection-close-confirm-button',
+                                },
+                              },
+                            ]}
+                          />
                         </TableCell>
                       )}
                     </TableRow>
@@ -170,34 +180,6 @@ export function RabbitmqConnectionsPanel({ mqttServerId, canManage }: { mqttServ
           </Table>
         )}
       </Card.Content>
-
-      <StatusDialog
-        isOpen={target !== null}
-        onClose={dismiss}
-        status="error"
-        title={t('connections.closeTitle')}
-        action={{
-          label: t('connections.closeConfirm'),
-          onPress: confirmClose,
-          isPending: closing,
-          'data-cy': 'rabbitmq-connection-close-confirm-button',
-        }}
-        closeLabel={t('common.cancel')}
-        data-cy={`rabbitmq-connection-close-modal-${mqttServerId}`}
-      >
-        <div className="rmq:flex rmq:flex-col rmq:gap-3">
-          <p>{t('connections.closeDescription', { name: target?.clientId ?? target?.name ?? '' })}</p>
-          <TextField value={reason} onChange={setReason} className="rmq:w-full">
-            <Label>{t('connections.reason')}</Label>
-            <Input autoComplete="off" data-cy="rabbitmq-connection-close-reason-input" />
-          </TextField>
-          {closeError && (
-            <StatusAlert status="danger" title={t('connections.closeError')} data-cy="rabbitmq-connection-close-error">
-              {closeError === t('connections.closeError') ? undefined : closeError}
-            </StatusAlert>
-          )}
-        </div>
-      </StatusDialog>
     </Card>
   );
 }

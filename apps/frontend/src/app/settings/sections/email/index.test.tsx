@@ -2,17 +2,14 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  useSettingsServiceGetSystemSettings,
-  useSettingsServiceUpdateSystemSettings,
-} from '@attraccess/react-query-client';
+import { useGetSystemSettings, useUpdateSystemSettings } from '@attraccess/react-query-client';
 import { EmailSection } from './index';
 
 vi.mock('@attraccess/react-query-client', () => ({
   SmtpServiceType: { SMTP: 'smtp', OUTLOOK365: 'outlook365' },
-  useSettingsServiceGetSystemSettings: vi.fn(),
-  UseSettingsServiceGetSystemSettingsKeyFn: () => ['settings'],
-  useSettingsServiceUpdateSystemSettings: vi.fn(),
+  useGetSystemSettings: vi.fn(),
+  UseGetSystemSettingsKeyFn: () => ['settings'],
+  useUpdateSystemSettings: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -45,14 +42,14 @@ const SMTP = {
 describe('EmailSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+    vi.mocked(useGetSystemSettings).mockReturnValue({
       data: { smtp: SMTP },
       isLoading: false,
-    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
-    vi.mocked(useSettingsServiceUpdateSystemSettings).mockReturnValue({
+    } as ReturnType<typeof useGetSystemSettings>);
+    vi.mocked(useUpdateSystemSettings).mockReturnValue({
       mutate: saveSettings,
       isPending: false,
-    } as unknown as ReturnType<typeof useSettingsServiceUpdateSystemSettings>);
+    } as unknown as ReturnType<typeof useUpdateSystemSettings>);
   });
 
   const saveBar = (container: HTMLElement) => container.querySelector('[data-slot="settings-save-bar"]');
@@ -83,7 +80,7 @@ describe('EmailSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
 
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: {
+      body: {
         smtp: { ...SMTP, from: 'noreply@example.org.uk', pass: undefined, passConfigured: undefined },
       },
     });
@@ -99,7 +96,7 @@ describe('EmailSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
 
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: {
+      body: {
         smtp: { ...SMTP, user: null, pass: undefined, passConfigured: undefined },
       },
     });
@@ -109,7 +106,7 @@ describe('EmailSection', () => {
     // Pinning host/port/secure to the Outlook constants made these instances mount with a save bar
     // that had no edit behind it, that Discard could not clear (the pinned values never came from
     // the draft), and whose Save silently rewrote the stored transport.
-    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+    vi.mocked(useGetSystemSettings).mockReturnValue({
       data: {
         smtp: {
           service: 'outlook365',
@@ -122,7 +119,7 @@ describe('EmailSection', () => {
         },
       },
       isLoading: false,
-    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
+    } as ReturnType<typeof useGetSystemSettings>);
 
     const { container } = render(<EmailSection />);
 
@@ -175,5 +172,32 @@ describe('EmailSection', () => {
 
     expect(saveSettings).not.toHaveBeenCalled();
     expect(screen.getByText('inputs.port.errors.invalid')).toBeInTheDocument();
+  });
+
+  it('reads the system settings once, in the section, so the form and the aside do not refetch them', () => {
+    render(<EmailSection />);
+
+    expect(useGetSystemSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps an unsaved edit and the shown validation through a refetch that passes through loading', async () => {
+    // Settings that failed to load have no data, so their next refetch goes back to loading and the
+    // spinner replaces the form. The edit and the validation state must survive that.
+    const mockSettings = (data: unknown, isLoading: boolean) =>
+      vi.mocked(useGetSystemSettings).mockReturnValue({ data, isLoading } as ReturnType<typeof useGetSystemSettings>);
+    mockSettings(undefined, false);
+    const { rerender } = render(<EmailSection />);
+    await userEvent.type(screen.getByLabelText('inputs.host.label'), 'relay.example.org');
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
+    expect(screen.getByText('inputs.port.errors.required')).toBeInTheDocument();
+
+    mockSettings(undefined, true);
+    rerender(<EmailSection />);
+    expect(screen.getByText('loading')).toBeInTheDocument();
+    mockSettings(undefined, false);
+    rerender(<EmailSection />);
+
+    expect(screen.getByLabelText('inputs.host.label')).toHaveValue('relay.example.org');
+    expect(screen.getByText('inputs.port.errors.required')).toBeInTheDocument();
   });
 });

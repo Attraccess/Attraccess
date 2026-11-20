@@ -1,7 +1,7 @@
-import { FormSubmission, Resource, ResourceUsage, User } from '@attraccess/database-entities';
+import type { UsageFormSubmissionDraft, UsageSession, UsageSessionUser } from '@attraccess/application-models';
 
 /** The usage session as flows see it: answered forms by form id, a sanitized user and no resource documentation. */
-export function usageFlowPayload(resourceUsage: ResourceUsage, formSubmissions?: FormSubmission[]) {
+export function usageFlowPayload(resourceUsage: UsageSession, formSubmissions?: UsageFormSubmissionDraft[]) {
   const normalizedFormSubmissions = formSubmissions ?? [];
   const mappedFormSubmissions: {
     [key: string]: { formName: string; answers: { [key: number]: { value: string; name: string } } };
@@ -19,11 +19,10 @@ export function usageFlowPayload(resourceUsage: ResourceUsage, formSubmissions?:
     };
   });
 
-  const usageUser =
-    resourceUsage.user ??
-    (resourceUsage.userId != null ? ({ id: resourceUsage.userId } as Pick<User, 'id'> & Partial<User>) : undefined);
+  const usageUser: Partial<UsageSessionUser> | undefined =
+    resourceUsage.user ?? (resourceUsage.userId != null ? { id: resourceUsage.userId } : undefined);
 
-  const sanitizedUser: (Partial<User> & Pick<User, 'id'>) | undefined = usageUser
+  const sanitizedUser: (Partial<UsageSessionUser> & Pick<UsageSessionUser, 'id'>) | undefined = usageUser
     ? {
         id: usageUser.id,
         username: usageUser.username,
@@ -43,7 +42,7 @@ export function usageFlowPayload(resourceUsage: ResourceUsage, formSubmissions?:
       documentationUrl: undefined,
       documentationType: undefined,
       metadata: resourceUsage.resource?.metadata ?? null,
-    } as Partial<Resource>,
+    },
     user: sanitizedUser,
     formSubmissions: mappedFormSubmissions,
   };

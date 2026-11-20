@@ -35,7 +35,7 @@ REQUIRED = {
     "SECURE_ENABLE_SECURE_ROM_DL_MODE": "y",
     "NVS_ENCRYPTION": "y",
     "NVS_SEC_KEY_PROTECT_USING_HMAC": "y",
-    # Fixed eFuse layout: KEY3 is the DS key, KEY4 the NVS key.
+    # Fixed eFuse layout: KEY3 is spare, KEY4 the NVS key.
     "NVS_SEC_HMAC_EFUSE_KEY_ID": "4",
     "BOOTLOADER_APP_ROLLBACK_ENABLE": "y",
     "BOOTLOADER_APP_ANTI_ROLLBACK": "y",
@@ -51,7 +51,14 @@ REQUIRED = {
     "BOOTLOADER_LOG_LEVEL_NONE": "y",
     "PARTITION_TABLE_CUSTOM_FILENAME": "partitions.csv",
     "PARTITION_TABLE_OFFSET": "0x8000",
-    "MBEDTLS_INTERNAL_MEM_ALLOC": "y",
+    # Key material stays in internal RAM; only the fixed-size TLS record buffers may go to
+    # PSRAM, through the custom allocator (src/api/security/tls_memory.c).
+    "MBEDTLS_CUSTOM_MEM_ALLOC": "y",
+    "MBEDTLS_INTERNAL_MEM_ALLOC": "n",
+    "MBEDTLS_EXTERNAL_MEM_ALLOC": "n",
+    "MBEDTLS_DEFAULT_MEM_ALLOC": "n",
+    "MBEDTLS_DYNAMIC_BUFFER": "n",
+    "MBEDTLS_SSL_VARIABLE_BUFFER_LENGTH": "n",
 }
 
 
@@ -64,11 +71,27 @@ def build_table(entries):
 
 SECURE_COMPILE_COMMANDS = [
     {"file": "/fw/src/main.cpp", "command": "xtensa-esp32s3-elf-g++ -DATTRACTAP_SECURE_PROFILE=1 -c main.cpp"},
+    {"file": "/fw/src/api/security/tls_memory.c", "command": "xtensa-esp32s3-elf-gcc -c tls_memory.c"},
 ]
 
 
+# Excerpt of a GNU ld map: the allocator's constructor in the image, with its address.
+LINKED_MAP = """\
+ .text.attractap_tls_memory_install
+                0x42012345       0x14 esp-idf/main/libmain.a(tls_memory.c.obj)
+                0x42012345                attractap_tls_memory_install
+"""
+# The object was compiled but never pulled in; ld lists only discarded sections without addresses.
+UNLINKED_MAP = """\
+Discarded input sections
+
+ .text.attractap_tls_memory_install
+                0x00000000       0x14 esp-idf/main/libmain.a(tls_memory.c.obj)
+"""
+
+
 def write_build_dir(root, sdkconfig=PROFILE, bootloader_size=0x6000, table=None,
-                    compile_commands=SECURE_COMPILE_COMMANDS):
+                    compile_commands=SECURE_COMPILE_COMMANDS, linker_map=LINKED_MAP):
     os.makedirs(os.path.join(root, "bootloader"))
     os.makedirs(os.path.join(root, "partition_table"))
     with open(os.path.join(root, "sdkconfig"), "w") as f:
@@ -79,6 +102,8 @@ def write_build_dir(root, sdkconfig=PROFILE, bootloader_size=0x6000, table=None,
         f.write(table if table is not None else build_table(c.parse_partition_csv(CSV)))
     with open(os.path.join(root, "compile_commands.json"), "w") as f:
         json.dump(compile_commands, f)
+    with open(os.path.join(root, "attractap.map"), "w") as f:
+        f.write(linker_map)
 
 
 class SecureProfileChecks(unittest.TestCase):
@@ -145,8 +170,9 @@ class SecureProfileChecks(unittest.TestCase):
             write_build_dir(build, sdkconfig=PROFILE.replace("CONFIG_NVS_ENCRYPTION=y\n", ""),
                             bootloader_size=0x7800, table=build_table([]),
                             compile_commands=[{"file": "/fw/src/serial/serialCommandHandler.cpp",
-                                               "arguments": ["g++", "-c", "serialCommandHandler.cpp"]}])
-            self.assertEqual(len(c.run_checks(build)), 5)
+                                               "arguments": ["g++", "-c", "serialCommandHandler.cpp"]}],
+                            linker_map=UNLINKED_MAP)
+            self.assertEqual(len(c.run_checks(build)), 7)
 
     def test_serial_handler_must_be_compiled_out(self):
         errors = c.check_serial_handler_compiled_out(
@@ -158,6 +184,38 @@ class SecureProfileChecks(unittest.TestCase):
         errors = c.check_serial_handler_compiled_out([{"file": "/fw/src/main.cpp", "arguments": ["g++", "-c", "x"]}])
         self.assertEqual(len(errors), 1)
         self.assertIn("ATTRACTAP_SECURE_PROFILE=1", errors[0])
+
+    def test_tls_allocator_must_be_compiled_in(self):
+        self.assertEqual(c.check_tls_allocator_compiled_in(SECURE_COMPILE_COMMANDS), [])
+        errors = c.check_tls_allocator_compiled_in(SECURE_COMPILE_COMMANDS[:1])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("tls_memory.c", errors[0])
+
+    def test_tls_allocator_must_be_linked(self):
+        self.assertEqual(c.check_tls_allocator_linked(LINKED_MAP), [])
+        for linker_map in (UNLINKED_MAP, ""):
+            errors = c.check_tls_allocator_linked(linker_map)
+            self.assertEqual(len(errors), 1)
+            self.assertIn("attractap_tls_memory_install", errors[0])
+
+    def test_run_checks_needs_the_linker_map(self):
+        with tempfile.TemporaryDirectory() as build:
+            write_build_dir(build)
+            os.remove(os.path.join(build, "attractap.map"))
+            with self.assertRaises(c.GateError):
+                c.run_checks(build)
+
+    def test_tls_memory_options_that_must_stay_off_fail_when_on(self):
+        for option in ("MBEDTLS_INTERNAL_MEM_ALLOC", "MBEDTLS_EXTERNAL_MEM_ALLOC", "MBEDTLS_DYNAMIC_BUFFER",
+                       "MBEDTLS_SSL_VARIABLE_BUFFER_LENGTH"):
+            errors = c.check_profile(PROFILE, PROFILE + f"CONFIG_{option}=y\n")
+            self.assertEqual(errors, [f"CONFIG_{option}: expected n, got y"])
+
+    def test_plain_tls_allocation_fails(self):
+        resolved = PROFILE.replace("CONFIG_MBEDTLS_CUSTOM_MEM_ALLOC=y\n", "CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y\n")
+        errors = c.check_profile(PROFILE, resolved)
+        self.assertIn("CONFIG_MBEDTLS_CUSTOM_MEM_ALLOC: expected y, got n", errors)
+        self.assertIn("CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: expected n, got y", errors)
 
 
 class BaseRefChecks(unittest.TestCase):

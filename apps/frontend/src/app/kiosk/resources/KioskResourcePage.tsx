@@ -4,7 +4,7 @@ import { ArrowLeftIcon } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import { KioskLogin } from '../login/KioskLogin';
 import { ResourceOverviewTab } from '../../resources/details/overview/ResourceOverviewTab';
-import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
+import { useGetOneResourceById } from '@attraccess/react-query-client';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ResourceImage } from '../../../components/ResourceImage';
 import en from './KioskResourcePage.en.json';
@@ -16,7 +16,7 @@ function KioskResourceContent({ resourceId }: { resourceId: number }) {
   const [params] = useSearchParams();
   const deviceId = params.get('deviceId');
   const autoLogoff = params.get('autoLogoff');
-  const { data: resource, isLoading } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  const { data: resource, isLoading } = useGetOneResourceById({ path: { id: resourceId } });
 
   if (isLoading) {
     return (

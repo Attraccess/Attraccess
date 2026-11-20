@@ -1,11 +1,13 @@
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
-import { DataSource } from 'typeorm';
+import { DATABASE_LIFECYCLE } from './database/database-lifecycle';
 import { SwaggerModule } from '@nestjs/swagger';
 import { Body, Controller, Logger, Post } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
+import { request as httpRequest } from 'http';
+import { AddressInfo } from 'net';
 import { bootstrap } from './main.bootstrap';
 import { SettingsService } from './settings/settings.service';
 import { PluginService } from './plugin-system/plugin.service';
@@ -26,9 +28,13 @@ jest.mock('./app/app.module', () => ({ AppModule: class AppModule {} }));
 jest.mock('./plugin-system/plugin.service', () => ({
   PluginService: {
     configure: jest.fn(),
+    setLicenseSnapshot: jest.fn(),
     beginBootGuard: jest.fn(),
     recordBootFailure: jest.fn(),
   },
+}));
+jest.mock('./plugin-system/license/startup-license', () => ({
+  evaluateStartupLicense: jest.fn(async () => ({ valid: true, modules: ['wago'] })),
 }));
 jest.mock('./plugin-system/plugin.module', () => ({
   PluginModule: { configure: jest.fn(), resetHostReferences: jest.fn() },
@@ -87,7 +93,7 @@ describe('API bootstrap ordering and configuration', () => {
     get: jest.fn((token: unknown) => {
       if (token === ConfigService) return config;
       if (token === SettingsService) return settings;
-      if (token === DataSource) return datasource;
+      if (token === DATABASE_LIFECYCLE) return datasource;
       if (token === HttpAdapterHost) return { httpAdapter: {} };
       return {};
     }),
@@ -147,7 +153,7 @@ describe('API bootstrap ordering and configuration', () => {
         providers: [
           { provide: ConfigService, useValue: config },
           { provide: SettingsService, useValue: settings },
-          { provide: DataSource, useValue: datasource },
+          { provide: DATABASE_LIFECYCLE, useValue: datasource },
         ],
       }).compile();
       httpApp = module.createNestApplication<NestExpressApplication>({ logger: false });
@@ -229,6 +235,35 @@ describe('API bootstrap ordering and configuration', () => {
       expect(response.status).toBe(201);
       expect(response.body).toEqual(body);
     });
+
+    // supertest builds its own URL, so the absolute-form target goes out through Node's http client.
+    function rawPost(path: string, body: string): Promise<number | undefined> {
+      const { port } = httpApp.getHttpServer().address() as AddressInfo;
+      return new Promise((resolve, reject) => {
+        httpRequest(
+          { host: '127.0.0.1', port, path, method: 'POST', headers: { 'content-type': 'application/json' } },
+          (res) => {
+            res.resume();
+            resolve(res.statusCode);
+          },
+        )
+          .on('error', reject)
+          .end(body);
+      });
+    }
+
+    // Malformed JSON shows the guard answers before the body parser reads the request.
+    it.each([
+      'http:///api/plugin-configuration/1/validate',
+      'HTTPS:///api/plugin-configuration/1/validate',
+      'http://u@:80/api/plugin-configuration/1/validate',
+    ])('answers the host-less absolute-form target %s with a 404', async (path) => {
+      await expect(rawPost(path, '{bad')).resolves.toBe(404);
+    });
+
+    it('still routes an absolute-form target with a host', async () => {
+      await expect(rawPost('http://localhost/api/plugin-configuration/1/validate', '{}')).resolves.toBe(201);
+    });
   });
 
   it('configures plugins and migrates before returning the configured application', async () => {
@@ -258,6 +293,13 @@ describe('API bootstrap ordering and configuration', () => {
     const migrationOrder = jest.mocked(PluginMigrationService.runPendingUpMigrationsForAllPlugins).mock
       .invocationCallOrder[0];
     expect(migrationOrder).toBeLessThan(jest.mocked(NestFactory.create).mock.invocationCallOrder[0]);
+    // The license decides which plugins load, so it is known before migrations and before AppModule is imported.
+    expect(PluginService.setLicenseSnapshot).toHaveBeenCalledWith({ valid: true, modules: ['wago'] });
+    const snapshotOrder = jest.mocked(PluginService.setLicenseSnapshot).mock.invocationCallOrder[0];
+    expect(snapshotOrder).toBeLessThan(migrationOrder);
+    // configure() resets the snapshot, and the boot guard must not record plugins the license keeps out.
+    expect(jest.mocked(PluginService.configure).mock.invocationCallOrder[0]).toBeLessThan(snapshotOrder);
+    expect(snapshotOrder).toBeLessThan(jest.mocked(PluginService.beginBootGuard).mock.invocationCallOrder[0]);
     expect(early.close).toHaveBeenCalled();
     expect(initializeProcessLogging).toHaveBeenCalledTimes(1);
     expect(early.useLogger).toHaveBeenCalledWith(jest.mocked(initializeProcessLogging).mock.results[0].value);
@@ -265,7 +307,10 @@ describe('API bootstrap ordering and configuration', () => {
     expect(datasource.initialize).toHaveBeenCalled();
     expect(datasource.runMigrations).toHaveBeenCalled();
     expect(app.set).toHaveBeenCalledWith('trust proxy', 1);
-    expect(app.setGlobalPrefix).toHaveBeenCalledWith('api');
+    // OAuth discovery documents stay at the origin root, outside the API prefix.
+    expect(app.setGlobalPrefix).toHaveBeenCalledWith('api', {
+      exclude: expect.arrayContaining(['.well-known/oauth-authorization-server']),
+    });
     expect(SwaggerModule.setup).toHaveBeenCalledWith('api', app, expect.any(Function));
   });
   it('honors migration skips and disabled plugins without opening the database', async () => {
@@ -274,6 +319,7 @@ describe('API bootstrap ordering and configuration', () => {
     const result = await bootstrap();
     expect(result.shouldGuardPluginLifecycle).toBe(false);
     expect(PluginService.beginBootGuard).not.toHaveBeenCalled();
+    expect(PluginService.setLicenseSnapshot).not.toHaveBeenCalled();
     expect(PluginMigrationService.runPendingUpMigrationsForAllPlugins).not.toHaveBeenCalled();
     expect(datasource.initialize).not.toHaveBeenCalled();
     expect(datasource.runMigrations).not.toHaveBeenCalled();

@@ -1,5 +1,5 @@
 import { registerPluginServiceFixture } from './plugin.service.plugin-service.test-fixture';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { PluginService } from './plugin.service';
@@ -53,7 +53,7 @@ describe('PluginService', () => {
         name: 'my-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
 
       const plugins = PluginService.getPlugins();
@@ -69,7 +69,7 @@ describe('PluginService', () => {
         name: 'stable-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
 
       const first = PluginService.getPlugins()[0].id;
@@ -83,13 +83,13 @@ describe('PluginService', () => {
         name: 'plugin-ok',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
       fixture.writePlugin(fixture.root, 'plugin-bad', {
         name: 'plugin-bad',
         version: '2.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
 
       PluginService.getPlugins();
@@ -108,7 +108,7 @@ describe('PluginService', () => {
         name: 'crashing-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
       const [plugin] = PluginService.getPlugins();
 
@@ -127,11 +127,14 @@ describe('PluginService', () => {
         name: 'crashing-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
       const [plugin] = PluginService.getPlugins();
       jest
-        .spyOn(PluginBootGuard as unknown as { writeFailures(failures: unknown[]): void }, 'writeFailures')
+        .spyOn(
+          PluginBootGuard as unknown as { writeFailures(pluginPath: string, failures: unknown[]): void },
+          'writeFailures',
+        )
         .mockImplementation(() => {
           throw new Error('read-only plugin directory');
         });
@@ -145,7 +148,7 @@ describe('PluginService', () => {
         name: 'repaired-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
       const [plugin] = PluginService.getPlugins();
       PluginService.quarantinePlugin(plugin, new Error('prior crash'));
@@ -161,12 +164,15 @@ describe('PluginService', () => {
         name: 'repaired-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
       const [plugin] = PluginService.getPlugins();
       PluginService.quarantinePlugin(plugin, new Error('prior crash'));
       jest
-        .spyOn(PluginBootGuard as unknown as { writeFailures(failures: unknown[]): void }, 'writeFailures')
+        .spyOn(
+          PluginBootGuard as unknown as { writeFailures(pluginPath: string, failures: unknown[]): void },
+          'writeFailures',
+        )
         .mockImplementation(() => {
           throw new Error('read-only plugin directory');
         });
@@ -180,7 +186,7 @@ describe('PluginService', () => {
         name: 'previously-active',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
 
       PluginService.beginBootGuard();
@@ -200,15 +206,21 @@ describe('PluginService', () => {
         name: 'unrelated-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
 
       PluginService.beginBootGuard();
       PluginService.configure({ PLUGIN_DIR: fixture.root, RESTART_BY_EXIT: true });
+      // The startup license check discovers plugins before the boot guard runs.
+      PluginService.getPlugins();
       PluginService.beginBootGuard();
 
       const [plugin] = PluginService.getPlugins();
       expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
+      expect(PluginService.getPluginsWithLoadStatus()[0]).toMatchObject({
+        status: 'error',
+        error: 'Plugin was disabled after an incomplete startup with no attributable stack frame.',
+      });
     });
 
     it.each(['SIGINT', 'SIGTERM'] as const)('does not quarantine plugins when startup is stopped by %s', (signal) => {
@@ -216,7 +228,7 @@ describe('PluginService', () => {
         name: 'installed-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
       jest.spyOn(process, 'kill').mockImplementation(() => true);
       const existing = new Set(process.listeners(signal));
@@ -243,7 +255,7 @@ describe('PluginService', () => {
         name: 'plugin-a',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
 
       const first = PluginService.getPlugins();
@@ -263,7 +275,7 @@ describe('PluginService', () => {
         name: 'stale-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
 
       expect(PluginService.getPlugins()).toEqual([]);
@@ -274,7 +286,7 @@ describe('PluginService', () => {
         name: 'uploaded-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
 
       expect(PluginService.getPlugins()).toEqual([]);
@@ -285,7 +297,7 @@ describe('PluginService', () => {
         name: 'bad-perms',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
         permissions: ['NOT_A_REAL_PERMISSION'],
       });
 
@@ -299,7 +311,7 @@ describe('PluginService', () => {
         name: 'find-me',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
 
       const [plugin] = PluginService.getPlugins();
@@ -325,6 +337,93 @@ describe('PluginService', () => {
       const file = zipFileUpload({ 'plugin.json': '{}' }, { mimetype: 'text/plain' });
       await expect(service.uploadPlugin(file)).rejects.toBeInstanceOf(BadRequestException);
     });
+
+    it.each([
+      ['the removed DATABASE_ACCESS permission', { permissions: ['DATABASE_ACCESS'] }, 'DATABASE_ACCESS permission'],
+      ['persistence.backends', { persistence: { backends: ['sqlite'] } }, 'persistence.backends'],
+      [
+        'a legacy migrations entry',
+        { main: { ...fixture.VALID_MANIFEST.main, migrations: { directory: 'dist', entryPoint: 'migrations.js' } } },
+        'migrations entry',
+      ],
+    ])(
+      'refuses a ZIP that uses %s: a 400 naming plugin, reason and guide, and no changes',
+      async (_label, extra, reason) => {
+        const service = new PluginService();
+        const manifest = { ...fixture.VALID_MANIFEST, ...extra };
+
+        const upload = service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(manifest) }));
+
+        await expect(upload).rejects.toBeInstanceOf(BadRequestException);
+        await expect(upload).rejects.toThrow(reason);
+        await expect(upload).rejects.toThrow(/Plugin uploaded-plugin .*migrating-to-2/s);
+        expect(existsSync(join(fixture.root, 'uploaded-plugin'))).toBe(false);
+        expect(fixture.restartSpy).not.toHaveBeenCalled();
+      },
+    );
+
+    it('refuses a ZIP whose backend bundle imports a database package, before it moves anything', async () => {
+      const service = new PluginService();
+      const upload = service.uploadPlugin(
+        zipFileUpload({
+          'plugin.json': JSON.stringify(fixture.VALID_MANIFEST),
+          'dist/index.js': "const { DataSource } = require('typeorm');",
+        }),
+      );
+
+      await expect(upload).rejects.toBeInstanceOf(BadRequestException);
+      await expect(upload).rejects.toThrow(/Plugin uploaded-plugin .*"typeorm".*migrating-to-2/s);
+      expect(existsSync(join(fixture.root, 'uploaded-plugin'))).toBe(false);
+      expect(fixture.restartSpy).not.toHaveBeenCalled();
+    });
+
+    it('refuses a ZIP whose storage namespace another installed plugin has, before it moves anything', async () => {
+      mkdirSync(join(fixture.root, 'installed'), { recursive: true });
+      const storage = { permissions: ['PLUGIN_STORAGE'] };
+      writeFileSync(
+        join(fixture.root, 'installed', 'plugin.json'),
+        JSON.stringify({ ...fixture.VALID_MANIFEST, ...storage, name: 'Uploaded.Plugin' }),
+      );
+      const service = new PluginService();
+
+      const upload = service.uploadPlugin(
+        zipFileUpload({ 'plugin.json': JSON.stringify({ ...fixture.VALID_MANIFEST, ...storage }) }),
+      );
+
+      await expect(upload).rejects.toBeInstanceOf(BadRequestException);
+      await expect(upload).rejects.toThrow(
+        /Plugin "uploaded-plugin" .*namespace "uploaded_plugin" is the one of the installed plugin "Uploaded\.Plugin"/,
+      );
+      expect(existsSync(join(fixture.root, 'uploaded-plugin'))).toBe(false);
+      expect(fixture.restartSpy).not.toHaveBeenCalled();
+    });
+
+    it('answers an invalid plugin.json with a client error that names the field', async () => {
+      const service = new PluginService();
+      const manifest = { ...fixture.VALID_MANIFEST, permissions: ['NOT_A_PERMISSION'] };
+
+      const upload = service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(manifest) }));
+
+      await expect(upload).rejects.toBeInstanceOf(BadRequestException);
+      await expect(upload).rejects.toThrow(/Invalid plugin\.json: permissions\.0/);
+      expect(existsSync(join(fixture.root, 'uploaded-plugin'))).toBe(false);
+    });
+
+    it.each([
+      ['a wrong type', { modules: 'wago' }, 'license.modules'],
+      ['an unknown key', { foo: true }, 'Unrecognized key'],
+    ])(
+      'rejects a ZIP with an invalid license block (%s) as a 400 and writes nothing',
+      async (_name, license, message) => {
+        const service = new PluginService();
+        const file = zipFileUpload({ 'plugin.json': JSON.stringify({ ...fixture.VALID_MANIFEST, license }) });
+
+        const rejection = service.uploadPlugin(file);
+        await expect(rejection).rejects.toBeInstanceOf(BadRequestException);
+        await expect(rejection).rejects.toThrow(message);
+        expect(existsSync(join(fixture.root, 'uploaded-plugin'))).toBe(false);
+      },
+    );
 
     it('unpacks a valid plugin, moves it into place and schedules a restart', async () => {
       const service = new PluginService();
@@ -368,8 +467,8 @@ describe('PluginService', () => {
       expect(manifest.name).toBe('uploaded-plugin');
       expect(existsSync(join(fixture.root, 'uploaded-plugin', 'plugin.json'))).toBe(true);
       expect(existsSync(join(fixture.root, 'uploaded-plugin', 'dist', 'index.js'))).toBe(true);
-      expect(existsSync(join(fixture.root, 'temp'))).toBe(true);
-      expect(readdirSync(join(fixture.root, 'temp'))).toEqual([]);
+      expect(existsSync(join(fixture.root, 'temp'))).toBe(false);
+      expect(readdirSync(fixture.root).filter((entry) => entry.startsWith('.zip-upload-'))).toEqual([]);
     });
 
     it('rejects a zip without a plugin.json instead of throwing ENOENT', async () => {
@@ -384,14 +483,6 @@ describe('PluginService', () => {
       const file = zipFileUpload({ 'plugin.json': '{}' }, { buffer: Buffer.from('not a zip at all') });
 
       await expect(service.uploadPlugin(file)).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('cleans up the temp folder when the upload is rejected', async () => {
-      const service = new PluginService();
-      const file = zipFileUpload({ 'plugin.json': JSON.stringify({ name: 'x' }) });
-
-      await expect(service.uploadPlugin(file)).rejects.toBeDefined();
-      expect(readdirSync(join(fixture.root, 'temp'))).toEqual([]);
     });
 
     it('rejects a manifest that fails schema validation', async () => {
@@ -471,32 +562,6 @@ describe('PluginService', () => {
       releaseFirst();
       await Promise.all([first, second]);
       expect(order).toEqual(['first-start', 'first-end', 'second']);
-    });
-  });
-
-  describe('deletePlugin', () => {
-    it('throws when the plugin id is unknown', async () => {
-      const service = new PluginService();
-      await expect(service.deletePlugin('nope')).rejects.toBeInstanceOf(NotFoundException);
-    });
-
-    it('removes the plugin folder and schedules a restart', async () => {
-      fixture.writePlugin(fixture.root, 'delete-me', {
-        name: 'delete-me',
-        version: '1.0.0',
-        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
-      });
-      const [plugin] = PluginService.getPlugins();
-      PluginService.quarantinePlugin(plugin, new Error('prior crash'));
-      const service = new PluginService();
-
-      await service.deletePlugin(plugin.id);
-
-      expect(existsSync(join(fixture.root, 'delete-me'))).toBe(false);
-      expect(PluginService.isPluginQuarantined(plugin)).toBe(false);
-      fixture.flushScheduledRestart();
-      expect(fixture.restartSpy).toHaveBeenCalledTimes(1);
     });
   });
 

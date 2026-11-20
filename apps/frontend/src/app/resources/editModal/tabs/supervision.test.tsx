@@ -6,11 +6,21 @@ import { SupervisionTab } from './supervision';
 const query = vi.hoisted(() => vi.fn());
 vi.mock('@attraccess/react-query-client', async (original) => ({
   ...(await original<typeof import('@attraccess/react-query-client')>()),
-  useResourcesServiceResourceGroupsGetMany: (...args: unknown[]) => {
+  useResourceGroupsGetMany: (_clientOptions: unknown, ...args: unknown[]) => {
     query(...args);
     return { data: [{ id: 3, name: 'Workshop' }], isLoading: false };
   },
 }));
+// The tab's own texts show their keys; everything else keeps its real texts.
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>();
+  const { default: editorEn } = await import('../resourceEditModal.en.json');
+  return {
+    ...original,
+    useTranslations: (modules: Parameters<typeof original.useTranslations>[0]) =>
+      modules.en === editorEn ? { t: (key: string) => key, tExists: () => true } : original.useTranslations(modules),
+  };
+});
 beforeEach(() => {
   query.mockClear();
 });
@@ -20,7 +30,6 @@ function Editor({ initial }: { initial: UpdateResourceDto }) {
   return (
     <>
       <SupervisionTab
-        t={(key) => key}
         formData={formData}
         setField={(field, value) => setData((current) => ({ ...current, [field]: value }))}
       />

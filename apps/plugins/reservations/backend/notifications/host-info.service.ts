@@ -1,11 +1,4 @@
-import {
-  ResourceHealthState,
-  ResourceIntroducer,
-  Setting,
-  User,
-  UserRole,
-  type PluginContext,
-} from '@attraccess/plugins-backend-sdk';
+import { type PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import { PLUGIN_CONTEXT } from '../constants';
 
@@ -23,17 +16,15 @@ export function normalizeLanguage(locale: string | null | undefined, fallback: L
 
 /**
  * Read-only lookups into host tables that the notification texts need: the public base URL for email
- * links, recipient languages and the managers of a resource. All of it goes through the plugin's
- * READ_SETTINGS / READ_USERS / DATABASE_ACCESS repositories; nothing is written.
+ * links, recipient languages and the managers of a resource. All of it goes through `hostData`
+ * (READ_SETTINGS / READ_USERS / ACCESS_RESOURCES); nothing is written.
  */
 @Injectable()
 export class HostInfoService {
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
   private async setting(key: string): Promise<string | null> {
-    const row = await this.context.getRepository(Setting).findOneBy({ parent: 'app', key });
-    const value = row?.value?.trim();
-    return value ? value : null;
+    return this.context.hostData.settings.getApp(key);
   }
 
   /**
@@ -56,23 +47,18 @@ export class HostInfoService {
     const ids = [...new Set(userIds)];
     const result = new Map<number, Lang>();
     if (ids.length === 0) return result;
-    const [fallback, rows] = await Promise.all([
+    const [fallback, locales] = await Promise.all([
       this.getDefaultLanguage(),
-      this.context
-        .getRepository(User)
-        .createQueryBuilder('user')
-        .select(['user.id', 'user.locale'])
-        .where('user.id IN (:...ids)', { ids })
-        .getMany(),
+      this.context.hostData.users.getLocales(ids),
     ]);
-    for (const row of rows) result.set(row.id, normalizeLanguage(row.locale, fallback));
+    for (const [id, locale] of locales) result.set(id, normalizeLanguage(locale, fallback));
     for (const id of ids) if (!result.has(id)) result.set(id, fallback);
     return result;
   }
 
   /** Health entries of the resource that are currently unhealthy (a resource may carry several). */
   countUnhealthyEntries(resourceId: number): Promise<number> {
-    return this.context.getRepository(ResourceHealthState).countBy({ resourceId, status: 'unhealthy' as never });
+    return this.context.hostData.resources.countUnhealthyEntries(resourceId);
   }
 
   /**
@@ -84,26 +70,9 @@ export class HostInfoService {
    */
   async managerIdsOf(resourceId: number): Promise<number[]> {
     const [introducers, permitted] = await Promise.all([
-      this.context
-        .getRepository(ResourceIntroducer)
-        .createQueryBuilder('introducer')
-        .select('introducer.userId', 'userId')
-        .innerJoin('introducer.user', 'user', 'user.deletedAt IS NULL')
-        .leftJoin('introducer.resourceGroup', 'group')
-        .leftJoin('group.resources', 'resource')
-        .where('(introducer.resourceId = :resourceId OR resource.id = :resourceId)', { resourceId })
-        .getRawMany<{ userId: number }>(),
-      this.context
-        .getRepository(UserRole)
-        .createQueryBuilder('ur')
-        .select('ur.userId', 'userId')
-        .distinct(true)
-        .innerJoin('ur.user', 'user', 'user.deletedAt IS NULL')
-        .innerJoin('ur.role', 'role')
-        .innerJoin('role.rolePermissions', 'rp')
-        .where('rp.permissionKey IN (:...keys)', { keys: MANAGER_PERMISSIONS })
-        .getRawMany<{ userId: number }>(),
+      this.context.hostData.resources.listIntroducerUserIds(resourceId),
+      this.context.hostData.users.listIdsWithAnyPermission(MANAGER_PERMISSIONS),
     ]);
-    return [...new Set([...introducers, ...permitted].map((row) => Number(row.userId)))];
+    return [...new Set([...introducers, ...permitted])];
   }
 }

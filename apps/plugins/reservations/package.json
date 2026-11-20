@@ -2,7 +2,7 @@
   "name": "@attraccess/plugin-reservations",
   "version": "0.1.0-alpha.0",
   "description": "Official Attraccess plugin to reserve resources for a specific time window.",
-  "license": "AGPL-3.0-only",
+  "license": "SEE LICENSE IN LICENSE.md",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Attraccess/Attraccess.git",
@@ -23,30 +23,43 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@attraccess/plugins-backend-sdk": "^1.9.0",
-    "@attraccess/plugins-frontend-sdk": "^1.9.0",
-    "@attraccess/plugins-frontend-ui": "^1.11.0"
+    "@attraccess/plugins-backend-sdk": "^2.0.0-0",
+    "@attraccess/plugins-frontend-sdk": "^2.0.0-0",
+    "@attraccess/plugins-frontend-ui": "^2.0.0-0"
   },
   "attraccess": {
     "displayName": "Reservations",
     "description": "Reserve a resource for a specific time window.",
-    "host": "^1.11.0",
+    "host": "^2.0.0-0",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
-    "migrations": "dist/migrations.js",
     "styles": "frontend/style.css",
+    "dashboardPaths": [
+      "/reservations",
+      "/reservations/manage"
+    ],
+    "dashboardWidgets": [
+      "reservations-upcoming"
+    ],
     "permissions": [
-      "DATABASE_ACCESS",
+      "PLUGIN_STORAGE",
       "ACCESS_HOOKS",
       "LISTEN_EVENTS",
       "ACCESS_RESOURCES",
       "READ_USERS",
       "READ_SETTINGS",
-      "SEND_NOTIFICATIONS"
+      "SEND_NOTIFICATIONS",
+      "READER_UI"
     ],
+    "license": {
+      "required": true,
+      "modules": [
+        "reservations"
+      ]
+    },
     "sdk": {
-      "backend": "^1.9.0",
-      "frontend": "^1.9.0"
+      "backend": "^2.0.0-0",
+      "frontend": "^2.0.0-0"
     }
   }
 }

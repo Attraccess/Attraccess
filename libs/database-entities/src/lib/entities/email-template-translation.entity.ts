@@ -1,6 +1,6 @@
 import { Column, Entity, PrimaryColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-import { EmailTemplateType } from './email-template.entity';
+import { EmailTemplateType } from '@attraccess/application-models';
 
 @Entity('email_template_translations')
 export class EmailTemplateTranslation {

@@ -1,12 +1,14 @@
 #include "../../state/language.hpp"
-// Reader registration, authentication, and device-name handshake handlers
+// Reader authentication and device-name handshake handlers
 // FEATURE: api-auth
 
 #include "../api.hpp"
 #include "../../clock/wall_clock.hpp"
 #include "../../platform.hpp"
 #include "../../display/ui/ui_capabilities.hpp"
+#include "../../ble_proxy/ble_capability.hpp"
 #include "../diagnostics/reset-reason.hpp"
+#include "../security/build_profile.hpp"
 #ifdef ESP_PLATFORM
 #include "esp_system.h"
 #endif
@@ -15,75 +17,6 @@
 #include <limits>
 #include <string>
 
-
-void API::onUnauthorized(JsonObject data)
-{
-    std::string message = "Unknown error";
-    if (data["payload"].is<JsonObject>())
-    {
-        JsonObject payload = data["payload"].as<JsonObject>();
-        if (payload["message"].is<const char *>() && !payload["message"].isNull())
-        {
-            message = payload["message"].as<std::string>();
-        }
-    }
-
-    logger.error(("UNAUTHORIZED: " + message).c_str());
-    State::setApiState(false, "");
-    Settings::clearAttraccessAuthConfig();
-
-    // The token is gone for good: the reader can only come back through pairing.
-    this->transport.startPairing("");
-}
-
-void API::onStartPairing(JsonObject data)
-{
-    const char *ticket = data["payload"]["ticket"] | "";
-    if (ticket[0] == '\0')
-    {
-        logger.error("READER_START_PAIRING without a ticket");
-        return;
-    }
-    logger.info("Admin started pairing this reader");
-    this->transport.startPairing(ticket);
-}
-
-bool API::isRegistered()
-{
-    return (Settings::getAttraccessAuthConfig().apiKey.length() > 0);
-}
-
-void API::sendAuthenticationRequest()
-{
-    // A paired reader is authenticated by its TLS session; a token must never travel inside it.
-    if (this->transport.authenticatesReader())
-    {
-        return;
-    }
-    if (!this->isRegistered())
-    {
-        // Open registration is gone: a reader without credentials pairs instead.
-        logger.info("No reader credentials, requesting pairing");
-        this->transport.startPairing("");
-        return;
-    }
-
-    logger.info("Sending authentication request");
-    JsonDocument event;
-    event["event"] = "EVENT";
-    event["data"]["type"] = "READER_AUTHENTICATE";
-    event["data"]["payload"]["id"] = Settings::getAttraccessAuthConfig().readerId;
-    event["data"]["payload"]["token"] = Settings::getAttraccessAuthConfig().apiKey;
-    char json[JSON_OUTBUF_AUTH];
-    size_t n = serializeJson(event, json, sizeof(json));
-    if (n == 0)
-    {
-        this->logger.error("Failed to serialize authenticate event to buffer");
-        return;
-    }
-    this->logger.info("Sending reader authentication request");
-    this->transport.sendMessage(json, n);
-}
 
 void API::sendFirmwareInfo()
 {
@@ -110,12 +43,20 @@ void API::sendFirmwareInfo()
 #endif
     JsonDocument event;
     char uiCaps[ui::CAPABILITIES_UI_SCRATCH];
-    ui::buildFirmwareInfo(event, {FIRMWARE_NAME, FIRMWARE_VARIANT, FIRMWARE_VERSION, resetReason, millis()}, traits,
-                          uiCaps, sizeof uiCaps);
+    // Profile, release flag and secure_version are the reader's claims (ATT-1207). The server decides "secured"
+    // only from the eFuse report and the paired credential of the session.
+    ui::buildFirmwareInfo(event,
+                          {FIRMWARE_NAME, FIRMWARE_VARIANT, FIRMWARE_VERSION, resetReason, millis(),
+                           BuildProfile::name(), BuildProfile::release(), BuildProfile::secureVersion()},
+                          traits, uiCaps, sizeof uiCaps);
     // This reader relays card APDUs to the server and holds no card keys (firmware 2.0.0+).
     event["data"]["payload"]["capabilities"]["cardRelay"] = true;
+    // Plugin BLE proxy, protocol v1 (ATT-1033). Builds without it send no `ble`: the API answers READER_UNSUPPORTED.
+    char bleCaps[ble::CAPABILITY_SCRATCH];
+    if (BleProxy::supported())
+        this->bleProxy.fillCapability(event["data"]["payload"]["capabilities"], bleCaps, sizeof bleCaps);
 
-    // The ui block makes this message ~730 B; 256 B would be truncated silently.
+    // The ui and ble blocks make this message ~1.1 KB; a smaller buffer would be truncated silently.
     char json[JSON_OUTBUF_AUTH];
     size_t n = serializeJson(event, json, sizeof(json));
     if (n == 0 || n >= sizeof(json))
@@ -123,7 +64,11 @@ void API::sendFirmwareInfo()
         this->logger.error("Failed to serialize firmware info");
         return;
     }
-    this->transport.sendMessage(json, n);
+    if (this->transport.sendMessage(json, n))
+    {
+        // Explicit, not a scan of outgoing bytes: the session's eFuse report follows this message.
+        this->transport.onFirmwareInfoSent();
+    }
 }
 
 void API::onReaderAuthenticated(JsonObject data)
@@ -139,6 +84,8 @@ void API::onReaderAuthenticated(JsonObject data)
     this->onServerTime(data["payload"]["serverTime"]);
 
     State::setApiState(true, deviceName, Language::supported(language ? language : "en"));
+    // A new authentication is a new connection for the server: no BLE session carries over.
+    this->bleProxy.linkLost();
     if (language) Settings::saveDefaultLanguage(language);
     ++authenticationCount;
 
@@ -150,7 +97,7 @@ void API::onReaderAuthenticated(JsonObject data)
     logger.info("Reader Authentication successful.");
 
     this->sendFirmwareInfo();
-    this->sendPendingCrashReport();
+    this->crashUploader.onAuthenticated(millis());
 }
 
 void API::onServerTime(JsonVariantConst serverTime)

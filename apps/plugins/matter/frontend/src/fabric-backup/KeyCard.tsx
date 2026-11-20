@@ -1,4 +1,4 @@
-import { Button, StatusAlert } from '@attraccess/plugins-frontend-ui';
+import { Button, ConfirmableButton, StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { Card } from '@heroui/react';
 import { useMatterTranslations } from '../i18n';
 import type { FabricBackupStatus } from './api';
@@ -8,13 +8,26 @@ type Props = Readonly<{
   status: FabricBackupStatus;
   busy: boolean;
   generating: boolean;
+  rotating: boolean;
   onGenerateKey: () => void;
-  onRotate: () => void;
+  /** Runs after the administrator confirmed the rotation. */
+  onRotate: () => Promise<void>;
+  /** Holds `matter.devices.manage`: without it generate and rotate are hidden. */
+  canManage: boolean;
   formatDateTime: (value: string | null) => React.ReactNode;
 }>;
 
 /** The recovery key's ID and state (never the key itself), with generate or rotate. */
-export function KeyCard({ status, busy, generating, onGenerateKey, onRotate, formatDateTime }: Props) {
+export function KeyCard({
+  status,
+  busy,
+  generating,
+  rotating,
+  onGenerateKey,
+  onRotate,
+  canManage,
+  formatDateTime,
+}: Props) {
   const { t } = useMatterTranslations();
   const { sidecar, recovery, recoveryKey } = status;
   const initialized = sidecar.reachable && sidecar.state === 'initialized';
@@ -32,25 +45,32 @@ export function KeyCard({ status, busy, generating, onGenerateKey, onRotate, for
           </dl>
         ) : (
           <StatusAlert status="warning" title={t('fabric.key.missing')} data-cy="matter-key-missing">
-            {t('fabric.key.missingText')}
+            {t(canManage ? 'fabric.key.missingText' : 'fabric.key.missingTextReadOnly')}
           </StatusAlert>
         )}
         {recoveryKey.present && !recoveryKey.acknowledged && (
           <StatusAlert status="warning" title={t('fabric.key.unacknowledged')} data-cy="matter-key-unacknowledged">
-            {t('fabric.key.unacknowledgedText')}
+            {t(canManage ? 'fabric.key.unacknowledgedText' : 'fabric.key.unacknowledgedTextReadOnly')}
           </StatusAlert>
         )}
-        {!recovery.required && (
+        {canManage && !recovery.required && (
           <div>
             {recoveryKey.present ? (
-              <Button
-                variant="secondary"
+              <ConfirmableButton
+                label={t('fabric.key.rotate')}
+                status="warning"
                 isDisabled={busy || !initialized}
-                onPress={onRotate}
+                isPending={rotating}
+                onConfirm={onRotate}
+                confirm={{
+                  title: t('fabric.key.rotateTitle'),
+                  message: t('fabric.key.rotateText'),
+                  confirmLabel: t('fabric.key.rotateConfirm'),
+                  'data-cy': 'matter-rotate-dialog',
+                  confirmDataCy: 'matter-rotate-confirm',
+                }}
                 data-cy="matter-key-rotate"
-              >
-                {t('fabric.key.rotate')}
-              </Button>
+              />
             ) : (
               <Button
                 isDisabled={busy || !initialized}

@@ -1,8 +1,4 @@
 export * from './lib/entities-index';
-export * from './lib/types/authenticationType.enum';
-export * from './lib/types/documentationType.enum';
-export { EmailTemplateType } from './lib/entities/email-template.entity';
-export { ProjectMemberRole } from './lib/entities/project-member.entity';
-export { ProjectInvitationStatus } from './lib/entities/project-invitation.entity';
-
-export type { SsoSessionContext } from './lib/types/sso-session-context';
+// Released migrations are never edited and still import these neutral models from here. New code imports them from
+// @attraccess/application-models; the persistence boundary check keeps application code off this package.
+export * from '@attraccess/application-models';

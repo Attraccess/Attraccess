@@ -1,5 +1,4 @@
 import type { AttractapService } from '../attractap.service';
-import type { AttractapAuthHandler } from './handlers/auth/auth.handler';
 import type { AttractapBillingHandler } from './handlers/billing/billing.handler';
 import type { CardConversationFailure, CardConversationService } from './card-conversation.service';
 import type { CardDetectedRouter } from './card-detected.router';
@@ -13,6 +12,7 @@ import type { ResourceListService } from './handlers/resource-list/resource-list
 import type { AttractapSessionHandler } from './handlers/session/session.handler';
 import type { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
 import type { AttractapUiHandler } from './handlers/ui/ui.handler';
+import type { ReaderBleDriver } from './handlers/ble/reader-ble.driver';
 import { AttractapEventType, type AttractapEvent, type AuthenticatedWebSocket } from './websocket.types';
 
 export type AttractapEventHandler = (socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']) => unknown;
@@ -20,7 +20,6 @@ export type AttractapEventHandler = (socket: AuthenticatedWebSocket, eventData: 
 /** The gateway members the dispatch table reads. They are injected after construction, so read lazily. */
 export interface EventHandlerDeps {
   attractapService: AttractapService;
-  authHandler: AttractapAuthHandler;
   firmwareHandler: AttractapFirmwareHandler;
   crashReportHandler: AttractapCrashReportHandler;
   cardHandler: AttractapCardHandler;
@@ -34,6 +33,7 @@ export interface EventHandlerDeps {
   uiHandler: AttractapUiHandler;
   cardConversations: CardConversationService;
   cardDetectedRouter: CardDetectedRouter;
+  readerBleDriver: ReaderBleDriver;
   /** Tells a reader on firmware before 2.0.0 that the server offers it no card functions. */
   requireFirmwareUpdate(
     socket: AuthenticatedWebSocket,
@@ -41,27 +41,28 @@ export interface EventHandlerDeps {
     extra?: Record<string, unknown>,
   ): Promise<void>;
   onReaderSessionEnded(socket: AuthenticatedWebSocket, reason?: CardConversationFailure): void;
-  resetReaderConnectionState(
-    socket: AuthenticatedWebSocket,
-    readerId: number | null,
-    reason: CardConversationFailure,
-  ): void;
   rejectServerEvent(socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']): never;
 }
 
 /** Typed `Record<AttractapEventType, ...>`: every event type must be listed here. */
 export function buildEventHandlers(d: EventHandlerDeps): Record<AttractapEventType, AttractapEventHandler> {
   return {
-    [AttractapEventType.READER_REGISTER]: (socket, eventData) => d.authHandler.handleReaderRegister(socket, eventData),
-    [AttractapEventType.READER_AUTHENTICATE]: (socket, eventData) => {
-      // A new identity on this connection starts from nothing: no verified card, no armed flow.
-      d.resetReaderConnectionState(socket, socket.readerId, 'READER_SESSION_ENDED');
-      return d.authHandler.handleAuthentication(socket, eventData);
+    [AttractapEventType.READER_FIRMWARE_INFO]: (socket, eventData) => {
+      // The reader is back on this connection: plugin BLE work on an older, half-open one of it is gone.
+      d.readerBleDriver.readerConnected(socket);
+      const handled = d.firmwareHandler.handleFirmwareInfo(socket, eventData);
+      // capabilities.ble is stored before the handler's first await: the watch set goes to the new connection now.
+      d.readerBleDriver.readerAnnounced(socket);
+      return handled;
     },
-    [AttractapEventType.READER_FIRMWARE_INFO]: (socket, eventData) =>
-      d.firmwareHandler.handleFirmwareInfo(socket, eventData),
     [AttractapEventType.READER_CRASH_REPORT]: (socket, eventData) =>
       d.crashReportHandler.handleCrashReport(socket, eventData),
+    [AttractapEventType.READER_COREDUMP_BEGIN]: (socket, eventData) =>
+      d.crashReportHandler.handleCoredumpBegin(socket, eventData),
+    [AttractapEventType.READER_COREDUMP_CHUNK]: (socket, eventData) =>
+      d.crashReportHandler.handleCoredumpChunk(socket, eventData),
+    [AttractapEventType.READER_COREDUMP_COMPLETE]: (socket, eventData) =>
+      d.crashReportHandler.handleCoredumpComplete(socket, eventData),
     // Card relay (ATT-1145): the reader announces a card and relays APDUs; the server runs the card crypto.
     [AttractapEventType.CARD_DETECTED]: (socket, eventData) => d.cardDetectedRouter.route(socket, eventData),
     [AttractapEventType.CARD_APDU_RESPONSE]: (socket, eventData) =>
@@ -119,12 +120,9 @@ export function buildEventHandlers(d: EventHandlerDeps): Record<AttractapEventTy
       d.formsHandler.handleResourceUsageFormCancel(socket, eventData);
     },
     [AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED]: () => undefined,
-    [AttractapEventType.READER_START_PAIRING]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
     [AttractapEventType.REQUEST_RESOURCE_LIST]: (socket, eventData) =>
       d.resourceListService.sendResourceListToSocket(socket, { requestId: eventData.payload?.requestId }),
     [AttractapEventType.RESOURCE_LIST]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
-    [AttractapEventType.READER_UNAUTHORIZED]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
-    [AttractapEventType.READER_REQUEST_AUTHENTICATION]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
     [AttractapEventType.READER_AUTHENTICATED]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
     [AttractapEventType.READER_LANGUAGE]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
     [AttractapEventType.CARD_AUTHENTICATION_DATA]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
@@ -157,5 +155,21 @@ export function buildEventHandlers(d: EventHandlerDeps): Record<AttractapEventTy
     [AttractapEventType.UI_SCREEN_CLOSE]: () => undefined,
     [AttractapEventType.UI_SCREEN_DISMISSED]: () => undefined,
     [AttractapEventType.UI_ACTION]: () => undefined,
+    // Plugin BLE (ATT-1033/ATT-1036): answers of the reader go to the driver, requests are server-only.
+    [AttractapEventType.BLE_RESULT]: (socket, eventData) => d.readerBleDriver.handleMessage(socket, eventData),
+    [AttractapEventType.BLE_SCAN_RESULT]: (socket, eventData) => d.readerBleDriver.handleMessage(socket, eventData),
+    [AttractapEventType.BLE_NOTIFICATION]: (socket, eventData) => d.readerBleDriver.handleMessage(socket, eventData),
+    [AttractapEventType.BLE_SESSION_ENDED]: (socket, eventData) => d.readerBleDriver.handleMessage(socket, eventData),
+    [AttractapEventType.BLE_WATCH_STATE]: (socket, eventData) => d.readerBleDriver.handleMessage(socket, eventData),
+    [AttractapEventType.BLE_WATCH_EVENT]: (socket, eventData) => d.readerBleDriver.handleMessage(socket, eventData),
+    [AttractapEventType.BLE_WATCH_SET]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
+    [AttractapEventType.BLE_SCAN]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
+    [AttractapEventType.BLE_SESSION_OPEN]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
+    [AttractapEventType.BLE_READ]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
+    [AttractapEventType.BLE_WRITE]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
+    [AttractapEventType.BLE_SUBSCRIBE]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
+    [AttractapEventType.BLE_UNSUBSCRIBE]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
+    [AttractapEventType.BLE_CANCEL]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
+    [AttractapEventType.BLE_SESSION_CLOSE]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
   };
 }

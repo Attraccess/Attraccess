@@ -9,13 +9,10 @@
     "columns": {
       "name": "Name",
       "enabled": "Aktiv",
-      "nodes": "Knoten",
-      "actions": "Aktionen"
+      "nodes": "Knoten"
     },
     "toggle": "{{name}} aktiv",
-    "edit": "{{name}} bearbeiten",
     "editTooltip": "Im Editor öffnen",
-    "delete": "{{name}} löschen",
     "deleteTooltip": "Löschen",
     "deleteTitle": "Flow löschen",
     "deleteConfirmation": "Den Flow „{{name}}“ und alle seine Knoten löschen? Das kann nicht rückgängig gemacht werden.",
@@ -26,7 +23,6 @@
     "createName": "Name",
     "createDescription": "Beschreibung",
     "createSubmit": "Flow erstellen",
-    "editDetails": "Details von {{name}} bearbeiten",
     "editDetailsTooltip": "Details bearbeiten",
     "editModalTitle": "Flow-Details bearbeiten",
     "editSubmit": "Speichern"

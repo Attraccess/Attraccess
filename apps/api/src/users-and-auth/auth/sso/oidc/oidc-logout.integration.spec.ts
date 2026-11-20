@@ -2,7 +2,8 @@ import { createServer, Server } from 'node:http';
 import { AddressInfo } from 'node:net';
 import { exportJWK, generateKeyPair, SignJWT, JWTPayload } from 'jose';
 import { ModuleRef } from '@nestjs/core';
-import { SSOProviderOIDCConfiguration, SSOProviderType, SsoSessionContext } from '@attraccess/database-entities';
+import { SSOProviderOIDCConfiguration } from '@attraccess/database-entities';
+import { SSOProviderType, SsoSessionContext } from '@attraccess/application-models';
 import { OidcTokenVerifier } from './oidc-token-verifier.service';
 import { SsoLogoutService } from '../sso-logout.service';
 import { SessionService } from '../../session.service';
@@ -128,6 +129,12 @@ describe('Signed OIDC logout with a local discovery/JWKS provider', () => {
     await service.backchannel(1, await token({ jti: 'subject-only', sid: undefined }));
     await service.backchannel(1, await token({ jti: 'sid-only', sub: undefined }));
     expect(sessions.revokeSsoSessions).toHaveBeenCalledTimes(3);
+  });
+
+  it('lets an unreachable Valkey surface (503) instead of calling the notification invalid', async () => {
+    const unavailable = new Error('Connection is closed.');
+    sessions.revokeSsoSessions.mockRejectedValueOnce(unavailable);
+    await expect(service.backchannel(1, await token())).rejects.toBe(unavailable);
   });
 
   it.each([

@@ -2,21 +2,22 @@
 // FEATURE: ATT-1151 Mass introduction
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  AccessControlService,
   ApiError,
   MassIntroductionEndReason,
   MassIntroductionLiveEventDto,
   MassIntroductionLiveEventType,
   MassIntroductionSessionDto,
-  useAccessControlServiceMassIntroductionCancel,
-  useAccessControlServiceMassIntroductionStart,
+  useMassIntroductionCancel,
+  useMassIntroductionStart,
+  massIntroductionGet,
+  massIntroductionCancel,
 } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useLiveUpdates } from '../../../../utils/live-updates';
 import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
-import { useInvalidatePeopleIntroductions } from '../usePeopleMutations';
+import { useInvalidatePeopleIntroductions } from '../useInvalidatePeopleIntroductions';
 import { PeopleTarget } from '../types';
 
 export type MassIntroductionPhase = 'setup' | 'active' | 'ended';
@@ -27,9 +28,21 @@ export function secondsUntil(timestamp: string): number {
   return Math.max(0, Math.ceil((new Date(timestamp).getTime() - Date.now()) / 1000));
 }
 
-export type MassIntroductionSessionState = ReturnType<typeof useMassIntroductionSession>;
+/** A mass-introduction session as the drawer tabs, the panel content and the footer actions see it. */
+export interface MassIntroductionSessionState {
+  phase: MassIntroductionPhase;
+  session: MassIntroductionSessionDto | null;
+  endReason: MassIntroductionEndState | null;
+  secondsLeft: number;
+  isStarting: boolean;
+  /** Starts a session for the target, optionally on a reader's display. */
+  start: (readerId?: number) => void;
+  cancel: () => void;
+  reset: () => void;
+}
 
-export function useMassIntroductionSession(target: PeopleTarget) {
+/** Shared by IntroductionTabs, MassIntroductionContent and MassIntroductionActions, which all follow the same running session. */
+export function useMassIntroductionSession(target: PeopleTarget): MassIntroductionSessionState {
   const invalidateIntroductions = useInvalidatePeopleIntroductions(target);
   const toast = useToastMessage();
   const { t, tExists } = useTranslations({
@@ -69,12 +82,14 @@ export function useMassIntroductionSession(target: PeopleTarget) {
   // Set while the drawer is closed: a start that finishes afterwards must not leave a QR code running.
   const unmountedRef = useRef(false);
 
-  const startMutation = useAccessControlServiceMassIntroductionStart({
+  const startMutation = useMassIntroductionStart(undefined, {
     onSuccess: (started) => {
       if (unmountedRef.current) {
         // React Query still reports a start that finishes after the drawer closed; end it right away
         // (with the plain service call, the mutation hook is gone).
-        void AccessControlService.massIntroductionCancel({ sessionId: started.id }).catch(() => undefined);
+        void massIntroductionCancel({ path: { sessionId: started.id }, throwOnError: true })
+          .then(({ data }) => data)
+          .catch(() => undefined);
         return;
       }
       activeSessionIdRef.current = started.id;
@@ -86,7 +101,7 @@ export function useMassIntroductionSession(target: PeopleTarget) {
     // E.g. READER_FIRMWARE_UPDATE_REQUIRED or READER_BUSY: say why in the user's language.
     onError: (error) => toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' }),
   });
-  const { mutate: cancelMutate } = useAccessControlServiceMassIntroductionCancel();
+  const { mutate: cancelMutate } = useMassIntroductionCancel();
   // The unmount cleanup below must not re-run (and cancel early) if the mutate identity ever changes.
   const cancelMutateRef = useRef(cancelMutate);
   cancelMutateRef.current = cancelMutate;
@@ -94,7 +109,7 @@ export function useMassIntroductionSession(target: PeopleTarget) {
   const start = useCallback(
     (readerId?: number) => {
       startMutation.mutate({
-        requestBody: {
+        body: {
           ...(target.type === 'resource' ? { resourceId: target.id } : { resourceGroupId: target.id }),
           ...(readerId !== undefined ? { readerId } : {}),
         },
@@ -108,7 +123,7 @@ export function useMassIntroductionSession(target: PeopleTarget) {
     const sessionId = activeSessionIdRef.current;
     if (!sessionId) return;
     activeSessionIdRef.current = null;
-    cancelMutate({ sessionId });
+    cancelMutate({ path: { sessionId } });
     setEndReason(MassIntroductionEndReason.CANCELLED);
   }, [cancelMutate]);
 
@@ -128,7 +143,7 @@ export function useMassIntroductionSession(target: PeopleTarget) {
       const sessionId = activeSessionIdRef.current;
       if (sessionId) {
         activeSessionIdRef.current = null;
-        cancelMutateRef.current({ sessionId });
+        cancelMutateRef.current({ path: { sessionId } });
       }
     };
   }, []);
@@ -166,16 +181,18 @@ export function useMassIntroductionSession(target: PeopleTarget) {
   const resync = useCallback(() => {
     const sessionId = activeSessionIdRef.current;
     if (!sessionId) return;
-    AccessControlService.massIntroductionGet({ sessionId }).then(
-      (current) => {
-        if (activeSessionIdRef.current === sessionId) applySession(current);
-      },
-      (error) => {
-        if (activeSessionIdRef.current !== sessionId) return;
-        if ((error as ApiError)?.status === 404) markEnded('unknown');
-        else setRefreshRetry((attempt) => attempt + 1);
-      },
-    );
+    massIntroductionGet({ path: { sessionId }, throwOnError: true })
+      .then(({ data }) => data)
+      .then(
+        (current) => {
+          if (activeSessionIdRef.current === sessionId) applySession(current);
+        },
+        (error) => {
+          if (activeSessionIdRef.current !== sessionId) return;
+          if ((error as ApiError)?.status === 404) markEnded('unknown');
+          else setRefreshRetry((attempt) => attempt + 1);
+        },
+      );
   }, [applySession, markEnded]);
 
   // The join code changes every 15 seconds so a photo of it cannot be passed on; fetch the next one
@@ -200,5 +217,5 @@ export function useMassIntroductionSession(target: PeopleTarget) {
     start,
     cancel,
     reset,
-  } as const;
+  };
 }

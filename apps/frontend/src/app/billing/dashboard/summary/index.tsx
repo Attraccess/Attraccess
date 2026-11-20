@@ -1,6 +1,12 @@
-import { DateTimeDisplay, EmptyState, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  Button,
+  DateTimeDisplay,
+  EmptyState,
+  PageHeader,
+  TableActionsColumnHeader,
+  TableRowActions,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
+import {
   Chip,
   cn,
   Skeleton,
@@ -24,9 +30,9 @@ import { useAuth } from '../../../../hooks/useAuth';
 import {
   BillingTransaction,
   BillingTransactionStatus,
-  useBillingServiceGetBillingBalance,
-  useBillingServiceGetBillingConfiguration,
-  useBillingServiceGetBillingTransactions,
+  useGetBillingBalance,
+  useGetBillingConfiguration,
+  useGetBillingTransactions,
 } from '@attraccess/react-query-client';
 import { useCallback, useMemo, useState } from 'react';
 
@@ -37,7 +43,7 @@ export interface Props {
   isDisabled?: boolean;
 }
 
-export function useSummaryCardState(props: Props) {
+export function SummaryCard(props: Props) {
   const { className, transactionsPerPage = 5, userId: userIdFromProps, isDisabled } = props;
   const { t } = useTranslations({ en, de });
 
@@ -45,9 +51,9 @@ export function useSummaryCardState(props: Props) {
 
   const userId = useMemo(() => userIdFromProps ?? currentUser?.id, [userIdFromProps, currentUser]);
 
-  const { data: configuration } = useBillingServiceGetBillingConfiguration();
-  const { data: balance, isLoading: isLoadingBalance } = useBillingServiceGetBillingBalance(
-    { userId: userId ?? 0 },
+  const { data: configuration } = useGetBillingConfiguration();
+  const { data: balance, isLoading: isLoadingBalance } = useGetBillingBalance(
+    { path: { userId: userId ?? 0 } },
     undefined,
     {
       enabled: !!userId && !isDisabled,
@@ -56,8 +62,8 @@ export function useSummaryCardState(props: Props) {
 
   const [transactionsPage] = useState(1);
 
-  const { data: transactions } = useBillingServiceGetBillingTransactions(
-    { userId: userId ?? 0, page: transactionsPage, limit: transactionsPerPage },
+  const { data: transactions } = useGetBillingTransactions(
+    { path: { userId: userId ?? 0 }, query: { page: transactionsPage, limit: transactionsPerPage } },
     undefined,
     {
       enabled: !!userId && !isDisabled,
@@ -66,7 +72,7 @@ export function useSummaryCardState(props: Props) {
 
   const getDetailsCellContent = useCallback(
     (transaction: BillingTransaction, skipNested = false): string => {
-      let type = '';
+      let type: string;
       let details = {} as Record<string, unknown>;
 
       if (transaction.refundOfId) {
@@ -80,12 +86,10 @@ export function useSummaryCardState(props: Props) {
           } else {
             // Skip deeper recursion but still provide a human-friendly label
             if (originalTransaction.resourceUsageId) {
-              type = 'resourceUsage';
               const tmp = t('transactions.table.cells.details.resourceUsage', {
                 resourceUsage: originalTransaction.resourceUsage,
               }) as string;
               originalDetails = tmp;
-              type = '';
             } else if (originalTransaction.initiatorId) {
               const tmp = t('transactions.table.cells.details.manual', {
                 initiator: originalTransaction.initiator,
@@ -155,39 +159,6 @@ export function useSummaryCardState(props: Props) {
     setOpenedTransactionId(transactionId);
     setIsOpenDetails(true);
   }, []);
-  return {
-    className,
-    t,
-    configuration,
-    balance,
-    isLoadingBalance,
-    transactions,
-    getDetailsCellContent,
-    statusColor,
-    formatCredits,
-    openedTransactionId,
-    isOpenDetails,
-    setIsOpenDetails,
-    openDetails,
-  };
-}
-
-export function SummaryCard(props: Props) {
-  const {
-    className,
-    t,
-    configuration,
-    balance,
-    isLoadingBalance,
-    transactions,
-    getDetailsCellContent,
-    statusColor,
-    formatCredits,
-    openedTransactionId,
-    isOpenDetails,
-    setIsOpenDetails,
-    openDetails,
-  } = useSummaryCardState(props);
 
   if (!configuration) {
     return <Skeleton className="h-10 w-full" />;
@@ -217,7 +188,9 @@ export function SummaryCard(props: Props) {
               <TableColumn>{t('transactions.table.columns.status')}</TableColumn>
               <TableColumn className="w-full">{t('transactions.table.columns.details')}</TableColumn>
               <TableColumn>{t('transactions.table.columns.amount')}</TableColumn>
-              <TableColumn>{t('transactions.table.columns.actions')}</TableColumn>
+              <TableColumn>
+                <TableActionsColumnHeader />
+              </TableColumn>
             </TableHeader>
             <TableBody
               items={transactions?.data ?? []}
@@ -244,14 +217,18 @@ export function SummaryCard(props: Props) {
                   <TableCell>
                     <RefundModal transactionId={transaction.id}>
                       {(onOpen) => (
-                        <Button
-                          isIconOnly
-                          variant="danger-soft"
-                          aria-label={t('transactions.table.actions.refund') as string}
-                          onPress={onOpen}
-                        >
-                          <RotateCcwIcon />
-                        </Button>
+                        <TableRowActions
+                          itemName={`#${transaction.id}`}
+                          actions={[
+                            {
+                              key: 'refund',
+                              label: t('transactions.table.actions.refund') as string,
+                              icon: RotateCcwIcon,
+                              tone: 'danger',
+                              onPress: onOpen,
+                            },
+                          ]}
+                        />
                       )}
                     </RefundModal>
                   </TableCell>

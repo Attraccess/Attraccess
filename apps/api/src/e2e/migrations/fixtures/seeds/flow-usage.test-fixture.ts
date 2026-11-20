@@ -1,24 +1,27 @@
 import {
   BillingTransaction,
   BillingTransactionItem,
-  BillingTransactionStatus,
   Flow,
   Project,
   Resource,
   ResourceFlowEdge,
   ResourceFlowNode,
-  ResourceFlowNodeType,
   ResourceFlowVariable,
-  ResourceFlowVariableScope,
   ResourceMeteringOperation,
+  ResourceMeteringSegment,
   ResourceMeteringSession,
   ResourceMeter,
-  ResourceMeteringSessionStatus,
   ResourceUsage,
-  ResourceUsageAction,
   ResourceUsageLifecycleAttempt,
   User,
 } from '@attraccess/database-entities';
+import {
+  BillingTransactionStatus,
+  ResourceFlowNodeType,
+  ResourceFlowVariableScope,
+  ResourceMeteringSessionStatus,
+  ResourceUsageAction,
+} from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import { ensureEntity } from '../seed-storage.test-fixture';
 export async function migrationFlowUsageSeeds(
@@ -172,6 +175,18 @@ export async function migrationFlowUsageSeeds(
     completedAt: new Date(),
     totalValue: '500000000',
     observedAt: new Date(),
+  }));
+
+  await ensureEntity(dataSource.getRepository(ResourceMeteringSegment), () => ({
+    id: `seed-metering-segment-${seedTag}`,
+    resourceId: resource.id,
+    meterId: meter.id,
+    status: 'closed' as const,
+    startedAt: new Date(Date.now() - 60_000),
+    endedAt: new Date(),
+    startValue: '1000000000',
+    endValue: '1500000000',
+    participants: [{ usageId: usage.id, creditsPerUnit: 30 }],
   }));
 
   const billingTransaction = await ensureEntity(billingTransactionRepo, () => ({

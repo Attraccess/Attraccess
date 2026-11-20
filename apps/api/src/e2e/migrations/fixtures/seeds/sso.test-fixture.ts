@@ -1,16 +1,15 @@
 import type { DataSource } from 'typeorm';
 import {
   AuthenticationDetail,
-  AuthenticationType,
   MqttServer,
   Session,
   Setting,
   SSOProvider,
   SSOProviderOIDCConfiguration,
   SSOProviderSAMLConfiguration,
-  SSOProviderType,
   User,
 } from '@attraccess/database-entities';
+import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
 import { ensureEntity } from '../seed-storage.test-fixture';
 export async function migrationSsoSeeds(dataSource: DataSource, seedTag: string, primaryUser: User) {
   const mqttRepo = dataSource.getRepository(MqttServer);

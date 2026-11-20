@@ -36,7 +36,6 @@
   - [Documentation](resources/documentation.md)
   - [Introductions](resources/introductions.md)
   - [Maintenance](resources/maintenance.md)
-  - [Reservations](resources/reservations.md)
   - [Usage Tracking](resources/usage-tracking.md)
   - [CSV Export](resources/csv-export.md)
 
@@ -74,16 +73,6 @@
   - [MQTT Server Setup](devices/mqtt/server-setup.md)
   - [MQTT Message Explorer](devices/mqtt/message-explorer.md)
   - [MQTT Examples](devices/mqtt/examples.md)
-  - [Guided WAGO CC100 Commissioning](devices/wago-cc100-commissioning.md)
-  - [WAGO CC100 Docker Runtime](devices/wago-cc100-runtime.md)
-  - [WAGO Production Support](devices/wago-production-support.md)
-  - [WAGO Recovery Runbooks](devices/wago-recovery-runbooks.md)
-  - [WAGO Threat Model and Pen-Test Brief](devices/wago-threat-model.md)
-  - [WAGO Safety Boundary](devices/wago-safety-boundary.md)
-  - [Matter: Architecture](devices/matter/architecture.md)
-  - [Matter: Operator Guide](devices/matter/operator.md)
-  - [Matter: Data Model and Lifecycle](devices/matter/data-model.md)
-  - [Matter: Backup and Recovery](devices/matter/backup-restore.md)
 
 - **Billing**
   - [Overview](billing/overview.md)
@@ -94,7 +83,35 @@
   - [Overview](plugins/overview.md)
   - [Installing Plugins](plugins/installing-plugins.md)
   - [Developing Plugins](plugins/developing-plugins.md)
-  - [Database Migrations](plugins/database-migrations.md)
+  - [Migrating Plugins to SDK 2.0](plugins/migrating-to-2.md)
+  - [Bluetooth Transport for Plugins](plugins/ble-transport.md)
+  - [Plugin Storage](plugins/plugin-storage.md)
+  - [Card Authentication for Plugins](plugins/card-authentication.md)
+  - [Plugin Readers](plugins/plugin-readers.md)
+  - **Reservations**
+    - [Overview](plugins/reservations/overview.md)
+    - [Using Reservations](plugins/reservations/using-reservations.md)
+    - [Administering Reservations](plugins/reservations/administration.md)
+    - [Reservations API](plugins/reservations/api.md)
+  - **WAGO**
+    - [Overview](plugins/wago/overview.md)
+    - [Guided WAGO CC100 Commissioning](plugins/wago/cc100-commissioning.md)
+    - [WAGO CC100 Docker Runtime](plugins/wago/cc100-runtime.md)
+    - [WAGO Production Support](plugins/wago/production-support.md)
+    - [WAGO Recovery Runbooks](plugins/wago/recovery-runbooks.md)
+    - [WAGO Threat Model and Pen-Test Brief](plugins/wago/threat-model.md)
+    - [WAGO Safety Boundary](plugins/wago/safety-boundary.md)
+  - **Matter**
+    - [Overview](plugins/matter/overview.md)
+    - [Matter: Architecture](plugins/matter/architecture.md)
+    - [Matter: Operator Guide](plugins/matter/operator.md)
+    - [Matter: Data Model and Lifecycle](plugins/matter/data-model.md)
+    - [Matter: Backup and Recovery](plugins/matter/backup-restore.md)
+    - [Matter: Permissions](plugins/matter/permissions.md)
+  - **RabbitMQ**
+    - [Overview](plugins/rabbitmq/overview.md)
+  - **Shelly**
+    - [Overview](plugins/shelly/overview.md)
 
 - **Monitoring & Metrics**
   - [Overview](monitoring/overview.md)
@@ -110,8 +127,12 @@
 - **Developer Guide**
   - [Overview](developer/overview.md)
   - [Architecture](developer/architecture.md)
+  - [Persistence Architecture](developer/persistence-architecture.md)
+  - [Persistence Guarantees](developer/persistence-guarantees.md)
+  - [Adding a Database Backend](developer/adding-a-database-backend.md)
   - [API Log Destinations](developer/logging.md)
   - [API Reference](developer/api-reference.md)
+  - [MCP Server (AI Clients)](developer/mcp.md)
   - [AI Agents (llms.txt & WebMCP)](developer/ai-agents.md)
   - [Contributing](developer/contributing.md)
 
@@ -120,6 +141,7 @@
   - [Logging In](end-user/login.md)
   - [My Account](end-user/account.md)
   - [Using Resources](end-user/using-resources.md)
+  - [Dashboard](end-user/dashboard.md)
   - [Mobile Usage (PWA)](end-user/mobile-pwa.md)
 
 - **FAQ & Help**

@@ -1,3 +1,5 @@
+import { makeReader } from './attractap-fake-stores.test-fixture';
+import { toReaderDto } from './dtos/reader.dto';
 import { CardAccessService } from './card-access.service';
 import { AttractapController } from './attractap.controller';
 import { AttractapService } from './attractap.service';
@@ -31,36 +33,47 @@ describe('AttractapController', () => {
   it('loads the resources relation when listing readers', async () => {
     await controller.getReaders();
 
-    expect(attractapService.getPairedReaders).toHaveBeenCalledWith(
-      expect.objectContaining({ relations: ['resources'] }),
-    );
+    expect(attractapService.getPairedReaders).toHaveBeenCalledWith(expect.objectContaining({ withResources: true }));
   });
 
-  // Readers that are not paired yet exist for the pairing session only.
-  it('lists only paired readers; the unpaired ones come from the pairing session list', async () => {
-    const paired = [{ id: 1, pairingState: 'paired' }];
-    const unpaired = [{ id: 2, pairingState: 'unpaired' }];
+  // Readers whose pairing was removed exist for the pairing session only.
+  it('lists only paired readers; the revoked ones come from the pairing session list', async () => {
+    const paired = [makeReader({ id: 1, pairingState: 'paired' })];
+    const revoked = [makeReader({ id: 2, pairingState: 'revoked' })];
     attractapService.getPairedReaders.mockResolvedValueOnce(paired);
-    attractapService.getReadersToPair.mockResolvedValueOnce(unpaired);
+    attractapService.getReadersToPair.mockResolvedValueOnce(revoked);
 
-    await expect(controller.getReaders()).resolves.toBe(paired);
-    await expect(controller.getReadersToPair()).resolves.toBe(unpaired);
+    await expect(controller.getReaders()).resolves.toEqual(paired.map(toReaderDto));
+    await expect(controller.getReadersToPair()).resolves.toEqual(revoked.map(toReaderDto));
   });
 
-  it.each(['unpaired', 'revoked'])('does not show a %s reader by id', async (pairingState) => {
+  it.each(['revoked'])('does not show a %s reader by id', async (pairingState) => {
     attractapService.findReaderById.mockResolvedValueOnce({ id: 4, pairingState });
     await expect(controller.getReaderById(4)).rejects.toThrow('not found');
   });
 
   it('shows a paired reader by id', async () => {
-    const reader = { id: 4, pairingState: 'paired' };
+    const reader = makeReader({ id: 4, pairingState: 'paired' });
     attractapService.findReaderById.mockResolvedValueOnce(reader);
-    await expect(controller.getReaderById(4)).resolves.toBe(reader);
+    await expect(controller.getReaderById(4)).resolves.toEqual(toReaderDto(reader));
+  });
+
+  // No reader response carries the credential or certificate internals, however the reader was loaded.
+  it('never puts the credential internals into a reader response', async () => {
+    const reader = makeReader({ id: 4, resources: [] });
+    attractapService.findReaderById.mockResolvedValueOnce(reader);
+    const byId = await controller.getReaderById(4);
+    expect(Object.keys(byId)).not.toContain('apiTokenHash');
+  });
+
+  it('leaves the resources out of a reader that was read without them, as before', async () => {
+    attractapService.getPairedReaders.mockResolvedValueOnce([makeReader({ id: 4 })]);
+    expect(Object.keys((await controller.getReaders())[0])).not.toContain('resources');
   });
 
   // A rename or a resource assignment through the API would make a reader that is not paired appear in
   // the resource's reader list.
-  it.each(['unpaired', 'revoked'])('does not update a %s reader', async (pairingState) => {
+  it.each(['revoked'])('does not update a %s reader', async (pairingState) => {
     attractapService.findReaderById.mockResolvedValueOnce({ id: 4, pairingState });
     await expect(controller.updateReader(4, { name: 'x', connectedResourceIds: [1] })).rejects.toThrow('not found');
     expect(attractapService.updateReader).not.toHaveBeenCalled();
@@ -72,16 +85,16 @@ describe('AttractapController', () => {
   });
 
   it('updates a paired reader', async () => {
-    const reader = { id: 4, pairingState: 'paired' };
+    const reader = makeReader({ id: 4, pairingState: 'paired' });
     attractapService.findReaderById.mockResolvedValueOnce(reader);
     attractapService.updateReader.mockResolvedValueOnce(reader);
     await expect(controller.updateReader(4, { name: 'x', connectedResourceIds: [1] })).resolves.toEqual({
       message: 'Reader updated successfully',
-      reader,
+      reader: toReaderDto(reader),
     });
   });
 
-  it.each(['unpaired', 'revoked'])('has no diagnostics for a %s reader', async (pairingState) => {
+  it.each(['revoked'])('has no diagnostics for a %s reader', async (pairingState) => {
     attractapService.findReaderById.mockResolvedValue({ id: 4, pairingState });
     await expect(controller.getReaderCrashReports(4)).rejects.toThrow('not found');
     await expect(controller.getReaderCrashReportCoredump(4, 1)).rejects.toThrow('not found');

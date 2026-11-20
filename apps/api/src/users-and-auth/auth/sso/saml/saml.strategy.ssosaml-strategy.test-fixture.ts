@@ -1,7 +1,6 @@
 import { withSignInProvisioning } from '../oidc/oidc.strategy.ssooidcstrategy-claim-path-resolution.test-fixture';
-import { SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
+import type { SsoSamlConfigurationRecord } from '@attraccess/application-models';
 import { ModuleRef } from '@nestjs/core';
-import { DataSource } from 'typeorm';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { RbacService } from '../../../rbac/rbac.service';
 import { UsersService } from '../../../users/users.service';
@@ -21,11 +20,10 @@ export function buildSamlModuleRef(deps: {
   metrics?: unknown;
 }): ModuleRef {
   const auth = deps.auth ?? { findUserIdBySSO: jest.fn().mockResolvedValue(null), addAuthenticationDetails: jest.fn() };
-  const dataSource = { transaction: (work: (manager: unknown) => unknown) => work({}) };
+  const withTransaction = (work: (manager: unknown) => unknown) => work({});
   const resolver = new SsoAccountResolver(
-    { recordCreatedUser: jest.fn(), ...deps.users } as unknown as UsersService,
+    { recordCreatedUser: jest.fn(), withTransaction, ...deps.users } as unknown as UsersService,
     auth as AuthService,
-    dataSource as unknown as DataSource,
   );
   const byToken = new Map<unknown, unknown>([
     [SsoAccountResolver, resolver],
@@ -50,7 +48,7 @@ export function registerSsosamlStrategyFixture() {
       forceAuthn: false,
       emailAttributeKeys: [emailKey],
       ssoProviderId: providerId,
-    } as SSOProviderSAMLConfiguration;
+    } as SsoSamlConfigurationRecord;
 
     return {
       ssoSamlOptions: {

@@ -1,7 +1,7 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import { Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK, RESERVATION_NOTIFIER } from '../constants';
-import { ReservationEntity, ReservationStatus } from '../entities/reservation.entity';
+import { CAPACITY_REDUCED_REASON, Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK, RESERVATION_NOTIFIER } from '../constants';
+import { ReservationRow, ReservationStatus } from '../storage/reservation-table';
 import { VisibilityService } from '../ical/visibility.service';
 import { ResourceSettingsService } from '../settings/resource-settings.service';
 import { GlobalSettingsService } from '../settings/global-settings.service';
@@ -13,6 +13,8 @@ import { ReservationError } from './errors';
 import { KeyedMutex } from './mutex';
 import type { ReservationNotifier } from './notifier';
 import { ReservationStore } from './reservation.store';
+import { tablesOf } from '../storage';
+import { exceedsCapacity, selectExcessBookings } from './capacity';
 import { blockedSpan, checkBookingRules, spansOverlap } from './rules';
 
 export const MAX_TEXT_LENGTH = 500;
@@ -146,11 +148,10 @@ export class ReservationService implements OnModuleDestroy {
   // ---------------------------------------------------------------- create
 
   /**
-   * Creates a booking. Creation is serialised per resource (in-process mutex + host serialized
-   * transaction), so of N concurrent overlapping requests exactly one succeeds. Throws a typed
+   * Creates a booking. Creation is serialised per resource (in-process mutex + one host transaction scope), so of N concurrent overlapping requests exactly one succeeds. Throws a typed
    * `ReservationError` (409 with `{ code, message }`) for every violated rule.
    */
-  async create(actor: ReservationActor, input: CreateReservationInput): Promise<ReservationEntity> {
+  async create(actor: ReservationActor, input: CreateReservationInput): Promise<ReservationRow> {
     const resource = await this.directory.getResource(input.resourceId);
     // A resource hidden from the actor (hidden groups) is answered like an unknown one.
     const visible = resource ? await this.visibility.filterVisible(actor, [input.resourceId]) : [];
@@ -184,9 +185,9 @@ export class ReservationService implements OnModuleDestroy {
       if (maintenance.length > 0) {
         throw new ReservationError('MAINTENANCE', 'The resource is in maintenance during this time');
       }
-      return this.context.runSerialized(async (manager) => {
+      return this.context.persistence.transaction(async (scope) => {
         if (settings.maxActiveBookingsPerUser > 0) {
-          const live = await this.store.countLiveForUser(manager, actor.userId, input.resourceId, now);
+          const live = await this.store.countLiveForUser(scope, actor.userId, input.resourceId, now);
           if (live >= settings.maxActiveBookingsPerUser) {
             throw new ReservationError(
               'USER_BOOKING_LIMIT',
@@ -194,23 +195,35 @@ export class ReservationService implements OnModuleDestroy {
             );
           }
         }
-        const candidates = await this.store.findOverlapCandidates(manager, input.resourceId, span.start, span.end);
-        if (candidates.some((other) => spansOverlap(span, blockedSpan(other)))) {
-          throw new ReservationError('OVERLAP', 'The time is already reserved');
+        const candidates = await this.store.findOverlapCandidates(scope, input.resourceId, span.start, span.end);
+        const overlapping = candidates.filter((other) => spansOverlap(span, blockedSpan(other)));
+        // Read inside the serialized transaction (and under the resource mutex), so concurrent creates and a
+        // concurrent limit change cannot exceed the limit.
+        const limit = await this.directory.getSessionLimit(input.resourceId, scope);
+        if (limit <= 1) {
+          if (overlapping.length > 0) throw new ReservationError('OVERLAP', 'The time is already reserved');
+        } else {
+          if (overlapping.some((other) => other.userId === actor.userId)) {
+            throw new ReservationError('OWN_OVERLAP', 'You already have a booking for this resource at that time');
+          }
+          if (exceedsCapacity(overlapping.map(blockedSpan), span, limit)) {
+            throw new ReservationError('OVERLAP', 'All slots are booked at that time');
+          }
         }
-        const entity = new ReservationEntity();
-        Object.assign(entity, {
-          resourceId: input.resourceId,
-          userId: actor.userId,
-          startTime: input.startTime,
-          endTime: input.endTime,
-          bufferBeforeMinutes: settings.bufferBeforeMinutes,
-          bufferAfterMinutes: settings.bufferAfterMinutes,
-          status: settings.approvalRequired ? 'pending' : 'confirmed',
-          note: cleanText(input.note),
-          createdAt: now,
-        } satisfies Partial<ReservationEntity>);
-        return manager.getRepository(ReservationEntity).save(entity);
+        return (await tablesOf(this.context).reservations.insert(
+          {
+            resourceId: input.resourceId,
+            userId: actor.userId,
+            startTime: input.startTime,
+            endTime: input.endTime,
+            bufferBeforeMinutes: settings.bufferBeforeMinutes,
+            bufferAfterMinutes: settings.bufferAfterMinutes,
+            status: settings.approvalRequired ? 'pending' : 'confirmed',
+            note: cleanText(input.note),
+            createdAt: now,
+          },
+          { scope },
+        )) as ReservationRow;
       });
     });
     await this.audit.record(
@@ -230,7 +243,7 @@ export class ReservationService implements OnModuleDestroy {
 
   // ----------------------------------------------------- holder / manager
 
-  private async load(id: number): Promise<ReservationEntity> {
+  private async load(id: number): Promise<ReservationRow> {
     const reservation = await this.store.findById(id);
     if (!reservation) throw new ReservationError('RESERVATION_NOT_FOUND', 'Reservation not found');
     return reservation;
@@ -240,7 +253,7 @@ export class ReservationService implements OnModuleDestroy {
   async getForActor(
     actor: ReservationActor,
     id: number,
-  ): Promise<{ reservation: ReservationEntity; isHolder: boolean; isManager: boolean }> {
+  ): Promise<{ reservation: ReservationRow; isHolder: boolean; isManager: boolean }> {
     const reservation = await this.load(id);
     const isHolder = reservation.userId === actor.userId;
     const isManager = await this.access.isManager(actor, reservation.resourceId);
@@ -248,7 +261,7 @@ export class ReservationService implements OnModuleDestroy {
     return { reservation, isHolder, isManager };
   }
 
-  async cancel(actor: ReservationActor, id: number, reason?: string | null): Promise<ReservationEntity> {
+  async cancel(actor: ReservationActor, id: number, reason?: string | null): Promise<ReservationRow> {
     const { reservation, isHolder, isManager } = await this.getForActor(actor, id);
     const now = this.clock();
     const live = reservation.status === 'pending' || reservation.status === 'confirmed';
@@ -285,7 +298,7 @@ export class ReservationService implements OnModuleDestroy {
   }
 
   /** Ends an active booking now (endTime = now) and frees the slot. Holder or manager. */
-  async endEarly(actor: ReservationActor, id: number): Promise<ReservationEntity> {
+  async endEarly(actor: ReservationActor, id: number): Promise<ReservationRow> {
     const { reservation, isHolder, isManager } = await this.getForActor(actor, id);
     const now = this.clock();
     const active =
@@ -316,7 +329,7 @@ export class ReservationService implements OnModuleDestroy {
   }
 
   /** Holder keeps the booking ("still needed" answer / keep the rest after stopping). Idempotent. */
-  async keep(actor: ReservationActor, id: number): Promise<ReservationEntity> {
+  async keep(actor: ReservationActor, id: number): Promise<ReservationRow> {
     const reservation = await this.load(id);
     if (reservation.userId !== actor.userId)
       throw new ReservationError('RESERVATION_NOT_FOUND', 'Reservation not found');
@@ -331,11 +344,11 @@ export class ReservationService implements OnModuleDestroy {
 
   // -------------------------------------------------------------- approval
 
-  async approve(actor: ReservationActor, id: number, reason?: string | null): Promise<ReservationEntity> {
+  async approve(actor: ReservationActor, id: number, reason?: string | null): Promise<ReservationRow> {
     return this.decide(actor, id, 'confirmed', reason);
   }
 
-  async reject(actor: ReservationActor, id: number, reason?: string | null): Promise<ReservationEntity> {
+  async reject(actor: ReservationActor, id: number, reason?: string | null): Promise<ReservationRow> {
     return this.decide(actor, id, 'rejected', reason);
   }
 
@@ -344,7 +357,7 @@ export class ReservationService implements OnModuleDestroy {
     id: number,
     target: 'confirmed' | 'rejected',
     reason?: string | null,
-  ): Promise<ReservationEntity> {
+  ): Promise<ReservationRow> {
     const reservation = await this.load(id);
     if (!(await this.access.isManager(actor, reservation.resourceId))) {
       // Like everywhere else, a booking the caller may not see does not exist for them. Only the holder,
@@ -423,12 +436,63 @@ export class ReservationService implements OnModuleDestroy {
     return cancelled.length;
   }
 
+  // ------------------------------------------------ lowered session limit
+
+  /**
+   * Cancels the bookings a lowered session limit left without a slot: the newest-created not-yet-started ones first,
+   * until every instant fits (see `selectExcessBookings`). Running bookings are never touched. Takes the resource lock;
+   * idempotent, so it also serves the start-up and scheduler reconciliation. A higher limit cancels nothing, and so
+   * does a resource that no longer exists (deleted: its bookings are not over capacity).
+   * `actorUserId` null = no user (system): the audit then attributes each cancellation to its holder.
+   */
+  async cancelExcessBookings(resourceId: number, actorUserId: number | null): Promise<number> {
+    return this.mutex.run(resourceId, async () => {
+      const now = this.clock();
+      const limit = await this.directory.findSessionLimit(resourceId);
+      if (limit === null) return 0;
+      const occupying = await this.store.findOccupyingFrom(resourceId, now);
+      // Fast exit: with fewer bookings than slots nothing can overlap beyond the limit.
+      if (occupying.length <= limit) return 0;
+      const cancelled: ReservationRow[] = [];
+      for (const booking of selectExcessBookings(occupying, limit, now)) {
+        if (await this.cancelForCapacity(booking, actorUserId)) cancelled.push(booking);
+      }
+      this.notifyEach('onRemoved', cancelled, (booking) =>
+        this.notifier.onRemoved(booking, { byUserId: null, reason: CAPACITY_REDUCED_REASON }),
+      );
+      if (cancelled.length > 0) this.invalidateViews(resourceId);
+      return cancelled.length;
+    });
+  }
+
+  /** Cancels one booking that lost its slot and audits it; false when it changed meanwhile. */
+  private async cancelForCapacity(booking: ReservationRow, actorUserId: number | null): Promise<boolean> {
+    const patch = { status: 'cancelled' as const, cancelledBy: actorUserId, cancelReason: CAPACITY_REDUCED_REASON };
+    // A check-in after the selection makes it a running booking: it keeps its slot.
+    if (!(await this.store.transition(booking.id, [booking.status], patch, { notCheckedIn: true }))) return false;
+    Object.assign(booking, patch);
+    await this.audit.record(
+      'cancelled',
+      // The user who lowered the limit; without one, the holder (system principal).
+      ReservationAudit.systemPrincipal(actorUserId ?? booking.userId),
+      { type: 'reservation', id: booking.id },
+      {
+        resourceId: booking.resourceId,
+        holderUserId: booking.userId,
+        byManager: actorUserId !== null && actorUserId !== booking.userId,
+        reason: CAPACITY_REDUCED_REASON,
+        bulk: true,
+      },
+    );
+    return true;
+  }
+
   // ------------------------------------------- scheduler / hook transitions
 
   private async system(
     id: number,
     from: ReservationStatus[],
-    changes: Partial<ReservationEntity>,
+    changes: Partial<ReservationRow>,
     action: 'no_show' | 'expired' | null,
     options: { notCheckedIn?: boolean } = {},
   ): Promise<boolean> {
@@ -470,16 +534,11 @@ export class ReservationService implements OnModuleDestroy {
 
   /** Holder started a session inside the check-in window. True when this call recorded the check-in. */
   async markCheckedIn(id: number, usageId: number, at: Date): Promise<boolean> {
-    const result = await this.context.runSerialized((manager) =>
-      manager
-        .getRepository(ReservationEntity)
-        .createQueryBuilder()
-        .update(ReservationEntity)
-        .set({ checkedInAt: at, checkedInUsageId: usageId })
-        .where("id = :id AND status = 'confirmed' AND checkedInAt IS NULL", { id })
-        .execute(),
+    const affected = await tablesOf(this.context).reservations.update(
+      { id, status: 'confirmed', checkedInAt: null },
+      { checkedInAt: at, checkedInUsageId: usageId },
     );
-    const checkedIn = (result.affected ?? 0) === 1;
+    const checkedIn = affected === 1;
     if (checkedIn) {
       const booking = await this.store.findById(id);
       if (booking) this.invalidateViews(booking.resourceId);

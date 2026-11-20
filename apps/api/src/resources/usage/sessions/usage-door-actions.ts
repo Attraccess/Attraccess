@@ -1,51 +1,49 @@
-import { ResourceType, ResourceUsage, ResourceUsageAction, User } from '@attraccess/database-entities';
+import { ResourceType, ResourceUsageAction } from '@attraccess/application-models';
+import type { UsageSession, UsageSessionUser } from '@attraccess/application-models';
 
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository } from 'typeorm';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 
 import { UsageResourceGate } from '../authorization/usage-resource-gate';
 
 import { RESOURCE_USAGE_LOG_CONTEXT } from '../lifecycle/usage-lifecycle';
 
+import { USAGE_SESSION_STORE, UsageSessionStore } from '../usage-session-store.port';
+
 import { UsageSessionNotifications } from './usage-session-notifications';
 
-/** Door lock, unlock and unlatch: stored as already-ended usage records. */
+import { ACCESS_ONLY_DOOR_MESSAGE } from '../../reader-capabilities/reader-capabilities';
+
+type DoorActionUser = UsageSessionUser;
+
+/**
+ * Door lock, unlock, unlatch and open: stored as already-ended usage records. Every entry point (web, readers)
+ * goes through here, so the access-only refusals apply everywhere.
+ */
 @Injectable()
 export class UsageDoorActions {
   private readonly logger = new Logger(RESOURCE_USAGE_LOG_CONTEXT);
 
   constructor(
-    @InjectRepository(ResourceUsage)
-    private readonly resourceUsageRepository: Repository<ResourceUsage>,
+    @Inject(USAGE_SESSION_STORE) private readonly sessions: UsageSessionStore,
     private readonly gate: UsageResourceGate,
     private readonly notifications: UsageSessionNotifications,
   ) {}
 
-  private async handleDoorAction(resourceId: number, user: User, action: ResourceUsageAction): Promise<ResourceUsage> {
-    const usageData = {
-      resourceId,
-      usageAction: action,
-      userId: user.id,
-      startTime: new Date(),
-      startNotes: null,
-      endTime: new Date(),
-      endNotes: null,
-    };
+  private async handleDoorAction(
+    resourceId: number,
+    user: DoorActionUser,
+    action: ResourceUsageAction,
+  ): Promise<UsageSession> {
+    this.logger.debug(`persisting door action for resource ${resourceId}`, { resourceId, action, userId: user.id });
 
-    this.logger.debug(`persisting door action for resource ${resourceId}`, { usageData });
-
-    let usage = await this.resourceUsageRepository.save(usageData, { reload: true });
-    usage = await this.resourceUsageRepository.findOne({ where: { id: usage.id }, relations: ['user', 'resource'] });
+    const usage = await this.sessions.recordDoorAction({ resourceId, userId: user.id, action });
 
     await this.notifications.emitUsageEvent(usage.id);
 
     return usage;
   }
 
-  async lockDoor(resourceId: number, user: User): Promise<ResourceUsage> {
+  async lockDoor(resourceId: number, user: DoorActionUser): Promise<UsageSession> {
     const resource = await this.gate.getResource(resourceId, user, {
       checkMaintenance: true,
       checkControlPermission: true,
@@ -54,11 +52,15 @@ export class UsageDoorActions {
     if (resource.type !== ResourceType.Door) {
       throw new BadRequestException('Resource is not a door');
     }
+    if (resource.accessOnly) {
+      throw new BadRequestException(ACCESS_ONLY_DOOR_MESSAGE);
+    }
 
     return await this.handleDoorAction(resourceId, user, ResourceUsageAction.DoorLock);
   }
 
-  async unlockDoor(resourceId: number, user: User): Promise<ResourceUsage> {
+  /** Also the Open of an access-only door: readers that predate access-only doors send unlock for it. */
+  async unlockDoor(resourceId: number, user: DoorActionUser): Promise<UsageSession> {
     const resource = await this.gate.getResource(resourceId, user, {
       checkMaintenance: true,
       checkControlPermission: true,
@@ -70,7 +72,7 @@ export class UsageDoorActions {
     return await this.handleDoorAction(resourceId, user, ResourceUsageAction.DoorUnlock);
   }
 
-  async unlatchDoor(resourceId: number, user: User): Promise<ResourceUsage> {
+  async unlatchDoor(resourceId: number, user: DoorActionUser): Promise<UsageSession> {
     const resource = await this.gate.getResource(resourceId, user, {
       checkMaintenance: true,
       checkControlPermission: true,
@@ -81,6 +83,10 @@ export class UsageDoorActions {
       );
     }
 
+    if (resource.accessOnly) {
+      throw new BadRequestException(ACCESS_ONLY_DOOR_MESSAGE);
+    }
+
     if (!resource.separateUnlockAndUnlatch) {
       throw new BadRequestException(
         `Door (ID: ${resourceId}${resource.name ? `, Name: ${resource.name}` : ''}) does not support unlatching`,
@@ -88,5 +94,21 @@ export class UsageDoorActions {
     }
 
     return await this.handleDoorAction(resourceId, user, ResourceUsageAction.DoorUnlatch);
+  }
+
+  /** The only action of an access-only door, recorded as a door unlock so the door-unlocked flows run. */
+  async openDoor(resourceId: number, user: DoorActionUser): Promise<UsageSession> {
+    const resource = await this.gate.getResource(resourceId, user, {
+      checkMaintenance: true,
+      checkControlPermission: true,
+    });
+    if (resource.type !== ResourceType.Door) {
+      throw new BadRequestException('Resource is not a door');
+    }
+    if (!resource.accessOnly) {
+      throw new BadRequestException('This door is not access only: use lock and unlock');
+    }
+
+    return await this.handleDoorAction(resourceId, user, ResourceUsageAction.DoorUnlock);
   }
 }

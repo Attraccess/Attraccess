@@ -7,7 +7,7 @@
   },
   "installPlugin": "Install plugin",
   "uploadButton": "Upload ZIP file",
-  "docsButton": "Documentation",
+  "docsButton": "Developer guide",
   "manageVersion": "Manage version",
   "classification": {
     "official": {
@@ -99,12 +99,18 @@
     "directory": "Directory",
     "permissions": "Permissions",
     "source": "Source",
-    "status": "Status",
-    "actions": "Actions"
+    "status": "Status"
   },
   "status": {
     "loaded": "Loaded",
     "error": "Failed to load",
+    "licenseMissing": "License missing",
+    "licenseMissingModules": {
+      "one": "Requires license module: {{modules}}",
+      "many": "Requires license modules: {{modules}}"
+    },
+    "licenseMissingRequired": "Requires a valid Attraccess license",
+    "licenseMissingTooltip": "Not loaded: at startup the license did not cover this plugin or could not be checked. After you save a matching license key, the server restarts and loads it.",
     "unknown": "Frontend only",
     "errorTooltip": "View the server load error",
     "viewError": "View load error for {{pluginName}}",
@@ -113,7 +119,11 @@
     "close": "Close",
     "retry": "Retry and restart",
     "retrySuccess": "The plugin will be retried when the app restarts.",
-    "retryError": "Could not retry the plugin."
+    "retryError": "Could not retry the plugin.",
+    "refused": "Refused",
+    "refusedTitle": "Attraccess refused {{pluginName}}",
+    "refusedDescription": "This plugin is not compatible with this Attraccess version (for example it was built for an older plugin SDK) and is never loaded, so it cannot be retried. Install a compatible version or remove it; removing keeps its stored data. The server reported:",
+    "remove": "Remove plugin"
   },
   "noPermissions": "None requested",
   "updatePolicy": {
@@ -142,15 +152,13 @@
     }
   },
   "deleteTooltip": "Remove plugin",
-  "aside": {
-    "title": "Writing a plugin",
-    "description": "Plugins extend the API and the frontend from a single bundle. The developer guide covers the manifest, the permission model and local development."
-  },
   "deleteConfirmation": {
     "title": "Remove plugin?",
-    "message": "Remove the plugin {{pluginName}}? Its code and runtime registrations will be removed and the app will reload. Plugin data and secrets are retained for recovery.",
     "cancel": "Cancel",
-    "delete": "Remove"
+    "delete": "Remove",
+    "messageRegistry": "Remove the plugin {{pluginName}}? Its code and runtime registrations will be removed and the app will reload. Its data and secrets are kept, so installing it again continues with them.",
+    "messageUploaded": "Remove the plugin {{pluginName}}? Its code, runtime registrations and all of its stored data will be deleted permanently, and the app will reload. Create a backup first if you might need the data.",
+    "messageRefused": "Remove the refused plugin {{pluginName}}? Its files will be removed without running its code, and the app will reload. Its stored data stays in the database until a compatible version takes it over."
   },
   "error": {
     "versions": {

@@ -2,11 +2,10 @@ import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-ba
 import { Inject, Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { MatterBackupService, type BackupOptions, type BackupsSummary } from '../backup/backup.service';
 import { MatterConnectionService } from '../connection/connection.service';
-import { DeviceAuditService, type DeviceAuditSubject } from '../devices/audit.service';
-import { MatterFabric } from '../devices/entities';
+import { DeviceAuditService, type AuditBy, type DeviceAuditSubject } from '../devices/audit.service';
 import { MatterReconciliationService } from '../devices/reconciliation.service';
 import { PLUGIN_CONTEXT } from '../plugin-context';
-import { runTransaction } from './db';
+import { matterStorage } from '../plugin-storage/access';
 import { NOT_CONNECTED, conflict, sidecarFailure } from './errors';
 import { factsOf, factsOfRow, recordFacts, recordedFabricRow, type FabricFacts, type SidecarFabric } from './facts';
 import { MatterFabricGuard } from './guard';
@@ -89,8 +88,12 @@ export class MatterFabricService implements OnModuleInit, OnModuleDestroy {
     return this.connectionService.connection;
   }
 
-  private get manager() {
-    return this.context.getRepository(MatterFabric).manager;
+  private get storage() {
+    return matterStorage(this.context);
+  }
+
+  private get tables() {
+    return this.storage.tables;
   }
 
   onModuleInit(): void {
@@ -143,7 +146,7 @@ export class MatterFabricService implements OnModuleInit, OnModuleDestroy {
       return this.guard.mismatch;
     }
     try {
-      const recorded = factsOfRow(await recordedFabricRow(this.manager));
+      const recorded = factsOfRow(await recordedFabricRow(this.tables));
       const detection = detectMismatch(sidecar, recorded);
       if (detection.kind === null) {
         await this.agree(detection.adopt, mode === 'connect' && !options.keepOutcomeUnknown);
@@ -153,7 +156,7 @@ export class MatterFabricService implements OnModuleInit, OnModuleDestroy {
       if (facts) {
         // The same fabric in the same storage moved on while the plugin was watching: a change it asked for or
         // one it was told about. Record it; a gap in what the plugin saw is handled by the connect check.
-        await runTransaction(this.context, (m) => recordFacts(m, facts));
+        await this.storage.transaction((tables) => recordFacts(tables, facts));
         for (const handler of this.advanced) handler(facts);
         return null;
       }
@@ -172,7 +175,7 @@ export class MatterFabricService implements OnModuleInit, OnModuleDestroy {
    * ahead of the plugin's record, which is a mismatch.
    */
   private async agree(adopt: FabricFacts | null, settlesOutcome: boolean): Promise<void> {
-    if (adopt) await runTransaction(this.context, (m) => recordFacts(m, adopt));
+    if (adopt) await this.storage.transaction((tables) => recordFacts(tables, adopt));
     this.settle(null);
     if (settlesOutcome) this.guard.outcomeUnknown = false;
   }
@@ -189,18 +192,14 @@ export class MatterFabricService implements OnModuleInit, OnModuleDestroy {
   private async auditMismatch(kind: MismatchKind): Promise<void> {
     if (this.auditedMismatch === kind) return;
     this.auditedMismatch = kind;
-    const { subject, details } = fabricAudit((await recordedFabricRow(this.manager))?.id ?? null);
+    const { subject, details } = fabricAudit((await recordedFabricRow(this.tables))?.id ?? null);
     await this.audit.record('matter.fabric_recovery_required', null, subject, { ...details, mismatch: kind });
   }
 
   /** An administrator's way out of recovery, audited on the fabric row the plugin recorded. */
-  async auditRecoveryChoice(
-    choice: RecoveryChoice,
-    principal: PluginAuditPrincipal,
-    rowId: string | null = null,
-  ): Promise<void> {
-    const { subject, details } = fabricAudit(rowId ?? (await recordedFabricRow(this.manager))?.id ?? null);
-    await this.audit.record('matter.recovery_action_chosen', principal, subject, { ...details, choice });
+  async auditRecoveryChoice(choice: RecoveryChoice, by: AuditBy, rowId: string | null = null): Promise<void> {
+    const { subject, details } = fabricAudit(rowId ?? (await recordedFabricRow(this.tables))?.id ?? null);
+    await this.audit.record('matter.recovery_action_chosen', by, subject, { ...details, choice });
   }
 
   private settle(kind: MismatchKind | null): void {
@@ -221,7 +220,7 @@ export class MatterFabricService implements OnModuleInit, OnModuleDestroy {
         fabric = null;
       }
     }
-    const recorded = factsOfRow(await recordedFabricRow(this.manager));
+    const recorded = factsOfRow(await recordedFabricRow(this.tables));
     const key = await this.keys.view();
     const reachable = connected && fabric !== null;
     const state = fabric?.state ?? 'unknown';
@@ -253,18 +252,22 @@ export class MatterFabricService implements OnModuleInit, OnModuleDestroy {
 
   // --- creating -----------------------------------------------------------------------------------------------------
 
-  /** Creates the fabric (and the recovery key when there is none yet) and takes the first backup. */
+  /**
+   * Creates the fabric (and the recovery key when there is none yet) and takes the first backup. Its entries share one
+   * operation ID, as do those of the other operations below.
+   */
   async create(label: string | undefined, principal: PluginAuditPrincipal): Promise<CreateResult> {
     this.guard.assertFabricMutationAllowed();
+    const actor = this.audit.actorFor(principal);
     const created = await this.createOnSidecar(label);
-    const key = await this.ensureKey(principal);
+    const key = await this.ensureKey(actor);
     await this.audit.record(
       'matter.fabric_created',
-      principal,
+      actor,
       { type: 'matter.fabric', ref: created.rowId },
       { fabricRef: created.rowId, fabricId: created.facts.fabricId, recoveryKeyCreated: key !== null },
     );
-    await this.backupQuietly('fabric_created', principal);
+    await this.backupQuietly('fabric_created', actor);
     return { status: await this.status(), recoveryKey: key };
   }
 
@@ -273,15 +276,17 @@ export class MatterFabricService implements OnModuleInit, OnModuleDestroy {
    * one under this key, never a run that started before the key existed.
    */
   async generateRecoveryKey(principal: PluginAuditPrincipal): Promise<RecoveryKeyReveal> {
-    const reveal = await this.keys.generate(principal);
-    await this.backupQuietly('manual', principal, { fresh: true });
+    const actor = this.audit.actorFor(principal);
+    const reveal = await this.keys.generate(actor);
+    await this.backupQuietly('manual', actor, { fresh: true });
     return reveal;
   }
 
   /** Replaces the recovery key and immediately takes a backup under the new one (not one running under the old). */
   async rotateRecoveryKey(principal: PluginAuditPrincipal): Promise<RecoveryKeyReveal> {
-    const reveal = await this.keys.rotate(principal);
-    await this.backupQuietly('manual', principal, { fresh: true });
+    const actor = this.audit.actorFor(principal);
+    const reveal = await this.keys.rotate(actor);
+    await this.backupQuietly('manual', actor, { fresh: true });
     return reveal;
   }
 
@@ -299,7 +304,9 @@ export class MatterFabricService implements OnModuleInit, OnModuleDestroy {
       }
       const facts = factsOf(result);
       if (!facts) throw sidecarFailure(new Error('The sidecar did not report a fabric.'));
-      const row = await runTransaction(this.context, (m) => recordFacts(m, facts, label?.trim() || DEFAULT_LABEL));
+      const row = await this.storage.transaction((tables) =>
+        recordFacts(tables, facts, label?.trim() || DEFAULT_LABEL),
+      );
       this.settle(null);
       this.guard.outcomeUnknown = false;
       return { facts, rowId: row.id };
@@ -308,18 +315,18 @@ export class MatterFabricService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async ensureKey(principal: PluginAuditPrincipal): Promise<RecoveryKeyReveal | null> {
+  private async ensureKey(by: AuditBy): Promise<RecoveryKeyReveal | null> {
     if ((await this.keys.view()).present) return null;
-    return this.keys.generate(principal);
+    return this.keys.generate(by);
   }
 
   private async backupQuietly(
     trigger: 'manual' | 'fabric_created' | 'fabric_changed',
-    principal: PluginAuditPrincipal | null,
+    by: AuditBy,
     options: BackupOptions = {},
   ) {
     try {
-      await this.backups.backup(trigger, principal, options);
+      await this.backups.backup(trigger, by, options);
     } catch {
       // Recorded as a failed attempt and audited by the backup service; the fabric operation itself succeeded.
     }
@@ -335,18 +342,19 @@ export class MatterFabricService implements OnModuleInit, OnModuleDestroy {
     if (sidecar.state !== 'initialized' || !facts) {
       throw conflict('sidecar_not_initialized', 'The sidecar has no healthy fabric to accept.');
     }
-    await this.auditRecoveryChoice('accept_sidecar', principal);
+    const actor = this.audit.actorFor(principal);
+    await this.auditRecoveryChoice('accept_sidecar', actor);
     this.guard.busy = true;
     try {
       // Still in recovery: this run is the one the administrator chose, so it may detach the other fabric's nodes.
-      await this.reconciliation.request(principal, { allowInRecovery: true });
-      await runTransaction(this.context, (m) => recordFacts(m, facts));
+      await this.reconciliation.request(actor, { allowInRecovery: true });
+      await this.storage.transaction((tables) => recordFacts(tables, facts));
       this.settle(null);
       this.guard.outcomeUnknown = false;
     } finally {
       this.guard.busy = false;
     }
-    await this.backupQuietly('fabric_changed', principal);
+    await this.backupQuietly('fabric_changed', actor);
     return this.status();
   }
 
@@ -358,21 +366,22 @@ export class MatterFabricService implements OnModuleInit, OnModuleDestroy {
       throw conflict('sidecar_not_empty', 'A new fabric can only be started on a sidecar without one.');
     }
     // The old fabric's row when there is one; otherwise the choice is audited on the new fabric's row.
-    const old = (await recordedFabricRow(this.manager))?.id ?? null;
-    if (old) await this.auditRecoveryChoice('start_new', principal, old);
+    const old = (await recordedFabricRow(this.tables))?.id ?? null;
+    const actor = this.audit.actorFor(principal);
+    if (old) await this.auditRecoveryChoice('start_new', actor, old);
     const created = await this.createOnSidecar(label);
-    if (!old) await this.auditRecoveryChoice('start_new', principal, created.rowId);
-    const key = await this.ensureKey(principal);
+    if (!old) await this.auditRecoveryChoice('start_new', actor, created.rowId);
+    const key = await this.ensureKey(actor);
     await this.audit.record(
       'matter.fabric_created',
-      principal,
+      actor,
       { type: 'matter.fabric', ref: created.rowId },
       { fabricRef: created.rowId, fabricId: created.facts.fabricId, recoveryKeyCreated: key !== null },
     );
     // The old fabric's devices are detached by the reconciliation, never matched to the new fabric's. The new fabric
     // is recorded and the recovery settled by now, so this is an ordinary run.
-    await this.reconciliation.request(principal).catch(() => undefined);
-    await this.backupQuietly('fabric_created', principal);
+    await this.reconciliation.request(actor).catch(() => undefined);
+    await this.backupQuietly('fabric_created', actor);
     return { status: await this.status(), recoveryKey: key };
   }
 

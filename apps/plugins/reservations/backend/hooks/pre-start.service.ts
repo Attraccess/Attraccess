@@ -1,5 +1,6 @@
 import type {
   PluginBlockReason,
+  PreStartOrigin,
   PreStartContext,
   PreStartResult,
   StartBlockedContext,
@@ -7,12 +8,13 @@ import type {
 } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import { Clock, RESERVATION_CLOCK } from '../constants';
-import type { ReservationEntity } from '../entities/reservation.entity';
+import type { ReservationRow } from '../storage/reservation-table';
 import { VisibilityService } from '../ical/visibility.service';
 import { formatTime, pick } from '../notifications/format';
 import { readerName, readerTime } from '../reader-ui/texts';
 import { AccessService } from '../reservations/access.service';
 import { type AccessSubject, subjectOfPrincipal } from '../reservations/actor';
+import { heldBookings } from '../reservations/capacity';
 import { DirectoryService } from '../reservations/directory.service';
 import { ReservationStore } from '../reservations/reservation.store';
 import { GlobalSettingsService } from '../settings/global-settings.service';
@@ -26,6 +28,16 @@ const MAX_HOLDER_NAME_CHARS = 40;
 
 export const reservationStepKey = (id: number) => `reservation-${id}`;
 export const overrideStepKey = (id: number) => `override-${id}`;
+
+/** Ids of the bookings whose override question this start attempt already confirmed. */
+export function overriddenBookingIds(stepKeys: readonly string[]): Set<number> {
+  return new Set(
+    stepKeys.flatMap((key) => {
+      const match = /^override-(\d+)$/.exec(key);
+      return match ? [Number(match[1])] : [];
+    }),
+  );
+}
 
 /**
  * Pre-start gate. Hot path of every session start, so:
@@ -62,10 +74,13 @@ export class PreStartService {
     const now = ctx.now ?? this.clock();
     // +1 ms so a booking starting exactly now counts as running even with a confirm window of 0.
     const horizon = new Date(now.getTime() + settings.confirmWindowMinutes * MINUTE_MS + 1);
-    const others = (await this.store.findConfirmedOverlapping(ctx.resourceId, now, horizon)).filter(
-      (reservation) => reservation.userId !== ctx.userId,
-    );
+    const confirmed = await this.store.findConfirmedOverlapping(ctx.resourceId, now, horizon);
+    const others = confirmed.filter((reservation) => reservation.userId !== ctx.userId);
     if (others.length === 0) return ALLOW;
+
+    // Shared machines (limit above 1): a booking holds one slot, not the machine.
+    const limit = await this.directory.getSessionLimit(ctx.resourceId);
+    if (limit > 1) return this.evaluateShared(ctx, confirmed, limit, now);
 
     const nowMs = now.getTime();
     const active = others.filter((r) => r.startTime.getTime() <= nowMs);
@@ -79,6 +94,46 @@ export class PreStartService {
       (r) => r.startTime.getTime() > nowMs && !ctx.confirmedStepKeys.includes(reservationStepKey(r.id)),
     );
     if (!upcoming) return ALLOW;
+    return this.askReservedSoon(ctx, upcoming, now);
+  }
+
+  /**
+   * The gate on a machine with several slots. Running bookings block only when the slots they hold fill the
+   * machine for this starter (the starter's own running booking is their slot); an upcoming booking is asked about
+   * only when starting now would leave it without a slot at its start.
+   */
+  private async evaluateShared(
+    ctx: PreStartContext,
+    confirmed: ReservationRow[],
+    limit: number,
+    now: Date,
+  ): Promise<PreStartResult> {
+    const nowMs = now.getTime();
+    const sessions = await this.directory.getActiveSessions(ctx.resourceId);
+    const inSession = new Set(sessions.map((session) => session.userId));
+    const running = confirmed.filter((r) => r.startTime.getTime() <= nowMs);
+    // A booking whose override this attempt confirmed gave its slot to the manager, now and at later starts.
+    const overridden = overriddenBookingIds(ctx.confirmedStepKeys);
+    if (!running.some((r) => r.userId === ctx.userId)) {
+      const held = heldBookings({ confirmed: running, starterId: ctx.userId, inSession, at: now, overridden });
+      if (held.length > 0 && limit - sessions.length - held.length <= 0) {
+        const verdict = await this.whenActive(ctx, held, now);
+        if (verdict) return verdict;
+      }
+    }
+    for (const booking of confirmed) {
+      if (booking.userId === ctx.userId || booking.startTime.getTime() <= nowMs) continue;
+      if (ctx.confirmedStepKeys.includes(reservationStepKey(booking.id))) continue;
+      // Sessions now keep running, the starter takes one more slot, and the bookings held at that start need theirs.
+      const heldThen = heldBookings({ confirmed, starterId: ctx.userId, inSession, at: booking.startTime, overridden });
+      if (sessions.length + 1 + heldThen.length > limit) return this.askReservedSoon(ctx, booking, now);
+    }
+    return ALLOW;
+  }
+
+  /** The "Reserved soon ... Start anyway?" question for an upcoming booking of someone else. */
+  private async askReservedSoon(ctx: PreStartContext, upcoming: ReservationRow, now: Date): Promise<PreStartResult> {
+    const nowMs = now.getTime();
     const { language: lang } = ctx;
     const minutes = Math.max(1, Math.ceil((upcoming.startTime.getTime() - nowMs) / MINUTE_MS));
     const from = await this.timeText(ctx, upcoming.startTime, now);
@@ -121,8 +176,23 @@ export class PreStartService {
     }
     if (!this.settings.getCachedSettings(ctx.resourceId).enabled) return null;
     const now = ctx.now ?? this.clock();
-    const active = (await this.store.findActiveForResource(ctx.resourceId, now)).find((r) => r.userId !== ctx.userId);
+    const running = await this.store.findActiveForResource(ctx.resourceId, now);
+    let active = running.find((r) => r.userId !== ctx.userId);
     if (!active) return null;
+    const limit = await this.directory.getSessionLimit(ctx.resourceId);
+    if (limit > 1) {
+      // Shared machine: blocked only when the slots held for others fill it (the viewer's own booking is their slot).
+      if (running.some((r) => r.userId === ctx.userId)) return null;
+      const sessions = await this.directory.getActiveSessions(ctx.resourceId);
+      const held = heldBookings({
+        confirmed: running,
+        starterId: ctx.userId,
+        inSession: new Set(sessions.map((session) => session.userId)),
+        at: now,
+      });
+      if (held.length === 0 || limit - sessions.length - held.length > 0) return null;
+      active = held[0];
+    }
     // The viewer's request scope (an API token's) applies to every check, as in core's own answers.
     const viewer = subjectOfPrincipal(ctx.principal);
     if (await this.access.isManager(viewer, ctx.resourceId)) return null;
@@ -134,10 +204,26 @@ export class PreStartService {
   }
 
   /**
+   * The `RESERVED` refusal for a start that finds every free slot held for `booking`'s holder: same text and
+   * holder-name rule as the gate's block, used by the host's atomic start check.
+   */
+  async reservedBlockReason(
+    ctx: { principal: PreStartContext['principal']; language: 'en' | 'de'; origin: PreStartOrigin },
+    booking: ReservationRow,
+    now: Date,
+  ): Promise<PluginBlockReason> {
+    const starter = subjectOfPrincipal(ctx.principal);
+    const until = await this.timeText(ctx, booking.endTime, now);
+    const found = await this.holderNameFor(starter, booking);
+    const holder = found && ctx.origin === 'reader' ? readerName(found) : found;
+    return reservedReason(ctx.language, until, holder);
+  }
+
+  /**
    * The booking holder's name for a viewer who may see who uses the machine (core's usage attribution rule, the
    * same one that decides who sees the current user of a running session); null for everyone else.
    */
-  private async holderNameFor(viewer: AccessSubject, booking: ReservationEntity): Promise<string | null> {
+  private async holderNameFor(viewer: AccessSubject, booking: ReservationRow): Promise<string | null> {
     if (!(await this.access.attributionResourceIds(viewer, [booking.resourceId])).has(booking.resourceId)) return null;
     return shorten((await this.directory.getUserNames([booking.userId])).get(booking.userId) ?? null);
   }
@@ -148,7 +234,7 @@ export class PreStartService {
    * reader. Starts are made by an identified user, so this is always "after the card tap". Web and API starts keep
    * the nameless ATT-881 question (no lookup).
    */
-  private async holderForReader(ctx: PreStartContext, booking: ReservationEntity): Promise<string | undefined> {
+  private async holderForReader(ctx: PreStartContext, booking: ReservationRow): Promise<string | undefined> {
     if (ctx.origin !== 'reader') return undefined;
     const name = (await this.access.isManager(subjectOfPrincipal(ctx.principal), ctx.resourceId))
       ? (await this.directory.getUserNames([booking.userId])).get(booking.userId)
@@ -157,18 +243,14 @@ export class PreStartService {
   }
 
   /** A time in a start text: readers follow the reader rule (weekday on another local day), web and API keep `HH:MM`. */
-  private async timeText(ctx: PreStartContext, date: Date, now: Date): Promise<string> {
+  private async timeText(ctx: Pick<PreStartContext, 'origin' | 'language'>, date: Date, now: Date): Promise<string> {
     const timeZone = await this.globalSettings.getTimezone();
     const { language: lang } = ctx;
     return ctx.origin === 'reader' ? readerTime(date, { lang, timeZone, now }) : formatTime(date, { lang, timeZone });
   }
 
   /** Block for non-managers; for managers the next unconfirmed override, or null when all are confirmed. */
-  private async whenActive(
-    ctx: PreStartContext,
-    active: ReservationEntity[],
-    now: Date,
-  ): Promise<PreStartResult | null> {
+  private async whenActive(ctx: PreStartContext, active: ReservationRow[], now: Date): Promise<PreStartResult | null> {
     const { language: lang } = ctx;
     // The starter's request scope applies: a token without `resources.update` gets no manager override.
     const starter = subjectOfPrincipal(ctx.principal);

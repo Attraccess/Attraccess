@@ -1,11 +1,10 @@
-import { AuditLog } from '@attraccess/database-entities';
 import { DualAuthGuard } from '@attraccess/plugins-backend-sdk';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { MatterConnectionService } from '../backend/connection/connection.service';
 import plugin from '../backend/plugin';
 import { FakeSidecar, TOKEN } from '../backend/testing/fake-sidecar.test-utils';
-import { ADMIN, auditRows, bootHost, type Host } from './host.test-utils';
+import { ADMIN, auditRows, bootHost, connectionRows, type Host } from './host.test-utils';
 
 async function until(predicate: () => boolean | Promise<boolean>, timeoutMs = 5_000) {
   const deadline = Date.now() + timeoutMs;
@@ -35,13 +34,19 @@ describe('Matter plugin composed with the host', () => {
     await api().get('/api/unrelated').expect(200);
   });
 
-  it('is admin-only: other users get 403 on every route', async () => {
-    const other = { 'x-test-permissions': 'resources.update' };
+  it('needs the Matter keys: other users get 403 on every route, read-only users only see the status', async () => {
+    const other = { 'x-test-permissions': 'resources.update,thread.network.read' };
     await api().get('/api/matter/connection').set(other).expect(403);
     await api().put('/api/matter/connection').set(other).send({}).expect(403);
     await api().delete('/api/matter/connection').set(other).expect(403);
     await api().get('/api/matter/connection/status').set(other).expect(403);
     await api().get('/api/matter/connection/status').expect(403);
+    const reader = { 'x-test-permissions': 'matter.devices.read' };
+    await api().get('/api/matter/connection/status').set(reader).expect(200);
+    await api().get('/api/matter/fabric').set(reader).expect(200);
+    await api().get('/api/matter/connection').set(reader).expect(403);
+    await api().put('/api/matter/connection').set(reader).send({}).expect(403);
+    await api().post('/api/matter/fabric/create').set(reader).send({}).expect(403);
   });
 
   it('stores the token encrypted, never returns it and audits the change without secrets', async () => {
@@ -53,18 +58,18 @@ describe('Matter plugin composed with the host', () => {
       .expect(200);
     expect(saved.body).toMatchObject({ url: fake.url, credentialConfigured: true, caCertificate: null });
     expect(JSON.stringify(saved.body)).not.toContain(TOKEN);
-    const rows = (await host.db.query('SELECT * FROM plugin_matter_connection')) as Record<string, unknown>[];
+    const rows = await connectionRows(host);
     expect(rows).toHaveLength(1);
     expect(JSON.stringify(rows)).not.toContain(TOKEN);
-    expect(rows[0]).toMatchObject({ id: 1, updated_by: 7 });
-    expect(host.context.secrets.decrypt(rows[0].encrypted_credential as string)).toBe(TOKEN);
+    expect(rows[0]).toMatchObject({ id: 1, updatedBy: 7 });
+    expect(host.context.secrets.decrypt(rows[0].encryptedCredential)).toBe(TOKEN);
 
     await until(async () => (await api().get('/api/matter/connection/status').set(ADMIN)).body.state === 'connected');
     const read = await api().get('/api/matter/connection').set(ADMIN).expect(200);
     expect(JSON.stringify(read.body)).not.toContain(TOKEN);
 
-    const audit = await auditRows(host.db);
-    expect(audit.map((row: AuditLog) => row.action)).toEqual(['matter.connection_saved']);
+    const audit = auditRows(host);
+    expect(audit.map((row) => row.action)).toEqual(['matter.connection_saved']);
     expect(JSON.stringify(audit)).not.toMatch(new RegExp(`${TOKEN}|127\\.0\\.0\\.1|Bearer`));
     expect(JSON.stringify(audit)).toContain('credentialChanged');
   });
@@ -88,11 +93,8 @@ describe('Matter plugin composed with the host', () => {
     await api().put('/api/matter/connection').set(ADMIN).send({ url: fake.url, credential: TOKEN }).expect(200);
     await api().delete('/api/matter/connection').set(ADMIN).expect(204);
     expect((await api().get('/api/matter/connection/status').set(ADMIN)).body.state).toBe('not_configured');
-    expect(await host.db.query('SELECT * FROM plugin_matter_connection')).toHaveLength(0);
-    expect((await auditRows(host.db)).map((row: AuditLog) => row.action)).toEqual([
-      'matter.connection_saved',
-      'matter.connection_removed',
-    ]);
+    expect(await connectionRows(host)).toHaveLength(0);
+    expect(auditRows(host).map((row) => row.action)).toEqual(['matter.connection_saved', 'matter.connection_removed']);
   });
 
   it('degrades, instead of crashing, on a host that cannot report its version', async () => {

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { Resource, User } from '@attraccess/database-entities';
+import type { UsageSessionResource, UsageSessionUser, UsageSessionUserRecord } from '@attraccess/application-models';
 import { ResourceUsageSessionEndedEvent, ResourceUsageSessionTakenOverEvent } from '../events/resource-usage.events';
 import { ResourceSessionNotificationListener } from './session.listener';
 import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
@@ -26,12 +26,12 @@ describe('ResourceSessionNotificationListener', () => {
   });
 
   it('notifies the previous user when their resource session is taken over', async () => {
-    const bob = { id: 2, username: 'bob', locale: 'en' } as User;
+    const bob = { id: 2, username: 'bob', locale: 'en' } as UsageSessionUserRecord;
     await listener.handleTakenOver(
       new ResourceUsageSessionTakenOverEvent(
-        { id: 4, name: 'Laser cutter' } as Resource,
+        { id: 4, name: 'Laser cutter' } as unknown as UsageSessionResource,
         new Date('2026-01-01T12:00:00.000Z'),
-        { id: 1, username: 'alice' } as User,
+        { id: 1, username: 'alice' } as UsageSessionUser,
         bob,
       ),
     );
@@ -55,15 +55,15 @@ describe('ResourceSessionNotificationListener', () => {
   it('sends resource takeover email through the notification dispatcher callback', async () => {
     await listener.handleTakenOver(
       new ResourceUsageSessionTakenOverEvent(
-        { id: 4, name: 'Laser cutter' } as Resource,
+        { id: 4, name: 'Laser cutter' } as unknown as UsageSessionResource,
         new Date('2026-01-01T12:00:00.000Z'),
-        { id: 1, username: 'alice' } as User,
-        { id: 2, username: 'bob' } as User,
+        { id: 1, username: 'alice' } as UsageSessionUser,
+        { id: 2, username: 'bob' } as UsageSessionUserRecord,
       ),
     );
 
     const dispatchRequest = notifications.dispatch.mock.calls[0][0];
-    await dispatchRequest.sendEmail({ id: 2, email: 'bob@example.com' } as User);
+    await dispatchRequest.sendEmail({ id: 2, email: 'bob@example.com' } as UsageSessionUser);
 
     expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(
       expect.objectContaining({ id: 2 }),
@@ -76,9 +76,9 @@ describe('ResourceSessionNotificationListener', () => {
   });
 
   it('notifies the session owner when another actor ends their resource session', async () => {
-    const owner = { id: 2, username: 'bob', email: 'bob@example.com', locale: 'en' } as User;
-    const actor = { id: 1, username: 'alice' } as User;
-    const resource = { id: 4, name: 'Laser cutter' } as Resource;
+    const owner = { id: 2, username: 'bob', email: 'bob@example.com', locale: 'en' } as UsageSessionUser;
+    const actor = { id: 1, username: 'alice' } as UsageSessionUser;
+    const resource = { id: 4, name: 'Laser cutter' } as unknown as UsageSessionResource;
 
     await listener.handleSessionEnded(
       new ResourceUsageSessionEndedEvent(
@@ -117,8 +117,8 @@ describe('ResourceSessionNotificationListener', () => {
   });
 
   it('does not notify when the user ends their own session', async () => {
-    const owner = { id: 2, username: 'bob', email: 'bob@example.com' } as User;
-    const resource = { id: 4, name: 'Laser cutter' } as Resource;
+    const owner = { id: 2, username: 'bob', email: 'bob@example.com' } as UsageSessionUser;
+    const resource = { id: 4, name: 'Laser cutter' } as unknown as UsageSessionResource;
 
     await listener.handleSessionEnded(
       new ResourceUsageSessionEndedEvent(
@@ -138,8 +138,8 @@ describe('ResourceSessionNotificationListener', () => {
   });
 
   it('notifies when the system (null endedBy) ends the session', async () => {
-    const owner = { id: 2, username: 'bob', email: 'bob@example.com', locale: 'en' } as User;
-    const resource = { id: 4, name: 'Laser cutter' } as Resource;
+    const owner = { id: 2, username: 'bob', email: 'bob@example.com', locale: 'en' } as UsageSessionUser;
+    const resource = { id: 4, name: 'Laser cutter' } as unknown as UsageSessionResource;
 
     await listener.handleSessionEnded(
       new ResourceUsageSessionEndedEvent(

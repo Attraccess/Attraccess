@@ -4,6 +4,7 @@ import { ResourceActionGuard } from './handlers/resource-action.guard';
 import { AttractapEventType, AttractapEvent } from './websocket.types';
 import { FlowExecutionError } from '../../resources/flows/errors/flow-execution.error';
 import { BadRequestException } from '@nestjs/common';
+import { ResourceType } from '@attraccess/application-models';
 
 describe('AttractapSessionHandler – door action error propagation', () => {
   let handler: AttractapSessionHandler;
@@ -21,7 +22,11 @@ describe('AttractapSessionHandler – door action error propagation', () => {
   let mockAttractapService: { findReaderById: jest.Mock; getResourcesForReader: jest.Mock };
 
   const mockUser = { id: 1, username: 'testuser' };
-  const mockReader = { id: 42, resources: [{ id: 10 }] };
+  // A door with separate unlatching, so the reader capability check lets every door action through.
+  const mockReader = {
+    id: 42,
+    resources: [{ id: 10, type: ResourceType.Door, separateUnlockAndUnlatch: true, accessOnly: false }],
+  };
 
   beforeEach(() => {
     handler = Object.create(AttractapSessionHandler.prototype);

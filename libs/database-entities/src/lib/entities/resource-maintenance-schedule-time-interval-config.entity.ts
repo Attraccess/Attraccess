@@ -1,13 +1,7 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  OneToOne,
-  JoinColumn,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { ResourceMaintenanceSchedule } from './resource-maintenance-schedule.entity';
-import { UsageDurationUnit } from '../types/usageDurationUnit.enum';
+import { UsageDurationUnit } from '@attraccess/application-models';
 
 /**
  * Config for TIME_INTERVAL trigger. Uses duration + unit (same as USAGE_HOURS).

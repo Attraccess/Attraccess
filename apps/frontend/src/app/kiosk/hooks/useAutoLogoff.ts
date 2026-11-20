@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useAuthenticationServiceEndSession } from '@attraccess/react-query-client';
+import { useEndSession } from '@attraccess/react-query-client';
 
 const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'wheel', 'touchstart'] as const;
 const WARNING_THRESHOLD_SECONDS = 60;
@@ -14,7 +14,7 @@ export function useAutoLogoff(seconds: number | null): AutoLogoffState {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const remainingRef = useRef<number | null>(seconds);
 
-  const { mutate: endSession } = useAuthenticationServiceEndSession({
+  const { mutate: endSession } = useEndSession(undefined, {
     onSettled: () => window.location.reload(),
   });
 

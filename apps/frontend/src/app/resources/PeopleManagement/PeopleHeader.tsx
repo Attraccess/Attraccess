@@ -1,9 +1,10 @@
 import { AwardIcon, ShieldCheckIcon, WrenchIcon } from 'lucide-react';
-import { PageAction, PageHeader, TFunction } from '@attraccess/plugins-frontend-ui';
+import { PageAction, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AddMode, PeopleTarget } from './types';
+import en from './en.json';
+import de from './de.json';
 
 interface PeopleHeaderProps {
-  t: TFunction;
   targetType: PeopleTarget['type'];
   canManageIntroducers: boolean;
   canManageIntroductions: boolean;
@@ -11,7 +12,8 @@ interface PeopleHeaderProps {
 }
 
 export function PeopleHeader(props: Readonly<PeopleHeaderProps>) {
-  const { t, targetType, canManageIntroducers, canManageIntroductions, onAdd } = props;
+  const { targetType, canManageIntroducers, canManageIntroductions, onAdd } = props;
+  const { t } = useTranslations({ en, de });
   const subtitle = t(`subtitle.${targetType}`);
 
   const canAdd = canManageIntroducers || canManageIntroductions;

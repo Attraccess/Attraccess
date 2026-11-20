@@ -1,16 +1,10 @@
-import { Resource } from '@attraccess/database-entities';
-
 import { Inject, Injectable } from '@nestjs/common';
-
-import { InjectRepository } from '@nestjs/typeorm';
 
 import { Redis } from 'ioredis';
 
-import { Repository } from 'typeorm';
-
 import { VALKEY_CLIENT } from '../../../valkey/valkey.module';
 
-import { sessionLimitOf } from './active-usage';
+import { USAGE_SESSION_STORE, UsageSessionStore } from '../usage-session-store.port';
 
 import {
   LocalSessionChangeCoordination,
@@ -31,8 +25,7 @@ export class SessionChangeTurns {
   private sessionChangeCoordinationInstance: SessionChangeCoordination | undefined;
 
   constructor(
-    @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
+    @Inject(USAGE_SESSION_STORE) private readonly sessions: UsageSessionStore,
     @Inject(VALKEY_CLIENT) private readonly valkeyClient: Redis | null,
   ) {}
 
@@ -51,17 +44,14 @@ export class SessionChangeTurns {
 
   /**
    * On a machine shared by several people, changes run one at a time so the counts flows see stay consistent.
-   * A limit of 1 keeps its immediate conflict.
+   * This includes a machine whose limit was lowered to 1 while several sessions still run: their stops close shared
+   * meter segments, which must not interleave. A limit of 1 otherwise keeps its immediate conflict.
    */
   async take<T>(resourceId: number, change: () => Promise<T>, withinSessionChange = false): Promise<T> {
     if (withinSessionChange) return change();
-    const limit = sessionLimitOf(
-      await this.resourceRepository.findOne({
-        where: { id: resourceId },
-        select: { id: true, type: true, maxParallelSessions: true },
-      }),
-    );
-    return limit > 1
+    const limit = await this.sessions.findSessionLimit(resourceId);
+    const shared = limit > 1 || (await this.sessions.countActiveSessions(resourceId)) > 1;
+    return shared
       ? this.sessionChangeQueue.run(resourceId, change, this.sessionChangeWaitMs, this.coordination)
       : this.sessionChangeQueue.runAlongside(resourceId, change);
   }

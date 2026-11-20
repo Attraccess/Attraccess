@@ -43,11 +43,12 @@ A reader cannot register itself. It shows a rotating code and an admin approves 
 3. Optionally enter a name (for example "Laser Cutter Reader") and click **Approve**.
 
 The reader connects and is ready. See [Reader Pairing](attractap/pairing.md) for details, the Lite
-LED pattern, security notes and what to do with readers that were registered before.
+LED pattern, security notes and what to do after the upgrade to firmware 2.6.0, when every reader pairs again.
 
 > [!NOTE]
-> You need the `resources.update` permission to approve a reader. Readers running firmware older
-> than 1.8.0 cannot pair a new reader; update them with the web flasher first.
+> You need the `resources.update` permission to approve a reader. A reader that signs in with a token
+> (any firmware older than 1.8.0, and a reader on 1.8.0 to 2.5.x that was never paired) cannot pair and
+> cannot update over the air; flash it to firmware 2.6.0 with the web flasher (USB) first.
 
 ## Step 3: Assign Resources to the Reader
 
@@ -62,6 +63,12 @@ After pairing the reader, you need to assign which resource(s) it controls:
 > A single reader can be assigned to one resource. If you need to control multiple machines, set up a separate reader for each one.
 
 <!-- TODO: Screenshot of assigning a resource to a reader -->
+
+### Optional: Allow plugins to use Bluetooth
+
+On the **General** tab of the reader editor, the switch **Allow plugins to use Bluetooth** is off by default. When this is on, plugins with the `BLE_TRANSPORT` permission can scan for nearby Bluetooth devices of the kinds they support and connect to the devices they have set up. Turning it off immediately ends their Bluetooth connections through this reader. Plugins can only use the Bluetooth profiles they registered themselves; see [Bluetooth Transport for Plugins](plugins/ble-transport.md).
+
+Plugin Bluetooth needs a paired reader (step 2) running firmware **2.5.0 or later**. Update older readers over the air (OTA) from the server; see [Firmware Updates](attractap/firmware-updates.md). On older firmware the switch has no effect and plugins get `READER_UNSUPPORTED`; on a reader that is not paired they get `READER_OFFLINE`. A reader runs one Bluetooth connection at a time: while one plugin uses it, other plugins are refused with `READER_BUSY` and try again later. Card login and the rest of the reader keep working during Bluetooth use.
 
 ## Step 4: Test the Setup
 
@@ -89,7 +96,7 @@ The reader communicates with the Attraccess backend via WebSocket. The connectio
 | Reader display shows "No connection" | Check network connectivity and verify the Attraccess server URL |
 | Reader not appearing in Attraccess | Ensure the reader is on the same network and can reach the backend. A reverse proxy must pass the `Sec-WebSocket-Protocol` header |
 | Code is rejected | The code changes every 30 seconds; enter the one currently shown. If a correctly read code keeps failing, check your network |
-| Settings of a reader are locked | The reader is not paired yet; use **Pair** on its row |
+| Reader list is empty after a server update | The release that removes token sign-in (Attractap firmware 2.6.0) deletes every reader record. Pair each reader again, see [After the upgrade](attractap/pairing.md#after-the-upgrade-every-reader-pairs-again) |
 | Card scan has no response | Verify the RFID card is registered and the reader has an assigned resource |
 
 ## See Also

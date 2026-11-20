@@ -1,20 +1,20 @@
-import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import type { EntityManager } from 'typeorm';
 import { SidecarClientError } from '../client/errors';
 import type { SidecarConnection } from '../client/connection';
 import { MatterConnectionService } from '../connection/connection.service';
 import { MatterFabricGuard } from '../fabric/guard';
 import { PLUGIN_CONTEXT } from '../plugin-context';
-import { DeviceAuditService, type AuditActor, type DeviceAuditSubject } from './audit.service';
+import { matterStorage, type MatterTables } from '../plugin-storage/access';
+import { DeviceAuditService, type AuditActor, type AuditBy, type DeviceAuditSubject } from './audit.service';
 import { pruneCommands } from './commands';
 import {
-  MatterFabric,
-  MatterNode,
-  MatterReconciliationStatus,
   RECONCILIATION_ROW_ID,
   type DetachedReason,
+  type MatterFabric,
+  type MatterNode,
+  type MatterReconciliationStatus,
   type ReconciliationResult,
 } from './entities';
 import type { NodeListView } from './sidecar-types';
@@ -77,7 +77,7 @@ export class MatterReconciliationService {
   private current: Promise<ReconciliationStatusView> | undefined;
   private queued: Promise<ReconciliationStatusView> | undefined;
   /** The administrator of the newest manual trigger that joined the queued run; null when only automatic ones did. */
-  private queuedPrincipal: PluginAuditPrincipal | null = null;
+  private queuedPrincipal: AuditBy = null;
   /** Whether a trigger that joined the queued run allowed it to run in recovery. */
   private queuedAllowInRecovery = false;
 
@@ -93,25 +93,21 @@ export class MatterReconciliationService {
   }
 
   async status(): Promise<ReconciliationStatusView> {
-    const row = await this.context.getRepository(MatterReconciliationStatus).findOneBy({ id: RECONCILIATION_ROW_ID });
-    return viewOf(row);
+    return viewOf(await matterStorage(this.context).tables.reconciliationStatus.get(RECONCILIATION_ROW_ID));
   }
 
   /**
    * Starts a run. A trigger that arrives during a run does not start a second one in parallel: all of them coalesce
    * into one follow-up run that starts when the current one ends.
    */
-  request(
-    principal: PluginAuditPrincipal | null = null,
-    options: ReconciliationOptions = {},
-  ): Promise<ReconciliationStatusView> {
+  request(by: AuditBy = null, options: ReconciliationOptions = {}): Promise<ReconciliationStatusView> {
     if (!this.current) {
-      this.current = this.execute(principal, options).finally(() => {
+      this.current = this.execute(by, options).finally(() => {
         this.current = undefined;
       });
       return this.current;
     }
-    if (principal) this.queuedPrincipal = principal;
+    if (by) this.queuedPrincipal = by;
     // The run a recovery choice asked for must not lose its permission by joining the queue.
     if (options.allowInRecovery) this.queuedAllowInRecovery = true;
     this.queued ??= this.current
@@ -127,10 +123,7 @@ export class MatterReconciliationService {
     return this.queued;
   }
 
-  private async execute(
-    principal: PluginAuditPrincipal | null,
-    options: ReconciliationOptions,
-  ): Promise<ReconciliationStatusView> {
+  private async execute(by: AuditBy, options: ReconciliationOptions): Promise<ReconciliationStatusView> {
     const startedAt = new Date().toISOString();
     let result: ReconciliationResult;
     let summary: ReconciliationSummary = emptySummary();
@@ -147,26 +140,27 @@ export class MatterReconciliationService {
       this.context.logger.warn?.('Matter reconciliation failed.');
       audits.length = 0;
     }
-    await this.context.runSerialized(async (manager) => {
-      const repo = manager.getRepository(MatterReconciliationStatus);
-      const previous = await repo.findOneBy({ id: RECONCILIATION_ROW_ID });
-      await repo.save({
-        id: RECONCILIATION_ROW_ID,
-        lastStartedAt: startedAt,
-        lastFinishedAt: new Date().toISOString(),
-        lastResult: result,
-        lastSummary: JSON.stringify(summary),
-        // A skipped run did not learn the fabric: keep what the last applied run saw.
-        sidecarFabricId: result === 'applied' ? fabricId : (previous?.sidecarFabricId ?? null),
-      });
+    await matterStorage(this.context).transaction(async ({ reconciliationStatus }) => {
+      const previous = await reconciliationStatus.get(RECONCILIATION_ROW_ID);
+      await reconciliationStatus.upsert(
+        {
+          id: RECONCILIATION_ROW_ID,
+          lastStartedAt: startedAt,
+          lastFinishedAt: new Date().toISOString(),
+          lastResult: result,
+          lastSummary: JSON.stringify(summary),
+          // A skipped run did not learn the fabric: keep what the last applied run saw.
+          sidecarFabricId: result === 'applied' ? fabricId : (previous?.sidecarFabricId ?? null),
+        },
+        { conflictOn: ['id'] },
+      );
     });
     // After the commit and never inside it: the audit store is a separate database.
-    const actor: AuditActor | null = audits.length > 0 ? await this.audit.actorFor(principal) : null;
-    if (actor) {
-      const initiator = actor.system ? 'system' : 'administrator';
-      for (const entry of audits) {
-        await this.audit.record(entry.action, actor, entry.subject, { ...entry.details, initiator });
-      }
+    // One operation ID for the run's entries; an automatic run is recorded as the system, never as a user.
+    const actor: AuditActor = this.audit.actorOf(by);
+    const initiator = actor.system ? 'system' : 'administrator';
+    for (const entry of audits) {
+      await this.audit.record(entry.action, actor, entry.subject, { ...entry.details, initiator });
     }
     return this.status();
   }
@@ -202,14 +196,14 @@ export class MatterReconciliationService {
 
     const summary = emptySummary();
     summary.nodesListed = list.nodes.length;
-    const blocked = await this.context.runSerialized(async (manager) => {
+    const blocked = await matterStorage(this.context).transaction(async (tables) => {
       // A restore ran (or is running) since the inventory was read: it replaced the tables this list was meant for.
       // Recovery may also have been entered meanwhile.
       const reason = this.guard.epoch !== epoch ? 'restore_in_progress' : this.blocked(allowInRecovery);
       if (reason) return reason;
       const now = new Date();
-      await this.apply(manager, list, summary, audits, now.toISOString());
-      await pruneCommands(manager, now);
+      await this.apply(tables, list, summary, audits, now.toISOString());
+      await pruneCommands(tables, now);
       return null;
     });
     if (blocked) return skipped(blocked);
@@ -225,19 +219,15 @@ export class MatterReconciliationService {
   }
 
   private async apply(
-    manager: EntityManager,
+    tables: MatterTables,
     list: NodeListView,
     summary: ReconciliationSummary,
     audits: PendingAudit[],
     now: string,
   ): Promise<void> {
     const { changes: counters, observed } = summary;
-    const fabrics = manager.getRepository(MatterFabric);
-    const nodes = manager.getRepository(MatterNode);
-    const activeFabrics = await fabrics
-      .createQueryBuilder('f')
-      .where(`f.status = 'active' AND f.retiredAt IS NULL`)
-      .getMany();
+    const { fabrics, nodes } = tables;
+    const activeFabrics = await fabrics.find({ where: { status: 'active', retiredAt: null } });
 
     const fabricIdOf = new Map<string, string>();
     const detach = async (node: MatterNode, reason: DetachedReason) => {
@@ -256,7 +246,7 @@ export class MatterReconciliationService {
         details: { nodeRef: node.id, fabricId: fabricIdOf.get(node.fabricRef) ?? '0', nodeId: node.nodeId, reason },
       });
     };
-    const liveOf = async (fabricRef: string) => findLive(manager, MatterNode, 'fabricRef', fabricRef);
+    const liveOf = async (fabricRef: string) => findLive(nodes, 'fabricRef', fabricRef);
     const detachableIn = async (fabricRef: string) =>
       (await liveOf(fabricRef)).filter((n) => n.lifecycleState === 'claimed' || n.lifecycleState === 'unclaimed');
 
@@ -273,12 +263,9 @@ export class MatterReconciliationService {
       return;
     }
 
-    let fabric = await fabrics
-      .createQueryBuilder('f')
-      .where('f.fabricId = :id AND f.retiredAt IS NULL', { id: list.fabricId })
-      .getOne();
+    let fabric = await fabrics.findOne({ where: { fabricId: list.fabricId, retiredAt: null } });
     if (!fabric) {
-      fabric = fabrics.create({
+      fabric = {
         id: randomUUID(),
         fabricId: list.fabricId,
         label: null,
@@ -286,7 +273,11 @@ export class MatterReconciliationService {
         lastSeenAt: now,
         status: 'active',
         retiredAt: null,
-      });
+        fabricGeneration: null,
+        storageInstanceId: null,
+        rootCertFingerprint: null,
+        recordedAt: null,
+      };
       await fabrics.insert(fabric);
       fabricIdOf.set(fabric.id, fabric.fabricId);
       counters.fabricsChanged += 1;
@@ -310,16 +301,19 @@ export class MatterReconciliationService {
     }
     // A wiped sidecar first comes up without a fabric (nodes detached with `fabric_absent`) and only then with a new
     // one. That is the same restore mismatch: those nodes must not come back by themselves if their fabric returns.
-    const absentSince = await nodes
-      .createQueryBuilder('n')
-      .where(`n.fabricRef != :fabric AND n.removedAt IS NULL`, { fabric: fabric.id })
-      .andWhere(`n.lifecycleState = 'detached' AND n.detachedReason = 'fabric_absent'`)
-      .getMany();
+    const absentSince = await nodes.find({
+      where: {
+        fabricRef: { ne: fabric.id },
+        removedAt: null,
+        lifecycleState: 'detached',
+        detachedReason: 'fabric_absent',
+      },
+    });
     const byFabric = new Map<string, MatterNode[]>();
     for (const node of absentSince) byFabric.set(node.fabricRef, [...(byFabric.get(node.fabricRef) ?? []), node]);
     for (const [fabricRef, stranded] of byFabric) {
       for (const node of stranded) await detach(node, 'fabric_mismatch');
-      const other = await fabrics.findOneBy({ id: fabricRef });
+      const other = await fabrics.get(fabricRef);
       if (other) mismatches.push({ fabric: other, detached: stranded.length });
     }
 
@@ -333,7 +327,7 @@ export class MatterReconciliationService {
       listed.add(view.nodeId);
       const node = byNodeId.get(view.nodeId);
       if (!node) {
-        const created: MatterNode = nodes.create({
+        const created: MatterNode = {
           id: randomUUID(),
           fabricRef: fabric.id,
           nodeId: view.nodeId,
@@ -355,9 +349,9 @@ export class MatterReconciliationService {
           createdAt: now,
           updatedAt: now,
           ...identityOf(view, now),
-        });
+        };
         await nodes.insert(created);
-        await syncNode(manager, created, view, now, counters);
+        await syncNode(tables, created, view, now, counters);
         counters.nodesQuarantined += 1;
         quarantined += 1;
         audits.push({
@@ -393,7 +387,7 @@ export class MatterReconciliationService {
           details: { nodeRef: node.id, fabricId: fabric.fabricId, nodeId: node.nodeId, resultingState },
         });
       }
-      await syncNode(manager, node, view, now, counters);
+      await syncNode(tables, node, view, now, counters);
     }
 
     for (const node of live) {

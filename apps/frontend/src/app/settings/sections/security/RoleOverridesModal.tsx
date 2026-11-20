@@ -1,4 +1,4 @@
-import { Button, LabeledSwitch, StandardModal } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ModalBody,
   ModalFooter,
@@ -13,9 +13,9 @@ import {
 import {
   PasswordPolicyDto,
   UpsertPasswordPolicyOverrideDto,
-  UsePasswordPolicyAdminServiceListPasswordPolicyOverridesKeyFn,
-  usePasswordPolicyAdminServiceDeletePasswordPolicyOverride,
-  usePasswordPolicyAdminServiceUpsertPasswordPolicyOverride,
+  UseListPasswordPolicyOverridesKeyFn,
+  useDeletePasswordPolicyOverride,
+  useUpsertPasswordPolicyOverride,
   PasswordPolicyOverrideDto,
   PasswordPolicyRole,
 } from '@attraccess/react-query-client';
@@ -24,23 +24,34 @@ import { POLICY_BOOL_FIELDS, POLICY_NUMBER_FIELDS, POLICY_FIELD_KEYS } from './p
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastMessage } from '../../../../components/toastProvider';
+import en from './en.json';
+import de from './de.json';
 
-export /** `null` is a real value here — "inherit" — so an untouched field is `undefined`, not `null`. */
+/** `null` is a real value here — "inherit" — so an untouched field is `undefined`, not `null`. */
 type OverrideDraft = Partial<Record<string, number | boolean | null>>;
 
-export type OverrideKey = keyof PasswordPolicyOverrideDto;
+type OverrideKey = keyof PasswordPolicyOverrideDto;
 
-export type Translate = (key: string, vars?: Record<string, string | number>) => string;
-
-export interface Props {
+interface RoleOverridesModalProps {
   role: PasswordPolicyRole | null;
   existing: PasswordPolicyOverrideDto | undefined;
   globalPolicy: PasswordPolicyDto;
-  t: Translate;
   onClose: () => void;
 }
 
-export function useRoleOverridesModalState({ role, existing, globalPolicy, t, onClose }: Props) {
+/**
+ * Per-role password overrides, kept as a modal rather than inlined into the section.
+ *
+ * An override is a *sparse* delta: twelve fields that are each either inherited or overridden, so
+ * inlining it means twenty-four controls that are empty on a default instance, sitting permanently
+ * above the fold of the section they are an exception to. The row in the section carries the state
+ * that matters — inherits, or N fields overridden — and the editor opens on demand.
+ *
+ * It also targets a different resource (one role's override, not the instance's settings), so it
+ * commits on its own rather than through the section's save bar.
+ */
+export function RoleOverridesModal({ role, existing, globalPolicy, onClose }: RoleOverridesModalProps) {
+  const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   // Derived, like every other draft in this section. Seeding a full copy from `existing` meant the
@@ -70,27 +81,26 @@ export function useRoleOverridesModalState({ role, existing, globalPolicy, t, on
     return value === null || Number.isInteger(value);
   });
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: UsePasswordPolicyAdminServiceListPasswordPolicyOverridesKeyFn() });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: UseListPasswordPolicyOverridesKeyFn() });
 
-  const { mutate: upsert, isPending: isUpserting } = usePasswordPolicyAdminServiceUpsertPasswordPolicyOverride({
+  const { mutate: upsert, isPending: isUpserting } = useUpsertPasswordPolicyOverride(undefined, {
     onSuccess: (_data, vars) => {
       invalidate();
       toast.success({
         title: t('overrides.saved.title'),
-        description: t('overrides.saved.description', { role: t(`overrides.roles.${vars.role}`) }),
+        description: t('overrides.saved.description', { role: t(`overrides.roles.${vars.path.role}`) }),
       });
       onClose();
     },
     onError: () => toast.error({ title: t('errorToast.title'), description: t('errorToast.description') }),
   });
 
-  const { mutate: remove, isPending: isRemoving } = usePasswordPolicyAdminServiceDeletePasswordPolicyOverride({
+  const { mutate: remove, isPending: isRemoving } = useDeletePasswordPolicyOverride(undefined, {
     onSuccess: (_data, vars) => {
       invalidate();
       toast.success({
         title: t('overrides.removed.title'),
-        description: t('overrides.removed.description', { role: t(`overrides.roles.${vars.role}`) }),
+        description: t('overrides.removed.description', { role: t(`overrides.roles.${vars.path.role}`) }),
       });
       onClose();
     },
@@ -107,7 +117,7 @@ export function useRoleOverridesModalState({ role, existing, globalPolicy, t, on
     // state, and storing an all-null row would be a lie about intent.
     if (isAllInherit) {
       if (existing) {
-        remove({ role });
+        remove({ path: { role } });
       } else {
         onClose();
       }
@@ -118,30 +128,8 @@ export function useRoleOverridesModalState({ role, existing, globalPolicy, t, on
     POLICY_FIELD_KEYS.forEach((key) => {
       (requestBody as Record<string, unknown>)[key as string] = valueOf(key as OverrideKey);
     });
-    upsert({ role, requestBody });
+    upsert({ path: { role }, body: requestBody });
   };
-  return { valueOf, setValue, isSavable, isSaving, handleSave, role, globalPolicy, t, onClose } as const;
-}
-
-/**
- * Per-role password overrides, kept as a modal rather than inlined into the section.
- *
- * An override is a *sparse* delta: twelve fields that are each either inherited or overridden, so
- * inlining it means twenty-four controls that are empty on a default instance, sitting permanently
- * above the fold of the section they are an exception to. The row in the section carries the state
- * that matters — inherits, or N fields overridden — and the editor opens on demand.
- *
- * It also targets a different resource (one role's override, not the instance's settings), so it
- * commits on its own rather than through the section's save bar.
- */
-export function RoleOverridesModal({ role, existing, globalPolicy, t, onClose }: Props) {
-  const { valueOf, setValue, isSavable, isSaving, handleSave } = useRoleOverridesModalState({
-    role,
-    existing,
-    globalPolicy,
-    t,
-    onClose,
-  });
 
   return (
     <StandardModal isOpen={role !== null} onOpenChange={(open) => !open && onClose()} size="lg">

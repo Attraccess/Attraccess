@@ -2,7 +2,6 @@ import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-ba
 import { Inject, Injectable } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import { Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK } from '../constants';
-import { IcalFeedEntity } from '../entities/ical-feed.entity';
 import { HostInfoService } from '../notifications/host-info.service';
 import { pick } from '../notifications/format';
 import { AccessService } from '../reservations/access.service';
@@ -13,6 +12,8 @@ import { ReservationAudit } from '../reservations/audit';
 import { ReservationStore } from '../reservations/reservation.store';
 import { GlobalSettingsService } from '../settings/global-settings.service';
 import { ResourceSettingsService } from '../settings/resource-settings.service';
+import { tablesOf } from '../storage';
+import type { IcalFeedRow } from '../storage/ical-feed-table';
 import { IcalEvent, buildCalendar } from './ical-format';
 import type { IcalFeedDto, IcalFeedSecretDto, IcalSelectionDto } from './ical.dto';
 import { VisibilityService } from './visibility.service';
@@ -76,16 +77,17 @@ export class IcalService {
     this.audit = new ReservationAudit(context.audit);
   }
 
-  private get repo() {
-    return this.context.getRepository(IcalFeedEntity);
+  private get feeds() {
+    return tablesOf(this.context).icalFeeds;
   }
 
-  /** Writes go through the host's serialized queue so concurrent requests never hit SQLITE_BUSY. */
-  private save(feed: IcalFeedEntity): Promise<IcalFeedEntity> {
-    return this.context.runSerialized((manager) => manager.getRepository(IcalFeedEntity).save(feed));
+  /** Applies a patch to a feed and returns the stored row. The host serializes writes. */
+  private async patch(feed: IcalFeedRow, changes: Partial<IcalFeedRow>): Promise<IcalFeedRow> {
+    await this.feeds.update({ id: feed.id }, changes);
+    return { ...feed, ...changes };
   }
 
-  private toDto(feed: IcalFeedEntity): IcalFeedDto {
+  private toDto(feed: IcalFeedRow): IcalFeedDto {
     return {
       id: feed.id,
       name: feed.name,
@@ -96,23 +98,22 @@ export class IcalService {
     };
   }
 
-  private async secretResult(feed: IcalFeedEntity, token: string): Promise<IcalFeedSecretDto> {
+  private async secretResult(feed: IcalFeedRow, token: string): Promise<IcalFeedSecretDto> {
     const base = (await this.hostInfo.getBaseUrl()) ?? '';
     return { feed: this.toDto(feed), url: `${base}/api/reservations/ical/${token}.ics`, token };
   }
 
-  private async load(userId: number, id: number): Promise<IcalFeedEntity> {
-    const feed = await this.repo.findOneBy({ id, userId });
+  private async load(userId: number, id: number): Promise<IcalFeedRow> {
+    const feed = await this.feeds.findOne({ where: { id, userId } });
     if (!feed || feed.revokedAt) throw new ReservationError('FEED_NOT_FOUND', 'Feed not found');
     return feed;
   }
 
   async list(userId: number): Promise<IcalFeedDto[]> {
-    const feeds = await this.repo
-      .createQueryBuilder('f')
-      .where('f.userId = :userId AND f.revokedAt IS NULL', { userId })
-      .orderBy('f.createdAt', 'ASC')
-      .getMany();
+    const feeds = await this.feeds.find({
+      where: { userId, revokedAt: null },
+      orderBy: [{ field: 'createdAt', direction: 'asc' }],
+    });
     return feeds.map((feed) => this.toDto(feed));
   }
 
@@ -121,26 +122,21 @@ export class IcalService {
     input: { name: string; selection: IcalSelectionDto },
   ): Promise<IcalFeedSecretDto> {
     const selection = assertSelection(input.selection);
-    const count = await this.repo
-      .createQueryBuilder('f')
-      .where('f.userId = :userId AND f.revokedAt IS NULL', { userId: actor.userId })
-      .getCount();
+    const count = await this.feeds.count({ userId: actor.userId, revokedAt: null });
     if (count >= MAX_FEEDS_PER_USER) {
       throw new ReservationError('FEED_LIMIT', `You can have at most ${MAX_FEEDS_PER_USER} calendar feeds`);
     }
     const token = randomBytes(32).toString('base64url');
-    const feed = await this.save(
-      Object.assign(new IcalFeedEntity(), {
-        userId: actor.userId,
-        name: input.name.trim(),
-        tokenHash: hashToken(token),
-        tokenPrefix: token.slice(0, TOKEN_PREFIX_LENGTH),
-        selection: JSON.stringify(selection),
-        createdAt: this.clock(),
-        revokedAt: null,
-        lastUsedAt: null,
-      }),
-    );
+    const feed = await this.feeds.insert({
+      userId: actor.userId,
+      name: input.name.trim(),
+      tokenHash: hashToken(token),
+      tokenPrefix: token.slice(0, TOKEN_PREFIX_LENGTH),
+      selection: JSON.stringify(selection),
+      createdAt: this.clock(),
+      revokedAt: null,
+      lastUsedAt: null,
+    });
     await this.audit.record('feed_created', actor, { type: 'feed', id: feed.id }, { feedName: feed.name });
     return this.secretResult(feed, token);
   }
@@ -151,25 +147,27 @@ export class IcalService {
     input: { name?: string; selection?: IcalSelectionDto },
   ): Promise<IcalFeedDto> {
     const feed = await this.load(actor.userId, id);
-    if (input.name !== undefined) feed.name = input.name.trim();
-    if (input.selection !== undefined) feed.selection = JSON.stringify(assertSelection(input.selection));
-    return this.toDto(await this.save(feed));
+    const changes: Partial<IcalFeedRow> = {};
+    if (input.name !== undefined) changes.name = input.name.trim();
+    if (input.selection !== undefined) changes.selection = JSON.stringify(assertSelection(input.selection));
+    return this.toDto(await this.patch(feed, changes));
   }
 
   /** New token; the old one stops working immediately (its hash is overwritten). */
   async regenerate(actor: PluginAuditPrincipal, id: number): Promise<IcalFeedSecretDto> {
     const feed = await this.load(actor.userId, id);
     const token = randomBytes(32).toString('base64url');
-    feed.tokenHash = hashToken(token);
-    feed.tokenPrefix = token.slice(0, TOKEN_PREFIX_LENGTH);
-    feed.lastUsedAt = null;
-    return this.secretResult(await this.save(feed), token);
+    const updated = await this.patch(feed, {
+      tokenHash: hashToken(token),
+      tokenPrefix: token.slice(0, TOKEN_PREFIX_LENGTH),
+      lastUsedAt: null,
+    });
+    return this.secretResult(updated, token);
   }
 
   async revoke(actor: PluginAuditPrincipal, id: number): Promise<void> {
     const feed = await this.load(actor.userId, id);
-    feed.revokedAt = this.clock();
-    await this.save(feed);
+    await this.patch(feed, { revokedAt: this.clock() });
     await this.audit.record('feed_revoked', actor, { type: 'feed', id: feed.id }, { feedName: feed.name });
   }
 
@@ -181,19 +179,17 @@ export class IcalService {
    */
   async renderForToken(token: string): Promise<string | null> {
     if (!FEED_TOKEN_PATTERN.test(token)) return null;
-    const feed = await this.repo.findOneBy({ tokenHash: hashToken(token) });
+    const feed = await this.feeds.findOne({ where: { tokenHash: hashToken(token) } });
     if (!feed || feed.revokedAt) return null;
     if (!(await this.visibility.isActiveAccount(feed.userId))) return null;
     const now = this.clock();
     if (!feed.lastUsedAt || now.getTime() - feed.lastUsedAt.getTime() > 60_000) {
-      await this.context
-        .runSerialized((manager) => manager.getRepository(IcalFeedEntity).update({ id: feed.id }, { lastUsedAt: now }))
-        .catch(() => undefined);
+      await this.feeds.update({ id: feed.id }, { lastUsedAt: now }).catch(() => undefined);
     }
     return this.render(feed, now);
   }
 
-  private async candidateResourceIds(feed: IcalFeedEntity, selection: IcalSelectionDto): Promise<number[]> {
+  private async candidateResourceIds(feed: IcalFeedRow, selection: IcalSelectionDto): Promise<number[]> {
     const enabledIds = this.settings.getEnabledResourceIds();
     const enabled = new Set(enabledIds);
     const hasSelectors =
@@ -240,7 +236,7 @@ export class IcalService {
     return introduced;
   }
 
-  async render(feed: IcalFeedEntity, now: Date): Promise<string> {
+  async render(feed: IcalFeedRow, now: Date): Promise<string> {
     const selection = parseSelection(feed.selection);
     const [timeZone, languages] = await Promise.all([
       this.globalSettings.getTimezone(),

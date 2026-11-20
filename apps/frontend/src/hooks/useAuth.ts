@@ -6,16 +6,16 @@ import { restoreAuthentication } from '../utils/auth-session';
 import { stopLiveUpdates } from '../utils/live-updates';
 import { useNavigate } from 'react-router-dom';
 import {
-  OpenAPI,
-  useAuthenticationServiceCreateSession,
-  AuthenticationService,
-  SsoService,
-  UsersService,
+  useCreateSession,
   ApiError,
-  useAuthenticationServiceGetLogoutCapability,
-  useTwoFactorAuthenticationServiceGetTwoFactorStatus,
-  useUsersServiceGetCurrent,
-  UseUsersServiceGetCurrentKeyFn,
+  useGetLogoutCapability,
+  useGetTwoFactorStatus,
+  useGetCurrent,
+  UseGetCurrentKeyFn,
+  endSession,
+  logoutEverywhere as requestLogoutEverywhere,
+  consumeLogoutResult,
+  getCurrent,
 } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useState } from 'react';
 import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -30,7 +30,7 @@ interface LoginCredentials {
 
 export function useLogin() {
   const queryClient = useQueryClient();
-  const login = useAuthenticationServiceCreateSession({
+  const login = useCreateSession(undefined, {
     onSuccess: () => restoreAuthentication(queryClient),
   });
 
@@ -39,7 +39,7 @@ export function useLogin() {
     mutate: (data: LoginCredentials, options?: Parameters<typeof login.mutate>[1]) => {
       return login.mutate(
         {
-          requestBody: {
+          body: {
             username: data.username,
             password: data.password,
             twoFactorCode: data.twoFactorCode,
@@ -50,7 +50,7 @@ export function useLogin() {
       );
     },
     mutateAsync: async (data: { username: string; password: string }) => {
-      return login.mutateAsync({ requestBody: { username: data.username, password: data.password } });
+      return login.mutateAsync({ body: { username: data.username, password: data.password } });
     },
   };
 }
@@ -74,11 +74,7 @@ export function useAuth() {
   // Initialize API base URL and configure for cookie-based authentication
   useEffect(() => {
     const initializeAuth = () => {
-      // Remove manual token setting - cookies will be handled automatically
-      OpenAPI.TOKEN = '';
-      // Enable credentials to include cookies in requests
-      OpenAPI.WITH_CREDENTIALS = true;
-
+      // configureApiClient() sends the session cookies with every request.
       // Clean up any existing localStorage/sessionStorage auth data
       for (const area of ['localStorage', 'sessionStorage'] as const) {
         try {
@@ -96,7 +92,7 @@ export function useAuth() {
 
   // Check authentication status by trying to fetch current user
   // This will work with cookies automatically
-  const { data: fetchedUser } = useUsersServiceGetCurrent(undefined, {
+  const { data: fetchedUser } = useGetCurrent({}, undefined, {
     refetchInterval: 1000 * 60 * 20, // 20 minutes
     retry: false,
     enabled: isInitialized && !hasStartedLogout, // Stop identity refetch while signing out
@@ -113,10 +109,12 @@ export function useAuth() {
     refetchOnWindowFocus: false,
     queryFn: async () => {
       if (!returnToken) return null;
-      const outcome = await SsoService.consumeLogoutResult({ requestBody: { token: returnToken } });
+      const outcome = await consumeLogoutResult({ body: { token: returnToken }, throwOnError: true }).then(
+        ({ data }) => data,
+      );
       // Check the server, rather than cached user data, before claiming local sign-out.
       try {
-        await UsersService.getCurrent();
+        await getCurrent({ throwOnError: true }).then(({ data }) => data);
         return null;
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) return outcome.result;
@@ -142,31 +140,31 @@ export function useAuth() {
     info({ title: logoutText('localOnly'), description: logoutText(key), duration: 10000 });
   }, [returnToken, isReturnFetched, providerReturn, currentUser, queryClient, info, logoutText]);
 
-  const { data: twoFactorStatus, isLoading: isTwoFactorStatusLoading } =
-    useTwoFactorAuthenticationServiceGetTwoFactorStatus(undefined, {
-      enabled: isInitialized && !!currentUser,
-    });
+  const { data: twoFactorStatus, isLoading: isTwoFactorStatusLoading } = useGetTwoFactorStatus({}, undefined, {
+    enabled: isInitialized && !!currentUser,
+  });
 
-  const { data: logoutCapability, isLoading: isLogoutCapabilityLoading } = useAuthenticationServiceGetLogoutCapability(
-    undefined,
-    {
-      enabled: isInitialized && !!currentUser && !hasStartedLogout,
-      retry: false,
-      staleTime: 30000,
-    },
-  );
+  const { data: logoutCapability, isLoading: isLogoutCapabilityLoading } = useGetLogoutCapability({}, undefined, {
+    enabled: isInitialized && !!currentUser && !hasStartedLogout,
+    retry: false,
+    staleTime: 30000,
+  });
 
   const logoutMutation = useMutation({
     mutationKey: ['auth-logout'],
     mutationFn: (everywhere: boolean) =>
-      everywhere ? AuthenticationService.logoutEverywhere() : AuthenticationService.endSession().then(() => undefined),
+      everywhere
+        ? requestLogoutEverywhere({ throwOnError: true }).then(({ data }) => data)
+        : endSession({ throwOnError: true })
+            .then(({ data }) => data)
+            .then(() => undefined),
     onSuccess: async (result) => {
       stopLiveUpdates();
       await queryClient.cancelQueries();
       queryClient.setQueryData(['auth-logout-status'], 'ended');
       queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'auth-logout-status' });
       queryClient.getMutationCache().clear();
-      queryClient.setQueryData(UseUsersServiceGetCurrentKeyFn(), null);
+      queryClient.setQueryData(UseGetCurrentKeyFn(), null);
       if (result?.kind === 'redirect' && result.redirectUrl) {
         window.location.assign(result.redirectUrl);
       } else {
@@ -185,7 +183,7 @@ export function useAuth() {
       queryClient.setQueryData(['auth-logout-status'], 'ended');
       queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'auth-logout-status' });
       queryClient.getMutationCache().clear();
-      queryClient.setQueryData(UseUsersServiceGetCurrentKeyFn(), null);
+      queryClient.setQueryData(UseGetCurrentKeyFn(), null);
       navigate('/', { replace: true });
       showError({
         title: logoutText('networkError'),
@@ -232,6 +230,11 @@ export function useAuth() {
     hasPermission: (permission: SystemPermission) => {
       const effectivePermissions: string[] = currentUser?.effectivePermissions ?? [];
       return effectivePermissions.includes(permission);
+    },
+    /** For keys only known at runtime: plugin-declared keys from route configs or the permission catalog. */
+    hasPermissionKey: (key: string) => {
+      const effectivePermissions: string[] = currentUser?.effectivePermissions ?? [];
+      return effectivePermissions.includes(key);
     },
   };
 }

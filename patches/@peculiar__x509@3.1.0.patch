@@ -1,0 +1,16 @@
+diff --git a/build/index.js b/build/index.js
+index 733c5e079282364a03c5ca2fba52fbbf578eecce..767451e122d6dfc1c32e718391530ea3683363c1 100644
+--- a/build/index.js
++++ b/build/index.js
+@@ -31,7 +31,10 @@ import * as asn1Ecc from "@peculiar/asn1-ecc";
+ import { ECDSASigValue, id_ecPublicKey } from "@peculiar/asn1-ecc";
+ import * as asn1Rsa from "@peculiar/asn1-rsa";
+ import { RSAPublicKey, id_RSASSA_PSS, id_rsaEncryption, id_sha1, id_sha256, id_sha384, id_sha512 } from "@peculiar/asn1-rsa";
+-import { container, injectable } from "tsyringe";
++import { container as globalContainer, injectable } from "tsyringe";
++// Attraccess patch: its own container, so another @peculiar/x509 major in the process (registering the same
++// string tokens in tsyringe's global container) cannot mix its algorithms into this one.
++const container = globalContainer.createChildContainer();
+ import * as asnPkcs9 from "@peculiar/asn1-pkcs9";
+ import { id_pkcs9_at_extensionRequest } from "@peculiar/asn1-pkcs9";
+ import { id_ml_dsa_44, id_ml_dsa_65, id_ml_dsa_87, id_slh_dsa_sha2_128f, id_slh_dsa_sha2_128s, id_slh_dsa_sha2_192f, id_slh_dsa_sha2_192s, id_slh_dsa_sha2_256f, id_slh_dsa_sha2_256s, id_slh_dsa_shake_128f, id_slh_dsa_shake_128s, id_slh_dsa_shake_192f, id_slh_dsa_shake_192s, id_slh_dsa_shake_256f, id_slh_dsa_shake_256s } from "@peculiar/asn1-x509-post-quantum";

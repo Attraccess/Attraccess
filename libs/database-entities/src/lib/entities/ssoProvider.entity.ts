@@ -1,13 +1,9 @@
+import { SSOProviderType } from '@attraccess/application-models';
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToOne } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { SSOProviderOIDCConfiguration } from './ssoProvider.oidc';
 import { SSOProviderSAMLConfiguration } from './ssoProvider.saml';
 import { IsEnum } from 'class-validator';
-
-export enum SSOProviderType {
-  OIDC = 'OIDC',
-  SAML = 'SAML',
-}
 
 @Entity()
 export class SSOProvider {

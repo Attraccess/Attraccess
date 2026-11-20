@@ -1,5 +1,6 @@
-import { SupervisionMode, User } from '@attraccess/database-entities';
+import { SupervisionMode } from '@attraccess/application-models';
 import { AuthenticatedWebSocket } from '../../websocket.types';
+import type { CoreUser } from '../../../core-user';
 import { AttractapSupervisionHandler } from './supervision.handler';
 
 export type SocketState = AuthenticatedWebSocket['state'];
@@ -24,9 +25,9 @@ export function registerAttractapSupervisionHandlerFixture() {
 
   let cardOperations: { verifyCard: jest.Mock };
 
-  let resourceRepository: { findOne: jest.Mock };
+  let resourceReads: { findResource: jest.Mock };
 
-  const requester = { id: 1, username: 'requester' } as User;
+  const requester = { id: 1, username: 'requester' } as unknown as CoreUser;
 
   const READER_ID = 3;
 
@@ -87,8 +88,10 @@ export function registerAttractapSupervisionHandlerFixture() {
         card: { isActive: true, keyNo: 1, user: { id: 2, username: 'supervisor' } },
       }),
     };
-    resourceRepository = {
-      findOne: jest.fn().mockResolvedValue({ id: RESOURCE_ID, supervisionMode: SupervisionMode.SUPERVISION_REQUIRED }),
+    resourceReads = {
+      findResource: jest
+        .fn()
+        .mockResolvedValue({ id: RESOURCE_ID, supervisionMode: SupervisionMode.SUPERVISION_REQUIRED }),
     };
 
     handler = new AttractapSupervisionHandler();
@@ -99,7 +102,7 @@ export function registerAttractapSupervisionHandlerFixture() {
       supervisionService,
       usersService,
       cardOperations,
-      resourceRepository,
+      resourceReads,
     });
   });
   return {
@@ -124,8 +127,8 @@ export function registerAttractapSupervisionHandlerFixture() {
     get usersService() {
       return usersService;
     },
-    get resourceRepository() {
-      return resourceRepository;
+    get resourceReads() {
+      return resourceReads;
     },
     get requester() {
       return requester;

@@ -18,25 +18,29 @@ project-local ESP-IDF v6.0.2 toolchain at `.tools/esp-idf`. The completion
 marker is created only after setup succeeds. If bootstrap fails, rerun that
 script from the new worktree before reporting a missing dependency.
 
+`apps/cesentry` is a private, optional submodule (`update = none`), so new
+worktrees and public clones leave it empty. With access to the private
+repository, fill it with `git submodule update --init --checkout apps/cesentry`,
+then follow its README's Checkout section (commit hook). Rerun the command after
+the pointer moves. Public code never references it (see `CONTRIBUTING.md`,
+"Private submodule").
+
 ## Committing
 
-The Husky pre-commit hook runs `pnpm precommit` (lint, typecheck, test and CRAP
-score for affected projects). On a busy machine it takes many minutes. PR and
+The Husky pre-commit hook runs `pnpm precommit`: the file-size and
+import-cycle checks on the staged files, and a lite typecheck
+(`scripts/typecheck-staged.mjs`). It runs CI's `tsc` commands, with incremental
+build info, for the projects that own staged TypeScript files. It skips code
+generation and dependent projects. Lint, tests, the CRAP score and the full
+typecheck run only in CI. Before pushing, run the affected ones locally with
+`pnpm nx affected -t typecheck,lint,test,crap-score --base=origin/main`, or
+everything with `pnpm precommit:all`. PR and
 merge-queue CI also typecheck and build every project, so a change can fail
 there in a project it does not touch; `scripts/ci-nx-exclude.mjs` shows the
 commands.
 
 - Git runs the hooks only after `pnpm install` has created `.husky/_`. In a
   checkout without `node_modules`, commits skip every check.
-- Stage every related change first. The CRAP check refuses unstaged or
-  untracked JS/TS files and analysis configuration (see
-  `scripts/crap-score/README.md`). Set unrelated work aside with
-  `git stash push --keep-index --include-untracked` and pop it after the commit.
-- `husky - pre-commit script failed (code 130)` does not mean the run was
-  interrupted: `--nxBail` stops the other tasks after the first failure. The
-  cause is listed under `Failed tasks:`.
-- Run one commit at a time per worktree. Parallel runs share `coverage/` and
-  break each other.
 - `--no-verify` is for emergencies only (see `CONTRIBUTING.md`). Fix the
   failure instead.
 
@@ -87,8 +91,14 @@ Solo `pnpm nx serve api` is **not** wrapped. Prefer `pnpm serve --only=api`.
 We use HeroUI, use it. Use as little tailwind/custom css as possible.
 
 Use `StatusDialog` for notices and confirmations (info, success, warning, error); only `error` gets a danger
-action button. Use `StandardModal` only for richer dialog content. Shared UI comes from
+action button. A control that asks before a destructive or irreversible action is a `ConfirmableButton` (built on
+`StatusDialog`), not hand-wired dialog state. Table row actions go in a `TableRowActions` ⋮ menu in the last column,
+headed by `TableActionsColumnHeader`. Use `StandardModal` only for richer dialog content. Shared UI comes from
 `@attraccess/plugins-frontend-ui`; do not add copies of these components in core or in plugins.
+
+Structure: a component reads its own data or takes a small explicit props interface; never type props or helpers
+with `ReturnType<typeof useX>` (lint rejects it). Keep a `use*State` hook only for state several components share, next
+to its owner with a one-line JSDoc naming them. One component or hook per file, named after its export.
 
 Use HeroUI React documentation from @Docs https://heroui.com/react/llms.txt
 For component-specific documentation @Docs https://heroui.com/react/llms-components.txt

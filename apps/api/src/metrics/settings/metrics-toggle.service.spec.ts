@@ -20,10 +20,7 @@ describe('MetricsToggleService', () => {
   beforeEach(async () => {
     store = { getPlainSetting: jest.fn().mockResolvedValue(null) };
     const moduleRef = await Test.createTestingModule({
-      providers: [
-        MetricsToggleService,
-        { provide: SettingsStoreService, useValue: store },
-      ],
+      providers: [MetricsToggleService, { provide: SettingsStoreService, useValue: store }],
     }).compile();
     svc = moduleRef.get(MetricsToggleService);
   });

@@ -1,88 +1,33 @@
-export type InstalledNpmPlugin = {
+/** The installed package a version dialog is opened for. */
+export interface VersionPlugin {
   name: string;
   version: string;
-  registryId: string;
-  registryUrl: string;
-  integrity: string;
-  installPath: string;
-  permissions: string[];
-  lastError: string | null;
-  classification: 'official' | 'community';
-  classificationReason: string;
-  requestedSpec: string;
-  updateOverride: 'inherit' | 'off' | 'patch' | 'minor' | 'follow';
-  updateCheck?: {
-    checkedAt: string;
-    candidate: string | null;
-    state: 'up-to-date' | 'available' | 'blocked' | 'failed';
-    error: string | null;
-  } | null;
-  publisher: string | null;
-};
-
-export type PluginDependency = { name: string; version: string; required: boolean };
-
-export type MarketplacePlugin = {
-  dependencies?: PluginDependency[];
-  name: string;
-  version: string | null;
-  displayName: string | null;
-  description: string | null;
-  permissions: string[];
-  hostRange: string | null;
-  sdkCompatibility: { backend: string | null; frontend: string | null };
-  repository: string | null;
-  homepage: string | null;
-  license: string | null;
-  publisher: string | null;
-  deprecated: boolean;
-  registry: { id: string; name: string; url: string };
-  classification: 'official' | 'community';
-  classificationReason: string;
-  installable: boolean;
-  incompatibilityReason: string | null;
-  integrity: string | null;
-  provenance: string | null;
-};
-
-export type PluginInstallPlan = {
-  root: string;
-  token: string;
-  plugins: Array<{
-    name: string;
-    displayName: string;
-    version: string;
-    action: 'install' | 'reuse' | 'replace';
-    permissions: string[];
-    dependencies: PluginDependency[];
-    classification: 'official' | 'community';
-    registryUrl?: string;
-  }>;
-};
-
-export type Registry = { id: string; name: string; url: string; tokenConfigured: boolean };
-
-export interface DeleteOptions {
-  onSuccess?: () => void;
-  onError?: (error: unknown) => void;
 }
 
-export type VersionCandidate = {
-  dependencies?: PluginDependency[];
-  version: string;
-  publishedAt: string | null;
-  direction: 'current' | 'newer' | 'older';
-  compatible: boolean;
-  reason: string | null;
-  permissions: string[];
-  permissionAdditions: string[];
-  permissionRemovals: string[];
-  deprecated: string | null;
-  integrity: string | null;
-  repository: string | null;
-  homepage: string | null;
-  semverImpact: 'major' | 'minor' | 'patch' | 'prerelease' | 'none';
-  matchesRequestedSpec: boolean;
-};
+/** A plugin whose backend failed to load or that the host refused, shown in the load-error dialog. */
+export interface FailedPlugin {
+  id: string;
+  name: string;
+  error: string;
+  /** Refused at discovery (for example built for SDK 1.x): it cannot be retried, only removed or replaced. */
+  refused: boolean;
+}
 
-export type VersionPlugin = Pick<InstalledNpmPlugin, 'name' | 'version'>;
+/** Identifies a marketplace package whose detail page should be opened. */
+export interface MarketplaceDetailRequest {
+  name: string;
+  registryId: string;
+}
+
+/**
+ * The registry form and its pending requests. It lives with the marketplace browser so that it survives showing a
+ * package's details and closing the marketplace, which unmount the registry management.
+ */
+export interface RegistryForm {
+  name: string;
+  url: string;
+  token: string;
+  isSaving: boolean;
+  /** The latest registry test still running; an earlier test settling does not end it. */
+  test: { registryId: string; request: symbol } | null;
+}

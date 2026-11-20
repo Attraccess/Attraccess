@@ -1,11 +1,11 @@
-import { AuditLog } from '@attraccess/database-entities';
 import type { PluginContext, PluginMqttClient } from '@attraccess/plugins-backend-sdk';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import httpRequest from 'supertest';
-import { DataSource } from 'typeorm';
-import { AuditService } from '../../../../api/src/audit/audit.service';
+import type { AuditEvent, AuditRecorder } from '../../../../api/src/audit/recorder/audit-event';
+import type { spyOnWagoStorage } from '../../backend/storage-spy.test-utils';
+import type { WagoTestStorage } from '../../backend/storage/testing';
 import { ApiTokenService } from '../../../../api/src/users-and-auth/auth/api-token/api-token.service';
 import { SessionService } from '../../../../api/src/users-and-auth/auth/session.service';
 import { TwoFactorService } from '../../../../api/src/users-and-auth/auth/two-factor.service';
@@ -13,11 +13,11 @@ import { AuthAuditLogger } from '../../../../api/src/users-and-auth/rate-limitin
 import { RbacService } from '../../../../api/src/users-and-auth/rbac/rbac.service';
 import { SessionStrategy } from '../../../../api/src/users-and-auth/strategies/session.strategy';
 import { heartbeatTopic, discoveryTopic } from '../../backend/protocol';
-import { WagoCommissioningSession } from '../../backend/commissioning/sessions/session.entity';
+import type { WagoCommissioningSession } from '../../backend/commissioning/sessions/session.entity';
 import { WagoCommissioningService } from '../../backend/commissioning/service';
-import { WagoController } from '../../backend/controllers/entity';
-import { WagoCredentialRotationService, WagoCredentialRotationEntity } from '../../backend/credentials/service';
-import { WagoRuntimeArtifactsService } from '../../backend/runtime/artifacts/catalog';
+import type { WagoController } from '../../backend/controllers/entity';
+import { WagoCredentialRotationService } from '../../backend/credentials/service';
+import { WagoRuntimeArtifactsService } from '../../backend/runtime/artifacts/service';
 import { WagoControllerApi } from '../../backend/controllers/controller';
 import { WagoService } from '../../backend/controllers/service';
 import type { WagoConfigurationSnapshot } from '../../backend/configuration/model';
@@ -86,11 +86,53 @@ export class FixtureMqtt implements PluginMqttClient {
   }
 }
 
+/** One audit record as the host stores it: the recorded event with the generated operation id and plugin id. */
+export type AuditRow = {
+  action: string;
+  outcome: string;
+  operationId: string;
+  pluginId: string;
+  actorId: number | null;
+  authenticationMethod: string | null;
+  apiTokenId: number | null;
+  subjectId: number | null;
+  subjectType: string;
+  details: Record<string, unknown>;
+};
+
+/**
+ * Stands in for the host's audit recorder: it keeps what the host's plugin projection admitted (an event outside the
+ * plugin's declared domain policy has no domain and is dropped, as the recorder does). The durable audit provider
+ * behind the recorder is the host's, covered by its own tests.
+ */
+export class AuditSink implements AuditRecorder {
+  readonly rows: AuditRow[] = [];
+  private nextOperation = 1;
+  async record(event: AuditEvent) {
+    if (!event.domain) return { status: 'unavailable' as const };
+    this.rows.push({
+      action: event.action,
+      outcome: event.outcome ?? 'succeeded',
+      operationId: event.operationId ?? `operation-${this.nextOperation++}`,
+      pluginId,
+      actorId: event.actor.id,
+      authenticationMethod: event.actor.authenticationMethod,
+      apiTokenId: event.actor.apiTokenId ?? null,
+      subjectId: event.subject.id,
+      subjectType: event.subject.type,
+      details: { ...event.details },
+    });
+    return { status: 'recorded' as const };
+  }
+}
+
 export class AuditFixtureState {
-  schemaDirectory!: string;
   directory!: string;
-  db!: DataSource;
-  audit!: AuditService;
+  /** The in-memory record port behind the plugin's storage. */
+  storage!: WagoTestStorage;
+  /** The same tables with every call spied, as the plugin reaches them through `context.storage`. */
+  spy!: ReturnType<typeof spyOnWagoStorage>;
+  sink!: AuditSink;
   wago!: WagoService;
   commissioning!: WagoCommissioningService;
   app!: INestApplication;
@@ -157,7 +199,7 @@ export class AuditFixtureState {
       .set('Authorization', 'Bearer fixture-token');
   }
   async rows(action: string) {
-    return this.db.getRepository(AuditLog).find({ where: { action: `wago.${action}` }, order: { id: 'ASC' } });
+    return this.sink.rows.filter((row) => row.action === `wago.${action}`);
   }
   async lifecycle(
     action: string,
@@ -183,8 +225,8 @@ export class AuditFixtureState {
   }
   async deliverAndClaim() {
     jest.mocked(this.wago.createEnrollment).mockImplementationOnce(async (...args) => {
-      const persisted = await this.db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: this.session.id });
-      expect(JSON.parse(persisted.platformReport).clock).toMatchObject({
+      const persisted = await this.storage.tables.commissioningSessions.get(this.session.id);
+      expect(JSON.parse(persisted?.platformReport ?? 'null').clock).toMatchObject({
         observation: 'before-action',
         action: 'none',
         result: 'within-tolerance',
@@ -197,20 +239,16 @@ export class AuditFixtureState {
     }).expect(201);
     expect(delivered.state).toBe('awaiting_discovery');
     expect(delivered).not.toHaveProperty('initiatingPrincipal');
-    expect(
-      (await this.db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: this.session.id }))
-        .initiatingPrincipal,
-    ).toBe(JSON.stringify(principal));
-    const enrollment = await this.db
-      .getRepository('plugin_wago_enrollments')
-      .findOneByOrFail({ id: delivered.enrollmentId });
+    expect((await this.storage.tables.commissioningSessions.get(this.session.id))?.initiatingPrincipal).toBe(
+      JSON.stringify(principal),
+    );
+    const enrollment = await this.storage.tables.enrollments.get(delivered.enrollmentId);
+    if (!enrollment) throw new Error('the delivery created no enrollment');
     // Observe the actual enrollment result, without mocking its persistence or parsing generated shell source.
     const credentials = await jest.mocked(this.wago.createEnrollment).mock.results[0].value;
     expect(enrollment.id).toBe(credentials.id);
     await this.mqtt.announce(this.session.hardwareId, credentials.claimSecret);
-    const controller = await this.db
-      .getRepository(WagoController)
-      .findOneByOrFail({ hardwareId: this.session.hardwareId });
+    const controller = await this.controllerByHardwareId(this.session.hardwareId);
     expect(controller.trustState).toBe('claimed');
     return controller;
   }
@@ -234,7 +272,7 @@ export class AuditFixtureState {
       streamId: '11111111-1111-4111-8111-111111111111',
       sequence: 1,
     });
-    const updated = await this.db.getRepository(WagoController).findOneByOrFail({ id: controller.id });
+    const updated = await this.controllerById(controller.id);
     expect(updated.lastHeartbeatAt).toBe(timestamp);
     expect(JSON.parse(updated.capabilities)).toContain('credential-rotation-v1');
   }
@@ -244,18 +282,25 @@ export class AuditFixtureState {
     jest.spyOn(this.context, 'getMqttCredentialProvisioning').mockReturnValue({ ...provider, rotate });
     return rotate;
   }
-  rotationRecord(controllerId: number) {
-    return this.db
-      .getRepository(WagoCredentialRotationEntity)
-      .createQueryBuilder('rotation')
-      .addSelect('rotation.encryptedCredentials')
-      .where('rotation.controllerId = :controllerId', { controllerId })
-      .getOneOrFail();
+  async rotationRecord(controllerId: number) {
+    const record = await this.storage.tables.credentialRotations.get(controllerId);
+    if (!record) throw new Error(`controller ${controllerId} has no credential rotation record`);
+    return record;
+  }
+  async controllerById(id: number) {
+    const controller = await this.storage.tables.controllers.get(id);
+    if (!controller) throw new Error(`controller ${id} is gone`);
+    return controller;
+  }
+  async controllerByHardwareId(hardwareId: string) {
+    const controller = await this.storage.tables.controllers.findOne({ where: { hardwareId } });
+    if (!controller) throw new Error(`controller ${hardwareId} is gone`);
+    return controller;
   }
   async manuallyEnrolledController() {
     const enrollment = await this.wago.createEnrollment('manual-fixture', 1);
     await this.mqtt.announce('manual-fixture', enrollment.claimSecret);
-    const controller = await this.db.getRepository(WagoController).findOneByOrFail({ hardwareId: 'manual-fixture' });
+    const controller = await this.controllerByHardwareId('manual-fixture');
     expect(controller.trustState).toBe('untrusted');
     const provisioner = this.context.getMqttCredentialProvisioning();
     const provision = jest.fn(provisioner.provision);
@@ -276,6 +321,8 @@ export class AuditFixtureState {
     this.rotationReady = this.rotationReady.bind(this);
     this.observeRotationProvider = this.observeRotationProvider.bind(this);
     this.rotationRecord = this.rotationRecord.bind(this);
+    this.controllerById = this.controllerById.bind(this);
+    this.controllerByHardwareId = this.controllerByHardwareId.bind(this);
     this.manuallyEnrolledController = this.manuallyEnrolledController.bind(this);
   }
 }

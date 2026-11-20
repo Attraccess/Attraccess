@@ -1,9 +1,9 @@
-import { ResourceFlowNode, WaitNodeDataSchema } from '@attraccess/database-entities';
+import { FlowNodeRecord, WaitNodeDataSchema } from '@attraccess/application-models';
 import z from 'zod';
 import { NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 
 export class WaitExecutor implements NodeExecutor {
-  async execute(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
+  async execute(node: FlowNodeRecord, input: object): Promise<NodeProcessingResult> {
     const { duration, unit } = node.data as z.infer<typeof WaitNodeDataSchema>;
 
     let waitDurationMs = duration * 1000;

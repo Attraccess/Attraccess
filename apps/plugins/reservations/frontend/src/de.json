@@ -1,7 +1,14 @@
 {
   "title": "Reservierungen",
-  "sidebar": { "my": "Meine Reservierungen", "manage": "Reservierungen verwalten" },
-  "slots": { "settings": "Reservierungen", "admin": "Reservierungen", "account": "Kalender-Feeds (iCal)" },
+  "sidebar": {
+    "my": "Meine Reservierungen",
+    "manage": "Reservierungen verwalten"
+  },
+  "slots": {
+    "settings": "Reservierungen",
+    "admin": "Reservierungen",
+    "account": "Kalender-Feeds (iCal)"
+  },
   "common": {
     "cancel": "Abbrechen",
     "close": "Schließen",
@@ -48,6 +55,8 @@
     "OUTSIDE_BOOKABLE_HOURS": "Der Zeitraum liegt außerhalb der buchbaren Zeiten.",
     "USER_BOOKING_LIMIT": "Du hast die maximale Anzahl aktiver Buchungen für diese Ressource erreicht.",
     "OVERLAP": "Der Zeitraum überschneidet sich mit einer anderen Buchung. Bitte wähle eine andere Zeit.",
+    "OVERLAP_FULL": "Zu dieser Zeit sind alle Plätze belegt. Bitte wähle eine andere Zeit.",
+    "OWN_OVERLAP": "Du hast in diesem Zeitraum bereits eine Buchung. Bitte wähle eine andere Zeit.",
     "MAINTENANCE": "Die Ressource ist in dieser Zeit in Wartung.",
     "NOT_PENDING": "Diese Buchung wartet nicht mehr auf Genehmigung.",
     "NOT_ACTIVE": "Diese Buchung ist nicht aktiv.",
@@ -86,6 +95,7 @@
     "free": "Keine Buchungen",
     "reserved": "Reserviert",
     "reservedPending": "Reserviert (wartet auf Genehmigung)",
+    "slotsBooked": "{{booked}} von {{total}} Plätzen reserviert",
     "yours": "Deine Buchung",
     "maintenance": "Wartung",
     "openEnd": "offenes Ende"
@@ -308,8 +318,14 @@
       "ownOnly": "Nur meine eigenen Buchungen",
       "introduced": "Ressourcen, in die ich eingewiesen bin",
       "maintained": "Ressourcen, die ich betreue",
-      "groups": { "one": "{{count}} Gruppe", "many": "{{count}} Gruppen" },
-      "resources": { "one": "{{count}} Ressource", "many": "{{count}} Ressourcen" }
+      "groups": {
+        "one": "{{count}} Gruppe",
+        "many": "{{count}} Gruppen"
+      },
+      "resources": {
+        "one": "{{count}} Ressource",
+        "many": "{{count}} Ressourcen"
+      }
     },
     "form": {
       "createTitle": "Neuer Kalender-Feed",
@@ -345,5 +361,17 @@
       "body": "Der Link funktioniert dauerhaft nicht mehr. Das lässt sich nicht rückgängig machen.",
       "confirm": "Widerrufen"
     }
+  },
+  "dashboard": {
+    "title": "Anstehende Reservierungen",
+    "description": "Ihre nächsten Buchungen",
+    "empty": "Keine anstehenden Reservierungen.",
+    "unknownResource": "Unbekannte Ressource",
+    "manage": "Verwalten",
+    "loadError": "Ihre Reservierungen konnten nicht geladen werden.",
+    "next": "Als Nächstes",
+    "now": "Jetzt",
+    "group": "Reservierungen",
+    "keywords": ["Buchung", "Kalender"]
   }
 }

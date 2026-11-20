@@ -1,94 +1,52 @@
 import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import {
-  Resource,
-  ResourceType,
-  ResourceMaintenance,
-  ResourceMaintenanceSchedule,
+  MaintenanceScheduleRecord,
   ResourceMaintenanceScheduleDurationBasis,
   ResourceMaintenanceScheduleTriggerType,
-  ResourceMaintenanceScheduleTimeIntervalConfig,
-  ResourceMaintenanceScheduleUsageCountConfig,
-  ResourceMaintenanceScheduleUsageHoursConfig,
-} from '@attraccess/database-entities';
+  ResourceType,
+  UsageDurationUnit,
+} from '@attraccess/application-models';
 import { MaintenanceScheduleService } from './maintenance-schedule.service';
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
+import { MAINTENANCE_SCHEDULE_STORE, type MaintenanceScheduleStore } from './maintenance-schedule-store.port';
 
 describe('MaintenanceScheduleService', () => {
   let service: MaintenanceScheduleService;
-  const schedule = {
+  const schedule: MaintenanceScheduleRecord = {
     id: 10,
+    createdAt: new Date('2025-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2025-01-01T00:00:00.000Z'),
     resourceId: 1,
+    name: null,
     triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_COUNT,
+    durationBasis: ResourceMaintenanceScheduleDurationBasis.SESSION_DURATION,
     enabled: true,
-    usageCountConfig: { thresholdSessions: 12 },
-  } as ResourceMaintenanceSchedule;
+    usageCountConfig: { id: 3, scheduleId: 10, thresholdSessions: 12 },
+  };
 
-  const scheduleRepository = {
+  const store: { [K in keyof MaintenanceScheduleStore]: jest.Mock } = {
+    findResourceType: jest.fn(),
+    listForResource: jest.fn(),
     findOne: jest.fn(),
-    manager: {
-      transaction: jest.fn(),
-    },
-  };
-  const maintenanceRepository = {
+    create: jest.fn(),
     update: jest.fn(),
+    deleteWithAudit: jest.fn(),
   };
-  const usageHoursConfigRepository = {
-    delete: jest.fn(),
-  };
-  const usageCountConfigRepository = {
-    delete: jest.fn(),
-  };
-  const timeIntervalConfigRepository = {
-    delete: jest.fn(),
-  };
-  const resourceRepository = { findOne: jest.fn() };
   const evaluator = { evaluateResource: jest.fn().mockResolvedValue(undefined) };
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
 
   beforeEach(async () => {
-    jest.clearAllMocks();
-
-    scheduleRepository.manager.transaction.mockImplementation(
-      async (callback: (manager: { getRepository: (entity: unknown) => unknown }) => Promise<void>) =>
-        callback({
-          getRepository: (entity) => {
-            switch (entity) {
-              case ResourceMaintenance:
-                return maintenanceRepository;
-              case ResourceMaintenanceScheduleUsageHoursConfig:
-                return usageHoursConfigRepository;
-              case ResourceMaintenanceScheduleUsageCountConfig:
-                return usageCountConfigRepository;
-              case ResourceMaintenanceScheduleTimeIntervalConfig:
-                return timeIntervalConfigRepository;
-              case ResourceMaintenanceSchedule:
-                return { remove: jest.fn() };
-            }
-          },
-        }),
-    );
+    jest.resetAllMocks();
+    evaluator.evaluateResource.mockResolvedValue(undefined);
+    audit.record.mockResolvedValue(undefined);
+    store.findResourceType.mockResolvedValue({ type: ResourceType.Machine });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MaintenanceScheduleService,
         { provide: MaintenanceScheduleEvaluatorService, useValue: evaluator },
-        { provide: getRepositoryToken(ResourceMaintenanceSchedule), useValue: scheduleRepository },
-        { provide: getRepositoryToken(ResourceMaintenance), useValue: maintenanceRepository },
-        {
-          provide: getRepositoryToken(ResourceMaintenanceScheduleUsageHoursConfig),
-          useValue: usageHoursConfigRepository,
-        },
-        {
-          provide: getRepositoryToken(ResourceMaintenanceScheduleUsageCountConfig),
-          useValue: usageCountConfigRepository,
-        },
-        {
-          provide: getRepositoryToken(ResourceMaintenanceScheduleTimeIntervalConfig),
-          useValue: timeIntervalConfigRepository,
-        },
-        { provide: getRepositoryToken(Resource), useValue: resourceRepository },
+        { provide: MAINTENANCE_SCHEDULE_STORE, useValue: store },
         { provide: AUDIT_RECORDER, useValue: audit },
       ],
     }).compile();
@@ -96,44 +54,14 @@ describe('MaintenanceScheduleService', () => {
     service = module.get(MaintenanceScheduleService);
   });
 
-  it('detaches generated maintenances before deleting a schedule', async () => {
-    const scheduleToDelete = { ...schedule } as ResourceMaintenanceSchedule;
-    const transactionalScheduleRepository = {
-      remove: jest.fn().mockImplementation((entity: ResourceMaintenanceSchedule) => {
-        delete entity.id;
-      }),
-    };
-    scheduleRepository.findOne.mockResolvedValue(scheduleToDelete);
-    let transactionManager: { getRepository: (entity: unknown) => unknown } | undefined;
-    scheduleRepository.manager.transaction.mockImplementation(
-      async (callback: (manager: { getRepository: (entity: unknown) => unknown }) => Promise<void>) => {
-        transactionManager = {
-          getRepository: (entity) =>
-            entity === ResourceMaintenance
-              ? maintenanceRepository
-              : entity === ResourceMaintenanceSchedule
-                ? transactionalScheduleRepository
-                : entity === ResourceMaintenanceScheduleUsageHoursConfig
-                  ? usageHoursConfigRepository
-                  : entity === ResourceMaintenanceScheduleUsageCountConfig
-                    ? usageCountConfigRepository
-                    : timeIntervalConfigRepository,
-        };
-        return callback(transactionManager);
-      },
-    );
+  it('hands the schedule deletion and its audit event to the store as one operation', async () => {
+    store.findOne.mockResolvedValue(schedule);
 
-    await service.delete(scheduleToDelete.resourceId, 10, 7);
+    await service.delete(schedule.resourceId, 10, 7);
 
-    expect(maintenanceRepository.update).toHaveBeenCalledWith(
-      { maintenanceSchedule: { id: 10 } },
-      { maintenanceSchedule: null },
-    );
-    expect(usageHoursConfigRepository.delete).toHaveBeenCalledWith({ scheduleId: 10 });
-    expect(usageCountConfigRepository.delete).toHaveBeenCalledWith({ scheduleId: 10 });
-    expect(timeIntervalConfigRepository.delete).toHaveBeenCalledWith({ scheduleId: 10 });
-    expect(transactionalScheduleRepository.remove).toHaveBeenCalledWith(scheduleToDelete);
-    expect(audit.record).toHaveBeenCalledWith(
+    // The store writes the audit row in the transaction of the delete, so the row rolls back with it.
+    expect(store.deleteWithAudit).toHaveBeenCalledWith(
+      10,
       expect.objectContaining({
         domain: 'resource',
         action: 'maintenance_schedule.deleted',
@@ -141,22 +69,19 @@ describe('MaintenanceScheduleService', () => {
         subject: expect.objectContaining({ id: 1 }),
         details: expect.objectContaining({ scheduleId: 10, enabled: 1, usageThreshold: 12 }),
       }),
-      expect.anything(),
     );
-    // Written with the delete's transaction manager, so the row rolls back with the delete.
-    expect(transactionManager).toBeDefined();
-    expect(audit.record).toHaveBeenCalledTimes(1);
-    expect(audit.record.mock.calls[0][1]).toBe(transactionManager);
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it('does not delete a schedule of another resource', async () => {
+    store.findOne.mockResolvedValue(null);
+    await expect(service.delete(2, 10, 7)).rejects.toThrow('Maintenance schedule not found');
+    expect(store.deleteWithAudit).not.toHaveBeenCalled();
   });
 
   it('records the intended state when creating a schedule', async () => {
-    const created = { ...schedule, id: 11 } as ResourceMaintenanceSchedule;
-    resourceRepository.findOne.mockResolvedValue({ id: 1 });
-    scheduleRepository.create = jest.fn().mockReturnValue(created);
-    scheduleRepository.save = jest.fn().mockResolvedValue(created);
-    scheduleRepository.findOne.mockResolvedValue(created);
-    usageCountConfigRepository.create = jest.fn().mockReturnValue({ scheduleId: 11, thresholdSessions: 12 });
-    usageCountConfigRepository.save = jest.fn().mockResolvedValue(undefined);
+    store.create.mockResolvedValue(11);
+    store.findOne.mockResolvedValue({ ...schedule, id: 11 });
 
     await service.create(
       1,
@@ -164,7 +89,18 @@ describe('MaintenanceScheduleService', () => {
       7,
     );
 
-    expect(usageCountConfigRepository.save).toHaveBeenCalledWith({ scheduleId: 11, thresholdSessions: 12 });
+    expect(store.create).toHaveBeenCalledWith({
+      resourceId: 1,
+      name: null,
+      triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_COUNT,
+      durationBasis: ResourceMaintenanceScheduleDurationBasis.SESSION_DURATION,
+      enabled: true,
+      configs: {
+        usageHoursConfig: undefined,
+        usageCountConfig: { thresholdSessions: 12 },
+        timeIntervalConfig: undefined,
+      },
+    });
     expect(evaluator.evaluateResource).toHaveBeenCalledWith(1);
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -178,12 +114,12 @@ describe('MaintenanceScheduleService', () => {
   });
 
   it('records the intended state when updating a schedule', async () => {
-    const updated = { ...schedule, enabled: false } as ResourceMaintenanceSchedule;
-    scheduleRepository.findOne.mockResolvedValueOnce(schedule).mockResolvedValueOnce(updated);
-    scheduleRepository.save = jest.fn().mockResolvedValue(updated);
+    const updated = { ...schedule, enabled: false };
+    store.findOne.mockResolvedValueOnce(schedule).mockResolvedValueOnce(updated);
 
     await service.update(1, 10, { enabled: false }, 7);
 
+    expect(store.update).toHaveBeenCalledWith(10, { enabled: false }, undefined);
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
         domain: 'resource',
@@ -193,24 +129,47 @@ describe('MaintenanceScheduleService', () => {
         details: expect.objectContaining({ scheduleId: 10, enabled: 0, usageThreshold: 12 }),
       }),
     );
+    expect(evaluator.evaluateResource).not.toHaveBeenCalled();
   });
+
+  it('replaces the trigger configs and keeps the stored ones the request does not mention', async () => {
+    store.findOne.mockResolvedValue({
+      ...schedule,
+      usageHoursConfig: { id: 1, scheduleId: 10, duration: 5, unit: UsageDurationUnit.HOURS },
+    });
+
+    await service.update(1, 10, { timeIntervalConfig: { duration: 2, unit: UsageDurationUnit.DAYS } }, 7);
+
+    expect(store.update).toHaveBeenCalledWith(
+      10,
+      {},
+      {
+        triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_COUNT,
+        configs: {
+          usageHoursConfig: { duration: 5, unit: UsageDurationUnit.HOURS },
+          usageCountConfig: { thresholdSessions: 12 },
+          timeIntervalConfig: { duration: 2, unit: UsageDurationUnit.DAYS },
+        },
+      },
+    );
+  });
+
   it('reevaluates the unchanged service cycle when a schedule is reenabled', async () => {
-    const disabled = { ...schedule, enabled: false } as ResourceMaintenanceSchedule;
-    const enabled = { ...schedule, enabled: true } as ResourceMaintenanceSchedule;
-    scheduleRepository.findOne.mockResolvedValueOnce(disabled).mockResolvedValueOnce(enabled);
-    scheduleRepository.save = jest.fn().mockResolvedValue(enabled);
+    store.findOne
+      .mockResolvedValueOnce({ ...schedule, enabled: false })
+      .mockResolvedValueOnce({ ...schedule, enabled: true });
 
     await service.update(1, 10, { enabled: true }, 7);
 
     expect(evaluator.evaluateResource).toHaveBeenCalledWith(1);
-    expect(maintenanceRepository.update).not.toHaveBeenCalled();
+    expect(store.update).toHaveBeenCalledWith(10, { enabled: true }, undefined);
   });
 
   describe('operating duration resource validation', () => {
     const operatingBasis = ResourceMaintenanceScheduleDurationBasis.ATTRIBUTABLE_OPERATING_DURATION;
 
     it('rejects operating-duration schedules on doors before creating a schedule', async () => {
-      resourceRepository.findOne.mockResolvedValue({ id: 1, type: ResourceType.Door });
+      store.findResourceType.mockResolvedValue({ type: ResourceType.Door });
       await expect(
         service.create(
           1,
@@ -221,7 +180,7 @@ describe('MaintenanceScheduleService', () => {
           7,
         ),
       ).rejects.toThrow('Operating duration is only supported for machine resources');
-      expect(scheduleRepository.save).not.toHaveBeenCalled();
+      expect(store.create).not.toHaveBeenCalled();
       expect(evaluator.evaluateResource).not.toHaveBeenCalled();
     });
 
@@ -232,36 +191,32 @@ describe('MaintenanceScheduleService', () => {
       },
       { existingBasis: operatingBasis, update: { enabled: true } },
     ])('rejects an effective operating basis on a door when updating: $update', async ({ existingBasis, update }) => {
-      resourceRepository.findOne.mockResolvedValue({ id: 1, type: ResourceType.Door });
-      scheduleRepository.findOne.mockResolvedValue({ ...schedule, durationBasis: existingBasis });
+      store.findResourceType.mockResolvedValue({ type: ResourceType.Door });
+      store.findOne.mockResolvedValue({ ...schedule, durationBasis: existingBasis });
       await expect(service.update(1, 10, update, 7)).rejects.toThrow(
         'Operating duration is only supported for machine resources',
       );
-      expect(scheduleRepository.save).not.toHaveBeenCalled();
+      expect(store.update).not.toHaveBeenCalled();
       expect(evaluator.evaluateResource).not.toHaveBeenCalled();
     });
 
     it('allows the operating basis for a machine', async () => {
       const machineSchedule = { ...schedule, durationBasis: operatingBasis };
-      resourceRepository.findOne.mockResolvedValue({ id: 1, type: ResourceType.Machine });
-      scheduleRepository.findOne.mockResolvedValue(machineSchedule);
-      scheduleRepository.save = jest.fn().mockResolvedValue(machineSchedule);
+      store.findOne.mockResolvedValue(machineSchedule);
 
       await expect(service.update(1, 10, { durationBasis: operatingBasis }, 7)).resolves.toEqual(machineSchedule);
-      expect(scheduleRepository.save).toHaveBeenCalledWith(machineSchedule);
+      expect(store.update).toHaveBeenCalledWith(10, { durationBasis: operatingBasis }, undefined);
     });
 
     it('allows a door schedule to switch back to session duration', async () => {
-      const doorSchedule = { ...schedule, durationBasis: operatingBasis };
-      resourceRepository.findOne.mockResolvedValue({ id: 1, type: ResourceType.Door });
-      scheduleRepository.findOne.mockResolvedValue(doorSchedule);
-      scheduleRepository.save = jest.fn().mockResolvedValue(doorSchedule);
+      store.findResourceType.mockResolvedValue({ type: ResourceType.Door });
+      store.findOne.mockResolvedValue({ ...schedule, durationBasis: operatingBasis });
 
       await service.update(1, 10, { durationBasis: ResourceMaintenanceScheduleDurationBasis.SESSION_DURATION }, 7);
-      expect(scheduleRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          durationBasis: ResourceMaintenanceScheduleDurationBasis.SESSION_DURATION,
-        }),
+      expect(store.update).toHaveBeenCalledWith(
+        10,
+        { durationBasis: ResourceMaintenanceScheduleDurationBasis.SESSION_DURATION },
+        undefined,
       );
     });
   });

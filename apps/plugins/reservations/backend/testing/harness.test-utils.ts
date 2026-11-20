@@ -1,14 +1,13 @@
-import type { PluginAccessPrincipal, PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { DataSource, EntityManager } from 'typeorm';
-import { GlobalSettingsEntity } from '../entities/global-settings.entity';
-import { IcalFeedEntity } from '../entities/ical-feed.entity';
-import { NoticeEntity } from '../entities/notice.entity';
-import { ReservationEntity } from '../entities/reservation.entity';
-import { ResourceSettingsEntity } from '../entities/resource-settings.entity';
-import * as pluginMigrations from '../migrations';
+import {
+  createInMemoryPluginStorage,
+  type InMemoryPluginStorage,
+  type PluginAccessPrincipal,
+  type PluginAuditPrincipal,
+  type PluginContext,
+  type PluginStorageContext,
+} from '@attraccess/plugins-backend-sdk';
+import { reservationsStorage, tablesOf } from '../storage';
+import type { ReservationRow, ReservationWhere } from '../storage/reservation-table';
 import { AccessService } from '../reservations/access.service';
 import type { ReservationActor } from '../reservations/actor';
 import type { VisibilityService } from '../ical/visibility.service';
@@ -44,21 +43,38 @@ interface AccessState {
   introduced: Map<number, number[]>; // userId -> resourceIds
   maintained: Map<number, number[]>; // extra maintained ids (besides makeManager)
   attribution: Map<number, Set<number>>; // userId -> resourceIds whose users' names they may see
+  limits: Map<number, number>; // effective session limit per resource (default 1)
   hidden: Set<number>; // resourceIds only in hidden groups (invisible to everyone in these tests)
 }
 
-/** Real SQLite (temp file), real services, scripted host facade. Time is controlled via `setNow`. */
-export async function createHarness() {
-  const dir = mkdtempSync(join(tmpdir(), 'reservations-test-'));
-  const dataSource = await new DataSource({
-    type: 'sqlite',
-    database: join(dir, 'db.sqlite'),
-    entities: [ReservationEntity, ResourceSettingsEntity, GlobalSettingsEntity, IcalFeedEntity, NoticeEntity],
-    // Every migration the plugin registers (migrations.ts), as the host would run them.
-    migrations: Object.values(pluginMigrations),
-    synchronize: false,
-  }).initialize();
-  await dataSource.runMigrations();
+/**
+ * The in-memory record port (the SDK's fake of the host's storage), real services, scripted host facade. Time is
+ * controlled via `setNow`. Pass another harness as `share` to run a second, independent host (own services, own
+ * in-process mutex) on the same storage: only the port's transactions then keep concurrent creates apart.
+ */
+export async function createHarness(options: { share?: { memory: InMemoryPluginStorage } } = {}) {
+  const memory: InMemoryPluginStorage = options.share?.memory ?? createInMemoryPluginStorage(reservationsStorage);
+  // Records every record-port call the services make (the unwrapped `tables` below are for test setup and asserts).
+  const storageCalls: string[] = [];
+  const countingStorage: PluginStorageContext = {
+    open: ((definition) => {
+      const opened = memory.storage.open(definition);
+      return Object.fromEntries(
+        Object.entries(opened).map(([table, api]) => [
+          table,
+          Object.fromEntries(
+            Object.entries(api).map(([method, call]) => [
+              method,
+              (...args: unknown[]) => {
+                storageCalls.push(`${table}.${method}`);
+                return (call as (...a: unknown[]) => unknown)(...args);
+              },
+            ]),
+          ),
+        ]),
+      );
+    }) as unknown as PluginStorageContext['open'],
+  };
 
   let now = new Date('2026-06-01T08:00:00.000Z');
   const state: AccessState = {
@@ -70,6 +86,7 @@ export async function createHarness() {
     introduced: new Map(),
     maintained: new Map(),
     attribution: new Map(),
+    limits: new Map(),
     hidden: new Set(),
   };
   const dispatch = jest.fn(async (_request: unknown) => undefined);
@@ -87,14 +104,6 @@ export async function createHarness() {
     onRemoved: jest.fn(),
   } satisfies ReservationNotifier;
 
-  // Mirrors the host: concurrent callers run one at a time inside a transaction.
-  let tail: Promise<unknown> = Promise.resolve();
-  const runSerialized = <T>(work: (manager: EntityManager) => Promise<T>): Promise<T> => {
-    const next = tail.catch(() => undefined).then(() => dataSource.transaction(work));
-    tail = next;
-    return next;
-  };
-
   // Like the host: a principal with effectivePermissions (a request's user) only uses the permissions inside that
   // scope; a plain id uses the user's full permissions. Maintainer roles and introductions are not permissions.
   const idOf = (subject: PluginAccessPrincipal) => (typeof subject === 'number' ? subject : subject.id);
@@ -107,8 +116,9 @@ export async function createHarness() {
 
   const context = {
     audit,
-    dataSource,
     logger: console,
+    persistence: memory.persistence,
+    storage: countingStorage,
     notifications: { dispatch },
     startBlocked: { invalidate: invalidateStartBlocked },
     readerUi: { invalidate: invalidateReaderUi },
@@ -122,8 +132,6 @@ export async function createHarness() {
           ),
       };
     },
-    runSerialized,
-    getRepository: (entity: never) => dataSource.getRepository(entity),
     resourceAccess: {
       // Core's rule for the current user's name; scripted per user and resource. Like core, a request scope without
       // resources.read (or update / access.manage) sees nobody's name.
@@ -161,6 +169,10 @@ export async function createHarness() {
   const directory = {
     getResource: async (id: number) => (knownResources.has(id) ? { id, name: `Resource ${id}` } : null),
     getResourceNames: async (ids: number[]) => new Map(ids.map((id) => [id, `Resource ${id}`])),
+    // Like the real lookup: an unknown (deleted) resource reads as limit 1, or as null where the caller asks.
+    getSessionLimit: async (id: number) => (knownResources.has(id) ? (state.limits.get(id) ?? 1) : 1),
+    findSessionLimit: async (id: number) => (knownResources.has(id) ? (state.limits.get(id) ?? 1) : null),
+    getActiveSessions: async (id: number) => state.sessions.filter((session) => session.resourceId === id),
     getUserNames: async (ids: number[]) => new Map(ids.map((id) => [id, `user${id}`])),
   } as unknown as DirectoryService;
 
@@ -202,8 +214,21 @@ export async function createHarness() {
   const admin = new SettingsAdminService(settings, globalSettings, reservations, access, directory);
   await globalSettings.setTimezone('Europe/Berlin');
 
+  const tables = tablesOf({ storage: memory.storage } as PluginContext);
+
   return {
-    dataSource,
+    memory,
+    /** The plugin's tables on the record port, uncounted: for arranging and asserting state in tests. */
+    tables,
+    /** `table.method` of every record-port call the plugin services made so far (reset with `length = 0`). */
+    storageCalls,
+    /** The booking matching `where` (an id, or a field filter); fails when there is none. */
+    async reservation(where: number | ReservationWhere): Promise<ReservationRow> {
+      const row =
+        typeof where === 'number' ? await tables.reservations.get(where) : await tables.reservations.findOne({ where });
+      if (!row) throw new Error(`No reservation for ${JSON.stringify(where)}`);
+      return row as ReservationRow;
+    },
     context,
     state,
     audit,
@@ -232,6 +257,14 @@ export async function createHarness() {
     async enable(resourceId: number, patch: Partial<ResourceSettingsValues> = {}) {
       await settings.update(resourceId, { enabled: true, whoCanBook: 'any-user', ...patch });
     },
+    /** Effective session limit of the resource (what core's `sessionLimitOf` answers). */
+    setLimit(resourceId: number, limit: number) {
+      state.limits.set(resourceId, limit);
+    },
+    /** The resource is (soft-)deleted in core: lookups no longer find it. */
+    deleteResource(resourceId: number) {
+      knownResources.delete(resourceId);
+    },
     makeManager(userId: number, resourceId: number) {
       state.maintainers.set(userId, new Set([...(state.maintainers.get(userId) ?? []), resourceId]));
     },
@@ -244,8 +277,6 @@ export async function createHarness() {
     },
     async close() {
       await reservations.flushNotifications();
-      await dataSource.destroy();
-      rmSync(dir, { recursive: true, force: true });
     },
   };
 }

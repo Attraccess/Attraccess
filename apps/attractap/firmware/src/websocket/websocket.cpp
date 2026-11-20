@@ -3,6 +3,7 @@
 #include "../platform.hpp"
 #include "esp_heap_caps.h"
 #include "esp_system.h"
+#include "../psram_task.hpp"
 #include "../settings/kvstore.hpp"
 #include <cstdlib>
 #include <cstring>
@@ -37,13 +38,17 @@ void Websocket::setup()
     {
         tx_queue = xQueueCreate(TX_QUEUE_DEPTH, sizeof(TxMessage));
     }
-    if (!tx_task && tx_queue)
+    // Both run on PSRAM stacks (psram_task.hpp): ws_conn reads and writes NVS, neither maps flash.
+    if (!tx_task && tx_queue && !createPsramTask(txTaskEntry, "ws_tx", TX_TASK_STACK, this, TX_TASK_PRIORITY, &tx_task))
     {
-        xTaskCreate(txTaskEntry, "ws_tx", TX_TASK_STACK, this, TX_TASK_PRIORITY, &tx_task);
+        tx_task = nullptr;
+        logger.error("Websocket setup: could not start the tx task; messages are not sent");
     }
-    if (!connect_task)
+    if (!connect_task &&
+        !createPsramTask(connectTaskEntry, "ws_conn", CONNECT_TASK_STACK, this, CONNECT_TASK_PRIORITY, &connect_task))
     {
-        xTaskCreate(connectTaskEntry, "ws_conn", CONNECT_TASK_STACK, this, CONNECT_TASK_PRIORITY, &connect_task);
+        connect_task = nullptr;
+        logger.error("Websocket setup: could not start the connect task; the reader cannot connect");
     }
     this->_certManager.begin();
 }
@@ -130,7 +135,12 @@ void Websocket::loop()
         break;
     case CONNECTED:
         sendPongProbe(nowMs);
-        if (millis() - this->lastInboundFrameTime > this->INBOUND_LIVENESS_TIMEOUT_MS)
+        // The websocket task writes lastInboundFrameTime unlocked, possibly after the clock was read here.
+        // A frame arriving in between carries a later time; as an unsigned difference that wrapped into
+        // a timeout in the middle of a busy stream and interrupted firmware updates. Read it first and
+        // compare signed, as publishNetworkQuality() does.
+        const uint32_t lastInbound = this->lastInboundFrameTime;
+        if ((int32_t)(millis() - lastInbound) > (int32_t)this->INBOUND_LIVENESS_TIMEOUT_MS)
         {
             logger.error("No inbound frames within liveness timeout, forcing reconnect");
             recordNetworkQualityEvent(this->livenessTimeoutEventTimes, this->livenessTimeoutEventNextIndex);
@@ -159,9 +169,10 @@ void Websocket::setState(ConnectionState state)
         clearPendingPongProbe();
     }
     _state = state;
-    if (this->connectionCallback && wasConnected != (state == CONNECTED))
+    if (wasConnected != (state == CONNECTED))
     {
-        this->connectionCallback(state == CONNECTED);
+        _connectionId++;
+        if (this->connectionCallback) this->connectionCallback(state == CONNECTED);
     }
 
     State::WebsocketPhase phase = State::WS_INIT;
@@ -198,9 +209,19 @@ void Websocket::setRawBinaryCallback(std::function<bool(const uint8_t *, size_t)
     this->rawBinaryCallback = callback;
 }
 
+bool Websocket::sendQueueHasRoom(size_t reserve) const
+{
+    return tx_queue && uxQueueSpacesAvailable(tx_queue) > reserve;
+}
+
 void Websocket::setConnectionCallback(std::function<void(bool connected)> callback)
 {
     this->connectionCallback = callback;
+}
+
+void Websocket::setSendSlotFreedCallback(std::function<void()> callback)
+{
+    this->sendSlotFreedCallback = callback;
 }
 
 void Websocket::setSubprotocol(const std::string &subprotocol)
@@ -439,6 +460,10 @@ void Websocket::txTaskLoop()
         if (xQueueReceive(tx_queue, &msg, portMAX_DELAY) != pdTRUE)
         {
             continue;
+        }
+        if (this->sendSlotFreedCallback)
+        {
+            this->sendSlotFreedCallback();
         }
 
         lockWsClient();

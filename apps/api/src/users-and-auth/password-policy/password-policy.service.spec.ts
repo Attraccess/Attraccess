@@ -1,5 +1,7 @@
 import { registerPasswordPolicyServiceFixture } from './password-policy.service.password-policy-service.test-fixture';
-import { PasswordPolicyRole, AuthenticationType } from '@attraccess/database-entities';
+import { PasswordPolicyRole } from '@attraccess/application-models';
+import { BadRequestException, ConflictException } from '@nestjs/common';
+import { PasswordPolicyConflictError, PasswordPolicyConstraintError } from './password-policy-store.port';
 import * as bcrypt from 'bcrypt';
 import { DEFAULT_PASSWORD_POLICY } from '@attraccess/shared';
 
@@ -18,7 +20,7 @@ describe('PasswordPolicyService', () => {
         request: { ipAddress: '192.0.2.7', userAgent: 'fixture' },
         details: { field: 'minLength', before: expect.any(String), after: expect.any(String) },
       }),
-      fixture.manager,
+      fixture.scope,
     );
     const details = fixture.identityAudit.record.mock.calls[0][0].details;
     expect(JSON.parse(details.before).minLength).toBe(12);
@@ -37,9 +39,8 @@ describe('PasswordPolicyService', () => {
         action: 'identity.password_policy_override_updated',
         details: { role: PasswordPolicyRole.ADMIN, after: expect.any(String) },
       }),
-      fixture.manager,
+      fixture.scope,
     );
-    fixture.overrideRepo.findOne.mockResolvedValue(fixture.buildOverride({ minLength: 16, requireDigit: true }));
     await fixture.service.deleteOverride(PasswordPolicyRole.ADMIN, fixture.audit);
     expect(fixture.identityAudit.record).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -47,7 +48,7 @@ describe('PasswordPolicyService', () => {
         action: 'identity.password_policy_override_deleted',
         details: { role: PasswordPolicyRole.ADMIN, before: expect.any(String) },
       }),
-      fixture.manager,
+      fixture.scope,
     );
     expect(JSON.parse(fixture.identityAudit.record.mock.calls[1][0].details.before)).toMatchObject({
       minLength: 16,
@@ -56,7 +57,7 @@ describe('PasswordPolicyService', () => {
   });
 
   it('does not emit successful audit records when policy persistence fails', async () => {
-    fixture.repo.save.mockRejectedValueOnce(new Error('Database unavailable'));
+    fixture.store.savePolicy.mockRejectedValueOnce(new Error('Database unavailable'));
     await expect(fixture.service.updatePolicy({ minLength: 14 }, fixture.audit)).rejects.toThrow(
       'Database unavailable',
     );
@@ -64,9 +65,10 @@ describe('PasswordPolicyService', () => {
   });
 
   it('seeds defaults when no row exists', async () => {
-    fixture.repo.findOne = jest.fn(async () => null);
+    fixture.state.policy = null;
     await fixture.service.ensureSeed();
-    expect(fixture.repo.save).toHaveBeenCalledWith(expect.objectContaining({ id: 1, ...DEFAULT_PASSWORD_POLICY }));
+    expect(fixture.store.seedPolicy).toHaveBeenCalledWith(DEFAULT_PASSWORD_POLICY);
+    expect(fixture.state.policy).toEqual(DEFAULT_PASSWORD_POLICY);
   });
 
   it('returns sanitized public policy without internal flags', async () => {
@@ -120,7 +122,7 @@ describe('PasswordPolicyService', () => {
   });
 
   it('skips HIBP when policy.checkHIBP is false', async () => {
-    fixture.repo.findOne = jest.fn(async () => fixture.buildRow({ checkHIBP: false }));
+    fixture.state.policy = fixture.buildRow({ checkHIBP: false });
     await fixture.service.validate('Tr0ub4dor-Hummingbird-9!plate', {
       username: 'someone-else',
       email: 'else@example.com',
@@ -134,11 +136,8 @@ describe('PasswordPolicyService', () => {
 
     it('flags PASSWORD_REUSED when candidate matches current password hash', async () => {
       const currentHash = await bcrypt.hash(currentPassword, 4);
-      fixture.repo.findOne = jest.fn(async () => fixture.buildRow({ historySize: 3 }));
-      fixture.authDetailRepo.findOne = jest.fn(async () => ({
-        password: currentHash,
-        type: AuthenticationType.LOCAL_PASSWORD,
-      }));
+      fixture.state.policy = fixture.buildRow({ historySize: 3 });
+      fixture.credentials.findLocalPasswordHash.mockResolvedValue(currentHash);
 
       const result = await fixture.service.validate(
         currentPassword,
@@ -152,11 +151,9 @@ describe('PasswordPolicyService', () => {
     it('flags PASSWORD_REUSED when candidate matches a prior history entry', async () => {
       const currentHash = await bcrypt.hash(currentPassword, 4);
       const priorHash = await bcrypt.hash(reusedPriorPassword, 4);
-      fixture.repo.findOne = jest.fn(async () => fixture.buildRow({ historySize: 3 }));
-      fixture.authDetailRepo.findOne = jest.fn(async () => ({ password: currentHash }));
-      fixture.historyRepo.find = jest.fn(async () => [
-        { id: 1, passwordHash: priorHash, userId: 7, createdAt: new Date() },
-      ]);
+      fixture.state.policy = fixture.buildRow({ historySize: 3 });
+      fixture.credentials.findLocalPasswordHash.mockResolvedValue(currentHash);
+      fixture.store.recentHistoryHashes.mockResolvedValue([priorHash]);
 
       const result = await fixture.service.validate(
         reusedPriorPassword,
@@ -165,31 +162,30 @@ describe('PasswordPolicyService', () => {
       );
       expect(result.ok).toBe(false);
       expect(result.errors).toContainEqual({ code: 'PASSWORD_REUSED', params: { historySize: 3 } });
+      expect(fixture.store.recentHistoryHashes).toHaveBeenCalledWith(7, 3);
     });
 
     it('does not check history when historySize is 0', async () => {
-      fixture.repo.findOne = jest.fn(async () => fixture.buildRow({ historySize: 0 }));
+      fixture.state.policy = fixture.buildRow({ historySize: 0 });
       await fixture.service.validate('Tr0ub4dor-Hummingbird-9!plate', {}, { userIdForHistory: 7 });
-      expect(fixture.authDetailRepo.findOne).not.toHaveBeenCalled();
-      expect(fixture.historyRepo.find).not.toHaveBeenCalled();
+      expect(fixture.credentials.findLocalPasswordHash).not.toHaveBeenCalled();
+      expect(fixture.store.recentHistoryHashes).not.toHaveBeenCalled();
     });
 
     it('archiveCurrentPasswordToHistory saves the current hash and prunes', async () => {
       const currentHash = await bcrypt.hash(currentPassword, 4);
-      fixture.repo.findOne = jest.fn(async () => fixture.buildRow({ historySize: 2 }));
-      fixture.authDetailRepo.findOne = jest.fn(async () => ({ password: currentHash }));
+      fixture.state.policy = fixture.buildRow({ historySize: 2 });
+      fixture.credentials.findLocalPasswordHash.mockResolvedValue(currentHash);
 
       await fixture.service.archiveCurrentPasswordToHistory(11);
-      expect(fixture.historyRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: 11, passwordHash: currentHash }),
-      );
-      expect(fixture.historyRepo.createQueryBuilder).toHaveBeenCalled();
+      expect(fixture.store.recordHistory).toHaveBeenCalledWith(11, currentHash, 2);
     });
 
     it('archiveCurrentPasswordToHistory is a no-op when historySize is 0', async () => {
-      fixture.repo.findOne = jest.fn(async () => fixture.buildRow({ historySize: 0 }));
+      fixture.state.policy = fixture.buildRow({ historySize: 0 });
+      fixture.credentials.findLocalPasswordHash.mockResolvedValue('some-hash');
       await fixture.service.archiveCurrentPasswordToHistory(11);
-      expect(fixture.historyRepo.save).not.toHaveBeenCalled();
+      expect(fixture.store.recordHistory).not.toHaveBeenCalled();
     });
   });
 
@@ -197,19 +193,19 @@ describe('PasswordPolicyService', () => {
     it('getEffectivePolicy returns base when no role provided', async () => {
       const effective = await fixture.service.getEffectivePolicy();
       expect(effective.minLength).toBe(12);
-      expect(fixture.overrideRepo.findOne).not.toHaveBeenCalled();
+      expect(fixture.store.findOverride).not.toHaveBeenCalled();
     });
 
     it('getEffectivePolicy returns base when no override row exists', async () => {
       const effective = await fixture.service.getEffectivePolicy(PasswordPolicyRole.ADMIN);
       expect(effective.minLength).toBe(12);
-      expect(fixture.overrideRepo.findOne).toHaveBeenCalledWith({ where: { role: PasswordPolicyRole.ADMIN } });
+      expect(fixture.store.findOverride).toHaveBeenCalledWith(PasswordPolicyRole.ADMIN);
     });
 
     it('getEffectivePolicy merges override fields over base', async () => {
-      fixture.overrideRepo.findOne = jest.fn(async () =>
+      fixture.state.overrides = [
         fixture.buildOverride({ role: PasswordPolicyRole.ADMIN, minLength: 24, requireSpecial: true }),
-      );
+      ];
       const effective = await fixture.service.getEffectivePolicy(PasswordPolicyRole.ADMIN);
       expect(effective.minLength).toBe(24);
       expect(effective.requireSpecial).toBe(true);
@@ -217,18 +213,14 @@ describe('PasswordPolicyService', () => {
     });
 
     it('null override fields fall back to base', async () => {
-      fixture.overrideRepo.findOne = jest.fn(async () =>
-        fixture.buildOverride({ role: PasswordPolicyRole.ADMIN, minLength: 20 }),
-      );
+      fixture.state.overrides = [fixture.buildOverride({ role: PasswordPolicyRole.ADMIN, minLength: 20 })];
       const effective = await fixture.service.getEffectivePolicy(PasswordPolicyRole.ADMIN);
       expect(effective.minLength).toBe(20);
       expect(effective.requireUppercase).toBe(false);
     });
 
     it('validate honours role-specific policy via getEffectivePolicy', async () => {
-      fixture.overrideRepo.findOne = jest.fn(async () =>
-        fixture.buildOverride({ role: PasswordPolicyRole.ADMIN, minLength: 24 }),
-      );
+      fixture.state.overrides = [fixture.buildOverride({ role: PasswordPolicyRole.ADMIN, minLength: 24 })];
       const result = await fixture.service.validate(
         'short-pw-1A!',
         { username: 'a', email: 'a@x.de' },
@@ -238,44 +230,41 @@ describe('PasswordPolicyService', () => {
     });
 
     it('upsertOverride creates a new row with null defaults plus provided fields', async () => {
-      fixture.overrideRepo.findOne = jest.fn(async () => null);
-      await fixture.service.upsertOverride(PasswordPolicyRole.ADMIN, { minLength: 32 });
-      expect(fixture.overrideRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          role: PasswordPolicyRole.ADMIN,
-          minLength: 32,
-          maxLength: null,
-        }),
+      const saved = await fixture.service.upsertOverride(PasswordPolicyRole.ADMIN, { minLength: 32 });
+      expect(fixture.store.saveOverride).toHaveBeenCalledWith(
+        PasswordPolicyRole.ADMIN,
+        { minLength: 32 },
+        fixture.scope,
       );
+      expect(saved).toMatchObject({ role: PasswordPolicyRole.ADMIN, minLength: 32, maxLength: null });
     });
 
     it('upsertOverride merges into existing row', async () => {
-      const existing = fixture.buildOverride({ role: PasswordPolicyRole.ADMIN, minLength: 16 });
-      fixture.overrideRepo.findOne = jest.fn(async () => existing);
+      fixture.state.overrides = [fixture.buildOverride({ role: PasswordPolicyRole.ADMIN, minLength: 16 })];
       await fixture.service.upsertOverride(PasswordPolicyRole.ADMIN, { minLength: 32, requireSpecial: true });
-      expect(fixture.overrideRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ minLength: 32, requireSpecial: true }),
+      expect(fixture.store.saveOverride).toHaveBeenCalledWith(
+        PasswordPolicyRole.ADMIN,
+        { minLength: 32, requireSpecial: true },
+        fixture.scope,
       );
+      expect(fixture.state.overrides).toEqual([expect.objectContaining({ minLength: 32, requireSpecial: true })]);
     });
 
     it('upsertOverride rejects when post-merge minLength exceeds global maxLength', async () => {
-      fixture.repo.findOne = jest.fn(async () => fixture.buildRow({ minLength: 12, maxLength: 16 }));
-      fixture.overrideRepo.findOne = jest.fn(async () => null);
+      fixture.state.policy = fixture.buildRow({ minLength: 12, maxLength: 16 });
       await expect(fixture.service.upsertOverride(PasswordPolicyRole.ADMIN, { minLength: 32 })).rejects.toThrow(
         /minLength/,
       );
     });
 
     it('updatePolicy rejects when new global minLength exceeds existing override maxLength', async () => {
-      const existing = fixture.buildOverride({ role: PasswordPolicyRole.ADMIN, maxLength: 16 });
-      fixture.repo.findOne = jest.fn(async () => fixture.buildRow());
-      fixture.overrideRepo.find = jest.fn(async () => [existing]);
+      fixture.state.overrides = [fixture.buildOverride({ role: PasswordPolicyRole.ADMIN, maxLength: 16 })];
       await expect(fixture.service.updatePolicy({ minLength: 32 })).rejects.toThrow(/minLength/);
     });
 
     it('deleteOverride throws when role has no override row', async () => {
-      fixture.overrideRepo.findOne = jest.fn(async () => null);
       await expect(fixture.service.deleteOverride(PasswordPolicyRole.ADMIN)).rejects.toThrow();
+      expect(fixture.store.deleteOverride).not.toHaveBeenCalled();
     });
 
     it('resolveRole returns admin for request-bound users with system.settings.manage permission', async () => {
@@ -308,30 +297,43 @@ describe('PasswordPolicyService', () => {
 
   describe('updatePolicy (hot reload)', () => {
     it('persists partial updates and returns the next read from DB', async () => {
-      let state = fixture.buildRow();
-      fixture.repo.findOne = jest.fn(async () => state);
-      fixture.repo.save = jest.fn(async (row) => {
-        state = { ...state, ...row };
-        return state;
-      });
       const after = await fixture.service.updatePolicy({ minLength: 20, requireUppercase: true });
       expect(after.minLength).toBe(20);
       expect(after.requireUppercase).toBe(true);
     });
 
     it('next validate() call sees the freshly written policy (no cache)', async () => {
-      let state = fixture.buildRow();
-      fixture.repo.findOne = jest.fn(async () => state);
-      fixture.repo.save = jest.fn(async (row) => {
-        state = { ...state, ...row };
-        return state;
-      });
       await fixture.service.updatePolicy({ minLength: 50 });
       const result = await fixture.service.validate('Tr0ub4dor-Hummingbird-9!plate', {
         username: 'else',
         email: 'else@example.com',
       });
       expect(result.errors.map((e) => e.code)).toContain('MIN_LENGTH');
+    });
+  });
+
+  describe('store rejections', () => {
+    it('answers 409 when the policy row changed under a concurrent writer', async () => {
+      fixture.store.savePolicy.mockRejectedValueOnce(new PasswordPolicyConflictError());
+      await expect(fixture.service.updatePolicy({ minLength: 20 }, fixture.audit)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(fixture.identityAudit.record).not.toHaveBeenCalled();
+    });
+
+    it('answers 400 with the constraint message when the database rejects a rule combination', async () => {
+      fixture.store.saveOverride.mockRejectedValueOnce(new PasswordPolicyConstraintError('CHECK constraint failed: x'));
+      await expect(
+        fixture.service.upsertOverride(PasswordPolicyRole.ADMIN, { minLength: 20 }, fixture.audit),
+      ).rejects.toEqual(new BadRequestException('CHECK constraint failed: x'));
+      expect(fixture.identityAudit.record).not.toHaveBeenCalled();
+    });
+
+    it('runs the change, the validation and the audit row in one unit of work', async () => {
+      await fixture.service.updatePolicy({ minLength: 14 }, fixture.audit);
+      expect(fixture.store.findPolicy).toHaveBeenCalledWith(fixture.scope);
+      expect(fixture.store.savePolicy).toHaveBeenCalledWith({ minLength: 14 }, fixture.scope);
+      expect(fixture.store.listOverrides).toHaveBeenCalledWith(fixture.scope);
     });
   });
 });

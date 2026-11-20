@@ -1,6 +1,6 @@
-import { ResourceFlowNode, ResourceUsageEndSessionNodeDataSchema } from '@attraccess/database-entities';
-import { SessionEndTarget } from '../../usage/sessions/usage-session-ends';
-import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
+import { FlowNodeRecord, ResourceUsageEndSessionNodeDataSchema } from '@attraccess/application-models';
+import type { SessionEndTarget } from '../../usage/sessions/usage-session-ends';
+import type { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
@@ -11,7 +11,7 @@ import { SYSTEM_AUDIT_ACTOR } from '../../../audit/recorder/audit-event';
 export class EndUsageSessionExecutor implements NodeExecutor {
   constructor(private readonly resourceUsageService: ResourceUsageService) {}
 
-  async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+  async execute(node: FlowNodeRecord, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
     const { notes, target, userId } = ResourceUsageEndSessionNodeDataSchema.parse(node.data ?? {}) ?? {};
 
     const resourceId = await requireRunMachineId(node, ctx);

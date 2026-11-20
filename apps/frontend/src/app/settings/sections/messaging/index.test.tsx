@@ -3,20 +3,20 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  usePushServicePushGetVapidConfig,
-  usePushServicePushReplaceVapidKeys,
-  useSettingsServiceGetMessagingRateLimitSettings,
-  useSettingsServiceUpdateMessagingRateLimitSettings,
+  usePushGetVapidConfig,
+  usePushReplaceVapidKeys,
+  useGetMessagingRateLimitSettings,
+  useUpdateMessagingRateLimitSettings,
 } from '@attraccess/react-query-client';
 import { MessagingSection } from './index';
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useSettingsServiceGetMessagingRateLimitSettings: vi.fn(),
-  UseSettingsServiceGetMessagingRateLimitSettingsKeyFn: () => ['messaging-limits'],
-  useSettingsServiceUpdateMessagingRateLimitSettings: vi.fn(),
-  usePushServicePushGetVapidConfig: vi.fn(),
-  UsePushServicePushGetVapidConfigKeyFn: () => ['vapid'],
-  usePushServicePushReplaceVapidKeys: vi.fn(),
+  useGetMessagingRateLimitSettings: vi.fn(),
+  UseGetMessagingRateLimitSettingsKeyFn: () => ['messaging-limits'],
+  useUpdateMessagingRateLimitSettings: vi.fn(),
+  usePushGetVapidConfig: vi.fn(),
+  UsePushGetVapidConfigKeyFn: () => ['vapid'],
+  usePushReplaceVapidKeys: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -42,8 +42,8 @@ const saveLimits = vi.fn();
 
 const mockLimitsQuery = (data: unknown, isLoading = false) =>
   vi
-    .mocked(useSettingsServiceGetMessagingRateLimitSettings)
-    .mockReturnValue({ data, isLoading } as ReturnType<typeof useSettingsServiceGetMessagingRateLimitSettings>);
+    .mocked(useGetMessagingRateLimitSettings)
+    .mockReturnValue({ data, isLoading } as ReturnType<typeof useGetMessagingRateLimitSettings>);
 
 const saveBar = (container: HTMLElement) => container.querySelector('[data-slot="settings-save-bar"]');
 
@@ -51,17 +51,17 @@ describe('MessagingSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockLimitsQuery(LIMITS);
-    vi.mocked(useSettingsServiceUpdateMessagingRateLimitSettings).mockReturnValue({
+    vi.mocked(useUpdateMessagingRateLimitSettings).mockReturnValue({
       mutate: saveLimits,
       isPending: false,
-    } as unknown as ReturnType<typeof useSettingsServiceUpdateMessagingRateLimitSettings>);
-    vi.mocked(usePushServicePushGetVapidConfig).mockReturnValue({
+    } as unknown as ReturnType<typeof useUpdateMessagingRateLimitSettings>);
+    vi.mocked(usePushGetVapidConfig).mockReturnValue({
       data: { publicKey: 'BPublicKey', subscriptionCount: 3 },
-    } as ReturnType<typeof usePushServicePushGetVapidConfig>);
-    vi.mocked(usePushServicePushReplaceVapidKeys).mockReturnValue({
+    } as ReturnType<typeof usePushGetVapidConfig>);
+    vi.mocked(usePushReplaceVapidKeys).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as unknown as ReturnType<typeof usePushServicePushReplaceVapidKeys>);
+    } as unknown as ReturnType<typeof usePushReplaceVapidKeys>);
   });
 
   it('shows no save bar until a limit is edited', () => {
@@ -106,7 +106,7 @@ describe('MessagingSection', () => {
     expect(saveBar(container)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
 
-    expect(saveLimits).toHaveBeenCalledWith({ requestBody: { ...LIMITS, sendMaxPerWindow: 45 } });
+    expect(saveLimits).toHaveBeenCalledWith({ body: { ...LIMITS, sendMaxPerWindow: 45 } });
   });
 
   it('keeps the bar mounted but blocks Save while a field is cleared', async () => {
@@ -124,12 +124,52 @@ describe('MessagingSection', () => {
     expect(saveBar(container)).toBeNull();
   });
 
+  it('requests the VAPID config in parallel with the limits, once each', () => {
+    // Subscribing in the rows delayed VAPID until the limits had arrived, and the rows refetched
+    // the limits on mount (the shared client has no `staleTime`).
+    mockLimitsQuery(undefined, true);
+    const { rerender } = render(<MessagingSection />);
+
+    expect(screen.getByText('loading')).toBeInTheDocument();
+    expect(usePushGetVapidConfig).toHaveBeenCalledTimes(1);
+
+    vi.clearAllMocks();
+    mockLimitsQuery(LIMITS);
+    rerender(<MessagingSection />);
+
+    expect(useGetMessagingRateLimitSettings).toHaveBeenCalledTimes(1);
+    expect(usePushGetVapidConfig).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps typed custom keys and an open confirmation through a limits refetch after an error', async () => {
+    // A refetch of a query without data goes back to loading, which shows the spinner and unmounts
+    // the rows. The keys and the confirmation step must still be there when the rows come back.
+    mockLimitsQuery(undefined);
+    const { rerender } = render(<MessagingSection />);
+
+    await userEvent.type(screen.getByLabelText('publicKeyInputLabel'), 'BCustomPublic');
+    await userEvent.type(screen.getByLabelText('privateKeyInputLabel'), 'custom-private');
+    await userEvent.click(screen.getByRole('button', { name: 'applyCustomButton' }));
+    expect(await screen.findByRole('alertdialog', { name: 'confirmWarning.title' })).toBeInTheDocument();
+
+    mockLimitsQuery(undefined, true);
+    rerender(<MessagingSection />);
+    expect(screen.getByText('loading')).toBeInTheDocument();
+
+    mockLimitsQuery(undefined);
+    rerender(<MessagingSection />);
+
+    expect(screen.getByLabelText('publicKeyInputLabel')).toHaveValue('BCustomPublic');
+    expect(screen.getByLabelText('privateKeyInputLabel')).toHaveValue('custom-private');
+    expect(await screen.findByRole('alertdialog', { name: 'confirmWarning.title' })).toBeInTheDocument();
+  });
+
   it('walks the two-step key replacement and goes back to step one on Escape', async () => {
     const replace = vi.fn();
-    vi.mocked(usePushServicePushReplaceVapidKeys).mockReturnValue({
+    vi.mocked(usePushReplaceVapidKeys).mockReturnValue({
       mutate: replace,
       isPending: false,
-    } as unknown as ReturnType<typeof usePushServicePushReplaceVapidKeys>);
+    } as unknown as ReturnType<typeof usePushReplaceVapidKeys>);
     render(<MessagingSection />);
 
     await userEvent.click(screen.getByRole('button', { name: /regenerateButton/ }));
@@ -144,6 +184,6 @@ describe('MessagingSection', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'confirmWarning.continue' }));
     await userEvent.click(await screen.findByRole('button', { name: 'confirmFinal.confirm' }));
-    expect(replace).toHaveBeenCalledWith({ requestBody: {} });
+    expect(replace).toHaveBeenCalledWith({ body: {} });
   });
 });

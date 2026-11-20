@@ -1,4 +1,3 @@
-import { AttractapCredentialEvent } from '@attraccess/database-entities';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import {
   Body,
@@ -17,11 +16,10 @@ import {
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { LicenseModuleType } from '../license/license.service';
 import { RequiresLicense } from '../license/require-license.decorator';
-import { ApprovePairingDto, PairingDto, RequestPairingResponseDto, ResolvePairingDto } from './dtos/pairing.dto';
+import { ApprovePairingDto, PairingDto, ResolvePairingDto } from './dtos/pairing.dto';
+import { AttractapCredentialEventDto, toCredentialEventDto } from './dtos/credential-event.dto';
 import { CredentialRegistryService } from './security/credential-registry.service';
 import { Actor, PairingService } from './security/pairing.service';
-import { AttractapEvent, AttractapEventType } from './websockets/websocket.types';
-import { WebsocketService } from './websockets/websocket.service';
 
 function actorOf(req: AuthenticatedRequest): Actor {
   return {
@@ -39,7 +37,6 @@ export class AttractapPairingController {
   public constructor(
     @Inject(PairingService) private readonly pairing: PairingService,
     @Inject(CredentialRegistryService) private readonly registry: CredentialRegistryService,
-    @Inject(WebsocketService) private readonly sockets: WebsocketService,
   ) {}
 
   @Get('pairings')
@@ -97,31 +94,6 @@ export class AttractapPairingController {
     await this.pairing.cancel(pairingId, actorOf(req));
   }
 
-  @Post('readers/:readerId/pair')
-  @Auth('resources.update')
-  @HttpCode(202)
-  @ApiOperation({
-    summary: 'Ask a connected reader to start pairing; it then appears in the pairing list',
-    operationId: 'requestReaderPairing',
-  })
-  @ApiResponse({ status: 202, type: RequestPairingResponseDto })
-  public async requestPairing(@Param('readerId', ParseIntPipe) readerId: number): Promise<RequestPairingResponseDto> {
-    const targets = [...this.sockets.sockets.values()].filter(
-      (socket) => socket.readerId === readerId && socket.transport !== 'session',
-    );
-    // A one-time ticket binds the reader's pairing request to this record; the token stays out of pairing.
-    await Promise.all(
-      targets.map((socket) =>
-        socket.sendMessage(
-          new AttractapEvent(AttractapEventType.READER_START_PAIRING, {
-            ticket: this.pairing.issueBindingTicket(readerId),
-          }),
-        ),
-      ),
-    );
-    return { requested: targets.length > 0 };
-  }
-
   @Post('readers/:readerId/revoke')
   @Auth('resources.update')
   @HttpCode(204)
@@ -133,8 +105,8 @@ export class AttractapPairingController {
   @Get('readers/:readerId/credentials')
   @Auth('resources.update')
   @ApiOperation({ summary: 'Credential history of a reader', operationId: 'getReaderCredentialHistory' })
-  @ApiResponse({ status: 200, type: [AttractapCredentialEvent] })
-  public async history(@Param('readerId', ParseIntPipe) readerId: number): Promise<AttractapCredentialEvent[]> {
-    return await this.registry.history(readerId);
+  @ApiResponse({ status: 200, type: [AttractapCredentialEventDto] })
+  public async history(@Param('readerId', ParseIntPipe) readerId: number): Promise<AttractapCredentialEventDto[]> {
+    return (await this.registry.history(readerId)).map(toCredentialEventDto);
   }
 }

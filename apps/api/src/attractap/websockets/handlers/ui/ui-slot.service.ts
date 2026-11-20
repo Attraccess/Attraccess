@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { ResourceUsageAction } from '@attraccess/database-entities';
+import { ResourceUsageAction } from '@attraccess/application-models';
 import { READER_UI_SLOTS, READER_UI_TIMING, type ReaderUiCapabilities } from '@attraccess/plugins-backend-sdk';
 import { AttractapService } from '../../../attractap.service';
 import { ReaderUpdatedEvent } from '../../../events';

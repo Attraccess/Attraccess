@@ -1,15 +1,19 @@
-import {
-  ResourceOperatingInterval,
-  ResourceUsage,
-  ResourceUsageLifecycleAttempt,
-  ResourceUsageAction,
-} from '@attraccess/database-entities';
+import { ResourceUsageAction } from '@attraccess/application-models';
+import type { OperatingIntervalRecord, OperatingTimelineSession } from '@attraccess/application-models';
 
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
+import type { TransactionContext } from '../../database/transaction-context';
 
-import { Repository, EntityManager, In, IsNull, LessThan, MoreThan, Not } from 'typeorm';
+import { computeOperatingShare, OperatingShare, ShareUsage } from './operating-share';
+
+import { OPERATING_TIMELINE_STORE, OperatingTimelineStore } from './operating-timeline.port';
+
+/** The session fields a duration or share is computed from. */
+export type AttributableUsage = Pick<
+  OperatingTimelineSession,
+  'id' | 'resourceId' | 'startTime' | 'endTime' | 'operatingDurationCreditsPerMinute'
+>;
 
 export const ATTRIBUTION_LOOKBACK_MS = 31 * 24 * 60 * 60_000;
 
@@ -35,7 +39,10 @@ export interface ResourceOperatingAttribution {
 export interface ResourceOperatingAttributionSummary {
   asOf: Date;
   windowStart: Date | null;
+  /** Machine hours with a session: the union of the session ranges (overlapping sessions count once). */
   sessionDurationMs: number;
+  /** Person hours: the sum of every session's duration (overlapping sessions count each). */
+  personDurationMs: number;
   operatingDataAvailable: boolean;
   operatingDurationMs: number | null;
   attributedOperatingDurationMs: number | null;
@@ -61,34 +68,27 @@ export interface ResourceDurations {
   operatingDurationMs: number;
 }
 
+export interface SessionSegments {
+  spans: { start: number; end: number; sessions: number; before: number }[];
+}
+
 export interface OperatingRange {
-  interval: ResourceOperatingInterval;
+  interval: OperatingIntervalRecord;
   range: TimeRange;
 }
 
 export interface UsageRange {
-  usage: ResourceUsage;
+  usage: OperatingTimelineSession;
   range: TimeRange;
 }
 
-export type SweepEvent =
-  | { type: 'operatingStart' | 'operatingEnd'; range: OperatingRange }
-  | { type: 'usageStart' | 'usageEnd'; range: UsageRange };
-
 @Injectable()
 export class ResourceOperatingAttributionService {
-  constructor(
-    @InjectRepository(ResourceOperatingInterval)
-    protected readonly intervalRepository: Repository<ResourceOperatingInterval>,
-    @InjectRepository(ResourceUsage)
-    protected readonly usageRepository: Repository<ResourceUsage>,
-    @InjectRepository(ResourceUsageLifecycleAttempt)
-    protected readonly lifecycleAttemptRepository: Repository<ResourceUsageLifecycleAttempt>,
-  ) {}
+  constructor(@Inject(OPERATING_TIMELINE_STORE) protected readonly timeline: OperatingTimelineStore) {}
 
   derive(
-    operatingIntervals: ResourceOperatingInterval[],
-    usages: ResourceUsage[],
+    operatingIntervals: OperatingIntervalRecord[],
+    usages: OperatingTimelineSession[],
     asOf = new Date(),
     windowStart?: Date,
     operatingDataAvailable = operatingIntervals.length > 0,
@@ -104,71 +104,32 @@ export class ResourceOperatingAttributionService {
       .filter((usage) => usage.usageAction === ResourceUsageAction.Usage && !usage.lifecyclePending)
       .map((usage) => ({ usage, range: this.toUsageRange(usage, asOf, windowStart, pendingSessionEnds) }))
       .filter((entry): entry is UsageRange => entry.range !== null);
-    // Interim rule for parallel sessions (ATT-1191 splits fairly): every operating moment is attributed to
-    // exactly one session, the earliest-started one. Without overlapping sessions this changes nothing.
-    const attributableUsageRanges = this.withoutOverlaps(usageRanges);
-    const events: SweepEvent[] = [
-      ...operatingRanges.flatMap((range) => [
-        { type: 'operatingStart' as const, range },
-        { type: 'operatingEnd' as const, range },
-      ]),
-      ...attributableUsageRanges.flatMap((range) => [
-        { type: 'usageStart' as const, range },
-        { type: 'usageEnd' as const, range },
-      ]),
-    ].sort((left, right) => {
-      const leftTime = left.type.endsWith('Start') ? left.range.range.startTime : left.range.range.endTime;
-      const rightTime = right.type.endsWith('Start') ? right.range.range.startTime : right.range.range.endTime;
-      return (
-        leftTime.getTime() - rightTime.getTime() ||
-        Number(left.type.endsWith('Start')) - Number(right.type.endsWith('Start'))
-      );
-    });
-    const activeOperatingRanges = new Set<OperatingRange>();
-    const activeUsageRanges = new Set<UsageRange>();
+    // Sessions running at the same time split the running time they share equally (ATT-1191): every start and end
+    // of a session closes a segment, and each operating interval's part inside it is shared by the segment's sessions.
+    const segments = this.sessionSegments(usageRanges);
     let isProvisional =
       usages.some((usage) => usage.endTime === null && pendingSessionEnds.has(usage.id) && usage.startTime < asOf) ||
       operatingRanges.some(({ interval }) => this.isOpenAt(interval, asOf)) ||
       usageRanges.some(({ usage }) => this.isOpenAt(usage, asOf));
-
-    const addAttribution = (operatingRange: OperatingRange, usageRange: UsageRange) => {
-      const intersection = this.intersection(operatingRange.range, usageRange.range);
-      if (!intersection) {
-        return;
-      }
-
-      const provisional = this.isOpenAt(operatingRange.interval, asOf) || this.isOpenAt(usageRange.usage, asOf);
-      attributions.push({
-        operatingIntervalId: operatingRange.interval.id,
-        usageId: usageRange.usage.id,
-        ...intersection,
-        durationMs: this.duration(intersection),
-        isProvisional: provisional,
-      });
-      attributedRanges.push(intersection);
-      isProvisional ||= provisional;
-    };
-
-    for (const event of events) {
-      switch (event.type) {
-        case 'operatingStart':
-          for (const usageRange of activeUsageRanges) {
-            addAttribution(event.range, usageRange);
-          }
-          activeOperatingRanges.add(event.range);
-          break;
-        case 'operatingEnd':
-          activeOperatingRanges.delete(event.range);
-          break;
-        case 'usageStart':
-          for (const operatingRange of activeOperatingRanges) {
-            addAttribution(operatingRange, event.range);
-          }
-          activeUsageRanges.add(event.range);
-          break;
-        case 'usageEnd':
-          activeUsageRanges.delete(event.range);
-          break;
+    const sortedUsageRanges = [...usageRanges].sort(
+      (left, right) => left.range.startTime.getTime() - right.range.startTime.getTime(),
+    );
+    for (const operatingRange of operatingRanges) {
+      for (const usageRange of sortedUsageRanges) {
+        if (usageRange.range.startTime >= operatingRange.range.endTime) break;
+        if (usageRange.range.endTime <= operatingRange.range.startTime) continue;
+        const intersection = this.intersection(operatingRange.range, usageRange.range);
+        if (!intersection) continue;
+        const provisional = this.isOpenAt(operatingRange.interval, asOf) || this.isOpenAt(usageRange.usage, asOf);
+        attributions.push({
+          operatingIntervalId: operatingRange.interval.id,
+          usageId: usageRange.usage.id,
+          ...intersection,
+          durationMs: this.sharedDuration(segments, intersection),
+          isProvisional: provisional,
+        });
+        attributedRanges.push(intersection);
+        isProvisional ||= provisional;
       }
     }
 
@@ -180,6 +141,7 @@ export class ResourceOperatingAttributionService {
       asOf,
       windowStart: windowStart ?? null,
       sessionDurationMs: this.unionDuration(usageRanges.map(({ range }) => range)),
+      personDurationMs: usageRanges.reduce((total, { range }) => total + this.duration(range), 0),
       operatingDataAvailable,
       operatingDurationMs,
       attributedOperatingDurationMs: operatingDataAvailable ? attributedOperatingDurationMs : null,
@@ -193,30 +155,52 @@ export class ResourceOperatingAttributionService {
   }
 
   /**
-   * Gives each time span to the earliest-started session covering it (ties by id). Sessions that never
-   * overlap an earlier one are returned untouched; others keep only the part after every earlier session.
-   * Linear after sorting: every earlier range starts no later, so together they cover one span up to the
-   * furthest end seen so far, and a later range can only keep what lies beyond that frontier.
+   * The spans in which the same sessions are active, with how many are, covering every moment any is. `shared` holds
+   * the time each span's sessions would be charged for it so far, as a running sum of each span's length per session.
    */
-  protected withoutOverlaps(usageRanges: UsageRange[]): UsageRange[] {
-    if (usageRanges.length < 2) return usageRanges;
-    const ordered = [...usageRanges].sort(
-      (left, right) =>
-        left.usage.startTime.getTime() - right.usage.startTime.getTime() || left.usage.id - right.usage.id,
-    );
-    const result: UsageRange[] = [];
-    let frontier: Date | null = null;
-    for (const entry of ordered) {
-      const { startTime, endTime } = entry.range;
-      if (frontier === null || startTime >= frontier) result.push(entry);
-      else if (endTime > frontier) result.push({ usage: entry.usage, range: { startTime: frontier, endTime } });
-      if (frontier === null || endTime > frontier) frontier = endTime;
+  protected sessionSegments(usageRanges: UsageRange[]): SessionSegments {
+    const changes = new Map<number, number>();
+    for (const { range } of usageRanges) {
+      changes.set(range.startTime.getTime(), (changes.get(range.startTime.getTime()) ?? 0) + 1);
+      changes.set(range.endTime.getTime(), (changes.get(range.endTime.getTime()) ?? 0) - 1);
     }
-    return result;
+    const times = [...changes.keys()].sort((left, right) => left - right);
+    const spans: SessionSegments['spans'] = [];
+    let sessions = 0;
+    let shared = 0;
+    times.forEach((time, index) => {
+      sessions += changes.get(time) ?? 0;
+      if (sessions > 0 && index + 1 < times.length) {
+        spans.push({ start: time, end: times[index + 1], sessions, before: shared });
+        shared += (times[index + 1] - time) / sessions;
+      }
+    });
+    return { spans };
+  }
+
+  /** A session's equal share of the time inside `range`, which lies within the sessions' span. */
+  protected sharedDuration({ spans }: SessionSegments, range: TimeRange): number {
+    const position = (time: number): number => {
+      let low = 0;
+      let high = spans.length;
+      while (low < high) {
+        const middle = (low + high) >> 1;
+        if (spans[middle].end <= time) low = middle + 1;
+        else high = middle;
+      }
+      const span = spans[low];
+      if (!span)
+        return spans.length
+          ? spans[spans.length - 1].before +
+              (spans[spans.length - 1].end - spans[spans.length - 1].start) / spans[spans.length - 1].sessions
+          : 0;
+      return span.before + Math.max(0, time - span.start) / span.sessions;
+    };
+    return position(range.endTime.getTime()) - position(range.startTime.getTime());
   }
 
   protected toRange(
-    interval: Pick<ResourceOperatingInterval | ResourceUsage, 'startTime' | 'endTime'>,
+    interval: Pick<OperatingIntervalRecord | OperatingTimelineSession, 'startTime' | 'endTime'>,
     asOf: Date,
     windowStart?: Date,
   ): TimeRange | null {
@@ -226,7 +210,7 @@ export class ResourceOperatingAttributionService {
   }
 
   protected toUsageRange(
-    usage: Pick<ResourceUsage, 'id' | 'startTime' | 'endTime'>,
+    usage: Pick<OperatingTimelineSession, 'id' | 'startTime' | 'endTime'>,
     asOf: Date,
     windowStart: Date | undefined,
     pendingSessionEnds: Map<number, Date>,
@@ -239,7 +223,10 @@ export class ResourceOperatingAttributionService {
     );
   }
 
-  protected isOpenAt(interval: Pick<ResourceOperatingInterval | ResourceUsage, 'endTime'>, asOf: Date): boolean {
+  protected isOpenAt(
+    interval: Pick<OperatingIntervalRecord | OperatingTimelineSession, 'endTime'>,
+    asOf: Date,
+  ): boolean {
     return interval.endTime === null || interval.endTime > asOf;
   }
 
@@ -275,36 +262,14 @@ export class ResourceOperatingAttributionService {
     asOf = new Date(),
     windowStart = new Date(asOf.getTime() - ATTRIBUTION_LOOKBACK_MS),
   ): Promise<ResourceOperatingAttributionSummary> {
-    const [operatingIntervals, usages, operatingDataAvailable, pendingSessionEnds] = await Promise.all([
-      this.intervalRepository.find({
-        where: [
-          { resourceId, startTime: LessThan(asOf), endTime: IsNull() },
-          { resourceId, startTime: LessThan(asOf), endTime: MoreThan(windowStart) },
-        ],
-        order: { startTime: 'ASC' },
-      }),
-      this.usageRepository.find({
-        where: [
-          {
-            resourceId,
-            usageAction: ResourceUsageAction.Usage,
-            lifecyclePending: false,
-            startTime: LessThan(asOf),
-            endTime: IsNull(),
-          },
-          {
-            resourceId,
-            usageAction: ResourceUsageAction.Usage,
-            lifecyclePending: false,
-            startTime: LessThan(asOf),
-            endTime: MoreThan(windowStart),
-          },
-        ],
-        order: { startTime: 'ASC' },
-      }),
-      this.intervalRepository.existsBy({ resourceId }),
+    const windows = [{ resourceId, from: windowStart }];
+    const [operatingIntervals, usages, withOperatingData, pendingSessionEnds] = await Promise.all([
+      this.timeline.findIntervals(windows, asOf),
+      this.timeline.findSessions(windows, asOf),
+      this.timeline.findResourcesWithIntervals([resourceId]),
       this.getPendingSessionEnds([resourceId]),
     ]);
+    const operatingDataAvailable = withOperatingData.has(resourceId);
 
     return this.derive(operatingIntervals, usages, asOf, windowStart, operatingDataAvailable, true, pendingSessionEnds);
   }
@@ -320,41 +285,13 @@ export class ResourceOperatingAttributionService {
       return new Map();
     }
 
-    const [operatingIntervals, usages, resourcesWithOperatingData, pendingSessionEnds] = await Promise.all([
-      this.intervalRepository.find({
-        where: [
-          { resourceId: In(uniqueResourceIds), startTime: LessThan(asOf), endTime: IsNull() },
-          { resourceId: In(uniqueResourceIds), startTime: LessThan(asOf), endTime: MoreThan(windowStart) },
-        ],
-        order: { startTime: 'ASC' },
-      }),
-      this.usageRepository.find({
-        where: [
-          {
-            resourceId: In(uniqueResourceIds),
-            usageAction: ResourceUsageAction.Usage,
-            lifecyclePending: false,
-            startTime: LessThan(asOf),
-            endTime: IsNull(),
-          },
-          {
-            resourceId: In(uniqueResourceIds),
-            usageAction: ResourceUsageAction.Usage,
-            lifecyclePending: false,
-            startTime: LessThan(asOf),
-            endTime: MoreThan(windowStart),
-          },
-        ],
-        order: { startTime: 'ASC' },
-      }),
-      this.intervalRepository
-        .createQueryBuilder('interval')
-        .select('DISTINCT interval.resourceId', 'resourceId')
-        .where('interval.resourceId IN (:...resourceIds)', { resourceIds: uniqueResourceIds })
-        .getRawMany<{ resourceId: number }>(),
+    const windows = uniqueResourceIds.map((resourceId) => ({ resourceId, from: windowStart }));
+    const [operatingIntervals, usages, availableResourceIds, pendingSessionEnds] = await Promise.all([
+      this.timeline.findIntervals(windows, asOf),
+      this.timeline.findSessions(windows, asOf),
+      this.timeline.findResourcesWithIntervals(uniqueResourceIds),
       this.getPendingSessionEnds(uniqueResourceIds),
     ]);
-    const availableResourceIds = new Set(resourcesWithOperatingData.map(({ resourceId }) => resourceId));
     const intervalsByResourceId = groupByResourceId(operatingIntervals);
     const usagesByResourceId = groupByResourceId(usages);
 
@@ -374,76 +311,42 @@ export class ResourceOperatingAttributionService {
     );
   }
 
-  async getForUsage(usage: ResourceUsage, manager: EntityManager): Promise<number> {
-    if (!usage.endTime) {
-      return 0;
-    }
-
-    const intervals = await manager.getRepository(ResourceOperatingInterval).find({
-      where: [
-        { resourceId: usage.resourceId, startTime: LessThan(usage.endTime), endTime: IsNull() },
-        { resourceId: usage.resourceId, startTime: LessThan(usage.endTime), endTime: MoreThan(usage.startTime) },
-      ],
-      order: { startTime: 'ASC' },
-    });
-    // Other sessions running alongside take precedence when they started earlier (parallel sessions).
-    const overlapping = await manager.getRepository(ResourceUsage).find({
-      where: [
-        {
-          resourceId: usage.resourceId,
-          usageAction: ResourceUsageAction.Usage,
-          lifecyclePending: false,
-          id: Not(usage.id),
-          startTime: LessThan(usage.endTime),
-          endTime: IsNull(),
-        },
-        {
-          resourceId: usage.resourceId,
-          usageAction: ResourceUsageAction.Usage,
-          lifecyclePending: false,
-          id: Not(usage.id),
-          startTime: LessThan(usage.endTime),
-          endTime: MoreThan(usage.startTime),
-        },
-      ],
-    });
-    if (overlapping.length === 0) {
-      const { attributedOperatingDurationMs } = this.derive(intervals, [usage], usage.endTime, usage.startTime);
-      return (attributedOperatingDurationMs ?? 0) / 60_000;
-    }
-    // An earlier session whose end is still in progress only owns the time up to its requested end.
-    const summary = this.derive(
-      intervals,
-      [usage, ...overlapping],
-      usage.endTime,
-      usage.startTime,
-      undefined,
-      undefined,
-      await this.getPendingSessionEnds([usage.resourceId], manager),
-    );
-    const own = summary.attributions.filter((attribution) => attribution.usageId === usage.id);
-    return this.unionDuration(own) / 60_000;
+  /**
+   * The running time charged to a usage when it ends, in minutes. A session that never overlapped another is
+   * charged exactly its operating time. A session that shared the machine is charged its equal share of each
+   * segment, so `getShareForUsage` carries the rest of the story.
+   */
+  async getForUsage(usage: AttributableUsage, context?: TransactionContext): Promise<number> {
+    const share = await this.getShareForUsage(usage, context);
+    return share ? share.shareMs / 60_000 : 0;
   }
 
-  protected async getPendingSessionEnds(resourceIds: number[], manager?: EntityManager): Promise<Map<number, Date>> {
-    const attempts = await (
-      manager?.getRepository(ResourceUsageLifecycleAttempt) ?? this.lifecycleAttemptRepository
-    ).find({
-      where: { resourceId: In(resourceIds), kind: In(['end', 'takeover']) },
-      select: ['previousUsageId', 'transitionTime'],
-    });
-    return new Map(
-      attempts.flatMap((attempt) =>
-        attempt.previousUsageId === null ? [] : [[attempt.previousUsageId, attempt.transitionTime] as const],
-      ),
+  /** The usage's running time split among the sessions it shared the machine with; null until it has ended. */
+  async getShareForUsage(usage: AttributableUsage, context?: TransactionContext): Promise<OperatingShare | null> {
+    if (!usage.endTime) {
+      return null;
+    }
+
+    const windows = [{ resourceId: usage.resourceId, from: usage.startTime }];
+    const intervals = await this.timeline.findIntervals(windows, usage.endTime, context);
+    const overlapping = await this.timeline.findSessions(windows, usage.endTime, { excludeUsageId: usage.id }, context);
+    return computeOperatingShare(
+      usage as ShareUsage & { endTime: Date },
+      overlapping,
+      intervals,
+      overlapping.length ? await this.getPendingSessionEnds([usage.resourceId], context) : undefined,
     );
+  }
+
+  protected getPendingSessionEnds(resourceIds: number[], context?: TransactionContext): Promise<Map<number, Date>> {
+    return this.timeline.findPendingSessionEnds(resourceIds, context);
   }
 
   /** Exact duration totals for independent service cycles, without deriving user attributions. */
   async getDurationsForWindows(
     windows: ResourceDurationWindow[],
     asOf: Date,
-    manager?: EntityManager,
+    context?: TransactionContext,
   ): Promise<Map<string, ResourceDurations>> {
     const result = new Map<string, ResourceDurations>();
     const windowsByResource = new Map<number, ResourceDurationWindow[]>();
@@ -453,39 +356,25 @@ export class ResourceOperatingAttributionService {
       windowsByResource.set(window.resourceId, resourceWindows);
     }
     const resourceIds = [...windowsByResource.keys()];
-    const intervalRepository = manager?.getRepository(ResourceOperatingInterval) ?? this.intervalRepository;
-    const usageRepository = manager?.getRepository(ResourceUsage) ?? this.usageRepository;
 
     // Each resource gets its own oldest requested boundary. Sharing a boundary across a batch
     // would load an unbounded history for unrelated resources with newer service cycles.
     for (let offset = 0; offset < resourceIds.length; offset += 150) {
       const batchIds = resourceIds.slice(offset, offset + 150);
       const batchWindows = batchIds.flatMap((id) => windowsByResource.get(id) ?? []);
-      const where = batchIds.flatMap((resourceId) => {
-        const start = new Date(
-          Math.min(...(windowsByResource.get(resourceId) ?? []).map((window) => window.start.getTime())),
-        );
-        return [
-          { resourceId, startTime: LessThan(asOf), endTime: IsNull() },
-          { resourceId, startTime: LessThan(asOf), endTime: MoreThan(start) },
-        ];
-      });
+      const batchRequests = batchIds.map((resourceId) => ({
+        resourceId,
+        from: new Date(Math.min(...(windowsByResource.get(resourceId) ?? []).map((window) => window.start.getTime()))),
+      }));
       const [intervals, usages, pendingSessionEnds] = await Promise.all([
-        intervalRepository.find({ where, select: ['resourceId', 'startTime', 'endTime'] }),
-        usageRepository.find({
-          where: where.map((condition) => ({
-            ...condition,
-            usageAction: ResourceUsageAction.Usage,
-            lifecyclePending: false,
-          })),
-          select: ['id', 'resourceId', 'startTime', 'endTime'],
-        }),
-        this.getPendingSessionEnds(batchIds, manager),
+        this.timeline.findIntervals(batchRequests, asOf, context),
+        this.timeline.findSessions(batchRequests, asOf, {}, context),
+        this.getPendingSessionEnds(batchIds, context),
       ]);
       const intervalsByResource = groupByResourceId(intervals);
       const usagesByResource = groupByResourceId(usages);
       for (const window of batchWindows) {
-        const duration = (rows: Array<Pick<ResourceUsage, 'startTime' | 'endTime'>>) =>
+        const duration = (rows: Array<Pick<OperatingIntervalRecord, 'startTime' | 'endTime'>>) =>
           this.unionDuration(
             rows
               .map((row) => this.toRange(row, asOf, window.start))

@@ -1,4 +1,4 @@
-import { ResourceFlowNode, Resource } from '@attraccess/database-entities';
+import { FlowNodeRecord } from '@attraccess/application-models';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 import { requireRunMachineId } from './flow.utils';
 
@@ -8,9 +8,9 @@ import { requireRunMachineId } from './flow.utils';
  * injected by reference.
  */
 export class ActivityTrackExecutor implements NodeExecutor {
-  constructor(private readonly resourceActivity: Map<Resource['id'], Date>) {}
+  constructor(private readonly resourceActivity: Map<number, Date>) {}
 
-  async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+  async execute(node: FlowNodeRecord, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
     this.resourceActivity.set(await requireRunMachineId(node, ctx), new Date());
 
     return { payload: input };

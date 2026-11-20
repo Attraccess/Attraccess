@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ResourceBillingInfoEditor } from './index';
@@ -6,21 +6,26 @@ import { ResourceBillingInfoEditor } from './index';
 const state = vi.hoisted(() => ({
   minorUnit: 2,
   meters: [
-    { id: 1, name: 'Largest rate', creditsPerUnit: Number.MAX_SAFE_INTEGER },
-    { id: 2, name: 'Free meter', creditsPerUnit: 0 },
+    { id: 1, name: 'Largest rate', creditsPerUnit: Number.MAX_SAFE_INTEGER, allocation: 'shared' },
+    { id: 2, name: 'Free meter', creditsPerUnit: 0, allocation: 'shared' },
   ],
   setRate: vi.fn().mockResolvedValue(undefined),
+  setAllocation: vi.fn().mockResolvedValue(undefined),
   updateConfiguration: vi.fn(),
 }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useBillingServiceGetBillingConfiguration: () => ({ data: { currency: 'EUR', minorUnit: state.minorUnit } }),
-  useBillingServiceGetResourceBillingConfiguration: () => ({
+  useGetBillingConfiguration: () => ({ data: { currency: 'EUR', minorUnit: state.minorUnit } }),
+  useGetResourceBillingConfiguration: () => ({
     data: { configuration: { creditsPerUsage: 0, creditsPerMinute: 0, creditsPerOperatingMinute: 0 } },
   }),
-  useBillingServiceUpdateResourceBillingConfiguration: () => ({ mutate: state.updateConfiguration, isPending: false }),
-  useResourceMeteringServiceListResourceMeters: () => ({ data: state.meters }),
-  useResourceMeteringServiceSetResourceMeterRate: () => ({ mutateAsync: state.setRate, isPending: false }),
+  useUpdateResourceBillingConfiguration: () => ({ mutate: state.updateConfiguration, isPending: false }),
+  useListResourceMeters: () => ({ data: state.meters }),
+  useSetResourceMeterRate: () => ({ mutateAsync: state.setRate, isPending: false }),
+  useSetResourceMeterAllocation: () => ({
+    mutateAsync: state.setAllocation,
+    isPending: false,
+  }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -62,22 +67,20 @@ it.each([
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   await waitFor(() => expect(state.updateConfiguration).toHaveBeenCalledOnce());
   expect(state.setRate).toHaveBeenCalledWith({
-    resourceId: 1,
-    meterId: 1,
-    requestBody: { creditsPerUnit: Number.MAX_SAFE_INTEGER },
+    path: { resourceId: 1, meterId: 1 },
+    body: { creditsPerUnit: Number.MAX_SAFE_INTEGER },
   });
-  expect(state.setRate).toHaveBeenCalledWith({ resourceId: 1, meterId: 2, requestBody: { creditsPerUnit: 0 } });
+  expect(state.setRate).toHaveBeenCalledWith({ path: { resourceId: 1, meterId: 2 }, body: { creditsPerUnit: 0 } });
 });
 it('accepts an exact comma decimal edit without changing another meter rate', async () => {
   await openEditor();
   fireEvent.change(screen.getByRole('textbox', { name: /Free meter/ }), { target: { value: '0,17' } });
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   await waitFor(() => expect(state.updateConfiguration).toHaveBeenCalledOnce());
-  expect(state.setRate).toHaveBeenCalledWith({ resourceId: 1, meterId: 2, requestBody: { creditsPerUnit: 17 } });
+  expect(state.setRate).toHaveBeenCalledWith({ path: { resourceId: 1, meterId: 2 }, body: { creditsPerUnit: 17 } });
   expect(state.setRate).toHaveBeenCalledWith({
-    resourceId: 1,
-    meterId: 1,
-    requestBody: { creditsPerUnit: Number.MAX_SAFE_INTEGER },
+    path: { resourceId: 1, meterId: 1 },
+    body: { creditsPerUnit: Number.MAX_SAFE_INTEGER },
   });
 });
 it.each(['0.001', '90071992547409.92', '-1', ''])(
@@ -93,3 +96,18 @@ it.each(['0.001', '90071992547409.92', '-1', ''])(
     expect(state.updateConfiguration).not.toHaveBeenCalled();
   },
 );
+it('saves a changed meter allocation and leaves unchanged ones alone', async () => {
+  await openEditor();
+  const group = document.querySelector('[data-cy="meter-allocation-2"]') as HTMLElement;
+  // Each option explains itself, not only the selected one.
+  expect(within(group).getByText('inputs.meterAllocation.description.shared')).toBeTruthy();
+  expect(within(group).getByText('inputs.meterAllocation.description.per-session')).toBeTruthy();
+  fireEvent.click(within(group).getByRole('radio', { name: 'inputs.meterAllocation.options.per-session' }));
+  fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
+  await waitFor(() => expect(state.updateConfiguration).toHaveBeenCalledOnce());
+  expect(state.setAllocation).toHaveBeenCalledTimes(1);
+  expect(state.setAllocation).toHaveBeenCalledWith({
+    path: { resourceId: 1, meterId: 2 },
+    body: { allocation: 'per-session' },
+  });
+});

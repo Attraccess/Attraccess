@@ -1,4 +1,7 @@
-import { Auth, AuthenticatedRequest, ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest, ResourceFlowNodeType } from '@attraccess/plugins-backend-sdk';
+import { ResourceFlowNodeResponseDto } from './dto/resource-flow-node-record-response.dto';
+
+import type { FlowNodeRecord } from '@attraccess/application-models';
 
 import { Body, Controller, Delete, Get, Logger, Param, ParseIntPipe, Post, Sse, Req, Put } from '@nestjs/common';
 
@@ -185,7 +188,7 @@ export class ResourceFlowsController {
   @ApiResponse({
     status: 200,
     description: 'Buttons retrieved successfully',
-    type: ResourceFlowNode,
+    type: ResourceFlowNodeResponseDto,
     isArray: true,
   })
   @ApiResponse({
@@ -196,7 +199,7 @@ export class ResourceFlowsController {
     status: 403,
     description: 'Insufficient permissions to manage resources',
   })
-  async getButtons(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<ResourceFlowNode[]> {
+  async getButtons(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<FlowNodeRecord[]> {
     return await this.resourceFlowsService.getNodes(resourceId, ResourceFlowNodeType.INPUT_BUTTON);
   }
 

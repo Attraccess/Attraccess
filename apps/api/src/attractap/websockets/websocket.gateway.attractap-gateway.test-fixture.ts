@@ -1,10 +1,8 @@
 import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { ReaderTimeZoneService } from './reader-time-zone.service';
 import { readerTimeZoneStub } from './reader-time-zone.test-fixture';
-import { Resource } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Provider } from '@nestjs/common';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { SettingsService } from '../../settings/settings.service';
 
 import { BillingService } from '../../billing/charges/billing.service';
@@ -28,6 +26,7 @@ import { ResourceUsageService } from '../../resources/usage/sessions/resource-us
 import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { UsersService } from '../../users-and-auth/users/users.service';
 import { AttractapService } from '../attractap.service';
+import { ATTRACTAP_RESOURCE_READS } from '../reader-resource-reads.port';
 import { AttractapFirmwareService } from '../firmware.service';
 import { AttractapAuthHandler } from './handlers/auth/auth.handler';
 import { AttractapBillingHandler } from './handlers/billing/billing.handler';
@@ -48,6 +47,7 @@ import { ReaderSessionService } from '../security/reader-session.service';
 import { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
 import { AttractapMassIntroductionHandler } from './handlers/mass-introduction/mass-introduction.handler';
 import { AttractapUiHandler } from './handlers/ui/ui.handler';
+import { ReaderBleDriver } from './handlers/ble/reader-ble.driver';
 import { CardSessionService } from './handlers/ui/card-session.service';
 import { UiAuditService } from './handlers/ui/ui-audit.service';
 import { UiSlotService } from './handlers/ui/ui-slot.service';
@@ -62,6 +62,7 @@ import { ReaderUiRegistry } from '../../plugin-system/reader-ui/reader-ui.regist
 import { MassIntroductionService } from '../../resources/mass-introductions/mass-introduction.service';
 import { AttractapGateway } from './websocket.gateway';
 import { WebsocketService } from './websocket.service';
+import { SESSION_SUBPROTOCOL } from '../security/session-framing';
 import { AuthenticatedWebSocket } from './websocket.types';
 
 const mockMetricsService = {
@@ -82,6 +83,7 @@ const mockMetricsToggle = { isEnabledCached: jest.fn().mockReturnValue(true) };
 function createMockSocket(overrides: Partial<AuthenticatedWebSocket> = {}): AuthenticatedWebSocket {
   return {
     id: 'test-id',
+    protocol: SESSION_SUBPROTOCOL,
     readerId: null,
     messageCount: 0,
     sendMessage: jest.fn().mockResolvedValue(undefined),
@@ -107,11 +109,18 @@ export function gatewayProviders(
       provide: PairingService,
       useValue: {
         handleConnection: jest.fn(),
-        issueBindingTicket: jest.fn(() => 'ticket-1'),
-        claimAutoPrompt: jest.fn(() => true),
       },
     },
-    { provide: ReaderSessionService, useValue: { accept: jest.fn() } },
+    {
+      provide: ReaderSessionService,
+      // A TLS session that signs in right away: the socket is registered like a paired reader's.
+      useValue: {
+        open: jest.fn(() => ({ close: jest.fn() })),
+        accept: jest.fn(async (socket: unknown, _connection: unknown, onReady: (s: unknown) => void) =>
+          onReady(socket),
+        ),
+      },
+    },
   ],
 ): Provider[] {
   return [
@@ -145,7 +154,7 @@ export function gatewayProviders(
     { provide: CardOperationsService, useValue: { verifyCard: jest.fn(), enroll: jest.fn(), reset: jest.fn() } },
     { provide: CardWriterPolicyService, useValue: { assertAllowed: jest.fn() } },
     { provide: SettingsService, useValue: { getDefaultLanguage: jest.fn().mockResolvedValue('de') } },
-    { provide: getRepositoryToken(Resource), useValue: {} },
+    { provide: ATTRACTAP_RESOURCE_READS, useValue: { findResource: jest.fn() } },
     ResourceListService,
     ResourceActionGuard,
     AttractapAuthHandler,
@@ -175,6 +184,7 @@ export function gatewayProviders(
     { provide: ReaderActiveUsageService, useValue: { activeResourceIds: jest.fn(async () => new Set<number>()) } },
     AttractapUiHandler,
     ReaderStartGate,
+    ReaderBleDriver,
     ...security,
   ];
 }

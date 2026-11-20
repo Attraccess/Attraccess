@@ -7,6 +7,7 @@ import { Providers } from '@attraccess/ui';
 import { Sidebar } from './index';
 import userEvent from '@testing-library/user-event';
 import { PlugIcon } from 'lucide-react';
+import { useInstallPromptStore, type BeforeInstallPromptEvent } from '../../../pwa-install/installPrompt';
 
 const state = vi.hoisted(() => ({
   items: [] as PluginSidebarItem[],
@@ -18,6 +19,7 @@ const state = vi.hoisted(() => ({
     | null,
   throwGroups: false,
   canManageWago: true,
+  granted: [] as string[],
   logout: vi.fn(),
   logoutEverywhere: vi.fn(),
   logoutPending: false,
@@ -27,7 +29,10 @@ const state = vi.hoisted(() => ({
 vi.mock('../../../hooks/useAuth', () => ({
   useAuth: () => ({
     user: { id: 1, username: 'operator' },
-    hasPermission: (permission: string) => permission === 'resources.update' && state.canManageWago,
+    hasPermission: (permission: string) =>
+      (permission === 'resources.update' && state.canManageWago) || state.granted.includes(permission),
+    hasPermissionKey: (permission: string) =>
+      (permission === 'resources.update' && state.canManageWago) || state.granted.includes(permission),
     logout: state.logout,
     logoutEverywhere: state.logoutEverywhere,
     logoutEverywhereLabel: 'Logout everywhere',
@@ -59,6 +64,7 @@ vi.mock('../../plugins/plugin.state', () => ({
 vi.mock('../../routes/index', () => ({
   useAllRoutes: () => [
     { path: '/wago', authRequired: 'resources.update' },
+    { path: '/matter', authRequired: ['matter.devices.read', 'thread.network.read'] },
     { path: '/printers', authRequired: true },
     { path: '/printers/bambulab', authRequired: 'resources.update' },
     { path: '/devices/flows', authRequired: 'resources.update' },
@@ -68,8 +74,8 @@ vi.mock('../../routes/index', () => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useLicenseServiceGetLicenseInformation: () => ({ data: { modules: [] } }),
-  useMessagingServiceMessagingGetUnreadCount: () => ({ data: { total: 0 } }),
+  useGetLicenseInformation: () => ({ data: { modules: [] } }),
+  useMessagingGetUnreadCount: () => ({ data: { total: 0 } }),
 }));
 
 function CurrentPath() {
@@ -93,6 +99,7 @@ beforeEach(() => {
   state.plugins = null;
   state.throwGroups = false;
   state.canManageWago = true;
+  state.granted = [];
   state.logout.mockClear();
   state.logoutEverywhere.mockClear();
   state.logoutPending = false;
@@ -164,6 +171,20 @@ describe('plugin sidebar placement', () => {
 
     expect(screen.queryByRole('button', { name: 'Devices' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'WAGO' })).not.toBeInTheDocument();
+  });
+
+  it('shows a plugin entry gated on plugin-declared keys only to holders of one of them', async () => {
+    state.items = [{ label: 'Matter', path: '/matter', group: 'devices' }];
+    state.canManageWago = false;
+    const view = renderSidebar();
+    expect(screen.queryByRole('button', { name: 'Devices' })).not.toBeInTheDocument();
+    view.unmount();
+
+    state.granted = ['thread.network.read'];
+    const user = userEvent.setup();
+    renderSidebar();
+    await user.click(screen.getByRole('button', { name: 'Devices' }));
+    expect(screen.getByRole('link', { name: 'Matter' })).toHaveAttribute('href', '/matter');
   });
 
   it('keeps entries with omitted or unknown groups at the root', () => {
@@ -372,6 +393,30 @@ describe('user menu preferences', () => {
 
     expect(screen.getByLabelText('Current path')).toHaveTextContent('/account');
   });
+
+  it('offers "Install app" only while the browser can install Attraccess', async () => {
+    const user = userEvent.setup();
+    const prompt = vi.fn(() => Promise.resolve());
+    useInstallPromptStore.setState({ deferredPrompt: null });
+    renderSidebar();
+
+    await user.click(screen.getByRole('button', { name: 'User menu' }));
+    expect(screen.queryByRole('menuitem', { name: 'Install app' })).toBeNull();
+    await user.keyboard('{Escape}');
+
+    useInstallPromptStore.setState({
+      deferredPrompt: Object.assign(new Event('beforeinstallprompt'), {
+        prompt,
+        userChoice: Promise.resolve({ outcome: 'dismissed' as const, platform: 'web' }),
+      }) as BeforeInstallPromptEvent,
+    });
+    await user.click(screen.getByRole('button', { name: 'User menu' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Install app' }));
+
+    expect(prompt).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole('button', { name: 'User menu' }));
+    expect(screen.queryByRole('menuitem', { name: 'Install app' })).toBeNull();
+  });
 });
 
 describe('account logout actions', () => {
@@ -405,5 +450,17 @@ describe('account logout actions', () => {
     await user.click(screen.getByRole('button', { name: 'User menu' }));
     expect(screen.getByRole('menuitem', { name: 'Signing out' })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByRole('menuitem', { name: /Logout everywhere/ })).toHaveAttribute('aria-disabled', 'true');
+  });
+});
+
+describe('sidebar width marker', () => {
+  // The install card reads it to sit right of the sidebar instead of behind it (ATT-1150).
+  it.each([
+    [false, 'expanded'],
+    [true, 'collapsed'],
+  ])('marks the sidebar collapsed=%s as %s', (collapsed, marker) => {
+    const { container } = renderSidebar(collapsed);
+
+    expect(container.querySelector('aside')).toHaveAttribute('data-sidebar', marker);
   });
 });

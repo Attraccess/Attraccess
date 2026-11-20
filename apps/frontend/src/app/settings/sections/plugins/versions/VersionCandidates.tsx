@@ -1,24 +1,15 @@
 import { Button } from '@attraccess/plugins-frontend-ui';
-import type { usePluginsSectionState } from '../state/usePluginSettings';
-type Props = Pick<
-  ReturnType<typeof usePluginsSectionState>,
-  | 'versions'
-  | 'selectedVersion'
-  | 'setSelectedVersion'
-  | 'setApprovedVersionPlanToken'
-  | 'setPermissionApproved'
-  | 'setMajorApproved'
-  | 't'
->;
-export function VersionCandidates({
-  versions,
-  selectedVersion,
-  setSelectedVersion,
-  setApprovedVersionPlanToken,
-  setPermissionApproved,
-  setMajorApproved,
-  t,
-}: Props) {
+import type { InstalledPluginVersionDto } from '@attraccess/react-query-client';
+import { usePluginsTranslations } from '../usePluginsTranslations';
+
+interface Props {
+  versions: InstalledPluginVersionDto[];
+  selectedVersion: InstalledPluginVersionDto | null;
+  onSelect: (candidate: InstalledPluginVersionDto) => void;
+}
+
+export function VersionCandidates({ versions, selectedVersion, onSelect }: Props) {
+  const { t } = usePluginsTranslations();
   return (
     <div className="flex max-h-64 flex-col gap-2 overflow-y-auto">
       {versions.map((candidate) => (
@@ -27,12 +18,7 @@ export function VersionCandidates({
           variant={selectedVersion?.version === candidate.version ? 'primary' : 'secondary'}
           className="justify-between"
           isDisabled={!candidate.compatible || candidate.direction === 'current'}
-          onPress={() => {
-            setSelectedVersion(candidate);
-            setApprovedVersionPlanToken(null);
-            setPermissionApproved(false);
-            setMajorApproved(false);
-          }}
+          onPress={() => onSelect(candidate)}
           data-cy={`plugins-list-version-${candidate.version}`}
         >
           <span>{candidate.version}</span>

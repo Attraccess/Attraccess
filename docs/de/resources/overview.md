@@ -18,7 +18,7 @@ Jede Ressource in Attraccess hat:
 | Typ | Beschreibung |
 |-----|-------------|
 | **Maschine** | Standard-Ressource (3D-Drucker, Lasercutter, CNC-Fräse etc.) |
-| **Tür** | Zugangspunkt mit Entriegelungsfunktion. Optionale getrennte Entsperr- und Öffnungsaktion. |
+| **Tür** | Zugangspunkt mit Auf- und Abschließen. Optional getrenntes Aufsperren und Falle öffnen oder [Nur Zutritt](resources/creating-resources.md#tür-optionen) mit der einzigen Aktion Öffnen. |
 
 ## Ressourcen in der Übersicht
 
@@ -38,4 +38,4 @@ Die Startseite von Attraccess zeigt alle verfügbaren Ressourcen in einer Übers
 - [Gruppen](resources/resource-groups.md) – Ressourcen organisieren
 - [Einweisungen](resources/introductions.md) – Zugang verwalten
 - [Wartung](resources/maintenance.md) – Wartungen planen
-- [Reservierungen](resources/reservations.md) – Ressourcen im Voraus buchen (Plugin)
+- Mit installiertem Plugin Reservierungen (ein bezahltes Add-on mit dem Lizenzmodul `reservations`) können Mitglieder Ressourcen im Voraus buchen; siehe [Reservierungen](plugins/reservations/overview.md).

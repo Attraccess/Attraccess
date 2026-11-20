@@ -1,19 +1,19 @@
 import { Logger } from '@nestjs/common';
-import { Resource, ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 import { ActivityTrackExecutor } from './activity-track.executor';
 
-function createNode(partial: Partial<ResourceFlowNode>): ResourceFlowNode {
+function createNode(partial: Partial<FlowNodeRecord>): FlowNodeRecord {
   return {
     id: 'n1',
     type: ResourceFlowNodeType.INPUT_BUTTON,
     resourceId: 1,
     data: {},
     ...partial,
-  } as unknown as ResourceFlowNode;
+  } as unknown as FlowNodeRecord;
 }
 
 describe('ActivityTrackExecutor', () => {
-  let resourceActivity: Map<Resource['id'], Date>;
+  let resourceActivity: Map<number, Date>;
   let executor: ActivityTrackExecutor;
 
   beforeEach(() => {
@@ -22,7 +22,7 @@ describe('ActivityTrackExecutor', () => {
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
 
-    resourceActivity = new Map<Resource['id'], Date>();
+    resourceActivity = new Map<number, Date>();
     executor = new ActivityTrackExecutor(resourceActivity);
   });
 

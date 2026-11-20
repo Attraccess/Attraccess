@@ -2,8 +2,14 @@ import { Global, Injectable, Logger, Module, OnApplicationShutdown } from '@nest
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { ValkeyConfigType } from '../config/valkey.config';
+import { redactValkeyCommandErrors } from './valkey-command-errors';
+import { describeValkeyError, logValkeyOutages } from './valkey-outage-logging';
 
 export const VALKEY_CLIENT = 'VALKEY_CLIENT';
+
+// ioredis 6 backs off exponentially up to 5 s. A request fails after maxRetriesPerRequest reconnect attempts, so
+// during an outage that left callers waiting about 20 s for the 503; keep the ioredis 5 delay (linear, at most 2 s).
+export const valkeyRetryDelay = (times: number): number => Math.min(times * 50, 2000);
 
 @Injectable()
 export class ValkeyClientService implements OnApplicationShutdown {
@@ -17,13 +23,27 @@ export class ValkeyClientService implements OnApplicationShutdown {
       return;
     }
 
-    const client = new Redis(config.VALKEY_URL, {
-      lazyConnect: false,
-      enableReadyCheck: true,
-      maxRetriesPerRequest: 3,
+    let client: Redis;
+    try {
+      client = new Redis(config.VALKEY_URL, {
+        lazyConnect: false,
+        enableReadyCheck: true,
+        maxRetriesPerRequest: 3,
+        retryStrategy: valkeyRetryDelay,
+      });
+    } catch (error) {
+      // The URL error carries the whole URL, password included, in `input`; rethrow without it.
+      // eslint-disable-next-line preserve-caught-error -- attaching the cause would leak the password.
+      throw new Error(
+        `VALKEY_URL is not a valid URL (${describeValkeyError(error)}); percent-encode reserved characters in the password`,
+      );
+    }
+    redactValkeyCommandErrors(client);
+    logValkeyOutages(client, this.logger, {
+      lost: (reason) => `Lost connection to Valkey (${reason}); retrying`,
+      reconnected: 'Reconnected to Valkey',
+      connected: 'Connected to Valkey',
     });
-    client.on('connect', () => this.logger.log('Connected to Valkey'));
-    client.on('error', (err) => this.logger.error('Valkey connection error', err));
     this.client = client;
   }
 

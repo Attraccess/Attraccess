@@ -1,10 +1,9 @@
-import { User } from '@attraccess/database-entities';
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import type { NotificationRecipient } from '@attraccess/application-models';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import * as Handlebars from 'handlebars';
 import { EmailService } from './email.service';
 import { EmailLayoutService } from '../email-layout/email-layout.service';
+import { EMAIL_RECIPIENT_DIRECTORY, EmailRecipientDirectory } from './email-recipient-directory.port';
 import { MetricsService } from '../metrics/metrics.service';
 import { getPluginEmailTemplate, pluginEmailTemplateKey } from '../email-template/plugin-email-templates';
 
@@ -29,8 +28,8 @@ export class PluginEmailService {
     private readonly emailService: EmailService,
     private readonly emailLayoutService: EmailLayoutService,
     private readonly metricsService: MetricsService,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    @Inject(EMAIL_RECIPIENT_DIRECTORY)
+    private readonly recipients: EmailRecipientDirectory,
   ) {}
 
   /**
@@ -39,7 +38,7 @@ export class PluginEmailService {
    */
   public async sendPluginTemplate(
     pluginName: string,
-    recipient: User,
+    recipient: NotificationRecipient,
     templateId: string,
     variables: Record<string, unknown>,
   ): Promise<void> {
@@ -51,13 +50,13 @@ export class PluginEmailService {
           'Declare it in emailTemplates of the plugin backend module.',
       );
     }
-    const user = recipient?.email ? recipient : await this.userRepository.findOne({ where: { id: recipient.id } });
+    const user = recipient?.email ? recipient : await this.recipients.findById(recipient.id);
     if (!user?.email) return;
     await this.emailService.sendEmail(user, key, { ...variables, ...(await this.emailService.getBaseContext(user)) });
   }
 
-  public async sendPluginEmail(recipient: User, content: PluginEmailContent): Promise<void> {
-    const user = recipient?.email ? recipient : await this.userRepository.findOne({ where: { id: recipient.id } });
+  public async sendPluginEmail(recipient: NotificationRecipient, content: PluginEmailContent): Promise<void> {
+    const user = recipient?.email ? recipient : await this.recipients.findById(recipient.id);
     if (!user?.email) return;
 
     try {

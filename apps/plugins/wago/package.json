@@ -8,7 +8,7 @@
     "wago",
     "cc100"
   ],
-  "license": "AGPL-3.0-only",
+  "license": "SEE LICENSE IN LICENSE.md",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Attraccess/Attraccess.git",
@@ -23,27 +23,35 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@attraccess/plugins-backend-sdk": "^1.9.0",
-    "@attraccess/plugins-frontend-sdk": "^1.9.0",
-    "@attraccess/plugins-frontend-ui": "^1.11.0"
+    "@attraccess/plugins-backend-sdk": "^2.0.0-0",
+    "@attraccess/plugins-frontend-sdk": "^2.0.0-0",
+    "@attraccess/plugins-frontend-ui": "^2.0.0-0"
   },
   "attraccess": {
     "displayName": "WAGO CC100",
     "description": "Discover, claim, and monitor WAGO CC100 controllers.",
-    "host": "^1.11.0",
+    "host": "^2.0.0-0",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
-    "migrations": "dist/migrations.js",
     "styles": "frontend/style.css",
+    "license": {
+      "required": true,
+      "modules": [
+        "wago"
+      ]
+    },
+    "dashboardPaths": [
+      "/wago"
+    ],
     "permissions": [
-      "DATABASE_ACCESS",
+      "PLUGIN_STORAGE",
       "ACCESS_MQTT_SERVERS",
       "TRIGGER_FLOWS",
       "MANAGE_SECRETS"
     ],
     "sdk": {
-      "backend": "^1.9.0",
-      "frontend": "^1.9.0"
+      "backend": "^2.0.0-0",
+      "frontend": "^2.0.0-0"
     }
   }
 }

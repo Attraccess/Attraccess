@@ -69,23 +69,23 @@ vi.mock('../../../../stores/ptr.store', () => ({ usePtrStore: () => ({ setPullTo
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('../../../../components/toastProvider', () => ({ useToastMessage: () => ({ apiError: state.error }) }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourceFlowsServiceGetResourceFlow: () => ({
+  useGetResourceFlow: () => ({
     data: state.original,
     isFetching: state.fetching,
     isError: state.failed,
   }),
-  UseResourceFlowsServiceGetResourceFlowKeyFn: ({ resourceId }: { resourceId: number }) => ['flow', resourceId],
-  useResourceFlowsServiceSaveResourceFlow: (options: typeof state.options) => {
+  UseGetResourceFlowKeyFn: ({ path }: { path: { resourceId: number } }) => ['flow', path.resourceId],
+  useSaveResourceFlow: (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
     return { mutate: state.save };
   },
-  useResourceFlowsServiceGetNodeSchemas: () => ({ data: undefined }),
-  useMqttServiceMqttServersGetAll: (_key: unknown, options?: { enabled?: boolean }) => ({
+  useGetNodeSchemas: () => ({ data: undefined }),
+  useMqttServersGetAll: (_clientOptions: unknown, _key: unknown, options?: { enabled?: boolean }) => ({
     data: options?.enabled === false ? undefined : state.mqttServers,
   }),
-  useGlobalFlowsServiceGetGlobalFlowCanvas: () => ({ data: undefined, isFetching: false, isError: false }),
-  useGlobalFlowsServiceGetGlobalFlowNodeSchemas: () => ({ data: undefined }),
-  useGlobalFlowsServiceSaveGlobalFlowCanvas: () => ({ mutate: vi.fn() }),
+  useGetGlobalFlowCanvas: () => ({ data: undefined, isFetching: false, isError: false }),
+  useGetGlobalFlowNodeSchemas: () => ({ data: undefined }),
+  useSaveGlobalFlowCanvas: () => ({ mutate: vi.fn() }),
 }));
 vi.mock('js-confetti', () => ({
   default: class {
@@ -113,29 +113,35 @@ vi.mock('@xyflow/react', () => ({
   Controls: () => null,
   Background: () => null,
 }));
-vi.mock('./context/index', () => ({
-  FlowProvider: ({ children }: { children: ReactNode }) => children,
-  useFlowContext: () => {
-    const [nodes, setNodes] = useState<Node[]>([]);
-    const [edges, setEdges] = useState<Edge[]>([]);
-    Object.assign(state, { nodes, edges, setNodes, setEdges });
-    return {
-      nodes,
-      edges,
-      setNodes,
-      setEdges,
-      addNode: state.add,
-      copySelectedNodes: state.copy,
-      cutSelectedNodes: state.cut,
-      pasteNodes: state.paste,
-      addLiveLogReceiver: state.receive,
-      removeLiveLogReceiver: state.remove,
-      setValidationErrors: state.validation,
-      flowNodeTypes: {},
-      owner: { kind: 'resource', resourceId: 7 },
-    };
-  },
-}));
+vi.mock('./context/index', async () => {
+  // One shared flow state for every consumer, like the real provider.
+  const { createContext, useContext } = await import('react');
+  const FlowStateContext = createContext<object | null>(null);
+  return {
+    FlowProvider: ({ children }: { children: ReactNode }) => {
+      const [nodes, setNodes] = useState<Node[]>([]);
+      const [edges, setEdges] = useState<Edge[]>([]);
+      Object.assign(state, { nodes, edges, setNodes, setEdges });
+      const value = {
+        nodes,
+        edges,
+        setNodes,
+        setEdges,
+        addNode: state.add,
+        copySelectedNodes: state.copy,
+        cutSelectedNodes: state.cut,
+        pasteNodes: state.paste,
+        addLiveLogReceiver: state.receive,
+        removeLiveLogReceiver: state.remove,
+        setValidationErrors: state.validation,
+        flowNodeTypes: {},
+        owner: { kind: 'resource', resourceId: 7 },
+      };
+      return <FlowStateContext.Provider value={value}>{children}</FlowStateContext.Provider>;
+    },
+    useFlowContext: () => useContext(FlowStateContext),
+  };
+});
 vi.mock('./flowImportExport', () => ({
   useFlowImportExport: () => ({ handleImportClick: state.imported, handleExport: state.exported }),
 }));
@@ -242,8 +248,8 @@ it.each(['type', 'position', 'data', 'identity', 'count'] as const)(
     expect(saveButton()).toBeEnabled();
     fireEvent.click(saveButton());
     expect(state.save).toHaveBeenCalledWith({
-      resourceId: 7,
-      requestBody: { nodes: state.nodes, edges: state.edges },
+      path: { resourceId: 7 },
+      body: { nodes: state.nodes, edges: state.edges },
     });
     act(() => state.options.onSuccess());
     expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['flow', 7] });
@@ -342,12 +348,12 @@ it('auto-aligns using measured handles and preserves positions, data and connect
   expect(state.edges).toEqual(state.original.edges);
 
   // Model a server round trip with serialized data and a fresh page mount.
-  state.save.mockImplementationOnce(({ requestBody }: { requestBody: { nodes: Node[]; edges: Edge[] } }) => {
-    state.original = JSON.parse(JSON.stringify(requestBody));
+  state.save.mockImplementationOnce(({ body }: { body: { nodes: Node[]; edges: Edge[] } }) => {
+    state.original = JSON.parse(JSON.stringify(body));
   });
   const aligned = structuredClone({ nodes: state.nodes, edges: state.edges });
   fireEvent.click(saveButton());
-  expect(state.save).toHaveBeenCalledWith({ resourceId: 7, requestBody: aligned });
+  expect(state.save).toHaveBeenCalledWith({ path: { resourceId: 7 }, body: aligned });
   view.unmount();
   show();
   expect(state.nodes).toEqual(aligned.nodes);

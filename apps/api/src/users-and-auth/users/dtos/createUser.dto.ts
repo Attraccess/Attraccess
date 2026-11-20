@@ -1,6 +1,6 @@
 import { IsBoolean, IsEmail, IsIn, IsOptional, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { AuthenticationType } from '@attraccess/database-entities';
+import { AuthenticationType } from '@attraccess/application-models';
 
 export class CreateUserDto {
   @ApiProperty({

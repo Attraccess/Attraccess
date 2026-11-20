@@ -3,9 +3,9 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  useResourceMeteringServiceGetResourceMeteringStatus,
-  useResourceMeteringServiceRetryResourceMeteringSettlement,
-  useResourceMeteringServiceWaiveResourceMeteringSettlement,
+  useGetResourceMeteringStatus,
+  useRetryResourceMeteringSettlement,
+  useWaiveResourceMeteringSettlement,
 } from '@attraccess/react-query-client';
 import { EnergySettlementNotices, MeterSetupNotice } from './MeterNotices';
 import en from './en.json';
@@ -13,10 +13,10 @@ import en from './en.json';
 const auth = vi.hoisted(() => ({ permissions: new Set<string>() }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourceMeteringServiceGetResourceMeteringStatus: vi.fn(),
-  UseResourceMeteringServiceGetResourceMeteringStatusKeyFn: () => ['status'],
-  useResourceMeteringServiceRetryResourceMeteringSettlement: vi.fn(),
-  useResourceMeteringServiceWaiveResourceMeteringSettlement: vi.fn(),
+  useGetResourceMeteringStatus: vi.fn(),
+  UseGetResourceMeteringStatusKeyFn: () => ['status'],
+  useRetryResourceMeteringSettlement: vi.fn(),
+  useWaiveResourceMeteringSettlement: vi.fn(),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
@@ -58,20 +58,20 @@ const retry = vi.fn();
 const waive = vi.fn();
 
 function mockStatus(status: object) {
-  vi.mocked(useResourceMeteringServiceGetResourceMeteringStatus).mockReturnValue({
+  vi.mocked(useGetResourceMeteringStatus).mockReturnValue({
     data: { meters: [], ...status },
-  } as ReturnType<typeof useResourceMeteringServiceGetResourceMeteringStatus>);
+  } as ReturnType<typeof useGetResourceMeteringStatus>);
 }
 
 describe('meter notices', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     auth.permissions = new Set(['billing.manage', 'resources.update']);
-    vi.mocked(useResourceMeteringServiceRetryResourceMeteringSettlement).mockReturnValue({
+    vi.mocked(useRetryResourceMeteringSettlement).mockReturnValue({
       mutate: retry,
       isPending: false,
     } as never);
-    vi.mocked(useResourceMeteringServiceWaiveResourceMeteringSettlement).mockReturnValue({
+    vi.mocked(useWaiveResourceMeteringSettlement).mockReturnValue({
       mutate: waive,
       isPending: false,
     } as never);
@@ -94,6 +94,36 @@ describe('meter notices', () => {
     expect(screen.getByText('Heartbeats: ' + en.setup.problems['ready-unreachable'])).toBeInTheDocument();
     expect(screen.getByText('Heartbeats: ' + en.setup.problems['collect-trigger-missing'])).toBeInTheDocument();
     expect(screen.getByRole('link', { name: en.setup.action })).toHaveAttribute('href', '/resources/7/flows');
+  });
+
+  it('warns that a shared meter without an on-demand reading cannot be split between sessions', () => {
+    mockStatus({
+      meters: [
+        {
+          meterId: 1,
+          name: 'Heartbeats',
+          creditsPerUnit: 30,
+          allocation: 'shared',
+          configured: true,
+          problems: ['shared-needs-collect'],
+        },
+        {
+          meterId: 2,
+          name: 'Per session',
+          creditsPerUnit: 30,
+          allocation: 'per-session',
+          configured: true,
+          problems: ['shared-needs-collect'],
+        },
+      ],
+      unsettled: [],
+    });
+    render(<MeterSetupNotice resourceId={7} />);
+    expect(screen.getByText('Heartbeats: ' + en.setup.problems['shared-needs-collect'])).toBeInTheDocument();
+    expect(screen.queryByText(/Per session/)).not.toBeInTheDocument();
+    // Sessions can still start, so the notice must not claim that none can.
+    expect(screen.getByText(en.setup.sharingTitle)).toBeInTheDocument();
+    expect(screen.queryByText(en.setup.title)).not.toBeInTheDocument();
   });
 
   it('stays silent for a complete meter or when energy billing is off', () => {
@@ -135,9 +165,9 @@ describe('meter notices', () => {
     expect(screen.getAllByText(en.unsettled.waive)).toHaveLength(2);
 
     fireEvent.click(screen.getByText(en.unsettled.retry));
-    expect(retry).toHaveBeenCalledWith({ resourceId: 7, sessionId: 'a' });
+    expect(retry).toHaveBeenCalledWith({ path: { resourceId: 7, sessionId: 'a' } });
     fireEvent.click(screen.getAllByText(en.unsettled.waive)[1]);
-    expect(waive).toHaveBeenCalledWith({ resourceId: 7, sessionId: 'b' });
+    expect(waive).toHaveBeenCalledWith({ path: { resourceId: 7, sessionId: 'b' } });
   });
 
   it('renders nothing when every energy charge is settled', () => {
@@ -171,8 +201,8 @@ describe('meter notices', () => {
     );
 
     expect(container).toBeEmptyDOMElement();
-    expect(useResourceMeteringServiceGetResourceMeteringStatus).toHaveBeenLastCalledWith(
-      { resourceId: 7 },
+    expect(useGetResourceMeteringStatus).toHaveBeenLastCalledWith(
+      { path: { resourceId: 7 } },
       undefined,
       expect.objectContaining({ enabled: false }),
     );

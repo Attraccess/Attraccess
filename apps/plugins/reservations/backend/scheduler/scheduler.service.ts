@@ -1,8 +1,10 @@
-import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginActiveSession, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Clock, PLUGIN_CONTEXT, READER_HORIZON_MS, RESERVATION_CLOCK } from '../constants';
-import type { ReservationEntity } from '../entities/reservation.entity';
+import type { ReservationRow } from '../storage/reservation-table';
 import { ReservationNotifications } from '../notifications/notifier.service';
+import { heldBookings } from '../reservations/capacity';
+import { DirectoryService } from '../reservations/directory.service';
 import { ReservationService } from '../reservations/reservation.service';
 import { ReservationStore } from '../reservations/reservation.store';
 import { ResourceSettingsService } from '../settings/resource-settings.service';
@@ -22,8 +24,11 @@ export const OVERRUN_CHECK_WINDOW_MS = 5 * TICK_INTERVAL_MS;
 /** A no-show found later than this after its deadline (API was down) is recorded without a mail. */
 export const NO_SHOW_NOTICE_WINDOW_MS = 5 * TICK_INTERVAL_MS;
 
+/** How often the scheduler re-checks every resource against its session limit. */
+export const CAPACITY_RECONCILE_MS = HOUR_MS;
+
 /** When the booking became confirmed: the approval of a request, otherwise its creation. */
-const confirmedAt = (r: ReservationEntity): number => (r.decidedAt ?? r.createdAt).getTime();
+const confirmedAt = (r: ReservationRow): number => (r.decidedAt ?? r.createdAt).getTime();
 
 /**
  * The plugin's minute loop: expiry, no-show, completion, reminders, handover and overrun notices.
@@ -53,6 +58,8 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
   private startsAnnouncedUntil: Date | null = null;
   /** Bookings that start up to here (now + the reader horizon) were already announced to the readers. */
   private readerHorizonAnnouncedUntil: Date | null = null;
+  /** When every resource was last checked against its current session limit (see `reconcileCapacity`). */
+  private capacityReconciledAt: Date | null = null;
 
   constructor(
     @Inject(PLUGIN_CONTEXT) private readonly context: PluginContext,
@@ -61,6 +68,7 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
     @Inject(ResourceSettingsService) private readonly settings: ResourceSettingsService,
     @Inject(ReservationNotifications) private readonly notifications: ReservationNotifications,
     @Inject(RESERVATION_CLOCK) private readonly clock: Clock,
+    @Inject(DirectoryService) private readonly directory: DirectoryService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -99,6 +107,7 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
 
   private async runSteps(now: Date): Promise<void> {
     const steps: [string, (at: Date) => Promise<void>][] = [
+      ['reconcile capacity', (at) => this.reconcileCapacity(at)],
       ['expire pending', (at) => this.expirePending(at)],
       ['no-show', (at) => this.markNoShows(at)],
       ['announce starts', (at) => this.announceStarts(at)],
@@ -118,12 +127,32 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private isEnabled(r: ReservationEntity): boolean {
+  /**
+   * Safety net for limit changes the plugin missed (it was disabled or the server was down): checks every enabled
+   * resource against its current session limit with the same algorithm as the limit-changed event. Right after
+   * start-up and then once per hour; idempotent.
+   */
+  private async reconcileCapacity(now: Date): Promise<void> {
+    if (this.capacityReconciledAt && now.getTime() - this.capacityReconciledAt.getTime() < CAPACITY_RECONCILE_MS)
+      return;
+    this.capacityReconciledAt = now;
+    for (const resourceId of this.settings.getEnabledResourceIds()) {
+      try {
+        await this.reservations.cancelExcessBookings(resourceId, null);
+      } catch (error) {
+        this.logger.error(
+          `capacity reconciliation of resource ${resourceId} failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+  }
+
+  private isEnabled(r: ReservationRow): boolean {
     return this.settings.getCachedSettings(r.resourceId).enabled;
   }
 
   /** Runs `work` for each item; one failing item does not stop the others. */
-  private async each(items: ReservationEntity[], work: (item: ReservationEntity) => Promise<void>): Promise<void> {
+  private async each(items: ReservationRow[], work: (item: ReservationRow) => Promise<void>): Promise<void> {
     for (const item of items) {
       try {
         await work(item);
@@ -195,7 +224,7 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
    * own back-to-back booking) is checked in here, at the no-show deadline, instead of being released.
    * True when such a session runs (the booking must then not become a no-show).
    */
-  private async checkInRunningSession(r: ReservationEntity, now: Date): Promise<boolean> {
+  private async checkInRunningSession(r: ReservationRow, now: Date): Promise<boolean> {
     const session = (await this.context.resourceAccess.getActiveSessions(r.resourceId)).find(
       (candidate) => candidate.userId === r.userId && candidate.startTime.getTime() < r.endTime.getTime(),
     );
@@ -236,6 +265,28 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  /** Slots held at the booking's start by other people's confirmed bookings (holders in session count as sessions). */
+  private async heldAtStart(r: ReservationRow, sessions: PluginActiveSession[]): Promise<number> {
+    const confirmed = await this.store.findConfirmedOverlapping(
+      r.resourceId,
+      r.startTime,
+      new Date(r.startTime.getTime() + 1),
+    );
+    const inSession = new Set(sessions.map((session) => session.userId));
+    return heldBookings({ confirmed, starterId: r.userId, inSession, at: r.startTime }).length;
+  }
+
+  /** Shared machine: the holder is in session, or a slot was free for them at the start besides the lingering ones. */
+  private async holderHadSlot(
+    r: ReservationRow,
+    sessions: PluginActiveSession[],
+    lingering: number,
+    limit: number,
+  ): Promise<boolean> {
+    if (sessions.some((session) => session.userId === r.userId)) return true;
+    return limit - lingering - (await this.heldAtStart(r, sessions)) > 0;
+  }
+
   /** Users with a running session on the resource, other than the holder, shortly before a booking starts. */
   private async handover(now: Date): Promise<void> {
     const widest = Math.max(
@@ -248,11 +299,13 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
       const settings = this.settings.getCachedSettings(r.resourceId);
       const minutes = settings.handoverReminderMinutes;
       if (!settings.enabled || minutes <= 0 || r.startTime.getTime() - now.getTime() > minutes * MINUTE_MS) return;
-      const others = (await this.context.resourceAccess.getActiveSessions(r.resourceId)).filter(
-        (session) => session.userId !== r.userId,
-      );
+      const sessions = await this.context.resourceAccess.getActiveSessions(r.resourceId);
+      const others = sessions.filter((session) => session.userId !== r.userId);
       // Nothing to say yet: stay unclaimed so a session that starts later inside the window is still told.
       if (others.length === 0) return;
+      // Shared machine: only when the booking would find no free slot at its start (sessions + other held slots).
+      const limit = await this.directory.getSessionLimit(r.resourceId);
+      if (limit > 1 && others.length + (await this.heldAtStart(r, sessions)) < limit) return;
       if (await this.store.claimFlag(r.id, 'handoverSentAt', now)) {
         await this.notifications.notifyHandover(r, [...new Set(others.map((session) => session.userId))]);
       }
@@ -269,10 +322,14 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
     const recent = await this.store.findUpcomingConfirmed(new Date(now.getTime() - OVERRUN_CHECK_WINDOW_MS), now);
     await this.each(recent, async (r) => {
       if (!this.isEnabled(r) || r.overrunSentAt || r.endTime.getTime() <= now.getTime()) return;
-      const lingering = (await this.context.resourceAccess.getActiveSessions(r.resourceId)).filter(
+      const sessions = await this.context.resourceAccess.getActiveSessions(r.resourceId);
+      const lingering = sessions.filter(
         (session) => session.userId !== r.userId && session.startTime.getTime() < r.startTime.getTime(),
       );
       if (lingering.length === 0) return;
+      // Shared machine: only when the holder has no session and no slot was free for them at the start.
+      const limit = await this.directory.getSessionLimit(r.resourceId);
+      if (limit > 1 && (await this.holderHadSlot(r, sessions, lingering.length, limit))) return;
       if (await this.store.claimFlag(r.id, 'overrunSentAt', now)) {
         await this.notifications.notifyOverrun(r, [...new Set(lingering.map((session) => session.userId))]);
       }

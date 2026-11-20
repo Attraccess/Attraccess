@@ -1,9 +1,9 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 import { globalHeartbeatKey, heartbeatKey } from '../node-executors';
 import { FlowResourceMonitor } from './resource-monitor';
 
-const noActivityNode = (id: string, minInactivityMinutes: number, extra: Partial<ResourceFlowNode> = {}) =>
+const noActivityNode = (id: string, minInactivityMinutes: number, extra: Partial<FlowNodeRecord> = {}) =>
   ({
     id,
     type: ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY,
@@ -11,32 +11,27 @@ const noActivityNode = (id: string, minInactivityMinutes: number, extra: Partial
     resourceId: null,
     flowId: null,
     ...extra,
-  }) as unknown as ResourceFlowNode;
+  }) as unknown as FlowNodeRecord;
 
-function build(resourceNodes: ResourceFlowNode[], globalNodes: ResourceFlowNode[], activeResourceIds: number[]) {
-  const queryBuilder = {
-    innerJoin: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    distinct: jest.fn().mockReturnThis(),
-    getMany: jest.fn(async () => resourceNodes),
+function build(resourceNodes: FlowNodeRecord[], globalNodes: FlowNodeRecord[], activeResourceIds: number[]) {
+  // The store answers what the adapter's SQL does: each own node pairs with its machine, each global node with
+  // every machine that has an active session.
+  const store = {
+    findTriggerNodes: jest.fn(async (_type: string) => globalNodes),
+    findInactivityTargets: jest.fn(async () => [
+      ...resourceNodes.map((node) => ({ node, resourceId: node.resourceId as number })),
+      ...(globalNodes.length > 0
+        ? globalNodes.flatMap((node) => activeResourceIds.map((resourceId) => ({ node, resourceId })))
+        : []),
+    ]),
   };
-  const usageQueryBuilder = {
-    select: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    distinct: jest.fn().mockReturnThis(),
-    getRawMany: jest.fn(async () => activeResourceIds.map((resourceId) => ({ resourceId }))),
-  };
-  const repository = {
-    createQueryBuilder: jest.fn(() => queryBuilder),
-    find: jest.fn(async () => globalNodes),
-    manager: { createQueryBuilder: jest.fn(() => usageQueryBuilder) },
-  };
+  const repository = store;
   const activity = new Map<number, Date>();
   const heartbeats = new Map<string, Date>();
   const startFlow = jest.fn(async (..._args: unknown[]): Promise<never[]> => []);
   const health = { reportHealth: jest.fn(async () => undefined) };
   const monitor = new FlowResourceMonitor(
-    repository as never,
+    store,
     activity,
     heartbeats,
     health as never,
@@ -76,12 +71,12 @@ describe('FlowResourceMonitor no-activity schedules', () => {
     activity.set(10, minutes(6));
 
     await monitor.checkResourceActivity();
-    expect(startFlow.mock.calls.map(([node]) => (node as ResourceFlowNode).id)).toEqual(['own']);
+    expect(startFlow.mock.calls.map(([node]) => (node as FlowNodeRecord).id)).toEqual(['own']);
 
     // The resource node fired at minute 6; at minute 11 it fires again and the global node fires for the first time.
     jest.setSystemTime(new Date(Date.now() + 5 * 60_000));
     await monitor.checkResourceActivity();
-    expect(startFlow.mock.calls.map(([node]) => (node as ResourceFlowNode).id)).toEqual(['own', 'own', 'g']);
+    expect(startFlow.mock.calls.map(([node]) => (node as FlowNodeRecord).id)).toEqual(['own', 'own', 'g']);
 
     // Neither firing touched the resource's last activity.
     expect(activity.get(10)).toEqual(minutes(11));
@@ -134,14 +129,13 @@ describe('FlowResourceMonitor no-activity schedules', () => {
   it('only loads no-activity nodes of enabled global flows', async () => {
     const { monitor, repository } = build([], [], [10]);
     await monitor.checkResourceActivity();
-    expect(repository.find).toHaveBeenCalledWith({
-      where: expect.objectContaining({ flow: { enabled: true, scope: 'global' } }),
-    });
+    // Which flows count as enabled global ones is the store's contract (see the adapter's persistence spec).
+    expect(repository.findInactivityTargets).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('FlowResourceMonitor heartbeats', () => {
-  const heartbeatNode = (id: string, timeoutSeconds: number, extra: Partial<ResourceFlowNode>) =>
+  const heartbeatNode = (id: string, timeoutSeconds: number, extra: Partial<FlowNodeRecord>) =>
     ({
       id,
       type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT,
@@ -149,7 +143,7 @@ describe('FlowResourceMonitor heartbeats', () => {
       resourceId: null,
       flowId: null,
       ...extra,
-    }) as unknown as ResourceFlowNode;
+    }) as unknown as FlowNodeRecord;
   const secondsAgo = (n: number) => new Date(Date.now() - n * 1000);
 
   it('marks every resource that beat through a global node unhealthy after the timeout', async () => {
@@ -213,11 +207,6 @@ describe('FlowResourceMonitor heartbeats', () => {
   it('only loads heartbeat nodes of resource flows and enabled global flows', async () => {
     const { monitor, repository } = build([], [], []);
     await monitor.checkHealthHeartbeats();
-    expect(repository.find).toHaveBeenCalledWith({
-      where: [
-        expect.objectContaining({ flowId: expect.anything() }),
-        expect.objectContaining({ flow: { enabled: true, scope: 'global' } }),
-      ],
-    });
+    expect(repository.findTriggerNodes).toHaveBeenCalledWith(ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT);
   });
 });

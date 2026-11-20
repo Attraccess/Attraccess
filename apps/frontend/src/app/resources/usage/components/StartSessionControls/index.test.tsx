@@ -5,8 +5,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@attraccess/react-query-client';
 import { StartSessionControls } from './index';
 
-const { startMutate, supervisionMode, resourceType, startBlocked, requestForms, toastError, bothCallbacks } = vi.hoisted(
-  () => ({
+const {
+  startMutate,
+  supervisionMode,
+  resourceType,
+  accessOnly,
+  doorMutate,
+  startBlocked,
+  requestForms,
+  toastError,
+  bothCallbacks,
+} = vi.hoisted(() => ({
   bothCallbacks: (options: unknown, callbacks: unknown, variables: unknown) => {
     // Mirrors TanStack: the hook-level callbacks run first, then the per-call ones.
     type Callbacks = {
@@ -30,9 +39,10 @@ const { startMutate, supervisionMode, resourceType, startBlocked, requestForms, 
   requestForms: vi.fn().mockResolvedValue([]),
   supervisionMode: { value: 'introduction_required' },
   resourceType: { value: 'machine' },
+  accessOnly: { value: false },
+  doorMutate: { lock: vi.fn(), unlock: vi.fn(), unlatch: vi.fn(), open: vi.fn() },
   startBlocked: { value: { blocked: false } as Record<string, unknown> },
-  }),
-);
+}));
 
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -58,7 +68,17 @@ vi.mock('./MachineStartControls', () => ({
     </button>
   ),
 }));
-vi.mock('./DoorControls', () => ({ DoorControls: () => <div data-testid="door-controls" /> }));
+// The real door buttons, so a click reaches the door mutation the controls wire up.
+vi.mock('./DoorControls', async (importOriginal) => {
+  const { DoorControls } = await importOriginal<typeof import('./DoorControls')>();
+  return {
+    DoorControls: (props: Parameters<typeof DoorControls>[0]) => (
+      <div data-testid="door-controls">
+        <DoorControls {...props} />
+      </div>
+    ),
+  };
+});
 vi.mock('../SessionNotesModal', () => ({ SessionNotesModal: () => null, SessionModalMode: { START: 'start' } }));
 vi.mock('./insufficientBalanceModal', () => ({ InsufficientBalanceModal: () => null }));
 vi.mock('../SupervisedStartModal', () => ({
@@ -73,27 +93,28 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
     SUPERVISION_ALLOWED: 'supervision_allowed',
     SUPERVISION_REQUIRED: 'supervision_required',
   },
-  useResourcesServiceGetOneResourceById: () => ({
-    data: { id: 1, type: resourceType.value, supervisionMode: supervisionMode.value },
+  useGetOneResourceById: () => ({
+    data: { id: 1, type: resourceType.value, supervisionMode: supervisionMode.value, accessOnly: accessOnly.value },
   }),
   // The real StartBlockedGate renders; only its query answer is faked.
-  useResourcesServiceResourceUsageStartBlocked: () => ({
+  useResourceUsageStartBlocked: () => ({
     data: startBlocked.value,
     isPending: false,
     isError: false,
     refetch: vi.fn(),
   }),
   // The shared start hook passes onSuccess/onError at hook level and plugin handling per call.
-  useResourcesServiceResourceUsageStartSession: (options: unknown) => ({
+  useResourceUsageStartSession: (_mutationKey: unknown, options: unknown) => ({
     mutate: (variables: unknown, callbacks: unknown) =>
       startMutate(variables, bothCallbacks(options, callbacks, variables)),
     isPending: false,
   }),
-  useResourcesServiceUnlockDoor: () => ({ mutate: vi.fn(), isPending: false }),
-  useResourcesServiceLockDoor: () => ({ mutate: vi.fn(), isPending: false }),
-  useResourcesServiceUnlatchDoor: () => ({ mutate: vi.fn(), isPending: false }),
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn: () => ['activeSession'],
-  UseResourcesServiceResourceUsageGetHistoryKeyFn: () => ['history'],
+  useUnlockDoor: () => ({ mutate: doorMutate.unlock, isPending: false }),
+  useLockDoor: () => ({ mutate: doorMutate.lock, isPending: false }),
+  useUnlatchDoor: () => ({ mutate: doorMutate.unlatch, isPending: false }),
+  useOpenDoor: () => ({ mutate: doorMutate.open, isPending: false }),
+  UseResourceUsageGetActiveSessionKeyFn: () => ['activeSession'],
+  UseResourceUsageGetHistoryKeyFn: () => ['history'],
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -176,7 +197,7 @@ it.each([
   expect(startMutate).toHaveBeenCalledTimes(retry ? 2 : 1);
   if (retry)
     expect(startMutate).toHaveBeenLastCalledWith(
-      { resourceId: 1, requestBody: { projectId: undefined, formSubmissions: submissions } },
+      { path: { resourceId: 1 }, body: { projectId: undefined, formSubmissions: submissions } },
       expect.any(Object),
     );
 });
@@ -230,7 +251,7 @@ it('asks for a plugin confirmation on 409 CONFIRMATION_REQUIRED and retries with
 
   await userEvent.click(document.querySelector('[data-cy="start-confirmation-confirm"]') as HTMLElement);
   expect(startMutate).toHaveBeenCalledTimes(2);
-  expect(startMutate.mock.calls[1][0].requestBody).toMatchObject({ confirmedStepIds: ['step-1'] });
+  expect(startMutate.mock.calls[1][0].body).toMatchObject({ confirmedStepIds: ['step-1'] });
 });
 
 it('shows the plugin reason on 403 START_BLOCKED instead of a generic error', async () => {
@@ -272,5 +293,35 @@ describe('StartSessionControls start-blocked gate', () => {
 
     expect(screen.getByTestId('door-controls')).toBeInTheDocument();
     expect(screen.queryByText(reason.body)).not.toBeInTheDocument();
+  });
+});
+
+describe('StartSessionControls door actions', () => {
+  beforeEach(() => {
+    resourceType.value = 'door';
+    startBlocked.value = { blocked: false };
+    for (const mutate of Object.values(doorMutate)) mutate.mockClear();
+  });
+
+  it('opens an access-only door through the open-door call, never unlock', async () => {
+    accessOnly.value = true;
+    render(<StartSessionControls resourceId={1} />);
+
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    await userEvent.click(screen.getByRole('button', { name: 'door.open' }));
+
+    expect(doorMutate.open).toHaveBeenCalledWith({ path: { resourceId: 1 } });
+    expect(doorMutate.unlock).not.toHaveBeenCalled();
+    expect(doorMutate.lock).not.toHaveBeenCalled();
+  });
+
+  it('unlocks a regular door through the unlock call', async () => {
+    accessOnly.value = false;
+    render(<StartSessionControls resourceId={1} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'door.unlock' }));
+
+    expect(doorMutate.unlock).toHaveBeenCalledWith({ path: { resourceId: 1 } });
+    expect(doorMutate.open).not.toHaveBeenCalled();
   });
 });

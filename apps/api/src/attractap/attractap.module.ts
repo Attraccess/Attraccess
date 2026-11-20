@@ -1,14 +1,12 @@
 import { Module } from '@nestjs/common';
+import { AttractapPersistenceModule } from '../database/adapters/attractap/attractap-persistence.module';
 import { AttractapController } from './attractap.controller';
 import { ResourceAttractapsController } from './resource-attractaps.controller';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { AttractapService } from './attractap.service';
 import { WebsocketService } from './websockets/websocket.service';
 import { AttractapGateway } from './websockets/websocket.gateway';
 import { AttractapNfcCardsController } from './card.controller';
 import { CardAccessService } from './card-access.service';
-import 'sqlite3';
-import '@nestjs/common';
 import { WebSocketEventService } from './websockets/websocket-event.service';
 import { ResourceListService } from './websockets/handlers/resource-list/resource-list.service';
 import { ResourceActionGuard } from './websockets/handlers/resource-action.guard';
@@ -23,23 +21,13 @@ import { AttractapBillingHandler } from './websockets/handlers/billing/billing.h
 import { AttractapProjectsHandler } from './websockets/handlers/projects/projects.handler';
 import { AttractapSupervisionHandler } from './websockets/handlers/supervision/supervision.handler';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import {
-  Attractap,
-  AttractapCrashReport,
-  AttractapCredentialEvent,
-  AttractapInstallation,
-  AttractapSecureBootKey,
-  NFCCard,
-  NFCCardPendingChange,
-  Resource,
-  ResourceUsage,
-  User,
-} from '@attraccess/database-entities';
 import { AttractapPairingController } from './pairing.controller';
 import { CredentialRegistryService } from './security/credential-registry.service';
 import { HandshakeLimiter } from './security/handshake-limiter';
 import { InstallationIdentityService } from './security/installation-identity.service';
 import { PairingService } from './security/pairing.service';
+import { ReaderControlService } from './security/reader-control.service';
+import { EfuseReportService } from './security/efuse-report.service';
 import { ReaderSessionService } from './security/reader-session.service';
 import { SessionMetrics } from './security/session-metrics';
 import { SecureBootKeyService } from './secure-boot/secure-boot-key.service';
@@ -85,21 +73,13 @@ import { UiStepService } from './websockets/handlers/ui/ui-step.service';
 import { ReaderStartGate } from './websockets/handlers/session/reader-start-gate.service';
 import { ReaderUiAdminController } from './reader-ui-admin.controller';
 
+import { ReaderBleDriver } from './websockets/handlers/ble/reader-ble.driver';
+import { BLE_TRANSPORT_DRIVER } from '../plugin-system/ble/ble-transport-driver';
+
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
-    TypeOrmModule.forFeature([
-      Attractap,
-      AttractapCrashReport,
-      AttractapCredentialEvent,
-      AttractapInstallation,
-      AttractapSecureBootKey,
-      NFCCard,
-      NFCCardPendingChange,
-      Resource,
-      ResourceUsage,
-      User,
-    ]),
+    AttractapPersistenceModule,
     UsersAndAuthModule,
     ResourcesModule,
     ResourceUsageModule,
@@ -128,6 +108,8 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
     InstallationIdentityService,
     CredentialRegistryService,
     PairingService,
+    ReaderControlService,
+    EfuseReportService,
     ReaderSessionService,
     SecureBootKeyService,
     SecureImageService,
@@ -163,6 +145,9 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
     ReaderActiveUsageService,
     AttractapUiHandler,
     ReaderStartGate,
+    ReaderBleDriver,
+    // Plugin BLE through readers: PluginBleService looks the transport up under this host-only token.
+    { provide: BLE_TRANSPORT_DRIVER, useExisting: ReaderBleDriver },
   ],
   controllers: [
     AttractapController,

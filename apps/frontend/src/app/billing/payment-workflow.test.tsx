@@ -23,29 +23,32 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   BillingTransactionStatus: { PENDING: 'pending', COMPLETED: 'completed', FAILED: 'failed' },
-  useBillingServiceGetSumUpConfiguration: () => ({ data: { enabled: state.enabled }, isLoading: state.loading }),
-  useBillingServiceGetSumUpConfigurationKey: 'sumup-config',
-  useBillingServiceGetSumUpReadersKey: 'readers',
-  useBillingServiceSetSumUpApiKey: (callbacks: (typeof state.callbacks)[string]) => {
+  useGetSumUpConfiguration: () => ({ data: { enabled: state.enabled }, isLoading: state.loading }),
+  useGetSumUpConfigurationKey: 'sumup-config',
+  useGetSumUpReadersKey: 'readers',
+  useSetSumUpApiKey: (_mutationKey: unknown, callbacks: (typeof state.callbacks)[string]) => {
     state.callbacks.key = callbacks;
     return { mutate: state.mutateKey };
   },
-  useBillingServiceGetBillingTransaction: () => ({ data: state.transaction }),
-  useBillingServiceGetBillingConfiguration: () => ({ data: state.configuration }),
-  useBillingServiceRefundTransaction: (callbacks: (typeof state.callbacks)[string]) => {
+  useGetBillingTransaction: () => ({ data: state.transaction }),
+  useGetBillingConfiguration: () => ({ data: state.configuration }),
+  useRefundTransaction: (_mutationKey: unknown, callbacks: (typeof state.callbacks)[string]) => {
     state.callbacks.refund = callbacks;
     return { mutate: state.refund };
   },
-  useBillingServiceGetBillingTransactionsKey: 'transactions',
-  UseBillingServiceGetBillingTransactionKeyFn: (input: unknown) => ['transaction', input],
-  UseBillingServiceGetBillingBalanceKeyFn: (input: unknown) => ['balance', input],
-  useBillingServiceGetBillingTransactions: () => ({ data: undefined }),
-  useBillingServiceGetResourceBillingConfiguration: () => ({ data: undefined }),
-  useResourceMeteringServiceListResourceMeters: () => ({ data: state.meters }),
-  useResourceMeteringServiceSetResourceMeterRate: () => ({ mutateAsync: state.setMeterRate }),
-  UseResourceMeteringServiceListResourceMetersKeyFn: (input: unknown) => ['meters', input],
-  UseBillingServiceGetResourceBillingConfigurationKeyFn: (input: unknown) => ['resource-billing', input],
-  useBillingServiceUpdateResourceBillingConfiguration: (callbacks: (typeof state.callbacks)[string]) => {
+  useGetBillingTransactionsKey: 'transactions',
+  UseGetBillingTransactionKeyFn: (input: unknown) => ['transaction', input],
+  UseGetBillingBalanceKeyFn: (input: unknown) => ['balance', input],
+  useGetBillingTransactions: () => ({ data: undefined }),
+  useGetResourceBillingConfiguration: () => ({ data: undefined }),
+  useListResourceMeters: () => ({ data: state.meters }),
+  useSetResourceMeterRate: () => ({ mutateAsync: state.setMeterRate }),
+  useSetResourceMeterAllocation: () => ({ mutateAsync: vi.fn() }),
+  UseListResourceMetersKeyFn: (input: unknown) => ['meters', input],
+  UseGetResourceMeteringStatusKeyFn: (input: unknown) => ['status', input],
+  ResourceMeterAllocation: { SHARED: 'shared', PER_SESSION: 'per-session' },
+  UseGetResourceBillingConfigurationKeyFn: (input: unknown) => ['resource-billing', input],
+  useUpdateResourceBillingConfiguration: (_mutationKey: unknown, callbacks: (typeof state.callbacks)[string]) => {
     state.callbacks.resource = callbacks;
     return { mutate: state.refund };
   },
@@ -87,7 +90,7 @@ it('validates and saves SumUp credentials, refreshing readers and exposing API e
   expect(state.mutateKey).not.toHaveBeenCalled();
   fireEvent.change(screen.getByLabelText(/API Key/), { target: { value: 'sumup-secret' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  expect(state.mutateKey).toHaveBeenCalledWith({ requestBody: { apiKey: 'sumup-secret' } });
+  expect(state.mutateKey).toHaveBeenCalledWith({ body: { apiKey: 'sumup-secret' } });
   act(() => state.callbacks.key.onSuccess());
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['sumup-config'] });
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['readers'] });
@@ -114,14 +117,14 @@ it('submits a partial refund in minor units and refreshes the transaction and us
   fireEvent.change(amount, { target: { value: '5.25' } });
   fireEvent.blur(amount);
   fireEvent.click(screen.getByRole('button', { name: 'Refund' }));
-  expect(state.refund).toHaveBeenCalledWith({ transactionId: 7, requestBody: { amount: 525 } });
+  expect(state.refund).toHaveBeenCalledWith({ path: { transactionId: 7 }, body: { amount: 525 } });
   const error = new Error('Refund rejected');
   act(() => state.callbacks.refund.onError(error));
   expect(state.apiError).toHaveBeenCalledWith(expect.objectContaining({ error }));
   act(() => state.callbacks.refund.onSuccess());
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['transactions'] });
-  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['transaction', { transactionId: 7 }] });
-  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['balance', { userId: 3 }] });
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['transaction', { path: { transactionId: 7 } }] });
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['balance', { path: { userId: 3 } }] });
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 });
 it('hides refunds without permission or billing configuration', () => {
@@ -179,19 +182,18 @@ it('edits all resource rates and converts them to minor units', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await waitFor(() => expect(state.refund).toHaveBeenCalled());
   expect(state.setMeterRate).toHaveBeenCalledWith({
-    resourceId: 9,
-    meterId: 42,
-    requestBody: { creditsPerUnit: 30 },
+    path: { resourceId: 9, meterId: 42 },
+    body: { creditsPerUnit: 30 },
   });
   expect(state.refund).toHaveBeenCalledWith({
-    resourceId: 9,
-    requestBody: { creditsPerUsage: 125, creditsPerMinute: 250, creditsPerOperatingMinute: 375 },
+    path: { resourceId: 9 },
+    body: { creditsPerUsage: 125, creditsPerMinute: 250, creditsPerOperatingMinute: 375 },
   });
   const error = new Error('Rate rejected');
   act(() => state.callbacks.resource.onError(error));
   expect(state.apiError).toHaveBeenCalledWith(expect.objectContaining({ error }));
   act(() => state.callbacks.resource.onSuccess());
-  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['resource-billing', { resourceId: 9 }] });
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['resource-billing', { path: { resourceId: 9 } }] });
   expect(state.success).toHaveBeenCalledWith(expect.objectContaining({ title: 'Billing updated' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 });

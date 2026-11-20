@@ -1,11 +1,11 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
-import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
+import { useGetLicenseInformation } from '@attraccess/react-query-client';
 import { describe, expect, it, vi } from 'vitest';
 import { BillingDashboardPage } from './index';
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useLicenseServiceGetLicenseInformation: vi.fn(),
+  useGetLicenseInformation: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -22,9 +22,9 @@ vi.mock('./topup', () => ({ BillingDashboardTopupCard: () => <div data-testid="t
 vi.mock('./summary', () => ({ SummaryCard: () => <div data-testid="summary" /> }));
 
 function mockLicense(modules: string[] | undefined) {
-  vi.mocked(useLicenseServiceGetLicenseInformation).mockReturnValue({
+  vi.mocked(useGetLicenseInformation).mockReturnValue({
     data: modules !== undefined ? { modules } : undefined,
-  } as ReturnType<typeof useLicenseServiceGetLicenseInformation>);
+  } as ReturnType<typeof useGetLicenseInformation>);
 }
 
 describe('BillingDashboardPage license gate', () => {

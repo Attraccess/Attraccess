@@ -16,10 +16,7 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link
-        to="/settings"
-        className="inline-flex w-fit items-center gap-1 text-sm text-muted hover:text-foreground"
-      >
+      <Link to="/settings" className="inline-flex w-fit items-center gap-1 text-sm text-muted hover:text-foreground">
         <ChevronLeftIcon size={16} />
         {t('backToSettings')}
       </Link>

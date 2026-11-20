@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup PNPM
-        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -43,7 +43,7 @@ jobs:
           fi
 
       - name: Upload SBOM to Dependency-Track
-        uses: DependencyTrack/gh-upload-sbom@v3
+        uses: DependencyTrack/gh-upload-sbom@v4
         with:
           serverHostname: ${{ vars.DEPENDENCYTRACK_HOSTNAME }}
           apiKey: ${{ secrets.DEPENDENCYTRACK_API_KEY }}

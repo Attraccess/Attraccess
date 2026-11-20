@@ -1,0 +1,43 @@
+{
+  "title": "{{client}} den Zugriff auf Attraccess erlauben?",
+  "intro": "Diese App möchte über die Attraccess-MCP-Schnittstelle in deinem Namen handeln. Sie darf nur das, was unten aufgeführt ist, und nur das, was du selbst darfst.",
+  "loopback": {
+    "title": "App auf diesem Gerät",
+    "message": "Die App kehrt zu {{host}} zurück, also zu diesem Gerät. Fahre nur fort, wenn du sie selbst gestartet hast."
+  },
+  "external": {
+    "title": "Adresse prüfen",
+    "message": "Die App kehrt zu {{host}} zurück. Fahre nur fort, wenn du die Adresse kennst und ihr vertraust."
+  },
+  "selfRegistered": "Die App hat sich selbst registriert, daher kann Attraccess ihren Namen nicht bestätigen.",
+  "permissions": {
+    "title": "Angeforderte Berechtigungen",
+    "all": "Die App hat keine bestimmten Berechtigungen genannt und fragt deshalb alles an, was du heute darfst ({{count}} Berechtigungen).",
+    "none": "Du hast derzeit keine Berechtigungen, die die App nutzen könnte.",
+    "other": "Sonstige"
+  },
+  "unavailable": {
+    "title": "Für dein Konto nicht erlaubt",
+    "message": "Die App fragt Berechtigungen an, die du nicht hast: {{permissions}}. Wenn du erlaubst, erhält die App einen Fehler."
+  },
+  "approve": "Erlauben",
+  "deny": "Ablehnen",
+  "returningApproved": "Zugriff erlaubt. Zurück zur App … Falls nichts passiert, kannst du diesen Tab schließen.",
+  "returningDenied": "Zugriff abgelehnt. Zurück zur App … Falls nichts passiert, kannst du diesen Tab schließen.",
+  "notice": "Der Zugriff gilt höchstens 7 Tage. Ablehnen hat keine Folgen für dein Konto. Verlierst du in Attraccess eine Berechtigung, verliert sie die App ebenfalls.",
+  "error": {
+    "title": "Diese Anfrage kann nicht beantwortet werden",
+    "expired": "Die Autorisierungsanfrage ist abgelaufen oder wurde bereits beantwortet. Starte die Verbindung in deiner App erneut.",
+    "generic": "Etwas ist schiefgelaufen. Starte die Verbindung in deiner App erneut.",
+    "missing": "Der Link ist unvollständig. Starte die Verbindung in deiner App erneut.",
+    "disabled": "Die MCP-Anmeldung ist auf diesem Server nicht verfügbar. Verwende stattdessen einen API-Token.",
+    "framed": "Zu deiner Sicherheit kann diese Seite nicht innerhalb einer anderen Seite angezeigt werden. Öffne den Link in einem eigenen Browser-Tab.",
+    "close": "Schließen"
+  },
+  "authorizeError": {
+    "title": "Die App kann sich nicht verbinden",
+    "invalid_client": "Diese App ist bei Attraccess nicht registriert. Starte die Verbindung in deiner App erneut.",
+    "invalid_redirect_uri": "Die App möchte zu einer Adresse zurückkehren, die sie nicht registriert hat. Starte die Verbindung in deiner App erneut.",
+    "request": "Die App hat eine ungültige Anmeldeanfrage gesendet ({{code}}). Starte die Verbindung in deiner App erneut oder wende dich an ihre Entwickler."
+  }
+}

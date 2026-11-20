@@ -1,4 +1,3 @@
-import { MatterEndpoint, MatterEndpointCluster, MatterFabric, MatterNode } from './entities';
 import {
   ADMIN,
   createHarness,
@@ -10,15 +9,10 @@ import {
   type Harness,
 } from '../testing/devices-harness.test-utils';
 import { SidecarUnavailableError } from '../client/errors';
+import { CONNECTION_ROW_ID } from '../connection/entity';
 
-const nodes = (h: Harness) => h.dataSource.getRepository(MatterNode);
-const live = (h: Harness, nodeId: string, fabricId = '1') =>
-  h.dataSource
-    .getRepository(MatterNode)
-    .createQueryBuilder('n')
-    .innerJoin(MatterFabric, 'f', 'f.id = n.fabricRef')
-    .where('n.nodeId = :nodeId AND f.fabricId = :fabricId AND n.removedAt IS NULL', { nodeId, fabricId })
-    .getOneOrFail();
+const nodes = (h: Harness) => h.tables.nodes;
+const live = (h: Harness, nodeId: string, fabricId = '1') => h.liveNode(nodeId, fabricId);
 const snapshot = async (h: Harness) => ({
   fabrics: await h.rows('plugin_matter_fabrics'),
   nodes: await h.rows('plugin_matter_nodes'),
@@ -47,7 +41,7 @@ describe('Matter reconciliation', () => {
         vendorName: 'Acme',
         reachable: true,
       });
-      const endpoints = await h.dataSource.getRepository(MatterEndpoint).find({ order: { endpointId: 'ASC' } });
+      const endpoints = await h.tables.endpoints.find({ orderBy: [{ field: 'endpointId' }] });
       expect(endpoints.map((e) => [e.endpointId, e.profile])).toEqual([
         [0, 'generic'],
         [1, 'dimmable_actuator'],
@@ -87,7 +81,7 @@ describe('Matter reconciliation', () => {
         true,
       );
       expect(h.actions()).toEqual(['matter.node_detached', 'matter.node_detached']);
-      expect(await h.dataSource.getRepository(MatterEndpoint).count()).toBe(4);
+      expect(await h.tables.endpoints.count()).toBe(4);
       // Detached stays detached on the next run.
       expect((await h.reconcile(inventory('1', []))).lastSummary?.changeCount).toBe(0);
     });
@@ -126,7 +120,7 @@ describe('Matter reconciliation', () => {
       const stored = await live(h, '5');
       await h.lifecycle.claim(stored.id, { displayName: 'Mine' }, ADMIN);
       await h.lifecycle.updateNode(stored.id, { description: 'Hall', location: 'Lab' }, ADMIN);
-      const endpointRow = await h.dataSource.getRepository(MatterEndpoint).findOneByOrFail({ endpointId: 1 });
+      const endpointRow = await h.one('endpoints', { endpointId: 1 });
       await h.lifecycle.updateEndpoint(endpointRow.id, { displayName: 'Socket' }, ADMIN);
       const status = await h.reconcile(
         inventory('1', [
@@ -142,9 +136,7 @@ describe('Matter reconciliation', () => {
         description: 'Hall',
         location: 'Lab',
       });
-      expect(
-        (await h.dataSource.getRepository(MatterEndpoint).findOneByOrFail({ id: endpointRow.id })).displayName,
-      ).toBe('Socket');
+      expect((await h.one('endpoints', { id: endpointRow.id })).displayName).toBe('Socket');
     });
 
     it('treats an equal node ID on another fabric as a different node', async () => {
@@ -159,17 +151,17 @@ describe('Matter reconciliation', () => {
     it('marks vanished endpoints and clusters removed instead of deleting them, and recreates them later', async () => {
       await h.reconcile(inventory('1', [node('5')]));
       await h.reconcile(inventory('1', [node('5', { endpoints: [endpoint(0, [0x0028]), endpoint(1, [0x0006])] })]));
-      let clusters = await h.dataSource.getRepository(MatterEndpointCluster).find();
+      let clusters = await h.tables.endpointClusters.find();
       expect(clusters.filter((c) => c.removedAt !== null).map((c) => c.clusterId)).toEqual([0x0008]);
       await h.reconcile(inventory('1', [node('5', { endpoints: [endpoint(0, [0x0028])] })]));
-      const endpoints = await h.dataSource.getRepository(MatterEndpoint).find({ order: { endpointId: 'ASC' } });
+      const endpoints = await h.tables.endpoints.find({ orderBy: [{ field: 'endpointId' }] });
       expect(endpoints.map((e) => [e.endpointId, e.removedAt !== null, e.removalReason])).toEqual([
         [0, false, null],
         [1, true, 'absent_from_sidecar'],
       ]);
       await h.reconcile(inventory('1', [node('5')]));
-      expect(await h.dataSource.getRepository(MatterEndpoint).count()).toBe(3);
-      clusters = await h.dataSource.getRepository(MatterEndpointCluster).find();
+      expect(await h.tables.endpoints.count()).toBe(3);
+      clusters = await h.tables.endpointClusters.find();
       expect(clusters.length).toBeGreaterThan(3);
     });
 
@@ -186,11 +178,11 @@ describe('Matter reconciliation', () => {
           },
         });
       await h.reconcile(inventory('1', [node('5', { endpoints: [bridged('A')] })]));
-      const first = await h.dataSource.getRepository(MatterEndpoint).findOneByOrFail({ endpointId: 3 });
+      const first = await h.one('endpoints', { endpointId: 3 });
       await h.lifecycle.updateEndpoint(first.id, { displayName: 'Bulb A' }, ADMIN);
       const status = await h.reconcile(inventory('1', [node('5', { endpoints: [bridged('B')] })]));
       expect(status.lastSummary?.changes.endpointsReplaced).toBe(1);
-      const rows = await h.dataSource.getRepository(MatterEndpoint).find({ order: { firstSeenAt: 'ASC', id: 'ASC' } });
+      const rows = await h.tables.endpoints.find({ orderBy: [{ field: 'firstSeenAt' }, { field: 'id' }] });
       const old = rows.find((row) => row.id === first.id);
       const fresh = rows.find((row) => row.id !== first.id);
       expect(old).toMatchObject({ removalReason: 'replaced', bridgedUniqueId: 'A', displayName: 'Bulb A' });
@@ -263,7 +255,7 @@ describe('Matter reconciliation', () => {
       h.audit.mockClear();
       const status = await h.reconcile(inventory('2', [node('5'), node('7')]));
       expect(status.lastSummary?.changes).toMatchObject({ nodesDetached: 2, nodesQuarantined: 2, fabricsChanged: 2 });
-      expect(await nodes(h).findOneByOrFail({ id: old.id })).toMatchObject({
+      expect(await h.one('nodes', { id: old.id })).toMatchObject({
         lifecycleState: 'detached',
         detachedReason: 'fabric_mismatch',
         displayName: 'Press',
@@ -271,7 +263,7 @@ describe('Matter reconciliation', () => {
       const fresh = await live(h, '5', '2');
       expect(fresh).toMatchObject({ lifecycleState: 'unclaimed', displayName: null });
       expect(fresh.id).not.toBe(old.id);
-      const fabrics = await h.dataSource.getRepository(MatterFabric).find({ order: { fabricId: 'ASC' } });
+      const fabrics = await h.tables.fabrics.find({ orderBy: [{ field: 'fabricId' }] });
       expect(fabrics.map((f) => [f.fabricId, f.status])).toEqual([
         ['1', 'absent'],
         ['2', 'active'],
@@ -309,7 +301,7 @@ describe('Matter reconciliation', () => {
       h.audit.mockClear();
       const status = await h.reconcile(inventory('2', [node('5')]));
       expect(status.lastSummary?.changes).toMatchObject({ nodesDetached: 1, nodesQuarantined: 1 });
-      expect(await nodes(h).findOneByOrFail({ id: old.id })).toMatchObject({ detachedReason: 'fabric_mismatch' });
+      expect(await h.one('nodes', { id: old.id })).toMatchObject({ detachedReason: 'fabric_mismatch' });
       expect(h.actions().sort()).toEqual(
         ['matter.fabric_mismatch_detected', 'matter.node_detached', 'matter.node_quarantined'].sort(),
       );
@@ -317,7 +309,7 @@ describe('Matter reconciliation', () => {
       // The old fabric returning does not re-attach them by itself any more.
       const back = await h.reconcile(inventory('1', [node('5')]));
       expect(back.lastSummary?.observed.mismatchedStillListed).toBe(1);
-      expect((await nodes(h).findOneByOrFail({ id: old.id })).lifecycleState).toBe('detached');
+      expect((await h.one('nodes', { id: old.id })).lifecycleState).toBe('detached');
     });
 
     it('keeps fabric_mismatch nodes detached when their fabric returns, and repair brings them back', async () => {
@@ -328,12 +320,12 @@ describe('Matter reconciliation', () => {
       const back = await h.reconcile(inventory('1', [node('5')]));
       expect(back.lastResult).toBe('applied');
       expect(back.lastSummary?.observed.mismatchedStillListed).toBe(1);
-      const fabrics = await h.dataSource.getRepository(MatterFabric).find({ order: { fabricId: 'ASC' } });
+      const fabrics = await h.tables.fabrics.find({ orderBy: [{ field: 'fabricId' }] });
       expect(fabrics.map((f) => [f.fabricId, f.status])).toEqual([
         ['1', 'active'],
         ['2', 'absent'],
       ]);
-      expect(await nodes(h).countBy({ nodeId: '5', fabricRef: old.fabricRef })).toBe(1);
+      expect(await nodes(h).count({ nodeId: '5', fabricRef: old.fabricRef })).toBe(1);
       h.sidecar.fabricId = '1';
       const repaired = await h.lifecycle.repair(old.id, ADMIN);
       expect(repaired).toMatchObject({ id: old.id, lifecycleState: 'claimed', displayName: 'Press' });
@@ -362,7 +354,7 @@ describe('Matter reconciliation', () => {
       const relinked = await h.lifecycle.relink(old.id, { sourceNodeId: fresh.id }, ADMIN);
       expect(relinked).toMatchObject({ id: old.id, displayName: 'Press', lifecycleState: 'claimed', nodeId: '5' });
       expect(relinked.fabricRef).toBe(fresh.fabricRef);
-      expect(await nodes(h).findOneByOrFail({ id: fresh.id })).toMatchObject({
+      expect(await h.one('nodes', { id: fresh.id })).toMatchObject({
         lifecycleState: 'removed',
         removalReason: 'merged',
         mergedInto: old.id,
@@ -378,26 +370,39 @@ describe('Matter reconciliation', () => {
     });
     const status = await h.reconcile(inventory('1', [twice]));
     expect(status.lastResult).toBe('applied');
-    expect(await h.dataSource.getRepository(MatterEndpoint).count()).toBe(1);
-    expect(await h.dataSource.getRepository(MatterEndpointCluster).count()).toBe(1);
+    expect(await h.tables.endpoints.count()).toBe(1);
+    expect(await h.tables.endpointClusters.count()).toBe(1);
   });
 
   it('refreshes an endpoint’s last-seen time from the sidecar’s observation', async () => {
     await h.reconcile(inventory('1', [node('5')]));
     await h.reconcile(inventory('1', [node('5', { observedAt: '2026-10-30T10:00:00.000Z' })]));
-    const endpoints = await h.dataSource.getRepository(MatterEndpoint).find();
+    const endpoints = await h.tables.endpoints.find();
     expect(endpoints.map((e) => e.lastSeenAt)).toEqual(['2026-10-30T10:00:00.000Z', '2026-10-30T10:00:00.000Z']);
   });
 
   it('attributes automatic runs to the system and manual ones to the administrator', async () => {
     await h.reconcile(inventory('1', [node('5')]));
-    const [system] = h.audit.mock.calls[0] as unknown as [{ principal: { userId: number }; details: object }];
-    expect(system).toMatchObject({ principal: { userId: 1 }, details: { initiator: 'system', fabricId: '1' } });
+    const [system] = h.audit.mock.calls[0] as unknown as [{ principal: object; details: object }];
+    // The system principal, never the administrator who last saved the connection settings.
+    expect(system.principal).toEqual({ kind: 'system' });
+    expect(system).toMatchObject({ details: { initiator: 'system', fabricId: '1' } });
     h.audit.mockClear();
     h.sidecar.list = inventory('1', [node('5'), node('6')]);
     await h.reconciliation.request(ADMIN);
     const [manual] = h.audit.mock.calls[0] as unknown as [{ principal: { userId: number }; details: object }];
     expect(manual).toMatchObject({ principal: { userId: 7 }, details: { initiator: 'administrator' } });
+  });
+
+  it('records system entries even when no administrator ever saved the connection, sharing one operation ID', async () => {
+    await h.tables.connection.update({ id: CONNECTION_ROW_ID }, { updatedBy: null });
+    await h.reconcile(inventory('1', [node('5'), node('6')]));
+    const events = h.audit.mock.calls.map(
+      (call) => (call as unknown as [{ principal: object; operationId: string }])[0],
+    );
+    expect(events.length).toBeGreaterThan(1);
+    expect(events.every((event) => (event.principal as { kind?: string }).kind === 'system')).toBe(true);
+    expect(new Set(events.map((event) => event.operationId)).size).toBe(1);
   });
 
   describe('around a restore', () => {

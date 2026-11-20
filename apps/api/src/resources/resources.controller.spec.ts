@@ -1,7 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourcesController } from './resources.controller';
 import { ResourcesService } from './resources.service';
-import { Resource, DocumentationType, ResourceType } from '@attraccess/database-entities';
+
+import { toResourceDto } from './dtos/resource.dto';
+import { DocumentationType, ResourceType } from '@attraccess/application-models';
 import { createMockResource } from '../test-utils/resource.fixtures';
 import { CreateResourceDto } from './dtos/createResource.dto';
 import { UpdateResourceDto } from './dtos/updateResource.dto';
@@ -12,6 +14,11 @@ import { ResourceActivityVisibilityService } from './usage/authorization/resourc
 import { ResourceIntroducersService } from './introducers/resourceIntroducers.service';
 import { AuthenticatedRequest, DualAuthGuard } from '@attraccess/plugins-backend-sdk';
 import supertest from 'supertest';
+
+// Only the documented columns and the relations a read loaded leave the controller, never a whole entity.
+type Resource = ReturnType<typeof createMockResource>;
+const dto = (resource: Resource, imageFilename = resource.imageFilename) =>
+  toResourceDto({ ...resource, imageFilename } as never);
 
 describe('ResourcesController', () => {
   let controller: ResourcesController;
@@ -91,12 +98,7 @@ describe('ResourcesController', () => {
 
       expect(result).toEqual({
         ...paginatedResponse,
-        data: [
-          {
-            ...resources[0],
-            imageFilename: 'public/path/1/test.jpg',
-          },
-        ],
+        data: [dto(resources[0], 'public/path/1/test.jpg')],
       });
       expect(service.listResources).toHaveBeenCalledWith({ page: 1, limit: 10 });
     });
@@ -115,10 +117,7 @@ describe('ResourcesController', () => {
 
       const result = await controller.getOneById(1, request);
 
-      expect(result).toEqual({
-        ...resource,
-        imageFilename: 'public/path/1/test.jpg',
-      });
+      expect(result).toEqual(dto(resource, 'public/path/1/test.jpg'));
       expect(service.getResourceById).toHaveBeenCalledWith(1);
     });
 
@@ -154,7 +153,7 @@ describe('ResourcesController', () => {
 
       const result = await controller.createOne(createDto, request);
 
-      expect(result).toEqual(newResource);
+      expect(result).toEqual(dto(newResource));
       expect(service.createResource).toHaveBeenCalledWith(createDto, undefined, request.user);
     });
   });
@@ -185,7 +184,7 @@ describe('ResourcesController', () => {
 
       const result = await controller.updateOne(1, updateDto, request);
 
-      expect(result).toEqual(updatedResource);
+      expect(result).toEqual(dto(updatedResource));
       expect(service.updateResource).toHaveBeenCalledWith(1, updateDto, undefined, request.user);
     });
 
