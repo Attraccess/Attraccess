@@ -1347,6 +1347,15 @@ den Ladezustand; er schließt sich, wenn die Aktion gelingt, und bleibt offen, w
 sie einen Fehler wirft. Melde den Fehler also selbst (zum Beispiel als Toast).
 `renderActivator` ersetzt den Standard-Button.
 
+```tsx
+<ConfirmableButton
+  label={t('revoke')}
+  status="error"
+  onConfirm={() => revokeKey.mutateAsync(key.id)}
+  confirm={{ title: t('revokeTitle'), message: t('revokeMessage', { name: key.name }) }}
+/>
+```
+
 Gib jeder Tabelle mit Zeilenaktionen eine letzte Spalte mit der Überschrift
 `<TableActionsColumnHeader />` und setze in ihre Zellen ein `TableRowActions`.
 Jede Aktion hat ein `label` und ein `icon`; `tone: 'danger'` markiert
@@ -1354,6 +1363,11 @@ zerstörerische Aktionen, die einen eigenen letzten Abschnitt bekommen, und
 `confirm` fragt nach, bevor `onPress` läuft:
 
 ```tsx
+<TableHeader>
+  <TableColumn isRowHeader>{t('name')}</TableColumn>
+  <TableColumn><TableActionsColumnHeader /></TableColumn>
+</TableHeader>
+…
 <TableRowActions
   itemName={server.name}
   actions={[

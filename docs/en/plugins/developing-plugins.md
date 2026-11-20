@@ -1626,12 +1626,26 @@ While `onConfirm` runs, the dialog stays open and shows pending; it closes when
 the action succeeds and stays open when it throws, so report the error yourself
 (for example in a toast). `renderActivator` replaces the default button.
 
+```tsx
+<ConfirmableButton
+  label={t('revoke')}
+  status="error"
+  onConfirm={() => revokeKey.mutateAsync(key.id)}
+  confirm={{ title: t('revokeTitle'), message: t('revokeMessage', { name: key.name }) }}
+/>
+```
+
 Give every table with row actions a last column headed
 `<TableActionsColumnHeader />` and put a `TableRowActions` in its cells. Each
 action has a `label` and an `icon`; `tone: 'danger'` marks destructive ones,
 which get their own last section, and `confirm` asks before `onPress` runs:
 
 ```tsx
+<TableHeader>
+  <TableColumn isRowHeader>{t('name')}</TableColumn>
+  <TableColumn><TableActionsColumnHeader /></TableColumn>
+</TableHeader>
+…
 <TableRowActions
   itemName={server.name}
   actions={[
