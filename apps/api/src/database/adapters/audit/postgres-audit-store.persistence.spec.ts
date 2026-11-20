@@ -231,6 +231,30 @@ describe('PostgresAuditStore on independent connections', () => {
       });
       expect((await stored()).map((row) => row.subjectId)).toEqual([20, 22]);
     });
+
+    it('does not queue the audit writes of one transaction behind those of a transaction on another connection', async () => {
+      let releaseFirst!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+      });
+      await main.transaction(async (first) => {
+        const query = first.query.bind(first);
+        // The first transaction's SAVEPOINT stalls until the second transaction has written its own audit row.
+        jest.spyOn(first, 'query').mockImplementationOnce(async (sql: string, parameters?: unknown[]) => {
+          await gate;
+          return query(sql, parameters);
+        });
+        const firstAppend = store.appendInTransaction(transactionOf(store, first), draft(30));
+        await main.transaction(async (second) => {
+          expect(await store.appendInTransaction(transactionOf(store, second), draft(31))).toEqual({
+            status: 'stored',
+          });
+        });
+        releaseFirst();
+        expect(await firstAppend).toEqual({ status: 'stored' });
+      });
+      expect((await stored()).map((row) => row.subjectId)).toEqual([31, 30]);
+    });
   });
 
   describe('retention', () => {

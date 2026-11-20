@@ -115,8 +115,12 @@ export class PostgresAuditStore implements AuditStore {
 
   private writeTail: Promise<void> = Promise.resolve();
 
-  /** Tail of the in-transaction audit writes per connection; see appendInTransaction. */
-  private readonly savepointQueues = new WeakMap<DataSource, Promise<unknown>>();
+  /**
+   * Tail of the in-transaction audit writes per connection, keyed by the transaction's query runner (one pooled
+   * connection) so transactions on other connections never wait for each other; see appendInTransaction. Weak, so the
+   * entry goes with the query runner.
+   */
+  private readonly savepointQueues = new WeakMap<object, Promise<unknown>>();
 
   constructor(
     private readonly source: DataSource,
@@ -144,7 +148,8 @@ export class PostgresAuditStore implements AuditStore {
       extra: {
         ...(options.extra ?? {}),
         max: 3,
-        options: `${(options.extra as { options?: string } | undefined)?.options ?? ''} -c synchronous_commit=on`.trim(),
+        options:
+          `${(options.extra as { options?: string } | undefined)?.options ?? ''} -c synchronous_commit=on`.trim(),
       },
     });
     try {
@@ -189,7 +194,9 @@ export class PostgresAuditStore implements AuditStore {
    */
   appendInTransaction(transaction: AuditTransaction, entry: AuditEntryDraft): Promise<AuditAppendResult> {
     const { manager } = transaction as PostgresAuditTransaction;
-    const connection = manager.connection;
+    // The query runner is the transaction's connection. `manager.connection` is the DataSource, which would make one
+    // queue for every transaction of the process.
+    const connection: object = manager.queryRunner ?? manager;
     const previous = this.savepointQueues.get(connection) ?? Promise.resolve();
     const insert = previous.then(() => this.insertInSavepoint(manager, entry));
     this.savepointQueues.set(

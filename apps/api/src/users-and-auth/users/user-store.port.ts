@@ -22,6 +22,20 @@ export interface UserIdentity {
   email: string;
 }
 
+/** Which unique identity of a user an insert collided with. */
+export type UserIdentityField = 'email' | 'username';
+
+/**
+ * Another account already holds the email or username: a concurrent insert or rename took it after the caller's
+ * existence check, and the unique constraint rejected the write.
+ */
+export class UserIdentityTakenError extends Error {
+  constructor(readonly field: UserIdentityField) {
+    super(field === 'email' ? 'USER_EMAIL_TAKEN' : 'USER_USERNAME_TAKEN');
+    this.name = 'UserIdentityTakenError';
+  }
+}
+
 /** A pending self-deletion confirmation. The token is stored hashed. */
 export interface DeleteAccountRequest {
   tokenHash: string;
@@ -55,8 +69,16 @@ export interface UserStore {
   findFirstUser(context?: TransactionContext): Promise<UserRecord | null>;
   listUsers(query: UserListQuery): Promise<{ users: UserAccount[]; total: number }>;
 
+  /**
+   * Waits until no other unit of work creates or claims an account, on any API instance, and holds that until
+   * `context` ends. Account creation takes it before its "first user" and "first-time setup" checks, so two
+   * registrations cannot both see an empty installation and both become administrator.
+   */
+  lockAccountCreation(context: TransactionContext): Promise<void>;
+
+  /** Throws {@link UserIdentityTakenError} when the email or username is taken. */
   insertUser(user: NewUser, context?: TransactionContext): Promise<UserRecord>;
-  /** Inserts the users in order; the result has the same order. */
+  /** Inserts the users in order; the result has the same order. Throws like {@link insertUser}. */
   insertUsers(users: NewUser[], context?: TransactionContext): Promise<UserRecord[]>;
   /** Changes the given columns. A patch without a defined column changes nothing. */
   updateUser(userId: number, patch: UserPatch, context?: TransactionContext): Promise<void>;
@@ -64,6 +86,8 @@ export interface UserStore {
   /**
    * Renames the still-unverified first-time-setup account so a replacement can use its identity, in one
    * conditional statement that only succeeds while that account is the sole active one. False when it was not.
+   * The caller holds {@link lockAccountCreation} in the same `context`: a claim that waited for a concurrent one
+   * would otherwise judge "sole active account" on a snapshot from before that claim committed.
    */
   claimFirstTimeSetupAccount(userId: number, identity: UserIdentity, context?: TransactionContext): Promise<boolean>;
   /** Removes a just-registered replacement and restores the first-time-setup account's identity, atomically. */
