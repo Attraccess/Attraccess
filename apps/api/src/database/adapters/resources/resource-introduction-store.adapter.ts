@@ -100,11 +100,16 @@ export class TypeOrmResourceIntroductionStore implements ResourceIntroductionSto
     return item ? toHistoryRecord(item) : null;
   }
 
-  async latestGrant(introductionId: number): Promise<IntroductionHistoryRecord | null> {
-    const item = await this.history.findOne({
-      where: { introduction: { id: introductionId }, action: IntroductionHistoryAction.GRANT },
-      order: { createdAt: 'DESC', id: 'DESC' },
-    });
+  async latestGrant(
+    introductionId: number,
+    context?: ResourcePersistenceContext,
+  ): Promise<IntroductionHistoryRecord | null> {
+    const item = await this.manager(context)
+      .getRepository(ResourceIntroductionHistoryItem)
+      .findOne({
+        where: { introduction: { id: introductionId }, action: IntroductionHistoryAction.GRANT },
+        order: { createdAt: 'DESC', id: 'DESC' },
+      });
     return item ? toHistoryRecord(item) : null;
   }
 

@@ -2,8 +2,6 @@ import { Resource, ResourceUsage, ResourceUsageLifecycleAttempt, User } from '@a
 import { ResourceUsageAction } from '@attraccess/application-models';
 import type { StartCapacityContext, StartCapacityHook } from '@attraccess/plugins-backend-sdk';
 import { ConflictException } from '@nestjs/common';
-import { rm } from 'node:fs/promises';
-import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
 import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
 import type { EntityManager } from 'typeorm';
 import { handleOfScope } from '../../../plugin-system/persistence/plugin-transaction-scope';
@@ -13,7 +11,10 @@ import { ResourceFullError } from '../errors/resource-full.error';
 import { StartBlockedException } from '../pre-start/start-confirmation.errors';
 import { countOccupiedSlots, findOccupyingUserIds } from '../../../database/adapters/usage/active-usage-queries';
 import { usageInternals } from '../sessions/fixtures/compose.test-fixture';
-import { resetTestFixture } from '../../../database/adapters/usage/lifecycle-fixtures/setup.test-fixture';
+import {
+  closeLifecycleFixture,
+  resetTestFixture,
+} from '../../../database/adapters/usage/lifecycle-fixtures/setup.test-fixture';
 import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../../../database/adapters/usage/lifecycle-fixtures/state.test-fixture';
 
 jest.setTimeout(30_000);
@@ -27,7 +28,11 @@ describe('Start capacity hook', () => {
     const users = await scope.source
       .getRepository(User)
       .save(
-        Array.from({ length: count }, (_, index) => ({ id: firstId + index, username: `user-${firstId + index}` })),
+        Array.from({ length: count }, (_, index) => ({
+          id: firstId + index,
+          username: `user-${firstId + index}`,
+          email: `user-${firstId + index}@example.test`,
+        })),
       );
     users.forEach((user) => Object.assign(user, { effectivePermissions: new Set(['resources.update']) }));
     return users;
@@ -68,12 +73,7 @@ describe('Start capacity hook', () => {
   });
 
   afterEach(async () => {
-    scope.usage?.onModuleDestroy();
-    if (scope.source) {
-      await closeResourceTransactionConnection(scope.source);
-      if (scope.source.isInitialized) await scope.source.destroy();
-    }
-    if (scope.directory) await rm(scope.directory, { recursive: true, force: true });
+    await closeLifecycleFixture(scope);
     jest.restoreAllMocks();
   });
 
@@ -124,13 +124,28 @@ describe('Start capacity hook', () => {
       // A supervised session: the supervisor never takes a slot of their own.
       {
         resourceId: 1,
+        usageAction: ResourceUsageAction.Usage,
         userId: finalized.id,
         supervisorUserId: supervisor.id,
         startTime: new Date(),
         isFinalized: true,
       },
-      { resourceId: 1, userId: pending.id, startTime: new Date(), isFinalized: false, lifecyclePending: true },
-      { resourceId: 1, userId: ended.id, startTime: new Date(), endTime: new Date(), isFinalized: true },
+      {
+        resourceId: 1,
+        usageAction: ResourceUsageAction.Usage,
+        userId: pending.id,
+        startTime: new Date(),
+        isFinalized: false,
+        lifecyclePending: true,
+      },
+      {
+        resourceId: 1,
+        usageAction: ResourceUsageAction.Usage,
+        userId: ended.id,
+        startTime: new Date(),
+        endTime: new Date(),
+        isFinalized: true,
+      },
       {
         resourceId: 1,
         userId: doorUser.id,
@@ -190,6 +205,7 @@ describe('Start capacity hook', () => {
   it("lets the precheck pass on a shared machine while another user's start is in progress", async () => {
     const candidate = await scope.source.getRepository(ResourceUsage).save({
       resourceId: 1,
+      usageAction: ResourceUsageAction.Usage,
       userId: scope.users[0].id,
       startTime: new Date(),
       isFinalized: false,

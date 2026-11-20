@@ -1,37 +1,25 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import type { AuditActor } from '../../../audit/recorder/audit-event';
-import { entities, Flow, Resource, ResourceFlowEdge, ResourceFlowNode } from '@attraccess/database-entities';
+import { Flow, Resource, ResourceFlowEdge, ResourceFlowNode } from '@attraccess/database-entities';
 import { ResourceFlowNodeType, ResourceType } from '@attraccess/application-models';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DataSource } from 'typeorm';
 import { ResourceFlowSaveDto } from '../../../resources/flows/dto/index';
 import { GlobalFlowsService } from '../../../resources/flows/global-flows.service';
 import { ResourceFlowsService } from '../../../resources/flows/resource-flows.service';
-import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { unitOfWorkFor } from '../shared-unit-of-work';
 import { TypeOrmFlowGraphStore } from './typeorm-flow-graph.store';
 import { TypeOrmFlowResourceDirectory } from './typeorm-flow-resource-directory';
 
 /**
- * A real SQLite file (the unit of work needs one; synchronized from the entities) with one machine and one enabled
- * global flow. `source.destroy()` also closes the unit of work's connection and removes the file.
+ * A real PostgreSQL database (a private copy of the migrated template) with one machine and one enabled global flow.
+ * `source.destroy()` also drops the database.
  */
 export async function openFlowCanvasDatabase() {
-  const directory = await mkdtemp(join(tmpdir(), 'attraccess-flow-canvas-'));
-  const source = await new DataSource({
-    type: 'better-sqlite3',
-    invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-    database: join(directory, 'flows.sqlite'),
-    entities: Object.values(entities),
-    synchronize: true,
-  }).initialize();
+  const source = await createTestDataSource();
   const destroy = source.destroy.bind(source);
   source.destroy = async () => {
-    await closeResourceTransactionConnection(source);
-    await destroy();
-    await rm(directory, { recursive: true, force: true });
+    source.destroy = destroy;
+    await closeTestDataSource(source);
   };
   const flows = source.getRepository(Flow);
   const nodes = source.getRepository(ResourceFlowNode);

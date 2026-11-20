@@ -1,8 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, In, IsNull, Not } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull, Not } from 'typeorm';
 import { Resource, ResourceGroup, ResourceUsage } from '@attraccess/database-entities';
 import type { RetrainingStore, RetrainingTarget } from '../../../resources/retraining/retraining-store.port';
+import type { ResourcePersistenceContext } from '../../../resources/resource-persistence-context';
+import { ScopedUnitOfWork, UNIT_OF_WORK } from '../../unit-of-work';
+import { managerFor } from './persistence-context';
 import type { MassIntroductionTargetStore } from '../../../resources/mass-introductions/mass-introduction-target-store.port';
 
 const toTarget = (entity: Resource | ResourceGroup): RetrainingTarget => ({
@@ -15,28 +18,47 @@ const toTarget = (entity: Resource | ResourceGroup): RetrainingTarget => ({
 
 @Injectable()
 export class TypeOrmRetrainingStore implements RetrainingStore {
-  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly dataSource: DataSource,
+    @Optional() @Inject(UNIT_OF_WORK) private readonly unitOfWork?: ScopedUnitOfWork<EntityManager>,
+  ) {}
 
-  async findResourceTarget(resourceId: number): Promise<RetrainingTarget | null> {
-    const resource = await this.dataSource.getRepository(Resource).findOne({ where: { id: resourceId } });
+  /** The caller's transaction when it has one: a read made while a transaction is open must not take a second connection. */
+  private manager(context?: ResourcePersistenceContext): EntityManager {
+    return managerFor(context, this.dataSource.manager, this.unitOfWork);
+  }
+
+  async findResourceTarget(resourceId: number, context?: ResourcePersistenceContext): Promise<RetrainingTarget | null> {
+    const resource = await this.manager(context)
+      .getRepository(Resource)
+      .findOne({ where: { id: resourceId } });
     return resource ? toTarget(resource) : null;
   }
 
-  async findGroupTarget(groupId: number): Promise<RetrainingTarget | null> {
-    const group = await this.dataSource.getRepository(ResourceGroup).findOne({ where: { id: groupId } });
+  async findGroupTarget(groupId: number, context?: ResourcePersistenceContext): Promise<RetrainingTarget | null> {
+    const group = await this.manager(context)
+      .getRepository(ResourceGroup)
+      .findOne({ where: { id: groupId } });
     return group ? toTarget(group) : null;
   }
 
-  async lastResourceUseAt(resourceId: number, userId: number): Promise<Date | null> {
-    const lastUsage = await this.dataSource.getRepository(ResourceUsage).findOne({
-      where: { resourceId, userId, endTime: Not(IsNull()) },
-      order: { endTime: 'DESC' },
-    });
+  async lastResourceUseAt(
+    resourceId: number,
+    userId: number,
+    context?: ResourcePersistenceContext,
+  ): Promise<Date | null> {
+    const lastUsage = await this.manager(context)
+      .getRepository(ResourceUsage)
+      .findOne({
+        where: { resourceId, userId, endTime: Not(IsNull()) },
+        order: { endTime: 'DESC' },
+      });
     return lastUsage?.endTime ?? null;
   }
 
-  async lastGroupUseAt(groupId: number, userId: number): Promise<Date | null> {
-    const group = await this.dataSource
+  async lastGroupUseAt(groupId: number, userId: number, context?: ResourcePersistenceContext): Promise<Date | null> {
+    const manager = this.manager(context);
+    const group = await manager
       .getRepository(ResourceGroup)
       .findOne({ where: { id: groupId }, relations: { resources: true } });
     const resourceIds = (group?.resources ?? []).map((resource) => resource.id);
@@ -44,7 +66,7 @@ export class TypeOrmRetrainingStore implements RetrainingStore {
       return null;
     }
 
-    const lastUsage = await this.dataSource.getRepository(ResourceUsage).findOne({
+    const lastUsage = await manager.getRepository(ResourceUsage).findOne({
       where: { resourceId: In(resourceIds), userId, endTime: Not(IsNull()) },
       order: { endTime: 'DESC' },
     });

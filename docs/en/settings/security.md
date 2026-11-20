@@ -69,13 +69,13 @@ Changing the secret makes the stored card keys and reader pairing keys unreadabl
      attraccess node /app/dist/apps/api/scripts/reencrypt-card-keys.mjs --dry-run
    ```
 
-   **Source installation** (run from the repository root with the same `STORAGE_ROOT` as the API):
+   **Source installation** (run from the repository root with the same `DATABASE_URL`, and `DATABASE_SCHEMA` / `DATABASE_SSL` if you set them, as the API; the command reads them from the environment or `.env`):
 
    ```bash
    pnpm nx run api:reencrypt-card-keys -- --dry-run
    ```
 
-   The command uses `<STORAGE_ROOT>/attraccess.sqlite` (default `./storage/attraccess.sqlite`). Add `--db <path>` to name the database file directly.
+   The command uses the database of `DATABASE_URL`, like the API. Add `--db <url>` to name another PostgreSQL database. Stop the API first and take a database backup (`pg_dump -Fc`).
 4. Run the same command without `--dry-run`. All keys are converted in one transaction; if one cannot be read with the old secret nothing is changed. The output lists how many card keys and reader pairing keys were converted.
 5. Set `AUTH_SESSION_SECRET` to the new value (for example in your `.env` file), clear the shell variables with `unset OLD_AUTH_SESSION_SECRET NEW_AUTH_SESSION_SECRET`, and start the API (`docker compose up -d`). Paired readers reconnect without being paired again.
 

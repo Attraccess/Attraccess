@@ -69,13 +69,13 @@ Wird das Secret geändert, sind die gespeicherten Kartenschlüssel und Kopplungs
      attraccess node /app/dist/apps/api/scripts/reencrypt-card-keys.mjs --dry-run
    ```
 
-   **Installation aus dem Quellcode** (im Wurzelverzeichnis des Repositorys, mit demselben `STORAGE_ROOT` wie die API):
+   **Installation aus dem Quellcode** (im Wurzelverzeichnis des Repositorys, mit derselben `DATABASE_URL` und, falls gesetzt, demselben `DATABASE_SCHEMA` / `DATABASE_SSL` wie die API; der Befehl liest sie aus der Umgebung oder aus `.env`):
 
    ```bash
    pnpm nx run api:reencrypt-card-keys -- --dry-run
    ```
 
-   Der Befehl verwendet `<STORAGE_ROOT>/attraccess.sqlite` (Standard: `./storage/attraccess.sqlite`). Mit `--db <Pfad>` geben Sie die Datenbankdatei direkt an.
+   Der Befehl verwendet die Datenbank aus `DATABASE_URL`, wie die API. Mit `--db <URL>` geben Sie eine andere PostgreSQL-Datenbank an. Stoppen Sie vorher die API und erstellen Sie ein Datenbank-Backup (`pg_dump -Fc`).
 4. Führen Sie denselben Befehl ohne `--dry-run` aus. Alle Schlüssel werden in einer Transaktion umgestellt; lässt sich einer mit dem alten Secret nicht lesen, bleibt alles unverändert. Die Ausgabe nennt, wie viele Kartenschlüssel und Kopplungsschlüssel umgestellt wurden.
 5. Setzen Sie `AUTH_SESSION_SECRET` auf den neuen Wert (zum Beispiel in Ihrer `.env`-Datei), löschen Sie die Shell-Variablen mit `unset OLD_AUTH_SESSION_SECRET NEW_AUTH_SESSION_SECRET` und starten Sie die API (`docker compose up -d`). Gekoppelte Reader verbinden sich wieder, ohne neu gekoppelt zu werden.
 

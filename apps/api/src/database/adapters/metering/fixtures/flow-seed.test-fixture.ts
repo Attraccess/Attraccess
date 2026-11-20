@@ -1,6 +1,6 @@
 import { ResourceFlowEdge, ResourceFlowNode } from '@attraccess/database-entities';
 import { DataSource } from 'typeorm';
-import { T } from './external-flow-schemas.test-fixture';
+import { T } from './node-types.test-fixture';
 export async function seedFlowMeter(
   source: DataSource,
   startData: object = {},
@@ -8,13 +8,26 @@ export async function seedFlowMeter(
 ) {
   const nodes = source.getRepository(ResourceFlowNode);
   await nodes.save([
-    { id: 'start', type: T.INPUT_METERING_START, resourceId: 1, data: { meterId: 1, ...startData } },
-    { id: 'ready', type: T.OUTPUT_METERING_READY, resourceId: 1, data: { meterId: 1 } },
-    { id: 'collect', type: T.INPUT_METERING_COLLECT, resourceId: 1, data: { meterId: 1, ...collectData } },
+    {
+      id: 'start',
+      type: T.INPUT_METERING_START,
+      resourceId: 1,
+      position: { x: 0, y: 0 },
+      data: { meterId: 1, ...startData },
+    },
+    { id: 'ready', type: T.OUTPUT_METERING_READY, resourceId: 1, position: { x: 0, y: 0 }, data: { meterId: 1 } },
+    {
+      id: 'collect',
+      type: T.INPUT_METERING_COLLECT,
+      resourceId: 1,
+      position: { x: 0, y: 0 },
+      data: { meterId: 1, ...collectData },
+    },
     {
       id: 'report',
       type: T.OUTPUT_METERING_REPORT,
       resourceId: 1,
+      position: { x: 0, y: 0 },
       data: { meterId: 1, value: '1' },
     },
   ]);

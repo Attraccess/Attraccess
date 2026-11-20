@@ -57,7 +57,7 @@ export class ResourceMeteringSession {
   collectionMode!: 'requested' | 'increment';
 
   /** Rate captured when the session started. */
-  @Column({ type: 'integer' })
+  @Column({ type: 'bigint' })
   creditsPerUnit!: number;
 
   /**
@@ -79,13 +79,13 @@ export class ResourceMeteringSession {
   @Column({ type: 'varchar', nullable: true })
   latestValue!: string | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   latestObservedAt!: Date | null;
 
   @Column({ type: 'varchar', nullable: true })
   consumedValue!: string | null;
 
-  @Column({ type: 'integer', nullable: true })
+  @Column({ type: 'bigint', nullable: true })
   chargeCredits!: number | null;
 
   @Column({ type: 'varchar', nullable: true })
@@ -98,13 +98,13 @@ export class ResourceMeteringSession {
   @Column({ type: 'text', nullable: true })
   compromisedReason!: string | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   settledAt!: Date | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
 }
 
@@ -138,10 +138,10 @@ export class ResourceMeteringOperation {
   @Column({ type: 'varchar' })
   status!: ResourceMeteringOperationStatus;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamptz' })
   requestedAt!: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   completedAt!: Date | null;
 
   @Column({ type: 'varchar', nullable: true })
@@ -154,7 +154,7 @@ export class ResourceMeteringOperation {
   @Column({ type: 'varchar', nullable: true })
   totalValue!: string | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   observedAt!: Date | null;
 
   @Column({ type: 'varchar', nullable: true })
@@ -163,7 +163,7 @@ export class ResourceMeteringOperation {
   @Column({ type: 'text', nullable: true })
   error!: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }
 
@@ -204,10 +204,10 @@ export class ResourceMeteringSegment {
   @Column({ type: 'varchar' })
   status!: ResourceMeteringSegmentStatus;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamptz' })
   startedAt!: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   endedAt!: Date | null;
 
   /** Meter counter at the opening boundary. Fixed-point billionths as text. */
@@ -217,9 +217,9 @@ export class ResourceMeteringSegment {
   @Column({ type: 'varchar', nullable: true })
   endValue!: string | null;
 
-  @Column({ type: 'simple-json' })
+  @Column({ type: 'jsonb' })
   participants!: ResourceMeteringSegmentParticipant[];
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }

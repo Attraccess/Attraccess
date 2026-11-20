@@ -27,11 +27,13 @@ export interface PluginPersistenceContext {
    * Concurrent transactions (core writes included) never see each other's uncommitted writes, and a check-then-write
    * sequence inside one transaction (an overlap check, then the insert) cannot be raced by another transaction.
    *
-   * The host either orders transactions (one runs after the other) or fails one of them with
-   * `PluginStorageConflict`, also when the database stays busy at the start or the commit; the failed one is rolled
-   * back completely and its `afterCommit` callbacks never run. The host never retries: a caller may retry the whole
+   * The host either orders the transactions of a plugin (one runs after the other, also across API instances) or
+   * fails one of them with `PluginStorageConflict`, also when the database stays busy at the start or the commit; the
+   * failed one is rolled back completely and its `afterCommit` callbacks never run. A write without scope is a
+   * transaction of its own and is ordered the same way. The host never retries: a caller may retry the whole
    * transaction, which is safe because `work` keeps every external effect in `afterCommit`. How a backend achieves
-   * isolation (a single writer, serializable transactions) is not part of the contract.
+   * this (a single writer, a lock per plugin) is not part of the contract; core work and other plugins are not
+   * ordered behind a plugin's transaction.
    *
    * Keep `work` short and limited to database work: no HTTP, MQTT, email or other I/O inside. Register such effects
    * with `scope.afterCommit`; they run only after the commit, in registration order. Do not nest calls: a transaction

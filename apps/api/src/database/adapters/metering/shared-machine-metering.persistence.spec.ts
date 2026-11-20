@@ -11,18 +11,14 @@ import {
 } from '@attraccess/database-entities';
 import { ResourceMeteringSessionStatus } from '@attraccess/application-models';
 
-import { rm } from 'node:fs/promises';
-
 import { IsNull, Not } from 'typeorm';
 
-import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
-
-import { resetTestFixture } from './fixtures/setup.test-fixture';
+import { closeMeteringFixture, resetTestFixture } from './fixtures/setup.test-fixture';
 
 import { createFlowDefinedMeteringFixture } from './fixtures/flow-defined-meters.test-fixture';
 import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 
-// This SQLite suite runs multiple settlements per case; coverage on CI exceeds Jest's five-second default.
+// This PostgreSQL suite runs multiple settlements per case; coverage on CI exceeds Jest's five-second default.
 jest.setTimeout(30_000);
 
 /** Billing on shared machines (ATT-1191): segments of a shared meter, their split, and meters measured per session. */
@@ -37,11 +33,7 @@ describe('Metering on a shared machine', () => {
 
   afterEach(async () => {
     scope.usage?.onModuleDestroy();
-    if (scope.source) {
-      await closeResourceTransactionConnection(scope.source);
-      if (scope.source.isInitialized) await scope.source.destroy();
-    }
-    if (scope.directory) await rm(scope.directory, { recursive: true, force: true });
+    await closeMeteringFixture(scope);
     jest.restoreAllMocks();
   });
 
@@ -49,7 +41,9 @@ describe('Metering on a shared machine', () => {
     await scope.seedMeter({}, { finalRetryDelaySeconds: 0, interimIntervalMinutes: 1 });
     await scope.metering.setRate(1, 1, rate);
     await scope.source.getRepository(Resource).update(1, { maxParallelSessions: limit });
-    const third = await scope.source.getRepository(User).save({ id: 3, username: 'third-user' });
+    const third = await scope.source
+      .getRepository(User)
+      .save({ username: 'third-user', email: 'third-user@example.test' });
     scope.users.push(Object.assign(third, { effectivePermissions: new Set(['resources.update']) }));
     counter = 100;
     scope.onStart = jest.fn(({ complete }) => complete({ kind: 'ready', baseline: { value: String(counter) } }));
@@ -606,12 +600,15 @@ describe('Metering on a shared machine', () => {
         id: 'report',
         type: scope.T.OUTPUT_METERING_REPORT,
         resourceId: 1,
+        position: { x: 0, y: 0 },
         data: { meterId: 1, mode: 'increment', value: '1' },
       });
       await scope.source.getRepository(ResourceFlowEdge).save([]);
       await scope.metering.setRate(1, 1, rate);
       await scope.source.getRepository(Resource).update(1, { maxParallelSessions: 2 });
-      const third = await scope.source.getRepository(User).save({ id: 3, username: 'third-user' });
+      const third = await scope.source
+        .getRepository(User)
+        .save({ username: 'third-user', email: 'third-user@example.test' });
       scope.users.push(Object.assign(third, { effectivePermissions: new Set(['resources.update']) }));
     }
 

@@ -43,7 +43,7 @@ export class MaintenanceScheduleService {
   recorder drops them as `invalid_event` without one.
 - **`record()` does not throw.** An event the domain policy rejects, a full queue or a storage error is logged
   and counted in `attraccess_audit_records_dropped_total`; the change itself goes on. The one exception is
-  `AuditTransactionAbortedError`, when SQLite discarded the caller's whole transaction.
+  `AuditTransactionAbortedError`, when PostgreSQL aborted the caller's whole transaction.
 
 ## The event
 

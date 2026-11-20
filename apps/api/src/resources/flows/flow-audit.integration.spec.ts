@@ -1,7 +1,6 @@
-import { createSqliteAuditService } from '../../database/adapters/audit/sqlite-audit-service.test-fixture';
+import { createPostgresAuditService } from '../../database/adapters/audit/postgres-audit-service.test-fixture';
 import {
   AuditLog,
-  entities,
   Flow,
   Resource,
   ResourceFlowNode,
@@ -18,7 +17,6 @@ import { DataSource } from 'typeorm';
 import { AuditService } from '../../audit/audit.service';
 import { createTestAuditMetrics } from '../../database/adapters/audit/audit.test-fixture';
 import { auditActorOf } from '../../audit/recorder/audit-event';
-import * as migrations from '../../database/migrations';
 import { SettingsStoreService } from '../../settings/settings-store.service';
 import { ResourceFlowSaveDto } from './dto/index';
 import { startToHttpCanvas, testActor } from '../../database/adapters/flows/flow-canvas-database.test-fixture';
@@ -30,6 +28,7 @@ import { GlobalFlowsService } from './global-flows.service';
 import { ResourceFlowsService } from './resource-flows.service';
 import { ResourceFlowVariablesService } from './variables/resource-flow-variables.service';
 import { TypeOrmSettingsRows } from '../../database/adapters/settings/typeorm-settings-rows';
+import { createTestDataSource, closeTestDataSource } from '../../test-utils/test-database';
 
 const T = ResourceFlowNodeType;
 const tokenActor = auditActorOf({ id: 3, authenticationMethod: 'api-token', apiTokenId: 12 });
@@ -70,17 +69,10 @@ describe('flow audit rows in migrated storage', () => {
 
   beforeAll(async () => {
     directory = await mkdtemp(join(tmpdir(), 'flow-audit-'));
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: join(directory, 'flow-audit.sqlite'),
-      entities: Object.values(entities),
-      migrations: Object.values(migrations),
-    }).initialize();
-    await source.runMigrations();
+    source = await createTestDataSource();
     const store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(source.getRepository(Setting)), null);
     await store.setPlainSetting('audit', 'domains', JSON.stringify(['resource']));
-    audit = createSqliteAuditService(source, store, createTestAuditMetrics());
+    audit = createPostgresAuditService(source, store, createTestAuditMetrics());
     await audit.onModuleInit();
     const graph = new TypeOrmFlowGraphStore(source, unitOfWorkFor(source), audit);
     resourceFlows = new ResourceFlowsService(
@@ -96,7 +88,7 @@ describe('flow audit rows in migrated storage', () => {
 
   afterAll(async () => {
     await audit?.onModuleDestroy();
-    if (source?.isInitialized) await source.destroy();
+    await closeTestDataSource(source);
     if (directory) await rm(directory, { recursive: true, force: true });
   });
 
@@ -112,7 +104,7 @@ describe('flow audit rows in migrated storage', () => {
 
   const rows = () => source.getRepository(AuditLog).find({ order: { id: 'ASC' } });
   const storedSizes = async () =>
-    (await source.query('SELECT length(CAST("details" AS BLOB)) AS size FROM "audit_log" ORDER BY "id"')).map(
+    (await source.query('SELECT octet_length("details"::text) AS size FROM "audit_log" ORDER BY "id"')).map(
       ({ size }: { size: number }) => size,
     );
   const resourceNodeIds = async () =>

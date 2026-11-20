@@ -174,8 +174,9 @@ Das Plugin schreibt die Audit-Domäne **reservations**: `created`, `approved`, `
 > [!WARNING]
 > Das Plugin unterstützt **eine** API-Instanz. Sein Minuten-Scheduler, die Buchungssperre pro Ressource, der
 > Einstellungs-Cache, die Entscheidungen „Behalten oder Rest freigeben?“ und der Rate-Limiter der Feeds liegen im
-> API-Prozess. Zwei Instanzen würden den Scheduler doppelt ausführen und weder Buchungen serialisieren noch ihre
-> Caches gegenseitig aktualisieren. Verteilte Sperren und Cache-Invalidierung werden unter **ATT-1146** verfolgt.
+> API-Prozess. Zwei Instanzen würden den Scheduler doppelt ausführen und ihre Caches nicht gegenseitig aktualisieren.
+> (Die Buchungstransaktionen selbst ordnet der Host auch über Instanzen hinweg.) Verteiltes Scheduling und
+> Cache-Invalidierung werden unter **ATT-1146** verfolgt.
 
 Gut zu wissen:
 

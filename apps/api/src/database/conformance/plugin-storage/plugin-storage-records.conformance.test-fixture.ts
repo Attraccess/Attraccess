@@ -1,9 +1,12 @@
-import { PluginStorageConflict, PluginStorageInvalid, increment } from '@attraccess/plugins-backend-sdk';
+import {
+  PluginStorageConflict,
+  PluginStorageInvalid,
+  increment,
+  type PluginTransactionScope,
+} from '@attraccess/plugins-backend-sdk';
 import { PLUGIN, storageV3 } from './storage-declarations.test-fixture';
 import { createHarness, type Harness } from './storage-harness.test-fixture';
 import type { StorageBackendFixture } from './storage-fixture';
-
-const ITEMS = 'plugin_conformance_plugin_items';
 
 /**
  * Conformance of the record port on real database connections, for what only a real engine shows: independent
@@ -45,10 +48,11 @@ export function describePluginStorageRecords(fixture: StorageBackendFixture): vo
       expect((await a.items.get(row.id)).qty).toBe(40);
     });
 
-    it('serialises check-then-write transactions of independent connections', async () => {
+    it('orders check-then-write transactions of independent connections (no unique key backs the check)', async () => {
       const [a, b] = [await harness.open(), await harness.open()];
       const slot = 'slot-' + Date.now();
       let sequence = 0;
+      // `status` has no unique index: only the order of the plugin's transactions keeps the slot single.
       const book = (side: typeof a) =>
         side.persistence.transaction(async (scope) => {
           if ((await side.items.count({ status: slot }, { scope })) > 0) return false;
@@ -60,25 +64,15 @@ export function describePluginStorageRecords(fixture: StorageBackendFixture): vo
       expect(await a.items.count({ status: slot })).toBe(1);
     });
 
-    it('reads binary data in a text field (an adopted 1.x blob column) as base64, byte for byte', async () => {
-      const { items } = await harness.open();
-      const row = await items.insert({ name: 'legacy-blob' });
-      // Every byte value, including ones that are no valid UTF-8 on their own.
-      const bytes = Buffer.from(Array.from({ length: 256 }, (_, index) => index));
-      await harness.db.execute(`UPDATE ${ITEMS} SET note = X'${bytes.toString('hex')}' WHERE id = ${row.id}`);
-      const [stored] = await harness.db.committed(`SELECT typeof(note) AS type FROM ${ITEMS} WHERE id = ${row.id}`);
-      expect(stored.type).toBe('blob');
-      const read = (await items.get(row.id)).note as string;
-      expect(Buffer.from(read, 'base64').equals(bytes)).toBe(true);
-    });
-
     it('refuses a call that binds more values than the engine takes, before it reaches the engine', async () => {
       const { items } = await harness.open();
       const values = (count: number) => Array.from({ length: count }, (_, index) => index);
-      expect(await items.count({ qty: { in: values(30_000) } })).toBeGreaterThan(0);
-      const tooMany = items.count({ qty: { in: values(40_000) } });
+      // The engine's bind limit (PostgreSQL: 65535).
+      const limit = 65_535;
+      expect(await items.count({ qty: { in: values(limit - 2_000) } })).toBeGreaterThan(0);
+      const tooMany = items.count({ qty: { in: values(limit + 7_000) } });
       await expect(tooMany).rejects.toBeInstanceOf(PluginStorageInvalid);
-      await expect(items.count({ qty: { in: values(40_000) } })).rejects.toThrow(/at most \d+ values/);
+      await expect(items.count({ qty: { in: values(limit + 7_000) } })).rejects.toThrow(/at most \d+ values/);
     });
 
     describe('a busy database', () => {
@@ -86,14 +80,15 @@ export function describePluginStorageRecords(fixture: StorageBackendFixture): vo
         const connection = await harness.db.connect({ busyTimeoutMs: 200 });
         const { persistence, storage } = connection.contexts(PLUGIN, harness.compiled);
         const tables = storage.open(storageV3) as unknown as {
-          items: { insert(row: object): Promise<unknown>; count(): Promise<number> };
+          items: { insert(row: object, options?: object): Promise<unknown>; count(): Promise<number> };
         };
         const release = await harness.db.holdWriteLock();
         try {
           const write = await tables.items.insert({ name: 'busy-write' }).catch((error: unknown) => error);
           expect(write).toBeInstanceOf(PluginStorageConflict);
           expect((write as Error).message).not.toMatch(/SQLITE|INSERT|plugin_/);
-          const work = jest.fn();
+          // A transaction waits for the table lock when it first writes; `work` writes through its scope.
+          const work = jest.fn((scope: PluginTransactionScope) => tables.items.insert({ name: 'busy-tx' }, { scope }));
           const transaction = await persistence.transaction(work).catch((error: unknown) => error);
           expect(transaction).toBeInstanceOf(PluginStorageConflict);
           expect((transaction as Error).message).not.toMatch(/SQLITE|BEGIN/);

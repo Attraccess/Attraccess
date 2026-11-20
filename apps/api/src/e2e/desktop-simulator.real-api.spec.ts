@@ -30,11 +30,11 @@ import { SupervisionService } from '../resources/supervision/supervision.service
 import { RbacService } from '../users-and-auth/rbac/rbac.service';
 import { EnrollmentLimitsService } from '../device-enrollment/enrollment-limits.service';
 import { bootstrap } from '../main.bootstrap';
-import { existsSync, readFileSync, realpathSync } from 'fs';
-import { join, relative, isAbsolute } from 'path';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import { DesktopFixture, buildProbe, waitFor } from './desktop-simulator.fixture';
 import { withDesktopCleanup } from './desktop-simulator-cleanup';
-import { disposeStorage, storageRoot } from '../test/desktop-real-api.test-fixture';
+import { disposeStorage, provisionDatabase } from '../test/desktop-real-api.test-fixture';
 
 const nonProfitLicense =
   'I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md';
@@ -50,14 +50,13 @@ describe('desktop simulator against an isolated real API', () => {
 
   beforeAll(async () => {
     await buildProbe();
+    await provisionDatabase();
     const boot = await bootstrap();
     app = boot.app;
     prefix = `/${boot.globalPrefix}`;
     db = app.get(DataSource);
-    const database = db.options.database;
-    if (typeof database !== 'string') throw new Error('Expected an owned SQLite database');
-    const location = relative(realpathSync(storageRoot), realpathSync(database));
-    if (location.startsWith('..') || isAbsolute(location)) throw new Error('API database escaped isolated storage');
+    const database = (db.options as { url?: string }).url;
+    if (!database || database !== process.env.DATABASE_URL) throw new Error('API database is not the isolated one');
     await app.get(SettingsService).updateAppSettings({ licenseKey: nonProfitLicense, defaultLanguage: 'de' });
     await app.listen(0, '127.0.0.1');
     const address = app.getHttpServer().address();

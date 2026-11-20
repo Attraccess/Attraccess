@@ -777,10 +777,12 @@ Keep effects in `afterCommit` so the caller can run the whole transaction again.
 - pass `{ scope }` on every write inside `work`. A write without it is rejected with `PluginStorageInvalid`; only a
   read without a scope runs outside the transaction, and it does not see the uncommitted writes of `work`.
 
-How the host orders transactions is an engine detail. On SQLite it runs them one at a time per host process, sharing
-that queue with core session starts and ends, so plugins that need exclusion across several API instances need a
-cross-instance lock of their own; the reservations plugin runs on a single instance for that reason (see
-[Reservations](plugins/reservations/administration.md#single-instance-operation)).
+The host either orders the transactions of your plugin (one runs after the other) or fails one with
+`PluginStorageConflict`; it never retries. On PostgreSQL every transaction of a plugin, and every write without a
+scope, first takes a lock of that plugin in the database, so the order also holds across several API instances. Core
+session starts and ends and other plugins are not queued behind it. State a plugin keeps in its process (an in-process
+lock, a cache, a scheduler) is not shared between instances; the reservations plugin runs on a single instance for that
+reason (see [Reservations](plugins/reservations/administration.md#single-instance-operation)).
 
 ### Flow nodes
 

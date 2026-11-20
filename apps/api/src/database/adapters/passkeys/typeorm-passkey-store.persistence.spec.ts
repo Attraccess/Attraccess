@@ -1,7 +1,7 @@
 import { DataSource } from 'typeorm';
 import { Passkey, PasskeyChallenge, User } from '@attraccess/database-entities';
 import type { NewPasskey } from '@attraccess/application-models';
-import { SqliteFileFixture } from '../sqlite-file.test-fixture';
+import { PostgresDatabaseFixture } from '../postgres-database.test-fixture';
 import { TypeOrmPasskeyStore } from './typeorm-passkey-store';
 
 jest.setTimeout(60_000);
@@ -13,8 +13,10 @@ const storeOn = (source: DataSource) =>
     source.getRepository(User),
   );
 
+const ids = { maker: 0, other: 0 };
+
 const newPasskey = (overrides: Partial<NewPasskey> = {}): NewPasskey => ({
-  userId: 7,
+  userId: ids.maker,
   credentialId: 'cred-1',
   publicKey: 'pk',
   counter: 0,
@@ -24,20 +26,22 @@ const newPasskey = (overrides: Partial<NewPasskey> = {}): NewPasskey => ({
   ...overrides,
 });
 
-describe('TypeOrmPasskeyStore on real SQLite', () => {
-  let fixture: SqliteFileFixture;
+describe('TypeOrmPasskeyStore on real PostgreSQL', () => {
+  let fixture: PostgresDatabaseFixture;
   let first: DataSource;
   let storeA: TypeOrmPasskeyStore;
   let storeB: TypeOrmPasskeyStore;
 
   beforeAll(async () => {
-    fixture = await SqliteFileFixture.create();
+    fixture = await PostgresDatabaseFixture.create();
     first = await fixture.open();
     const second = await fixture.open();
-    await first.getRepository(User).save([
-      { id: 7, username: 'maker', email: 'maker@example.com', isEmailVerified: true },
-      { id: 8, username: 'other', email: 'other@example.com', isEmailVerified: true },
+    const [maker, other] = await first.getRepository(User).save([
+      { username: 'maker', email: 'maker@example.com', isEmailVerified: true },
+      { username: 'other', email: 'other@example.com', isEmailVerified: true },
     ]);
+    ids.maker = maker.id;
+    ids.other = other.id;
     storeA = storeOn(first);
     storeB = storeOn(second);
   });
@@ -68,7 +72,7 @@ describe('TypeOrmPasskeyStore on real SQLite', () => {
   describe('passkeys', () => {
     it('registers, finds by credential id and records a sign-in', async () => {
       const registered = await storeA.register(newPasskey());
-      expect(registered).toMatchObject({ userId: 7, credentialId: 'cred-1', counter: 0, backedUp: false });
+      expect(registered).toMatchObject({ userId: ids.maker, credentialId: 'cred-1', counter: 0, backedUp: false });
       expect(registered.lastUsedAt).toBeNull();
 
       const usedAt = new Date();
@@ -91,24 +95,28 @@ describe('TypeOrmPasskeyStore on real SQLite', () => {
       const older = await storeA.register(newPasskey({ credentialId: 'a' }));
       await first.getRepository(Passkey).update(older.id, { createdAt: new Date(Date.now() - 60_000) });
       await storeA.register(newPasskey({ credentialId: 'b' }));
-      await storeA.register(newPasskey({ credentialId: 'c', userId: 8 }));
+      await storeA.register(newPasskey({ credentialId: 'c', userId: ids.other }));
 
-      expect((await storeA.listForUser(7)).map((passkey) => passkey.credentialId)).toEqual(['b', 'a']);
+      expect((await storeA.listForUser(ids.maker)).map((passkey) => passkey.credentialId)).toEqual(['b', 'a']);
     });
 
     it('renames and deletes only passkeys the user owns', async () => {
       const passkey = await storeA.register(newPasskey());
 
-      expect(await storeA.renameOwned(8, passkey.id, 'Stolen')).toBeNull();
-      expect(await storeA.deleteOwned(8, passkey.id)).toBe(false);
-      expect(await storeA.renameOwned(7, passkey.id, 'Renamed')).toMatchObject({ name: 'Renamed' });
-      expect(await storeA.deleteOwned(7, passkey.id)).toBe(true);
-      expect(await storeA.deleteOwned(7, passkey.id)).toBe(false);
+      expect(await storeA.renameOwned(ids.other, passkey.id, 'Stolen')).toBeNull();
+      expect(await storeA.deleteOwned(ids.other, passkey.id)).toBe(false);
+      expect(await storeA.renameOwned(ids.maker, passkey.id, 'Renamed')).toMatchObject({ name: 'Renamed' });
+      expect(await storeA.deleteOwned(ids.maker, passkey.id)).toBe(true);
+      expect(await storeA.deleteOwned(ids.maker, passkey.id)).toBe(false);
     });
 
     it('finds the account a passkey signs in', async () => {
-      expect(await storeA.findSignInUser(7)).toMatchObject({ id: 7, username: 'maker', isEmailVerified: true });
-      expect(await storeA.findSignInUser(99)).toBeNull();
+      expect(await storeA.findSignInUser(ids.maker)).toMatchObject({
+        id: ids.maker,
+        username: 'maker',
+        isEmailVerified: true,
+      });
+      expect(await storeA.findSignInUser(ids.maker + 1000)).toBeNull();
     });
   });
 });

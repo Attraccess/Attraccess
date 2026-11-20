@@ -31,7 +31,7 @@ export function resolvePluginDir(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 /**
- * DATABASE_TYPE as the backend registry reads it (blanks and case ignored, unset or empty selects sqlite), with the
+ * DATABASE_TYPE as the backend registry reads it (blanks and case ignored, unset or empty selects postgres), with the
  * same message for an unsupported value. The message never echoes a value that is not a plain name.
  */
 const databaseTypeSchema = z
@@ -50,8 +50,13 @@ export const AppEnvSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     PORT: z.coerce.number().default(3000),
-    /** Database engine. Only `sqlite` is supported; validated before any connection (see database/backend). */
+    /** Database engine. Only `postgres` is supported; validated before any connection (see database/backend). */
     DATABASE_TYPE: databaseTypeSchema,
+    /** Connection settings of the database. Required at startup (see database/postgres/postgres-config); errors never echo values. */
+    DATABASE_URL: z.string().optional(),
+    DATABASE_SSL: z.string().optional(),
+    DATABASE_POOL_MAX: z.string().optional(),
+    DATABASE_SCHEMA: z.string().optional(),
     LOG_LEVELS: logLevelsSchema,
     LOG_DESTINATIONS: logDestinationsSchema,
     LOG_FILE_PATH: z.string().optional(),

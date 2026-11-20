@@ -1,0 +1,20 @@
+/** Enum types of the schema. */
+export const TYPE_STATEMENTS: readonly string[] = [
+  `CREATE TYPE "authentication_detail_type_enum" AS ENUM('local_password', 'sso', 'totp')`,
+  `CREATE TYPE "authentication_detail_providertype_enum" AS ENUM('OIDC', 'SAML')`,
+  `CREATE TYPE "resource_maintenance_schedule_usage_hours_config_unit_enum" AS ENUM('MINUTES', 'HOURS', 'DAYS')`,
+  `CREATE TYPE "resource_maintenance_schedule_time_interval_config_unit_enum" AS ENUM('MINUTES', 'HOURS', 'DAYS')`,
+  `CREATE TYPE "resource_maintenance_schedule_triggertype_enum" AS ENUM('USAGE_HOURS', 'USAGE_COUNT', 'TIME_INTERVAL')`,
+  `CREATE TYPE "resource_maintenance_schedule_durationbasis_enum" AS ENUM('SESSION_DURATION', 'ATTRIBUTABLE_OPERATING_DURATION')`,
+  `CREATE TYPE "resource_introduction_history_item_action_enum" AS ENUM('revoke', 'grant')`,
+  `CREATE TYPE "resource_introducer_type_enum" AS ENUM('introducer', 'maintainer')`,
+  `CREATE TYPE "resource_supervisionmode_enum" AS ENUM('introduction_required', 'supervision_allowed', 'supervision_required')`,
+  `CREATE TYPE "resource_autointroductiontarget_enum" AS ENUM('resource', 'group')`,
+  `CREATE TYPE "resource_type_enum" AS ENUM('machine', 'door')`,
+  `CREATE TYPE "form_field_type_enum" AS ENUM('text', 'number', 'boolean', 'select')`,
+  `CREATE TYPE "resource_usage_usageaction_enum" AS ENUM('usage', 'door.lock', 'door.unlock', 'door.unlatch')`,
+  `CREATE TYPE "billing_transaction_status_enum" AS ENUM('pending', 'completed', 'failed')`,
+  `CREATE TYPE "password_policy_override_role_enum" AS ENUM('admin')`,
+  `CREATE TYPE "resource_maintenance_request_status_enum" AS ENUM('open', 'resolved', 'dismissed')`,
+  `CREATE TYPE "sso_provider_type_enum" AS ENUM('OIDC', 'SAML')`,
+]

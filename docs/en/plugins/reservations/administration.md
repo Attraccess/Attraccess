@@ -168,8 +168,8 @@ The plugin records the audit domain **reservations**: `created`, `approved`, `re
 > [!WARNING]
 > The plugin supports **one** API instance. Its minute scheduler, the per-resource booking lock, the settings cache,
 > the "keep or free the rest?" decisions and the feed rate limiter live in the API process. Two instances would
-> run the scheduler twice and would neither serialize bookings nor refresh each other's caches. Distributed locking
-> and cache invalidation are tracked as **ATT-1146**.
+> run the scheduler twice and would not refresh each other's caches. (Booking transactions themselves are ordered by the
+> host across instances.) Distributed scheduling and cache invalidation are tracked as **ATT-1146**.
 
 Behaviour you should know about:
 

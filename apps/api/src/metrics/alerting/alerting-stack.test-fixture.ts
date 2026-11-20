@@ -1,12 +1,12 @@
-import { mkdtempSync, readFileSync, rmSync } from 'fs';
+import { readFileSync } from 'fs';
 import { createServer, IncomingMessage, Server } from 'http';
-import { tmpdir } from 'os';
 import { join } from 'path';
 import { GenericContainer, Network, StartedNetwork, StartedTestContainer, Wait } from 'testcontainers';
 import {
-  openSqliteFixtureDatabase,
-  SqliteFixtureDatabase,
-} from '../../database/adapters/metrics/sqlite-fixture-database';
+  openPostgresFixtureDatabase,
+  PostgresFixtureDatabase,
+} from '../../database/adapters/metrics/postgres-fixture-database';
+import { createTestDatabaseLocation, type TestDatabaseLocation } from '../../test-utils/test-database';
 import { MetricsService } from '../metrics.service';
 import { ResetReportMetricsCollector } from '../reset-report-metrics.collector';
 import { AuditMetrics, createAuditMetrics } from '../definitions/audit.metrics';
@@ -62,17 +62,17 @@ export interface AlertInstance {
   description: string;
 }
 
-/** A metrics endpoint served by the real MetricsService and collector over a shared SQLite file. */
+/** A metrics endpoint served by the real MetricsService and collector over a shared PostgreSQL database. */
 class MetricsServer {
   private constructor(
     readonly port: number,
     private readonly server: Server,
-    private readonly database: SqliteFixtureDatabase,
+    private readonly database: PostgresFixtureDatabase,
     readonly audit: AuditMetrics,
   ) {}
 
   static async start(file: string): Promise<MetricsServer> {
-    const database = await openSqliteFixtureDatabase(file);
+    const database = await openPostgresFixtureDatabase(file);
     const service = new MetricsService({} as never);
     const collector = new ResetReportMetricsCollector(service, database.resetReportReader);
     collector.onModuleInit();
@@ -113,8 +113,8 @@ function parseNotification(body: string): Notification {
 
 export class AlertingStack {
   readonly notifications: Notification[] = [];
-  private dir = '';
-  private db!: SqliteFixtureDatabase;
+  private database?: TestDatabaseLocation;
+  private db!: PostgresFixtureDatabase;
   private servers: MetricsServer[] = [];
   private webhook!: Server;
   private network!: StartedNetwork;
@@ -134,9 +134,10 @@ export class AlertingStack {
   }
 
   private async boot(rules: string): Promise<void> {
-    this.dir = mkdtempSync(join(tmpdir(), 'attraccess-alerting-'));
-    const file = join(this.dir, 'attraccess.sqlite');
-    this.db = await openSqliteFixtureDatabase(file);
+    // An empty database: the test creates just the tables the reset-report queries read.
+    this.database = await createTestDatabaseLocation({ empty: true });
+    const file = this.database.location;
+    this.db = await openPostgresFixtureDatabase(file);
     await this.createSchema();
     // Push each server as it starts, so a failed second start still stops the first.
     this.servers.push(await MetricsServer.start(file));
@@ -150,8 +151,8 @@ export class AlertingStack {
   private async createSchema(): Promise<void> {
     await this.db.query(`CREATE TABLE attractap (id integer PRIMARY KEY, name text NOT NULL)`);
     await this.db.query(`CREATE TABLE attractap_crash_report (
-      id integer PRIMARY KEY, attractapId integer NOT NULL, resetReason text NOT NULL,
-      createdAt datetime NOT NULL DEFAULT (datetime('now')))`);
+      id integer PRIMARY KEY, "attractapId" integer NOT NULL, "resetReason" text NOT NULL,
+      "createdAt" timestamptz NOT NULL DEFAULT now())`);
     await this.db.query(
       `CREATE INDEX "IDX_attractap_crash_report_created_at" ON "attractap_crash_report" ("createdAt")`,
     );
@@ -245,7 +246,7 @@ policies:
       await queries.query('DELETE FROM attractap_crash_report');
       for (const { reader, reason } of reports) {
         await queries.query(
-          `INSERT INTO attractap_crash_report (id, attractapId, resetReason, createdAt) VALUES (?, ?, ?, datetime('now'))`,
+          `INSERT INTO attractap_crash_report (id, "attractapId", "resetReason", "createdAt") VALUES ($1, $2, $3, now())`,
           [this.nextId++, reader, reason],
         );
       }
@@ -311,6 +312,6 @@ policies:
       this.webhook && new Promise((resolve) => this.webhook.close(resolve)),
       this.db?.close(),
     ]);
-    if (this.dir) rmSync(this.dir, { recursive: true, force: true });
+    await this.database?.remove();
   }
 }

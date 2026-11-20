@@ -5,7 +5,7 @@ import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 import { resolveTriggeringUsage, triggeringUsageId } from './triggering-usage';
 import { requireRunMachineId } from './flow.utils';
-import type { UnitOfWork } from '../../../database/unit-of-work';
+import { runWithRetry, type UnitOfWork } from '../../../database/unit-of-work';
 import type { TransactionContext } from '../../../database/transaction-context';
 import type { FlowBillingItemStore } from '../flow-billing-item-store.port';
 
@@ -87,10 +87,12 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
 
     if (ctx.transactionManager) {
       await savePendingItem(ctx.transactionManager);
-    } else {
-      // Share finalization's write queue so a delayed event cannot pass the status check
-      // before finalization and then change its completed items afterward.
+    } else if (this.unitOfWork.current()?.isOpen) {
       await this.unitOfWork.run((scope) => savePendingItem(scope));
+    } else {
+      // The bill row lock makes a delayed event wait for a finalization that already changed the bill. The unit only
+      // reads and writes the bill, so a deadlock or serialization conflict is retried (bounded) from the start.
+      await runWithRetry(this.unitOfWork, (scope) => savePendingItem(scope));
     }
 
     return { payload: item };

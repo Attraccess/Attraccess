@@ -31,6 +31,11 @@ async function scriptProviders(): Promise<string[]> {
 describe('the supported database engines', () => {
   const engines = sorted(SUPPORTED_DATABASE_TYPES);
 
+  it('is PostgreSQL only: SQLite survives as the source of the one-way import, never as a backend', () => {
+    expect(engines).toEqual(['postgres']);
+    expect(Object.keys(DATABASE_BACKENDS)).toEqual(['postgres']);
+  });
+
   it('has exactly one backend object per supported type, each naming its own type', () => {
     expect(sorted(Object.keys(DATABASE_BACKENDS))).toEqual(engines);
     for (const [type, backend] of Object.entries(DATABASE_BACKENDS)) {

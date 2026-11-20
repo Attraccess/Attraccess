@@ -7,7 +7,11 @@ import {
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
 } from '@attraccess/database-entities';
-import { BillingTransactionStatus, ResourceMeteringSessionStatus } from '@attraccess/application-models';
+import {
+  BillingTransactionStatus,
+  ResourceMeteringSessionStatus,
+  ResourceUsageAction,
+} from '@attraccess/application-models';
 
 import { BadRequestException } from '@nestjs/common';
 
@@ -17,19 +21,9 @@ import type { TransactionScope } from '../../unit-of-work';
 
 import { unitOfWorkFor } from '../shared-unit-of-work';
 
-import { rm } from 'node:fs/promises';
-
-import { MeteringReadyExecutor, MeteringReport, MeteringReportExecutor } from '../../../resources/flows/node-executors';
-
-import { MeterFlowConversions1790300000000 } from '../../migrations/1790300000000-meter-flow-conversions';
-
-import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
-
 import { inheritTestScope } from '../../../test-utils/inherit-test-scope';
 
-import { compileFlowTemplate } from '../../../resources/flows/execution/flow-template';
-
-import { resetTestFixture } from './fixtures/setup.test-fixture';
+import { closeMeteringFixture, resetTestFixture } from './fixtures/setup.test-fixture';
 
 import { createFlowDefinedMeteringFixture } from './fixtures/flow-defined-meters.test-fixture';
 
@@ -40,7 +34,7 @@ import { createUsageLifecycleFixture } from './fixtures/usage-lifecycle.test-fix
 import type { Handler } from './fixtures/report-handler.test-fixture';
 import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 
-// This SQLite suite runs multiple settlements per case; coverage on CI exceeds Jest's five-second default.
+// This PostgreSQL suite runs multiple settlements per case; coverage on CI exceeds Jest's five-second default.
 jest.setTimeout(30_000);
 
 export { Handler } from './fixtures/report-handler.test-fixture';
@@ -58,11 +52,7 @@ describe('Flow-defined metering', () => {
 
   afterEach(async () => {
     scope.usage?.onModuleDestroy();
-    if (scope.source) {
-      await closeResourceTransactionConnection(scope.source);
-      if (scope.source.isInitialized) await scope.source.destroy();
-    }
-    if (scope.directory) await rm(scope.directory, { recursive: true, force: true });
+    await closeMeteringFixture(scope);
     jest.restoreAllMocks();
   });
 
@@ -218,6 +208,7 @@ describe('Flow-defined metering', () => {
       const candidate = await usageLifecycleScope.source.getRepository(ResourceUsage).save({
         resourceId: 1,
         userId: 1,
+        usageAction: ResourceUsageAction.Usage,
         startTime: new Date(),
         isFinalized: false,
         lifecyclePending: true,
@@ -236,6 +227,8 @@ describe('Flow-defined metering', () => {
         id: 's1',
         resourceId: 1,
         usageId: candidate.id,
+        meterId: 1,
+        meterName: 'Energy',
         status: ResourceMeteringSessionStatus.Active,
         creditsPerUnit: 30,
       });
@@ -342,43 +335,6 @@ describe('Flow-defined metering', () => {
       expect((await usageLifecycleScope.sessionOf(ended.id)).consumedValue).toBe('1500000000');
     });
 
-    it('bills migrated flow conversions from the converted counter baseline through ordinary completion nodes', async () => {
-      await usageLifecycleScope.seedMeter();
-      const nodes = usageLifecycleScope.source.getRepository(ResourceFlowNode);
-      await nodes.update('ready', { data: { meterId: 1, baselineValue: '{{reading}}', legacyEnergyUnit: 'Wh' } });
-      await nodes.update('report', { data: { meterId: 1, value: '{{reading}}', legacyEnergyUnit: '{{unit}}' } });
-      const runner = usageLifecycleScope.source.createQueryRunner();
-      try {
-        await new MeterFlowConversions1790300000000().up(runner);
-      } finally {
-        await runner.release();
-      }
-      const completion = (complete: (report: MeteringReport) => Promise<void>, kind: 'start' | 'final') => ({
-        compileTemplate: compileFlowTemplate,
-        metering: { meterId: 1, operationId: 'op', kind, complete },
-      });
-      usageLifecycleScope.onStart = async ({ complete }) => {
-        await new MeteringReadyExecutor().execute(
-          await nodes.findOneByOrFail({ id: 'ready' }),
-          { reading: '1000000' },
-          completion(complete, 'start') as never,
-        );
-      };
-      usageLifecycleScope.onCollect = async ({ complete }) => {
-        await new MeteringReportExecutor(usageLifecycleScope.metering).execute(
-          await nodes.findOneByOrFail({ id: 'report' }),
-          { reading: '1001500', unit: 'Wh' },
-          completion(complete, 'final') as never,
-        );
-      };
-      await usageLifecycleScope.start();
-      const ended = await usageLifecycleScope.end();
-      const { transaction, items: rows } = await usageLifecycleScope.items(ended.id);
-      expect(transaction.amount).toBe(-45);
-      expect(rows).toEqual([expect.objectContaining({ meterQuantity: '1.5', meterCreditsPerUnit: 30, unitPrice: 45 })]);
-      expect((await nodes.findOneByOrFail({ id: 'report' })).data).not.toHaveProperty('legacyEnergyUnit');
-    });
-
     it('rejects a lifetime counter that dropped below its baseline', async () => {
       await usageLifecycleScope.seedMeter({}, { finalAttempts: 1 });
       usageLifecycleScope.onStart = ({ complete }) => complete({ kind: 'ready', baseline: { value: '1000' } });
@@ -464,6 +420,7 @@ describe('Flow-defined metering', () => {
         await nodes.save({
           id: 'increment-report',
           resourceId: 1,
+          position: { x: 0, y: 0 },
           type: takeoverScope.parentScope.T.OUTPUT_METERING_REPORT,
           data: { meterId: 1, mode: 'increment', value: '1' },
         });
@@ -795,6 +752,7 @@ describe('Flow-defined metering', () => {
           id: 'increment-report',
           type: reconciliationScope.parentScope.T.OUTPUT_METERING_REPORT,
           resourceId: 1,
+          position: { x: 0, y: 0 },
           data: { meterId: 1, mode: 'increment', value: '1' },
         });
         const startFlow = jest.fn(reconciliationScope.parentScope.ready);

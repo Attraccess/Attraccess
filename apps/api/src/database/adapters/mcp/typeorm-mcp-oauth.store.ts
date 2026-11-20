@@ -14,6 +14,9 @@ import { EntityManager, LessThan, Repository } from 'typeorm';
 import { ScopedUnitOfWork, UNIT_OF_WORK } from '../../unit-of-work';
 import type { McpOAuthStore } from '../../../mcp/mcp-oauth.port';
 
+/** Advisory lock key serialising OAuth client registrations (unique among the keys listed in `resource-locks.ts`). */
+const MCP_CLIENT_REGISTRATION_LOCK = 584_601;
+
 const toClient = (row: McpOAuthClient): McpOAuthClientRecord => ({
   clientId: row.clientId,
   clientName: row.clientName,
@@ -63,17 +66,24 @@ export class TypeOrmMcpOAuthStore implements McpOAuthStore {
     limit: number,
     staleBefore: Date,
   ): Promise<McpOAuthClientRecord | null> {
-    if ((await this.clients.count()) >= limit) {
-      // Registrations that never obtained a grant and are old enough make room.
-      await this.clients
-        .createQueryBuilder()
-        .delete()
-        .where('createdAt < :cutoff', { cutoff: staleBefore })
-        .andWhere('clientId NOT IN (SELECT clientId FROM mcp_oauth_grant)')
-        .execute();
-      if ((await this.clients.count()) >= limit) return null;
-    }
-    return toClient(await this.clients.save(this.clients.create(client)));
+    // The limit check and the insert run under one transaction-level advisory lock, so parallel registrations
+    // (several API instances included) cannot all pass the check and exceed the limit.
+    return this.unitOfWork.run(async (scope) => {
+      const manager = this.unitOfWork.handleOf(scope);
+      await manager.query('SELECT pg_advisory_xact_lock($1)', [MCP_CLIENT_REGISTRATION_LOCK]);
+      const clients = manager.getRepository(McpOAuthClient);
+      if ((await clients.count()) >= limit) {
+        // Registrations that never obtained a grant and are old enough make room.
+        await clients
+          .createQueryBuilder()
+          .delete()
+          .where('"createdAt" < :cutoff', { cutoff: staleBefore })
+          .andWhere('"clientId" NOT IN (SELECT "clientId" FROM "mcp_oauth_grant")')
+          .execute();
+        if ((await clients.count()) >= limit) return null;
+      }
+      return toClient(await clients.save(clients.create(client)));
+    });
   }
 
   async createGrant(grant: NewMcpOAuthGrant): Promise<McpOAuthGrantRecord> {
@@ -111,7 +121,7 @@ export class TypeOrmMcpOAuthStore implements McpOAuthStore {
       .createQueryBuilder()
       .update(McpOAuthToken)
       .set({ usedAt })
-      .where('tokenHash = :tokenHash AND usedAt IS NULL', { tokenHash })
+      .where('"tokenHash" = :tokenHash AND "usedAt" IS NULL', { tokenHash })
       .execute();
     return result.affected === 1;
   }

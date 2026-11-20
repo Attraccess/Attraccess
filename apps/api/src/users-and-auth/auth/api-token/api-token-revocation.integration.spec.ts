@@ -1,20 +1,20 @@
 import { DataSource } from 'typeorm';
 import { ApiToken, Permission, User } from '@attraccess/database-entities';
 import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
-import { SqliteFileFixture } from '../../../database/adapters/sqlite-file.test-fixture';
+import { PostgresDatabaseFixture } from '../../../database/adapters/postgres-database.test-fixture';
 import { TypeOrmApiTokenStore } from '../../../database/adapters/auth/typeorm-api-token.store';
 import { ApiTokenService } from './api-token.service';
 
 jest.setTimeout(60_000);
 
-// A real SQLite store: TypeORM ignores plain null values in WHERE clauses, which fakes cannot detect.
-describe('API token revocation with SQLite', () => {
-  let fixture: SqliteFileFixture;
+// A real PostgreSQL store: TypeORM ignores plain null values in WHERE clauses, which fakes cannot detect.
+describe('API token revocation with PostgreSQL', () => {
+  let fixture: PostgresDatabaseFixture;
   let database: DataSource;
   let service: ApiTokenService;
 
   beforeAll(async () => {
-    fixture = await SqliteFileFixture.create();
+    fixture = await PostgresDatabaseFixture.create();
     database = await fixture.open();
   });
 
@@ -23,8 +23,8 @@ describe('API token revocation with SQLite', () => {
   });
 
   beforeEach(async () => {
-    await database.getRepository(ApiToken).clear();
-    await database.getRepository(User).clear();
+    await database.query('DELETE FROM api_token');
+    await database.query('DELETE FROM "user"');
     await database.getRepository(User).save([
       { id: 1, username: 'one', email: 'one@example.com' },
       { id: 2, username: 'two', email: 'two@example.com' },

@@ -33,12 +33,13 @@ import {
   DeleteAccountTokenExpiredException,
   DeleteAccountTokenInvalidException,
   FindOneOptions,
+  identityTakenException,
   UpdateUserData,
   UserHasActiveUsageSessionsException,
   UserListOptions,
 } from './accounts/user-accounts';
 
-import { USER_STORE, type UserStore } from './user-store.port';
+import { USER_STORE, UserIdentityTakenError, type UserStore } from './user-store.port';
 
 import { PaginatedResponse } from '../../types/response';
 
@@ -238,6 +239,8 @@ export class UsersService {
     }));
 
     const run = async (context: TransactionContext) => {
+      // Like a single registration: only one creation at a time may see the installation empty.
+      await this.store.lockAccountCreation(context);
       const totalExisting = await this.store.countUsers({}, context);
 
       const newUsers = normalized.map((data) => {
@@ -255,7 +258,10 @@ export class UsersService {
         };
       });
 
-      const saved = await this.store.insertUsers(newUsers, context);
+      const saved = await this.store.insertUsers(newUsers, context).catch((error: unknown) => {
+        // A concurrent write took an identity after the caller's existence check.
+        throw error instanceof UserIdentityTakenError ? identityTakenException(error.field) : error;
+      });
 
       // Assign administrator role to the first user when bootstrapping; default roles for everyone else.
       // Pass the transaction so role assignments are part of the same unit of work.

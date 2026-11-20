@@ -1,4 +1,4 @@
-import { DataSource, EntityManager } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 import {
   Resource,
   ResourceMaintenance,
@@ -13,12 +13,12 @@ import {
   ResourceUsageAction,
   UsageDurationUnit,
 } from '@attraccess/application-models';
-import { SqliteFileFixture } from '../sqlite-file.test-fixture';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { unitOfWorkFor } from '../shared-unit-of-work';
 import { TypeOrmMaintenanceEvaluationStore } from './maintenance-evaluation-store.adapter';
+import { MAX_PAIRS_PER_QUERY } from './maintenance-evaluation-queries';
 
-describe('maintenance evaluation store on real SQLite', () => {
-  let files: SqliteFileFixture;
+describe('maintenance evaluation store on real PostgreSQL', () => {
   let source: DataSource;
   let store: TypeOrmMaintenanceEvaluationStore;
   let resourceId: number;
@@ -45,17 +45,17 @@ describe('maintenance evaluation store on real SQLite', () => {
       startTime: new Date('2025-01-01T00:00:00.000Z'),
       endTime,
       lifecyclePending,
+      isFinalized: !lifecyclePending,
     });
 
   beforeEach(async () => {
-    files = await SqliteFileFixture.create();
-    source = await files.open();
+    source = await createTestDataSource();
     store = new TypeOrmMaintenanceEvaluationStore(source, unitOfWorkFor(source));
     const resource = await source
       .getRepository(Resource)
       .save(source.getRepository(Resource).create({ name: 'Laser', type: ResourceType.Machine }));
     resourceId = resource.id;
-    await source.query('UPDATE resource SET createdAt = ? WHERE id = ?', ['2024-01-01 00:00:00.000', resourceId]);
+    await source.query('UPDATE resource SET "createdAt" = $1 WHERE id = $2', [createdAt, resourceId]);
     userId = (
       await source
         .getRepository(User)
@@ -74,7 +74,7 @@ describe('maintenance evaluation store on real SQLite', () => {
   });
 
   afterEach(async () => {
-    await files.close();
+    await closeTestDataSource(source);
   });
 
   describe('schedules', () => {
@@ -175,9 +175,9 @@ describe('maintenance evaluation store on real SQLite', () => {
       expect(state.hasActiveMaintenance).toBe(true);
     });
 
-    it('splits the requests below the SQLite bind limit', async () => {
+    it('splits the requests below the PostgreSQL bind limit', async () => {
       const queries = jest.spyOn(source.manager, 'query').mockResolvedValue([]);
-      const requests = Array.from({ length: 10_922 }, (_, index) => ({
+      const requests = Array.from({ length: MAX_PAIRS_PER_QUERY + 1 }, (_, index) => ({
         resourceId: index + 1,
         scheduleId: index + 1,
         createdAt,
@@ -186,13 +186,16 @@ describe('maintenance evaluation store on real SQLite', () => {
 
       await store.loadServiceCycleStates(requests, new Date());
 
-      expect(queries.mock.calls.map(([, params]) => (params as unknown[]).length)).toEqual([32_764, 4]);
+      expect(queries.mock.calls.map(([, params]) => (params as unknown[]).length)).toEqual([
+        MAX_PAIRS_PER_QUERY * 3 + 1,
+        4,
+      ]);
     });
   });
 
   describe('snapshot and transaction', () => {
-    it('reads the committed history on its own connection, not the uncommitted writes of another transaction', async () => {
-      expect(store.snapshotReads).toBe(true);
+    it('reads the committed history and never the uncommitted writes of another transaction', async () => {
+      expect(store.snapshotReads).toBe(false);
       await addSession(null);
       const committed = await store.inSnapshot((view) => view.durationFingerprint(resourceId));
 
@@ -208,15 +211,6 @@ describe('maintenance evaluation store on real SQLite', () => {
       ).rejects.toThrow('rollback');
 
       expect(await store.inSnapshot((view) => view.durationFingerprint(resourceId))).toBe(committed);
-      await store.close();
-    });
-
-    it('refuses to write through the snapshot connection', async () => {
-      await expect(
-        store.inSnapshot((view) =>
-          view.atomically('write', () => view.context && transactionOf(view).query('DELETE FROM resource')),
-        ),
-      ).rejects.toThrow();
       await store.close();
     });
 

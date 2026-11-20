@@ -33,8 +33,10 @@ function toOverrideRecord(row: PasswordPolicyOverride): PasswordPolicyOverrideRe
 /** The driver's rejections the application answers specially; everything else passes through. */
 function translateRejection(error: unknown): never {
   if (error instanceof OptimisticLockVersionMismatchError) throw new PasswordPolicyConflictError();
-  if (error instanceof QueryFailedError && /CHECK constraint failed/i.test(error.message)) {
-    throw new PasswordPolicyConstraintError(error.message);
+  // 23514 check_violation (rule combinations), 22P02 invalid_text_representation (a role outside the enum type)
+  if (error instanceof QueryFailedError) {
+    const code = (error.driverError as { code?: string } | undefined)?.code;
+    if (code === '23514' || code === '22P02') throw new PasswordPolicyConstraintError(error.message);
   }
   throw error;
 }
@@ -98,8 +100,8 @@ export class TypeOrmPasswordPolicyStore implements PasswordPolicyStore {
     scope: TransactionScope,
   ): Promise<PasswordPolicyOverrideRecord> {
     const overrides = this.manager(scope).getRepository(PasswordPolicyOverride);
-    const existing = await overrides.findOne({ where: { role } });
     try {
+      const existing = await overrides.findOne({ where: { role } });
       if (existing) {
         Object.assign(existing, values);
         return toOverrideRecord(await overrides.save(existing));

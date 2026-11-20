@@ -11,7 +11,7 @@ Development, redistribution and commercial use are subject to the [modified Pros
 |-------|-----------|
 | **Frontend** | React, TypeScript, HeroUI, TanStack Query, React Router |
 | **Backend** | NestJS (Node.js), TypeScript |
-| **Database** | SQLite with TypeORM |
+| **Database** | PostgreSQL with TypeORM |
 | **Monorepo** | NX workspace |
 | **Package Manager** | pnpm |
 | **Containerization** | Docker |

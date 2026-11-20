@@ -214,6 +214,27 @@ describe('BillingSetAdditionalItemsExecutor', () => {
     expect(billingItems.addToPendingBill).toHaveBeenCalledWith({ usageId: 'ru-1', resourceId: 1 }, itemOf(), scope);
   });
 
+  it('runs its own unit of work again after a write conflict', async () => {
+    ctx.transactionManager = undefined;
+    const deadlock = Object.assign(new Error('deadlock detected'), { code: '40P01' });
+    unitOfWork.run.mockRejectedValueOnce(deadlock);
+
+    await executor.execute(createNode(baseData), {}, ctx);
+
+    expect(unitOfWork.run).toHaveBeenCalledTimes(2);
+    expect(billingItems.addToPendingBill).toHaveBeenCalledTimes(1);
+  });
+
+  it('joins a unit of work that is already open instead of retrying inside it', async () => {
+    ctx.transactionManager = undefined;
+    unitOfWork.current.mockReturnValue(scope);
+
+    await executor.execute(createNode(baseData), {}, ctx);
+
+    expect(unitOfWork.run).toHaveBeenCalledTimes(1);
+    expect(billingItems.addToPendingBill).toHaveBeenCalledWith({ usageId: 'ru-1', resourceId: 1 }, itemOf(), scope);
+  });
+
   it('throws when node data fails schema validation', async () => {
     await expect(executor.execute(createNode({ name: '', unitPrice: 5, quantity: 2 }), {}, ctx)).rejects.toThrow();
     expect(billingItems.addToPendingBill).not.toHaveBeenCalled();

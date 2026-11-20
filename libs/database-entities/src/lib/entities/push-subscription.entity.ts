@@ -36,11 +36,11 @@ export class PushSubscription {
   })
   userAgent!: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'When this subscription was created', example: '2025-01-18T12:30:00.000Z' })
   createdAt!: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @ApiProperty({
     description: 'When this subscription was last re-confirmed by the client',
     example: '2025-01-18T12:30:00.000Z',

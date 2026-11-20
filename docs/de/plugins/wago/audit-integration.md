@@ -26,8 +26,8 @@ record(event: PluginAuditEvent & { pluginId: string }): Promise<PluginAuditRecei
 // PluginAuditReceipt = { status: 'recorded' } | { status: 'unavailable' }
 ```
 
-`recorded` bedeutet ein abgeschlossenes Autocommit-Einfügen über eine separate Verbindung zur
-SQLite-Datei des Hosts mit `synchronous=FULL`. Zeilen enthalten Server-Zeitstempel, Akteurs- und
+`recorded` bedeutet ein abgeschlossenes Autocommit-Einfügen über einen separaten Verbindungspool zur
+PostgreSQL-Datenbank des Hosts mit aktivem `synchronous_commit`. Zeilen enthalten Server-Zeitstempel, Akteurs- und
 API-Token-IDs, Plugin-Identität, Vorgangs-UUID, Ergebnis, Ziel und sichere Details.
 Historische Bezeichner haben keine kaskadierenden Fremdschlüssel: Das Löschen eines Controllers,
 Principals, Tokens oder Plugins löscht dessen Historie nicht. Ein Datenbank-Trigger weist
@@ -36,21 +36,20 @@ Zeilenänderungen zurück; die Aufbewahrung ist der vorgesehene Löschpfad. Die 
 
 Plugin-Aufrufe tragen keine Host-Transaktion, daher wird die Zeile nicht gemeinsam mit der eigenen Änderung des Plugins
 committet oder zurückgerollt. Jeder Aufruf wird auf der
-separaten Audit-Verbindung geschrieben: Schreibvorgänge werden serialisiert, bis zu 1.000 können in der Warteschlange stehen,
-und jeder wartet bis zu 5 Sekunden auf eine belegte SQLite-Sperre, statt aufzugeben.
+separaten Audit-Verbindung geschrieben: Bis zu 1.000 können in der Warteschlange stehen, und ein Schreibvorgang, der
+auf eine Datenbanksperre wartet, wird einige Male wiederholt, statt sofort aufzugeben.
 Ein nicht gespeicherter Schreibvorgang liefert `unavailable`, protokolliert eine
 `Audit record dropped`-Zeile im API-Log und erhöht
 `attraccess_audit_records_dropped_total` (siehe den
 [Audit-Alarm](monitoring/prometheus-grafana.md#audit-alarm)). Gründe sind ein
-Speicherfehler, eine volle Warteschlange, nicht verfügbarer Audit-Speicher (Start fehlgeschlagen
-oder `:memory:`-Datenbank), Herunterfahren, nicht lesbare Audit-Einstellungen oder ein ungültiges
+Speicherfehler, eine volle Warteschlange, nicht verfügbarer Audit-Speicher (Start fehlgeschlagen), Herunterfahren, nicht lesbare Audit-Einstellungen oder ein ungültiges
 Ereignis. Schreibvorgänge, die beim Beginn des Herunterfahrens bereits in der Warteschlange stehen, werden noch bis zu 4 Sekunden lang gespeichert. Die Bridge
 liefert außerdem `unavailable`, wenn kein Provider registriert ist oder der Provider
 eine Ausnahme wirft; sie serialisiert Fehler nie als Ersatzeinträge. Deaktiviertes Audit oder eine
 deaktivierte Plugin-Domäne liefert ebenfalls `unavailable`, zählt aber nicht als verworfen.
 WAGO gibt bei jeder `unavailable`-Quittung nur die feste Warnung `WAGO audit storage unavailable` aus.
 Abgewiesene Schreibvorgänge werden nicht wiederholt, und die Quittung kann das Domänenergebnis nicht ändern:
-Domänenoperationen werden fortgesetzt. Persistenztests verwenden isolierte SQLite-Fixtures auf der Festplatte.
+Domänenoperationen werden fortgesetzt. Persistenztests verwenden isolierte PostgreSQL-Testdatenbanken.
 Aktualisieren Sie das Host-SDK, bevor Sie ein
 Plugin ausrollen, das diese Bridge erwartet. Ältere Kontexte ohne `audit` bleiben unterstützt.
 

@@ -104,21 +104,23 @@ zutreffenden Fall.
 Attraccess 2.0 hat das Plugin-SDK geändert: Plugins haben keinen Datenbankzugriff mehr und halten ihre eigenen Daten in
 Tabellen, die der Host verwaltet (siehe [Plugin-Speicher](plugins/plugin-storage.md)). Für 1.x gebaute Plugins werden
 nicht geladen: Sie bleiben mit einem Fehler in der Plugin-Liste, der das Plugin nennt, den Grund angibt und auf die
-[Umstellungsanleitung](plugins/migrating-to-2.md) verweist, und ihre Daten bleiben unverändert. Typische Gründe:
+[Umstellungsanleitung](plugins/migrating-to-2.md) verweist. Typische Gründe:
 
 - das Plugin zielt auf das SDK 1.x (es deklariert keine Mindest-Host-Version ab `2.0.0-0`);
 - es fordert die entfernte Berechtigung `DATABASE_ACCESS` an (2.0-Plugins fordern `PLUGIN_STORAGE`);
 - es deklariert noch `persistence.backends` oder einen TypeORM-Migrationseintrag, oder sein Bundle importiert TypeORM
   oder einen Datenbanktreiber;
 - die Datenbank enthält nur einen Teil der alten (1.x-)Migrationen des Plugins: Die Daten stammen aus einem Release vor
-  Attraccess 1.11. Attraccess 2.0 übernimmt Plugin-Daten nur vom letzten 1.x-Release (1.11). Spielen Sie das Backup
-  von vor dem Upgrade zurück, aktualisieren Sie auf Attraccess 1.11 und starten Sie es einmal, damit die Migrationen
-  des Plugins abschließen, und aktualisieren Sie dann auf 2.0. Es wurde nichts geändert (siehe
-  [Upgrade auf Attraccess 2.0](installation/updating.md#upgrade-auf-attraccess-20)).
+  Attraccess 1.11. Attraccess 2.0 übernimmt Plugin-Daten nur vom letzten 1.x-Release (1.11). Aktualisieren Sie auf
+  Attraccess 1.11 und starten Sie es einmal, damit die Migrationen des Plugins abschließen, und aktualisieren Sie dann
+  auf 2.0 (siehe [Upgrade auf Attraccess 2.0](installation/updating.md#upgrade-auf-attraccess-20)).
 
-Installieren Sie vor oder direkt nach dem Upgrade den 2.0-Build jedes Plugins (Upload oder Marktplatz) oder löschen Sie
-das alte Plugin aus der Liste. Das Löschen eines abgelehnten Plugins entfernt seine Dateien, ohne seinen Code
-auszuführen; seine Tabellen bleiben in der Datenbank, bis ein 2.0-Build sie übernimmt oder Sie sie von Hand löschen.
+Jede 1.x-Installation hält ihre Daten in SQLite und überträgt sie beim ersten Start von 2.0 nach PostgreSQL. Enthalten
+die Tabellen eines Plugins Zeilen, muss sein 2.0-Build **vor** diesem ersten Start im Plugin-Ordner liegen: Sonst stoppt
+die Übernahme, und die API startet nicht (die SQLite-Datei bleibt unberührt). Attraccess 1.11 kann keine 2.0-Builds
+installieren. [Plugins mit Daten](installation/updating.md#plugins-mit-daten) zeigt, wie Sie sie bereitlegen. Plugins
+ohne Daten können Sie nach dem Upgrade installieren oder aus der Liste löschen. Das Löschen eines abgelehnten Plugins
+entfernt seine Dateien, ohne seinen Code auszuführen.
 
 ## Fehlerbehebung
 

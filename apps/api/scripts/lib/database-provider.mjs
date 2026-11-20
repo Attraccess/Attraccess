@@ -1,72 +1,144 @@
 // The database provider of the operational scripts (dev seed, re-encryption) and the setup scripts.
 //
 // Plain Node only: the production image has no TypeScript sources and only ships this folder beside the script, so
-// nothing here may import a .ts file. The application reaches its engine through the DatabaseBackend seam
-// (apps/api/src/database/backend); these scripts reach theirs through a provider selected by the same DATABASE_TYPE.
-// A second backend adds a provider here and one entry in PROVIDERS; a test (database-provider.compat.spec.ts) keeps
-// the supported types in step with the seam.
-import { join, resolve } from 'node:path';
+// nothing here may import a .ts file. The only dependency is the `pg` driver the deployed API package ships.
+// PostgreSQL is the only runtime database: DATABASE_TYPE may be unset or `postgres`, and DATABASE_URL names it.
+import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const DEFAULT_DATABASE_TYPE = 'sqlite';
+export const DEFAULT_DATABASE_TYPE = 'postgres';
 
 /** Only a plain identifier is echoed: a misplaced connection string must not reach logs. */
 function describe(value) {
   return /^[A-Za-z0-9_-]{1,32}$/.test(value) ? `"${value}"` : '(redacted: not a database type name)';
 }
 
+/** Turns `?` placeholders into `$1, $2, ...` (a `?` inside a quoted literal or identifier is left alone). */
+export function toPositionalParameters(sql) {
+  let index = 0;
+  let quote = null;
+  let out = '';
+  for (const char of sql) {
+    if (quote) {
+      if (char === quote) quote = null;
+      out += char;
+    } else if (char === "'" || char === '"') {
+      quote = char;
+      out += char;
+    } else if (char === '?') {
+      out += `$${++index}`;
+    } else {
+      out += char;
+    }
+  }
+  return out;
+}
+
+// DATABASE_SSL exactly as the API reads it (apps/api/src/database/postgres/postgres-config.ts, parseSsl and
+// sslOption). A copy, because this folder may not import TypeScript: change both together.
+const SSL_MODES = ['off', 'require', 'verify-ca', 'verify-full'];
+const SSL_ALIASES = { '': 'off', false: 'off', 0: 'off', disable: 'off', true: 'require', 1: 'require' };
+const SSL_OPTIONS = {
+  off: undefined,
+  // Encrypted, the certificate is not verified.
+  require: { rejectUnauthorized: false },
+  // The chain is verified, the host name on the certificate is not.
+  'verify-ca': { rejectUnauthorized: true, checkServerIdentity: () => undefined },
+  'verify-full': { rejectUnauthorized: true },
+};
+
+/** The pg `ssl` option for DATABASE_SSL (undefined = no TLS). Throws for a value the API would refuse. */
+export function resolveSsl(env = process.env) {
+  const raw = (env.DATABASE_SSL ?? '').trim().toLowerCase();
+  const mode = Object.hasOwn(SSL_ALIASES, raw) ? SSL_ALIASES[raw] : raw;
+  if (!SSL_MODES.includes(mode)) {
+    throw new Error(`DATABASE_SSL must be one of ${SSL_MODES.join(', ')} (value not shown).`);
+  }
+  return SSL_OPTIONS[mode];
+}
+
+/** Host and database name of a connection URL, without credentials. */
+export function describeLocation(url) {
+  try {
+    const parsed = new URL(url);
+    return { host: parsed.hostname, database: decodeURIComponent(parsed.pathname.replace(/^\//, '')) };
+  } catch {
+    throw new Error(
+      'DATABASE_URL is not a valid connection URL (expected postgres://user:password@host:5432/database)',
+    );
+  }
+}
+
+export function isLocalHost(host) {
+  return ['localhost', '127.0.0.1', '::1', '[::1]', ''].includes(host) || host.startsWith('/');
+}
+
 /**
- * SQLite: one file under the storage root. A handle is an open better-sqlite3 Database. The helpers stay async so callers keep one
- * shape; `run` resolves to `{ lastID, changes }`; `begin({ writeLock: true })` takes the write lock at once so a script never fails half way on a busy database.
+ * PostgreSQL through `pg`. The location is a connection URL; a handle is a connected pg Client. Statements use `?`
+ * placeholders (converted to `$n`) so callers keep one shape; `run` resolves to `{ lastID, changes }` where lastID is
+ * the `id` of the first row when the statement ends in `RETURNING id`. camelCase identifiers must be quoted.
  */
-export const sqliteProvider = {
-  type: 'sqlite',
-  /** Same rule as resolveDatabasePath() in apps/api/src/config/storage-path.ts (a test keeps them in step). */
-  defaultLocation(env = process.env, cwd = process.cwd()) {
-    const storageRoot = resolve(cwd, env.STORAGE_ROOT ?? join(cwd, 'storage'));
-    return join(storageRoot, 'attraccess.sqlite');
+export const postgresProvider = {
+  type: 'postgres',
+  /** The connection URL from DATABASE_URL (required). */
+  defaultLocation(env = process.env) {
+    const url = env.DATABASE_URL?.trim();
+    if (!url) throw new Error('DATABASE_URL is required (postgres://user:password@host:5432/database)');
+    return url;
   },
-  async open(location) {
-    const { default: Database } = await import('better-sqlite3');
-    return new Database(location, { fileMustExist: true, timeout: 5000 });
+  async open(location, env = process.env) {
+    const { default: pg } = await import('pg');
+    const client = new pg.Client({ connectionString: location, ssl: resolveSsl(env) });
+    await client.connect();
+    const schema = env.DATABASE_SCHEMA?.trim();
+    if (schema) {
+      await client.query('SELECT set_config($1, $2, false)', ['search_path', `"${schema.split('"').join('""')}"`]);
+    }
+    return client;
   },
   async close(db) {
-    db.close();
+    await db.end();
   },
   async run(db, sql, params = []) {
-    const { lastInsertRowid, changes } = db.prepare(sql).run(...params);
-    return { lastID: Number(lastInsertRowid), changes };
+    const result = await db.query(toPositionalParameters(sql), params);
+    const first = result.rows[0];
+    return { lastID: first && 'id' in first ? Number(first.id) : undefined, changes: result.rowCount ?? 0 };
   },
   async get(db, sql, params = []) {
-    return db.prepare(sql).get(...params);
+    return (await db.query(toPositionalParameters(sql), params)).rows[0];
   },
   async all(db, sql, params = []) {
-    return db.prepare(sql).all(...params);
+    return (await db.query(toPositionalParameters(sql), params)).rows;
   },
-  async begin(db, { writeLock = false } = {}) {
-    db.exec(writeLock ? 'BEGIN IMMEDIATE' : 'BEGIN');
+  async begin(db) {
+    await db.query('BEGIN');
   },
   async commit(db) {
-    db.exec('COMMIT');
+    await db.query('COMMIT');
   },
   async rollback(db) {
-    if (db.inTransaction) db.exec('ROLLBACK');
+    await db.query('ROLLBACK');
   },
   async hasTable(db, table) {
-    return Boolean(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(table));
+    const result = await db.query(
+      'SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = $1',
+      [table],
+    );
+    return result.rows.length > 0;
   },
   async columns(db, table) {
-    return db
-      .prepare(`PRAGMA table_info("${table}")`)
-      .all()
-      .map((row) => row.name);
+    const result = await db.query(
+      'SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1 ORDER BY ordinal_position',
+      [table],
+    );
+    return result.rows.map((row) => row.column_name);
   },
 };
 
-const PROVIDERS = { sqlite: sqliteProvider };
+const PROVIDERS = { postgres: postgresProvider };
 export const SUPPORTED_DATABASE_TYPES = Object.keys(PROVIDERS);
 
-/** Throws before any file or database is touched when DATABASE_TYPE is not supported. */
+/** Throws before any database is touched when DATABASE_TYPE is not supported. */
 export function parseDatabaseType(env = process.env) {
   const raw = env.DATABASE_TYPE?.trim();
   if (!raw) return DEFAULT_DATABASE_TYPE;

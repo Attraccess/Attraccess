@@ -3,7 +3,8 @@
 # SERVICE_USER_*, SERVICE_PASSWORD_*, SERVICE_BASE64_*. See
 # https://coolify.io/docs/knowledge-base/docker/compose for details.
 #
-# Stack: rabbitmq (AMQP+MQTT), zigbee2mqtt, attraccess, prometheus, grafana.
+# Stack: postgres (the Attraccess database), valkey, rabbitmq (AMQP+MQTT), attraccess, prometheus, grafana.
+# Back up the database (pg_dump) together with the attraccess-storage volume.
 #
 # Sidecar configs (Prometheus rules, Grafana provisioning, dashboards) ship
 # bundled inside the attraccess image at /app/share/monitoring/. The
@@ -23,6 +24,7 @@ services:
       - ATTRACCESS_URL=$SERVICE_URL_ATTRACCESS
       - ATTRACCESS_PUBLIC_INTERNET_URL=${ATTRACCESS_PUBLIC_INTERNET_URL:-$SERVICE_URL_ATTRACCESS}
       - AUTH_SESSION_SECRET=$SERVICE_BASE64_64_AUTHSESSION
+      - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/attraccess
       - VALKEY_URL=redis://valkey:6379
       - TZ=${TZ:-UTC}
       - LOG_LEVELS=${LOG_LEVELS:-error,warn,log}
@@ -39,10 +41,28 @@ services:
       retries: 5
       start_period: 30s
     depends_on:
+      postgres:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
       valkey:
         condition: service_healthy
+
+  postgres:
+    image: postgres:18.6-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=attraccess
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d attraccess']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   valkey:
     image: valkey/valkey:9-alpine
@@ -221,6 +241,7 @@ services:
 
 volumes:
   attraccess-storage:
+  postgres-data:
   valkey-data:
   rabbitmq-data:
   zigbee2mqtt-data:

@@ -1,17 +1,12 @@
 import { UserRoleSource } from '@attraccess/application-models';
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  ManyToOne,
-  JoinColumn,
-  CreateDateColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, Index, Unique } from 'typeorm';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { Role } from './role.entity';
 
+@Unique('UQ_user_role', ['userId', 'roleId', 'source'])
+@Index('IDX_user_role_role', ['roleId'])
+@Index('IDX_user_role_user', ['userId'])
 @Entity('user_role')
 export class UserRole {
   @PrimaryGeneratedColumn()
@@ -57,10 +52,10 @@ export class UserRole {
   })
   externalValue!: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })

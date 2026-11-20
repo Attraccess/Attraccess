@@ -10,14 +10,26 @@ import { ApiTokenRequestRateLimitService } from '../users-and-auth/auth/api-toke
 import { ApiTokenService } from '../users-and-auth/auth/api-token/api-token.service';
 import { SessionService } from '../users-and-auth/auth/session.service';
 import { RbacService } from '../users-and-auth/rbac/rbac.service';
+import { createTestDatabaseEnv } from '../test/test-database-env';
 
 export const MCP_ACCEPT = 'application/json, text/event-stream';
 
 /** The API-token rate limiter needs Valkey, which is not part of this test. Its own spec covers the limit. */
 const unlimitedApiTokenRequests = { assertWithinLimit: async () => undefined };
 
-/** Boots the real application (plugins disabled, temp SQLite) for MCP integration tests. */
+/** Boots the real application (plugins disabled, a private PostgreSQL database that `close()` drops) for MCP integration tests. */
 export async function startMcpTestApp(publicUrl: string) {
+  const databaseEnv = createTestDatabaseEnv();
+  await databaseEnv.setup();
+  try {
+    return await bootMcpTestApp(publicUrl, databaseEnv);
+  } catch (error) {
+    await databaseEnv.teardown();
+    throw error;
+  }
+}
+
+async function bootMcpTestApp(publicUrl: string, databaseEnv: ReturnType<typeof createTestDatabaseEnv>) {
   process.env.DISABLE_PLUGINS = 'true';
   process.env.AUTH_SESSION_SECRET ??= 'mcp-integration-session-secret-0123456789';
   // A developer's .env may point at a real Valkey; these tests run without one.
@@ -40,14 +52,17 @@ export async function startMcpTestApp(publicUrl: string) {
   configureBootstrapHttp(app, appConfig, logger);
   configureBootstrapApi(app, appConfig, logger);
   await app.init();
-  return new McpTestApp(app);
+  return new McpTestApp(app, databaseEnv);
 }
 
 export class McpTestApp {
   readonly db: DataSource;
   private counter = 0;
 
-  constructor(readonly app: NestExpressApplication) {
+  constructor(
+    readonly app: NestExpressApplication,
+    private readonly databaseEnv: ReturnType<typeof createTestDatabaseEnv>,
+  ) {
     this.db = app.get(DataSource);
   }
 
@@ -108,5 +123,6 @@ export class McpTestApp {
 
   async close() {
     await this.app.close();
+    await this.databaseEnv.teardown();
   }
 }

@@ -40,7 +40,7 @@ export class UsageAccessRules {
     }
 
     if (await this.resourceIntroductionService.hasValidIntroduction(resourceId, user.id, scope)) {
-      if (!(await this.resourceRetrainingService.isResourceIntroductionBlocked(resourceId, user.id))) {
+      if (!(await this.resourceRetrainingService.isResourceIntroductionBlocked(resourceId, user.id, scope))) {
         this.logger.debug(`User ${user.id} has valid introduction for resource ${resourceId}`);
         return true;
       }
@@ -60,7 +60,7 @@ export class UsageAccessRules {
           scope,
         )
       ) {
-        if (!(await this.resourceRetrainingService.isGroupIntroductionBlocked(group.id, user.id))) {
+        if (!(await this.resourceRetrainingService.isGroupIntroductionBlocked(group.id, user.id, scope))) {
           this.logger.debug(`User ${user.id} has valid group introduction for resource ${resourceId}`);
           return true;
         }

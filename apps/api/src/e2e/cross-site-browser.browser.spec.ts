@@ -9,7 +9,7 @@ import { ResourceType } from '@attraccess/application-models';
 import { bootstrap } from '../main.bootstrap';
 import { AUTH_COOKIE_NAME } from '../common/services/cookie-config.service';
 import { SessionService } from '../users-and-auth/auth/session.service';
-import { disposeStorage } from '../test/desktop-real-api.test-fixture';
+import { disposeStorage, provisionDatabase } from '../test/desktop-real-api.test-fixture';
 import { SESSION_SUBPROTOCOL } from '../attractap/security/session-framing';
 
 /**
@@ -52,6 +52,7 @@ describe('sibling website against a real API in headless Chromium', () => {
     // First-time setup state: no application URL is configured anywhere.
     delete process.env.ATTRACCESS_URL;
     process.env.ATTRACCESS_TRUSTED_ORIGINS = portalUrl;
+    await provisionDatabase();
     const boot = await bootstrap();
     app = boot.app;
     db = app.get(DataSource);
@@ -106,7 +107,7 @@ describe('sibling website against a real API in headless Chromium', () => {
     await step('app', async () => app?.close());
     await step('db', async () => (db?.isInitialized ? db.destroy() : undefined));
     delete process.env.ATTRACCESS_TRUSTED_ORIGINS;
-    disposeStorage();
+    await disposeStorage();
   }, 90_000);
 
   const cookieValue = async () => (await context.cookies(appUrl)).find((c) => c.name === AUTH_COOKIE_NAME)?.value;

@@ -28,13 +28,14 @@ import {
   UsageSessionStore,
 } from '../../../resources/usage/usage-session-store.port';
 import { sessionLimitOf } from '../../../resources/usage/sessions/active-usage';
-import { recoverOrphanedUsages } from '../../resource-usage-integrity';
+import { recoverOrphanedUsages } from '../../postgres/postgres-usage-recovery';
 import type { TransactionContext } from '../../transaction-context';
 import { EntityManagerResolver } from '../entity-manager-resolver';
 import { activeUsageWhere, countOccupiedSlots, findOccupyingUserIds } from './active-usage-queries';
 import { toUsageLifecycleAttempt, toUsageSession } from './usage-session-mapping';
 import { toResourceRecord } from '../resources/resource-mapping';
 import { findRelations } from '../find-options';
+import { RESOURCE_LOCK, lockResource } from '../resources/resource-locks';
 
 /** Relations of running sessions and of session details (exported for the mapping spec). */
 export const ACTIVE_RELATIONS = ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'];
@@ -60,8 +61,16 @@ const toSessionWithParties = (row: ResourceUsage): UsageSessionWithParties =>
 export class TypeOrmUsageSessionStore implements UsageSessionStore {
   constructor(private readonly managers: EntityManagerResolver) {}
 
+  /**
+   * The effective limit. Inside a unit of work this is the first read of every lifecycle transaction, so it also takes
+   * the per-resource lifecycle lock: starts, takeovers and capacity decisions of one resource queue behind each other
+   * and re-read the sessions the previous one committed (read committed), so simultaneous starts cannot exceed the
+   * limit or create a second session of one person. Other resources and plain reads are not blocked.
+   */
   async findSessionLimit(resourceId: number, context?: TransactionContext): Promise<number> {
-    const resource = await this.managers.resolve(context).findOne(Resource, {
+    const manager = this.managers.resolve(context);
+    if (context) await lockResource(manager, RESOURCE_LOCK.usageLifecycle, resourceId);
+    const resource = await manager.findOne(Resource, {
       where: { id: resourceId },
       select: { id: true, type: true, maxParallelSessions: true },
     });
@@ -288,14 +297,21 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     );
   }
 
+  /**
+   * Inside a unit of work the attempt row is locked (FOR UPDATE) until commit: the transactions that change an attempt
+   * (staging billing items from parallel flow branches, commit, abort, cancel, recovery) read it, decide and write it
+   * back one after the other, so none overwrites another's staged items or acts on an attempt another one removed.
+   * The query has no relations, so no outer join ends up under the lock.
+   */
   async findAttempt(
     attemptId: string,
     resourceId: number,
     context?: TransactionContext,
   ): Promise<UsageLifecycleAttempt | null> {
-    const attempt = await this.managers
-      .resolve(context)
-      .findOne(ResourceUsageLifecycleAttempt, { where: { id: attemptId, resourceId } });
+    const attempt = await this.managers.resolve(context).findOne(ResourceUsageLifecycleAttempt, {
+      where: { id: attemptId, resourceId },
+      ...(context ? { lock: { mode: 'pessimistic_write' as const } } : {}),
+    });
     return attempt && toAttempt(attempt);
   }
 
@@ -347,11 +363,15 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     return attempts.map(({ id, createdAt }) => ({ id, createdAt }));
   }
 
+  /** Locked like `findAttempt` inside a unit of work, in id order so two recoveries cannot deadlock each other. */
   async findAttemptsByIds(ids: string[], context?: TransactionContext): Promise<UsageLifecycleAttempt[]> {
     if (ids.length === 0) return [];
-    return (await this.managers.resolve(context).find(ResourceUsageLifecycleAttempt, { where: { id: In(ids) } })).map(
-      toAttempt,
-    );
+    const attempts = await this.managers.resolve(context).find(ResourceUsageLifecycleAttempt, {
+      where: { id: In(ids) },
+      order: { id: 'ASC' },
+      ...(context ? { lock: { mode: 'pessimistic_write' as const } } : {}),
+    });
+    return attempts.map(toAttempt);
   }
 
   async createPendingSession(
@@ -378,11 +398,10 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     if (draft.supervisorUserId !== undefined) usageData.supervisorUserId = draft.supervisorUserId;
     if (draft.projectId !== undefined) usageData.projectId = draft.projectId;
 
-    await manager.createQueryBuilder().insert().into(ResourceUsage).values(usageData).execute();
+    const { identifiers } = await manager.createQueryBuilder().insert().into(ResourceUsage).values(usageData).execute();
 
     const createdSession = await manager.findOne(ResourceUsage, {
-      where: { resourceId, userId, endTime: IsNull(), lifecyclePending: true },
-      order: { startTime: 'DESC' },
+      where: { id: identifiers[0].id as number },
       relations: { resource: true, user: true, project: true },
     });
     if (!createdSession) throw new Error('Failed to retrieve the newly created session.');
@@ -406,8 +425,11 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     return result.affected !== 0;
   }
 
-  async publishSession(usageId: number, context?: TransactionContext): Promise<void> {
-    await this.managers.resolve(context).update(ResourceUsage, usageId, { isFinalized: true, lifecyclePending: false });
+  async publishSession(usageId: number, context?: TransactionContext): Promise<boolean> {
+    const result = await this.managers
+      .resolve(context)
+      .update(ResourceUsage, { id: usageId, lifecyclePending: true }, { isFinalized: true, lifecyclePending: false });
+    return result.affected !== 0;
   }
 
   async endSessionIfOpen(
@@ -462,7 +484,8 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
       };
       const existing = await manager.findOne(BillingTransactionItem, { where });
       if (existing) {
-        await manager.update(BillingTransactionItem, existing.id, { quantity: existing.quantity + quantity });
+        // Atomic in the database: two attempts adding to the same line never lose an increment.
+        await manager.increment(BillingTransactionItem, { id: existing.id }, 'quantity', quantity);
       } else {
         await manager.save(BillingTransactionItem, { billingTransactionId: transaction.id, ...item, quantity });
       }

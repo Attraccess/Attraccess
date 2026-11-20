@@ -35,6 +35,44 @@ services:
       timeout: 3s
       retries: 3
 
+  # PostgreSQL: the only database of Attraccess. Not published, only the other services of the app reach it.
+  # Balena does not interpolate ${VAR} from device variables, so the credentials come from .env.docker-compose
+  # (POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB and DATABASE_URL for the API). Set POSTGRES_PASSWORD and
+  # DATABASE_URL (with the same password) as balena device variables (they override the file) BEFORE the first
+  # start: the password is fixed when the data volume is initialised. The settings below suit small devices
+  # (Raspberry Pi class, 1-2 GB RAM).
+  postgres:
+    image: 'postgres:18.6-alpine'
+    restart: unless-stopped
+    expose:
+      - '5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    command:
+      - postgres
+      - '-c'
+      - shared_buffers=64MB
+      - '-c'
+      - effective_cache_size=192MB
+      - '-c'
+      - work_mem=4MB
+      - '-c'
+      - maintenance_work_mem=32MB
+      - '-c'
+      - max_connections=50
+      - '-c'
+      - max_wal_size=512MB
+      - '-c'
+      - wal_compression=on
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    env_file:
+      - .env.docker-compose
+
   attraccess:
     restart: unless-stopped
     build:
@@ -50,8 +88,10 @@ services:
       - .env.docker-compose
     # Balena only supports the short-form depends_on (service_started); the
     # long-form `condition: service_healthy` is rejected (ATT-593-style). The app
-    # retries Valkey connections, and restart: unless-stopped covers startup races.
+    # retries the PostgreSQL and Valkey connections at startup, and
+    # restart: unless-stopped covers startup races.
     depends_on:
+      - postgres
       - valkey
 
   monitoring-init:
@@ -266,12 +306,21 @@ services:
     depends_on:
       - grafana
 
-  duplicati:
-    image: duplicati/duplicati:2.4.1.0-stable
-    expose:
-      - '8200'
+  # Scheduled restic backups of the database (pg_dump) and of the volumes below (docker/backup/README.md).
+  # Without BACKUP_REPOSITORY it logs one warning and idles. Configure with balena device variables:
+  # BACKUP_REPOSITORY, BACKUP_PASSWORD, the target's credentials (e.g. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY),
+  # optionally BACKUP_SCHEDULE (cron, default '0 3 * * *') and BACKUP_KEEP_DAILY/WEEKLY/MONTHLY (7/4/6).
+  # One repository per device: BACKUP_REPOSITORY as a fleet variable would share it; then set BACKUP_HOST per device.
+  # Restore (stop the other services first): `docker compose run --rm backup restore [snapshot]`, on a balena device
+  # `balena-engine exec -it <backup container> attraccess-backup restore [snapshot]`.
+  # The volumes are mounted writable only because `restore` writes them back; a backup run only reads them.
+  backup:
+    build:
+      context: ./docker/backup
+      dockerfile: Dockerfile
+    restart: unless-stopped
     volumes:
-      - duplicati:/data
+      - backup-state:/var/lib/backup
       # mount volumes of all services that should be backed up
       - proxy-data:/external-storage/proxy/data
       - proxy-letsencrypt:/external-storage/proxy/letsencrypt
@@ -282,10 +331,14 @@ services:
       - prometheus-data:/external-storage/prometheus
       - grafana-data:/external-storage/grafana
       - config-ui-data:/external-storage/config-ui
+    depends_on:
+      - postgres
     env_file:
       - .env.docker-compose
 
 volumes:
+  postgres-data:
+  backup-state:
   proxy-data:
   proxy-letsencrypt:
   attraccess-storage:
@@ -299,4 +352,3 @@ volumes:
   grafana-data:
   grafana-provisioning:
   grafana-dashboards:
-  duplicati:

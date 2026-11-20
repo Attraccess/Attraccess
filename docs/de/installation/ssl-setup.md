@@ -11,7 +11,7 @@ Die einfachste Methode ist ein Reverse Proxy, der SSL-Zertifikate automatisch ü
 
 Nginx Proxy Manager bietet eine grafische Oberfläche zur Verwaltung von Proxy-Hosts und SSL-Zertifikaten.
 
-Fügen Sie den Dienst zu Ihrer `docker-compose.yml` hinzu:
+Fügen Sie den Proxy zu Ihrer `docker-compose.yml` hinzu (die Dienste `attraccess` und `postgres` sind die aus der [Docker-Compose-Installation](installation/docker-compose.md)):
 
 ```yaml
 services:
@@ -23,6 +23,26 @@ services:
       - attraccess-storage:/app/storage
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgres://attraccess:${POSTGRES_PASSWORD}@postgres:5432/attraccess
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:18.6-alpine
+    environment:
+      POSTGRES_USER: attraccess
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: attraccess
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U attraccess -d attraccess"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   proxy:
@@ -38,6 +58,7 @@ services:
 
 volumes:
   attraccess-storage:
+  postgres-data:
   proxy-data:
   proxy-letsencrypt:
 ```
@@ -57,7 +78,7 @@ volumes:
 
 ### Traefik
 
-Falls Sie Traefik bevorzugen, fügen Sie Labels zum Attraccess-Container hinzu:
+Falls Sie Traefik bevorzugen, fügen Sie Labels zum Attraccess-Container derselben Compose-Datei hinzu (der Dienst `postgres`, `DATABASE_URL` und `depends_on` bleiben erhalten):
 
 ```yaml
 services:

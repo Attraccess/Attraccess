@@ -1,31 +1,34 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {
   DEFAULT_DATABASE_TYPE,
   SUPPORTED_DATABASE_TYPES,
+  describeLocation,
+  isLocalHost,
   parseDatabaseType,
+  postgresProvider,
   resolveDatabaseProvider,
-  sqliteProvider,
+  resolveSsl,
+  toPositionalParameters,
 } from './lib/database-provider.mjs';
+import { createTestDatabase, skipWithoutPostgres } from './lib/test-postgres.mjs';
 
 const provider = path.resolve('apps/api/scripts/lib/database-provider.mjs');
 const seed = path.resolve('apps/api/scripts/seed-dev-user.mjs');
 const reencrypt = path.resolve('apps/api/scripts/reencrypt-card-keys.mjs');
 const cleanEnv = (extra) => ({ PATH: process.env.PATH, ...extra });
 
-test('defaults to sqlite, accepts it case-insensitively and rejects everything else by name', () => {
-  assert.equal(DEFAULT_DATABASE_TYPE, 'sqlite');
-  assert.deepEqual(SUPPORTED_DATABASE_TYPES, ['sqlite']);
-  assert.equal(parseDatabaseType({}), 'sqlite');
-  assert.equal(parseDatabaseType({ DATABASE_TYPE: ' SQLite ' }), 'sqlite');
-  assert.equal(resolveDatabaseProvider({}), sqliteProvider);
+test('defaults to postgres, accepts it case-insensitively and rejects everything else by name', () => {
+  assert.equal(DEFAULT_DATABASE_TYPE, 'postgres');
+  assert.deepEqual(SUPPORTED_DATABASE_TYPES, ['postgres']);
+  assert.equal(parseDatabaseType({}), 'postgres');
+  assert.equal(parseDatabaseType({ DATABASE_TYPE: ' PostgreS ' }), 'postgres');
+  assert.equal(resolveDatabaseProvider({}), postgresProvider);
   assert.throws(
-    () => parseDatabaseType({ DATABASE_TYPE: 'postgres' }),
-    /Unsupported DATABASE_TYPE "postgres"\. Supported values: sqlite\./,
+    () => parseDatabaseType({ DATABASE_TYPE: 'sqlite' }),
+    /Unsupported DATABASE_TYPE "sqlite"\. Supported values: postgres\./,
   );
   assert.throws(() => parseDatabaseType({ DATABASE_TYPE: 'toString' }), /Unsupported DATABASE_TYPE/);
 });
@@ -37,64 +40,107 @@ test('does not echo a value that is not a plain database type name', () => {
   );
 });
 
-test('sqlite provider resolves the database next to the storage root like the API', () => {
+test('the default location is DATABASE_URL and it is required', () => {
   assert.equal(
-    sqliteProvider.defaultLocation({ STORAGE_ROOT: 'data' }, '/srv/app'),
-    path.join('/srv/app', 'data', 'attraccess.sqlite'),
+    postgresProvider.defaultLocation({ DATABASE_URL: ' postgres://u:p@h:5432/d ' }),
+    'postgres://u:p@h:5432/d',
   );
-  assert.equal(sqliteProvider.defaultLocation({}, '/srv/app'), path.join('/srv/app', 'storage', 'attraccess.sqlite'));
+  assert.throws(() => postgresProvider.defaultLocation({}), /DATABASE_URL is required/);
 });
 
-test('sqlite provider runs statements, transactions and schema inspection', async () => {
-  const db = await sqliteProvider.open(':memory:');
-  try {
-    await sqliteProvider.run(db, 'CREATE TABLE item (id INTEGER PRIMARY KEY, name TEXT)');
-    assert.equal(await sqliteProvider.hasTable(db, 'item'), true);
-    assert.equal(await sqliteProvider.hasTable(db, 'missing'), false);
-    assert.deepEqual(await sqliteProvider.columns(db, 'item'), ['id', 'name']);
-    await sqliteProvider.begin(db, { writeLock: true });
-    const { lastID } = await sqliteProvider.run(db, 'INSERT INTO item (name) VALUES (?)', ['a']);
-    assert.equal(lastID, 1);
-    await sqliteProvider.rollback(db);
-    assert.deepEqual(await sqliteProvider.all(db, 'SELECT * FROM item'), []);
-    await sqliteProvider.begin(db);
-    await sqliteProvider.run(db, 'INSERT INTO item (name) VALUES (?)', ['b']);
-    await sqliteProvider.commit(db);
-    assert.deepEqual(await sqliteProvider.get(db, 'SELECT name FROM item'), { name: 'b' });
-  } finally {
-    await sqliteProvider.close(db);
+test('converts ? placeholders but leaves quoted question marks alone', () => {
+  assert.equal(
+    toPositionalParameters('SELECT a FROM t WHERE b = ? AND c = ?'),
+    'SELECT a FROM t WHERE b = $1 AND c = $2',
+  );
+  assert.equal(
+    toPositionalParameters('SELECT \'?\' , "a?" FROM t WHERE x = ?'),
+    'SELECT \'?\' , "a?" FROM t WHERE x = $1',
+  );
+});
+
+test('reads DATABASE_SSL with the values and meaning the API gives it', () => {
+  for (const off of [undefined, '', ' ', 'off', 'false', '0', 'disable', 'OFF']) {
+    assert.equal(resolveSsl({ DATABASE_SSL: off }), undefined, `DATABASE_SSL=${off}`);
+  }
+  for (const require of ['true', '1', 'require', ' Require ']) {
+    assert.deepEqual(resolveSsl({ DATABASE_SSL: require }), { rejectUnauthorized: false }, `DATABASE_SSL=${require}`);
+  }
+  // verify-ca checks the chain, not the host name; verify-full checks both.
+  const verifyCa = resolveSsl({ DATABASE_SSL: 'verify-ca' });
+  assert.equal(verifyCa.rejectUnauthorized, true);
+  assert.equal(verifyCa.checkServerIdentity(), undefined);
+  assert.deepEqual(resolveSsl({ DATABASE_SSL: 'verify-full' }), { rejectUnauthorized: true });
+  for (const refused of ['no', 'yes', 'on', 'prefer', 'verify', 'postgres://u:secret@h/db']) {
+    assert.throws(
+      () => resolveSsl({ DATABASE_SSL: refused }),
+      (error) =>
+        /DATABASE_SSL must be one of off, require, verify-ca, verify-full/.test(error.message) &&
+        !error.message.includes('secret'),
+      `DATABASE_SSL=${refused}`,
+    );
   }
 });
+
+test('reads the location of a connection URL without leaking credentials', () => {
+  assert.deepEqual(describeLocation('postgres://u:secret@db.example:5432/my%20db'), {
+    host: 'db.example',
+    database: 'my db',
+  });
+  assert.throws(
+    () => describeLocation('not a url with secret'),
+    (error) => !error.message.includes('secret'),
+  );
+  assert.equal(isLocalHost('127.0.0.1'), true);
+  assert.equal(isLocalHost('db.example'), false);
+});
+
+test(
+  'postgres provider runs statements, transactions and schema inspection',
+  { skip: skipWithoutPostgres },
+  async (t) => {
+    const created = await createTestDatabase('attraccess_provider_test');
+    t.after(() => created.drop());
+    const db = await postgresProvider.open(created.url);
+    try {
+      await postgresProvider.run(db, 'CREATE TABLE item (id SERIAL PRIMARY KEY, name text, "camelCase" integer)');
+      assert.equal(await postgresProvider.hasTable(db, 'item'), true);
+      assert.equal(await postgresProvider.hasTable(db, 'missing'), false);
+      assert.deepEqual(await postgresProvider.columns(db, 'item'), ['id', 'name', 'camelCase']);
+      await postgresProvider.begin(db);
+      const { lastID } = await postgresProvider.run(db, 'INSERT INTO item (name) VALUES (?) RETURNING id', ['a']);
+      assert.equal(lastID, 1);
+      await postgresProvider.rollback(db);
+      assert.deepEqual(await postgresProvider.all(db, 'SELECT * FROM item'), []);
+      await postgresProvider.begin(db);
+      await postgresProvider.run(db, 'INSERT INTO item (name) VALUES (?)', ['b']);
+      await postgresProvider.commit(db);
+      assert.deepEqual(await postgresProvider.get(db, 'SELECT name FROM item'), { name: 'b' });
+    } finally {
+      await postgresProvider.close(db);
+    }
+  },
+);
 
 test('the provider CLI validates DATABASE_TYPE for the shell setup scripts', () => {
   const ok = spawnSync(process.execPath, [provider], { env: cleanEnv({}), encoding: 'utf8' });
   assert.equal(ok.status, 0);
-  assert.equal(ok.stdout.trim(), 'sqlite');
+  assert.equal(ok.stdout.trim(), 'postgres');
   const bad = spawnSync(process.execPath, [provider], { env: cleanEnv({ DATABASE_TYPE: 'oracle' }), encoding: 'utf8' });
   assert.equal(bad.status, 1);
   assert.match(bad.stderr, /Unsupported DATABASE_TYPE "oracle"/);
 });
 
 test('the seed and re-encryption commands refuse an unsupported DATABASE_TYPE before touching any database', () => {
-  const directory = mkdtempSync(path.join(tmpdir(), 'attraccess-provider-test-'));
-  try {
-    const storage = path.join(directory, 'storage');
-    const database = path.join(directory, 'x.sqlite');
-    const env = cleanEnv({
-      DATABASE_TYPE: 'oracle',
-      STORAGE_ROOT: storage,
-      OLD_AUTH_SESSION_SECRET: 'old',
-      NEW_AUTH_SESSION_SECRET: 'new',
-    });
-    const seeded = spawnSync(process.execPath, [seed, '--db', database], { env, encoding: 'utf8' });
-    assert.notEqual(seeded.status, 0);
-    assert.match(seeded.stderr, /Unsupported DATABASE_TYPE "oracle"/);
-    const reencrypted = spawnSync(process.execPath, [reencrypt, '--db', database], { env, encoding: 'utf8' });
-    assert.notEqual(reencrypted.status, 0);
-    assert.match(reencrypted.stderr, /Unsupported DATABASE_TYPE "oracle"/);
-    assert.equal(existsSync(database), false);
-    assert.equal(existsSync(storage), false);
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
+  const env = cleanEnv({
+    DATABASE_TYPE: 'oracle',
+    DATABASE_URL: 'postgres://u:p@127.0.0.1:1/none',
+    OLD_AUTH_SESSION_SECRET: 'old',
+    NEW_AUTH_SESSION_SECRET: 'new',
+  });
+  for (const script of [seed, reencrypt]) {
+    const result = spawnSync(process.execPath, [script], { env, encoding: 'utf8' });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Unsupported DATABASE_TYPE "oracle"/);
   }
 });

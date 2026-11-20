@@ -85,7 +85,7 @@ describe('DbMetricsInstrumentation', () => {
     const { instrumentation, dataSource, driver, registry } = setup();
     instrumentation.install(dataSource);
 
-    await makeRunner(driver).query('SELECT * FROM "user" WHERE "id" = ?', [1]);
+    await makeRunner(driver).query('SELECT * FROM "user" WHERE "id" = $1', [1]);
 
     const text = await registry.metrics();
     expect(text).toContain('attraccess_db_query_duration_seconds_count{entity="user",method="select"} 1');
@@ -95,7 +95,7 @@ describe('DbMetricsInstrumentation', () => {
     const { instrumentation, dataSource, driver, registry } = setup();
     instrumentation.install(dataSource);
 
-    await makeRunner(driver).query('INSERT INTO "session" ("id") VALUES (?)', [1]);
+    await makeRunner(driver).query('INSERT INTO "session" ("id") VALUES ($1)', [1]);
 
     const text = await registry.metrics();
     expect(text).toContain('attraccess_db_query_duration_seconds_count{entity="session",method="insert"} 1');
@@ -105,7 +105,7 @@ describe('DbMetricsInstrumentation', () => {
     const { instrumentation, dataSource, driver, registry } = setup();
     instrumentation.install(dataSource);
 
-    await makeRunner(driver).query('UPDATE "resource" SET "name" = ? WHERE "id" = ?', ['x', 1]);
+    await makeRunner(driver).query('UPDATE "resource" SET "name" = $1 WHERE "id" = $2', ['x', 1]);
 
     const text = await registry.metrics();
     expect(text).toContain('attraccess_db_query_duration_seconds_count{entity="resource",method="update"} 1');
@@ -115,19 +115,19 @@ describe('DbMetricsInstrumentation', () => {
     const { instrumentation, dataSource, driver, registry } = setup();
     instrumentation.install(dataSource);
 
-    await makeRunner(driver).query('DELETE FROM "session" WHERE "id" = ?', [1]);
+    await makeRunner(driver).query('DELETE FROM "session" WHERE "id" = $1', [1]);
 
     const text = await registry.metrics();
     expect(text).toContain('attraccess_db_query_duration_seconds_count{entity="session",method="delete"} 1');
   });
 
-  it('skips housekeeping verbs (BEGIN, COMMIT, PRAGMA, ...)', async () => {
+  it('skips housekeeping verbs (BEGIN, COMMIT, SAVEPOINT, ...)', async () => {
     const { instrumentation, dataSource, driver, registry } = setup();
     instrumentation.install(dataSource);
 
     await makeRunner(driver).query('BEGIN TRANSACTION');
     await makeRunner(driver).query('COMMIT');
-    await makeRunner(driver).query('PRAGMA foreign_keys = ON');
+    await makeRunner(driver).query('SAVEPOINT audit_sp');
 
     const text = await registry.metrics();
     expect(text).not.toMatch(/attraccess_db_query_duration_seconds_count\{/);
@@ -162,16 +162,14 @@ describe('DbMetricsInstrumentation', () => {
   });
 
   it('records error and observes duration when query throws', async () => {
-    const queryImpl = () => Promise.reject(Object.assign(new Error('boom'), { code: 'SQLITE_BUSY' }));
+    const queryImpl = () => Promise.reject(Object.assign(new Error('boom'), { code: '40P01' }));
     const { instrumentation, dataSource, driver, registry } = setup({ queryImpl });
     instrumentation.install(dataSource);
 
     await expect(makeRunner(driver).query('SELECT * FROM "user"')).rejects.toThrow('boom');
 
     const text = await registry.metrics();
-    expect(text).toContain(
-      'attraccess_db_query_errors_total{entity="user",method="select",error_type="SQLITE_BUSY"} 1',
-    );
+    expect(text).toContain('attraccess_db_query_errors_total{entity="user",method="select",error_type="40P01"} 1');
     expect(text).toContain('attraccess_db_query_duration_seconds_count{entity="user",method="select"} 1');
   });
 
@@ -183,7 +181,7 @@ describe('DbMetricsInstrumentation', () => {
       expect(parseSql('SELECT * FROM resource')).toEqual({ method: 'select', entity: 'resource', observable: true });
     });
     it('parses INSERT', () => {
-      expect(parseSql('INSERT INTO "session" ("id") VALUES (?)')).toEqual({
+      expect(parseSql('INSERT INTO "session" ("id") VALUES ($1)')).toEqual({
         method: 'insert',
         entity: 'session',
         observable: true,
@@ -193,7 +191,7 @@ describe('DbMetricsInstrumentation', () => {
       expect(parseSql('UPDATE "user" SET "name" = ?')).toEqual({ method: 'update', entity: 'user', observable: true });
     });
     it('parses DELETE FROM', () => {
-      expect(parseSql('DELETE FROM "user" WHERE "id" = ?')).toEqual({
+      expect(parseSql('DELETE FROM "user" WHERE "id" = $1')).toEqual({
         method: 'delete',
         entity: 'user',
         observable: true,
@@ -202,11 +200,11 @@ describe('DbMetricsInstrumentation', () => {
     it('marks BEGIN as not observable', () => {
       expect(parseSql('BEGIN TRANSACTION').observable).toBe(false);
     });
-    it('marks PRAGMA as not observable', () => {
-      expect(parseSql('PRAGMA foreign_keys = ON').observable).toBe(false);
+    it('marks SAVEPOINT as not observable', () => {
+      expect(parseSql('SAVEPOINT audit_sp').observable).toBe(false);
     });
     it('treats REPLACE INTO as insert', () => {
-      expect(parseSql('REPLACE INTO "user" ("id") VALUES (?)')).toEqual({
+      expect(parseSql('REPLACE INTO "user" ("id") VALUES ($1)')).toEqual({
         method: 'insert',
         entity: 'user',
         observable: true,

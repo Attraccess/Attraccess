@@ -16,14 +16,14 @@ export class StorageParams {
   readonly values: unknown[] = [];
   constructor(private readonly dialect: PluginStorageDialect) {}
 
-  add(value: unknown): string {
+  add(value: unknown, field?: CompiledField): string {
     if (this.values.length >= this.dialect.maxParameters) {
       throw new PluginStorageInvalid(
         `A storage call binds at most ${this.dialect.maxParameters} values; split long in/notIn lists.`,
       );
     }
     this.values.push(value);
-    return this.dialect.placeholder(this.values.length);
+    return this.dialect.placeholder(this.values.length, field);
   }
 }
 
@@ -59,7 +59,7 @@ class Compiler {
   }
 
   private bind(field: CompiledField, operand: FilterOperand): string {
-    return this.params.add(this.dialect.encode(field, operand.value));
+    return this.params.add(this.dialect.encode(field, operand.value), field);
   }
 
   private requireOrderable(field: CompiledField, operator: string): void {

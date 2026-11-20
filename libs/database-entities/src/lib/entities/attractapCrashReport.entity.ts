@@ -33,7 +33,7 @@ export class AttractapCrashReport {
   })
   rebootReason!: string | null;
 
-  @Column({ type: 'integer', nullable: true })
+  @Column({ type: 'bigint', nullable: true })
   @ApiProperty({
     description: 'Free heap in bytes captured before the freeze/reset',
     example: 48213,
@@ -41,7 +41,7 @@ export class AttractapCrashReport {
   })
   heapFreeBytes!: number | null;
 
-  @Column({ type: 'integer', nullable: true })
+  @Column({ type: 'bigint', nullable: true })
   @ApiProperty({
     description: 'Largest contiguous free heap block in bytes before the freeze/reset',
     example: 20480,
@@ -49,7 +49,7 @@ export class AttractapCrashReport {
   })
   largestFreeBlockBytes!: number | null;
 
-  @Column({ type: 'integer', nullable: true })
+  @Column({ type: 'bigint', nullable: true })
   @ApiProperty({
     description: 'Uptime in milliseconds before the reset occurred',
     example: 372000,
@@ -81,7 +81,7 @@ export class AttractapCrashReport {
   })
   firmwareVersion!: string | null;
 
-  @Column({ type: 'integer', nullable: true })
+  @Column({ type: 'bigint', nullable: true })
   @ApiProperty({
     description: 'Size of the attached coredump blob in bytes, if any',
     example: 16384,
@@ -99,7 +99,7 @@ export class AttractapCrashReport {
   })
   coredumpStatus!: CoredumpStatus | null;
 
-  @Column({ type: 'integer', nullable: true })
+  @Column({ type: 'bigint', nullable: true })
   @ApiProperty({
     description: 'Size in bytes of the coredump the reader announced for a chunked upload',
     example: 43776,
@@ -108,11 +108,11 @@ export class AttractapCrashReport {
   coredumpExpectedSize!: number | null;
 
   /** zlib CRC-32 the reader announced; a restarted upload must declare the same dump. */
-  @Column({ type: 'integer', nullable: true })
+  @Column({ type: 'bigint', nullable: true })
   @Exclude()
   coredumpExpectedCrc32!: number | null;
 
-  @Column({ type: 'blob', nullable: true, select: false })
+  @Column({ type: 'bytea', nullable: true, select: false })
   @Exclude()
   coredump!: Buffer | null;
 
@@ -141,7 +141,7 @@ export class AttractapCrashReport {
   })
   symbolizedBacktrace!: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When this crash report was received by the server',
     example: '2026-06-02T12:00:00.000Z',

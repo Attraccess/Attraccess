@@ -38,7 +38,7 @@ export class PluginReaderEntity {
   @Column({ type: 'text' })
   name!: string;
 
-  @Column({ type: 'simple-json' })
+  @Column({ type: 'jsonb' })
   capabilities!: PluginReaderCapabilitiesColumn;
 
   @Column({ type: 'integer', nullable: true })
@@ -48,9 +48,9 @@ export class PluginReaderEntity {
   @JoinColumn({ name: 'resourceId' })
   resource?: Resource | null;
 
-  @CreateDateColumn({ type: 'datetime' })
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn({ type: 'datetime' })
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
 }

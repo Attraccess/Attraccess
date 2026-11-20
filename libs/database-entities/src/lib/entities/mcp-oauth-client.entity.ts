@@ -9,12 +9,12 @@ export class McpOAuthClient {
   @Column({ type: 'text' })
   clientName!: string;
 
-  @Column({ type: 'simple-json' })
+  @Column({ type: 'jsonb' })
   redirectUris!: string[];
 
   @Column({ type: 'text', nullable: true })
   registeredIp!: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }

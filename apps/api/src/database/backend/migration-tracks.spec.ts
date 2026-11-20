@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { sqliteBackend } from '../sqlite/sqlite-backend';
+import { postgresBackend } from '../postgres/postgres-backend';
 import { DEFAULT_DATABASE_TYPE, SUPPORTED_DATABASE_TYPES } from './database-backend';
 
 interface MigrationTracks {
@@ -20,24 +20,24 @@ describe('migration track selection for the migration datasource build', () => {
   });
 
   it('points every track at the directory its backend declares, and that directory exists', () => {
-    expect(tracks.MIGRATION_TRACK_DIRECTORIES.sqlite).toBe(sqliteBackend.migrationTrack.directory);
+    expect(tracks.MIGRATION_TRACK_DIRECTORIES.postgres).toBe(postgresBackend.migrationTrack.directory);
     for (const directory of Object.values(tracks.MIGRATION_TRACK_DIRECTORIES)) {
       expect(existsSync(join(repositoryRoot, directory, 'index.ts'))).toBe(true);
     }
   });
 
-  it('selects the sqlite track by default and case-insensitively', () => {
-    expect(tracks.resolveMigrationTrack({}).type).toBe('sqlite');
-    expect(tracks.resolveMigrationTrack({ DATABASE_TYPE: '  ' }).type).toBe('sqlite');
-    expect(tracks.resolveMigrationTrack({ DATABASE_TYPE: 'SQLite' })).toEqual({
-      type: 'sqlite',
-      directory: sqliteBackend.migrationTrack.directory,
+  it('selects the postgres track by default and case-insensitively', () => {
+    expect(tracks.resolveMigrationTrack({}).type).toBe('postgres');
+    expect(tracks.resolveMigrationTrack({ DATABASE_TYPE: '  ' }).type).toBe('postgres');
+    expect(tracks.resolveMigrationTrack({ DATABASE_TYPE: 'PostgreS' })).toEqual({
+      type: 'postgres',
+      directory: postgresBackend.migrationTrack.directory,
     });
   });
 
   it('rejects an unsupported type without echoing anything that is not a plain name', () => {
-    expect(() => tracks.resolveMigrationTrack({ DATABASE_TYPE: 'postgres' })).toThrow(
-      'Unsupported DATABASE_TYPE "postgres". Supported values: sqlite.',
+    expect(() => tracks.resolveMigrationTrack({ DATABASE_TYPE: 'sqlite' })).toThrow(
+      'Unsupported DATABASE_TYPE "sqlite". Supported values: postgres.',
     );
     expect(() => tracks.resolveMigrationTrack({ DATABASE_TYPE: 'postgres://user:secret@host/db' })).toThrow(
       /\(redacted: not a database type name\)/,
@@ -66,14 +66,16 @@ describe('migration track selection for the migration datasource build', () => {
     };
     const root = (file: string) => join(repositoryRoot, file);
 
-    it('builds the sqlite track as entries of the datasource bundle', () => {
+    it('builds the postgres track as entries of the datasource bundle', () => {
       const previousCwd = process.cwd();
       process.chdir(repositoryRoot);
       try {
-        const { entry } = loadConfig('sqlite');
+        const { entry } = loadConfig('postgres');
         expect(entry.main).toBe('./apps/api/src/database/datasource.ts');
-        expect(entry['./migrations/index.ts']).toBe('apps/api/src/database/migrations/index.ts');
-        expect(entry['./migrations/1741283322250-init.ts']).toBeDefined();
+        expect(entry['./postgres/migrations/index.ts']).toBe('apps/api/src/database/postgres/migrations/index.ts');
+        expect(entry['./postgres/migrations/1760000000000-baseline.ts']).toBeDefined();
+        // The frozen SQLite track is not a migration track of the build: it only runs on a copy during the import.
+        expect(Object.keys(entry).some((key) => key.startsWith('./migrations/'))).toBe(false);
       } finally {
         process.chdir(previousCwd);
       }
@@ -81,6 +83,7 @@ describe('migration track selection for the migration datasource build', () => {
 
     it('fails the build before compiling anything when DATABASE_TYPE is not supported', () => {
       expect(() => loadConfig('oracle')).toThrow('Unsupported DATABASE_TYPE "oracle"');
+      expect(() => loadConfig('sqlite')).toThrow('Unsupported DATABASE_TYPE "sqlite"');
     });
 
     it('keeps the nx cache of the migration datasource per database type', () => {

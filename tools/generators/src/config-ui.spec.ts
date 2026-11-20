@@ -146,9 +146,9 @@ describe('config-ui', () => {
       expect(volumesSection).toContain('prometheus-config:');
     });
 
-    it('should include config-ui-data in duplicati backup volumes', () => {
-      const duplicatiSection = extractServiceBlock(content, 'duplicati');
-      expect(duplicatiSection).toContain('config-ui-data:/external-storage/config-ui');
+    it('should include config-ui-data in the backup volumes', () => {
+      const backupSection = extractServiceBlock(content, 'backup');
+      expect(backupSection).toContain('config-ui-data:/external-storage/config-ui');
     });
 
     it('should define a prometheus service that depends_on config-ui', () => {

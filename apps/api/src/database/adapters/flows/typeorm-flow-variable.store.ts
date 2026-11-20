@@ -10,6 +10,9 @@ import {
 import type { FlowVariableKey, FlowVariableStore } from '../../../resources/flows/flow-variable-store.port';
 import { toVariableRecord } from './flow-mappers';
 
+/** Advisory lock namespace (first key) of flow variable writes. */
+const FLOW_VARIABLE_LOCK = 584_303;
+
 @Injectable()
 export class TypeOrmFlowVariableStore implements FlowVariableStore {
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
@@ -59,15 +62,26 @@ export class TypeOrmFlowVariableStore implements FlowVariableStore {
     valueType: ResourceFlowVariableValueType,
     existing: FlowVariableRecord | null,
   ): Promise<FlowVariableRecord> {
-    const row = await this.repository.save({
-      ...(existing ?? {}),
-      scope,
-      resourceId,
-      key,
-      value: serializedValue,
-      valueType,
+    // A variable has no unique key a database could enforce (global ones have a NULL resourceId), so concurrent first
+    // writes of one variable queue on an advisory lock and the later one updates the row the earlier one created.
+    return this.dataSource.transaction(async (manager) => {
+      await manager.query('SELECT pg_advisory_xact_lock($1, hashtext($2))', [
+        FLOW_VARIABLE_LOCK,
+        `${scope}:${resourceId ?? ''}:${key}`,
+      ]);
+      const repository = manager.getRepository(ResourceFlowVariable);
+      const current =
+        existing ?? (await repository.findOne({ where: { scope, resourceId: resourceId ?? IsNull(), key } }));
+      const row = await repository.save({
+        ...(current ?? {}),
+        scope,
+        resourceId,
+        key,
+        value: serializedValue,
+        valueType,
+      });
+      return toVariableRecord(row as ResourceFlowVariable);
     });
-    return toVariableRecord(row as ResourceFlowVariable);
   }
 
   async delete({ scope, resourceId, key }: FlowVariableKey): Promise<boolean> {

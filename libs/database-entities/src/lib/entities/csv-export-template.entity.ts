@@ -65,18 +65,18 @@ export class CsvExportTemplate {
   })
   exportType!: CsvExportType;
 
-  @Column({ type: 'json' })
+  @Column({ type: 'jsonb' })
   @ApiProperty({
     description: 'The ordered column configuration of the template',
     type: [CsvExportTemplateColumn],
   })
   columns!: CsvExportTemplateColumn[];
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'When the template was created' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'When the template was last updated' })
   updatedAt!: Date;
 }

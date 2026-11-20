@@ -180,11 +180,13 @@ Grenzen übernommener Tabellen:
 - `f.decimal` ist an einer übernommenen Tabelle nicht erlaubt (1.x hat Dezimalzahlen anders gespeichert). Behalten Sie
   eine solche Spalte so, wie sie gespeichert ist, etwa als `f.string()`, oder kopieren Sie sie in eine neue Tabelle
   (siehe unten).
-- Unter SQLite darf eine spätere Version keinen `UNIQUE`-Constraint aus 1.x entfernen und keine Spalte, die ein
-  `UNIQUE`- oder `CHECK`-Constraint aus 1.x abdeckt: Dafür müsste die Tabelle neu aufgebaut werden, was der Host noch
-  nicht tut. Die Migration wird abgelehnt.
 - Es gibt keinen Binärtyp. Eine 1.x-Spalte vom Typ `blob`, als `f.text()` deklariert, liest sich als Base64-Text;
   schreiben Sie ebenfalls Base64.
+- Ein Schritt, der einen Index löscht, hinter dem ein Constraint steht (ein UNIQUE-Constraint oder der Primärschlüssel),
+  wird beim Ausführen der Migration abgelehnt. Ebenso ein Schritt, der eine Spalte löscht, die Teil eines Index oder
+  Schlüssels ist oder die ein UNIQUE-, CHECK- oder Fremdschlüssel-Constraint nutzt. PostgreSQL würde diese mit
+  entfernen. Nichts wird geändert. Um ein solches Layout hinter sich zu lassen, kopieren Sie die Zeilen in eine neue
+  Tabelle (siehe unten).
 
 **1.x-Namen, die der Host ablehnt.** Ist ein 1.x-Tabellenname einer der oben verbotenen Namen, lässt sich die Tabelle
 nicht deklarieren; ein 2.0-Build kann sie dann weder lesen noch übernehmen noch löschen. Wenden Sie sich an die
@@ -296,10 +298,11 @@ Die Fehler sind neutral und auf jeder Engine gleich; alle erweitern `PluginStora
 committet, wenn `work` abschließt, und zurückgerollt, wenn es wirft. Geben Sie `{ scope }` an jeden Speicheraufruf (und
 an Host-Ports, die einen Scope annehmen, etwa `hostData.resources.get(id, scope)`), der teilnehmen soll.
 
-**Der Vertrag:** Der Host ordnet gleichzeitige Transaktionen oder lässt eine davon mit `PluginStorageConflict`
-scheitern, die dann zurückgerollt wird. Ein Prüfen-dann-Schreiben-Ablauf innerhalb einer Transaktion lässt sich daher
-nicht überholen. Der Host wiederholt **nicht**: Halten Sie externe Effekte in `scope.afterCommit`, damit der Aufrufer
-die ganze Transaktion nach einem Konflikt gefahrlos erneut ausführen kann.
+**Der Vertrag:** Der Host ordnet gleichzeitige Transaktionen Ihres Plugins (eine läuft nach der anderen) oder lässt
+eine davon mit `PluginStorageConflict` scheitern, die dann zurückgerollt wird. Ein Prüfen-dann-Schreiben-Ablauf
+innerhalb einer Transaktion lässt sich daher nicht überholen. Ein Schreibvorgang ohne Scope ist eine eigene
+Transaktion und wird genauso eingeordnet. Der Host wiederholt **nicht**: Halten Sie externe Effekte in
+`scope.afterCommit`, damit der Aufrufer die ganze Transaktion nach einem Konflikt gefahrlos erneut ausführen kann.
 
 ```ts
 await context.persistence.transaction(async (scope) => {
@@ -320,9 +323,14 @@ Regeln:
   abgewiesen. Nur ein Lesezugriff ohne Scope läuft außerhalb der Transaktion, und er sieht die noch nicht committeten
   Schreibvorgänge von `work` **nicht**.
 - In `work` nicht auf Kern-Vorgänge warten, die schreiben (Sitzungsstart oder -ende).
-- Wie der Host Transaktionen ordnet, ist ein Detail der Engine. Unter SQLite führt er sie pro Host-Prozess nacheinander
-  aus; Ausschluss über mehrere API-Instanzen braucht daher eine eigene Sperre. Das Reservierungs-Plugin läuft deshalb
-  mit einer Instanz (siehe [Reservierungen](plugins/reservations/administration.md#betrieb-mit-einer-instanz)).
+- Wie der Host Transaktionen ordnet, ist ein Detail der Engine. Unter PostgreSQL nimmt jede Transaktion eines Plugins
+  zuerst eine Sperre dieses Plugins in der Datenbank (ein Advisory Lock auf Transaktionsebene), daher gilt die
+  Reihenfolge auch über mehrere API-Instanzen hinweg. Arbeit des Kerns und andere Plugins warten nicht darauf. Eine
+  Transaktion, die länger als das Lock-Timeout der Datenbank auf die Sperre wartet, scheitert mit
+  `PluginStorageConflict`. Halten Sie Transaktionen kurz: Die nächste Transaktion Ihres Plugins wartet auf sie.
+- Die Reihenfolge gilt nur für Datenbankarbeit. Zustand, den ein Plugin in seinem Prozess hält (eine Sperre im
+  Prozess, ein Cache, ein Scheduler), teilen API-Instanzen nicht; das Reservierungs-Plugin läuft deshalb mit einer
+  Instanz (siehe [Reservierungen](plugins/reservations/administration.md#betrieb-mit-einer-instanz)).
 
 Der Scope im `startCapacityHook` (`ctx.scope`) ist die Start-Transaktion des Kerns: Lesen Sie darüber mit
 `{ scope: ctx.scope }`, schreiben Sie nie und rufen Sie darauf nie `afterCommit` auf. In einem Host-Hook, der Ihnen

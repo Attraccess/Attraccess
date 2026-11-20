@@ -1,6 +1,7 @@
 import { ProjectInvitationStatus, ProjectMemberRole } from '@attraccess/application-models';
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
@@ -14,6 +15,9 @@ import { Project } from './project';
 import { User } from './user.entity';
 
 @Entity('project_invitations')
+// The released SQLite schema checked both value sets; a new enum value needs a migration that widens these checks.
+@Check('CHK_project_invitations_status', `"status" IN ('pending', 'accepted', 'declined', 'canceled')`)
+@Check('CHK_project_invitations_requested_role', `"requestedRole" IN ('viewer')`)
 @Index('IDX_project_invitation_unique_by_user_and_status', ['invitedUserId', 'status'])
 export class ProjectInvitation {
   @PrimaryGeneratedColumn()
@@ -63,18 +67,18 @@ export class ProjectInvitation {
   })
   requestedRole!: ProjectMemberRole;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @ApiProperty({
     description: 'Timestamp when the invitation was responded to (accept/decline/cancel)',
     required: false,
   })
   respondedAt!: Date | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'When the invitation was created' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'When the invitation was last updated' })
   updatedAt!: Date;
 }
