@@ -17,6 +17,7 @@ import { ResourceFlowLog, useGetOneResourceById } from '@attraccess/react-query-
 import { useLiveLogs } from '../liveLogs';
 import { FlowOwner, useFlowNodeSchemasQuery } from '../flowOwner';
 import { AttraccessNode } from '../node/index';
+import type { NodeValidationError } from '../node/validationMessages';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FlowContext, type FlowContextType, type LiveLogReceiver } from './flowContext';
 import nodesDeTranslations from '../node/de.json';
@@ -30,7 +31,7 @@ export interface FlowProviderProps {
 export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
-  const [validationErrors, setValidationErrorsState] = useState<Record<string, string>>({});
+  const [validationErrors, setValidationErrorsState] = useState<Record<string, NodeValidationError[]>>({});
   const { data: resource } = useGetOneResourceById(
     { path: { id: owner.kind === 'resource' ? owner.resourceId : 0 } },
     undefined,
@@ -75,16 +76,12 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
     [setNodes],
   );
 
-  const setValidationErrors = useCallback((errors: Array<{ nodeId: string; message: string }>) => {
-    setValidationErrorsState(
-      errors.reduce<Record<string, string>>(
-        (messages, error) => ({
-          ...messages,
-          [error.nodeId]: messages[error.nodeId] ? `${messages[error.nodeId]} ${error.message}` : error.message,
-        }),
-        {},
-      ),
-    );
+  const setValidationErrors = useCallback((errors: ReadonlyArray<NodeValidationError & { nodeId: string }>) => {
+    const byNode: Record<string, NodeValidationError[]> = {};
+    for (const { nodeId, field, code, message } of errors) {
+      (byNode[nodeId] ??= []).push({ field, code, message });
+    }
+    setValidationErrorsState(byNode);
   }, []);
 
   const liveLogReceivers = useRef<LiveLogReceiver[]>([]);
@@ -126,7 +123,7 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
           tNodeExists={tNodeExists}
           schema={nodeSchema}
           node={props}
-          validationError={validationErrors[props.id]}
+          validationErrors={validationErrors[props.id]}
         />
       );
     });

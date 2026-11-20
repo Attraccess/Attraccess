@@ -6,7 +6,12 @@ import { afterEach, beforeEach, vi, expect, it } from 'vitest';
 import FlowsPage from './index';
 const state = vi.hoisted(() => ({
   original: undefined as
-    undefined | { nodes: Node[]; edges: Edge[]; validationErrors?: { nodeId: string; message: string }[] },
+    | undefined
+    | {
+        nodes: Node[];
+        edges: Edge[];
+        validationErrors?: { nodeId: string; field: string; code?: string; message: string }[];
+      },
   fetching: false,
   failed: false,
   save: vi.fn(),
@@ -210,10 +215,12 @@ beforeEach(() => {
 afterEach(cleanup);
 
 it('loads saved nodes and validation, disables saving unchanged graphs and restores pull-to-refresh on unmount', () => {
-  state.original!.validationErrors = [{ nodeId: 'one', message: 'Missing config' }];
+  state.original!.validationErrors = [{ nodeId: 'one', field: 'data', code: 'invalid', message: 'Missing config' }];
   const view = show();
   expect(state.nodes).toEqual(state.original?.nodes);
-  expect(state.validation).toHaveBeenCalledWith([{ nodeId: 'one', message: 'Missing config' }]);
+  expect(state.validation).toHaveBeenCalledWith([
+    { nodeId: 'one', field: 'data', code: 'invalid', message: 'Missing config' },
+  ]);
   expect(saveButton()).toBeDisabled();
   expect(state.refresh).toHaveBeenCalledWith(false);
   view.unmount();

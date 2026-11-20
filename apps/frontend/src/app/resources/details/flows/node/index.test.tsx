@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { act, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { TFunction } from '@attraccess/plugins-frontend-ui';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useTranslations, useTranslationState, type TFunction } from '@attraccess/plugins-frontend-ui';
 import {
   ResourceFlowLogType,
   type ResourceFlowLog,
@@ -10,6 +10,9 @@ import {
 import type { NodeProps } from '@xyflow/react';
 import { AttraccessNode } from './index';
 import { useNodePreviewRows, type NodePreviewData } from './preview';
+import type { NodeValidationError } from './validationMessages';
+import nodesDe from './de.json';
+import nodesEn from './en.json';
 
 const flowContext = vi.hoisted(() => ({
   addLiveLogReceiver: vi.fn<(receiver: (log: ResourceFlowLog) => void) => void>(),
@@ -240,12 +243,17 @@ describe('AttraccessNode', () => {
 
   it('keeps validation warnings distinct from the selection accent', () => {
     const { container } = render(
-      <AttraccessNode schema={schema} tNodeTranslations={tStub} node={selectedNode} validationError="Invalid node" />,
+      <AttraccessNode
+        schema={schema}
+        tNodeTranslations={tStub}
+        node={selectedNode}
+        validationErrors={[{ field: 'data', code: 'invalid', message: 'Invalid node' }]}
+      />,
     );
 
     expect(container.querySelector('.card')).toHaveClass('border-warning');
     expect(container.querySelector('.card')).not.toHaveClass('border-accent');
-    expect(screen.getByText('Invalid node')).toHaveClass('text-danger');
+    expect(screen.getByText('Invalid node').parentElement).toHaveClass('text-danger');
   });
 });
 
@@ -263,4 +271,70 @@ it('uses raw plugin handle names only for explicitly missing translations', () =
   );
   expect(translate).not.toHaveBeenCalledWith('nodes.input.event.inputs.in');
   expect(translate).not.toHaveBeenCalledWith('nodes.input.event.outputs.out');
+});
+
+describe('validation errors', () => {
+  const meteringStart: ResourceFlowNodeSchemaDto = {
+    ...schema,
+    type: 'input.resource.metering.start',
+    configSchema: { properties: { meterId: { type: 'number' }, timeoutSeconds: { type: 'number' } } },
+  };
+  const originalLanguage = useTranslationState.getState().language;
+  afterEach(() => act(() => useTranslationState.getState().setLanguage(originalLanguage)));
+
+  function TranslatedNode({ errors }: { errors: NodeValidationError[] }) {
+    const { t, tExists } = useTranslations({ en: nodesEn, de: nodesDe });
+    return (
+      <AttraccessNode schema={meteringStart} tNodeTranslations={t} tNodeExists={tExists} validationErrors={errors} />
+    );
+  }
+
+  it.each([
+    ['en', 'Meter is missing'],
+    ['de', 'Zähler fehlt'],
+  ] as const)('names a missing field in the user language (%s)', (language, text) => {
+    act(() => useTranslationState.getState().setLanguage(language));
+    render(<TranslatedNode errors={[{ field: 'meterId', code: 'required', message: 'This field is required.' }]} />);
+    expect(screen.getByText(text)).toBeInTheDocument();
+    expect(screen.queryByText(/This field is required/)).not.toBeInTheDocument();
+  });
+
+  it('shows one line per error, the field label before invalid messages and unlabelled messages as they are', () => {
+    act(() => useTranslationState.getState().setLanguage('en'));
+    render(
+      <TranslatedNode
+        errors={[
+          { field: 'meterId', code: 'invalid', message: 'Choose a meter belonging to this resource' },
+          { field: 'timeoutSeconds', message: 'Too big: expected number to be <=600' },
+          { field: 'data', code: 'invalid', message: 'Invalid node configuration' },
+        ]}
+      />,
+    );
+    expect(screen.getByText('Meter: Choose a meter belonging to this resource')).toBeInTheDocument();
+    expect(screen.getByText('Timeout (seconds): Too big: expected number to be <=600')).toBeInTheDocument();
+    expect(screen.getByText('Invalid node configuration')).toBeInTheDocument();
+  });
+
+  it('keeps long unbroken messages within the card width', () => {
+    const message = 'x'.repeat(300);
+    render(
+      <AttraccessNode schema={schema} tNodeTranslations={tStub} validationErrors={[{ field: 'data', message }]} />,
+    );
+    const text = screen.getByText(message);
+    expect(text).toHaveClass('break-words', '[overflow-wrap:anywhere]', 'min-w-0');
+    expect(text.parentElement).toHaveClass('w-64', 'items-start');
+    expect(text.parentElement?.querySelector('svg')).toHaveClass('shrink-0');
+  });
+
+  it('shows no errors in previews', () => {
+    render(
+      <AttraccessNode
+        schema={schema}
+        tNodeTranslations={tStub}
+        previewMode
+        validationErrors={[{ field: 'data', message: 'Invalid node' }]}
+      />,
+    );
+    expect(screen.queryByText('Invalid node')).not.toBeInTheDocument();
+  });
 });
