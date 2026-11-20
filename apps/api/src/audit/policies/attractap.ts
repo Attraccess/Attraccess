@@ -26,6 +26,7 @@ export const attractapDetails = {
   'reader.pairing_expired': new Set(['reason']),
   'reader.revoked': new Set(['reason']),
   'reader.replaced': new Set(['mode']),
+  // No longer written since token sign-in was removed (ATT-1207); kept so that existing audit entries still render.
   'reader.token_rejected': new Set(['reason']),
   'reader.handshake_rejected': new Set(['reason', 'count']),
   'reader.secure_keys_created': new Set(['signingFingerprint', 'recoveryFingerprint']),
@@ -158,6 +159,7 @@ const detailValidators: Record<string, (value: DetailValue) => boolean> = {
   readerId: positive,
   pluginId: (value) => typeof value === 'string' && /^[a-zA-Z0-9_-]{21}$/.test(value),
   count: positive,
+  // The server no longer writes `pair` (pairing a token reader, removed in ATT-1207); kept for existing audit entries.
   mode: oneOf('new', 'pair', 'takeover'),
   method: oneOf('code', 'led-pattern', 'flasher'),
   // Manifest names are free strings (npm names incl. `@scope/name`); only control characters are refused.
@@ -221,6 +223,7 @@ export const ATTRACTAP_AUDIT_ACTIONS = [
   'attractap.reader.pairing_expired',
   'attractap.reader.revoked',
   'attractap.reader.replaced',
+  // No longer written (ATT-1207); kept so that existing audit entries still render.
   'attractap.reader.token_rejected',
   'attractap.reader.handshake_rejected',
   'attractap.reader.secure_keys_created',

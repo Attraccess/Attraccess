@@ -12,14 +12,13 @@ export function isPairingRunning(state: string) {
   return !TERMINAL_PAIRING_STATES.includes(state);
 }
 
-/** Readers with a running pairing that is bound or targeted to their record. */
+/** Readers with a running pairing that is targeted to their record. */
 export function readerIdsWaitingToPair(
-  pairings: ReadonlyArray<{ state: string; boundReaderId: number | null; targetReaderId: number | null }> | undefined,
+  pairings: ReadonlyArray<{ state: string; targetReaderId: number | null }> | undefined,
 ): Set<number> {
   const ids = new Set<number>();
   for (const pairing of pairings ?? []) {
     if (!isPairingRunning(pairing.state)) continue;
-    if (pairing.boundReaderId !== null) ids.add(pairing.boundReaderId);
     if (pairing.targetReaderId !== null) ids.add(pairing.targetReaderId);
   }
   return ids;
@@ -36,7 +35,6 @@ export type PairingErrorKind =
   | 'keyInUse'
   | 'targetNotFound'
   | 'targetMissing'
-  | 'wrongMode'
   | 'rateLimited'
   | 'unknown';
 
@@ -62,9 +60,6 @@ const NOT_FOUND: Record<string, PairingErrorKind> = {
 // The server's wording for a mode that does not fit the reader; the dialog says it in plain words.
 const BAD_REQUESTS: Record<string, PairingErrorKind> = {
   'targetReaderId is required': 'targetMissing',
-  'This reader already has a record; use pair': 'wrongMode',
-  'Only readers signed in with a token can be paired': 'wrongMode',
-  'This reader is bound to a different record': 'wrongMode',
 };
 
 const KNOWN_BY_STATUS: Record<number, Record<string, PairingErrorKind>> = {

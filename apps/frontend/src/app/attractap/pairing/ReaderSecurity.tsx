@@ -22,6 +22,7 @@ import { ReactNode, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { PairingDialog } from './PairingDialog';
 import { PairingStateChip } from './PairingStateChip';
+import { ReaderSecured } from './ReaderSecured';
 import { apiErrorMessage, readerIdsWaitingToPair } from './pairingUtils';
 import de from './de.json';
 import en from './en.json';
@@ -105,6 +106,8 @@ export function ReaderSecurity(props: Readonly<{ reader: Attractap; onPairingRem
           <EventActor actorId={pairedEvent?.actorId ?? null} />
         </dd>
       </dl>
+
+      <ReaderSecured reader={reader} />
 
       <div className="flex flex-col gap-3">
         <h3 className="font-semibold">{t('security.actions')}</h3>

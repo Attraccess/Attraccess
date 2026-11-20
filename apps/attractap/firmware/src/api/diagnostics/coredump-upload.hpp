@@ -84,7 +84,7 @@ public:
     virtual const char *resetReasonName(uint8_t reason) = 0; // esp_reset_reason_t as text
 };
 
-// The public calls may come from different tasks (on the token channel the replies arrive on the
+// The public calls may come from different tasks (the replies arrive on the
 // websocket task, tick runs on the main loop); a mutex serializes them.
 class Uploader
 {

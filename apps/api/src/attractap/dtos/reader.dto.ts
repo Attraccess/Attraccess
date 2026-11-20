@@ -1,10 +1,14 @@
 import { ApiProperty, ApiSchema, getSchemaPath } from '@nestjs/swagger';
-import type {
-  AttractapFirmwareInfo,
-  AttractapLinkedResource,
-  AttractapPairingState,
-  AttractapReader,
-  AttractapReaderCapabilities,
+import {
+  ATTRACTAP_FIRMWARE_PROFILES,
+  ATTRACTAP_SECURITY_PROBLEMS,
+  type AttractapFirmwareInfo,
+  type AttractapFirmwareProfile,
+  type AttractapLinkedResource,
+  type AttractapPairingState,
+  type AttractapReader,
+  type AttractapReaderCapabilities,
+  type AttractapSecurityProblem,
 } from '@attraccess/application-models';
 
 /** Schema names match the published API: the generated clients know these as AttractapCapabilities etc. */
@@ -79,7 +83,7 @@ export class AttractapFirmwareVersionDto {
   capabilities!: AttractapReaderCapabilities;
 }
 
-/** A reader as the API publishes it. The token hash is deliberately not part of it. */
+/** A reader as the API publishes it.  */
 @ApiSchema({ name: 'Attractap' })
 export class AttractapReaderDto {
   @ApiProperty({ description: 'The ID of the reader' })
@@ -89,9 +93,9 @@ export class AttractapReaderDto {
   name!: string;
 
   @ApiProperty({
-    description: 'Pairing state: unpaired (legacy token sign-in), paired (TLS identity) or revoked',
-    enum: ['unpaired', 'paired', 'revoked'],
-    default: 'unpaired',
+    description: 'Pairing state: paired (TLS identity) or revoked (no active credential)',
+    enum: ['paired', 'revoked'],
+    default: 'revoked',
   })
   pairingState!: AttractapPairingState;
 
@@ -118,6 +122,50 @@ export class AttractapReaderDto {
 
   @ApiProperty({ description: 'Serial number of the current reader certificate', nullable: true })
   certificateSerial!: string | null;
+
+  @ApiProperty({
+    description:
+      'True when the last eFuse report matched the secure profile on a release build and the paired P-256 session',
+    default: false,
+  })
+  secured!: boolean;
+
+  @ApiProperty({ description: 'When the reader last became secured', nullable: true })
+  securedAt!: Date | null;
+
+  @ApiProperty({
+    description: 'Firmware profile the reader reported (a claim, not attestation)',
+    enum: ATTRACTAP_FIRMWARE_PROFILES,
+    nullable: true,
+  })
+  firmwareProfile!: AttractapFirmwareProfile | null;
+
+  @ApiProperty({
+    description:
+      'Anti-rollback secure_version of the running app image, as the reader reported it in its firmware info. ' +
+      'Compare with efuseSecureVersion: the image runs only while this is at least the eFuse value.',
+    nullable: true,
+  })
+  secureVersion!: number | null;
+
+  @ApiProperty({
+    description: "The chip's eFuse SECURE_VERSION (anti-rollback floor), from the reader's last eFuse report",
+    nullable: true,
+  })
+  efuseSecureVersion!: number | null;
+
+  @ApiProperty({ description: 'When the server last checked an eFuse report of the reader', nullable: true })
+  securityReportCheckedAt!: Date | null;
+
+  @ApiProperty({
+    description:
+      'Problem codes of the last security check (build and eFuse report); empty when it passed, ' +
+      'null when no eFuse report was received',
+    enum: ATTRACTAP_SECURITY_PROBLEMS,
+    isArray: true,
+    nullable: true,
+  })
+  securityReportProblems!: AttractapSecurityProblem[] | null;
 
   @ApiProperty({
     description: 'The resources that the reader has access to',
@@ -153,7 +201,7 @@ export class AttractapReaderDto {
   firmware!: AttractapFirmwareInfo;
 }
 
-/** Explicit mapping: the token hash and every other internal field stay behind. */
+/** Explicit mapping: internal fields stay behind. */
 export function toReaderDto(reader: AttractapReader): AttractapReaderDto {
   return {
     id: reader.id,
@@ -166,6 +214,13 @@ export function toReaderDto(reader: AttractapReader): AttractapReaderDto {
     pairedAt: reader.pairedAt,
     certificateNotAfter: reader.certificateNotAfter,
     certificateSerial: reader.certificateSerial,
+    secured: reader.secured,
+    securedAt: reader.securedAt,
+    firmwareProfile: reader.firmwareProfile,
+    secureVersion: reader.secureVersion,
+    efuseSecureVersion: reader.efuseSecureVersion,
+    securityReportCheckedAt: reader.securityReportCheckedAt,
+    securityReportProblems: reader.securityReportProblems,
     ...(reader.resources ? { resources: reader.resources } : {}),
     lastConnection: reader.lastConnection,
     firstConnection: reader.firstConnection,

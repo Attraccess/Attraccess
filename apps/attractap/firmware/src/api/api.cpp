@@ -240,15 +240,7 @@ API::API(IReaderTransport &transport) : logger("API"),
 
 void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
 {
-    if (strcmp(eventType, "READER_START_PAIRING") == 0)
-    {
-        this->onStartPairing(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "READER_UNAUTHORIZED") == 0)
-    {
-        this->onUnauthorized(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "READER_AUTHENTICATED") == 0)
+    if (strcmp(eventType, "READER_AUTHENTICATED") == 0)
     {
         this->onReaderAuthenticated(inboundDoc["data"].as<JsonObject>());
     }
@@ -257,10 +249,6 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
         const char *language = inboundDoc["data"]["payload"]["language"].as<const char *>();
         State::setDefaultLanguage(language ? language : "en");
         if (language) Settings::saveDefaultLanguage(language);
-    }
-    else if (strcmp(eventType, "READER_REQUEST_AUTHENTICATION") == 0)
-    {
-        this->sendAuthenticationRequest();
     }
     else if (strcmp(eventType, "RESOURCE_USAGE_STATS") == 0)
     {
@@ -450,8 +438,8 @@ void API::processIncomingMessage(const char *buf, size_t len)
         return;
     }
     // BLE proxy requests carry their own requestId and answers; never ACKed (ATT-1033). Only the server that
-    // authenticated this reader on the paired session channel (mutual TLS) may drive its radio: not the legacy
-    // token or pairing channel, and not before READER_AUTHENTICATED. Others get READER_UNSUPPORTED.
+    // authenticated this reader on the paired session channel (mutual TLS) may drive its radio: not the
+    // pairing channel, and not before READER_AUTHENTICATED. Others get READER_UNSUPPORTED.
     if (strncmp(eventType, "BLE_", 4) == 0)
     {
         const bool trusted = this->transport.authenticatesReader() && State::getApiState().authenticated;

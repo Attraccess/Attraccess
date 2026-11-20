@@ -150,17 +150,17 @@ void testPairingProtocol()
     FakeServer server{caKey->publicKeySpki(), readerKey->publicKeySpki(), {}, {}};
     const Bytes ns1(16, 0x11), ns2(16, 0x22);
 
-    // Touch reader with a binding ticket: full round trip.
+    // Touch reader: full round trip.
     {
         fakeEnrollment = FakeEnrollment();
         PairingClient client(*readerKey, false, {"attractap_touch_v2", "wifi", "2.0.0"}, fakeClock);
-        client.start("ticket-1", [&](const std::string &m) { server.sent.push_back(m); return true; });
+        client.start([&](const std::string &m) { server.sent.push_back(m); return true; });
         CHECK(fakeEnrollment.requested == 1); // pending (no code yet) as soon as the request starts
         JsonDocument hello = server.last();
         CHECK(hello["type"] == "hello");
         CHECK(hello["v"] == 1);
         CHECK(hello["kind"] == "touch");
-        CHECK(hello["ticket"] == "ticket-1");
+        CHECK(hello["ticket"].isNull());
         CHECK(hello["firmware"]["variant"] == "wifi");
         CHECK(hello["publicKey"].as<std::string>() == PairingCodec::base64Encode(readerKey->publicKeySpki()));
 
@@ -198,7 +198,7 @@ void testPairingProtocol()
     {
         fakeEnrollment = FakeEnrollment();
         PairingClient client(*readerKey, true, {"attractap_lite", "ethernet", "2.0.0"}, fakeClock);
-        client.start("", [&](const std::string &m) { server.sent.push_back(m); return true; });
+        client.start([&](const std::string &m) { server.sent.push_back(m); return true; });
         CHECK(server.last()["kind"] == "lite");
         CHECK(server.last()["ticket"].isNull());
         CHECK(fakeEnrollment.lite);
@@ -214,7 +214,7 @@ void testPairingProtocol()
     // The revealed nonce does not match the commitment: abort, new request.
     {
         PairingClient client(*readerKey, false, {"n", "v", "1"}, fakeClock);
-        client.start("", [&](const std::string &m) { server.sent.push_back(m); return true; });
+        client.start([&](const std::string &m) { server.sent.push_back(m); return true; });
         deliver(client, server.round(1, ns1));
         CHECK(deliver(client, server.reveal(1, ns2)) == PairingClient::Outcome::Retry);
         CHECK(client.failureReason() == "commitment");
@@ -225,7 +225,7 @@ void testPairingProtocol()
     {
         auto otherKey = SoftwareReaderKey::generate();
         PairingClient client(*readerKey, false, {"n", "v", "1"}, fakeClock);
-        client.start("", [&](const std::string &m) { server.sent.push_back(m); return true; });
+        client.start([&](const std::string &m) { server.sent.push_back(m); return true; });
         deliver(client, server.round(1, ns1));
         FakeServer impostor{otherKey->publicKeySpki(), readerKey->publicKeySpki(), {}, {}};
         CHECK(deliver(client, impostor.round(2, ns2)) == PairingClient::Outcome::Retry);
@@ -235,7 +235,7 @@ void testPairingProtocol()
     // Server refusals back off; expiry starts over quickly; garbage is a protocol error.
     {
         PairingClient client(*readerKey, false, {"n", "v", "1"}, fakeClock);
-        const auto start = [&] { client.start("", [&](const std::string &m) { server.sent.push_back(m); return true; }); };
+        const auto start = [&] { client.start([&](const std::string &m) { server.sent.push_back(m); return true; }); };
         start();
         CHECK(deliver(client, R"({"type":"failed","reason":"busy"})") == PairingClient::Outcome::Retry);
         CHECK(client.retryDelayMs() == PairingClient::RETRY_AFTER_LIMIT_MS);
@@ -283,7 +283,7 @@ void testRoundPacing()
     FakeServer server{caKey->publicKeySpki(), readerKey->publicKeySpki(), {}, {}};
     const Bytes ns(16, 0x33);
     PairingClient client(*readerKey, false, {"n", "v", "1"}, fakeClock);
-    const auto start = [&] { client.start("", [&](const std::string &m) { server.sent.push_back(m); return true; }); };
+    const auto start = [&] { client.start([&](const std::string &m) { server.sent.push_back(m); return true; }); };
     const auto revealedRound = [&](int round) {
         CHECK(deliver(client, server.round(round, ns)) == PairingClient::Outcome::None);
         return deliver(client, server.reveal(round, ns));

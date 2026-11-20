@@ -132,6 +132,7 @@ export function AttractapList() {
 
     return { stale, active };
   }, [allReaders, now]);
+  const noPairedReaders = allReaders !== undefined && activeReaders.length + staleReaders.length === 0;
 
   const firmwareUpdateChip = useCallback(
     (reader: Attractap) => {
@@ -229,7 +230,23 @@ export function AttractapList() {
                         <TableActionsColumnHeader />
                       </TableColumn>
                     </TableHeader>
-                    <TableBody items={readers ?? []} renderEmptyState={() => <EmptyState />}>
+                    <TableBody
+                      items={readers ?? []}
+                      renderEmptyState={() => (
+                        <>
+                          <EmptyState message={t('table.noData')} />
+                          {/* With no paired reader at all, say where readers come from (e.g. right after the upgrade). */}
+                          {tableIndex === 0 && noPairedReaders && (
+                            <p
+                              className="pb-6 text-center text-sm text-default-500"
+                              data-cy="attractap-list-empty-hint"
+                            >
+                              {t('table.emptyHint')}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    >
                       {(reader) => (
                         <TableRow
                           key={reader.id}

@@ -165,9 +165,9 @@ and the reader refuses everything outside it before it touches the radio. The re
 info; the server answers readers without it, or with another version, with `READER_UNSUPPORTED`.
 Demo variants, park images and the desktop simulator announce no `ble`. BLE works only on paired
 readers: the reader accepts BLE requests only on the secure link (see "Pairing and session
-protocol" below) after it signed in, and refuses them on the legacy token channel and before
-sign-in. The server reports a reader that is not on the secure link as `READER_OFFLINE`
-(`pairing-required`) and sends it no BLE requests.
+protocol" below) after it signed in, and refuses them on the pairing channel and before
+sign-in. A reader without a certificate cannot connect except to pair, so the server never
+sends BLE requests to a reader that is not on the secure link.
 
 | Direction       | Event               | Payload (besides `v: 1` and `sessionId`)                                                                                          |
 | --------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
@@ -249,35 +249,39 @@ BLE link itself has no Bluetooth-level security: NimBLE is built without it
 is not encrypted. Plugins must encrypt and authenticate sensitive payloads in their own protocol.
 Only the reader-server hop is protected, by the secure link.
 
-## Pairing and session protocol (1.8.0)
+## Pairing and session protocol (2.6.0: the only way in)
 
-Firmware 1.8.0 no longer registers itself with a token (ATT-1165, ATT-1168, ATT-1170,
-ATT-1171). A new reader joins through one approval by an admin of a rotating code, then talks to
-the server only inside mutually authenticated TLS 1.3. Both run inside the WebSocket at
-`/api/attractap/websocket`; the server selects them by WebSocket subprotocol, so a reverse proxy
-must pass `Sec-WebSocket-Protocol`.
+A reader joins through one approval by an admin of a rotating code, then talks to the server only
+inside mutually authenticated TLS 1.3 with its own P-256 key (ATT-1165, ATT-1168, ATT-1170,
+ATT-1171). Both run inside the WebSocket at `/api/attractap/websocket`; the server selects them by
+WebSocket subprotocol, so a reverse proxy must pass `Sec-WebSocket-Protocol`.
 
-| Protocol / firmware            | Subprotocol            | Behaviour                                                                                                                                                                                                                                                                    |
+**Firmware 2.6.0 has no token sign-in at all** (ATT-1207). There is no token to enter, store or
+send, no serial command or screen field for one, and no plain-text channel. A reader without a
+certificate starts pairing; a paired reader only uses the session. The server no longer knows
+readers that signed in with a token or that paired with an older server: after the upgrade every
+reader pairs again, from the pairing screen, like a new reader.
+
+| Protocol                       | Subprotocol            | Behaviour                                                                                                                                                                                                                                                                    |
 | ------------------------------ | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Token (up to 1.7.x)            | none                   | Plain-text events, token sign-in. Existing token readers keep working and are updated over the air. New readers cannot enroll.                                                                                                                                               |
-| `attractap-pairing.v1` (1.8.0) | `attractap-pairing.v1` | Plain-text JSON frames of at most 4 KiB: `hello`, `round`, `nonce`, `reveal`, `accepted`, `failed`, `cancel`. Used only while pairing.                                                                                                                                       |
-| `attractap-session.v1` (1.8.0) | `attractap-session.v1` | TLS 1.3 only, mutual authentication, AEAD (AES-128-GCM preferred), no resumption, 0-RTT or renegotiation. Binary WebSocket frames with inner length-prefixed framing, 64 KiB messages. The server is identified by the installation ID in the certificate, not by host name. |
-| Legacy `READER_REGISTER`       | none                   | Creates nothing and gets **no reply**, for old and new firmware alike. New firmware without credentials goes straight to pairing.                                                                                                                                            |
+| `attractap-pairing.v1`         | `attractap-pairing.v1` | Plain-text JSON frames of at most 4 KiB: `hello`, `round`, `nonce`, `reveal`, `accepted`, `failed`, `cancel`. Used only while pairing.                                                                                                                                       |
+| `attractap-session.v1`         | `attractap-session.v1` | TLS 1.3 only, mutual authentication, AEAD (AES-128-GCM preferred), no resumption, 0-RTT or renegotiation. Binary WebSocket frames with inner length-prefixed framing, 64 KiB messages. The server is identified by the installation ID in the certificate, not by host name. |
 
-| Reader firmware                   | Server with pairing                                                                                                | Older server                              |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
-| 1.7.x and older, token registered | Works with its token and updates over the air; must then be paired from its row (settings stay locked until then). | Unchanged.                                |
-| 1.7.x and older, never registered | Registration gets no reply; update it with the web flasher first.                                                  | Registers as before.                      |
-| 1.8.0 and newer, no credentials   | Pairing, then the TLS session.                                                                                     | Cannot pair; needs a server with pairing. |
-| 1.8.0 and newer, paired           | TLS session. Never falls back to token or plain channel.                                                           | Cannot connect.                           |
+| Reader firmware                       | Server (2.6.0 generation)                                       |
+| ------------------------------------- | --------------------------------------------------------------- |
+| 2.6.0 and newer, no credentials       | Pairing, then the TLS session.                                  |
+| 2.6.0 and newer, paired               | TLS session. Never falls back to another channel.               |
+| Older than 2.6.0, token registered    | Cannot connect. It cannot update over the air either (the update runs over the authenticated connection): flash 2.6.0 over USB (web flasher), then pair it. |
+| 1.8.0 to 2.5.x, paired with the old server | The server no longer knows its certificate and ends the session (`session.rejected`); the reader shows "Pairing removed" and pairs again. It keeps updating over the air as before. |
+
+A reader moved to another server pairs there with its existing key; clear it on the old server
+and pair it again (pairing screen), nothing else is needed.
 
 Pairing sequence:
 
 1. The reader opens a WebSocket with `attractap-pairing.v1` and sends `hello` within 30 s: kind
    (`touch` or `lite`), its public key (canonical uncompressed P-256 SubjectPublicKeyInfo,
-   91 bytes), firmware name, variant and version. A reader that signed in with a token may add
-   the one-time `ticket` it received through `READER_START_PAIRING` when an admin clicked **Pair**
-   on its row; that binds the pairing to the existing record.
+   91 bytes), firmware name, variant and version.
 2. The server sends a `round` immediately and then every 30 s: the installation CA public key,
    a commitment to the server nonce, the app URL (or `null`) and the times until rotation and
    expiry. The reader answers with its own `nonce` (at least 16 random bytes); the server
@@ -298,9 +302,7 @@ Pairing sequence:
 4. An admin approves the code once. The server issues the reader certificate, sends `accepted`,
    and the reader pins the CA and opens `attractap-session.v1`. The reader takes `accepted` only
    after a round whose reveal it verified (a code was derived). The first session grant carries
-   its reader ID, installation ID and certificate; the reader stores them and the token hash is
-   deleted on the server. A token reader keeps its stored token until that grant is verified and
-   stored, and only then deletes it. A pending request lasts at most 10 minutes; then the server
+   its reader ID, installation ID and certificate; the reader stores them. A pending request lasts at most 10 minutes; then the server
    sends `failed` (`expired`) and the reader asks again with the same key. Expiry is not shown as
    a failure (no "Request failed", no red flash); the screen waits for the next code and the Lite
    ring breathes white until the next round.
@@ -309,16 +311,15 @@ After pairing (once the reader holds its certificate) the reader never erases it
 key because of an unauthenticated message. A TLS failure against the pinned CA shows "Server could
 not be verified" on the connecting screen (Lite: a red error flash per attempt) and retries every
 30 s; the reader does not enroll again by itself. Two failed handshakes in a row (timeouts,
-errors, or a text frame from a server that took the connection for a token reader, as when a
+errors, or a text frame from a server that did not speak TLS to the reader, as when a
 proxy strips `Sec-WebSocket-Protocol`) show "Secure connection failed. Check the server or proxy."
 (Lite: red error flash). Both messages clear when a session opens.
 
 A reader that pinned a CA but never completed the first session (no certificate yet) handles an
 unverifiable server differently: after 3 such handshakes in a row it forgets the pinned CA (not
-its own key) and goes back to its token if it still has one, or to pairing otherwise. The
+its own key) and asks to be paired again. The
 approval may have come from someone posing as the server, and the reader would otherwise stay
-stuck. The channel at boot follows the stored state: a pin means the session, otherwise the token,
-otherwise pairing. When an admin removes the pairing, the session ends within 1 s, the reader shows
+stuck. The channel at boot follows the stored state: a pin means the session, otherwise pairing. When an admin removes the pairing, the session ends within 1 s, the reader shows
 "Pairing removed", generates a **new** key and returns to pending approval.
 
 Touch variants show the code on the pending-approval screen with a countdown and a QR code of
@@ -341,7 +342,7 @@ for its **Approve** button. Each new code is also logged on the UART as
 `Enrollment: code=K7P-3XQ`. Treat that line as a stable contract: the lab tool
 (`apps/attractap-lab/src/attractap_lab/enrollment.py`) parses the `Enrollment: code=` marker
 (`ENROLLMENT_LOG_MARKER`) to approve readers without a screen, so do not reword it. Codes, keys,
-nonces and tokens are never logged otherwise.
+nonces are never logged otherwise.
 
 ## Secure profile (ATT-1166)
 
@@ -380,16 +381,29 @@ python3 tools/check_secure_profile.py build/attractap-touch-v2-secure
 | KEY0 | Secure Boot digest: per-installation signing key |
 | KEY1 | Secure Boot digest: recovery key |
 | KEY2 | Flash encryption key (XTS-AES-128) |
-| KEY3 | DS identity (HMAC key, read-protected) |
+| KEY3 | Spare (no Digital Signature key: the reader identity is a P-256 key) |
 | KEY4 | NVS encryption (HMAC key, read-protected) |
 | KEY5 | Spare |
 
 ### eFuse read protection (RD_DIS)
 
-The bootloader leaves RD_DIS writable. The secure app burns the DS key (KEY3) and the
-NVS key (KEY4) read-protected on first boot and then MUST write-protect RD_DIS
-(`WR_DIS_RD_DIS`). The server marks a reader secured only after its eFuse report
-shows that lock.
+The bootloader leaves RD_DIS writable so the NVS key (KEY4) can be burned read-protected
+after Secure Boot is on; RD_DIS then MUST be write-protected (`WR_DIS_RD_DIS`). The server
+marks a reader secured only after its eFuse report shows that lock.
+
+### eFuse report and profile claims (ATT-1207)
+
+The firmware never writes an eFuse. Secure builds only read them: once per session, right after
+`READER_FIRMWARE_INFO`, the reader sends one `efuse.report` control frame inside the TLS session
+(`src/api/security/efuse_report.cpp`, `efuse_snapshot.cpp`). It lists, per key block, the purpose
+and whether it is used or read-protected, the two public Secure Boot digests (never any key
+material), the revoke bits, the flash-encryption counters and mode, the JTAG and download
+protections, `RD_DIS` and its write protection, and the eFuse `SECURE_VERSION`. Plain builds send
+no report. `READER_FIRMWARE_INFO` adds the build's claims `profile` (`plain`, `secure`,
+`secure-lab`), `release` and, on secure builds, `secureVersion`. The server treats all of it as a
+claim; only a release secure build whose report passes and whose session uses the paired
+certificate counts as secured. The lab reader (`secure-lab`, development-mode flash encryption)
+is expected to report *not secured*. `tests/efuse-report` checks the message format on the host.
 
 Lab secure readers use public keys and development-mode flash encryption; see
 `lab/secure-boot/README.md`.

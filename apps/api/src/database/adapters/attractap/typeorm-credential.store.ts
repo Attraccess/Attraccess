@@ -21,7 +21,6 @@ const CREDENTIAL_COLUMNS = {
   certificateSerial: true,
   pairedAt: true,
   certificateNotAfter: true,
-  apiTokenHash: true,
 } as const;
 
 @Injectable()
@@ -69,7 +68,6 @@ export class TypeOrmAttractapCredentialStore implements AttractapCredentialStore
       pairedAt: reader.pairedAt ?? null,
       certificateNotAfter: reader.certificateNotAfter ?? null,
       certificateSerial: reader.certificateSerial ?? null,
-      apiTokenHash: reader.apiTokenHash ?? '',
     };
   }
 
