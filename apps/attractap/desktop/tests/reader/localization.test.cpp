@@ -206,9 +206,9 @@ void ReaderWorkflow::testLocalization()
     display.capture(output, "i18n-failed-verification-default");
     clearStatus(); nfc.setPresent(0, false); pump();
     server.push("READER_LANGUAGE", R"({"language":"de"})"); pump();
-    // API rejection clears the session and keeps the most recent default.
+    // Losing the API session (the link dropped or the pairing was removed) clears it and keeps the most recent default.
     userLocale = "en"; login();
-    server.push("READER_UNAUTHORIZED", R"({"message":"PLEASE_REREGISTER"})"); pump();
+    State::setApiState(false, ""); pump();
     assert(!State::getApiState().authenticated && !State::getApiState().userAuthenticated);
     assert(State::getActiveLanguage() == "de");
     server.push("READER_AUTHENTICATED", R"({"name":"Test reader","language":""})"); list(false); pump();

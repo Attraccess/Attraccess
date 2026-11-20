@@ -7,7 +7,7 @@
 # eFuse key block layout (BLOCK_KEY0..5), fixed so blocks never collide:
 #   KEY0, KEY1  Secure Boot digests (signing key, recovery key), burned during conversion
 #   KEY2        flash encryption key (the bootloader takes the first free block)
-#   KEY3        DS identity HMAC key (secure app, first boot)
+#   KEY3        spare (the reader identity is a P-256 key in encrypted NVS; no Digital Signature key)
 #   KEY4        NVS encryption HMAC key (NVS_SEC_HMAC_EFUSE_KEY_ID below)
 #   KEY5        spare
 
@@ -21,10 +21,10 @@ CONFIG_SECURE_BOOT_V2_RSA_ENABLED=y
 # CONFIG_SECURE_BOOT_ENABLE_AGGRESSIVE_KEY_REVOKE is not set
 # CONFIG_SECURE_BOOT_SKIP_WRITE_PROTECTION_SCA is not set
 # Decided design (RD_DIS): the bootloader leaves eFuse read protection open
-# (RD_DIS stays writable) because the NVS (KEY4) and DS (KEY3) HMAC keys are burned
-# read-protected by the secure app after Secure Boot is on. Right after it burns
-# both keys, the secure app MUST write-protect RD_DIS (WR_DIS_RD_DIS). The server
-# may mark a reader "secured" only once the eFuse report shows that lock.
+# (RD_DIS stays writable) because the NVS (KEY4) HMAC key is burned read-protected
+# after Secure Boot is on. Right after that, RD_DIS MUST be write-protected
+# (WR_DIS_RD_DIS). The server may mark a reader "secured" only once the eFuse report
+# shows that lock. The firmware only reports the eFuses; it never writes one.
 CONFIG_SECURE_BOOT_V2_ALLOW_EFUSE_RD_DIS=y
 
 # --- Flash encryption: release mode, XTS-AES-128 (256-bit key) ---

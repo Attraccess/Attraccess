@@ -116,6 +116,8 @@
   "save": "Speichern",
   "edit": "Bearbeiten",
   "deleteText": "Löschen",
+  "editProviderLabel": "Anbieter {{name}} bearbeiten",
+  "deleteProviderLabel": "Anbieter {{name}} löschen",
   "createNewProvider": "Neuen SSO-Anbieter erstellen",
   "editProvider": "SSO-Anbieter bearbeiten",
   "fillAllFields": "Bitte füllen Sie alle erforderlichen Felder aus.",

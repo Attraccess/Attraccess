@@ -3,7 +3,7 @@ import { Button, Input, Label, TextField } from '@heroui/react';
 import { FilterIcon, RefreshCwIcon, SearchIcon } from 'lucide-react';
 import { StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { LocaleDateField } from '../../../../../components/localeDateField';
-import { coreAuditDomains, filterRequest, pluginDomains } from '../audit-log-model';
+import { coreAuditDomains, filterRequest, filterVocabulary, pluginDomains } from '../audit-log-model';
 import { AuditLogFilterState } from '../useAuditLogFilterState';
 import { useAuditDomainLabel } from '../useAuditDomainLabel';
 import { useAuditLogMeta } from '../useAuditLogMeta';
@@ -42,7 +42,7 @@ export function AuditLogFilters({ filterState, isRefreshing }: AuditLogFiltersPr
   } = filterState;
   const applyFilters = () => {
     if (!fromDateValid || !toDateValid) return;
-    const result = filterRequest(filters, meta.data?.subjectTypes);
+    const result = filterRequest(filters, filterVocabulary(meta.data));
     if (result.error) {
       setFilterError(t(result.error));
       return;

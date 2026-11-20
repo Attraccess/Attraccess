@@ -36,6 +36,11 @@ export async function verifyPackedPlugin(
     const pkg = JSON.parse(readFileSync(join(extracted, 'package.json'), 'utf8'));
     validatePackageContract(pkg, hostVersion);
     validateLicenseFile(pkg, paths);
+    // Nx plugins copy plugin.json into the package dir; the examples keep it next to it.
+    const manifestPath = [join(root, 'plugin.json'), join(dirname(root), 'plugin.json')].find((path) =>
+      existsSync(path),
+    );
+    if (manifestPath) validatePermissionsMatch(pkg, JSON.parse(readFileSync(manifestPath, 'utf8')));
 
     for (const entry of Object.values(pkg.attraccess ?? {})) {
       if (typeof entry === 'string' && entry.includes('/') && !existsSync(join(extracted, entry))) {
@@ -124,6 +129,22 @@ export function resolvePluginTestHostVersion(workspaceVersion, releaseTarget) {
 export function validateLicenseFile(pkg, paths) {
   const file = /^SEE LICENSE IN (.+)$/.exec(pkg.license ?? '')?.[1]?.trim();
   if (file && !paths.includes(`package/${file}`)) throw new Error(`Packed plugin is missing its license file ${file}`);
+}
+
+/**
+ * plugin.json (repo/host manifest) and the package.json attraccess block (npm contract) must grant the same
+ * permissions; the host enforces the npm contract, so a missing entry only breaks the marketplace install.
+ */
+export function validatePermissionsMatch(pkg, manifest) {
+  const declared = new Set(pkg.attraccess?.permissions ?? []);
+  const expected = new Set(manifest.permissions ?? []);
+  const missing = [...expected].filter((permission) => !declared.has(permission));
+  const extra = [...declared].filter((permission) => !expected.has(permission));
+  if (missing.length > 0 || extra.length > 0)
+    throw new Error(
+      `Packed plugin permissions differ from plugin.json (missing in package.json: ${missing.join(', ') || 'none'}; ` +
+        `only in package.json: ${extra.join(', ') || 'none'})`,
+    );
 }
 
 export function validatePackageContract(pkg, hostVersion) {

@@ -1,7 +1,21 @@
-import { Button } from '@attraccess/plugins-frontend-ui';
 import type { InstalledNpmPluginDto, LoadedPluginManifest } from '@attraccess/react-query-client';
-import { Chip, TableCell, TableRow, Tooltip, TooltipContent, TooltipTrigger } from '@heroui/react';
-import { AlertTriangle, CheckCircle2, KeyRound, Trash2 } from 'lucide-react';
+import {
+  Chip,
+  cn,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownPopover,
+  DropdownTrigger,
+  Label,
+  TableCell,
+  TableRow,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@heroui/react';
+import { buttonVariants } from '@heroui/styles';
+import { AlertTriangle, CheckCircle2, History, Info, KeyRound, MoreHorizontal, Trash2 } from 'lucide-react';
 import { PluginClassificationBadge } from '../PluginClassificationBadge';
 import type { FailedPlugin, MarketplaceDetailRequest, VersionPlugin } from '../types';
 import { usePluginsTranslations } from '../usePluginsTranslations';
@@ -37,7 +51,9 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
               : t('status.licenseMissingRequired')}
           </p>
         ) : null}
-        {installed?.registryUrl ? <p className="mt-1 text-xs text-muted md:hidden">{installed.registryUrl}</p> : null}
+        {installed?.registryUrl ? (
+          <p className="mt-1 break-all text-xs text-muted md:hidden">{installed.registryUrl}</p>
+        ) : null}
       </TableCell>
       <TableCell>
         <Chip variant="soft" color="accent">
@@ -49,7 +65,9 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
           </Chip>
         ) : null}
       </TableCell>
-      <TableCell className="hidden sm:table-cell">{plugin.pluginDirectory || '-'}</TableCell>
+      {/* npm directories are an opaque `npm-<base64>` token and registry URLs have no spaces: let both break anywhere so
+          they do not set the column's minimum width. */}
+      <TableCell className="hidden sm:table-cell break-all">{plugin.pluginDirectory || '-'}</TableCell>
       <TableCell className="hidden sm:table-cell">
         {plugin.permissions && plugin.permissions.length > 0 ? (
           <div className="flex flex-wrap gap-1" data-cy={`plugins-list-permissions-${plugin.id}`}>
@@ -63,7 +81,9 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
           <span className="text-muted">{t('noPermissions')}</span>
         )}
       </TableCell>
-      <TableCell className="hidden md:table-cell text-xs text-muted">{installed?.registryUrl ?? '-'}</TableCell>
+      <TableCell className="hidden md:table-cell break-all text-xs text-muted">
+        {installed?.registryUrl ?? '-'}
+      </TableCell>
       <TableCell>
         {plugin.status === 'error' ? (
           <button
@@ -118,38 +138,53 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
       </TableCell>
       <TableCell>
         <div className="flex justify-end">
-          {installed ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onPress={() => onShowDetails({ name: plugin.name, registryId: installed.registryId ?? 'npm' })}
+          <Dropdown>
+            {/* HeroUI's .dropdown__trigger sets display:inline-block, which beats the inline-flex from .button. */}
+            <DropdownTrigger
+              className={cn(
+                buttonVariants({ variant: 'ghost', size: 'sm', isIconOnly: true }),
+                '!inline-flex items-center justify-center',
+              )}
+              aria-label={t('rowActions', { pluginName: plugin.name })}
+              data-cy={`plugins-list-actions-button-${plugin.id}`}
             >
-              {t('marketplace.details')}
-            </Button>
-          ) : null}
-          {installed ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onPress={() => onManageVersion({ name: plugin.name, version: plugin.version })}
-              data-cy={`plugins-list-manage-version-button-${plugin.id}`}
-            >
-              {t('manageVersion')}
-            </Button>
-          ) : null}
-          <Tooltip>
-            <Button
-              variant="danger-soft"
-              size="sm"
-              isIconOnly
-              aria-label={t('deleteTooltip')}
-              onPress={() => onDelete(plugin.id)}
-              data-cy={`plugins-list-delete-plugin-button-${plugin.id}`}
-            >
-              <Trash2 size={16} />
-            </Button>
-            <TooltipContent>{t('deleteTooltip')}</TooltipContent>
-          </Tooltip>
+              <MoreHorizontal size={16} />
+            </DropdownTrigger>
+            <DropdownPopover placement="bottom end">
+              <DropdownMenu aria-label={t('rowActions', { pluginName: plugin.name })}>
+                {installed ? (
+                  <DropdownItem
+                    id="details"
+                    onPress={() => onShowDetails({ name: plugin.name, registryId: installed.registryId ?? 'npm' })}
+                    data-cy={`plugins-list-details-button-${plugin.id}`}
+                  >
+                    <Info size={16} />
+                    <Label>{t('marketplace.details')}</Label>
+                  </DropdownItem>
+                ) : null}
+                {installed ? (
+                  <DropdownItem
+                    id="manage-version"
+                    onPress={() => onManageVersion({ name: plugin.name, version: plugin.version })}
+                    data-cy={`plugins-list-manage-version-button-${plugin.id}`}
+                  >
+                    <History size={16} />
+                    <Label>{t('manageVersion')}</Label>
+                  </DropdownItem>
+                ) : null}
+                <DropdownItem
+                  id="delete"
+                  variant="danger"
+                  onPress={() => onDelete(plugin.id)}
+                  data-cy={`plugins-list-delete-plugin-button-${plugin.id}`}
+                >
+                  {/* The danger variant colours only the item's Label slot, so the icon takes the colour itself. */}
+                  <Trash2 size={16} className="text-danger" />
+                  <Label>{t('deleteTooltip')}</Label>
+                </DropdownItem>
+              </DropdownMenu>
+            </DropdownPopover>
+          </Dropdown>
         </div>
       </TableCell>
     </TableRow>

@@ -9,7 +9,7 @@ export const CREDENTIAL_CHANGED_EVENT = 'attractap.credential.changed';
 
 export const PAIRING_STATES = ['waiting', 'completed', 'failed', 'cancelled', 'expired'] as const;
 export type PairingState = (typeof PAIRING_STATES)[number];
-export const PAIRING_MODES = ['new', 'pair', 'takeover'] as const;
+export const PAIRING_MODES = ['new', 'takeover'] as const;
 export type PairingMode = (typeof PAIRING_MODES)[number];
 export const READER_KINDS = ['touch', 'lite'] as const;
 export type ReaderKind = (typeof READER_KINDS)[number];
@@ -64,8 +64,6 @@ export interface PairingRequest {
   firmware: ReaderFirmware;
   state: PairingState;
   readerPublicKey: Buffer;
-  /** Set when the reader presented a binding ticket from its token connection in `hello`. */
-  boundReaderId: number | null;
   serverPublicKey: Buffer;
   current: Round;
   previous: Round | null;
@@ -90,7 +88,6 @@ export interface PairingView {
   state: PairingState;
   kind: ReaderKind;
   firmware: ReaderFirmware;
-  boundReaderId: number | null;
   targetReaderId: number | null;
   mode: PairingMode | null;
   createdAt: Date;

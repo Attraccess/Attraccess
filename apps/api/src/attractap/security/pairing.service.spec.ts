@@ -97,13 +97,12 @@ describe('PairingService', () => {
         const reader = {
           id: nextId++,
           name: 'abcd',
-          pairingState: 'unpaired',
-          apiTokenHash: 'hash',
+          pairingState: 'revoked',
           credentialFingerprint: null,
           certificateSerial: null,
         };
         readers.set(reader.id, reader);
-        return { reader, token: 't' };
+        return reader;
       },
       deleteReader: async (id: number) => readers.delete(id),
       updateReader: async (id: number, update: Record<string, unknown>) => Object.assign(readers.get(id) ?? {}, update),
@@ -137,7 +136,6 @@ describe('PairingService', () => {
           pairingState: reader['pairingState'],
           credentialFingerprint: reader['credentialFingerprint'] ?? null,
           certificateSerial: reader['certificateSerial'] ?? null,
-          apiTokenHash: reader['apiTokenHash'] ?? '',
         };
         const previous =
           reader['pairingState'] === 'paired' && reader['credentialFingerprint'] !== fingerprint
@@ -155,7 +153,6 @@ describe('PairingService', () => {
           pairingState: 'paired',
           credentialFingerprint: fingerprint,
           certificateSerial: input.certificate.serial,
-          apiTokenHash: '',
         });
         credentialEvents.push({ readerId: reader['id'], keyFingerprint: fingerprint, state: 'paired' });
         return { previousFingerprint: previous, before };
@@ -268,7 +265,6 @@ describe('PairingService', () => {
     expect(readers.get(done.targetReaderId as number)).toMatchObject({
       name: 'Laser',
       pairingState: 'paired',
-      apiTokenHash: '',
     });
     expect(credentialEvents).toEqual([expect.objectContaining({ state: 'paired' })]);
     expect(audited).toEqual([
@@ -480,86 +476,6 @@ describe('PairingService', () => {
     expect(readers.size).toBe(1);
   });
 
-  it('binds a token reader through its one-time ticket and pairs its own record', async () => {
-    readers.set(7, { id: 7, name: 'old', pairingState: 'unpaired', apiTokenHash: 'h', credentialFingerprint: null });
-    nextId = 8;
-    const ticket = service.issueBindingTicket(7);
-    const { code } = await announce({ ticket });
-    const pending = await pendingOf();
-    expect(pending.boundReaderId).toBe(7);
-
-    await expect(service.approve(pending.id, { code, mode: 'new' }, actor)).rejects.toThrow('already has a record');
-    await service.approve(pending.id, { code, mode: 'pair' }, actor);
-    expect(readers.get(7)).toMatchObject({ pairingState: 'paired', apiTokenHash: '' });
-    expect(readers.size).toBe(1);
-    expect(audited[0]).toMatchObject({
-      action: 'attractap.reader.pairing_confirmed',
-      details: { mode: 'pair', method: 'code' },
-    });
-  });
-
-  it('hands the same reader the ticket it already has, and a new one once that ran low', async () => {
-    readers.set(7, { id: 7, pairingState: 'unpaired' });
-    const first = service.issueBindingTicket(7);
-    expect(service.issueBindingTicket(7)).toBe(first);
-    expect(service.issueBindingTicket(8)).not.toBe(first);
-
-    jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 4.5 * 60 * 1000);
-    expect(service.issueBindingTicket(7)).not.toBe(first);
-  });
-
-  it('hands out a new ticket once the old one was used', async () => {
-    readers.set(7, { id: 7, pairingState: 'unpaired' });
-    const first = service.issueBindingTicket(7);
-    await announce({ ticket: first });
-
-    expect(service.issueBindingTicket(7)).not.toBe(first);
-  });
-
-  it('lets a token reader be asked on its own to pair at most every two minutes', () => {
-    const start = Date.now();
-    const now = jest.spyOn(Date, 'now').mockReturnValue(start);
-    expect(service.claimAutoPrompt(7)).toBe(true);
-    expect(service.claimAutoPrompt(7)).toBe(false);
-    expect(service.claimAutoPrompt(8)).toBe(true);
-
-    now.mockReturnValue(start + 119_000);
-    expect(service.claimAutoPrompt(7)).toBe(false);
-    now.mockReturnValue(start + 120_000);
-    expect(service.claimAutoPrompt(7)).toBe(true);
-  });
-
-  it('refuses an unknown or already used ticket instead of listing a new reader', async () => {
-    readers.set(7, { id: 7, pairingState: 'unpaired' });
-    const ticket = service.issueBindingTicket(7);
-    await announce({ ticket });
-    const client = new PairingClient(url);
-    clients.push(client);
-    await client.opened();
-    client.send({
-      type: 'hello',
-      v: 1,
-      kind: 'touch',
-      publicKey: (await readerKey()).toString('base64'),
-      firmware,
-      ticket,
-    });
-    await new Promise<void>((resolve) => client.ws.once('close', () => resolve()));
-    const bogus = new PairingClient(url);
-    clients.push(bogus);
-    await bogus.opened();
-    bogus.send({
-      type: 'hello',
-      v: 1,
-      kind: 'touch',
-      publicKey: (await readerKey()).toString('base64'),
-      firmware,
-      ticket: 'nope',
-    });
-    await new Promise<void>((resolve) => bogus.ws.once('close', () => resolve()));
-    expect(service.list()).toHaveLength(1);
-  });
-
   it('takes over an existing record and closes the old credential as replaced', async () => {
     readers.set(3, {
       id: 3,
@@ -656,6 +572,19 @@ describe('PairingService', () => {
     expect(service.get(pending.id)).toMatchObject({ state: 'cancelled', failureReason: 'cancelled-by-admin' });
   });
 
+  it('tells the reader an admin cancelled its request; the audit log has no reader to attach that to', async () => {
+    const { client } = await announce();
+    const pending = await pendingOf();
+
+    await service.cancel(pending.id, { userId: 2, authenticationMethod: 'api-token', apiTokenId: 5 });
+
+    expect((await client.next('failed'))['reason']).toBe('cancelled-by-admin');
+    expect(service.get(pending.id)).toMatchObject({ state: 'cancelled', failureReason: 'cancelled-by-admin' });
+    // A pending request names no reader before its approval (token readers that bound one are gone, ATT-1207), and
+    // every pairing audit event needs a reader as its subject.
+    expect(audited).toEqual([]);
+  });
+
   it('undoes an approval the reader never received because it left right after the commit', async () => {
     const { client, code } = await announce();
     const pending = await pendingOf();
@@ -673,33 +602,6 @@ describe('PairingService', () => {
     expect(readers.size).toBe(0);
     expect(audited.map((a) => a['action'])).not.toContain('attractap.reader.enrolled');
     expect(service.get(pending.id)).toMatchObject({ state: 'failed', failureReason: 'reader-disconnected' });
-  });
-
-  it('gives a token reader its token back when it never received its approval', async () => {
-    readers.set(7, { id: 7, name: 'old', pairingState: 'unpaired', apiTokenHash: 'h', credentialFingerprint: null });
-    nextId = 8;
-    const { client, code } = await announce({ ticket: service.issueBindingTicket(7) });
-    const pending = await pendingOf();
-    const markPaired = registry['markPaired'] as (input: unknown) => Promise<unknown>;
-    registry['markPaired'] = async (input: unknown) => {
-      const result = await markPaired(input);
-      client.ws.close();
-      await waitFor(() => requestOf(pending.id).ws.readyState === WebSocket.CLOSED);
-      return result;
-    };
-    await expect(service.approve(pending.id, { code, mode: 'pair' }, actor)).rejects.toThrow('PairingReaderGone');
-    // Still the token reader it was: it keeps signing in with its token and can be paired again.
-    expect(readers.get(7)).toMatchObject({ pairingState: 'unpaired', apiTokenHash: 'h', credentialFingerprint: null });
-    expect(credentialEvents.map((e) => e['state'])).toEqual(['paired', 'revoked']);
-    // One audit event says why; no enrolment or confirmation for the undone approval.
-    expect(audited).toEqual([
-      expect.objectContaining({
-        action: 'attractap.reader.pairing_failed',
-        subject: { type: 'attractap.reader', id: 7 },
-        details: { reason: 'not-delivered' },
-      }),
-    ]);
-    expect(emitted).toEqual([7, 7]); // after the commit and after the undo
   });
 
   /** Makes the reader leave right after the commit, before `accepted` reaches it. */
@@ -721,7 +623,6 @@ describe('PairingService', () => {
       pairingState: 'paired',
       credentialFingerprint: 'old-fp',
       certificateSerial: '00',
-      apiTokenHash: '',
     });
     const { client, code } = await announce();
     const pending = await pendingOf();
@@ -831,27 +732,6 @@ describe('PairingService', () => {
     await waitFor(() => limits.pendingCount === 0);
     expect(limits.pendingCount).toBe(0);
     expect(service.list()).toEqual([]);
-  });
-
-  it('does not use up a binding ticket on a hello that was rate limited', async () => {
-    readers.set(7, { id: 7, name: 'old', pairingState: 'unpaired', apiTokenHash: 'h', credentialFingerprint: null });
-    const ticket = service.issueBindingTicket(7);
-    jest.spyOn(limits, 'admit').mockReturnValueOnce({ allowed: false, reason: 'RATE_LIMITED' });
-    const limited = new PairingClient(url);
-    clients.push(limited);
-    await limited.opened();
-    limited.send({
-      type: 'hello',
-      v: 1,
-      kind: 'touch',
-      publicKey: (await readerKey()).toString('base64'),
-      firmware,
-      ticket,
-    });
-    expect((await limited.next('failed'))['reason']).toBe('rate-limited');
-
-    await announce({ ticket });
-    expect((await pendingOf()).boundReaderId).toBe(7);
   });
 
   it('aborts when the reader cancels, and accepts a new request on the same connection', async () => {
@@ -968,28 +848,18 @@ describe('PairingService', () => {
     emitted.length = 0;
     emittedEvents.length = 0;
 
-    await service.revoke(readerId, actor);
+    await service.revoke(readerId, { userId: 2, authenticationMethod: 'api-token', apiTokenId: 5 });
     expect(readers.get(readerId)).toMatchObject({ pairingState: 'revoked' });
-    expect(audited.at(-1)).toMatchObject({ action: 'attractap.reader.revoked' });
+    // The admin who did it is the actor, with the API token it used.
+    expect(audited.at(-1)).toMatchObject({
+      action: 'attractap.reader.revoked',
+      actor: { id: 2, authenticationMethod: 'api-token', apiTokenId: 5 },
+      subject: { type: 'attractap.reader', id: readerId },
+      details: { reason: 'admin' },
+    });
     expect(emittedEvents).toEqual([CREDENTIAL_CHANGED_EVENT]);
     expect(emitted).toEqual([readerId]);
     expect(grants.get(peer.spkiFingerprint)).toBeUndefined();
     expect(await service.resolveBootstrap(peer)).toBeNull();
-  });
-
-  it('records the admin who cancelled a pairing', async () => {
-    readers.set(7, { id: 7, name: 'old', pairingState: 'unpaired', apiTokenHash: 'h', credentialFingerprint: null });
-    const { client } = await announce({ ticket: service.issueBindingTicket(7) });
-    const pending = await pendingOf();
-    await service.cancel(pending.id, { userId: 2, authenticationMethod: 'api-token', apiTokenId: 5 });
-    expect((await client.next('failed'))['reason']).toBe('cancelled-by-admin');
-    expect(audited).toEqual([
-      expect.objectContaining({
-        action: 'attractap.reader.pairing_failed',
-        actor: { id: 2, authenticationMethod: 'api-token', apiTokenId: 5 },
-        subject: { type: 'attractap.reader', id: 7 },
-        details: { reason: 'cancelled-by-admin' },
-      }),
-    ]);
   });
 });

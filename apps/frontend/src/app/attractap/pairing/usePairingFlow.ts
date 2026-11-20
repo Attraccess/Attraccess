@@ -25,11 +25,10 @@ import de from './de.json';
 import en from './en.json';
 
 export type Choice = 'new' | 'takeover';
-type Mode = 'new' | 'pair' | 'takeover';
+type Mode = 'new' | 'takeover';
 
 export interface PairingFlowProps {
   pairingId?: string;
-  waitForReaderId?: number;
   presetCode?: string;
   via?: 'flasher';
   presetTargetReaderId?: number;
@@ -38,7 +37,6 @@ export interface PairingFlowProps {
 }
 
 const POLL_INTERVAL_MS = 1000;
-const NO_RESPONSE_TIMEOUT_MS = 30_000;
 // After these the request moved on or ended: read it again so the dialog shows what the reader shows.
 const REREAD_ERRORS: ReadonlySet<string> = new Set(['stale', 'notWaiting', 'failed', 'readerGone']);
 // The request is over; once the dialog shows how it ended, the error would only repeat it.
@@ -48,18 +46,17 @@ export const isFinished = (pairing: PairingDto | null) =>
   pairing !== null && TERMINAL_PAIRING_STATES.includes(pairing.state);
 
 /**
- * Paired and not paired records in one list. A reader that was just paired can briefly be in both
- * lists; it is listed once, as the paired entry.
+ * Paired records and records whose pairing was removed in one list. A reader that was just paired can briefly be
+ * in both lists; it is listed once, as the paired entry.
  */
-export function mergeReaderLists(paired?: Attractap[], unpaired?: Attractap[]): Attractap[] | undefined {
-  if (!paired && !unpaired) return undefined;
+export function mergeReaderLists(paired?: Attractap[], removed?: Attractap[]): Attractap[] | undefined {
+  if (!paired && !removed) return undefined;
   const pairedIds = new Set((paired ?? []).map((reader) => reader.id));
-  return [...(paired ?? []), ...(unpaired ?? []).filter((reader) => !pairedIds.has(reader.id))];
+  return [...(paired ?? []), ...(removed ?? []).filter((reader) => !pairedIds.has(reader.id))];
 }
 
-/** What the reader is: its own record (token), a takeover of a chosen record, or a new record. */
-export function modeOf(bound: boolean, hasPresetTarget: boolean, choice: Choice): Mode {
-  if (bound) return 'pair';
+/** What the reader becomes: a takeover of a chosen record, or a new record. */
+export function modeOf(hasPresetTarget: boolean, choice: Choice): Mode {
   return hasPresetTarget || choice === 'takeover' ? 'takeover' : 'new';
 }
 
@@ -81,41 +78,12 @@ export function approvalBase({ mode, targetReaderId, name, via }: BodyInput) {
   };
 }
 
-/**
- * The request a token reader sends after it was asked to pair. Once seen it is kept, so the dialog can
- * show how it ended (the list of pairings only holds running ones).
- */
-function useArrivedPairing(props: PairingFlowProps, running: PairingDto[]) {
-  const { waitForReaderId, pairingId } = props;
-  const arrived = running.find((p) => waitForReaderId !== undefined && p.boundReaderId === waitForReaderId)?.id;
-  const [seenId, setSeenId] = useState<string | null>(null);
-  const [noResponse, setNoResponse] = useState(false);
-
-  useEffect(() => {
-    if (!arrived) return;
-    setSeenId(arrived);
-    // A reader that answers late can still be approved.
-    setNoResponse(false);
-  }, [arrived]);
-
-  // A reader that was asked to pair but never connects is off or runs software that cannot pair yet.
-  const waiting = waitForReaderId !== undefined && !pairingId && !arrived && !seenId;
-  useEffect(() => {
-    if (!waiting) return;
-    const timer = setTimeout(() => setNoResponse(true), NO_RESPONSE_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [waiting]);
-
-  return { arrivedId: arrived ?? seenId, noResponse };
-}
-
-/** Finds the request the dialog works on: given, announced by a token reader, picked, or found by code. */
+/** Finds the request the dialog works on: given, picked, or found by code. */
 function useActivePairing(props: PairingFlowProps, resolved: PairingDto | null, pickedId: string | null) {
   const { data: allPairings } = useGetPairings({}, undefined, { refetchInterval: POLL_INTERVAL_MS });
   const running = useMemo(() => (allPairings ?? []).filter((p) => isPairingRunning(p.state)), [allPairings]);
-  const { arrivedId, noResponse } = useArrivedPairing(props, running);
 
-  const activeId = props.pairingId ?? arrivedId ?? pickedId ?? resolved?.id ?? null;
+  const activeId = props.pairingId ?? pickedId ?? resolved?.id ?? null;
   const query = useGetPairing({ path: { pairingId: activeId ?? '' } }, undefined, {
     enabled: activeId !== null,
     // Nothing changes any more once the pairing ended.
@@ -128,7 +96,6 @@ function useActivePairing(props: PairingFlowProps, resolved: PairingDto | null, 
     activeId,
     current,
     resolvedByCode,
-    noResponse,
     pollingFailed: query.isError,
     refetch: query.refetch,
   };
@@ -198,7 +165,6 @@ export interface PairingFlow {
   activeId: string | null;
   current: PairingDto | null;
   resolvedByCode: boolean;
-  noResponse: boolean;
   pollingFailed: boolean;
   readers: Attractap[] | undefined;
   codeInput: string;
@@ -219,7 +185,6 @@ export interface PairingFlow {
   notice: string | null;
   idle: boolean;
   normalizedCode: string | null;
-  bound: boolean;
   byPattern: boolean;
   finished: boolean;
   canFind: boolean;
@@ -232,7 +197,6 @@ export interface PairingFlow {
   cancel: () => void;
   resolvePending: boolean;
   approvePending: boolean;
-  waitingForReader: boolean;
   needsCodeToFind: boolean;
   needsChoice: boolean;
 }
@@ -262,10 +226,10 @@ export function usePairingFlow(props: PairingFlowProps): PairingFlow {
 
   const active = useActivePairing(props, resolved, pickedId);
   const { current, resolvedByCode, refetch } = active;
-  // The pairing session sees every reader record: paired ones and the ones that are not paired yet.
+  // The pairing session sees every reader record: paired ones and the ones whose pairing was removed.
   const { data: pairedReaders } = useGetReaders();
-  const { data: unpairedReaders } = useGetReadersToPair();
-  const readers = useMemo(() => mergeReaderLists(pairedReaders, unpairedReaders), [pairedReaders, unpairedReaders]);
+  const { data: removedReaders } = useGetReadersToPair();
+  const readers = useMemo(() => mergeReaderLists(pairedReaders, removedReaders), [pairedReaders, removedReaders]);
 
   const refreshLists = () =>
     Promise.all(
@@ -306,7 +270,7 @@ export function usePairingFlow(props: PairingFlowProps): PairingFlow {
       // A preset target means the record was paired before: it is paired again.
       const title = props.presetTargetReaderId === undefined ? 'dialog.paired' : 'security.pairedAgain';
       toast.success({ title: t(title), duration: 2500 });
-      const readerId = done.targetReaderId ?? done.boundReaderId;
+      const readerId = done.targetReaderId;
       if (readerId === null) onClose();
       else props.onPaired?.(readerId);
     },
@@ -327,8 +291,7 @@ export function usePairingFlow(props: PairingFlowProps): PairingFlow {
   );
   const blocked = countdown.secondsLeft > 0;
   const normalizedCode = normalizeEnrollmentCode(codeInput);
-  const bound = current?.boundReaderId != null;
-  const mode = modeOf(bound, !!props.presetTargetReaderId, choice);
+  const mode = modeOf(!!props.presetTargetReaderId, choice);
   const targetReaderId = props.presetTargetReaderId ?? pickedTarget;
   // A Lite reader that was not found by its code is compared by its colour pattern.
   const byPattern = current?.kind === 'lite' && !resolvedByCode;
@@ -381,8 +344,7 @@ export function usePairingFlow(props: PairingFlowProps): PairingFlow {
   // The round on screen, so it always matches what the admin can see.
   shownRound.current = byPattern ? (current?.round ?? null) : null;
 
-  const waitingForReader = props.waitForReaderId !== undefined && !active.activeId && !active.noResponse;
-  const needsCodeToFind = !active.activeId && !waitingForReader && !active.noResponse;
+  const needsCodeToFind = !active.activeId;
   // Typing a new code answers an error about the old one, but not a wait the server asked for.
   const clearError = () => setError((previous) => (previous?.kind === 'rateLimited' ? previous : null));
   return {
@@ -390,7 +352,6 @@ export function usePairingFlow(props: PairingFlowProps): PairingFlow {
     activeId: active.activeId,
     current,
     resolvedByCode,
-    noResponse: active.noResponse,
     pollingFailed: active.pollingFailed,
     readers,
     codeInput,
@@ -420,7 +381,6 @@ export function usePairingFlow(props: PairingFlowProps): PairingFlow {
     notice,
     idle,
     normalizedCode,
-    bound,
     byPattern,
     finished,
     canFind,
@@ -431,8 +391,7 @@ export function usePairingFlow(props: PairingFlowProps): PairingFlow {
     cancel: cancelAndClose,
     resolvePending: resolving,
     approvePending: approve.isPending,
-    waitingForReader,
     needsCodeToFind,
-    needsChoice: current !== null && !finished && !bound && props.presetTargetReaderId === undefined,
+    needsChoice: current !== null && !finished && props.presetTargetReaderId === undefined,
   };
 }

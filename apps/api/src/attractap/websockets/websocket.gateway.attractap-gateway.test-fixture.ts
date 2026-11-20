@@ -62,6 +62,7 @@ import { ReaderUiRegistry } from '../../plugin-system/reader-ui/reader-ui.regist
 import { MassIntroductionService } from '../../resources/mass-introductions/mass-introduction.service';
 import { AttractapGateway } from './websocket.gateway';
 import { WebsocketService } from './websocket.service';
+import { SESSION_SUBPROTOCOL } from '../security/session-framing';
 import { AuthenticatedWebSocket } from './websocket.types';
 
 const mockMetricsService = {
@@ -82,6 +83,7 @@ const mockMetricsToggle = { isEnabledCached: jest.fn().mockReturnValue(true) };
 function createMockSocket(overrides: Partial<AuthenticatedWebSocket> = {}): AuthenticatedWebSocket {
   return {
     id: 'test-id',
+    protocol: SESSION_SUBPROTOCOL,
     readerId: null,
     messageCount: 0,
     sendMessage: jest.fn().mockResolvedValue(undefined),
@@ -107,11 +109,18 @@ export function gatewayProviders(
       provide: PairingService,
       useValue: {
         handleConnection: jest.fn(),
-        issueBindingTicket: jest.fn(() => 'ticket-1'),
-        claimAutoPrompt: jest.fn(() => true),
       },
     },
-    { provide: ReaderSessionService, useValue: { accept: jest.fn() } },
+    {
+      provide: ReaderSessionService,
+      // A TLS session that signs in right away: the socket is registered like a paired reader's.
+      useValue: {
+        open: jest.fn(() => ({ close: jest.fn() })),
+        accept: jest.fn(async (socket: unknown, _connection: unknown, onReady: (s: unknown) => void) =>
+          onReady(socket),
+        ),
+      },
+    },
   ],
 ): Provider[] {
   return [

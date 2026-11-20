@@ -43,7 +43,6 @@ const waiting = {
   state: 'waiting',
   kind: 'touch',
   firmware: { name: 'attractap', variant: 'touch-v2', version: '1.8.0' },
-  boundReaderId: null,
   targetReaderId: null,
   mode: null,
   createdAt: '2026-10-31T07:00:00.000Z',

@@ -61,6 +61,14 @@ namespace ui
         const char *version;
         const char *resetReason;
         uint32_t uptimeMs;
+        // ATT-1207. The server never trusts these (the reader is not attested): `profile` and `release` gate the
+        // "secured" decision together with the eFuse report.
+        // "plain" | "secure" | "secure-lab"
+        const char *profile = "plain";
+        // Release build without test hooks.
+        bool release = false;
+        // The app's secure_version (esp_app_desc); negative = not reported (plain builds).
+        int64_t secureVersion = -1;
     };
 
     // The whole READER_FIRMWARE_INFO event; `scratch` (CAPABILITIES_UI_SCRATCH) must outlive its serialization.
@@ -74,6 +82,12 @@ namespace ui
         p["name"] = id.name;
         p["variant"] = id.variant;
         p["version"] = id.version;
+        p["profile"] = id.profile;
+        p["release"] = id.release;
+        if (id.secureVersion >= 0)
+        {
+            p["secureVersion"] = id.secureVersion;
+        }
         JsonObject caps = p["capabilities"].to<JsonObject>();
         caps["resourceSelection"] = v.hasDisplay;
         caps["cardEnrollment"] = v.hasDisplay;

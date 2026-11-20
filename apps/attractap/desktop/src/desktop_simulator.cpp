@@ -10,8 +10,6 @@ DesktopSimulator::DesktopSimulator(const std::string &endpoint, uint32_t readerI
 {
     if (profile.get("api.host").empty())
         profile.put("api.host", endpoint);
-    if (profile.get("api.readerId").empty())
-        profile.put("api.readerId", std::to_string(readerId));
 
     KVStore::setHostProfile(&profile);
     Settings::setup();
@@ -20,8 +18,6 @@ DesktopSimulator::DesktopSimulator(const std::string &endpoint, uint32_t readerI
         const auto apiEndpoint = parseApiEndpoint(profile.get("api.host"));
         Settings::saveAttraccessApiConfig(apiEndpoint.hostname, apiEndpoint.port, apiEndpoint.useSSL);
     }
-    if (readerId != 0 || Settings::getAttraccessAuthConfig().readerId == 0)
-        Settings::saveAttraccessAuthConfig(Settings::getAttraccessAuthConfig().apiKey, readerId);
 
     const auto apiConfig = Settings::getAttraccessApiConfig();
     State::setWifiState(true, {}, "Desktop");
@@ -47,7 +43,7 @@ DesktopSimulator::DesktopSimulator(const std::string &endpoint, uint32_t readerI
     sdlDisplay.setClearCardCallback([this](size_t index) { virtualNfc.clearCardData(index); });
 
     Display::setup(sdlDisplay);
-    // The production reader link: pairing, the TLS 1.3 session, or the token channel.
+    // The production reader link: pairing, the TLS 1.3 session, or nothing (a reader without credentials pairs).
     readerLink.emplace(*websocket, ReaderLink::Options{false, {FIRMWARE_NAME, FIRMWARE_VARIANT, FIRMWARE_VERSION}});
     api.emplace(*readerLink);
     application.emplace(virtualNfc, *api);

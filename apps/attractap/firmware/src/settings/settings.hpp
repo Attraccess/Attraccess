@@ -26,12 +26,6 @@ struct AttraccessApiConfig
     bool useSSL = false;
 };
 
-struct AttraccessAuthConfig
-{
-    std::string apiKey = "";
-    uint32_t readerId = 0;
-};
-
 class Settings
 {
 public:
@@ -49,22 +43,18 @@ public:
     static AttraccessApiConfig getAttraccessApiConfig();
     static void saveAttraccessApiConfig(const std::string &hostname, uint16_t port, bool useSSL);
 
-    static AttraccessAuthConfig getAttraccessAuthConfig();
-    static void saveAttraccessAuthConfig(const std::string &apiKey, uint32_t readerId);
-    static void clearAttraccessAuthConfig();
-
     static void saveDefaultLanguage(const std::string &language);
 
     static std::string getHostname();
 
 private:
+    static void eraseRetiredTokenKeys();
     static KVStore preferences;
     static Logger logger;
 
     static DeviceConfig _deviceConfig;
     static NetworkConfig _networkConfig;
     static AttraccessApiConfig _attraccessApiConfig;
-    static AttraccessAuthConfig _attraccessAuthConfig;
     static std::string _cachedDefaultLanguage;
 
     static std::string _hostname;

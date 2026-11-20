@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import type { UserEvent } from '@testing-library/user-event';
 import type { PropsWithChildren, ReactElement } from 'react';
 import { afterEach, beforeEach, vi } from 'vitest';
 
@@ -238,6 +239,16 @@ export function makePlugin(overrides: Record<string, unknown> = {}) {
     permissions: ['read:resources', 'write:resources'],
     ...overrides,
   };
+}
+/** Picks an item from a plugin row's actions menu, where Details, Manage version and Remove plugin live. */
+export async function chooseRowAction(user: UserEvent, pluginId: string, item: string) {
+  const trigger = await waitFor(() => {
+    const element = document.querySelector(`[data-cy="plugins-list-actions-button-${pluginId}"]`);
+    if (!element) throw new Error(`No actions menu for ${pluginId}`);
+    return element;
+  });
+  await user.click(trigger);
+  await user.click(await screen.findByRole('menuitem', { name: item }));
 }
 beforeEach(resetTestFixture);
 afterEach(() => {

@@ -2,7 +2,6 @@ import { Button } from '@attraccess/plugins-frontend-ui';
 import { useGetPluginSystemStatus } from '@attraccess/react-query-client';
 import type { MarketplacePluginDto } from '@attraccess/react-query-client';
 import { Alert, AlertContent, AlertDescription, AlertTitle } from '@heroui/react';
-import { BookOpen } from 'lucide-react';
 import { useState } from 'react';
 import { ReaderUiAlerts } from '../../../readerUi/ReaderUiAlerts';
 import { UploadPluginModal } from '../../../plugins/UploadPluginModal';
@@ -18,8 +17,6 @@ import { useMarketplaceBrowserState } from './marketplace/useMarketplaceBrowserS
 import type { FailedPlugin, VersionPlugin } from './types';
 import { usePluginsTranslations } from './usePluginsTranslations';
 import { VersionManagementModal } from './versions/VersionManagementModal';
-
-const DOCS_URL = 'https://docs.attraccess.org/#/plugins/developing-plugins';
 
 /**
  * Installed plugins. This is the one section on `system.plugins.manage` rather than
@@ -41,21 +38,8 @@ export function PluginsSection() {
 
   const availableUpdates = installed.filter((plugin) => plugin.updateCheck?.state === 'available');
 
-  const aside = (
-    <div className="flex flex-col gap-2">
-      <h3 className="text-sm font-semibold text-foreground">{t('aside.title')}</h3>
-      <p className="text-xs text-muted">{t('aside.description')}</p>
-      <a href={DOCS_URL} target="_blank" rel="noreferrer" data-cy="plugins-list-docs-link">
-        <Button variant="secondary" size="sm">
-          <BookOpen size={16} />
-          {t('docsButton')}
-        </Button>
-      </a>
-    </div>
-  );
-
   return (
-    <SettingsSection title={t('title')} description={t('description')} aside={aside}>
+    <SettingsSection title={t('title')} description={t('description')} fullWidth>
       <div data-cy="plugins-list-card" className="flex flex-col gap-4">
         {pluginSystemStatus?.disabled === true ? (
           <Alert status="warning" data-cy="plugins-disabled-warning">

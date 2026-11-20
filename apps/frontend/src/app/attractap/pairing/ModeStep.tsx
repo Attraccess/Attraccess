@@ -13,20 +13,23 @@ const MODES: Choice[] = ['new', 'takeover'];
 /** New reader (optional name) or a takeover of an existing record. */
 export function ModeStep({ flow }: Readonly<{ flow: PairingFlow }>) {
   const { t } = useTranslations({ de, en });
-  const ownReaderId = flow.current?.boundReaderId ?? null;
   const readerOptions = useMemo(
-    // Any record can be taken over, also a token reader that was never paired (new hardware replaces it).
-    () =>
-      (flow.readers ?? [])
-        .filter((reader) => reader.id !== ownReaderId)
-        .map((reader) => ({ key: reader.id.toString(), label: reader.name })),
-    [flow.readers, ownReaderId],
+    // Any record can be taken over, also one whose pairing was removed (new hardware replaces it).
+    () => (flow.readers ?? []).map((reader) => ({ key: reader.id.toString(), label: reader.name })),
+    [flow.readers],
   );
+  // Nothing to take over yet, for example right after the upgrade that removed every reader record.
+  const noRecords = flow.readers?.length === 0;
   return (
     <div className="flex flex-col gap-3">
       <p>{t('dialog.chooseMode')}</p>
       <Select
-        items={MODES.map((m) => ({ key: m, label: t(`dialog.mode.${m}`) }))}
+        items={MODES.map((m) => ({
+          key: m,
+          label: t(`dialog.mode.${m}`),
+          description: m === 'takeover' && noRecords ? t('dialog.mode.takeoverUnavailable') : undefined,
+        }))}
+        disabledKeys={noRecords ? ['takeover'] : []}
         aria-label={t('dialog.chooseMode')}
         value={flow.choice}
         onChange={(key) => flow.setChoice(key as Choice)}

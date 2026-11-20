@@ -6,7 +6,7 @@ import en from './en.json';
 
 export type ReaderKind = 'touch' | 'lite';
 
-/** The reader type from its firmware, so token readers and waiting devices are labelled the same way. */
+/** The reader type from its firmware, so reader records and waiting requests are labelled the same way. */
 export function readerKindOf(firmware: { name?: string } | null | undefined): ReaderKind {
   return firmware?.name?.includes('lite') ? 'lite' : 'touch';
 }

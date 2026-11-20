@@ -38,10 +38,10 @@ Ein Leser kann sich nicht selbst registrieren. Er zeigt einen wechselnden Code, 
 2. Scannen Sie den QR-Code mit Ihrem Smartphone, oder oeffnen Sie in Attraccess die Leser-Seite (**Geraete** > **Attractap-Lesegeraete**), klicken Sie im Block **Nicht gekoppelt** beim wartenden Leser auf **Koppeln** und geben Sie den Code ein.
 3. Geben Sie optional einen Namen ein (z.B. "Lasercutter-Leser") und klicken Sie auf **Freigeben**.
 
-Der Leser verbindet sich und ist einsatzbereit. Details, das LED-Muster der Lite-Variante, Sicherheitshinweise und den Umgang mit frueher registrierten Lesern finden Sie unter [Reader koppeln](attractap/pairing.md).
+Der Leser verbindet sich und ist einsatzbereit. Details, das LED-Muster der Lite-Variante, Sicherheitshinweise und den Ablauf nach dem Upgrade auf Firmware 2.6.0, bei dem jeder Leser neu koppelt, finden Sie unter [Reader koppeln](attractap/pairing.md).
 
 > [!NOTE]
-> Zum Freigeben eines Lesers brauchen Sie die Berechtigung `resources.update`. Leser mit Firmware aelter als 1.8.0 koennen keinen neuen Leser koppeln; aktualisieren Sie sie zuerst mit dem Web-Flasher.
+> Zum Freigeben eines Lesegeräts brauchen Sie die Berechtigung `resources.update`. Ein Lesegerät, das sich mit einem Token anmeldet (jede Firmware älter als 1.8.0 und ein nie gekoppeltes Lesegerät mit 1.8.0 bis 2.5.x), kann weder koppeln noch per Funk aktualisiert werden; flashen Sie es zuerst mit dem Web-Flasher (USB) auf Firmware 2.6.0.
 
 ## Schritt 3: Ressourcen dem Leser zuweisen
 
@@ -89,7 +89,7 @@ Der Leser kommuniziert mit dem Attraccess-Backend ueber WebSocket. Die Verbindun
 | Leser-Display zeigt "Keine Verbindung" | Pruefen Sie die Netzwerkkonnektivitaet und ueberpruefen Sie die Attraccess-Server-URL |
 | Leser erscheint nicht in Attraccess | Stellen Sie sicher, dass der Leser im selben Netzwerk ist und das Backend erreichen kann. Ein Reverse Proxy muss den Header `Sec-WebSocket-Protocol` durchreichen |
 | Code wird abgelehnt | Der Code wechselt alle 30 Sekunden; geben Sie den aktuell angezeigten ein. Scheitert ein korrekt abgelesener Code immer wieder, pruefen Sie Ihr Netzwerk |
-| Einstellungen eines Lesers sind gesperrt | Der Leser ist noch nicht gekoppelt; nutzen Sie **Koppeln** in seiner Zeile |
+| Liste der Lesegeräte ist nach einem Server-Update leer | Das Release, das die Token-Anmeldung entfernt (Attractap-Firmware 2.6.0), löscht alle Einträge der Lesegeräte. Koppeln Sie jedes Lesegerät neu, siehe [Nach dem Upgrade](attractap/pairing.md#nach-dem-upgrade-jeder-reader-koppelt-neu) |
 | Kartenscan ohne Reaktion | Ueberpruefen Sie, ob die RFID-Karte registriert ist und der Leser eine zugewiesene Ressource hat |
 
 ## Siehe auch

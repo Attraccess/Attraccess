@@ -105,7 +105,7 @@ describe('AttractapMassIntroductionHandler', () => {
       expect(start.payload.remainingMs).toBeGreaterThan(0);
     });
 
-    it.each(['unpaired', 'revoked'])('refuses a %s reader and arms nothing', async (pairingState) => {
+    it.each(['revoked'])('refuses a %s reader and arms nothing', async (pairingState) => {
       attractapService.findReaderById.mockResolvedValue({
         id: READER_ID,
         name: 'Entrance',

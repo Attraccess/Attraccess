@@ -76,14 +76,14 @@ describe('CredentialRegistryService', () => {
       ['replaced', 'old', '0a'],
       ['paired', 'new', '0b'],
     ]);
-    expect(rows.get(3)).toMatchObject({ credentialFingerprint: 'new', certificateSerial: '0b', apiTokenHash: '' });
+    expect(rows.get(3)).toMatchObject({ credentialFingerprint: 'new', certificateSerial: '0b' });
     expect(await service.isActive(3, 'new')).toBe(true);
     expect(await service.isActive(3, 'old')).toBe(false);
   });
 
   it('refuses to make a key the credential of a second reader', async () => {
     seed(6, paired(6, 'shared'));
-    seed(7, { id: 7, name: 'reader-7', pairingState: 'unpaired', credentialFingerprint: null });
+    seed(7, { id: 7, name: 'reader-7', pairingState: 'revoked', credentialFingerprint: null });
     const pair = (readerId: number) =>
       service.markPaired({
         readerId,
@@ -93,7 +93,7 @@ describe('CredentialRegistryService', () => {
         previousCredentialBecomes: 'revoked',
       });
     await expect(pair(7)).rejects.toThrow('PairingKeyInUse');
-    expect(rows.get(7)?.pairingState).toBe('unpaired');
+    expect(rows.get(7)?.pairingState).toBe('revoked');
     expect(events()).toEqual([]);
     // The same record with the same key again is not a second reader.
     await expect(pair(6)).resolves.toMatchObject({ previousFingerprint: null });
@@ -111,7 +111,7 @@ describe('CredentialRegistryService', () => {
   it('puts a replaced credential back, appending to the history, when the approval is undone', async () => {
     const notAfter = new Date('2027-01-01T00:00:00Z');
     const pairedAt = new Date('2026-01-01T00:00:00Z');
-    seed(8, { ...paired(8, 'old'), certificateNotAfter: notAfter, pairedAt, apiTokenHash: '' });
+    seed(8, { ...paired(8, 'old'), certificateNotAfter: notAfter, pairedAt });
     const { before } = await markPaired(8, 'new', 'replaced');
     expect(await service.isActive(8, 'new')).toBe(true);
 
@@ -133,12 +133,11 @@ describe('CredentialRegistryService', () => {
     ]);
   });
 
-  it('gives a token reader its token back when the approval is undone', async () => {
-    seed(9, { id: 9, name: 'reader-9', pairingState: 'unpaired', credentialFingerprint: null, apiTokenHash: 'h' });
+  it('puts a record without a credential back when the approval is undone', async () => {
+    seed(9, { id: 9, name: 'reader-9', pairingState: 'revoked', credentialFingerprint: null });
     const { before } = await markPaired(9, 'new', 'revoked');
-    expect(rows.get(9)?.apiTokenHash).toBe('');
     await service.undoPairing({ readerId: 9, fingerprint: 'new', before, actorId: 1 });
-    expect(rows.get(9)).toMatchObject({ pairingState: 'unpaired', credentialFingerprint: null, apiTokenHash: 'h' });
+    expect(rows.get(9)).toMatchObject({ pairingState: 'revoked', credentialFingerprint: null });
     expect(events().map((e) => e['state'])).toEqual(['paired', 'revoked']);
   });
 
