@@ -24,11 +24,12 @@ function valueAt(data: unknown, path: readonly PropertyKey[]): unknown {
 
 /**
  * Turns a schema error into one short, JSON-free error per issue. A missing value is reported
- * as `required`; Zod 4 issues do not carry their input, so the value is looked up in `data`.
+ * as `required`, whatever the issue code (Zod 4 reports a missing enum as `invalid_value`, not
+ * `invalid_type`); its issues do not carry their input, so the value is looked up in `data`.
  */
 export function zodErrorToFieldErrors(error: ZodError, data: unknown): NodeFieldError[] {
   return error.issues.map((issue) => {
-    const required = issue.code === 'invalid_type' && valueAt(data, issue.path) === undefined;
+    const required = valueAt(data, issue.path) === undefined;
     return {
       field: issue.path.map(String).join('.') || 'data',
       code: required ? 'required' : 'invalid',

@@ -29,6 +29,15 @@ describe('zodErrorToFieldErrors', () => {
     expect(error.message).toContain('Too small');
   });
 
+  it('reports a missing enum value as required, whatever code Zod uses for it', () => {
+    // Zod 4 reports a missing enum as `invalid_value`, not `invalid_type`.
+    const withEnum = z.object({ method: z.enum(['GET', 'POST']) });
+    expect(issuesOf(withEnum, {})).toEqual([{ field: 'method', code: 'required', message: REQUIRED_FIELD_MESSAGE }]);
+    expect(issuesOf(withEnum, { method: 'FETCH' })).toEqual([
+      { field: 'method', code: 'invalid', message: expect.stringContaining('Invalid option') },
+    ]);
+  });
+
   it('uses "data" for an issue on the whole configuration', () => {
     expect(issuesOf(schema, undefined)).toEqual([{ field: 'data', code: 'required', message: REQUIRED_FIELD_MESSAGE }]);
     expect(issuesOf(schema, 'text')).toEqual([{ field: 'data', code: 'invalid', message: expect.any(String) }]);
