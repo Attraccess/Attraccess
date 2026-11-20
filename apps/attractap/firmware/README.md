@@ -307,7 +307,7 @@ changes nothing. Who opens it:
 - Touch / Touch V2: at every boot while unpaired (`Application::tickBtSetup`, first main-loop pass), and the **Bluetooth setup**
   button next to **Settings** on `InitScreen` (shown only while unpaired and no window is open; no PIN, the commands
   check it). If NimBLE cannot start, the button shows "Bluetooth unavailable". While the window is open,
-  `InitScreen` and the pairing-code screen show "Bluetooth setup open · mm:ss · Attractap Touch XXXX", or
+  `InitScreen` and the pairing-code screen show "Bluetooth setup open · mm:ss" over the name `Attractap Touch XXXX`, or
   "Bluetooth setup: browser connected" (`display/shared/btSetupStatus.hpp`, `messages.catalog.bt-setup.hpp`).
 - Lite: at every boot while unpaired. The ring shows `LED_STATE_BT_SETUP` (`led/led_bt_setup.hpp`): two short
   blue pulses every 1.5 s over a dim ring, steady blue with a browser connected. It replaces Configuration Required
@@ -324,7 +324,7 @@ required) takes the bytes of Serial Configurator lines (`CMND <topic> <json>\n`,
 most 256 bytes; a longer one is dropped whole); TX `...a003` notifies the replies (`RESP <topic> <json>\n`, split
 into ATT MTU - 3 pieces). The lines run through `SerialCommandHandler` on the main loop with the serial PIN rules
 (`SerialCommandHandler::Channel`). Pairing is LE Secure Connections, Just Works, without stored bonds. The host task
-stack (4 KB) comes from PSRAM where there is some.
+stack (4 KB) stays in internal RAM: with it in PSRAM the S3's host stalled through the whole 30 s pairing timeout.
 
 **NimBLE ownership.** While the window is open the BLE proxy refuses to start (`READER_OFFLINE` `bt-setup`,
 retryable). Closing drops the link, stops advertising, frees NimBLE and restores `ble_hs_cfg` as it was before the

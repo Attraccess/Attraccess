@@ -70,7 +70,9 @@ def build_table(entries):
 
 
 def compile_entry(name, defines="-DATTRACTAP_SECURE_PROFILE=1"):
-    return {"file": f"/fw/src/{name}", "command": f"xtensa-esp32s3-elf-g++ {defines} -c {name}"}
+    return {"file": f"/fw/src/{name}",
+            "command": f"xtensa-esp32s3-elf-g++ {defines} -o esp-idf/main/CMakeFiles/__idf_main.dir/__/src/{name}.obj "
+                       f"-c /fw/src/{name}"}
 
 
 # A secure build: the command handler and the Bluetooth setup, no console input.
@@ -79,7 +81,9 @@ SECURE_COMPILE_COMMANDS = [
     compile_entry("serial/serialCommandHandler.cpp"),
     compile_entry("bt_setup/bt_setup.cpp"),
     compile_entry("api/security/tls_memory.c"),
-    {"file": "/idf/components/bt/host/nimble/ble_hs.c", "command": "xtensa-esp32s3-elf-gcc -c ble_hs.c"},
+    # Other components have src/ trees too and never get the app's defines.
+    {"file": "/idf/components/bootloader_support/bootloader_flash/src/bootloader_flash.c",
+     "command": "xtensa-esp32s3-elf-gcc -o esp-idf/bootloader_support/x.obj -c bootloader_flash.c"},
 ]
 
 
@@ -178,7 +182,8 @@ class SecureProfileChecks(unittest.TestCase):
             write_build_dir(build, sdkconfig=PROFILE.replace("CONFIG_NVS_ENCRYPTION=y\n", ""),
                             bootloader_size=0x7800, table=build_table([]),
                             compile_commands=[{"file": "/fw/src/serial/serialConsoleInput.cpp",
-                                               "arguments": ["g++", "-c", "serialConsoleInput.cpp"]}],
+                                               "arguments": ["g++", "-o", "__idf_main.dir/x.obj", "-c",
+                                                             "serialConsoleInput.cpp"]}],
                             linker_map=UNLINKED_MAP)
             # sdkconfig, bootloader, partition table, then: console input, define, Bluetooth channel, and the
             # TLS allocator neither compiled in nor linked.

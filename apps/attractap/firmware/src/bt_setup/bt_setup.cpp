@@ -16,10 +16,8 @@
 #include <cstring>
 #include <string>
 
-#include "esp_heap_caps.h"
 #include "esp_mac.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/idf_additions.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "host/ble_gap.h"
@@ -220,22 +218,17 @@ namespace bt_setup
             services[0].characteristics = characteristics;
         }
 
-        // `arg` is non-null when the stack came from heap_caps (PSRAM): such a task must end with vTaskDeleteWithCaps.
-        void hostTask(void *arg)
+        void hostTask(void *)
         {
             nimble_port_run(); // until close() calls nimble_port_stop()
-            if (arg) vTaskDeleteWithCaps(nullptr);
-            else vTaskDelete(nullptr);
+            vTaskDelete(nullptr);
         }
 
-        // NimBLE's host task, its stack in PSRAM where there is some (the readers), else in internal RAM (the bridge).
+        // NimBLE's host task, its stack in internal RAM: pairing (LE Secure Connections key generation) on a PSRAM
+        // stack stalled the host for the whole 30 s SMP timeout on the S3 (ATT-1371 lab run).
         bool startHostTask()
         {
-            static int withCaps = 1;
-            return xTaskCreatePinnedToCoreWithCaps(hostTask, "nimble_host", HOST_TASK_STACK, &withCaps,
-                                                   configMAX_PRIORITIES - 4, nullptr, CONFIG_BT_NIMBLE_PINNED_TO_CORE,
-                                                   MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) == pdPASS ||
-                   xTaskCreatePinnedToCore(hostTask, "nimble_host", HOST_TASK_STACK, nullptr, configMAX_PRIORITIES - 4,
+            return xTaskCreatePinnedToCore(hostTask, "nimble_host", HOST_TASK_STACK, nullptr, configMAX_PRIORITIES - 4,
                                            nullptr, CONFIG_BT_NIMBLE_PINNED_TO_CORE) == pdPASS;
         }
 
