@@ -44,6 +44,7 @@ export function MonitoringApiKeyRow({ apiKeyConfigured, generatedKey, setGenerat
       queryClient.invalidateQueries({ queryKey: UseGetMetricsSettingsKeyFn() });
       toast.success({ title: t('keyGenerated.title'), description: t('keyGenerated.description') });
     },
+    onError: (error) => toast.error({ title: t('keyGenerateFailed'), description: (error as Error).message }),
   });
 
   const { mutateAsync: deleteApiKey, isPending: isDeleting } = useDeleteMetricsApiKey(undefined, {
@@ -52,6 +53,7 @@ export function MonitoringApiKeyRow({ apiKeyConfigured, generatedKey, setGenerat
       queryClient.invalidateQueries({ queryKey: UseGetMetricsSettingsKeyFn() });
       toast.success({ title: t('keyRemoved.title'), description: t('keyRemoved.description') });
     },
+    onError: (error) => toast.error({ title: t('keyRemoveFailed'), description: (error as Error).message }),
   });
 
   return (

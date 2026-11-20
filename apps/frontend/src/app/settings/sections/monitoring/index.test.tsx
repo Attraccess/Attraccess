@@ -190,6 +190,16 @@ describe('MonitoringSection', () => {
     expect(error).toHaveBeenLastCalledWith({ title: 'toggles.errorTitle', description: 'toggles.errorDescription' });
   });
 
+  it('reports a failed key generation or removal in a toast', () => {
+    render(<MonitoringSection />);
+    const generate = vi.mocked(useGenerateMetricsApiKey).mock.calls.at(-1)?.[1] as { onError: (e: Error) => void };
+    const remove = vi.mocked(useDeleteMetricsApiKey).mock.calls.at(-1)?.[1] as { onError: (e: Error) => void };
+    act(() => generate.onError(new Error('boom')));
+    expect(error).toHaveBeenLastCalledWith({ title: 'keyGenerateFailed', description: 'boom' });
+    act(() => remove.onError(new Error('gone')));
+    expect(error).toHaveBeenLastCalledWith({ title: 'keyRemoveFailed', description: 'gone' });
+  });
+
   it('confirms regenerating and removing the API key before calling the API', async () => {
     const reroll = vi.fn().mockResolvedValue({ apiKey: 'new' });
     const remove = vi.fn().mockResolvedValue(undefined);
