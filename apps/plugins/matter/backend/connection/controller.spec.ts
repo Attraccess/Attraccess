@@ -189,6 +189,37 @@ describe('Matter connection settings API', () => {
     await until(() => fake?.sockets.size === 0);
   });
 
+  it('retries now: reconnects with the saved settings, audits it and never touches them', async () => {
+    fake = await FakeSidecar.start();
+    const harness = await setup();
+    service = harness.service;
+    await harness.controller.put({ url: fake.url, credential: TOKEN }, request());
+    await until(() => harness.controller.status().state === 'connected');
+    const saved = await harness.getRow();
+    const reload = jest.spyOn(harness.service, 'reload');
+    harness.audit.mockClear();
+
+    const status = await harness.controller.reconnect(request());
+
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(status.state).toBeDefined();
+    expect(await harness.getRow()).toEqual(saved);
+    expect(harness.audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'matter.connection_reconnect_requested',
+        subject: { type: 'matter.connection', id: 1 },
+        principal: { userId: 7, authenticationMethod: 'session' },
+      }),
+    );
+  });
+
+  it('retries now without a configuration: stays not_configured', async () => {
+    const harness = await setup();
+    service = harness.service;
+    const status = await harness.controller.reconnect(request());
+    expect(status.state).toBe('not_configured');
+  });
+
   it('audits changes with flags only, and skips silently on a host without audit support', async () => {
     const harness = await setup();
     service = harness.service;
@@ -301,7 +332,7 @@ describe('Matter connection settings API', () => {
   it('guards every route with its key from the Matter permission map (see permissions.spec.ts)', () => {
     const source = readFileSync(join(__dirname, 'controller.ts'), 'utf8');
     expect(source.match(/@Auth\(\.\.\.MATTER_OPERATIONS\./g)).toHaveLength(
-      source.match(/@(Get|Put|Delete)\(/g)?.length ?? -1,
+      source.match(/@(Get|Put|Post|Delete)\(/g)?.length ?? -1,
     );
     expect(COMPATIBILITY_TABLE).toHaveLength(1);
   });

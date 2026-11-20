@@ -51,6 +51,7 @@ const ROUTES: Route[] = [
   [MatterConnectionController, 'get', 'connectionSettings', 'get', '/matter/connection'],
   [MatterConnectionController, 'put', 'connectionSave', 'put', '/matter/connection'],
   [MatterConnectionController, 'remove', 'connectionRemove', 'delete', '/matter/connection'],
+  [MatterConnectionController, 'reconnect', 'connectionReconnect', 'post', '/matter/connection/reconnect'],
   [MatterConnectionController, 'status', 'connectionStatus', 'get', '/matter/connection/status'],
   [MatterFabricController, 'status', 'fabricStatus', 'get', '/matter/fabric'],
   [MatterFabricController, 'create', 'fabricCreate', 'post', '/matter/fabric/create'],

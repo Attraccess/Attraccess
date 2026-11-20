@@ -20,7 +20,7 @@ describe('matter plugin backend', () => {
       MatterFabricController,
       MatterBackupController,
     ]);
-    expect(module.providers).toHaveLength(15);
+    expect(module.providers).toHaveLength(17);
     expect(plugin.storage).toBe(MATTER_STORAGE);
     expect(plugin.auditDomains).toEqual([MATTER_AUDIT_DOMAIN]);
   });

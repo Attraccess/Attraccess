@@ -1,10 +1,18 @@
 import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
-import { ConflictException, Inject, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { SidecarClientError } from '../client/errors';
 import { MatterConnectionService } from '../connection/connection.service';
 import { PLUGIN_CONTEXT } from '../plugin-context';
 import { matterStorage, type MatterTables } from '../plugin-storage/access';
 import { DeviceAuditService } from './audit.service';
+import { MatterChangeBus } from './change-bus';
 import type { LifecycleState, MatterEndpoint, MatterFabric, MatterNode } from './entities';
 import type { MetadataInput } from './schemas';
 import type { NodeView } from './sidecar-types';
@@ -33,6 +41,7 @@ export class MatterLifecycleService {
     @Inject(PLUGIN_CONTEXT) private readonly context: PluginContext,
     @Inject(MatterConnectionService) private readonly connectionService: MatterConnectionService,
     @Inject(DeviceAuditService) private readonly audit: DeviceAuditService,
+    @Optional() @Inject(MatterChangeBus) private readonly changes?: MatterChangeBus,
   ) {}
 
   private get storage() {
@@ -98,6 +107,7 @@ export class MatterLifecycleService {
       });
       return node;
     });
+    this.changes?.inventoryChanged();
     await this.audit.record('matter.node_claimed', actor, nodeSubject(node), {
       nodeRef: node.id,
       nameSet: input.displayName !== undefined,
@@ -159,6 +169,7 @@ export class MatterLifecycleService {
       await this.moveEndpoints(tables, source, target, now);
       return { target, source, mismatch };
     });
+    this.changes?.inventoryChanged();
     await this.audit.record('matter.node_relinked', actor, nodeSubject(target), {
       nodeRef: target.id,
       sourceNodeRef: source.id,
@@ -203,6 +214,7 @@ export class MatterLifecycleService {
       await syncNode(tables, node, view, now, newCounters());
       return { node, reattached };
     });
+    this.changes?.inventoryChanged();
     await this.audit.record('matter.node_repaired', actor, nodeSubject(node), { nodeRef: node.id, reattached });
     return node;
   }
@@ -223,6 +235,7 @@ export class MatterLifecycleService {
       });
       return node;
     });
+    this.changes?.inventoryChanged();
     await this.audit.record('matter.node_archived', actor, nodeSubject(node), { nodeRef: node.id, previousState });
     return node;
   }
@@ -250,6 +263,7 @@ export class MatterLifecycleService {
       });
       return node;
     });
+    this.changes?.inventoryChanged();
     await this.audit.record('matter.node_restored', actor, nodeSubject(node), { nodeRef: node.id });
     return node;
   }
@@ -277,6 +291,7 @@ export class MatterLifecycleService {
       }
       return node;
     });
+    this.changes?.inventoryChanged();
     await this.audit.record('matter.node_force_removed', actor, nodeSubject(node), { nodeRef: node.id, previousState });
     return node;
   }
@@ -303,6 +318,7 @@ export class MatterLifecycleService {
       return { node, flags };
     });
     if (!flags) return node;
+    this.changes?.inventoryChanged();
     await this.audit.record('matter.node_metadata_updated', actor, nodeSubject(node), { nodeRef: node.id, ...flags });
     return node;
   }
@@ -322,6 +338,7 @@ export class MatterLifecycleService {
       return { endpoint, flags };
     });
     if (!flags) return endpoint;
+    this.changes?.inventoryChanged();
     await this.audit.record(
       'matter.endpoint_metadata_updated',
       actor,

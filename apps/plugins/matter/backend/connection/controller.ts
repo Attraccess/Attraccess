@@ -1,5 +1,5 @@
 import { Auth, type AuthenticatedRequest, type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Inject, Put, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Inject, Post, Put, Req } from '@nestjs/common';
 import { MATTER_OPERATIONS } from '../permissions';
 import { MatterConnectionService } from './connection.service';
 import { MissingCredentialError, MatterSettingsService, type PublicSettings } from './settings.service';
@@ -60,6 +60,19 @@ export class MatterConnectionController {
     const removed = await this.settings.remove();
     if (removed) await this.settings.audit('matter.connection_removed', principalOf(request));
     await this.service.reload();
+  }
+
+  /**
+   * "Retry now": reconnects at once instead of waiting for the next backoff step. Reads the saved settings again and
+   * changes nothing; with no configuration it stays `not_configured`. Answers with the status as it is right after.
+   */
+  @Auth(...MATTER_OPERATIONS.connectionReconnect)
+  @Post('reconnect')
+  @HttpCode(200)
+  async reconnect(@Req() request: AuthenticatedRequest): Promise<ConnectionStatus> {
+    await this.settings.audit('matter.connection_reconnect_requested', principalOf(request));
+    await this.service.reload();
+    return this.service.connection.status();
   }
 
   @Auth(...MATTER_OPERATIONS.connectionStatus)

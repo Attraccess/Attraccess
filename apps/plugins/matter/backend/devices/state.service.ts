@@ -1,9 +1,10 @@
 import type { CommandOutcomePayload, DeviceStatePayload } from '@attraccess/matter-contract';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PLUGIN_CONTEXT } from '../plugin-context';
 import { matterStorage, type MatterTables } from '../plugin-storage/access';
+import { MatterChangeBus } from './change-bus';
 import { pruneCommands } from './commands';
 import type { MatterEndpoint } from './entities';
 import { stateKeyFor } from './profile';
@@ -59,9 +60,14 @@ export const MAX_CLOCK_SKEW_MS = 5 * 60_000;
 export const MAX_VALUE_BYTES = 4_096;
 
 type Resolved = { endpoint: MatterEndpoint } | { ignored: 'unknownEndpoint' | 'inactiveNode' };
-/** The counters an event can raise. They are merged into `stats` only once the event's transaction committed. */
-type Delta = Omit<IngestStats, 'dropped'>;
+type Counters = Omit<IngestStats, 'dropped'>;
+/**
+ * The counters an event can raise, and the endpoints whose state it wrote. They are merged into `stats` and announced
+ * only once the event's transaction committed.
+ */
+type Delta = Counters & { touched: Set<string> };
 const newDelta = (): Delta => ({
+  touched: new Set(),
   applied: 0,
   outOfOrder: 0,
   unknownEndpoint: 0,
@@ -93,7 +99,10 @@ export class MatterStateService {
     dropped: 0,
   };
 
-  constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
+  constructor(
+    @Inject(PLUGIN_CONTEXT) private readonly context: PluginContext,
+    @Optional() @Inject(MatterChangeBus) private readonly changes?: MatterChangeBus,
+  ) {}
 
   private get storage() {
     return matterStorage(this.context);
@@ -113,7 +122,7 @@ export class MatterStateService {
 
   /** Records that a command was requested for a state key. Sets `requested`; the command stays unconfirmed. */
   async recordRequest(input: RecordRequestInput, now: string = new Date().toISOString()): Promise<StateEntryView> {
-    return this.storage.transaction(async (tables) => {
+    const view = await this.storage.transaction(async (tables) => {
       const current = await tables.endpointState.findOne({
         where: { endpointRef: input.endpointRef, stateKey: input.stateKey },
       });
@@ -146,6 +155,8 @@ export class MatterStateService {
       await pruneCommands(tables, new Date(now));
       return toView(next);
     });
+    this.changes?.stateChanged([input.endpointRef]);
+    return view;
   }
 
   /** A physical command timed out: the effect is unknown. It becomes `uncertain` and is never retried here. */
@@ -213,7 +224,9 @@ export class MatterStateService {
   }
 
   private merge(delta: Delta): void {
-    for (const key of Object.keys(delta) as (keyof Delta)[]) this.stats[key] += delta[key];
+    const { touched, ...counters } = delta;
+    for (const key of Object.keys(counters) as (keyof Counters)[]) this.stats[key] += counters[key];
+    this.changes?.stateChanged(touched);
   }
 
   /** One `device.state` event on its own. */
@@ -257,6 +270,7 @@ export class MatterStateService {
     );
     if (!next) return void (delta.outOfOrder += 1);
     await tables.endpointState.upsert(next, { conflictOn: ['id'] });
+    delta.touched.add(resolved.endpoint.id);
     // A matching report resolves the command; keep the bounded command record in step with the state row.
     if (next.commandState === 'reported' && row.commandState !== 'reported' && next.requestId) {
       await tables.commands.update(
@@ -322,7 +336,9 @@ export class MatterStateService {
     });
     if (!row) return;
     const next = applyOutcome(row, requestId, input, now);
-    if (next !== row) await tables.endpointState.upsert(next, { conflictOn: ['id'] });
+    if (next === row) return;
+    await tables.endpointState.upsert(next, { conflictOn: ['id'] });
+    delta.touched.add(command.endpointRef);
   }
 
   /**
