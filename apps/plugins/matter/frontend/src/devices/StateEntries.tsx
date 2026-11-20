@@ -13,7 +13,12 @@ function Entry({ entry }: Readonly<{ entry: StateEntry }>) {
     <li className="mt:flex mt:flex-wrap mt:items-center mt:gap-x-3 mt:gap-y-1 mt:text-sm" data-cy="matter-state-entry">
       <span className="mt:font-medium">{stateLabel(t, tExists, entry.stateKey)}</span>
       <span data-cy="matter-state-value">{formatStateValue(t, tExists, entry.stateKey, entry.reported.value)}</span>
-      <Chip size="sm" variant="soft" color={FRESHNESS_COLOR[entry.freshness]} data-cy={`matter-state-${entry.freshness}`}>
+      <Chip
+        size="sm"
+        variant="soft"
+        color={FRESHNESS_COLOR[entry.freshness]}
+        data-cy={`matter-state-${entry.freshness}`}
+      >
         {t(`devices.state.freshness.${entry.freshness}`)}
       </Chip>
       {entry.uncertainActuation && (
@@ -26,7 +31,9 @@ function Entry({ entry }: Readonly<{ entry: StateEntry }>) {
           {t('devices.state.observed')}: <DateTimeDisplay date={entry.reported.observedAt} />
         </span>
       )}
-      {entry.fault && <span className="mt:text-danger">{t('devices.state.fault', { message: entry.fault.message })}</span>}
+      {entry.fault && (
+        <span className="mt:text-danger">{t('devices.state.fault', { message: entry.fault.message })}</span>
+      )}
     </li>
   );
 }

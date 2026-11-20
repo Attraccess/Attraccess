@@ -14,7 +14,13 @@ export function CompatibilityHealthCard() {
     <HealthCard
       title={t('health.compatibility.title')}
       level={level}
-      levelLabel={t(incompatible ? 'health.compatibility.incompatible' : level === 'ok' ? 'health.compatibility.ok' : 'health.levels.unknown')}
+      levelLabel={t(
+        incompatible
+          ? 'health.compatibility.incompatible'
+          : level === 'ok'
+            ? 'health.compatibility.ok'
+            : 'health.levels.unknown',
+      )}
       fix={{ tab: 'infrastructure', label: t('health.fix.infrastructure') }}
       dataCy="matter-health-compatibility"
     >

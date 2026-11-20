@@ -55,21 +55,21 @@ describe('createPluginApiClient', () => {
 
   it('throws the backend error message with its status', async () => {
     fetchMock.mockReturnValue(
-      respond(JSON.stringify({ message: ['broker unreachable', 'retry later'] }), { status: 502 })
+      respond(JSON.stringify({ message: ['broker unreachable', 'retry later'] }), { status: 502 }),
     );
 
     await expect(createPluginApiClient().request('/api/demo/things')).rejects.toThrow(
-      new PluginApiError('broker unreachable, retry later', 502)
+      new PluginApiError('broker unreachable, retry later', 502),
     );
   });
 
   it('joins sentence-style validation messages without a stray ".,"', async () => {
     fetchMock.mockReturnValue(
-      respond(JSON.stringify({ message: ['url: The URL is too long.', 'credential: Too short.'] }), { status: 400 })
+      respond(JSON.stringify({ message: ['url: The URL is too long.', 'credential: Too short.'] }), { status: 400 }),
     );
 
     await expect(createPluginApiClient().request('/api/demo/things')).rejects.toThrow(
-      new PluginApiError('url: The URL is too long. credential: Too short.', 400)
+      new PluginApiError('url: The URL is too long. credential: Too short.', 400),
     );
   });
 

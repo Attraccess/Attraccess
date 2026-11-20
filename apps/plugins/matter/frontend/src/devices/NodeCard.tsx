@@ -55,7 +55,9 @@ export function NodeCard({
             <span data-cy="matter-node-software">
               {software ?? t('devices.unknown')}
               {identity.hardwareVersion !== null && (
-                <span className="mt:block mt:text-muted">{t('devices.hardware', { version: identity.hardwareVersion })}</span>
+                <span className="mt:block mt:text-muted">
+                  {t('devices.hardware', { version: identity.hardwareVersion })}
+                </span>
               )}
             </span>
           </Fact>

@@ -1,5 +1,12 @@
 import type { AuthenticatedUser, PluginContext } from '@attraccess/plugins-backend-sdk';
-import { ForbiddenException, Inject, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { auditTime, filter, map, type Observable } from 'rxjs';
 import { MATTER_OPERATIONS } from '../permissions';
 import { PLUGIN_CONTEXT } from '../plugin-context';
@@ -72,7 +79,10 @@ export class MatterLiveUpdatesService implements OnModuleInit, OnModuleDestroy {
       // Keeps the newest change of the window; a signal means "refetch", so which one it was does not matter.
       auditTime(LIVE_COALESCE_MS),
       map((change) => ({
-        data: change.kind === 'inventory' ? { changed: 'inventory' } : { changed: 'state', endpointRef: change.endpointRef },
+        data:
+          change.kind === 'inventory'
+            ? { changed: 'inventory' }
+            : { changed: 'state', endpointRef: change.endpointRef },
       })),
     );
   }

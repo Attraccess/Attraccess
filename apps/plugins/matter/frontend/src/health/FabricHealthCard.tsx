@@ -4,7 +4,10 @@ import type { FabricBackupStatus } from '../fabric-backup/api';
 import { HealthCard, type HealthLevel } from './HealthCard';
 
 /** The fabric: whether the sidecar has one, and whether the plugin and the sidecar agree on it (recovery). */
-export function FabricHealthCard({ status, error }: Readonly<{ status: FabricBackupStatus | null; error: string | null }>) {
+export function FabricHealthCard({
+  status,
+  error,
+}: Readonly<{ status: FabricBackupStatus | null; error: string | null }>) {
   const { t } = useMatterTranslations();
   let level: HealthLevel = 'unknown';
   let key = 'unknown';

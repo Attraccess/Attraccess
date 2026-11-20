@@ -81,12 +81,7 @@ export function MatterPage() {
       {shell(
         <>
           <MatterDegradedBanner permissions={permissions} onInfrastructure={active.key === 'infrastructure'} />
-          <RoutedTabs
-            items={items}
-            basePath={MATTER_BASE_PATH}
-            aria-label={t('tabs.label')}
-            data-cy="matter-tabs"
-          />
+          <RoutedTabs items={items} basePath={MATTER_BASE_PATH} aria-label={t('tabs.label')} data-cy="matter-tabs" />
           <div className="mt:min-w-0" data-cy={`matter-tab-${active.key}`}>
             <Content />
           </div>

@@ -30,7 +30,10 @@ export function setApiBaseUrl(baseUrl: string): void {
 
 /** Thrown for any non-2xx response, carrying the status for callers that branch on it. */
 export class PluginApiError extends Error {
-  constructor(message: string, public readonly status: number) {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
     super(message);
     this.name = 'PluginApiError';
   }
@@ -99,8 +102,7 @@ export function createPluginApiClient(basePath = ''): PluginApiClient {
   };
 
   // Cookies carry the session, so credentials are included on every call.
-  const doFetch: PluginApiClient['fetch'] = (path, init) =>
-    fetch(url(path), { credentials: 'include', ...init });
+  const doFetch: PluginApiClient['fetch'] = (path, init) => fetch(url(path), { credentials: 'include', ...init });
 
   return {
     url,

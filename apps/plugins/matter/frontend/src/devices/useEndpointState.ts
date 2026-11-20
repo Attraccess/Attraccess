@@ -10,6 +10,11 @@ export function useEndpointState(
 ): MatterResource<{ endpointRef: string; states: StateEntry[] }> & { stale: boolean } {
   const load = useCallback(() => getEndpointState(endpointRef), [endpointRef]);
   const resource = useMatterResource(load, enabled);
-  const { stale } = useMatterLive({ topic: 'device-state', identifier: endpointRef, enabled, refetch: resource.refetch });
+  const { stale } = useMatterLive({
+    topic: 'device-state',
+    identifier: endpointRef,
+    enabled,
+    refetch: resource.refetch,
+  });
   return { ...resource, stale };
 }

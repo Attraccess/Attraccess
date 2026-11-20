@@ -7,7 +7,15 @@ import { HealthCard, type HealthLevel } from './HealthCard';
 export function ConnectionHealthCard() {
   const { t } = useMatterTranslations();
   const { status } = useMatterConnection();
-  if (!status) return <HealthCard title={t('health.connection.title')} level="unknown" levelLabel={t('health.levels.unknown')} dataCy="matter-health-connection" />;
+  if (!status)
+    return (
+      <HealthCard
+        title={t('health.connection.title')}
+        level="unknown"
+        levelLabel={t('health.levels.unknown')}
+        dataCy="matter-health-connection"
+      />
+    );
   const level: HealthLevel = status.state === 'connected' ? 'ok' : status.state === 'connecting' ? 'unknown' : 'danger';
   const key = status.state === 'degraded' ? (status.reason ?? 'unavailable') : status.state;
   return (

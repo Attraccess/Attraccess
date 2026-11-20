@@ -11,7 +11,9 @@ export function nodeLabel(node: Labelled, fallback: (nodeId: string) => string):
 }
 
 /** `1.0.3` (the sidecar's string), else the numeric version; null when the device reported none. */
-export function softwareLabel(identity: Pick<NodeIdentity, 'softwareVersionString' | 'softwareVersion'>): string | null {
+export function softwareLabel(
+  identity: Pick<NodeIdentity, 'softwareVersionString' | 'softwareVersion'>,
+): string | null {
   if (identity.softwareVersionString) return identity.softwareVersionString;
   return identity.softwareVersion === null ? null : String(identity.softwareVersion);
 }
@@ -39,6 +41,9 @@ export const ACTIONS_BY_STATE: Record<LifecycleState, readonly LifecycleAction[]
 };
 
 /** Vendor, product or serial number that differ between a detached node and the unclaimed one it would take over. */
-export function identityMismatch(target: NodeIdentity, source: NodeIdentity): ('vendorId' | 'productId' | 'serialNumber')[] {
+export function identityMismatch(
+  target: NodeIdentity,
+  source: NodeIdentity,
+): ('vendorId' | 'productId' | 'serialNumber')[] {
   return (['vendorId', 'productId', 'serialNumber'] as const).filter((key) => target[key] !== source[key]);
 }

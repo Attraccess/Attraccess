@@ -3,7 +3,6 @@ import type { AuthenticatedUser, PluginContext, PluginLiveTopic } from '@attracc
 import { MATTER_OPERATIONS } from '../permissions';
 import { ADMIN, createHarness, inventory, node, type Harness } from '../testing/devices-harness.test-utils';
 import { LIVE_COALESCE_MS, MatterLiveUpdatesService } from './live-updates.service';
-import { MatterLifecycleService } from './lifecycle.service';
 
 const user = (permissions: string[]) =>
   ({ id: 1, effectivePermissions: new Set(permissions) }) as unknown as AuthenticatedUser;
@@ -89,7 +88,9 @@ describe('MatterLiveUpdatesService', () => {
       jest.useFakeTimers();
       try {
         const received: unknown[] = [];
-        const subscription = topics['devices'].source({ topic: 'devices' }, user(READ)).subscribe((m) => received.push(m));
+        const subscription = topics['devices']
+          .source({ topic: 'devices' }, user(READ))
+          .subscribe((m) => received.push(m));
         bus().inventoryChanged();
         bus().inventoryChanged();
         bus().stateChanged(['e-1']);

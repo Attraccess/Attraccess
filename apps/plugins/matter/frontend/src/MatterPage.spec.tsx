@@ -446,7 +446,6 @@ describe('MatterPage permissions', () => {
     expect(spinner()).not.toBeInTheDocument();
   });
 
-
   it('shows no manage controls, and requests nothing, for matter.devices.manage without read', async () => {
     signIn('matter.devices.manage');
     renderPage({ state: 'connected' }, configured);

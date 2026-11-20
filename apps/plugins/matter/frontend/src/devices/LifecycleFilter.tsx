@@ -1,4 +1,14 @@
-import { Label, ListBox, ListBoxItem, Select, SelectIndicator, SelectPopover, SelectTrigger, SelectValue, Switch } from '@heroui/react';
+import {
+  Label,
+  ListBox,
+  ListBoxItem,
+  Select,
+  SelectIndicator,
+  SelectPopover,
+  SelectTrigger,
+  SelectValue,
+  Switch,
+} from '@heroui/react';
 import { useMatterTranslations } from '../i18n';
 import type { LifecycleState } from './api';
 
@@ -8,7 +18,11 @@ export type LifecycleFilterValue = 'active' | LifecycleState;
 const ACTIVE_OPTIONS: LifecycleFilterValue[] = ['active', 'unclaimed', 'claimed', 'detached'];
 const ALL_OPTIONS: LifecycleFilterValue[] = [...ACTIVE_OPTIONS, 'archived', 'removed'];
 
-export const matchesFilter = (state: LifecycleState, filter: LifecycleFilterValue, includeInactive: boolean): boolean => {
+export const matchesFilter = (
+  state: LifecycleState,
+  filter: LifecycleFilterValue,
+  includeInactive: boolean,
+): boolean => {
   if (filter === 'active') return includeInactive || (state !== 'archived' && state !== 'removed');
   return state === filter;
 };

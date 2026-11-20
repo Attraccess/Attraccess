@@ -1,4 +1,11 @@
-import { Accordion, AccordionBody, AccordionHeading, AccordionItem, AccordionPanel, AccordionTrigger } from '@heroui/react';
+import {
+  Accordion,
+  AccordionBody,
+  AccordionHeading,
+  AccordionItem,
+  AccordionPanel,
+  AccordionTrigger,
+} from '@heroui/react';
 import { useState } from 'react';
 import { useMatterTranslations } from '../i18n';
 import type { MatterNodeDetail } from './api';
@@ -11,12 +18,19 @@ function raw(node: MatterNodeDetail): string {
       id: node.id,
       nodeId: node.nodeId,
       fabric: node.fabric,
-      identity: { vendorId: node.identity.vendorId, productId: node.identity.productId, uniqueId: node.identity.uniqueId },
+      identity: {
+        vendorId: node.identity.vendorId,
+        productId: node.identity.productId,
+        uniqueId: node.identity.uniqueId,
+      },
       endpoints: node.endpoints.map((endpoint) => ({
         id: endpoint.id,
         endpointId: endpoint.endpointId,
         parentEndpointId: endpoint.parentEndpointId,
-        deviceTypes: endpoint.deviceTypes.map((type) => ({ deviceTypeId: hex(type.deviceTypeId), revision: type.revision })),
+        deviceTypes: endpoint.deviceTypes.map((type) => ({
+          deviceTypeId: hex(type.deviceTypeId),
+          revision: type.revision,
+        })),
         clusters: endpoint.clusters.map((cluster) => ({
           clusterId: hex(cluster.clusterId),
           role: cluster.role,

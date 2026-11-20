@@ -61,7 +61,13 @@ export function MetadataForm({
   return (
     <Form onSubmit={submit} className="mt:flex mt:flex-col mt:gap-3" data-cy={`${idPrefix}-metadata-form`}>
       {fields.map((field) => (
-        <TextField key={field} value={draft[field]} onChange={set(field)} isInvalid={tooLong.includes(field)} className="mt:w-full">
+        <TextField
+          key={field}
+          value={draft[field]}
+          onChange={set(field)}
+          isInvalid={tooLong.includes(field)}
+          className="mt:w-full"
+        >
           <Label>{t(`devices.metadata.${field}`)}</Label>
           {field === 'description' ? (
             <TextArea rows={3} data-cy={`${idPrefix}-${field}`} />

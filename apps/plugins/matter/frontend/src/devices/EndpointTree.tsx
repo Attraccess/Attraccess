@@ -29,7 +29,13 @@ function Branch({
   const list = tree.get(parent) ?? [];
   if (list.length === 0) return null;
   return (
-    <ul className={parent === null ? 'mt:flex mt:flex-col mt:gap-3' : 'mt:ml-3 mt:flex mt:flex-col mt:gap-3 mt:border-l mt:border-separator mt:pl-3'}>
+    <ul
+      className={
+        parent === null
+          ? 'mt:flex mt:flex-col mt:gap-3'
+          : 'mt:ml-3 mt:flex mt:flex-col mt:gap-3 mt:border-l mt:border-separator mt:pl-3'
+      }
+    >
       {list.map((endpoint) => (
         <li key={endpoint.id} className="mt:flex mt:flex-col mt:gap-3">
           <EndpointCard endpoint={endpoint} {...rest} />

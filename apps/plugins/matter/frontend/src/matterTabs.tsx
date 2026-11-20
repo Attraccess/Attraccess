@@ -24,7 +24,13 @@ export interface MatterTab {
 const icon = (Icon: typeof BoxesIcon) => <Icon className="mt:h-4 mt:w-4" />;
 
 export const MATTER_TABS: readonly MatterTab[] = [
-  { key: 'devices', path: MATTER_TAB_SEGMENTS.devices, icon: icon(BoxesIcon), isVisible: (p) => p.canRead, Content: DevicesTab },
+  {
+    key: 'devices',
+    path: MATTER_TAB_SEGMENTS.devices,
+    icon: icon(BoxesIcon),
+    isVisible: (p) => p.canRead,
+    Content: DevicesTab,
+  },
   {
     key: 'infrastructure',
     path: MATTER_TAB_SEGMENTS.infrastructure,
@@ -32,7 +38,13 @@ export const MATTER_TABS: readonly MatterTab[] = [
     isVisible: (p) => p.canRead,
     Content: InfrastructureTab,
   },
-  { key: 'thread', path: MATTER_TAB_SEGMENTS.thread, icon: icon(NetworkIcon), isVisible: (p) => p.canReadThread, Content: ThreadTab },
+  {
+    key: 'thread',
+    path: MATTER_TAB_SEGMENTS.thread,
+    icon: icon(NetworkIcon),
+    isVisible: (p) => p.canReadThread,
+    Content: ThreadTab,
+  },
   {
     key: 'commissioning',
     path: MATTER_TAB_SEGMENTS.commissioning,

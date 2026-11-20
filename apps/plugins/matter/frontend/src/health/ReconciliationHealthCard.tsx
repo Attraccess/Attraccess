@@ -21,7 +21,9 @@ export function ReconciliationHealthCard({ resource }: Readonly<{ resource: Matt
     <HealthCard
       title={t('health.reconciliation.title')}
       level={level}
-      levelLabel={data?.lastResult ? t(`devices.reconciliation.result.${data.lastResult}`) : t('devices.reconciliation.never')}
+      levelLabel={
+        data?.lastResult ? t(`devices.reconciliation.result.${data.lastResult}`) : t('devices.reconciliation.never')
+      }
       fix={{ tab: 'devices', label: t('health.fix.devices') }}
       dataCy="matter-health-reconciliation"
     >

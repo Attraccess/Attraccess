@@ -55,14 +55,21 @@ export function LifecycleActions({
   };
 
   if (actions.length === 0) return null;
-  const confirmed = typeof dialog === 'string' && dialog in CONFIRMED ? CONFIRMED[dialog as keyof typeof CONFIRMED] : null;
+  const confirmed =
+    typeof dialog === 'string' && dialog in CONFIRMED ? CONFIRMED[dialog as keyof typeof CONFIRMED] : null;
   return (
     <div className="mt:flex mt:flex-wrap mt:gap-2" data-cy="matter-lifecycle-actions">
       {actions.map((action) => (
         <Button
           key={action}
           size="sm"
-          variant={action === 'forceRemove' ? 'danger-soft' : action === 'claim' || action === 'repair' ? 'primary' : 'secondary'}
+          variant={
+            action === 'forceRemove'
+              ? 'danger-soft'
+              : action === 'claim' || action === 'repair'
+                ? 'primary'
+                : 'secondary'
+          }
           onPress={() => setDialog(action)}
           data-cy={`matter-action-${action}`}
         >

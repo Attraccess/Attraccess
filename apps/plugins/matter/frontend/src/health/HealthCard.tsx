@@ -42,7 +42,12 @@ export function HealthCard({
         {children}
         {fix && level !== 'ok' && (
           <div>
-            <Button size="sm" variant="secondary" onPress={() => navigate(matterTabPath(fix.tab))} data-cy={`${dataCy}-fix`}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onPress={() => navigate(matterTabPath(fix.tab))}
+              data-cy={`${dataCy}-fix`}
+            >
               {fix.label}
             </Button>
           </div>

@@ -139,4 +139,5 @@ export const restoreNode = (id: string) => action(id, 'restore');
 export const forceRemoveNode = (id: string) => action(id, 'force-remove', { confirm: true });
 
 export const getReconciliation = () => api.request<ReconciliationStatus>('/reconciliation');
-export const runReconciliation = () => api.request<ReconciliationStatus>('/reconciliation', { method: 'POST', body: {} });
+export const runReconciliation = () =>
+  api.request<ReconciliationStatus>('/reconciliation', { method: 'POST', body: {} });

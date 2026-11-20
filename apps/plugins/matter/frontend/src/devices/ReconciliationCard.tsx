@@ -43,12 +43,19 @@ export function ReconciliationCard({
       <Card.Content className="mt:flex mt:flex-col mt:gap-3">
         {loading && <Spinner size="sm" />}
         {error && !data && (
-          <StatusAlert status="danger" title={t('devices.reconciliation.loadError')} data-cy="matter-reconciliation-error">
+          <StatusAlert
+            status="danger"
+            title={t('devices.reconciliation.loadError')}
+            data-cy="matter-reconciliation-error"
+          >
             {error}
           </StatusAlert>
         )}
         {data && (
-          <div className="mt:flex mt:flex-wrap mt:items-center mt:gap-2 mt:text-sm" data-cy="matter-reconciliation-status">
+          <div
+            className="mt:flex mt:flex-wrap mt:items-center mt:gap-2 mt:text-sm"
+            data-cy="matter-reconciliation-status"
+          >
             {data.lastResult ? (
               <>
                 <Chip color={RESULT_COLOR[data.lastResult]} variant="soft">
@@ -74,7 +81,11 @@ export function ReconciliationCard({
           </div>
         )}
         {failure && (
-          <StatusAlert status="danger" title={t('devices.reconciliation.runError')} data-cy="matter-reconciliation-run-error">
+          <StatusAlert
+            status="danger"
+            title={t('devices.reconciliation.runError')}
+            data-cy="matter-reconciliation-run-error"
+          >
             {failure}
           </StatusAlert>
         )}

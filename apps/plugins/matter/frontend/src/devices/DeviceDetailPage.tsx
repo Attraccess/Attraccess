@@ -32,7 +32,12 @@ export function DeviceDetailPage({ nodeId }: Readonly<{ nodeId: string }>) {
 
   const back = (
     <div>
-      <Button variant="tertiary" size="sm" onPress={() => navigate(matterTabPath('devices'))} data-cy="matter-back-to-devices">
+      <Button
+        variant="tertiary"
+        size="sm"
+        onPress={() => navigate(matterTabPath('devices'))}
+        data-cy="matter-back-to-devices"
+      >
         <ArrowLeftIcon className="mt:h-4 mt:w-4" />
         {t('devices.back')}
       </Button>
@@ -108,7 +113,10 @@ export function DeviceDetailPage({ nodeId }: Readonly<{ nodeId: string }>) {
               onSave={(changes) => refreshed(updateNode(node.id, changes))}
             />
           ) : (
-            <dl className="mt:grid mt:grid-cols-1 mt:gap-3 mt:text-sm mt:sm:grid-cols-3" data-cy="matter-metadata-readonly">
+            <dl
+              className="mt:grid mt:grid-cols-1 mt:gap-3 mt:text-sm mt:sm:grid-cols-3"
+              data-cy="matter-metadata-readonly"
+            >
               {(['displayName', 'description', 'location'] as const).map((field) => (
                 <div key={field} className="mt:flex mt:min-w-0 mt:flex-col">
                   <dt className="mt:text-xs mt:text-muted">{t(`devices.metadata.${field}`)}</dt>

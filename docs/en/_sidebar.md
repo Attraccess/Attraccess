@@ -103,6 +103,7 @@
   - **Matter**
     - [Overview](plugins/matter/overview.md)
     - [Matter: Architecture](plugins/matter/architecture.md)
+    - [Matter: Administration Page](plugins/matter/admin-ui.md)
     - [Matter: Operator Guide](plugins/matter/operator.md)
     - [Matter: Data Model and Lifecycle](plugins/matter/data-model.md)
     - [Matter: Backup and Recovery](plugins/matter/backup-restore.md)

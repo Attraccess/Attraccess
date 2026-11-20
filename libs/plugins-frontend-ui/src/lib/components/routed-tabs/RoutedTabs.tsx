@@ -61,7 +61,8 @@ export function RoutedTabs({
     const next = visible.find((item) => item.key === key);
     if (next) navigate(routedTabPath(basePath, next.path));
   };
-  const textOf = (item: RoutedTabItem) => getTextValue?.(item) ?? (typeof item.label === 'string' ? item.label : item.key);
+  const textOf = (item: RoutedTabItem) =>
+    getTextValue?.(item) ?? (typeof item.label === 'string' ? item.label : item.key);
 
   return (
     <div className={className}>

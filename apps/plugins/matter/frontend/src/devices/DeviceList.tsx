@@ -23,7 +23,8 @@ export function DeviceList() {
   const nodes = useNodes(includeInactive, canRead);
   const reconciliation = useReconciliation(canRead);
 
-  const label = (node: Parameters<typeof nodeLabel>[0]) => nodeLabel(node, (nodeId) => t('devices.nodeFallback', { nodeId }));
+  const label = (node: Parameters<typeof nodeLabel>[0]) =>
+    nodeLabel(node, (nodeId) => t('devices.nodeFallback', { nodeId }));
   const shown = sortNodes(
     (nodes.data ?? []).filter((node) => matchesFilter(node.lifecycleState, filter, includeInactive)),
     label,

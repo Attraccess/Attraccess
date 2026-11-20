@@ -3,7 +3,9 @@ import { useMatterTranslations } from '../i18n';
 import type { MatterNodeSummary } from './api';
 
 /** Says why an unclaimed or detached device is not usable yet and what resolves it. Nothing for other states. */
-export function ResolutionCallout({ node }: Readonly<{ node: Pick<MatterNodeSummary, 'lifecycleState' | 'detachedReason'> }>) {
+export function ResolutionCallout({
+  node,
+}: Readonly<{ node: Pick<MatterNodeSummary, 'lifecycleState' | 'detachedReason'> }>) {
   const { t } = useMatterTranslations();
   if (node.lifecycleState === 'unclaimed') {
     return (
@@ -15,7 +17,8 @@ export function ResolutionCallout({ node }: Readonly<{ node: Pick<MatterNodeSumm
   if (node.lifecycleState === 'detached') {
     return (
       <StatusAlert status="danger" title={t('devices.callout.detached.title')} data-cy="matter-callout-detached">
-        {t('devices.callout.detached.text')} {t(`devices.callout.detached.reason.${node.detachedReason ?? 'absent_from_sidecar'}`)}
+        {t('devices.callout.detached.text')}{' '}
+        {t(`devices.callout.detached.reason.${node.detachedReason ?? 'absent_from_sidecar'}`)}
       </StatusAlert>
     );
   }
