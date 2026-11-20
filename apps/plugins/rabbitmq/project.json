@@ -79,7 +79,11 @@
       "cache": true,
       "dependsOn": ["build-backend", "build-frontend"],
       "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json", "{projectRoot}/LICENSE.md"],
-      "outputs": ["{projectRoot}/package"],
+      "outputs": [
+        "{projectRoot}/package/package.json",
+        "{projectRoot}/package/plugin.json",
+        "{projectRoot}/package/LICENSE.md"
+      ],
       "options": {
         "cwd": "apps/plugins/rabbitmq",
         "command": "node -e \"for (const file of ['package.json', 'plugin.json', 'LICENSE.md']) require('fs').copyFileSync(file, 'package/' + file)\""

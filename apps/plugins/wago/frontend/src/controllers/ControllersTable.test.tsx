@@ -11,6 +11,7 @@ const getRootPassword = vi.hoisted(() => vi.fn());
 const getSessionStatus = vi.hoisted(() => vi.fn());
 const retryRuntimeUpdate = vi.hoisted(() => vi.fn());
 const retryManagedAccess = vi.hoisted(() => vi.fn());
+const removeController = vi.hoisted(() => vi.fn());
 vi.mock('../api/client', () => ({
   getCommissioningVerification: getVerification,
   getRuntimeUpdateStatus: getUpdateStatus,
@@ -19,6 +20,7 @@ vi.mock('../api/client', () => ({
   retryManagedAccess,
   retryRuntimeUpdate,
   restoreManagedAccess: vi.fn(),
+  removeController,
 }));
 let client: QueryClient;
 const session = { id: 7, hardwareId: 'fixture', state: 'awaiting_verification' } as CommissioningSession;
@@ -69,14 +71,14 @@ function mount(onResume = vi.fn(), onConfigure = vi.fn(), row = controller) {
         onResume={onResume}
         onConfigure={onConfigure}
         onClaim={vi.fn()}
-        onRemove={vi.fn()}
       />
     </QueryClientProvider>,
   );
 }
 
 async function openDetails(name = 'Fixture') {
-  fireEvent.click(screen.getByRole('button', { name: `Details for ${name}` }));
+  fireEvent.click(screen.getByRole('button', { name: `Actions for ${name}` }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Details' }));
   return await screen.findByRole('dialog');
 }
 
@@ -443,7 +445,6 @@ it('keeps administrator recovery available for a removed controller session', as
         onResume={vi.fn()}
         onConfigure={vi.fn()}
         onClaim={vi.fn()}
-        onRemove={vi.fn()}
       />
     </QueryClientProvider>,
   );
@@ -510,7 +511,6 @@ it('keeps session recovery reachable when merged into an untrusted controller ro
         onResume={vi.fn()}
         onConfigure={vi.fn()}
         onClaim={vi.fn()}
-        onRemove={vi.fn()}
       />
     </QueryClientProvider>,
   );
@@ -521,7 +521,7 @@ it('keeps session recovery reachable when merged into an untrusted controller ro
 });
 
 it('can transition between empty and populated collections without changing hook order', () => {
-  const props = { sessions: [], onResume: vi.fn(), onConfigure: vi.fn(), onClaim: vi.fn(), onRemove: vi.fn() };
+  const props = { sessions: [], onResume: vi.fn(), onConfigure: vi.fn(), onClaim: vi.fn() };
   const wrap = (controllers: WagoController[]) => (
     <QueryClientProvider client={client}>
       <ControllersTable {...props} controllers={controllers} />
@@ -548,7 +548,7 @@ it('keeps detailed failures and administrator controls out of the compact table'
     within(table)
       .getAllByRole('columnheader')
       .map((element) => element.textContent),
-  ).toEqual(['Device', 'Status', 'Software', 'Last seen', 'Actions']);
+  ).toEqual(['Device', 'Status', 'Software', 'Last seen', 'Main action', 'Actions']);
   expect(within(table).queryByText(/insufficient free space/)).toBeNull();
   expect(within(table).queryByRole('button', { name: 'Recovery tools' })).toBeNull();
   expect(within(table).queryByRole('button', { name: 'Remove' })).toBeNull();
@@ -573,7 +573,6 @@ it('renders and polls only the current page, and finds devices by name, ID and a
         onResume={vi.fn()}
         onConfigure={vi.fn()}
         onClaim={vi.fn()}
-        onRemove={vi.fn()}
       />
     </QueryClientProvider>,
   );
@@ -605,9 +604,10 @@ it('uses natural German column and registration labels', async () => {
     within(table)
       .getAllByRole('columnheader')
       .map((element) => element.textContent),
-  ).toEqual(['Gerät', 'Status', 'Software', 'Zuletzt gesehen', 'Aktionen']);
+  ).toEqual(['Gerät', 'Status', 'Software', 'Zuletzt gesehen', 'Hauptaktion', 'Aktionen']);
   expect(screen.queryByText('Vertrauen')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'Details zu Fixture' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Aktionen für Fixture' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Details' }));
   expect(await screen.findByText('Registriert')).toBeTruthy();
   expect(screen.queryByText('Übernommen')).toBeNull();
 });
@@ -650,7 +650,7 @@ it('translates recognized saved failures on mounted controller rows while retain
 });
 
 function mountWithActions(controllers: WagoController[], sessions: CommissioningSession[]) {
-  const actions = { onResume: vi.fn(), onConfigure: vi.fn(), onClaim: vi.fn(), onRemove: vi.fn() };
+  const actions = { onResume: vi.fn(), onConfigure: vi.fn(), onClaim: vi.fn() };
   render(
     <QueryClientProvider client={client}>
       <ControllersTable controllers={controllers} sessions={sessions} {...actions} />
@@ -667,17 +667,36 @@ it('closes the details drawer before configuring a claimed controller', async ()
   expect(onConfigure).toHaveBeenCalledWith(1);
 });
 
-it('closes the details drawer before removing a controller', async () => {
-  const { onRemove } = mountWithActions([controller], [session]);
+it('removes a controller only after confirming, then closes the details drawer', async () => {
+  removeController.mockResolvedValue(undefined);
+  mountWithActions([controller], [session]);
   const drawer = await openDetails();
   fireEvent.click(within(drawer).getByRole('button', { name: 'Remove' }));
+  const confirm = await screen.findByRole('alertdialog');
+  expect(within(confirm).getByText('Remove Fixture from Attraccess?')).toBeTruthy();
+  expect(removeController).not.toHaveBeenCalled();
+  fireEvent.click(within(confirm).getByRole('button', { name: 'Remove controller' }));
+  await waitFor(() => expect(removeController).toHaveBeenCalledWith(1, expect.anything()));
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-  expect(onRemove).toHaveBeenCalledWith(controller);
+  expect(screen.queryByRole('alertdialog')).toBeNull();
+});
+
+it('keeps the remove confirmation open and shows why removing failed', async () => {
+  removeController.mockRejectedValue(new Error('An active operation blocks removal.'));
+  mountWithActions([controller], [session]);
+  const drawer = await openDetails();
+  fireEvent.click(within(drawer).getByRole('button', { name: 'Remove' }));
+  const confirm = await screen.findByRole('alertdialog');
+  fireEvent.click(within(confirm).getByRole('button', { name: 'Remove controller' }));
+  expect(await within(confirm).findByText('An active operation blocks removal.')).toBeTruthy();
+  fireEvent.click(within(confirm).getByRole('button', { name: 'Keep controller' }));
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+  expect(screen.getByRole('dialog')).toBeTruthy();
 });
 
 it('resumes an unfinished enrolment from the details drawer', async () => {
   const pending = { ...session, state: 'awaiting_delivery' } as CommissioningSession;
-  const { onResume, onConfigure, onRemove } = mountWithActions([], [pending]);
+  const { onResume, onConfigure } = mountWithActions([], [pending]);
   const drawer = await openDetails('fixture');
   expect(within(drawer).queryByRole('button', { name: 'Configure' })).toBeNull();
   expect(within(drawer).queryByRole('button', { name: 'Remove' })).toBeNull();
@@ -685,5 +704,5 @@ it('resumes an unfinished enrolment from the details drawer', async () => {
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   expect(onResume).toHaveBeenCalledWith(pending);
   expect(onConfigure).not.toHaveBeenCalled();
-  expect(onRemove).not.toHaveBeenCalled();
+  expect(removeController).not.toHaveBeenCalled();
 });

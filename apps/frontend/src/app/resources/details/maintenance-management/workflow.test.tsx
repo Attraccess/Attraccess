@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MaintenanceManagement } from './index';
@@ -93,11 +94,14 @@ it.each(['card', 'flat'] as const)(
       undefined,
       { refetchInterval: 10000 },
     );
-    const active = screen.getByText('Active repair').closest(variant === 'flat' ? 'li' : 'tr');
-    expect(active).toBeTruthy();
-    const complete = active?.querySelector('button');
-    expect(complete).toBeTruthy();
-    fireEvent.click(complete!);
+    if (variant === 'flat') {
+      expect(screen.getAllByRole('button', { name: 'Mark as done' })).toHaveLength(1);
+      fireEvent.click(screen.getByRole('button', { name: 'Mark as done' }));
+    } else {
+      expect(screen.getAllByRole('button', { name: /^Actions for/ })).toHaveLength(1);
+      await userEvent.click(screen.getByRole('button', { name: 'Actions for Active repair' }));
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Mark as done' }));
+    }
     expect(state.done).toHaveBeenCalledWith(1);
     fireEvent.click(screen.getByRole('button', { name: 'Manage maintenance' }));
     expect(await screen.findByText('Maintenance hub')).toBeTruthy();

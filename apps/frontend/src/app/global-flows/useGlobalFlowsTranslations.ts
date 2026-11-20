@@ -5,8 +5,12 @@ import de from './de.json';
 import en from './en.json';
 
 export function useGlobalFlowsTranslations() {
-  return useTranslations({
-    en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
-    de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
-  });
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  return useTranslations(
+    {
+      en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
+      de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
+    },
+    { escapeValues: false },
+  );
 }

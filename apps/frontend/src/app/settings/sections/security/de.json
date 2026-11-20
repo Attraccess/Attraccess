@@ -180,7 +180,6 @@
     "subtitle": "Einzelne Passwortregeln pro Rolle überschreiben. Alles Vererbte folgt der Richtlinie oben.",
     "role": "Rolle",
     "status": "Status",
-    "actions": "Aktionen",
     "statusInherits": "Erbt die globale Richtlinie",
     "statusCustom": "{{count}} Feld(er) überschrieben",
     "edit": "Bearbeiten",

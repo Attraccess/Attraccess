@@ -4,5 +4,9 @@
   "error": {
     "title": "Passkey sign in failed",
     "description": "We could not verify that passkey. Try again or sign in with your password."
+  },
+  "emailNotVerified": {
+    "title": "Email not verified",
+    "description": "Please verify your email before signing in. Open the activation link we sent you, or sign in with your password to request a new one."
   }
 }

@@ -206,7 +206,7 @@ NimBLE finished. The reader ends the session itself only when the lease expires 
 finished a GATT procedure after about 35 s. Writes without response
 retry on full controller buffers until their deadline. The reader requests MTU 517 and reports the
 negotiated MTU; writes with response above `mtu - 3` use long writes. Notifications are buffered per
-session (64 entries, 32 KiB) and forwarded with `seq`; overflow (`NOTIFICATION_OVERFLOW`,
+session (128 entries, 32 KiB) and forwarded with `seq`; overflow (`NOTIFICATION_OVERFLOW`,
 `reader-buffer`) or an oversized notification (`PAYLOAD_TOO_LARGE`, `max-notification`) ends that
 stream with an `error` instead of dropping data. A read result above its bound is answered
 `PAYLOAD_TOO_LARGE` (`max-read`). Scans deduplicate by address; a scan filter takes at most 8
@@ -232,11 +232,25 @@ as soon as the websocket frees a send slot while it waits for one
 and without BLE work it still sleeps until a request arrives.
 
 **Memory.** NimBLE (central and observer roles only, no security) starts lazily on the first BLE
-request and stays until the next reboot, so readers that never use BLE keep their RAM and radio as
-before. Host memory and the proxy task stack live in PSRAM; the controller runs from flash
+request, so readers that never use BLE keep their RAM and radio as before. It is released again
+after 30 s without BLE work (`STACK_IDLE_SHUTDOWN_MS` in `ble_types.hpp`): no scan or session, no
+request or answer waiting, no undelivered notification, and nothing the controller still runs (a
+scan, a connect, or a link it has not let go yet). The release stops the host (`nimble_port_stop`),
+ends NimBLE's host task and deinitialises host and controller (`nimble_port_deinit`), which gives the
+controller's ~24 KB of internal RAM back; the next request brings a fresh stack up first, so it
+takes the init time on top. A lock plugin's exchange when a usage session starts holds the RAM for
+the exchange plus 30 s, and the one when it ends brings the stack up again. The reader never calls
+`esp_bt_controller_mem_release`: it is one-way and would keep the controller from starting again.
+The stack starts only with at least 40 KB of DMA-capable internal RAM free
+(`STACK_MIN_FREE_INTERNAL` in `ble_radio_nimble.cpp`); with less the request fails with
+`READER_OFFLINE` (`ble init failed detail=low-memory` in the log) and the next one tries again.
+Espressif's controller does not check every allocation: started with 20 KB free it asserted and the
+reader restarted.
+Host memory and the proxy task stack live in PSRAM; the controller runs from flash
 (`CONFIG_BT_CTRL_RUN_IN_FLASH_ONLY`). The proxy logs the internal heap and its largest free block at
-boot and after the first BLE init. Init failure is reported as `READER_OFFLINE` (`ble-init-failed`)
-and never stops the reader.
+boot, after every BLE init (`Heap after BLE init`) and after every release (`Heap after BLE
+shutdown`). Init failure is reported as `READER_OFFLINE` (`ble-init-failed`), never stops the
+reader, and the next request tries again.
 
 **Logs.** Each scan, operation and session end logs the session id, operation, outcome, NimBLE code
 and duration, never payload bytes. Successful operations log at debug level, cancels and expected session ends at info, failures,
@@ -363,6 +377,17 @@ API signs them per installation. It is never available for demo variants.
   encryption, anti-rollback), so a web-flashable image can never burn eFuses.
 - `secure-version-floor.txt` must equal `CONFIG_BOOTLOADER_APP_SECURE_VERSION`; CI
   fails if either decreases. The eFuse field has 16 steps: bump only for security fixes.
+- No TLS key material in PSRAM: mbedTLS keys, secrets, bignums, PK and cipher contexts
+  and handshake state stay in internal RAM. Only the two fixed record buffers of each TLS
+  session (ciphertext and decrypted application data, about 13 KB per session) go to
+  PSRAM, which flash encryption also encrypts, and fall back to internal RAM when PSRAM
+  is full. Standard builds keep all mbedTLS memory in PSRAM
+  (`CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC`). The secure profile uses
+  `CONFIG_MBEDTLS_CUSTOM_MEM_ALLOC` with the allocator in `src/api/security/tls_memory.c`,
+  which matches the exact record buffer lengths (`tests/tls-memory` checks this through
+  real handshakes). The link fails without the allocator, and
+  `tools/check_secure_profile.py` keeps the option set, the dynamic and variable-length
+  buffer options off and the allocator compiled in and linked.
 
 Build the secure profile locally (always in its own build directory and sdkconfig;
 CMake refuses a reused one):
@@ -457,6 +482,28 @@ idf.py -B build/dbg -DATTRACTAP_VARIANT=attractap-touch \
 Note: `tools/build_individual_ca_certs.py` needs network access on the first
 run (it downloads Mozilla's CA bundle, cached for 7 days). Run it once before
 `idf.py` when building without `build_firmwares.py`.
+
+### Internal RAM and PSRAM
+
+Internal RAM is the scarce resource; PSRAM has megabytes to spare. `sdkconfig.defaults` sets:
+
+- `CONFIG_SPIRAM_XIP_FROM_PSRAM`: code and read-only data run from PSRAM, so NVS and OTA flash
+  writes no longer disable the cache.
+- `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=1024`: plain `malloc()` tries internal RAM first only for
+  blocks up to 1 KB; larger ones (JSON documents, message buffers, lwIP packet buffers, the Wi-Fi
+  driver's non-DMA blocks) go to PSRAM first. Memory that must be internal (DMA buffers, task
+  stacks, FreeRTOS objects, mbedTLS on the secure profile) is requested with `MALLOC_CAP_INTERNAL`
+  or `MALLOC_CAP_DMA`.
+
+Task stacks in PSRAM (`createPsramTask()` in `src/psram_task.hpp`, or
+`xTaskCreatePinnedToCoreWithCaps` directly): `ws_conn`, `ws_tx`, `NetworkTask`, `rl_tls`,
+`ble_proxy` and `nimble_host`. `ws_conn` and `NetworkTask` read and write NVS, which is
+only safe with XIP from PSRAM (the sources refuse to build without it). A task on a PSRAM stack
+must never map flash (`esp_partition_mmap`, OTA image verification, reads of an encrypted
+partition such as `otadata` on the secure profile): ESP-IDF asserts that the stack is in internal
+RAM while the cache is frozen for the mapping. The main task, `LvglTask`, `LedTask`, `Beeper` and
+the `esp_websocket_client` task (`websocket_task`, 16 KB, created by the component with plain
+`xTaskCreate`; no released component version can put it in PSRAM) keep internal stacks.
 
 ## Display Theme
 
@@ -727,6 +774,17 @@ coredump grows by about that much. Without `stackBytes` it panics right away. Th
 `-DATTRACTAP_CRASH_TRIGGER=OFF`, and `tools/check_release_build.py` fails a
 release build whose sources were compiled with a lab-only define or whose app
 image contains the `debug.crash` topic.
+
+### Device-lab TLS CA (lab builds only)
+
+`-DATTRACTAP_LAB_CA=<ca.pem>` embeds a device-lab CA certificate and puts it
+first in the certificate manager's list, so a lab reader validates the lab
+API's wss:// certificate (the HIL suite's `HIL_WSS=1` mode, see
+`apps/attractap-lab/README.md`). It needs `-DATTRACTAP_TEST_HOOKS=ON` and is
+refused for a release secure profile. `build_firmwares.py` passes
+`-DATTRACTAP_LAB_CA=`, and `tools/check_release_build.py` fails a release build
+compiled with `ATTRACTAP_LAB_CA=1` or whose app image contains the
+"Attractap Device Lab CA" list entry.
 
 ## Attractap Lite LED Animations
 

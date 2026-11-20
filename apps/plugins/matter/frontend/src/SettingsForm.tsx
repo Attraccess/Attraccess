@@ -1,4 +1,4 @@
-import { Button, StatusAlert } from '@attraccess/plugins-frontend-ui';
+import { Button, ConfirmableButton, StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { Description, FieldError, Form, Input, Label, TextField } from '@heroui/react';
 import { useRef, useState, type FormEvent, type RefObject } from 'react';
 import type { ConnectionSettings, SettingsInput } from './api';
@@ -67,7 +67,6 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
   };
 
   const remove = async () => {
-    setNotice(null);
     setBusy(true);
     try {
       await onRemove();
@@ -132,25 +131,27 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
             {t('form.save')}
           </Button>
           {draft.base.url !== null && (
-            <Button
-              ref={removeRef}
-              variant="danger-soft"
+            <ConfirmableButton
+              label={t('form.remove')}
+              status="error"
               isDisabled={busy}
-              onPress={() => setNotice({ kind: 'remove' })}
+              onConfirm={remove}
+              confirm={{
+                title: t('form.removeTitle'),
+                message: t('form.removeText'),
+                confirmLabel: t('form.removeConfirm'),
+                'data-cy': 'matter-remove-dialog',
+              }}
+              buttonProps={{ ref: removeRef, variant: 'danger-soft' }}
               data-cy="matter-remove"
-            >
-              {t('form.remove')}
-            </Button>
+            />
           )}
         </div>
       </Form>
       <SettingsDialogs
         notice={notice}
-        busy={busy}
         onCloseSaved={() => closeNotice(saveRef)}
         onCloseError={() => closeNotice(notice?.kind === 'error' && notice.returnTo === 'remove' ? removeRef : saveRef)}
-        onCloseRemove={() => closeNotice(removeRef)}
-        onConfirmRemove={remove}
       />
     </section>
   );

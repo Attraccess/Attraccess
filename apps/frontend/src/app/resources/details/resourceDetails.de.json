@@ -23,6 +23,10 @@
     "documentation": "Dokumentation",
     "maintenance": "Wartung",
     "qrCode": "QR-Code",
-    "moreLabel": "Weitere Aktionen"
+    "moreLabel": "Weitere Aktionen",
+    "deleteConfirm": {
+      "title": "{{name}} löschen?",
+      "message": "Die Ressource wird gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
+    }
   }
 }

@@ -39,7 +39,7 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   useGetUserRoleAssignments: () => ({ data: state.assignments }),
   useDeleteUser: (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
-    return { mutate: state.remove, isPending: false };
+    return { mutateAsync: state.remove, isPending: false };
   },
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({

@@ -1,21 +1,7 @@
+import { TableRowActions } from '@attraccess/plugins-frontend-ui';
 import type { InstalledNpmPluginDto, LoadedPluginManifest } from '@attraccess/react-query-client';
-import {
-  Chip,
-  cn,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownPopover,
-  DropdownTrigger,
-  Label,
-  TableCell,
-  TableRow,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@heroui/react';
-import { buttonVariants } from '@heroui/styles';
-import { AlertTriangle, CheckCircle2, History, Info, KeyRound, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Chip, TableCell, TableRow, Tooltip, TooltipContent, TooltipTrigger } from '@heroui/react';
+import { AlertTriangle, CheckCircle2, History, Info, KeyRound, Trash2 } from 'lucide-react';
 import { PluginClassificationBadge } from '../PluginClassificationBadge';
 import type { FailedPlugin, MarketplaceDetailRequest, VersionPlugin } from '../types';
 import { usePluginsTranslations } from '../usePluginsTranslations';
@@ -137,55 +123,36 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
         )}
       </TableCell>
       <TableCell>
-        <div className="flex justify-end">
-          <Dropdown>
-            {/* HeroUI's .dropdown__trigger sets display:inline-block, which beats the inline-flex from .button. */}
-            <DropdownTrigger
-              className={cn(
-                buttonVariants({ variant: 'ghost', size: 'sm', isIconOnly: true }),
-                '!inline-flex items-center justify-center',
-              )}
-              aria-label={t('rowActions', { pluginName: plugin.name })}
-              data-cy={`plugins-list-actions-button-${plugin.id}`}
-            >
-              <MoreHorizontal size={16} />
-            </DropdownTrigger>
-            <DropdownPopover placement="bottom end">
-              <DropdownMenu aria-label={t('rowActions', { pluginName: plugin.name })}>
-                {installed ? (
-                  <DropdownItem
-                    id="details"
-                    onPress={() => onShowDetails({ name: plugin.name, registryId: installed.registryId ?? 'npm' })}
-                    data-cy={`plugins-list-details-button-${plugin.id}`}
-                  >
-                    <Info size={16} />
-                    <Label>{t('marketplace.details')}</Label>
-                  </DropdownItem>
-                ) : null}
-                {installed ? (
-                  <DropdownItem
-                    id="manage-version"
-                    onPress={() => onManageVersion({ name: plugin.name, version: plugin.version })}
-                    data-cy={`plugins-list-manage-version-button-${plugin.id}`}
-                  >
-                    <History size={16} />
-                    <Label>{t('manageVersion')}</Label>
-                  </DropdownItem>
-                ) : null}
-                <DropdownItem
-                  id="delete"
-                  variant="danger"
-                  onPress={() => onDelete(plugin.id)}
-                  data-cy={`plugins-list-delete-plugin-button-${plugin.id}`}
-                >
-                  {/* The danger variant colours only the item's Label slot, so the icon takes the colour itself. */}
-                  <Trash2 size={16} className="text-danger" />
-                  <Label>{t('deleteTooltip')}</Label>
-                </DropdownItem>
-              </DropdownMenu>
-            </DropdownPopover>
-          </Dropdown>
-        </div>
+        <TableRowActions
+          itemName={plugin.name}
+          data-cy={`plugins-list-actions-button-${plugin.id}`}
+          actions={[
+            {
+              key: 'details',
+              label: t('marketplace.details'),
+              icon: Info,
+              isHidden: !installed,
+              onPress: () => onShowDetails({ name: plugin.name, registryId: installed?.registryId ?? 'npm' }),
+              'data-cy': `plugins-list-details-button-${plugin.id}`,
+            },
+            {
+              key: 'manageVersion',
+              label: t('manageVersion'),
+              icon: History,
+              isHidden: !installed,
+              onPress: () => onManageVersion({ name: plugin.name, version: plugin.version }),
+              'data-cy': `plugins-list-manage-version-button-${plugin.id}`,
+            },
+            {
+              key: 'delete',
+              label: t('deleteTooltip'),
+              icon: Trash2,
+              tone: 'danger',
+              onPress: () => onDelete(plugin.id),
+              'data-cy': `plugins-list-delete-plugin-button-${plugin.id}`,
+            },
+          ]}
+        />
       </TableCell>
     </TableRow>
   );

@@ -11,12 +11,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDetection } from '../detection/detection';
 import { useRabbitmqTranslations } from '../i18n';
 import { RabbitmqPermissionsModal } from './permissions/RabbitmqPermissionsModal';
-import { RabbitmqUserDeleteDialog } from './RabbitmqUserDeleteDialog';
 import { RabbitmqUserFormModal } from './RabbitmqUserFormModal';
 import { RabbitmqUserPanelCardHeader } from './RabbitmqUserPanelCardHeader';
 import { RabbitmqUserTable } from './RabbitmqUserTable';
 import { errorTitle } from './errorTitle';
-import { fetchUsers, type RabbitmqUser, type RabbitmqUserList } from './users-api';
+import { deleteUser, fetchUsers, type RabbitmqUser, type RabbitmqUserList } from './users-api';
 
 export function RabbitmqUserPanel({ mqttServerId, canManage = false }: { mqttServerId: number; canManage?: boolean }) {
   const { t, tMessage } = useRabbitmqTranslations();
@@ -30,7 +29,6 @@ export function RabbitmqUserPanel({ mqttServerId, canManage = false }: { mqttSer
   const [formOpen, setFormOpen] = useState(false);
   const [formUser, setFormUser] = useState<RabbitmqUser | null>(null);
   const [permissionsUser, setPermissionsUser] = useState<RabbitmqUser | null>(null);
-  const [userToDelete, setUserToDelete] = useState<RabbitmqUser | null>(null);
 
   // The panel can unmount while a fetch is in flight (navigation away) — drop
   // the result instead of calling setState on an unmounted component.
@@ -120,7 +118,10 @@ export function RabbitmqUserPanel({ mqttServerId, canManage = false }: { mqttSer
               setFormOpen(true);
             }}
             onPermissions={setPermissionsUser}
-            onDelete={setUserToDelete}
+            onDelete={async (user) => {
+              await deleteUser(mqttServerId, user.name);
+              void reload();
+            }}
           />
         )}
       </Card.Content>
@@ -142,13 +143,6 @@ export function RabbitmqUserPanel({ mqttServerId, canManage = false }: { mqttSer
         vhosts={data?.vhosts ?? []}
         onClose={() => setPermissionsUser(null)}
         onSaved={() => void reload()}
-      />
-
-      <RabbitmqUserDeleteDialog
-        mqttServerId={mqttServerId}
-        user={userToDelete}
-        onClose={() => setUserToDelete(null)}
-        onDeleted={() => void reload()}
       />
     </Card>
   );

@@ -231,7 +231,7 @@ Echte Reader setzen zusätzlich diese Grenzen:
 | Scanfilter (`advertisement` des Profils) | 8 Service-UUIDs, 8 Hersteller-IDs, Namenspräfix von 64 Bytes (UTF-8); ein größerer Filter endet mit `INVALID_ARGUMENT`                    |
 | Characteristics pro Profil               | 16 (mehr enden mit `READER_UNSUPPORTED`, Detail `allowlist-too-large:<n>`)                                                                |
 | Wartende Anfragen pro Reader             | 16, der kleinere Wert aus der Host-Grenze (32) und der Grenze, die die Firmware meldet; mehr enden mit `READER_BUSY`, Detail `queue-full` |
-| Benachrichtigungspuffer auf dem Reader   | 64 Benachrichtigungen oder 32 KiB pro Sitzung                                                                                             |
+| Benachrichtigungspuffer auf dem Reader   | 128 Benachrichtigungen oder 32 KiB pro Sitzung                                                                                            |
 
 Ein beworbener Name ist höchstens 31 Bytes lang; ein längeres Namenspräfix passt deshalb nie.
 
@@ -246,7 +246,7 @@ Die Reader-Firmware (2.5.0 oder neuer) meldet Plugin-Bluetooth beim Verbinden an
   - Der Reader beendet die Sitzung selbst nur, wenn eine GATT-Operation im Funk-Stack hängt (etwa 35 s) oder wenn sein Lease abläuft (Ihr Lease plus 10 s, gezählt ab dem Aufbau der Verbindung).
   - Verliert der Reader die Verbindung zum Server, trennt er das Gerät sofort.
 - **Bytes vom Reader** prüft der Host, bevor er sie dekodiert. Ein gelesener Wert über seiner Grenze endet mit `PAYLOAD_TOO_LARGE` (Detail `max-read`), ein fehlerhafter (falsche Kodierung oder kein Wert) mit `INTERNAL` (Detail `malformed-result`).
-- **Benachrichtigungen** puffert der Reader (64 Benachrichtigungen oder 32 KiB pro Sitzung) und leitet sie in Reihenfolge mit einer Sequenznummer weiter. Jeder Fehler lässt den Stream scheitern:
+- **Benachrichtigungen** puffert der Reader (128 Benachrichtigungen oder 32 KiB pro Sitzung) und leitet sie in Reihenfolge mit einer Sequenznummer weiter. Jeder Fehler lässt den Stream scheitern:
   - ein voller Puffer am Reader: `NOTIFICATION_OVERFLOW` (Detail `reader-buffer`); eine volle Warteschlange des Hosts für das Abonnement: `NOTIFICATION_OVERFLOW`;
   - eine Benachrichtigung über `maxNotificationBytes`: `PAYLOAD_TOO_LARGE` (Detail `max-notification`);
   - eine Lücke oder ein Duplikat in der Sequenz oder eine fehlerhafte Benachrichtigung: `INTERNAL` (Detail `malformed-notification`).

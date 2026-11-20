@@ -32,9 +32,17 @@ namespace ble
         constexpr uint32_t SYNC_TIMEOUT_MS = 3000;
         // NimBLE's own host task, like nimble_port_freertos_init but with its stack in PSRAM.
         constexpr uint32_t HOST_TASK_STACK = 4096;
+        // Free DMA-capable internal RAM the stack needs to start. Espressif's controller takes about 24 KB of it
+        // (28 KB with a link) and does not check every allocation: with too little it asserts and the reader
+        // restarts (seen with 20 KB free). The rest is headroom for whatever else needs internal RAM meanwhile.
+        constexpr size_t STACK_MIN_FREE_INTERNAL = 40 * 1024;
 
         NimbleRadio *instance = nullptr;
         SemaphoreHandle_t syncSemaphore = nullptr;
+        // Given once nimble_port_run() returned; the host task then waits to be deleted.
+        SemaphoreHandle_t hostStopped = nullptr;
+        // Set while the stack is up (nimble_port_init done, host task running).
+        TaskHandle_t hostTaskHandle = nullptr;
 
         void toNimble(const Address &address, ble_addr_t &out)
         {
@@ -58,8 +66,18 @@ namespace ble
 
         void hostTask(void *)
         {
-            nimble_port_run(); // returns only after nimble_port_stop(), which this firmware never calls
-            vTaskDeleteWithCaps(nullptr);
+            nimble_port_run(); // returns once NimbleRadio::shutdown() called nimble_port_stop()
+            // Deleted by shutdown(), not by itself: a WithCaps task that deletes itself needs a helper task in
+            // internal RAM, and aborts the reader when that allocation fails.
+            xSemaphoreGive(hostStopped);
+            vTaskSuspend(nullptr);
+        }
+
+        Error espError(esp_err_t err)
+        {
+            char detail[sizeof(Error::detail)];
+            snprintf(detail, sizeof detail, "esp:0x%x", static_cast<unsigned>(err));
+            return Error(Code::ReaderOffline, detail);
         }
 
         void onSyncCallback()
@@ -78,23 +96,71 @@ namespace ble
     {
         if (synced) return Error();
         if (!syncSemaphore) syncSemaphore = xSemaphoreCreateBinary();
-        instance = this;
-        const esp_err_t err = nimble_port_init();
-        if (err != ESP_OK)
+        if (!hostStopped) hostStopped = xSemaphoreCreateBinary();
+        if (!syncSemaphore || !hostStopped) return Error(Code::ReaderOffline, "no-memory");
+        // A stack that came up but never synced stays up: the next request waits for its sync again. Stopping it
+        // instead would race the host task's own sync retries, which reschedule the host timer that the stop frees.
+        if (!hostTaskHandle)
         {
-            char detail[sizeof(Error::detail)];
-            snprintf(detail, sizeof detail, "esp:0x%x", static_cast<unsigned>(err));
-            return Error(Code::ReaderOffline, detail);
+            instance = this;
+            // A sync that came after an earlier timeout must not stand in for this stack's.
+            (void)xSemaphoreTake(syncSemaphore, 0);
+            if (heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA) < STACK_MIN_FREE_INTERNAL)
+                return Error(Code::ReaderOffline, "low-memory");
+            // On failure nimble_port_init() takes the controller down again itself.
+            const esp_err_t err = nimble_port_init();
+            if (err != ESP_OK) return espError(err);
+            ble_hs_cfg.sync_cb = onSyncCallback;
+            ble_hs_cfg.reset_cb = onResetCallback;
+            if (xTaskCreatePinnedToCoreWithCaps(hostTask, "nimble_host", HOST_TASK_STACK, nullptr,
+                                                configMAX_PRIORITIES - 4, &hostTaskHandle,
+                                                CONFIG_BT_NIMBLE_PINNED_TO_CORE,
+                                                MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS)
+            {
+                hostTaskHandle = nullptr;
+                (void)nimble_port_deinit();
+                return Error(Code::ReaderOffline, "host-task");
+            }
         }
-        ble_hs_cfg.sync_cb = onSyncCallback;
-        ble_hs_cfg.reset_cb = onResetCallback;
-        if (xTaskCreatePinnedToCoreWithCaps(hostTask, "nimble_host", HOST_TASK_STACK, nullptr, configMAX_PRIORITIES - 4,
-                                            nullptr, CONFIG_BT_NIMBLE_PINNED_TO_CORE,
-                                            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS)
-            return Error(Code::ReaderOffline, "host-task");
         if (xSemaphoreTake(syncSemaphore, pdMS_TO_TICKS(SYNC_TIMEOUT_MS)) != pdTRUE)
             return Error(Code::ReaderOffline, "no-sync");
         return Error();
+    }
+
+    Error NimbleRadio::shutdown()
+    {
+        if (!hostTaskHandle) return Error();
+        // Not under `mutex`: stopping waits for the host task, whose GAP callbacks take it. Stopping also ends any
+        // link the controller still holds after the core gave up on it.
+        const int rc = nimble_port_stop();
+        if (rc != 0)
+        {
+            char detail[sizeof(Error::detail)];
+            snprintf(detail, sizeof detail, "nimble:rc=%d", rc);
+            return Error(Code::Internal, detail);
+        }
+        synced = false;
+        // nimble_port_stop() returns once the host task ran its stop event; it gives this a few instructions later.
+        xSemaphoreTake(hostStopped, portMAX_DELAY);
+        vTaskDeleteWithCaps(hostTaskHandle);
+        hostTaskHandle = nullptr;
+        {
+            std::lock_guard<std::recursive_mutex> lock(mutex);
+            reset();
+        }
+        // Host first, then the controller (disable, deinit): their heap goes back.
+        const esp_err_t err = nimble_port_deinit();
+        if (err != ESP_OK) return espError(err);
+        return Error();
+    }
+
+    bool NimbleRadio::active()
+    {
+        if (!hostTaskHandle) return false;
+        std::lock_guard<std::recursive_mutex> lock(mutex);
+        // NimBLE's own view of the procedures: it covers any scan, whoever started it. A host that is syncing again
+        // after a controller reset counts too: its sync procedure reschedules the host timer that stopping frees.
+        return conn != NO_CONN || connecting || ble_gap_disc_active() || ble_gap_conn_active() || !ble_hs_synced();
     }
 
     void NimbleRadio::onSync()

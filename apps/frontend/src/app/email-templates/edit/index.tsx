@@ -26,7 +26,7 @@ import { TranslationsSection } from './TranslationsSection';
 import { CHROME_CLASS, extractTemplateFragment, splitHead, wrapInLayoutChrome } from './mjmlLayout';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, StandardDrawer, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, ConfirmableButton, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import * as enTranslationsFile from './en.json';
 import * as deTranslationsFile from './de.json';
@@ -105,22 +105,18 @@ export function EditEmailTemplatePage() {
     );
   }, [updateTemplate, subject, templateType, toast, t]);
 
-  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const resetTemplate = useResetTemplateToDefault();
-  const onResetConfirm = useCallback(() => {
+  const onResetConfirm = useCallback(async () => {
     if (!templateType) return;
-    resetTemplate.mutate(
-      { path: { type: templateType } },
-      {
-        onSuccess: (data) => {
-          setSubject(data.subject);
-          seedEditor(data.body);
-          setResetConfirmOpen(false);
-          toast.success({ title: t('toast.resetSuccess') });
-        },
-        onError: () => toast.error({ title: t('toast.resetError') }),
-      },
-    );
+    try {
+      const data = await resetTemplate.mutateAsync({ path: { type: templateType } });
+      setSubject(data.subject);
+      seedEditor(data.body);
+      toast.success({ title: t('toast.resetSuccess') });
+    } catch (error) {
+      toast.error({ title: t('toast.resetError') });
+      throw error;
+    }
   }, [resetTemplate, templateType, seedEditor, toast, t]);
 
   const variables = template.data?.variables ?? [];
@@ -209,16 +205,28 @@ export function EditEmailTemplatePage() {
             <Languages size={16} />
             <span className="hidden sm:inline">{t('actions.translations')}</span>
           </Button>
-          <Button
-            isIconOnly
-            variant="ghost"
-            size="sm"
-            onPress={() => setResetConfirmOpen(true)}
-            aria-label={t('actions.resetToDefault')}
-            data-cy="edit-email-template-reset-button"
-          >
-            <RotateCcw size={16} />
-          </Button>
+          <ConfirmableButton
+            label={t('resetConfirm.confirm')}
+            status="error"
+            confirm={{
+              title: t('resetConfirm.title'),
+              message: t('resetConfirm.message'),
+              cancelLabel: t('resetConfirm.cancel'),
+            }}
+            onConfirm={onResetConfirm}
+            renderActivator={(open) => (
+              <Button
+                isIconOnly
+                variant="ghost"
+                size="sm"
+                onPress={open}
+                aria-label={t('actions.resetToDefault')}
+                data-cy="edit-email-template-reset-button"
+              >
+                <RotateCcw size={16} />
+              </Button>
+            )}
+          />
           <Button
             variant="primary"
             size="sm"
@@ -266,17 +274,6 @@ export function EditEmailTemplatePage() {
           <Button onPress={() => setTranslationsOpen(false)}>{t('actions.close')}</Button>
         </DrawerFooter>
       </StandardDrawer>
-
-      <StatusDialog
-        isOpen={resetConfirmOpen}
-        onClose={() => setResetConfirmOpen(false)}
-        status="error"
-        title={t('resetConfirm.title')}
-        closeLabel={t('resetConfirm.cancel')}
-        action={{ label: t('resetConfirm.confirm'), onPress: onResetConfirm, isPending: resetTemplate.isPending }}
-      >
-        {t('resetConfirm.message')}
-      </StatusDialog>
     </div>
   );
 }

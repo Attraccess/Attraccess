@@ -2,7 +2,7 @@
 // FEATURE: ATT-386 Resource details page full redesign tabbed hub layout
 
 import { useParams, Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Button, Spinner, useOverlayState } from '@heroui/react';
+import { Button, Spinner } from '@heroui/react';
 import {
   ArrowLeft,
   Settings2Icon,
@@ -24,7 +24,6 @@ import { useToastMessage } from '../../../../components/toastProvider';
 import { useDeleteOneResource, useGetOneResourceById, useGetAllResourcesKey } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  DeleteConfirmationModal,
   PageAction,
   PageHeader,
   RoutedTabs,
@@ -58,13 +57,13 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { isOpen, open, close: closeDeleteModal } = useOverlayState();
 
   const { hasPermission } = useAuth();
   const { success, error: showError } = useToastMessage();
   const { confirmationDialog } = useQrCodeAction({ resourceId });
 
-  const { t } = useTranslations({ en, de });
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  const { t } = useTranslations({ en, de }, { escapeValues: false });
 
   const canUpdateResources = hasPermission('resources.update');
   const canDeleteResources = hasPermission('resources.delete');
@@ -146,7 +145,14 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
       icon: <Trash className="w-4 h-4" />,
       variant: 'destructive',
       isHidden: !canDeleteResources,
-      onPress: open,
+      onPress: handleDelete,
+      confirm: {
+        title: t('actions.deleteConfirm.title', { name: resource.name }),
+        message: t('actions.deleteConfirm.message'),
+        'data-cy': 'delete-confirmation-modal',
+        confirmDataCy: 'delete-button',
+        cancelDataCy: 'cancel-button',
+      },
       dataCy: 'delete-resource-button',
     },
   ];
@@ -187,15 +193,6 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
       <div className="flex-1 min-h-0 overflow-auto">{children ?? <Outlet />}</div>
       {confirmationDialog}
 
-      {canDeleteResources && (
-        <DeleteConfirmationModal
-          isOpen={isOpen}
-          onClose={closeDeleteModal}
-          onConfirm={handleDelete}
-          itemName={resource.name}
-          data-cy="delete-confirmation-modal"
-        />
-      )}
       {canUpdateResources && (
         <ResourceQrCode
           resourceId={resourceId}

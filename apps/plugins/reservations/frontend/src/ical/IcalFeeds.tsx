@@ -1,5 +1,6 @@
 import {
   Button,
+  ConfirmableButton,
   EmptyState,
   StatusAlert,
   StatusDialog,
@@ -19,7 +20,7 @@ import { listState } from '../shared/queryState';
 import { FeedFormModal } from './FeedFormModal';
 import { FeedSecretDialog } from './FeedSecretDialog';
 
-type Confirm = { kind: 'regenerate' | 'revoke'; feed: IcalFeed } | null;
+type FeedAction = { kind: 'regenerate' | 'revoke'; feed: IcalFeed };
 
 /**
  * iCal feed management: list, create, rename/re-scope, regenerate and revoke. Used by the account
@@ -35,22 +36,35 @@ export function IcalFeeds() {
   const [formFeed, setFormFeed] = useState<IcalFeed | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [secret, setSecret] = useState<IcalFeedSecret | null>(null);
-  const [confirm, setConfirm] = useState<Confirm>(null);
   const [error, setError] = useState<string | null>(null);
 
   const run = useMutation({
-    mutationFn: async (current: NonNullable<Confirm>) =>
+    mutationFn: async (current: FeedAction) =>
       current.kind === 'regenerate' ? regenerateFeed(current.feed.id) : (await revokeFeed(current.feed.id), null),
     onSuccess: async (result) => {
-      setConfirm(null);
       if (result) setSecret(result);
       await invalidate();
     },
-    onError: (failure) => {
-      setConfirm(null);
-      setError(describeError(failure, t));
-    },
+    onError: (failure) => setError(describeError(failure, t)),
   });
+
+  // The error dialog reports a failure, so the confirmation closes either way.
+  const runAction = (current: FeedAction) => run.mutateAsync(current).catch(() => undefined);
+
+  const confirmButton = (kind: FeedAction['kind'], feed: IcalFeed) => (
+    <ConfirmableButton
+      label={t(`feeds.${kind}.label`)}
+      status={kind === 'revoke' ? 'error' : 'warning'}
+      buttonProps={{ size: 'sm', variant: 'secondary' }}
+      onConfirm={() => runAction({ kind, feed })}
+      confirm={{
+        title: t(`feeds.${kind}.title`, { name: feed.name }),
+        message: t(`feeds.${kind}.body`),
+        confirmLabel: t(`feeds.${kind}.confirm`),
+        'data-cy': 'reservations-feed-confirm',
+      }}
+    />
+  );
 
   const describeSelection = (feed: IcalFeed) => {
     const { selection } = feed;
@@ -130,12 +144,8 @@ export function IcalFeeds() {
                 >
                   {t('common.edit')}
                 </Button>
-                <Button size="sm" variant="secondary" onPress={() => setConfirm({ kind: 'regenerate', feed })}>
-                  {t('feeds.regenerate.label')}
-                </Button>
-                <Button size="sm" variant="secondary" onPress={() => setConfirm({ kind: 'revoke', feed })}>
-                  {t('feeds.revoke.label')}
-                </Button>
+                {confirmButton('regenerate', feed)}
+                {confirmButton('revoke', feed)}
               </div>
             )}
           </li>
@@ -151,20 +161,6 @@ export function IcalFeeds() {
         }}
       />
       <FeedSecretDialog secret={secret} onClose={() => setSecret(null)} />
-      <StatusDialog
-        isOpen={confirm !== null}
-        onClose={() => !run.isPending && setConfirm(null)}
-        status="warning"
-        title={confirm ? t(`feeds.${confirm.kind}.title`, { name: confirm.feed.name }) : ''}
-        action={{
-          label: confirm ? t(`feeds.${confirm.kind}.confirm`) : '',
-          onPress: () => confirm && run.mutate(confirm),
-          isPending: run.isPending,
-        }}
-        data-cy="reservations-feed-confirm"
-      >
-        {confirm ? t(`feeds.${confirm.kind}.body`) : ''}
-      </StatusDialog>
       <StatusDialog isOpen={error !== null} onClose={() => setError(null)} status="error" title={t('feeds.failed')}>
         {error ?? ''}
       </StatusDialog>

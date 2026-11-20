@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { FormEditorPage } from './FormEditorPage';
@@ -14,12 +14,13 @@ const state = vi.hoisted(() => ({
   error: vi.fn(),
   apiError: vi.fn(),
   invalidate: vi.fn(),
+  removeQueries: vi.fn(),
   callbacks: {} as Record<
     string,
     { onSuccess: (data: { id: number }) => Promise<void>; onError: (error: Error) => void }
   >,
 }));
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
+vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate, removeQueries: state.removeQueries }) }));
 vi.mock('../../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: state.success, error: state.error, apiError: state.apiError }),
 }));
@@ -153,16 +154,19 @@ it('loads existing fields, saves edits, and removes draft fields', async () => {
   expect(screen.getByText('No fields')).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Save form' })).toBeDisabled();
 });
-it('confirms deletion and refreshes list and detail queries', async () => {
+it('confirms deletion, drops the deleted form from the cache and refreshes the list', async () => {
   state.form = saved;
   mount('11');
   fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
   fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete form' }));
-  fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+  fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete form' }));
   await waitFor(() => expect(state.remove).toHaveBeenCalledWith({ path: { resourceId: 7, formId: 11 } }));
   expect(await screen.findByText('Form list')).toBeTruthy();
   expect(state.success).toHaveBeenCalledWith({ title: 'Form deleted' });
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['forms', { path: { resourceId: 7 } }] });
+  // Refetching the deleted form would 404 through every retry and keep the confirmation pending.
+  expect(state.removeQueries).toHaveBeenCalledWith({ queryKey: ['form', { path: { resourceId: 7, formId: 11 } }] });
+  expect(state.invalidate).not.toHaveBeenCalledWith({ queryKey: ['form', expect.anything()] });
 });
 it('forwards mutation errors to the API error presenter and shows edit loading', () => {
   state.loading = true;

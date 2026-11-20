@@ -10,7 +10,6 @@
     "type": "Type",
     "value": "Value",
     "updated": "Updated",
-    "actions": "Actions",
     "empty": "No variables yet."
   },
   "actions": {
@@ -21,8 +20,7 @@
     "cancel": "Cancel",
     "close": "Close",
     "confirmDelete": "Delete this variable?",
-    "confirmDeleteYes": "Delete",
-    "confirmDeleteNo": "Cancel"
+    "confirmDeleteMessage": "The variable \"{{{key}}}\" will be deleted. This cannot be undone."
   },
   "editor": {
     "createTitle": "Add variable",

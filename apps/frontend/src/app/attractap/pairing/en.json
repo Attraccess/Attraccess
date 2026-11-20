@@ -103,7 +103,10 @@
     "newReader": "New reader",
     "waitingSince": "Waiting since {{time}}",
     "pair": "Pair",
-    "delete": "Delete"
+    "delete": "Delete",
+    "deleteTitle": "Delete {{name}}?",
+    "deleteMessage": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+    "deleteFailed": "The reader could not be deleted"
   },
   "kind": {
     "touch": "Touch",

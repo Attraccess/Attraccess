@@ -925,7 +925,8 @@ describe('PluginsSection', () => {
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
 
-    await chooseRowAction(user, 'plugin-1', 'Remove plugin');
+    await user.click(document.querySelector('[data-cy="plugins-list-actions-button-plugin-1"]') as Element);
+    await user.click(document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element);
 
     await waitFor(() =>
       expect(document.querySelector('[data-cy="plugins-list-delete-confirmation-delete-button"]')).toBeInTheDocument(),
@@ -937,7 +938,8 @@ describe('PluginsSection', () => {
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
 
-    await chooseRowAction(user, 'plugin-1', 'Remove plugin');
+    await user.click(document.querySelector('[data-cy="plugins-list-actions-button-plugin-1"]') as Element);
+    await user.click(document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element);
     const confirm = await waitFor(() =>
       document.querySelector('[data-cy="plugins-list-delete-confirmation-delete-button"]'),
     );
@@ -972,7 +974,8 @@ describe('PluginsSection', () => {
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
 
-    await chooseRowAction(user, 'plugin-1', 'Remove plugin');
+    await user.click(document.querySelector('[data-cy="plugins-list-actions-button-plugin-1"]') as Element);
+    await user.click(document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element);
     const cancel = await waitFor(() =>
       document.querySelector('[data-cy="plugins-list-delete-confirmation-cancel-button"]'),
     );

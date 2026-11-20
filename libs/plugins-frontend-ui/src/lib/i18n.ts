@@ -4,6 +4,20 @@ import { get } from 'lodash-es';
 import { useCallback, useEffect, useState } from 'react';
 import { create } from 'zustand';
 
+// Compiled templates by escape mode and text. Translation texts are a fixed set, so the cache stays small; it
+// spares every row of a large table recompiling the same texts on each render.
+const compiledTemplates = new Map<string, Handlebars.TemplateDelegate>();
+
+function compileTemplate(translation: string, noEscape: boolean) {
+  const cacheKey = `${noEscape ? 1 : 0}:${translation}`;
+  let template = compiledTemplates.get(cacheKey);
+  if (!template) {
+    template = Handlebars.compile(translation, { noEscape });
+    compiledTemplates.set(cacheKey, template);
+  }
+  return template;
+}
+
 // Pluralization helpers
 interface PluralObject {
   one: string;
@@ -179,7 +193,7 @@ export function useTranslations(
         return ABSOLUTE_FALLBACK_TRANSLATION;
       }
 
-      const template = Handlebars.compile(translation, { noEscape: options.escapeValues === false });
+      const template = compileTemplate(translation, options.escapeValues === false);
       return template(data);
     },
     [getTranslationRaw, options.escapeValues],

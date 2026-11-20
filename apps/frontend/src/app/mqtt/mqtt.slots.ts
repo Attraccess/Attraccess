@@ -11,7 +11,7 @@
 // Detail/edit view of a single MQTT server (an "extensions" section).
 export const MQTT_SERVER_DETAIL_SLOT = 'mqtt.server.detail';
 
-// Per-row action / badge area in the MQTT server list.
+// Per-row badge area next to the server name in the MQTT server list.
 export const MQTT_SERVER_LIST_ROW_SLOT = 'mqtt.server.list.row';
 
 // Context shape passed to both MQTT server slots. The index signature keeps it

@@ -1,0 +1,7 @@
+{
+  "title": "Check your email",
+  "lead": "We sent an activation link to",
+  "instruction": "Open the link in that email to activate your account, then sign in.",
+  "spamHint": "Can't find it? Check your spam folder.",
+  "backToSignIn": "Back to sign in"
+}

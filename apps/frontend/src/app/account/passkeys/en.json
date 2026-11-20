@@ -5,14 +5,17 @@
   "neverUsed": "Never",
   "columns": {
     "name": "Name",
-    "lastUsed": "Last used",
-    "actions": "Actions"
+    "lastUsed": "Last used"
   },
   "nameLabel": "Name",
   "namePlaceholder": "e.g. MacBook Touch ID",
   "actions": {
     "add": "Add a passkey",
-    "delete": "Delete passkey {{name}}"
+    "delete": "Delete"
+  },
+  "deleteConfirm": {
+    "title": "Delete passkey {{name}}?",
+    "message": "You can no longer sign in with this passkey. This cannot be undone."
   },
   "success": {
     "added": "Passkey added",

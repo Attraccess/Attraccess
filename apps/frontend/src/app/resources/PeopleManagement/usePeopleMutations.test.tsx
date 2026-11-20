@@ -16,7 +16,7 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
           _mutationKey: unknown,
           options: {
             onSuccess: (data: unknown, variables: unknown) => void;
-            onError: (error: Error) => void;
+            onError: (error: Error, variables: unknown) => void;
           },
         ) => ({
           isPending: state.pending,
@@ -24,7 +24,7 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
             state.calls(name, variables);
             if (state.failure) {
               const error = new Error('Forbidden');
-              options.onError(error);
+              options.onError(error, variables);
               throw error;
             }
             options.onSuccess({}, variables);
@@ -132,6 +132,7 @@ it.each(['resource', 'group'] as const)(
     const actions = [
       () => result.current.grantIntroducer(3),
       () => result.current.revokeIntroducer(3, ResourceIntroducerType.INTRODUCER),
+      () => result.current.revokeIntroducer(3, ResourceIntroducerType.MAINTAINER),
       () => result.current.grantIntroduction(3),
       () => result.current.revokeIntroduction(3),
     ];
@@ -145,6 +146,7 @@ it.each(['resource', 'group'] as const)(
     expect(state.error.mock.calls.map(([value]) => value.title)).toEqual([
       'toasts.introducerGrantFailed.title',
       'toasts.introducerRevokeFailed.title',
+      'toasts.maintainerRevokeFailed.title',
       'toasts.introductionGrantFailed.title',
       'toasts.introductionRevokeFailed.title',
     ]);

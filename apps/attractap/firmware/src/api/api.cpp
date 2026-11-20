@@ -228,6 +228,8 @@ API::API(IReaderTransport &transport) : logger("API"),
                 { return this->sendMessage(type, payload); },
                 [this](const char *reason)
                 { this->transport.forceReconnect(reason); },
+                [this]()
+                { return this->transport.connectionId(); },
                 firmwareUpdateProgressCallback,
                 firmwareUpdateMetaCallback,
                 errorCallback),

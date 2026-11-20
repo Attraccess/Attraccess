@@ -99,8 +99,7 @@
     "directory": "Directory",
     "permissions": "Permissions",
     "source": "Source",
-    "status": "Status",
-    "actions": "Actions"
+    "status": "Status"
   },
   "status": {
     "loaded": "Loaded",
@@ -153,7 +152,6 @@
     }
   },
   "deleteTooltip": "Remove plugin",
-  "rowActions": "Actions for {{pluginName}}",
   "deleteConfirmation": {
     "title": "Remove plugin?",
     "cancel": "Cancel",

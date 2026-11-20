@@ -44,6 +44,9 @@ class AppImage(unittest.TestCase):
     def test_trigger_topic_fails(self):
         self.assertEqual(len(c.check_app_image(b"\x00prefix debug.crash suffix")), 1)
 
+    def test_lab_ca_fails(self):
+        self.assertEqual(len(c.check_app_image(b"\x00Attractap Device Lab CA (lab builds only)\x00")), 1)
+
     def test_clean_image_passes(self):
         self.assertEqual(c.check_app_image(b"\x00 debug.log auth.status.get"), [])
 
@@ -81,6 +84,17 @@ class ReleaseBuildFlags(unittest.TestCase):
             b.build_variant("attractap-touch-v2", "variants/attractap-touch-v2.cmake", "ERROR")
         args = run_idf.call_args[0][0]
         self.assertIn("-DATTRACTAP_CRASH_TRIGGER=OFF", args)
+        self.assertIn("-DATTRACTAP_TEST_HOOKS=OFF", args)
+        self.assertIn("-DATTRACTAP_LAB_CA=", args)
+
+    def test_secure_release_builds_clear_the_lab_ca(self):
+        with mock.patch.object(b, "run_idf", return_value=1) as run_idf, \
+                mock.patch.object(b.os.path, "exists", return_value=False), \
+                contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit):
+            b.build_variant("attractap-touch-v2", "variants/attractap-touch-v2.cmake", "ERROR", secure=True)
+        args = run_idf.call_args[0][0]
+        self.assertIn("-DATTRACTAP_SECURE_PROFILE=ON", args)
+        self.assertIn("-DATTRACTAP_LAB_CA=", args)
         self.assertIn("-DATTRACTAP_TEST_HOOKS=OFF", args)
 
 

@@ -1,21 +1,16 @@
 import '@testing-library/jest-dom/vitest';
-import { act, render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChangeEmailForm } from './index';
 import { QueryWrapper } from '../../../../../test-utils/wrappers';
 
-const mutate = vi.fn();
-let hookOptions: { onSuccess?: () => void; onError?: (error: unknown) => void } = {};
+const mutateAsync = vi.fn();
 
 vi.mock('@attraccess/react-query-client', () => ({
   ApiError: class ApiError extends Error {},
   UseGetOneUserByIdKeyFn: vi.fn(),
-  useChangeUserEmail: (_mutationKey: unknown, options: typeof hookOptions) => {
-    hookOptions = options;
-    return { mutate, isPending: false };
-  },
+  useChangeUserEmail: () => ({ mutateAsync, isPending: false }),
   useFindManyKey: 'users',
 }));
 
@@ -35,68 +30,6 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
         })[key] ?? key,
     }),
   }))()),
-  ...(await (() => ({
-    Button: ({
-      children,
-      onPress,
-      isDisabled,
-    }: {
-      children: React.ReactNode;
-      onPress: () => void;
-      isDisabled?: boolean;
-    }) => (
-      <button type="button" onClick={onPress} disabled={isDisabled}>
-        {children}
-      </button>
-    ),
-  }))()),
-  ...(await (() => ({
-    StatusDialog: ({
-      isOpen,
-      title,
-      children,
-      closeLabel,
-      onClose,
-      action,
-    }: {
-      isOpen: boolean;
-      title: React.ReactNode;
-      children?: React.ReactNode;
-      closeLabel?: React.ReactNode;
-      onClose: () => void;
-      action?: { label: React.ReactNode; onPress: () => void };
-    }) =>
-      isOpen ? (
-        <div role="alertdialog" aria-label={String(title)}>
-          <div>{children}</div>
-          <button type="button" onClick={onClose}>
-            {closeLabel}
-          </button>
-          <button type="button" onClick={action?.onPress}>
-            {action?.label}
-          </button>
-        </div>
-      ) : null,
-  }))()),
-}));
-
-vi.mock('@heroui/react', () => ({
-  cn: (...classes: (string | undefined)[]) => classes.filter(Boolean).join(' '),
-  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
-  Label: ({ children }: { children: React.ReactNode }) => <label>{children}</label>,
-  TextField: ({
-    children,
-    value,
-    onChange,
-  }: {
-    children: React.ReactNode;
-    value: string;
-    onChange: (value: string) => void;
-  }) => <div onChange={(event) => onChange((event.target as HTMLInputElement).value)}>{children}</div>,
-  useOverlayState: () => {
-    const [isOpen, setIsOpen] = useState(false);
-    return { isOpen, open: () => setIsOpen(true), close: () => setIsOpen(false) };
-  },
 }));
 
 vi.mock('../../../../../components/toastProvider', () => ({
@@ -104,7 +37,7 @@ vi.mock('../../../../../components/toastProvider', () => ({
 }));
 
 describe('ChangeEmailForm', () => {
-  beforeEach(() => mutate.mockClear());
+  beforeEach(() => mutateAsync.mockReset());
 
   it('requires confirmation before changing a user email address', async () => {
     const user = userEvent.setup();
@@ -113,20 +46,24 @@ describe('ChangeEmailForm', () => {
     expect(
       screen.getByText("The current email address is not shown to protect this user's privacy."),
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
 
-    await user.type(screen.getByRole('textbox'), 'new@example.com');
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'new@example.com');
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(screen.getByText('Sign-in warning')).toBeInTheDocument();
-    expect(mutate).not.toHaveBeenCalled();
-
-    await user.click(screen.getByRole('button', { name: 'Change email' }));
-    expect(mutate).toHaveBeenCalledWith({ path: { id: 7 }, body: { email: 'new@example.com' } });
+    expect(await screen.findByRole('alertdialog', { name: 'Confirm email change' })).toHaveTextContent(
+      'Sign-in warning',
+    );
+    expect(mutateAsync).not.toHaveBeenCalled();
 
     // A failed request keeps the dialog open; only success closes it.
-    act(() => hookOptions.onError?.(new Error('request failed')));
+    mutateAsync.mockRejectedValueOnce(new Error('request failed'));
+    await user.click(screen.getByRole('button', { name: 'Change email' }));
+    expect(mutateAsync).toHaveBeenCalledWith({ path: { id: 7 }, body: { email: 'new@example.com' } });
     expect(screen.getByRole('alertdialog')).toBeInTheDocument();
-    act(() => hookOptions.onSuccess?.());
-    expect(screen.queryByRole('alertdialog')).toBeNull();
+
+    mutateAsync.mockResolvedValueOnce(undefined);
+    await user.click(screen.getByRole('button', { name: 'Change email' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
   });
 });

@@ -101,19 +101,27 @@
   },
   "UserEmailNotVerifiedException": {
     "title": "Email not verified",
-    "description": "Please verify your email before signing in. Check your inbox for the verification email or ask an administrator to resend it."
+    "description": "Please verify your email before signing in. Open the activation link we sent you, or request a new one below."
+  },
+  "EmailAlreadyVerified": {
+    "title": "Email already verified",
+    "description": "This account is already verified. Sign in instead."
+  },
+  "UnverifiedEmailChangeNotAllowed": {
+    "title": "Email can't be changed here",
+    "description": "This account's email address can't be changed before activation. Open the activation link we sent you, or request a new one."
   },
   "UnkownUserOrPasswordException": {
     "title": "Unknown user or password",
     "description": "The user or password is invalid."
   },
   "TooManyAuthAttempts": {
-    "title": "Too many sign-in attempts",
-    "description": "Please wait {{retryAfterSeconds}} seconds before trying to sign in again."
+    "title": "Too many attempts",
+    "description": "Please wait {{retryAfterSeconds}} seconds before trying again."
   },
   "EmailSendFailed": {
     "title": "Email delivery failed",
-    "description": "We could not send the invitation email. Please check the mail server configuration and try again."
+    "description": "We could not send the email. Please try again in a few minutes. If this keeps happening, the mail server configuration needs to be checked."
   },
   "You cannot update your own permissions": {
     "title": "Cannot update own permissions",

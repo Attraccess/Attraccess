@@ -10,6 +10,8 @@ void OtaUpdater::begin(JsonObject firmwareMeta)
 {
     std::string availableVersion = firmwareMeta["version"].as<std::string>();
     uint32_t offeredSize = firmwareMeta["totalSize"].is<uint32_t>() ? firmwareMeta["totalSize"].as<uint32_t>() : 0;
+    // The connection this offer arrived on (flash preparation below takes seconds).
+    const uint32_t connection = this->connectionId();
 
     if (this->ota.inProgress)
     {
@@ -22,7 +24,12 @@ void OtaUpdater::begin(JsonObject firmwareMeta)
         // fail at esp_ota_end after transferring the whole rest of the image.
         if (availableVersion == this->ota.version && offeredSize == this->ota.totalSize)
         {
-            // Server re-offered the same update, e.g. after a websocket reconnect.
+            if (connection == this->offerConnectionId)
+            {
+                // Offered again on the connection the transfer runs on: a request may be in flight.
+                return;
+            }
+            // Server re-offered the same update after a websocket reconnect.
             // Chunk reads are stateless on the server, so resume at bytesWritten
             // instead of aborting and restarting the whole transfer from 0.
             // consecutiveChunkFailures is intentionally NOT reset here - only real
@@ -31,6 +38,7 @@ void OtaUpdater::begin(JsonObject firmwareMeta)
             this->logger.errorf("Resuming OTA update at %u/%u bytes", this->ota.bytesWritten, this->ota.totalSize);
             this->lastChunkRequestSendFailed = false;
             this->readyForNextFirmwareChunk = true;
+            this->offerConnectionId = connection;
             return;
         }
         this->abortFirmwareUpdate("Different firmware offered mid-update");
@@ -82,7 +90,10 @@ void OtaUpdater::begin(JsonObject firmwareMeta)
 
     this->updateFirmwareProgress(0);
 
+    // Arms the response timeout: it also covers a connection lost before the first request.
+    this->lastFirmwareChunkRequestTimeMs = millis();
     this->readyForNextFirmwareChunk = true;
+    this->offerConnectionId = connection;
 }
 
 void OtaUpdater::tick()
@@ -96,7 +107,10 @@ void OtaUpdater::tick()
         return;
     }
 
-    if (this->readyForNextFirmwareChunk)
+    // After a reconnect the server offers the update again and begin() resumes; until then nothing is requested
+    // and the response timeout below runs.
+    const bool onOfferConnection = this->connectionId() == this->offerConnectionId;
+    if (this->readyForNextFirmwareChunk && onOfferConnection)
     {
         // consecutiveChunkFailures is NOT reset here: onChunk() already clears it
         // per fragment, and the resume-accepted path must keep counting so reconnect
@@ -107,7 +121,8 @@ void OtaUpdater::tick()
 
     if (this->lastFirmwareChunkRequestTimeMs != 0)
     {
-        const uint32_t waitMs = this->lastChunkRequestSendFailed
+        const bool retrySend = this->lastChunkRequestSendFailed && onOfferConnection;
+        const uint32_t waitMs = retrySend
                                     ? this->FIRMWARE_CHUNK_SEND_RETRY_DELAY_MS
                                     : this->FIRMWARE_CHUNK_REQUEST_RESPONSE_TIMEOUT_MS;
         if (millis() - this->lastFirmwareChunkRequestTimeMs > waitMs)
@@ -118,7 +133,7 @@ void OtaUpdater::tick()
                 return;
             }
             this->consecutiveChunkFailures++;
-            if (this->lastChunkRequestSendFailed)
+            if (retrySend)
             {
                 // TX failed (queue full/alloc): re-request on the same socket
                 this->logger.errorf("Firmware chunk send failed at offset %u, retry %u/%u",
@@ -129,9 +144,10 @@ void OtaUpdater::tick()
             }
             else
             {
-                // Response timeout: force a fresh socket so any stale in-flight
-                // response from the previous request cannot arrive and be written
-                // out-of-sequence. begin() resumes from bytesWritten after re-auth.
+                // Response timeout, or no new offer after a reconnect: force a fresh
+                // socket so any stale in-flight response from the previous request
+                // cannot arrive and be written out-of-sequence. begin() resumes from
+                // bytesWritten after re-auth.
                 this->logger.errorf("Firmware chunk timeout at offset %u, reconnecting (retry %u/%u)",
                                     (unsigned)this->ota.bytesWritten,
                                     (unsigned)this->consecutiveChunkFailures,

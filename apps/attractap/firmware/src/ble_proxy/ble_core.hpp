@@ -30,8 +30,15 @@ namespace ble
         };
 
         virtual ~IBleRadio() = default;
-        // Brings the stack up (lazily, on the first request). Called again after a failure.
+        // Brings the stack up (lazily, on the first request). Called again after a failure or a shutdown.
         virtual Error init() = 0;
+        // Takes the whole stack down so its RAM goes back to the heap; the next init() starts it afresh. Called only
+        // while nothing uses the radio. init() comes next whatever it returned: it takes a stack that is still up as
+        // it is and starts one that is down.
+        virtual Error shutdown() = 0;
+        // Whether the controller still runs anything (a scan, a connect, a link), whoever started it. Asked only
+        // while the stack is up.
+        virtual bool active() = 0;
         virtual Error startScan(uint32_t durationMs) = 0;
         virtual void stopScan() = 0;
         // Connects, exchanges the MTU and discovers the allowlisted services; reports onConnected or onConnectFailed.
@@ -113,6 +120,9 @@ namespace ble
         }
         uint16_t mtu() const { return session.mtu; }
         size_t pendingRequests() const { return session.queue.size() + (session.current.active ? 1 : 0); }
+        // While the stack is up: how long until tick() may shut it down (0: due). The proxy task sleeps no longer
+        // than this.
+        uint32_t shutdownInMs(uint32_t now) const;
 
     private:
         enum class SessionState : uint8_t
@@ -189,6 +199,8 @@ namespace ble
         NotificationBuffer &notifications;
         std::function<bool()> otaActive;
         bool initialized = false;
+        // The last time anything used the stack; it shuts down STACK_IDLE_SHUTDOWN_MS later.
+        uint32_t stackUsedMs = 0;
         Owner currentOwner = Owner::None;
         Session session;
         Scan scan;
@@ -198,7 +210,15 @@ namespace ble
         std::deque<std::string, PsAlloc<std::string>> outbox;
 
         bool ota() const { return otaActive && otaActive(); }
+        // Whether the stack must stay up: an owner (a scan, or a session until the controller let its link go),
+        // anything still to go out, or anything the controller still runs. Not idle(), which only says whether this
+        // task may sleep: work without an owner that keeps the radio busy (a standing scan, say) must count here.
+        bool stackInUse() const
+        {
+            return currentOwner != Owner::None || !outbox.empty() || notifications.size() != 0 || radio.active();
+        }
         bool ensureRadio(const Command &command);
+        void shutdownIdleStack(uint32_t now);
         void startScan(Command &&command, uint32_t now);
         void openSession(Command &&command, uint32_t now);
         void queueOperation(Command &&command, uint32_t now);

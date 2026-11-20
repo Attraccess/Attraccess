@@ -5,7 +5,7 @@ import { MjmlVisualEditor } from '../email-templates/edit/MjmlVisualEditor';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { OnMount } from '@monaco-editor/react';
-import { Button, StandardDrawer, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, ConfirmableButton, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAppTheme } from '@attraccess/ui';
 import { useToastMessage } from '../../components/toastProvider';
 import { CONTENT_PLACEHOLDER, splitHead } from '../email-templates/edit/mjmlLayout';
@@ -98,17 +98,16 @@ export function EmailLayoutPage() {
     );
   }, [updateLayout, toast, t]);
 
-  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const resetLayout = useResetLayoutToDefault();
-  const onResetConfirm = useCallback(() => {
-    resetLayout.mutate(undefined, {
-      onSuccess: (data) => {
-        seedFromStored(data.body);
-        setResetConfirmOpen(false);
-        toast.success({ title: t('toast.resetSuccess') });
-      },
-      onError: () => toast.error({ title: t('toast.resetError') }),
-    });
+  const onResetConfirm = useCallback(async () => {
+    try {
+      const data = await resetLayout.mutateAsync(undefined);
+      seedFromStored(data.body);
+      toast.success({ title: t('toast.resetSuccess') });
+    } catch (error) {
+      toast.error({ title: t('toast.resetError') });
+      throw error;
+    }
   }, [resetLayout, seedFromStored, toast, t]);
 
   // The mj-head (global fonts/colors via mj-attributes, mj-style) has no visual
@@ -158,16 +157,28 @@ export function EmailLayoutPage() {
             <Palette size={16} />
             <span className="hidden sm:inline">{t('actions.styles')}</span>
           </Button>
-          <Button
-            isIconOnly
-            variant="ghost"
-            size="sm"
-            onPress={() => setResetConfirmOpen(true)}
-            aria-label={t('actions.resetToDefault')}
-            data-cy="email-layout-reset-button"
-          >
-            <RotateCcw size={16} />
-          </Button>
+          <ConfirmableButton
+            label={t('resetConfirm.confirm')}
+            status="error"
+            confirm={{
+              title: t('resetConfirm.title'),
+              message: t('resetConfirm.message'),
+              cancelLabel: t('resetConfirm.cancel'),
+            }}
+            onConfirm={onResetConfirm}
+            renderActivator={(open) => (
+              <Button
+                isIconOnly
+                variant="ghost"
+                size="sm"
+                onPress={open}
+                aria-label={t('actions.resetToDefault')}
+                data-cy="email-layout-reset-button"
+              >
+                <RotateCcw size={16} />
+              </Button>
+            )}
+          />
           <Button
             variant="primary"
             size="sm"
@@ -232,17 +243,6 @@ export function EmailLayoutPage() {
           </Button>
         </DrawerFooter>
       </StandardDrawer>
-
-      <StatusDialog
-        isOpen={resetConfirmOpen}
-        onClose={() => setResetConfirmOpen(false)}
-        status="error"
-        title={t('resetConfirm.title')}
-        closeLabel={t('resetConfirm.cancel')}
-        action={{ label: t('resetConfirm.confirm'), onPress: onResetConfirm, isPending: resetLayout.isPending }}
-      >
-        {t('resetConfirm.message')}
-      </StatusDialog>
     </div>
   );
 }

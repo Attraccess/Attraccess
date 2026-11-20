@@ -892,5 +892,11 @@
         }
       }
     }
+  },
+  "deleteNode": {
+    "title": "Löschen bestätigen",
+    "message": "Sind Sie sicher, dass Sie \"{{name}}\" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "confirm": "Löschen",
+    "cancel": "Abbrechen"
   }
 }

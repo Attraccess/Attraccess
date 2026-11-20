@@ -27,7 +27,8 @@ export function TeamInviteCard(props: Readonly<TeamInviteCardProps>) {
       <Card.Content>
         <InviteProjectMemberModal projectId={projectId}>
           {(onOpen) => (
-            <Button variant="primary" onPress={onOpen}><UserPlus2Icon className="size-4" />
+            <Button variant="primary" onPress={onOpen}>
+              <UserPlus2Icon className="size-4" />
               {t('sections.invite.cta')}
             </Button>
           )}
@@ -36,4 +37,3 @@ export function TeamInviteCard(props: Readonly<TeamInviteCardProps>) {
     </Card>
   );
 }
-

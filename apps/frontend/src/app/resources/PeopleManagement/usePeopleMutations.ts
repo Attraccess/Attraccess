@@ -90,11 +90,12 @@ export function usePeopleMutations({ target }: Params): PeopleMutations {
       });
       invalidateIntroducers();
     },
-    onError: (err: Error) => {
-      toast.error({
-        title: t('toasts.introducerRevokeFailed.title'),
-        description: t('toasts.introducerRevokeFailed.description', { error: err.message }),
-      });
+    onError: (err: Error, variables: { body?: { type?: ResourceIntroducerType } }) => {
+      const key =
+        variables?.body?.type === ResourceIntroducerType.MAINTAINER
+          ? 'toasts.maintainerRevokeFailed'
+          : 'toasts.introducerRevokeFailed';
+      toast.error({ title: t(`${key}.title`), description: t(`${key}.description`, { error: err.message }) });
     },
   };
 
