@@ -54,7 +54,7 @@ export function IcalFeeds() {
   const confirmButton = (kind: FeedAction['kind'], feed: IcalFeed) => (
     <ConfirmableButton
       label={t(`feeds.${kind}.label`)}
-      status="warning"
+      status={kind === 'revoke' ? 'error' : 'warning'}
       buttonProps={{ size: 'sm', variant: 'secondary' }}
       onConfirm={() => runAction({ kind, feed })}
       confirm={{
