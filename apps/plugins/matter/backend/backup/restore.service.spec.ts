@@ -129,6 +129,27 @@ describe('MatterRestoreService', () => {
       });
     });
 
+    it('tells open device views to refetch once the tables are replaced, before reconciliation runs', async () => {
+      await disaster();
+      const validation = await h.restore.validate(stored(), undefined, ADMIN);
+      const listed = () => h.connection.requests.filter((operation) => operation === 'inventory.list').length;
+      const inventoryAt: number[] = [];
+      h.bus.changes.subscribe((change) => {
+        if (change.kind === 'inventory') inventoryAt.push(listed());
+      });
+      const stateChanged = jest.spyOn(h.bus, 'stateChanged');
+      const before = listed();
+
+      await h.restore.confirm(validation.validationId, undefined, ADMIN);
+
+      // The first signal comes from the restore itself, before the reconciliation read the inventory; that
+      // reconciliation then signals again, whether or not it changed anything.
+      expect(inventoryAt[0]).toBe(before);
+      expect(inventoryAt.length).toBeGreaterThanOrEqual(2);
+      // Every restored endpoint's state is announced (none here: the restored nodes have no endpoints).
+      expect(stateChanged).toHaveBeenCalledWith([]);
+    });
+
     it('does not let a reconciliation that starts during the restore touch the tables', async () => {
       await disaster();
       const validation = await h.restore.validate(stored(), undefined, ADMIN);

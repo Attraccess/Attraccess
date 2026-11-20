@@ -1,4 +1,5 @@
 import { COMPATIBILITY_TABLE, minimumAttraccessVersion } from '@attraccess/matter-contract';
+import { Test } from '@nestjs/testing';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import plugin from './plugin';
@@ -6,8 +7,15 @@ import { MATTER_AUDIT_DOMAIN } from './connection/audit';
 import { MatterConnectionController } from './connection/controller';
 import { MatterBackupController } from './backup/controller';
 import { MatterFabricController } from './fabric/controller';
+import { MatterRestoreService } from './backup/restore.service';
+import { MatterChangeBus } from './devices/change-bus';
 import { MatterDevicesController } from './devices/controller';
+import { MatterLifecycleService } from './devices/lifecycle.service';
+import { MatterLiveUpdatesService } from './devices/live-updates.service';
+import { MatterReconciliationService } from './devices/reconciliation.service';
+import { MatterStateService } from './devices/state.service';
 import { MATTER_STORAGE } from './plugin-storage/tables';
+import { createHarness } from './testing/devices-harness.test-utils';
 
 const read = (name: string) => JSON.parse(readFileSync(join(__dirname, '..', name), 'utf8'));
 
@@ -23,6 +31,19 @@ describe('matter plugin backend', () => {
     expect(module.providers).toHaveLength(17);
     expect(plugin.storage).toBe(MATTER_STORAGE);
     expect(plugin.auditDomains).toEqual([MATTER_AUDIT_DOMAIN]);
+  });
+
+  it('wires one change bus into every service that announces changes and into the live topics', async () => {
+    const { context } = await createHarness();
+    // Compiling builds the providers without running their lifecycle hooks: no sidecar, no timers.
+    const moduleRef = await Test.createTestingModule({ imports: [plugin.register(context)] }).compile();
+    const bus = moduleRef.get(MatterChangeBus);
+    const busOf = (service: object, field: string) => (service as Record<string, unknown>)[field];
+    expect(busOf(moduleRef.get(MatterLifecycleService), 'changes')).toBe(bus);
+    expect(busOf(moduleRef.get(MatterStateService), 'changes')).toBe(bus);
+    expect(busOf(moduleRef.get(MatterReconciliationService), 'changes')).toBe(bus);
+    expect(busOf(moduleRef.get(MatterRestoreService), 'changes')).toBe(bus);
+    expect(busOf(moduleRef.get(MatterLiveUpdatesService), 'bus')).toBe(bus);
   });
 
   it('declares exactly the permissions it uses, no legacy persistence entry and a frontend entry', () => {

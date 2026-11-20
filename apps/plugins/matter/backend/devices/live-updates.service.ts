@@ -15,7 +15,7 @@ import { MatterLifecycleService } from './lifecycle.service';
 import { idParamSchema } from './schemas';
 
 /** Bursts of changes (a reconciliation, a telemetry batch) reach a subscriber as one signal per window. */
-export const LIVE_COALESCE_MS = 250;
+export const LIVE_COALESCE_MS = 1000;
 
 /** `devices`: the inventory changed. `device-state`: this endpoint's state changed. Neither carries any data. */
 export type MatterLiveSignal = { changed: 'inventory' } | { changed: 'state'; endpointRef: string };
@@ -41,7 +41,8 @@ export class MatterLiveUpdatesService implements OnModuleInit, OnModuleDestroy {
   onModuleInit(): void {
     const live = this.context.liveUpdates;
     if (!live) {
-      // An older host: the page falls back to polling when the topic is unavailable.
+      // A host without plugin live updates registers no topic: the page's subscriptions are refused and it polls.
+      // Hosts from 2.0.0 (the plugin.json minimum) always have them.
       this.context.logger.warn?.('This host has no plugin live updates; the Matter page refreshes by polling.');
       return;
     }

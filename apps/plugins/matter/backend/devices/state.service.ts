@@ -1,6 +1,6 @@
 import type { CommandOutcomePayload, DeviceStatePayload } from '@attraccess/matter-contract';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
-import { Inject, Injectable, Optional } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PLUGIN_CONTEXT } from '../plugin-context';
 import { matterStorage, type MatterTables } from '../plugin-storage/access';
@@ -101,7 +101,7 @@ export class MatterStateService {
 
   constructor(
     @Inject(PLUGIN_CONTEXT) private readonly context: PluginContext,
-    @Optional() @Inject(MatterChangeBus) private readonly changes?: MatterChangeBus,
+    @Inject(MatterChangeBus) private readonly changes: MatterChangeBus,
   ) {}
 
   private get storage() {
@@ -155,7 +155,7 @@ export class MatterStateService {
       await pruneCommands(tables, new Date(now));
       return toView(next);
     });
-    this.changes?.stateChanged([input.endpointRef]);
+    this.changes.stateChanged([input.endpointRef]);
     return view;
   }
 
@@ -187,27 +187,32 @@ export class MatterStateService {
   async ingest(events: readonly StateEvent[], receivedAt: string = new Date().toISOString()): Promise<void> {
     if (events.length === 0) return;
     const batch = newDelta();
+    // `merge` (counters and live signals) runs only after the try: a throwing listener must never make a committed
+    // batch look failed and be applied a second time, one event at a time.
+    let committed = false;
     try {
       const fabrics: FabricLookup = new Map();
       await this.storage.transaction(async (tables) => {
         for (const event of events)
           await this.applyEvent(tables, fabrics, event, event.receivedAt ?? receivedAt, batch);
       });
-      this.merge(batch);
-      return;
+      committed = true;
     } catch {
       this.context.logger.debug?.('A batch of Matter events is applied one by one after one of them failed.');
     }
+    if (committed) return this.merge(batch);
     for (const event of events) {
       const delta = newDelta();
+      let applied = false;
       try {
         await this.storage.transaction((tables) =>
           this.applyEvent(tables, new Map(), event, event.receivedAt ?? receivedAt, delta),
         );
-        this.merge(delta);
+        applied = true;
       } catch {
         this.context.logger.warn?.('A Matter event could not be applied to the device state.');
       }
+      if (applied) this.merge(delta);
     }
   }
 
@@ -226,7 +231,7 @@ export class MatterStateService {
   private merge(delta: Delta): void {
     const { touched, ...counters } = delta;
     for (const key of Object.keys(counters) as (keyof Counters)[]) this.stats[key] += counters[key];
-    this.changes?.stateChanged(touched);
+    this.changes.stateChanged(touched);
   }
 
   /** One `device.state` event on its own. */

@@ -1,5 +1,5 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
-import { Inject, Injectable, Optional } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { SidecarClientError } from '../client/errors';
 import type { SidecarConnection } from '../client/connection';
@@ -87,7 +87,7 @@ export class MatterReconciliationService {
     @Inject(MatterConnectionService) private readonly connectionService: Pick<MatterConnectionService, 'connection'>,
     @Inject(DeviceAuditService) private readonly audit: DeviceAuditService,
     @Inject(MatterFabricGuard) private readonly guard: MatterFabricGuard,
-    @Optional() @Inject(MatterChangeBus) private readonly changes?: MatterChangeBus,
+    @Inject(MatterChangeBus) private readonly changes: MatterChangeBus,
   ) {}
 
   private get source(): InventorySource {
@@ -157,8 +157,9 @@ export class MatterReconciliationService {
         { conflictOn: ['id'] },
       );
     });
-    // The device views follow the run's changes; the status itself is read over REST on the next refetch.
-    if (summary.changeCount > 0) this.changes?.inventoryChanged();
+    // After every finished run, also one that changed nothing, was skipped or failed: the device views follow its
+    // changes, and the reconciliation status and outcome (read over REST on the refetch) changed in any case.
+    this.changes.inventoryChanged();
     // After the commit and never inside it: the audit store is a separate database.
     // One operation ID for the run's entries; an automatic run is recorded as the system, never as a user.
     const actor: AuditActor = this.audit.actorOf(by);

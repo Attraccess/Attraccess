@@ -59,7 +59,8 @@ export class MatterDevicesController {
   @Get('nodes')
   async listNodes(@Query() query: unknown) {
     const filter = parse(listQuerySchema, query, 'query');
-    const [nodes, counts] = await Promise.all([this.lifecycle.listNodes(filter), this.lifecycle.endpointCounts()]);
+    const nodes = await this.lifecycle.listNodes(filter);
+    const counts = await this.lifecycle.endpointCounts(nodes.map((node) => node.id));
     return nodes.map((node) => ({ ...nodeView(node), endpointCount: counts.get(node.id) ?? 0 }));
   }
 

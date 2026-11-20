@@ -3,12 +3,13 @@ import {
   type AuthenticatedRequest,
   type PluginContext,
 } from '@attraccess/plugins-backend-sdk';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { COMPATIBILITY_TABLE } from '@attraccess/matter-contract';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar.test-utils';
 import { selfSignedCertificate } from '../testing/certs';
+import { MatterFabricGuard } from '../fabric/guard';
 import { MatterConnectionController } from './controller';
 import { MatterConnectionService } from './connection.service';
 import { matterStorage } from '../plugin-storage/access';
@@ -56,8 +57,9 @@ async function setup(options: Parameters<typeof fakeContext>[0] = {}) {
   const harness = fakeContext(options);
   const settings = new MatterSettingsService(harness.context);
   const service = new MatterConnectionService(harness.context, settings);
-  const controller = new MatterConnectionController(settings, service);
-  return { ...harness, settings, service, controller };
+  const guard = new MatterFabricGuard();
+  const controller = new MatterConnectionController(settings, service, guard);
+  return { ...harness, settings, service, controller, guard };
 }
 
 async function until(predicate: () => boolean, timeoutMs = 4_000) {
@@ -195,6 +197,10 @@ describe('Matter connection settings API', () => {
     service = harness.service;
     await harness.controller.put({ url: fake.url, credential: TOKEN }, request());
     await until(() => harness.controller.status().state === 'connected');
+    // The sidecar goes away: the connection is degraded and waits for its next backoff step.
+    await fake.stop();
+    fake = undefined;
+    await until(() => harness.controller.status().state !== 'connected');
     const saved = await harness.getRow();
     const reload = jest.spyOn(harness.service, 'reload');
     harness.audit.mockClear();
@@ -202,7 +208,8 @@ describe('Matter connection settings API', () => {
     const status = await harness.controller.reconnect(request());
 
     expect(reload).toHaveBeenCalledTimes(1);
-    expect(status.state).toBeDefined();
+    // Right after the reload the connection is trying again; the sidecar is still down, so never `connected`.
+    expect(['connecting', 'degraded']).toContain(status.state);
     expect(await harness.getRow()).toEqual(saved);
     expect(harness.audit).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -211,6 +218,35 @@ describe('Matter connection settings API', () => {
         principal: { userId: 7, authenticationMethod: 'session' },
       }),
     );
+  });
+
+  it('leaves a healthy connection alone: no reconnect and no audit entry', async () => {
+    fake = await FakeSidecar.start();
+    const harness = await setup();
+    service = harness.service;
+    await harness.controller.put({ url: fake.url, credential: TOKEN }, request());
+    await until(() => harness.controller.status().state === 'connected');
+    const reload = jest.spyOn(harness.service, 'reload');
+    harness.audit.mockClear();
+
+    const status = await harness.controller.reconnect(request());
+
+    expect(status.state).toBe('connected');
+    expect(reload).not.toHaveBeenCalled();
+    expect(harness.audit).not.toHaveBeenCalled();
+  });
+
+  it('refuses to retry while a fabric operation runs, so its sidecar requests are not cut off', async () => {
+    const harness = await setup();
+    service = harness.service;
+    const reload = jest.spyOn(harness.service, 'reload');
+    harness.guard.busy = true;
+    await expect(harness.controller.reconnect(request())).rejects.toBeInstanceOf(ConflictException);
+    harness.guard.busy = false;
+    harness.guard.restoring = true;
+    await expect(harness.controller.reconnect(request())).rejects.toBeInstanceOf(ConflictException);
+    expect(reload).not.toHaveBeenCalled();
+    expect(harness.audit).not.toHaveBeenCalled();
   });
 
   it('retries now without a configuration: stays not_configured', async () => {
