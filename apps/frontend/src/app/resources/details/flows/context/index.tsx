@@ -10,11 +10,12 @@ import {
   NodeChange,
   applyNodeChanges,
   applyEdgeChanges,
+  NodeTypes,
 } from '@xyflow/react';
 import { ResourceFlowLog, useGetOneResourceById } from '@attraccess/react-query-client';
 import { useLiveLogs } from '../liveLogs';
 import { FlowOwner, useFlowNodeSchemasQuery } from '../flowOwner';
-import { buildFlowNodeTypes } from '../node/FlowCanvasNode';
+import { FlowCanvasNode } from '../node/FlowCanvasNode';
 import { FlowContext, type FlowContextType, type LiveLogReceiver } from './flowContext';
 
 export interface FlowProviderProps {
@@ -103,12 +104,16 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
   });
 
   const { data: nodeSchemas } = useFlowNodeSchemasQuery(owner);
+  const nodeSchemasByType = useMemo(
+    () => new Map((nodeSchemas ?? []).map((schema) => [schema.type, schema])),
+    [nodeSchemas],
+  );
   // Keyed on the type names only: every key maps to the same component, so the object changes only when the set of
   // node types does.
-  const nodeTypeNames = nodeSchemas ? [...new Set(nodeSchemas.map((schema) => schema.type))].sort().join('\n') : '';
-  const flowNodeTypes = useMemo(
-    () => buildFlowNodeTypes(nodeTypeNames ? nodeTypeNames.split('\n') : []),
-    [nodeTypeNames],
+  const nodeTypesKey = [...nodeSchemasByType.keys()].sort().join('\n');
+  const flowNodeTypes = useMemo<NodeTypes>(
+    () => Object.fromEntries((nodeTypesKey ? nodeTypesKey.split('\n') : []).map((type) => [type, FlowCanvasNode])),
+    [nodeTypesKey],
   );
 
   const copySelectedNodes = useCallback(async () => {
@@ -164,6 +169,7 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
       addLiveLogReceiver: addLiveLogReceiver,
       removeLiveLogReceiver: removeLiveLogReceiver,
       flowNodeTypes: flowNodeTypes,
+      nodeSchemasByType,
       copySelectedNodes,
       cutSelectedNodes,
       pasteNodes,
@@ -189,6 +195,7 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
       addLiveLogReceiver,
       removeLiveLogReceiver,
       flowNodeTypes,
+      nodeSchemasByType,
       copySelectedNodes,
       cutSelectedNodes,
       pasteNodes,

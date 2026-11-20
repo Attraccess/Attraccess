@@ -1,7 +1,8 @@
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAppTheme } from '@attraccess/ui';
 import { useCallback, useMemo, useRef } from 'react';
-import { flowOwnerKey, useFlowNodeSchemasQuery } from './flowOwner';
+import { flowOwnerKey } from './flowOwner';
+import { useNodeSchemasSettled } from './canvas/useNodeSchemasSettled';
 import { Background, BackgroundVariant, Controls, ReactFlow, Panel, SelectionMode } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { ButtonGroup, Spinner } from '@heroui/react';
@@ -61,10 +62,9 @@ export function FlowEditorCanvas() {
     handleExport,
     handleImportClick,
   } = useFlowCanvasData();
-  const { data: nodeSchemas, isError: isNodeSchemasError } = useFlowNodeSchemasQuery(owner);
   // React Flow warns (#002) when node type keys change after it mounts, and draws default nodes (#003) for types it
   // does not know yet. So the canvas mounts once the schemas are in; until then the loading overlay covers it.
-  const nodeSchemasPending = !nodeSchemas && !isNodeSchemasError;
+  const nodeSchemasPending = !useNodeSchemasSettled(owner);
   const showLoading = isFlowLoading || nodeSchemasPending;
   const { layout, addStartNode } = useFlowLayoutActions();
   const { onDragOver, onDropNode } = useFlowNodeDrop();

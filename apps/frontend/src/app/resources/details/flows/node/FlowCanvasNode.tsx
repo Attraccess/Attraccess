@@ -1,7 +1,6 @@
-import type { NodeProps, NodeTypes } from '@xyflow/react';
+import type { NodeProps } from '@xyflow/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useFlowContext } from '../context/flowContext';
-import { useFlowNodeSchemasQuery } from '../flowOwner';
 import { AttraccessNode } from './index';
 import nodesDeTranslations from './de.json';
 import nodesEnTranslations from './en.json';
@@ -12,10 +11,9 @@ import nodesEnTranslations from './en.json';
  * nodes keep their state when validation errors change.
  */
 export function FlowCanvasNode(props: NodeProps) {
-  const { owner, validationErrors } = useFlowContext();
-  const { data: nodeSchemas } = useFlowNodeSchemasQuery(owner);
+  const { nodeSchemasByType, validationErrors } = useFlowContext();
   const { t, tExists } = useTranslations({ de: nodesDeTranslations, en: nodesEnTranslations });
-  const schema = nodeSchemas?.find((candidate) => candidate.type === props.type);
+  const schema = props.type === undefined ? undefined : nodeSchemasByType.get(props.type);
 
   if (!schema) {
     return null;
@@ -30,9 +28,4 @@ export function FlowCanvasNode(props: NodeProps) {
       validationError={validationErrors[props.id]}
     />
   );
-}
-
-/** Maps each node type to FlowCanvasNode. Same keys give equal values, whatever object holds them. */
-export function buildFlowNodeTypes(types: readonly string[]): NodeTypes {
-  return Object.fromEntries(types.map((type) => [type, FlowCanvasNode]));
 }

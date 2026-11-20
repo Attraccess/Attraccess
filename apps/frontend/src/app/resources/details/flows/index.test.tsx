@@ -459,7 +459,20 @@ it('mounts the canvas only once the node schemas are in, whichever loads first',
 it('still shows the canvas when the node schemas fail to load', () => {
   state.schemas = undefined;
   state.schemasFailed = true;
-  show();
+  const view = show();
+  expect(screen.getByTestId('canvas')).toBeTruthy();
+  expect(screen.queryByRole('status')).toBeNull();
+
+  // A refetch (window focus, reconnect, a new reader) sets a failed query without data back to pending. The canvas
+  // stays mounted, so its viewport, open panels and node state survive.
+  state.schemasFailed = false;
+  view.rerender(
+    <MemoryRouter initialEntries={['/resources/7/flows']}>
+      <Routes>
+        <Route path="/resources/:id/flows" element={<FlowsPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
   expect(screen.getByTestId('canvas')).toBeTruthy();
   expect(screen.queryByRole('status')).toBeNull();
 });

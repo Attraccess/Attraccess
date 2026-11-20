@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { useEffect } from 'react';
 import { act, cleanup, render, screen } from '@testing-library/react';
-import type { NodeProps } from '@xyflow/react';
+import { ReactFlow, type NodeProps } from '@xyflow/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { FlowProvider, useFlowContext, type FlowContextType } from './index';
 
@@ -75,6 +75,50 @@ it('keeps every node type component identical across validation errors, node cha
 
   expect(context.flowNodeTypes['trigger']).toBe(first['trigger']);
   expect(context.flowNodeTypes['action']).toBe(first['action']);
+
+  // A refetch that returns the same node types in a new array (other order, other labels) keeps the object itself.
+  const sameTypes = context.flowNodeTypes;
+  state.schemas = [
+    { type: 'action', label: 'Action (new)' },
+    { type: 'trigger', label: 'Trigger (new)' },
+  ];
+  view.rerender(
+    <FlowProvider owner={{ kind: 'resource', resourceId: 7 }}>
+      <Canvas />
+    </FlowProvider>,
+  );
+  expect(context.flowNodeTypes).toBe(sameTypes);
+});
+
+function RealCanvas({ onError }: { onError: (code: string, message: string) => void }) {
+  context = useFlowContext();
+  return <ReactFlow nodes={context.nodes} edges={context.edges} nodeTypes={context.flowNodeTypes} onError={onError} />;
+}
+
+it('gives React Flow no reason to warn about new node types (#002) or unknown ones (#003)', () => {
+  // React Flow checks node types only in development builds.
+  vi.stubEnv('NODE_ENV', 'development');
+  const onError = vi.fn();
+  const flow = () => (
+    <FlowProvider owner={{ kind: 'resource', resourceId: 7 }}>
+      <RealCanvas onError={onError} />
+    </FlowProvider>
+  );
+  try {
+    const view = render(flow());
+    act(() => context.setNodes([{ id: 'one', type: 'trigger', position: { x: 0, y: 0 }, data: {} }]));
+    act(() => context.setValidationErrors([{ nodeId: 'one', message: 'Missing config' }]));
+    act(() => context.setEdges([{ id: 'edge', source: 'one', target: 'one' }]));
+    state.schemas = [...(state.schemas ?? [])];
+    view.rerender(flow());
+
+    expect(screen.getByTestId('node-one')).toHaveTextContent(/^trigger: Missing config$/);
+    // happy-dom has no layout or stylesheet, so React Flow also reports #004 and #013; only the node type codes count.
+    const nodeTypeErrors = onError.mock.calls.filter(([code]) => code === '002' || code === '003');
+    expect(nodeTypeErrors).toEqual([]);
+  } finally {
+    vi.unstubAllEnvs();
+  }
 });
 
 it('shows validation errors on the right node without remounting it', () => {
@@ -88,7 +132,7 @@ it('shows validation errors on the right node without remounting it', () => {
       { nodeId: 'two', message: 'Other node.' },
     ]),
   );
-  expect(screen.getByTestId('node-one')).toHaveTextContent('trigger: Missing config. No server.');
+  expect(screen.getByTestId('node-one')).toHaveTextContent(/^trigger: Missing config\. No server\.$/);
 
   act(() => context.setValidationErrors([]));
   expect(screen.getByTestId('node-one')).toHaveTextContent('trigger: ok');
