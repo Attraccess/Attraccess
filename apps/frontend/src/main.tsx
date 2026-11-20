@@ -1,6 +1,6 @@
 import 'intl-pluralrules';
 import { StrictMode } from 'react';
-import { BrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import * as ReactDOM from 'react-dom/client';
 import { QueryClientProvider } from '@tanstack/react-query';
 import App from './app/app';
@@ -19,18 +19,26 @@ trackVisualViewportHeight();
 registerInstallPrompt();
 registerPwaUpdates();
 
+// A data router, so pages can block navigation (useBlocker). One splat route keeps the app's own <Routes>.
+const router = createBrowserRouter([
+  {
+    path: '*',
+    element: (
+      <PluginProvider>
+        <StrictMode>
+          <App />
+        </StrictMode>
+      </PluginProvider>
+    ),
+  },
+]);
+
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 
 root.render(
   <Providers>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <PluginProvider>
-          <StrictMode>
-            <App />
-          </StrictMode>
-        </PluginProvider>
-      </BrowserRouter>
+      <RouterProvider router={router} />
     </QueryClientProvider>
   </Providers>,
 );

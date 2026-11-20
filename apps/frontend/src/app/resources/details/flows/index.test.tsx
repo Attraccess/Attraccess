@@ -1,6 +1,6 @@
 import { useState, type Dispatch, type SetStateAction, type ReactNode } from 'react';
 import { cleanup, render, act, fireEvent, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import type { Node, Edge } from '@xyflow/react';
 import { afterEach, beforeEach, vi, expect, it } from 'vitest';
 import FlowsPage from './index';
@@ -177,13 +177,14 @@ vi.mock('./variablesModal', () => ({
   VariablesModal: ({ children }: { children: (open: () => void) => ReactNode }) => children(vi.fn()),
 }));
 function show() {
-  return render(
-    <MemoryRouter initialEntries={['/resources/7/flows']}>
-      <Routes>
-        <Route path="/resources/:id/flows" element={<FlowsPage />} />
-      </Routes>
-    </MemoryRouter>,
+  const router = createMemoryRouter(
+    [
+      { path: '/resources/:id/flows', element: <FlowsPage /> },
+      { path: '/elsewhere', element: <p>Elsewhere</p> },
+    ],
+    { initialEntries: ['/resources/7/flows'] },
   );
+  return Object.assign(render(<RouterProvider router={router} />), { router });
 }
 function saveButton() {
   return document.querySelector('svg.lucide-save')?.closest('button') as HTMLButtonElement;
