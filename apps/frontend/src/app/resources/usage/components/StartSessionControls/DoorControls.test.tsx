@@ -1,9 +1,10 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { DoorControls } from './DoorControls';
 
-function renderControls(props: { accessOnly?: boolean; separateUnlockAndUnlatch?: boolean }) {
+function renderControls(props: Partial<ComponentProps<typeof DoorControls>>) {
   const handlers = { onLock: vi.fn(), onUnlock: vi.fn(), onUnlatch: vi.fn(), onOpen: vi.fn() };
   render(
     <DoorControls
@@ -56,18 +57,13 @@ describe('DoorControls', () => {
   });
 
   it('hides Unlatch without an onUnlatch handler', () => {
-    render(
-      <DoorControls
-        onLock={vi.fn()}
-        onUnlock={vi.fn()}
-        onOpen={vi.fn()}
-        separateUnlockAndUnlatch
-        lockIsPending={false}
-        unlockIsPending={false}
-        unlatchIsPending={false}
-        openIsPending={false}
-      />,
-    );
+    renderControls({ separateUnlockAndUnlatch: true, onUnlatch: undefined });
+    expect(screen.queryByRole('button', { name: 'Unlatch' })).not.toBeInTheDocument();
+  });
+
+  it('hides Unlatch on an access-only door even with separate unlatch', () => {
+    renderControls({ accessOnly: true, separateUnlockAndUnlatch: true });
+    expect(screen.getAllByRole('button')).toHaveLength(1);
     expect(screen.queryByRole('button', { name: 'Unlatch' })).not.toBeInTheDocument();
   });
 });
