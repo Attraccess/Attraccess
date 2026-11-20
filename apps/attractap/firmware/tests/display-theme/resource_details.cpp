@@ -1,6 +1,8 @@
 #include "render_harness.hpp"
 #include "display/ui/ui_builder.hpp"
 #include "src/misc/lv_text_private.h"
+#include <cstdlib>
+#include <string>
 #include <vector>
 
 void testUsageStatsExpiry(Renderer &renderer)
@@ -120,6 +122,21 @@ bool shownOnScreen(lv_obj_t *object)
         if (lv_obj_has_flag(object, LV_OBJ_FLAG_HIDDEN)) return false;
     return true;
 }
+
+// Width of the button holding `label`, as a percentage of its row (the door controls).
+int doorButtonWidthPercent(lv_obj_t *root, const char *label)
+{
+    lv_obj_update_layout(root);
+    auto *button = lv_obj_get_parent(requireObject(root, &lv_label_class, label));
+    return lv_obj_get_width(button) * 100 / lv_obj_get_content_width(lv_obj_get_parent(button));
+}
+
+void expectDoorButtonWidths(lv_obj_t *root, int lockAndUnlock, const char *context)
+{
+    const std::string message = std::string(context) + ": lock and unlock width";
+    for (const char *label : {"Abschliessen", "Aufschliessen"})
+        expect(std::abs(doorButtonWidthPercent(root, label) - lockAndUnlock) <= 1, message.c_str());
+}
 }
 
 // An access-only door offers one Open button (an unlock on the wire); a regular door keeps lock, unlock and unlatch.
@@ -163,6 +180,7 @@ void testAccessOnlyDoorDetails(Renderer &renderer)
     expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Abschliessen")), "Regular door shows Lock");
     expect(!shownOnScreen(requireObject(guard.root, &lv_label_class, "Falle öffnen")), "Door without separate unlatch hides Unlatch");
     expect(!findObject(guard.root, &lv_label_class, "Öffnen"), "Regular door shows no Open");
+    expectDoorButtonWidths(guard.root, 48, "Door without separate unlatch");
     renderer.capture("door-without-unlatch");
 
     door.separateUnlockAndUnlatch = true;
@@ -171,18 +189,28 @@ void testAccessOnlyDoorDetails(Renderer &renderer)
     expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Aufschliessen")), "Separate-unlatch door shows Unlock");
     expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Abschliessen")), "Separate-unlatch door shows Lock");
     expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Falle öffnen")), "Separate-unlatch door shows Unlatch");
+    expectDoorButtonWidths(guard.root, 30, "Separate-unlatch door");
+    expect(std::abs(doorButtonWidthPercent(guard.root, "Falle öffnen") - 30) <= 1, "Unlatch is 30% wide");
+    renderer.capture("door-with-unlatch");
 
     door.separateUnlockAndUnlatch = false;
     details.setResourceAndUsageDetails(door);
     settle();
     expect(!shownOnScreen(requireObject(guard.root, &lv_label_class, "Falle öffnen")), "Unlatch is hidden again after switching back");
     expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Abschliessen")), "Lock stays shown after switching back");
+    expectDoorButtonWidths(guard.root, 48, "Switched back to no separate unlatch");
+
+    door.separateUnlockAndUnlatch = true;
+    details.setResourceAndUsageDetails(door);
+    settle();
+    expectDoorButtonWidths(guard.root, 30, "Switched to separate unlatch again");
 
     door.accessOnly = true;
     door.separateUnlockAndUnlatch = true;
     details.setResourceAndUsageDetails(door);
     settle();
     expect(!shownOnScreen(requireObject(guard.root, &lv_label_class, "Falle öffnen")), "Access-only door hides Unlatch even with separate unlatch");
+    expect(doorButtonWidthPercent(guard.root, "Öffnen") >= 99, "Access-only Open fills the row");
 }
 
 // ATT-1188: the reservations plugin splits a clause with a long holder name (16 characters) between the name and
