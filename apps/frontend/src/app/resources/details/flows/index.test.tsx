@@ -14,6 +14,8 @@ const state = vi.hoisted(() => ({
       },
   fetching: false,
   failed: false,
+  schemas: [] as undefined | { type: string }[],
+  schemasFailed: false,
   save: vi.fn(),
   error: vi.fn(),
   invalidate: vi.fn(),
@@ -84,7 +86,7 @@ vi.mock('@attraccess/react-query-client', () => ({
     state.options = options;
     return { mutate: state.save };
   },
-  useGetNodeSchemas: () => ({ data: undefined }),
+  useGetNodeSchemas: () => ({ data: state.schemas, isError: state.schemasFailed }),
   useMqttServersGetAll: (_clientOptions: unknown, _key: unknown, options?: { enabled?: boolean }) => ({
     data: options?.enabled === false ? undefined : state.mqttServers,
   }),
@@ -206,6 +208,8 @@ beforeEach(() => {
   };
   state.fetching = false;
   state.failed = false;
+  state.schemas = [{ type: 'trigger' }, { type: 'action' }];
+  state.schemasFailed = false;
   state.permissions = ['resources.update'];
   state.mqttServers = [{ id: 1, name: 'Broker' }];
   window.localStorage.clear();
@@ -429,6 +433,46 @@ it('shows loading and errors and routes import/export actions', () => {
   const error = new Error('Denied');
   act(() => state.options.onError(error));
   expect(state.error).toHaveBeenCalledWith(expect.objectContaining({ error }));
+});
+
+it('mounts the canvas only once the node schemas are in, whichever loads first', async () => {
+  // Flow first: the saved nodes wait behind the loading overlay until the schemas arrive.
+  state.schemas = undefined;
+  const view = show();
+  expect(screen.getByRole('status', { name: 'loading' })).toBeTruthy();
+  expect(screen.queryByTestId('canvas')).toBeNull();
+  expect(state.nodes).toEqual(state.original?.nodes);
+
+  state.schemas = [{ type: 'trigger' }, { type: 'action' }];
+  // Re-render the page (the schema mock reads `state` on render); a same-path navigation does that under the data router.
+  await act(() => view.router.navigate('/resources/7/flows', { replace: true }));
+  expect(screen.getByTestId('canvas')).toBeTruthy();
+  expect(state.flowProps.nodes).toEqual(state.original?.nodes);
+  expect(screen.queryByRole('status')).toBeNull();
+  view.unmount();
+
+  // Schemas first: the canvas is there while the flow itself still loads.
+  state.original = undefined;
+  state.fetching = true;
+  show();
+  expect(screen.getByTestId('canvas')).toBeTruthy();
+  expect(screen.getByRole('status', { name: 'loading' })).toBeTruthy();
+});
+
+it('still shows the canvas when the node schemas fail to load', async () => {
+  state.schemas = undefined;
+  state.schemasFailed = true;
+  const view = show();
+  expect(screen.getByTestId('canvas')).toBeTruthy();
+  expect(screen.queryByRole('status')).toBeNull();
+
+  // A refetch (window focus, reconnect, a new reader) sets a failed query without data back to pending. The canvas
+  // stays mounted, so its viewport, open panels and node state survive.
+  state.schemasFailed = false;
+  // Re-render the page (the schema mock reads `state` on render); a same-path navigation does that under the data router.
+  await act(() => view.router.navigate('/resources/7/flows', { replace: true }));
+  expect(screen.getByTestId('canvas')).toBeTruthy();
+  expect(screen.queryByRole('status')).toBeNull();
 });
 
 const explorerButton = () => screen.queryByRole('button', { name: 'actions.mqttExplorer' });

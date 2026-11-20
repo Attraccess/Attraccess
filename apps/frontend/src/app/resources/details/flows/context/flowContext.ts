@@ -3,7 +3,7 @@
 import { createContext, useContext } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { Connection, Edge, Node, NodeTypes, OnEdgesChange, OnNodesChange } from '@xyflow/react';
-import type { ResourceFlowLog } from '@attraccess/react-query-client';
+import type { ResourceFlowLog, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 import type { FlowOwner } from '../flowOwner';
 import type { NodeValidationError } from '../node/validationMessages';
 
@@ -30,6 +30,8 @@ export interface FlowContextType {
   addLiveLogReceiver: (receiver: LiveLogReceiver) => void;
   removeLiveLogReceiver: (receiver: LiveLogReceiver) => void;
   flowNodeTypes: NodeTypes;
+  /** The owner's node schemas by node type; empty until they load. */
+  nodeSchemasByType: ReadonlyMap<string, ResourceFlowNodeSchemaDto>;
   copySelectedNodes: () => Promise<void>;
   cutSelectedNodes: () => Promise<void>;
   pasteNodes: (targetFlowPosition?: { x: number; y: number }) => Promise<void>;

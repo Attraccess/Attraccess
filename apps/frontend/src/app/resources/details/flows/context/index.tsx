@@ -11,18 +11,14 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
   NodeTypes,
-  NodeProps,
 } from '@xyflow/react';
 import { ResourceFlowLog, useGetOneResourceById } from '@attraccess/react-query-client';
 import { useLiveLogs } from '../liveLogs';
 import { FlowOwner, useFlowNodeSchemasQuery } from '../flowOwner';
-import { AttraccessNode } from '../node/index';
 import type { NodeValidationError } from '../node/validationMessages';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { FlowCanvasNode } from '../node/FlowCanvasNode';
 import { FlowContext, type FlowContextType, type LiveLogReceiver } from './flowContext';
 import { groupValidationErrorsByNode } from './groupValidationErrorsByNode';
-import nodesDeTranslations from '../node/de.json';
-import nodesEnTranslations from '../node/en.json';
 
 export interface FlowProviderProps {
   children: ReactNode;
@@ -38,11 +34,6 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
     undefined,
     { enabled: owner.kind === 'resource' },
   );
-
-  const { t: tNodeTranslations, tExists: tNodeExists } = useTranslations({
-    de: nodesDeTranslations,
-    en: nodesEnTranslations,
-  });
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes((nodes) => applyNodeChanges(changes, nodes));
@@ -107,26 +98,17 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
   });
 
   const { data: nodeSchemas } = useFlowNodeSchemasQuery(owner);
-  const flowNodeTypes = useMemo(() => {
-    if (!nodeSchemas) {
-      return {};
-    }
-
-    const types: NodeTypes = {};
-    nodeSchemas.forEach((nodeSchema) => {
-      types[nodeSchema.type] = (props: NodeProps) => (
-        <AttraccessNode
-          tNodeTranslations={tNodeTranslations}
-          tNodeExists={tNodeExists}
-          schema={nodeSchema}
-          node={props}
-          validationErrors={validationErrors[props.id]}
-        />
-      );
-    });
-
-    return types;
-  }, [nodeSchemas, tNodeTranslations, tNodeExists, validationErrors]);
+  const nodeSchemasByType = useMemo(
+    () => new Map((nodeSchemas ?? []).map((schema) => [schema.type, schema])),
+    [nodeSchemas],
+  );
+  // Keyed on the type names only: every key maps to the same component, so the object changes only when the set of
+  // node types does.
+  const nodeTypesKey = [...nodeSchemasByType.keys()].sort().join('\n');
+  const flowNodeTypes = useMemo<NodeTypes>(
+    () => Object.fromEntries((nodeTypesKey ? nodeTypesKey.split('\n') : []).map((type) => [type, FlowCanvasNode])),
+    [nodeTypesKey],
+  );
 
   const copySelectedNodes = useCallback(async () => {
     const clipboardData = buildClipboardData(nodes, edges);
@@ -181,6 +163,7 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
       addLiveLogReceiver: addLiveLogReceiver,
       removeLiveLogReceiver: removeLiveLogReceiver,
       flowNodeTypes: flowNodeTypes,
+      nodeSchemasByType,
       copySelectedNodes,
       cutSelectedNodes,
       pasteNodes,
@@ -206,6 +189,7 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
       addLiveLogReceiver,
       removeLiveLogReceiver,
       flowNodeTypes,
+      nodeSchemasByType,
       copySelectedNodes,
       cutSelectedNodes,
       pasteNodes,
