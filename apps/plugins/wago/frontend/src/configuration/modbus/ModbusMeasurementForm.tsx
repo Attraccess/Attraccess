@@ -24,7 +24,6 @@ export function ModbusMeasurementForm({ profile, measurement: m, index, onChange
     });
   return (
     <SignalDisclosure
-      defaultExpanded={false}
       label={t('modbus.measurementTitle', { name: modbusDisplayName(profile, m.name, tBackendMessage) })}
     >
       <div className="wg:flex wg:flex-col wg:gap-3 wg:pt-3">
