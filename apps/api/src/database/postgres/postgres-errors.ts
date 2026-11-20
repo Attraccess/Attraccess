@@ -33,10 +33,10 @@ const SAFE_TO_RETRY = new Set(['40001', '40P01', '55P03', '57014']);
 
 /**
  * 22003 numeric value out of range, 22P02 invalid text representation, 22021 character not in repertoire (a NUL
- * byte), 22007 invalid datetime format, 22008 datetime field overflow: a value the request supplied that the column
- * type cannot hold.
+ * byte), 22P05 untranslatable character (`\u0000` in a jsonb string), 22007 invalid datetime format, 22008 datetime
+ * field overflow: a value the request supplied that the column type cannot hold.
  */
-const INVALID_INPUT = new Set(['22003', '22P02', '22021', '22007', '22008']);
+const INVALID_INPUT = new Set(['22003', '22P02', '22021', '22P05', '22007', '22008']);
 
 /**
  * 40001 serialization failure and 40P01 deadlock: the transaction was rolled back and may be run again.

@@ -38,7 +38,7 @@ describe('persistence error categories', () => {
   });
 
   it('classifies values the column type rejects as invalid input', () => {
-    for (const code of ['22003', '22P02', '22021', '22007', '22008']) {
+    for (const code of ['22003', '22P02', '22021', '22P05', '22007', '22008']) {
       expect(classifyPersistenceError({ code })).toBe('invalid-input');
       expect(isInvalidInputError({ driverError: { code } })).toBe(true);
     }

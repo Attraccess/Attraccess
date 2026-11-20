@@ -142,6 +142,58 @@ describe('PostgreSQL baseline migration', () => {
     await expect(source.query(`UPDATE audit_log SET action = 'y' WHERE id = 1`)).rejects.toThrow(/immutable/);
   });
 
+  it('stores audit details of up to 4096 bytes of compact JSON, as the application and SQLite limit them', async () => {
+    // Worst case for a re-rendering JSON type: as many separators as fit, and numbers in exponent form.
+    const bytes = (value: unknown) => Buffer.byteLength(JSON.stringify(value), 'utf8');
+    const details: Record<string, string | number> = { pad: '' };
+    for (let index = 0; bytes(details) < 4080; index++) details[`k${index}`] = index % 2 ? 1e21 : index;
+    const unpadded = bytes(details);
+    details.pad = 'x'.repeat(4096 - unpadded);
+    const text = JSON.stringify(details);
+    expect(Buffer.byteLength(text, 'utf8')).toBe(4096);
+
+    const insert = (id: number, value: string) =>
+      source.query(
+        `INSERT INTO audit_log (id, at, domain, action, "operationId", outcome, "subjectType", details)
+         VALUES ($1, now(), 'resource', 'x', 'op', 'success', 'resource', $2)`,
+        [id, value],
+      );
+    await insert(2, text);
+    const stored = await one<{ bytes: number; details: Record<string, unknown> }>(
+      'SELECT octet_length(details::text) AS bytes, details FROM audit_log WHERE id = 2',
+    );
+    expect(stored).toEqual({ bytes: 4096, details });
+    // Still bounded: one byte more is refused.
+    await expect(insert(3, JSON.stringify({ ...details, pad: `${details.pad}x` }))).rejects.toMatchObject({
+      driverError: { code: '23514' },
+    });
+  });
+
+  it('accepts only the project invitation statuses and project roles the released schema allowed', async () => {
+    const project = await one<{ id: number }>(`INSERT INTO project (name) VALUES ('Workshop') RETURNING id`);
+    const invite = (status: string, role: string) =>
+      source.query(
+        `INSERT INTO project_invitations ("projectId", "inviterId", "invitedUserId", status, "requestedRole")
+         VALUES ($1, 1, 2, $2, $3)`,
+        [project.id, status, role],
+      );
+    const member = (userId: number, role: string) =>
+      source.query(`INSERT INTO project_members ("projectId", "userId", role) VALUES ($1, $2, $3)`, [
+        project.id,
+        userId,
+        role,
+      ]);
+    for (const status of ['pending', 'accepted', 'declined', 'canceled']) await invite(status, 'viewer');
+    await member(1, 'viewer');
+    for (const work of [
+      () => invite('expired', 'viewer'),
+      () => invite('pending', 'owner'),
+      () => member(2, 'owner'),
+    ]) {
+      await expect(work()).rejects.toMatchObject({ driverError: { code: '23514' } });
+    }
+  });
+
   it('classifies SQLSTATEs', async () => {
     const failure = async (work: Promise<unknown>) =>
       work.then(
@@ -165,6 +217,7 @@ describe('PostgreSQL baseline migration', () => {
       ['SELECT id FROM "user" WHERE username = $1', 'nul\u0000byte', '22021'],
       ['SELECT id FROM "user" WHERE "createdAt" = $1', 'not a date', '22007'],
       ['SELECT id FROM "user" WHERE "createdAt" = $1', '2026-13-45T00:00:00Z', '22008'],
+      ['SELECT $1::jsonb AS document', '{"text":"nul\\u0000byte"}', '22P05'],
     ]) {
       const error = await failure(source.query(sql, [param]));
       expect([postgresErrorClassifier.diagnosticCode(error), postgresErrorClassifier.classify(error)]).toEqual([

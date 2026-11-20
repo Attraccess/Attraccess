@@ -1,10 +1,21 @@
 import { ProjectMemberRole } from '@attraccess/application-models';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, Unique } from 'typeorm';
+import {
+  Check,
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  Unique,
+} from 'typeorm';
 import { Project } from './project';
 import { User } from './user.entity';
 
 @Entity('project_members')
+// The released SQLite schema checked the role; a new role needs a migration that widens this check.
+@Check('CHK_project_members_role', `"role" IN ('viewer')`)
 @Unique(['projectId', 'userId'])
 export class ProjectMember {
   @PrimaryGeneratedColumn()
