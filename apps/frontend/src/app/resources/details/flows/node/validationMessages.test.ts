@@ -29,6 +29,9 @@ describe('validationMessages', () => {
         titled,
       ),
     ).toEqual(['Duration must be a positive integer']);
+    expect(validationMessages([{ field: 'duration', code: 'invalid', message: 'Durations overlap' }], titled)).toEqual([
+      'Duration: Durations overlap',
+    ]);
   });
 
   it('prefers the schema title over the translation, like the node editor', () => {

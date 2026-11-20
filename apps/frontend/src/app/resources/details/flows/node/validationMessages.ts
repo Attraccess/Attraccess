@@ -37,7 +37,7 @@ export function validationMessages(errors: readonly NodeValidationError[], optio
       return options.t('validation.required', { field });
     }
     // Some schema messages already start with the field's name ("Duration must be …").
-    if (!field || error.message.startsWith(field)) {
+    if (!field || error.message.startsWith(`${field} `)) {
       return error.message;
     }
     return options.t('validation.invalid', { field, message: error.message });
