@@ -17,6 +17,8 @@ class WorkflowApi : public API
 public:
     using API::API;
     bool prepareFirmwareUpdate() { return firmwareUpdateMetaCallback("test"); }
+    // The reader's generic error callback, as the API raises it for an error without a result callback of its own.
+    void reportError(const char *eventType, const char *code) { errorCallback(eventType, code); }
 };
 
 struct ReaderWorkflow
@@ -199,6 +201,8 @@ struct ReaderWorkflow
     void testButtonErrors();
     void testFormErrors();
     void testTransientRouting();
+    void testRefusedCardSuppression();
+    void testRefusedCardVariants();
     void testListAndAuthentication();
     void testSessionStart();
     void testUsageStats();

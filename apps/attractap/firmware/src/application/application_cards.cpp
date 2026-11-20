@@ -12,6 +12,7 @@ void Application::processCardAuthenticationData() {
   this->led.triggerSuccess();
 #endif
   this->logger.info("Card verified by the server");
+  this->refusedCardGuard.clear();
 
   this->externalState = EXTERNAL_STATE_NONE;
 

@@ -47,6 +47,8 @@ public:
     const Card &card(size_t index) const { return cards.at(index); }
     void setCard(size_t index, const Card &card);
     void setPresent(size_t index, bool present);
+    // Test hook: another UID for an absent card (a 4-byte random UID, a longer one); not persisted.
+    void setUid(size_t index, const uint8_t *uid, uint8_t length);
     void clearCardData(size_t index);
     void setFaults(bool failAuthentication, bool failWrite);
     void resetKeySlot(uint8_t keyNumber);

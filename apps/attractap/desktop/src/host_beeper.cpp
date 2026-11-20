@@ -45,8 +45,11 @@ void appendSilence(std::vector<float> &samples, int durationMs)
 }
 }
 
+unsigned hostErrorBeepCount = 0;
+
 void hostBeeper(const char *pattern)
 {
+    if (std::strcmp(pattern, "error") == 0) ++hostErrorBeepCount;
     std::lock_guard lock(streamMutex);
     if (!openStream()) return;
 

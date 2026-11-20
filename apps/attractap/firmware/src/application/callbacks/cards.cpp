@@ -145,9 +145,6 @@ void Application::setupNfcCallbacks()
       return; // consume this presentation; do not authenticate the next member
     }
 #endif
-    this->logger.infof("Card detected: %s",
-                       hexToString(uid, uidLength).c_str());
-
 #ifdef DEMO_MODE
     if (this->demoPendingScanActive) {
         this->demoScanUid = hexToString(uid, uidLength);
@@ -157,6 +154,31 @@ void Application::setupNfcCallbacks()
     }
 #endif
 
+    // A card the server just refused and that is still (or again) on the reader gets no second
+    // check, beep or screen change (ATT-882). Decided before any side effect below.
+#ifdef HAS_LVGL_DISPLAY
+    lv_lock();
+    // While "Sign-in failed" is up the state is not a sign-in state yet: dismissing the status is what returns it.
+    const bool signInFailedShown = this->statusHeld && !this->unlocked && Display::isActive(&Display::statusScreen) &&
+                                   Display::statusScreen.purpose() == StatusScreen::Purpose::SignInFailed;
+    const bool tapSignInState = signInFailedShown || this->state == APPLICATION_STATE_LOCKED ||
+                                this->state == APPLICATION_STATE_RESOURCE_LIST;
+    const bool suppressed = tapSignInState && this->refusedCardGuard.shouldSuppress(uid, uidLength, millis());
+    // A card tapped while "sign-in failed" or "status unavailable" is up dismisses it and signs in as usual.
+    if (!suppressed) this->dismissSignedOutStatus();
+    lv_unlock();
+#else
+    // Lite keeps no pending check: a card found again before its answer came is not sent twice either.
+    const bool suppressed = this->state == APPLICATION_STATE_WAIT_FOR_CARD &&
+                            (this->refusedCardGuard.shouldSuppress(uid, uidLength, millis()) ||
+                             this->refusedCardGuard.awaitingVerdict(uid, uidLength, millis()));
+#endif
+    if (suppressed) {
+      this->logger.debugf("Refused card still present, ignored: %s", hexToString(uid, uidLength).c_str());
+      return;
+    }
+    this->logger.infof("Card detected: %s", hexToString(uid, uidLength).c_str());
+
 #ifndef HAS_LVGL_DISPLAY
     this->cardDetected = true;
     this->cardRemoved = false;
@@ -165,10 +187,6 @@ void Application::setupNfcCallbacks()
 #endif
 
 #ifdef HAS_LVGL_DISPLAY
-    // A card tapped while "sign-in failed" or "status unavailable" is up dismisses it and signs in as usual.
-    lv_lock();
-    this->dismissSignedOutStatus();
-    lv_unlock();
     if (this->state == APPLICATION_STATE_LOCKED || this->state == APPLICATION_STATE_RESOURCE_LIST)
 #else
     if (this->state == APPLICATION_STATE_WAIT_FOR_CARD)
@@ -192,8 +210,10 @@ void Application::setupNfcCallbacks()
       if (this->resourceIsSelected) Display::lockscreen.showActionProgress();
       else Display::resourceListScreen.showActionProgress(FirmwareI18n::Message::CheckingCard, FirmwareI18n::Message::OneMoment);
       lv_unlock();
+      this->refusedCardGuard.noteChecked(uid, uidLength, millis());
       if (!this->api.sendCardDetected("tap", uid, uidLength, this->authenticationResourceId)) {
         // Nothing reached the server: don't leave "checking card" up until the 30 s timeout.
+        this->refusedCardGuard.forgetChecked();
         Display::asyncCall(
             [](void *data) {
               auto *self = static_cast<Application *>(data);
@@ -202,7 +222,8 @@ void Application::setupNfcCallbacks()
             this);
       }
 #else
-      this->api.sendCardDetected("tap", uid, uidLength, this->selectedResourceId);
+      this->refusedCardGuard.noteChecked(uid, uidLength, millis());
+      if (!this->api.sendCardDetected("tap", uid, uidLength, this->selectedResourceId)) this->refusedCardGuard.forgetChecked();
 #endif
       return;
     }

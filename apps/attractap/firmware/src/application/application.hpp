@@ -1,5 +1,6 @@
 #pragma once
 #include "state/forms.hpp"
+#include "refused_card_guard.hpp"
 
 class Application : protected ApplicationFormsState
 {
@@ -31,6 +32,8 @@ private:
     API &api;
     bool firmwareUpdateActive = false;
     Beeper beeper;
+    // The card the server last refused; its repeat detections are ignored (ATT-882).
+    RefusedCardGuard refusedCardGuard;
 
     // Runs card commands for the server (the reader holds no card keys or session).
     CardRelay cardRelay{CardRelay::Hooks{

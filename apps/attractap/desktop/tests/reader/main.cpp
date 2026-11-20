@@ -31,6 +31,7 @@ void runJourney(ReaderWorkflow &workflow, bool timeKnown)
     workflow.testFormErrors();
     workflow.testTransientRouting();
     workflow.testParallelSessions();
+    workflow.testRefusedCardSuppression();
     if (!timeKnown) workflow.testWallClock();
 }
 }
@@ -44,6 +45,16 @@ int main(int argc, char **argv)
         workflow.testFooterClockAndLockscreenStatus();
         std::filesystem::remove_all(workflow.storage);
         std::cout << "PASS ATT-1187 plugin UI journeys\n";
+        return 0;
+    }
+    if (argc > 1 && std::string(argv[1]) == "--refused-card") {
+        // ATT-882 variants on the test clock: no real waits for the 2000 ms window or the 30 s sign-in timeout.
+        ReaderWorkflow workflow(argc > 2 ? argv[2] : "");
+        hostFreezeMillis();
+        workflow.boot();
+        workflow.testRefusedCardVariants();
+        std::filesystem::remove_all(workflow.storage);
+        std::cout << "PASS ATT-882 refused card journeys\n";
         return 0;
     }
     if (argc > 1 && std::string(argv[1]) == "--with-clock") {

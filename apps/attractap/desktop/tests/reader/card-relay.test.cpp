@@ -62,8 +62,9 @@ void ReaderWorkflow::testCardRelay()
     assert(label(lv_screen_active(), "Bitte eine gültige RFID-Karte auflegen.") ||
            label(lv_screen_active(), "Please tap a valid RFID card."));
 
-    // A command too long for the PN532 is dropped before it gets near the card.
-    nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump();
+    // A command too long for the PN532 is dropped before it gets near the card. The refused card must have been away
+    // for 2 s first: until then its repeat detections are ignored (ATT-882).
+    nfc.setPresent(0, false); pump(2100); nfc.setPresent(0, true); pump();
     assert(server.count("CARD_DETECTED") == detectedBefore + 2);
     const uint32_t second = server.last("CARD_DETECTED")["data"]["payload"]["detectionId"];
     assert(second != first);
