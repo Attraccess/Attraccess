@@ -273,6 +273,26 @@ describe('AttractapService reader maintenance and crash reports', () => {
     );
     expect(readers.edits).toEqual([]);
   });
+  it('drops the resource links of a reader once, when it first reports itself as a BLE Bridge', async () => {
+    const { service, readers, reader, events } = setup();
+    const firmware = (nfc: boolean) => ({ ...reader.firmware, capabilities: { ...reader.firmware.capabilities, nfc } });
+    reader.allowPluginBle = true;
+    reader.resources = [makeResource(1)];
+
+    await service.updateReaderFirmware(4, firmware(true));
+    expect(reader.resources.map((r) => r.id)).toEqual([1]);
+    expect(readers.edits.at(-1)?.edit).not.toHaveProperty('resourceIds');
+
+    await service.updateReaderFirmware(4, firmware(false));
+    expect(reader.resources).toEqual([]);
+    expect(readers.edits.at(-1)?.edit).toMatchObject({ resourceIds: [] });
+    expect(events.emit).toHaveBeenCalledTimes(1);
+
+    // A bridge that already said nfc:false is left alone on reconnect.
+    await service.updateReaderFirmware(4, firmware(false));
+    expect(readers.edits.at(-1)?.edit).not.toHaveProperty('resourceIds');
+    expect(events.emit).toHaveBeenCalledTimes(1);
+  });
   it('opens a reader for plugin BLE once, when it first reports itself as a BLE Bridge', async () => {
     const { service, readers, reader, events } = setup();
     const firmware = (nfc: boolean) => ({ ...reader.firmware, capabilities: { ...reader.firmware.capabilities, nfc } });
