@@ -115,7 +115,7 @@ function mount() {
   );
 }
 async function inspect(id: number) {
-  await userEvent.click(await screen.findByRole('button', { name: `Actions for #${id}` }));
+  await userEvent.click(await screen.findByRole('button', { name: new RegExp(`^Actions for .+ \\(#${id}\\)$`) }));
   await userEvent.click(await screen.findByRole('menuitem', { name: 'View event' }));
 }
 beforeEach(() => {
@@ -157,7 +157,7 @@ describe('audit admin workflows', () => {
     async (label) => {
       const user = userEvent.setup();
       mount();
-      await screen.findByRole('button', { name: 'Actions for #52' });
+      await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
       const field = within(screen.getAllByRole('group', { name: label })[0]);
       const apply = screen.getByRole('button', { name: 'Apply filters' });
       for (const [segment, value] of [
@@ -328,18 +328,18 @@ describe('audit admin workflows', () => {
       nextCursor: beforeId ? null : 51,
     }));
     mount();
-    await screen.findByRole('button', { name: 'Actions for #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     await userEvent.click(screen.getByRole('button', { name: 'Older' }));
-    await screen.findByRole('button', { name: 'Actions for #50' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#50\)$/ });
     await userEvent.click(screen.getByRole('button', { name: 'Newer' }));
-    await screen.findByRole('button', { name: 'Actions for #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     expect(list.mock.calls.some(([query]) => query.beforeId === 51)).toBe(true);
     expect(list.mock.calls.some(([query]) => query.beforeId === 0)).toBe(false);
   });
 
   it('validates IDs before applying filters and preserves the current result on invalid input', async () => {
     mount();
-    await screen.findByRole('button', { name: 'Actions for #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     await userEvent.click(screen.getByRole('button', { name: 'More filters' }));
     await userEvent.type(screen.getByLabelText('Actor ID'), '-1');
     await userEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
@@ -356,7 +356,7 @@ describe('audit admin workflows', () => {
   it('keeps the expanded filters after switching to the settings tab and back', async () => {
     // The Activity panel unmounts on a tab switch, so the disclosure state has to live above the tabs.
     mount();
-    await screen.findByRole('button', { name: 'Actions for #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     await userEvent.click(screen.getByRole('button', { name: 'More filters' }));
     expect(screen.getByLabelText('Actor ID')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('tab', { name: 'Logging settings' }));
@@ -368,7 +368,7 @@ describe('audit admin workflows', () => {
   it('clears partially typed dates when resetting all filters', async () => {
     const user = userEvent.setup();
     mount();
-    await screen.findByRole('button', { name: 'Actions for #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: 'resource.' } });
     await user.click(screen.getByRole('button', { name: 'Apply filters' }));
     await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ eventPrefix: 'resource.' })));
@@ -410,7 +410,7 @@ describe('audit admin workflows', () => {
   it('does not request or offer management settings to read-only audit users', async () => {
     permissions.delete('system.settings.manage');
     mount();
-    await screen.findByRole('button', { name: 'Actions for #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     expect(getSettings).not.toHaveBeenCalled();
     expect(screen.queryByRole('tab', { name: 'Logging settings' })).not.toBeInTheDocument();
   });
@@ -421,7 +421,7 @@ describe('audit admin workflows', () => {
     expect(await screen.findByText('Activity could not be loaded.')).toBeInTheDocument();
     expect(screen.queryByText('No activity found')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(await screen.findByRole('button', { name: 'Actions for #52' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ })).toBeInTheDocument();
   });
 });
 

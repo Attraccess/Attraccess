@@ -65,7 +65,7 @@ export function AuditEntriesTable({
                   </Table.Cell>
                   <Table.Cell>
                     <TableRowActions
-                      itemName={`#${entry.id}`}
+                      itemName={`${auditLabel('events', entry.action, t)} (#${entry.id})`}
                       actions={[
                         { key: 'inspect', label: t('inspect'), icon: EyeIcon, onPress: () => onInspect(entry) },
                       ]}
