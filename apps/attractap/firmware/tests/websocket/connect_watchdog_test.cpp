@@ -34,6 +34,19 @@ int main()
         require(watchdog.poll(true, 210000 + ConnectWatchdog::RENEW_LINK_AFTER_MS, false) == Action::RenewLink,
                 "the next outage did not renew the link");
 
+        // Renewing the link drops it. The link going down must not forget the renewal, or the reader would
+        // renew every 30 s forever and never reach the reboot.
+        ConnectWatchdog renewing;
+        renewing.poll(true, 1000, false);
+        require(renewing.poll(true, 1000 + ConnectWatchdog::RENEW_LINK_AFTER_MS, false) == Action::RenewLink,
+                "did not renew the link");
+        renewing.pause(); // the renewal took the link down
+        require(renewing.poll(true, 40000, false) == Action::None, "the wait did not restart after the link returned");
+        require(renewing.poll(true, 40000 + ConnectWatchdog::RENEW_LINK_AFTER_MS, false) == Action::None,
+                "renewed the link again although the last renewal did not help");
+        require(renewing.poll(true, 40000 + ConnectWatchdog::REBOOT_AFTER_MS, false) == Action::Reboot,
+                "never rebooted while the renewed link stayed dead");
+
         // An advancing certificate sweep re-arms the whole watchdog (ATT-714).
         ConnectWatchdog sweeping;
         sweeping.poll(true, 5000, false);

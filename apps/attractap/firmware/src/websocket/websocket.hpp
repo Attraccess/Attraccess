@@ -127,8 +127,8 @@ private:
     static constexpr uint8_t MAX_CONSECUTIVE_CONNECT_FAILURES = 5;
     void handleConnectFailure(const char *reason);
 
-    // Reboot when no connection could be established for this long even though
-    // network and server config are present (ATT-714).
+    // Renews the Wi-Fi association, then reboots, when no connection could be
+    // established even though network and server config are present (ATT-714, ATT-1366).
     ConnectWatchdog connectWatchdog;
     // Cert index seen at the last watchdog check: an advancing sweep re-arms the
     // watchdog, since a full sweep (certs x attempts x retry interval) takes far

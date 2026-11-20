@@ -104,7 +104,7 @@ void Websocket::loop()
 
     if (!connectionAttemptsEnabled)
     {
-        this->connectWatchdog.reset();
+        this->connectWatchdog.pause();
         return;
     }
 
@@ -114,7 +114,7 @@ void Websocket::loop()
 
     if (!network_is_connected)
     {
-        this->connectWatchdog.reset();
+        this->connectWatchdog.pause();
         return;
     }
 
@@ -336,9 +336,11 @@ void Websocket::checkConnectWatchdog(const AttraccessApiConfig &apiConfig)
     case ConnectWatchdog::Action::None:
         return;
     case ConnectWatchdog::Action::RenewLink:
-        this->logger.warnf("No connection for %u ms; renewing the Wi-Fi association",
-                           (unsigned)ConnectWatchdog::RENEW_LINK_AFTER_MS);
-        Wifi::reassociate();
+        if (Wifi::reassociate())
+        {
+            this->logger.warnf("No connection for %u ms; renewed the Wi-Fi association",
+                               (unsigned)ConnectWatchdog::RENEW_LINK_AFTER_MS);
+        }
         return;
     case ConnectWatchdog::Action::Reboot:
         break;

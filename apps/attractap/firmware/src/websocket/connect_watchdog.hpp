@@ -52,11 +52,21 @@ public:
         return Action::None;
     }
 
-    /** Nothing to wait for: the next wait starts from scratch. */
+    /** Nothing to wait for (connected, or no server configured): the next wait starts from scratch. */
     void reset()
     {
         startMs = 0;
         linkRenewed = false;
+    }
+
+    /**
+     * The network link is down (or connection attempts are off): stop the clock, but remember a renewal.
+     * Renewing the link drops it, so forgetting the renewal here would renew it every 30 s forever and
+     * never reach the reboot. Only a server connection clears the renewal.
+     */
+    void pause()
+    {
+        startMs = 0;
     }
 
 private:
