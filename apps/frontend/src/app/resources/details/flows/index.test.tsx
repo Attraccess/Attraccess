@@ -435,7 +435,7 @@ it('shows loading and errors and routes import/export actions', () => {
   expect(state.error).toHaveBeenCalledWith(expect.objectContaining({ error }));
 });
 
-it('mounts the canvas only once the node schemas are in, whichever loads first', () => {
+it('mounts the canvas only once the node schemas are in, whichever loads first', async () => {
   // Flow first: the saved nodes wait behind the loading overlay until the schemas arrive.
   state.schemas = undefined;
   const view = show();
@@ -444,13 +444,8 @@ it('mounts the canvas only once the node schemas are in, whichever loads first',
   expect(state.nodes).toEqual(state.original?.nodes);
 
   state.schemas = [{ type: 'trigger' }, { type: 'action' }];
-  view.rerender(
-    <MemoryRouter initialEntries={['/resources/7/flows']}>
-      <Routes>
-        <Route path="/resources/:id/flows" element={<FlowsPage />} />
-      </Routes>
-    </MemoryRouter>,
-  );
+  // Re-render the page (the schema mock reads `state` on render); a same-path navigation does that under the data router.
+  await act(() => view.router.navigate('/resources/7/flows', { replace: true }));
   expect(screen.getByTestId('canvas')).toBeTruthy();
   expect(state.flowProps.nodes).toEqual(state.original?.nodes);
   expect(screen.queryByRole('status')).toBeNull();
@@ -464,7 +459,7 @@ it('mounts the canvas only once the node schemas are in, whichever loads first',
   expect(screen.getByRole('status', { name: 'loading' })).toBeTruthy();
 });
 
-it('still shows the canvas when the node schemas fail to load', () => {
+it('still shows the canvas when the node schemas fail to load', async () => {
   state.schemas = undefined;
   state.schemasFailed = true;
   const view = show();
@@ -474,13 +469,8 @@ it('still shows the canvas when the node schemas fail to load', () => {
   // A refetch (window focus, reconnect, a new reader) sets a failed query without data back to pending. The canvas
   // stays mounted, so its viewport, open panels and node state survive.
   state.schemasFailed = false;
-  view.rerender(
-    <MemoryRouter initialEntries={['/resources/7/flows']}>
-      <Routes>
-        <Route path="/resources/:id/flows" element={<FlowsPage />} />
-      </Routes>
-    </MemoryRouter>,
-  );
+  // Re-render the page (the schema mock reads `state` on render); a same-path navigation does that under the data router.
+  await act(() => view.router.navigate('/resources/7/flows', { replace: true }));
   expect(screen.getByTestId('canvas')).toBeTruthy();
   expect(screen.queryByRole('status')).toBeNull();
 });
