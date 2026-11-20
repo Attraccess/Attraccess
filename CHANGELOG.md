@@ -1,3 +1,28 @@
+## 2.0.0-beta.0 (2026-11-20)
+
+### 🚀 Features
+
+- unified table row actions and ConfirmableButton (ATT-560) ([#2253](https://github.com/Attraccess/Attraccess/pull/2253))
+- access-only doors, plugin readers and BLE advertisement watch (ATT-1307) ([#2240](https://github.com/Attraccess/Attraccess/pull/2240))
+- ⚠️  **attractap:** P-256-only reader auth, reader tokens removed, eFuse report and secured state (ATT-1207) ([#2249](https://github.com/Attraccess/Attraccess/pull/2249))
+- **auth:** check-your-email registration screen, change unverified email, drop optional 2FA prompt (ATT-838) ([#2258](https://github.com/Attraccess/Attraccess/pull/2258))
+
+### 🩹 Fixes
+
+- **attractap:** steady display under load, less internal RAM, safer firmware updates ([#2260](https://github.com/Attraccess/Attraccess/pull/2260))
+- **deps:** drop stray pruned api lockfile, bump hello-world example vite (ATT-1367) ([#2257](https://github.com/Attraccess/Attraccess/pull/2257))
+- **flows:** document that a takeover skips Usage Stopped; bill in the Takeover flow (ATT-1261) ([#2246](https://github.com/Attraccess/Attraccess/pull/2246))
+- **frontend:** plugins table width, SSO icon-button labels, audit prefix error (ATT-1234) ([#2254](https://github.com/Attraccess/Attraccess/pull/2254))
+- **plugins:** raise the versions of the five plugins changed since 1.11.0-beta.0 (ATT-1373) ([#2263](https://github.com/Attraccess/Attraccess/pull/2263))
+
+### ⚠️  Breaking Changes
+
+- **attractap:** P-256-only reader auth, reader tokens removed, eFuse report and secured state (ATT-1207)  ([#2249](https://github.com/Attraccess/Attraccess/pull/2249))
+
+### ❤️ Thank You
+
+- Jan Jaap @jappyjan
+
 ## 1.11.0-beta.4 (2026-11-19)
 
 ### 🩹 Fixes
