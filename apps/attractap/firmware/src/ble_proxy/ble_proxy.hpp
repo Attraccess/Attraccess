@@ -5,8 +5,8 @@
 //
 // Threads: requests arrive on the websocket task and are only parsed and queued there. The proxy task runs the
 // state machine; NimBLE's host task reports radio events to it. Neither ever blocks the websocket, NFC, display
-// or access control. NimBLE comes up on the first BLE request and stays until reboot, so a reader that never
-// uses BLE keeps its RAM and radio as before.
+// or access control. NimBLE comes up on the first BLE request and shuts down again after 30 s without BLE work
+// (ble::STACK_IDLE_SHUTDOWN_MS), so a reader that does not use BLE right now keeps its RAM and radio as before.
 
 #include <ArduinoJson.h>
 #include <cstddef>

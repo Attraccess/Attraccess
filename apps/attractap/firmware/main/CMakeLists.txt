@@ -37,6 +37,10 @@ if(NOT CMAKE_BUILD_EARLY_EXPANSION)
             list(APPEND ATTRACTAP_DEFINES ATTRACTAP_CRASH_TRIGGER=1)
         endif()
 
+        if(NOT "${ATTRACTAP_LAB_CA}" STREQUAL "")
+            list(APPEND ATTRACTAP_DEFINES ATTRACTAP_LAB_CA=1)
+        endif()
+
         if(ATTRACTAP_UI_SELFTEST)
             if(NOT ATTRACTAP_UI OR "DEMO_MODE=1" IN_LIST ATTRACTAP_DEFINES)
                 message(FATAL_ERROR "ATTRACTAP_UI_SELFTEST needs a real display variant (not a demo variant)")
@@ -96,6 +100,20 @@ target_compile_definitions(${COMPONENT_LIB} PUBLIC
 # unaffected). Suppress for the app like IDF does for the sibling warning
 # (-Wno-enum-conversion in tools/cmake/build.cmake:193).
 target_compile_options(${COMPONENT_LIB} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-enum-enum-conversion>")
+
+if("ATTRACTAP_LAB_CA=1" IN_LIST ATTRACTAP_DEFINES)
+    # Fixed name for the embedded symbol (_binary_attractap_lab_ca_pem_start, NUL-terminated);
+    # configure_file also reconfigures when the CA file changes.
+    configure_file("${ATTRACTAP_LAB_CA}" "${CMAKE_CURRENT_BINARY_DIR}/attractap_lab_ca.pem" COPYONLY)
+    target_add_binary_data(${COMPONENT_LIB} "${CMAKE_CURRENT_BINARY_DIR}/attractap_lab_ca.pem" TEXT)
+endif()
+
+if(CONFIG_MBEDTLS_CUSTOM_MEM_ALLOC AND NOT "${ATTRACTAP_APP}" STREQUAL "park")
+    # Nothing calls the secure profile's mbedTLS allocator (src/api/security/tls_memory.c) by name; it installs
+    # itself from a constructor. This pulls its object into the link and fails the link if it is missing,
+    # where a missing allocator would leave mbedTLS on plain calloc(). Parking images do no TLS.
+    target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--require-defined=attractap_tls_memory_install")
+endif()
 
 if(ATTRACTAP_UI)
     # Generic binary embedding does not align the start symbol. LVGL's RGB565

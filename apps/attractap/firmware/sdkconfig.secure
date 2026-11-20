@@ -74,6 +74,19 @@ CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 CONFIG_PARTITION_TABLE_OFFSET=0x8000
 
-# --- TLS memory in internal RAM (no PSRAM-resident key material) ---
+# --- TLS memory: no PSRAM-resident key material ---
+# Rule: everything mbedTLS and PSA allocate through mbedtls_calloc() (keys,
+# secrets, bignums, PK and cipher contexts, handshake state, transforms,
+# sessions) lives in internal RAM, with no PSRAM fallback. Only the two fixed
+# record buffers that mbedtls_ssl_setup() allocates per TLS context (ciphertext
+# and decrypted application data) may live in PSRAM, which flash encryption also
+# encrypts; they fall back to internal RAM when PSRAM is full.
+# src/api/security/tls_memory.c installs the allocator that does this. It matches
+# the exact record buffer lengths, so the dynamic and variable-length buffer
+# options, which allocate records at other sizes, must stay off.
 # CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC is not set
-CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC=y
+# CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC is not set
+# CONFIG_MBEDTLS_DEFAULT_MEM_ALLOC is not set
+CONFIG_MBEDTLS_CUSTOM_MEM_ALLOC=y
+# CONFIG_MBEDTLS_DYNAMIC_BUFFER is not set
+# CONFIG_MBEDTLS_SSL_VARIABLE_BUFFER_LENGTH is not set

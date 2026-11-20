@@ -1,6 +1,18 @@
 #include "AdaptiveCertManager.hpp"
 #include "../../certs/ca_index.hpp"
 
+#ifdef ATTRACTAP_LAB_CA
+// Lab images (main/CMakeLists.txt, ATTRACTAP_LAB_CA) also trust the device-lab CA of the HIL wss mode.
+// It comes first so the lab API's certificate verifies on the first attempt instead of after a sweep.
+extern const char attractap_lab_ca_pem[] asm("_binary_attractap_lab_ca_pem_start");
+static const CACertInfo LAB_CA = {"Attractap Device Lab CA (lab builds only)", "attractap_lab_ca.pem", attractap_lab_ca_pem};
+static constexpr int CERT_COUNT = CA_CERT_COUNT + 1;
+static const CACertInfo &certAt(int index) { return index == 0 ? LAB_CA : ca_certificates[index - 1]; }
+#else
+static constexpr int CERT_COUNT = CA_CERT_COUNT;
+static const CACertInfo &certAt(int index) { return ca_certificates[index]; }
+#endif
+
 // Preference keys
 const char *AdaptiveCertManager::PREF_NAMESPACE = "cert_mgr";
 const char *AdaptiveCertManager::PREF_SUCCESSFUL_CERT = "success_cert";
@@ -68,7 +80,7 @@ const char *AdaptiveCertManager::getCurrentCertName() const
         return "Invalid";
     }
 
-    return ca_certificates[currentCertIndex].name;
+    return certAt(currentCertIndex).name;
 }
 
 int AdaptiveCertManager::getCurrentCertIndex() const
@@ -78,7 +90,7 @@ int AdaptiveCertManager::getCurrentCertIndex() const
 
 int AdaptiveCertManager::getCertCount() const
 {
-    return CA_CERT_COUNT;
+    return CERT_COUNT;
 }
 
 int AdaptiveCertManager::getRememberedFailureCount() const
@@ -105,7 +117,7 @@ void AdaptiveCertManager::loadSuccessfulCertIndexFromPreferences()
     if (successfulCertIndex >= 0 && !isValidCertIndex(successfulCertIndex))
     {
         logger.errorf("Stored certificate index %d is out of range (max %d), clearing lock",
-                      successfulCertIndex, CA_CERT_COUNT - 1);
+                      successfulCertIndex, CERT_COUNT - 1);
         this->reset();
         return;
     }
@@ -117,7 +129,7 @@ void AdaptiveCertManager::loadSuccessfulCertIndexFromPreferences()
     if (successfulCertIndex >= 0)
     {
         std::string storedCertName = preferences.getString(PREF_SUCCESSFUL_CERT_NAME);
-        const char *currentName = ca_certificates[successfulCertIndex].name;
+        const char *currentName = certAt(successfulCertIndex).name;
         if (storedCertName.empty())
         {
             preferences.putString(PREF_SUCCESSFUL_CERT_NAME, currentName);
@@ -169,7 +181,7 @@ void AdaptiveCertManager::saveSuccessfulCertIndexToPreferences(int certIndex)
 bool AdaptiveCertManager::isValidCertIndex(int index) const
 {
     logger.debugf("isValidCertIndex: %d", index);
-    return index >= 0 && index < CA_CERT_COUNT;
+    return index >= 0 && index < CERT_COUNT;
 }
 
 bool AdaptiveCertManager::getCertificate(const char **certData)
@@ -185,7 +197,7 @@ bool AdaptiveCertManager::getCertificate(const char **certData, const char **cer
         return false;
     }
 
-    logger.infof("Available certificates: %d", CA_CERT_COUNT);
+    logger.infof("Available certificates: %d", CERT_COUNT);
 
     // A locked (once-successful) certificate is always used, no matter how often
     // it failed since: connect failures with a known-good cert mean the server is
@@ -205,7 +217,7 @@ bool AdaptiveCertManager::getCertificate(const char **certData, const char **cer
     if (!isValidCertIndex(currentCertIndex))
     {
         logger.errorf("No certificates available (index %d, max %d)",
-                      currentCertIndex, CA_CERT_COUNT);
+                      currentCertIndex, CERT_COUNT);
         currentCertIndex = 0;
         rememberedCertFailureCount = 0;
         return false;
@@ -213,17 +225,17 @@ bool AdaptiveCertManager::getCertificate(const char **certData, const char **cer
 
     logger.debug("Writing cert data to pointer");
     // Configure WebSocket with current certificate
-    *certData = ca_certificates[currentCertIndex].data;
+    *certData = certAt(currentCertIndex).data;
 
     if (certName)
     {
         logger.debug("Writing cert name to pointer");
-        *certName = ca_certificates[currentCertIndex].name;
+        *certName = certAt(currentCertIndex).name;
     }
 
     const char *currentCertName = getCurrentCertName();
     logger.infof("Configured with certificate: %s (index %d/%d)",
-                 currentCertName, currentCertIndex, CA_CERT_COUNT - 1);
+                 currentCertName, currentCertIndex, CERT_COUNT - 1);
 
     return true;
 }
@@ -299,7 +311,7 @@ bool AdaptiveCertManager::markFailure()
 
     // Regular iteration through certificates
     logger.infof("Certificate failed during iteration: %s (index %d/%d, attempt %d/%d)",
-                 failedCertName, currentCertIndex, CA_CERT_COUNT - 1,
+                 failedCertName, currentCertIndex, CERT_COUNT - 1,
                  currentCertAttemptCount + 1, ATTEMPTS_PER_CERT);
 
     currentCertAttemptCount++;
@@ -317,14 +329,14 @@ bool AdaptiveCertManager::markFailure()
     if (!isValidCertIndex(currentCertIndex))
     {
         logger.errorf("No more certificates to try (reached index %d, max %d)",
-                      currentCertIndex, CA_CERT_COUNT - 1);
+                      currentCertIndex, CERT_COUNT - 1);
         this->reset();
         exhausted = true;
     }
 
     const char *nextCertName = getCurrentCertName();
     logger.infof("Trying next certificate: %s (index %d/%d)",
-                 nextCertName, currentCertIndex, CA_CERT_COUNT - 1);
+                 nextCertName, currentCertIndex, CERT_COUNT - 1);
 
     return exhausted;
 }

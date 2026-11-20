@@ -18,48 +18,21 @@ Results (throughput, notification rate, heap before and after BLE init) land in 
 import base64
 import json
 import os
+import re
 import time
 from pathlib import Path
 
 import pytest
 
-from conftest import PROFILE, read_heap, record_heap
+from conftest import PERIPHERAL, PROFILE, read_heap, record_heap
 from heap_floors import floors
 from wire import Wire
 
 pytestmark = pytest.mark.skipif(os.environ.get("HIL_BLE") != "1", reason="plugin BLE tests are opt-in (HIL_BLE=1)")
 
-PERIPHERAL = os.environ.get("BLE_PERIPHERAL_ADDRESS", "").upper()
 SOLO = os.environ.get("SOLO_ADDRESS", "").upper()
 SOLO_CODE = os.environ.get("SOLO_USER_CODE", "")
 needs_peripheral = pytest.mark.skipif(not PERIPHERAL, reason="set BLE_PERIPHERAL_ADDRESS")
-
-
-@pytest.fixture(scope="session")
-def ble(api, admin, reader, resource):
-    """The fixture plugin's REST surface, on a reader an administrator opened for plugins.
-
-    The reader update takes the whole editable state, so it keeps the name and the resource the suite connected.
-    """
-    status, body = api.call("PATCH", f"/attractap/readers/{reader['id']}",
-                            {"name": "Lab Reader", "connectedResourceIds": [resource], "allowPluginBle": True},
-                            token=admin)
-    assert status == 200, body
-
-    def call(path, body=None, timeout=900):
-        status, answer = api.call("POST", f"/ble-lab/{path}", body or {}, token=admin, timeout=timeout)
-        assert status in (200, 201), answer
-        return answer
-
-    return call
-
-
-@pytest.fixture(scope="session")
-def peripheral(ble, reader):
-    status = ble("endpoints", {"readerId": reader["id"], "address": PERIPHERAL, "addressType": "public",
-                               "profileId": "test-peripheral"})
-    assert "id" in status, status
-    return status["id"]
 
 
 def run(ble, endpoint, steps, timeout=900, **options):
@@ -202,6 +175,68 @@ def test_ble_peripheral_loss_ends_the_session(ble, peripheral):
     assert result["closed"] == {"reason": "disconnected"}, result
     again = run(ble, peripheral, [{"op": "read", "key": "read"}])
     assert again["steps"][0]["ok"], again
+
+
+# The reader releases NimBLE and the controller after this long without BLE work (ble::STACK_IDLE_SHUTDOWN_MS).
+BLE_IDLE_RELEASE_S = 30
+# Free internal heap after a release may sit this far below its value before the stack came up: other tasks allocate
+# too (websocket buffers, the TLS session), and the controller's ~24 KB must not stay behind.
+BLE_RELEASE_TOLERANCE = 4 * 1024
+BLE_STACK_LOG = re.compile(rb"Heap (at boot|after BLE init|after BLE shutdown)")
+
+
+def ble_released(console, since):
+    """Wait for the release logged after position ``since``; return the settled internal heap."""
+    console.expect(r"Heap after BLE shutdown", since, BLE_IDLE_RELEASE_S + 20)
+    time.sleep(1)  # a deleted task's memory may come back through the idle task
+    return read_heap(console)
+
+
+def heap_without_ble(console):
+    """The internal heap with the BLE stack down, at any point of the session.
+
+    An earlier test may have brought the stack up less than an idle period ago: the last of the proxy's heap lines
+    (at boot, after an init, after a release) tells, and an init that is the last one is waited out.
+    """
+    with console.lock:
+        last = list(BLE_STACK_LOG.finditer(console.data))[-1:]
+    if last and last[0].group(1) == b"after BLE init":
+        return ble_released(console, last[0].end())
+    return read_heap(console)
+
+
+@needs_peripheral
+def test_ble_idle_release_returns_the_heap(ble, peripheral, reader, artifacts):
+    """A lock-sized exchange, then the idle period: the stack goes and its internal RAM with it, twice in a row.
+
+    The second exchange proves the released stack comes back on the next request and works.
+    """
+    console = reader["console"]
+    exchange = [
+        {"op": "subscribe", "key": "notify"},
+        control(0x02, 3, 0, 16, 0),
+        {"op": "drain", "key": "notify", "count": 3},
+    ]
+    baseline = heap_without_ble(console)
+    start = console.mark()
+    rounds = []
+    for _ in range(2):
+        mark = console.mark()
+        result = run_when_free(ble, peripheral, exchange)
+        assert result["open"]["ok"] and all(step["ok"] for step in result["steps"]), result
+        console.expect(r"Heap after BLE init", mark, 30)  # this exchange brought the stack up
+        up = read_heap(console)
+        released = ble_released(console, mark)
+        rounds.append({"result": result, "up": up, "released": released})
+    save(artifacts, "idle-release", {"baseline": baseline, "rounds": rounds,
+                                     "log": re.findall(r"[^\r\n]*Heap after BLE[^\r\n]*", console.since(start))})
+    # Disabling and enabling the controller next to Wi-Fi (coexistence) did not cost the server connection.
+    assert "Reader Authentication successful" not in console.since(start)
+    for entry in rounds:
+        # The stack held a material amount while up (measured ~24 KB), so its release is what the heap shows.
+        assert entry["released"]["internalFree"] - entry["up"]["internalFree"] >= 8 * 1024, rounds
+        assert entry["released"]["internalFree"] >= baseline["internalFree"] - BLE_RELEASE_TOLERANCE, \
+            {"baseline": baseline, "released": entry["released"]}
 
 
 @needs_peripheral
