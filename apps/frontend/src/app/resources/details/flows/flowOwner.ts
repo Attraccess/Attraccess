@@ -89,11 +89,15 @@ export function useFlowCanvasQuery(owner: FlowOwner) {
 }
 
 export function useFlowNodeSchemasQuery(owner: FlowOwner) {
+  // The canvas mounts once this query settles, also on an error, and its nodes and log viewer read it too. Retrying
+  // a failed query on their mount would set it back to pending, unmount the canvas again and loop.
   const resource = useGetNodeSchemas({ path: { resourceId: resourceIdOf(owner) } }, undefined, {
     enabled: owner.kind === 'resource',
+    retryOnMount: false,
   });
   const global = useGetGlobalFlowNodeSchemas({}, undefined, {
     enabled: owner.kind === 'global',
+    retryOnMount: false,
   });
   return (owner.kind === 'resource' ? resource : global) as {
     data: ResourceFlowNodeSchemaDto[] | undefined;
