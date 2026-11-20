@@ -1,0 +1,7 @@
+{
+  "title": "Prüfe deine E-Mails",
+  "lead": "Wir haben einen Aktivierungslink gesendet an",
+  "instruction": "Öffne den Link in dieser E-Mail, um dein Konto zu aktivieren, und melde dich danach an.",
+  "spamHint": "Nichts gefunden? Schau in deinem Spam-Ordner nach.",
+  "backToSignIn": "Zurück zur Anmeldung"
+}

@@ -1,14 +1,14 @@
-import { isValidEmail } from '../../utils/email';
 import { ArrowRight } from 'lucide-react';
-import { AlertContent, AlertDescription, AlertTitle, Input, Label, TextField, Alert } from '@heroui/react';
+import { Input, Label, TextField } from '@heroui/react';
 import { OneTimeCodeInput } from '../../components/OneTimeCodeInput/index';
 import { Button, PasswordInput, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { ApiError, useResendVerificationEmail } from '@attraccess/react-query-client';
+import { ApiError } from '@attraccess/react-query-client';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLogin } from '../../hooks/useAuth';
-import { getTranslationKeyForApiError } from '../../utils/apiError';
+import { toApiErrorNotice } from './apiErrorNotice';
+import { LoginErrorAlert } from './LoginErrorAlert';
 import en from './loginForm.en.json';
 import de from './loginForm.de.json';
 
@@ -38,9 +38,8 @@ export function LoginFormContent(props: Readonly<{ onForgotPassword: () => void 
     }
   }, [challengeCredentials, isPending]);
   const [twoFactorCode, setTwoFactorCode] = useState('');
-  const [resendEmail, setResendEmail] = useState('');
-  const [resendSuccess, setResendSuccess] = useState(false);
-  const [resendError, setResendError] = useState<{ title: string; description: string } | null>(null);
+  // Remounts the error card per attempt, so its resend field starts from the identifier just submitted.
+  const [attempt, setAttempt] = useState(0);
 
   const isEmailNotVerified = useMemo(() => {
     if (!error) return false;
@@ -49,61 +48,10 @@ export function LoginFormContent(props: Readonly<{ onForgotPassword: () => void 
     return body?.message === 'UserEmailNotVerifiedException';
   }, [error]);
 
-  useEffect(() => {
-    setResendSuccess(false);
-    setResendError(null);
-    setResendEmail('');
-  }, [error]);
-
-  const resendVerification = useResendVerificationEmail(undefined, {
-    onSuccess: () => {
-      setResendError(null);
-      setResendSuccess(true);
-    },
-    onError: (mutationError) => {
-      setResendSuccess(false);
-      const { key } = getTranslationKeyForApiError({
-        error: mutationError as ApiError,
-        t,
-        tExists,
-        baseTranslationKey: 'api',
-        fallbackKey: 'generic',
-      });
-      setResendError({
-        title: t(key + '.title', { error: mutationError }),
-        description: t(key + '.description', { error: mutationError }),
-      });
-    },
-  });
-
-  const { errorTitle, errorDescription } = useMemo(() => {
-    if (!error || errorMessage === 'TwoFactorRequired') {
-      return {
-        errorTitle: null,
-        errorDescription: null,
-      };
-    }
-
-    const { key } = getTranslationKeyForApiError({
-      error: error as ApiError,
-      t,
-      tExists,
-      baseTranslationKey: 'api',
-      fallbackKey: 'generic',
-    });
-
-    const responseBody = (error as ApiError).body as Record<string, unknown> | undefined;
-    const retryAfterSeconds = Number(responseBody?.retryAfterSeconds);
-    const retryAfter = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0 ? retryAfterSeconds : undefined;
-
-    return {
-      errorTitle: t(key + '.title', { error }),
-      errorDescription: t(key + '.description', {
-        error,
-        retryAfterSeconds: retryAfter ?? '',
-      }),
-    };
-  }, [error, errorMessage, t, tExists]);
+  const errorNotice = useMemo(
+    () => (!error || errorMessage === 'TwoFactorRequired' ? null : toApiErrorNotice(error, t, tExists)),
+    [error, errorMessage, t, tExists],
+  );
 
   const changeCredentials = useCallback(() => {
     if (isPending || submitting.current) return;
@@ -129,8 +77,7 @@ export function LoginFormContent(props: Readonly<{ onForgotPassword: () => void 
       setIdentifier(credentials.username);
       setPasswordValue(credentials.password);
 
-      setResendSuccess(false);
-      setResendError(null);
+      setAttempt((count) => count + 1);
       submitting.current = true;
       login(
         {
@@ -213,6 +160,16 @@ export function LoginFormContent(props: Readonly<{ onForgotPassword: () => void 
           </Button>
         </fieldset>
       )}
+      {errorNotice && (
+        <LoginErrorAlert
+          key={attempt}
+          title={errorNotice.title}
+          description={errorNotice.description}
+          isEmailNotVerified={isEmailNotVerified}
+          identifier={identifier}
+          password={passwordValue}
+        />
+      )}
       <div className="flex items-center justify-between">
         <Button
           variant="secondary"
@@ -234,64 +191,6 @@ export function LoginFormContent(props: Readonly<{ onForgotPassword: () => void 
         {challengeCredentials ? t('verifyCode') : t('signInButton')}
         {arrowRight}
       </Button>
-
-      {errorTitle && (
-        <Alert status="danger" data-cy="login-form-error-alert">
-          <AlertContent>
-            <AlertTitle>{errorTitle}</AlertTitle>
-            <AlertDescription>{errorDescription}</AlertDescription>
-          </AlertContent>
-        </Alert>
-      )}
-
-      {isEmailNotVerified && !resendSuccess && (
-        <div className="space-y-2" data-testid="resend-verification-section">
-          <p className="text-sm text-gray-600 dark:text-gray-400">{t('resendVerification.prompt')}</p>
-          <TextField
-            value={resendEmail}
-            onChange={(value) => {
-              setResendEmail(value);
-              setResendError(null);
-            }}
-          >
-            <Label>{t('resendVerification.emailLabel')}</Label>
-            <Input type="email" data-testid="resend-email-input" />
-          </TextField>
-          {resendError && (
-            <Alert status="danger" data-testid="resend-error-alert">
-              <AlertContent>
-                <AlertTitle>{resendError.title}</AlertTitle>
-                <AlertDescription>{resendError.description}</AlertDescription>
-              </AlertContent>
-            </Alert>
-          )}
-          <Button
-            variant="secondary"
-            className="w-full"
-            onPress={() => {
-              const trimmed = resendEmail.trim();
-              if (!isValidEmail(trimmed)) {
-                return;
-              }
-              resendVerification.mutate({ body: { email: trimmed } });
-            }}
-            isPending={resendVerification.isPending}
-            isDisabled={!isValidEmail(resendEmail.trim()) || resendVerification.isPending}
-            data-testid="resend-verification-button"
-          >
-            {t('resendVerification.button')}
-          </Button>
-        </div>
-      )}
-
-      {resendSuccess && (
-        <Alert status="success" data-testid="resend-success-alert">
-          <AlertContent>
-            <AlertTitle>{t('resendVerification.successTitle')}</AlertTitle>
-            <AlertDescription>{t('resendVerification.successMessage')}</AlertDescription>
-          </AlertContent>
-        </Alert>
-      )}
     </form>
   );
 }

@@ -12,6 +12,14 @@ const mutateMock = vi.fn();
 const onHasAccountMock = vi.fn();
 const locale = vi.hoisted(() => ({ current: 'en' }));
 const pending = vi.hoisted(() => ({ createAccount: false }));
+const resend = vi.hoisted(() => ({
+  mutate: vi.fn(),
+  options: undefined as undefined | { onSuccess?: () => void; onError?: (error: unknown) => void },
+}));
+const change = vi.hoisted(() => ({
+  mutate: vi.fn(),
+  options: undefined as undefined | { onSuccess?: () => void; onError?: (error: unknown) => void },
+}));
 const createAccountOptions = vi.hoisted(() => ({ current: undefined as undefined | { onSuccess?: () => void } }));
 const labels = { en, de };
 
@@ -43,6 +51,14 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
+  useResendVerificationEmail: (_key: unknown, options: typeof resend.options) => {
+    resend.options = options;
+    return { mutate: resend.mutate, isPending: false };
+  },
+  useChangeUnverifiedEmail: (_key: unknown, options: typeof change.options) => {
+    change.options = options;
+    return { mutate: change.mutate, isPending: false };
+  },
   useCreateOneUser: (_mutationKey: unknown, options: { onSuccess?: () => void }) => {
     createAccountOptions.current = options;
     return {
@@ -83,7 +99,10 @@ describe('RegistrationForm', () => {
     onHasAccountMock.mockReset();
     locale.current = 'en';
     pending.createAccount = false;
+    resend.mutate.mockReset();
+    change.mutate.mockReset();
     sessionStorage.clear();
+    localStorage.clear();
   });
 
   it('shows username guidance text', async () => {
@@ -158,20 +177,120 @@ describe('RegistrationForm', () => {
     });
   });
 
-  it('offers 2FA setup from the success dialog: sets the intent, closes and switches to sign-in', async () => {
-    const user = userEvent.setup();
+  async function register(user: ReturnType<typeof userEvent.setup>) {
     renderForm();
-
+    await user.type(screen.getByLabelText('Username'), 'jane');
+    await user.type(screen.getByLabelText('Email address'), 'jane@example.org');
+    await user.type(screen.getByLabelText('Password'), 'correct-horse-battery-staple-42');
+    await user.type(screen.getByLabelText('Confirm your password'), 'correct-horse-battery-staple-42');
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
     act(() => createAccountOptions.current?.onSuccess?.());
+  }
 
-    const dialog = await screen.findByRole('alertdialog');
-    expect(dialog).toHaveTextContent(en.twoFactor.title);
-    expect(dialog).toHaveTextContent(en.twoFactor.description);
+  describe('after registering', () => {
+    it('replaces the form with a focused check-your-email screen without 2FA or storage', async () => {
+      const user = userEvent.setup();
+      await register(user);
 
-    await user.click(screen.getByRole('button', { name: en.twoFactor.action }));
+      const heading = screen.getByRole('heading', { level: 2, name: 'Check your email' });
+      expect(heading).toHaveFocus();
+      expect(screen.getByText('jane@example.org').tagName).toBe('STRONG');
+      expect(screen.queryByRole('form')).toBeNull();
+      expect(screen.queryByRole('alertdialog')).toBeNull();
+      expect(screen.queryByText(/two-factor|2FA/i)).toBeNull();
+      expect(sessionStorage.length).toBe(0);
+      expect(localStorage.length).toBe(0);
+      for (const name of ['Resend email', 'Change email address', 'Back to sign in']) {
+        expect(screen.getByRole('button', { name })).toBeInTheDocument();
+      }
+    });
 
-    expect(sessionStorage.getItem('twoFactorSetupIntent')).toBe('true');
-    expect(onHasAccountMock).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('alertdialog')).toBeNull();
+    it('goes to sign-in from "Back to sign in"', async () => {
+      const user = userEvent.setup();
+      await register(user);
+      await user.click(screen.getByRole('button', { name: 'Back to sign in' }));
+      expect(onHasAccountMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('resends to the shown address in one click and reports it as a status', async () => {
+      const user = userEvent.setup();
+      await register(user);
+      await user.click(screen.getByRole('button', { name: 'Resend email' }));
+      expect(resend.mutate).toHaveBeenCalledWith({ body: { email: 'jane@example.org' } });
+
+      act(() => resend.options?.onSuccess?.());
+      expect(screen.getByRole('status')).toHaveTextContent('We sent a new activation link to jane@example.org.');
+    });
+
+    it('announces a translated resend error', async () => {
+      const user = userEvent.setup();
+      await register(user);
+      await user.click(screen.getByRole('button', { name: 'Resend email' }));
+
+      act(() =>
+        resend.options?.onError?.({ message: 'x', body: { message: 'TooManyAuthAttempts', retryAfterSeconds: 30 } }),
+      );
+      expect(screen.getByRole('alert')).toHaveTextContent('Too many sign-in attempts');
+      expect(screen.getByRole('alert')).toHaveTextContent('30');
+    });
+
+    it('changes the address with the registration credentials and shows the new one', async () => {
+      const user = userEvent.setup();
+      await register(user);
+      await user.click(screen.getByRole('button', { name: 'Change email address' }));
+      await user.type(screen.getByLabelText('New email address'), ' new@example.org ');
+      await user.click(screen.getByRole('button', { name: 'Send activation link' }));
+
+      expect(change.mutate).toHaveBeenCalledWith({
+        body: { identifier: 'jane', password: 'correct-horse-battery-staple-42', newEmail: 'new@example.org' },
+      });
+      act(() => change.options?.onSuccess?.());
+
+      expect(screen.getByText('new@example.org', { selector: 'strong' })).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('We sent a new activation link to new@example.org.');
+      expect(screen.queryByLabelText('New email address')).toBeNull();
+      expect(sessionStorage.length + localStorage.length).toBe(0);
+    });
+
+    it('shows a change error inline and keeps the form, and cancel returns to the confirmation', async () => {
+      const user = userEvent.setup();
+      await register(user);
+      await user.click(screen.getByRole('button', { name: 'Change email address' }));
+      await user.type(screen.getByLabelText('New email address'), 'taken@example.org');
+      await user.click(screen.getByRole('button', { name: 'Send activation link' }));
+
+      act(() => change.options?.onError?.({ message: 'x', body: { message: 'Email already exists' } }));
+      expect(screen.getByRole('alert')).toHaveTextContent('Email already in use');
+      expect(screen.getByLabelText('New email address')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByLabelText('New email address')).toBeNull();
+      expect(screen.getByText('jane@example.org', { selector: 'strong' })).toBeInTheDocument();
+    });
+
+    it('does not submit an invalid new address', async () => {
+      const user = userEvent.setup();
+      await register(user);
+      await user.click(screen.getByRole('button', { name: 'Change email address' }));
+      await user.type(screen.getByLabelText('New email address'), 'not-an-email');
+      expect(screen.getByRole('button', { name: 'Send activation link' })).toBeDisabled();
+    });
+
+    it('is fully translated in German', async () => {
+      locale.current = 'de';
+      const user = userEvent.setup();
+      renderForm();
+      await user.type(screen.getByLabelText(de.username), 'jane');
+      await user.type(screen.getByLabelText(de.email), 'jane@example.org');
+      await user.type(screen.getByLabelText(de.password), 'correct-horse-battery-staple-42');
+      await user.type(screen.getByLabelText(de.passwordConfirmation), 'correct-horse-battery-staple-42');
+      await user.click(screen.getByRole('button', { name: de.createAccountButton }));
+      act(() => createAccountOptions.current?.onSuccess?.());
+
+      expect(screen.getByRole('heading', { name: 'Prüfe deine E-Mails' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'E-Mail erneut senden' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'E-Mail-Adresse ändern' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Zurück zur Anmeldung' })).toBeInTheDocument();
+    });
   });
 });

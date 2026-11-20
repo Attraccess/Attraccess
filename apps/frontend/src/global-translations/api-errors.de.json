@@ -101,7 +101,11 @@
   },
   "UserEmailNotVerifiedException": {
     "title": "E-Mail nicht verifiziert",
-    "description": "Bitte verifiziere deine E-Mail, bevor du dich anmeldest. Pruefe dein Postfach auf den Verifizierungslink oder bitte einen Administrator, ihn erneut zu senden."
+    "description": "Bitte bestätige deine E-Mail-Adresse, bevor du dich anmeldest. Öffne den Aktivierungslink, den wir dir geschickt haben, oder fordere unten einen neuen an."
+  },
+  "EmailAlreadyVerified": {
+    "title": "E-Mail bereits bestätigt",
+    "description": "Dieses Konto ist bereits bestätigt. Melde dich stattdessen an."
   },
   "UnkownUserOrPasswordException": {
     "title": "Unbekannter Benutzer oder Passwort",

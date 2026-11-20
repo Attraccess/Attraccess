@@ -135,6 +135,7 @@
     "identity.registration": "Account registration",
     "identity.password_reset_requested": "Password reset requested",
     "identity.verification_email_resent": "Verification email resent",
+    "identity.unverified_email_changed": "Email changed before verification",
     "identity.password_reset_completed": "Password reset completed",
     "identity.sso_account_link": "SSO account linking",
     "identity.two_factor_setup_started": "Two-factor setup started",

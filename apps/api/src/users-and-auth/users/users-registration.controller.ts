@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Req, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseIntPipe, Post, Req, UseInterceptors } from '@nestjs/common';
 import type { Request } from 'express';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
@@ -8,6 +8,7 @@ import { BooleanDto } from '../../types/boolean.dto';
 import { CreateUserDto } from './dtos/createUser.dto';
 import { UserDto, toUserAccountDto } from './dtos/user.dto';
 import { VerifyEmailDto } from './dtos/verifyEmail.dto';
+import { ChangeUnverifiedEmailDto } from './dtos/changeUnverifiedEmail.dto';
 import { ResendVerificationEmailDto } from './dtos/resendVerificationEmail.dto';
 import { AcceptInvitationDto } from './dtos/acceptInvitation.dto';
 import { ResetPasswordDto } from './dtos/resetPassword.dto';
@@ -15,6 +16,7 @@ import { ChangePasswordDto } from './dtos/changePassword.dto';
 import { SignupDomainService } from './signup-domain.service';
 import { UserRegistrationService } from './user-registration.service';
 import { UserPasswordService } from './user-password.service';
+import { UnverifiedEmailChangeService } from './unverified-email-change.service';
 
 @ApiTags('Users')
 @Controller('users')
@@ -24,6 +26,7 @@ export class UsersRegistrationController {
     private readonly signupDomainService: SignupDomainService,
     private readonly registrationService: UserRegistrationService,
     private readonly passwordService: UserPasswordService,
+    private readonly unverifiedEmailChangeService: UnverifiedEmailChangeService,
   ) {}
 
   @Get('local-signup-domain-whitelist')
@@ -131,6 +134,40 @@ export class UsersRegistrationController {
   })
   async resendVerificationEmail(@Body() body: ResendVerificationEmailDto) {
     await this.registrationService.resendVerificationEmail(body.email);
+    return { message: 'OK' };
+  }
+
+  @Post('change-unverified-email')
+  @HttpCode(200)
+  @AuthRateLimit('unverified_email_change')
+  @ApiOperation({
+    summary: 'Change the email address of an account that has not been verified yet',
+    operationId: 'changeUnverifiedEmail',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'The email address was changed and a new verification email was sent to it.',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'OK' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input data or the email is already in use.',
+  })
+  @ApiResponse({ status: 401, description: 'Unknown user or wrong password.' })
+  @ApiResponse({
+    status: 403,
+    description: 'The account is already verified, or the domain of the new email is not allowed.',
+  })
+  @ApiResponse({ status: 429, description: 'Too many attempts.' })
+  @ApiResponse({ status: 503, description: 'The verification email could not be sent.' })
+  async changeUnverifiedEmail(@Body() body: ChangeUnverifiedEmailDto, @Req() req: Request) {
+    const userAgent = req.headers['user-agent'];
+    await this.unverifiedEmailChangeService.changeUnverifiedEmail(body, { ipAddress: req.ip, userAgent });
     return { message: 'OK' };
   }
 

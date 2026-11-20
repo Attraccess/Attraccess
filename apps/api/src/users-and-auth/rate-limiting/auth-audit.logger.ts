@@ -8,6 +8,7 @@ export type AuthAuditType =
   | 'register'
   | 'password_reset_request'
   | 'verification_email_resend'
+  | 'unverified_email_change'
   | 'password_reset_complete'
   | 'delete_account_confirm'
   | 'api_token'

@@ -34,6 +34,7 @@ import { UserAdministrationService } from './users/user-administration.service';
 import { UserProfileController } from './users/user-profile.controller';
 
 import { UserRegistrationService } from './users/user-registration.service';
+import { UnverifiedEmailChangeService } from './users/unverified-email-change.service';
 
 import { UsersAdminController } from './users/users-admin.controller';
 
@@ -182,6 +183,7 @@ export const sessionStoreProvider = {
     UserDirectory,
     SignupDomainService,
     UserRegistrationService,
+    UnverifiedEmailChangeService,
     UserPasswordService,
     UserInvitationService,
     UserPermissionsService,

@@ -1,4 +1,5 @@
 # Anmeldung
+
 <!-- llms-description: Die Anmeldemöglichkeiten bei Attraccess: Passwort, SSO, Zwei-Faktor-Authentifizierung, Registrierung und Passwort zurücksetzen. -->
 
 Diese Seite erklärt die verschiedenen Möglichkeiten, sich bei Attraccess anzumelden.
@@ -42,7 +43,10 @@ Wenn die Selbstregistrierung aktiviert ist, können Sie ein neues Konto erstelle
 1. Klicken Sie auf **Registrieren** auf der Anmeldeseite
 2. Füllen Sie Ihre Daten aus (Name, E-Mail, Passwort)
 3. Klicken Sie auf **Konto erstellen**
-4. Möglicherweise müssen Sie Ihre E-Mail-Adresse bestätigen, bevor Sie sich anmelden können
+4. Sie landen auf dem Bildschirm **Prüfe deine E-Mails**, der die verwendete Adresse anzeigt. Öffnen Sie den Aktivierungslink in dieser E-Mail und melden Sie sich danach an
+   - Keine E-Mail erhalten? Klicken Sie auf **E-Mail erneut senden** oder prüfen Sie Ihren Spam-Ordner
+   - Falsche Adresse? Klicken Sie auf **E-Mail-Adresse ändern** und geben Sie die richtige ein. Ein neuer Link wird gesendet, der alte Link funktioniert nicht mehr
+   - Vor der Aktivierung angemeldet? Die Anmeldeseite bietet dieselben Optionen **Verifizierungsmail erneut senden** und **E-Mail-Adresse ändern**
 
 > [!NOTE]
 > Manche Organisationen deaktivieren die Selbstregistrierung. Fragen Sie in diesem Fall Ihren Administrator, wie Sie Zugang erhalten.

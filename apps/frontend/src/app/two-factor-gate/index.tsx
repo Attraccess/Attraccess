@@ -1,4 +1,3 @@
-import { Button } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { TwoFactorCard } from '../account/two-factor';
 import { useTwoFactorGate } from '../../hooks/useTwoFactorGate';
@@ -22,18 +21,9 @@ export function TwoFactorGate({ children }: TwoFactorGateProps) {
       <section className="my-auto mx-auto max-w-lg w-full flex flex-col gap-6">
         <header className="flex flex-col gap-2 border-b border-separator pb-4">
           <h2 className="text-2xl font-bold">{t('title')}</h2>
-          <p className="text-sm text-muted">
-            {gate.needsTwoFactorSetup ? t('requiredDescription') : t('optionalDescription')}
-          </p>
+          <p className="text-sm text-muted">{t('requiredDescription')}</p>
         </header>
         <TwoFactorCard />
-        {gate.canSkip && (
-          <div className="flex justify-end">
-            <Button variant="ghost" onPress={gate.clearSetupIntent}>
-              {t('skip')}
-            </Button>
-          </div>
-        )}
       </section>
     </div>
   );
