@@ -1,9 +1,8 @@
-import { useState } from 'react';
 import { Button, Link } from '@heroui/react';
 import type { DashboardWidgetRenderProps } from '@attraccess/plugins-frontend-sdk';
 import { useQueryClient } from '@tanstack/react-query';
 import { SquareIcon } from 'lucide-react';
-import { StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { ConfirmableButton, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   useGetAllResources,
   useGetAllResourcesKey,
@@ -45,8 +44,6 @@ function SessionRow({
   const toast = useToastMessage();
   const endOwnSession = useEndOwnSession();
   const endSessionErrorMessage = useEndSessionErrorMessage();
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [isStopping, setIsStopping] = useState(false);
   // Shares its cache with the resource card and detail page.
   const { data: activeSession } = useResourceUsageGetActiveSession({ path: { resourceId: resource.id } });
   // The resource need not be pinned, so the row follows its session itself, e.g. one ended at the reader.
@@ -64,15 +61,14 @@ function SessionRow({
   const ownSession = activeSession?.usages.find((usage) => usage.userId === user?.id);
 
   const stop = async () => {
-    setIsStopping(true);
     try {
       await endOwnSession(resource.id);
       toast.success({ title: t('my-sessions.stopped', { name: resource.name }) });
-      setIsConfirmOpen(false);
     } catch (error) {
       toast.error(endSessionErrorMessage(error));
+      // Keeps the confirmation open so the user can retry.
+      throw error;
     } finally {
-      setIsStopping(false);
       void queryClient.invalidateQueries({ queryKey: [useGetAllResourcesKey] });
     }
   };
@@ -89,34 +85,30 @@ function SessionRow({
         </Link>
         {ownSession && <SessionTimer startTime={ownSession.startTime} variant="compact" />}
       </div>
-      <Button
-        size="sm"
-        variant="danger-soft"
-        isIconOnly={isIconOnly}
-        className={isIconOnly ? 'shrink-0' : 'shrink-0 @max-[18rem]:px-2'}
-        aria-label={t('my-sessions.stopLabel', { name: resource.name })}
-        onPress={isPreview ? undefined : () => setIsConfirmOpen(true)}
-        data-cy="dashboard-my-sessions-stop"
-      >
-        <SquareIcon className="w-4 h-4" />
-        {!isIconOnly && <span className="@max-[18rem]:sr-only">{t('my-sessions.stop')}</span>}
-      </Button>
-      {!isPreview && (
-        <StatusDialog
-          isOpen={isConfirmOpen}
-          onClose={() => setIsConfirmOpen(false)}
-          status="warning"
-          title={t('my-sessions.confirmTitle')}
-          action={{
-            label: t('my-sessions.stop'),
-            onPress: stop,
-            isPending: isStopping,
-            'data-cy': 'dashboard-my-sessions-confirm',
-          }}
-        >
-          {t('my-sessions.confirmDescription', { name: resource.name })}
-        </StatusDialog>
-      )}
+      <ConfirmableButton
+        label={t('my-sessions.stop')}
+        status="warning"
+        confirm={{
+          title: t('my-sessions.confirmTitle'),
+          message: t('my-sessions.confirmDescription', { name: resource.name }),
+          confirmDataCy: 'dashboard-my-sessions-confirm',
+        }}
+        onConfirm={stop}
+        renderActivator={(open) => (
+          <Button
+            size="sm"
+            variant="danger-soft"
+            isIconOnly={isIconOnly}
+            className={isIconOnly ? 'shrink-0' : 'shrink-0 @max-[18rem]:px-2'}
+            aria-label={t('my-sessions.stopLabel', { name: resource.name })}
+            onPress={isPreview ? undefined : open}
+            data-cy="dashboard-my-sessions-stop"
+          >
+            <SquareIcon className="w-4 h-4" />
+            {!isIconOnly && <span className="@max-[18rem]:sr-only">{t('my-sessions.stop')}</span>}
+          </Button>
+        )}
+      />
     </li>
   );
 }

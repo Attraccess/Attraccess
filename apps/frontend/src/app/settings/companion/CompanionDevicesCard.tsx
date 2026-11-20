@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableScrollContainer,
 } from '@heroui/react';
-import { EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { EmptyState, TableActionsColumnHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { CompanionDevice, useListCompanionDevices, useGetCompanionVersions } from '@attraccess/react-query-client';
 import { DeviceRow } from './DeviceRow';
 import en from './en.json';
@@ -16,10 +16,9 @@ import de from './de.json';
 
 interface CompanionDevicesCardProps {
   onRenameStart: (device: CompanionDevice) => void;
-  onDeleteStart: (device: CompanionDevice) => void;
 }
 
-export function CompanionDevicesCard({ onRenameStart, onDeleteStart }: CompanionDevicesCardProps) {
+export function CompanionDevicesCard({ onRenameStart }: CompanionDevicesCardProps) {
   const { t } = useTranslations({ en, de });
   const { data: devices, isLoading: devicesLoading } = useListCompanionDevices({}, undefined, {
     refetchInterval: 30000,
@@ -45,7 +44,9 @@ export function CompanionDevicesCard({ onRenameStart, onDeleteStart }: Companion
                   <TableColumn>{t('devices.columns.status')}</TableColumn>
                   <TableColumn>{t('devices.columns.lastSeen')}</TableColumn>
                   <TableColumn>{t('devices.columns.version')}</TableColumn>
-                  <TableColumn>{t('devices.columns.actions')}</TableColumn>
+                  <TableColumn id="actions">
+                    <TableActionsColumnHeader />
+                  </TableColumn>
                 </TableHeader>
                 <TableBody items={devices ?? []} renderEmptyState={() => <EmptyState />}>
                   {(device) => (
@@ -54,7 +55,6 @@ export function CompanionDevicesCard({ onRenameStart, onDeleteStart }: Companion
                       device={device}
                       latestVersion={manifest?.version ?? null}
                       onRenameStart={onRenameStart}
-                      onDeleteStart={onDeleteStart}
                     />
                   )}
                 </TableBody>

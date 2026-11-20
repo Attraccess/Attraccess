@@ -59,32 +59,33 @@ describe('DeviceInfoCards', () => {
 });
 
 describe('RowActions', () => {
-  it('shows an icon-only info action and collapses the rest into an overflow menu', async () => {
+  it('collects every device action, info included, in one row menu', async () => {
     const user = userEvent.setup();
     const onAuth = vi.fn();
+    const onInfo = vi.fn();
 
     render(
       <RowActions
-        deviceId={1}
+        device={{ id: 1, name: 'Workshop light', ipAddress: '192.0.2.1' }}
         isBusy={false}
-        onInfo={() => undefined}
+        onInfo={onInfo}
         onFirmware={() => undefined}
         onAuth={onAuth}
         onReprobe={() => undefined}
-        onDelete={() => undefined}
+        onDelete={async () => undefined}
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'View device info' })).toHaveTextContent('');
-
-    await user.click(screen.getByRole('button', { name: 'More actions' }));
+    await user.click(screen.getByRole('button', { name: 'Actions for Workshop light' }));
 
     const authItem = await screen.findByRole('menuitem', { name: /Set admin password/ });
+    expect(screen.getByRole('menuitem', { name: /View device info/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Manage firmware/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Re-probe device/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Delete device/ })).toBeInTheDocument();
 
     await user.click(authItem);
     expect(onAuth).toHaveBeenCalledTimes(1);
+    expect(onInfo).not.toHaveBeenCalled();
   });
 });

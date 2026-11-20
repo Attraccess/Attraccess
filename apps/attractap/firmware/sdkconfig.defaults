@@ -13,6 +13,16 @@ CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_USE_MALLOC=y
+# malloc() tries internal RAM first only up to 1 KB (IDF default 16 KB), so
+# message buffers, JSON documents and larger lwIP/Wi-Fi heap blocks go to PSRAM
+# first and internal RAM stays free for what must live there (DMA buffers, task
+# stacks, FreeRTOS objects, mbedTLS on the secure profile), all of which ask for
+# MALLOC_CAP_INTERNAL or MALLOC_CAP_DMA explicitly.
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=1024
+# Run code and read-only data from PSRAM (copied there at boot) instead of
+# flash, so the cache stays enabled while NVS or OTA write the flash and the
+# RGB panel's bounce buffers keep refilling (rgb_gt911_driver.cpp).
+CONFIG_SPIRAM_XIP_FROM_PSRAM=y
 CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
 
 # --- Partition table (dual-OTA 16 MB layout, byte-identical to fielded devices) ---
@@ -29,8 +39,9 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=18432
 CONFIG_ESP_MAIN_TASK_AFFINITY_CPU1=y
 
 # --- Plugin BLE proxy (ATT-1033, src/ble_proxy): central-only NimBLE, one connection ---
-# Nothing starts at boot: the proxy brings NimBLE up on the first BLE request and keeps it until reboot,
-# so a reader that never does BLE keeps today's RAM and radio. Host memory comes from PSRAM.
+# Nothing starts at boot: the proxy brings NimBLE up on a BLE request and releases host and controller
+# (~24 KB internal RAM) after 30 s without BLE work, so a reader that does no BLE right now keeps today's
+# RAM and radio. Host memory comes from PSRAM.
 CONFIG_BT_ENABLED=y
 CONFIG_BT_NIMBLE_ENABLED=y
 # CONFIG_BT_BLUEDROID_ENABLED is not set
@@ -61,10 +72,9 @@ CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
 
 # --- RGB LCD anti-drift (ATT-717) ---
-# The Touch RGB panels free-run from a PSRAM framebuffer with no bounce buffers.
-# When flash/PSRAM bus contention (WiFi bring-up, NVS writes) underruns the LCD
-# GDMA, the frame shifts permanently. Restarting the GDMA channel every VBlank
-# resyncs within one frame instead.
+# The Touch RGB panels free-run from a PSRAM framebuffer through bounce buffers.
+# If a refill still comes late, the frame would shift permanently. Restarting
+# the GDMA channel every VBlank resyncs within one frame instead.
 CONFIG_LCD_RGB_RESTART_IN_VSYNC=y
 
 # --- Ethernet (W5500 over SPI; wifi-only variants gate it at runtime) ---

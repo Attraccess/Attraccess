@@ -1,0 +1,9 @@
+{
+  "prompt": "Verifizierungs-E-Mail nicht erhalten oder Link abgelaufen? Gib deine E-Mail ein, um einen neuen zu erhalten.",
+  "emailLabel": "E-Mail-Adresse",
+  "button": "Verifizierungs-E-Mail erneut senden",
+  "confirmationButton": "E-Mail erneut senden",
+  "successTitle": "E-Mail gesendet!",
+  "successMessage": "Wenn ein Konto mit dieser E-Mail existiert und noch nicht verifiziert ist, wurde ein neuer Verifizierungslink gesendet.",
+  "successMessageKnownAddress": "Wir haben einen neuen Aktivierungslink an {{email}} gesendet."
+}

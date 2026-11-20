@@ -3,6 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { FixedWindowCounterStore } from '../../common/rate-limiting/fixed-window-counter';
 import { SettingsService } from '../../settings/settings.service';
 import {
+  recordAccountFailure as recordAccountFailureImplementation,
   recordFailure as recordFailureImplementation,
   recordIpFailure as recordIpFailureImplementation,
 } from './brute-force-failure';
@@ -90,6 +91,11 @@ export class BruteForceProtectionService {
     username: string | null = null,
   ): Promise<void> {
     return recordFailureImplementation(this.failureContext(), scope, ip, userId, username);
+  }
+
+  /** Counts a failed password check toward the account's lockout only; the IP counters are the caller's business. */
+  async recordAccountFailure(userId: number): Promise<void> {
+    return recordAccountFailureImplementation(this.failureContext(), userId);
   }
 
   /**

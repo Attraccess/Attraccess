@@ -5,3 +5,5 @@ build/
 dist/
 /hil-artifacts/
 /lab-artifacts/
+# HIL_WSS lab CA and server keys (src/attractap_lab/lab_tls.py), generated per machine.
+/lab-tls/

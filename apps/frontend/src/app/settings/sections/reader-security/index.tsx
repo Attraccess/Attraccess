@@ -1,5 +1,5 @@
 import { Spinner } from '@heroui/react';
-import { Button, StatusAlert, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   useCheckRecoveryKey,
   useCreateSecureBootKeys,
@@ -115,7 +115,14 @@ export function ReaderSecuritySection() {
         {t('warning')}
       </StatusAlert>
       <KeyStatus keys={keys} />
-      <KeyActions keys={keys} isCreating={create.isPending} onCreate={createKeys} onOpen={openDialog} />
+      <KeyActions
+        keys={keys}
+        isCreating={create.isPending}
+        onCreate={createKeys}
+        onOpen={openDialog}
+        // The confirmation's own pending state blocks a second press, so no single-flight guard here.
+        onRegenerate={() => create.mutateAsync(undefined)}
+      />
       <BackupHint />
 
       <PassphraseDialog
@@ -155,20 +162,6 @@ export function ReaderSecuritySection() {
         onClose={() => setDialog(null)}
         onSubmit={(requestBody) => once(() => restore.mutateAsync({ body: requestBody }))}
       />
-      <StatusDialog
-        isOpen={dialog === 'regenerate'}
-        status="warning"
-        title={t('regenerate.title')}
-        onClose={() => setDialog(null)}
-        action={{
-          label: t('regenerate.confirm'),
-          isPending: create.isPending,
-          onPress: createKeys,
-          'data-cy': 'reader-security-regenerate-confirm',
-        }}
-      >
-        {t('regenerate.description')}
-      </StatusDialog>
     </SettingsSection>
   );
 }

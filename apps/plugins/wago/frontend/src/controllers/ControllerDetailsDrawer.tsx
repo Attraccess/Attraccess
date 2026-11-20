@@ -1,11 +1,14 @@
-import { StandardDrawer, StatusAlert, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
+import { ConfirmableButton, StandardDrawer, StatusAlert, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { Button, Drawer } from '@heroui/react';
-import type { CommissioningSession, WagoController } from '../api/client';
+import { useRef } from 'react';
+import type { CommissioningSession } from '../api/client';
+import { useRemoveControllerMutation } from '../api/queries';
 import { ControllerDropCountsRow, ControllerDropCountsWarning } from '../diagnostics/DropCounts';
 import { useWagoTranslations } from '../i18n';
 import { NetworkChangeDetails } from '../runtime/NetworkChangeDetails';
 import { RuntimeUpdateDetails } from '../runtime/RuntimeUpdateDetails';
 import { CommissioningStatus } from './CommissioningStatus';
+import { RemoveControllerMessage, type RemoveControllerMessageHandle } from './RemoveControllerMessage';
 import type { TableRowData } from './controllersTableModel';
 import { SessionProgressAction } from './SessionProgressAction';
 
@@ -13,13 +16,11 @@ export function ControllerDetailsDrawer({
   row,
   onClose,
   onConfigure,
-  onRemove,
   onResume,
 }: {
   row: TableRowData;
   onClose: () => void;
   onConfigure: (id: number) => void;
-  onRemove: (controller: WagoController) => void;
   onResume: (session: CommissioningSession) => void;
 }) {
   const formatDateTime = useDateTimeFormatter({ showSeconds: true });
@@ -29,6 +30,18 @@ export function ControllerDetailsDrawer({
   const name = controller?.name ?? session?.controllerName ?? controller?.hardwareId ?? t('controllers.enrollment');
   const target =
     controller?.trustState === 'claimed' ? { controller } : session?.managedAccessAvailable ? { session } : null;
+  const removeMutation = useRemoveControllerMutation();
+  const removeMessage = useRef<RemoveControllerMessageHandle>(null);
+  const remove = async (id: number) => {
+    removeMessage.current?.showError(null);
+    try {
+      await removeMutation.mutateAsync(id);
+      onClose();
+    } catch (error) {
+      removeMessage.current?.showError(error instanceof Error ? error.message : t('remove.error'));
+      throw error;
+    }
+  };
   const configure = () => {
     if (controller) {
       onClose();
@@ -105,15 +118,17 @@ export function ControllerDetailsDrawer({
           />
         )}
         {controller && (
-          <Button
-            variant="danger"
-            onPress={() => {
-              onClose();
-              onRemove(controller);
+          <ConfirmableButton
+            label={t('common.remove')}
+            status="error"
+            onConfirm={() => remove(controller.id)}
+            confirm={{
+              title: t('remove.title'),
+              message: <RemoveControllerMessage name={controller.name ?? controller.hardwareId} ref={removeMessage} />,
+              confirmLabel: t('remove.title'),
+              cancelLabel: t('remove.keep'),
             }}
-          >
-            {t('common.remove')}
-          </Button>
+          />
         )}
       </Drawer.Footer>
     </StandardDrawer>

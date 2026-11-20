@@ -9,7 +9,6 @@ export interface ControllersTableProps {
   sessions: CommissioningSession[];
   onClaim: (controllerId: number) => void;
   onConfigure: (controllerId: number) => void;
-  onRemove: (controller: WagoController) => void;
   onResume: (session: CommissioningSession) => void;
 }
 

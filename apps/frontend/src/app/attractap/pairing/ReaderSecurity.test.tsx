@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Attractap } from '@attraccess/react-query-client';
@@ -23,7 +23,13 @@ vi.mock('@attraccess/react-query-client', () => ({
   useGetReaderCredentialHistory: () => ({ data: mocks.history.current }),
   useRevokeReader: (_mutationKey: unknown, options: { onSuccess?: () => void }) => {
     mocks.revokeOptions.current = options;
-    return { mutate: mocks.revoke, isPending: false };
+    return {
+      mutateAsync: async (variables: unknown) => {
+        await mocks.revoke(variables);
+        mocks.revokeOptions.current?.onSuccess?.();
+      },
+      isPending: false,
+    };
   },
   useGetReadersKey: 'readers',
   useGetReadersToPairKey: 'readers-to-pair',
@@ -91,7 +97,7 @@ describe('ReaderSecurity', () => {
     await user.click(within(dialog).getByRole('button', { name: 'security.revoke' }));
     expect(mocks.revoke).toHaveBeenCalledWith({ path: { readerId: 7 } });
 
-    act(() => mocks.revokeOptions.current?.onSuccess?.());
+    await waitFor(() => expect(mocks.toast.success).toHaveBeenCalled());
     expect(mocks.toast.success).toHaveBeenCalledWith({ title: 'security.revoked' });
     // The reader moves from the paired list to the one under Not paired: both are refreshed.
     expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['readers'] });

@@ -97,7 +97,9 @@ Solo `pnpm nx serve api` is **not** wrapped. Prefer `pnpm serve --only=api`.
 We use HeroUI, use it. Use as little tailwind/custom css as possible.
 
 Use `StatusDialog` for notices and confirmations (info, success, warning, error); only `error` gets a danger
-action button. Use `StandardModal` only for richer dialog content. Shared UI comes from
+action button. A control that asks before a destructive or irreversible action is a `ConfirmableButton` (built on
+`StatusDialog`), not hand-wired dialog state. Table row actions go in a `TableRowActions` ⋮ menu in the last column,
+headed by `TableActionsColumnHeader`. Use `StandardModal` only for richer dialog content. Shared UI comes from
 `@attraccess/plugins-frontend-ui`; do not add copies of these components in core or in plugins.
 
 Structure: a component reads its own data or takes a small explicit props interface; never type props or helpers

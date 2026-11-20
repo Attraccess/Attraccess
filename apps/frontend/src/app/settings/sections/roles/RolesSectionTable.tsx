@@ -15,7 +15,13 @@ import {
 } from '@heroui/react';
 import { useNavigate } from 'react-router-dom';
 import { Permission, RoleWithUsageDto } from '@attraccess/react-query-client';
-import { Button, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  EmptyState,
+  TableActionsColumnHeader,
+  TableRowActions,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import { useRbacCatalogTranslations } from '../../../../hooks/useRbacCatalogTranslations';
 import en from './en.json';
 import de from './de.json';
@@ -45,8 +51,8 @@ export function RolesSectionTable({ roles, permissions, onEdit, onDelete }: Role
             <TableColumn width="0" className="hidden sm:table-cell text-center">
               {t('table.columns.users')}
             </TableColumn>
-            <TableColumn width="0" className="text-right">
-              {t('table.columns.actions')}
+            <TableColumn id="actions">
+              <TableActionsColumnHeader />
             </TableColumn>
           </TableHeader>
 
@@ -136,30 +142,28 @@ export function RolesSectionTable({ roles, permissions, onEdit, onDelete }: Role
                   </Button>
                 </TableCell>
                 <TableCell>
-                  <div className="flex justify-end gap-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      isIconOnly
-                      aria-label={role.isSystemManaged ? t('table.actions.view') : t('table.actions.edit')}
-                      onPress={() => onEdit(role)}
-                      data-cy={`roles-table-edit-${role.key}`}
-                    >
-                      {role.isSystemManaged ? <EyeIcon className="w-4 h-4" /> : <PencilIcon className="w-4 h-4" />}
-                    </Button>
-                    {!role.isSystemManaged ? (
-                      <Button
-                        size="sm"
-                        variant="danger-soft"
-                        isIconOnly
-                        aria-label={t('table.actions.delete')}
-                        onPress={() => onDelete(role)}
-                        data-cy={`roles-table-delete-${role.key}`}
-                      >
-                        <Trash2Icon className="w-4 h-4" />
-                      </Button>
-                    ) : null}
-                  </div>
+                  <TableRowActions
+                    itemName={roleName(role)}
+                    data-cy={`roles-table-actions-${role.key}`}
+                    actions={[
+                      {
+                        key: 'edit',
+                        label: role.isSystemManaged ? t('table.actions.view') : t('table.actions.edit'),
+                        icon: role.isSystemManaged ? EyeIcon : PencilIcon,
+                        onPress: () => onEdit(role),
+                        'data-cy': `roles-table-edit-${role.key}`,
+                      },
+                      {
+                        key: 'delete',
+                        label: t('table.actions.delete'),
+                        icon: Trash2Icon,
+                        tone: 'danger',
+                        isHidden: role.isSystemManaged,
+                        onPress: () => onDelete(role),
+                        'data-cy': `roles-table-delete-${role.key}`,
+                      },
+                    ]}
+                  />
                 </TableCell>
               </TableRow>
             )}

@@ -8,7 +8,7 @@
     "controller": "Gerät",
     "runtime": "Software",
     "heartbeat": "Zuletzt gesehen",
-    "actions": "Aktionen",
+    "mainAction": "Hauptaktion",
     "claim": "Registrieren",
     "configure": "Konfigurieren",
     "progress": "Einrichtung ansehen",

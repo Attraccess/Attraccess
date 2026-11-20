@@ -14,15 +14,14 @@
   },
   "columns": {
     "name": "Name",
-    "assigned": "Assigned",
-    "actions": "Actions"
+    "assigned": "Assigned"
   },
   "row": {
     "toggleOn": "Add {{resource}} to {{group}}",
     "toggleOff": "Remove {{resource}} from {{group}}",
     "add": "Add",
     "remove": "Remove",
-    "openGroup": "open"
+    "openGroup": "Open group"
   },
   "newGroup": "New group",
   "empty": {

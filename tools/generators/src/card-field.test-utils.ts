@@ -65,9 +65,11 @@ export const FIELD_PRIMITIVES = new Set([
 /**
  * Components that portal their children to <body>, so their subtree renders on the overlay
  * surface and never on the Card. Matched by suffix so wrappers count too — `StandardModal`,
- * `PermissionsModal`, `DeviceInfoDrawer`.
+ * `PermissionsModal`, `DeviceInfoDrawer`. `ConfirmableButton` and `TableRowActions` render their
+ * confirmation content in a dialog.
  */
-export const isPortal = (tag: string) => /(?:Modal|Drawer|Dialog|Popover|Tooltip)$/.test(tag);
+export const isPortal = (tag: string) =>
+  /(?:Modal|Drawer|Dialog|Popover|Tooltip|ConfirmableButton|TableRowActions)$/.test(tag);
 
 /**
  * Card-wrapped fields that are deliberately left as they are.

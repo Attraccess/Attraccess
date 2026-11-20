@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import type { User } from '@attraccess/react-query-client';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { UserMinusIcon } from 'lucide-react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
 import { UserSelectionList } from './index';
@@ -39,7 +41,11 @@ it('adds the chosen user once and clears the picker', () => {
   expect(screen.getByTestId('add-user')).toBeEmptyDOMElement();
   expect(screen.getByLabelText('Picker reset')).toHaveTextContent('1');
 });
-it('sorts and paginates selected users and dispatches dynamic row actions', () => {
+async function chooseAction(username: string, action: string) {
+  await userEvent.click(screen.getByRole('button', { name: `Actions for ${username}` }));
+  await userEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: action }));
+}
+it('sorts and paginates selected users and dispatches dynamic row actions', async () => {
   const action = vi.fn();
   const users = Array.from(
     { length: 11 },
@@ -50,7 +56,9 @@ it('sorts and paginates selected users and dispatches dynamic row actions', () =
       <UserSelectionList
         selectedUsers={users}
         onAddToSelection={vi.fn()}
-        actions={(user) => [{ key: 'remove', label: `Remove ${user.username}`, onClick: action }]}
+        actions={(user) => [
+          { key: 'remove', label: `Remove ${user.username}`, icon: UserMinusIcon, tone: 'danger', onPress: action },
+        ]}
         additionalColumns={[
           { key: 'identifier', label: 'Identifier', value: (user) => `ID-${user.id}` },
           { key: 'kind', label: 'Kind', value: 'Member' },
@@ -59,16 +67,16 @@ it('sorts and paginates selected users and dispatches dynamic row actions', () =
       />
     </MemoryRouter>,
   );
-  expect(screen.getByRole('button', { name: 'Remove User 01' })).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Remove User 11' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Actions for User 01' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Actions for User 11' })).toBeNull();
   expect(screen.getByText('ID-11').closest('tr')).toHaveClass('first-user');
-  fireEvent.click(screen.getByRole('button', { name: 'Remove User 01' }));
+  await chooseAction('User 01', 'Remove User 01');
   expect(action).toHaveBeenCalledWith(users[10]);
   fireEvent.click(screen.getByRole('button', { name: '2' }));
-  expect(screen.getByRole('button', { name: 'Remove User 11' })).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Remove User 01' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Actions for User 11' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Actions for User 01' })).toBeNull();
 });
-it('supports fixed actions and row styling', () => {
+it('supports fixed actions and row styling', async () => {
   const action = vi.fn();
   const user = { id: 1, username: 'Alice' } as User;
   render(
@@ -76,11 +84,11 @@ it('supports fixed actions and row styling', () => {
       <UserSelectionList
         selectedUsers={[user]}
         onAddToSelection={vi.fn()}
-        actions={[{ key: 'remove', label: 'Remove', onClick: action }]}
+        actions={[{ key: 'remove', label: 'Remove', icon: UserMinusIcon, tone: 'danger', onPress: action }]}
         rowClassName="selected-user"
       />
     </MemoryRouter>,
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+  await chooseAction('Alice', 'Remove');
   expect(action).toHaveBeenCalledWith(user);
 });

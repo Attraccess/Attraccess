@@ -23,6 +23,10 @@
     "documentation": "Documentation",
     "maintenance": "Maintenance",
     "qrCode": "QR Code",
-    "moreLabel": "More actions"
+    "moreLabel": "More actions",
+    "deleteConfirm": {
+      "title": "Delete {{name}}?",
+      "message": "This deletes the resource. This action cannot be undone."
+    }
   }
 }

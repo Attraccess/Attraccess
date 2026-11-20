@@ -17,6 +17,7 @@ target_compile_features(ble-proxy-test PRIVATE cxx_std_17)
 target_compile_options(ble-proxy-test PRIVATE -Wall -Wextra -Wpedantic)
 target_include_directories(ble-proxy-test PRIVATE "${BLE_DIR}" "${FIRMWARE_DIR}/src/display/ui")
 target_link_libraries(ble-proxy-test PRIVATE ArduinoJson)
+target_sources(ble-proxy-test PRIVATE ble_stack_test.cpp)
 
 enable_testing()
 add_test(NAME ble-proxy-test COMMAND ble-proxy-test)

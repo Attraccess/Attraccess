@@ -21,7 +21,7 @@ vi.mock('@attraccess/react-query-client', () => ({
     refetch: state.refetch,
   }),
   useEmailLayoutControllerUpdate: () => ({ mutate: state.update }),
-  useEmailLayoutControllerResetToDefault: () => ({ mutate: state.reset }),
+  useEmailLayoutControllerResetToDefault: () => ({ mutateAsync: state.reset }),
 }));
 vi.mock('@attraccess/ui', () => ({ useAppTheme: () => ({ resolvedTheme: 'dark' }) }));
 vi.mock('../../components/toastProvider', () => ({
@@ -142,20 +142,20 @@ it('requires reset confirmation and reseeds from the returned default', async ()
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(state.reset).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Reset to Default' }));
+  state.reset.mockRejectedValueOnce(new Error('offline'));
+  fireEvent.click(await screen.findByRole('button', { name: 'Reset' }));
+  await waitFor(() => expect(state.toastError).toHaveBeenCalledWith({ title: 'Layout could not be reset.' }));
+  expect(screen.getByRole('alertdialog')).toBeTruthy();
+  state.reset.mockResolvedValueOnce({
+    body: '<mjml><mj-body><mj-section>Default header</mj-section>{{content}}</mj-body></mjml>',
+  });
   fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
-  act(() => state.reset.mock.calls[0][1].onError());
-  expect(state.toastError).toHaveBeenCalledWith({ title: 'Layout could not be reset.' });
-  act(() =>
-    state.reset.mock.calls[0][1].onSuccess({
-      body: '<mjml><mj-body><mj-section>Default header</mj-section>{{content}}</mj-body></mjml>',
-    }),
-  );
   await waitFor(() =>
     expect((screen.getByRole('textbox', { name: 'Layout body' }) as HTMLTextAreaElement).value).toContain(
       'Default header',
     ),
   );
-  expect(screen.queryByRole('alertdialog')).toBeNull();
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
 });
 it('offers retry after a failed initial load', () => {
   state.body = undefined;

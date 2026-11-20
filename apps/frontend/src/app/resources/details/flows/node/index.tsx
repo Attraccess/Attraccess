@@ -1,4 +1,4 @@
-import { Button, Card, Code, cn, Tooltip, TooltipContent, TooltipTrigger, useOverlayState } from '@heroui/react';
+import { Button, Card, Code, cn, Tooltip, TooltipContent, TooltipTrigger } from '@heroui/react';
 import { Handle, NodeToolbar, Position, useNodeId, NodeProps } from '@xyflow/react';
 import { Edit2Icon, Trash2Icon, TriangleAlertIcon } from 'lucide-react';
 import { NodeEditor } from './editor/index';
@@ -7,7 +7,7 @@ import { useFlowContext } from '../context/flowContext';
 import { schemaSupportsOwner } from '../flowOwner';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNodePreviewRows } from './preview/index';
-import { DeleteConfirmationModal, TExists, TFunction } from '@attraccess/plugins-frontend-ui';
+import { ConfirmableButton, TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 
 export interface Props {
   tNodeTranslations: TFunction;
@@ -84,8 +84,6 @@ export function AttraccessNode(props: Props) {
 
     removeNode(nodeId);
   }, [removeNode, nodeId]);
-
-  const { isOpen: showDeleteConfirmation, open: userWantsToDelete, close: userDoesNotWantToDelete } = useOverlayState();
 
   const isSelected = props.node?.selected ?? false;
 
@@ -172,13 +170,6 @@ export function AttraccessNode(props: Props) {
     <NodeEditor schema={schema} tNodeTranslations={t} tNodeExists={tNodeExists}>
       {(openEditor) => (
         <div>
-          <DeleteConfirmationModal
-            isOpen={showDeleteConfirmation}
-            onClose={userDoesNotWantToDelete}
-            onConfirm={remove}
-            itemName={nodeTitle}
-          />
-
           <NodeToolbar isVisible={data?.forceToolbarVisible || undefined} position={data?.toolbarPosition}>
             <div className="flex flex-row gap-2">
               {isEditable && (
@@ -187,9 +178,21 @@ export function AttraccessNode(props: Props) {
                 </Button>
               )}
               {!previewMode && (
-                <Button variant="danger" isIconOnly onPress={userWantsToDelete}>
-                  <Trash2Icon size={12} />
-                </Button>
+                <ConfirmableButton
+                  label={t('deleteNode.confirm')}
+                  status="error"
+                  confirm={{
+                    title: t('deleteNode.title'),
+                    message: t('deleteNode.message', { name: nodeTitle }),
+                    cancelLabel: t('deleteNode.cancel'),
+                  }}
+                  onConfirm={remove}
+                  renderActivator={(open, { label }) => (
+                    <Button variant="danger" isIconOnly onPress={open} aria-label={String(label)}>
+                      <Trash2Icon size={12} />
+                    </Button>
+                  )}
+                />
               )}
             </div>
           </NodeToolbar>

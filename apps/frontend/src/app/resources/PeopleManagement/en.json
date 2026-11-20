@@ -20,8 +20,7 @@
     "name": "Name",
     "introducer": "Introducer",
     "role": "Role",
-    "introduced": "Introduced",
-    "actions": "Actions"
+    "introduced": "Introduced"
   },
   "roles": {
     "introducer": "Introducer",
@@ -37,7 +36,11 @@
     "revokeMaintainer": "Revoke maintainer status",
     "revokeIntroduction": "Revoke introduction",
     "grantIntroduction": "Re-grant introduction",
-    "revokeDirectIntroduction": "Revoke direct introduction"
+    "revokeDirectIntroduction": "Revoke direct introduction",
+    "sections": {
+      "introduction": "Introduction",
+      "introducer": "Introducer"
+    }
   },
   "addModal": {
     "title": {
@@ -53,11 +56,6 @@
       "individual": "Individual",
       "mass": "Mass introduction (QR code)"
     }
-  },
-  "commentModal": {
-    "title": "Add comment",
-    "submit": "Submit",
-    "cancel": "Cancel"
   },
   "emptyState": "No introducers or introductions yet",
   "loadError": "Failed to load data",
@@ -78,6 +76,14 @@
     "introducerRevokeFailed": {
       "title": "Failed to remove introducer",
       "description": "{{error}}"
+    },
+    "maintainerRevokeFailed": {
+      "title": "Failed to remove maintainer",
+      "description": "{{error}}"
+    },
+    "maintainerRevoked": {
+      "title": "Maintainer removed",
+      "description": "Maintainer privileges have been revoked."
     },
     "maintainerGranted": {
       "title": "Maintainer added",
@@ -103,5 +109,23 @@
   "sources": {
     "direct": "Direct introduction",
     "group": "Introduced via {{{group}}}"
+  },
+  "confirm": {
+    "revokeIntroduction": {
+      "title": "Revoke introduction?",
+      "message": "The introduction of {{{name}}} will be revoked. You can add a comment for the history."
+    },
+    "grantIntroduction": {
+      "title": "Re-grant introduction?",
+      "message": "The introduction of {{{name}}} will be granted again. You can add a comment for the history."
+    },
+    "revokeIntroducer": {
+      "title": "Revoke introducer status?",
+      "message": "{{{name}}} will no longer be able to introduce other users."
+    },
+    "revokeMaintainer": {
+      "title": "Revoke maintainer status?",
+      "message": "{{{name}}} will lose maintainer privileges."
+    }
   }
 }

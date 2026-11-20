@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import userEvent, { UserEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GlobalFlowsListPage } from './GlobalFlowsListPage';
 import { TestWrapper } from '../../test-utils/wrappers';
@@ -26,7 +26,7 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/react-query-client')>()),
   useListGlobalFlows: () => ({ data: state.flows, isLoading: false, isError: false }),
   useUpdateGlobalFlow: () => ({ mutate: state.update, isPending: false }),
-  useDeleteGlobalFlow: () => ({ mutate: state.remove, isPending: false }),
+  useDeleteGlobalFlow: () => ({ mutateAsync: state.remove, isPending: false }),
   useCreateGlobalFlow: (_mutationKey: unknown, options: { onSuccess: (flow: { id: number }) => void }) => ({
     mutate: (variables: unknown) => {
       state.create(variables);
@@ -35,6 +35,11 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
     isPending: false,
   }),
 }));
+
+async function chooseAction(user: UserEvent, flowName: string, action: string) {
+  await user.click(screen.getByRole('button', { name: `Actions for ${flowName}` }));
+  await user.click(await screen.findByRole('menuitem', { name: action }));
+}
 
 function renderPage() {
   return render(
@@ -106,7 +111,7 @@ describe('GlobalFlowsListPage', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole('button', { name: 'Edit Notify' }));
+    await chooseAction(user, 'Notify', 'Open in editor');
     expect(state.navigate).toHaveBeenCalledWith('/devices/flows/2');
   });
 
@@ -114,7 +119,7 @@ describe('GlobalFlowsListPage', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole('button', { name: 'Delete Power off all' }));
+    await chooseAction(user, 'Power off all', 'Delete');
     expect(state.remove).not.toHaveBeenCalled();
 
     const dialog = await screen.findByRole('alertdialog');
@@ -122,6 +127,20 @@ describe('GlobalFlowsListPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
     expect(state.remove).toHaveBeenCalledWith({ path: { flowId: 1 } });
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+  });
+
+  it('keeps the confirmation open when deleting fails', async () => {
+    state.remove.mockRejectedValueOnce(new Error('nope'));
+    const user = userEvent.setup();
+    renderPage();
+
+    await chooseAction(user, 'Power off all', 'Delete');
+    const dialog = await screen.findByRole('alertdialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+    expect(state.remove).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
   });
 
   it('creates a flow from the modal and opens its editor', async () => {
@@ -182,7 +201,7 @@ describe('GlobalFlowsListPage', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole('button', { name: 'Edit details of Power off all' }));
+    await chooseAction(user, 'Power off all', 'Edit details');
     const dialog = await screen.findByRole('dialog');
     const name = within(dialog).getByRole('textbox', { name: 'Name' });
     const description = within(dialog).getByRole('textbox', { name: 'Description' });
@@ -205,7 +224,7 @@ describe('GlobalFlowsListPage', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole('button', { name: 'Edit details of Notify' }));
+    await chooseAction(user, 'Notify', 'Edit details');
     const dialog = await screen.findByRole('dialog');
     await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), ' changed');
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));

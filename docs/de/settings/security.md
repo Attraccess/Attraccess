@@ -91,7 +91,7 @@ Wird das Secret geändert, sind die gespeicherten Kartenschlüssel und Kopplungs
 
 ## Drosselung und Kontosperre
 
-Fehlgeschlagene Anmeldungen, Registrierungen, Passwort-Zuruecksetzungen, erneut angeforderte Bestaetigungs-E-Mails, SSO-Kontoverknuepfungen und SSO-Provisionierungsaufrufe werden pro IP gedrosselt. Wiederholte Login-Fehlversuche und falsche Passwoerter bei der SSO-Kontoverknuepfung sperren zusaetzlich das betroffene Konto. Werte sind unter **Einstellungen -> Drosselung & Kontosperre** einstellbar.
+Fehlgeschlagene Anmeldungen, Registrierungen, Passwort-Zuruecksetzungen, erneut angeforderte Bestaetigungs-E-Mails, das Aendern der E-Mail-Adresse eines unbestaetigten Kontos, SSO-Kontoverknuepfungen und SSO-Provisionierungsaufrufe werden pro IP gedrosselt. Wiederholte Login-Fehlversuche, falsche Passwoerter bei der SSO-Kontoverknuepfung und falsche Passwoerter beim Aendern der E-Mail-Adresse eines unbestaetigten Kontos sperren zusaetzlich das betroffene Konto. Werte sind unter **Einstellungen -> Drosselung & Kontosperre** einstellbar.
 
 | Einstellung | Standard | Beschreibung |
 |-------------|----------|-------------|
@@ -189,7 +189,7 @@ auth.failed type=login outcome=invalid_credentials ip=1.2.3.4 user_id=42 usernam
 | Feld | Beschreibung |
 |------|-------------|
 | `prefix` | `auth.success` bei Erfolg, sonst `auth.failed`. |
-| `type` | `login`, `register`, `password_reset_request`, `verification_email_resend`, `password_reset_complete`, `sso_link_account`, `sso_provisioning`. |
+| `type` | `login`, `register`, `password_reset_request`, `verification_email_resend`, `unverified_email_change`, `password_reset_complete`, `sso_link_account`, `sso_provisioning`. |
 | `outcome` | `success`, `invalid_credentials`, `account_locked`, `rate_limited`, `two_factor_required`, `two_factor_invalid`, `email_not_verified`, `invalid_token`, `invalid_input`, `unknown_user`. |
 | `ip` | Client-IP, sonst `unknown`. |
 | `user_id` | Numerische User-ID, sonst `-`. |
@@ -204,7 +204,7 @@ Passwoerter, Tokens oder andere Secrets werden nie geloggt.
 Minimaler `failregex` fuer `/etc/fail2ban/filter.d/attraccess-auth.conf`:
 
 ```
-failregex = ^.*auth\.failed type=(?:login|register|password_reset_request|verification_email_resend|password_reset_complete|sso_link_account) outcome=\S+ ip=<HOST> .*$
+failregex = ^.*auth\.failed type=(?:login|register|password_reset_request|verification_email_resend|unverified_email_change|password_reset_complete|sso_link_account) outcome=\S+ ip=<HOST> .*$
 ignoreregex =
 ```
 

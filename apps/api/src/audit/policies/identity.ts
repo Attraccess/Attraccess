@@ -10,6 +10,7 @@ export const identityPolicies = {
   registration: ['reason'],
   password_reset_requested: ['reason'],
   verification_email_resent: ['reason'],
+  unverified_email_changed: ['reason'],
   password_reset_completed: ['reason'],
   sso_account_link: ['reason'],
   two_factor_setup_started: [],

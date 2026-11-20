@@ -96,6 +96,7 @@ const SCOPE_AUDIT_TYPES: Record<RateLimitScope, AuthAuditType> = {
   register: 'register',
   password_reset_request: 'password_reset_request',
   verification_email_resend: 'verification_email_resend',
+  unverified_email_change: 'unverified_email_change',
   password_reset_complete: 'password_reset_complete',
   delete_account_confirm: 'delete_account_confirm',
   sso_link_account: 'sso_link_account',

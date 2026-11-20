@@ -74,6 +74,7 @@ public:
     void enableConnectionAttempts() override;
     void disableConnectionAttempts() override;
     void forceReconnect(const char *reason) override;
+    uint32_t connectionId() const override { return socket.connectionId(); }
     void resetCertificateTrust() override { socket.resetCertificateTrust(); }
 #ifdef ESP_PLATFORM
     void setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback) override;

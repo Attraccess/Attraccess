@@ -7,11 +7,7 @@
   },
   "selectedUsers": {
     "columns": {
-      "user": "Benutzer",
-      "actions": "Aktionen"
-    },
-    "actions": {
-      "remove": "Entfernen"
+      "user": "Benutzer"
     }
   }
 }

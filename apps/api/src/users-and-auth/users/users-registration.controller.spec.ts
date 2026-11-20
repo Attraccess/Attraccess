@@ -10,6 +10,10 @@ describe('UsersRegistrationController rate-limit scopes', () => {
     expect(scopeOf('requestPasswordReset')).toBe('password_reset_request');
   });
 
+  it('rate-limits the unverified email change under its own scope', () => {
+    expect(scopeOf('changeUnverifiedEmail')).toBe('unverified_email_change');
+  });
+
   it('keeps the default options for resend, so a successful resend clears its failures', () => {
     expect(
       Reflect.getMetadata(

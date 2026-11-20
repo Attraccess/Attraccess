@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { ApiTokensCard } from './index';
@@ -200,14 +200,29 @@ it('shows token permissions and dates and handles revocation outcomes', async ()
   expect(screen.getByText('neverUsed')).toBeTruthy();
   expect(screen.getByText('neverExpires')).toBeTruthy();
   expect(screen.getByText('2026-09-01')).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: 'actions.revoke:Integration' }));
+  const user = userEvent.setup();
+  const revoke = async (name: string) => {
+    await user.click(screen.getByRole('button', { name: `Actions for ${name}` }));
+    await user.click(screen.getByRole('menuitem', { name: 'actions.revoke' }));
+    const dialog = await screen.findByRole('alertdialog', { name: `revokeConfirm.title:${name}` });
+    await user.click(within(dialog).getByRole('button', { name: 'actions.revoke' }));
+    return dialog;
+  };
+  await user.click(screen.getByRole('button', { name: 'Actions for Integration' }));
+  await user.click(screen.getByRole('menuitem', { name: 'actions.revoke' }));
+  await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+  expect(state.revoke).not.toHaveBeenCalled();
+  await revoke('Integration');
   await waitFor(() => expect(state.toast).toHaveBeenCalledWith({ title: 'success.revoked', type: 'success' }));
   expect(state.revoke).toHaveBeenCalledWith({ path: { id: 1 } });
   expect(state.refetch).toHaveBeenCalledOnce();
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
   state.revoke.mockRejectedValue(new Error('Unavailable'));
-  fireEvent.click(screen.getByRole('button', { name: 'actions.revoke:Other' }));
+  const dialog = await revoke('Other');
   await waitFor(() => expect(state.toast).toHaveBeenCalledWith({ title: 'errors.revokeFailed', type: 'error' }));
   expect(state.refetch).toHaveBeenCalledOnce();
+  expect(dialog).toBeInTheDocument();
 });
 it('offers plugin permission keys the owner holds and scopes a token to them', async () => {
   render(<ApiTokensCard availablePermissions={['matter.devices.read']} />);

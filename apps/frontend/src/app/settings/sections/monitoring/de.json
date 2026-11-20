@@ -19,6 +19,8 @@
     "title": "API-Schlüssel entfernt",
     "description": "Der Metriken-Endpunkt ist jetzt deaktiviert."
   },
+  "keyGenerateFailed": "Der API-Schlüssel konnte nicht generiert werden",
+  "keyRemoveFailed": "Der API-Schlüssel konnte nicht entfernt werden",
   "warning": "Dieser Schlüssel wird nur einmal angezeigt. Wenn du ihn verlierst, musst du ihn neu generieren.",
   "apiKeyLabel": "API-Schlüssel",
   "copyButton": "Kopieren",

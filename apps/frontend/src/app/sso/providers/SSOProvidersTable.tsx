@@ -7,23 +7,27 @@ import {
   TableHeader,
   TableRow,
   TableScrollContainer,
-  Tooltip,
-  TooltipContent,
 } from '@heroui/react';
-import { Key, Pencil, Trash } from 'lucide-react';
+import { Key, Pencil, Trash2 } from 'lucide-react';
 import { SsoProvider } from '@attraccess/react-query-client';
-import { Button, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  EmptyState,
+  TableActionsColumnHeader,
+  TableRowActions,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 
 interface SSOProvidersTableProps {
   providers: SsoProvider[];
   onEdit: (provider: SsoProvider) => void;
-  onDelete: (id: number) => void;
+  /** Runs after the user confirmed; rejects to keep the confirmation open. */
+  onDelete: (id: number) => Promise<unknown>;
 }
 
 export const SSOProvidersTable = ({ providers, onEdit, onDelete }: SSOProvidersTableProps) => {
-  // React escapes the output; escaping again would put `&amp;` into a name like `A & B` in aria-labels.
+  // React escapes the output; escaping again would put `&amp;` into a name like `A & B`.
   const { t } = useTranslations({ en, de }, { escapeValues: false });
 
   if (!providers || providers.length === 0) {
@@ -42,7 +46,9 @@ export const SSOProvidersTable = ({ providers, onEdit, onDelete }: SSOProvidersT
             <TableColumn isRowHeader>{t('id')}</TableColumn>
             <TableColumn>{t('name')}</TableColumn>
             <TableColumn>{t('type')}</TableColumn>
-            <TableColumn>{t('actions')}</TableColumn>
+            <TableColumn id="actions">
+              <TableActionsColumnHeader />
+            </TableColumn>
           </TableHeader>
           <TableBody items={providers} renderEmptyState={() => <EmptyState />}>
             {(provider) => (
@@ -58,32 +64,32 @@ export const SSOProvidersTable = ({ providers, onEdit, onDelete }: SSOProvidersT
                 </TableCell>
                 <TableCell>{provider.type}</TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Tooltip>
-                      <Button
-                        variant="ghost"
-                        isIconOnly
-                        aria-label={t('editProviderLabel', { name: provider.name })}
-                        onPress={() => onEdit(provider)}
-                        data-cy={`sso-provider-edit-button-${provider.id}`}
-                      >
-                        <Pencil size={16} />
-                      </Button>
-                      <TooltipContent>{t('edit')}</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <Button
-                        variant="danger-soft"
-                        isIconOnly
-                        aria-label={t('deleteProviderLabel', { name: provider.name })}
-                        onPress={() => onDelete(provider.id)}
-                        data-cy={`sso-provider-delete-button-${provider.id}`}
-                      >
-                        <Trash size={16} />
-                      </Button>
-                      <TooltipContent>{t('deleteText')}</TooltipContent>
-                    </Tooltip>
-                  </div>
+                  <TableRowActions
+                    itemName={provider.name}
+                    actions={[
+                      {
+                        key: 'edit',
+                        label: t('edit'),
+                        icon: Pencil,
+                        onPress: () => onEdit(provider),
+                        'data-cy': `sso-provider-edit-button-${provider.id}`,
+                      },
+                      {
+                        key: 'delete',
+                        label: t('deleteText'),
+                        icon: Trash2,
+                        tone: 'danger',
+                        onPress: () => onDelete(provider.id),
+                        'data-cy': `sso-provider-delete-button-${provider.id}`,
+                        confirm: {
+                          title: t('deleteConfirmTitle', { name: provider.name }),
+                          message: t('deleteConfirmation', { name: provider.name }),
+                          cancelLabel: t('cancel'),
+                          confirmDataCy: 'sso-provider-delete-confirm-button',
+                        },
+                      },
+                    ]}
+                  />
                 </TableCell>
               </TableRow>
             )}

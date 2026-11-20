@@ -13,6 +13,10 @@ interface DeleteConfirmationModalProps {
   'data-cy'?: string;
 }
 
+/**
+ * @deprecated Use `ConfirmableButton` (or a `TableRowActions` action with `confirm`), which hosts its own
+ * confirmation dialog. Kept for plugins that still import it.
+ */
 export function DeleteConfirmationModal({
   isOpen,
   onClose,

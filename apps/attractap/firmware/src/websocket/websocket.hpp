@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <string>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -38,6 +39,7 @@ public:
     // Tear down the current connection and reconnect (same mechanism as the
     // inbound-liveness watchdog). Must be called from the main-loop task.
     void forceReconnect(const char *reason) override;
+    uint32_t connectionId() const override { return _connectionId.load(); }
 
     // Clear the locked TLS certificate decision so the next connect sweeps the
     // full CA list again (device settings "reset certificate" button).
@@ -86,6 +88,8 @@ private:
     // esp_websocket_client_stop()/start() block for up to the network timeout,
     // which used to stall the UI-driving main loop on every reconnect attempt.
     // loop() only signals the task via a task notification (coalescing).
+    // The stack is in PSRAM; nothing on this task may map flash (OTA, esp_partition_mmap, reads of
+    // an encrypted partition): ESP-IDF asserts on a PSRAM stack while it remaps.
     static constexpr uint32_t CONNECT_TASK_STACK = 8192;
     static constexpr UBaseType_t CONNECT_TASK_PRIORITY = 2;
     TaskHandle_t connect_task = nullptr;
@@ -177,6 +181,7 @@ private:
     int _clientCertIndex = -1;
 
     ConnectionState _state = INIT;
+    std::atomic<uint32_t> _connectionId{0};
     void setState(ConnectionState state);
 
     esp_websocket_client_handle_t ws_client = nullptr;
@@ -195,6 +200,7 @@ private:
         bool isBinary;
     };
     static constexpr size_t TX_QUEUE_DEPTH = 8;
+    // In PSRAM, like CONNECT_TASK_STACK.
     static constexpr uint32_t TX_TASK_STACK = 4096;
     // Below the LVGL render task (prio 4): the tx task must not preempt UI
     // refresh (PERFORMANCE_ANALYSIS.md quick win Q3). Was 5 (above render).

@@ -13,7 +13,7 @@ RUN_SH = Path(__file__).parents[1] / "hil" / "run.sh"
 pytestmark = pytest.mark.skipif(not RUN_SH.is_file(), reason="hil/run.sh is not part of this package build")
 
 
-def run(tmp_path, env, place_output=None, run_sh=RUN_SH):
+def run(tmp_path, env, place_output=None, run_sh=RUN_SH, timeout=30):
     """Run run.sh with a stand-in labgrid-client that prints ``place_output`` for `show` (None: fails).
 
     The stand-ins go first on PATH, also ahead of a PATH in ``env``, so a real labgrid-client is never reached.
@@ -33,7 +33,7 @@ def run(tmp_path, env, place_output=None, run_sh=RUN_SH):
     lab_python.write_text("#!/bin/sh\nexit 0\n")
     lab_python.chmod(0o755)
     result = subprocess.run(
-        ["bash", str(run_sh)], cwd=run_sh.parents[1], capture_output=True, text=True, timeout=30,
+        ["bash", str(run_sh)], cwd=run_sh.parents[1], capture_output=True, text=True, timeout=timeout,
         env={"LAB_PYTHON": str(lab_python), "TMPDIR": str(tmp_path), **env,
              "PATH": f"{bin_dir}:{env.get('PATH', os.environ['PATH'])}"})
     return result.returncode, result.stderr
@@ -110,3 +110,23 @@ def test_published_elf_is_the_flashed_build_not_the_ota_rebuild(tmp_path):
     assert (published / "hil-reader.elf").read_bytes() == b"elf:"  # the base build has no version override
     manifest = json.loads((published / "firmwares.json").read_text())
     assert manifest["firmwares"][0]["buildId"] == hashlib.sha256(b"elf:").hexdigest()
+
+
+@pytest.mark.skipif(shutil.which("openssl") is None, reason="needs the openssl command line tool")
+def test_wss_refuses_an_image_without_the_lab_ca(tmp_path):
+    image = tmp_path / "reader.bin"
+    image.write_bytes(b"\xe9 an image built without -DATTRACTAP_LAB_CA")
+    # Generating the RSA-4096 lab root alone can take tens of seconds on a busy machine.
+    code, stderr = run(tmp_path, {"HIL_WSS": "1", "LAB_TLS_DIR": str(tmp_path / "lab-tls"), "READER_IMAGE": str(image)},
+                       place("board=attractap, profile=plain, variant=attractap-touch-v2"), timeout=300)
+    assert code == 1 and "needs reader images that trust the lab CA" in stderr
+    assert (tmp_path / "lab-tls" / "ca.pem").exists()
+    # A reader image with the CA does not help when the update image lacks it.
+    image.write_bytes(b"\xe9" + (tmp_path / "lab-tls" / "ca.pem").read_bytes())
+    ota = tmp_path / "ota-app.bin"
+    ota.write_bytes(b"\xe9 an update image built without -DATTRACTAP_LAB_CA")
+    (tmp_path / "again").mkdir()
+    code, stderr = run(tmp_path / "again", {"HIL_WSS": "1", "LAB_TLS_DIR": str(tmp_path / "lab-tls"),
+                                            "READER_IMAGE": str(image), "READER_OTA_IMAGE": str(ota)},
+                       place("board=attractap, profile=plain, variant=attractap-touch-v2"), timeout=300)
+    assert code == 1 and f"{ota} does not trust the lab CA" in stderr

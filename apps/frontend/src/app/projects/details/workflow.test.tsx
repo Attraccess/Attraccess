@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ProjectDetailsPage } from './index';
@@ -34,7 +34,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   useFindOneProjectKey: 'project',
   useDeleteOneProject: (_mutationKey: unknown, options: (typeof state.callbacks)[string]) => {
     state.callbacks.remove = options;
-    return { mutate: state.remove, isPending: false };
+    return { mutateAsync: state.remove, isPending: false };
   },
   useArchiveProject: (_mutationKey: unknown, options: (typeof state.callbacks)[string]) => {
     state.callbacks.archive = options;
@@ -142,7 +142,7 @@ it('unarchives archived projects and confirms deletion before navigating away', 
   fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
   await action('Delete Project');
-  fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+  fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete Project' }));
   expect(state.remove).toHaveBeenCalledWith({ path: { id: 7 } });
   act(() => state.callbacks.remove.onSuccess());
   expect(screen.getByText('Project list')).toBeTruthy();

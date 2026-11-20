@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Attractap } from '@attraccess/react-query-client';
@@ -12,22 +12,29 @@ const mocks = vi.hoisted(() => ({
   pairingDialog: vi.fn(),
   onPaired: vi.fn(),
   navigate: vi.fn(),
-  deleteModal: vi.fn(),
+  deleteReader: vi.fn(),
+  invalidateQueries: vi.fn(),
 }));
 
 vi.mock('react-router-dom', () => ({ useNavigate: () => mocks.navigate }));
-vi.mock('../AttractapList/delete', () => ({
-  AttractapDeleteModal: ({
-    readerId,
-    children,
-  }: {
-    readerId: number;
-    children: (open: () => void) => React.ReactNode;
-  }) => children(() => mocks.deleteModal(readerId)),
-}));
+vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }) }));
 
 vi.mock('@attraccess/react-query-client', () => ({
   useGetPairings: () => ({ data: mocks.pairings.current }),
+  useDeleteReader: (_mutationKey: unknown, options: { onSuccess?: () => void; onError?: (e: unknown) => void }) => ({
+    mutateAsync: async (variables: unknown) => {
+      try {
+        await mocks.deleteReader(variables);
+      } catch (error) {
+        options.onError?.(error);
+        throw error;
+      }
+      options.onSuccess?.();
+    },
+    isPending: false,
+  }),
+  UseGetReadersKeyFn: () => ['readers'],
+  UseGetReadersToPairKeyFn: () => ['readers-to-pair'],
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -77,7 +84,7 @@ describe('ReadersToPair', () => {
     mocks.pairingDialog.mockClear();
     mocks.onPaired.mockClear();
     mocks.navigate.mockClear();
-    mocks.deleteModal.mockClear();
+    mocks.deleteReader.mockReset();
     Object.values(mocks.toast).forEach((fn) => fn.mockClear());
   });
 
@@ -130,7 +137,19 @@ describe('ReadersToPair', () => {
     const user = userEvent.setup();
     render(<ReadersToPair onPaired={mocks.onPaired} readers={[reader(1, 'revoked')]} />);
     await user.click(screen.getByRole('button', { name: 'toPair.delete' }));
-    expect(mocks.deleteModal).toHaveBeenCalledWith(1);
+    const dialog = await screen.findByRole('alertdialog');
+    expect(mocks.deleteReader).not.toHaveBeenCalled();
+
+    mocks.deleteReader.mockRejectedValueOnce(new Error('offline'));
+    await user.click(within(dialog).getByRole('button', { name: 'toPair.delete' }));
+    await waitFor(() => expect(mocks.toast.error).toHaveBeenCalled());
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'toPair.delete' }));
+    expect(mocks.deleteReader).toHaveBeenLastCalledWith({ path: { readerId: 1 } });
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['readers'] });
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['readers-to-pair'] });
   });
 
   it('offers no diagnostics for a reader that is not paired: those wait until it is paired', () => {

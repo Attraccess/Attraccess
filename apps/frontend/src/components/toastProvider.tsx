@@ -2,6 +2,7 @@ import React, { useCallback, useMemo } from 'react';
 import { Toaster, toast } from 'sonner';
 import { AlertCircle, CheckCircle2, Info, XCircle } from 'lucide-react';
 import { getTranslationKeyForApiError, Props as ApiErrorToastProps } from '../utils/apiError';
+import { getRetryAfterSeconds } from '../utils/retryAfterSeconds';
 import { useAppTheme } from '@attraccess/ui';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
@@ -79,6 +80,7 @@ export function useToastMessage() {
         title: props.t(key + '.title'),
         description: props.t(key + '.description', {
           error: errorMessage,
+          retryAfterSeconds: getRetryAfterSeconds(props.error),
         }),
       });
     },

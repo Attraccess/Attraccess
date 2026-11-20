@@ -65,6 +65,9 @@ describe('PasskeyLogin – error reporting', () => {
 
     await waitFor(() => expect(errorAlert()).toHaveTextContent('Email not verified'));
     expect(errorAlert()).not.toHaveTextContent('Passkey sign in failed');
+    // Nothing is rendered below the passkey button, so the copy must not send the user there.
+    expect(errorAlert()).not.toHaveTextContent('below');
+    expect(errorAlert()).toHaveTextContent('sign in with your password to request a new one');
   });
 
   it('falls back to the passkey wording for a failure the server does not name', async () => {

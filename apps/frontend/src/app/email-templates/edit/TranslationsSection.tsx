@@ -2,13 +2,12 @@ import { Spinner, Tab, TabList, Tabs, TextArea } from '@heroui/react';
 import type { Key } from '@heroui/react';
 import { Languages, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, ConfirmableButton, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import { extractTranslationKeys } from '@attraccess/shared';
 import { EmailTemplateType } from '@attraccess/react-query-client';
 import { AddLanguageDropdown } from './AddLanguageDropdown';
 import { CustomLocaleModal } from './CustomLocaleModal';
-import { TranslationDeleteModal } from './TranslationDeleteModal';
 import { COMMON_LOCALES, LocaleValues, normalize } from './translationLocales';
 import { useLocaleDisplayName } from './useLocaleDisplayName';
 import { useTemplateTranslations } from './useTemplateTranslations';
@@ -39,7 +38,6 @@ export function TranslationsSection({ templateType, liveContent }: Readonly<Tran
   const [addedLocales, setAddedLocales] = useState<string[]>([]);
   // Local edits per language, so switching tabs never discards unsaved work.
   const [editedByLocale, setEditedByLocale] = useState<Record<string, LocaleValues>>({});
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [customLocaleOpen, setCustomLocaleOpen] = useState(false);
 
   const allLocales = useMemo(() => {
@@ -95,24 +93,24 @@ export function TranslationsSection({ templateType, liveContent }: Readonly<Tran
     }
   };
 
-  const handleDeleteConfirmed = async () => {
-    if (!deleteTarget) return;
+  const handleDelete = async (locale: string) => {
     try {
-      if (existingLocales.includes(deleteTarget)) {
-        await deleteMutation.mutateAsync({ path: { locale: deleteTarget, type: templateType } });
+      if (existingLocales.includes(locale)) {
+        await deleteMutation.mutateAsync({ path: { locale, type: templateType } });
       }
-      setAddedLocales((prev) => prev.filter((l) => l !== deleteTarget));
-      setEditedByLocale((prev) => {
-        const next = { ...prev };
-        delete next[deleteTarget];
-        return next;
-      });
-      if (selectedLocale === deleteTarget) {
-        setSelectedLocale(allLocales.find((l) => l !== deleteTarget) ?? '');
-      }
-      setDeleteTarget(null);
-    } catch {
+    } catch (error) {
       toast.error({ title: t('translations.deleteFailed') });
+      // Keeps the confirmation open so the user can retry.
+      throw error;
+    }
+    setAddedLocales((prev) => prev.filter((l) => l !== locale));
+    setEditedByLocale((prev) => {
+      const next = { ...prev };
+      delete next[locale];
+      return next;
+    });
+    if (selectedLocale === locale) {
+      setSelectedLocale(allLocales.find((l) => l !== locale) ?? '');
     }
   };
 
@@ -189,19 +187,33 @@ export function TranslationsSection({ templateType, liveContent }: Readonly<Tran
               </Tabs.ListContainer>
             </Tabs>
             {selectedLocale && (
-              <Button
-                size="sm"
-                variant="ghost"
-                isIconOnly
-                className="text-danger"
-                onPress={() => setDeleteTarget(selectedLocale)}
-                aria-label={t('translations.removeLanguage', {
-                  language: displayName(selectedLocale),
-                })}
-                data-cy="translations-remove-language-button"
-              >
-                <Trash2 size={16} />
-              </Button>
+              <ConfirmableButton
+                label={t('translations.deleteConfirmButton')}
+                status="error"
+                confirm={{
+                  title: t('translations.removeLanguage', { language: displayName(selectedLocale) }),
+                  message: t('translations.deleteConfirm', { language: displayName(selectedLocale) }),
+                  cancelLabel: t('actions.cancel'),
+                  confirmDataCy: 'translations-remove-language-confirm',
+                }}
+                isPending={deleteMutation.isPending}
+                onConfirm={() => handleDelete(selectedLocale)}
+                renderActivator={(open) => (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    isIconOnly
+                    className="text-danger"
+                    onPress={open}
+                    aria-label={t('translations.removeLanguage', {
+                      language: displayName(selectedLocale),
+                    })}
+                    data-cy="translations-remove-language-button"
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                )}
+              />
             )}
             <div className="ml-auto">{addLanguageButton}</div>
           </div>
@@ -260,13 +272,6 @@ export function TranslationsSection({ templateType, liveContent }: Readonly<Tran
       )}
 
       <CustomLocaleModal isOpen={customLocaleOpen} onOpenChange={setCustomLocaleOpen} onAdd={handleAddLanguage} />
-
-      <TranslationDeleteModal
-        deleteTarget={deleteTarget}
-        isPending={deleteMutation.isPending}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDeleteConfirmed}
-      />
     </section>
   );
 }

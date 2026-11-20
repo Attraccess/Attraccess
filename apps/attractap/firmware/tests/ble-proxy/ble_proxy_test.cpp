@@ -588,6 +588,7 @@ int main()
     advertisingParserSurvivesGarbage();
     errorMapping();
     capabilityFitsTheFirmwareInfo();
+    runStackTests();
     runEdgeTests();
     runLinkTests();
     std::puts("PASS ble proxy");

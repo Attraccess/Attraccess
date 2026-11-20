@@ -11,7 +11,10 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { MaintenanceReasonDisplay } from '../../../../components/MaintenanceReasonDisplay/index';
+import {
+  MaintenanceReasonDisplay,
+  useFormattedMaintenanceReason,
+} from '../../../../components/MaintenanceReasonDisplay/index';
 import { HTMLAttributes, useMemo, useState } from 'react';
 import {
   DateTimeDisplay,
@@ -19,10 +22,12 @@ import {
   LabeledSwitch,
   PageAction,
   PageHeader,
+  TableActionsColumnHeader,
+  TableRowActions,
   useTranslations,
 } from '@attraccess/plugins-frontend-ui';
 import { MarkDoneModal } from './mark-done/index';
-import { CheckCircleIcon, ConstructionIcon, CogIcon, ExternalLinkIcon, PlusIcon } from 'lucide-react';
+import { CheckCircleIcon, ConstructionIcon, ExternalLinkIcon, PlusIcon } from 'lucide-react';
 import { FlatSection } from '../../../../components/flatSection';
 import { ResourceMaintenance, useFindMaintenances } from '@attraccess/react-query-client';
 import { useNavigate } from 'react-router-dom';
@@ -45,6 +50,7 @@ export function MaintenanceManagement(props: Props) {
   });
 
   const navigate = useNavigate();
+  const formatReason = useFormattedMaintenanceReason();
 
   const [includePast, setIncludePast] = useState(false);
 
@@ -140,7 +146,7 @@ export function MaintenanceManagement(props: Props) {
             <TableColumn>{t('table.columns.completedBy')}</TableColumn>
             <TableColumn>{t('table.columns.completedAt')}</TableColumn>
             <TableColumn>
-              <CogIcon />
+              <TableActionsColumnHeader />
             </TableColumn>
           </TableHeader>
           <TableBody items={maintenanceWithStatus} renderEmptyState={() => <EmptyState />}>
@@ -173,9 +179,17 @@ export function MaintenanceManagement(props: Props) {
                   {maintenance.isActive && (
                     <MarkDoneModal resourceId={resourceId} maintenanceId={maintenance.id}>
                       {(openMarkDone: () => void) => (
-                        <Button variant="tertiary" isIconOnly onPress={openMarkDone}>
-                          <CheckCircleIcon className="w-4 h-4" />
-                        </Button>
+                        <TableRowActions
+                          itemName={formatReason(maintenance.reason)}
+                          actions={[
+                            {
+                              key: 'mark-done',
+                              label: t('actions.markDone.title'),
+                              icon: CheckCircleIcon,
+                              onPress: openMarkDone,
+                            },
+                          ]}
+                        />
                       )}
                     </MarkDoneModal>
                   )}
@@ -227,7 +241,12 @@ export function MaintenanceManagement(props: Props) {
                 {maintenance.isActive && (
                   <MarkDoneModal resourceId={resourceId} maintenanceId={maintenance.id}>
                     {(openMarkDone: () => void) => (
-                      <Button variant="tertiary" isIconOnly onPress={openMarkDone}>
+                      <Button
+                        variant="tertiary"
+                        isIconOnly
+                        onPress={openMarkDone}
+                        aria-label={t('actions.markDone.title')}
+                      >
                         <CheckCircleIcon className="w-4 h-4" />
                       </Button>
                     )}

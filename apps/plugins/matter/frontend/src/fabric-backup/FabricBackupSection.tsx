@@ -46,7 +46,6 @@ export function FabricBackupSection({ canManage }: Readonly<{ canManage: boolean
   const [pending, setPending] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [restoring, setRestoring] = useState(false);
-  const [rotating, setRotating] = useState(false);
 
   const act = async (name: string, title: string, action: () => Promise<void>, keyOf?: ErrorKeyOf) => {
     setPending(name);
@@ -74,12 +73,9 @@ export function FabricBackupSection({ canManage }: Readonly<{ canManage: boolean
     });
   const rotate = () =>
     act('rotate', t('fabric.key.rotateError'), async () => {
-      try {
-        showKey(await rotateRecoveryKey());
-      } finally {
-        setRotating(false);
-      }
-      await refresh();
+      showKey(await rotateRecoveryKey());
+      // The confirmation closes as the reveal opens; the status catches up behind it.
+      void refresh();
     });
   const backup = () =>
     act(
@@ -130,9 +126,10 @@ export function FabricBackupSection({ canManage }: Readonly<{ canManage: boolean
           status={status}
           busy={busy}
           generating={pending === 'generateKey'}
+          rotating={pending === 'rotate'}
           canManage={canManage}
           onGenerateKey={() => void generateKey()}
-          onRotate={() => setRotating(true)}
+          onRotate={rotate}
           formatDateTime={formatDateTime}
         />
         <BackupsCard
@@ -170,21 +167,6 @@ export function FabricBackupSection({ canManage }: Readonly<{ canManage: boolean
           onRestored={setStatus}
         />
       )}
-      <StatusDialog
-        isOpen={rotating}
-        status="warning"
-        title={t('fabric.key.rotateTitle')}
-        onClose={() => setRotating(false)}
-        action={{
-          label: t('fabric.key.rotateConfirm'),
-          isPending: pending === 'rotate',
-          onPress: rotate,
-          'data-cy': 'matter-rotate-confirm',
-        }}
-        data-cy="matter-rotate-dialog"
-      >
-        {t('fabric.key.rotateText')}
-      </StatusDialog>
       <StatusDialog
         isOpen={notice !== null}
         status="error"

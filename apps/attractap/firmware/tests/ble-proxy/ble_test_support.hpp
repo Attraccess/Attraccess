@@ -42,12 +42,25 @@ namespace bletest
         Error failError = Error(Code::GattError, "att:0x0e");
         uint32_t lastToken = 0;
         int initCalls = 0;
+        Error shutdownError;
+        // Runs inside shutdown(), while the stack goes down.
+        std::function<void()> duringShutdown;
+        // The controller still runs something the core does not own (a link it has not let go yet, a standing scan).
+        bool controllerActive = false;
 
         Error init() override
         {
             initCalls++;
+            calls.push_back("init");
             return initError;
         }
+        Error shutdown() override
+        {
+            calls.push_back("shutdown");
+            if (duringShutdown) duringShutdown();
+            return shutdownError;
+        }
+        bool active() override { return controllerActive; }
         Error startScan(uint32_t) override
         {
             calls.push_back("scan");
@@ -227,6 +240,8 @@ namespace bletest
         void done(const Error &error = Error(), Bytes value = Bytes()) { core.onOpDone(radio.lastToken, error, std::move(value), now); }
     };
 
+    // ble_stack_test.cpp: the idle shutdown and the next init.
+    void runStackTests();
     // ble_proxy_edge_test.cpp: bounds, edges and regressions found in review.
     void runEdgeTests();
     // ble_link_test.cpp: the requested link and the send-slot wakeup.

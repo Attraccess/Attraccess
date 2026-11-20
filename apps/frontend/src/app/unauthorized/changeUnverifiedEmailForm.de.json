@@ -1,0 +1,9 @@
+{
+  "openButton": "E-Mail-Adresse ändern",
+  "emailLabel": "Neue E-Mail-Adresse",
+  "submit": "Aktivierungslink senden",
+  "cancel": "Abbrechen",
+  "successTitle": "E-Mail-Adresse geändert",
+  "successMessage": "Wir haben einen neuen Aktivierungslink an {{email}} gesendet. Der bisherige Link funktioniert nicht mehr.",
+  "invalidEmail": "Gib eine gültige E-Mail-Adresse ein."
+}

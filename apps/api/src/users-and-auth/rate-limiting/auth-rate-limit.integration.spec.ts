@@ -44,6 +44,15 @@ class FakeController {
     return { ok: true };
   }
 
+  @Post('change-email')
+  @AuthRateLimit('unverified_email_change')
+  changeEmail(@Body() body: { fail?: boolean }) {
+    if (body?.fail) {
+      throw new UnauthorizedException('boom');
+    }
+    return { ok: true };
+  }
+
   @Post('reset-request')
   @AuthRateLimit('password_reset_request')
   requestReset(@Body() body: { fail?: boolean }) {
@@ -151,16 +160,27 @@ describe('AuthRateLimitInterceptor (HTTP integration)', () => {
     it.each([
       ['/resend', '/reset-request'],
       ['/reset-request', '/resend'],
-    ])('a lockout on %s leaves %s open (verification email resend and password reset have separate counters)', async (
-      locked,
-      open,
-    ) => {
+    ])(
+      'a lockout on %s leaves %s open (verification email resend and password reset have separate counters)',
+      async (locked, open) => {
+        for (let i = 0; i < policy.maxAttempts; i += 1) {
+          const res = await request(app.getHttpServer()).post(locked).send({ fail: true });
+          expect(res.status).toBe(401);
+        }
+        expect((await request(app.getHttpServer()).post(locked).send({})).status).toBe(429);
+        expect((await request(app.getHttpServer()).post(open).send({})).status).toBe(201);
+      },
+    );
+
+    it('locks out repeated failed unverified email changes without touching sign-up or resend', async () => {
       for (let i = 0; i < policy.maxAttempts; i += 1) {
-        const res = await request(app.getHttpServer()).post(locked).send({ fail: true });
-        expect(res.status).toBe(401);
+        expect((await request(app.getHttpServer()).post('/change-email').send({ fail: true })).status).toBe(401);
       }
-      expect((await request(app.getHttpServer()).post(locked).send({})).status).toBe(429);
-      expect((await request(app.getHttpServer()).post(open).send({})).status).toBe(201);
+      const blocked = await request(app.getHttpServer()).post('/change-email').send({});
+      expect(blocked.status).toBe(429);
+      expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0);
+      expect((await request(app.getHttpServer()).post('/register').send({})).status).toBe(201);
+      expect((await request(app.getHttpServer()).post('/resend').send({})).status).toBe(201);
     });
 
     it('records resends as identity.verification_email_resent, never as a password reset request', async () => {
