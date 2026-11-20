@@ -10,34 +10,23 @@ export function ConfigurationRevisions({
   controllerId,
   metadata,
   disabled,
-  onRollback,
-  generation,
   onBusyChange,
 }: {
   controllerId: number;
   metadata: ConfigurationEditorMetadata;
   disabled: boolean;
-  onRollback: (failure?: unknown) => Promise<void>;
-  generation: number;
   onBusyChange: (busy: boolean) => void;
 }) {
-  const { t, tMessage } = useWagoTranslations();
+  const { t, tMessage, tBackendMessage } = useWagoTranslations();
   const [offset, setOffset] = useState(0);
   const history = useConfigurationRevisionsQuery(controllerId, offset);
   const actions = useConfigurationActions(controllerId);
   const [rollbackForce, setRollbackForce] = useState(false);
   const [error, setError] = useState<string | TranslationMessage | null>(null);
-  const [reconciling, setReconciling] = useState(false);
-  const busy =
-    reconciling || actions.preview.isPending || actions.acknowledgeRejection.isPending || actions.rollback.isPending;
+  const busy = actions.preview.isPending || actions.acknowledgeRejection.isPending || actions.rollback.isPending;
   useEffect(() => {
     onBusyChange(busy);
   }, [busy, onBusyChange]);
-  useEffect(() => {
-    actions.preview.reset();
-    setRollbackForce(false);
-    setError(null);
-  }, [generation]);
   const preview = actions.preview.data;
   const rollbackNames = { ...metadata.names, ...readMetadata(preview?.revision.presetProvenance ?? null).names };
   async function run(operation: () => Promise<unknown>) {
@@ -76,9 +65,9 @@ export function ConfigurationRevisions({
         onPublishRollback={() =>
           void run(async () => {
             if (!preview) return;
-            setReconciling(true);
-            let failure: unknown;
             try {
+              // The mutation settles only after the draft and revisions were read again, so a rollback that raced
+              // with a draft change leaves the page current; a failure then reaches `run`, which shows its reason.
               await actions.rollback.mutateAsync({
                 revision: preview.revision.revision,
                 force: rollbackForce,
@@ -86,20 +75,15 @@ export function ConfigurationRevisions({
                 currentHash: preview.current?.contentHash ?? null,
                 draftHash: preview.draftHash,
               });
-            } catch (error) {
-              failure = error;
-            }
-            try {
-              actions.preview.reset();
-              setOffset(0);
-              await onRollback(failure);
             } finally {
-              setReconciling(false);
+              actions.preview.reset();
+              setRollbackForce(false);
+              setOffset(0);
             }
           })
         }
       />
-      {error && <p role="alert">{tMessage(error)}</p>}
+      {error && <p role="alert">{typeof error === 'string' ? tBackendMessage(error) : tMessage(error)}</p>}
     </section>
   );
 }

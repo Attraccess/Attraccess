@@ -3,7 +3,7 @@
 // These flows were once exercised through the removed configuration editor; the history page is now their only entry.
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HistoryPage } from '../src/front-panel/HistoryPage';
@@ -259,6 +259,21 @@ describe('rollback from the history page', () => {
     await waitFor(() => expect(api.getDraft.mock.calls.length).toBeGreaterThan(1));
   });
 
+  it('keeps the page busy until the draft was read again after a rollback', async () => {
+    renderHistory();
+    fireEvent.click(await (await revisionSection(1)).findByRole('button', { name: 'Preview rollback to revision 1' }));
+    let releaseDraft: (value: typeof draft) => void = () => undefined;
+    api.getDraft.mockImplementationOnce(() => new Promise((resolve) => (releaseDraft = resolve)));
+    fireEvent.click(await screen.findByRole('button', { name: 'Publish rollback as new revision' }));
+    await waitFor(() => expect(api.getDraft.mock.calls.length).toBeGreaterThan(1));
+    const back = () => screen.getByRole('button', { name: 'Inputs & outputs' });
+    expect(back().hasAttribute('disabled')).toBe(true);
+    releaseDraft(draft);
+    await waitFor(() => expect(back().hasAttribute('disabled')).toBe(false));
+    expect(screen.queryByText('Restore revision 1 as a new revision')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('requires the impact acknowledgement before publishing a rollback that breaks flow references', async () => {
     api.preview.mockResolvedValue(previewOf(1, { impacts: [impact] }));
     renderHistory();
@@ -315,6 +330,9 @@ describe('rollback from the history page', () => {
     expect(alert.getAttribute('role')).toBe('alert');
     expect(screen.queryByText('Restore revision 1 as a new revision')).toBeNull();
     await waitFor(() => expect(api.getDraft.mock.calls.length).toBeGreaterThan(1));
+    // The server's reason is translated like the front panel's backend messages.
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect((await screen.findByText(/Die Konfiguration wurde seit der Vorschau/)).getAttribute('role')).toBe('alert');
   });
 
   it('reports a failed preview without opening the review', async () => {

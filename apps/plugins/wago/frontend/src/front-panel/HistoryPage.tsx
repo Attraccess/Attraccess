@@ -23,7 +23,6 @@ function ControllerHistory({ controllerId }: { controllerId: number }) {
   const navigate = useNavigate();
   const draft = useDraftQuery(controllerId);
   const [busy, setBusy] = useState(false);
-  const [generation, setGeneration] = useState(0);
   return (
     <main className="wg:mx-auto wg:flex wg:w-full wg:max-w-[1440px] wg:flex-col wg:gap-5 wg:p-4 wg:md:p-6">
       <Button
@@ -39,15 +38,7 @@ function ControllerHistory({ controllerId }: { controllerId: number }) {
         controllerId={controllerId}
         metadata={readMetadata(draft.data?.presetProvenance ?? null)}
         disabled={!draft.isSuccess}
-        generation={generation}
         onBusyChange={setBusy}
-        onRollback={async (failure) => {
-          // The draft is read again either way: a rejected rollback may have raced with a draft change.
-          await draft.refetch();
-          // Rethrown so the revision list shows the reason; the generation stays, so that reason is not reset.
-          if (failure) throw failure;
-          setGeneration((value) => value + 1);
-        }}
       />
     </main>
   );
