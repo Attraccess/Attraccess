@@ -28,7 +28,7 @@ You can combine the following options per resource:
 
 Session duration and operating duration are rounded up independently to whole minutes. Exactly one minute remains one billed minute; zero recorded duration remains zero. Operating duration requires recorded operating-state observations from [flows](flows/node-types.md); starting a session alone does not establish that the machine is operating.
 
-The fixed fee, both duration rates and the user's billing factor are saved when the session starts. Later configuration changes apply to new sessions. The saved factor applies to the total of the session's charges, including any custom billing items added by flows.
+The fixed fee, both duration rates and the user's billing factor are saved when the session starts. Later configuration changes apply to new sessions. The saved factor applies to the total of the session's charges, including any custom billing items added by flows. For a taken-over session, items you would normally add on stop come from the [Usage Takeover](flows/node-types.md#resource-usage-takeover) flow instead, because **Usage Stopped** does not run.
 
 ## Meter consumption
 

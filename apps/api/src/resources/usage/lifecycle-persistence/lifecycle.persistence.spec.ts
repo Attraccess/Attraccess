@@ -7,7 +7,12 @@ import {
   ResourceUsageLifecycleAttempt,
   User,
 } from '@attraccess/database-entities';
-import { BillingTransactionStatus, ResourceFormAction, ResourceUsageAction } from '@attraccess/application-models';
+import {
+  BillingTransactionStatus,
+  ResourceFlowNodeType,
+  ResourceFormAction,
+  ResourceUsageAction,
+} from '@attraccess/application-models';
 import { InsufficientBalanceError } from '../../../billing/errors/insufficient-balance.error';
 import { recoverOrphanedUsages } from '../../../database/postgres/postgres-usage-recovery';
 import { ResourceInUseError } from '../errors/resource-in-use.error';
@@ -389,6 +394,30 @@ describe('Usage lifecycle persistence around external flows', () => {
 
     expect(await scope.publishedState()).toEqual(before);
     await scope.expectObservationAndNoAttempt();
+  });
+
+  it('bills items staged by the takeover flow on the outgoing session and never runs the stopped trigger', async () => {
+    const outgoing = await scope.seedActiveSession();
+    const takeoverItem = { ...scope.draftItem, name: 'Takeover consumable', quantity: 1 };
+    scope.flow.runFlow.mockImplementation(async (resourceId, _trigger, payload, _manager, { lifecycleAttemptId }) => {
+      await scope.usage.stageLifecycleBillingItem(lifecycleAttemptId, resourceId, payload.id, takeoverItem);
+    });
+
+    const incoming = await scope.usage.startSession(1, scope.users[1], { forceTakeOver: true });
+
+    const triggers = scope.flow.runFlow.mock.calls.map((call) => call[1]);
+    expect(triggers).toEqual([ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER]);
+    const { transactions, items } = await scope.publishedState();
+    const itemsOf = (resourceUsageId: number) => {
+      const transaction = transactions.find((candidate) => candidate.resourceUsageId === resourceUsageId);
+      return items.filter((item) => item.billingTransactionId === transaction?.id);
+    };
+    // Exactly one takeover item: applying the drafts twice would merge into quantity 2 and double-bill.
+    expect(itemsOf(outgoing.id).filter((item) => item.name === takeoverItem.name)).toEqual([
+      expect.objectContaining({ quantity: 1, unitPrice: takeoverItem.unitPrice }),
+    ]);
+    expect(transactions.some((transaction) => transaction.resourceUsageId === incoming.id)).toBe(true);
+    expect(itemsOf(incoming.id)).toEqual([]);
   });
 
   it('rejects same-user takeover when the outgoing charge leaves too little balance for replacement', async () => {

@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it } from 'vitest';
 // Register the shared API mocks before loading the component's feature modules.
-import { hoisted, makePlugin, renderWithQuery } from './index.test.hoisted';
+import { chooseRowAction, hoisted, makePlugin, renderWithQuery } from './index.test.hoisted';
 import { PluginsSection } from './index';
 
 import { describe } from 'vitest';
@@ -155,7 +155,7 @@ describe('plugin dependency confirmations', () => {
     const user = userEvent.setup();
     const view = renderWithQuery(<PluginsSection />);
     await waitFor(() => expect(screen.getByText(core.name)).toBeInTheDocument());
-    await user.click(document.querySelector('[data-cy="plugins-list-delete-plugin-button-core-id"]') as HTMLElement);
+    await chooseRowAction(user, 'core-id', 'Remove plugin');
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(`${provider.name} · ${provider.version}`)).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Remove' })).toBeDisabled();
@@ -192,7 +192,7 @@ describe('plugin version management', () => {
     });
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
-    const open = async () => user.click(await screen.findByRole('button', { name: 'Manage version' }));
+    const open = async () => chooseRowAction(user, 'plugin-1', 'Manage version');
     const close = async () => {
       await user.click(screen.getByRole('button', { name: 'Cancel' }));
       await waitFor(() =>
@@ -255,7 +255,7 @@ describe('plugin version management', () => {
     });
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
-    await user.click(await screen.findByRole('button', { name: 'Manage version' }));
+    await chooseRowAction(user, 'plugin-1', 'Manage version');
     const spec = screen.getByRole('textbox', { name: 'Requested version or channel' });
     await user.clear(spec);
     await user.type(spec, '^2.0.0');
@@ -320,7 +320,7 @@ describe('plugin version management', () => {
     });
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
-    await user.click(await screen.findByRole('button', { name: 'Manage version' }));
+    await chooseRowAction(user, 'plugin-1', 'Manage version');
     const spec = screen.getByRole('textbox', { name: 'Requested version or channel' });
     await user.clear(spec);
     await user.type(spec, '^2.0.0');
@@ -333,7 +333,7 @@ describe('plugin version management', () => {
     await waitFor(() =>
       expect(screen.queryByRole('heading', { name: 'Manage Cool Plugin version' })).not.toBeInTheDocument(),
     );
-    await user.click(screen.getByRole('button', { name: 'Manage version' }));
+    await chooseRowAction(user, 'plugin-1', 'Manage version');
 
     expect(await screen.findByRole('textbox', { name: 'Requested version or channel' })).toHaveValue('^2.0.0');
     expect(screen.getByRole('button', { name: /Plugin automatic update policy/ })).toHaveTextContent('Patch only');
@@ -377,7 +377,7 @@ describe('plugin version management', () => {
     });
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
-    await user.click(await screen.findByRole('button', { name: 'Manage version' }));
+    await chooseRowAction(user, 'plugin-1', 'Manage version');
     await user.click(await screen.findByRole('button', { name: '1.3.0 Newer' }));
 
     expect(screen.getByText('3D Printer Core · 1.0.0')).toBeInTheDocument();
@@ -425,7 +425,7 @@ describe('plugin version management', () => {
     });
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
-    await user.click(await screen.findByRole('button', { name: 'Details' }));
+    await chooseRowAction(user, 'plugin-1', 'Details');
     expect(await screen.findByText('Installed package details')).toBeInTheDocument();
     expect(hoisted.apiMock).toHaveBeenCalledWith(
       expect.stringContaining('/marketplace/Cool%20Plugin?registryId=private'),
@@ -443,7 +443,7 @@ describe('plugin version management', () => {
     });
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
-    await user.click(await screen.findByRole('button', { name: 'Details' }));
+    await chooseRowAction(user, 'plugin-1', 'Details');
 
     await waitFor(() => expect(hoisted.errorToast).toHaveBeenCalledWith({ title: 'Could not load the marketplace.' }));
     expect(hoisted.apiMock).toHaveBeenCalledWith('/api/plugins/marketplace/Cool%20Plugin?registryId=private');

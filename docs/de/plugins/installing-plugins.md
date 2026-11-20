@@ -27,7 +27,7 @@ Offizielle Plugins werden auf npm unter diesen Dist-Tags veröffentlicht:
 | `next`   | Nightly-Builds von `main` | Builds aus erfolgreichen, hardwaregeprüften `main`-Builds, z. B. `0.2.0-nightly.1180.1` (Plugin-Version, dann `-nightly.<Lauf>.<Versuch>`). |
 | `alpha`  | Niemand (veraltet)        | Eingefrorene Builds aus der Zeit vor den Release-Kanälen.                                                                                   |
 
-Um ein Nightly zu testen, öffne **Einstellungen → Plugins**, wähle beim installierten Plugin **Version verwalten** und trage `next` (oder eine bestimmte Nightly-Version) unter **Gewünschte Version oder Kanal** ein. Nightly-Versionen sind Vorabversionen und werden nie automatisch installiert.
+Um ein Nightly zu testen, öffne **Einstellungen → Plugins**, öffne das Aktionsmenü (**⋯**) des installierten Plugins, wähle **Version verwalten** und trage `next` (oder eine bestimmte Nightly-Version) unter **Gewünschte Version oder Kanal** ein. Nightly-Versionen sind Vorabversionen und werden nie automatisch installiert.
 
 Sobald ein Plugin einmal released wurde, bietet der Marktplatz nur noch released Versionen an. Bis dahin gilt:
 
@@ -80,10 +80,10 @@ trotz gültiger Lizenz **Lizenz fehlt**, konnte die Lizenz beim Start nicht gepr
 
 ## Plugin entfernen
 
-1. Oeffnen Sie **Einstellungen** in der Seitenleiste und waehlen Sie den Bereich **Plugins**
+1. Öffnen Sie **Einstellungen** in der Seitenleiste und wählen Sie den Bereich **Plugins**
 2. Finden Sie das Plugin in der Liste
-3. Klicken Sie auf die Schaltflaeche **Entfernen** oder **Loeschen**
-4. Bestaetigen Sie die Entfernung
+3. Öffnen Sie das Aktionsmenü des Plugins (**⋯**) und wählen Sie **Plugin entfernen**
+4. Bestätigen Sie die Entfernung
 
 Was mit den Daten des Plugins geschieht, hängt davon ab, wie es installiert wurde. Der Bestätigungsdialog nennt den
 zutreffenden Fall.

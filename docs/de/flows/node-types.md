@@ -31,13 +31,13 @@ Läuft während eines Nutzungsstarts. Keine Einstellungen. Die Payload enthält 
 
 Typ: `input.resource.usage.stopped` · Maschinen
 
-Läuft während eines Nutzungsendes. Keine Einstellungen. Die Payload enthält die bisherige Sitzung, eingereichte Formulare und Endfelder wie `endTime`, `endNotes` sowie [`activeSessions`](flows/payloads-variables-templates.md#aktive-sitzungen-auf-gemeinsam-genutzten-maschinen). Beispiel: Relais ausschalten oder vor der Abrechnung einen Posten ergänzen.
+Läuft während eines Nutzungsendes. Keine Einstellungen. Die Payload enthält die bisherige Sitzung, eingereichte Formulare und Endfelder wie `endTime`, `endNotes` sowie [`activeSessions`](flows/payloads-variables-templates.md#aktive-sitzungen-auf-gemeinsam-genutzten-maschinen). Beispiel: Relais ausschalten oder vor der Abrechnung einen Posten ergänzen. Läuft nicht für eine Sitzung, die durch eine Übernahme endet; siehe [Nutzung übernommen](flows/node-types.md#nutzung-übernommen).
 
 ### Nutzung übernommen
 
 Typ: `input.resource.usage.takeover` · Maschinen
 
-Läuft bei Übernahme einer aktiven Sitzung. Keine Einstellungen. Die Payload enthält die bisherige Sitzung sowie `newUser`, `oldUser`, `takeOverTime` und `activeSessions` (immer 1 zu 1). `{{newUser.username}}` liest den neuen Besitzer. Eine Übernahme verwendet diesen Trigger anstelle von **Nutzung gestartet**.
+Läuft bei Übernahme einer aktiven Sitzung. Keine Einstellungen. Die Payload enthält die bisherige Sitzung sowie `newUser`, `oldUser`, `takeOverTime` und `activeSessions` (immer 1 zu 1). `{{newUser.username}}` liest den neuen Besitzer. Eine Übernahme verwendet diesen Trigger anstelle von **Nutzung gestartet**. Die bisherige Sitzung endet hier, und **Nutzung beendet** läuft für sie nicht. Posten für die bisherige Sitzung (z. B. Verbrauchsmaterial, das Sie sonst beim Beenden ergänzen) erfassen Sie in diesem Flow mit dem Knoten [**Abrechnungs Position hinzufügen**](flows/node-types.md#abrechnungsposten-setzen); sie werden mit der bisherigen Sitzung abgerechnet. Sollen Posten vom Beenden auch bei Übernahmen anfallen, fügen Sie denselben Abrechnungszweig an beiden Triggern hinzu. Die Payload der Übernahme enthält kein `endTime` und kein `endNotes` (verwenden Sie `takeOverTime`), und ihre `formSubmissions` sind die Antworten des neuen Benutzers auf das Übernahmeformular, nicht auf das Beendigungsformular; ein kopierter Zweig muss seine Werte von dort lesen. Physische Effekte wie das Ausschalten eines Relais gehören nicht an diesen Trigger, denn die Maschine bleibt beim neuen Benutzer in Nutzung.
 
 ### Tür entriegelt
 
@@ -318,7 +318,7 @@ Verwendet die Nutzungs-ID im Wurzelfeld `id`, falls vorhanden, sonst die aktive 
 
 Die externe Referenz verwendet ein Wurzelfeld `externalReference` vom Typ Text als Override, falls vorhanden. Ist dieses Feld vorhanden **und** eine nicht leere Referenz am Knoten konfiguriert, wird stattdessen die konfigurierte Referenz als Vorlage gerendert. Ohne das Payload-Feld bleibt die konfigurierte Referenz wörtlich. Name, Beschreibung und Einzelpreis rendern keine Vorlagen.
 
-Beispiel: Formularantwort mit **Payload setzen** nach `quantity` übertragen, dann bei **Nutzung beendet** einen Verbrauchsmaterialposten ergänzen.
+Beispiel: Formularantwort mit **Payload setzen** nach `quantity` übertragen, dann bei **Nutzung beendet** einen Verbrauchsmaterialposten ergänzen. Eine Übernahme führt **Nutzung beendet** nicht aus; ergänzen Sie denselben Knoten im Flow [**Nutzung übernommen**](flows/node-types.md#nutzung-übernommen), wenn auch übernommene Sitzungen abgerechnet werden sollen. Seine Posten werden mit der bisherigen Sitzung abgerechnet.
 
 ### Nutzungssitzung beenden
 

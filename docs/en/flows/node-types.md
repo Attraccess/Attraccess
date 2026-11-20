@@ -33,13 +33,13 @@ Runs during a usage start. No settings. Payload contains the new usage session's
 
 Type: `input.resource.usage.stopped` · Machines
 
-Runs during a usage stop. No settings. Payload contains the outgoing session, submitted forms, stop fields such as `endTime` and `endNotes`, and [`activeSessions`](flows/payloads-variables-templates.md#active-sessions-on-shared-machines). Example: switch off a relay or add a billing item before settlement.
+Runs during a usage stop. No settings. Payload contains the outgoing session, submitted forms, stop fields such as `endTime` and `endNotes`, and [`activeSessions`](flows/payloads-variables-templates.md#active-sessions-on-shared-machines). Example: switch off a relay or add a billing item before settlement. It does not run for a session that ends through a takeover; see [Resource Usage Takeover](flows/node-types.md#resource-usage-takeover).
 
 ### Resource Usage Takeover
 
 Type: `input.resource.usage.takeover` · Machines
 
-Runs when an active session is taken over. No settings. Payload contains the outgoing usage session plus `newUser`, `oldUser`, `takeOverTime` and `activeSessions` (always 1 to 1). Use `{{newUser.username}}` for the incoming owner. A takeover uses this trigger instead of the ordinary Usage Started trigger.
+Runs when an active session is taken over. No settings. Payload contains the outgoing usage session plus `newUser`, `oldUser`, `takeOverTime` and `activeSessions` (always 1 to 1). Use `{{newUser.username}}` for the incoming owner. A takeover uses this trigger instead of the ordinary Usage Started trigger. The outgoing session ends here, and **Usage Stopped** does not run for it. Add billing items for the outgoing session (for example consumables you normally add on stop) with [**Add billing item**](flows/node-types.md#set-billing-items) in this flow; they are billed on the outgoing session. If stop charges should also apply to takeovers, add the same billing branch to both triggers. The takeover payload has no `endTime` or `endNotes` (use `takeOverTime`), and its `formSubmissions` are the new user's takeover form answers, not stop form answers, so a copied branch must read its values from there. Do not copy physical effects such as switching a relay off onto this trigger, because the machine stays in use by the new user.
 
 ### Door Unlocked
 
@@ -320,7 +320,7 @@ Uses the usage ID in root `id` when supplied, otherwise the active session on th
 
 The external reference uses a root string `externalReference` override when present. If that field is present **and** a nonempty reference is configured on the node, the configured reference is rendered as a template instead. Without the payload field, the configured reference stays literal. Name, description and unit price do not render templates.
 
-Example: use **Set Payload** to map a form answer to `quantity`, then add a consumable item during **Usage Stopped**.
+Example: use **Set Payload** to map a form answer to `quantity`, then add a consumable item during **Usage Stopped**. A takeover does not run **Usage Stopped**, so add the same node to the [**Usage Takeover**](flows/node-types.md#resource-usage-takeover) flow if taken-over sessions should be charged too; its items are billed on the outgoing session.
 
 ### End Usage Session
 

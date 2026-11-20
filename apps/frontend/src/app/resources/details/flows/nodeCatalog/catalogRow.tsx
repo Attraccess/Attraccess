@@ -23,6 +23,7 @@ export function CatalogRow({ node, tNodeTranslations, onSelect }: Props) {
   const def = getDomainDef(domain);
   const Icon = def.icon;
   const { icon: DirIcon, label: dirLabel } = DIRECTION_ICON[node.direction];
+  const description = node.schema.description ?? tNodeTranslations('nodes.' + node.schema.type + '.description');
 
   const handleDragStart = (e: DragEvent<HTMLButtonElement>) => {
     e.dataTransfer.setData('application/reactflow', node.schema.type);
@@ -44,8 +45,8 @@ export function CatalogRow({ node, tNodeTranslations, onSelect }: Props) {
         <span className="block text-sm font-medium truncate">
           {node.schema.label ?? tNodeTranslations('nodes.' + node.schema.type + '.title')}
         </span>
-        <span className="block text-xs text-muted truncate">
-          {node.schema.description ?? tNodeTranslations('nodes.' + node.schema.type + '.description')}
+        <span className="block text-xs text-muted truncate" title={description}>
+          {description}
         </span>
       </span>
       <span aria-label={dirLabel} className="flex-none text-muted">

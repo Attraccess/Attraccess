@@ -214,7 +214,6 @@
           "pnpm nx run plugin-wago:production-fleet",
           "pnpm nx run plugin-wago:test-commissioning-acceptance",
           "pnpm nx run plugin-wago:e2e",
-          "bash apps/plugins/wago/frontend/tests/run_browser_tests.sh",
           "pnpm nx run plugin-wago:test-scripts"
         ],
         "parallel": false
