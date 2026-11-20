@@ -116,10 +116,31 @@ export class AttractapReaderResetAndSecurityState1793700000000 implements Migrat
     await this.rebuild(queryRunner, OLD_TABLE, `${SHARED}, "apiTokenHash"`, `${SHARED}, ''`);
   }
 
+  /**
+   * Rebuilds the reader table and keeps its id sequence. Dropping the AUTOINCREMENT table drops its `sqlite_sequence`
+   * row, and ids would start at 1 again: the audit log, metrics and credential history name readers by id, so a new
+   * reader must never reuse the id of a deleted one.
+   */
   private async rebuild(queryRunner: QueryRunner, definition: string, into: string, from: string): Promise<void> {
+    const sequence = await this.readSequence(queryRunner);
     await queryRunner.query(`CREATE TABLE "temporary_attractap" (${definition})`);
     await queryRunner.query(`INSERT INTO "temporary_attractap" (${into}) SELECT ${from} FROM "attractap"`);
     await queryRunner.query(`DROP TABLE "attractap"`);
     await queryRunner.query(`ALTER TABLE "temporary_attractap" RENAME TO "attractap"`);
+    await queryRunner.query(`DELETE FROM "sqlite_sequence" WHERE "name" = 'attractap'`);
+    if (sequence > 0) {
+      await queryRunner.query(`INSERT INTO "sqlite_sequence" ("name", "seq") VALUES ('attractap', ?)`, [sequence]);
+    }
+  }
+
+  /** The highest reader id ever handed out: the sequence row, or the highest id still in the table. */
+  private async readSequence(queryRunner: QueryRunner): Promise<number> {
+    const [row] = (await queryRunner.query(
+      `SELECT max(
+        coalesce((SELECT "seq" FROM "sqlite_sequence" WHERE "name" = 'attractap'), 0),
+        coalesce((SELECT max("id") FROM "attractap"), 0)
+      ) AS "seq"`,
+    )) as { seq: number }[];
+    return Number(row?.seq ?? 0);
   }
 }

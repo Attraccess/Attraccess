@@ -184,7 +184,7 @@ describe('credential registry on SQLite (atomic reader row and history)', () => 
     expect((await registry.history(readerId)).map((e) => e.state)).toEqual(['revoked', 'paired']);
   });
 
-  it('clears secured when the credential is revoked or replaced, and keeps the other security columns', async () => {
+  it('clears the eFuse report result when the credential is revoked or replaced, and keeps the build profile', async () => {
     const { source, registry } = await connect();
     const readerId = await addReader(source, 'one');
     const readers = new TypeOrmAttractapReaderStore(source.getRepository(Attractap), source.getRepository(Resource));
@@ -206,17 +206,24 @@ describe('credential registry on SQLite (atomic reader row and history)', () => 
       securityReportProblems: [],
     });
 
-    await pair('fp-new'); // another key: it has to pass the report check again
-    expect(await readers.findById(readerId)).toMatchObject({
+    const noReport = {
       secured: false,
       securedAt: null,
-      firmwareProfile: 'secure',
+      efuseSecureVersion: null,
+      securityReportCheckedAt: null,
+      securityReportProblems: null,
+    };
+    await pair('fp-new'); // another key: it has to pass the report check again, the old report described the old key
+    expect(await readers.findById(readerId)).toMatchObject({ ...noReport, firmwareProfile: 'secure' });
+    await readers.applySecurity(readerId, {
+      secured: true,
+      securedAt: checkedAt,
       efuseSecureVersion: 1,
       securityReportCheckedAt: checkedAt,
+      securityReportProblems: [],
     });
-    await readers.applySecurity(readerId, { secured: true, securedAt: checkedAt });
     await registry.revoke(readerId, 9);
-    expect(await readers.findById(readerId)).toMatchObject({ secured: false, securedAt: null });
+    expect(await readers.findById(readerId)).toMatchObject({ ...noReport, firmwareProfile: 'secure' });
   });
 
   it('writes the security columns only while the session key is the credential', async () => {

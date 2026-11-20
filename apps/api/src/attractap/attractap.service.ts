@@ -343,11 +343,6 @@ export class AttractapService {
   }
 
   /**
-   * Updates the firmware version and type for a reader
-   * @param id The reader ID
-   * @param firmware The firmware the reader reported
-   */
-  /**
    * Stores what the reader reported about its build (profile, app secure_version). A claim: it never makes a reader
    * secured. A reader that is not a release secure build any more loses `secured` right away. Every connection
    * reports its build, so only what differs from the stored columns is written, and usually nothing is.
@@ -366,6 +361,11 @@ export class AttractapService {
     if (Object.keys(patch).length > 0) await this.readerStore.applySecurity(id, patch);
   }
 
+  /**
+   * Updates the firmware version and type for a reader
+   * @param id The reader ID
+   * @param firmware The firmware the reader reported
+   */
   public async updateReaderFirmware(id: number, firmware: AttractapFirmwareInfo) {
     await this.updateReader(id, { firmware }, false);
   }

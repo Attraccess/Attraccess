@@ -166,8 +166,8 @@ info; the server answers readers without it, or with another version, with `READ
 Demo variants, park images and the desktop simulator announce no `ble`. BLE works only on paired
 readers: the reader accepts BLE requests only on the secure link (see "Pairing and session
 protocol" below) after it signed in, and refuses them on the pairing channel and before
-sign-in. The server reports a reader that is not on the secure link as `READER_OFFLINE`
-(`pairing-required`) and sends it no BLE requests.
+sign-in. A reader without a certificate cannot connect except to pair, so the server never
+sends BLE requests to a reader that is not on the secure link.
 
 | Direction       | Event               | Payload (besides `v: 1` and `sessionId`)                                                                                          |
 | --------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |

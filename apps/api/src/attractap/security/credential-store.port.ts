@@ -2,6 +2,7 @@ import type {
   AttractapCredentialEventRecord,
   AttractapCredentialSnapshot,
   AttractapPairingState,
+  AttractapReaderSecurityPatch,
 } from '@attraccess/application-models';
 import type { TransactionScope } from '../../database/unit-of-work';
 
@@ -20,15 +21,21 @@ export interface CredentialEventInput {
   actorId: number | null;
 }
 
-export interface CredentialPatch {
+/**
+ * The eFuse report result. Cleared when the credential goes away or changes hands: it described the previous key,
+ * and the report check of the new session sets it again.
+ */
+export type CredentialSecurityPatch = Pick<
+  AttractapReaderSecurityPatch,
+  'secured' | 'securedAt' | 'efuseSecureVersion' | 'securityReportCheckedAt' | 'securityReportProblems'
+>;
+
+export interface CredentialPatch extends CredentialSecurityPatch {
   pairingState?: AttractapPairingState;
   credentialFingerprint?: string | null;
   pairedAt?: Date | null;
   certificateNotAfter?: Date | null;
   certificateSerial?: string | null;
-  /** Cleared when the credential goes away or changes hands; the eFuse report check sets it again. */
-  secured?: boolean;
-  securedAt?: Date | null;
 }
 
 /**

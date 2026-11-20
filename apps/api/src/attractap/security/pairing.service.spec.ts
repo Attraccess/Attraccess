@@ -572,6 +572,19 @@ describe('PairingService', () => {
     expect(service.get(pending.id)).toMatchObject({ state: 'cancelled', failureReason: 'cancelled-by-admin' });
   });
 
+  it('tells the reader an admin cancelled its request; the audit log has no reader to attach that to', async () => {
+    const { client } = await announce();
+    const pending = await pendingOf();
+
+    await service.cancel(pending.id, { userId: 2, authenticationMethod: 'api-token', apiTokenId: 5 });
+
+    expect((await client.next('failed'))['reason']).toBe('cancelled-by-admin');
+    expect(service.get(pending.id)).toMatchObject({ state: 'cancelled', failureReason: 'cancelled-by-admin' });
+    // A pending request names no reader before its approval (token readers that bound one are gone, ATT-1207), and
+    // every pairing audit event needs a reader as its subject.
+    expect(audited).toEqual([]);
+  });
+
   it('undoes an approval the reader never received because it left right after the commit', async () => {
     const { client, code } = await announce();
     const pending = await pendingOf();
@@ -835,9 +848,15 @@ describe('PairingService', () => {
     emitted.length = 0;
     emittedEvents.length = 0;
 
-    await service.revoke(readerId, actor);
+    await service.revoke(readerId, { userId: 2, authenticationMethod: 'api-token', apiTokenId: 5 });
     expect(readers.get(readerId)).toMatchObject({ pairingState: 'revoked' });
-    expect(audited.at(-1)).toMatchObject({ action: 'attractap.reader.revoked' });
+    // The admin who did it is the actor, with the API token it used.
+    expect(audited.at(-1)).toMatchObject({
+      action: 'attractap.reader.revoked',
+      actor: { id: 2, authenticationMethod: 'api-token', apiTokenId: 5 },
+      subject: { type: 'attractap.reader', id: readerId },
+      details: { reason: 'admin' },
+    });
     expect(emittedEvents).toEqual([CREDENTIAL_CHANGED_EVENT]);
     expect(emitted).toEqual([readerId]);
     expect(grants.get(peer.spkiFingerprint)).toBeUndefined();

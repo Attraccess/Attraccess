@@ -1,6 +1,6 @@
-import { Logger } from '@nestjs/common';
 import type { IncomingMessage } from 'http';
 import { PAIRING_SUBPROTOCOL, SESSION_SUBPROTOCOL } from '../security/session-framing';
+import { RefusedUpgradeLog } from './refused-upgrade-log';
 
 /** Bounds every incoming message before it is buffered. Session frames carry TLS records of <= ~16 KiB. */
 const MAX_READER_FRAME_BYTES = 128 * 1024;
@@ -16,7 +16,8 @@ function offeredSubprotocols(request: IncomingMessage): string[] {
     .filter(Boolean);
 }
 
-const logger = new Logger('AttractapUpgrade');
+/** Shared by every refused upgrade of this process; exported for tests. */
+export const refusedUpgrades = new RefusedUpgradeLog();
 
 /**
  * `ws` server options for the reader endpoint. Subprotocols select the transport: session = TLS 1.3 inside
@@ -31,8 +32,8 @@ export const readerWebSocketOptions = {
     if (offered.some((p) => p.startsWith(ATTRACTAP_SUBPROTOCOL_PREFIX))) {
       return callback(false, 400, 'Unsupported subprotocol version');
     }
-    // One line per refused upgrade, which is once per connection attempt; nothing of the request is logged.
-    logger.warn('Refused a reader connection: token sign-in no longer supported, the reader has to pair');
+    // At most one line per refused upgrade, aggregated over time; nothing of the request is logged.
+    refusedUpgrades.note();
     callback(false, 400, 'Token sign-in is no longer supported');
   },
   handleProtocols: (protocols: Set<string>) => {

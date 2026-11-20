@@ -106,9 +106,39 @@ describe('AttractapReaderResetAndSecurityState migration', () => {
       { pairingState: 'revoked', secured: 0, securityReportProblems: null },
     ]);
     // The children still point at the rebuilt table.
-    await source.query(`INSERT INTO "attractap_crash_report" ("attractapId") VALUES (1)`);
-    await source.query(`DELETE FROM "attractap" WHERE "id" = 1`);
+    const [{ id }] = (await source.query(`SELECT "id" FROM "attractap"`)) as { id: number }[];
+    await source.query(`INSERT INTO "attractap_crash_report" ("attractapId") VALUES (?)`, [id]);
+    await source.query(`DELETE FROM "attractap" WHERE "id" = ?`, [id]);
     expect(await count('attractap_crash_report')).toBe(0);
+  });
+
+  const insertReader = async (name: string) => {
+    await source.query(`INSERT INTO "attractap" ("name", "apiTokenHash") VALUES (?, '')`, [name]);
+  };
+  const lastReaderId = async () =>
+    ((await source.query(`SELECT max("id") AS id FROM "attractap"`)) as { id: number }[])[0].id;
+
+  it('keeps the reader id sequence, so a new reader never reuses the id of a deleted one', async () => {
+    await source.query(`INSERT INTO "attractap" ("id", "name", "apiTokenHash") VALUES (7, 'last', 'hash')`);
+    await source.query(`DELETE FROM "attractap" WHERE "id" = 7`);
+
+    await run('up');
+    await source.query(`INSERT INTO "attractap" ("name") VALUES ('after up')`);
+    expect(await lastReaderId()).toBe(8);
+
+    await source.query(`DELETE FROM "attractap"`);
+    await run('down');
+    await insertReader('after down');
+    expect(await lastReaderId()).toBe(9);
+  });
+
+  it('keeps the id sequence on down when the highest id is still a record', async () => {
+    await run('up');
+    await source.query(`INSERT INTO "attractap" ("id", "name") VALUES (12, 'kept')`);
+
+    await run('down');
+    await insertReader('after down');
+    expect(await lastReaderId()).toBe(13);
   });
 
   it('reverts to the shape with the token hash and keeps the readers paired meanwhile', async () => {

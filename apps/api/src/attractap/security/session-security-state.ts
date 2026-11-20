@@ -52,10 +52,6 @@ export class SessionSecurityState {
     waiting.forEach((resolve) => resolve(build));
   }
 
-  public currentBuild(): ReportedBuild | null {
-    return this.build;
-  }
-
   public whenBuild(timeoutMs: number): Promise<ReportedBuild | null> {
     if (this.build) return Promise.resolve(this.build);
     return new Promise((resolve) => {

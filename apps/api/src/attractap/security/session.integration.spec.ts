@@ -376,7 +376,7 @@ describe('reader session through the real gateway', () => {
 
     it.each([
       ['an unknown type', { t: 'session.hello' }],
-      ['a removed type', { t: 'identity.upgrade.request' }],
+      ['another unknown type', { t: 'reader.hello' }],
       ['no type', { nonce: 'x' }],
       ['not JSON', 'not json'],
       ['a JSON array', '[]'],

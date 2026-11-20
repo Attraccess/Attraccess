@@ -244,8 +244,6 @@ export function queuedSendBytes(socket: Pick<AuthenticatedWebSocket, 'pendingSen
 export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   messageCount: number;
   id: string;
-  /** `session` connections carry TLS 1.3 inside binary frames. */
-  transport?: 'session';
   /** The credential this session authenticated with and the build the reader reported. */
   sessionSecurity?: SessionSecurityState;
   /** Set when a session connection sent a plain text frame; nothing from it may be processed. */
@@ -280,7 +278,7 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
     cardRelay?: boolean;
     /**
      * Plugin BLE support negotiated from capabilities.ble; undefined until READER_FIRMWARE_INFO arrived. Used only
-     * on the paired reader link (`transport` `session`).
+     * on the paired reader link (the session; pairing connections get no socket state).
      */
     ble?: BleCapabilityState;
     /**

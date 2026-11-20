@@ -359,7 +359,6 @@ describe('AttractapGateway card relay rules', () => {
       const client: any = {
         readyState: WebSocket.OPEN,
         bufferedAmount: 0,
-        transport: 'session',
         readerId: 7,
         state: { verifiedUserId: null },
         pendingSendBytes: options.queued ?? (() => 0),

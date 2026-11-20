@@ -7,7 +7,11 @@ import type {
 } from '@attraccess/application-models';
 import { UNIT_OF_WORK, type UnitOfWork } from '../../database/unit-of-work';
 import { ReaderDeletedEvent } from '../events';
-import { ATTRACTAP_CREDENTIAL_STORE, type AttractapCredentialStore } from './credential-store.port';
+import {
+  ATTRACTAP_CREDENTIAL_STORE,
+  type AttractapCredentialStore,
+  type CredentialSecurityPatch,
+} from './credential-store.port';
 
 export interface ActiveCredential {
   state: AttractapPairingState;
@@ -18,6 +22,18 @@ export interface IssuedCertificate {
   serial: string;
   notAfter: Date;
 }
+
+/**
+ * What a credential change does to the eFuse report result: it described the previous key, so the admin UI shows
+ * "no report received yet" until the new session's report is checked.
+ */
+const NO_SECURITY_REPORT: CredentialSecurityPatch = {
+  secured: false,
+  securedAt: null,
+  efuseSecureVersion: null,
+  securityReportCheckedAt: null,
+  securityReportProblems: null,
+};
 
 /** The credential columns of a reader row as `markPaired` found them, so an undo can put them back. */
 export type CredentialSnapshot = AttractapCredentialSnapshot;
@@ -111,8 +127,7 @@ export class CredentialRegistryService {
           certificateNotAfter: certificate.notAfter,
           certificateSerial: certificate.serial,
           // A new credential has to pass the eFuse report check again.
-          secured: false,
-          securedAt: null,
+          ...NO_SECURITY_REPORT,
         });
         await this.store.appendEvent(scope, {
           readerId: reader.id,
@@ -194,8 +209,7 @@ export class CredentialRegistryService {
         await this.store.updateCredential(scope, reader.id, {
           pairingState: 'revoked',
           certificateNotAfter: null,
-          secured: false,
-          securedAt: null,
+          ...NO_SECURITY_REPORT,
         });
       });
     } finally {

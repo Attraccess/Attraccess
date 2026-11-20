@@ -54,7 +54,6 @@ describe('SessionSecurityState', () => {
     state.setBuild(build);
     await expect(waiting).resolves.toBe(build);
     await expect(state.whenBuild(5_000)).resolves.toBe(build);
-    expect(state.currentBuild()).toBe(build);
   });
 
   it('gives up waiting with null when no firmware info arrives', async () => {
@@ -66,7 +65,7 @@ describe('SessionSecurityState', () => {
       await expect(waiting).resolves.toBeNull();
       // A late firmware info does not reach the waiter that already gave up.
       state.setBuild(build);
-      expect(state.currentBuild()).toBe(build);
+      await expect(state.whenBuild(1_000)).resolves.toBe(build);
     } finally {
       jest.useRealTimers();
     }

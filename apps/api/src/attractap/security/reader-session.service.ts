@@ -50,7 +50,6 @@ export class ReaderSessionService implements OnModuleDestroy {
    * before any await, so early TLS bytes and stray text frames are seen first by the session.
    */
   public open(ws: WebSocket): SessionConnection {
-    (ws as unknown as AuthenticatedWebSocket).transport = 'session';
     return new SessionConnection(ws, this.limiter);
   }
 

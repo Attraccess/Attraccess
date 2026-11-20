@@ -45,19 +45,6 @@ describe('ReaderBleDriver (plugin BLE over the reader websocket)', () => {
       });
     });
 
-    it.each([['a connection of unknown transport', { transport: undefined }]])(
-      'offers no BLE on %s, even with a BLE capable firmware',
-      async (_name, connection) => {
-        socket().transport = connection.transport;
-        await expect(ble.scan(1, PROFILE.id)).rejects.toMatchObject({
-          code: 'READER_OFFLINE',
-          detail: 'pairing-required',
-        });
-        expect((await ble.listReaders())[0].available).toBe(false);
-        expect(firmware().received).toEqual([]);
-      },
-    );
-
     it('clamps announced limits and refuses profiles larger than the reader allowlist', async () => {
       socket().state.ble = parseBleCapability({
         version: 1,

@@ -401,9 +401,9 @@ describe('AttractapGateway', () => {
       await expect(fixture.gateway.disconnectReader(999)).resolves.toBeUndefined();
     });
 
-    it('terminates all sockets for the given reader, token and session alike', async () => {
+    it('terminates all sockets of the given reader', async () => {
       const socket1 = fixture.createMockSocket({ id: 'dr-1', readerId: 5 });
-      const socket2 = fixture.createMockSocket({ id: 'dr-2', readerId: 5, transport: 'session' });
+      const socket2 = fixture.createMockSocket({ id: 'dr-2', readerId: 5 });
       const other = fixture.createMockSocket({ id: 'dr-3', readerId: 6 });
       for (const socket of [socket1, socket2, other]) fixture.websocketService.sockets.set(socket.id, socket);
 
