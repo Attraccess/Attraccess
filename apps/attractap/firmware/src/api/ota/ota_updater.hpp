@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <string>
 
 #include <ArduinoJson.h>
@@ -18,10 +19,11 @@ public:
     OtaUpdater(Logger &logger,
                std::function<bool(const char *, JsonObject)> send,
                std::function<void(const char *)> forceReconnect,
+               std::function<uint32_t()> connectionId,
                std::function<void(int)> &progressCallback,
                std::function<bool(std::string)> &metaCallback,
                std::function<void(const char *, const char *)> &errorCallback)
-        : logger(logger), send(send), forceReconnect(forceReconnect), progressCallback(progressCallback), metaCallback(metaCallback), errorCallback(errorCallback) {}
+        : logger(logger), send(send), forceReconnect(forceReconnect), connectionId(connectionId), progressCallback(progressCallback), metaCallback(metaCallback), errorCallback(errorCallback) {}
 
     void begin(JsonObject firmwareMeta);
     void onChunk(esp_websocket_event_data_t data);
@@ -43,10 +45,17 @@ private:
     Logger &logger;
     std::function<bool(const char *, JsonObject)> send;
     std::function<void(const char *)> forceReconnect;
+    // IReaderTransport::connectionId()
+    std::function<uint32_t()> connectionId;
     std::function<void(int)> &progressCallback;
     std::function<bool(std::string)> &metaCallback;
     std::function<void(const char *, const char *)> &errorCallback;
 
+    // The connection the server offered the update on; chunks are requested on this one only. A chunk answer
+    // carries no offset, so two requests for one chunk on the same connection get it written twice. After a
+    // reconnect nothing is requested until the server offers the update again. begin() (websocket task) writes
+    // it last, tick() (main loop) reads it first.
+    std::atomic<uint32_t> offerConnectionId{0};
     bool readyForNextFirmwareChunk = false;
     uint32_t lastFirmwareChunkRequestTimeMs = 0;
     const uint32_t FIRMWARE_CHUNK_REQUEST_RESPONSE_TIMEOUT_MS = 10000;

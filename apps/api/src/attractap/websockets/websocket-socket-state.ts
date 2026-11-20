@@ -361,6 +361,8 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       size: number;
       fd?: number;
       lastLoggedPct?: number;
+      /** End of the last chunk sent on this connection; a request below it is a duplicate. */
+      servedUntil?: number;
     } | null;
     formDrafts?: Record<string, Record<number, FormFieldAnswerValue>>;
     /** Live card authentication (ATT-1187). Null once the reader reported sign-out or the server expired it. */

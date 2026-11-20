@@ -45,6 +45,14 @@ export class AttractapFirmwareHandler {
         return;
       }
 
+      // A chunk answer carries no offset: the reader writes whatever arrives next. On one connection it never
+      // needs the same bytes twice (after a lost answer it reconnects), so a repeated request is a duplicate,
+      // and answering it too would corrupt the image.
+      if (offset < (socket.state.ota.servedUntil ?? 0)) {
+        this.logger.warn(`Ignoring repeated chunk request from client ${socket.id}: offset=${offset}`);
+        return;
+      }
+
       const maxChunk = 4096; // hard cap chunk size
       const safeLen = Math.min(length, maxChunk, total - offset);
 
@@ -70,6 +78,7 @@ export class AttractapFirmwareHandler {
 
       if (bytesRead > 0) {
         socket.sendBinaryData(buffer.subarray(0, bytesRead));
+        socket.state.ota.servedUntil = offset + bytesRead;
         const progressPct = Math.round(((offset + bytesRead) / total) * 100);
         const pctBucket = Math.floor(progressPct / 10) * 10;
         const lastLogged = socket.state.ota.lastLoggedPct ?? -1;

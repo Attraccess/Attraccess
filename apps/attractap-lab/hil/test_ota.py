@@ -4,7 +4,9 @@ Every test makes the API offer an image with another version than the one the
 reader runs (``run.sh`` builds it from the same sources), resets the reader so it
 sends its firmware info, and follows the update on the console. Rejected images
 leave the reader on the old version; the last test installs the good one, so the
-reader runs the new version afterwards. On READER_PROFILE=secure-lab the images
+reader runs the new version afterwards. Its Wi-Fi drops once during that download:
+the reader reconnects, the API offers the update again and the download continues
+where it stopped. On READER_PROFILE=secure-lab the images
 are signed here with the lab key (the API's signer refuses lab keys); the
 unsigned and wrongly signed images must be refused by the reader's Secure Boot.
 
@@ -22,6 +24,7 @@ import pytest
 from attractap_lab import ota_images
 from attractap_lab.enrollment import latest_code
 from attractap_lab.reader_screen import ReaderTestHooks, ReaderCommandError
+from attractap_lab.workflow import send_reader_wifi
 
 from conftest import PIN, PROFILE, read_heap, reboot_reader
 from heap_floors import floors
@@ -32,6 +35,9 @@ UPDATE_TIMEOUT = 900
 RESPONSE_LIMIT_SECONDS = 10
 UNDERRUN = re.compile(r"LCD underrun")
 CAMERA_EVERY_SECONDS = 8
+# A download takes 30 s or more; this far in, the reader's Wi-Fi is reconnected once.
+WIFI_DROP_AFTER_SECONDS = 8
+RESUMED = "Resuming OTA update at"
 
 
 def version_pattern(version):
@@ -129,6 +135,7 @@ def test_update_to_the_new_version(target, reader, ota, images, api, admin, scre
     started = time.monotonic()
     summary = {"screens": [], "responseSeconds": [], "heap": [], "camera": []}
     last_camera = 0
+    wifi_dropped = False
     screenshot("ota-start")
     try:
         while not re.search(rb"Firmware update complete", console.data[mark:]):
@@ -155,6 +162,9 @@ def test_update_to_the_new_version(target, reader, ota, images, api, admin, scre
                 name = f"ota-flash-{int(last_camera - started)}s"
                 screenshot(name)
                 summary["camera"].append(name)
+            if not wifi_dropped and time.monotonic() - started > WIFI_DROP_AFTER_SECONDS:
+                wifi_dropped = True
+                send_reader_wifi(target, PIN)
             time.sleep(4)
     finally:
         log = console.since(mark)
@@ -162,8 +172,10 @@ def test_update_to_the_new_version(target, reader, ota, images, api, admin, scre
         summary["minFree"] = min((item["windowMinFree"] for item in summary["heap"]), default=0)
         summary["minLargest"] = min((item["windowMinLargest"] for item in summary["heap"]), default=0)
         summary["lcdUnderruns"] = len(UNDERRUN.findall(log))
+        summary["resumed"] = log.count(RESUMED)
         (artifacts / "ota-update.json").write_text(json.dumps(summary, indent=1))
     assert UPDATE_SCREEN in summary["screens"], f"never showed the update screen: {summary['screens']}"
+    assert summary["resumed"] >= 1, "the download did not continue after the Wi-Fi drop"
     assert max(summary["responseSeconds"]) < RESPONSE_LIMIT_SECONDS, summary["responseSeconds"]
     assert summary["lcdUnderruns"] == 0, f"{summary['lcdUnderruns']} LCD underruns during the update"
     limit = floors(PROFILE, "ota")

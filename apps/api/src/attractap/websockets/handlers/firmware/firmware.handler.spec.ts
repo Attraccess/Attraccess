@@ -197,6 +197,27 @@ describe('AttractapFirmwareHandler', () => {
       expect(fixture.mockReadSync).toHaveBeenCalledWith(9, expect.any(Buffer), 0, 48, 2000);
     });
 
+    it('ignores a repeated request for bytes already sent on this connection', async () => {
+      fixture.socket.state.ota = { path: '/tmp/fw.bin', size: 100000, fd: 9 };
+      fixture.mockReadSync.mockReturnValue(4096 as any);
+      const request = (offset: number) =>
+        fixture.handler.handleFirmwareChunkRequest(fixture.socket, {
+          payload: { offset, length: 4096 },
+        } as AttractapEvent['data']);
+
+      await request(8192);
+      // The reader asked twice for one chunk (a retry and a resume after its reconnect).
+      await request(8192);
+      await request(12288);
+
+      const offsets = fixture.mockReadSync.mock.calls.map((call) => call[4]);
+      expect(offsets).toEqual([8192, 12288]);
+      expect(fixture.socket.sendBinaryData).toHaveBeenCalledTimes(2);
+      expect((fixture.handler as any).logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Ignoring repeated chunk request'),
+      );
+    });
+
     it('does not send binary data when bytesRead is 0', async () => {
       fixture.socket.state.ota = { path: '/tmp/fw.bin', size: 2048, fd: 9 };
       fixture.mockReadSync.mockReturnValue(0 as any);
@@ -231,12 +252,12 @@ describe('AttractapFirmwareHandler', () => {
       expect((fixture.handler as any).logger.log).toHaveBeenCalledTimes(1);
 
       // Third read crosses into 20% bucket -> logs again
-      fixture.mockReadSync.mockReturnValue(100 as any);
+      fixture.mockReadSync.mockReturnValue(50 as any);
       await fixture.handler.handleFirmwareChunkRequest(fixture.socket, {
-        payload: { offset: 100, length: 100 },
+        payload: { offset: 150, length: 50 },
       } as AttractapEvent['data']);
 
-      // (100+100)/1000 = 20% -> bucket 20 > 10
+      // (150+50)/1000 = 20% -> bucket 20 > 10
       expect(fixture.socket.state.ota.lastLoggedPct).toBe(20);
       expect((fixture.handler as any).logger.log).toHaveBeenCalledTimes(2);
     });
