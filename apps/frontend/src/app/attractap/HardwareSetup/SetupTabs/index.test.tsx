@@ -11,7 +11,7 @@ const bridge = {
   friendlyName: 'Attractap BLE Bridge',
   variant: 'gl_s10',
   variantFriendlyName: 'GL.iNet GL-S10',
-  version: '2.7.0',
+  version: '2.8.0',
   boardFamily: 'ESP32',
   filename: 'attractap_bridge_gl_s10.bin',
   filenameOTA: 'attractap_bridge_gl_s10.bin.zz',

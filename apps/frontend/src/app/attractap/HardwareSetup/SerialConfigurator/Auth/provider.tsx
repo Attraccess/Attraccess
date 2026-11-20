@@ -110,6 +110,13 @@ export function AttractapSerialCommGate({ children }: PropsWithChildren) {
   return children;
 }
 
+const PIN_STATUS_TIMEOUT_MS = 5000;
+/**
+ * The first Bluetooth command arrives while the OS is still pairing and encrypting the link, and the bridge may
+ * never answer it. Ask again for up to about 20 s instead of leaving the user on "Waiting for the device".
+ */
+const BLUETOOTH_PIN_STATUS_ATTEMPTS = 4;
+
 export function AttractapSerialCommProvider({ children }: PropsWithChildren) {
   const [pinIsSet, setPinIsSet] = useState<boolean | null>(null);
   const [authCode, setAuthCode] = useState<string | null>(null);
@@ -118,7 +125,11 @@ export function AttractapSerialCommProvider({ children }: PropsWithChildren) {
 
   const refreshPinStatus = useCallback(async () => {
     const transport = getActiveConfiguratorTransport();
-    const response = await transport.sendCommand({ topic: 'auth.status.get' }, true, 5000);
+    const attempts = transport.kind === 'bluetooth' ? BLUETOOTH_PIN_STATUS_ATTEMPTS : 1;
+    let response: string | null = null;
+    for (let attempt = 0; attempt < attempts && !response; attempt++) {
+      response = await transport.sendCommand({ topic: 'auth.status.get' }, true, PIN_STATUS_TIMEOUT_MS);
+    }
 
     if (!response) {
       throw new Error('NO_RESPONSE');
