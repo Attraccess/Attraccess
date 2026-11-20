@@ -67,7 +67,7 @@ Eine noch nicht gekoppelte Bridge (frisch geflasht oder nach einem Werksreset) l
 
 1. Halten Sie die Taste am Gehäuse **3 Sekunden** gedrückt. Nach 3 Sekunden blinken alle LEDs schnell; lassen Sie die Taste dann los (nach 10 Sekunden würde die Bridge auf Werkseinstellungen zurückgesetzt).
 2. Die **BT**-LED blinkt jetzt alle 1,5 Sekunden zweimal kurz: Die Einrichtung ist 10 Minuten lang offen.
-3. Öffnen Sie in Attraccess **Geräte** > **Attractap-Lesegeräte**, wählen Sie **Attractap einrichten** und klicken Sie auf **Über Bluetooth einrichten**.
+3. Öffnen Sie in Attraccess **Geräte** > **Attractap-Lesegeräte**, wählen Sie **Attractap einrichten** und klicken Sie auf **Per Bluetooth einrichten**.
 4. Wählen Sie in der Geräteliste des Browsers **Attractap Bridge XXXX**. Ihr Computer oder Smartphone koppelt sich beim ersten Befehl mit der Bridge; bestätigen Sie die Kopplungsabfrage, falls eine erscheint. Solange der Browser verbunden ist, leuchtet die BT-LED dauerhaft.
 5. Legen Sie die PIN, das WLAN (mit Ethernet optional) und den Server fest und geben Sie die Bridge dann mit dem angezeigten Code frei.
 
@@ -75,11 +75,11 @@ Die Einrichtung schließt nach 10 Minuten, etwa 10 Sekunden nachdem die Bridge g
 
 Die Verbindung ist verschlüsselt (Bluetooth LE Secure Connections); das WLAN-Passwort wird also nie im Klartext übertragen. Es gelten dieselben PIN-Regeln wie über die serielle Schnittstelle.
 
-| Browser                                      | Einrichtung über Bluetooth                          |
-| -------------------------------------------- | --------------------------------------------------- |
-| Chrome oder Edge unter Windows, macOS, Linux | Unterstützt                                         |
-| Chrome unter Android                         | Unterstützt                                         |
-| Firefox, Safari, jeder Browser unter iOS     | Nicht unterstützt: Nutzen Sie den seriellen Adapter |
+| Browser                                      | Einrichtung über Bluetooth                                                                  |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Chrome oder Edge unter Windows, macOS, Linux | Unterstützt                                                                                 |
+| Chrome unter Android                         | Unterstützt                                                                                 |
+| Firefox, Safari, jeder Browser unter iOS     | Nicht unterstützt: Nutzen Sie den seriellen Adapter mit Chrome oder Edge auf einem Computer |
 
 > [!NOTE]
 > Die Seite muss über HTTPS (oder `localhost`) geöffnet sein; Browser bieten Bluetooth nur sicheren Seiten an.

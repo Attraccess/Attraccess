@@ -75,11 +75,11 @@ The setup closes after 10 minutes, about 10 seconds after the bridge is paired, 
 
 The connection is encrypted (Bluetooth LE Secure Connections), so the Wi-Fi password is never sent in clear text. The same PIN rules apply as over the serial port.
 
-| Browser                                 | Bluetooth setup                       |
-| --------------------------------------- | ------------------------------------- |
-| Chrome or Edge on Windows, macOS, Linux | Supported                             |
-| Chrome on Android                       | Supported                             |
-| Firefox, Safari, any browser on iOS     | Not supported: use the serial adapter |
+| Browser                                 | Bluetooth setup                                                         |
+| --------------------------------------- | ----------------------------------------------------------------------- |
+| Chrome or Edge on Windows, macOS, Linux | Supported                                                               |
+| Chrome on Android                       | Supported                                                               |
+| Firefox, Safari, any browser on iOS     | Not supported: use the serial adapter with Chrome or Edge on a computer |
 
 > [!NOTE]
 > The page must be opened over HTTPS (or `localhost`); browsers only offer Bluetooth to secure pages.

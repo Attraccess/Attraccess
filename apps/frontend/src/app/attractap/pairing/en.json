@@ -97,7 +97,7 @@
   },
   "toPair": {
     "title": "Not paired",
-    "description": "A new reader shows a code on its screen (Lite: colours on its ring). Press Pair, then type the code or compare the colours. A reader whose pairing was removed shows its code like a new reader and takes over its old record when you choose it. The reader must be switched on and connected.",
+    "description": "A new reader shows a code on its screen (Lite: colours on its ring; Bluetooth bridge: on its setup page). Press Pair, then type the code or compare the colours. A reader whose pairing was removed shows its code like a new reader and takes over its old record when you choose it. The reader must be switched on and connected.",
     "resources": "Resources: {{names}}",
     "pairingRemoved": "Pairing was removed",
     "newReader": "New reader",

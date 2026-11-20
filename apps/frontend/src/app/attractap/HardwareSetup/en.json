@@ -20,7 +20,7 @@
       "button": "Set up over Bluetooth",
       "unavailable": {
         "title": "Bluetooth setup is not available in this browser",
-        "description": "Setting up over Bluetooth needs Web Bluetooth, which Chrome and Edge offer on desktop and Android (over HTTPS). Open this page there, or connect the bridge via USB: USB setup works everywhere."
+        "description": "Setting up over Bluetooth needs Web Bluetooth, which Chrome and Edge offer on desktop and Android (over HTTPS). Open this page there, or connect the bridge via USB, which also needs Chrome or Edge on a computer."
       },
       "failed": {
         "title": "Could not connect to the bridge",
