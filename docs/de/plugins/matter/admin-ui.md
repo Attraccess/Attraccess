@@ -11,20 +11,20 @@ Zurück- und Vor-Schaltflächen des Browsers und ein Neuladen behalten Ihre Posi
 
 ```text
  Matter
- ┌───────────────────────────────────────────────────────────────────────────┐
- │ ⚠ Matter-Sidecar nicht erreichbar                                         │
- │   Nicht erreichbar seit 12:03. [Infrastruktur öffnen] [Jetzt erneut versuchen] │
- ├───────────────────────────────────────────────────────────────────────────┤
- │ Geräte │ Infrastruktur │ Thread-Netzwerk │ Inbetriebnahme │ Zustand │ Updates │
- ├───────────────────────────────────────────────────────────────────────────┤
- │ Anzeigen: [Alle aktiven ▾]   ( ) Archivierte und entfernte einbeziehen    │
- │ ┌─────────────────────────────────────────────────────────────────────┐   │
- │ │ Plug (7)   [Nicht übernommen] [Erreichbar]                          │   │
- │ │ ⚠ Nicht übernommenes Gerät – in Flows erst nach Übernahme nutzbar.  │   │
- │ │ Acme / Plug · Software 1.0.3 · 2 Endpunkte · zuletzt gesehen 12:01  │   │
- │ │ [Übernehmen] [Archivieren] [Erzwungen entfernen] [Details]          │   │
- │ └─────────────────────────────────────────────────────────────────────┘   │
- └───────────────────────────────────────────────────────────────────────────┘
+ ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+ │ ⚠ Matter-Sidecar nicht erreichbar                                                            │
+ │   Nicht erreichbar seit 12:03. [Infrastruktur öffnen] [Jetzt erneut versuchen]               │
+ ├──────────────────────────────────────────────────────────────────────────────────────────────┤
+ │ Geräte │ Infrastruktur │ Thread-Netzwerk │ Inbetriebnahme │ Systemzustand │ Software-Updates │
+ ├──────────────────────────────────────────────────────────────────────────────────────────────┤
+ │ Anzeigen: [Alle aktiven ▾]   ( ) Archivierte und entfernte einbeziehen                       │
+ │ ┌────────────────────────────────────────────────────────────────────────────────────────┐   │
+ │ │ Plug (7)   [Nicht übernommen] [Erreichbar]                                             │   │
+ │ │ ⚠ Nicht übernommenes Gerät – in Flows erst nach Übernahme nutzbar.                     │   │
+ │ │ Acme / Plug · Software 1.0.3 · 2 Endpunkte · zuletzt gesehen 12:01                     │   │
+ │ │ [Übernehmen] [Archivieren] [Entfernen erzwingen] [Details]                             │   │
+ │ └────────────────────────────────────────────────────────────────────────────────────────┘   │
+ └──────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 Auf dem Smartphone werden die Tabs zu einer Auswahlliste über dem Inhalt.
@@ -37,11 +37,11 @@ dürfen, führt Sie zum ersten Tab, den Sie sehen dürfen. Die Schlüssel stehen
 
 | Tab              | Sichtbar mit                                     | Aktionen erfordern                                                                                                                   |
 | ---------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Geräte           | `matter.devices.read`                            | `matter.devices.manage`: übernehmen, reparieren, neu verknüpfen, archivieren, wiederherstellen, erzwungen entfernen, Namen, Abgleich |
+| Geräte           | `matter.devices.read`                            | `matter.devices.manage`: übernehmen, reparieren, neu verknüpfen, archivieren, wiederherstellen, Entfernen erzwingen, Namen, Abgleich |
 | Infrastruktur    | `matter.devices.read`                            | `matter.devices.manage`: Einstellungen, Fabric, Wiederherstellungsschlüssel, Backup, Restore                                         |
 | Thread-Netzwerk  | `thread.network.read`                            | `thread.network.manage` (noch keine Aktion)                                                                                          |
 | Inbetriebnahme   | `matter.devices.commission`                      | –                                                                                                                                    |
-| Zustand          | `matter.devices.read` oder `thread.network.read` | – (Thread-Karten brauchen `thread.network.read`)                                                                                     |
+| Systemzustand    | `matter.devices.read` oder `thread.network.read` | – (Thread-Karten brauchen `thread.network.read`)                                                                                     |
 | Software-Updates | `matter.devices.read`                            | `matter.devices.manage` (Freigeben und Einspielen, später)                                                                           |
 
 Benutzer mit reinem Leserecht sehen keine Bearbeiten- oder Lebenszyklus-Schaltfläche, und Attraccess sendet nie eine
@@ -70,15 +70,15 @@ Geräte, die eine Entscheidung brauchen, stehen zuerst und werden erklärt:
 
 | Zustand          | Bedeutung                                                                                        | Was Sie tun können                                                              |
 | ---------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
-| Nicht übernommen | Das Gerät ist in der Fabric, aber niemand hat es übernommen. Es ist in Flows nicht nutzbar.      | **Übernehmen** (mit optionalem Namen), **Archivieren**, **Erzwungen entfernen** |
-| Getrennt         | Der Datensatz hat sein Gerät verloren (nicht mehr gelistet oder Fabric geändert). Nicht nutzbar. | **Reparieren**, **Neu verknüpfen**, **Archivieren**, **Erzwungen entfernen**    |
-| Übernommen       | In Benutzung.                                                                                    | **Reparieren**, **Erzwungen entfernen** (auf der Detailseite)                   |
-| Archiviert       | In der Liste ausgeblendet, nicht nutzbar.                                                        | **Wiederherstellen**, **Erzwungen entfernen**                                   |
+| Nicht übernommen | Das Gerät ist in der Fabric, aber niemand hat es übernommen. Es ist in Flows nicht nutzbar.      | **Übernehmen** (mit optionalem Namen), **Archivieren**, **Entfernen erzwingen** |
+| Getrennt         | Der Datensatz hat sein Gerät verloren (nicht mehr gelistet oder Fabric geändert). Nicht nutzbar. | **Reparieren**, **Neu verknüpfen**, **Archivieren**, **Entfernen erzwingen**    |
+| Übernommen       | In Benutzung.                                                                                    | **Reparieren**, **Entfernen erzwingen** (auf der Detailseite)                   |
+| Archiviert       | In der Liste ausgeblendet, nicht nutzbar.                                                        | **Wiederherstellen**, **Entfernen erzwingen**                                   |
 | Entfernt         | Aus Attraccess entfernt; der Verlauf bleibt erhalten.                                            | –                                                                               |
 
 Nicht übernommene und getrennte Geräte bieten nichts außer diesen Aktionen: keinen Befehl und keine „Benutzen“-Schaltfläche.
 **Neu verknüpfen** lässt Sie das nicht übernommene Gerät wählen, das das getrennte ersetzt hat. Unterscheiden sich
-Hersteller, Produkt oder Seriennummer, bestätigen Sie das in einem zweiten Schritt. **Erzwungen entfernen** verlangt eine
+Hersteller, Produkt oder Seriennummer, bestätigen Sie das in einem zweiten Schritt. **Entfernen erzwingen** verlangt eine
 Bestätigung, die sagt, dass das Gerät nur aus Attraccess entfernt wird: Es wird nicht auf Werkseinstellungen
 zurückgesetzt und nicht aus der Matter-Fabric entfernt. Was jede Aktion bewirkt, steht in
 [Matter: Datenmodell und Lebenszyklus](plugins/matter/data-model.md).
@@ -123,15 +123,17 @@ Jeder sagt das, ausgehend von dem, was der Sidecar meldet (Funktionsfamilien `th
 - **Software-Updates** listet die Software, die jedes Gerät gerade nutzt. Updates finden, freigeben und einspielen kommt
   mit der OTA-Unterstützung.
 
-## Zustand
+## Systemzustand
 
 Eine Seite mit Verbindung, Kompatibilität, Fabric, Backup, Abgleich und Ereigniszählern, den Funktionsfamilien, die der
 Sidecar unterstützt, und für Benutzer mit `thread.network.read` einem Thread-Platzhalter. Eine Karte, die nicht in
-Ordnung ist, verlinkt auf den Tab, auf dem Sie das beheben können.
+Ordnung ist, verlinkt auf den Tab, auf dem Sie das beheben können. Die Verbindungskarten folgen dem Status, den die Seite
+alle 5 Sekunden prüft; Fabric, Backup und Abgleich aktualisieren sich alle 30 Sekunden. Beides pausiert, solange der
+Browser-Tab im Hintergrund ist.
 
 ## Live-Updates
 
 Geräteliste, Gerät und sein Zustand aktualisieren sich ohne Neuladen: Attraccess sendet ein kurzes „etwas hat sich
 geändert“-Signal, und die Seite liest die neuen Daten über die normale, berechtigungsgeprüfte API. Sind Live-Updates nicht
-verfügbar, sagt die Seite, dass das Angezeigte veraltet sein kann, und aktualisiert sich alle paar Sekunden selbst, bis sie
-wieder funktionieren.
+verfügbar, sagt die Seite, dass das Angezeigte veraltet sein kann, und aktualisiert sich etwa alle 15 Sekunden selbst,
+bis sie wieder funktionieren.

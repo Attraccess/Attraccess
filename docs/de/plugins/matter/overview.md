@@ -27,7 +27,7 @@ Geräte-Oberfläche.
 ## Wo es erscheint
 
 Eine Admin-Seite unter **Geräte → Matter** in der Seitenleiste mit Tabs für Geräte, Infrastruktur (Verbindungseinstellungen zum
-Sidecar, Fabric, Backups und Wiederherstellung), Thread-Netzwerk, Inbetriebnahme, Zustand und Software-Updates.
+Sidecar, Fabric, Backups und Wiederherstellung), Thread-Netzwerk, Inbetriebnahme, Systemzustand und Software-Updates.
 
 ## In diesem Bereich
 

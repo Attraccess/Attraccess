@@ -11,20 +11,20 @@ reload keep your place.
 
 ```text
  Matter
- ┌───────────────────────────────────────────────────────────────────────────┐
- │ ⚠ Matter sidecar unreachable                                              │
- │   Unreachable since 12:03. [Open Infrastructure] [Retry now]              │
- ├───────────────────────────────────────────────────────────────────────────┤
- │ Devices │ Infrastructure │ Thread Network │ Commissioning │ Health │ Updates │
- ├───────────────────────────────────────────────────────────────────────────┤
- │ Show: [All active ▾]   ( ) Include archived and removed                   │
- │ ┌─────────────────────────────────────────────────────────────────────┐   │
- │ │ Plug (7)   [Unclaimed] [Reachable]                                  │   │
- │ │ ⚠ Unclaimed device – cannot be used in flows until claimed.         │   │
- │ │ Acme / Plug · Software 1.0.3 · 2 endpoints · last seen 12:01        │   │
- │ │ [Claim] [Archive] [Force remove] [Details]                          │   │
- │ └─────────────────────────────────────────────────────────────────────┘   │
- └───────────────────────────────────────────────────────────────────────────┘
+ ┌───────────────────────────────────────────────────────────────────────────────────────┐
+ │ ⚠ Matter sidecar unreachable                                                          │
+ │   Unreachable since 12:03. [Open Infrastructure] [Retry now]                          │
+ ├───────────────────────────────────────────────────────────────────────────────────────┤
+ │ Devices │ Infrastructure │ Thread Network │ Commissioning │ Health │ Software Updates │
+ ├───────────────────────────────────────────────────────────────────────────────────────┤
+ │ Show: [All active ▾]   ( ) Include archived and removed                               │
+ │ ┌─────────────────────────────────────────────────────────────────────────────────┐   │
+ │ │ Plug (7)   [Unclaimed] [Reachable]                                              │   │
+ │ │ ⚠ Unclaimed device – cannot be used in flows until claimed.                     │   │
+ │ │ Acme / Plug · Software 1.0.3 · 2 endpoints · last seen 12:01                    │   │
+ │ │ [Claim] [Archive] [Force remove] [Details]                                      │   │
+ │ └─────────────────────────────────────────────────────────────────────────────────┘   │
+ └───────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 On a phone the tabs become a drop-down list above the content.
@@ -125,10 +125,11 @@ Each says so, based on what the sidecar reports (feature families `thread`, `com
 
 One page with connection, compatibility, fabric, backup, reconciliation and event counters, the feature families the sidecar
 supports and, for users with `thread.network.read`, a Thread placeholder. A card that is not healthy links to the tab where
-you can fix it.
+you can fix it. The connection cards follow the status, which the page checks every 5 seconds; fabric, backup and
+reconciliation refresh every 30 seconds. Both pause while the browser tab is in the background.
 
 ## Live updates
 
 The device list, a device and its state update without reloading the page: Attraccess pushes a short "something changed"
 signal and the page reads the new data through the normal, permission-checked API. If live updates are unavailable, the page
-says that what you see may be out of date and refreshes itself every few seconds until they work again.
+says that what you see may be out of date and refreshes itself about every 15 seconds until they work again.
