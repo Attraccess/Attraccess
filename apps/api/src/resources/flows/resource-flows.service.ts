@@ -39,10 +39,20 @@ import { getNodeFlowScopes } from './schemas/node-flow-scopes';
 
 import type { TransactionScope } from '../../database/unit-of-work';
 
+import { ZodError } from 'zod';
+
+import {
+  INVALID_NODE_CONFIGURATION_MESSAGE,
+  ValidationErrorCode,
+  zodErrorToFieldErrors,
+} from './node-validation-errors';
+
 export interface ValidationError {
   nodeId: string;
   nodeType: string;
   field: string;
+  /** Missing on errors from plugins; the editor treats that as `invalid`. */
+  code?: ValidationErrorCode;
   message: string;
   value?: unknown;
 }
@@ -304,6 +314,7 @@ export class ResourceFlowsService {
           nodeId: nodeData.id,
           nodeType: nodeData.type,
           field: 'type',
+          code: 'invalid',
           message: `Unknown node type: ${nodeData.type}`,
         });
       }
@@ -317,6 +328,7 @@ export class ResourceFlowsService {
           ...validationErrors.map((error) => ({
             nodeId: nodeData.id,
             nodeType: nodeData.type,
+            code: 'invalid' as const,
             ...error,
           })),
         );
@@ -337,31 +349,29 @@ export class ResourceFlowsService {
             nodeId: nodeData.id,
             nodeType: nodeData.type,
             field: 'meterId',
+            code: 'invalid',
             message: 'Choose a meter belonging to this resource',
           });
         }
       }
     } catch (error) {
-      // Handle Zod validation errors
-      if (error.errors) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        error.errors.forEach((zodError: any) => {
-          errors.push({
+      if (error instanceof ZodError) {
+        errors.push(
+          ...zodErrorToFieldErrors(error, nodeData.data).map((fieldError) => ({
             nodeId: nodeData.id,
             nodeType: nodeData.type,
-            field: zodError.path?.join('.') || 'data',
-            message: zodError.message,
-            value: zodError.received,
-          });
-        });
+            ...fieldError,
+          })),
+        );
       } else {
-        // Fallback for other types of errors
+        // Not a schema problem: keep internal details out of the editor.
+        this.logger.error(`Failed to validate node ${nodeData.id} (${nodeData.type})`, (error as Error)?.stack);
         errors.push({
           nodeId: nodeData.id,
           nodeType: nodeData.type,
           field: 'data',
-          message: error.message || 'Invalid node data',
-          value: nodeData.data,
+          code: 'invalid',
+          message: INVALID_NODE_CONFIGURATION_MESSAGE,
         });
       }
     }
