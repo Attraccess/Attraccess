@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 // Register the shared API mocks before loading the component's feature modules.
-import { chooseRowAction, hoisted, makePlugin, renderWithQuery } from './index.test.hoisted';
+import { hoisted, makePlugin, renderWithQuery } from './index.test.hoisted';
 import { PluginsSection } from './index';
 
 const LEGACY_ERROR =
