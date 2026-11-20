@@ -36,4 +36,36 @@ describe('DoorControls', () => {
     expect(screen.getByRole('button', { name: 'Unlock' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Open' })).not.toBeInTheDocument();
   });
+
+  it('hides Unlatch when the door has no separate unlatch', () => {
+    renderControls({ separateUnlockAndUnlatch: false });
+    expect(screen.queryByRole('button', { name: 'Unlatch' })).not.toBeInTheDocument();
+  });
+
+  it('hides Unlatch when separateUnlockAndUnlatch is omitted', () => {
+    renderControls({});
+    expect(screen.queryByRole('button', { name: 'Unlatch' })).not.toBeInTheDocument();
+  });
+
+  it('shows Unlatch and calls onUnlatch on a door with separate unlatch', () => {
+    const { onUnlatch } = renderControls({ separateUnlockAndUnlatch: true });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Unlatch' }));
+
+    expect(onUnlatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides Unlatch without an onUnlatch handler', () => {
+    render(
+      <DoorControls
+        onLock={vi.fn()}
+        onUnlock={vi.fn()}
+        separateUnlockAndUnlatch
+        lockIsPending={false}
+        unlockIsPending={false}
+        unlatchIsPending={false}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Unlatch' })).not.toBeInTheDocument();
+  });
 });

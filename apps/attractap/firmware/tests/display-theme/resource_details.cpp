@@ -154,13 +154,35 @@ void testAccessOnlyDoorDetails(Renderer &renderer)
     expect(clicked.buttonClickType == ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR, "Open sends the unlock action");
     details.hideActionProgress();
 
+    // ATT-1272: a regular door shows Unlatch only with a separate unlatch; the same screen is reused across resources.
     door.accessOnly = false;
+    door.separateUnlockAndUnlatch = false;
     details.setResourceAndUsageDetails(door);
     settle();
     expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Aufschliessen")), "Regular door shows Unlock");
     expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Abschliessen")), "Regular door shows Lock");
-    expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Falle öffnen")), "Regular door shows Unlatch");
+    expect(!shownOnScreen(requireObject(guard.root, &lv_label_class, "Falle öffnen")), "Door without separate unlatch hides Unlatch");
     expect(!findObject(guard.root, &lv_label_class, "Öffnen"), "Regular door shows no Open");
+    renderer.capture("door-without-unlatch");
+
+    door.separateUnlockAndUnlatch = true;
+    details.setResourceAndUsageDetails(door);
+    settle();
+    expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Aufschliessen")), "Separate-unlatch door shows Unlock");
+    expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Abschliessen")), "Separate-unlatch door shows Lock");
+    expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Falle öffnen")), "Separate-unlatch door shows Unlatch");
+
+    door.separateUnlockAndUnlatch = false;
+    details.setResourceAndUsageDetails(door);
+    settle();
+    expect(!shownOnScreen(requireObject(guard.root, &lv_label_class, "Falle öffnen")), "Unlatch is hidden again after switching back");
+    expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Abschliessen")), "Lock stays shown after switching back");
+
+    door.accessOnly = true;
+    door.separateUnlockAndUnlatch = true;
+    details.setResourceAndUsageDetails(door);
+    settle();
+    expect(!shownOnScreen(requireObject(guard.root, &lv_label_class, "Falle öffnen")), "Access-only door hides Unlatch even with separate unlatch");
 }
 
 // ATT-1188: the reservations plugin splits a clause with a long holder name (16 characters) between the name and
