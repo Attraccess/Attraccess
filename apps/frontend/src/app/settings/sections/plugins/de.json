@@ -7,7 +7,7 @@
   },
   "installPlugin": "Plugin installieren",
   "uploadButton": "ZIP-Datei hochladen",
-  "docsButton": "Dokumentation",
+  "docsButton": "Entwicklerleitfaden",
   "manageVersion": "Version verwalten",
   "classification": {
     "official": {
@@ -153,10 +153,7 @@
     }
   },
   "deleteTooltip": "Plugin entfernen",
-  "aside": {
-    "title": "Ein Plugin schreiben",
-    "description": "Plugins erweitern API und Frontend aus einem einzigen Bundle. Der Entwicklerleitfaden beschreibt Manifest, Berechtigungsmodell und lokale Entwicklung."
-  },
+  "rowActions": "Aktionen für {{pluginName}}",
   "deleteConfirmation": {
     "title": "Plugin entfernen?",
     "cancel": "Abbrechen",

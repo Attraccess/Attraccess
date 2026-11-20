@@ -2,10 +2,12 @@ import { Button } from '@attraccess/plugins-frontend-ui';
 import { usePluginControllerCheckAllInstalledPackages } from '@attraccess/react-query-client';
 import { Dropdown, DropdownItem, DropdownMenu, DropdownPopover, DropdownTrigger } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
-import { ChevronDown, Store, Upload } from 'lucide-react';
+import { BookOpen, ChevronDown, Store, Upload } from 'lucide-react';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { usePluginsTranslations } from '../usePluginsTranslations';
 import { useInstalledNpmPlugins } from './useInstalledNpmPlugins';
+
+const DOCS_URL = 'https://docs.attraccess.org/#/plugins/developing-plugins';
 
 interface Props {
   onOpenMarketplace: () => void;
@@ -35,6 +37,16 @@ export function PluginToolbar({ onOpenMarketplace, onOpenUpload }: Props) {
 
   return (
     <div className="flex flex-wrap justify-end gap-2">
+      <a
+        href={DOCS_URL}
+        target="_blank"
+        rel="noreferrer"
+        className={`${buttonVariants({ variant: 'secondary', size: 'sm' })} inline-flex items-center gap-2`}
+        data-cy="plugins-list-docs-link"
+      >
+        <BookOpen size={16} />
+        {t('docsButton')}
+      </a>
       {installed.length > 0 ? (
         <Button
           variant="secondary"

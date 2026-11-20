@@ -27,7 +27,7 @@ Official plugins are published to npm under these dist-tags:
 | `next`   | Nightly builds of main | Builds from green, hardware-gated main builds, versioned like `0.2.0-nightly.1180.1` (the plugin version, then `-nightly.<run>.<attempt>`). |
 | `alpha`  | Nobody (legacy)        | Frozen builds from before release channels existed.                                                                                         |
 
-To try a nightly, open **Settings → Plugins**, choose **Manage version** on the installed plugin and enter `next` (or a specific nightly version) as **Requested version or channel**. Nightly versions are prereleases, so they are never installed automatically.
+To try a nightly, open **Settings → Plugins**, open the installed plugin's actions menu (**⋯**), choose **Manage version** and enter `next` (or a specific nightly version) as **Requested version or channel**. Nightly versions are prereleases, so they are never installed automatically.
 
 Once a plugin has had a release, the marketplace offers only released versions. Until then:
 
@@ -82,7 +82,7 @@ restart Attraccess.
 
 1. Open **Settings** in the sidebar and select the **Plugins** section
 2. Find the plugin in the list
-3. Click the **Remove** or **Delete** button
+3. Open the plugin's actions menu (**⋯**) and choose **Remove plugin**
 4. Confirm the removal
 
 What happens to the plugin's data depends on how it was installed. The confirmation dialog says which case applies.
