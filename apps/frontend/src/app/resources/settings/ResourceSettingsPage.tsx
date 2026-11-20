@@ -40,6 +40,7 @@ export function fromResource(resource: Resource): FormData {
     maxParallelSessions: resource.maxParallelSessions ?? 1,
     type: resource.type ?? ResourceType.MACHINE,
     separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch ?? false,
+    accessOnly: resource.accessOnly ?? false,
     retrainingMaxAgeDays: resource.retrainingMaxAgeDays ?? null,
     retrainingMaxInactivityDays: resource.retrainingMaxInactivityDays ?? null,
     retrainingBlocksAccess: resource.retrainingBlocksAccess ?? false,
@@ -112,7 +113,14 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
     submittedRevision.current = editRevision.current;
     updateResource.mutate({
       path: { id: resourceId },
-      body: { ...formData, name: formData.name.trim(), image: selectedImage ?? undefined, deleteImage },
+      body: {
+        ...formData,
+        name: formData.name.trim(),
+        // Only doors can be access only; a door switched to a machine drops it.
+        accessOnly: formData.type === ResourceType.DOOR && Boolean(formData.accessOnly),
+        image: selectedImage ?? undefined,
+        deleteImage,
+      },
     });
   };
 

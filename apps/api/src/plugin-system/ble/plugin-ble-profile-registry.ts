@@ -39,6 +39,17 @@ export function getPluginBleProfile(pluginId: string, profileId: string): Plugin
   return registry.get(pluginId)?.get(profileId);
 }
 
+/** The plugin's own profile, or `PROFILE_NOT_REGISTERED` (another plugin's profile looks missing). */
+export function requirePluginBleProfile(pluginId: string, profileId: string): PluginBleProfile {
+  const profile = getPluginBleProfile(pluginId, profileId);
+  if (!profile) {
+    throw new PluginBleError('PROFILE_NOT_REGISTERED', `Profile "${profileId}" is not registered by this plugin`, {
+      detail: profileId,
+    });
+  }
+  return profile;
+}
+
 /** Test helper: forgets every profile. */
 export function clearPluginBleProfiles(): void {
   registry.clear();

@@ -187,6 +187,10 @@ Plugins mit der Berechtigung `BLE_TRANSPORT` sprechen über Attractap-Reader mit
 | `attraccess_plugin_ble_session_closes_total` | Counter | `reason` | Geschlossene Sitzungen nach Grund (`closed`, `lease-expired`, `disconnected`, `cancelled`, ...) |
 | `attraccess_plugin_ble_rejections_total` | Counter | `code` | Aufrufe, die Profil, Reader-Allowlist oder ein Größenlimit abgelehnt haben (`OPERATION_NOT_ALLOWED`, `UNKNOWN_CHARACTERISTIC`, `PAYLOAD_TOO_LARGE`) |
 | `attraccess_plugin_ble_notifications_total` | Counter | `outcome` | Benachrichtigungen nach Ergebnis: `delivered` (an den Stream des Plugins übergeben), `overflow` (der Puffer des Readers oder die Warteschlange der API pro Abonnement ist übergelaufen; der Stream scheitert mit `NOTIFICATION_OVERFLOW`), `oversized` (über `maxNotificationBytes` des Profils; `PAYLOAD_TOO_LARGE`), `malformed` (fehlerhafte Kodierung oder eine Lücke oder ein Duplikat in der Sequenz des Readers; `INTERNAL`). Jedes Ergebnis außer `delivered` lässt diesen Stream scheitern |
+| `attraccess_plugin_ble_watches_active` | Gauge | -- | Offene Advertisement-Beobachtungen (`context.ble.watch`) |
+| `attraccess_plugin_ble_watch_events_received_total` | Counter | -- | Ereignisse der Advertisement-Beobachtung, die die API von Readern angenommen hat |
+| `attraccess_plugin_ble_watch_events_routed_total` | Counter | -- | An Beobachtungen von Plugins übergebene Ereignisse; ein Ereignis kann mehrere Beobachtungen erreichen |
+| `attraccess_plugin_ble_watch_events_dropped_total` | Counter | `reason` | Ereignisse, die kein Plugin erreicht haben: `malformed`, `batch-too-large` (mehr als 8 pro Nachricht), `rate-limit` (weit über der Rate, die der Reader meldet), `stale-connection` (von einer Verbindung, an die der Filtersatz nicht ging), `access-denied` (Reader nicht für Plugins freigegeben), `no-watch` (keine Beobachtung für den genannten Filter), `filter-mismatch` (der Profilfilter passt nicht), `queue-full` (das älteste wartende Ereignis einer beschäftigten Beobachtung) |
 
 **Buckets der Operationsdauer:** 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s, 30s, 60s
 

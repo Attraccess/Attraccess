@@ -5,33 +5,44 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@attraccess/react-query-client';
 import { StartSessionControls } from './index';
 
-const { startMutate, supervisionMode, resourceType, startBlocked, requestForms, toastError, bothCallbacks } =
-  vi.hoisted(() => ({
-    bothCallbacks: (options: unknown, callbacks: unknown, variables: unknown) => {
-      // Mirrors TanStack: the hook-level callbacks run first, then the per-call ones.
-      type Callbacks = {
-        onSuccess?: (data: unknown, v: unknown) => void;
-        onError?: (error: unknown, v: unknown) => void;
-      };
-      const [hook, call] = [options as Callbacks | undefined, callbacks as Callbacks | undefined];
-      return {
-        onSuccess: (data: unknown, _variables?: unknown) => {
-          hook?.onSuccess?.(data, variables);
-          call?.onSuccess?.(data, variables);
-        },
-        onError: (error: unknown) => {
-          hook?.onError?.(error, variables);
-          call?.onError?.(error, variables);
-        },
-      };
-    },
-    startMutate: vi.fn(),
-    toastError: vi.fn(),
-    requestForms: vi.fn().mockResolvedValue([]),
-    supervisionMode: { value: 'introduction_required' },
-    resourceType: { value: 'machine' },
-    startBlocked: { value: { blocked: false } as Record<string, unknown> },
-  }));
+const {
+  startMutate,
+  supervisionMode,
+  resourceType,
+  accessOnly,
+  doorMutate,
+  startBlocked,
+  requestForms,
+  toastError,
+  bothCallbacks,
+} = vi.hoisted(() => ({
+  bothCallbacks: (options: unknown, callbacks: unknown, variables: unknown) => {
+    // Mirrors TanStack: the hook-level callbacks run first, then the per-call ones.
+    type Callbacks = {
+      onSuccess?: (data: unknown, v: unknown) => void;
+      onError?: (error: unknown, v: unknown) => void;
+    };
+    const [hook, call] = [options as Callbacks | undefined, callbacks as Callbacks | undefined];
+    return {
+      onSuccess: (data: unknown, _variables?: unknown) => {
+        hook?.onSuccess?.(data, variables);
+        call?.onSuccess?.(data, variables);
+      },
+      onError: (error: unknown) => {
+        hook?.onError?.(error, variables);
+        call?.onError?.(error, variables);
+      },
+    };
+  },
+  startMutate: vi.fn(),
+  toastError: vi.fn(),
+  requestForms: vi.fn().mockResolvedValue([]),
+  supervisionMode: { value: 'introduction_required' },
+  resourceType: { value: 'machine' },
+  accessOnly: { value: false },
+  doorMutate: { lock: vi.fn(), unlock: vi.fn(), unlatch: vi.fn(), open: vi.fn() },
+  startBlocked: { value: { blocked: false } as Record<string, unknown> },
+}));
 
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -57,7 +68,17 @@ vi.mock('./MachineStartControls', () => ({
     </button>
   ),
 }));
-vi.mock('./DoorControls', () => ({ DoorControls: () => <div data-testid="door-controls" /> }));
+// The real door buttons, so a click reaches the door mutation the controls wire up.
+vi.mock('./DoorControls', async (importOriginal) => {
+  const { DoorControls } = await importOriginal<typeof import('./DoorControls')>();
+  return {
+    DoorControls: (props: Parameters<typeof DoorControls>[0]) => (
+      <div data-testid="door-controls">
+        <DoorControls {...props} />
+      </div>
+    ),
+  };
+});
 vi.mock('../SessionNotesModal', () => ({ SessionNotesModal: () => null, SessionModalMode: { START: 'start' } }));
 vi.mock('./insufficientBalanceModal', () => ({ InsufficientBalanceModal: () => null }));
 vi.mock('../SupervisedStartModal', () => ({
@@ -73,7 +94,7 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
     SUPERVISION_REQUIRED: 'supervision_required',
   },
   useGetOneResourceById: () => ({
-    data: { id: 1, type: resourceType.value, supervisionMode: supervisionMode.value },
+    data: { id: 1, type: resourceType.value, supervisionMode: supervisionMode.value, accessOnly: accessOnly.value },
   }),
   // The real StartBlockedGate renders; only its query answer is faked.
   useResourceUsageStartBlocked: () => ({
@@ -88,9 +109,10 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
       startMutate(variables, bothCallbacks(options, callbacks, variables)),
     isPending: false,
   }),
-  useUnlockDoor: () => ({ mutate: vi.fn(), isPending: false }),
-  useLockDoor: () => ({ mutate: vi.fn(), isPending: false }),
-  useUnlatchDoor: () => ({ mutate: vi.fn(), isPending: false }),
+  useUnlockDoor: () => ({ mutate: doorMutate.unlock, isPending: false }),
+  useLockDoor: () => ({ mutate: doorMutate.lock, isPending: false }),
+  useUnlatchDoor: () => ({ mutate: doorMutate.unlatch, isPending: false }),
+  useOpenDoor: () => ({ mutate: doorMutate.open, isPending: false }),
   UseResourceUsageGetActiveSessionKeyFn: () => ['activeSession'],
   UseResourceUsageGetHistoryKeyFn: () => ['history'],
 }));
@@ -271,5 +293,35 @@ describe('StartSessionControls start-blocked gate', () => {
 
     expect(screen.getByTestId('door-controls')).toBeInTheDocument();
     expect(screen.queryByText(reason.body)).not.toBeInTheDocument();
+  });
+});
+
+describe('StartSessionControls door actions', () => {
+  beforeEach(() => {
+    resourceType.value = 'door';
+    startBlocked.value = { blocked: false };
+    for (const mutate of Object.values(doorMutate)) mutate.mockClear();
+  });
+
+  it('opens an access-only door through the open-door call, never unlock', async () => {
+    accessOnly.value = true;
+    render(<StartSessionControls resourceId={1} />);
+
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    await userEvent.click(screen.getByRole('button', { name: 'door.open' }));
+
+    expect(doorMutate.open).toHaveBeenCalledWith({ path: { resourceId: 1 } });
+    expect(doorMutate.unlock).not.toHaveBeenCalled();
+    expect(doorMutate.lock).not.toHaveBeenCalled();
+  });
+
+  it('unlocks a regular door through the unlock call', async () => {
+    accessOnly.value = false;
+    render(<StartSessionControls resourceId={1} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'door.unlock' }));
+
+    expect(doorMutate.unlock).toHaveBeenCalledWith({ path: { resourceId: 1 } });
+    expect(doorMutate.open).not.toHaveBeenCalled();
   });
 });

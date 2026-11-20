@@ -221,9 +221,10 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
     const plugin = PluginService.getPlugins().find((p) => p.name === PLUGIN_NAME);
     expect(plugin).toBeDefined();
 
-    await new PluginUninstallService(new PluginService(), {
-      deleteAllForPlugin: async () => undefined,
-    } as never).deletePlugin((plugin as LoadedPluginManifest).id);
+    const owned = { deleteAllForPlugin: async () => undefined } as never;
+    await new PluginUninstallService(new PluginService(), owned, owned).deletePlugin(
+      (plugin as LoadedPluginManifest).id,
+    );
 
     expect(existsSync(join(PLUGIN_PATH, PLUGIN_NAME))).toBe(false);
     expect(restartSpy).toHaveBeenCalledTimes(0);

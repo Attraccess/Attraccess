@@ -151,6 +151,10 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     return this.doors.unlatchDoor(resourceId, user);
   }
 
+  async openDoor(resourceId: number, user: UsageSessionUser): Promise<UsageSession> {
+    return this.doors.openDoor(resourceId, user);
+  }
+
   /**
    * Read-only can-start precheck (ATT-1187): raises the refusals a start would raise, except balance, flows and
    * form handling. Plugin pre-start hooks only run for users who pass it.

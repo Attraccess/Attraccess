@@ -91,9 +91,10 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Installing Plugins](https://docs.attraccess.org/en/plugins/installing-plugins.md): How to upload, enable, disable and remove plugins in the web interface, with troubleshooting.
 - [Developing Plugins](https://docs.attraccess.org/en/plugins/developing-plugins.md): Developer guide to building Attraccess plugins: anatomy, SDKs, backend plugins, dependencies and reader UI integration.
 - [Migrating Plugins to SDK 2.0](https://docs.attraccess.org/en/plugins/migrating-to-2.md): Migrating plugins to Attraccess 2.0: no database access, host ports instead of host entities, declared tables with neutral migrations and the record port, a porting guide and the refusal rules.
-- [Bluetooth Transport for Plugins](https://docs.attraccess.org/en/plugins/ble-transport.md): Describes the BLE transport contract that backend plugins use to talk to Bluetooth devices through Attractap readers: profiles, endpoints, sessions, errors, limits and testing with the fake.
+- [Bluetooth Transport for Plugins](https://docs.attraccess.org/en/plugins/ble-transport.md): The BLE transport contract for backend plugins on Attractap readers: profiles, endpoints, sessions, advertisement watches, errors, limits and testing with the fake.
 - [Plugin Storage](https://docs.attraccess.org/en/plugins/plugin-storage.md): How a plugin keeps data of its own without database access: declaring tables, shipping neutral migrations, using the record port context.storage, transactions, errors and test fakes.
 - [Card Authentication for Plugins](https://docs.attraccess.org/en/plugins/card-authentication.md): How backend plugins with CARD_AUTHENTICATION let Attraccess authenticate an NFC card on their own device over a card channel: limits, failure reasons, BLE example.
+- [Plugin Readers](https://docs.attraccess.org/en/plugins/plugin-readers.md): How backend plugins with READER_DEVICES register card readers, assign an access-only door and open it with a card authenticated on the device.
 
 ## English: Reservations
 - [Overview](https://docs.attraccess.org/en/plugins/reservations/overview.md): The Reservations plugin lets members book a resource for a time window; overview, prerequisites and links to member, administrator and API pages.
@@ -245,9 +246,10 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Plugins installieren](https://docs.attraccess.org/de/plugins/installing-plugins.md): Plugins über die Weboberfläche hochladen, aktivieren, deaktivieren und entfernen, mit Fehlerbehebung.
 - [Plugins entwickeln](https://docs.attraccess.org/de/plugins/developing-plugins.md): Entwicklerleitfaden für Attraccess-Plugins: SDKs, Frontend- und Backend-Plugins, Abhängigkeiten, Reader-UI und Start-Hooks.
 - [Plugins auf SDK 2.0 umstellen](https://docs.attraccess.org/de/plugins/migrating-to-2.md): Plugins auf Attraccess 2.0 umstellen: kein Datenbankzugriff, Host-Ports statt Host-Entitäten, deklarierte Tabellen mit neutralen Migrationen und Record-Port, Portierungsanleitung und Ablehnungsregeln.
-- [Bluetooth-Transport für Plugins](https://docs.attraccess.org/de/plugins/ble-transport.md): Beschreibt den BLE-Transportvertrag, über den Backend-Plugins mit Bluetooth-Geräten über Attractap-Reader sprechen: Profile, Endpunkte, Sitzungen, Fehler, Grenzwerte und Tests mit dem Fake.
+- [Bluetooth-Transport für Plugins](https://docs.attraccess.org/de/plugins/ble-transport.md): Der BLE-Transportvertrag für Backend-Plugins auf Attractap-Readern: Profile, Endpunkte, Sitzungen, Advertisement-Beobachtungen, Fehler, Grenzwerte und Tests mit dem Fake.
 - [Plugin-Speicher](https://docs.attraccess.org/de/plugins/plugin-storage.md): Wie ein Plugin eigene Daten ohne Datenbankzugriff hält: Tabellen deklarieren, neutrale Migrationen mitliefern, den Record-Port context.storage nutzen, Transaktionen, Fehler und Test-Fakes.
 - [Kartenauthentifizierung für Plugins](https://docs.attraccess.org/de/plugins/card-authentication.md): Wie Backend-Plugins mit CARD_AUTHENTICATION eine NFC-Karte an ihrem Gerät über einen Kartenkanal authentifizieren lassen: Grenzwerte, Fehlergründe, BLE-Beispiel.
+- [Plugin-Reader](https://docs.attraccess.org/de/plugins/plugin-readers.md): Wie Backend-Plugins mit READER_DEVICES eigene Kartenleser registrieren, ihnen eine Tür mit der Option „Nur Zutritt“ zuweisen und sie per Karte öffnen.
 
 ## Deutsch: Reservierungen
 - [Überblick](https://docs.attraccess.org/de/plugins/reservations/overview.md): Das Plugin Reservierungen lässt Mitglieder eine Ressource für ein Zeitfenster buchen; Überblick, Voraussetzungen und Links zu Mitglieder-, Administrations- und API-Seiten.

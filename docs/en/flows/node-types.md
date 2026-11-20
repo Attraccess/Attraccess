@@ -1,4 +1,5 @@
 # Node Types
+
 <!-- llms-description: Reference of all built-in flow nodes, grouped into input triggers, processing nodes and output actions. -->
 
 This reference covers all built-in flow nodes. The editor groups them by purpose, such as Billing, Messaging and Flow Control, and shows nodes supported by the resource type. Usage, activity and billing nodes are for **machines**; door triggers are for **doors**. Plugins can add further nodes with their own settings.
@@ -46,6 +47,8 @@ Runs when an active session is taken over. No settings. Payload contains the out
 Type: `input.resource.door.unlocked` · Doors
 
 Runs for a door-unlock action. No settings. Payload contains `event.timestamp`, `usage.start`, `usage.end`, `user.id`, `user.username` and `user.externalIdentifier`. Example: send an unlock command with **MQTT Send Message**.
+
+A door action waits for its flows. When a node set to **Fail flow** fails, or an **Error** node runs, the person who used the door sees the error in the web app, on the Attractap or on the plugin's reader. The action stays in the usage history. The same applies to **Door Locked** and **Door Unlatched**.
 
 ### Door Locked
 
@@ -255,13 +258,13 @@ Actions with an **Output** connection can continue into further nodes. Billing i
 
 ### Failure Behavior
 
-**HTTP Request**, **MQTT Send Message**, **Wait for MQTT Message** and **End Usage Session** expose **On failure** (`failureBehavior`):
+**HTTP Request**, **MQTT Send Message**, **Wait for MQTT Message** and **End Usage Session** expose **On failure** (`failureBehavior`). Plugin nodes can offer the same choice:
 
-| Choice                                                 | Result                                                                        |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------- |
-| **Fail flow** (`fail-flow`)                            | Throws an error and stops this path; can abort the triggering usage operation |
-| **Continue through failure output** (`failure-output`) | Routes original input plus `flowError: { kind, message }` through **Failure** |
-| **Log and continue** (`log-and-continue`, default)     | Logs failure and forwards original input through **Output**                   |
+| Choice                                                 | Result                                                                                                |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| **Fail flow** (`fail-flow`)                            | Throws an error and stops this path; can abort the triggering usage operation or fail the door action |
+| **Continue through failure output** (`failure-output`) | Routes original input plus `flowError: { kind, message }` through **Failure**                         |
+| **Log and continue** (`log-and-continue`, default)     | Logs failure and forwards original input through **Output**                                           |
 
 `flowError.kind` is `transport-dispatch`, `acknowledgement-timeout`, `controller-rejection` or `node-failure`. Use `{{flowError.message}}` on a failure branch. A connected Failure edge alone does not enable routing to it.
 

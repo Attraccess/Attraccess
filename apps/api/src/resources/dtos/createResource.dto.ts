@@ -92,6 +92,18 @@ export class CreateResourceDto extends CreateResourceDtoDocumentation {
   separateUnlockAndUnlatch?: boolean;
 
   @ApiProperty({
+    description:
+      '(only for doors) whether the door is access only: its only action is Open (stored as a door unlock). Cannot be combined with separateUnlockAndUnlatch',
+    example: false,
+    default: false,
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  @ToBoolean()
+  accessOnly?: boolean;
+
+  @ApiProperty({
     description: 'A detailed description of the resource',
     example: 'Prusa i3 MK3S+ 3D printer with 0.4mm nozzle',
     required: false,

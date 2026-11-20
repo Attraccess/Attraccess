@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import type { ModuleRef } from '@nestjs/core';
 import { CardConversationService } from '../../attractap/websockets/card-conversation.service';
 import type { CardOperationsService } from '../../attractap/websockets/card-operations.service';
+import { dropPluginCardAuthentications, type PluginCardAuthentications } from '../readers/plugin-card-authentications';
 
 /** Longest plugin device id the host keeps as a conversation key. */
 const MAX_DEVICE_LENGTH = 200;
@@ -13,10 +14,14 @@ const logger = new Logger('PluginModule');
  * `context.cards` for one plugin. The card service is resolved per call, because it lives in the Attractap module
  * and is only available once the host finished bootstrapping. Invalid requests are programming errors and reject;
  * a host failure rejects with a generic error; every card or conversation outcome resolves.
+ *
+ * With `resolveAuthentications` (a plugin with READER_DEVICES), a successful authentication also carries the
+ * single-use handle `readers.tap` takes.
  */
 export function createPluginCardsContext(
   pluginId: string,
   resolveOperations: () => CardOperationsService,
+  resolveAuthentications?: () => PluginCardAuthentications,
 ): PluginCardsContext {
   return {
     async authenticate(request) {
@@ -31,13 +36,17 @@ export function createPluginCardsContext(
         throw new TypeError('cards.authenticate needs signal to be an AbortSignal');
       }
       try {
-        return await resolveOperations().verifyPluginCard({
+        const result = await resolveOperations().verifyPluginCard({
           pluginId,
           device,
           uid,
           exchange: (apdu, options) => channel.exchange(apdu, options),
           signal,
         });
+        if (!result.ok || !resolveAuthentications) return result;
+        const { id: cardId, userId } = result.card;
+        const authentication = resolveAuthentications().issue({ pluginId, device, cardId, userId });
+        return { ok: true, card: { ...result.card, authentication } };
       } catch (error) {
         // A host failure (database, not yet bootstrapped). Its error may carry queries or card data: it stays here.
         logger.warn(`Card authentication for plugin ${pluginId} failed in the host: ${(error as Error)?.message}`);
@@ -49,11 +58,13 @@ export function createPluginCardsContext(
 }
 
 /**
- * The plugin module is destroyed (disable, uninstall, restart, shutdown): its card conversations end with CANCELLED.
- * A plugin that never got host refs has none. A failure is logged, never blocking the unload.
+ * The plugin module is destroyed (disable, uninstall, restart, shutdown): its card conversations end with CANCELLED,
+ * and its pending card authentications can no longer be tapped. A plugin that never got host refs has none. A
+ * failure is logged, never blocking the unload.
  */
 export function cancelPluginCardConversations(moduleRef: ModuleRef | null, pluginId: string): void {
   if (!moduleRef) return;
+  dropPluginCardAuthentications(moduleRef, pluginId);
   try {
     moduleRef.get(CardConversationService, { strict: false }).cancelPlugin(pluginId);
   } catch (error) {

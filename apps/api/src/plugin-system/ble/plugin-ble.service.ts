@@ -32,13 +32,14 @@ import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../../attractap/events';
 import { bleStreamOutcome, type PluginBleMetrics } from '../../metrics/definitions/plugin-ble.metrics';
 import { PLUGIN_BLE_METRICS } from '../../metrics/definitions/tokens';
 import {
-  BLE_TRANSPORT_DRIVER,
   bleAllowlist,
+  resolveBleTransportDriver,
   type BleReaderStatus,
   type BleTransportDriver,
 } from './ble-transport-driver';
-import { getPluginBleProfile } from './plugin-ble-profile-registry';
+import { requirePluginBleProfile } from './plugin-ble-profile-registry';
 import { PLUGIN_BLE_STORE, type PluginBleStore } from './plugin-ble-store.port';
+import { PluginBleWatchManager } from './plugin-ble-watch.manager';
 
 /** Who is calling: the plugin's stable manifest id and its scoped logger. */
 export interface PluginBleCaller {
@@ -106,6 +107,11 @@ export class PluginBleService implements OnModuleDestroy {
   private endpointWrites: Promise<unknown> = Promise.resolve();
   /** Overridable for tests. */
   public clock: BleSessionClock = realClock;
+  /** Advertisement watches (`context.ble.watch`). */
+  readonly watches = new PluginBleWatchManager(this.store, this.moduleRef, {
+    logger: () => this.logger,
+    metrics: () => this.metrics,
+  });
 
   constructor(
     @Inject(PLUGIN_BLE_STORE) private readonly store: PluginBleStore,
@@ -114,18 +120,21 @@ export class PluginBleService implements OnModuleDestroy {
   ) {}
 
   async onModuleDestroy(): Promise<void> {
+    await this.watches.closeWhere(() => true, 'shutdown');
     await this.closeWhere(() => true, 'shutdown');
   }
 
   // -------------------------------------------------------------- cleanup
 
-  /** The plugin module is destroyed: its sessions end, its endpoints stay. */
-  closePluginSessions(pluginId: string, reason: PluginBleCloseReason = 'shutdown'): Promise<void> {
-    return this.closeWhere((entry) => entry.pluginId === pluginId, reason);
+  /** The plugin module is destroyed: its sessions and watches end, its endpoints stay. */
+  async closePluginSessions(pluginId: string, reason: PluginBleCloseReason = 'shutdown'): Promise<void> {
+    await this.watches.closeWhere((entry) => entry.pluginId === pluginId, 'shutdown');
+    await this.closeWhere((entry) => entry.pluginId === pluginId, reason);
   }
 
   /** Plugin uninstall: closes sessions and deletes every endpoint the plugin owns. */
   async deleteAllForPlugin(pluginId: string): Promise<void> {
+    await this.watches.closeWhere((entry) => entry.pluginId === pluginId, 'shutdown');
     await this.serializeEndpointWrite(() => this.store.deleteEndpointsOfPlugin(pluginId));
     await this.closeWhere((scope) => scope.pluginId === pluginId, 'endpoint-deleted');
   }
@@ -133,13 +142,16 @@ export class PluginBleService implements OnModuleDestroy {
   // The event bus is shared with plugins (EMIT_EVENTS), so the database decides, not the event payload.
   @OnEvent(ReaderUpdatedEvent.EVENT_NAME)
   async onReaderUpdated(event: ReaderUpdatedEvent): Promise<void> {
-    if (event.reader?.allowPluginBle !== false) return;
+    if (typeof event.reader?.allowPluginBle !== 'boolean') return;
+    await this.watches.readerAccessChanged(event.reader.id);
+    if (event.reader.allowPluginBle) return;
     const reader = await this.findReader(event.reader.id);
     if (!reader?.allowPluginBle) await this.revokeReader(event.reader.id);
   }
 
   @OnEvent(ReaderDeletedEvent.EVENT_NAME)
   async onReaderDeleted(event: ReaderDeletedEvent): Promise<void> {
+    await this.watches.readerAccessChanged(event.readerId);
     if (!(await this.findReader(event.readerId))) await this.revokeReader(event.readerId);
   }
 
@@ -177,7 +189,7 @@ export class PluginBleService implements OnModuleDestroy {
     options?: PluginBleScanOptions,
   ): Promise<PluginBleAdvertisement[]> {
     validateBleReaderId(readerId);
-    const profile = this.requireProfile(caller.pluginId, validateBleProfileId(profileId));
+    const profile = requirePluginBleProfile(caller.pluginId, validateBleProfileId(profileId));
     const durationMs = resolveBleScanDuration(options?.durationMs);
     const filter = profile.advertisement;
     if (!filter) {
@@ -268,7 +280,7 @@ export class PluginBleService implements OnModuleDestroy {
 
   async createEndpoint(caller: PluginBleCaller, input: PluginBleEndpointInput): Promise<PluginBleEndpoint> {
     const normalized = normalizeBleEndpointInput(input);
-    this.requireProfile(caller.pluginId, normalized.profileId);
+    requirePluginBleProfile(caller.pluginId, normalized.profileId);
     await this.requireReader(normalized.readerId);
     const row = await this.serializeEndpointWrite(async () => {
       await this.assertNoConflict(caller.pluginId, normalized.readerId, normalized.address);
@@ -352,7 +364,7 @@ export class PluginBleService implements OnModuleDestroy {
   ): Promise<PluginBleSession> {
     const endpoint = await this.findOwned(caller.pluginId, endpointId);
     trace.scope = `reader=${endpoint.readerId} endpoint=${endpoint.id} plugin=${caller.pluginId}`;
-    const profile = this.requireProfile(caller.pluginId, endpoint.profileId);
+    const profile = requirePluginBleProfile(caller.pluginId, endpoint.profileId);
     const resolved = resolveBleSessionOptions(profile, options);
     if (options?.signal?.aborted)
       throw new PluginBleError('CANCELLED', 'openSession was cancelled', { operation: 'openSession' });
@@ -422,11 +434,7 @@ export class PluginBleService implements OnModuleDestroy {
   // ------------------------------------------------------------- helpers
 
   private driver(): BleTransportDriver | undefined {
-    try {
-      return this.moduleRef.get<BleTransportDriver>(BLE_TRANSPORT_DRIVER, { strict: false }) ?? undefined;
-    } catch {
-      return undefined;
-    }
+    return resolveBleTransportDriver(this.moduleRef);
   }
 
   /** Operation outcome for logs and metrics; never payload bytes. `detail` is the safe diagnostic. */
@@ -521,16 +529,6 @@ export class PluginBleService implements OnModuleDestroy {
       });
     }
     return driver;
-  }
-
-  private requireProfile(pluginId: string, profileId: string): PluginBleProfile {
-    const profile = getPluginBleProfile(pluginId, profileId);
-    if (!profile) {
-      throw new PluginBleError('PROFILE_NOT_REGISTERED', `Profile "${profileId}" is not registered by this plugin`, {
-        detail: profileId,
-      });
-    }
-    return profile;
   }
 
   private findReader(readerId: number): Promise<PluginBleReaderAccess | null> {

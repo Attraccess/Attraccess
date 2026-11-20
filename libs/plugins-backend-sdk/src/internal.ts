@@ -9,3 +9,14 @@ export {
   type BleSessionEngineDeps,
   type BleSessionLink,
 } from './lib/plugin-ble-session-engine';
+export {
+  BLE_WATCH_MAX_READER_IDS,
+  BleWatchEngine,
+  bleWatchPayloadKey,
+  matchesBleWatchFilter,
+  requireBleWatchFilter,
+  resolveBleWatchOptions,
+  type BleWatchCloseReason,
+  type BleWatchEngineDeps,
+  type ResolvedBleWatchOptions,
+} from './lib/plugin-ble-watch-engine';

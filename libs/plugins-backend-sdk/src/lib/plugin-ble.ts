@@ -201,6 +201,67 @@ export interface PluginBleScanOptions {
   signal?: AbortSignal;
 }
 
+// ------------------------------------------------------------------- watch
+
+/** Host caps of the advertisement watch. */
+export const PLUGIN_BLE_WATCH_LIMITS = {
+  /** Watches per plugin. */
+  maxWatchesPerPlugin: 8,
+  /** Events queued per watch while its handler runs; the oldest is dropped beyond it. */
+  maxQueuedEvents: 64,
+  /** An unchanged device is reported at least this often while the reader sees it. */
+  keepaliveMs: 30_000,
+} as const;
+
+/** One advertisement a reader saw while watching. */
+export interface PluginBleWatchEvent extends PluginBleAdvertisement {
+  readerId: number;
+  /**
+   * True when the advertising payload (manufacturer data, name or service UUIDs) differs from the last one this
+   * reader reported for the address, or the reader reports the address for the first time. False for a keepalive.
+   */
+  changed: boolean;
+  /** When the API received it. */
+  receivedAt: Date;
+}
+
+/**
+ * Why a reader in a watch reports nothing: `watching` it does; `offline` not connected; `unsupported` its firmware
+ * has no advertisement watch (`detail` says why); `access-denied` not (or no longer) open for plugins.
+ */
+export type PluginBleWatchReaderStatus = 'watching' | 'offline' | 'unsupported' | 'access-denied';
+
+export interface PluginBleWatchReaderState {
+  readerId: number;
+  status: PluginBleWatchReaderStatus;
+  detail?: string;
+}
+
+export interface PluginBleWatchOptions {
+  /**
+   * Readers to watch on. Absent: every reader open for plugins, including ones opened later. A listed reader that
+   * is not open for plugins is reported `access-denied` and starts watching once an administrator opens it.
+   */
+  readerIds?: number[];
+  /** Aborting closes the watch. */
+  signal?: AbortSignal;
+  /** Called (serially, never concurrently with itself) whenever a reader's status in this watch changes. */
+  onReaderStatus?: (state: PluginBleWatchReaderState) => void | Promise<void>;
+}
+
+export interface PluginBleWatch {
+  readonly id: string;
+  readonly profileId: string;
+  /** The current status of every reader in the watch. */
+  readers(): PluginBleWatchReaderState[];
+  /** Idempotent. */
+  close(): Promise<void>;
+  /** Resolves (never rejects) once the watch ended. */
+  readonly closed: Promise<{ reason: 'closed' | 'cancelled' | 'shutdown' }>;
+}
+
+export type PluginBleWatchHandler = (event: PluginBleWatchEvent) => void | Promise<void>;
+
 // --------------------------------------------------------------- endpoints
 
 export interface PluginBleEndpointInput {
@@ -304,4 +365,13 @@ export interface PluginBleContext {
     fn: (session: PluginBleSession) => Promise<T>,
     options?: PluginBleSessionOptions,
   ): Promise<T>;
+  /**
+   * Watches the advertisements of the profile's devices continuously on the readers, without a session: each reader
+   * scans passively with the profile's advertisement filter and reports a device when its advertising payload
+   * changes, plus a keepalive every `PLUGIN_BLE_WATCH_LIMITS.keepaliveMs` while it sees it. The handler runs
+   * serially per watch. Rejects with `PROFILE_NOT_REGISTERED`, `INVALID_PROFILE` (a profile without an advertisement
+   * filter), `INVALID_ARGUMENT` or `READER_BUSY` (`detail` `watch-limit`). Watches end when the plugin is unloaded.
+   * Optional: absent on hosts predating the advertisement watch.
+   */
+  watch?(profileId: string, handler: PluginBleWatchHandler, options?: PluginBleWatchOptions): Promise<PluginBleWatch>;
 }

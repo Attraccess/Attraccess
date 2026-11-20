@@ -78,3 +78,17 @@ it('keeps edits made during an in-flight save and allows saving them next', () =
     expect.objectContaining({ body: expect.objectContaining({ name: 'Later edit' }) }),
   );
 });
+
+it.each([
+  ['keeps access only on a door', 'door', true],
+  ['drops access only on a machine', 'machine', false],
+])('%s when saving', (_name, type, accessOnly) => {
+  state.resource = { id: 1, name: 'Side', type, accessOnly: true } as Resource;
+  render(<ResourceSettingsPage />);
+  fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'Side door' } });
+  fireEvent.click(screen.getByRole('button', { name: 'save' }));
+
+  expect(state.mutate).toHaveBeenCalledWith(
+    expect.objectContaining({ body: expect.objectContaining({ accessOnly }) }),
+  );
+});

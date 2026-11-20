@@ -1,6 +1,6 @@
 import { Attractap, PluginBleEndpointEntity } from '@attraccess/database-entities';
 import type { PluginBleEndpointRecord, PluginBleReaderAccess } from '@attraccess/application-models';
-import type { DataSource } from 'typeorm';
+import { In, type DataSource } from 'typeorm';
 import type { PluginBleStore } from '../../../plugin-system/ble/plugin-ble-store.port';
 
 function toEndpoint(row: PluginBleEndpointEntity): PluginBleEndpointRecord {
@@ -28,9 +28,9 @@ export function createTypeOrmPluginBleStore(source: () => DataSource): PluginBle
   const readerColumns = { id: true, name: true, allowPluginBle: true } as const;
 
   return {
-    async listOpenReaders() {
+    async listOpenReaders(readerIds) {
       const rows = await readers().find({
-        where: { allowPluginBle: true },
+        where: readerIds ? { allowPluginBle: true, id: In(readerIds) } : { allowPluginBle: true },
         select: readerColumns,
         order: { id: 'ASC' },
       });

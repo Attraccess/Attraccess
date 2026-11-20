@@ -10,6 +10,8 @@ import { USAGE_SESSION_STORE, UsageSessionStore } from '../usage-session-store.p
 
 import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../../exceptions/resource.maintenance.inUse.exception';
 
+import { ResourceIntroductionRequiredException } from '../../../exceptions/resource.introduction.required.exception';
+
 import { ResourceNotFoundException } from '../../../exceptions/resource.notFound.exception';
 
 import { ResourceUnhealthyException } from '../../../exceptions/resource.unhealthy.exception';
@@ -103,7 +105,7 @@ export class UsageResourceGate {
 
       if (!canStartSession) {
         this.logger.warn(`User ${user.id} cannot control resource ${resourceId} - missing introduction`);
-        throw new BadRequestException('You must complete the resource introduction before using it');
+        throw new ResourceIntroductionRequiredException();
       }
     }
 

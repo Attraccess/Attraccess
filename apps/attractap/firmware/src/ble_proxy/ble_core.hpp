@@ -5,9 +5,13 @@
 // proxy task. The radio (NimBLE) and the outbound channel (websocket) are interfaces, so host tests drive it
 // with fakes and a fake clock.
 //
-// Every request gets exactly one answer (BLE_RESULT or BLE_SCAN_RESULT); BLE_CANCEL gets none. A request whose
-// radio work cannot be aborted (a GATT procedure in flight) is answered CANCELLED or TIMEOUT at once, but later
-// requests wait until NimBLE finished it, so operations never overlap on the link.
+// Every request gets exactly one answer (BLE_RESULT, BLE_SCAN_RESULT or BLE_WATCH_STATE); BLE_CANCEL gets none. A
+// request whose radio work cannot be aborted (a GATT procedure in flight) is answered CANCELLED or TIMEOUT at once, but
+// later requests wait until NimBLE finished it, so operations never overlap on the link.
+//
+// The advertisement watch is no owner: its passive scan runs beside a session (duty-cycled, with a link up), steps
+// aside while a connection is being established (NimBLE cannot scan and initiate at once), while an on-demand scan
+// runs (whose reports it still reads) and during an OTA, and resumes afterwards.
 
 #include <deque>
 #include <functional>
@@ -15,6 +19,7 @@
 
 #include "ble_notification_buffer.hpp"
 #include "ble_types.hpp"
+#include "ble_watch.hpp"
 
 namespace ble
 {
@@ -40,6 +45,10 @@ namespace ble
         // while the stack is up.
         virtual bool active() = 0;
         virtual Error startScan(uint32_t durationMs) = 0;
+        // The watch's passive scan, until stopScan(). `connected`: a link is up, so it scans less of the time.
+        // Ends on its own only when the controller drops it (BleProxyCore::onWatchScanEnded).
+        virtual Error startWatchScan(bool connected) = 0;
+        // Stops either scan.
         virtual void stopScan() = 0;
         // Connects, exchanges the MTU and discovers the allowlisted services; reports onConnected or onConnectFailed.
         virtual Error connect(const Address &address, uint32_t timeoutMs, const PsVector<AllowEntry> &allowlist) = 0;
@@ -98,8 +107,10 @@ namespace ble
         void otaStarted(uint32_t now);
 
         // --- radio events (proxy task) ----------------------------------------------------------------------
-        void onAdvertisement(const Address &address, int8_t rssi, bool hasRssi, const uint8_t *data, size_t length);
+        void onAdvertisement(const Address &address, int8_t rssi, bool hasRssi, const uint8_t *data, size_t length,
+                             uint32_t now = 0);
         void onScanComplete(uint32_t now);
+        void onWatchScanEnded(uint32_t now);
         void onConnected(const Address &peer, uint16_t mtu, uint32_t now);
         void onConnectFailed(const Error &error, uint32_t now);
         void onDisconnected(int reason, uint32_t now);
@@ -109,7 +120,12 @@ namespace ble
         bool radioReady() const { return initialized; }
         // Nothing to do until the next request or radio event: no owner (so no deadline), nothing waiting to go
         // out. The proxy task then sleeps instead of polling.
-        bool idle() const { return currentOwner == Owner::None && outbox.empty() && notifications.size() == 0; }
+        bool idle() const
+        {
+            return currentOwner == Owner::None && outbox.empty() && notifications.size() == 0 && !watch.hasPending() &&
+                   (!watch.active() || watchScanning);
+        }
+        bool watching() const { return watchScanning; }
         // Whether the next request may be taken. Answers are never dropped: the outbox keeps room for everything
         // already accepted work still owes, so a request waits (in the proxy's command queue) while it is full.
         bool acceptsRequests() const;
@@ -204,6 +220,13 @@ namespace ble
         Owner currentOwner = Owner::None;
         Session session;
         Scan scan;
+        AdvertisementWatch watch;
+        bool watchScanning = false;
+        bool watchScanConnected = false; // started with the parameters for a connected link
+        bool watchRetry = false;         // the radio refused (or lost) the watch scan: try again at watchRetryAt
+        uint32_t watchRetryAt = 0;
+        bool watchAnnouncedInactive = false; // the API was told the watch stopped; it hears when it runs again
+        char watchError[sizeof(Error::detail)] = "";
         uint32_t nextToken = 0;
         // Answers and session ends the websocket did not take yet; dropped when the connection is lost.
         // Notifications never wait here: they stay in their own bounded buffer.
@@ -213,13 +236,23 @@ namespace ble
         // Whether the stack must stay up: an owner (a scan, or a session until the controller let its link go),
         // anything still to go out, or anything the controller still runs. Not idle(), which only says whether this
         // task may sleep: work without an owner that keeps the radio busy (a standing scan, say) must count here.
+        // The watch's own scan counts whatever the radio reports, so the watch never loses its stack.
         bool stackInUse() const
         {
-            return currentOwner != Owner::None || !outbox.empty() || notifications.size() != 0 || radio.active();
+            return currentOwner != Owner::None || !outbox.empty() || notifications.size() != 0 || watchScanning ||
+                   radio.active();
         }
         bool ensureRadio(const Command &command);
         void shutdownIdleStack(uint32_t now);
         void startScan(Command &&command, uint32_t now);
+        void setWatch(Command &&command, uint32_t now);
+        // Why the watch scan cannot run right now; null when it can.
+        const char *watchPause() const;
+        // Starts, restarts (other parameters) or stops the watch scan to match the current state. `announce`: tell the
+        // API when the watch stops or runs again for the reader's own reasons.
+        void updateWatchScan(uint32_t now, bool announce = true);
+        void stopWatchScan();
+        void flushWatch(uint32_t now);
         void openSession(Command &&command, uint32_t now);
         void queueOperation(Command &&command, uint32_t now);
         void cancel(const Command &command, uint32_t now);

@@ -18,7 +18,7 @@ Jede Ressource in Attraccess hat:
 | Typ | Beschreibung |
 |-----|-------------|
 | **Maschine** | Standard-Ressource (3D-Drucker, Lasercutter, CNC-Fräse etc.) |
-| **Tür** | Zugangspunkt mit Entriegelungsfunktion. Optionale getrennte Entsperr- und Öffnungsaktion. |
+| **Tür** | Zugangspunkt mit Auf- und Abschließen. Optional getrenntes Aufsperren und Falle öffnen oder [Nur Zutritt](resources/creating-resources.md#tür-optionen) mit der einzigen Aktion Öffnen. |
 
 ## Ressourcen in der Übersicht
 

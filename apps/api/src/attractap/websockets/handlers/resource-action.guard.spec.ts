@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ResourceActionGuard } from './resource-action.guard';
 import { AttractapEventType } from '../websocket.types';
+import { ResourceType } from '@attraccess/application-models';
+import { ACCESS_ONLY_DOOR_MESSAGE } from '../../../resources/reader-capabilities/reader-capabilities';
 
 describe('ResourceActionGuard', () => {
   let guard: ResourceActionGuard;
@@ -15,7 +17,10 @@ describe('ResourceActionGuard', () => {
   let mockUsersService: { findOne: jest.Mock };
 
   const mockUser = { id: 1, username: 'testuser' };
-  const mockReader = { id: 42, resources: [{ id: 10 }] };
+  const door = { id: 10, type: ResourceType.Door, separateUnlockAndUnlatch: false, accessOnly: false };
+  const accessOnlyDoor = { id: 11, type: ResourceType.Door, separateUnlockAndUnlatch: false, accessOnly: true };
+  const machine = { id: 12, type: ResourceType.Machine, separateUnlockAndUnlatch: false, accessOnly: false };
+  const mockReader = { id: 42, resources: [door, accessOnlyDoor, machine] };
 
   beforeEach(() => {
     guard = Object.create(ResourceActionGuard.prototype);
@@ -230,12 +235,60 @@ describe('ResourceActionGuard', () => {
     it('returns true for the START fallback event type as well', async () => {
       const result = await guard.validateResourceAction(
         mockSocket as any,
-        10,
+        12,
         AttractapEventType.START_RESOURCE_USAGE_SESSION,
       );
 
       expect(result).toBe(true);
       expect(mockSocket.sendMessage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reader capabilities', () => {
+    const errorOf = () => mockSocket.sendMessage.mock.calls[0][0].data.payload.error;
+
+    it.each([AttractapEventType.LOCK_DOOR, AttractapEventType.UNLATCH_DOOR])(
+      'refuses %s on an access-only door',
+      async (eventType) => {
+        const result = await guard.validateResourceAction(mockSocket as any, 11, eventType, 7);
+
+        expect(result).toBe(false);
+        expect(mockSocket.sendMessage.mock.calls[0][0].data).toEqual({
+          type: eventType,
+          payload: { requestId: 7, error: ACCESS_ONLY_DOOR_MESSAGE },
+        });
+        expect(mockUsersService.findOne).not.toHaveBeenCalled();
+      },
+    );
+
+    it('allows unlock on an access-only door: older readers send it for Open', async () => {
+      const result = await guard.validateResourceAction(mockSocket as any, 11, AttractapEventType.UNLOCK_DOOR);
+
+      expect(result).toBe(true);
+    });
+
+    it('refuses unlatch on a door without separate unlatching', async () => {
+      const result = await guard.validateResourceAction(mockSocket as any, 10, AttractapEventType.UNLATCH_DOOR);
+
+      expect(result).toBe(false);
+      expect(errorOf()).toBe('This door does not support unlatching');
+    });
+
+    it('refuses a session start on a door', async () => {
+      const result = await guard.validateResourceAction(
+        mockSocket as any,
+        10,
+        AttractapEventType.START_RESOURCE_USAGE_SESSION,
+      );
+
+      expect(result).toBe(false);
+      expect(errorOf()).toBe('This resource does not support this action');
+    });
+
+    it('does not check events that are not reader actions', async () => {
+      const result = await guard.validateResourceAction(mockSocket as any, 10, AttractapEventType.RESOURCE_USAGE_STATS);
+
+      expect(result).toBe(true);
     });
   });
 });

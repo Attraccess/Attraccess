@@ -25,3 +25,9 @@ inline ResourceListAction resourceListAction(const API::ResourceBrief &resource,
     if (resource.requiresSupervisor) return ResourceListAction::Supervision;
     return canUse ? ResourceListAction::Start : ResourceListAction::None;
 }
+
+// The list's door action unlatches a door with separate unlock and unlatch, else it unlocks. An access-only door only
+// opens (an unlock on the wire), even if its separate-unlatch flag is still set from before.
+inline bool resourceListDoorActionUnlatches(const API::ResourceBrief &resource) {
+    return resource.separateUnlockAndUnlatch && !resource.accessOnly;
+}

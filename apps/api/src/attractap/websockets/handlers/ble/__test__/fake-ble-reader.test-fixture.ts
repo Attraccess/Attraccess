@@ -1,4 +1,5 @@
-import { PluginBleError } from '@attraccess/plugins-backend-sdk';
+import { PluginBleError, type PluginBleAdvertisement } from '@attraccess/plugins-backend-sdk';
+import { bleWatchPayloadKey, matchesBleWatchFilter } from '@attraccess/plugins-backend-sdk/internal';
 import type { BleDriverLink } from '../../../../../plugin-system/ble/ble-transport-driver';
 import { BleTestDriver } from '../../../../../plugin-system/ble/__test__/ble-test-driver.test-fixture';
 import { AttractapEventType, type AttractapEvent, type AuthenticatedWebSocket } from '../../../websocket.types';
@@ -16,7 +17,18 @@ export const FAKE_READER_BLE_CAPABILITY = {
   maxScanResults: 32,
   maxAllowlistEntries: 16,
   maxPendingRequests: 16,
+  watch: { version: 1, maxFilters: 8, maxDevices: 32, maxEventsPerSecond: 20 },
 };
+
+/** The same reader on firmware without the advertisement watch. */
+export const FAKE_READER_BLE_CAPABILITY_WITHOUT_WATCH = { ...FAKE_READER_BLE_CAPABILITY, watch: undefined };
+
+interface WatchFilter {
+  id: number;
+  serviceUuids: string[];
+  manufacturerIds: number[];
+  namePrefix?: string;
+}
 
 type Payload = Record<string, unknown>;
 
@@ -53,6 +65,12 @@ export class FakeBleReaderFirmware {
   private readonly running = new Map<number, AbortController>();
   /** Set to drop answers (simulates a reader that went silent). */
   silent = false;
+  /** The advertisement watch set as the API last sent it. */
+  watchFilters: WatchFilter[] = [];
+  /** Set to refuse the next BLE_WATCH_SET with this error. */
+  watchError: { code: string; detail?: string } | null = null;
+  /** Per address, the payload key last reported: what the firmware keeps to send `changed`. */
+  private readonly watchSeen = new Map<string, string>();
 
   constructor(
     readonly readerId: number,
@@ -75,6 +93,8 @@ export class FakeBleReaderFirmware {
         return this.onCancel(payload);
       case AttractapEventType.BLE_SESSION_CLOSE:
         return this.onClose(payload);
+      case AttractapEventType.BLE_WATCH_SET:
+        return this.onWatchSet(payload);
       default:
         return this.onOperation(type, payload);
     }
@@ -87,6 +107,38 @@ export class FakeBleReaderFirmware {
     const session = this.session;
     this.session = null;
     void session?.link?.disconnect().catch(() => undefined);
+  }
+
+  /** The radio sees an advertisement: reported with the ids of the watch filters it matches (any criterion). */
+  advertise(advertisement: PluginBleAdvertisement, changed?: boolean): void {
+    const filters = this.watchFilters.filter((filter) => matchesBleWatchFilter(filter, advertisement));
+    if (filters.length === 0) return;
+    const key = bleWatchPayloadKey(advertisement);
+    const isChanged = changed ?? this.watchSeen.get(advertisement.address) !== key;
+    this.watchSeen.set(advertisement.address, key);
+    const event = {
+      ...advertisement,
+      filters: filters.map((filter) => filter.id),
+      manufacturerData: advertisement.manufacturerData.map((entry) => ({ ...entry, data: encodeBleBytes(entry.data) })),
+      changed: isChanged,
+    };
+    this.answer(AttractapEventType.BLE_WATCH_EVENT, { v: 1, events: [event] }, true);
+  }
+
+  /** Watches beside scans and sessions: never busy. */
+  private onWatchSet(payload: Payload): void {
+    const error = this.watchError;
+    this.watchError = null;
+    if (error) {
+      return this.answer(AttractapEventType.BLE_WATCH_STATE, { v: 1, requestId: payload.requestId, ok: false, error });
+    }
+    this.watchFilters = Array.isArray(payload.filters) ? (payload.filters as WatchFilter[]) : [];
+    this.answer(AttractapEventType.BLE_WATCH_STATE, {
+      v: 1,
+      requestId: payload.requestId,
+      ok: true,
+      active: this.watchFilters.length > 0,
+    });
   }
 
   get hasSession(): boolean {

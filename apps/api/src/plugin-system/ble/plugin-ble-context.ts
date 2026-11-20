@@ -52,6 +52,8 @@ export function createPluginBleContext(
     updateEndpoint: (id, update) => call('updateEndpoint', (service) => service.updateEndpoint(caller, id, update)),
     deleteEndpoint: (id) => call('deleteEndpoint', (service) => service.deleteEndpoint(caller, id)),
     openSession,
+    watch: (profileId, handler, options) =>
+      call('watch', (service) => service.watches.watch(caller, profileId, handler, options)),
     async withSession<T>(
       endpointId: string,
       fn: (session: PluginBleSession) => Promise<T>,
@@ -68,7 +70,8 @@ export function createPluginBleContext(
 }
 
 /**
- * The plugin module is destroyed (disable, uninstall, restart, shutdown): its BLE sessions close with `shutdown`.
+ * The plugin module is destroyed (disable, uninstall, restart, shutdown): its BLE sessions and advertisement watches
+ * close with `shutdown`.
  * A plugin that never got host refs has none. A failure is logged, never blocking the unload.
  */
 export async function closePluginBleSessions(

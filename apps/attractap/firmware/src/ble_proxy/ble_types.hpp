@@ -61,6 +61,21 @@ namespace ble
     // NimBLE ends a GATT procedure after the 30 s ATT timeout; anything stuck longer drops the link.
     constexpr uint32_t STUCK_OP_MS = 35000;
 
+    // Advertisement watch (`capabilities.ble.watch`, version 1): a continuous passive scan the API filters with a
+    // filter set of its own, reported as change events and keepalives per device.
+    constexpr int WATCH_VERSION = 1;
+    constexpr size_t MAX_WATCH_FILTERS = 8;
+    constexpr size_t MAX_WATCH_DEVICES = 32;
+    constexpr uint32_t MAX_WATCH_EVENTS_PER_SECOND = 20;
+    constexpr size_t MAX_WATCH_EVENTS_PER_MESSAGE = 8;
+    // Events of one batch window go out together; a change waits at most this long for its message.
+    constexpr uint32_t WATCH_BATCH_MS = 50;
+    constexpr uint32_t MIN_WATCH_KEEPALIVE_MS = 1000;
+    constexpr uint32_t MAX_WATCH_KEEPALIVE_MS = 3600000;
+    constexpr uint32_t DEFAULT_WATCH_KEEPALIVE_MS = 30000;
+    // A watch scan the radio refused (or lost) is tried again this often.
+    constexpr uint32_t WATCH_RETRY_MS = 2000;
+
     enum class Code : uint8_t
     {
         None,
@@ -201,6 +216,17 @@ namespace ble
         Unsubscribe,
         Cancel,
         Close,
+        WatchSet,
+    };
+
+    // One filter of BLE_WATCH_SET: the scan filter's semantics, under an id the API chose.
+    struct WatchFilter
+    {
+        uint16_t id = 0;
+        PsVector<Uuid> services;
+        PsVector<uint16_t> manufacturers;
+        bool hasNamePrefix = false;
+        char namePrefix[MAX_NAME_PREFIX + 1] = "";
     };
 
     // One parsed server request. Only the fields of its type are set.
@@ -237,6 +263,21 @@ namespace ble
 
         // BLE_CANCEL: the request to cancel
         uint32_t targetRequestId = 0;
+
+        // BLE_WATCH_SET (no sessionId: the watch belongs to the reader's connection, not to a session)
+        PsVector<WatchFilter> watchFilters;
+        uint32_t keepaliveMs = DEFAULT_WATCH_KEEPALIVE_MS;
+    };
+
+    struct Advertisement;
+
+    // One entry of BLE_WATCH_EVENT: a device's current advertisement and the filters it matches.
+    struct WatchEvent
+    {
+        const Advertisement *advertisement = nullptr;
+        uint16_t filters[MAX_WATCH_FILTERS] = {};
+        uint8_t filterCount = 0;
+        bool changed = false;
     };
 
     // One advertising report, already decoded (advertising data and scan response merged).

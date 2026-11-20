@@ -87,6 +87,7 @@
   - [Bluetooth Transport for Plugins](plugins/ble-transport.md)
   - [Plugin Storage](plugins/plugin-storage.md)
   - [Card Authentication for Plugins](plugins/card-authentication.md)
+  - [Plugin Readers](plugins/plugin-readers.md)
   - **Reservations**
     - [Overview](plugins/reservations/overview.md)
     - [Using Reservations](plugins/reservations/using-reservations.md)

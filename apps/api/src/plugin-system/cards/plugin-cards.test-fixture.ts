@@ -9,6 +9,7 @@ import { CardOperationsService } from '../../attractap/websockets/card-operation
 import { createRelayReader, createServices, detect } from '../../attractap/websockets/card-relay.test-fixture';
 import { LoadedPluginManifest } from '../plugin.manifest';
 import { PluginModule } from '../plugin.module';
+import { PluginCardAuthentications } from '../readers/plugin-card-authentications';
 import { cancelPluginCardConversations } from './plugin-cards-context';
 
 export const PLUGIN_ID = 'plugin-id';
@@ -28,8 +29,10 @@ export function createPluginCardsHost(
   permissions: PluginPermission[],
 ) {
   const services = createServices();
+  const authentications = new PluginCardAuthentications();
   const moduleRef = {
     get: jest.fn((token: unknown) => {
+      if (token === PluginCardAuthentications) return authentications;
       if (token === CardOperationsService) return services.operations;
       if (token === CardConversationService) return services.conversations;
       throw new Error(`unexpected host token ${String(token)}`);
@@ -53,7 +56,7 @@ export function createPluginCardsHost(
   /** The helper the plugin module's cleanup calls on unload (the hook itself: plugin-ble.integration.spec.ts). */
   const unloadPlugin = (pluginId: string) => cancelPluginCardConversations(moduleRef, pluginId);
 
-  return { ...services, context, enroll, unloadPlugin };
+  return { ...services, context, enroll, unloadPlugin, authentications };
 }
 
 /** A plugin device that hands every APDU straight to the card. */

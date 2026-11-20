@@ -106,6 +106,10 @@ uint32_t pendingUiStartedAt = 0;
 bool resourceIsDoor = false;
 #endif
 
+#if !(defined(HAS_LVGL_DISPLAY))
+bool resourceIsAccessOnlyDoor = false;
+#endif
+
 uint32_t selectedResourceId = 0;
 
 #if !defined(HAS_LVGL_DISPLAY)

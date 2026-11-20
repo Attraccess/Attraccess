@@ -44,27 +44,13 @@ import { WebsocketService } from './websocket.service';
 import { ReaderTimeZoneService } from './reader-time-zone.service';
 import { readerHeartbeat } from './websocket-reader-payloads';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
+import { SKIPS_ACTIVITY_WRITE } from './websocket-activity';
 import { randomBytes } from 'crypto';
 import type { IncomingMessage } from 'http';
 import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
 
 /** Events of the removed token sign-in; a reader that still sends one is closed. */
 const TOKEN_SIGN_IN_EVENTS = new Set<string>(['READER_REGISTER', 'READER_AUTHENTICATE']);
-
-/**
- * Card relay, coredump and BLE events: a card conversation must not wait for the lastConnection update, and coredump
- * chunks and BLE traffic must not write it per chunk (a coredump's BEGIN and COMPLETE record the activity).
- */
-const SKIPS_ACTIVITY_WRITE = new Set<AttractapEventType>([
-  AttractapEventType.CARD_DETECTED,
-  AttractapEventType.CARD_APDU_RESPONSE,
-  AttractapEventType.CARD_REMOVED,
-  AttractapEventType.READER_COREDUMP_CHUNK,
-  AttractapEventType.BLE_RESULT,
-  AttractapEventType.BLE_SCAN_RESULT,
-  AttractapEventType.BLE_NOTIFICATION,
-  AttractapEventType.BLE_SESSION_ENDED,
-]);
 
 @WebSocketGateway({
   path: '/api/attractap/websocket',

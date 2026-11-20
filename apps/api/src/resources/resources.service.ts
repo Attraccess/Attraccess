@@ -32,6 +32,7 @@ import { ResourceSessionLimitChangedEvent } from './events/resource-session-limi
 import { sessionLimitOf } from './usage/sessions/active-usage';
 import { ResourceChangedEvent } from './events/resource-changed.event';
 
+import { assertDoorOptions } from './door-options';
 import { AUDIT_DETAILS_BYTE_LIMIT, fitAuditText, fitAuditTexts } from '../audit/policies/projection';
 
 export const MAX_AUDIT_DETAILS_BYTES = AUDIT_DETAILS_BYTE_LIMIT;
@@ -45,6 +46,7 @@ export function resourceAuditSnapshot(resource: ResourceRecord) {
     name: resource.name,
     type: resource.type,
     separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch,
+    accessOnly: resource.accessOnly,
     description: resource.description,
     documentationType: resource.documentationType,
     documentationMarkdown: resource.documentationMarkdown,
@@ -68,6 +70,7 @@ export function applyResourceFields(resource: ResourceRecord, dto: UpdateResourc
   if (dto.name !== undefined) resource.name = dto.name;
   if (dto.type !== undefined) resource.type = dto.type;
   if (dto.separateUnlockAndUnlatch !== undefined) resource.separateUnlockAndUnlatch = dto.separateUnlockAndUnlatch;
+  if (dto.accessOnly !== undefined) resource.accessOnly = dto.accessOnly;
   if (dto.description !== undefined) resource.description = dto.description;
   if (dto.metadata !== undefined) resource.metadata = dto.metadata;
 
@@ -103,6 +106,7 @@ export function resourceUpdateAuditDetails(
     ...(before.separateUnlockAndUnlatch !== updatedResource.separateUnlockAndUnlatch
       ? ['separateUnlockAndUnlatch']
       : []),
+    ...(before.accessOnly !== updatedResource.accessOnly ? ['accessOnly'] : []),
     ...(before.description !== updatedResource.description ? ['description'] : []),
     ...(before.documentationType !== updatedResource.documentationType ||
     before.documentationMarkdown !== updatedResource.documentationMarkdown ||
@@ -220,6 +224,12 @@ export class ResourcesService {
       throw error;
     }
 
+    assertDoorOptions({
+      type: dto.type,
+      accessOnly: dto.accessOnly || false,
+      separateUnlockAndUnlatch: dto.separateUnlockAndUnlatch || false,
+    });
+
     const resource = await this.store.create({
       name: dto.name,
       description: dto.description,
@@ -230,6 +240,7 @@ export class ResourcesService {
       maxParallelSessions: dto.maxParallelSessions ?? 1,
       type: dto.type,
       separateUnlockAndUnlatch: dto.separateUnlockAndUnlatch || false,
+      accessOnly: dto.accessOnly || false,
       metadata: dto.metadata ?? null,
       retrainingMaxAgeDays: dto.retrainingMaxAgeDays ?? null,
       retrainingMaxInactivityDays: dto.retrainingMaxInactivityDays ?? null,
@@ -277,6 +288,7 @@ export class ResourcesService {
     const before = resourceAuditSnapshot(resource);
 
     applyResourceFields(resource, dto);
+    assertDoorOptions(resource);
 
     if (image && dto.deleteImage) {
       throw new BadRequestException('Image and deleteImage cannot be used together');

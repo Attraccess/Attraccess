@@ -2,6 +2,20 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AttractapService } from '../../attractap.service';
 import { UsersService } from '../../../users-and-auth/users/users.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
+import {
+  ATTRACTAP_READER_CAPABILITIES,
+  ReaderAction,
+  readerActionRefusal,
+} from '../../../resources/reader-capabilities/reader-capabilities';
+
+/** The reader action behind each Attractap event; events without one (stats, flow buttons) are not actions. */
+const READER_ACTION_OF_EVENT: Partial<Record<AttractapEventType, ReaderAction>> = {
+  [AttractapEventType.START_RESOURCE_USAGE_SESSION]: 'start',
+  [AttractapEventType.STOP_RESOURCE_USAGE_SESSION]: 'stop',
+  [AttractapEventType.LOCK_DOOR]: 'lock',
+  [AttractapEventType.UNLOCK_DOOR]: 'unlock',
+  [AttractapEventType.UNLATCH_DOOR]: 'unlatch',
+};
 
 @Injectable()
 export class ResourceActionGuard {
@@ -39,6 +53,13 @@ export class ResourceActionGuard {
           error: 'RESOURCE_NOT_ASSOCIATED_WITH_READER',
         }),
       );
+      return false;
+    }
+
+    const action = READER_ACTION_OF_EVENT[eventType];
+    const refusal = action ? readerActionRefusal(ATTRACTAP_READER_CAPABILITIES, resource, action) : null;
+    if (refusal) {
+      await socket.sendMessage(new AttractapEvent(eventType, { ...correlation, error: refusal }));
       return false;
     }
 
