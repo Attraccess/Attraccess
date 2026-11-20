@@ -265,13 +265,6 @@ void ReaderLink::abandonBootstrap()
         return;
     }
     credentials.caSpki.clear();
-    pairingTicket.clear();
-    pairingFromToken = false;
-    if (!Settings::getAttraccessAuthConfig().apiKey.empty())
-    {
-        useChannel(Channel::Legacy, "pairing not confirmed");
-        return;
-    }
     useChannel(Channel::Pairing, "pairing not confirmed");
 }
 
@@ -292,7 +285,7 @@ void ReaderLink::onSessionFrame(SessionFraming::FrameType type, std::string payl
 #ifdef ESP_PLATFORM
         if (appBinary)
         {
-            // OTA chunks: one complete binary message, as the token channel delivers them.
+            // OTA chunks: one complete binary message.
             esp_websocket_event_data_t data = {};
             data.data_ptr = payload.data();
             data.data_len = static_cast<int>(payload.size());
@@ -368,9 +361,7 @@ void ReaderLink::onControl(const std::string &payload)
         credentials.readerId = readerId;
         credentials.installationId = serverInstallation;
         credentials.certificate = certificate;
-        // Verified and stored: the server deleted the token with the approval, and a paired reader
-        // never uses it again.
-        Settings::clearAttraccessAuthConfig();
+        // Verified and stored.
         State::clearEnrollment();
         logger.infof("Paired as reader %u", static_cast<unsigned>(readerId));
         // The server closes this session; the next one (soon) uses the certificate.
@@ -410,10 +401,7 @@ void ReaderLink::onPairingRemoved(const char *reason)
     // pairing (or it never completed): start over with a new key.
     logger.errorf("Server ended the pairing (%s); requesting a new one", reason);
     State::setPairingRemoved();
-    Settings::clearAttraccessAuthConfig();
     newIdentity();
-    pairingTicket.clear();
-    pairingFromToken = false;
     useChannel(Channel::Pairing, "pairing removed");
 }
 

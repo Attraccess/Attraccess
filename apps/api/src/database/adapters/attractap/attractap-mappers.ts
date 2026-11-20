@@ -71,7 +71,6 @@ export function toReader(reader: Attractap): AttractapReader {
   return {
     id: reader.id,
     name: reader.name,
-    apiTokenHash: reader.apiTokenHash,
     pairingState: reader.pairingState,
     credentialFingerprint: reader.credentialFingerprint,
     secureBootDigest0: reader.secureBootDigest0,
@@ -80,6 +79,13 @@ export function toReader(reader: Attractap): AttractapReader {
     pairedAt: reader.pairedAt,
     certificateNotAfter: reader.certificateNotAfter,
     certificateSerial: reader.certificateSerial,
+    secured: reader.secured ?? false,
+    securedAt: reader.securedAt ?? null,
+    firmwareProfile: reader.firmwareProfile ?? null,
+    secureVersion: reader.secureVersion ?? null,
+    efuseSecureVersion: reader.efuseSecureVersion ?? null,
+    securityReportCheckedAt: reader.securityReportCheckedAt ?? null,
+    securityReportProblems: reader.securityReportProblems ?? null,
     // Absent unless the query loaded the relation, as before.
     ...(reader.resources ? { resources: reader.resources.map(toLinkedResource) } : {}),
     lastConnection: reader.lastConnection,

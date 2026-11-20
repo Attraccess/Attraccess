@@ -119,7 +119,7 @@ describe('AttractapSelect for card writing', () => {
     expect(screen.getByRole('button')).toBeDisabled();
   });
 
-  // After an upgrade every reader is unpaired until an administrator pairs it: say where that happens.
+  // After the upgrade every reader has to be paired again by an administrator: say where that happens.
   it('points to pairing when no paired reader is connected', () => {
     readersQuery([reader(1, 'Entrance', {}, new Date(Date.now() - 60_000))]);
     settingsQuery({ mode: 'all', readerIds: [] });
@@ -134,11 +134,7 @@ describe('AttractapSelect for card writing', () => {
   });
 
   it('never offers a reader that is not paired, in any picker', async () => {
-    readersQuery([
-      reader(1, 'Entrance', {}),
-      reader(5, 'Legacy', {}, new Date(), 'unpaired'),
-      reader(6, 'Removed', {}, new Date(), 'revoked'),
-    ]);
+    readersQuery([reader(1, 'Entrance', {}), reader(6, 'Removed', {}, new Date(), 'revoked')]);
     settingsQuery({ mode: 'all', readerIds: [] });
     const writing = render(<AttractapSelect selection={null} onSelectionChange={vi.fn()} forCardWriting />);
     expect(await options()).toEqual(['Entrance']);
@@ -148,7 +144,7 @@ describe('AttractapSelect for card writing', () => {
   });
 
   it('does not show a picked reader that is not paired', () => {
-    readersQuery([reader(5, 'Legacy', {}, new Date(), 'unpaired')]);
+    readersQuery([reader(5, 'Legacy', {}, new Date(), 'revoked')]);
     settingsQuery({ mode: 'all', readerIds: [] });
     render(<AttractapSelect selection={5} onSelectionChange={vi.fn()} forCardWriting />);
     expect(screen.queryByText('Legacy')).toBeNull();

@@ -19,6 +19,7 @@
       "actions": "Actions"
     },
     "noData": "No Attractaps found",
+    "emptyHint": "Readers appear here once they are paired. A new reader shows a code and waits in the Not paired list, where you pair it. After the upgrade to Attractap firmware 2.6.0, every reader has to be paired again.",
     "actions": {
       "editReader": "Edit",
       "diagnostics": "Diagnostics",

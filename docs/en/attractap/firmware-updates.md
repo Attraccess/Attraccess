@@ -14,6 +14,12 @@ Reader firmware ships with Attraccess itself: every Attraccess release bundles t
 
 The way to update your readers is therefore to update Attraccess. Once the backend runs a release carrying newer reader firmware, every reader picks it up the next time it connects.
 
+> [!IMPORTANT]
+> Updates run over the encrypted connection of a paired reader. A reader that still signs in with a token
+> cannot update over the air: flash it to firmware 2.6.0 over USB with the web flasher, then pair it. A
+> reader on firmware 1.8.0 to 2.5.x has to be paired again after the server upgrade before it receives
+> updates. See [After the upgrade: every reader pairs again](attractap/pairing.md#after-the-upgrade-every-reader-pairs-again).
+
 > [!NOTE]
 > During a firmware update, the reader is temporarily unavailable. The update typically takes less than a minute.
 

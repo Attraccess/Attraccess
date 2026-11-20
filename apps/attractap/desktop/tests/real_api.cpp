@@ -204,7 +204,6 @@ bool screenshotTextSafe(const std::string &text)
     const std::vector<std::string> secrets = {
         Settings::getDeviceConfig().passCode,
         Settings::getNetworkConfig().password,
-        Settings::getAttraccessAuthConfig().apiKey,
     };
     for (const auto &secret : secrets)
         if (!secret.empty() && text.find(secret) != std::string::npos) return false;

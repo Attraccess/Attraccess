@@ -62,7 +62,7 @@ describe('ReaderUiAdminController', () => {
   });
 
   // Readers that are not paired yet exist for the pairing session only: no settings, no resync.
-  it.each(['unpaired', 'revoked'])('answers 404 for the settings of a %s reader', async (pairingState) => {
+  it.each(['revoked'])('answers 404 for the settings of a %s reader', async (pairingState) => {
     const { controller, settings, slots, readers, req } = setup();
     readers.findReaderById.mockResolvedValue({ id: 5, pairingState });
     await expect(controller.getReaderSettings(5)).rejects.toThrow(NotFoundException);

@@ -230,8 +230,8 @@ export class SessionConnection extends EventEmitter {
   }
 
   /**
-   * Hands a decrypted application message to the framework's message handlers, exactly as if
-   * it had arrived as a text frame on a legacy connection.
+   * Hands a decrypted application message to the framework's message handlers as a text message, the
+   * form the gateway's `EVENT` handlers read. A text frame the peer sends itself is a violation (`onWsMessage`).
    */
   public injectText(text: Buffer): void {
     this.injecting = true;

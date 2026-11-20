@@ -1,11 +1,23 @@
 # Reader-Sicherheit (Secure-Boot-Schlüssel)
-<!-- llms-description: Wie Attractap-Touch-V2-Leser abgesichert werden, damit sie nur mit Ihren eigenen Secure-Boot-Schlüsseln signierte Firmware akzeptieren, inklusive Sichern und Wiederherstellen. -->
+<!-- llms-description: Wie Attractap-Touch-V2-Reader gesichert werden, damit sie nur mit deinen eigenen Secure-Boot-Schlüsseln signierte Firmware akzeptieren, inklusive Backup und Wiederherstellung der Schlüssel. -->
 
-Attractap-Touch-V2-Reader können **abgesichert** werden: Danach akzeptieren sie nur noch Firmware, die
-von _deiner_ Installation signiert ist, ihr Flash ist verschlüsselt und ihre Server-Identität ist an den
-Chip gebunden. Diese Seite beschreibt die Schlüssel, die deine Installation dafür braucht. Einen Reader
-abzusichern ist noch nicht verfügbar; die Schaltfläche erscheint in einer späteren Version, sobald der
-Ablauf auf echter Hardware geprüft ist.
+Attractap-Touch-V2-Reader können **gesichert** werden: Danach akzeptieren sie nur noch Firmware, die
+von _deiner_ Installation signiert ist, und ihr Flash und ihr Einstellungsspeicher sind verschlüsselt.
+Diese Seite beschreibt die Schlüssel, die deine Installation dafür braucht. Einen Reader zu sichern ist
+noch nicht verfügbar; die Schaltfläche erscheint in einer späteren Version, sobald der Ablauf auf echter
+Hardware geprüft ist.
+
+## Identität und Sicherheitsstatus des Readers
+
+Die Identität eines Readers ist der P-256-Schlüssel, den er selbst erzeugt und dem deine Installation
+vertraut, sobald ein Admin ihn [gekoppelt](attractap/pairing.md) hat. Auf einem Reader mit sicherer
+Firmware schützen Flash-Verschlüsselung und NVS-Verschlüsselung diesen Schlüssel.
+
+Ein sicherer Reader meldet bei jeder Verbindung seine Sicherheitseinstellungen (eFuses), und der Tab
+**Kopplung** im Reader-Editor zeigt **Gesichert** oder **Nicht gesichert** samt den Einstellungen, die
+nicht passen (siehe [Sichere Reader](attractap/pairing.md#sichere-reader)). Für **Gesichert** braucht der
+Server außerdem die Fingerabdrücke der Secure-Boot-Schlüssel des Readers, die er erst beim Sichern des
+Readers speichert. Bis dieser Ablauf verfügbar ist, zeigen sichere Reader **Nicht gesichert**.
 
 Öffne **Einstellungen → Reader-Sicherheit** (Berechtigung `system.settings.manage`).
 
@@ -14,7 +26,7 @@ Ablauf auf echter Hardware geprüft ist.
 | Schlüssel                       | Zweck                                                                                                                                                                                                              |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Signaturschlüssel**           | Signiert die Firmware, die deine Reader akzeptieren. Der Server speichert ihn verschlüsselt mit einem aus `AUTH_SESSION_SECRET` abgeleiteten Schlüssel.                                                            |
-| **Wiederherstellungsschlüssel** | Ein Ersatz, dem jeder abgesicherte Reader ebenfalls vertraut. Du lädst ihn einmal herunter, bewahrst ihn offline auf und weist nach, dass du ihn hast. Dann löscht der Server seine Kopie des privaten Schlüssels. |
+| **Wiederherstellungsschlüssel** | Ein Ersatz, dem jeder gesicherte Reader ebenfalls vertraut. Du lädst ihn einmal herunter, bewahrst ihn offline auf und weist nach, dass du ihn hast. Dann löscht der Server seine Kopie des privaten Schlüssels. |
 
 Beide sind RSA-3072-Schlüssel. Die Seite zeigt nur ihre Fingerabdrücke.
 
@@ -28,9 +40,9 @@ Beide sind RSA-3072-Schlüssel. Die Seite zeigt nur ihre Fingerabdrücke.
    Passt sie, löscht der Server seine Kopie des privaten Wiederherstellungsschlüssels und der Status
    wird **Bereit**.
 
-Vor Schritt 3 kann kein Reader abgesichert werden. Das erzwingt der Server, nicht nur die Seite.
+Vor Schritt 3 kann kein Reader gesichert werden. Das erzwingt der Server, nicht nur die Seite.
 
-## Sichern
+## Backup
 
 - **Backup des Signaturschlüssels herunterladen** ist möglich, sobald Schlüssel existieren. Es verlangt
   eine Passphrase mit mindestens 12 Zeichen (zweimal eingeben), genau wie beim Wiederherstellungsschlüssel.
@@ -42,7 +54,7 @@ Vor Schritt 3 kann kein Reader abgesichert werden. Das erzwingt der Server, nich
 
 > **Warnung:** Der Signaturschlüssel des Servers geht verloren, wenn die Datenbank oder
 > `AUTH_SESSION_SECRET` verloren geht. Hast du dann weder ein Backup des Signaturschlüssels noch den
-> Wiederherstellungsschlüssel, können abgesicherte Reader nie wieder aktualisiert werden.
+> Wiederherstellungsschlüssel, können gesicherte Reader nie wieder aktualisiert werden.
 
 Die heruntergeladenen Dateien sind verschlüsselte PKCS#8-PEM-Dateien. `openssl` liest sie mit der
 Passphrase. `espsecure` kann verschlüsselte Schlüssel nicht lesen, entschlüssele deshalb zuerst eine
@@ -63,8 +75,8 @@ jeweils mit Passphrase, so wie sie von dieser Seite heruntergeladen wurden (unve
 Schlüsseldateien und die öffentlichen Laborschlüssel werden abgelehnt). Es ist nur möglich, wenn die
 Installation keinen nutzbaren Signaturschlüssel hat (keinen, oder einen, der sich nicht mehr
 entschlüsseln lässt, weil sich `AUTH_SESSION_SECRET` geändert hat) oder kein Reader mit dem aktuellen
-abgesichert ist. Existieren schon Schlüssel, ersetzt die Wiederherstellung den aktuellen
-Signaturschlüssel. Sind Reader mit einem Schlüssel abgesichert, der sich nicht mehr entschlüsseln lässt,
+gesichert ist. Existieren schon Schlüssel, ersetzt die Wiederherstellung den aktuellen
+Signaturschlüssel. Sind Reader mit einem Schlüssel gesichert, der sich nicht mehr entschlüsseln lässt,
 wird nur ein Schlüssel angenommen, dem diese Reader vertrauen (das Backup des Signaturschlüssels oder
 die Wiederherstellungsdatei).
 
@@ -72,7 +84,7 @@ Nach einer Wiederherstellung aus der **Wiederherstellungsdatei** wird dieser Sch
 Signaturschlüssel (die Reader vertrauen ihm als zweitem Schlüssel) und es wird ein **neuer
 Wiederherstellungsschlüssel** erzeugt. Der Status zeigt _Wiederhergestellt, Prüfung des
 Wiederherstellungsschlüssels offen_, bis der neue Wiederherstellungsschlüssel die Prüfung bestanden hat;
-vorher kann kein weiterer Reader abgesichert werden.
+vorher kann kein weiterer Reader gesichert werden.
 
 Eine Wiederherstellung aus einem **Backup des Signaturschlüssels** ersetzt nur den Signaturschlüssel;
 Wiederherstellungsschlüssel und sein Status bleiben unverändert. Ein Schlüssel, der bereits der
@@ -86,8 +98,8 @@ Installation eingebrannt sind.
 
 ## Grenzen
 
-- Widerruf und Rotation der Schlüssel bereits abgesicherter Reader werden noch nicht unterstützt.
-- Ein abgesicherter Reader kann nicht in eine andere Installation umziehen.
+- Widerruf und Rotation der Schlüssel bereits gesicherter Reader werden noch nicht unterstützt.
+- Ein gesicherter Reader kann nicht in eine andere Installation umziehen.
 - Der Schutz richtet sich gegen Angreifer mit kurzem physischem Zugriff. Er macht keine Aussagen gegen
-  Glitching, Seitenkanal- oder invasive Angriffe, und das DS-Modul (Digital Signature) des Chips belegt
-  die Schlüsselnutzung, ist aber keine Remote-Attestierung.
+  Glitching, Seitenkanal- oder invasive Angriffe. Der Sicherheitsbericht ist eine Aussage des Readers
+  selbst, keine Remote-Attestierung.

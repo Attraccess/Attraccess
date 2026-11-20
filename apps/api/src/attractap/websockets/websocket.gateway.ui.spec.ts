@@ -66,27 +66,25 @@ describe('AttractapGateway reader UI messaging', () => {
   describe('frame size and retries', () => {
     afterEach(() => jest.useRealTimers());
 
-    /** Connects a client through the real gateway; `session` routes sends through a TLS-session `send`. */
-    async function connect(session: boolean) {
+    /** Connects a client through the real gateway; sends go through a TLS-session `send`. */
+    async function connect() {
       const client = {
         close: jest.fn(),
         send: jest.fn(),
         on: jest.fn(),
-        protocol: session ? SESSION_SUBPROTOCOL : '',
+        protocol: SESSION_SUBPROTOCOL,
       } as unknown as WebSocket;
       const sessionSend = jest.fn();
-      if (session) {
-        const sessions = gateway().readerSessionService;
-        sessions.open = jest.fn(() => ({ close: jest.fn() }));
-        sessions.accept = jest.fn(async (socket: any, _connection: unknown, onReady: (s: unknown) => void) => {
-          socket.send = sessionSend; // what ReaderSessionService.attach does
-          onReady(socket);
-        });
-      }
+      const sessions = gateway().readerSessionService;
+      sessions.open = jest.fn(() => ({ close: jest.fn() }));
+      sessions.accept = jest.fn(async (socket: any, _connection: unknown, onReady: (s: unknown) => void) => {
+        socket.send = sessionSend; // what ReaderSessionService.attach does
+        onReady(socket);
+      });
       const connecting = fixture.gateway.handleConnection(client);
       await jest.advanceTimersByTimeAsync(0);
       const socket = [...fixture.websocketService.sockets.values()][0];
-      const wire = session ? sessionSend : (client.send as jest.Mock);
+      const wire = sessionSend;
       wire.mockClear();
       return { socket, wire, connecting };
     }
@@ -105,12 +103,9 @@ describe('AttractapGateway reader UI messaging', () => {
         .filter((data: any) => data.type === AttractapEventType.UI_SLOT_UPDATE)
         .map((data: any) => data.payload.revision);
 
-    it.each([
-      ['legacy websocket', false],
-      ['TLS session', true],
-    ])('refuses a UI frame over 4096 bytes and still sends small ones (%s)', async (_name, session) => {
+    it('refuses a UI frame over 4096 bytes and still sends small ones', async () => {
       jest.useFakeTimers();
-      const { socket, wire, connecting } = await connect(session);
+      const { socket, wire, connecting } = await connect();
 
       await expect(socket.sendMessage(slotUpdate(1, 'x'.repeat(4200)))).resolves.toBe(false);
       expect(wire).not.toHaveBeenCalled();
@@ -127,7 +122,7 @@ describe('AttractapGateway reader UI messaging', () => {
 
     it('resends only the newest revision when the reader withholds the ACK of an older one', async () => {
       jest.useFakeTimers();
-      const { socket, wire, connecting } = await connect(false);
+      const { socket, wire, connecting } = await connect();
       socket.readerId = 1;
       const slots = (gateway().uiHandler as any).slots;
       let text = 'A';

@@ -8,7 +8,7 @@ import {
 
 /**
  * Plugin BLE reader protocol, version 1 (ATT-1033/ATT-1036). JSON EVENT messages on the paired reader link (the
- * session transport) only, without the generic ACK; a reader signed in with its legacy token gets no BLE. Bytes
+ * session transport) only, without the generic ACK. Bytes
  * travel as base64. Every message carries `v`; every request a server-assigned `sessionId` and a per-connection
  * `requestId`.
  */

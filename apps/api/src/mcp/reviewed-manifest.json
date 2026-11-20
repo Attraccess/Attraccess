@@ -1672,12 +1672,12 @@
   "updateReader": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "68294a8b"
+    "shape": "a7d12f66"
   },
   "getReaderById": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "2816e33e"
+    "shape": "f2725ab9"
   },
   "deleteReader": {
     "decision": "allow",
@@ -1687,12 +1687,12 @@
   "getReaders": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "00519949"
+    "shape": "d5f7b8f0"
   },
   "getReadersToPair": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "b4f4c36f"
+    "shape": "4cc2f829"
   },
   "getReaderCrashReports": {
     "decision": "allow",
@@ -1752,27 +1752,27 @@
   "getResourceAttractaps": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "0bac3694"
+    "shape": "de346de3"
   },
   "getResourceGroupAttractaps": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "9c867be9"
+    "shape": "fbd993d0"
   },
   "getPairings": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "5fc2453c"
+    "shape": "c2813557"
   },
   "resolvePairing": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "64b1aa63"
+    "shape": "78616398"
   },
   "getPairing": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "a8e0667a"
+    "shape": "5cfde791"
   },
   "cancelPairing": {
     "decision": "allow",
@@ -1782,12 +1782,7 @@
   "approvePairing": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "95a8425e"
-  },
-  "requestReaderPairing": {
-    "decision": "allow",
-    "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "e8d8eed3"
+    "shape": "0b933d0a"
   },
   "revokeReader": {
     "decision": "allow",
