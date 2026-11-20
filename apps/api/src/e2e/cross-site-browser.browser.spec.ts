@@ -10,6 +10,7 @@ import { bootstrap } from '../main.bootstrap';
 import { AUTH_COOKIE_NAME } from '../common/services/cookie-config.service';
 import { SessionService } from '../users-and-auth/auth/session.service';
 import { disposeStorage } from '../test/desktop-real-api.test-fixture';
+import { SESSION_SUBPROTOCOL } from '../attractap/security/session-framing';
 
 /**
  * Sibling hostnames share one registrable domain, so the browser treats them
@@ -317,10 +318,13 @@ describe('sibling website against a real API in headless Chromium', () => {
   });
 
   it('accepts device websockets that send a foreign Origin', async () => {
-    // Readers authenticate inside the socket; the upgrade itself must not depend on the Origin.
-    const socket = new WebSocket(`${appUrl.replace(`http://${APP_HOST}`, 'ws://127.0.0.1')}/api/attractap/websocket`, {
-      origin: siblingUrl,
-    });
+    // Readers authenticate with their certificate inside the session; the upgrade itself must not depend on the
+    // Origin. (A socket without the session or pairing subprotocol is refused: token sign-in is gone.)
+    const socket = new WebSocket(
+      `${appUrl.replace(`http://${APP_HOST}`, 'ws://127.0.0.1')}/api/attractap/websocket`,
+      [SESSION_SUBPROTOCOL],
+      { origin: siblingUrl },
+    );
     try {
       await new Promise<void>((resolve, reject) => {
         socket.once('open', () => resolve());

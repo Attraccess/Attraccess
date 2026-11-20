@@ -238,6 +238,50 @@ describe('credential registry on SQLite (atomic reader row and history)', () => 
     expect(await readers.applySecurity(readerId, { secured: true }, 'fp')).toBe(false);
   });
 
+  it('reads the security columns of a reader: empty before any report, as stored after one', async () => {
+    const { source } = await connect();
+    const readerId = await addReader(source, 'one');
+    const readers = new TypeOrmAttractapReaderStore(source.getRepository(Attractap), source.getRepository(Resource));
+    expect(await readers.findSecurity(readerId + 100)).toBeUndefined();
+    expect(await readers.findSecurity(readerId)).toEqual({
+      id: readerId,
+      secureBootDigest0: null,
+      secureBootDigest1: null,
+      secured: false,
+      securedAt: null,
+      firmwareProfile: null,
+      secureVersion: null,
+      efuseSecureVersion: null,
+      securityReportCheckedAt: null,
+      securityReportProblems: null,
+    });
+
+    const checkedAt = new Date('2026-11-19T10:00:00Z');
+    await source.getRepository(Attractap).update(readerId, {
+      secureBootDigest0: 'a1'.repeat(32),
+      secureBootDigest1: 'b2'.repeat(32),
+      secured: true,
+      securedAt: checkedAt,
+      firmwareProfile: 'secure',
+      secureVersion: 2,
+      efuseSecureVersion: 1,
+      securityReportCheckedAt: checkedAt,
+      securityReportProblems: ['jtag-enabled'],
+    });
+    expect(await readers.findSecurity(readerId)).toEqual({
+      id: readerId,
+      secureBootDigest0: 'a1'.repeat(32),
+      secureBootDigest1: 'b2'.repeat(32),
+      secured: true,
+      securedAt: checkedAt,
+      firmwareProfile: 'secure',
+      secureVersion: 2,
+      efuseSecureVersion: 1,
+      securityReportCheckedAt: checkedAt,
+      securityReportProblems: ['jtag-enabled'],
+    });
+  });
+
   it('puts the record back to its state before the pairing when the pairing is undone', async () => {
     const { source, registry } = await connect();
     const readerId = await addReader(source, 'one');

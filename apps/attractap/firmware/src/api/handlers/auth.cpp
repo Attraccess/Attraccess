@@ -18,24 +18,6 @@
 #include <string>
 
 
-void API::onUnauthorized(JsonObject data)
-{
-    std::string message = "Unknown error";
-    if (data["payload"].is<JsonObject>())
-    {
-        JsonObject payload = data["payload"].as<JsonObject>();
-        if (payload["message"].is<const char *>() && !payload["message"].isNull())
-        {
-            message = payload["message"].as<std::string>();
-        }
-    }
-
-    // Authentication is the paired TLS session; there is no other way in. The reader keeps its identity
-    // and the connection logic reconnects or pairs again as the link decides.
-    logger.error(("UNAUTHORIZED: " + message).c_str());
-    State::setApiState(false, "");
-}
-
 void API::sendFirmwareInfo()
 {
     this->logger.info("Requested firmware info");

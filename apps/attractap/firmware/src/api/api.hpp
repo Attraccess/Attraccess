@@ -268,7 +268,6 @@ private:
 
     void sendHeartbeat();
 
-    void onUnauthorized(JsonObject data);
     void onReaderAuthenticated(JsonObject data);
     void onServerTime(JsonVariantConst serverTime);
     void sendFirmwareInfo();

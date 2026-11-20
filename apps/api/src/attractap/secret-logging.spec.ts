@@ -117,11 +117,6 @@ const SAFE_CALLS: Array<{ file: string; call: string; why: string }> = [
     why: 'the provisioning protocol reply channel; replies only carry status fields (pinIsSet, never the PIN or Wi-Fi password)',
   },
   {
-    file: 'apps/attractap/firmware/src/api/handlers/auth.cpp',
-    call: '("UNAUTHORIZED: " + message)',
-    why: "the server's READER_UNAUTHORIZED reason code (PLEASE_REREGISTER), not the reader's credentials",
-  },
-  {
     file: 'apps/attractap/firmware/src/application/callbacks/api.cpp',
     call: '("Reader error %s: %s", title, message)',
     why: 'the error code the server sent for display on the reader screen',

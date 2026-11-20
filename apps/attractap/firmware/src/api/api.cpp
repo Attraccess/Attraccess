@@ -240,11 +240,7 @@ API::API(IReaderTransport &transport) : logger("API"),
 
 void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
 {
-    if (strcmp(eventType, "READER_UNAUTHORIZED") == 0)
-    {
-        this->onUnauthorized(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "READER_AUTHENTICATED") == 0)
+    if (strcmp(eventType, "READER_AUTHENTICATED") == 0)
     {
         this->onReaderAuthenticated(inboundDoc["data"].as<JsonObject>());
     }
