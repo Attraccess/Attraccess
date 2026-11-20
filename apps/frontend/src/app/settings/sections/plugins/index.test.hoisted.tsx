@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import type { PropsWithChildren, ReactElement } from 'react';
 import { afterEach, beforeEach, vi } from 'vitest';
 
@@ -244,3 +244,13 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
 });
+
+/** Opens the marketplace registry select and picks a registry by its visible name. */
+export async function pickRegistry(user: { click: (element: Element) => Promise<void> }, name: string) {
+  const trigger = document.querySelector(
+    '[data-cy="marketplace-registry-select"] button, button[data-cy="marketplace-registry-select"]',
+  );
+  if (!trigger) throw new Error('registry select missing');
+  await user.click(trigger);
+  await user.click(await screen.findByRole('option', { name }));
+}

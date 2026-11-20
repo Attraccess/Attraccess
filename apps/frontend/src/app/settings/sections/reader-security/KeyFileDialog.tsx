@@ -1,4 +1,11 @@
-import { Button, PasswordInput, StandardModal, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  FileInput,
+  PasswordInput,
+  StandardModal,
+  StatusAlert,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import { Label, ModalBody, ModalFooter, ModalHeader, ModalHeading, Radio, RadioGroup } from '@heroui/react';
 import { useState } from 'react';
 import { apiErrorMessage } from '../../../attractap/pairing/pairingUtils';
@@ -74,10 +81,8 @@ export function KeyFileDialog({ isOpen, kind, replacesKeys, isPending, error, on
             ) : null}
             <label className="flex flex-col gap-1 text-sm">
               {t('file.label')}
-              <input
-                type="file"
+              <FileInput
                 accept=".pem,.key,text/plain"
-                className="block w-full cursor-pointer text-sm file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-default file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground"
                 onChange={(event) => void readFile(event.target.files?.[0])}
                 data-cy="reader-security-key-file"
               />
