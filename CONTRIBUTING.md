@@ -170,6 +170,26 @@ git commit --no-verify -m "anything"
 
 This skips the local hook but **CI still validates** all commits in the PR range when you open or update the pull request.
 
+## Merging and releases
+
+`main` is protected by a merge queue.
+
+- Merging a PR (squash) only enqueues it. The queue re-runs the full CI on a
+  `gh-readonly-queue/main/pr-<N>-*` branch, and the required `precommit-check`
+  job gates on every upstream job. Read the state with the GraphQL fields
+  `isInMergeQueue` and `mergeQueueEntry`; `gh pr view --json` does not offer them.
+- A queue run can fail on a flaky test that passed on the PR head, for example a
+  millisecond-tie ordering assertion in a plugin spec. Check the failed job's
+  log; if the failure is unrelated to the change, enqueue the PR again.
+  Never weaken a test to get through.
+- The squash commit body is the concatenation of the branch commit messages. A
+  `BREAKING CHANGE:` footer that lives only in the PR description is lost, and
+  the release notes (manual `create-release.yml`, `nx release`) then only see the
+  `!` in the title. Put the footer in a commit message on the branch, or add the
+  warning to the release notes by hand.
+- When two open PRs add migrations with the same timestamp prefix, whoever
+  merges second renumbers its migrations after the one on `main`.
+
 ## GitHub Secrets
 
 ### Companion App Code Signing
