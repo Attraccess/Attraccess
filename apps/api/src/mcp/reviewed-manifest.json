@@ -57,7 +57,7 @@
   "changeUnverifiedEmail": {
     "decision": "deny",
     "reason": "Credential flow: takes the account password to redirect the e-mail verification token.",
-    "shape": "a36a9c86"
+    "shape": "168cd610"
   },
   "acceptInvitation": {
     "decision": "deny",
