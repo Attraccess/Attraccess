@@ -41,8 +41,11 @@ function ControllerHistory({ controllerId }: { controllerId: number }) {
         disabled={!draft.isSuccess}
         generation={generation}
         onBusyChange={setBusy}
-        onRollback={async () => {
+        onRollback={async (failure) => {
+          // The draft is read again either way: a rejected rollback may have raced with a draft change.
           await draft.refetch();
+          // Rethrown so the revision list shows the reason; the generation stays, so that reason is not reset.
+          if (failure) throw failure;
           setGeneration((value) => value + 1);
         }}
       />

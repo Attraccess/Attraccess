@@ -303,14 +303,17 @@ describe('rollback from the history page', () => {
     expect(api.rollback).not.toHaveBeenCalled();
   });
 
-  // The history page does not show the rollback error yet (HistoryPage ignores the failure passed to onRollback);
-  // this only pins the draft reconciliation that must happen either way.
-  it('still refreshes the draft after a failed rollback', async () => {
-    api.rollback.mockRejectedValue(new Error('Controller offline'));
+  it('shows why a rollback failed and still refreshes the draft', async () => {
+    api.rollback.mockRejectedValue(
+      new Error('configuration changed since rollback preview; preview and confirm again'),
+    );
     renderHistory();
     fireEvent.click(await (await revisionSection(1)).findByRole('button', { name: 'Preview rollback to revision 1' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Publish rollback as new revision' }));
     await waitFor(() => expect(api.rollback).toHaveBeenCalled());
+    const alert = await screen.findByText('configuration changed since rollback preview; preview and confirm again');
+    expect(alert.getAttribute('role')).toBe('alert');
+    expect(screen.queryByText('Restore revision 1 as a new revision')).toBeNull();
     await waitFor(() => expect(api.getDraft.mock.calls.length).toBeGreaterThan(1));
   });
 
