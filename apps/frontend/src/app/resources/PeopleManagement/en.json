@@ -77,6 +77,10 @@
       "title": "Failed to remove introducer",
       "description": "{{error}}"
     },
+    "maintainerRevokeFailed": {
+      "title": "Failed to remove maintainer",
+      "description": "{{error}}"
+    },
     "maintainerRevoked": {
       "title": "Maintainer removed",
       "description": "Maintainer privileges have been revoked."

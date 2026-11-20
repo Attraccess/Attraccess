@@ -77,6 +77,10 @@
       "title": "Fehler beim Entfernen des Einweisers",
       "description": "{{error}}"
     },
+    "maintainerRevokeFailed": {
+      "title": "Fehler beim Entfernen des Wartenden",
+      "description": "{{error}}"
+    },
     "maintainerRevoked": {
       "title": "Wartender entfernt",
       "description": "Die Wartungs-Privilegien wurden widerrufen."
