@@ -137,22 +137,31 @@ void expectDoorButtonWidths(lv_obj_t *root, int lockAndUnlock, const char *conte
     for (const char *label : {"Abschliessen", "Aufschliessen"})
         expect(std::abs(doorButtonWidthPercent(root, label) - lockAndUnlock) <= 1, message.c_str());
 }
+
+// A door resource as the reader gets it from the resource list.
+API::ResourceBrief doorResource(bool accessOnly, bool separateUnlockAndUnlatch)
+{
+    API::ResourceBrief door{};
+    door.id = 7;
+    door.type = 1;
+    door.accessOnly = accessOnly;
+    door.separateUnlockAndUnlatch = separateUnlockAndUnlatch;
+    door.isHealthy = true;
+    door.accessKnown = true;
+    door.hasIntroduction = true;
+    std::strcpy(door.name, "Workshop entrance");
+    return door;
+}
 }
 
-// An access-only door offers one Open button (an unlock on the wire); a regular door keeps lock, unlock and unlatch.
+// An access-only door offers one Open button (an unlock on the wire); switching to a regular door brings back Lock
+// and Unlock.
 void testAccessOnlyDoorDetails(Renderer &renderer)
 {
     ResourceDetailsScreen details;
     ResourceDetailsScreen::ButtonClickEventData clicked{};
     details.setButtonClickCallback([&](ResourceDetailsScreen::ButtonClickEventData event) { clicked = event; });
-    API::ResourceBrief door{};
-    door.id = 7;
-    door.type = 1;
-    door.accessOnly = true;
-    door.isHealthy = true;
-    door.accessKnown = true;
-    door.hasIntroduction = true;
-    std::strcpy(door.name, "Workshop entrance");
+    API::ResourceBrief door = doorResource(true, false);
     details.setResourceAndUsageDetails(door);
     details.setUserDetails({Fixtures::userName, false, true, false, false});
     details.init();
@@ -171,46 +180,77 @@ void testAccessOnlyDoorDetails(Renderer &renderer)
     expect(clicked.buttonClickType == ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR, "Open sends the unlock action");
     details.hideActionProgress();
 
-    // ATT-1272: a regular door shows Unlatch only with a separate unlatch; the same screen is reused across resources.
     door.accessOnly = false;
-    door.separateUnlockAndUnlatch = false;
     details.setResourceAndUsageDetails(door);
     settle();
     expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Aufschliessen")), "Regular door shows Unlock");
     expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Abschliessen")), "Regular door shows Lock");
-    expect(!shownOnScreen(requireObject(guard.root, &lv_label_class, "Falle öffnen")), "Door without separate unlatch hides Unlatch");
     expect(!findObject(guard.root, &lv_label_class, "Öffnen"), "Regular door shows no Open");
+    expectDoorButtonWidths(guard.root, 48, "Access-only switched to a regular door");
+}
+
+// ATT-1272: a regular door shows Unlatch only with a separate unlatch. Lock and Unlock fill the row without it. The
+// same screen is reused across resources, so every update sets visibility and width in both directions.
+void testDoorUnlatchVisibility(Renderer &renderer)
+{
+    ResourceDetailsScreen details;
+    details.setButtonClickCallback([](ResourceDetailsScreen::ButtonClickEventData) {});
+    API::ResourceBrief door = doorResource(false, false);
+    details.setResourceAndUsageDetails(door);
+    details.setUserDetails({Fixtures::userName, false, true, false, false});
+    details.init();
+    ScreenGuard guard(details.getScreen(), &details);
+    const auto update = [&](bool accessOnly, bool separateUnlockAndUnlatch) {
+        door.accessOnly = accessOnly;
+        door.separateUnlockAndUnlatch = separateUnlockAndUnlatch;
+        details.setResourceAndUsageDetails(door);
+        settle();
+    };
+    const auto unlatchShown = [&] { return shownOnScreen(requireObject(guard.root, &lv_label_class, "Falle öffnen")); };
+    settle();
+    expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Aufschliessen")), "Door without separate unlatch shows Unlock");
+    expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Abschliessen")), "Door without separate unlatch shows Lock");
+    expect(!unlatchShown(), "Door without separate unlatch hides Unlatch");
     expectDoorButtonWidths(guard.root, 48, "Door without separate unlatch");
     renderer.capture("door-without-unlatch");
 
-    door.separateUnlockAndUnlatch = true;
-    details.setResourceAndUsageDetails(door);
-    settle();
+    update(false, true);
     expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Aufschliessen")), "Separate-unlatch door shows Unlock");
     expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Abschliessen")), "Separate-unlatch door shows Lock");
-    expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Falle öffnen")), "Separate-unlatch door shows Unlatch");
+    expect(unlatchShown(), "Separate-unlatch door shows Unlatch");
     expectDoorButtonWidths(guard.root, 30, "Separate-unlatch door");
     expect(std::abs(doorButtonWidthPercent(guard.root, "Falle öffnen") - 30) <= 1, "Unlatch is 30% wide");
     renderer.capture("door-with-unlatch");
 
-    door.separateUnlockAndUnlatch = false;
-    details.setResourceAndUsageDetails(door);
-    settle();
-    expect(!shownOnScreen(requireObject(guard.root, &lv_label_class, "Falle öffnen")), "Unlatch is hidden again after switching back");
+    update(false, false);
+    expect(!unlatchShown(), "Unlatch is hidden again after switching back");
     expect(shownOnScreen(requireObject(guard.root, &lv_label_class, "Abschliessen")), "Lock stays shown after switching back");
     expectDoorButtonWidths(guard.root, 48, "Switched back to no separate unlatch");
 
-    door.separateUnlockAndUnlatch = true;
-    details.setResourceAndUsageDetails(door);
-    settle();
+    update(false, true);
     expectDoorButtonWidths(guard.root, 30, "Switched to separate unlatch again");
 
-    door.accessOnly = true;
-    door.separateUnlockAndUnlatch = true;
+    // A machine in between hides the door controls; the next door still gets its own buttons.
+    door.type = 0;
     details.setResourceAndUsageDetails(door);
     settle();
-    expect(!shownOnScreen(requireObject(guard.root, &lv_label_class, "Falle öffnen")), "Access-only door hides Unlatch even with separate unlatch");
+    expect(!shownOnScreen(requireObject(guard.root, &lv_label_class, "Abschliessen")), "A machine shows no door buttons");
+    door.type = 1;
+    update(false, false);
+    expect(!unlatchShown(), "Door after a machine hides Unlatch");
+    expectDoorButtonWidths(guard.root, 48, "Door without separate unlatch after a machine");
+
+    update(true, true);
+    expect(!unlatchShown(), "Access-only door hides Unlatch even with separate unlatch");
     expect(doorButtonWidthPercent(guard.root, "Öffnen") >= 99, "Access-only Open fills the row");
+
+    // A failed unlatch that returns after a refresh hid the button has nowhere to show its error.
+    update(false, true);
+    lv_obj_send_event(lv_obj_get_parent(requireObject(guard.root, &lv_label_class, "Falle öffnen")), LV_EVENT_CLICKED, nullptr);
+    update(false, false);
+    expect(!details.showActionError(FirmwareI18n::Message::ActionFailedTapToRetry), "A hidden Unlatch shows no error");
+    lv_obj_send_event(lv_obj_get_parent(requireObject(guard.root, &lv_label_class, "Aufschliessen")), LV_EVENT_CLICKED, nullptr);
+    expect(details.showActionError(FirmwareI18n::Message::ActionFailedTapToRetry), "A shown Unlock still shows its error");
 }
 
 // ATT-1188: the reservations plugin splits a clause with a long holder name (16 characters) between the name and

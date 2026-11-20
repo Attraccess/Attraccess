@@ -163,7 +163,8 @@ private:
     lv_obj_t *lockDoorButton = nullptr;
     lv_obj_t *unlockDoorButton = nullptr;
     lv_obj_t *unlatchDoorButton = nullptr;
-    // An access-only door has one full-width Open button (the unlock button); other doors have all three.
+    // An access-only door has one full-width Open button (the unlock button). Other doors have Lock and Unlock, plus
+    // Unlatch only with a separate unlatch (Lock and Unlock widen to fill the row without it).
     void showDoorButtons(bool accessOnly, bool separateUnlockAndUnlatch);
     bool startIsTakeover = false;
     bool stopIsForeign = false;
