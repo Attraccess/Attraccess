@@ -6,6 +6,7 @@ import { ApiError } from '@attraccess/react-query-client';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isValidEmail } from '../../utils/email';
 import { useLogin } from '../../hooks/useAuth';
 import { toApiErrorNotice } from './apiErrorNotice';
 import { LoginErrorAlert } from './LoginErrorAlert';
@@ -168,6 +169,8 @@ export function LoginFormContent(props: Readonly<{ onForgotPassword: () => void 
           isEmailNotVerified={isEmailNotVerified}
           identifier={identifier}
           password={passwordValue}
+          // The old address no longer signs in, so a typed email identifier follows the change.
+          onEmailChanged={(newEmail) => setIdentifier((current) => (isValidEmail(current.trim()) ? newEmail : current))}
         />
       )}
       <div className="flex items-center justify-between">

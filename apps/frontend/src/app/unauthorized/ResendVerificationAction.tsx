@@ -37,7 +37,7 @@ export function ResendVerificationAction({ email, onEmailChange }: Readonly<Rese
   });
 
   return (
-    <div className="space-y-2" data-testid="resend-verification-section">
+    <div className="w-full space-y-2" data-testid="resend-verification-section">
       {hasField && (
         <>
           <p className="text-sm">{t('prompt')}</p>

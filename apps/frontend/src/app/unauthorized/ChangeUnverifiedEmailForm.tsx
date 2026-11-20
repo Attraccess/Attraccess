@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Input, Label, TextField } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, FieldError, Input, Label, TextField } from '@heroui/react';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useChangeUnverifiedEmail } from '@attraccess/react-query-client';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
@@ -45,7 +45,7 @@ export function ChangeUnverifiedEmailForm({
   };
 
   return (
-    <div className="space-y-2" data-testid="change-email-form">
+    <div className="w-full space-y-2" data-testid="change-email-form">
       <TextField
         value={newEmail}
         onChange={(value) => {
@@ -64,9 +64,13 @@ export function ChangeUnverifiedEmailForm({
             if (event.key === 'Enter') {
               event.preventDefault();
               submit();
+            } else if (event.key === 'Escape' && !change.isPending) {
+              event.preventDefault();
+              onCancel();
             }
           }}
         />
+        <FieldError data-testid="change-email-invalid-error">{t('invalidEmail')}</FieldError>
       </TextField>
       {error && (
         <Alert status="danger" role="alert" data-testid="change-email-error-alert">

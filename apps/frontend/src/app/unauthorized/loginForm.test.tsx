@@ -227,8 +227,8 @@ describe('LoginForm – resend verification email', () => {
   });
 
   it.each([
-    ['en', 'Please wait 17 seconds before trying to sign in again.'],
-    ['de', 'Bitte warte 17 Sekunden, bevor du dich erneut anmeldest.'],
+    ['en', 'Please wait 17 seconds before trying again.'],
+    ['de', 'Bitte warte 17 Sekunden, bevor du es erneut versuchst.'],
   ] as const)('shows the rate-limit retry time in %s', (language, message) => {
     locale.current = language;
     const apiError = new Error('Too many attempts') as Error & { body: Record<string, unknown> };
@@ -657,6 +657,28 @@ describe('LoginForm credential and authenticator steps', () => {
       });
       act(() => changeOnSuccess?.());
       expect(screen.getByRole('status')).toHaveTextContent('new@example.org');
+    });
+
+    it.each([
+      ['an email address', 'jane@example.org', 'new@example.org'],
+      ['a username', 'jane', 'jane'],
+    ])('keeps the sign-in identifier usable after the address changed when it is %s', async (_kind, typed, expected) => {
+      const user = userEvent.setup();
+      renderLogin();
+      await user.type(screen.getByLabelText(labels.en.username), typed);
+      await user.type(screen.getByLabelText(labels.en.password), 'secret-password');
+      loginMock.mockRejectedValue(
+        Object.assign(new Error('Forbidden'), { body: { message: 'UserEmailNotVerifiedException' } }),
+      );
+      await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+      await user.click(await screen.findByRole('button', { name: 'Change email address' }));
+      await user.type(screen.getByLabelText('New email address'), 'new@example.org');
+      await user.click(screen.getByRole('button', { name: 'Send activation link' }));
+      act(() => changeOnSuccess?.());
+
+      expect(screen.getByLabelText(labels.en.username)).toHaveValue(expected);
+      expect(screen.getByTestId('resend-email-input')).toHaveValue('new@example.org');
     });
   });
 });

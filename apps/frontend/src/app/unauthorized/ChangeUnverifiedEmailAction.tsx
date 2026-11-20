@@ -23,7 +23,7 @@ export function ChangeUnverifiedEmailAction({
   const [changedTo, setChangedTo] = useState<string | null>(null);
 
   return (
-    <div className="space-y-2">
+    <div className="w-full space-y-2">
       {changedTo !== null && (
         <Alert status="success" role="status" data-testid="change-email-success-alert">
           <AlertContent>

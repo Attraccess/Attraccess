@@ -112,12 +112,12 @@
     "description": "Der Benutzer oder das Passwort ist ungültig."
   },
   "TooManyAuthAttempts": {
-    "title": "Zu viele Anmeldeversuche",
-    "description": "Bitte warte {{retryAfterSeconds}} Sekunden, bevor du dich erneut anmeldest."
+    "title": "Zu viele Versuche",
+    "description": "Bitte warte {{retryAfterSeconds}} Sekunden, bevor du es erneut versuchst."
   },
   "EmailSendFailed": {
     "title": "E-Mail konnte nicht gesendet werden",
-    "description": "Die Einladung konnte nicht versendet werden. Bitte Mailserver-Konfiguration prüfen und erneut versuchen."
+    "description": "Wir konnten die E-Mail nicht senden. Versuche es in ein paar Minuten erneut. Wenn das Problem bleibt, bitte eine Administratorin oder einen Administrator, die Mailserver-Konfiguration zu prüfen."
   },
   "You cannot update your own permissions": {
     "title": "Eigene Berechtigungen können nicht geändert werden",

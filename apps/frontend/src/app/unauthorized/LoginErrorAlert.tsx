@@ -12,6 +12,8 @@ interface LoginErrorAlertProps {
   /** The identifier and password just submitted. */
   identifier: string;
   password: string;
+  /** Called with the new address after the account's email was changed from this card. */
+  onEmailChanged?: (newEmail: string) => void;
 }
 
 export function LoginErrorAlert({
@@ -20,6 +22,7 @@ export function LoginErrorAlert({
   isEmailNotVerified,
   identifier,
   password,
+  onEmailChanged,
 }: Readonly<LoginErrorAlertProps>) {
   const trimmedIdentifier = identifier.trim();
   const [resendEmail, setResendEmail] = useState(isValidEmail(trimmedIdentifier) ? trimmedIdentifier : '');
@@ -34,7 +37,14 @@ export function LoginErrorAlert({
         {isEmailNotVerified && (
           <>
             <ResendVerificationAction email={resendEmail} onEmailChange={setResendEmail} />
-            <ChangeUnverifiedEmailAction identifier={trimmedIdentifier} password={password} />
+            <ChangeUnverifiedEmailAction
+              identifier={trimmedIdentifier}
+              password={password}
+              onChanged={(newEmail) => {
+                setResendEmail(newEmail);
+                onEmailChanged?.(newEmail);
+              }}
+            />
           </>
         )}
       </AlertContent>

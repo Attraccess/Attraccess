@@ -230,7 +230,7 @@ describe('RegistrationForm', () => {
       act(() =>
         resend.options?.onError?.({ message: 'x', body: { message: 'TooManyAuthAttempts', retryAfterSeconds: 30 } }),
       );
-      expect(screen.getByRole('alert')).toHaveTextContent('Too many sign-in attempts');
+      expect(screen.getByRole('alert')).toHaveTextContent('Too many attempts');
       expect(screen.getByRole('alert')).toHaveTextContent('30');
     });
 
@@ -274,6 +274,20 @@ describe('RegistrationForm', () => {
       await user.click(screen.getByRole('button', { name: 'Change email address' }));
       await user.type(screen.getByLabelText('New email address'), 'not-an-email');
       expect(screen.getByRole('button', { name: 'Send activation link' })).toBeDisabled();
+      expect(screen.getByText('Enter a valid email address.')).toBeInTheDocument();
+      await user.keyboard('{Enter}');
+      expect(change.mutate).not.toHaveBeenCalled();
+    });
+
+    it('closes the change form on Escape without sending anything', async () => {
+      const user = userEvent.setup();
+      await register(user);
+      await user.click(screen.getByRole('button', { name: 'Change email address' }));
+      await user.type(screen.getByLabelText('New email address'), 'half@exam');
+      await user.keyboard('{Escape}');
+      expect(screen.queryByLabelText('New email address')).toBeNull();
+      expect(change.mutate).not.toHaveBeenCalled();
+      expect(screen.getByText('jane@example.org', { selector: 'strong' })).toBeInTheDocument();
     });
 
     it('is fully translated in German', async () => {

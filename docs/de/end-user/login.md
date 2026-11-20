@@ -1,5 +1,4 @@
 # Anmeldung
-
 <!-- llms-description: Die Anmeldemöglichkeiten bei Attraccess: Passwort, SSO, Zwei-Faktor-Authentifizierung, Registrierung und Passwort zurücksetzen. -->
 
 Diese Seite erklärt die verschiedenen Möglichkeiten, sich bei Attraccess anzumelden.
@@ -40,7 +39,7 @@ Wenn die Zwei-Faktor-Authentifizierung für Ihr Konto aktiviert ist, werden Sie 
 
 Wenn die Selbstregistrierung aktiviert ist, können Sie ein neues Konto erstellen:
 
-1. Klicken Sie auf **Registrieren** auf der Anmeldeseite
+1. Klicken Sie auf der Anmeldeseite auf **Konto erstellen**
 2. Füllen Sie Ihre Daten aus (Name, E-Mail, Passwort)
 3. Klicken Sie auf **Konto erstellen**
 4. Sie landen auf dem Bildschirm **Prüfe deine E-Mails**, der die verwendete Adresse anzeigt. Öffnen Sie den Aktivierungslink in dieser E-Mail und melden Sie sich danach an

@@ -1,5 +1,4 @@
 # Logging In
-
 <!-- llms-description: The ways to log in to Attraccess: password, SSO, two-factor authentication, registration and password reset. -->
 
 This page explains the different ways to log in to Attraccess.
@@ -40,9 +39,9 @@ If two-factor authentication is enabled on your account, you will be asked for a
 
 If self-registration is enabled, you can create a new account:
 
-1. Click **Register** on the login page
+1. Click **Create an account** on the login page
 2. Fill in your details (name, email, password)
-3. Click **Create Account**
+3. Click **Create account**
 4. You land on a **Check your email** screen that shows the address you used. Open the activation link in that email, then sign in
    - No email? Click **Resend email**, or check your spam folder
    - Wrong address? Click **Change email address** and enter the correct one. A new link is sent and the old link stops working
