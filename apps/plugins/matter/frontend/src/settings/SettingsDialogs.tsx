@@ -3,9 +3,7 @@ import { useMatterTranslations } from '../i18n';
 
 /** An error remembers which action failed, so closing it returns the focus to that action's button. */
 export type SettingsNotice =
-  | { kind: 'saved' }
-  | { kind: 'error'; title: string; message: string; returnTo: 'save' | 'remove' }
-  | null;
+  { kind: 'saved' } | { kind: 'error'; title: string; message: string; returnTo: 'save' | 'remove' } | null;
 
 /** The result and confirmation dialogs of the settings form. */
 export function SettingsDialogs({

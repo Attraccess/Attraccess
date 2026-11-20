@@ -23,13 +23,7 @@ import { useAuth } from '../../../../hooks/useAuth';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useDeleteOneResource, useGetOneResourceById, useGetAllResourcesKey } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  PageAction,
-  PageHeader,
-  RoutedTabs,
-  activeRoutedTab,
-  useTranslations,
-} from '@attraccess/plugins-frontend-ui';
+import { PageAction, PageHeader, RoutedTabs, activeRoutedTab, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQrCodeAction } from '../useQrCodeAction';
 import de from '../resourceDetails.de.json';
 import en from '../resourceDetails.en.json';
