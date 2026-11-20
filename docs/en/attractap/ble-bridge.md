@@ -75,6 +75,8 @@ The setup closes after 10 minutes, about 10 seconds after the bridge is paired, 
 
 The connection is encrypted (Bluetooth LE Secure Connections), so the Wi-Fi password is never sent in clear text. The same PIN rules apply as over the serial port.
 
+Attractap readers use the same Bluetooth setup; they open it by themselves while they are not paired. See [Attractap Setup](attractap/setup.md#set-up-over-bluetooth).
+
 | Browser                                 | Bluetooth setup                                                         |
 | --------------------------------------- | ----------------------------------------------------------------------- |
 | Chrome or Edge on Windows, macOS, Linux | Supported                                                               |

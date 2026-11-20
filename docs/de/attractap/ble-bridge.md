@@ -75,6 +75,8 @@ Die Einrichtung schließt nach 10 Minuten, etwa 10 Sekunden nachdem die Bridge g
 
 Die Verbindung ist verschlüsselt (Bluetooth LE Secure Connections); das WLAN-Passwort wird also nie im Klartext übertragen. Es gelten dieselben PIN-Regeln wie über die serielle Schnittstelle.
 
+Attractap-Leser nutzen dieselbe Bluetooth-Einrichtung; sie öffnen sie von selbst, solange sie nicht gekoppelt sind. Siehe [Attractap Einrichtung](attractap/setup.md#per-bluetooth-einrichten).
+
 | Browser                                      | Einrichtung über Bluetooth                                                                  |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | Chrome oder Edge unter Windows, macOS, Linux | Unterstützt                                                                                 |
