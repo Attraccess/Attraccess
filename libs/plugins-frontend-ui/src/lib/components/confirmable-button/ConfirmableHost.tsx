@@ -1,0 +1,40 @@
+// Hosts the dialogs of ConfirmableButtons whose activator unmounts, such as dropdown menu items
+// FEATURE: confirmations triggered from menus survive the menu closing
+import { ReactNode, useState } from 'react';
+import { ConfirmDialog } from './ConfirmDialog';
+import { ConfirmableHostContext, ConfirmableRequest } from './ConfirmableHostContext';
+
+interface ConfirmableHostProps {
+  children: ReactNode;
+  /** Runs when the hosted dialog closes, e.g. to put the focus back on the menu trigger. */
+  onClose?: () => void;
+}
+
+/**
+ * Wrap content that unmounts when used (a dropdown menu) and render the host where it stays mounted.
+ * Every ConfirmableButton inside opens its dialog here instead of in itself. The dialog shows the
+ * button's props as they were when it opened, so an input in `confirm.message` must keep its own state.
+ */
+export function ConfirmableHost({ children, onClose }: Readonly<ConfirmableHostProps>) {
+  const [request, setRequest] = useState<ConfirmableRequest>();
+  const [isOpen, setIsOpen] = useState(false);
+
+  const open = (next: ConfirmableRequest) => {
+    setRequest(next);
+    setIsOpen(true);
+  };
+
+  return (
+    <ConfirmableHostContext value={open}>
+      {children}
+      <ConfirmDialog
+        request={request}
+        isOpen={isOpen}
+        onClose={() => {
+          setIsOpen(false);
+          onClose?.();
+        }}
+      />
+    </ConfirmableHostContext>
+  );
+}

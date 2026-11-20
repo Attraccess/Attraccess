@@ -1,5 +1,5 @@
+import { TableActionsColumnHeader, TableRowActions } from '@attraccess/plugins-frontend-ui';
 import {
-  Button,
   Chip,
   Table,
   TableBody,
@@ -11,7 +11,9 @@ import {
   TableScrollContainer,
 } from '@heroui/react';
 import { KeyRoundIcon, PencilIcon, Trash2Icon } from 'lucide-react';
+import { useRef } from 'react';
 import { useRabbitmqTranslations } from '../i18n';
+import { RabbitmqUserDeleteMessage, type RabbitmqUserDeleteMessageHandle } from './RabbitmqUserDeleteMessage';
 import type { RabbitmqUser } from './users-api';
 
 function PermissionChips({ user }: { user: RabbitmqUser }) {
@@ -35,11 +37,24 @@ interface RabbitmqUserTableProps {
   canManage: boolean;
   onEdit: (user: RabbitmqUser) => void;
   onPermissions: (user: RabbitmqUser) => void;
-  onDelete: (user: RabbitmqUser) => void;
+  /** Deletes the user after confirmation; a rejection keeps the dialog open and shows the error. */
+  onDelete: (user: RabbitmqUser) => Promise<unknown>;
 }
 
 export function RabbitmqUserTable({ users, canManage, onEdit, onPermissions, onDelete }: RabbitmqUserTableProps) {
   const { t, language } = useRabbitmqTranslations();
+  const deleteMessage = useRef<RabbitmqUserDeleteMessageHandle>(null);
+
+  const confirmDelete = async (user: RabbitmqUser) => {
+    deleteMessage.current?.showError(null);
+    try {
+      await onDelete(user);
+    } catch (err) {
+      deleteMessage.current?.showError(err instanceof Error ? err.message : { key: 'users.deleteError' });
+      throw err;
+    }
+  };
+
   return (
     <Table data-cy="rabbitmq-user-panel-table">
       <TableScrollContainer>
@@ -48,7 +63,11 @@ export function RabbitmqUserTable({ users, canManage, onEdit, onPermissions, onD
             <TableColumn isRowHeader>{t('users.username')}</TableColumn>
             <TableColumn>{t('users.tags')}</TableColumn>
             <TableColumn>{t('users.access')}</TableColumn>
-            {canManage && <TableColumn>{t('common.actions')}</TableColumn>}
+            {canManage && (
+              <TableColumn id="actions">
+                <TableActionsColumnHeader />
+              </TableColumn>
+            )}
           </TableHeader>
           <TableBody items={users} dependencies={[language]}>
             {(user) => (
@@ -72,38 +91,42 @@ export function RabbitmqUserTable({ users, canManage, onEdit, onPermissions, onD
                 </TableCell>
                 {canManage && (
                   <TableCell>
-                    <div className="rmq:flex rmq:flex-row rmq:gap-1">
-                      <Button
-                        isIconOnly
-                        size="sm"
-                        variant="ghost"
-                        aria-label={t('users.edit', { name: user.name })}
-                        onPress={() => onEdit(user)}
-                        data-cy={`rabbitmq-user-edit-button-${user.name}`}
-                      >
-                        <PencilIcon className="rmq:w-4 rmq:h-4" />
-                      </Button>
-                      <Button
-                        isIconOnly
-                        size="sm"
-                        variant="ghost"
-                        aria-label={t('users.permissions', { name: user.name })}
-                        onPress={() => onPermissions(user)}
-                        data-cy={`rabbitmq-user-permissions-button-${user.name}`}
-                      >
-                        <KeyRoundIcon className="rmq:w-4 rmq:h-4" />
-                      </Button>
-                      <Button
-                        isIconOnly
-                        size="sm"
-                        variant="ghost"
-                        aria-label={t('users.delete', { name: user.name })}
-                        onPress={() => onDelete(user)}
-                        data-cy={`rabbitmq-user-delete-button-${user.name}`}
-                      >
-                        <Trash2Icon className="rmq:w-4 rmq:h-4 rmq:text-danger" />
-                      </Button>
-                    </div>
+                    <TableRowActions
+                      itemName={user.name}
+                      actions={[
+                        {
+                          key: 'edit',
+                          label: t('users.edit'),
+                          icon: PencilIcon,
+                          onPress: () => onEdit(user),
+                          'data-cy': `rabbitmq-user-edit-button-${user.name}`,
+                        },
+                        {
+                          key: 'permissions',
+                          label: t('users.permissions'),
+                          icon: KeyRoundIcon,
+                          onPress: () => onPermissions(user),
+                          'data-cy': `rabbitmq-user-permissions-button-${user.name}`,
+                        },
+                        {
+                          key: 'delete',
+                          label: t('users.deleteTitle'),
+                          icon: Trash2Icon,
+                          tone: 'danger',
+                          onPress: () => confirmDelete(user),
+                          'data-cy': `rabbitmq-user-delete-button-${user.name}`,
+                          confirm: {
+                            title: t('users.deleteTitle'),
+                            message: <RabbitmqUserDeleteMessage name={user.name} ref={deleteMessage} />,
+                            confirmLabel: t('common.delete'),
+                            cancelLabel: t('common.cancel'),
+                            'data-cy': `rabbitmq-user-delete-modal-${user.name}`,
+                            confirmDataCy: 'rabbitmq-user-delete-confirm-button',
+                            cancelDataCy: 'rabbitmq-user-delete-cancel-button',
+                          },
+                        },
+                      ]}
+                    />
                   </TableCell>
                 )}
               </TableRow>

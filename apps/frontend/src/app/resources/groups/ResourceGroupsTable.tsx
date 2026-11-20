@@ -1,6 +1,5 @@
-import { ChevronRightIcon, MinusIcon, PlusIcon } from 'lucide-react';
+import { FolderOpenIcon, MinusIcon, PlusIcon } from 'lucide-react';
 import {
-  Link,
   Table,
   TableBody,
   TableCell,
@@ -10,7 +9,13 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { Button, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  EmptyState,
+  TableActionsColumnHeader,
+  TableRowActions,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import type { ResourceGroup } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
@@ -41,7 +46,9 @@ export function ResourceGroupsTable({
           <TableHeader>
             <TableColumn isRowHeader>{t('columns.name')}</TableColumn>
             <TableColumn>{t('columns.assigned')}</TableColumn>
-            <TableColumn>{t('columns.actions')}</TableColumn>
+            <TableColumn>
+              <TableActionsColumnHeader />
+            </TableColumn>
           </TableHeader>
           <TableBody
             items={groups}
@@ -98,15 +105,18 @@ export function ResourceGroupsTable({
                     </Button>
                   </TableCell>
                   <TableCell>
-                    <Link
-                      href={`/resource-groups/${group.id}`}
-                      className="text-xs inline-flex items-center gap-0.5"
-                      data-cy={`resource-group-row-${group.id}-open`}
-                      aria-label={`${t('row.openGroup')}: ${group.name}`}
-                    >
-                      {t('row.openGroup')}
-                      <ChevronRightIcon size={14} />
-                    </Link>
+                    <TableRowActions
+                      itemName={group.name}
+                      actions={[
+                        {
+                          key: 'open',
+                          label: t('row.openGroup'),
+                          icon: FolderOpenIcon,
+                          href: `/resource-groups/${group.id}`,
+                          'data-cy': `resource-group-row-${group.id}-open`,
+                        },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               );

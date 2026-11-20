@@ -21,7 +21,6 @@ vi.mock('./ControllersTable', () => ({
   ),
 }));
 vi.mock('./ClaimControllerModal', () => ({ ClaimControllerModal: () => null }));
-vi.mock('./RemoveControllerDrawer', () => ({ RemoveControllerDrawer: () => null }));
 vi.mock('../commissioning/CommissioningModal', () => ({
   CommissioningModal: ({ isOpen }: { isOpen: boolean }) => (isOpen ? <p>Commissioning dialog</p> : null),
 }));

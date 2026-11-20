@@ -5,14 +5,17 @@
   "neverUsed": "Nie",
   "columns": {
     "name": "Name",
-    "lastUsed": "Zuletzt genutzt",
-    "actions": "Aktionen"
+    "lastUsed": "Zuletzt genutzt"
   },
   "nameLabel": "Name",
   "namePlaceholder": "z.B. MacBook Touch ID",
   "actions": {
     "add": "Passkey hinzufügen",
-    "delete": "Passkey {{name}} löschen"
+    "delete": "Löschen"
+  },
+  "deleteConfirm": {
+    "title": "Passkey {{name}} löschen?",
+    "message": "Du kannst dich danach nicht mehr mit diesem Passkey anmelden. Das kann nicht rückgängig gemacht werden."
   },
   "success": {
     "added": "Passkey hinzugefügt",

@@ -255,10 +255,11 @@ describe('ReaderSecuritySection', () => {
     expect(field('reader-security-restore-replaces')).toBeNull();
   });
 
-  it('regenerates the keys only after the confirmation', () => {
+  it('regenerates the keys only after the confirmation', async () => {
     keys({ status: 'ready', signingKey: key, recoveryKey: { ...key, verifiedAt: '2026-11-08T10:00:00Z' } });
     render(<ReaderSecuritySection />);
     fireEvent.click(screen.getByText('actions.regenerate'));
+    expect(await screen.findByRole('alertdialog', { name: 'regenerate.title' })).toBeInTheDocument();
     expect(mutations.create.mutateAsync).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText('regenerate.confirm'));
     expect(mutations.create.mutateAsync).toHaveBeenCalledTimes(1);

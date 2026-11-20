@@ -1,6 +1,12 @@
-import { DateTimeDisplay, EmptyState, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  Button,
+  DateTimeDisplay,
+  EmptyState,
+  PageHeader,
+  TableActionsColumnHeader,
+  TableRowActions,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
+import {
   Chip,
   cn,
   Skeleton,
@@ -182,7 +188,9 @@ export function SummaryCard(props: Props) {
               <TableColumn>{t('transactions.table.columns.status')}</TableColumn>
               <TableColumn className="w-full">{t('transactions.table.columns.details')}</TableColumn>
               <TableColumn>{t('transactions.table.columns.amount')}</TableColumn>
-              <TableColumn>{t('transactions.table.columns.actions')}</TableColumn>
+              <TableColumn>
+                <TableActionsColumnHeader />
+              </TableColumn>
             </TableHeader>
             <TableBody
               items={transactions?.data ?? []}
@@ -209,14 +217,18 @@ export function SummaryCard(props: Props) {
                   <TableCell>
                     <RefundModal transactionId={transaction.id}>
                       {(onOpen) => (
-                        <Button
-                          isIconOnly
-                          variant="danger-soft"
-                          aria-label={t('transactions.table.actions.refund') as string}
-                          onPress={onOpen}
-                        >
-                          <RotateCcwIcon />
-                        </Button>
+                        <TableRowActions
+                          itemName={`#${transaction.id}`}
+                          actions={[
+                            {
+                              key: 'refund',
+                              label: t('transactions.table.actions.refund') as string,
+                              icon: RotateCcwIcon,
+                              tone: 'danger',
+                              onPress: onOpen,
+                            },
+                          ]}
+                        />
                       )}
                     </RefundModal>
                   </TableCell>

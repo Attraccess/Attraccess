@@ -42,6 +42,11 @@ const user = { name: 'sensor', tags: ['management'], permissions: [{ vhost: '/',
 beforeEach(() => {
   request.mockReset();
 });
+
+async function chooseRowAction(row: string, action: string) {
+  fireEvent.click(await screen.findByRole('button', { name: `Actions for ${row}` }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: action }));
+}
 afterEach(() => {
   cleanup();
   useTranslationState.setState({ language: 'en' });
@@ -214,7 +219,7 @@ it('loads users and requires confirmation before deletion, then refreshes the li
   });
   render(<RabbitmqUserPanel mqttServerId={104} canManage />);
   expect(await screen.findByRole('row', { name: /sensor/ })).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: 'Delete user sensor' }));
+  await chooseRowAction('sensor', 'Delete user');
   const dialog = await screen.findByRole('alertdialog');
   expect(request.mock.calls.some(([, options]) => options?.method === 'DELETE')).toBe(false);
   fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
@@ -230,7 +235,7 @@ it('keeps the delete dialog open on failure and names a generic failure only onc
     return { mqttServerId: 107, users: [user], vhosts: ['/'] };
   });
   render(<RabbitmqUserPanel mqttServerId={107} canManage />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Delete user sensor' }));
+  await chooseRowAction('sensor', 'Delete user');
   const dialog = await screen.findByRole('alertdialog');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
   expect(await within(dialog).findAllByText('Deleting the user failed.')).toHaveLength(1);
@@ -245,7 +250,7 @@ it('keeps the delete dialog open on failure and names a generic failure only onc
 
   fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
-  fireEvent.click(screen.getByRole('button', { name: 'Delete user sensor' }));
+  await chooseRowAction('sensor', 'Delete user');
   const reopened = await screen.findByRole('alertdialog');
   expect(within(reopened).queryByText('Broker refused')).toBeNull();
   expect(within(reopened).queryByText('Deleting the user failed.')).toBeNull();
@@ -270,10 +275,10 @@ it('refreshes cached row translations without reloading users or changing their 
     return { mqttServerId: 106, users: [{ ...user, tags: [] }], vhosts: ['/'] };
   });
   render(<RabbitmqUserPanel mqttServerId={106} canManage />);
-  await screen.findByRole('button', { name: 'Edit user sensor' });
+  await screen.findByRole('button', { name: 'Actions for sensor' });
   const calls = request.mock.calls.length;
   act(() => useTranslationState.setState({ language: 'de' }));
-  expect(screen.getByRole('button', { name: 'Benutzer sensor bearbeiten' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Aktionen für sensor' })).toBeTruthy();
   expect(screen.getByText('keine')).toBeTruthy();
   expect(screen.getByText('sensor')).toBeTruthy();
   expect(request).toHaveBeenCalledTimes(calls);

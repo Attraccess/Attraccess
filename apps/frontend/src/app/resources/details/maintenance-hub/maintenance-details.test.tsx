@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { Accordion } from '@heroui/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -87,8 +87,8 @@ it('shows empty maintenance history', () => {
   expect(screen.getByText('activity.history.empty')).toBeTruthy();
 });
 it.each([Trigger.USAGE_HOURS, Trigger.USAGE_COUNT, Trigger.TIME_INTERVAL])(
-  'edits, pauses and deletes a %s schedule',
-  (triggerType) => {
+  'edits, pauses and deletes a %s schedule after confirmation',
+  async (triggerType) => {
     const edit = vi.fn();
     const remove = vi.fn();
     const schedule = {
@@ -121,6 +121,9 @@ it.each([Trigger.USAGE_HOURS, Trigger.USAGE_COUNT, Trigger.TIME_INTERVAL])(
     act(() => state.success?.());
     expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['schedules'] });
     fireEvent.click(screen.getByRole('button', { name: 'schedules.actions.delete' }));
+    expect(remove).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'schedules.actions.delete' }));
     expect(remove).toHaveBeenCalledOnce();
   },
 );

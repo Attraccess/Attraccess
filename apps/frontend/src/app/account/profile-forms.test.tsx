@@ -31,7 +31,7 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@attraccess/react-query-client')>();
   const mutation = (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
-    return { mutate: state.mutate };
+    return { mutate: state.mutate, mutateAsync: state.mutate };
   };
   return {
     ...actual,

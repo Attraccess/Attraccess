@@ -93,7 +93,7 @@ it('hides force-close for view-only users', async () => {
   request.mockResolvedValue({ mqttServerId: 2, total: 1, truncated: false, connections: [connection] });
   render(<RabbitmqConnectionsPanel mqttServerId={2} canManage={false} />);
   await screen.findByText('sensor-1');
-  expect(screen.queryByRole('button', { name: /Close connection/ })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Actions for sensor-1' })).toBeNull();
 });
 
 it('confirms before closing a connection, sends the reason and refreshes the list afterwards', async () => {
@@ -106,7 +106,8 @@ it('confirms before closing a connection, sends the reason and refreshes the lis
     return { mqttServerId: 3, total: 1, truncated: false, connections: closed ? [] : [connection] };
   });
   render(<RabbitmqConnectionsPanel mqttServerId={3} canManage />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Close connection sensor-1' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Actions for sensor-1' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Close connection' }));
   const dialog = await screen.findByRole('alertdialog');
   expect(request.mock.calls.some(([, options]) => options?.method === 'DELETE')).toBe(false);
   fireEvent.change(within(dialog).getByLabelText('Reason (optional)'), { target: { value: 'maintenance' } });
@@ -131,7 +132,8 @@ it('keeps the close dialog open and shows the error when closing fails', async (
     return { mqttServerId: 4, total: 1, truncated: false, connections: [connection] };
   });
   render(<RabbitmqConnectionsPanel mqttServerId={4} canManage />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Close connection sensor-1' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Actions for sensor-1' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Close connection' }));
   const dialog = await screen.findByRole('alertdialog');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Close connection' }));
   expect(await within(dialog).findByText('Broker refused')).toBeTruthy();
@@ -350,9 +352,7 @@ it('hides the user write actions without the manage tier', async () => {
   render(<RabbitmqUserPanel mqttServerId={8} canManage={false} />);
   await screen.findByRole('row', { name: /sensor/ });
   expect(screen.queryByRole('button', { name: 'Add user' })).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Edit user sensor' })).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Delete user sensor' })).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Edit permissions of sensor' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Actions for sensor' })).toBeNull();
 });
 
 const slotRequest = (options: { isRabbitMQ: boolean; authOk: boolean; canManage: boolean }) => async (path: string) => {

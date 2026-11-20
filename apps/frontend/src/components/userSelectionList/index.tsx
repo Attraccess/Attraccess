@@ -2,13 +2,15 @@ import {
   AttraccessUser,
   Button,
   EmptyState,
+  TableActionsColumnHeader,
+  TableRowAction,
+  TableRowActions,
   UserIdentity,
   UserSearch,
   useTranslations,
 } from '@attraccess/plugins-frontend-ui';
 import { User } from '@attraccess/react-query-client';
 import {
-  ButtonProps,
   Table,
   TableBody,
   TableCell,
@@ -26,11 +28,9 @@ import { PlusIcon } from 'lucide-react';
 import de from './de.json';
 import en from './en.json';
 
-export interface Action<TUser> extends Omit<ButtonProps, 'onClick' | 'children' | 'key'> {
-  key: string;
-  label?: string;
-  startContent?: ReactNode;
-  onClick: (user: TUser) => void;
+/** A row action of the shared TableRowActions menu, called with the row's user. */
+export interface Action<TUser> extends Omit<TableRowAction, 'onPress' | 'href'> {
+  onPress: (user: TUser) => unknown;
 }
 
 export interface Column<TUser> {
@@ -81,16 +81,9 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
     }
   }, [userSearchSelection, onAddToSelection]);
 
-  const parseActions = (user: TUser) => {
-    if (!actions) {
-      return [];
-    }
-
-    if (typeof actions === 'function') {
-      return actions(user);
-    }
-
-    return actions;
+  const rowActions = (user: TUser): TableRowAction[] => {
+    const userActions = typeof actions === 'function' ? actions(user) : (actions ?? []);
+    return userActions.map((action) => ({ ...action, onPress: () => action.onPress(user) }));
   };
 
   const [page, setPage] = useState(1);
@@ -139,7 +132,9 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 )) as any
               }
-              <TableColumn>{t('selectedUsers.columns.actions')}</TableColumn>
+              <TableColumn>
+                <TableActionsColumnHeader />
+              </TableColumn>
             </TableHeader>
             <TableBody items={currentPage} renderEmptyState={() => <EmptyState />}>
               {(user) => (
@@ -162,19 +157,7 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
                   }
 
                   <TableCell>
-                    <div className="flex gap-4 flex-row flex-wrap md:flex-nowrap">
-                      {parseActions(user).map((action) => (
-                        <Button
-                          {...{ ...action, label: undefined, onClick: undefined, startContent: undefined }}
-                          key={action.key}
-                          onPress={() => action.onClick(user)}
-                          className="flex"
-                        >
-                          {action.startContent}
-                          {action.label}
-                        </Button>
-                      ))}
-                    </div>
+                    <TableRowActions itemName={user.username} actions={rowActions(user)} />
                   </TableCell>
                 </TableRow>
               )}

@@ -6,7 +6,7 @@
   "empty": "You have not created an API token yet.",
   "neverUsed": "Never",
   "neverExpires": "Never",
-  "columns": { "name": "Name", "permissions": "Permissions", "lastUsed": "Last used", "expires": "Expires", "actions": "Actions" },
+  "columns": { "name": "Name", "permissions": "Permissions", "lastUsed": "Last used", "expires": "Expires" },
   "nameLabel": "Name",
   "namePlaceholder": "e.g. CI deployment",
   "permissionsLabel": "Permissions",
@@ -26,7 +26,8 @@
     "cancel": "Cancel"
   },
   "expiryLabel": "Expiry date (optional)",
-  "actions": { "create": "Create API token", "revoke": "Revoke API token {{name}}", "copy": "Copy token", "dismiss": "Dismiss token" },
+  "actions": { "create": "Create API token", "revoke": "Revoke", "copy": "Copy token", "dismiss": "Dismiss token" },
+  "revokeConfirm": { "title": "Revoke API token {{name}}?", "message": "Anything using this token loses API access immediately. This cannot be undone." },
   "secret": { "title": "Copy your token now", "description": "This secret is shown only once and cannot be recovered." },
   "success": { "created": "API token created", "revoked": "API token revoked", "copied": "API token copied" },
   "errors": { "loadFailed": "Could not load API tokens", "createFailed": "Could not create API token", "revokeFailed": "Could not revoke API token" }

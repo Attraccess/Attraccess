@@ -55,5 +55,11 @@
         "description": "There was an error deleting the group: {{error}}"
       }
     }
+  },
+  "deleteConfirm": {
+    "title": "Confirm Deletion",
+    "message": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+    "confirm": "Delete",
+    "cancel": "Cancel"
   }
 }

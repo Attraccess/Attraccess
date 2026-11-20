@@ -1,16 +1,7 @@
-import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  InputGroup,
-  TextField,
-  Tooltip,
-  TooltipContent,
-  useOverlayState,
-} from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, InputGroup, TextField, Tooltip, TooltipContent } from '@heroui/react';
 import { ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertStatusIcon, Button, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, Button, ConfirmableButton, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   useDeleteMetricsApiKey,
   useGenerateMetricsApiKey,
@@ -42,109 +33,109 @@ export function MonitoringApiKeyRow({ apiKeyConfigured, generatedKey, setGenerat
     title: t('copyFailed.title'),
     description: t('copyFailed.description'),
   });
-  const rerollModal = useOverlayState();
-  const removeModal = useOverlayState();
 
-  const { mutate: generateApiKey, isPending: isGenerating } = useGenerateMetricsApiKey(undefined, {
+  const {
+    mutate: generateApiKey,
+    mutateAsync: rerollApiKey,
+    isPending: isGenerating,
+  } = useGenerateMetricsApiKey(undefined, {
     onSuccess(data) {
       setGeneratedKey((data as { apiKey: string }).apiKey);
       queryClient.invalidateQueries({ queryKey: UseGetMetricsSettingsKeyFn() });
       toast.success({ title: t('keyGenerated.title'), description: t('keyGenerated.description') });
-      rerollModal.close();
     },
+    onError: (error) => toast.error({ title: t('keyGenerateFailed'), description: (error as Error).message }),
   });
 
-  const { mutate: deleteApiKey, isPending: isDeleting } = useDeleteMetricsApiKey(undefined, {
+  const { mutateAsync: deleteApiKey, isPending: isDeleting } = useDeleteMetricsApiKey(undefined, {
     onSuccess() {
       setGeneratedKey(null);
       queryClient.invalidateQueries({ queryKey: UseGetMetricsSettingsKeyFn() });
       toast.success({ title: t('keyRemoved.title'), description: t('keyRemoved.description') });
-      removeModal.close();
     },
+    onError: (error) => toast.error({ title: t('keyRemoveFailed'), description: (error as Error).message }),
   });
 
   return (
-    <>
-      <SettingsRow stacked={!!generatedKey} label={t('apiKeyLabel')} hint={t('description')}>
-        {generatedKey ? (
-          <div className="flex w-full flex-col gap-2">
-            {/* HeroUI's own warning surface, not `text-warning-600` — v2's numbered colour
+    <SettingsRow stacked={!!generatedKey} label={t('apiKeyLabel')} hint={t('description')}>
+      {generatedKey ? (
+        <div className="flex w-full flex-col gap-2">
+          {/* HeroUI's own warning surface, not `text-warning-600` — v2's numbered colour
                   scales compile to nothing under v3 (ATT-858). */}
-            <Alert status="warning">
-              <AlertStatusIcon status="warning" />
-              <AlertContent>
-                <AlertDescription>{t('warning')}</AlertDescription>
-              </AlertContent>
-            </Alert>
-            <TextField value={generatedKey} isReadOnly aria-label={t('apiKeyLabel')}>
-              <InputGroup>
-                <InputGroup.Input className="font-mono text-sm" />
-                <InputGroup.Suffix>
-                  <Tooltip>
-                    <Button
-                      variant="ghost"
-                      isIconOnly
-                      aria-label={t('copyButton')}
-                      onPress={() =>
-                        copyToClipboard(generatedKey, {
-                          title: t('copied.title'),
-                          description: t('copied.description'),
-                        })
-                      }
-                    >
-                      <ClipboardCopyIcon size={16} />
-                    </Button>
-                    <TooltipContent>{t('copyButton')}</TooltipContent>
-                  </Tooltip>
-                </InputGroup.Suffix>
-              </InputGroup>
-            </TextField>
-            <Button variant="secondary" size="sm" onPress={() => setGeneratedKey(null)}>
-              {t('doneButton')}
+          <Alert status="warning">
+            <AlertStatusIcon status="warning" />
+            <AlertContent>
+              <AlertDescription>{t('warning')}</AlertDescription>
+            </AlertContent>
+          </Alert>
+          <TextField value={generatedKey} isReadOnly aria-label={t('apiKeyLabel')}>
+            <InputGroup>
+              <InputGroup.Input className="font-mono text-sm" />
+              <InputGroup.Suffix>
+                <Tooltip>
+                  <Button
+                    variant="ghost"
+                    isIconOnly
+                    aria-label={t('copyButton')}
+                    onPress={() =>
+                      copyToClipboard(generatedKey, {
+                        title: t('copied.title'),
+                        description: t('copied.description'),
+                      })
+                    }
+                  >
+                    <ClipboardCopyIcon size={16} />
+                  </Button>
+                  <TooltipContent>{t('copyButton')}</TooltipContent>
+                </Tooltip>
+              </InputGroup.Suffix>
+            </InputGroup>
+          </TextField>
+          <Button variant="secondary" size="sm" onPress={() => setGeneratedKey(null)}>
+            {t('doneButton')}
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {apiKeyConfigured ? (
+            <>
+              <ConfirmableButton
+                label={t('rerollButton')}
+                icon={<RefreshCwIcon size={16} />}
+                status="warning"
+                isPending={isGenerating}
+                buttonProps={{ variant: 'primary', size: 'sm' }}
+                confirm={{
+                  title: t('confirmReroll.title'),
+                  message: t('confirmReroll.description'),
+                  confirmLabel: t('confirmReroll.confirm'),
+                  cancelLabel: t('confirmReroll.cancel'),
+                }}
+                onConfirm={() => rerollApiKey()}
+              />
+              <ConfirmableButton
+                label={t('removeButton')}
+                icon={<Trash2Icon size={16} />}
+                status="error"
+                isPending={isDeleting}
+                buttonProps={{ variant: 'danger-soft', size: 'sm' }}
+                confirm={{
+                  title: t('confirmRemove.title'),
+                  message: t('confirmRemove.description'),
+                  confirmLabel: t('confirmRemove.confirm'),
+                  cancelLabel: t('confirmRemove.cancel'),
+                }}
+                onConfirm={() => deleteApiKey()}
+              />
+            </>
+          ) : (
+            <Button variant="primary" size="sm" isPending={isGenerating} onPress={() => generateApiKey()}>
+              <KeyIcon size={16} />
+              {t('generateButton')}
             </Button>
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="primary"
-              size="sm"
-              isPending={isGenerating}
-              onPress={() => (apiKeyConfigured ? rerollModal.open() : generateApiKey())}
-            >
-              {apiKeyConfigured ? <RefreshCwIcon size={16} /> : <KeyIcon size={16} />}
-              {apiKeyConfigured ? t('rerollButton') : t('generateButton')}
-            </Button>
-            {apiKeyConfigured && (
-              <Button variant="danger-soft" size="sm" onPress={removeModal.open}>
-                <Trash2Icon size={16} />
-                {t('removeButton')}
-              </Button>
-            )}
-          </div>
-        )}
-      </SettingsRow>
-
-      <StatusDialog
-        isOpen={rerollModal.isOpen}
-        onClose={rerollModal.close}
-        status="warning"
-        title={t('confirmReroll.title')}
-        closeLabel={t('confirmReroll.cancel')}
-        action={{ label: t('confirmReroll.confirm'), onPress: () => generateApiKey(), isPending: isGenerating }}
-      >
-        {t('confirmReroll.description')}
-      </StatusDialog>
-
-      <StatusDialog
-        isOpen={removeModal.isOpen}
-        onClose={removeModal.close}
-        status="error"
-        title={t('confirmRemove.title')}
-        closeLabel={t('confirmRemove.cancel')}
-        action={{ label: t('confirmRemove.confirm'), onPress: () => deleteApiKey(), isPending: isDeleting }}
-      >
-        {t('confirmRemove.description')}
-      </StatusDialog>
-    </>
+          )}
+        </div>
+      )}
+    </SettingsRow>
   );
 }

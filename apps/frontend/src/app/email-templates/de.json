@@ -8,8 +8,7 @@
   },
   "columns": {
     "type": "Art",
-    "subject": "Betreff",
-    "actions": "Aktionen"
+    "subject": "Betreff"
   },
   "editButton": "Bearbeiten",
   "noTemplates": "Keine E-Mail-Vorlagen gefunden.",

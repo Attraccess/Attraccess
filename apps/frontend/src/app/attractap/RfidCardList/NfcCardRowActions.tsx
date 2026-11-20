@@ -1,0 +1,64 @@
+import { CheckIcon, Trash2Icon, XIcon } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { TableRowActions, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { NfcCard, UseGetAllCardsKeyFn, useToggleCardActive } from '@attraccess/react-query-client';
+import { useToastMessage } from '../../../components/toastProvider';
+import de from './de.json';
+import en from './en.json';
+
+interface NfcCardRowActionsProps {
+  card: NfcCard;
+  onDeleteClick: () => void;
+}
+
+export function NfcCardRowActions({ card, onDeleteClick }: Readonly<NfcCardRowActionsProps>) {
+  const { t } = useTranslations({ de, en });
+  const queryClient = useQueryClient();
+  const toast = useToastMessage();
+  const { mutateAsync: toggleActive } = useToggleCardActive(undefined, {
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: UseGetAllCardsKeyFn({}, []) }),
+    onError: (error) => toast.error({ title: t('nfcCardsTable.toggleError'), description: (error as Error).message }),
+  });
+
+  return (
+    <TableRowActions
+      itemName={card.uid}
+      actions={[
+        {
+          key: 'deactivate',
+          label: t('nfcCardsTable.actions.deactivate'),
+          icon: XIcon,
+          isHidden: !card.isActive,
+          onPress: () => toggleActive({ path: { id: card.id }, body: { active: false } }),
+          confirm: {
+            title: t('nfcCardsTable.deactivateModal.title'),
+            message: t('nfcCardsTable.deactivateModal.description'),
+            'data-cy': 'nfc-card-deactivate-modal',
+          },
+          'data-cy': `nfc-card-table-cell-deactivate-button-${card.id}`,
+        },
+        {
+          key: 'activate',
+          label: t('nfcCardsTable.actions.activate'),
+          icon: CheckIcon,
+          isHidden: card.isActive,
+          onPress: () => toggleActive({ path: { id: card.id }, body: { active: true } }),
+          confirm: {
+            title: t('nfcCardsTable.activateModal.title'),
+            message: t('nfcCardsTable.activateModal.description'),
+            'data-cy': 'nfc-card-activate-modal',
+          },
+          'data-cy': `nfc-card-table-cell-activate-button-${card.id}`,
+        },
+        {
+          key: 'delete',
+          label: t('nfcCardsTable.actions.delete'),
+          icon: Trash2Icon,
+          tone: 'danger',
+          onPress: onDeleteClick,
+          'data-cy': `nfc-card-table-cell-delete-button-${card.id}`,
+        },
+      ]}
+    />
+  );
+}

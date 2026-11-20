@@ -10,8 +10,7 @@
       "name": "Name",
       "source": "Source",
       "permissions": "Permissions",
-      "users": "Users",
-      "actions": "Actions"
+      "users": "Users"
     },
     "source": {
       "system": "System",

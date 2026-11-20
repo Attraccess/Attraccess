@@ -1,4 +1,4 @@
-import { PageHeader, StatusAlert, StatusDialog, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
+import { PageHeader, StatusAlert, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
 import { useOverlayState } from '@heroui/react';
 import { PlusIcon, SearchIcon, WifiIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -21,8 +21,6 @@ export function DevicesPage() {
   const [authDevice, setAuthDevice] = useState<ShellyDevice | null>(null);
   const [firmwareDevice, setFirmwareDevice] = useState<ShellyDevice | null>(null);
   const [firmware, setFirmware] = useState<Record<number, FirmwareOverviewEntry>>({});
-  const [deleteTarget, setDeleteTarget] = useState<ShellyDevice | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const addDrawer = useOverlayState();
   const discoverDrawer = useOverlayState();
 
@@ -71,20 +69,17 @@ export function DevicesPage() {
     [refresh],
   );
 
-  const confirmDelete = useCallback(async () => {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      await deleteDevice(deleteTarget.id);
-      await refresh();
-      setDeleteTarget(null);
-    } catch (err) {
-      setPageError(err instanceof Error ? err.message : String(err));
-      setDeleteTarget(null);
-    } finally {
-      setDeleting(false);
-    }
-  }, [deleteTarget, refresh]);
+  const removeDevice = useCallback(
+    async (device: ShellyDevice) => {
+      try {
+        await deleteDevice(device.id);
+        await refresh();
+      } catch (err) {
+        setPageError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [refresh],
+  );
 
   return (
     <div className="sh:mx-auto sh:flex sh:w-full sh:max-w-5xl sh:flex-col sh:gap-6 sh:p-4 sh:md:p-6">
@@ -130,7 +125,7 @@ export function DevicesPage() {
           setInfoDevice={setInfoDevice}
           setFirmwareDevice={setFirmwareDevice}
           setAuthDevice={setAuthDevice}
-          setDeleteTarget={setDeleteTarget}
+          onDelete={removeDevice}
           withRowBusy={withRowBusy}
         />
       )}
@@ -148,24 +143,6 @@ export function DevicesPage() {
         onOpenChange={(open) => !open && setFirmwareDevice(null)}
         onUpdated={() => void refreshFirmware(devices)}
       />
-
-      <StatusDialog
-        isOpen={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        status="error"
-        title={t('devices.delete')}
-        action={{
-          label: t('common.delete'),
-          onPress: confirmDelete,
-          isPending: deleting,
-          'data-cy': 'shelly-delete-confirm',
-        }}
-        closeLabel={t('common.cancel')}
-        closeDataCy="shelly-delete-cancel"
-        data-cy="shelly-delete-confirmation-modal"
-      >
-        {t('devices.deleteDescription', { name: deleteTarget?.name, address: deleteTarget?.ipAddress })}
-      </StatusDialog>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { EmptyState } from '@attraccess/plugins-frontend-ui';
+import { EmptyState, TableActionsColumnHeader } from '@attraccess/plugins-frontend-ui';
 import { useGetPlugins } from '@attraccess/react-query-client';
 import { Table, TableBody, TableColumn, TableContent, TableHeader, TableScrollContainer } from '@heroui/react';
 import type { FailedPlugin, MarketplaceDetailRequest, VersionPlugin } from '../types';
@@ -31,8 +31,8 @@ export function PluginsTable({ onShowError, onShowDetails, onManageVersion, onDe
             <TableColumn className="hidden sm:table-cell">{t('columns.permissions')}</TableColumn>
             <TableColumn className="hidden md:table-cell">{t('columns.source')}</TableColumn>
             <TableColumn>{t('columns.status')}</TableColumn>
-            <TableColumn width="0" className="text-right">
-              {t('columns.actions')}
+            <TableColumn id="actions">
+              <TableActionsColumnHeader />
             </TableColumn>
           </TableHeader>
           <TableBody

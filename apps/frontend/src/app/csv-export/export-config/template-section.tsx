@@ -12,7 +12,13 @@ import {
   ModalHeading,
   TextField,
 } from '@heroui/react';
-import { Button, StandardModal, StatusAlert, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  ConfirmableButton,
+  StandardModal,
+  StatusAlert,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
   CsvExportTemplate,
@@ -74,7 +80,6 @@ export function TemplateSection(props: Props) {
   const [saveAsError, setSaveAsError] = useState<string | null>(null);
   // Set synchronously on submit: isPending only flips after a re-render, so a quick second Enter would POST again.
   const createInFlight = useRef(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const activate = useCallback((template: Pick<CsvExportTemplate, 'id' | 'name'> | null) => {
     activeTemplateIdRef.current = template?.id ?? null;
@@ -146,11 +151,9 @@ export function TemplateSection(props: Props) {
     onSuccess: async (_result, { path: { id } }) => {
       await invalidateTemplates();
       if (activeTemplateIdRef.current === id) activate(null);
-      setDeleteOpen(false);
       toast.success({ title: t('templates.toasts.deleted') });
     },
     onError: (error, { path: { id } }) => {
-      setDeleteOpen(false);
       toast.error({ title: t('templates.errors.deleteFailed'), description: errorDescription(error) });
       // somebody else may have deleted it already: stop offering a template that no longer exists
       void invalidateTemplates();
@@ -279,16 +282,26 @@ export function TemplateSection(props: Props) {
           {t('templates.saveAsNew')}
         </Button>
         {activeTemplate && (
-          <Button
-            size="sm"
-            variant="outline"
+          <ConfirmableButton
+            label={t('templates.delete')}
+            icon={<Trash2Icon className="size-4" />}
+            status="error"
+            buttonProps={{ size: 'sm', variant: 'outline' }}
             isDisabled={updateTemplate.isPending}
-            onPress={() => setDeleteOpen(true)}
+            isPending={deleteTemplate.isPending}
             data-cy="csv-export-template-delete"
-          >
-            <Trash2Icon className="size-4" />
-            {t('templates.delete')}
-          </Button>
+            confirm={{
+              title: t('templates.deleteTitle'),
+              message: (
+                <span className="wrap-anywhere">{t('templates.deleteMessage', { name: activeTemplate.name })}</span>
+              ),
+              cancelLabel: t('templates.cancel'),
+              confirmDataCy: 'csv-export-template-delete-confirm',
+              'data-cy': 'csv-export-template-delete-dialog',
+            }}
+            // A failed delete is reported by onError and closes the dialog like a successful one.
+            onConfirm={() => deleteTemplate.mutateAsync({ path: { id: activeTemplate.id } }).catch(() => undefined)}
+          />
         )}
       </div>
 
@@ -332,23 +345,6 @@ export function TemplateSection(props: Props) {
           </Form>
         )}
       </StandardModal>
-
-      <StatusDialog
-        isOpen={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
-        status="error"
-        title={t('templates.deleteTitle')}
-        closeLabel={t('templates.cancel')}
-        action={{
-          label: t('templates.delete'),
-          onPress: () => activeTemplate && deleteTemplate.mutate({ path: { id: activeTemplate.id } }),
-          isPending: deleteTemplate.isPending,
-          'data-cy': 'csv-export-template-delete-confirm',
-        }}
-        data-cy="csv-export-template-delete-dialog"
-      >
-        <span className="wrap-anywhere">{t('templates.deleteMessage', { name: activeTemplate?.name ?? '' })}</span>
-      </StatusDialog>
     </section>
   );
 }

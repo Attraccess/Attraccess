@@ -1,4 +1,10 @@
-import { Button, PasswordInput, StatusDialog, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  ConfirmableButton,
+  PasswordInput,
+  StatusDialog,
+  useDateTimeFormatter,
+} from '@attraccess/plugins-frontend-ui';
 import { Description, Form, Input, Label, TextArea, TextField } from '@heroui/react';
 import { useState, type FormEvent } from 'react';
 import type { ConnectionSettings, SettingsInput } from './api';
@@ -11,7 +17,7 @@ type Props = Readonly<{
   onRemove: () => Promise<void>;
 }>;
 
-type Notice = { kind: 'saved' } | { kind: 'error'; title: string; message: string } | { kind: 'remove' } | null;
+type Notice = { kind: 'saved' } | { kind: 'error'; title: string; message: string } | null;
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -144,14 +150,19 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
               {t('form.save')}
             </Button>
             {settings.url !== null && (
-              <Button
-                variant="danger-soft"
+              <ConfirmableButton
+                label={t('form.remove')}
+                status="error"
                 isDisabled={busy}
-                onPress={() => setNotice({ kind: 'remove' })}
+                onConfirm={remove}
+                confirm={{
+                  title: t('form.removeTitle'),
+                  message: t('form.removeText'),
+                  confirmLabel: t('form.removeConfirm'),
+                  'data-cy': 'matter-remove-dialog',
+                }}
                 data-cy="matter-remove"
-              >
-                {t('form.remove')}
-              </Button>
+              />
             )}
           </div>
         </Form>
@@ -174,23 +185,6 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
         data-cy="matter-error-dialog"
       >
         {notice?.kind === 'error' ? notice.message : ''}
-      </StatusDialog>
-      <StatusDialog
-        isOpen={notice?.kind === 'remove'}
-        status="warning"
-        title={t('form.removeTitle')}
-        onClose={() => setNotice(null)}
-        action={{
-          label: t('form.removeConfirm'),
-          isPending: busy,
-          onPress: async () => {
-            setNotice(null);
-            await remove();
-          },
-        }}
-        data-cy="matter-remove-dialog"
-      >
-        {t('form.removeText')}
       </StatusDialog>
     </section>
   );

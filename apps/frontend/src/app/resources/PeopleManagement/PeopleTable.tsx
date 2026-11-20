@@ -12,7 +12,13 @@ import {
 } from '@heroui/react';
 import { AwardIcon, CheckIcon, WrenchIcon } from 'lucide-react';
 import { ResourceIntroducerType, User } from '@attraccess/react-query-client';
-import { AttraccessUser, DateTimeDisplay, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  AttraccessUser,
+  DateTimeDisplay,
+  EmptyState,
+  TableActionsColumnHeader,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import { PeopleRowActions } from './PeopleRowActions';
 import { PeopleTarget, PersonRow } from './types';
 import en from './en.json';
@@ -30,8 +36,8 @@ interface PeopleTableProps {
   isGrantingIntroduction: boolean;
   isRevokingIntroduction: boolean;
   onOpenHistory: (userId: number) => void;
-  onToggleIntroduction: (user: User, action: 'grant' | 'revoke') => void;
-  onRevokeIntroducer: (userId: number, type: ResourceIntroducerType) => void;
+  onChangeIntroduction: (user: User, action: 'grant' | 'revoke', comment: string) => Promise<void>;
+  onRevokeIntroducer: (userId: number, type: ResourceIntroducerType) => Promise<void>;
 }
 
 export function PeopleTable(props: Readonly<PeopleTableProps>) {
@@ -47,7 +53,7 @@ export function PeopleTable(props: Readonly<PeopleTableProps>) {
     isGrantingIntroduction,
     isRevokingIntroduction,
     onOpenHistory,
-    onToggleIntroduction,
+    onChangeIntroduction,
     onRevokeIntroducer,
   } = props;
   const { t } = useTranslations({ en, de });
@@ -60,7 +66,9 @@ export function PeopleTable(props: Readonly<PeopleTableProps>) {
             <TableColumn isRowHeader>{t('columns.name')}</TableColumn>
             <TableColumn>{t('columns.role')}</TableColumn>
             <TableColumn>{t('columns.introduced')}</TableColumn>
-            <TableColumn>{t('columns.actions')}</TableColumn>
+            <TableColumn>
+              <TableActionsColumnHeader />
+            </TableColumn>
           </TableHeader>
           <TableBody
             items={isLoading ? [] : rows}
@@ -131,7 +139,7 @@ export function PeopleTable(props: Readonly<PeopleTableProps>) {
                     isGrantingIntroduction={isGrantingIntroduction}
                     isRevokingIntroduction={isRevokingIntroduction}
                     onOpenHistory={onOpenHistory}
-                    onToggleIntroduction={onToggleIntroduction}
+                    onChangeIntroduction={onChangeIntroduction}
                     onRevokeIntroducer={onRevokeIntroducer}
                   />
                 </TableCell>
