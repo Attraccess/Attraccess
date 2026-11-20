@@ -1,5 +1,7 @@
 import { StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Chip, DrawerBody, DrawerHeader, DrawerHeading, useOverlayState } from '@heroui/react';
+import { useEffect, useRef } from 'react';
+import { useToastMessage } from '../../../components/toastProvider';
 import { ConnectScreen } from './ConnectScreen';
 import { SetupTabs } from './SetupTabs';
 import { useConfiguratorConnection } from './useConfiguratorConnection';
@@ -35,7 +37,21 @@ export function AttractapHardwareSetup(props: Props) {
   const { t } = useTranslations({ de, en });
   const { isOpen, open, setOpen, close } = useOverlayState();
 
-  const { kind } = useConfiguratorConnection();
+  const { kind, closedAfterPairing } = useConfiguratorConnection();
+  const toast = useToastMessage();
+
+  // Approving a bridge closes this drawer for the reader editor, so the bridge's "set up" notice on the
+  // connect screen is never seen. Confirm it with a toast instead while the drawer is closed.
+  const isOpenRef = useRef(isOpen);
+  isOpenRef.current = isOpen;
+  useEffect(() => {
+    if (!closedAfterPairing || isOpenRef.current) return;
+    toast.success({
+      title: t('connect.bluetooth.closedAfterPairing.title'),
+      description: t('connect.bluetooth.closedAfterPairing.description'),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- announce only the transition, not every new `t`.
+  }, [closedAfterPairing]);
 
   return (
     <>

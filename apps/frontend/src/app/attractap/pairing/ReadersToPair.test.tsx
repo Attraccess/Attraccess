@@ -122,7 +122,7 @@ describe('ReadersToPair', () => {
 
   it('calls a BLE bridge a Bluetooth bridge, whether it is a reader record or a waiting device', () => {
     mocks.pairings.current = [
-      pairing('dev', { kind: 'lite', firmware: { name: 'attractap_bridge', variant: 'gl_s10', version: '2.7.0' } }),
+      pairing('dev', { kind: 'lite', firmware: { name: 'attractap_bridge', variant: 'gl_s10', version: '2.8.0' } }),
     ];
     render(<ReadersToPair onPaired={mocks.onPaired} readers={[reader(1, 'revoked', 'attractap_bridge')]} />);
     const card = document.querySelector('[data-cy="attractap-readers-to-pair"]') as HTMLElement;

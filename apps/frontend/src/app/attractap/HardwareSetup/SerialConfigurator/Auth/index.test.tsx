@@ -2,11 +2,14 @@ import type { ReactNode } from 'react';
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AttractapSerialCommGate, AttractapSerialCommProvider, useAttractapSerialComm } from './index';
-const state = vi.hoisted(() => ({ send: vi.fn() }));
-vi.mock('../../../../../utils/esp-tools', () => ({ ESPTools: { getInstance: () => ({ sendCommand: state.send }) } }));
+const state = vi.hoisted(() => ({ send: vi.fn(), kind: 'serial' as 'serial' | 'bluetooth' }));
+vi.mock('../../../../../utils/active-configurator-transport', () => ({
+  getActiveConfiguratorTransport: () => ({ kind: state.kind, sendCommand: state.send }),
+}));
 vi.mock('../Pin', () => ({ AttractapSerialConfiguratorPin: () => <p>Set a new device PIN</p> }));
 beforeEach(() => {
   vi.clearAllMocks();
+  state.kind = 'serial';
   state.send.mockResolvedValue('{}');
 });
 afterEach(() => {
@@ -70,6 +73,26 @@ it('refreshes PIN status and clears stale authentication when PIN protection is 
   expect(state.send).toHaveBeenLastCalledWith({ topic: 'auth.status.get' }, true, 5000);
   state.send.mockResolvedValueOnce(undefined);
   await act(async () => expect(result.current.refreshPinStatus()).rejects.toThrow('NO_RESPONSE'));
+});
+it('asks a Bluetooth bridge again while the link is still pairing, but a USB reader only once', async () => {
+  const { result } = renderHook(() => useAttractapSerialComm(), { wrapper });
+  state.send.mockReset();
+  state.send.mockResolvedValueOnce(null);
+  await act(async () => expect(result.current.refreshPinStatus()).rejects.toThrow('NO_RESPONSE'));
+  expect(state.send).toHaveBeenCalledTimes(1);
+
+  state.kind = 'bluetooth';
+  state.send.mockReset();
+  state.send.mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValueOnce('{"pinIsSet":true}');
+  await act(() => result.current.refreshPinStatus());
+  expect(state.send).toHaveBeenCalledTimes(3);
+  expect(state.send).toHaveBeenLastCalledWith({ topic: 'auth.status.get' }, true, 5000);
+  expect(result.current.pinIsSet).toBe(true);
+
+  state.send.mockReset();
+  state.send.mockResolvedValue(null);
+  await act(async () => expect(result.current.refreshPinStatus()).rejects.toThrow('NO_RESPONSE'));
+  expect(state.send).toHaveBeenCalledTimes(4);
 });
 it('assembles configuration and settles loading on success and failure', async () => {
   const { result } = renderHook(() => useAttractapSerialComm(), { wrapper });
