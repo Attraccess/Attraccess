@@ -10,17 +10,12 @@ import {
   NodeChange,
   applyNodeChanges,
   applyEdgeChanges,
-  NodeTypes,
-  NodeProps,
 } from '@xyflow/react';
 import { ResourceFlowLog, useGetOneResourceById } from '@attraccess/react-query-client';
 import { useLiveLogs } from '../liveLogs';
 import { FlowOwner, useFlowNodeSchemasQuery } from '../flowOwner';
-import { AttraccessNode } from '../node/index';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { buildFlowNodeTypes } from '../node/FlowCanvasNode';
 import { FlowContext, type FlowContextType, type LiveLogReceiver } from './flowContext';
-import nodesDeTranslations from '../node/de.json';
-import nodesEnTranslations from '../node/en.json';
 
 export interface FlowProviderProps {
   children: ReactNode;
@@ -36,11 +31,6 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
     undefined,
     { enabled: owner.kind === 'resource' },
   );
-
-  const { t: tNodeTranslations, tExists: tNodeExists } = useTranslations({
-    de: nodesDeTranslations,
-    en: nodesEnTranslations,
-  });
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes((nodes) => applyNodeChanges(changes, nodes));
@@ -113,26 +103,13 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
   });
 
   const { data: nodeSchemas } = useFlowNodeSchemasQuery(owner);
-  const flowNodeTypes = useMemo(() => {
-    if (!nodeSchemas) {
-      return {};
-    }
-
-    const types: NodeTypes = {};
-    nodeSchemas.forEach((nodeSchema) => {
-      types[nodeSchema.type] = (props: NodeProps) => (
-        <AttraccessNode
-          tNodeTranslations={tNodeTranslations}
-          tNodeExists={tNodeExists}
-          schema={nodeSchema}
-          node={props}
-          validationError={validationErrors[props.id]}
-        />
-      );
-    });
-
-    return types;
-  }, [nodeSchemas, tNodeTranslations, tNodeExists, validationErrors]);
+  // Keyed on the type names only: every key maps to the same component, so the object changes only when the set of
+  // node types does.
+  const nodeTypeNames = nodeSchemas ? [...new Set(nodeSchemas.map((schema) => schema.type))].sort().join('\n') : '';
+  const flowNodeTypes = useMemo(
+    () => buildFlowNodeTypes(nodeTypeNames ? nodeTypeNames.split('\n') : []),
+    [nodeTypeNames],
+  );
 
   const copySelectedNodes = useCallback(async () => {
     const clipboardData = buildClipboardData(nodes, edges);
