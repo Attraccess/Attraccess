@@ -1682,12 +1682,12 @@
   "updateReader": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "6e9e69b9"
+    "shape": "87b40b3a"
   },
   "getReaderById": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "577d2f58"
+    "shape": "ade6a65d"
   },
   "deleteReader": {
     "decision": "allow",
@@ -1697,12 +1697,12 @@
   "getReaders": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "a32f06b3"
+    "shape": "63fe837a"
   },
   "getReadersToPair": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "40c4c448"
+    "shape": "eea457ed"
   },
   "getReaderCrashReports": {
     "decision": "allow",
@@ -1747,7 +1747,7 @@
   "getFirmwares": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "a2e4f45f"
+    "shape": "97431ecd"
   },
   "downloadFirmwareBinary": {
     "decision": "deny",
@@ -1762,12 +1762,12 @@
   "getResourceAttractaps": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "00a48622"
+    "shape": "89dd4a3b"
   },
   "getResourceGroupAttractaps": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "1a8c5d53"
+    "shape": "5ef29cda"
   },
   "getPairings": {
     "decision": "allow",

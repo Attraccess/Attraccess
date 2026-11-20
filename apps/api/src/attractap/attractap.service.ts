@@ -292,12 +292,17 @@ export class AttractapService {
 
     const firmware = updateData.firmware ?? reader.firmware;
     let openedForPlugins = false;
+    let droppedResources = false;
     if (updateData.firmware) {
       this.logger.debug('Updating reader firmware info', updateData.firmware);
+      const becameBridge = !isBleBridge(reader) && isBleBridge(updateData);
       // A BLE Bridge exists to carry plugin Bluetooth traffic, so it starts open for plugins. Only when the
       // reader becomes a bridge: an administrator who turns it off later keeps it off across reconnects.
-      openedForPlugins = !isBleBridge(reader) && isBleBridge(updateData) && !reader.allowPluginBle;
+      openedForPlugins = becameBridge && !reader.allowPluginBle;
       if (openedForPlugins) edit.allowPluginBle = true;
+      // A bridge cannot serve resources: drop the links it kept from before, instead of waiting for an admin's save.
+      droppedResources = becameBridge && (reader.resources?.length ?? 0) > 0;
+      if (droppedResources) edit.resourceIds = [];
       edit.firmware = updateData.firmware;
     }
 
@@ -334,7 +339,8 @@ export class AttractapService {
     const response = (await this.findReaderById(id)) ?? reader;
 
     // Opening a new bridge for plugins is always announced: running advertisement watches add it from the event.
-    if (emitEvent || openedForPlugins) {
+    // Dropping a new bridge's resources is too, so resource pages stop listing it.
+    if (emitEvent || openedForPlugins || droppedResources) {
       this.eventEmitter.emit(ReaderUpdatedEvent.EVENT_NAME, new ReaderUpdatedEvent(response));
     }
 
