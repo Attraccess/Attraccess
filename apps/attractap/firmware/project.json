@@ -106,6 +106,9 @@
           "cmake -S apps/attractap/firmware/tests/ble-proxy -B apps/attractap/firmware/tests/ble-proxy/build",
           "cmake --build apps/attractap/firmware/tests/ble-proxy/build --parallel 2",
           "ctest --test-dir apps/attractap/firmware/tests/ble-proxy/build --output-on-failure",
+          "cmake -S apps/attractap/firmware/tests/tls-memory -B apps/attractap/firmware/tests/tls-memory/build",
+          "cmake --build apps/attractap/firmware/tests/tls-memory/build --parallel 4",
+          "ctest --test-dir apps/attractap/firmware/tests/tls-memory/build --output-on-failure",
           "sh apps/attractap/firmware/tests/pn532-target/run.sh"
         ],
         "parallel": false,

@@ -21,6 +21,9 @@ public:
     virtual void enableConnectionAttempts() = 0;
     virtual void disableConnectionAttempts() = 0;
     virtual void forceReconnect(const char *reason) = 0;
+    // Changes whenever the WebSocket opens or closes: two moments with the same value belong to the same
+    // connection. Readable from any task. A transport that cannot lose its connection keeps the default.
+    virtual uint32_t connectionId() const { return 0; }
     virtual void resetCertificateTrust() = 0;
 #ifdef ESP_PLATFORM
     virtual void setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback) = 0;

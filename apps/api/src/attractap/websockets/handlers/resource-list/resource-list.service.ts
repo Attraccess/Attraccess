@@ -60,6 +60,8 @@ export class ResourceListService {
     if (resourceIds) {
       await this.sendResourceListToSockets(sockets, { resourceIds });
     } else {
+      // This full list is read after the changes a pending debounced send waits for, so that send would repeat it.
+      this.cancelPendingSend(readerId);
       await this.sendResourceListToSockets(sockets);
     }
   }
@@ -95,6 +97,13 @@ export class ResourceListService {
     }, DEBOUNCE_MS);
 
     this.pendingSends.set(readerId, { timer, resourceIds: pendingResourceIds });
+  }
+
+  private cancelPendingSend(readerId: number): void {
+    const pending = this.pendingSends.get(readerId);
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    this.pendingSends.delete(readerId);
   }
 
   public async sendResourceListToSocket(

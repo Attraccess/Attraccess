@@ -31,6 +31,11 @@ option(ATTRACTAP_UI_SELFTEST "Compile the reader UI self-test scenario (lab buil
 
 option(ATTRACTAP_BEEPER_DEFAULT "Enable the beeper on readers without a saved beeper setting" ON)
 
+# Device-lab TLS CA (PEM path) that a lab image also trusts for wss://, so HIL runs can measure the
+# reader over a validated TLS connection (HIL_WSS in apps/attractap-lab). Never ship it:
+# build_firmwares.py clears it and tools/check_release_build.py fails an image that contains it.
+set(ATTRACTAP_LAB_CA "" CACHE STRING "Device-lab CA certificate (PEM) a lab image trusts (needs ATTRACTAP_TEST_HOOKS)")
+
 set(ATTRACTAP_VARIANT_FILE "${CMAKE_CURRENT_LIST_DIR}/variants/${ATTRACTAP_VARIANT}.cmake")
 if(NOT EXISTS "${ATTRACTAP_VARIANT_FILE}")
     file(GLOB _attractap_variants RELATIVE "${CMAKE_CURRENT_LIST_DIR}/variants" "${CMAKE_CURRENT_LIST_DIR}/variants/*.cmake")
@@ -49,6 +54,15 @@ if(ATTRACTAP_SECURE_LAB AND NOT ATTRACTAP_SECURE_PROFILE)
 endif()
 if(ATTRACTAP_CRASH_TRIGGER AND ATTRACTAP_SECURE_PROFILE)
     message(FATAL_ERROR "ATTRACTAP_CRASH_TRIGGER=ON is not available with the secure profile (coredumps are off there)")
+endif()
+if(NOT "${ATTRACTAP_LAB_CA}" STREQUAL "")
+    if(NOT ATTRACTAP_TEST_HOOKS OR (ATTRACTAP_SECURE_PROFILE AND NOT ATTRACTAP_SECURE_LAB))
+        message(FATAL_ERROR "ATTRACTAP_LAB_CA is for lab images only: it needs ATTRACTAP_TEST_HOOKS=ON and no release secure profile")
+    endif()
+    get_filename_component(ATTRACTAP_LAB_CA "${ATTRACTAP_LAB_CA}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_LIST_DIR}")
+    if(NOT EXISTS "${ATTRACTAP_LAB_CA}")
+        message(FATAL_ERROR "ATTRACTAP_LAB_CA: ${ATTRACTAP_LAB_CA} does not exist")
+    endif()
 endif()
 if(ATTRACTAP_SECURE_PROFILE)
     if(ATTRACTAP_FIRMWARE_VARIANT STREQUAL "demo")
@@ -101,7 +115,7 @@ project(attractap)
 if(ATTRACTAP_SECURE_PROFILE AND NOT (CONFIG_SECURE_BOOT AND CONFIG_SECURE_FLASH_ENC_ENABLED))
     message(FATAL_ERROR "ATTRACTAP_SECURE_PROFILE=ON but ${SDKCONFIG} lacks Secure Boot / flash encryption. "
                         "It predates the secure profile; build in a clean directory with its own -DSDKCONFIG.")
-elseif(ATTRACTAP_SECURE_PROFILE AND NOT (CONFIG_ESP_COREDUMP_ENABLE_TO_NONE AND CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC))
+elseif(ATTRACTAP_SECURE_PROFILE AND NOT (CONFIG_ESP_COREDUMP_ENABLE_TO_NONE AND CONFIG_MBEDTLS_CUSTOM_MEM_ALLOC))
     # ESP-IDF enables the fuse options of a stale standard sdkconfig but keeps its explicit
     # coredump/MbedTLS choices, so the profile is only half applied. Check the options
     # that differ between the standard and the secure profile (tools/check_secure_profile.py
