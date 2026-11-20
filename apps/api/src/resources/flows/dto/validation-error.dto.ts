@@ -22,7 +22,7 @@ export class ValidationErrorDto {
 
   @ApiProperty({
     description:
-      'What is wrong with the field: `required` when the value is missing, `invalid` otherwise. Missing on errors from plugins, which means `invalid`.',
+      'What is wrong with the field: `required` when the value is missing (undefined, null or empty), `invalid` otherwise. Always set by this API; clients should treat a missing code as `invalid`.',
     enum: VALIDATION_ERROR_CODES,
     enumName: 'FlowValidationErrorCode',
     required: false,
@@ -35,11 +35,4 @@ export class ValidationErrorDto {
     example: 'This field is required.',
   })
   message: string;
-
-  @ApiProperty({
-    description: 'The invalid value that caused the error',
-    required: false,
-    example: 'invalid-url',
-  })
-  value?: unknown;
 }

@@ -51,10 +51,9 @@ export interface ValidationError {
   nodeId: string;
   nodeType: string;
   field: string;
-  /** Missing on errors from plugins; the editor treats that as `invalid`. */
+  /** Always set by this API; the editor treats a missing code (older APIs) as `invalid`. */
   code?: ValidationErrorCode;
   message: string;
-  value?: unknown;
 }
 
 export interface ResourceFlowResponse {
@@ -301,6 +300,18 @@ export class ResourceFlowsService {
     );
   }
 
+  /** Not a schema problem: log it, and keep internal details out of the editor. */
+  private unexpectedValidationFailure(nodeData: { id: string; type: string }, error: unknown): ValidationError {
+    this.logger.error(`Failed to validate node ${nodeData.id} (${nodeData.type})`, (error as Error)?.stack);
+    return {
+      nodeId: nodeData.id,
+      nodeType: nodeData.type,
+      field: 'data',
+      code: 'invalid',
+      message: INVALID_NODE_CONFIGURATION_MESSAGE,
+    };
+  }
+
   public async validateNodeData(
     nodeData: { id: string; type: string; data: unknown },
     validationContext = new Map<string, unknown>(),
@@ -320,18 +331,24 @@ export class ResourceFlowsService {
       }
       const plugin = getPluginFlowNode(nodeData.type);
       if (plugin?.validateConfig) {
-        const validationErrors = await plugin.validateConfig(
-          nodeData.data as Record<string, unknown>,
-          validationContext,
-        );
-        errors.push(
-          ...validationErrors.map((error) => ({
-            nodeId: nodeData.id,
-            nodeType: nodeData.type,
-            code: 'invalid' as const,
-            ...error,
-          })),
-        );
+        try {
+          const validationErrors = await plugin.validateConfig(
+            nodeData.data as Record<string, unknown>,
+            validationContext,
+          );
+          // Only the field and message: the host owns the ids and the code, and node values stay out of responses.
+          errors.push(
+            ...validationErrors.map(({ field, message }) => ({
+              nodeId: nodeData.id,
+              nodeType: nodeData.type,
+              field,
+              code: 'invalid' as const,
+              message,
+            })),
+          );
+        } catch (error) {
+          errors.push(this.unexpectedValidationFailure(nodeData, error));
+        }
       }
       return errors;
     }
@@ -364,15 +381,7 @@ export class ResourceFlowsService {
           })),
         );
       } else {
-        // Not a schema problem: keep internal details out of the editor.
-        this.logger.error(`Failed to validate node ${nodeData.id} (${nodeData.type})`, (error as Error)?.stack);
-        errors.push({
-          nodeId: nodeData.id,
-          nodeType: nodeData.type,
-          field: 'data',
-          code: 'invalid',
-          message: INVALID_NODE_CONFIGURATION_MESSAGE,
-        });
+        errors.push(this.unexpectedValidationFailure(nodeData, error));
       }
     }
 

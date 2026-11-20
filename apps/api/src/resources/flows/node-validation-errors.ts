@@ -1,9 +1,9 @@
 import { ZodError } from 'zod';
 
-/** `required`: the value is missing. `invalid`: any other problem. */
-export type ValidationErrorCode = 'required' | 'invalid';
+export const VALIDATION_ERROR_CODES = ['required', 'invalid'] as const;
 
-export const VALIDATION_ERROR_CODES: readonly ValidationErrorCode[] = ['required', 'invalid'];
+/** `required`: the value is missing. `invalid`: any other problem. */
+export type ValidationErrorCode = (typeof VALIDATION_ERROR_CODES)[number];
 
 export interface NodeFieldError {
   field: string;
@@ -22,14 +22,20 @@ function valueAt(data: unknown, path: readonly PropertyKey[]): unknown {
   );
 }
 
+/** Empty like the editor sees it (`isValueValid` in the frontend property inputs). */
+function isMissing(value: unknown): boolean {
+  return value === undefined || value === null || value === '';
+}
+
 /**
- * Turns a schema error into one short, JSON-free error per issue. A missing value is reported
- * as `required`, whatever the issue code (Zod 4 reports a missing enum as `invalid_value`, not
- * `invalid_type`); its issues do not carry their input, so the value is looked up in `data`.
+ * Turns a schema error into one short, JSON-free error per issue. A missing (undefined, null or
+ * empty) value is reported as `required`, whatever the issue code (Zod 4 reports a missing enum as
+ * `invalid_value`, not `invalid_type`); its issues do not carry their input, so the value is looked
+ * up in `data`.
  */
 export function zodErrorToFieldErrors(error: ZodError, data: unknown): NodeFieldError[] {
   return error.issues.map((issue) => {
-    const required = valueAt(data, issue.path) === undefined;
+    const required = isMissing(valueAt(data, issue.path));
     return {
       field: issue.path.map(String).join('.') || 'data',
       code: required ? 'required' : 'invalid',

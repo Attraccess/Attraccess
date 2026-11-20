@@ -1137,12 +1137,12 @@
   "getResourceFlow": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "b736656c"
+    "shape": "f6b367ec"
   },
   "saveResourceFlow": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "31ee956d"
+    "shape": "536b050f"
   },
   "listGlobalFlows": {
     "decision": "allow",
@@ -1177,12 +1177,12 @@
   "getGlobalFlowCanvas": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "8ef1f234"
+    "shape": "89bb2904"
   },
   "saveGlobalFlowCanvas": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "b18d9c28"
+    "shape": "34983698"
   },
   "resolveGlobalFlowNodeSchema": {
     "decision": "allow",

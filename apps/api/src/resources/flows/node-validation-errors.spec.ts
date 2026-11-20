@@ -38,6 +38,15 @@ describe('zodErrorToFieldErrors', () => {
     ]);
   });
 
+  it('reports null and empty values as required, like the editor', () => {
+    expect(issuesOf(schema, { name: null })).toEqual([
+      { field: 'name', code: 'required', message: REQUIRED_FIELD_MESSAGE },
+    ]);
+    expect(issuesOf(schema, { name: '' })).toEqual([
+      { field: 'name', code: 'required', message: REQUIRED_FIELD_MESSAGE },
+    ]);
+  });
+
   it('uses "data" for an issue on the whole configuration', () => {
     expect(issuesOf(schema, undefined)).toEqual([{ field: 'data', code: 'required', message: REQUIRED_FIELD_MESSAGE }]);
     expect(issuesOf(schema, 'text')).toEqual([{ field: 'data', code: 'invalid', message: expect.any(String) }]);

@@ -159,7 +159,7 @@ describe('resource flow meter validation', () => {
     async (operation) => {
       const { service, nodes, directory } = fixture(true);
       directory.meterError = new Error('Meter lookup failed');
-      jest.spyOn(Logger.prototype, 'error').mockImplementationOnce(() => undefined);
+      const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
       const result =
         operation === 'load'
           ? await service.getResourceFlow(resourceId)
@@ -175,6 +175,8 @@ describe('resource flow meter validation', () => {
         })),
       );
       expectOneMeterQuery(directory);
+      expect(logError).toHaveBeenCalledTimes(nodes.length);
+      logError.mockRestore();
     },
   );
 });
