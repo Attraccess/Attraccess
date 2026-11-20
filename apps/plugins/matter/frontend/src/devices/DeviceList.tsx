@@ -1,10 +1,11 @@
 import { EmptyState, StatusAlert } from '@attraccess/plugins-frontend-ui';
-import { Button, Spinner } from '@heroui/react';
+import { Spinner } from '@heroui/react';
 import { useState } from 'react';
 import { useMatterTranslations } from '../i18n';
 import { useMatterPermissions } from '../permissions';
 import { LifecycleFilter, matchesFilter, type LifecycleFilterValue } from './LifecycleFilter';
 import { NodeCard } from './NodeCard';
+import { RetryButton } from './RetryButton';
 import { nodeLabel, sortNodes } from './nodeLabel';
 import { ReconciliationCard } from './ReconciliationCard';
 import { useNodes } from './useNodes';
@@ -50,15 +51,7 @@ export function DeviceList() {
       {nodes.error && (
         <StatusAlert status="danger" title={t('devices.loadError')} data-cy="matter-devices-error">
           <span className="mt:block">{nodes.error}</span>
-          <Button
-            size="sm"
-            variant="secondary"
-            className="mt:mt-2"
-            onPress={() => void nodes.refetch()}
-            data-cy="matter-devices-retry"
-          >
-            {t('devices.retry')}
-          </Button>
+          <RetryButton onRetry={nodes.refetch} data-cy="matter-devices-retry" />
         </StatusAlert>
       )}
       {!nodes.loading && !nodes.error && shown.length === 0 && (

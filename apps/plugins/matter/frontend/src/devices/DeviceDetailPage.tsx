@@ -14,6 +14,7 @@ import { LifecycleActions } from './LifecycleActions';
 import { LifecycleChip } from './LifecycleChip';
 import { MetadataForm } from './MetadataForm';
 import { needsResolution, nodeLabel } from './nodeLabel';
+import { RetryButton } from './RetryButton';
 import { ReachabilityChip } from './ReachabilityChip';
 import { ResolutionCallout } from './ResolutionCallout';
 import { useNodeDetail } from './useNodeDetail';
@@ -58,15 +59,7 @@ export function DeviceDetailPage({ nodeId }: Readonly<{ nodeId: string }>) {
         {back}
         <StatusAlert status="danger" title={t('devices.detailError')} data-cy="matter-device-error">
           <span className="mt:block">{detail.error}</span>
-          <Button
-            size="sm"
-            variant="secondary"
-            className="mt:mt-2"
-            onPress={() => void detail.refetch()}
-            data-cy="matter-device-retry"
-          >
-            {t('devices.retry')}
-          </Button>
+          <RetryButton onRetry={detail.refetch} data-cy="matter-device-retry" />
         </StatusAlert>
       </div>
     );
