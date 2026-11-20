@@ -65,7 +65,6 @@ const waitingDevice = (id: string, kind: 'touch' | 'lite', createdAt: string) =>
   id,
   state: 'waiting',
   kind,
-  boundReaderId: null,
   targetReaderId: null,
   mode: null,
   createdAt,
@@ -150,7 +149,7 @@ describe('ReaderSecurity', () => {
 
   it('shows the stored state when the pairing for this reader ended', () => {
     mocks.pairings.current = [
-      { ...waitingDevice('c', 'touch', '2026-10-30T07:00:00.000Z'), boundReaderId: 7, state: 'failed' },
+      { ...waitingDevice('c', 'touch', '2026-10-30T07:00:00.000Z'), targetReaderId: 7, state: 'failed' },
     ];
     render(<ReaderSecurity reader={reader} onPairingRemoved={mocks.pairingRemoved} />);
     expect(document.querySelector('[data-cy="attractap-pairing-state-paired"]')).not.toBeNull();

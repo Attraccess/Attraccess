@@ -7,7 +7,11 @@ import type {
 } from '@attraccess/application-models';
 import { UNIT_OF_WORK, type UnitOfWork } from '../../database/unit-of-work';
 import { ReaderDeletedEvent } from '../events';
-import { ATTRACTAP_CREDENTIAL_STORE, type AttractapCredentialStore } from './credential-store.port';
+import {
+  ATTRACTAP_CREDENTIAL_STORE,
+  type AttractapCredentialStore,
+  type CredentialSecurityPatch,
+} from './credential-store.port';
 
 export interface ActiveCredential {
   state: AttractapPairingState;
@@ -18,6 +22,18 @@ export interface IssuedCertificate {
   serial: string;
   notAfter: Date;
 }
+
+/**
+ * What a credential change does to the eFuse report result: it described the previous key, so the admin UI shows
+ * "no report received yet" until the new session's report is checked.
+ */
+const NO_SECURITY_REPORT: CredentialSecurityPatch = {
+  secured: false,
+  securedAt: null,
+  efuseSecureVersion: null,
+  securityReportCheckedAt: null,
+  securityReportProblems: null,
+};
 
 /** The credential columns of a reader row as `markPaired` found them, so an undo can put them back. */
 export type CredentialSnapshot = AttractapCredentialSnapshot;
@@ -110,7 +126,8 @@ export class CredentialRegistryService {
           pairedAt: new Date(),
           certificateNotAfter: certificate.notAfter,
           certificateSerial: certificate.serial,
-          apiTokenHash: '', // token sign-in is over for this reader
+          // A new credential has to pass the eFuse report check again.
+          ...NO_SECURITY_REPORT,
         });
         await this.store.appendEvent(scope, {
           readerId: reader.id,
@@ -129,7 +146,7 @@ export class CredentialRegistryService {
 
   /**
    * Takes back a pairing the reader never learned about: the row gets the credential columns
-   * `markPaired` found (`before`) again, with the token hash, so a working reader keeps working.
+   * `markPaired` found (`before`) again.
    * Applied only while `fingerprint` is still the reader's active credential; a change that
    * happened since wins. The history is appended to, never rewritten: the undone key is closed as
    * revoked and a credential that becomes active again is recorded as paired. Returns whether it
@@ -189,7 +206,11 @@ export class CredentialRegistryService {
           state: 'revoked',
           actorId,
         });
-        await this.store.updateCredential(scope, reader.id, { pairingState: 'revoked', certificateNotAfter: null });
+        await this.store.updateCredential(scope, reader.id, {
+          pairingState: 'revoked',
+          certificateNotAfter: null,
+          ...NO_SECURITY_REPORT,
+        });
       });
     } finally {
       this.invalidate(readerId);
@@ -216,6 +237,5 @@ function snapshotOf(reader: AttractapCredentialSnapshot): CredentialSnapshot {
     pairedAt: reader.pairedAt ?? null,
     certificateNotAfter: reader.certificateNotAfter ?? null,
     certificateSerial: reader.certificateSerial ?? null,
-    apiTokenHash: reader.apiTokenHash ?? '',
   };
 }

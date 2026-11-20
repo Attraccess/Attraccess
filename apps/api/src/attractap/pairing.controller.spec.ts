@@ -8,7 +8,6 @@ import { EnrollmentRateLimitedException } from '../device-enrollment/enrollment-
 import { AttractapPairingController } from './pairing.controller';
 import { CredentialRegistryService } from './security/credential-registry.service';
 import { PairingService } from './security/pairing.service';
-import { WebsocketService } from './websockets/websocket.service';
 
 describe('AttractapPairingController authorization and throttling', () => {
   let app: INestApplication;
@@ -27,7 +26,6 @@ describe('AttractapPairingController authorization and throttling', () => {
       providers: [
         { provide: PairingService, useValue: pairing },
         { provide: CredentialRegistryService, useValue: { history: jest.fn() } },
-        { provide: WebsocketService, useValue: { sockets: new Map() } },
       ],
     })
       .overrideGuard(LicenseGuard)
@@ -65,7 +63,6 @@ describe('AttractapPairingController authorization and throttling', () => {
     ['post', '/attractap/pairings/abc/approve'],
     ['delete', '/attractap/pairings/abc'],
     ['post', '/attractap/readers/4/revoke'],
-    ['post', '/attractap/readers/4/pair'],
     ['get', '/attractap/readers/4/credentials'],
   ];
 

@@ -76,9 +76,12 @@ if(ATTRACTAP_SECURE_PROFILE)
         set(SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults")
     endif()
     list(APPEND SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.secure")
+    # The eFuse report (ATT-1207) is compiled only into secure builds.
+    list(APPEND ATTRACTAP_DEFINES ATTRACTAP_SECURE_BUILD=1)
     if(ATTRACTAP_SECURE_LAB)
         # Lab readers keep the console and serial config handler for provisioning.
         list(APPEND SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.secure-lab")
+        list(APPEND ATTRACTAP_DEFINES ATTRACTAP_SECURE_LAB=1)
     else()
         # Compiles out the USB serial config handler and console driver.
         list(APPEND ATTRACTAP_DEFINES ATTRACTAP_SECURE_PROFILE=1)
@@ -88,6 +91,14 @@ if(ATTRACTAP_SECURE_PROFILE)
             set(ATTRACTAP_EXCLUDE_REGEX "src/serial/")
         endif()
     endif()
+endif()
+
+# A release build reports `release: true` in READER_FIRMWARE_INFO (ATT-1207): not a lab-only variant
+# (ATTRACTAP_RELEASE OFF), no secure lab overlay, no test hooks or crash trigger. The server still
+# treats it as a claim.
+if((NOT DEFINED ATTRACTAP_RELEASE OR ATTRACTAP_RELEASE) AND NOT ATTRACTAP_SECURE_LAB AND NOT ATTRACTAP_TEST_HOOKS
+   AND NOT ATTRACTAP_CRASH_TRIGGER AND NOT ATTRACTAP_UI_SELFTEST)
+    list(APPEND ATTRACTAP_DEFINES ATTRACTAP_RELEASE=1)
 endif()
 
 # Single source of truth for the firmware version (also read by

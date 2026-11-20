@@ -94,6 +94,9 @@
           "cmake -S apps/attractap/firmware/tests/websocket -B apps/attractap/firmware/tests/websocket/build",
           "cmake --build apps/attractap/firmware/tests/websocket/build",
           "ctest --test-dir apps/attractap/firmware/tests/websocket/build --output-on-failure",
+          "cmake -S apps/attractap/firmware/tests/efuse-report -B apps/attractap/firmware/tests/efuse-report/build",
+          "cmake --build apps/attractap/firmware/tests/efuse-report/build --parallel 4",
+          "ctest --test-dir apps/attractap/firmware/tests/efuse-report/build --output-on-failure",
           "cmake -S apps/attractap/firmware/tests/pairing -B apps/attractap/firmware/tests/pairing/build",
           "cmake --build apps/attractap/firmware/tests/pairing/build --parallel 4",
           "ctest --test-dir apps/attractap/firmware/tests/pairing/build --output-on-failure",
@@ -114,10 +117,7 @@
         "parallel": false,
         "cwd": "."
       },
-      "cache": false,
-      "dependsOn": [
-        "test-node"
-      ]
+      "cache": false
     },
     "flash": {
       "executor": "nx:run-commands",
@@ -145,22 +145,6 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/attractap/firmware"
-      },
-      "dependsOn": [
-        "test-node"
-      ]
-    },
-    "test-node": {
-      "executor": "nx:run-commands",
-      "cache": true,
-      "inputs": [
-        "default"
-      ],
-      "outputs": [
-        "{workspaceRoot}/coverage/apps/attractap/firmware/test-node"
-      ],
-      "options": {
-        "command": "node scripts/crap-score/node-test.mjs apps/attractap/firmware coverage/apps/attractap/firmware/test-node apps/attractap/firmware/tests/ota/hardware-soak.test.mjs"
       }
     }
   }

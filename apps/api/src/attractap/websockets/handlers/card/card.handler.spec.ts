@@ -69,7 +69,7 @@ describe('AttractapCardHandler', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it.each(['unpaired', 'revoked'])('refuses to arm enrollment on a %s reader', async (pairingState) => {
+    it.each(['revoked'])('refuses to arm enrollment on a %s reader', async (pairingState) => {
       const socket = startEnrollOfNewNfcCardScope.createMockSocket();
       startEnrollOfNewNfcCardScope.websocketService.sockets.set(socket.id, socket);
       startEnrollOfNewNfcCardScope.attractapService.findReaderById.mockResolvedValueOnce({
@@ -396,7 +396,7 @@ describe('AttractapCardHandler', () => {
       expect(socket.state.resetNfcCardData).toEqual(expect.objectContaining({ cardId: 8 }));
     });
 
-    it.each(['unpaired', 'revoked'])('refuses to arm a reset on a %s reader', async (pairingState) => {
+    it.each(['revoked'])('refuses to arm a reset on a %s reader', async (pairingState) => {
       const socket = startResetOfNfcCardScope.createMockSocket();
       startResetOfNfcCardScope.websocketService.sockets.set(socket.id, socket);
       startResetOfNfcCardScope.attractapService.findReaderById.mockResolvedValueOnce({

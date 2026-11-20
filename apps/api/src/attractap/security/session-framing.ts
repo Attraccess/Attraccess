@@ -6,8 +6,9 @@ export const SESSION_SUBPROTOCOL = 'attractap-session.v1';
 export const PAIRING_SUBPROTOCOL = 'attractap-pairing.v1';
 
 /**
- * Largest legitimate message is a legacy crash report with an inline coredump (firmware before ATT-1144
- * capped it at 32 KiB -> ~44 KiB base64 + JSON). Newer firmware uploads dumps in 4 KiB chunks.
+ * Largest legitimate message is a crash report with an inline coredump, which paired readers on firmware
+ * before ATT-1144 still send (capped at 32 KiB -> ~44 KiB base64 + JSON). Newer firmware uploads dumps in
+ * 4 KiB chunks.
  */
 export const MAX_MESSAGE_BYTES = 64 * 1024;
 export const HEADER_BYTES = 5;

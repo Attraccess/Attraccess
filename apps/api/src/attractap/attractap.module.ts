@@ -26,6 +26,8 @@ import { CredentialRegistryService } from './security/credential-registry.servic
 import { HandshakeLimiter } from './security/handshake-limiter';
 import { InstallationIdentityService } from './security/installation-identity.service';
 import { PairingService } from './security/pairing.service';
+import { ReaderControlService } from './security/reader-control.service';
+import { EfuseReportService } from './security/efuse-report.service';
 import { ReaderSessionService } from './security/reader-session.service';
 import { SessionMetrics } from './security/session-metrics';
 import { SecureBootKeyService } from './secure-boot/secure-boot-key.service';
@@ -106,6 +108,8 @@ import { BLE_TRANSPORT_DRIVER } from '../plugin-system/ble/ble-transport-driver'
     InstallationIdentityService,
     CredentialRegistryService,
     PairingService,
+    ReaderControlService,
+    EfuseReportService,
     ReaderSessionService,
     SecureBootKeyService,
     SecureImageService,

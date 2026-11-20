@@ -10,9 +10,8 @@ import { AttractapEventType, AttractapMessage, AuthenticatedWebSocket, queuedSen
  * Per-reader send queue limits (requirement: nothing queues without limit).
  *
  * A reader that stops reading (hung, Wi-Fi gone without a FIN) would let its queue grow forever, so
- * every send checks what is still waiting (`queuedSendBytes`). For a token reader that is `ws`'s
- * `bufferedAmount`; for a paired reader it is the TLS session's own queue, which the session caps at
- * 64 KiB (SEND_QUEUE_LIMIT_BYTES). The 1 MiB and 256 KiB values therefore only apply to token readers.
+ * every send checks what is still waiting (`queuedSendBytes`): the TLS session's own queue, which the
+ * session caps at 64 KiB (SEND_QUEUE_LIMIT_BYTES).
  *
  * The largest legitimate burst to one reader is far below these values: OTA is pulled one 4 KiB chunk
  * at a time (the firmware waits for each chunk before it requests the next, see
@@ -20,16 +19,10 @@ import { AttractapEventType, AttractapMessage, AuthenticatedWebSocket, queuedSen
  * and a resource list is a few KiB per resource.
  */
 export const READER_SEND_LIMITS = {
-  /** Token readers: above this the reader is not reading any more; drop the message and cut it off. */
-  maxBufferedBytes: 1024 * 1024,
-  /** Token readers: above this an ACK retry would only queue another copy behind the first one; wait instead. */
-  retryMaxBufferedBytes: 256 * 1024,
-  /** Paired readers (session transport). */
-  session: {
-    /** What the session itself accepts: more than this already queued and the next message is refused. */
-    maxQueuedBytes: SEND_QUEUE_LIMIT_BYTES,
-    retryMaxQueuedBytes: 16 * 1024,
-  },
+  /** What the session itself accepts: more than this already queued and the next message is refused. */
+  maxQueuedBytes: SEND_QUEUE_LIMIT_BYTES,
+  /** Above this an ACK retry would only queue another copy behind the first one; wait instead. */
+  retryMaxQueuedBytes: 16 * 1024,
   ackRetryCount: 3,
 } as const;
 
@@ -57,16 +50,10 @@ export function createReaderSenders(context: ReaderSenderContext): ReaderSenders
   const socket = client as unknown as AuthenticatedWebSocket;
   let messageCount = 0;
 
-  const isSession = () => socket.transport === 'session';
-
-  /** Queues `bytes` more unless the send queue would exceed its cap; then the reader is cut off. */
-  const fitsQueue = (bytes: number, what: string): boolean => {
+  /** Takes one more message (up to 64 KiB) unless the send queue is over its cap; then the reader is cut off. */
+  const fitsQueue = (what: string): boolean => {
     const buffered = queuedSendBytes(socket);
-    // A session takes one more message (up to 64 KiB) as long as no more than its limit is queued.
-    const fits = isSession()
-      ? buffered <= READER_SEND_LIMITS.session.maxQueuedBytes
-      : buffered + bytes <= READER_SEND_LIMITS.maxBufferedBytes;
-    if (fits) return true;
+    if (buffered <= READER_SEND_LIMITS.maxQueuedBytes) return true;
     // Never log the message itself: it may carry card APDUs or reader data.
     logger.error(
       `Send queue of client ${id} (reader ${socket.readerId ?? 'unknown'}) is full ` +
@@ -82,8 +69,7 @@ export function createReaderSenders(context: ReaderSenderContext): ReaderSenders
 
   /**
    * Hands `data` to the transport. False when it refused the message right away: a session reports a
-   * closed session or a full queue synchronously through the callback. A token socket reports write
-   * errors later; those surface as a missing ACK or a closed connection instead.
+   * closed session or a full queue synchronously through the callback.
    */
   const write = (data: string | Buffer): boolean => {
     let refused = false;
@@ -113,22 +99,19 @@ export function createReaderSenders(context: ReaderSenderContext): ReaderSenders
         return false;
 
       // A retry while the first copy is still queued would only add a second copy behind it.
-      const retryLimit = isSession()
-        ? READER_SEND_LIMITS.session.retryMaxQueuedBytes
-        : READER_SEND_LIMITS.retryMaxBufferedBytes;
-      const resend = i === 0 || queuedSendBytes(socket) <= retryLimit;
+      const resend = i === 0 || queuedSendBytes(socket) <= READER_SEND_LIMITS.retryMaxQueuedBytes;
       if (resend) {
         // An older auth/update retry must not restore a superseded default.
         const language = context.readerLanguage();
         if (isLanguageCarrier(type) && language !== undefined) message.data.payload.language = language;
         if (isUiMessageSuperseded(socket, message)) return false;
         const stringifiedMessage = JSON.stringify(sanitizeForLVGL(message));
-        // Legacy token readers cannot reassemble frames: a bigger UI frame would silently break parsing.
+        // The reader's UI engine takes frames up to this size only.
         if (isUiType(type) && Buffer.byteLength(stringifiedMessage, 'utf8') > READER_UI_LIMITS.maxFrameBytes) {
           logger.error(`Refusing to send ${type}: frame exceeds ${READER_UI_LIMITS.maxFrameBytes} bytes`);
           return false;
         }
-        if (!fitsQueue(Buffer.byteLength(stringifiedMessage), type)) return false;
+        if (!fitsQueue(type)) return false;
         logger.debug(`Sending ${message.event} of type ${type} to client ${id} (attempt ${attempt})`);
         if (!write(stringifiedMessage)) return false;
       } else {
@@ -153,7 +136,7 @@ export function createReaderSenders(context: ReaderSenderContext): ReaderSenders
     if (client.readyState !== WebSocket.OPEN) return false;
     try {
       const stringifiedMessage = JSON.stringify(message);
-      if (!fitsQueue(Buffer.byteLength(stringifiedMessage), message.data.type)) return false;
+      if (!fitsQueue(message.data.type)) return false;
       return write(stringifiedMessage);
     } catch (error) {
       logger.error(`Failed to send raw message to client ${id}: ${(error as Error).message}`);
@@ -163,7 +146,7 @@ export function createReaderSenders(context: ReaderSenderContext): ReaderSenders
 
   const sendBinaryData = (data: Buffer) => {
     try {
-      if (!fitsQueue(data.length, 'binary data')) return;
+      if (!fitsQueue('binary data')) return;
       write(data);
     } catch (e) {
       logger.error(`Failed to send binary data to client ${id}: ${(e as Error).message}`);

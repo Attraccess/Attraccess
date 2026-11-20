@@ -35,7 +35,7 @@ REQUIRED = {
     "SECURE_ENABLE_SECURE_ROM_DL_MODE": "y",
     "NVS_ENCRYPTION": "y",
     "NVS_SEC_KEY_PROTECT_USING_HMAC": "y",
-    # Fixed eFuse layout: KEY3 is the DS key, KEY4 the NVS key.
+    # Fixed eFuse layout: KEY3 is spare, KEY4 the NVS key.
     "NVS_SEC_HMAC_EFUSE_KEY_ID": "4",
     "BOOTLOADER_APP_ROLLBACK_ENABLE": "y",
     "BOOTLOADER_APP_ANTI_ROLLBACK": "y",

@@ -315,9 +315,7 @@ export function createFakeReaderSocket(options: {
     id: options.id,
     readerId: options.readerId,
     readyState: 1,
-    // A paired reader: plugin BLE only travels on the session transport.
-    transport: 'session',
-    state: { pairingRequired: false, ble: parseBleCapability(options.capability ?? FAKE_READER_BLE_CAPABILITY) },
+    state: { ble: parseBleCapability(options.capability ?? FAKE_READER_BLE_CAPABILITY) },
   } as unknown as AuthenticatedWebSocket;
   const firmware = new FakeBleReaderFirmware(options.readerId, options.radio, (type, payload, sync) => {
     const eventData = { type, payload } as AttractapEvent['data'];

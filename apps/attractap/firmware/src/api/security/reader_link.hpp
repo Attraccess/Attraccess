@@ -18,15 +18,13 @@
 #include "reader_key_store.hpp"
 #include "session_tls.hpp"
 
-// The reader's connection to the server, as the API sees it. It picks one of three channels on
+// The reader's connection to the server, as the API sees it. It picks one of two channels on
 // the same WebSocket path and switches between them:
 //  - Session (attractap-session.v1): paired readers. TLS 1.3 inside binary frames, mutually
 //    authenticated against the pinned installation CA. A paired reader never leaves it except
 //    after an authenticated "session.rejected" (pairing removed), which starts a new identity.
-//  - Pairing (attractap-pairing.v1): readers without credentials, and token readers an admin
-//    asked to pair. Shows the rotating code until approved.
-//  - Legacy (no subprotocol): readers that still sign in with their token. Unchanged, until an
-//    admin starts pairing.
+//  - Pairing (attractap-pairing.v1): readers without credentials. Shows the rotating code until
+//    approved.
 // The API's messages and heartbeats travel inside the session; on the pairing channel they are
 // dropped. All TLS and pairing work runs on the main loop (loop()); transport callbacks only queue.
 class ReaderLink : public IReaderTransport
@@ -34,7 +32,6 @@ class ReaderLink : public IReaderTransport
 public:
     enum class Channel
     {
-        Legacy,
         Pairing,
         Session,
     };
@@ -52,7 +49,7 @@ public:
     // After the pinned server could not be verified: wait before trying again.
     static constexpr uint32_t UNTRUSTED_RETRY_MS = 30000;
     // A reader whose first (bootstrap) session never came up: after this many consecutive
-    // unverifiable servers it forgets the pinned key (not its own) and asks again (token or pairing).
+    // unverifiable servers it forgets the pinned key (not its own) and asks to be paired again.
     // A reader with a certificate never does this.
     static constexpr int BOOTSTRAP_UNTRUSTED_LIMIT = 3;
     // Consecutive failed handshakes (timeouts, errors, text frames) before the screen shows an error.
@@ -82,8 +79,9 @@ public:
 #ifdef ESP_PLATFORM
     void setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback) override;
 #endif
-    void startPairing(const std::string &ticket) override;
     bool authenticatesReader() const override { return channel == Channel::Session; }
+    // Secure builds: sends the eFuse report once per session. No-op on plain builds and outside a session.
+    void onFirmwareInfoSent() override;
 
     Channel currentChannel() const { return channel.load(); }
     // Lock-free: the main loop never waits for the TLS worker to learn this.
@@ -98,7 +96,6 @@ private:
         Disconnected,
         Text,
         Binary,
-        StartPairing,
         // Results of session work: one decrypted frame, then the session status after the work.
         SessionFrame,
         SessionStatus,
@@ -145,6 +142,10 @@ private:
     bool loadIdentity();
     bool newIdentity();
 
+    // Sends the eFuse report once per session (reader_link_report.cpp).
+    void sendEfuseReport();
+    bool sendControl(const std::string &json);
+
     void onSessionConnected();
     // A handshake did not complete (not an unverifiable server): shown after a few in a row.
     void onHandshakeFailed();
@@ -173,9 +174,6 @@ private:
     SoftwareReaderKeyStore keyStore;
     std::unique_ptr<IReaderKey> key;
     std::unique_ptr<PairingClient> pairing;
-    std::string pairingTicket;
-    // Pairing was started from the token channel: a failure goes back to it.
-    bool pairingFromToken = false;
     TimeFloor timeFloor;
     bool connected = false;
     bool untrusted = false;
@@ -205,4 +203,5 @@ private:
     // tls.open(), readable without sessionMutex: senders on the main loop must not wait for a
     // handshake step on the worker (LVGL, LEDs and NFC would stall).
     std::atomic<bool> sessionReady{false};
+    bool efuseReportSent = false;
 };

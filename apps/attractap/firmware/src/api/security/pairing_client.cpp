@@ -33,7 +33,7 @@ uint32_t PairingClient::now() const
     return clock ? clock() : millis();
 }
 
-void PairingClient::start(const std::string &ticket, SendText sendText)
+void PairingClient::start(SendText sendText)
 {
     send = std::move(sendText);
     pinnedCandidate.clear();
@@ -55,13 +55,9 @@ void PairingClient::start(const std::string &ticket, SendText sendText)
     hello["firmware"]["name"] = firmware.name;
     hello["firmware"]["variant"] = firmware.variant;
     hello["firmware"]["version"] = firmware.version;
-    if (!ticket.empty())
-    {
-        hello["ticket"] = ticket;
-    }
     std::string message;
     serializeJson(hello, message);
-    logger.info(ticket.empty() ? "Requesting pairing" : "Requesting pairing for this reader's record");
+    logger.info("Requesting pairing");
     if (!send || !send(message))
     {
         finish("send-failed", RETRY_AFTER_ERROR_MS);

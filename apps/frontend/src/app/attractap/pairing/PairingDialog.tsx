@@ -1,4 +1,4 @@
-import { Button, Form, ModalBody, ModalFooter, ModalHeader, ModalHeading, Spinner } from '@heroui/react';
+import { Button, Form, ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { StandardModal, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FindStep } from './FindStep';
 import { PairingResult } from './PairingResult';
@@ -29,8 +29,7 @@ export function PairingDialog(props: Readonly<PairingDialogProps>) {
 
 function Footer({ flow, onClose }: Readonly<{ flow: PairingFlow; onClose: () => void }>) {
   const { t } = useTranslations({ de, en });
-  // A reader that answers late can still be approved, so only a reader that never showed up ends here.
-  if (flow.finished || (flow.noResponse && !flow.activeId)) {
+  if (flow.finished) {
     return <Button onPress={onClose}>{t('dialog.close')}</Button>;
   }
   return (
@@ -94,17 +93,6 @@ function PairingDialogContent(props: Readonly<PairingDialogProps>) {
           {flow.pollingFailed && (
             <StatusAlert status="danger" data-cy="attractap-pairing-connection-lost">
               {t('dialog.connectionLost')}
-            </StatusAlert>
-          )}
-          {flow.waitingForReader && (
-            <div className="flex items-center justify-center gap-3" data-cy="attractap-pairing-waiting">
-              <Spinner size="sm" />
-              <span>{t('dialog.waitingForReader')}</span>
-            </div>
-          )}
-          {flow.noResponse && !flow.activeId && (
-            <StatusAlert status="danger" data-cy="attractap-pairing-no-response">
-              {t('dialog.noResponse')}
             </StatusAlert>
           )}
           {flow.needsCodeToFind && (
