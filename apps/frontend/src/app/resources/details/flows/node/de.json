@@ -1,4 +1,8 @@
 {
+  "validation": {
+    "required": "{{{field}}} fehlt",
+    "invalid": "{{{field}}}: {{{message}}}"
+  },
   "preview": {
     "configuration": "Konfiguration",
     "loading": "Zusammenfassung wird geladen…",

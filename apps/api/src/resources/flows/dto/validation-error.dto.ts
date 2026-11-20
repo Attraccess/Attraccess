@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { VALIDATION_ERROR_CODES, ValidationErrorCode } from '../node-validation-errors';
 
 export class ValidationErrorDto {
   @ApiProperty({
@@ -20,15 +21,18 @@ export class ValidationErrorDto {
   field: string;
 
   @ApiProperty({
-    description: 'The validation error message',
-    example: 'Invalid URL format',
+    description:
+      'What is wrong with the field: `required` when the value is missing (undefined, null or empty), `invalid` otherwise. Always set by this API; clients should treat a missing code as `invalid`.',
+    enum: VALIDATION_ERROR_CODES,
+    enumName: 'FlowValidationErrorCode',
+    required: false,
+    example: 'required',
   })
-  message: string;
+  code?: ValidationErrorCode;
 
   @ApiProperty({
-    description: 'The invalid value that caused the error',
-    required: false,
-    example: 'invalid-url',
+    description: 'A short, plain English validation message (no JSON)',
+    example: 'This field is required.',
   })
-  value?: unknown;
+  message: string;
 }

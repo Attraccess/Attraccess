@@ -100,10 +100,7 @@ export function useFlowCanvasData() {
     if (originalFlowData) {
       setNodes(originalFlowData.nodes);
       setEdges(originalFlowData.edges);
-      setValidationErrors(
-        (originalFlowData as unknown as { validationErrors?: Array<{ nodeId: string; message: string }> })
-          .validationErrors ?? [],
-      );
+      setValidationErrors(originalFlowData.validationErrors ?? []);
     }
   }, [originalFlowData, setNodes, setEdges, setValidationErrors]);
 
