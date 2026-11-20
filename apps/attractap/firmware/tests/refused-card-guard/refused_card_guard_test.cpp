@@ -41,6 +41,41 @@ int main() {
     assert(!g.shouldSuppress(UID_A, 7, 0x00000100u + 2000u));
   }
 
+  // The 2000 ms window is measured across the wrap too (no refresh in between).
+  {
+    RefusedCardGuard g;
+    g.recordRefusal(UID_A, 7, 0xFFFFFF00u);
+    assert(g.shouldSuppress(UID_A, 7, 0xFFFFFF00u + 1999u)); // wraps to 0x6CF: 1999 ms since
+  }
+  {
+    RefusedCardGuard g;
+    g.recordRefusal(UID_A, 7, 0xFFFFFF00u);
+    assert(!g.shouldSuppress(UID_A, 7, 0xFFFFFF00u + 2000u)); // exactly 2000 ms since, across the wrap
+  }
+
+  // Same leading bytes but another length is another identity, also when the extra byte is zero.
+  {
+    const uint8_t zeroTail[7] = {0x04, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0x00};
+    RefusedCardGuard g;
+    g.recordRefusal(zeroTail, 7, 0);
+    assert(!g.shouldSuppress(zeroTail, 6, 100));
+    assert(g.shouldSuppress(zeroTail, 7, 200));
+  }
+
+  // Edge inputs: an empty UID and an over-long UID (clamped) do not crash; a verdict before any check does nothing.
+  {
+    const uint8_t longUid[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+    RefusedCardGuard g;
+    assert(!g.shouldSuppress(longUid, 0, 0)); // inactive guard never suppresses
+    g.recordRefusalOfChecked(0);
+    assert(!g.shouldSuppress(longUid, 16, 1));
+    g.recordRefusal(longUid, 0, 10);
+    assert(g.shouldSuppress(longUid, 0, 20));
+    assert(!g.shouldSuppress(longUid, 7, 30));
+    g.recordRefusal(longUid, 16, 40);
+    assert(g.shouldSuppress(longUid, 16, 50));
+  }
+
   // A different identity is never suppressed and does not refresh the suppressed card.
   {
     RefusedCardGuard g;

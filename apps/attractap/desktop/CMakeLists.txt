@@ -251,6 +251,7 @@ target_compile_options(attractap-reader-workflow-tests PRIVATE -Wall -Wextra -Wp
 add_test(NAME attractap-reader-workflow-tests COMMAND attractap-reader-workflow-tests)
 add_test(NAME attractap-reader-ui-tests COMMAND attractap-reader-workflow-tests --ui)
 add_test(NAME attractap-reader-clock-journey-tests COMMAND attractap-reader-workflow-tests --with-clock)
+add_test(NAME attractap-reader-refused-card-tests COMMAND attractap-reader-workflow-tests --refused-card)
 add_test(NAME attractap-ota-interrupt-enrollment COMMAND attractap-reader-workflow-tests --ota-enrollment)
 add_test(NAME attractap-ota-interrupt-reset COMMAND attractap-reader-workflow-tests --ota-reset)
 set_tests_properties(attractap-ota-interrupt-enrollment attractap-ota-interrupt-reset PROPERTIES TIMEOUT 20)

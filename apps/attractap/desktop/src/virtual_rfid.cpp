@@ -77,6 +77,15 @@ void VirtualNfc::setPresent(size_t index, bool present)
     reconcileCardPresence();
 }
 
+void VirtualNfc::setUid(size_t index, const uint8_t *uid, uint8_t length)
+{
+    if (index >= CardCount || presentedCard == index || length > cards[index].uid.size())
+        return;
+    cards[index].uid = {};
+    std::copy(uid, uid + length, cards[index].uid.begin());
+    cards[index].uidLength = length;
+}
+
 void VirtualNfc::clearCardData(size_t index)
 {
     if (index >= CardCount)
