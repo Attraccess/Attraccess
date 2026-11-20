@@ -6,6 +6,10 @@
       "success": {
         "title": "Project successfully deleted",
         "description": "The project {{name}} was successfully deleted"
+      },
+      "confirm": {
+        "title": "Delete {{name}}?",
+        "message": "This deletes the project. This action cannot be undone."
       }
     },
     "update": {

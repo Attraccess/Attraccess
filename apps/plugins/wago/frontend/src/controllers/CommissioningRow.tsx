@@ -1,5 +1,6 @@
-import { useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
+import { TableRowActions, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { Button, Chip, TableCell, TableRow } from '@heroui/react';
+import { InfoIcon } from 'lucide-react';
 import type { CommissioningSession } from '../api/client';
 import { useWagoTranslations } from '../i18n';
 import { cellClass, isResumable, type TableRowData } from './controllersTableModel';
@@ -45,16 +46,17 @@ export function CommissioningRow({
         {session.updatedAt ? formatDateTime(session.updatedAt) : '—'}
       </TableCell>
       <TableCell className={cellClass}>
-        <div className="wg:flex wg:justify-end wg:gap-2">
-          {session.state !== 'revoked' && (
-            <Button size="sm" variant="secondary" onPress={() => onResume(session)}>
-              {t(isResumable(session.state) ? 'controllers.resume' : 'controllers.progress')}
-            </Button>
-          )}
-          <Button size="sm" variant="ghost" aria-label={t('controllers.detailsFor', { name })} onPress={onDetails}>
-            {t('controllers.details')}
+        {session.state !== 'revoked' && (
+          <Button size="sm" variant="secondary" onPress={() => onResume(session)}>
+            {t(isResumable(session.state) ? 'controllers.resume' : 'controllers.progress')}
           </Button>
-        </div>
+        )}
+      </TableCell>
+      <TableCell className={cellClass}>
+        <TableRowActions
+          itemName={name}
+          actions={[{ key: 'details', label: t('controllers.details'), icon: InfoIcon, onPress: onDetails }]}
+        />
       </TableCell>
     </TableRow>
   );

@@ -4,13 +4,16 @@
   "actions": {
     "pairReader": "Pair Reader"
   },
+  "deleteConfirm": {
+    "title": "Delete card reader {{name}}?",
+    "message": "The reader is unpaired and has to be paired again before it can take payments. This cannot be undone."
+  },
   "table": {
     "ariaLabel": "Card Readers",
     "columns": {
       "name": "Name",
       "device": "Device",
-      "status": "Status",
-      "actions": "Actions"
+      "status": "Status"
     },
     "actions": {
       "deleteReader": "Delete"

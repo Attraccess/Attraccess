@@ -62,6 +62,10 @@ struct Fixture
     Device state;
     Logger logger{"OTA test"};
     unsigned suspensions = 0;
+    // Like IReaderTransport::connectionId(): changes when the socket closes and when it opens again.
+    uint32_t connection = 1;
+    bool sendFails = false;
+    unsigned forcedReconnects = 0;
     std::vector<uint32_t> requestedOffsets;
     std::vector<int> progress;
     std::string failure;
@@ -76,9 +80,10 @@ struct Fixture
     OtaUpdater updater{logger, [&](const char *type, JsonObject payload) {
         require(std::string(type) == "FIRMWARE_REQUEST_CHUNK", "unexpected OTA event");
         require(state.nfcSuspended, "chunk requested while NFC was active");
+        if (sendFails) return false;
         requestedOffsets.push_back(payload["offset"].as<uint32_t>());
         return true;
-    }, [](const char *) {}, onProgress, onMeta, onError};
+    }, [&](const char *) { ++forcedReconnects; drop(); }, [&]() { return connection; }, onProgress, onMeta, onError};
     JsonDocument metadata;
 
     Fixture()
@@ -88,6 +93,13 @@ struct Fixture
         metadata["totalSize"] = uint32_t(8192);
     }
     void begin() { updater.begin(metadata.as<JsonObject>()); }
+    void drop() { connection += connection % 2; }
+    // The socket closed and opened again; the server has not offered the update on it yet.
+    void reconnect()
+    {
+        drop();
+        ++connection;
+    }
     void chunk()
     {
         std::array<char, 4096> image{};
@@ -128,6 +140,7 @@ static void resume()
     f.updater.tick();
     f.chunk();
     // Re-authentication after a socket loss re-offers the same image.
+    f.reconnect();
     f.begin();
     require(f.state.preparations == 1 && f.suspensions == 1, "resume restarted preparation instead of preserving the update");
     f.updater.tick();
@@ -136,6 +149,55 @@ static void resume()
     require(f.state.written == 8192 && f.state.completedImages == 1, "resumed image was not completed");
     require(f.state.bootSelections == 1 && f.state.reboots == 1, "completed image was not selected and rebooted");
     require(f.progress.back() == 100 && f.failure.empty(), "resumed update failed to reach 100%");
+}
+
+// A request that failed to send was retried every second. Once the reader was connected again a retry went out,
+// then the server's new offer requested the same chunk a second time, and both answers were written.
+static void oneRequestPerConnection()
+{
+    Fixture f;
+    f.begin();
+    f.updater.tick();
+    f.chunk();
+    f.sendFails = true;
+    f.updater.tick();
+    f.reconnect();
+    f.sendFails = false;
+    for (int second = 0; second < 3; ++second)
+    {
+        f.state.now += 1001;
+        f.updater.tick();
+    }
+    require(f.requestedOffsets == std::vector<uint32_t>{0}, "a chunk was requested before the server offered the update again");
+    f.begin();
+    f.updater.tick();
+    // The same offer again on this connection: the request above is still in flight.
+    f.begin();
+    f.updater.tick();
+    require(f.requestedOffsets == std::vector<uint32_t>({0, 4096}), "one chunk was requested twice on one connection");
+    f.chunk();
+    require(f.state.written == 8192 && f.state.completedImages == 1 && f.failure.empty(), "resumed image was not completed");
+}
+
+// Without a new offer the update must not wait forever: it reconnects, then gives up and reboots.
+static void noOfferAfterReconnect()
+{
+    Fixture f;
+    f.begin();
+    f.reconnect();
+    for (int attempt = 0; attempt < 5; ++attempt)
+    {
+        f.state.now += 10001;
+        f.updater.tick();
+        require(f.failure.empty(), "update gave up before its retries were used");
+    }
+    require(f.forcedReconnects == 5 && f.requestedOffsets.empty(), "waiting for a new offer did not reconnect");
+    f.state.now += 10001;
+    f.updater.tick();
+    require(f.failure == "Firmware chunk request timeout", "update without a new offer was not aborted");
+    f.state.now += 3001;
+    f.updater.tick();
+    require(f.state.reboots == 1, "aborted update did not reboot");
 }
 
 static void nfcFailure()
@@ -174,6 +236,8 @@ int main(int argc, char **argv)
         if (scenario == "nfc-before-flash") beforeFlash();
         else if (scenario == "preparation-failure") preparationFailure();
         else if (scenario == "resume") resume();
+        else if (scenario == "one-request-per-connection") oneRequestPerConnection();
+        else if (scenario == "no-offer-after-reconnect") noOfferAfterReconnect();
         else if (scenario == "nfc-failure") nfcFailure();
         else if (scenario == "invalid-offer") invalidOffer();
         else throw std::runtime_error("unknown lifecycle scenario");

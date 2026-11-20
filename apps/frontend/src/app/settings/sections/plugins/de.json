@@ -99,8 +99,7 @@
     "directory": "Verzeichnis",
     "permissions": "Berechtigungen",
     "source": "Quelle",
-    "status": "Status",
-    "actions": "Aktionen"
+    "status": "Status"
   },
   "status": {
     "loaded": "Geladen",
@@ -153,7 +152,6 @@
     }
   },
   "deleteTooltip": "Plugin entfernen",
-  "rowActions": "Aktionen für {{pluginName}}",
   "deleteConfirmation": {
     "title": "Plugin entfernen?",
     "cancel": "Abbrechen",

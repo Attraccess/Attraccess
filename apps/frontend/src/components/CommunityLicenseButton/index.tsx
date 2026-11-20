@@ -1,6 +1,5 @@
-import { Button, useOverlayState } from '@heroui/react';
 import { HeartHandshakeIcon } from 'lucide-react';
-import { I18nTransComponent, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { ConfirmableButton, I18nTransComponent, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 
@@ -17,50 +16,40 @@ export interface CommunityLicenseButtonProps {
 
 export function CommunityLicenseButton({ onAccept, isDisabled, ...rest }: CommunityLicenseButtonProps) {
   const { t } = useTranslations({ en, de });
-  const { isOpen, open, close } = useOverlayState();
-
-  const handleConfirm = () => {
-    onAccept(COMMUNITY_LICENSE_KEY);
-    close();
-  };
 
   return (
-    <>
-      <Button
-        variant="secondary"
-        onPress={open}
-        isDisabled={isDisabled}
-        data-cy={rest['data-cy'] ?? 'community-license-button'}
-      >
-        <HeartHandshakeIcon size={16} />
-        {t('button')}
-      </Button>
-      <StatusDialog
-        isOpen={isOpen}
-        onClose={close}
-        status="warning"
-        title={t('modal.title')}
-        closeLabel={t('modal.cancel')}
-        closeDataCy="community-license-cancel"
-        action={{ label: t('modal.confirm'), onPress: handleConfirm, 'data-cy': 'community-license-confirm' }}
-      >
-        <div className="flex flex-col gap-3">
-          <p>
-            <I18nTransComponent
-              t={t}
-              i18nKey="modal.question"
-              components={{
-                link: (
-                  <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer" className="text-primary underline">
-                    LICENSE.md
-                  </a>
-                ),
-              }}
-            />
-          </p>
-          <p>{t('modal.commercialNotice')}</p>
-        </div>
-      </StatusDialog>
-    </>
+    <ConfirmableButton
+      label={t('button')}
+      icon={<HeartHandshakeIcon size={16} />}
+      status="warning"
+      isDisabled={isDisabled}
+      data-cy={rest['data-cy'] ?? 'community-license-button'}
+      confirm={{
+        title: t('modal.title'),
+        message: (
+          <div className="flex flex-col gap-3">
+            <p>
+              <I18nTransComponent
+                t={t}
+                i18nKey="modal.question"
+                components={{
+                  link: (
+                    <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                      LICENSE.md
+                    </a>
+                  ),
+                }}
+              />
+            </p>
+            <p>{t('modal.commercialNotice')}</p>
+          </div>
+        ),
+        confirmLabel: t('modal.confirm'),
+        cancelLabel: t('modal.cancel'),
+        cancelDataCy: 'community-license-cancel',
+        confirmDataCy: 'community-license-confirm',
+      }}
+      onConfirm={() => onAccept(COMMUNITY_LICENSE_KEY)}
+    />
   );
 }

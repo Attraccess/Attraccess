@@ -7,6 +7,9 @@ The reader is erased on release, so every run flashes and provisions it.
 READER_PROFILE=secure-lab runs on a Secure Boot lab reader (README "Secure lab
 reader"): its image is lab-signed Intel HEX, written encrypted after an eFuse
 check, and the reader is wiped the same way when the run ends.
+
+HIL_WSS=1 connects the reader over wss:// through a TLS front with a device-lab
+CA (attractap_lab.lab_tls); run.sh builds the reader image to trust that CA.
 """
 
 import json
@@ -19,7 +22,7 @@ import urllib.error
 
 import pytest
 
-from attractap_lab import efuse, ota_images
+from attractap_lab import efuse, lab_tls, ota_images
 from attractap_lab.hil_report import RunReport
 from attractap_lab.drivers import (
     ESPToolDriver, NfcEmulatorDriver, NfcEmulatorFlashDriver, ScreenCaptureDriver,
@@ -37,6 +40,7 @@ PROFILE = os.environ.get("READER_PROFILE") or efuse.PLAIN
 if PROFILE not in efuse.PROFILES:
     raise RuntimeError(f"READER_PROFILE must be one of {', '.join(efuse.PROFILES)}, not {PROFILE!r}")
 PIN = os.environ.get("READER_PIN", "4711")
+WSS = os.environ.get("HIL_WSS") == "1"
 CARD_UIDS = ("08a11ce1", "08b0b001", "08ca0101")
 
 
@@ -161,6 +165,19 @@ def admin(api):
     return api.login("admin")
 
 
+@pytest.fixture(scope="session")
+def api_tls(artifacts):
+    """With HIL_WSS=1 the TLS front between reader and API (``reader`` starts it for the address it
+    gives the reader, on API_TLS_PORT or a free port); otherwise None. Handshakes are logged to api-tls.jsonl."""
+    if not WSS:
+        yield None
+        return
+    front = lab_tls.TlsFront(int(os.environ["API_PORT"]), int(os.environ.get("API_TLS_PORT") or 0),
+                             max_version=os.environ.get("HIL_WSS_TLS_MAX") or None, log=artifacts / "api-tls.jsonl")
+    yield front
+    front.stop()
+
+
 def approve_pairing(console, url, token, timeout=180, since=0, **options):
     """Approve the newest pairing code on the reader's UART; return the record id.
 
@@ -230,7 +247,7 @@ def reboot_reader(target, reader):
 
 
 @pytest.fixture(scope="session")
-def reader(target, emulator, api, admin, artifacts):
+def reader(target, emulator, api, admin, artifacts, api_tls):
     """A freshly flashed reader on the lab Wi-Fi, paired with the test API.
 
     The janitor erases readers between sessions (this fixture also wipes a
@@ -259,9 +276,13 @@ def reader(target, emulator, api, admin, artifacts):
         response = console.expect(r"RESP network\.wifi\.credentials\.set ([^\r\n]*)", mark, 30).group(1)
         assert b"error" not in response.lower(), response
         reader_ip = console.expect(r"Got IP (\d+\.\d+\.\d+\.\d+)", mark, 60).group(1).decode()
+        hostname = api_host(reader_ip)
+        port = os.environ["API_PORT"]
+        if api_tls is not None:
+            port = api_tls.start(hostname)  # its certificate names the address the reader validates
         configuration = console.command("api.configuration.set", {
-            "authCode": PIN, "hostname": api_host(reader_ip),
-            "port": int(os.environ.get("READER_API_PORT") or os.environ["API_PORT"]), "useSSL": False,
+            "authCode": PIN, "hostname": hostname,
+            "port": int(os.environ.get("READER_API_PORT") or port), "useSSL": api_tls is not None,
         })
         assert "error" not in configuration.lower(), configuration
         # Leave the configuration-required state with a reboot.
@@ -431,3 +452,34 @@ def ota(reader, api, admin):
     yield {"directory": directory, "image": image, "definition": definition, "base": base,
            "version": os.environ["READER_OTA_VERSION"], "secure": PROFILE == efuse.SECURE_LAB}
     ota_images.offer(directory)  # nothing on offer for any later test
+
+
+# The generic BLE test peripheral in range of the reader (plugin BLE tests, HIL_BLE=1).
+PERIPHERAL = os.environ.get("BLE_PERIPHERAL_ADDRESS", "").upper()
+
+
+@pytest.fixture(scope="session")
+def ble(api, admin, reader, resource):
+    """The fixture plugin's REST surface, on a reader an administrator opened for plugins.
+
+    The reader update takes the whole editable state, so it keeps the name and the resource the suite connected.
+    """
+    status, body = api.call("PATCH", f"/attractap/readers/{reader['id']}",
+                            {"name": "Lab Reader", "connectedResourceIds": [resource], "allowPluginBle": True},
+                            token=admin)
+    assert status == 200, body
+
+    def call(path, body=None, timeout=900):
+        status, answer = api.call("POST", f"/ble-lab/{path}", body or {}, token=admin, timeout=timeout)
+        assert status in (200, 201), answer
+        return answer
+
+    return call
+
+
+@pytest.fixture(scope="session")
+def peripheral(ble, reader):
+    status = ble("endpoints", {"readerId": reader["id"], "address": PERIPHERAL, "addressType": "public",
+                               "profileId": "test-peripheral"})
+    assert "id" in status, status
+    return status["id"]

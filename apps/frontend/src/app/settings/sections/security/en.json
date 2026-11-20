@@ -177,7 +177,6 @@
     "subtitle": "Override individual password rules for a role. Anything left inherited follows the policy above.",
     "role": "Role",
     "status": "Status",
-    "actions": "Actions",
     "statusInherits": "Inherits the global policy",
     "statusCustom": "{{count}} field(s) overridden",
     "edit": "Edit",

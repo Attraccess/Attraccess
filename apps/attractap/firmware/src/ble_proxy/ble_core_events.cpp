@@ -271,6 +271,8 @@ namespace ble
 
     void BleProxyCore::tick(uint32_t now)
     {
+        // First, on the state the requests and radio events of this round left: whatever is still pending keeps it.
+        shutdownIdleStack(now);
         flushOutbox();
         if (currentOwner == Owner::Scan && due(now, scan.deadline))
         {

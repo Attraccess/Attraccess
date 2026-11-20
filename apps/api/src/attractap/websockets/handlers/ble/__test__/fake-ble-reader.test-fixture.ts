@@ -12,7 +12,7 @@ export const FAKE_READER_BLE_CAPABILITY = {
   maxConnections: 1,
   maxMtu: 517,
   maxPayloadBytes: 512,
-  maxNotificationQueue: 64,
+  maxNotificationQueue: 128,
   maxScanMs: 15_000,
   maxScanResults: 32,
   maxAllowlistEntries: 16,

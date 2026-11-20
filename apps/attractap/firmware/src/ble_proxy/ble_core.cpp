@@ -31,6 +31,8 @@ namespace ble
 
     void BleProxyCore::handle(Command &&command, uint32_t now)
     {
+        // Every request restarts the idle period, also one that ends before it reaches the radio.
+        stackUsedMs = now;
         if (command.type == CommandType::Cancel)
         {
             cancel(command, now);
@@ -77,6 +79,32 @@ namespace ble
         }
         initialized = true;
         return true;
+    }
+
+    uint32_t BleProxyCore::shutdownInMs(uint32_t now) const
+    {
+        const uint32_t deadline = stackUsedMs + STACK_IDLE_SHUTDOWN_MS;
+        return due(now, deadline) ? 0 : deadline - now;
+    }
+
+    void BleProxyCore::shutdownIdleStack(uint32_t now)
+    {
+        if (!initialized) return;
+        if (stackInUse())
+        {
+            stackUsedMs = now;
+            return;
+        }
+        if (!due(now, stackUsedMs + STACK_IDLE_SHUTDOWN_MS)) return;
+        // Cleared first: whatever happens below, the next request goes through init(), which brings a stack that is
+        // down up again and takes one that is still up as it is. Everything runs on this task, so no request can
+        // reach the radio while it is going down.
+        initialized = false;
+        const Error error = radio.shutdown();
+        if (error.ok())
+            logf(LogLevel::Info, "ble stack shut down after %us idle",
+                 static_cast<unsigned>(STACK_IDLE_SHUTDOWN_MS / 1000));
+        else logf(LogLevel::Warn, "ble shutdown failed detail=%s", error.detail);
     }
 
     void BleProxyCore::startScan(Command &&command, uint32_t now)

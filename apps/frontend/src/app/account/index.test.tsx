@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import AccountPage from './index';
@@ -30,7 +30,17 @@ vi.mock('@attraccess/react-query-client', () => ({
   useGetMcpConnectionInfo: () => ({ data: state.mcp }),
   useRequestDeleteAccount: (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
-    return { mutate: state.request };
+    return {
+      mutateAsync: async () => {
+        try {
+          await state.request();
+        } catch (error) {
+          state.options.onError(error);
+          throw error;
+        }
+        state.options.onSuccess();
+      },
+    };
   },
 }));
 vi.mock('./email', () => ({ EmailForm: () => <div>Email form</div> }));
@@ -105,12 +115,13 @@ it('requires confirmation for deletion, allows cancellation and closes after a s
   fireEvent.click(screen.getByRole('button', { name: 'deleteAccount.actions.request' }));
   fireEvent.click(await screen.findByRole('button', { name: 'deleteAccount.actions.confirm' }));
   expect(state.request).toHaveBeenCalledOnce();
-  act(() => state.options.onSuccess());
-  expect(state.success).toHaveBeenCalledWith({
-    title: 'deleteAccount.toast.title',
-    description: 'deleteAccount.toast.description',
-  });
-  expect(screen.queryByRole('button', { name: 'deleteAccount.actions.confirm' })).toBeNull();
+  await waitFor(() =>
+    expect(state.success).toHaveBeenCalledWith({
+      title: 'deleteAccount.toast.title',
+      description: 'deleteAccount.toast.description',
+    }),
+  );
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'deleteAccount.actions.confirm' })).toBeNull());
 });
 it('retains deletion confirmation and reports an unsuccessful request', async () => {
   open();
@@ -118,9 +129,12 @@ it('retains deletion confirmation and reports an unsuccessful request', async ()
   fireEvent.click(screen.getByRole('button', { name: 'deleteAccount.actions.request' }));
   await screen.findByText('deleteAccount.modal.description');
   const failure = new Error('Unavailable');
-  act(() => state.options.onError(failure));
-  expect(state.apiError).toHaveBeenCalledWith(
-    expect.objectContaining({ error: failure, baseTranslationKey: 'apiErrors' }),
+  state.request.mockRejectedValueOnce(failure);
+  fireEvent.click(screen.getByRole('button', { name: 'deleteAccount.actions.confirm' }));
+  await waitFor(() =>
+    expect(state.apiError).toHaveBeenCalledWith(
+      expect.objectContaining({ error: failure, baseTranslationKey: 'apiErrors' }),
+    ),
   );
   expect(screen.getByRole('button', { name: 'deleteAccount.actions.confirm' })).toBeTruthy();
   expect(state.success).not.toHaveBeenCalled();

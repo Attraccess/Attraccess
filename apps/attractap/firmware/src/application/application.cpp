@@ -15,6 +15,7 @@
 #include "esp_task_wdt.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "../psram_task.hpp"
 #endif
 
 void Application::networkTask(void *parameter) {
@@ -107,8 +108,8 @@ void Application::setup() {
   this->setupNfcCallbacks();
 
 #if !defined(DEMO_MODE) && defined(ESP_PLATFORM)
-  xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr,
-              tskIDLE_PRIORITY, nullptr);
+  bool started = createPsramTask(Application::networkTask, "NetworkTask", 4096, nullptr, tskIDLE_PRIORITY);
+  if (!started) this->logger.error("Could not start the network task; the reader stays offline");
 #endif
 
 #ifdef ESP_PLATFORM

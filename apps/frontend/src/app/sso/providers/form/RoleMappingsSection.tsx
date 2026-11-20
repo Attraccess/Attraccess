@@ -15,12 +15,16 @@ import {
   TableRow,
   TableScrollContainer,
   TextField,
-  Tooltip,
-  TooltipContent,
   useOverlayState,
 } from '@heroui/react';
 import { Plus, Trash } from 'lucide-react';
-import { Button, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  StandardDrawer,
+  TableActionsColumnHeader,
+  TableRowActions,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import { Role } from '@attraccess/react-query-client';
 import { Select } from '../../../../components/select';
 import { useRbacCatalogTranslations } from '../../../../hooks/useRbacCatalogTranslations';
@@ -119,7 +123,9 @@ export const RoleMappingsSection = ({
               <TableHeader>
                 <TableColumn isRowHeader>{t('roleMappingsAttraccessRole')}</TableColumn>
                 <TableColumn>{t('roleMappingsSsoRole')}</TableColumn>
-                <TableColumn>{t('roleMappingsActions')}</TableColumn>
+                <TableColumn id="actions">
+                  <TableActionsColumnHeader />
+                </TableColumn>
               </TableHeader>
               <TableBody>
                 {entries.map((entry, index) => (
@@ -129,17 +135,19 @@ export const RoleMappingsSection = ({
                       <span className="font-mono text-sm">{entry.ssoRole}</span>
                     </TableCell>
                     <TableCell>
-                      <Tooltip>
-                        <Button
-                          variant="danger-soft"
-                          isIconOnly
-                          onPress={() => handleRemove(index)}
-                          data-cy={`sso-provider-form-${variant}-role-mapping-remove-${entry.roleKey}-${entry.ssoRole}`}
-                        >
-                          <Trash size={16} />
-                        </Button>
-                        <TooltipContent>{t('roleMappingsRemove')}</TooltipContent>
-                      </Tooltip>
+                      <TableRowActions
+                        itemName={`${roleLabel(entry.roleKey)} → ${entry.ssoRole}`}
+                        actions={[
+                          {
+                            key: 'remove',
+                            label: t('roleMappingsRemove'),
+                            icon: Trash,
+                            tone: 'danger',
+                            onPress: () => handleRemove(index),
+                            'data-cy': `sso-provider-form-${variant}-role-mapping-remove-${entry.roleKey}-${entry.ssoRole}`,
+                          },
+                        ]}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

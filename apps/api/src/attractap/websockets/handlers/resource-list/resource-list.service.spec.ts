@@ -4,6 +4,7 @@ import { zoneOffsetMinutes } from '../../reader-time-zone';
 import { registerResourceListServiceFixture } from './service.test-fixture';
 import { ResourceFlowNodeType, ResourceIntroducerType, SupervisionMode } from '@attraccess/application-models';
 import { AttractapEvent, AttractapEventType } from '../../websocket.types';
+import { MAX_READER_RESOURCES } from './payload';
 
 describe('ResourceListService', () => {
   const fixture = registerResourceListServiceFixture();
@@ -600,6 +601,94 @@ describe('ResourceListService', () => {
       await fixture.service.sendResourceListToSocket(socket, {});
 
       expect(socket.sendMessage).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('resources a reader keeps', () => {
+    // Attached in reverse name order, so the payload has to sort before it cuts.
+    const readerWith = (count: number) =>
+      fixture.createReaderFixture({
+        resources: Array.from({ length: count }, (_, index) => ({
+          id: 100 + index,
+          name: `Machine ${String.fromCharCode(97 + index)}`,
+          type: 'machine',
+        })).reverse(),
+      });
+    const sentIds = (socket: any) =>
+      socket.sendMessage.mock.calls[0][0].data.payload.resources.map((resource: { id: number }) => resource.id);
+    const firstIds = (count: number) => Array.from({ length: count }, (_, index) => 100 + index);
+
+    it('sends only the first MAX_READER_RESOURCES resources by name to a reader with more', async () => {
+      fixture.attractapService.findReaderById.mockResolvedValue(readerWith(MAX_READER_RESOURCES + 3));
+      const guest = fixture.createMockSocket({ id: 'guest' });
+      const member = fixture.createMockSocket({ id: 'member', state: { verifiedUserId: 1 } });
+
+      await fixture.service.sendResourceListToSocket(guest);
+      await fixture.service.sendResourceListToSocket(member);
+
+      expect(sentIds(guest)).toEqual(firstIds(MAX_READER_RESOURCES));
+      expect(sentIds(member)).toEqual(firstIds(MAX_READER_RESOURCES));
+      // Nothing is looked up for the resources that are not sent.
+      expect(fixture.resourceUsageService.getActiveSessions).toHaveBeenCalledWith(firstIds(MAX_READER_RESOURCES));
+      expect(fixture.resourceUsageService.canControllResource).toHaveBeenCalledTimes(MAX_READER_RESOURCES);
+    });
+
+    it.each([MAX_READER_RESOURCES, 3])('sends every resource, sorted by name, to a reader with %i', async (count) => {
+      fixture.attractapService.findReaderById.mockResolvedValue(readerWith(count));
+      const socket = fixture.createMockSocket();
+
+      await fixture.service.sendResourceListToSocket(socket);
+
+      expect(sentIds(socket)).toEqual(firstIds(count));
+    });
+
+    it('still refreshes the reader for a change of an attached resource it is not sent', async () => {
+      // A rename can move that resource into the listed ones.
+      fixture.attractapService.findReaderById.mockResolvedValue(readerWith(MAX_READER_RESOURCES + 3));
+      const socket = fixture.createMockSocket();
+
+      await fixture.service.sendResourceListToSocket(socket, { resourceIds: new Set([100 + MAX_READER_RESOURCES]) });
+
+      expect(sentIds(socket)).toEqual(firstIds(MAX_READER_RESOURCES));
+    });
+  });
+
+  describe('full sends supersede pending debounced sends', () => {
+    it('sends a reader one list when a resource changes just before the reader is edited', async () => {
+      // A new resource, then an edit that attaches it: the debounced send would repeat the edit's list.
+      const socket = fixture.createMockSocket({ readerId: 42 });
+      fixture.websocketService.sockets.set('socket', socket);
+      fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
+
+      fixture.service.sendResourceListToReadersWithResources([10]);
+      await fixture.service.sendResourceList(42);
+      await jest.runAllTimersAsync();
+
+      expect(socket.sendMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps a debounced send for a change that comes in after the full send', async () => {
+      const socket = fixture.createMockSocket({ readerId: 42 });
+      fixture.websocketService.sockets.set('socket', socket);
+      fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
+
+      await fixture.service.sendResourceList(42);
+      fixture.service.sendResourceListToReadersWithResources([10]);
+      await jest.runAllTimersAsync();
+
+      expect(socket.sendMessage).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps a pending debounced send when a resource-filtered send runs', async () => {
+      const socket = fixture.createMockSocket({ readerId: 42 });
+      fixture.websocketService.sockets.set('socket', socket);
+      fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
+
+      fixture.service.sendResourceListToReadersWithResources([10]);
+      await fixture.service.sendResourceList(42, new Set([10]));
+      await jest.runAllTimersAsync();
+
+      expect(socket.sendMessage).toHaveBeenCalledTimes(2);
     });
   });
 });

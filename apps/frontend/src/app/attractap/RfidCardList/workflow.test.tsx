@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { RfidCardList } from './index';
@@ -36,7 +37,12 @@ vi.mock('@attraccess/react-query-client', () => ({
       else options.onSuccess();
     },
   }),
-  useToggleCardActive: () => ({ mutate: state.toggle }),
+  useToggleCardActive: (_mutationKey: unknown, options: { onSuccess: () => void }) => ({
+    mutateAsync: async (data: unknown) => {
+      state.toggle(data);
+      options.onSuccess();
+    },
+  }),
   UseGetAllCardsKeyFn: () => ['cards'],
   useGetOneUserById: () => ({ data: undefined }),
   useGetLicenseInformation: () => ({ data: { modules: state.licensed ? ['attractap'] : [] } }),
@@ -86,7 +92,11 @@ beforeEach(() => {
   state.resetFails = null;
 });
 afterEach(cleanup);
-it('renders card identities and requires a reader before deleting a card', () => {
+const openRowMenu = async (uid: string) => {
+  await userEvent.click(screen.getByRole('button', { name: `Actions for ${uid}` }));
+  return screen.getByRole('menu');
+};
+it('renders card identities and requires a reader before deleting a card', async () => {
   render(
     <MemoryRouter>
       <RfidCardList />
@@ -94,9 +104,9 @@ it('renders card identities and requires a reader before deleting a card', () =>
   );
   expect(screen.getByText('AA-BB')).toBeInTheDocument();
   expect(screen.getByText('CC-DD')).toBeInTheDocument();
-  const row = screen.getByText('AA-BB').closest('tr');
-  if (!row) throw new Error('Card row not found');
-  fireEvent.click(within(row).getByRole('button', { name: 'Delete' }));
+  expect(within(screen.getByText('AA-BB').closest('tr') as HTMLElement).getByText('Active')).toBeInTheDocument();
+  expect(within(screen.getByText('CC-DD').closest('tr') as HTMLElement).getByText('Inactive')).toBeInTheDocument();
+  await userEvent.click(within(await openRowMenu('AA-BB')).getByRole('menuitem', { name: 'Delete' }));
   expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' })).toBeDisabled();
   fireEvent.change(screen.getByRole('combobox', { name: 'Select Attractap' }), { target: { value: '4' } });
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
@@ -107,17 +117,25 @@ it('renders card identities and requires a reader before deleting a card', () =>
 it.each([
   { uid: 'AA-BB', action: 'Deactivate', id: 7, active: false },
   { uid: 'CC-DD', action: 'Activate', id: 8, active: true },
-])('confirms $action for the correct card', ({ uid, action, id, active }) => {
+])('confirms $action for the correct card', async ({ uid, action, id, active }) => {
   render(
     <MemoryRouter>
       <RfidCardList />
     </MemoryRouter>,
   );
-  const row = screen.getByText(uid).closest('tr');
-  if (!row) throw new Error('Card row not found');
-  fireEvent.click(within(row).getByRole('button', { name: action }));
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: action }));
+  const menu = await openRowMenu(uid);
+  expect(
+    within(menu)
+      .getAllByRole('menuitem')
+      .map((item) => item.textContent),
+  ).toEqual([action, 'Delete']);
+  await userEvent.click(within(menu).getByRole('menuitem', { name: action }));
+  const dialog = await screen.findByRole('alertdialog');
+  expect(state.toggle).not.toHaveBeenCalled();
+  await userEvent.click(within(dialog).getByRole('button', { name: action }));
   expect(state.toggle).toHaveBeenCalledWith({ path: { id }, body: { active } });
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['cards'] });
 });
 it('enrolls on the selected reader and hides the page without a license', () => {
   const view = render(
@@ -176,16 +194,14 @@ it.each([
   expect(description).not.toContain(code);
 });
 
-it('reports a failed reset through the same translated reasons', () => {
+it('reports a failed reset through the same translated reasons', async () => {
   state.resetFails = Object.assign(new Error('Refused'), { body: { message: 'READER_BUSY' } });
   render(
     <MemoryRouter>
       <RfidCardList />
     </MemoryRouter>,
   );
-  const row = screen.getByText('AA-BB').closest('tr');
-  if (!row) throw new Error('Card row not found');
-  fireEvent.click(within(row).getByRole('button', { name: 'Delete' }));
+  await userEvent.click(within(await openRowMenu('AA-BB')).getByRole('menuitem', { name: 'Delete' }));
   fireEvent.change(screen.getByRole('combobox', { name: 'Select Attractap' }), { target: { value: '4' } });
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
   expect(state.toastError).toHaveBeenCalledWith(expect.objectContaining({ title: 'Reader busy' }));

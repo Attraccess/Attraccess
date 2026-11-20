@@ -1,4 +1,10 @@
-import { AlertStatusIcon, Button, EmptyState, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  AlertStatusIcon,
+  EmptyState,
+  TableActionsColumnHeader,
+  TableRowActions,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
   AlertContent,
@@ -12,26 +18,23 @@ import {
   TableHeader,
   TableRow,
   TableScrollContainer,
-  useOverlayState,
 } from '@heroui/react';
 import { PencilIcon, Trash2Icon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './translations/list/en.json';
 import de from './translations/list/de.json';
-import { useState } from 'react';
 import { useMqttServersGetAll, useMqttServersDeleteOne, useMqttServersGetAllKey } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { PluginSlot } from '../../plugins/PluginSlot';
 import { MQTT_SERVER_LIST_ROW_SLOT, MqttServerSlotContext } from '../mqtt.slots';
 
 export function MqttServerList() {
-  const { t } = useTranslations({ en, de });
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  const { t } = useTranslations({ en, de }, { escapeValues: false });
   const navigate = useNavigate();
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
-  const { isOpen, open, close: closeDeleteModal } = useOverlayState();
-  const [serverToDelete, setServerToDelete] = useState<number | null>(null);
 
   const { data: servers = [], isLoading, error } = useMqttServersGetAll();
 
@@ -44,7 +47,6 @@ export function MqttServerList() {
       queryClient.invalidateQueries({
         queryKey: [useMqttServersGetAllKey],
       });
-      closeDeleteModal();
     },
     onError: (err) => {
       showError({
@@ -56,17 +58,6 @@ export function MqttServerList() {
 
   const handleEditServer = (serverId: number) => {
     navigate(`/devices/mqtt/servers/${serverId}`);
-  };
-
-  const handleDeleteServer = (serverId: number) => {
-    setServerToDelete(serverId);
-    open();
-  };
-
-  const confirmDelete = async () => {
-    if (serverToDelete) {
-      deleteServer.mutate({ path: { id: serverToDelete } });
-    }
   };
 
   if (isLoading) {
@@ -89,70 +80,66 @@ export function MqttServerList() {
   }
 
   return (
-    <>
-      <Table data-cy="mqtt-server-list-table">
-        <TableScrollContainer>
-          <TableContent aria-label={t('tableLabel')}>
-            <TableHeader>
-              <TableColumn isRowHeader>{t('columnName')}</TableColumn>
-              <TableColumn>{t('columnAddress')}</TableColumn>
-              <TableColumn>{t('columnActions')}</TableColumn>
-            </TableHeader>
-            <TableBody items={servers} renderEmptyState={() => <EmptyState message={t('noServersConfigured')} />}>
-              {(server) => (
-                <TableRow key={`mqtt-server-${server.id}`} id={server.id}>
-                  <TableCell>{server.name}</TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {server.host}:{server.port}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-row gap-2">
-                      <Button
-                        variant="ghost"
-                        onPress={() => handleEditServer(server.id)}
-                        data-cy={`mqtt-server-list-item-edit-button-${server.id}`}
-                      >
-                        <PencilIcon className="w-4 h-4" />
-                        {t('editServer')}
-                      </Button>
-                      <Button
-                        variant="danger-soft"
-                        onPress={() => handleDeleteServer(server.id)}
-                        data-cy={`mqtt-server-list-item-delete-button-${server.id}`}
-                      >
-                        <Trash2Icon className="w-4 h-4" />
-                        {t('deleteServer')}
-                      </Button>
-                      <PluginSlot<MqttServerSlotContext>
-                        slotId={MQTT_SERVER_LIST_ROW_SLOT}
-                        context={{ mqttServerId: server.id }}
-                      />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </TableContent>
-        </TableScrollContainer>
-      </Table>
-
-      <StatusDialog
-        isOpen={isOpen}
-        onClose={closeDeleteModal}
-        status="error"
-        title={t('deleteServer')}
-        closeLabel={t('cancel')}
-        closeDataCy="mqtt-server-list-delete-confirmation-cancel-button"
-        action={{
-          label: t('deleteServer'),
-          onPress: confirmDelete,
-          isPending: deleteServer.isPending,
-          'data-cy': 'mqtt-server-list-delete-confirmation-delete-button',
-        }}
-        data-cy="mqtt-server-list-delete-confirmation-modal"
-      >
-        {t('deleteConfirmation')}
-      </StatusDialog>
-    </>
+    <Table data-cy="mqtt-server-list-table">
+      <TableScrollContainer>
+        <TableContent aria-label={t('tableLabel')}>
+          <TableHeader>
+            <TableColumn isRowHeader>{t('columnName')}</TableColumn>
+            <TableColumn>{t('columnAddress')}</TableColumn>
+            <TableColumn>
+              <TableActionsColumnHeader />
+            </TableColumn>
+          </TableHeader>
+          <TableBody items={servers} renderEmptyState={() => <EmptyState message={t('noServersConfigured')} />}>
+            {(server) => (
+              <TableRow key={`mqtt-server-${server.id}`} id={server.id}>
+                <TableCell>
+                  <div className="flex flex-row items-center gap-2">
+                    {server.name}
+                    <PluginSlot<MqttServerSlotContext>
+                      slotId={MQTT_SERVER_LIST_ROW_SLOT}
+                      context={{ mqttServerId: server.id }}
+                    />
+                  </div>
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {server.host}:{server.port}
+                </TableCell>
+                <TableCell>
+                  <TableRowActions
+                    itemName={server.name}
+                    actions={[
+                      {
+                        key: 'edit',
+                        label: t('editServer'),
+                        icon: PencilIcon,
+                        onPress: () => handleEditServer(server.id),
+                        'data-cy': `mqtt-server-list-item-edit-button-${server.id}`,
+                      },
+                      {
+                        key: 'delete',
+                        label: t('deleteServer'),
+                        icon: Trash2Icon,
+                        tone: 'danger',
+                        onPress: () => deleteServer.mutateAsync({ path: { id: server.id } }),
+                        confirm: {
+                          title: t('deleteConfirmTitle', { name: server.name }),
+                          message: t('deleteConfirmation', { name: server.name }),
+                          cancelLabel: t('cancel'),
+                          'data-cy': 'mqtt-server-list-delete-confirmation-modal',
+                          confirmDataCy: 'mqtt-server-list-delete-confirmation-delete-button',
+                          cancelDataCy: 'mqtt-server-list-delete-confirmation-cancel-button',
+                        },
+                        'data-cy': `mqtt-server-list-item-delete-button-${server.id}`,
+                      },
+                    ]}
+                  />
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </TableContent>
+      </TableScrollContainer>
+    </Table>
   );
 }

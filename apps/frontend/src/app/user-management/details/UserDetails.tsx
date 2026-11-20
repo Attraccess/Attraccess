@@ -3,7 +3,7 @@ import { UserPermissionForm } from './components/permissionsForm/index';
 import { SetPasswordForm } from './components/setPasswordForm/index';
 import { ChangeUsernameForm } from './components/changeUsername/index';
 import { ChangeEmailForm } from './components/changeEmail/index';
-import { Chip, Separator, useOverlayState } from '@heroui/react';
+import { Chip, Separator } from '@heroui/react';
 import { EffectivePermissionsSection } from './components/EffectivePermissionsSection';
 import { useSsoProviders } from '../useSsoProviders';
 import {
@@ -25,7 +25,7 @@ import {
   useDeleteUser,
   useGetOneUserById,
 } from '@attraccess/react-query-client';
-import { Button, PageHeader, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { ConfirmableButton, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useMemo } from 'react';
 import en from './en.json';
 import de from './de.json';
@@ -43,7 +43,6 @@ export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign
 
   const navigate = useNavigate();
   const toast = useToastMessage();
-  const { isOpen, open, setOpen } = useOverlayState();
   const { user: me, hasPermission } = useAuth();
 
   const { data: user } = useGetOneUserById({ path: { id } });
@@ -130,7 +129,7 @@ export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign
   }, [providersById, ssoDetails]);
 
   const isSelf = !!me && !!user && me.id === user.id;
-  const { mutate: deleteUser, isPending: isDeleting } = useDeleteUser(undefined, {
+  const { mutateAsync: deleteUser, isPending: isDeleting } = useDeleteUser(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('delete.success.title'),
@@ -272,31 +271,28 @@ export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign
             <div className="flex flex-col gap-4">
               <p className="text-sm text-default-500">{t('delete.description')}</p>
               <div className="flex w-full justify-end">
-                <Button variant="danger-soft" onPress={open} isDisabled={isSelf} data-cy="admin-delete-user-open-modal">
-                  {t('delete.actions.open')}
-                </Button>
+                <ConfirmableButton
+                  label={t('delete.actions.open')}
+                  status="error"
+                  isDisabled={isSelf}
+                  isPending={isDeleting}
+                  buttonProps={{ variant: 'danger-soft' }}
+                  confirm={{
+                    title: t('delete.modal.title'),
+                    message: t('delete.modal.description'),
+                    confirmLabel: t('delete.actions.confirm'),
+                    cancelLabel: t('delete.actions.cancel'),
+                    confirmDataCy: 'admin-delete-user-confirm-button',
+                  }}
+                  onConfirm={() => user && deleteUser({ path: { id: user.id } })}
+                  data-cy="admin-delete-user-open-modal"
+                />
               </div>
               {isSelf ? <p className="text-xs text-default-400">{t('delete.selfDisabled')}</p> : null}
             </div>
           </FlatSection>
         </div>
       )}
-
-      <StatusDialog
-        isOpen={isOpen}
-        onClose={() => setOpen(false)}
-        status="error"
-        title={t('delete.modal.title')}
-        closeLabel={t('delete.actions.cancel')}
-        action={{
-          label: t('delete.actions.confirm'),
-          onPress: () => user && deleteUser({ path: { id: user.id } }),
-          isPending: isDeleting,
-          'data-cy': 'admin-delete-user-confirm-button',
-        }}
-      >
-        {t('delete.modal.description')}
-      </StatusDialog>
     </div>
   );
 }

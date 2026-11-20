@@ -7,8 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { ControllersTable } from './ControllersTable';
 import { CommissioningModal } from '../commissioning/CommissioningModal';
 import { MqttSettingsModal } from './MqttSettingsModal';
-import type { CommissioningSession, WagoController } from '../api/client';
-import { RemoveControllerDrawer } from './RemoveControllerDrawer';
+import type { CommissioningSession } from '../api/client';
 import { useCommissioningSessionsQuery, useControllersQuery } from '../api/queries';
 import { useWagoTranslations } from '../i18n';
 
@@ -22,7 +21,6 @@ export function ControllersPage() {
   const [isCommissioningOpen, setCommissioningOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [commissioningSession, setCommissioningSession] = useState<CommissioningSession | null>(null);
-  const [removingController, setRemovingController] = useState<WagoController | null>(null);
 
   useEffect(() => {
     setCommissioningSession((session) =>
@@ -76,7 +74,6 @@ export function ControllersPage() {
           sessions={sessionsQuery.data ?? []}
           onClaim={setClaimControllerId}
           onConfigure={configure}
-          onRemove={setRemovingController}
           onResume={(session) => {
             setCommissioningSession(session);
             setCommissioningOpen(true);
@@ -104,10 +101,6 @@ export function ControllersPage() {
         }}
       />
       <MqttSettingsModal isOpen={isSettingsOpen} onOpenChange={setSettingsOpen} />
-      <RemoveControllerDrawer
-        controller={removingController}
-        onOpenChange={(open) => !open && setRemovingController(null)}
-      />
     </main>
   );
 }

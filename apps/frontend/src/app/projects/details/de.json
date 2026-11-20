@@ -6,6 +6,10 @@
       "success": {
         "title": "Projekt erfolgreich gelöscht",
         "description": "Das Projekt {{name}} wurde erfolgreich gelöscht"
+      },
+      "confirm": {
+        "title": "{{name}} löschen?",
+        "message": "Das Projekt wird gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
       }
     },
     "update": {

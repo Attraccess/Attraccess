@@ -1,5 +1,6 @@
-import { useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
+import { TableRowActions, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { Button, TableCell, TableRow } from '@heroui/react';
+import { InfoIcon } from 'lucide-react';
 import { useWagoTranslations } from '../i18n';
 import { RuntimeUpdateSummary } from '../runtime/RuntimeUpdateSummary';
 import { useRuntimeStatus } from '../runtime/useRuntimeStatus';
@@ -46,27 +47,23 @@ export function ControllerRow({
         {controller.lastHeartbeatAt ? formatDateTime(controller.lastHeartbeatAt) : '—'}
       </TableCell>
       <TableCell className={cellClass}>
-        <div className="wg:flex wg:justify-end wg:gap-2">
-          {controller.trustState === 'claimed' ? (
-            <Button size="sm" variant="secondary" onPress={() => onConfigure(controller.id)}>
-              {t('controllers.configure')}
-            </Button>
-          ) : (
-            !session && (
-              <Button size="sm" onPress={() => onClaim(controller.id)}>
-                {t('controllers.claim')}
-              </Button>
-            )
-          )}
-          <Button
-            size="sm"
-            variant="ghost"
-            aria-label={t('controllers.detailsFor', { name: controller.name ?? controller.hardwareId })}
-            onPress={onDetails}
-          >
-            {t('controllers.details')}
+        {controller.trustState === 'claimed' ? (
+          <Button size="sm" variant="secondary" onPress={() => onConfigure(controller.id)}>
+            {t('controllers.configure')}
           </Button>
-        </div>
+        ) : (
+          !session && (
+            <Button size="sm" onPress={() => onClaim(controller.id)}>
+              {t('controllers.claim')}
+            </Button>
+          )
+        )}
+      </TableCell>
+      <TableCell className={cellClass}>
+        <TableRowActions
+          itemName={controller.name ?? controller.hardwareId}
+          actions={[{ key: 'details', label: t('controllers.details'), icon: InfoIcon, onPress: onDetails }]}
+        />
       </TableCell>
     </TableRow>
   );

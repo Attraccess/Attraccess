@@ -4,13 +4,16 @@
   "actions": {
     "pairReader": "Karten-Lesegerät einrichten"
   },
+  "deleteConfirm": {
+    "title": "Karten-Lesegerät {{name}} löschen?",
+    "message": "Das Lesegerät wird entkoppelt und muss neu eingerichtet werden, bevor es wieder Zahlungen annehmen kann. Das kann nicht rückgängig gemacht werden."
+  },
   "table": {
     "ariaLabel": "Karten-Lesegeräte",
     "columns": {
       "name": "Name",
       "device": "Gerät",
-      "status": "Status",
-      "actions": "Aktionen"
+      "status": "Status"
     },
     "actions": {
       "deleteReader": "Löschen"

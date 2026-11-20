@@ -2,8 +2,20 @@ import { Chip, TableCell, TableRow } from '@heroui/react';
 import { PencilIcon, Trash2Icon } from 'lucide-react';
 import { ReactNode } from 'react';
 import { lt, valid } from 'semver';
-import { Button, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { CompanionDevice, useGetCompanionDevice } from '@attraccess/react-query-client';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  I18nTransComponent,
+  TableRowActions,
+  useDateTimeFormatter,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
+import {
+  CompanionDevice,
+  UseListCompanionDevicesKeyFn,
+  useDeleteCompanionDevice,
+  useGetCompanionDevice,
+} from '@attraccess/react-query-client';
+import { useToastMessage } from '../../../components/toastProvider';
 import en from './en.json';
 import de from './de.json';
 
@@ -11,7 +23,6 @@ interface DeviceRowProps {
   device: CompanionDevice;
   latestVersion: string | null;
   onRenameStart: (device: CompanionDevice) => void;
-  onDeleteStart: (device: CompanionDevice) => void;
 }
 
 type DeviceWithConnected = CompanionDevice & { connected?: boolean };
@@ -21,9 +32,20 @@ function isOutdated(deviceVersion: string, latestVersion: string): boolean {
   return lt(deviceVersion, latestVersion);
 }
 
-export function DeviceRow({ device, latestVersion, onRenameStart, onDeleteStart }: DeviceRowProps) {
+export function DeviceRow({ device, latestVersion, onRenameStart }: DeviceRowProps) {
   const { t } = useTranslations({ en, de });
   const formatDateTime = useDateTimeFormatter();
+  const toast = useToastMessage();
+  const queryClient = useQueryClient();
+  const { mutateAsync: deleteDevice } = useDeleteCompanionDevice(undefined, {
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: UseListCompanionDevicesKeyFn() });
+      toast.success({ title: t('devices.delete.success') });
+    },
+    onError: () => {
+      toast.error({ title: t('devices.delete.error') });
+    },
+  });
   const { data } = useGetCompanionDevice({ path: { id: device.id } }, undefined, {
     refetchInterval: 30000,
   });
@@ -52,16 +74,39 @@ export function DeviceRow({ device, latestVersion, onRenameStart, onDeleteStart 
         </div>
       </TableCell>
       <TableCell>
-        <div className="flex flex-row gap-2 flex-wrap">
-          <Button variant="ghost" size="sm" onPress={() => onRenameStart(device)}>
-            <PencilIcon className="w-4 h-4" />
-            {t('devices.actions.rename')}
-          </Button>
-          <Button variant="danger-soft" size="sm" onPress={() => onDeleteStart(device)}>
-            <Trash2Icon className="w-4 h-4" />
-            {t('devices.actions.delete')}
-          </Button>
-        </div>
+        <TableRowActions
+          itemName={device.name}
+          actions={[
+            {
+              key: 'rename',
+              label: t('devices.actions.rename'),
+              icon: PencilIcon,
+              onPress: () => onRenameStart(device),
+            },
+            {
+              key: 'delete',
+              label: t('devices.actions.delete'),
+              icon: Trash2Icon,
+              tone: 'danger',
+              onPress: () => deleteDevice({ path: { id: device.id } }),
+              confirm: {
+                title: t('deleteConfirm.title'),
+                message: (
+                  <p>
+                    <I18nTransComponent
+                      t={t}
+                      i18nKey="deleteConfirm.message"
+                      values={{ name: device.name }}
+                      components={{ bold: <strong /> }}
+                    />
+                  </p>
+                ),
+                confirmLabel: t('deleteConfirm.confirm'),
+                cancelLabel: t('deleteConfirm.cancel'),
+              },
+            },
+          ]}
+        />
       </TableCell>
     </TableRow>
   );

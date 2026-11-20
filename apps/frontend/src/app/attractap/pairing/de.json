@@ -103,7 +103,10 @@
     "newReader": "Neuer Reader",
     "waitingSince": "Wartet seit {{time}}",
     "pair": "Koppeln",
-    "delete": "Löschen"
+    "delete": "Löschen",
+    "deleteTitle": "{{name}} löschen?",
+    "deleteMessage": "Sind Sie sicher, dass Sie \"{{name}}\" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "deleteFailed": "Der Leser konnte nicht gelöscht werden"
   },
   "kind": {
     "touch": "Touch",

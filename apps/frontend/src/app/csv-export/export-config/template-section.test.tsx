@@ -43,8 +43,20 @@ vi.mock('@attraccess/react-query-client', () => ({
     mutate: (vars: unknown) => state.update(vars, options),
     isPending: state.pending.update,
   }),
-  useDeleteCsvExportTemplate: (_mutationKey: unknown, options: unknown) => ({
-    mutate: (vars: unknown) => state.remove(vars, options),
+  useDeleteCsvExportTemplate: (_mutationKey: unknown, options: MutationOptions) => ({
+    mutateAsync: (vars: unknown) =>
+      new Promise((resolve, reject) =>
+        state.remove(vars, {
+          onSuccess: async (data: unknown, variables: unknown) => {
+            await options.onSuccess(data, variables);
+            resolve(data);
+          },
+          onError: (error: unknown, variables: unknown) => {
+            options.onError(error, variables);
+            reject(error);
+          },
+        }),
+      ),
     isPending: state.pending.remove,
   }),
 }));

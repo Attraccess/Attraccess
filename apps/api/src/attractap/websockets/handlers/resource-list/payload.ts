@@ -63,6 +63,12 @@ function listedReaderSessions(
   return ordered.slice(0, MAX_LISTED_READER_SESSIONS).map((session) => toReaderSession(session, offsetMinutes));
 }
 
+/**
+ * Readers keep only the first this many resources of the list (firmware API::MAX_RESOURCES in
+ * src/api/api_types.hpp) and drop the rest, so the surplus is never sent.
+ */
+export const MAX_READER_RESOURCES = 10;
+
 export async function sendResourceListToSockets(
   context: ResourceListServiceResourceListPayloadContext,
   sockets: AuthenticatedWebSocket[],
@@ -76,14 +82,17 @@ export async function sendResourceListToSockets(
     throw new Error(`Reader not found: ${sockets[0].readerId}`);
   }
 
-  const resources = [...reader.resources].sort((a, b) => a.name.localeCompare(b.name));
+  const attachedResources = [...reader.resources].sort((a, b) => a.name.localeCompare(b.name));
 
+  // Matched against every attached resource: a rename can move a resource into or out of the listed ones.
   const resourceIdsToMatch = onlyIfResourceMatches?.resourceIds;
   if (resourceIdsToMatch?.size) {
-    if (!resources.some((resource) => resourceIdsToMatch.has(resource.id))) {
+    if (!attachedResources.some((resource) => resourceIdsToMatch.has(resource.id))) {
       return;
     }
   }
+
+  const resources = attachedResources.slice(0, MAX_READER_RESOURCES);
 
   const resourceIds = resources.map((resource) => resource.id);
   const [introducersByResourceId, healthMap, activeSessionMap, activeMaintenanceIds, flowButtonMap] = await Promise.all(

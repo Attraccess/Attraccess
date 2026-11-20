@@ -40,6 +40,13 @@
 # (READER_ELF, set by the builds here) is published to the API as a symbol-only
 # firmware entry so the uploaded coredump can be symbolicated. API_LOG points the
 # tests at the API's log.
+#
+# HIL_WSS=1: the reader connects over wss:// with certificate validation, like a production
+# reader on an HTTPS server. Reader images are built with -DATTRACTAP_LAB_CA=<lab CA> (created on
+# first use into apps/attractap-lab/lab-tls, gitignored; src/attractap_lab/lab_tls.py), a prebuilt
+# READER_IMAGE or READER_SECURE_BUILD must embed that CA, and the tests start a TLS front on
+# API_TLS_PORT (a free port by default) that forwards to the API; the relay carries that port.
+# HIL_WSS_TLS_MAX=1.2 pins the front to TLS 1.2 (default: 1.2 and 1.3).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -51,7 +58,7 @@ if [[ "${1:-}" == --in-session ]]; then
   relay_pid=
   if [[ -n "${API_RELAY_SSH:-}" ]]; then
     ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 \
-      -R "0.0.0.0:$READER_API_PORT:127.0.0.1:$API_PORT" "$API_RELAY_SSH" &
+      -R "0.0.0.0:$READER_API_PORT:127.0.0.1:${API_TLS_PORT:-$API_PORT}" "$API_RELAY_SSH" &
     relay_pid=$!
     sleep 3
     kill -0 "$relay_pid" 2>/dev/null || { echo "API relay through $API_RELAY_SSH failed" >&2; exit 1; }
@@ -101,6 +108,12 @@ place_profile="$(sed -n 's/^ *tags:.*[ ,]profile=\([a-z-]*\).*/\1/p' <<<"$place"
 [[ "${place_profile:-plain}" == "$READER_PROFILE" ]] ||
   fail "$PLACE is a ${place_profile:-plain} reader, but READER_PROFILE=$READER_PROFILE"
 
+# Always passed, so a reused build directory does not keep the CA of an earlier HIL_WSS run.
+LAB_CA=
+if [[ "${HIL_WSS:-}" == 1 ]]; then
+  LAB_CA="$(python3 "$HERE/../src/attractap_lab/lab_tls.py" ca)" || fail "HIL_WSS=1 could not create the lab CA"
+fi
+
 require_idf() {
   command -v idf.py >/dev/null || { echo "Source ESP-IDF export.sh first (or set READER_IMAGE/EMULATOR_IMAGE)" >&2; exit 1; }
 }
@@ -115,7 +128,8 @@ build_ota_image() { # build directory, extra CMake arguments...
   (cd "$ROOT/apps/attractap/firmware" &&
     idf.py -B "$directory" -DSDKCONFIG="$directory/sdkconfig" -DATTRACTAP_VARIANT="$VARIANT" \
       -DATTRACTAP_LOG_LEVEL=DEBUG -DATTRACTAP_TEST_HOOKS=ON -DATTRACTAP_BEEPER_DEFAULT=OFF \
-      -DATTRACTAP_VERSION_OVERRIDE="$READER_OTA_VERSION" "$@" ${READER_CMAKE_ARGS:-} build >"$WORK/ota-build.log")
+      -DATTRACTAP_VERSION_OVERRIDE="$READER_OTA_VERSION" -DATTRACTAP_LAB_CA="$LAB_CA" "$@" ${READER_CMAKE_ARGS:-} \
+      build >"$WORK/ota-build.log")
   cp "$directory/attractap.bin" "$WORK/ota-app.bin"
   READER_OTA_IMAGE="$WORK/ota-app.bin"
 }
@@ -128,7 +142,7 @@ if [[ "$READER_PROFILE" == secure-lab ]]; then
     (cd "$firmware" && python3 tools/build_individual_ca_certs.py >/dev/null &&
       idf.py -B "$READER_SECURE_BUILD" -DSDKCONFIG="$READER_SECURE_BUILD/sdkconfig" -DATTRACTAP_VARIANT="$VARIANT" \
         -DATTRACTAP_LOG_LEVEL=DEBUG -DATTRACTAP_TEST_HOOKS=ON -DATTRACTAP_BEEPER_DEFAULT=OFF \
-        -DATTRACTAP_VERSION_OVERRIDE= \
+        -DATTRACTAP_VERSION_OVERRIDE= -DATTRACTAP_LAB_CA="$LAB_CA" \
         -DATTRACTAP_SECURE_PROFILE=ON -DATTRACTAP_SECURE_LAB=ON ${READER_CMAKE_ARGS:-} build >"$WORK/reader-build.log")
     built_here=1
   fi
@@ -148,7 +162,8 @@ elif [[ -z "${READER_IMAGE:-}" ]]; then
   (cd "$firmware" && python3 tools/build_individual_ca_certs.py >/dev/null &&
     idf.py -B "$build" -DSDKCONFIG="$build/sdkconfig" -DATTRACTAP_VARIANT="$VARIANT" \
       -DATTRACTAP_LOG_LEVEL=DEBUG -DATTRACTAP_TEST_HOOKS=ON -DATTRACTAP_BEEPER_DEFAULT=OFF \
-      -DATTRACTAP_CRASH_TRIGGER=ON -DATTRACTAP_VERSION_OVERRIDE= ${READER_CMAKE_ARGS:-} build >"$WORK/reader-build.log")
+      -DATTRACTAP_CRASH_TRIGGER=ON -DATTRACTAP_VERSION_OVERRIDE= -DATTRACTAP_LAB_CA="$LAB_CA" ${READER_CMAKE_ARGS:-} \
+      build >"$WORK/reader-build.log")
   (cd "$build" && esptool --chip esp32s3 merge-bin -o "$WORK/reader.bin" @flash_args >/dev/null)
   READER_IMAGE="$WORK/reader.bin"
   # Copy the ELF before the OTA build rebuilds this directory (another version string, so another
@@ -156,6 +171,14 @@ elif [[ -z "${READER_IMAGE:-}" ]]; then
   cp "$build/attractap.elf" "$WORK/reader.elf"
   READER_ELF="${READER_ELF:-$WORK/reader.elf}"
   build_ota_image "$build" -DATTRACTAP_CRASH_TRIGGER=ON
+fi
+if [[ -n "$LAB_CA" ]]; then
+  # A reader without the CA would only fail its handshakes; the update image must trust it too, or the
+  # reader never comes back after the OTA tests.
+  for image in "$READER_IMAGE" ${READER_OTA_IMAGE:+"$READER_OTA_IMAGE"}; do
+    python3 "$HERE/../src/attractap_lab/lab_tls.py" check-image "$image" ||
+      fail "HIL_WSS=1 needs reader images that trust the lab CA"
+  done
 fi
 if [[ -z "${EMULATOR_IMAGE:-}" ]]; then
   require_idf
@@ -166,6 +189,11 @@ if [[ -z "${EMULATOR_IMAGE:-}" ]]; then
 fi
 
 API_PORT="${API_PORT:-$(python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1])')}"
+if [[ -n "$LAB_CA" ]]; then
+  API_TLS_PORT="${API_TLS_PORT:-$(python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1])')}"
+else
+  API_TLS_PORT=
+fi
 export STORAGE_ROOT="$WORK/storage"
 if [[ "${HIL_BLE:-}" == 1 ]]; then
   # Plugin BLE tests (test_ble.py, opt-in): the lab fixture plugin talks to devices through context.ble.
@@ -217,7 +245,7 @@ until curl -sf -o /dev/null "http://127.0.0.1:$API_PORT/api/info"; do
   fi
   sleep 2
 done
-READER_API_PORT="$API_PORT"
+READER_API_PORT="${API_TLS_PORT:-$API_PORT}"
 if [[ -n "${API_RELAY_SSH:-}" ]]; then
   : "${API_RELAY_HOST:?set API_RELAY_HOST to the lab host address on the reader network}"
   API_HOST="$API_RELAY_HOST"
@@ -233,6 +261,7 @@ GRPC_ENABLE_FORK_SUPPORT=0 PYTHONPATH="$HERE/../src:$HERE" LAB_PYTHON="$LAB_PYTH
   API_URL="http://127.0.0.1:$API_PORT" API_DB="$STORAGE_ROOT/attraccess.sqlite" \
   API_HOST="${API_HOST:-}" API_PORT="$API_PORT" READER_API_PORT="$READER_API_PORT" \
   API_RELAY_SSH="${API_RELAY_SSH:-}" WIRETAP_FILE="$WIRETAP_FILE" API_LOG="$WORK/api.log" \
+  HIL_WSS="${HIL_WSS:-}" API_TLS_PORT="$API_TLS_PORT" HIL_WSS_TLS_MAX="${HIL_WSS_TLS_MAX:-}" \
   HIL_BLE="${HIL_BLE:-}" HIL_BLE_LONG="${HIL_BLE_LONG:-}" BLE_PERIPHERAL_ADDRESS="${BLE_PERIPHERAL_ADDRESS:-}" \
   SOLO_ADDRESS="${SOLO_ADDRESS:-}" SOLO_USER_CODE="${SOLO_USER_CODE:-}" \
   labgrid-client -x "$COORDINATOR" -p "$PLACE" session \

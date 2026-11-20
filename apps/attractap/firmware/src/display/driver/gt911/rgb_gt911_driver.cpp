@@ -179,9 +179,8 @@ bool RgbGt911Driver::begin()
         return false;
     }
 
-    // RGB dot-clock config — replicates the effective Arduino_ESP32RGBPanel
-    // values bit for bit: 12 MHz pclk (octal PSRAM), single framebuffer in
-    // PSRAM, no bounce buffers, 16-bit bus, little-endian B/G/R lane order.
+    // RGB dot-clock config: 12 MHz pclk (octal PSRAM), single framebuffer in
+    // PSRAM fed through bounce buffers, 16-bit bus, little-endian B/G/R lane order.
     esp_lcd_rgb_panel_config_t rgbConfig = {};
     rgbConfig.clk_src = LCD_CLK_SRC_DEFAULT;
     rgbConfig.timings.pclk_hz = 12 * 1000 * 1000;
@@ -202,12 +201,15 @@ bool RgbGt911Driver::begin()
     rgbConfig.in_color_format = LCD_COLOR_FMT_RGB565;
     rgbConfig.out_color_format = LCD_COLOR_FMT_RGB565;
     rgbConfig.num_fbs = 1;
-#if CONFIG_SECURE_FLASH_ENC_ENABLED
-    // Flash encryption also encrypts all of PSRAM on the S3, and DMA reads of
-    // the framebuffer straight from encrypted PSRAM underrun the panel (the
-    // picture shakes sideways). Bounce buffers in internal RAM, refilled by the
-    // CPU through the cache, keep it steady (ATT-1166). Each refill covers
-    // BOUNCE_ROWS rows. Photographing a Touch V2 after bursts of screen changes:
+    // DMA reads of the framebuffer straight from PSRAM underrun the panel (the
+    // picture shakes sideways): PSRAM shares the SPI bus with flash, so every
+    // flash read, write or erase (NVS, OTA) stalls them, and with flash
+    // encryption all of PSRAM is encrypted too (ATT-1166). Bounce buffers in
+    // internal RAM, refilled by the CPU through the cache, keep it steady; with
+    // CONFIG_SPIRAM_XIP_FROM_PSRAM the cache stays on during flash writes, so
+    // the refills keep running. Continuous NVS writes on a Touch V2 garbled 6 of
+    // 6 camera frames without either, 5 of 7 with XIP alone, 0 of 7 with both.
+    // Each refill covers BOUNCE_ROWS rows. Photographing a Touch V2 after bursts of screen changes:
     // 10 rows left dash artifacts after about 40 % of the bursts, 12 rows after
     // all, 15, 16 and 20 rows after none (20 of 20 clean). IDF allocates two bounce buffers in internal DMA RAM, so
     // 16 rows cost 2 x 16 x 480 x 2 B = 30 KB (11.5 KB more than 10 rows) of
@@ -216,9 +218,6 @@ bool RgbGt911Driver::begin()
     // esp_lcd only accepts a framebuffer that is a whole number of bounce buffers.
     static_assert(480 % BOUNCE_ROWS == 0, "the 480-row framebuffer must be a multiple of the bounce buffer");
     rgbConfig.bounce_buffer_size_px = BOUNCE_ROWS * 480;
-#else
-    rgbConfig.bounce_buffer_size_px = 0;
-#endif
     rgbConfig.dma_burst_size = 64;
     rgbConfig.hsync_gpio_num = (gpio_num_t)38;
     rgbConfig.vsync_gpio_num = (gpio_num_t)39;

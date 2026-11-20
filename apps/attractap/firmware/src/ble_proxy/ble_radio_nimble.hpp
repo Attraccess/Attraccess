@@ -49,6 +49,8 @@ namespace ble
         explicit NimbleRadio(IRadioEvents &events) : events(events) {}
 
         Error init() override;
+        Error shutdown() override;
+        bool active() override;
         Error startScan(uint32_t durationMs) override;
         Error startWatchScan(bool connected) override;
         void stopScan() override;

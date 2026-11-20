@@ -20,7 +20,7 @@ afterEach(() => {
 
 type Handlers = Pick<
   ComponentProps<typeof DevicesTable>,
-  'setInfoDevice' | 'setFirmwareDevice' | 'setAuthDevice' | 'setDeleteTarget' | 'withRowBusy'
+  'setInfoDevice' | 'setFirmwareDevice' | 'setAuthDevice' | 'onDelete' | 'withRowBusy'
 >;
 
 const baseDevice: ShellyDevice = {
@@ -41,7 +41,7 @@ function handlers(): Handlers {
     setInfoDevice: vi.fn(),
     setFirmwareDevice: vi.fn(),
     setAuthDevice: vi.fn(),
-    setDeleteTarget: vi.fn(),
+    onDelete: vi.fn(async () => undefined),
     withRowBusy: vi.fn(async (_id: number, action: () => Promise<unknown>) => {
       await action();
     }),
@@ -125,8 +125,8 @@ describe('DevicesTable', () => {
     const devices = [baseDevice, { ...baseDevice, id: 8, name: 'Second light' }];
     renderTable({ devices, rowBusyId: 7, actions: handlers() });
 
-    expect(row(7).getByRole('button', { name: 'View device info' })).toBeDisabled();
-    expect(row(8).getByRole('button', { name: 'View device info' })).toBeEnabled();
+    expect(row(7).getByRole('button', { name: 'Actions for Workshop light' })).toBeDisabled();
+    expect(row(8).getByRole('button', { name: 'Actions for Second light' })).toBeEnabled();
   });
 
   it('routes every row action to the matching device', async () => {
@@ -135,13 +135,12 @@ describe('DevicesTable', () => {
     vi.mocked(reprobeDevice).mockResolvedValue(baseDevice);
     renderTable({ devices: [baseDevice], actions });
 
-    await user.click(row(7).getByRole('button', { name: 'View device info' }));
-    expect(actions.setInfoDevice).toHaveBeenCalledWith(baseDevice);
-
     const chooseFromMenu = async (name: RegExp) => {
-      await user.click(row(7).getByRole('button', { name: 'More actions' }));
+      await user.click(row(7).getByRole('button', { name: 'Actions for Workshop light' }));
       await user.click(await screen.findByRole('menuitem', { name }));
     };
+    await chooseFromMenu(/View device info/);
+    expect(actions.setInfoDevice).toHaveBeenCalledWith(baseDevice);
     await chooseFromMenu(/Manage firmware/);
     expect(actions.setFirmwareDevice).toHaveBeenCalledWith(baseDevice);
     await chooseFromMenu(/Set admin password/);
@@ -150,6 +149,10 @@ describe('DevicesTable', () => {
     expect(actions.withRowBusy).toHaveBeenCalledWith(7, expect.any(Function));
     expect(reprobeDevice).toHaveBeenCalledWith(7);
     await chooseFromMenu(/Delete device/);
-    expect(actions.setDeleteTarget).toHaveBeenCalledWith(baseDevice);
+    expect(actions.onDelete).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('Remove Workshop light (192.0.2.7) from the registry?');
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    expect(actions.onDelete).toHaveBeenCalledWith(baseDevice);
   });
 });

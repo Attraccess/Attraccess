@@ -1,7 +1,6 @@
 import { pairedReadersOnly } from '../cardWriting';
 import { isReaderStale } from '../readerStaleness';
 import {
-  Button,
   Card,
   Table,
   TableBody,
@@ -18,22 +17,27 @@ import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
 import { ReadersToPair } from '../pairing/ReadersToPair';
 import { AttractapHardwareSetup } from '../HardwareSetup/index';
 import { WebSerialConsole } from '../HardwareSetup/WebSerialConsole/index';
-import { AttractapDeleteModal } from './delete/index';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   EmptyState,
   PageAction,
   PageHeader,
+  TableActionsColumnHeader,
+  TableRowActions,
   useDateTimeFormatter,
   useTranslations,
 } from '@attraccess/plugins-frontend-ui';
 import {
   Attractap,
+  useDeleteReader,
   useGetFirmwares,
   useGetReaders,
   useGetReadersToPair,
   useGetLicenseInformation,
+  UseGetReadersKeyFn,
+  UseGetReadersToPairKeyFn,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useNow } from '../../../hooks/useNow';
@@ -41,10 +45,14 @@ import de from './de.json';
 import en from './en.json';
 
 export function AttractapList() {
-  const { t } = useTranslations({
-    de,
-    en,
-  });
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  const { t } = useTranslations(
+    {
+      de,
+      en,
+    },
+    { escapeValues: false },
+  );
 
   const { data: license } = useGetLicenseInformation();
 
@@ -58,7 +66,18 @@ export function AttractapList() {
   const { data: readersToPair } = useGetReadersToPair({}, undefined, { refetchInterval: 5000 });
 
   const toast = useToastMessage();
-  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const { mutateAsync: deleteReader } = useDeleteReader(undefined, {
+    onSuccess: () => {
+      // The deleted record can be in either list.
+      queryClient.invalidateQueries({ queryKey: UseGetReadersKeyFn() });
+      queryClient.invalidateQueries({ queryKey: UseGetReadersToPairKeyFn() });
+    },
+    onError: (error) => {
+      toast.error({ title: t('error.deleteReader'), description: (error as Error).message });
+    },
+  });
 
   const [openedReaderEditor, setOpenedReaderEditor] = useState<number | null>(null);
 
@@ -207,7 +226,9 @@ export function AttractapList() {
                       <TableColumn isRowHeader>{t('table.columns.name')}</TableColumn>
                       <TableColumn>{t('table.columns.type')}</TableColumn>
                       <TableColumn>{t('table.columns.lastConnection')}</TableColumn>
-                      <TableColumn>{t('table.columns.actions')}</TableColumn>
+                      <TableColumn>
+                        <TableActionsColumnHeader />
+                      </TableColumn>
                     </TableHeader>
                     <TableBody
                       items={readers ?? []}
@@ -247,38 +268,38 @@ export function AttractapList() {
                           </TableCell>
                           <TableCell className="whitespace-nowrap">{formatDateTime(reader.lastConnection)}</TableCell>
                           <TableCell>
-                            <div className="flex flex-row gap-2">
-                              <Button
-                                variant="ghost"
-                                onPress={() => setOpenedReaderEditor(reader.id)}
-                                data-cy={`attractap-list-edit-reader-button-${reader.id}`}
-                              >
-                                <PencilIcon className="w-4 h-4" />
-                                {t('table.actions.editReader')}
-                              </Button>
-
-                              <Button
-                                variant="ghost"
-                                onPress={() => navigate(`/attractap/readers/${reader.id}/diagnostics`)}
-                                data-cy={`attractap-list-diagnostics-reader-button-${reader.id}`}
-                              >
-                                <ActivityIcon className="w-4 h-4" />
-                                {t('table.actions.diagnostics')}
-                              </Button>
-
-                              <AttractapDeleteModal readerId={reader.id}>
-                                {(onOpen) => (
-                                  <Button
-                                    variant="danger-soft"
-                                    onPress={onOpen}
-                                    data-cy={`attractap-list-delete-reader-button-${reader.id}`}
-                                  >
-                                    <Trash2Icon className="w-4 h-4" />
-                                    {t('table.actions.deleteReader')}
-                                  </Button>
-                                )}
-                              </AttractapDeleteModal>
-                            </div>
+                            <TableRowActions
+                              itemName={reader.name}
+                              actions={[
+                                {
+                                  key: 'edit',
+                                  label: t('table.actions.editReader'),
+                                  icon: PencilIcon,
+                                  onPress: () => setOpenedReaderEditor(reader.id),
+                                  'data-cy': `attractap-list-edit-reader-button-${reader.id}`,
+                                },
+                                {
+                                  key: 'diagnostics',
+                                  label: t('table.actions.diagnostics'),
+                                  icon: ActivityIcon,
+                                  href: `/attractap/readers/${reader.id}/diagnostics`,
+                                  'data-cy': `attractap-list-diagnostics-reader-button-${reader.id}`,
+                                },
+                                {
+                                  key: 'delete',
+                                  label: t('table.actions.deleteReader'),
+                                  icon: Trash2Icon,
+                                  tone: 'danger',
+                                  onPress: () => deleteReader({ path: { readerId: reader.id } }),
+                                  confirm: {
+                                    title: t('deleteConfirm.title', { name: reader.name }),
+                                    message: t('deleteConfirm.message'),
+                                    confirmDataCy: `attractap-list-delete-reader-confirm-${reader.id}`,
+                                  },
+                                  'data-cy': `attractap-list-delete-reader-button-${reader.id}`,
+                                },
+                              ]}
+                            />
                           </TableCell>
                         </TableRow>
                       )}

@@ -33,7 +33,9 @@ namespace ble
     constexpr uint16_t MAX_MTU = 517;
     constexpr uint16_t MIN_MTU = 23;
     constexpr size_t MAX_PAYLOAD_BYTES = 512;
-    constexpr size_t MAX_NOTIFICATION_QUEUE = 64;
+    // In PSRAM. Over wss:// a secure reader forwards about 120 notifications a second; a burst of 200 backed up
+    // to more than 64 there.
+    constexpr size_t MAX_NOTIFICATION_QUEUE = 128;
     constexpr size_t MAX_NOTIFICATION_QUEUE_BYTES = 32 * 1024;
     constexpr size_t MAX_ALLOWLIST_ENTRIES = 16;
     constexpr size_t MAX_PENDING_REQUESTS = 16;
@@ -49,6 +51,11 @@ namespace ble
     // The reader's own deadlines run a little behind the API's, so the API normally decides first.
     constexpr uint32_t LEASE_GRACE_MS = 10000;
     constexpr uint32_t OP_GRACE_MS = 2000;
+    // The stack (NimBLE and the controller, ~24 KB of internal RAM) shuts down after this long without BLE work. One
+    // lock exchange (scan, open, a few operations, close, the API's READER_BUSY retries, a plugin that reconnects at
+    // once) has gaps of seconds and never pays the init twice; the next one, at the end of the usage session, is
+    // minutes or hours away, so the RAM is back for that whole time and that exchange pays the init once.
+    constexpr uint32_t STACK_IDLE_SHUTDOWN_MS = 30000;
     // A close or a cancelled connect waits this long for the controller before the owner is released anyway.
     constexpr uint32_t RELEASE_DEADLINE_MS = 5000;
     // NimBLE ends a GATT procedure after the 30 s ATT timeout; anything stuck longer drops the link.

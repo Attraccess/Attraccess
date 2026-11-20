@@ -30,7 +30,14 @@ import {
 import { VariableEditor, EditorMode, VariableFormValues, ValueType } from './editor';
 import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button, StandardModal, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  StandardModal,
+  TableActionsColumnHeader,
+  TableRowActions,
+  useDateTimeFormatter,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
@@ -64,16 +71,19 @@ export interface Props {
 export function VariablesModal(props: Props) {
   const { resourceId } = props;
   const { isOpen, open, setOpen, close } = useOverlayState();
-  const { t, tExists } = useTranslations({
-    en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
-    de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
-  });
+  // React escapes the output; escaping names again would show `A &amp; B` in confirmations.
+  const { t, tExists } = useTranslations(
+    {
+      en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
+      de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
+    },
+    { escapeValues: false },
+  );
   const formatDateTime = useDateTimeFormatter({ showSeconds: false });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
   const [activeScope, setActiveScope] = useState<ResourceFlowVariableScope>(ResourceFlowVariableScope.RESOURCE);
-  const [pendingDeleteKey, setPendingDeleteKey] = useState<string | null>(null);
   const [editor, setEditor] = useState<
     { open: false } | { open: true; mode: EditorMode; initial?: VariableFormValues }
   >({ open: false });
@@ -103,7 +113,6 @@ export function VariablesModal(props: Props) {
     onSuccess: () => {
       invalidate();
       toast.success({ title: t('toast.deleted.title') });
-      setPendingDeleteKey(null);
     },
     onError: (error) => {
       toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' });
@@ -152,9 +161,7 @@ export function VariablesModal(props: Props) {
   );
 
   const handleDelete = useCallback(
-    (row: FlowVariableDto) => {
-      remove.mutate({ path: { resourceId, scope: row.scope, key: row.key } });
-    },
+    (row: FlowVariableDto) => remove.mutateAsync({ path: { resourceId, scope: row.scope, key: row.key } }),
     [remove, resourceId],
   );
 
@@ -208,7 +215,9 @@ export function VariablesModal(props: Props) {
                       <TableColumn>{t('table.type')}</TableColumn>
                       <TableColumn>{t('table.value')}</TableColumn>
                       <TableColumn>{t('table.updated')}</TableColumn>
-                      <TableColumn>{t('table.actions')}</TableColumn>
+                      <TableColumn>
+                        <TableActionsColumnHeader />
+                      </TableColumn>
                     </TableHeader>
                     <TableBody>
                       {rows.length === 0 ? (
@@ -238,39 +247,28 @@ export function VariablesModal(props: Props) {
                             </TableCell>
                             <TableCell className="text-sm text-default-500">{formatDateTime(row.updatedAt)}</TableCell>
                             <TableCell>
-                              <div className="flex flex-row justify-end gap-1">
-                                <Button
-                                  isIconOnly
-                                  variant="ghost"
-                                  aria-label={t('actions.edit')}
-                                  onPress={() => handleEdit(row)}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                {pendingDeleteKey === rowKey(row) ? (
-                                  <>
-                                    <Button variant="ghost" onPress={() => setPendingDeleteKey(null)}>
-                                      {t('actions.confirmDeleteNo')}
-                                    </Button>
-                                    <Button
-                                      variant="danger"
-                                      isPending={remove.isPending}
-                                      onPress={() => handleDelete(row)}
-                                    >
-                                      {t('actions.confirmDeleteYes')}
-                                    </Button>
-                                  </>
-                                ) : (
-                                  <Button
-                                    isIconOnly
-                                    variant="danger-soft"
-                                    aria-label={t('actions.delete')}
-                                    onPress={() => setPendingDeleteKey(rowKey(row))}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </div>
+                              <TableRowActions
+                                itemName={row.key}
+                                actions={[
+                                  {
+                                    key: 'edit',
+                                    label: t('actions.edit'),
+                                    icon: Pencil,
+                                    onPress: () => handleEdit(row),
+                                  },
+                                  {
+                                    key: 'delete',
+                                    label: t('actions.delete'),
+                                    icon: Trash2,
+                                    tone: 'danger',
+                                    onPress: () => handleDelete(row),
+                                    confirm: {
+                                      title: t('actions.confirmDelete'),
+                                      message: t('actions.confirmDeleteMessage', { key: row.key }),
+                                    },
+                                  },
+                                ]}
+                              />
                             </TableCell>
                           </TableRow>
                         ))

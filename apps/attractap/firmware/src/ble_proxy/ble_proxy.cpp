@@ -97,7 +97,7 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
     std::atomic<uint32_t> generation{1};
     std::atomic<bool> otaPending{false};
     uint32_t handledGeneration = 1;
-    bool loggedInit = false;
+    bool stackUp = false;
 
     // --- IBleSink (proxy task) ----------------------------------------------------------------------------
     bool send(const std::string &message) override
@@ -264,9 +264,13 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
     {
         for (;;)
         {
-            // A reader that never uses BLE never wakes this task: nothing has a deadline and nothing waits.
+            // A reader that never uses BLE never wakes this task: nothing has a deadline and nothing waits. While the
+            // stack is up it also wakes when the idle period runs out, to shut the stack down if nothing uses it.
             const bool idle = core.idle() && uxQueueMessagesWaiting(commands) == 0;
-            ulTaskNotifyTake(pdTRUE, idle ? portMAX_DELAY : core.waitsForRadioBuffers() ? RETRY_WAIT : POLL_WAIT);
+            const TickType_t wait = !idle                ? core.waitsForRadioBuffers() ? RETRY_WAIT : POLL_WAIT
+                                    : core.radioReady() ? pdMS_TO_TICKS(core.shutdownInMs(millis())) + 1
+                                                        : portMAX_DELAY;
+            ulTaskNotifyTake(pdTRUE, wait);
             uint32_t now = millis();
             const uint32_t current = generation.load();
             if (current != handledGeneration)
@@ -286,16 +290,7 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
             while (core.acceptsRequests() && xQueueReceive(commands, &command, 0) == pdTRUE)
             {
                 // Requests of a connection that is already gone never run.
-                if (command->generation == handledGeneration)
-                {
-                    const bool wasReady = core.radioReady();
-                    core.handle(std::move(*command), millis());
-                    if (!wasReady && core.radioReady() && !loggedInit)
-                    {
-                        loggedInit = true;
-                        logHeap(logger, "after BLE init");
-                    }
-                }
+                if (command->generation == handledGeneration) core.handle(std::move(*command), millis());
                 delete command;
                 // Radio results first: a burst of requests must not delay them.
                 while (xQueueReceive(events, &event, 0) == pdTRUE)
@@ -304,7 +299,15 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
                     delete event;
                 }
             }
+            // tick() also shuts an idle stack down. A request that arrives meanwhile waits in the queue and brings
+            // a fresh stack up next round: init and shutdown both run only on this task.
             core.tick(millis());
+            // Whichever step brought the stack up or took it down: the log shows the internal RAM it takes and returns.
+            if (core.radioReady() != stackUp)
+            {
+                stackUp = core.radioReady();
+                logHeap(logger, stackUp ? "after BLE init" : "after BLE shutdown");
+            }
         }
     }
 

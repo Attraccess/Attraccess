@@ -593,6 +593,7 @@ int main()
     advertisingParserSurvivesGarbage();
     errorMapping();
     capabilityFitsTheFirmwareInfo();
+    runStackTests();
     runEdgeTests();
     runLinkTests();
     runWatchTests();

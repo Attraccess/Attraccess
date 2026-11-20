@@ -115,6 +115,10 @@ function mount(queries: { retry: number | false; retryDelay?: number } = { retry
     </QueryClientProvider>,
   );
 }
+async function inspect(id: number) {
+  await userEvent.click(await screen.findByRole('button', { name: new RegExp(`^Actions for .+ \\(#${id}\\)$`) }));
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'View event' }));
+}
 beforeEach(() => {
   // jsdom lacks the layout observers and animation API used by HeroUI's tabs.
   vi.stubGlobal(
@@ -154,7 +158,7 @@ describe('audit admin workflows', () => {
     async (label) => {
       const user = userEvent.setup();
       mount();
-      await screen.findByRole('button', { name: 'View event #52' });
+      await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
       const field = within(screen.getAllByRole('group', { name: label })[0]);
       const apply = screen.getByRole('button', { name: 'Apply filters' });
       for (const [segment, value] of [
@@ -220,7 +224,7 @@ describe('audit admin workflows', () => {
       nextCursor: null,
     });
     mount();
-    await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));
+    await inspect(52);
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText(
@@ -250,7 +254,7 @@ describe('audit admin workflows', () => {
       nextCursor: null,
     });
     mount();
-    await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));
+    await inspect(52);
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Password')).toBeInTheDocument();
     expect(within(dialog).getAllByText('Not recorded')).toHaveLength(2);
@@ -271,7 +275,7 @@ describe('audit admin workflows', () => {
       nextCursor: null,
     });
     mount();
-    await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));
+    await inspect(52);
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('["truncated')).toBeInTheDocument();
     expect(within(dialog).getAllByText('Current name; may have changed since this event')).toHaveLength(2);
@@ -281,7 +285,7 @@ describe('audit admin workflows', () => {
 
   it('opens a readable change comparison and exposes only changed fields', async () => {
     mount();
-    await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));
+    await inspect(52);
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('What changed')).toBeInTheDocument();
     expect(within(dialog).getByText('Enabled')).toBeInTheDocument();
@@ -308,7 +312,7 @@ describe('audit admin workflows', () => {
       nextCursor: null,
     });
     mount();
-    await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));
+    await inspect(52);
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Meter updated')).toBeInTheDocument();
     expect(within(dialog).getByText('Allocation')).toBeInTheDocument();
@@ -325,18 +329,18 @@ describe('audit admin workflows', () => {
       nextCursor: beforeId ? null : 51,
     }));
     mount();
-    await screen.findByRole('button', { name: 'View event #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     await userEvent.click(screen.getByRole('button', { name: 'Older' }));
-    await screen.findByRole('button', { name: 'View event #50' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#50\)$/ });
     await userEvent.click(screen.getByRole('button', { name: 'Newer' }));
-    await screen.findByRole('button', { name: 'View event #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     expect(list.mock.calls.some(([query]) => query.beforeId === 51)).toBe(true);
     expect(list.mock.calls.some(([query]) => query.beforeId === 0)).toBe(false);
   });
 
   it('validates IDs before applying filters and preserves the current result on invalid input', async () => {
     mount();
-    await screen.findByRole('button', { name: 'View event #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     await userEvent.click(screen.getByRole('button', { name: 'More filters' }));
     await userEvent.type(screen.getByLabelText('Actor ID'), '-1');
     await userEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
@@ -353,7 +357,7 @@ describe('audit admin workflows', () => {
   it('keeps the expanded filters after switching to the settings tab and back', async () => {
     // The Activity panel unmounts on a tab switch, so the disclosure state has to live above the tabs.
     mount();
-    await screen.findByRole('button', { name: 'View event #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     await userEvent.click(screen.getByRole('button', { name: 'More filters' }));
     expect(screen.getByLabelText('Actor ID')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('tab', { name: 'Logging settings' }));
@@ -365,7 +369,7 @@ describe('audit admin workflows', () => {
   it('clears partially typed dates when resetting all filters', async () => {
     const user = userEvent.setup();
     mount();
-    await screen.findByRole('button', { name: 'View event #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: 'resource.' } });
     await user.click(screen.getByRole('button', { name: 'Apply filters' }));
     await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ eventPrefix: 'resource.' })));
@@ -407,7 +411,7 @@ describe('audit admin workflows', () => {
   it('does not request or offer management settings to read-only audit users', async () => {
     permissions.delete('system.settings.manage');
     mount();
-    await screen.findByRole('button', { name: 'View event #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     expect(getSettings).not.toHaveBeenCalled();
     expect(screen.queryByRole('tab', { name: 'Logging settings' })).not.toBeInTheDocument();
   });
@@ -418,13 +422,13 @@ describe('audit admin workflows', () => {
     expect(await screen.findByText('Activity could not be loaded.')).toBeInTheDocument();
     expect(screen.queryByText('No activity found')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(await screen.findByRole('button', { name: 'View event #52' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ })).toBeInTheDocument();
   });
 
   it.each(['foo', 'nonsense.created'])('rejects the unknown event prefix %s before requesting it', async (prefix) => {
     const user = userEvent.setup();
     mount();
-    await screen.findByRole('button', { name: 'View event #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     // Wait for meta to settle, not just to be requested: before it loads, only the shape check applies.
     await waitFor(() => expect(client.getQueryState(UseAuditControllerMetaKeyFn())?.status).toBe('success'));
     fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: prefix } });
@@ -432,13 +436,13 @@ describe('audit admin workflows', () => {
     expect(await screen.findByText('Enter a valid event prefix.')).toBeInTheDocument();
     expect(list).not.toHaveBeenCalledWith(expect.objectContaining({ eventPrefix: prefix }));
     expect(screen.queryByText('Activity could not be loaded.')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'View event #52' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Actions for .+ \(#52\)$/ })).toBeInTheDocument();
   });
 
   it('shows the prefix validation message with a clear action when the API rejects the prefix', async () => {
     const user = userEvent.setup();
     mount();
-    await screen.findByRole('button', { name: 'View event #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     // The demo plugin was unloaded after meta loaded: the API no longer knows its prefix.
     list.mockRejectedValueOnce(
       new ApiError(
@@ -460,14 +464,14 @@ describe('audit admin workflows', () => {
     expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Clear filters' }));
-    expect(await screen.findByRole('button', { name: 'View event #52' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ })).toBeInTheDocument();
     expect(list.mock.lastCall?.[0]).not.toHaveProperty('eventPrefix');
   });
 
   it('does not retry a rejected event prefix, so the message shows without the retry backoff', async () => {
     const user = userEvent.setup();
     mount({ retry: 3, retryDelay: 0 });
-    await screen.findByRole('button', { name: 'View event #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     list.mockRejectedValue(
       new ApiError(
         { method: 'GET', url: '/api/audit' },
@@ -492,14 +496,14 @@ describe('audit admin workflows', () => {
     let resolveMeta: (value: AuditMetaDto) => void = () => undefined;
     getMeta.mockReturnValue(new Promise<AuditMetaDto>((resolve) => (resolveMeta = resolve)));
     mount();
-    await screen.findByRole('button', { name: 'View event #52' });
+    await screen.findByRole('button', { name: /^Actions for .+ \(#52\)$/ });
     fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: 'foo' } });
     await user.click(screen.getByRole('button', { name: 'Apply filters' }));
     await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ eventPrefix: 'foo' })));
     const requestsBefore = list.mock.calls.length;
     resolveMeta(meta);
     expect(await screen.findByText('Enter a valid event prefix.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'View event #52' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Actions for .+ \(#52\)$/ })).not.toBeInTheDocument();
     expect(list).toHaveBeenCalledTimes(requestsBefore);
     // The list query is off, not failed, so only the filter error keeps the export from running unfiltered.
     expect(screen.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
@@ -696,7 +700,7 @@ it('shows a global flow audit entry with its recorded flow name and a readable p
     nextCursor: null,
   });
   mount();
-  await userEvent.click(await screen.findByRole('button', { name: 'View event #31' }));
+  await inspect(31);
   const dialog = await screen.findByRole('dialog');
   expect(within(dialog).getAllByText('Global flow deleted').length).toBeGreaterThan(0);
   expect(within(dialog).getAllByText('Door bell').length).toBeGreaterThan(0);
