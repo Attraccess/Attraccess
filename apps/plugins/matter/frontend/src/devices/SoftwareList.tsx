@@ -2,6 +2,7 @@ import { EmptyState, StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { Card, Spinner } from '@heroui/react';
 import { useMatterTranslations } from '../i18n';
 import { nodeLabel, softwareLabel } from './nodeLabel';
+import { RetryButton } from './RetryButton';
 import { useNodes } from './useNodes';
 
 /** The current software of every device, from the inventory. Update availability comes with OTA (ATT-1015). */
@@ -20,10 +21,11 @@ export function SoftwareList({ enabled }: Readonly<{ enabled: boolean }>) {
         {nodes.loading && <Spinner size="sm" />}
         {nodes.error && (
           <StatusAlert status="danger" title={t('devices.loadError')} data-cy="matter-software-error">
-            {nodes.error}
+            <span className="mt:block">{nodes.error}</span>
+            <RetryButton onRetry={nodes.refetch} data-cy="matter-software-retry" />
           </StatusAlert>
         )}
-        {!nodes.loading && !nodes.error && rows.length === 0 && <EmptyState message={t('devices.empty')} />}
+        {!nodes.loading && !nodes.error && rows.length === 0 && <EmptyState message={t('devices.noDevices')} />}
         <ul className="mt:flex mt:flex-col mt:divide-y mt:divide-separator">
           {rows.map((node) => (
             <li

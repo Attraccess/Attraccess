@@ -12,7 +12,7 @@ import {
 import { useMatterTranslations } from '../i18n';
 import type { LifecycleState } from './api';
 
-/** `active`: unclaimed, claimed and detached (all of them, unless archived and removed are included). */
+/** `active`: unclaimed, claimed and detached; every device when archived and removed are included. */
 export type LifecycleFilterValue = 'active' | LifecycleState;
 
 const ACTIVE_OPTIONS: LifecycleFilterValue[] = ['active', 'unclaimed', 'claimed', 'detached'];
@@ -41,6 +41,9 @@ export function LifecycleFilter({
 }>) {
   const { t } = useMatterTranslations();
   const options = includeInactive ? ALL_OPTIONS : ACTIVE_OPTIONS;
+  // With archived and removed included, `active` lists every device: it is labelled "All" then.
+  const labelOf = (option: LifecycleFilterValue) =>
+    t(option === 'active' && includeInactive ? 'devices.filter.all' : `devices.filter.${option}`);
   return (
     <div className="mt:flex mt:flex-wrap mt:items-end mt:gap-4">
       <Select
@@ -57,8 +60,8 @@ export function LifecycleFilter({
         <SelectPopover>
           <ListBox>
             {options.map((option) => (
-              <ListBoxItem key={option} id={option} textValue={t(`devices.filter.${option}`)}>
-                {t(`devices.filter.${option}`)}
+              <ListBoxItem key={option} id={option} textValue={labelOf(option)}>
+                {labelOf(option)}
               </ListBoxItem>
             ))}
           </ListBox>

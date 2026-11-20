@@ -1,4 +1,4 @@
-import { StatusDialog } from '@attraccess/plugins-frontend-ui';
+import { StatusAlert, StatusDialog } from '@attraccess/plugins-frontend-ui';
 import {
   Label,
   ListBox,
@@ -10,11 +10,12 @@ import {
   SelectValue,
   Spinner,
 } from '@heroui/react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useMatterTranslations } from '../i18n';
 import { useMatterResource } from '../useMatterResource';
 import { listNodes, type MatterNodeSummary } from './api';
-import { identityMismatch, nodeLabel } from './nodeLabel';
+import { identityMismatch } from './lifecycle';
+import { nodeLabel } from './nodeLabel';
 
 /**
  * Relinks a detached device to the unclaimed device that took its place. Step one picks that source. When vendor,
@@ -39,16 +40,17 @@ export function RelinkDialog({
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
 
+  // However the dialog was closed (cancel, or the parent after a relink failed), the next open starts at the picker.
+  useEffect(() => {
+    if (isOpen) return;
+    setSourceId(null);
+    setConfirming(false);
+  }, [isOpen]);
+
   const fallback = (nodeId: string) => t('devices.nodeFallback', { nodeId });
   const sources = (data ?? []).filter((node) => node.lifecycleState === 'unclaimed' && node.id !== target.id);
   const source = sources.find((node) => node.id === sourceId);
   const mismatch = source ? identityMismatch(target.identity, source.identity) : [];
-
-  const close = () => {
-    setSourceId(null);
-    setConfirming(false);
-    onClose();
-  };
 
   if (confirming && source) {
     return (
@@ -78,7 +80,7 @@ export function RelinkDialog({
       isOpen={isOpen}
       status="info"
       title={t('devices.relink.title')}
-      onClose={close}
+      onClose={onClose}
       action={{
         label: t('devices.relink.next'),
         isPending: busy,
@@ -91,11 +93,14 @@ export function RelinkDialog({
       <div className="mt:flex mt:flex-col mt:gap-3">
         <p>{t('devices.relink.text')}</p>
         {loading && <Spinner size="sm" />}
-        {error && <p className="mt:text-danger">{error}</p>}
+        {error && (
+          <StatusAlert status="danger" title={t('devices.loadError')} data-cy="matter-relink-error">
+            {error}
+          </StatusAlert>
+        )}
         {!loading && !error && sources.length === 0 && <p data-cy="matter-relink-none">{t('devices.relink.none')}</p>}
         {sources.length > 0 && (
           <Select
-            aria-label={t('devices.relink.source')}
             value={sourceId}
             onChange={(key) => setSourceId(key === null ? null : String(key))}
             placeholder={t('devices.relink.source')}

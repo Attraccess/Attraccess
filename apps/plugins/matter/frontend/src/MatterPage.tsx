@@ -4,7 +4,7 @@ import { CableIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useMatterTranslations } from './i18n';
-import { MatterConnectionProvider, type MatterConnectionValue } from './MatterConnectionContext';
+import { MatterConnectionProvider } from './MatterConnectionContext';
 import { MatterDegradedBanner } from './MatterDegradedBanner';
 import { MATTER_BASE_PATH } from './matterPaths';
 import { MATTER_TABS } from './matterTabs';
@@ -24,26 +24,18 @@ import { useMatterPage } from './useMatterPage';
 export function MatterPage() {
   const { t } = useMatterTranslations();
   const permissions = useMatterPermissions();
-  const connection = useMatterPage(permissions);
   const location = useLocation();
   const visible = useMemo(() => MATTER_TABS.filter((tab) => tab.isVisible(permissions)), [permissions]);
+  const active = activeMatterTab(visible, location.pathname);
+  // The settings are polled only while the tab that edits them is open.
+  const connection = useMatterPage(permissions, active?.key === 'infrastructure');
   const items = useMemo<RoutedTabItem[]>(
     () => visible.map((tab) => ({ key: tab.key, label: t(`tabs.${tab.key}`), icon: tab.icon, path: tab.path })),
     [visible, t],
   );
-  const value = useMemo<MatterConnectionValue>(
-    () => ({
-      status: connection.status,
-      statusError: connection.statusError,
-      settings: connection.settings,
-      settingsError: connection.settingsError,
-      loading: connection.loading,
-      save: connection.save,
-      remove: connection.remove,
-      retryNow: connection.retryNow,
-    }),
-    [connection],
-  );
+  // The same element while the tab stays: a status poll re-renders the layout, not the whole tab.
+  const Content = active?.Content;
+  const content = useMemo(() => (Content ? <Content /> : null), [Content]);
 
   const header = (
     <PageHeader
@@ -72,18 +64,16 @@ export function MatterPage() {
     );
   }
 
-  const active = activeMatterTab(visible, location.pathname);
   if (!active) return <Navigate to={`${MATTER_BASE_PATH}/${visible[0].path}`} replace />;
 
-  const { Content } = active;
   return (
-    <MatterConnectionProvider value={value}>
+    <MatterConnectionProvider value={connection}>
       {shell(
         <>
           <MatterDegradedBanner permissions={permissions} onInfrastructure={active.key === 'infrastructure'} />
           <RoutedTabs items={items} basePath={MATTER_BASE_PATH} aria-label={t('tabs.label')} data-cy="matter-tabs" />
           <div className="mt:min-w-0" data-cy={`matter-tab-${active.key}`}>
-            <Content />
+            {content}
           </div>
         </>,
       )}

@@ -11,12 +11,11 @@ import {
   type MatterNodeSummary,
 } from './api';
 import { ClaimDialog } from './ClaimDialog';
-import { ACTIONS_BY_STATE, type LifecycleAction } from './nodeLabel';
+import { ACTIONS_BY_STATE, needsResolution, type LifecycleAction } from './lifecycle';
 import { RelinkDialog } from './RelinkDialog';
+import { errorMessage } from '../errorMessage';
 
 type Dialog = LifecycleAction | { error: string } | null;
-
-const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /** Actions that need a confirmation text of their own; claim and relink have richer dialogs. */
 const CONFIRMED = {
@@ -25,6 +24,12 @@ const CONFIRMED = {
   restore: { status: 'info', run: (id: string) => restoreNode(id) },
   forceRemove: { status: 'error', run: (id: string) => forceRemoveNode(id) },
 } as const;
+
+/** Danger for force-remove; the action that resolves an unclaimed or detached device stands out; the rest is secondary. */
+function variantOf(action: LifecycleAction, resolving: boolean): 'danger-soft' | 'primary' | 'secondary' {
+  if (action === 'forceRemove') return 'danger-soft';
+  return resolving && (action === 'claim' || action === 'repair') ? 'primary' : 'secondary';
+}
 
 /**
  * The lifecycle buttons of one device and their confirmations (`StatusDialog`). Only the actions its state allows are
@@ -48,7 +53,7 @@ export function LifecycleActions({
       setDialog(null);
       onChanged();
     } catch (error) {
-      setDialog({ error: messageOf(error) });
+      setDialog({ error: errorMessage(error) });
     } finally {
       setBusy(false);
     }
@@ -63,13 +68,8 @@ export function LifecycleActions({
         <Button
           key={action}
           size="sm"
-          variant={
-            action === 'forceRemove'
-              ? 'danger-soft'
-              : action === 'claim' || action === 'repair'
-                ? 'primary'
-                : 'secondary'
-          }
+          variant={variantOf(action, needsResolution(node.lifecycleState))}
+          aria-label={t('devices.actionFor', { action: t(`devices.actions.${action}`), name })}
           onPress={() => setDialog(action)}
           data-cy={`matter-action-${action}`}
         >

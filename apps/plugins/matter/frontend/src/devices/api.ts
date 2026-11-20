@@ -100,6 +100,8 @@ export interface StateEntry {
   stateKey: string;
   reported: { value: unknown; observedAt: string | null; receivedAt: string | null };
   freshness: 'fresh' | 'stale' | 'unknown';
+  /** How long after `reported.observedAt` the entry turns stale. */
+  staleAfterMs?: number;
   requested: { value: unknown; requestedAt: string | null };
   command: { state: string };
   confirmed: boolean;

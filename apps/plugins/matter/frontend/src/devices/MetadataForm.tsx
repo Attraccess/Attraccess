@@ -3,13 +3,12 @@ import { Description, FieldError, Form, Input, Label, TextArea, TextField } from
 import { useState, type FormEvent } from 'react';
 import { useMatterTranslations } from '../i18n';
 import type { Metadata } from './api';
+import { errorMessage } from '../errorMessage';
 
 export type MetadataField = keyof Metadata;
 
 /** The backend's limits (backend/devices/schemas.ts). */
 export const METADATA_LIMITS: Record<MetadataField, number> = { displayName: 100, description: 500, location: 100 };
-
-const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /**
  * Inline editor for a device's or endpoint's name, description and location (`fields` picks which). Validates the
@@ -60,7 +59,7 @@ export function MetadataForm({
     try {
       await onSave(changes);
     } catch (failure) {
-      setError(messageOf(failure));
+      setError(errorMessage(failure));
     } finally {
       setBusy(false);
     }

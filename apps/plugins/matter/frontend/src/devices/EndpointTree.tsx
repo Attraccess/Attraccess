@@ -1,5 +1,6 @@
-import type { MatterEndpointDetail, Metadata } from './api';
-import { EndpointCard } from './EndpointCard';
+import type { MatterEndpointDetail } from './api';
+import { EndpointBranch } from './EndpointBranch';
+import type { EndpointCardOptions } from './EndpointTreeProps';
 
 /** Endpoints grouped under their parent (`parentEndpointId`); an endpoint whose parent is not listed is a root. */
 export function buildEndpointTree(endpoints: readonly MatterEndpointDetail[]) {
@@ -14,52 +15,14 @@ export function buildEndpointTree(endpoints: readonly MatterEndpointDetail[]) {
   return children;
 }
 
-function Branch({
-  parent,
-  tree,
-  ...rest
-}: Readonly<{
-  parent: number | null;
-  tree: Map<number | null, MatterEndpointDetail[]>;
-  bridgeName: string;
-  canEdit: boolean;
-  canRead: boolean;
-  onRename: (endpointRef: string, changes: Partial<Metadata>) => Promise<unknown>;
-}>) {
-  const list = tree.get(parent) ?? [];
-  if (list.length === 0) return null;
-  return (
-    <ul
-      className={
-        parent === null
-          ? 'mt:flex mt:flex-col mt:gap-3'
-          : 'mt:ml-3 mt:flex mt:flex-col mt:gap-3 mt:border-l mt:border-separator mt:pl-3'
-      }
-    >
-      {list.map((endpoint) => (
-        <li key={endpoint.id} className="mt:flex mt:flex-col mt:gap-3">
-          <EndpointCard endpoint={endpoint} {...rest} />
-          <Branch parent={endpoint.endpointId} tree={tree} {...rest} />
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 /** The endpoint hierarchy of a node as a nested tree of endpoint cards. */
 export function EndpointTree({
   endpoints,
-  ...rest
-}: Readonly<{
-  endpoints: readonly MatterEndpointDetail[];
-  bridgeName: string;
-  canEdit: boolean;
-  canRead: boolean;
-  onRename: (endpointRef: string, changes: Partial<Metadata>) => Promise<unknown>;
-}>) {
+  ...options
+}: Readonly<{ endpoints: readonly MatterEndpointDetail[] } & EndpointCardOptions>) {
   return (
     <div data-cy="matter-endpoint-tree">
-      <Branch parent={null} tree={buildEndpointTree(endpoints)} {...rest} />
+      <EndpointBranch parent={null} tree={buildEndpointTree(endpoints)} {...options} />
     </div>
   );
 }

@@ -1,23 +1,16 @@
 import { DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
 import { Button, Card } from '@heroui/react';
 import { useNavigate } from 'react-router-dom';
+import { Fact } from '../Fact';
 import { useMatterTranslations } from '../i18n';
 import { matterDevicePath } from '../matterPaths';
 import type { MatterNodeSummary } from './api';
 import { LifecycleActions } from './LifecycleActions';
 import { LifecycleChip } from './LifecycleChip';
-import { needsResolution, nodeLabel, softwareLabel } from './nodeLabel';
+import { needsResolution } from './lifecycle';
+import { nodeLabel, softwareLabel } from './nodeLabel';
 import { ReachabilityChip } from './ReachabilityChip';
 import { ResolutionCallout } from './ResolutionCallout';
-
-function Fact({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
-  return (
-    <div className="mt:flex mt:min-w-0 mt:flex-col">
-      <dt className="mt:text-xs mt:text-muted">{label}</dt>
-      <dd className="mt:break-words">{children}</dd>
-    </div>
-  );
-}
 
 /**
  * One device in the list. An unclaimed or detached device carries its explanation and only the actions that resolve
@@ -74,6 +67,7 @@ export function NodeCard({
             size="sm"
             variant="tertiary"
             onPress={() => navigate(matterDevicePath(node.id))}
+            aria-label={t('devices.detailsFor', { name })}
             data-cy="matter-node-open"
           >
             {t('devices.details')}

@@ -6,7 +6,8 @@ import { useMatterPermissions } from '../permissions';
 import { LifecycleFilter, matchesFilter, type LifecycleFilterValue } from './LifecycleFilter';
 import { NodeCard } from './NodeCard';
 import { RetryButton } from './RetryButton';
-import { nodeLabel, sortNodes } from './nodeLabel';
+import { sortNodes } from './lifecycle';
+import { nodeLabel } from './nodeLabel';
 import { ReconciliationCard } from './ReconciliationCard';
 import { useNodes } from './useNodes';
 import { useReconciliation } from './useReconciliation';
@@ -56,7 +57,7 @@ export function DeviceList() {
       )}
       {!nodes.loading && !nodes.error && shown.length === 0 && (
         <div data-cy="matter-devices-empty">
-          <EmptyState message={t('devices.empty')} />
+          <EmptyState message={t((nodes.data ?? []).length === 0 ? 'devices.noDevices' : 'devices.empty')} />
         </div>
       )}
       <ul className="mt:flex mt:flex-col mt:gap-3">
@@ -66,7 +67,13 @@ export function DeviceList() {
           </li>
         ))}
       </ul>
-      <ReconciliationCard resource={reconciliation} canManage={canManage} />
+      <ReconciliationCard
+        data={reconciliation.data}
+        error={reconciliation.error}
+        loading={reconciliation.loading}
+        onRefresh={reconciliation.refetch}
+        canManage={canManage}
+      />
     </div>
   );
 }

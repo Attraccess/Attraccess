@@ -1,35 +1,39 @@
 import { Button, DateTimeDisplay, StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { Card, Chip, Spinner } from '@heroui/react';
 import { useState } from 'react';
+import { errorMessage } from '../errorMessage';
+import { HEALTH_LEVEL_COLOR, reconciliationLevel } from '../healthLevel';
 import { useMatterTranslations } from '../i18n';
 import { runReconciliation, type ReconciliationStatus } from './api';
-import type { MatterResource } from '../useMatterResource';
-
-const RESULT_COLOR = {
-  applied: 'success',
-  skipped_unavailable: 'warning',
-  skipped_non_authoritative: 'warning',
-  failed: 'danger',
-} as const;
+import { RetryButton } from './RetryButton';
 
 /** The outcome of the last reconciliation with the sidecar's inventory, and "Run reconciliation now" (manage). */
 export function ReconciliationCard({
-  resource,
+  data,
+  error,
+  loading,
+  onRefresh,
   canManage,
-}: Readonly<{ resource: MatterResource<ReconciliationStatus>; canManage: boolean }>) {
+}: Readonly<{
+  data: ReconciliationStatus | null;
+  error: string | null;
+  loading: boolean;
+  /** Reads the status again: after a run, and from "Try again" under a load error. */
+  onRefresh: () => Promise<unknown>;
+  canManage: boolean;
+}>) {
   const { t } = useMatterTranslations();
   const [running, setRunning] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
-  const { data, error, loading, refetch } = resource;
 
   const run = async () => {
     setRunning(true);
     setFailure(null);
     try {
       await runReconciliation();
-      await refetch();
+      await onRefresh();
     } catch (cause) {
-      setFailure(cause instanceof Error ? cause.message : String(cause));
+      setFailure(errorMessage(cause));
     } finally {
       setRunning(false);
     }
@@ -48,7 +52,8 @@ export function ReconciliationCard({
             title={t('devices.reconciliation.loadError')}
             data-cy="matter-reconciliation-error"
           >
-            {error}
+            <span className="mt:block">{error}</span>
+            <RetryButton onRetry={onRefresh} data-cy="matter-reconciliation-retry" />
           </StatusAlert>
         )}
         {data && (
@@ -58,7 +63,7 @@ export function ReconciliationCard({
           >
             {data.lastResult ? (
               <>
-                <Chip color={RESULT_COLOR[data.lastResult]} variant="soft">
+                <Chip color={HEALTH_LEVEL_COLOR[reconciliationLevel(data.lastResult)]} variant="soft">
                   {t(`devices.reconciliation.result.${data.lastResult}`)}
                 </Chip>
                 <span>
@@ -66,10 +71,8 @@ export function ReconciliationCard({
                 </span>
                 {data.lastSummary && (
                   <span className="mt:text-muted">
-                    {t('devices.reconciliation.summary', {
-                      nodes: data.lastSummary.nodesListed,
-                      changes: data.lastSummary.changeCount,
-                    })}
+                    {t('devices.reconciliation.nodesListed', { count: data.lastSummary.nodesListed })},{' '}
+                    {t('devices.reconciliation.changes', { count: data.lastSummary.changeCount })}
                   </span>
                 )}
               </>

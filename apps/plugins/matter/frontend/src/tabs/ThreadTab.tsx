@@ -1,4 +1,4 @@
-import { Button, Card } from '@heroui/react';
+import { Card, Link } from '@heroui/react';
 import { CpuIcon, NetworkIcon, RadioTowerIcon, ShieldCheckIcon, StethoscopeIcon } from 'lucide-react';
 import { useMatterTranslations } from '../i18n';
 import { FamilyNotice } from './FamilyNotice';
@@ -33,14 +33,10 @@ export function ThreadTab() {
         <Card.Content className="mt:flex mt:flex-col mt:gap-3">
           <p>{t('thread.coexistenceText')}</p>
           <div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onPress={() => window.open(t('thread.docsUrl'), '_blank', 'noopener,noreferrer')}
-              data-cy="matter-thread-docs"
-            >
+            <Link href={t('thread.docsUrl')} target="_blank" rel="noopener noreferrer" data-cy="matter-thread-docs">
               {t('thread.docs')}
-            </Button>
+              <Link.Icon />
+            </Link>
           </div>
         </Card.Content>
       </Card>

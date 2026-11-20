@@ -1,6 +1,12 @@
 // Fixtures for the Matter page specs: a connection status, nodes, endpoints and state entries as the REST API returns them.
 import type { ConnectionSettings, ConnectionStatus } from '../api';
-import type { MatterEndpointDetail, MatterNodeDetail, MatterNodeSummary, StateEntry } from '../devices/api';
+import type {
+  MatterEndpointDetail,
+  MatterNodeDetail,
+  MatterNodeSummary,
+  ReconciliationStatus,
+  StateEntry,
+} from '../devices/api';
 
 export const SUPPORTED = {
   wireVersion: 1,
@@ -112,5 +118,16 @@ export const stateEntry = (overrides: Partial<StateEntry> = {}): StateEntry => (
   confirmed: false,
   fault: null,
   uncertainActuation: false,
+  ...overrides,
+});
+
+/** A reconciliation status; by default no run yet. */
+export const reconciliation = (overrides: Partial<ReconciliationStatus> = {}): ReconciliationStatus => ({
+  lastStartedAt: null,
+  lastFinishedAt: null,
+  lastResult: null,
+  lastSummary: null,
+  sidecarFabricId: null,
+  events: {},
   ...overrides,
 });

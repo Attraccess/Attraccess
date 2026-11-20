@@ -321,7 +321,7 @@
     "infrastructure": "Infrastruktur",
     "thread": "Thread-Netzwerk",
     "commissioning": "Inbetriebnahme",
-    "health": "Zustand",
+    "health": "Systemzustand",
     "updates": "Software-Updates"
   },
   "banner": {
@@ -335,7 +335,6 @@
       "misconfigured": "Matter-Verbindung ist falsch konfiguriert"
     },
     "since": {
-      "not_configured": "Nicht konfiguriert seit {{time}}.",
       "connecting": "Verbindungsaufbau seit {{time}}.",
       "unavailable": "Nicht erreichbar seit {{time}}.",
       "unauthorized": "Abgelehnt seit {{time}}.",
@@ -413,8 +412,11 @@
     "endpoints": "Endpunkte",
     "lastSeen": "Zuletzt gesehen",
     "details": "Details",
+    "detailsFor": "Details: {{name}}",
+    "actionFor": "{{action}}: {{name}}",
     "back": "Alle Geräte",
-    "empty": "Keine passenden Geräte.",
+    "empty": "Keine Geräte passen zu diesem Filter.",
+    "noDevices": "Noch keine Matter-Geräte. Geräte erscheinen hier, sobald sie in Betrieb genommen sind und der Sidecar sie meldet.",
     "loadError": "Die Geräte konnten nicht geladen werden.",
     "detailError": "Das Gerät konnte nicht geladen werden.",
     "retry": "Erneut versuchen",
@@ -452,7 +454,8 @@
     },
     "bridge": {
       "aggregator": "Bridge",
-      "behind": "Hinter Bridge {{bridge}}"
+      "behind": "Hinter Bridge {{bridge}}",
+      "reportedAs": "Gerät hinter der Bridge: {{name}}"
     },
     "claim": {
       "title": "Gerät übernehmen",
@@ -486,7 +489,7 @@
       "relink": "Neu verknüpfen",
       "archive": "Archivieren",
       "restore": "Wiederherstellen",
-      "forceRemove": "Erzwungen entfernen"
+      "forceRemove": "Entfernen erzwingen"
     },
     "confirm": {
       "repair": {
@@ -502,13 +505,14 @@
         "text": "Das Gerät kehrt als getrennt zurück. Der nächste Abgleich verbindet es wieder, wenn der Sidecar es noch listet."
       },
       "forceRemove": {
-        "title": "{{name}} erzwungen entfernen?",
+        "title": "Entfernen von {{name}} erzwingen?",
         "text": "Das entfernt das Gerät nur aus Attraccess. Es setzt das Gerät nicht auf Werkseinstellungen zurück und entfernt es nicht aus der Matter-Fabric. Listet der Sidecar es noch, kommt es als neues, nicht übernommenes Gerät zurück."
       }
     },
     "filter": {
       "label": "Anzeigen",
       "active": "Alle aktiven",
+      "all": "Alle",
       "unclaimed": "Nicht übernommen",
       "claimed": "Übernommen",
       "detached": "Getrennt",
@@ -523,7 +527,14 @@
       "lastRun": "Letzter Lauf",
       "never": "Noch kein Abgleich",
       "run": "Abgleich jetzt ausführen",
-      "summary": "{{nodes}} Geräte gelistet, {{changes}} Änderungen",
+      "nodesListed": {
+        "one": "{{count}} Gerät gelistet",
+        "many": "{{count}} Geräte gelistet"
+      },
+      "changes": {
+        "one": "{{count}} Änderung",
+        "many": "{{count}} Änderungen"
+      },
       "result": {
         "applied": "Angewendet",
         "skipped_unavailable": "Übersprungen: Sidecar nicht verfügbar",
@@ -542,7 +553,8 @@
       "location": "Ort",
       "maxLength": "Höchstens {{max}} Zeichen.",
       "save": "Speichern",
-      "claimFirst": "Übernimm das Gerät, um es zu benennen."
+      "claimFirst": "Übernimm das Gerät, um es zu benennen.",
+      "resolveFirst": "Repariere oder verknüpfe das Gerät neu, um es zu bearbeiten."
     },
     "endpoint": {
       "title": "Endpunkte",
@@ -567,6 +579,8 @@
     "state": {
       "none": "Noch kein Zustand gemeldet.",
       "noValue": "Kein Wert",
+      "complexValue": "Strukturierter Wert",
+      "notLive": "Nicht live",
       "yes": "Ja",
       "no": "Nein",
       "observed": "Beobachtet",
@@ -580,7 +594,7 @@
       },
       "keys": {
         "onOff": {
-          "onOff": "Strom"
+          "onOff": "Ein/Aus"
         },
         "booleanState": {
           "stateValue": "Kontakt"
@@ -602,7 +616,7 @@
           "reachable": "Erreichbar"
         },
         "levelControl": {
-          "currentLevel": "Helligkeit"
+          "currentLevel": "Stufe"
         }
       },
       "values": {
@@ -728,7 +742,11 @@
       "unknown": "Unbekannt",
       "last": "Letztes Backup",
       "noneYet": "noch keins",
-      "age": "vor {{days}} Tagen",
+      "age": {
+        "one": "vor {{count}} Tag",
+        "many": "vor {{count}} Tagen"
+      },
+      "today": "heute",
       "next": "Nächstes geplant"
     },
     "reconciliation": {

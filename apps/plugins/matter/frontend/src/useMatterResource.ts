@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { errorMessage } from './errorMessage';
 
 export interface MatterResource<T> {
   data: T | null;
@@ -9,8 +10,6 @@ export interface MatterResource<T> {
   /** Loads again. Resolves with the data (or null on failure). Only the newest request may update the state. */
   refetch: () => Promise<T | null>;
 }
-
-const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /**
  * One REST read with its own loading and error state, so a failing request blanks nothing but its own section. It
@@ -40,7 +39,7 @@ export function useMatterResource<T>(load: () => Promise<T>, enabled = true): Ma
       setError(null);
       return next;
     } catch (failure) {
-      if (mounted.current && mine === sequence.current) setError(messageOf(failure));
+      if (mounted.current && mine === sequence.current) setError(errorMessage(failure));
       return null;
     } finally {
       if (mounted.current && mine === sequence.current) setLoading(false);

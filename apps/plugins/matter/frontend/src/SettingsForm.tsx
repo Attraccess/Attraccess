@@ -7,6 +7,7 @@ import { CaField } from './settings/CaField';
 import { CredentialField } from './settings/CredentialField';
 import { SettingsDialogs, type SettingsNotice } from './settings/SettingsDialogs';
 import { useSettingsDraft } from './settings/useSettingsDraft';
+import { errorMessage } from './errorMessage';
 
 type Props = Readonly<{
   /** The settings as the server has them now. They are polled: a change made elsewhere arrives here as a new value. */
@@ -15,8 +16,6 @@ type Props = Readonly<{
   onSave: (input: SettingsInput) => Promise<ConnectionSettings>;
   onRemove: () => Promise<void>;
 }>;
-
-const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 const EMPTY: ConnectionSettings = {
   url: null,
@@ -42,11 +41,16 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
   const draft = useSettingsDraft(settings, busy);
   const saveRef = useRef<HTMLButtonElement>(null);
   const removeRef = useRef<HTMLButtonElement>(null);
+  const urlRef = useRef<HTMLInputElement>(null);
+
+  // The browser may have dropped the focus meanwhile (the button was disabled while the request ran, or it is gone), so
+  // the focus is put back explicitly, after the dialog has closed.
+  const focusLater = (target: RefObject<HTMLElement | null>) => setTimeout(() => target.current?.focus(), 0);
 
   /** Closes a dialog and puts the focus back where the action started. */
-  const closeNotice = (returnTo: RefObject<HTMLButtonElement | null>) => {
+  const closeNotice = (returnTo: RefObject<HTMLElement | null>) => {
     setNotice(null);
-    setTimeout(() => returnTo.current?.focus(), 0);
+    focusLater(returnTo);
   };
 
   const submit = async (event: FormEvent) => {
@@ -56,7 +60,7 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
       draft.load(await onSave(draft.input()));
       setNotice({ kind: 'saved' });
     } catch (error) {
-      setNotice({ kind: 'error', title: t('form.saveError'), message: messageOf(error) });
+      setNotice({ kind: 'error', title: t('form.saveError'), message: errorMessage(error), returnTo: 'save' });
     } finally {
       setBusy(false);
     }
@@ -68,8 +72,10 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
     try {
       await onRemove();
       draft.load(EMPTY);
+      // Remove is gone now (nothing is configured): the focus goes to the URL, where the next step starts.
+      focusLater(urlRef);
     } catch (error) {
-      setNotice({ kind: 'error', title: t('form.removeError'), message: messageOf(error) });
+      setNotice({ kind: 'error', title: t('form.removeError'), message: errorMessage(error), returnTo: 'remove' });
     } finally {
       setBusy(false);
     }
@@ -97,14 +103,30 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
           isInvalid={draft.urlError !== null}
         >
           <Label>{t('form.url')}</Label>
-          <Input placeholder={t('form.urlPlaceholder')} autoComplete="off" data-cy="matter-url-input" />
+          <Input ref={urlRef} placeholder={t('form.urlPlaceholder')} autoComplete="off" data-cy="matter-url-input" />
           <Description>{t('form.urlDescription')}</Description>
           {draft.urlError && (
             <FieldError data-cy="matter-url-error">{t(`form.validation.${draft.urlError}`)}</FieldError>
           )}
         </TextField>
-        <CredentialField draft={draft} />
-        <CaField draft={draft} />
+        <CredentialField
+          configured={draft.base.credentialConfigured}
+          configuredAt={draft.base.credentialUpdatedAt}
+          needed={draft.needsCredential}
+          endpointChanged={draft.endpointChanged}
+          value={draft.credential}
+          error={draft.credentialError}
+          onChange={draft.setCredential}
+          onReplacingChange={draft.setReplacing}
+        />
+        <CaField
+          value={draft.ca}
+          stored={draft.base.caCertificate !== null}
+          cleared={draft.caCleared}
+          error={draft.caError}
+          onChange={draft.setCa}
+          onClearedChange={draft.setCaCleared}
+        />
         <div className="mt:flex mt:flex-wrap mt:gap-2">
           <Button ref={saveRef} type="submit" isDisabled={!draft.canSave} isPending={busy} data-cy="matter-save">
             {t('form.save')}
@@ -126,6 +148,7 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
         notice={notice}
         busy={busy}
         onCloseSaved={() => closeNotice(saveRef)}
+        onCloseError={() => closeNotice(notice?.kind === 'error' && notice.returnTo === 'remove' ? removeRef : saveRef)}
         onCloseRemove={() => closeNotice(removeRef)}
         onConfirmRemove={remove}
       />

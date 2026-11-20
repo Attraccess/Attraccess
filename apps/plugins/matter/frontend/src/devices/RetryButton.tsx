@@ -1,4 +1,4 @@
-import { Button } from '@heroui/react';
+import { Button } from '@attraccess/plugins-frontend-ui';
 import { useState } from 'react';
 import { useMatterTranslations } from '../i18n';
 

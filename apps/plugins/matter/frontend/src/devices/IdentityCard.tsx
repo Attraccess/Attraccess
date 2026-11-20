@@ -1,17 +1,9 @@
 import { DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
 import { Card } from '@heroui/react';
+import { Fact } from '../Fact';
 import { useMatterTranslations } from '../i18n';
 import type { MatterNodeSummary } from './api';
 import { softwareLabel } from './nodeLabel';
-
-function Fact({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
-  return (
-    <div className="mt:flex mt:min-w-0 mt:flex-col">
-      <dt className="mt:text-xs mt:text-muted">{label}</dt>
-      <dd className="mt:break-words">{children}</dd>
-    </div>
-  );
-}
 
 /** What the device reports about itself: vendor, product, serial, versions and attestation. Read-only. */
 export function IdentityCard({ node }: Readonly<{ node: MatterNodeSummary }>) {

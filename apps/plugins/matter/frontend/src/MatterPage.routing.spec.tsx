@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, configure, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { configuredSettings, node, status } from './test-utils/fixtures';
+import { configuredSettings, node, reconciliation, status } from './test-utils/fixtures';
 import { ALL_KEYS, renderMatter, signIn } from './test-utils/renderMatter';
 
 const api = vi.hoisted(() => ({
@@ -40,20 +40,14 @@ vi.mock('./fabric-backup/FabricBackupSection', () => ({
 configure({ testIdAttribute: 'data-cy' });
 
 const where = () => screen.getByTestId('location').textContent;
+const navigation = () => screen.getByTestId('location').getAttribute('data-navigation');
 const tabNames = () => screen.getAllByRole('tab').map((tab) => tab.textContent);
 
 beforeEach(() => {
   api.getStatus.mockResolvedValue(status());
   api.getSettings.mockResolvedValue(configuredSettings);
   devices.listNodes.mockResolvedValue([]);
-  devices.getReconciliation.mockResolvedValue({
-    lastStartedAt: null,
-    lastFinishedAt: null,
-    lastResult: null,
-    lastSummary: null,
-    sidecarFabricId: null,
-    events: {},
-  });
+  devices.getReconciliation.mockResolvedValue(reconciliation());
   fabric.getFabricStatus.mockRejectedValue(new Error('not needed'));
   signIn(...ALL_KEYS);
 });
@@ -84,6 +78,7 @@ describe('tabs and permissions', () => {
       ['Devices', 'Infrastructure', 'Health', 'Software Updates'],
     ],
     [['thread.network.read'], ['Thread Network', 'Health']],
+    [['matter.devices.commission'], ['Commissioning']],
     [
       ['matter.devices.read', 'matter.devices.commission'],
       ['Devices', 'Infrastructure', 'Commissioning', 'Health', 'Software Updates'],
@@ -144,6 +139,61 @@ describe('tabs and permissions', () => {
   });
 });
 
+describe('no request a role would get a 403 for, on any route', () => {
+  // What each request needs, as MATTER_OPERATIONS (backend/permissions.ts) says: status, nodes, endpoint state,
+  // reconciliation, fabric and both live topics need matter.devices.read; the settings need matter.devices.manage.
+  const READ = 'matter.devices.read';
+  const MANAGE = 'matter.devices.manage';
+  const needsRead = () => ({
+    getStatus: api.getStatus,
+    listNodes: devices.listNodes,
+    getNode: devices.getNode,
+    getEndpointState: devices.getEndpointState,
+    getReconciliation: devices.getReconciliation,
+    getFabricStatus: fabric.getFabricStatus,
+  });
+  const ROLES: Record<string, string[]> = {
+    read: [READ],
+    'read+manage': [READ, MANAGE],
+    thread: ['thread.network.read'],
+    commission: ['matter.devices.commission'],
+    'commission+thread': ['matter.devices.commission', 'thread.network.read'],
+    'manage only': [MANAGE],
+  };
+  const ROUTES = [
+    '/matter',
+    '/matter/devices',
+    '/matter/devices/node-1',
+    '/matter/infrastructure',
+    '/matter/thread',
+    '/matter/commissioning',
+    '/matter/health',
+    '/matter/updates',
+  ];
+
+  it.each(Object.keys(ROLES).flatMap((role) => ROUTES.map((route) => [role, route] as const)))(
+    '%s on %s',
+    async (role, route) => {
+      const keys = ROLES[role];
+      devices.getNode.mockResolvedValue({ ...node('node-1'), fabric: null, endpoints: [] });
+      signIn(...keys);
+      const { live } = renderMatter(route);
+      await waitFor(() => expect(screen.queryByTestId('matter-page-loading')).not.toBeInTheDocument());
+      // Let the tab's first requests and subscriptions start.
+      await act(async () => new Promise((resolve) => setTimeout(resolve, 50)));
+      const topics = live.subscribed.map((entry) => entry.topic.split(':').pop());
+      if (!keys.includes(READ)) {
+        for (const [name, request] of Object.entries(needsRead())) {
+          expect(request, `${name} needs ${READ}`).not.toHaveBeenCalled();
+        }
+        expect(topics).not.toContain('devices');
+        expect(topics).not.toContain('device-state');
+      }
+      if (!(keys.includes(READ) && keys.includes(MANAGE))) expect(api.getSettings).not.toHaveBeenCalled();
+    },
+  );
+});
+
 describe('routes, deep links and history', () => {
   it.each([
     [['matter.devices.read'], '/matter/devices'],
@@ -176,22 +226,40 @@ describe('routes, deep links and history', () => {
     expect(devices.getNode).toHaveBeenCalledWith('node-1');
   });
 
-  it('falls back to the first allowed tab (replacing the entry) for a tab the user may not see', async () => {
+  it('falls back to the first allowed tab, replacing the entry, for a tab the user may not see', async () => {
     signIn('matter.devices.read');
-    renderMatter('/matter/thread');
+    const { back } = renderMatter('/matter/thread', { before: '/elsewhere' });
     await waitFor(() => expect(where()).toBe('/matter/devices'));
     expect(screen.getByTestId('matter-tab-devices')).toBeInTheDocument();
+    expect(navigation()).toBe('REPLACE');
+    // The forbidden URL is gone from the history: back leaves the page instead of redirecting again.
+    back();
+    await waitFor(() => expect(where()).toBe('/elsewhere'));
+  });
+
+  it('replaces /matter with the first tab, so back does not return to /matter', async () => {
+    const { back } = renderMatter('/matter', { before: '/elsewhere' });
+    await waitFor(() => expect(where()).toBe('/matter/devices'));
+    expect(navigation()).toBe('REPLACE');
+    back();
+    await waitFor(() => expect(where()).toBe('/elsewhere'));
   });
 
   it('pushes a history entry per tab switch, so back and forward work', async () => {
     const user = userEvent.setup();
-    const { container } = renderMatter('/matter/devices');
+    const { back } = renderMatter('/matter/devices');
     await user.click(await screen.findByRole('tab', { name: 'Health' }));
     expect(where()).toBe('/matter/health');
+    expect(navigation()).toBe('PUSH');
     await user.click(screen.getByRole('tab', { name: 'Software Updates' }));
     expect(where()).toBe('/matter/updates');
-    // MemoryRouter has no browser buttons; the history entries are what `navigate(-1)` walks.
-    expect(container).toBeTruthy();
+    expect(navigation()).toBe('PUSH');
+    back();
+    await waitFor(() => expect(where()).toBe('/matter/health'));
+    expect(screen.getByRole('tab', { name: 'Health' })).toHaveAttribute('aria-selected', 'true');
+    back();
+    await waitFor(() => expect(where()).toBe('/matter/devices'));
+    expect(await screen.findByTestId('matter-tab-devices')).toBeInTheDocument();
   });
 
   it('marks the tab of the URL as selected', async () => {
@@ -304,5 +372,35 @@ describe('the degraded banner', () => {
     expect(await screen.findByText('Matter sidecar unreachable')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Retry now' })).not.toBeInTheDocument();
     expect(screen.getByText(/ask an administrator/i)).toBeInTheDocument();
+  });
+
+  it('says the connection is being set up while the sidecar is connecting', async () => {
+    api.getStatus.mockResolvedValue(status({ state: 'connecting' }));
+    renderMatter('/matter/devices');
+    const banner = await screen.findByTestId('matter-degraded-banner');
+    expect(banner).toHaveTextContent(/Connecting since/);
+  });
+
+  it('shows no banner, but the error where the status is shown, when the status cannot be loaded', async () => {
+    api.getStatus.mockRejectedValue(new Error('Request failed (HTTP 503).'));
+    renderMatter('/matter/devices');
+    await screen.findByTestId('matter-tab-devices');
+    await waitFor(() => expect(api.getStatus).toHaveBeenCalled());
+    expect(screen.queryByTestId('matter-banners')).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: 'Health' }));
+    expect(await screen.findByTestId('matter-health-connection-error')).toHaveTextContent('HTTP 503');
+    expect(screen.getByTestId('matter-health-connection-fix')).toBeInTheDocument();
+  });
+});
+
+describe('Health with Matter and Thread read', () => {
+  it('shows the Matter cards and the Thread card together', async () => {
+    signIn('matter.devices.read', 'thread.network.read');
+    renderMatter('/matter/health');
+    expect(await screen.findByTestId('matter-health-connection')).toBeInTheDocument();
+    expect(screen.getByTestId('matter-health-fabric')).toBeInTheDocument();
+    expect(screen.getByTestId('matter-health-reconciliation')).toBeInTheDocument();
+    expect(screen.getByTestId('matter-health-thread')).toBeInTheDocument();
   });
 });

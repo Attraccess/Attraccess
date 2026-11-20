@@ -335,7 +335,6 @@
       "misconfigured": "Matter connection is misconfigured"
     },
     "since": {
-      "not_configured": "Not configured since {{time}}.",
       "connecting": "Connecting since {{time}}.",
       "unavailable": "Unreachable since {{time}}.",
       "unauthorized": "Rejected since {{time}}.",
@@ -409,12 +408,15 @@
     "unknown": "Unknown",
     "vendorProduct": "Vendor / product",
     "software": "Software",
-    "hardware": "hardware {{version}}",
+    "hardware": "Hardware {{version}}",
     "endpoints": "Endpoints",
     "lastSeen": "Last seen",
     "details": "Details",
+    "detailsFor": "Details: {{name}}",
+    "actionFor": "{{action}}: {{name}}",
     "back": "All devices",
-    "empty": "No devices match.",
+    "empty": "No devices match this filter.",
+    "noDevices": "No Matter devices yet. Devices appear here once they are commissioned and the sidecar reports them.",
     "loadError": "The devices could not be loaded.",
     "detailError": "The device could not be loaded.",
     "retry": "Try again",
@@ -452,7 +454,8 @@
     },
     "bridge": {
       "aggregator": "Bridge",
-      "behind": "Behind bridge {{bridge}}"
+      "behind": "Behind bridge {{bridge}}",
+      "reportedAs": "Bridged device: {{name}}"
     },
     "claim": {
       "title": "Claim device",
@@ -509,6 +512,7 @@
     "filter": {
       "label": "Show",
       "active": "All active",
+      "all": "All",
       "unclaimed": "Unclaimed",
       "claimed": "Claimed",
       "detached": "Detached",
@@ -523,7 +527,14 @@
       "lastRun": "Last run",
       "never": "No reconciliation yet",
       "run": "Run reconciliation now",
-      "summary": "{{nodes}} devices listed, {{changes}} changes",
+      "nodesListed": {
+        "one": "{{count}} device listed",
+        "many": "{{count}} devices listed"
+      },
+      "changes": {
+        "one": "{{count}} change",
+        "many": "{{count}} changes"
+      },
       "result": {
         "applied": "Applied",
         "skipped_unavailable": "Skipped: sidecar unavailable",
@@ -542,7 +553,8 @@
       "location": "Location",
       "maxLength": "At most {{max}} characters.",
       "save": "Save",
-      "claimFirst": "Claim the device to name it."
+      "claimFirst": "Claim the device to name it.",
+      "resolveFirst": "Repair or relink the device to edit it."
     },
     "endpoint": {
       "title": "Endpoints",
@@ -567,6 +579,8 @@
     "state": {
       "none": "No state reported yet.",
       "noValue": "No value",
+      "complexValue": "Structured value",
+      "notLive": "Not live",
       "yes": "Yes",
       "no": "No",
       "observed": "Observed",
@@ -728,7 +742,11 @@
       "unknown": "Unknown",
       "last": "Last backup",
       "noneYet": "none yet",
-      "age": "{{days}} days ago",
+      "age": {
+        "one": "{{count}} day ago",
+        "many": "{{count}} days ago"
+      },
+      "today": "today",
       "next": "Next scheduled"
     },
     "reconciliation": {

@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, configure, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, configure, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FabricBackupStatus } from './fabric-backup/api';
+import { HEALTH_POLL_MS } from './tabs/HealthTab';
 import { node, status } from './test-utils/fixtures';
 import { ALL_KEYS, renderMatter, signIn } from './test-utils/renderMatter';
 
@@ -78,7 +79,7 @@ describe('Thread Network', () => {
     expect(empty).toHaveTextContent('Thread is not set up');
     await waitFor(() =>
       expect(within(empty).getByTestId('matter-family-notice-thread')).toHaveTextContent(
-        /does not report "thread" as available/,
+        /does not report "Thread" as available/,
       ),
     );
   });
@@ -88,7 +89,7 @@ describe('Thread Network', () => {
     renderMatter('/matter/thread');
     await waitFor(() =>
       expect(screen.getByTestId('matter-family-notice-thread')).toHaveTextContent(
-        /sidecar is not connected, so its "thread" support is unknown/,
+        /sidecar is not connected, so its "Thread" support is unknown/,
       ),
     );
   });
@@ -100,7 +101,7 @@ describe('Thread Network', () => {
     renderMatter('/matter/thread');
     await waitFor(() =>
       expect(screen.getByTestId('matter-family-notice-thread')).toHaveTextContent(
-        /supports "thread", but this plugin version does not use it yet/,
+        /supports "Thread", but this plugin version does not use it yet/,
       ),
     );
   });
@@ -115,17 +116,13 @@ describe('Thread Network', () => {
     expect(screen.queryAllByRole('textbox')).toHaveLength(0);
   });
 
-  it('opens the docs in a new tab', async () => {
-    const user = userEvent.setup();
-    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+  it('links the docs in a new tab', async () => {
     renderMatter('/matter/thread');
-    await user.click(await screen.findByTestId('matter-thread-docs'));
-    expect(open).toHaveBeenCalledWith(
-      'https://docs.attraccess.org/#/en/plugins/matter/admin-ui',
-      '_blank',
-      'noopener,noreferrer',
-    );
-    open.mockRestore();
+    const link = await screen.findByRole('link', { name: /Read the documentation/ });
+    expect(link).toHaveAttribute('href', 'https://docs.attraccess.org/#/en/plugins/matter/admin-ui');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(link).toHaveAttribute('data-cy', 'matter-thread-docs');
   });
 });
 
@@ -152,7 +149,7 @@ describe('Commissioning', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await waitFor(() =>
       expect(screen.getByTestId('matter-family-notice-commissioning')).toHaveTextContent(
-        /does not report "commissioning"/,
+        /does not report "Commissioning"/,
       ),
     );
   });
@@ -181,7 +178,7 @@ describe('Software Updates', () => {
     );
     const rows = await screen.findAllByTestId('matter-software-row');
     expect(rows.map((row) => row.textContent)).toEqual([
-      expect.stringMatching(/Lamp.*1\.0\.3.*hardware 2/),
+      expect.stringMatching(/Lamp.*1\.0\.3.*Hardware 2/),
       expect.stringMatching(/Plug \(2\).*9/),
     ]);
     expect(screen.getByTestId('matter-family-notice-ota')).toBeInTheDocument();
@@ -212,6 +209,57 @@ describe('Health', () => {
     expect(screen.queryByTestId('matter-health-connection-fix')).not.toBeInTheDocument();
   });
 
+  it.each([
+    ['unauthorized', 'danger'],
+    ['incompatible', 'danger'],
+    ['misconfigured', 'danger'],
+  ] as const)('rates %s as %s, like the banner and the status card', async (reason, level) => {
+    api.getStatus.mockResolvedValue(status({ state: 'degraded', reason }));
+    renderMatter('/matter/health');
+    const card = await screen.findByTestId('matter-health-connection');
+    await waitFor(() => expect(card).toHaveAttribute('data-level', level));
+    expect(screen.getByTestId('matter-degraded-banner')).toBeInTheDocument();
+  });
+
+  it('shows a spinner, and no level or fix link, while a card loads', async () => {
+    fabric.getFabricStatus.mockReturnValue(new Promise(() => undefined));
+    devices.getReconciliation.mockReturnValue(new Promise(() => undefined));
+    renderMatter('/matter/health');
+    for (const card of ['matter-health-fabric', 'matter-health-backup', 'matter-health-reconciliation']) {
+      const element = await screen.findByTestId(card);
+      expect(element).toHaveAttribute('data-level', 'loading');
+      expect(within(element).getByTestId(`${card}-loading`)).toBeInTheDocument();
+      expect(within(element).queryByTestId(`${card}-level`)).not.toBeInTheDocument();
+      expect(within(element).queryByTestId(`${card}-fix`)).not.toBeInTheDocument();
+    }
+  });
+
+  it('says "unknown", not "no reconciliation yet", when the reconciliation status cannot be loaded', async () => {
+    devices.getReconciliation.mockRejectedValue(new Error('Request failed (HTTP 500).'));
+    renderMatter('/matter/health');
+    expect(await screen.findByTestId('matter-health-reconciliation-error')).toBeInTheDocument();
+    expect(screen.getByTestId('matter-health-reconciliation-level')).toHaveTextContent('Unknown');
+  });
+
+  it('refreshes fabric, backup and reconciliation every 30 seconds', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      renderMatter('/matter/health');
+      await waitFor(() =>
+        expect(screen.getByTestId('matter-health-reconciliation')).toHaveAttribute('data-level', 'ok'),
+      );
+      const fabricCalls = fabric.getFabricStatus.mock.calls.length;
+      const reconciliationCalls = devices.getReconciliation.mock.calls.length;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(HEALTH_POLL_MS);
+      });
+      expect(fabric.getFabricStatus.mock.calls.length).toBe(fabricCalls + 1);
+      expect(devices.getReconciliation.mock.calls.length).toBe(reconciliationCalls + 1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('shows the connection details of a degraded sidecar and links to where it is fixed', async () => {
     const user = userEvent.setup();
     api.getStatus.mockResolvedValue(
@@ -224,7 +272,8 @@ describe('Health', () => {
     );
     renderMatter('/matter/health');
     const card = await screen.findByTestId('matter-health-connection');
-    await waitFor(() => expect(card).toHaveAttribute('data-level', 'danger'));
+    // `unavailable` usually heals by itself: a warning here, as in the banner and on Infrastructure.
+    await waitFor(() => expect(card).toHaveAttribute('data-level', 'warning'));
     expect(within(card).getByTestId('matter-health-last-error')).toHaveTextContent('sidecar_unavailable');
     expect(within(card).getByTestId('matter-health-last-error')).toHaveTextContent('corr-1');
     expect(within(card).getByTestId('matter-health-next-retry')).toBeInTheDocument();
@@ -284,7 +333,7 @@ describe('Health', () => {
       fabricStatus({ backups: { ...fabricStatus().backups, lastSuccessfulAt: iso(1.2 * DAY) } }),
     );
     renderMatter('/matter/health');
-    expect(await screen.findByTestId('matter-health-backup-last')).toHaveTextContent('1 days ago');
+    expect(await screen.findByTestId('matter-health-backup-last')).toHaveTextContent('(1 day ago)');
   });
 
   it('shows reconciliation status and event counters, and links to Devices when it failed', async () => {

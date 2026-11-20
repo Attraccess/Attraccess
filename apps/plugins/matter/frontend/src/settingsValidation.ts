@@ -4,8 +4,11 @@
 export const MAX_URL_LENGTH = 2048;
 export const MAX_CA_BYTES = 64 * 1024;
 const CERTIFICATE_BLOCK = /-----BEGIN CERTIFICATE-----[A-Za-z0-9+/=\s]+?-----END CERTIFICATE-----/g;
-/** The sidecar's service token: 32-512 printable ASCII characters (`SERVICE_TOKEN_PATTERN` in matter-contract). */
-const TOKEN = /^[\x21-\x7e]{32,512}$/;
+/**
+ * The sidecar's service token: 32-512 printable ASCII characters. A copy of `SERVICE_TOKEN_PATTERN` in matter-contract
+ * (its barrel would bring zod into the page bundle); constantsParity.spec.ts keeps them equal.
+ */
+export const SERVICE_TOKEN = /^[\x21-\x7e]{32,512}$/;
 
 /** A translation key under `form.validation`, or null when the value is acceptable. Empty values are not judged. */
 export type ValidationKey = 'urlScheme' | 'urlInvalid' | 'urlTooLong' | 'credential' | 'caShape' | 'caTooLong' | null;
@@ -27,7 +30,7 @@ export function validateUrl(value: string): ValidationKey {
 }
 
 export function validateCredential(value: string): ValidationKey {
-  return value === '' || TOKEN.test(value) ? null : 'credential';
+  return value === '' || SERVICE_TOKEN.test(value) ? null : 'credential';
 }
 
 export function validateCa(value: string): ValidationKey {

@@ -11,6 +11,8 @@ export interface FakeSubscription {
 
 export function createFakeLiveClient() {
   const active = new Set<FakeSubscription>();
+  /** Every subscription ever opened, also the ones closed since. */
+  const subscribed: FakeSubscription[] = [];
   const client: PluginLiveUpdatesClient = {
     subscribe(subscription, onUpdate, onReconnect, onUnavailable) {
       const entry: FakeSubscription = {
@@ -21,6 +23,7 @@ export function createFakeLiveClient() {
         onUnavailable,
       };
       active.add(entry);
+      subscribed.push(entry);
       return () => active.delete(entry);
     },
   };
@@ -31,6 +34,7 @@ export function createFakeLiveClient() {
   return {
     client,
     active,
+    subscribed,
     /** The server pushed a signal on the topic. */
     push: (topic: string, identifier?: string) =>
       where(topic, identifier).forEach((entry) => entry.onUpdate({ changed: true })),

@@ -1,15 +1,12 @@
-import { StatusAlert, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
-import { Button } from '@heroui/react';
+import { Button, StatusAlert, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { connectionKey, connectionSeverity, hintKey } from './connectionStatus';
+import { errorMessage } from './errorMessage';
 import { useMatterConnection } from './MatterConnectionContext';
 import { matterTabPath } from './matterPaths';
 import { useMatterTranslations } from './i18n';
 import type { MatterPermissions } from './permissions';
-import { hintKey } from './StatusCard';
-
-/** `unavailable` usually heals by itself; the other reasons need the administrator. */
-const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /**
  * The global banner: shown on every tab while the sidecar is not connected, with the reason and where to fix it, and
@@ -33,27 +30,28 @@ export function MatterDegradedBanner({
     try {
       await retryNow();
     } catch (error) {
-      setRetryError(messageOf(error));
+      setRetryError(errorMessage(error));
     } finally {
       setRetrying(false);
     }
   };
 
-  const key = status.state === 'degraded' ? (status.reason ?? 'unavailable') : status.state;
+  const key = connectionKey(status);
   const connected = status.state === 'connected';
   const configured = status.state !== 'not_configured';
   return (
     <div className="mt:flex mt:flex-col mt:gap-3" data-cy="matter-banners">
       {!connected && (
         <StatusAlert
-          status={status.state === 'connecting' ? 'accent' : key === 'not_configured' ? 'default' : 'warning'}
+          status={connectionSeverity(status)}
           title={t(`banner.title.${key}`)}
           data-cy="matter-degraded-banner"
         >
           <span className="mt:block">
-            {t(`banner.since.${key}`, { time: formatDateTime(status.since) })}
+            {/* "Not configured since" says nothing: a connection that was never set up has no start. */}
+            {configured && t(`banner.since.${key}`, { time: formatDateTime(status.since) })}
             {/* On Infrastructure the status card right below says what to do; elsewhere the banner does. */}
-            {!onInfrastructure && ` ${t(hintKey(status, permissions.canManage))}`}
+            {!onInfrastructure && `${configured ? ' ' : ''}${t(hintKey(status, permissions.canManage))}`}
           </span>
           {status.nextRetryAt && !onInfrastructure && (
             <span className="mt:block mt:text-sm" data-cy="matter-banner-next-retry">

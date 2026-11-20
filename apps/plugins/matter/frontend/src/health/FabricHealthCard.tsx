@@ -7,7 +7,8 @@ import { HealthCard, type HealthLevel } from './HealthCard';
 export function FabricHealthCard({
   status,
   error,
-}: Readonly<{ status: FabricBackupStatus | null; error: string | null }>) {
+  loading = false,
+}: Readonly<{ status: FabricBackupStatus | null; error: string | null; loading?: boolean }>) {
   const { t } = useMatterTranslations();
   let level: HealthLevel = 'unknown';
   let key = 'unknown';
@@ -23,6 +24,7 @@ export function FabricHealthCard({
       level={level}
       levelLabel={t(`health.fabric.${key}`)}
       fix={{ tab: 'infrastructure', label: t('health.fix.infrastructure') }}
+      loading={loading && !status}
       dataCy="matter-health-fabric"
     >
       {error && !status && (

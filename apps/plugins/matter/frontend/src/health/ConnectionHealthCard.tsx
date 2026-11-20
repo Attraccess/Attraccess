@@ -1,37 +1,53 @@
-import { DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
+import { DateTimeDisplay, StatusAlert } from '@attraccess/plugins-frontend-ui';
+import { connectionKey, connectionSeverity } from '../connectionStatus';
+import { connectionHealthLevel } from '../healthLevel';
 import { useMatterTranslations } from '../i18n';
 import { useMatterConnection } from '../MatterConnectionContext';
-import { HealthCard, type HealthLevel } from './HealthCard';
+import { HealthCard } from './HealthCard';
 
-/** Sidecar connection: state, since, next retry, last error code and correlation ID. */
+const SECONDS = { showSeconds: true } as const;
+
+/**
+ * Sidecar connection: state, since, next retry, last error code and correlation ID. Same severity as the banner and the
+ * status card (see connectionStatus.ts).
+ */
 export function ConnectionHealthCard() {
   const { t } = useMatterTranslations();
-  const { status } = useMatterConnection();
+  const { status, statusError } = useMatterConnection();
+  const fix = { tab: 'infrastructure', label: t('health.fix.infrastructure') } as const;
   if (!status)
     return (
       <HealthCard
         title={t('health.connection.title')}
-        level="unknown"
-        levelLabel={t('health.levels.unknown')}
+        level={statusError ? 'danger' : 'unknown'}
+        levelLabel={t(statusError ? 'health.levels.danger' : 'health.levels.unknown')}
+        fix={fix}
+        loading={!statusError}
         dataCy="matter-health-connection"
-      />
+      >
+        {statusError && (
+          <StatusAlert status="danger" title={t('status.loadError')} data-cy="matter-health-connection-error">
+            {statusError}
+          </StatusAlert>
+        )}
+      </HealthCard>
     );
-  const level: HealthLevel = status.state === 'connected' ? 'ok' : status.state === 'connecting' ? 'unknown' : 'danger';
-  const key = status.state === 'degraded' ? (status.reason ?? 'unavailable') : status.state;
+  const level = connectionHealthLevel(connectionSeverity(status));
+  const key = connectionKey(status);
   return (
     <HealthCard
       title={t('health.connection.title')}
       level={level}
       levelLabel={t(`banner.title.${key}`)}
-      fix={{ tab: 'infrastructure', label: t('health.fix.infrastructure') }}
+      fix={fix}
       dataCy="matter-health-connection"
     >
       <p>
-        {t('status.since')}: <DateTimeDisplay date={status.since} />
+        {t('status.since')}: <DateTimeDisplay date={status.since} options={SECONDS} />
       </p>
       {status.nextRetryAt && (
         <p data-cy="matter-health-next-retry">
-          {t('status.nextRetry')}: <DateTimeDisplay date={status.nextRetryAt} />
+          {t('status.nextRetry')}: <DateTimeDisplay date={status.nextRetryAt} options={SECONDS} />
         </p>
       )}
       {status.lastError && (

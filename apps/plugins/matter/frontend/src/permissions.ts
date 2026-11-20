@@ -2,7 +2,7 @@
 // permission keys, through `onApiAuthStateChange`; the page reads it here to hide the controls (and skip the requests)
 // the API would refuse with 403. The API enforces every key on its own.
 import { hasPluginAuthPermission, type AttraccessFrontendPluginAuthData } from '@attraccess/plugins-frontend-sdk';
-import { useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import {
   MATTER_DEVICES_COMMAND_DIRECT,
   MATTER_DEVICES_COMMISSION,
@@ -48,16 +48,19 @@ export interface MatterPermissions {
 
 export function useMatterPermissions(): MatterPermissions {
   const current = useSyncExternalStore(subscribe, () => authData);
-  const has = (key: string) => hasPluginAuthPermission(current, key);
-  const canRead = has(MATTER_DEVICES_READ);
-  const canReadThread = has(THREAD_NETWORK_READ);
-  return {
-    known: current !== null,
-    canRead,
-    canManage: canRead && has(MATTER_DEVICES_MANAGE),
-    canCommission: has(MATTER_DEVICES_COMMISSION),
-    canCommandDirect: has(MATTER_DEVICES_COMMAND_DIRECT),
-    canReadThread,
-    canManageThread: canReadThread && has(THREAD_NETWORK_MANAGE),
-  };
+  // One object per auth state, so memos and effects that depend on the permissions do not rerun on every render.
+  return useMemo(() => {
+    const has = (key: string) => hasPluginAuthPermission(current, key);
+    const canRead = has(MATTER_DEVICES_READ);
+    const canReadThread = has(THREAD_NETWORK_READ);
+    return {
+      known: current !== null,
+      canRead,
+      canManage: canRead && has(MATTER_DEVICES_MANAGE),
+      canCommission: has(MATTER_DEVICES_COMMISSION),
+      canCommandDirect: has(MATTER_DEVICES_COMMAND_DIRECT),
+      canReadThread,
+      canManageThread: canReadThread && has(THREAD_NETWORK_MANAGE),
+    };
+  }, [current]);
 }

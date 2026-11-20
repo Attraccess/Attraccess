@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -23,6 +23,9 @@ vi.mock('./fabric-backup/FabricBackupSection', () => ({
     <div data-testid="fabric-section-stub">{canManage ? 'manage' : 'read'}</div>
   ),
 }));
+
+/** The parts of the page are marked with `data-cy`; this spec's own stubs use `data-testid`. */
+const byCy = (cy: string) => document.querySelector(`[data-cy="${cy}"]`) as HTMLElement | null;
 
 // HeroUI's spinner has no accessible role.
 const spinner = () => document.querySelector('[data-slot="spinner"]');
@@ -363,6 +366,93 @@ describe('MatterPage polling', () => {
   });
 });
 
+describe('MatterPage settings polling (ATT-1202)', () => {
+  const elsewhere: ConnectionSettings = {
+    ...configured,
+    url: 'https://other.example.com',
+    updatedAt: '2026-11-06T11:00:00.000Z',
+  };
+
+  it('warns an edited form about a change saved elsewhere and blocks Save until reload', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderPage({ state: 'connected' }, configured);
+    const url = await screen.findByLabelText(/Sidecar URL/);
+    await user.type(url, '/');
+    api.getSettings.mockResolvedValue(elsewhere);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STATUS_POLL_MS);
+    });
+    await waitFor(() => expect(byCy('matter-settings-stale')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(url).toHaveValue('https://matter.example.com/');
+    await user.click(byCy('matter-settings-reload') as HTMLElement);
+    expect(url).toHaveValue('https://other.example.com');
+  });
+
+  it('does not let a poll answered after a save bring the old settings back', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderPage({ state: 'connected' }, configured);
+    const url = await screen.findByLabelText(/Sidecar URL/);
+    let answerPoll: (settings: ConnectionSettings) => void = () => undefined;
+    api.getSettings.mockImplementationOnce(() => new Promise((resolve) => (answerPoll = resolve)));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STATUS_POLL_MS);
+    });
+    await user.clear(url);
+    await user.type(url, 'https://other.example.com');
+    await user.type(screen.getByLabelText(/^Token/), SECRET);
+    api.saveSettings.mockResolvedValue(elsewhere);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Close' }));
+    await act(async () => answerPoll(configured));
+    expect(url).toHaveValue('https://other.example.com');
+    expect(byCy('matter-settings-stale')).not.toBeInTheDocument();
+  });
+
+  it('polls the settings only while Infrastructure is open', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    signIn('matter.devices.read', 'matter.devices.manage', 'matter.devices.commission');
+    api.getStatus.mockResolvedValue({ ...baseStatus, state: 'connected' });
+    renderAt('/matter/commissioning');
+    await waitFor(() => expect(byCy('matter-commissioning-tab')).toBeInTheDocument());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STATUS_POLL_MS * 2);
+    });
+    expect(api.getStatus.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(api.getSettings).not.toHaveBeenCalled();
+  });
+
+  it('pauses the polls while the browser tab is hidden and refreshes once it is visible again', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let visibility: DocumentVisibilityState = 'visible';
+    const spy = vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
+    const setVisibility = (next: DocumentVisibilityState) =>
+      act(() => {
+        visibility = next;
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+    try {
+      renderPage({ state: 'connected' }, configured);
+      await screen.findByLabelText(/Sidecar URL/);
+      setVisibility('hidden');
+      const status = api.getStatus.mock.calls.length;
+      const settings = api.getSettings.mock.calls.length;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(STATUS_POLL_MS * 3);
+      });
+      expect(api.getStatus.mock.calls.length).toBe(status);
+      expect(api.getSettings.mock.calls.length).toBe(settings);
+      setVisibility('visible');
+      await waitFor(() => expect(api.getStatus.mock.calls.length).toBe(status + 1));
+      expect(api.getSettings.mock.calls.length).toBe(settings + 1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
 describe('MatterPage recovery', () => {
   it('reports a failed settings load even when the status loads', async () => {
     api.getStatus.mockResolvedValue({ ...baseStatus, state: 'connected' });
@@ -397,7 +487,9 @@ describe('MatterPage permissions', () => {
     expect(screen.getByTestId('fabric-section-stub')).toHaveTextContent('read');
     expect(api.getSettings).not.toHaveBeenCalled();
     expect(screen.queryByLabelText(/Sidecar URL/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Save|Replace|Remove|Retry now/ })).not.toBeInTheDocument();
+    // No control at all on the tab: whatever a later change adds there must check manage too.
+    expect(within(byCy('matter-infrastructure-tab') as HTMLElement).queryAllByRole('button')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: 'Retry now' })).not.toBeInTheDocument();
   });
 
   it('shows the settings form and the manage actions with matter.devices.manage', async () => {

@@ -1,54 +1,9 @@
 import { StatusAlert, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { Card, Chip } from '@heroui/react';
 import type { ConnectionStatus, SupportedCombination } from './api';
+import { connectionSeverity, hintKey } from './connectionStatus';
+import { Fact } from './Fact';
 import { useMatterTranslations } from './i18n';
-
-const STATE_COLOR = {
-  not_configured: 'default',
-  connecting: 'accent',
-  connected: 'success',
-  degraded: 'warning',
-} as const;
-
-/** `unavailable` usually heals by itself; the other reasons need the administrator. */
-const REASON_COLOR = {
-  unavailable: 'warning',
-  unauthorized: 'danger',
-  incompatible: 'danger',
-  misconfigured: 'danger',
-} as const;
-
-function Field({ label, children, dataCy }: Readonly<{ label: string; children: React.ReactNode; dataCy?: string }>) {
-  return (
-    <div className="mt:flex mt:flex-col" data-cy={dataCy}>
-      <dt className="mt:text-xs mt:text-muted">{label}</dt>
-      <dd className="mt:break-words">{children}</dd>
-    </div>
-  );
-}
-
-// Hints that tell the reader to change the settings or the installation; read-only users, who cannot see the settings,
-// are told to ask an administrator instead.
-const READ_ONLY_HINTS = new Set([
-  'hint.not_configured',
-  'hint.unauthorized',
-  'hint.unavailable',
-  'hint.misconfigured',
-  'hint.incompatible',
-  'hint.hostVersion',
-]);
-
-/** What the administrator can do about the current state, or what a read-only user should expect. */
-export function hintKey(status: ConnectionStatus, canManage = true): string {
-  const key = baseHintKey(status);
-  return !canManage && READ_ONLY_HINTS.has(key) ? `${key}ReadOnly` : key;
-}
-
-function baseHintKey(status: ConnectionStatus): string {
-  if (status.state !== 'degraded') return `hint.${status.state}`;
-  if (status.reasonDetail === 'host version unavailable') return 'hint.hostVersion';
-  return `hint.${status.reason ?? 'unavailable'}`;
-}
 
 /** The lowest Attraccess version of the first supported combination, e.g. `2.0.0` for `^2.0.0`. */
 function minimumAttraccess(status: ConnectionStatus): string {
@@ -79,6 +34,7 @@ export function StatusCard({ status, canManage }: Readonly<{ status: ConnectionS
     status.state === 'connected' ? t(key) : t('status.lastKnown', { label: t(key) });
   const error = status.lastError;
   const received = error?.details?.received;
+  const severity = connectionSeverity(status);
   return (
     <Card data-cy="matter-status-card">
       <Card.Header>
@@ -86,36 +42,36 @@ export function StatusCard({ status, canManage }: Readonly<{ status: ConnectionS
       </Card.Header>
       <Card.Content className="mt:flex mt:flex-col mt:gap-4">
         <div className="mt:flex mt:flex-wrap mt:items-center mt:gap-2">
-          <Chip color={STATE_COLOR[status.state]} variant="soft" data-cy="matter-state-chip">
+          <Chip color={severity} variant="soft" data-cy="matter-state-chip">
             {t(`status.state.${status.state}`)}
           </Chip>
           {status.reason && (
-            <Chip color={REASON_COLOR[status.reason]} variant="soft" data-cy="matter-reason-chip">
+            <Chip color={severity} variant="soft" data-cy="matter-reason-chip">
               {t(`status.reason.${status.reason}`)}
             </Chip>
           )}
         </div>
         <p data-cy="matter-hint">{t(hintKey(status, canManage), { attraccess: minimumAttraccess(status) })}</p>
         <dl className="mt:grid mt:grid-cols-1 mt:gap-3 mt:sm:grid-cols-2">
-          <Field label={t('status.since')}>{formatDateTime(status.since)}</Field>
+          <Fact label={t('status.since')}>{formatDateTime(status.since)}</Fact>
           {status.nextRetryAt && (
-            <Field label={t('status.nextRetry')} dataCy="matter-next-retry">
+            <Fact label={t('status.nextRetry')} dataCy="matter-next-retry">
               {formatDateTime(status.nextRetryAt)}
-            </Field>
+            </Fact>
           )}
           {status.sidecar && (
             <>
-              <Field label={versionLabel('status.sidecarVersion')} dataCy="matter-sidecar-version">
+              <Fact label={versionLabel('status.sidecarVersion')} dataCy="matter-sidecar-version">
                 {status.sidecar.sidecar}
-              </Field>
-              <Field label={versionLabel('status.matterJsVersion')} dataCy="matter-matterjs-version">
+              </Fact>
+              <Fact label={versionLabel('status.matterJsVersion')} dataCy="matter-matterjs-version">
                 {status.sidecar.matterJs}
-              </Field>
+              </Fact>
             </>
           )}
-          <Field label={versionLabel('status.wireVersion')} dataCy="matter-wire-version">
+          <Fact label={versionLabel('status.wireVersion')} dataCy="matter-wire-version">
             {status.wireVersion}
-          </Field>
+          </Fact>
         </dl>
         {error && (
           <StatusAlert status="warning" title={t('status.lastError')} data-cy="matter-last-error">

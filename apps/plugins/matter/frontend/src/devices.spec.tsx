@@ -100,7 +100,7 @@ describe('the device list', () => {
     const card = await screen.findByTestId('matter-node-claimed');
     expect(within(card).getByText('Acme / Plug')).toBeInTheDocument();
     expect(within(card).getByTestId('matter-node-software')).toHaveTextContent('1.0.3');
-    expect(within(card).getByTestId('matter-node-software')).toHaveTextContent('hardware 2');
+    expect(within(card).getByTestId('matter-node-software')).toHaveTextContent('Hardware 2');
     expect(within(card).getByText('2')).toBeInTheDocument();
     expect(within(card).getByTestId('matter-reachability-reachable')).toHaveTextContent('Reachable');
     expect(within(card).getByText('Last seen')).toBeInTheDocument();
@@ -170,7 +170,9 @@ describe('the device list', () => {
     expect(await screen.findByText('Old plug')).toBeInTheDocument();
     expect(devices.listNodes).toHaveBeenLastCalledWith(true);
 
-    await user.click(screen.getByRole('button', { name: /All active/ }));
+    // With archived and removed included, the default option lists every device and says so.
+    expect(screen.queryByRole('button', { name: /All active/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /\bAll\b/ }));
     await user.click(await screen.findByRole('option', { name: 'Archived' }));
     await waitFor(() => expect(screen.queryByText('Workshop lamp')).not.toBeInTheDocument());
     expect(screen.getByText('Old plug')).toBeInTheDocument();
@@ -189,7 +191,27 @@ describe('the device list', () => {
 
   it('shows an empty state without devices', async () => {
     renderMatter('/matter/devices');
-    expect(await screen.findByTestId('matter-devices-empty')).toHaveTextContent('No devices match.');
+    expect(await screen.findByTestId('matter-devices-empty')).toHaveTextContent('No Matter devices yet.');
+  });
+
+  it('says the filter matches nothing when devices exist but none fit it', async () => {
+    const user = userEvent.setup();
+    devices.listNodes.mockResolvedValue([nodes[0]]);
+    renderMatter('/matter/devices');
+    await screen.findByText('Workshop lamp');
+    await user.click(screen.getByRole('button', { name: /All active/ }));
+    await user.click(await screen.findByRole('option', { name: 'Detached' }));
+    expect(await screen.findByTestId('matter-devices-empty')).toHaveTextContent('No devices match this filter.');
+  });
+
+  it('names the device in the accessible names of its buttons', async () => {
+    devices.listNodes.mockResolvedValue(nodes);
+    renderMatter('/matter/devices');
+    const card = await screen.findByTestId('matter-node-unclaimed');
+    expect(within(card).getByRole('button', { name: 'Details: Plug (2)' })).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'Claim: Plug (2)' })).toBeInTheDocument();
+    // The action that resolves the device stands out.
+    expect(within(card).getByTestId('matter-action-claim').className).toContain('button--primary');
   });
 });
 
@@ -206,7 +228,7 @@ describe('lifecycle actions', () => {
     devices.claimNode.mockResolvedValue(node('node-2'));
     renderMatter('/matter/devices');
     const card = await screen.findByTestId('matter-node-unclaimed');
-    await user.click(within(card).getByRole('button', { name: 'Claim' }));
+    await user.click(within(card).getByRole('button', { name: /^Claim: / }));
     const dialog = await screen.findByTestId('matter-claim-dialog');
     await user.type(within(dialog).getByLabelText('Name (optional)'), '  Printer plug ');
     await user.click(within(dialog).getByRole('button', { name: 'Claim' }));
@@ -218,7 +240,9 @@ describe('lifecycle actions', () => {
     const user = userEvent.setup();
     devices.claimNode.mockResolvedValue(node('node-2'));
     renderMatter('/matter/devices');
-    await user.click(within(await screen.findByTestId('matter-node-unclaimed')).getByRole('button', { name: 'Claim' }));
+    await user.click(
+      within(await screen.findByTestId('matter-node-unclaimed')).getByRole('button', { name: /^Claim: / }),
+    );
     const dialog = await screen.findByTestId('matter-claim-dialog');
     await user.type(within(dialog).getByLabelText('Name (optional)'), 'x'.repeat(101));
     expect(within(dialog).getByText('At most 100 characters.')).toBeInTheDocument();
@@ -232,7 +256,9 @@ describe('lifecycle actions', () => {
     const user = userEvent.setup();
     devices.repairNode.mockResolvedValue(node('node-3'));
     renderMatter('/matter/devices');
-    await user.click(within(await screen.findByTestId('matter-node-detached')).getByRole('button', { name: 'Repair' }));
+    await user.click(
+      within(await screen.findByTestId('matter-node-detached')).getByRole('button', { name: /^Repair: / }),
+    );
     expect(devices.repairNode).not.toHaveBeenCalled();
     await user.click(within(await screen.findByTestId('matter-confirm-repair')).getByTestId('matter-confirm-action'));
     await waitFor(() => expect(devices.repairNode).toHaveBeenCalledWith('node-3'));
@@ -246,7 +272,9 @@ describe('lifecycle actions', () => {
       node('node-3', { lifecycleState: 'detached', detachedReason: 'absent_from_sidecar' }),
     ]);
     renderMatter('/matter/devices');
-    await user.click(within(await screen.findByTestId('matter-node-detached')).getByRole('button', { name: 'Relink' }));
+    await user.click(
+      within(await screen.findByTestId('matter-node-detached')).getByRole('button', { name: /^Relink: / }),
+    );
     const dialog = await screen.findByTestId('matter-relink-dialog');
     expect(within(dialog).getByTestId('matter-relink-next')).toBeDisabled();
     await user.click(await within(dialog).findByRole('button', { name: /Unclaimed device/ }));
@@ -269,12 +297,42 @@ describe('lifecycle actions', () => {
       node('node-3', { lifecycleState: 'detached', detachedReason: 'absent_from_sidecar', identity: same }),
     ]);
     renderMatter('/matter/devices');
-    await user.click(within(await screen.findByTestId('matter-node-detached')).getByRole('button', { name: 'Relink' }));
+    await user.click(
+      within(await screen.findByTestId('matter-node-detached')).getByRole('button', { name: /^Relink: / }),
+    );
     const dialog = await screen.findByTestId('matter-relink-dialog');
     await user.click(await within(dialog).findByRole('button', { name: /Unclaimed device/ }));
     await user.click(await screen.findByRole('option', { name: 'Plug (2)' }));
     await user.click(within(dialog).getByTestId('matter-relink-next'));
     await waitFor(() => expect(devices.relinkNode).toHaveBeenCalledWith('node-3', 'node-2', false));
+  });
+
+  it('starts again at the picker when the relink dialog is opened after a failed relink', async () => {
+    const user = userEvent.setup();
+    devices.relinkNode.mockRejectedValue(new Error('Identity mismatch'));
+    devices.listNodes.mockResolvedValue([
+      node('node-2', { lifecycleState: 'unclaimed', identity: { ...node('node-2').identity, serialNumber: 'OTHER' } }),
+      node('node-3', { lifecycleState: 'detached', detachedReason: 'absent_from_sidecar' }),
+    ]);
+    renderMatter('/matter/devices');
+    const relink = async () =>
+      user.click(within(await screen.findByTestId('matter-node-detached')).getByRole('button', { name: /^Relink: / }));
+    await relink();
+    const dialog = await screen.findByTestId('matter-relink-dialog');
+    await user.click(await within(dialog).findByRole('button', { name: /Unclaimed device/ }));
+    await user.click(await screen.findByRole('option', { name: 'Plug (2)' }));
+    await user.click(within(dialog).getByTestId('matter-relink-next'));
+    await user.click(
+      within(await screen.findByTestId('matter-relink-mismatch-dialog')).getByTestId('matter-relink-confirm-mismatch'),
+    );
+    const error = await screen.findByTestId('matter-action-error');
+    await user.click(within(error).getByRole('button', { name: /close/i }));
+    await waitFor(() => expect(screen.queryByTestId('matter-action-error')).not.toBeInTheDocument());
+
+    await relink();
+    const again = await screen.findByTestId('matter-relink-dialog');
+    expect(screen.queryByTestId('matter-relink-mismatch-dialog')).not.toBeInTheDocument();
+    expect(within(again).getByTestId('matter-relink-next')).toBeDisabled();
   });
 
   it('says so when there is nothing to relink to', async () => {
@@ -283,7 +341,9 @@ describe('lifecycle actions', () => {
       node('node-3', { lifecycleState: 'detached', detachedReason: 'absent_from_sidecar' }),
     ]);
     renderMatter('/matter/devices');
-    await user.click(within(await screen.findByTestId('matter-node-detached')).getByRole('button', { name: 'Relink' }));
+    await user.click(
+      within(await screen.findByTestId('matter-node-detached')).getByRole('button', { name: /^Relink: / }),
+    );
     expect(await screen.findByTestId('matter-relink-none')).toBeInTheDocument();
   });
 
@@ -292,7 +352,7 @@ describe('lifecycle actions', () => {
     devices.forceRemoveNode.mockResolvedValue(node('node-2'));
     renderMatter('/matter/devices');
     await user.click(
-      within(await screen.findByTestId('matter-node-unclaimed')).getByRole('button', { name: 'Force remove' }),
+      within(await screen.findByTestId('matter-node-unclaimed')).getByRole('button', { name: /^Force remove: / }),
     );
     const dialog = await screen.findByTestId('matter-confirm-forceRemove');
     expect(dialog).toHaveTextContent(/does not factory-reset the device/);
@@ -307,7 +367,7 @@ describe('lifecycle actions', () => {
     devices.archiveNode.mockRejectedValue(new Error('The node is claimed.'));
     renderMatter('/matter/devices');
     await user.click(
-      within(await screen.findByTestId('matter-node-unclaimed')).getByRole('button', { name: 'Archive' }),
+      within(await screen.findByTestId('matter-node-unclaimed')).getByRole('button', { name: /^Archive: / }),
     );
     await user.click(within(await screen.findByTestId('matter-confirm-archive')).getByTestId('matter-confirm-action'));
     expect(await screen.findByTestId('matter-action-error')).toHaveTextContent('The node is claimed.');
@@ -339,6 +399,28 @@ describe('reconciliation', () => {
     expect(await screen.findByTestId('matter-reconciliation-never')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Run reconciliation now' }));
     expect(await screen.findByTestId('matter-reconciliation-run-error')).toHaveTextContent('Sidecar unavailable');
+  });
+
+  it('uses singular forms for one device and one change', async () => {
+    devices.getReconciliation.mockResolvedValue({
+      ...NEVER_RUN,
+      lastResult: 'applied',
+      lastFinishedAt: '2026-11-06T10:00:00.000Z',
+      lastSummary: { changeCount: 1, nodesListed: 1 },
+    });
+    renderMatter('/matter/devices');
+    const card = await screen.findByTestId('matter-reconciliation');
+    expect(await within(card).findByText('1 device listed, 1 change')).toBeInTheDocument();
+  });
+
+  it('offers Try again when the status could not be loaded', async () => {
+    const user = userEvent.setup();
+    devices.getReconciliation.mockRejectedValueOnce(new Error('busy'));
+    renderMatter('/matter/devices');
+    const error = await screen.findByTestId('matter-reconciliation-error');
+    expect(error).toHaveTextContent('busy');
+    await user.click(within(error).getByTestId('matter-reconciliation-retry'));
+    expect(await screen.findByTestId('matter-reconciliation-never')).toBeInTheDocument();
   });
 });
 
@@ -381,11 +463,16 @@ describe('the device detail', () => {
       .getAllByTestId('matter-endpoint-profile')
       .map((chip) => chip.textContent);
     expect(profiles).toEqual(['Device', 'Door lock', 'Bridge', 'Switch']);
-    // Endpoint 3 is nested under endpoint 2, which is under endpoint 0.
-    const nested = within(tree)
-      .getAllByRole('list')
-      .map((list) => list.className.includes('border-l'));
-    expect(nested.filter(Boolean).length).toBeGreaterThanOrEqual(2);
+    // Endpoint 3 is nested under endpoint 2, which is under endpoint 0; endpoint 1 has no children.
+    const subtree = (endpointId: number) =>
+      tree
+        .querySelector(`[data-endpoint-id="${endpointId}"]`)
+        ?.closest('[data-cy="matter-endpoint-node"]') as HTMLElement;
+    const card = (scope: HTMLElement, endpointId: number) => scope.querySelector(`[data-endpoint-id="${endpointId}"]`);
+    expect(card(subtree(2), 3)).not.toBeNull();
+    expect(card(subtree(0), 2)).not.toBeNull();
+    expect(card(subtree(1), 3)).toBeNull();
+    expect(within(subtree(2)).getAllByTestId('matter-endpoint')).toHaveLength(2);
     expect(document.body.textContent).not.toMatch(/0x0006|0x010A|clusterId|attributeIds/);
   });
 
@@ -393,15 +480,22 @@ describe('the device detail', () => {
     renderMatter('/matter/devices/node-1');
     const behind = await screen.findByTestId('matter-bridge-behind');
     expect(behind).toHaveTextContent('Behind bridge Hub');
-    expect(behind).toHaveTextContent('Hall lamp');
+    expect(within(behind).getByTestId('matter-bridged-as')).toHaveTextContent('Bridged device: Hall lamp');
     expect(within(behind).getByTestId('matter-reachability-unreachable')).toBeInTheDocument();
     expect(screen.getByTestId('matter-bridge-aggregator')).toHaveTextContent('Bridge');
   });
 
-  it('shows the flow usage placeholder and the back link', async () => {
+  it('shows the flow usage placeholder once per endpoint and the back link', async () => {
     const user = userEvent.setup();
     renderMatter('/matter/devices/node-1');
-    expect((await screen.findAllByTestId('matter-flow-usage'))[0]).toHaveTextContent('Not used in any flow.');
+    const usage = await screen.findAllByTestId('matter-flow-usage');
+    expect(usage.map((entry) => entry.getAttribute('data-endpoint-ref'))).toEqual([
+      'endpoint-0',
+      'endpoint-1',
+      'endpoint-2',
+      'endpoint-3',
+    ]);
+    expect(usage[0]).toHaveTextContent('Not used in any flow.');
     await user.click(screen.getByTestId('matter-back-to-devices'));
     expect(screen.getByTestId('location')).toHaveTextContent('/matter/devices');
   });
@@ -505,14 +599,17 @@ describe('the device detail', () => {
     expect(screen.getByTestId('matter-endpoint-tree').textContent).not.toMatch(/0x0006/);
   });
 
-  it('treats an unclaimed device as not usable: callout, resolving actions, no endpoints, no editing', async () => {
+  it('treats an unclaimed device as not usable: callout, resolving actions, read-only endpoints, no editing', async () => {
     devices.getNode.mockResolvedValue(detail('node-2', { lifecycleState: 'unclaimed' }));
     renderMatter('/matter/devices/node-2');
     await screen.findByTestId('matter-callout-unclaimed');
     expect(buttons(screen.getByTestId('matter-lifecycle-actions'))).toEqual(['Claim', 'Archive', 'Force remove']);
-    expect(screen.queryByTestId('matter-endpoint-tree')).not.toBeInTheDocument();
+    // The endpoints help decide how to resolve it, but nothing in them is editable or offered for flows.
+    expect(screen.getByTestId('matter-endpoint-tree')).toBeInTheDocument();
+    expect(screen.queryByTestId('matter-endpoint-1-metadata-form')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('matter-flow-usage')).not.toBeInTheDocument();
     expect(screen.queryByTestId('matter-node-metadata-form')).not.toBeInTheDocument();
-    expect(screen.getByText('Claim the device to name it.')).toBeInTheDocument();
+    expect(screen.getByTestId('matter-metadata-resolve-first')).toHaveTextContent('Claim the device to name it.');
     // Diagnostics stay available for support.
     expect(screen.getByTestId('matter-diagnostics')).toBeInTheDocument();
   });
@@ -531,6 +628,37 @@ describe('the device detail', () => {
       'Archive',
       'Force remove',
     ]);
+    // A detached device is resolved by repair or relink, never by claiming it.
+    expect(screen.getByTestId('matter-metadata-resolve-first')).toHaveTextContent(
+      'Repair or relink the device to edit it.',
+    );
+    expect(screen.getByTestId('matter-action-repair').className).toContain('button--primary');
+  });
+
+  it('shows Repair on a claimed device as a secondary action', async () => {
+    renderMatter('/matter/devices/node-1');
+    await screen.findByTestId('matter-lifecycle-actions');
+    expect(screen.getByTestId('matter-action-repair').className).not.toContain('button--primary');
+  });
+
+  it('leaves unnamed attributes out and never shows a structured value as JSON', async () => {
+    devices.getNode.mockResolvedValue(detail('node-1'));
+    devices.getEndpointState.mockImplementation(async (id: string) => ({
+      endpointRef: id,
+      states: [
+        stateEntry(),
+        stateEntry({ stateKey: 'onOff.attr16384', reported: { value: 1, observedAt: null, receivedAt: null } }),
+        stateEntry({
+          stateKey: 'levelControl.currentLevel',
+          reported: { value: { level: 3, raw: [1, 2] }, observedAt: null, receivedAt: null },
+        }),
+      ],
+    }));
+    renderMatter('/matter/devices/node-1');
+    await waitFor(() => expect(screen.getAllByTestId('matter-state-entry').length).toBeGreaterThan(0));
+    const tree = screen.getByTestId('matter-endpoint-tree');
+    expect(tree.textContent).not.toMatch(/attr16384|\{|"level"/);
+    expect(within(tree).getAllByText('Structured value').length).toBeGreaterThan(0);
   });
 
   it('has an error state of its own with a way back', async () => {
@@ -601,6 +729,49 @@ describe('live updates', () => {
       await vi.advanceTimersByTimeAsync(LIVE_FALLBACK_POLL_MS * 2);
     });
     expect(calls()).toBe(afterRecovery);
+  });
+
+  it('marks the state of an endpoint as not live when its topic is unavailable, and polls it', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    devices.getNode.mockResolvedValue(detail('node-1'));
+    devices.getEndpointState.mockImplementation(async (id: string) => ({ endpointRef: id, states: [] }));
+    const { live } = renderMatter('/matter/devices/node-1');
+    await screen.findByTestId('matter-endpoint-tree');
+    await waitFor(() => expect(screen.getAllByTestId('matter-state-entries').length).toBeGreaterThan(0));
+    expect(screen.queryByTestId('matter-state-live-stale')).not.toBeInTheDocument();
+    const calls = () => devices.getEndpointState.mock.calls.filter(([id]) => id === 'endpoint-1').length;
+
+    act(() => live.unavailable('device-state'));
+    expect((await screen.findAllByTestId('matter-state-live-stale'))[0]).toHaveTextContent('Not live');
+    // The device itself is not flagged: only its state topic is down.
+    expect(screen.queryByTestId('matter-device-stale')).not.toBeInTheDocument();
+    const before = calls();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LIVE_FALLBACK_POLL_MS);
+    });
+    expect(calls()).toBeGreaterThanOrEqual(before + 1);
+  });
+
+  it('reads a current state again when it is due to turn stale', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    devices.getNode.mockResolvedValue(detail('node-1'));
+    const observedAt = new Date().toISOString();
+    devices.getEndpointState.mockImplementation(async (id: string) => ({
+      endpointRef: id,
+      states: [stateEntry({ staleAfterMs: 30_000, reported: { value: true, observedAt, receivedAt: observedAt } })],
+    }));
+    renderMatter('/matter/devices/node-1');
+    await waitFor(() => expect(screen.getAllByTestId('matter-state-fresh').length).toBeGreaterThan(0));
+    const calls = () => devices.getEndpointState.mock.calls.filter(([id]) => id === 'endpoint-1').length;
+    const before = calls();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000);
+    });
+    expect(calls()).toBe(before);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    expect(calls()).toBeGreaterThanOrEqual(before + 1);
   });
 
   it('marks a device detail stale when its topic is unavailable', async () => {

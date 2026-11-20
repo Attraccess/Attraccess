@@ -1,30 +1,31 @@
 import { DateTimeDisplay, StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { useMatterTranslations } from '../i18n';
 import type { ReconciliationStatus } from '../devices/api';
-import type { MatterResource } from '../useMatterResource';
-import { HealthCard, type HealthLevel } from './HealthCard';
-
-const LEVEL: Record<NonNullable<ReconciliationStatus['lastResult']>, HealthLevel> = {
-  applied: 'ok',
-  skipped_unavailable: 'warning',
-  skipped_non_authoritative: 'warning',
-  failed: 'danger',
-};
+import { reconciliationLevel } from '../healthLevel';
+import { HealthCard } from './HealthCard';
 
 /** The last reconciliation of the device records with the sidecar's inventory, and the event counters. */
-export function ReconciliationHealthCard({ resource }: Readonly<{ resource: MatterResource<ReconciliationStatus> }>) {
+export function ReconciliationHealthCard({
+  data,
+  error,
+  loading,
+}: Readonly<{ data: ReconciliationStatus | null; error: string | null; loading: boolean }>) {
   const { t } = useMatterTranslations();
-  const { data, error } = resource;
-  const level: HealthLevel = data ? (data.lastResult ? LEVEL[data.lastResult] : 'unknown') : 'unknown';
+  const level = reconciliationLevel(data?.lastResult);
+  // Not loaded (failed): unknown. Loaded without a run yet: "No reconciliation yet".
+  let levelLabel = t('health.levels.unknown');
+  if (data)
+    levelLabel = t(
+      data.lastResult ? `devices.reconciliation.result.${data.lastResult}` : 'devices.reconciliation.never',
+    );
   const counters = Object.entries(data?.events ?? {}).filter(([, count]) => count > 0);
   return (
     <HealthCard
       title={t('health.reconciliation.title')}
       level={level}
-      levelLabel={
-        data?.lastResult ? t(`devices.reconciliation.result.${data.lastResult}`) : t('devices.reconciliation.never')
-      }
+      levelLabel={levelLabel}
       fix={{ tab: 'devices', label: t('health.fix.devices') }}
+      loading={loading && !data}
       dataCy="matter-health-reconciliation"
     >
       {error && !data && (

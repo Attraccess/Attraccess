@@ -1,28 +1,24 @@
 import { Card, Chip } from '@heroui/react';
 import { useMatterTranslations } from '../i18n';
-import type { MatterEndpointDetail, Metadata } from './api';
+import type { MatterEndpointDetail } from './api';
 import { BridgeInfo } from './BridgeInfo';
+import type { EndpointCardOptions } from './EndpointTreeProps';
 import { FlowUsage } from './FlowUsage';
 import { MetadataForm } from './MetadataForm';
 import { StateEntries } from './StateEntries';
 
 /**
  * One endpoint: its name (editable with `canEdit`), the profile as a human label, the bridge relation, the current
- * state and the flow usage placeholder. Raw device types and cluster IDs are in the Diagnostics section, not here.
+ * state and its flow usage. Raw device types and cluster IDs are in the Diagnostics section, not here.
  */
 export function EndpointCard({
   endpoint,
   bridgeName,
   canEdit,
   canRead,
+  showFlowUsage,
   onRename,
-}: Readonly<{
-  endpoint: MatterEndpointDetail;
-  bridgeName: string;
-  canEdit: boolean;
-  canRead: boolean;
-  onRename: (endpointRef: string, changes: Partial<Metadata>) => Promise<unknown>;
-}>) {
+}: Readonly<{ endpoint: MatterEndpointDetail } & EndpointCardOptions>) {
   const { t } = useMatterTranslations();
   const title = endpoint.metadata.displayName ?? t('devices.endpoint.number', { number: endpoint.endpointId });
   return (
@@ -46,7 +42,7 @@ export function EndpointCard({
           />
         )}
         <StateEntries endpointRef={endpoint.id} enabled={canRead} />
-        <FlowUsage />
+        {showFlowUsage && <FlowUsage endpointRef={endpoint.id} />}
       </Card.Content>
     </Card>
   );

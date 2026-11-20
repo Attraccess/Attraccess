@@ -11,5 +11,9 @@ export function FamilyNotice({ family }: Readonly<{ family: FeatureFamily }>) {
   const { status } = useMatterConnection();
   // No status at all (the user may not read the connection, or it has not loaded) is not "not connected".
   const availability = status ? familyAvailability(status, family) : 'noStatus';
-  return <p data-cy={`matter-family-notice-${family}`}>{t(`notAvailable.${availability}`, { family })}</p>;
+  return (
+    <p data-cy={`matter-family-notice-${family}`}>
+      {t(`notAvailable.${availability}`, { family: t(`health.capabilities.family.${family}`) })}
+    </p>
+  );
 }

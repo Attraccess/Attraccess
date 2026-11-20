@@ -10,8 +10,9 @@ export const BACKUP_OVERDUE_MS = 2 * 24 * 60 * 60 * 1000;
 export function BackupHealthCard({
   status,
   error,
+  loading = false,
   now = Date.now(),
-}: Readonly<{ status: FabricBackupStatus | null; error: string | null; now?: number }>) {
+}: Readonly<{ status: FabricBackupStatus | null; error: string | null; loading?: boolean; now?: number }>) {
   const { t } = useMatterTranslations();
   const { backups } = status ?? {};
   const last = backups?.lastSuccessfulAt ?? null;
@@ -32,6 +33,7 @@ export function BackupHealthCard({
       level={level}
       levelLabel={t(`health.backup.${key}`)}
       fix={{ tab: 'infrastructure', label: t('health.fix.infrastructure') }}
+      loading={loading && !status}
       dataCy="matter-health-backup"
     >
       {error && !status && (
@@ -43,7 +45,9 @@ export function BackupHealthCard({
         <>
           <p data-cy="matter-health-backup-last">
             {t('health.backup.last')}: {last ? <DateTimeDisplay date={last} /> : t('health.backup.noneYet')}
-            {ageDays !== null && <> ({t('health.backup.age', { days: ageDays })})</>}
+            {ageDays !== null && (
+              <> ({ageDays === 0 ? t('health.backup.today') : t('health.backup.age', { count: ageDays })})</>
+            )}
           </p>
           {backups.nextScheduledAt && (
             <p>

@@ -5,7 +5,7 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, configure, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { detail, node, status } from './test-utils/fixtures';
+import { detail, node, reconciliation, status } from './test-utils/fixtures';
 import { ALL_KEYS, renderMatter, signIn } from './test-utils/renderMatter';
 
 const api = vi.hoisted(() => ({
@@ -35,14 +35,7 @@ beforeEach(() => {
   api.getSettings.mockResolvedValue(null);
   devices.listNodes.mockResolvedValue([]);
   devices.getEndpointState.mockResolvedValue({ endpointRef: 'endpoint-1', states: [] });
-  devices.getReconciliation.mockResolvedValue({
-    lastStartedAt: null,
-    lastFinishedAt: null,
-    lastResult: null,
-    lastSummary: null,
-    sidecarFabricId: null,
-    events: {},
-  });
+  devices.getReconciliation.mockResolvedValue(reconciliation());
 });
 
 afterEach(() => {

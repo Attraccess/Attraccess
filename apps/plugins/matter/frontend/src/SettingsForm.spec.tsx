@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, configure, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, configure, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ConnectionSettings } from './api';
@@ -168,27 +168,84 @@ describe('clearing the CA certificate (ATT-1202)', () => {
 });
 
 describe('focus after a dialog closes (ATT-1202)', () => {
+  /** A promise the test settles, to keep a request pending while it moves the focus away. */
+  function deferred<T>() {
+    let resolve: (value: T) => void = () => undefined;
+    let reject: (error: Error) => void = () => undefined;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  }
+
+  // While the request runs the focus may move away from the pressed button (the user clicks elsewhere, the button
+  // re-renders); the dialog that opens afterwards would hand it back to wherever it is then. Moving it to the URL field
+  // while the request is pending reproduces that: only the form's own focus handling brings it back to the button.
+  const moveFocusAway = () => act(() => urlInput().focus());
+
   it('returns to Save after the success dialog', async () => {
     const user = userEvent.setup();
-    setup();
+    const pending = deferred<ConnectionSettings>();
+    render(<SettingsForm settings={configuredSettings} onSave={() => pending.promise} onRemove={vi.fn()} />);
     await user.type(urlInput(), '/');
     await user.click(save());
+    moveFocusAway();
+    await act(async () => pending.resolve(configuredSettings));
     const dialog = await screen.findByTestId('matter-saved-dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(save()).toHaveFocus());
   });
 
-  it('returns to Save after the error dialog', async () => {
+  it('returns to Save after the error dialog of a failed save', async () => {
     const user = userEvent.setup();
-    const onSave = vi.fn(async () => {
-      throw new Error('nope');
-    });
-    render(<SettingsForm settings={configuredSettings} onSave={onSave} onRemove={vi.fn()} />);
+    const pending = deferred<ConnectionSettings>();
+    render(<SettingsForm settings={configuredSettings} onSave={() => pending.promise} onRemove={vi.fn()} />);
     await user.type(urlInput(), '/');
     await user.click(save());
+    moveFocusAway();
+    await act(async () => pending.reject(new Error('nope')));
     const dialog = await screen.findByTestId('matter-error-dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(save()).toHaveFocus());
+  });
+
+  it('returns to Remove after the error dialog of a failed removal', async () => {
+    const user = userEvent.setup();
+    const pending = deferred<void>();
+    render(<SettingsForm settings={configuredSettings} onSave={vi.fn()} onRemove={() => pending.promise} />);
+    await user.click(screen.getByTestId('matter-remove'));
+    const confirm = await screen.findByTestId('matter-remove-dialog');
+    await user.click(within(confirm).getByRole('button', { name: 'Remove' }));
+    moveFocusAway();
+    await act(async () => pending.reject(new Error('nope')));
+    const dialog = await screen.findByTestId('matter-error-dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.getByTestId('matter-remove')).toHaveFocus());
+  });
+
+  it('moves to the URL after a removal, since Remove is gone', async () => {
+    const user = userEvent.setup();
+    const pending = deferred<void>();
+    const onRemove = () => pending.promise;
+    const view = render(<SettingsForm settings={configuredSettings} onSave={vi.fn()} onRemove={onRemove} />);
+    await user.click(screen.getByTestId('matter-remove'));
+    const confirm = await screen.findByTestId('matter-remove-dialog');
+    await user.click(within(confirm).getByRole('button', { name: 'Remove' }));
+    // The page reloads the (now empty) settings before the removal resolves.
+    const removed: ConnectionSettings = {
+      url: null,
+      credentialConfigured: false,
+      credentialUpdatedAt: null,
+      caCertificate: null,
+      updatedAt: null,
+    };
+    await act(async () => {
+      view.rerender(<SettingsForm settings={removed} onSave={vi.fn()} onRemove={onRemove} />);
+      pending.resolve();
+    });
+    await waitFor(() => expect(screen.queryByTestId('matter-remove')).not.toBeInTheDocument());
+    await waitFor(() => expect(urlInput()).toHaveFocus());
   });
 
   it('returns to Remove when the removal is cancelled', async () => {
