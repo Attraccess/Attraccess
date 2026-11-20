@@ -66,10 +66,11 @@ afterEach(() => {
   Reflect.deleteProperty(navigator, 'bluetooth');
 });
 
-it('asks for the bridge service and subscribes to notifications before the first write', async () => {
+it('lists readers and bridges in setup mode and subscribes to notifications before the first write', async () => {
   const ble = await connected();
+  // The setup service, or a name like "Attractap Touch 71C8", "Attractap Lite 71C8" or "Attractap Bridge 71C8".
   expect(requestDevice).toHaveBeenCalledWith({
-    filters: [{ services: [SERVICE] }, { namePrefix: 'Attractap Bridge' }],
+    filters: [{ services: [SERVICE] }, { namePrefix: 'Attractap' }],
     optionalServices: [SERVICE],
   });
   expect(device.tx.startNotifications).toHaveBeenCalledOnce();

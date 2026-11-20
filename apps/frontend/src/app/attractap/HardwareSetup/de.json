@@ -16,23 +16,23 @@
       "label": "Per USB verbinden"
     },
     "bluetooth": {
-      "hint": "Ist die Firmware schon auf deiner Attractap BLE-Bridge und die Bridge noch nicht gekoppelt? Halte ihren Taster gedrückt, bis alle LEDs schnell blinken (etwa 3 Sekunden), und lass dann los: Die Bluetooth-LED blinkt doppelt, und du kannst sie ohne Kabel einrichten. Halte den Taster nicht 10 Sekunden, das setzt die Bridge zurück. Das geht nur mit der BLE-Bridge.",
+      "hint": "Schon geflasht und noch nicht gekoppelt? Richte das Gerät ohne Kabel ein, solange seine Bluetooth-Einrichtung offen ist. Ein Attractap Touch öffnet sie für 10 Minuten nach dem Start oder mit der Schaltfläche „Bluetooth-Einrichtung“ auf seinem Display. Ein Attractap Lite öffnet sie für 10 Minuten nach dem Einschalten (sein LED-Ring pulsiert blau). Eine BLE-Bridge öffnet sie, wenn du ihren Taster 3 Sekunden gedrückt hältst (die Bluetooth-LED blinkt doppelt; 10 Sekunden setzen die Bridge zurück).",
       "button": "Per Bluetooth einrichten",
       "unavailable": {
         "title": "Bluetooth-Einrichtung ist in diesem Browser nicht verfügbar",
-        "description": "Die Einrichtung per Bluetooth braucht Web Bluetooth, das Chrome und Edge auf dem Desktop und unter Android (über HTTPS) bieten. Öffne die Seite dort oder richte die Bridge mit einem USB-TTL-Adapter ein; auch das braucht Chrome oder Edge auf einem Computer."
+        "description": "Die Einrichtung per Bluetooth braucht Web Bluetooth, das Chrome und Edge auf dem Desktop und unter Android (über HTTPS) bieten. Öffne die Seite dort oder verbinde das Gerät per USB; auch das braucht Chrome oder Edge auf einem Computer."
       },
       "failed": {
-        "title": "Verbindung zur Bridge fehlgeschlagen",
-        "description": "Prüfe, ob die Bluetooth-LED der Bridge doppelt blinkt (das Einrichtungsfenster bleibt 10 Minuten offen), halte sie nah an dieses Gerät und versuche es erneut. Klappt es weiterhin nicht, richte sie mit einem USB-TTL-Adapter ein."
+        "title": "Bluetooth-Verbindung fehlgeschlagen",
+        "description": "Prüfe, ob die Bluetooth-Einrichtung des Geräts noch offen ist (sie schließt nach 10 Minuten), halte es nah an dieses Gerät und versuche es erneut. Wähle den Namen, den der Leser auf seinem Display zeigt. Klappt es weiterhin nicht, richte es per USB ein."
       },
       "lost": {
         "title": "Bluetooth-Verbindung getrennt",
-        "description": "Die Bridge hat die Verbindung getrennt: Sie war außer Reichweite, wurde neu gestartet oder ihr 10-minütiges Einrichtungsfenster ist abgelaufen. Noch nicht gespeicherte Einstellungen sind verloren. Ist die Bridge noch nicht gekoppelt, halte ihren Taster gedrückt, bis alle LEDs schnell blinken (etwa 3 Sekunden), lass los und verbinde dich erneut."
+        "description": "Das Gerät hat die Verbindung getrennt: Es war außer Reichweite, wurde neu gestartet oder sein 10-minütiges Einrichtungsfenster ist abgelaufen. Noch nicht gespeicherte Einstellungen sind verloren. Ist es noch nicht gekoppelt, öffne seine Bluetooth-Einrichtung erneut (siehe oben) und verbinde dich noch einmal."
       },
       "closedAfterPairing": {
-        "title": "Bridge eingerichtet",
-        "description": "Die Bridge ist mit Attraccess verbunden und hat ihre Bluetooth-Verbindung wie erwartet getrennt."
+        "title": "Einrichtung abgeschlossen",
+        "description": "Das Gerät ist mit Attraccess verbunden und hat seine Bluetooth-Verbindung wie erwartet getrennt."
       }
     }
   },

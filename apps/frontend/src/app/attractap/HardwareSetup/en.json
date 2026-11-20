@@ -16,23 +16,23 @@
       "label": "Connect via USB"
     },
     "bluetooth": {
-      "hint": "Is the firmware already on your Attractap BLE Bridge and the bridge not paired yet? Hold its button until all LEDs blink fast (about 3 seconds), then let go: the Bluetooth LED double-flashes and you can set it up without a cable. Do not hold the button for 10 seconds, that resets the bridge. This only works for the BLE Bridge.",
+      "hint": "Already flashed and not paired yet? Set it up without a cable while its Bluetooth setup is open. An Attractap Touch opens it for 10 minutes after it starts, or with the \"Bluetooth setup\" button on its screen. An Attractap Lite opens it for 10 minutes after power-up (its ring pulses blue). A BLE Bridge opens it when you hold its button for 3 seconds (the Bluetooth LED double-flashes; holding it for 10 seconds resets the bridge).",
       "button": "Set up over Bluetooth",
       "unavailable": {
         "title": "Bluetooth setup is not available in this browser",
-        "description": "Setting up over Bluetooth needs Web Bluetooth, which Chrome and Edge offer on desktop and Android (over HTTPS). Open this page there, or set the bridge up with a USB-TTL adapter, which also needs Chrome or Edge on a computer."
+        "description": "Setting up over Bluetooth needs Web Bluetooth, which Chrome and Edge offer on desktop and Android (over HTTPS). Open this page there, or connect the device via USB, which also needs Chrome or Edge on a computer."
       },
       "failed": {
-        "title": "Could not connect to the bridge",
-        "description": "Make sure the bridge's Bluetooth LED double-flashes (its setup window stays open for 10 minutes), keep it close to this device and try again. If it keeps failing, set it up with a USB-TTL adapter."
+        "title": "Could not connect over Bluetooth",
+        "description": "Make sure the device's Bluetooth setup is still open (it closes after 10 minutes), keep it close to this device and try again. Pick the name the reader shows on its screen. If it keeps failing, set it up via USB."
       },
       "lost": {
         "title": "Bluetooth connection lost",
-        "description": "The bridge dropped the connection: it was out of range, restarted or its 10-minute setup window closed. Settings you had not saved yet are gone. If the bridge is not paired yet, hold its button until all LEDs blink fast (about 3 seconds), let go and connect again."
+        "description": "The device dropped the connection: it was out of range, restarted or its 10-minute setup window closed. Settings you had not saved yet are gone. If it is not paired yet, open its Bluetooth setup again (see above) and connect again."
       },
       "closedAfterPairing": {
-        "title": "Bridge set up",
-        "description": "The bridge is connected to Attraccess and closed its Bluetooth connection, as expected."
+        "title": "Setup complete",
+        "description": "The device is connected to Attraccess and closed its Bluetooth connection, as expected."
       }
     }
   },

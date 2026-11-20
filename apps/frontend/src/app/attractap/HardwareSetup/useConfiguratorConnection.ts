@@ -6,7 +6,7 @@ import { ESPTools } from '../../../utils/esp-tools';
 export interface ConfiguratorConnection {
   /** The connected transport, or null while nothing is connected. */
   kind: ConfiguratorTransportKind | null;
-  /** The bridge closed Bluetooth on purpose after its reader was authenticated (not an error). */
+  /** The reader or bridge closed Bluetooth on purpose after it was authenticated (not an error). */
   closedAfterPairing: boolean;
   /** The Bluetooth link dropped unexpectedly; the unsaved form is gone, so say why. */
   bluetoothLost: boolean;

@@ -11,7 +11,7 @@ import en from './en.json';
 type BluetoothNotice = 'unavailable' | 'failed' | null;
 
 interface Props {
-  /** The bridge closed Bluetooth after its reader was approved; say so instead of starting blank. */
+  /** The reader or bridge closed Bluetooth after it was approved; say so instead of starting blank. */
   closedAfterPairing?: boolean;
   /** The Bluetooth link dropped during setup; explain instead of starting blank. */
   bluetoothLost?: boolean;
@@ -44,7 +44,7 @@ export function ConnectScreen({ closedAfterPairing = false, bluetoothLost = fals
       // false: the user closed the device picker, nothing to report.
       await BleConfigurator.getInstance().connect();
     } catch (err) {
-      console.error('Failed to connect to the bridge over Bluetooth', err);
+      console.error('Failed to connect over Bluetooth', err);
       setBluetoothNotice('failed');
     } finally {
       setIsConnectingBluetooth(false);
