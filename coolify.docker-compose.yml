@@ -164,6 +164,9 @@ services:
       - /:/host:ro,rslave
 
   cadvisor:
+    # Enable with COMPOSE_PROFILES=cadvisor when container metrics are needed.
+    profiles:
+      - cadvisor
     image: gcr.io/cadvisor/cadvisor:v0.52.1
     restart: unless-stopped
     privileged: true
