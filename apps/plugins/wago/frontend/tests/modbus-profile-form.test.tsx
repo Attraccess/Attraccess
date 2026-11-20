@@ -38,9 +38,12 @@ function Harness({ initial = custom }: { initial?: ModbusProfile }) {
 const set = (element: HTMLElement, value: string) => fireEvent.change(element, { target: { value } });
 /** Signals render collapsed in the front panel, so a test opens a signal's disclosure before editing inside it. */
 const openPanel = (title: string) => {
-  const details = screen.getByText(title).closest('details') as HTMLElement;
-  fireEvent.click(within(details).getByText(title));
-  fireEvent(details, new Event('toggle'));
+  const details = screen.getByText(title).closest('details') as HTMLDetailsElement;
+  // Opening is idempotent: a second call keeps the panel and its mounted fields open.
+  if (!details.open) {
+    details.open = true;
+    fireEvent(details, new Event('toggle'));
+  }
   return within(details);
 };
 const measurementPanel = () => openPanel('Measurement: Boiler temp');
@@ -172,6 +175,7 @@ describe('custom profile', () => {
     });
     expect(latest.actions).toHaveLength(2);
     expect(latest.actions[1]).toMatchObject({ name: 'Switch', functionCode: 5, onValue: 1, offValue: 0 });
+    // A measurement's remove button mounts only with its fields, so the first measurement is opened first.
     measurementPanel();
     await user.click(screen.getAllByRole('button', { name: 'Remove measurement' })[0]);
     await user.click(screen.getAllByRole('button', { name: 'Remove action' })[0]);
@@ -196,6 +200,7 @@ describe('custom profile', () => {
 
   it('shows the custom-profile hint and no identifier fields', () => {
     render(<Harness />);
+    expect(screen.getByText('Custom register map — verify against the device manual before use.')).toBeTruthy();
     expect(screen.queryByText(/Read-only profile/)).toBeNull();
     expect(screen.queryByLabelText('Profile ID')).toBeNull();
     const panel = measurementPanel();

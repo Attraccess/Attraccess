@@ -33,12 +33,12 @@ const preview = (extra: Partial<RevisionPreview> = {}): RevisionPreview => ({
   ...extra,
 });
 
-function renderReview(value: RevisionPreview, onPublish = vi.fn()) {
+function renderReview(value: RevisionPreview, onPublish = vi.fn(), force = false) {
   render(
     <RollbackReview
       preview={value}
       names={{ output: 'Laser power' }}
-      force={false}
+      force={force}
       onForceChange={vi.fn()}
       disabled={false}
       busy={false}
@@ -58,8 +58,9 @@ afterEach(() => {
 it('reviews a rollback when the controller has no current revision', () => {
   const onPublish = renderReview(preview({ current: null }));
   expect(screen.getByText('Restore revision 1 as a new revision')).toBeTruthy();
-  expect(screen.getAllByText(/^Before:/).length).toBeGreaterThan(0);
-  expect(screen.getAllByText(/^After:/).length).toBeGreaterThan(0);
+  // The empty side of the comparison is the controller's missing configuration.
+  expect(screen.getAllByText('Before: Not configured').length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/^After: Version: 1;/).length).toBeGreaterThan(0);
   fireEvent.click(screen.getByRole('button', { name: 'Publish rollback as new revision' }));
   expect(onPublish).toHaveBeenCalledTimes(1);
 });
@@ -78,7 +79,12 @@ it.each([[undefined], [[]]])('shows no names section without a metadata diff (%j
   expect(screen.queryByRole('region', { name: 'Names and presets' })).toBeNull();
 });
 
-it('keeps publication disabled until the flow impacts are acknowledged', () => {
-  renderReview(preview({ impacts: [{ channelId: 'output', message: 'Channel removed.', references: [] }] }));
-  expect(screen.getByRole('button', { name: 'Publish rollback as new revision' }).hasAttribute('disabled')).toBe(true);
+it.each([
+  [false, true],
+  [true, false],
+])('keeps publication disabled until the flow impacts are acknowledged (acknowledged %s)', (force, disabled) => {
+  const impacts = [{ channelId: 'output', message: 'Channel removed.', references: [] }];
+  renderReview(preview({ impacts }), vi.fn(), force);
+  const publish = screen.getByRole('button', { name: 'Publish rollback as new revision' });
+  expect(publish.hasAttribute('disabled')).toBe(disabled);
 });

@@ -10,13 +10,13 @@ const impact = (references: ConfigurationImpact['references'], channelId = 'outp
   message,
   references,
 });
-const globalReference = {
+const globalReference: ConfigurationImpact['references'][number] = {
   resourceId: null,
   flowId: 12,
   flowName: 'Night shift',
   nodeId: 'node-9',
   nodeType: 'plugin.wago.command',
-} as ConfigurationImpact['references'][number];
+};
 
 function renderWarning(impacts: ConfigurationImpact[], names: Record<string, string> = {}, onChange = vi.fn()) {
   return render(<ImpactWarning impacts={impacts} names={names} acknowledged={false} onChange={onChange} />);
