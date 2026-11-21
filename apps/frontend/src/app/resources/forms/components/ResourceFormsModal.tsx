@@ -245,7 +245,8 @@ export function ResourceFormsModal({
   onSubmit,
   onCancel,
 }: ResourceFormsModalProps) {
-  const { t } = useTranslations({ en, de });
+  // React escapes the output; escaping form and field names again would show "A &amp; B".
+  const { t } = useTranslations({ en, de }, { escapeValues: false });
   const [values, setValues] = useState<Record<number, FieldValue>>({});
   const [errors, setErrors] = useState<Record<number, string | null>>({});
 
