@@ -96,8 +96,9 @@ def test_bt_setup_sets_up_and_pairs_a_fresh_reader(fresh_console, target, api, a
 
     # PIN over the encrypted link: the OS pairs on the first write (RX refuses unencrypted writes).
     lines = central("run", name, "auth.status.get", command("auth.code.set", {"newCode": PIN}))
-    # The first write met an unencrypted link and was refused; it went through once the OS had paired.
-    assert any("Insufficient" in line.get("refused", "") for line in lines), lines
+    # RX refuses writes on an unencrypted link (Insufficient Encryption); the OS pairs then. macOS either reports the
+    # refusal (bt_central.py retries) or holds the write until it has paired, so only record which one it was.
+    refused = [line["refused"] for line in lines if "refused" in line]
     assert reply(lines, "auth.status.get") == {"pinIsSet": False}
     assert reply(lines, "auth.code.set")["success"] is True
     hooks = ReaderTestHooks(console.stream(), PIN)
@@ -153,7 +154,7 @@ def test_bt_setup_sets_up_and_pairs_a_fresh_reader(fresh_console, target, api, a
     assert "Bluetooth setup open" not in console.since(mark)
     assert not any(device["name"] == name for device in central("scan", "10", name))
     heap_paired = read_heap(console)
-    save(artifacts, "pairing", {"name": name, "closedSecondsAfterAuthentication": round(closed_after, 1),
+    save(artifacts, "pairing", {"name": name, "refusedBeforePairing": refused, "closedSecondsAfterAuthentication": round(closed_after, 1),
                                 "heapWindowOpen": heap_open, "heapWindowClosed": heap_closed,
                                 "heapPairedAfterRestart": heap_paired, "pluginScan": scan})
 
