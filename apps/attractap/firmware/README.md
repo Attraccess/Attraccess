@@ -568,7 +568,9 @@ asset shared by those screens, embedded once with four-byte alignment through
 ## Host Tests
 
 From the repository root, run `pnpm nx run attractap-firmware:test`. It runs
-SupervisionFlow logic tests and the [real LVGL host-rendering harness](tests/display-theme/README.md).
+SupervisionFlow logic tests, the UTF-8-safe text copy used for server-supplied names (`tests/text`:
+display names are cut to 79 bytes in whole characters) and the
+[real LVGL host-rendering harness](tests/display-theme/README.md).
 The latter checks theme states, both logo assets, selected production screens
 and deterministic 480 x 480 rendering. The dedicated firmware CI runs both.
 

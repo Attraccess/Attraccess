@@ -2,6 +2,7 @@
 // FEATURE: api-mass-introduction
 
 #include "../api.hpp"
+#include "display-name.hpp"
 #include <cstring>
 #include <string>
 
@@ -47,8 +48,7 @@ void API::onMassIntroductionStart(JsonObject data)
     command.sessionId = stringField(payload, "sessionId");
     command.targetName = stringField(payload, "targetName");
     command.introducerUsername = stringField(payload, "introducerUsername");
-    command.introducerDisplayName = stringField(payload, "introducerDisplayName");
-    if (command.introducerDisplayName.empty()) command.introducerDisplayName = command.introducerUsername;
+    command.introducerDisplayName = displayNameOr(payload["introducerDisplayName"], command.introducerUsername);
     command.remainingMs = payload["remainingMs"].is<uint32_t>() ? payload["remainingMs"].as<uint32_t>() : 0;
     this->massIntroductionStartCallback(command);
 }
@@ -65,8 +65,7 @@ void API::onMassIntroductionResult(JsonObject data)
     result.error = stringField(payload, "error");
     result.success = result.error.empty() && payload["success"].is<bool>() && payload["success"].as<bool>();
     result.username = stringField(payload, "username");
-    result.displayName = stringField(payload, "displayName");
-    if (result.displayName.empty()) result.displayName = result.username;
+    result.displayName = displayNameOr(payload["displayName"], result.username);
     result.alreadyIntroduced = payload["alreadyIntroduced"].is<bool>() && payload["alreadyIntroduced"].as<bool>();
     result.participantCount =
         payload["participantCount"].is<uint32_t>() ? payload["participantCount"].as<uint32_t>() : 0;

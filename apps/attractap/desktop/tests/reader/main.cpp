@@ -57,6 +57,16 @@ int main(int argc, char **argv)
         std::cout << "PASS ATT-882 refused card journeys\n";
         return 0;
     }
+    if (argc > 1 && std::string(argv[1]) == "--display-names") {
+        // ATT-1385: the reader shows display names and keeps the username as the identity.
+        testDisplayNameParsing();
+        ReaderWorkflow workflow(argc > 2 ? argv[2] : "");
+        workflow.boot();
+        workflow.testDisplayNames();
+        std::filesystem::remove_all(workflow.storage);
+        std::cout << "PASS ATT-1385 display names\n";
+        return 0;
+    }
     if (argc > 1 && std::string(argv[1]) == "--with-clock") {
         // The same journeys on a reader that knows the time: the footer clock is on every screen and every
         // capture checks that it collides with no hint line, keyboard or button.

@@ -10,6 +10,7 @@
 #include "../../ui/ui_builder.hpp"
 #include "../../ui/ui_slots.hpp"
 #include "../../../platform.hpp"
+#include "../../../text/utf8_copy.hpp"
 #include <string>
 
 #include <cstring>
@@ -228,8 +229,7 @@ void Lockscreen::storeUsage(bool hasActiveUsage, const char *username, bool isUn
 {
     if (hasActiveUsage)
     {
-        strlcpy(this->username, username, API::MAX_DISPLAY_NAME_LEN);
-        this->username[API::MAX_DISPLAY_NAME_LEN - 1] = '\0';
+        copyUtf8(this->username, username, sizeof(this->username));
     }
     this->hasActiveUsage = hasActiveUsage;
     this->isUnderMaintenance = isUnderMaintenance;

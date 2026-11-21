@@ -219,6 +219,17 @@ void Application::resetSessionOnDisconnect() {
   this->nfc.enableCardDetection();
 }
 
+// The card holder as the card authentication describes them, before a personalised resource list arrives.
+void Application::showCardHolderDetails() {
+  Display::resourceDetailsScreen.setUserDetails(ResourceDetailsScreen::UserDetails{
+      .username = this->cardAuthenticationData.username,
+      .canManageResource = this->cardAuthenticationData.canManageResource,
+      .hasIntroduction = this->cardAuthenticationData.hasIntroduction,
+      .isIntroducer = this->cardAuthenticationData.isIntroducer,
+      .requiresSupervisor = this->cardAuthenticationData.requiresSupervisor,
+      .displayName = this->cardAuthenticationData.displayName});
+}
+
 void Application::updateSelectedResourceDetails() {
   for (uint16_t i = 0; i < this->resourceList.count; ++i) {
     const auto &resource = this->resourceList.items[i];
@@ -235,7 +246,8 @@ void Application::updateSelectedResourceDetails() {
       personalized ? resource.isIntroducer : legacy && this->cardAuthenticationData.isIntroducer,
       personalized ? resource.requiresSupervisor : legacy && this->cardAuthenticationData.requiresSupervisor,
       personalized && resource.canEndOtherSessions,
-      personalized});
+      personalized,
+      this->cardAuthenticationData.displayName});
     return;
   }
   // The selected resource was removed while the user was looking at it.
@@ -321,7 +333,7 @@ void Application::handleResourceDetailsButtonClick(
         requiresSupervisor = this->resourceList.items[i].requiresSupervisor;
     if (requiresSupervisor && !isTakeover) {
       this->beginActionPause();
-      this->supervision.beginReaderInitiated(this->cardAuthenticationData.username,
+      this->supervision.beginReaderInitiated(this->cardAuthenticationData.displayName,
                                              this->selectedResourceId);
       this->state = APPLICATION_STATE_SUPERVISION;
       this->externalState = EXTERNAL_STATE_NONE;

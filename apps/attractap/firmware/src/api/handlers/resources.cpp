@@ -3,6 +3,7 @@
 
 #include "../api.hpp"
 #include "resource-introducers.hpp"
+#include "../../text/utf8_copy.hpp"
 #include <functional>
 #include <string.h>
 #include <string>
@@ -225,7 +226,7 @@ void API::onResourceList(JsonObject data)
     const char *authenticatedUsername = data["payload"]["authenticatedUsername"].as<const char *>();
     strlcpy(result.authenticatedUsername, authenticatedUsername ? authenticatedUsername : "", sizeof(result.authenticatedUsername));
     const char *authenticatedDisplayName = data["payload"]["authenticatedDisplayName"].as<const char *>();
-    strlcpy(result.authenticatedDisplayName, authenticatedDisplayName && authenticatedDisplayName[0] ? authenticatedDisplayName : result.authenticatedUsername, sizeof(result.authenticatedDisplayName));
+    copyUtf8(result.authenticatedDisplayName, authenticatedDisplayName && authenticatedDisplayName[0] ? authenticatedDisplayName : result.authenticatedUsername, sizeof(result.authenticatedDisplayName));
 
     JsonArray arr = data["payload"]["resources"].as<JsonArray>();
     if (arr.isNull())
@@ -290,7 +291,7 @@ void API::onResourceList(JsonObject data)
             const char *username = aus["user"]["username"].as<const char *>();
             strlcpy(dst.activeUser, username ? username : "", sizeof(dst.activeUser));
             const char *displayName = aus["user"]["displayName"].as<const char *>();
-            strlcpy(dst.activeUserDisplayName, displayName && displayName[0] ? displayName : dst.activeUser, sizeof(dst.activeUserDisplayName));
+            copyUtf8(dst.activeUserDisplayName, displayName && displayName[0] ? displayName : dst.activeUser, sizeof(dst.activeUserDisplayName));
             const char *startIso = aus["startTime"].as<const char *>();
             dst.activeStartEpoch = parseIso8601ToTimeT(startIso);
             // Offset is optional for backwards compatibility; absent -> 0 (render UTC as before)
@@ -324,13 +325,14 @@ void API::onResourceList(JsonObject data)
             entry.id = session["id"].as<uint32_t>();
             strlcpy(entry.username, sessionUser, sizeof(entry.username));
             const char *sessionDisplayName = session["user"]["displayName"].as<const char *>();
-            strlcpy(entry.displayName, sessionDisplayName && sessionDisplayName[0] ? sessionDisplayName : entry.username, sizeof(entry.displayName));
+            copyUtf8(entry.displayName, sessionDisplayName && sessionDisplayName[0] ? sessionDisplayName : entry.username, sizeof(entry.displayName));
             dst.activeSessions.push_back(entry);
         }
 
         // Parse introducers: array of strings (usernames)
         dst.introducers = parseResourceIntroducers(resource["introducers"].as<JsonArrayConst>());
-        dst.introducerDisplayNames = parseResourceIntroducers(resource["introducerDisplayNames"].as<JsonArrayConst>());
+        dst.introducerDisplayNames = parseIntroducerDisplayNames(resource["introducers"].as<JsonArrayConst>(),
+                                                                 resource["introducerDisplayNames"].as<JsonArrayConst>());
 
         // Parse flowButtons: array of { id, label }
         dst.flowButtonCount = 0;

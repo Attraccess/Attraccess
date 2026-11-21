@@ -6,22 +6,9 @@
 #ifdef HAS_LVGL_DISPLAY
 #include "../platform.hpp"
 #include "../display/display.hpp"
+#include "../text/utf8_copy.hpp"
 #include <cstring>
 #include <string>
-
-namespace {
-// Server-supplied names may be cut to fit the event; never leave half a UTF-8 character behind.
-void copyText(char *destination, const std::string &source, size_t size) {
-    strlcpy(destination, source.c_str(), size);
-    if (source.size() < size) return;
-    size_t start = strlen(destination);
-    while (start > 0 && (static_cast<unsigned char>(destination[start - 1]) & 0xC0) == 0x80) --start;
-    if (start == 0) return;
-    const unsigned char lead = static_cast<unsigned char>(destination[start - 1]);
-    const size_t needed = lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;
-    if (strlen(destination) - (start - 1) < needed) destination[start - 1] = '\0';
-}
-}
 
 MassIntroductionFlow::MassIntroductionFlow(API &api, INfc &nfc, Beeper &beeper, Logger &logger,
                                            MassIntroductionScreen &screen)
@@ -34,9 +21,9 @@ void MassIntroductionFlow::onStart(const API::MassIntroductionStartCommand &comm
     event.type = EventType::Start;
     event.remainingMs = command.remainingMs;
     event.receivedAtMs = millis();
-    copyText(event.sessionId, command.sessionId, sizeof(event.sessionId));
-    copyText(event.name, command.targetName, sizeof(event.name));
-    copyText(event.introducer, command.introducerDisplayName, sizeof(event.introducer));
+    copyUtf8(event.sessionId, command.sessionId, sizeof(event.sessionId));
+    copyUtf8(event.name, command.targetName, sizeof(event.name));
+    copyUtf8(event.introducer, command.introducerDisplayName, sizeof(event.introducer));
     enqueue(event);
 }
 
@@ -46,17 +33,17 @@ void MassIntroductionFlow::onResult(const API::MassIntroductionResult &result) {
     event.success = result.success;
     event.alreadyIntroduced = result.alreadyIntroduced;
     event.participantCount = result.participantCount;
-    copyText(event.sessionId, result.sessionId, sizeof(event.sessionId));
-    copyText(event.name, result.displayName, sizeof(event.name));
-    copyText(event.code, result.error, sizeof(event.code));
+    copyUtf8(event.sessionId, result.sessionId, sizeof(event.sessionId));
+    copyUtf8(event.name, result.displayName, sizeof(event.name));
+    copyUtf8(event.code, result.error, sizeof(event.code));
     enqueue(event);
 }
 
 void MassIntroductionFlow::onEnd(const API::MassIntroductionEnd &end) {
     Event event = {};
     event.type = EventType::End;
-    copyText(event.sessionId, end.sessionId, sizeof(event.sessionId));
-    copyText(event.code, end.reason.empty() ? std::string("unknown") : end.reason, sizeof(event.code));
+    copyUtf8(event.sessionId, end.sessionId, sizeof(event.sessionId));
+    copyUtf8(event.code, end.reason.empty() ? std::string("unknown") : end.reason, sizeof(event.code));
     enqueue(event);
 }
 

@@ -51,14 +51,13 @@ private:
         bool success;
         uint8_t cardUid[7];
         uint8_t cardUidLength;
-        uint8_t supervisorCount;
         char error[64];
-        // Display names only (never compared): the screen shows people by their display name.
+        // Display name only (never compared): the screen shows people by their display name.
         char requesterName[API::MAX_DISPLAY_NAME_LEN];
-        char supervisorNames[API::MAX_INTRODUCERS][API::MAX_DISPLAY_NAME_LEN];
         uint32_t resourceId;
         uint32_t timeoutMs;
         uint32_t receivedAtMs;
+        uint32_t supervisorNamesSequence; // RequestResult: the supervisorNames it wrote
     };
 
     API &api;
@@ -73,6 +72,12 @@ private:
     uint32_t overflowEventSequence[static_cast<uint8_t>(EventType::Count)] = {};
     // Starts at one so zero unambiguously marks counter rollover.
     uint32_t nextOverflowEventSequence = 1;
+    // Supervisor display names of the latest RequestResult. They live here once instead of in every
+    // queue slot (8 names of up to 79 bytes); guarded by overflowEventsMux. A RequestResult whose
+    // sequence no longer matches was superseded by a newer one, which shows its own names.
+    char supervisorNames[API::MAX_INTRODUCERS][API::MAX_DISPLAY_NAME_LEN] = {};
+    uint8_t supervisorNameCount = 0;
+    uint32_t supervisorNamesSequence = 0;
     Phase phase = Phase::Idle;
     bool webInitiated = false;
     bool pendingWebStart = false;
@@ -110,6 +115,7 @@ private:
     bool takeOverflowEvent(Event &event);
     void processEvents(bool stopWhenWebStart = false);
     void processEvent(const Event &event);
+    void showSupervisorNames(const Event &event);
     void publishTerminalEvent(TerminalEvent event);
     void renderScreen(SupervisionScreen::Status status);
     void showError(bool terminal, uint32_t now);

@@ -409,12 +409,7 @@ bool Application::processAuthenticationState()
     }
 
 #ifdef HAS_LVGL_DISPLAY
-    Display::resourceDetailsScreen.setUserDetails(
-        ResourceDetailsScreen::UserDetails{
-            .username = this->cardAuthenticationData.username,
-            .canManageResource = this->cardAuthenticationData.canManageResource,
-            .hasIntroduction = this->cardAuthenticationData.hasIntroduction,
-            .isIntroducer = this->cardAuthenticationData.isIntroducer, .requiresSupervisor = this->cardAuthenticationData.requiresSupervisor, .displayName = this->cardAuthenticationData.displayName});
+    this->showCardHolderDetails();
 #endif
 
     this->state = APPLICATION_STATE_AUTHENTICATE_CARD;

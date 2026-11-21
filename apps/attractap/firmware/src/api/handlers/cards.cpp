@@ -3,6 +3,7 @@
 
 #include "../api.hpp"
 #include "../../rfid/rfid_contract.hpp"
+#include "display-name.hpp"
 #include <functional>
 #include <cstring>
 #include <string>
@@ -144,8 +145,7 @@ void API::onCardAuthenticationDetailsResponse(JsonObject data)
     CardAuthenticationDetailsResponse response;
     response.error = error;
     response.username = username;
-    response.displayName = payload["displayName"].is<const char *>() ? payload["displayName"].as<std::string>() : std::string("");
-    if (response.displayName.empty()) response.displayName = username;
+    response.displayName = displayNameOr(payload["displayName"], username);
     response.cardSessionId = payload["cardSessionId"].is<const char *>() ? payload["cardSessionId"].as<std::string>() : std::string("");
     if (error.empty() && !response.cardSessionId.empty())
     {
@@ -236,8 +236,7 @@ void API::onResetNfcCard(JsonObject data)
         return;
     }
     std::string username = payload["username"].is<const char *>() ? payload["username"].as<std::string>() : std::string("");
-    std::string displayName = payload["displayName"].is<const char *>() ? payload["displayName"].as<std::string>() : std::string("");
-    this->resetNfcCardCallback(username, displayName.empty() ? username : displayName);
+    this->resetNfcCardCallback(username, displayNameOr(payload["displayName"], username));
 }
 
 void API::onEnrollNewCardGetAvailableKeyNo(JsonObject data)
@@ -250,9 +249,7 @@ void API::onEnrollNewCardGetAvailableKeyNo(JsonObject data)
     }
 
     std::string username = data["payload"]["username"].as<std::string>();
-    std::string displayName = data["payload"]["displayName"].is<const char *>() ? data["payload"]["displayName"].as<std::string>() : std::string("");
-
-    this->enrollNewCardGetAvailableKeyNoCallback(username, displayName.empty() ? username : displayName);
+    this->enrollNewCardGetAvailableKeyNoCallback(username, displayNameOr(data["payload"]["displayName"], username));
 }
 
 void API::onEnrollNewCard(JsonObject data)

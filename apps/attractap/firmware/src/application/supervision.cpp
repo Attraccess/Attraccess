@@ -5,6 +5,7 @@
 #include "../platform.hpp"
 #include "../display/display.hpp"
 #endif
+#include "../text/utf8_copy.hpp"
 
 SupervisionFlow::SupervisionFlow(API &api, INfc &nfc, Beeper &beeper, Logger &logger,
                                  SupervisionScreen &screen)
@@ -42,7 +43,7 @@ void SupervisionFlow::enter(const char *requester, const FirmwareI18n::Text &hin
     errorMessage.clear();
     phaseChangedAtMs = now;
     activeDeadlineMs = deadlineMs;
-    strlcpy(requesterName, requester, sizeof(requesterName));
+    copyUtf8(requesterName, requester, sizeof(requesterName));
     nfc.resetCardPresence();
     nfc.enableCardDetection();
     hintMessage = hint;
@@ -76,7 +77,7 @@ void SupervisionFlow::armWebInitiated(const API::SupervisionStartCommand &comman
     event.receivedAtMs = millis();
     const std::string &shownRequester =
         command.requesterDisplayName.empty() ? command.requesterUsername : command.requesterDisplayName;
-    strlcpy(event.requesterName, shownRequester.c_str(), sizeof(event.requesterName));
+    copyUtf8(event.requesterName, shownRequester, sizeof(event.requesterName));
     enqueueEvent(event);
 }
 
@@ -141,13 +142,17 @@ void SupervisionFlow::onRequestResult(const API::SupervisionRequestResult &resul
     Event event = {};
     event.type = EventType::RequestResult;
     event.success = result.success;
-    event.supervisorCount = result.supervisorCount;
     strlcpy(event.error, result.error.c_str(), sizeof(event.error));
-    for (uint8_t i = 0; i < result.supervisorCount; ++i) {
+    const uint8_t count = result.supervisorCount < API::MAX_INTRODUCERS ? result.supervisorCount : API::MAX_INTRODUCERS;
+    portENTER_CRITICAL(&overflowEventsMux);
+    for (uint8_t i = 0; i < count; ++i) {
         const std::string &shown =
             result.supervisorDisplayNames[i].empty() ? result.supervisorNames[i] : result.supervisorDisplayNames[i];
-        strlcpy(event.supervisorNames[i], shown.c_str(), sizeof(event.supervisorNames[i]));
+        copyUtf8(supervisorNames[i], shown, sizeof(supervisorNames[i]));
     }
+    supervisorNameCount = count;
+    event.supervisorNamesSequence = ++supervisorNamesSequence;
+    portEXIT_CRITICAL(&overflowEventsMux);
     enqueueEvent(event);
 }
 
@@ -282,14 +287,7 @@ void SupervisionFlow::processEvent(const Event &event) {
             publishTerminalEvent(TerminalEvent::Failed);
             break;
         }
-        hintMessage = FirmwareI18n::Message::TapSupervisorCardOrApproveInTheAppWebInterface;
-        std::string names;
-        for (uint8_t i = 0; i < event.supervisorCount; ++i) {
-            if (i > 0) names += ", ";
-            names += event.supervisorNames[i];
-        }
-        if (!names.empty()) hintMessage = FirmwareI18n::Text::format(FirmwareI18n::Message::Breadcrumb, {hintMessage, FirmwareI18n::Text::literal(names)});
-        hintReady = true;
+        showSupervisorNames(event);
         break;
     }
     case EventType::CardAuthentication:
@@ -319,7 +317,7 @@ void SupervisionFlow::processEvent(const Event &event) {
             logger.debug("Ignoring duplicate supervision start");
             break;
         }
-        strlcpy(armedRequesterName, event.requesterName, sizeof(armedRequesterName));
+        copyUtf8(armedRequesterName, event.requesterName, sizeof(armedRequesterName));
         armedResourceId = event.resourceId;
         requestedAtMs = event.receivedAtMs;
         requestedTimeoutMs = event.timeoutMs > 0 ? event.timeoutMs : TIMEOUT_MS;
@@ -328,6 +326,26 @@ void SupervisionFlow::processEvent(const Event &event) {
     case EventType::Count:
         break;
     }
+}
+
+void SupervisionFlow::showSupervisorNames(const Event &event) {
+    // Copy the names out under the lock: building the text allocates, which a critical section must not.
+    char names[API::MAX_INTRODUCERS][API::MAX_DISPLAY_NAME_LEN];
+    portENTER_CRITICAL(&overflowEventsMux);
+    const bool current = event.supervisorNamesSequence == supervisorNamesSequence;
+    const uint8_t count = current ? supervisorNameCount : 0;
+    if (count > 0) memcpy(names, supervisorNames, sizeof(names[0]) * count);
+    portEXIT_CRITICAL(&overflowEventsMux);
+    if (!current) return; // a newer RequestResult is queued and shows its own names
+
+    hintMessage = FirmwareI18n::Message::TapSupervisorCardOrApproveInTheAppWebInterface;
+    std::string joined;
+    for (uint8_t i = 0; i < count; ++i) {
+        if (i > 0) joined += ", ";
+        joined += names[i];
+    }
+    if (!joined.empty()) hintMessage = FirmwareI18n::Text::format(FirmwareI18n::Message::Breadcrumb, {hintMessage, FirmwareI18n::Text::literal(joined)});
+    hintReady = true;
 }
 
 #endif
