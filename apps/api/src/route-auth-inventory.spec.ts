@@ -181,6 +181,17 @@ const REVIEWED_PUBLIC_ROUTES: Record<string, ReviewedPublicRoute> = {
     credential: 'random-token',
     rateLimit: true,
   },
+  'PublicWallController.snapshot': {
+    reason:
+      'big-screen status wall (status-wall plugin); machine names, photos and states only; revocable per-wall token',
+    credential: 'random-token',
+    rateLimit: true,
+  },
+  'PublicWallController.events': {
+    reason: 'live change stream for a status wall (status-wall plugin); carries no data; revocable per-wall token',
+    credential: 'random-token',
+    rateLimit: true,
+  },
   'SSOController.oidcUpdatePermissions': {
     reason: 'identity-provider provisioning, verified by the provider client secret',
     credential: 'shared-secret',

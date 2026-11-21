@@ -59,6 +59,7 @@ const HOST_DATA_METHODS: { [K in keyof PluginHostDataContext]: Record<keyof Plug
     listIdsInGroups: true,
     countUnhealthyEntries: true,
     listIntroducerUserIds: true,
+    listDisplay: true,
   },
   users: { getUsernames: true, getLocales: true, isActive: true, listIdsWithAnyPermission: true },
   settings: { getApp: true },

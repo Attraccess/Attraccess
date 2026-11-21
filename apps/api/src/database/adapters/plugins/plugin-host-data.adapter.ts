@@ -20,7 +20,8 @@ import type {
 } from '@attraccess/plugins-backend-sdk';
 import { handleOfScope } from '../../../plugin-system/persistence/plugin-transaction-scope';
 import { Brackets, DataSource, EntityManager, In, SelectQueryBuilder } from 'typeorm';
-import type { PluginResourceModel } from '@attraccess/application-models';
+import type { PluginResourceDisplayModel, PluginResourceModel } from '@attraccess/application-models';
+import { resourceImageUrl } from '../../../resources/resource-image-url';
 
 /** Same predicate core uses for hidden resource groups (ResourceGroupsService.ACTIVE_INTRODUCTION_EXISTS_SQL). */
 const ACTIVE_INTRODUCTION_EXISTS_SQL = `EXISTS (
@@ -70,6 +71,22 @@ class ResourceDirectory implements PluginResourceDirectory {
       .where('resource.id IN (:...ids)', { ids })
       .getMany();
     return new Map(rows.map((row) => [row.id, row.name]));
+  }
+
+  async listDisplay(resourceIds?: number[]): Promise<PluginResourceDisplayModel[]> {
+    const query = this.source()
+      .getRepository(Resource)
+      .createQueryBuilder('resource')
+      .select(['resource.id', 'resource.name', 'resource.imageFilename'])
+      .orderBy('resource.name', 'ASC')
+      .addOrderBy('resource.id', 'ASC');
+    if (resourceIds) {
+      const ids = unique(resourceIds);
+      if (ids.length === 0) return [];
+      query.where('resource.id IN (:...ids)', { ids });
+    }
+    const rows = await query.getMany();
+    return rows.map((row) => ({ id: row.id, name: row.name, imageUrl: resourceImageUrl(row.id, row.imageFilename) }));
   }
 
   async filterVisible(userId: number, resourceIds: number[], options?: { seeAll?: boolean }): Promise<number[]> {

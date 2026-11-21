@@ -59,7 +59,13 @@ describe('plugin host data adapter on a real database', () => {
       description: null,
       supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED,
     };
-    const printer = await resources.save({ ...base, name: 'Printer', maxParallelSessions: 3, groups: [visibleGroup] });
+    const printer = await resources.save({
+      ...base,
+      name: 'Printer',
+      maxParallelSessions: 3,
+      groups: [visibleGroup],
+      imageFilename: 'printer.webp',
+    });
     const door = await resources.save({
       ...base,
       name: 'Door',
@@ -185,6 +191,20 @@ describe('plugin host data adapter on a real database', () => {
         [ids.door, 'Door'],
       ]);
       expect((await hostData().resources.getNames([])).size).toBe(0);
+    });
+
+    it('lists name and public image URL sorted by name, for the given ids or every resource', async () => {
+      expect(await hostData().resources.listDisplay([ids.printer, ids.door, 999])).toEqual([
+        { id: ids.door, name: 'Door', imageUrl: null },
+        { id: ids.printer, name: 'Printer', imageUrl: `/cdn/resources/${ids.printer}/original/printer.webp` },
+      ]);
+      expect(await hostData().resources.listDisplay([])).toEqual([]);
+      // Soft-deleted resources are left out of the full list.
+      expect((await hostData().resources.listDisplay()).map((resource) => resource.name)).toEqual([
+        'Door',
+        'Printer',
+        'Secret',
+      ]);
     });
 
     it('reads a resource inside the transaction of a scope it is given, and refuses a closed scope', async () => {

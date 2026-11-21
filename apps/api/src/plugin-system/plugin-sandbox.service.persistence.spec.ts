@@ -67,6 +67,7 @@ function buildBaseContext(events: EventEmitter2): PluginContext {
         listIdsInGroups: jest.fn(async () => []),
         countUnhealthyEntries: jest.fn(async () => 0),
         listIntroducerUserIds: jest.fn(async () => []),
+        listDisplay: jest.fn(async () => []),
       },
       users: {
         getUsernames: jest.fn(async () => new Map()),

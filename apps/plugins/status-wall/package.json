@@ -1,0 +1,50 @@
+{
+  "name": "@attraccess/plugin-status-wall",
+  "version": "0.1.0-alpha.0",
+  "description": "Official Attraccess plugin: live status walls for big screens.",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Attraccess/Attraccess.git",
+    "directory": "apps/plugins/status-wall"
+  },
+  "homepage": "https://attraccess.org",
+  "keywords": [
+    "attraccess-plugin",
+    "attraccess",
+    "status",
+    "display"
+  ],
+  "files": [
+    "dist",
+    "frontend"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@attraccess/plugins-backend-sdk": "^2.0.0-0",
+    "@attraccess/plugins-frontend-sdk": "^2.0.0-0",
+    "@attraccess/plugins-frontend-ui": "^2.0.0-0"
+  },
+  "attraccess": {
+    "displayName": "Status Wall",
+    "description": "Show which machines are free, in use or under maintenance on a big screen, without signing in.",
+    "host": "^2.0.0-0",
+    "backend": "dist/index.js",
+    "frontend": "frontend/remoteEntry.js",
+    "styles": "frontend/style.css",
+    "dashboardPaths": [
+      "/status-walls"
+    ],
+    "permissions": [
+      "PLUGIN_STORAGE",
+      "ACCESS_RESOURCES",
+      "LISTEN_EVENTS"
+    ],
+    "sdk": {
+      "backend": "^2.0.0-0",
+      "frontend": "^2.0.0-0"
+    }
+  }
+}

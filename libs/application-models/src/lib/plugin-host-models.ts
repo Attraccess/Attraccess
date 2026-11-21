@@ -23,3 +23,11 @@ export interface PluginResourceModel {
   maxParallelSessions: number;
   supervisionMode: SupervisionMode;
 }
+
+/** What a plugin needs to show a resource to people: its name and picture. */
+export interface PluginResourceDisplayModel {
+  id: number;
+  name: string;
+  /** Host-relative URL of the resource's image (served without authentication), or null when it has none. */
+  imageUrl: string | null;
+}
