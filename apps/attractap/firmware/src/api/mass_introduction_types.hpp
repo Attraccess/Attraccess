@@ -14,6 +14,7 @@ struct ApiMassIntroduction
         std::string sessionId;
         std::string targetName;
         std::string introducerUsername;
+        std::string introducerDisplayName;
         uint32_t remainingMs = 0;
     };
 
@@ -23,6 +24,7 @@ struct ApiMassIntroduction
         std::string sessionId;
         bool success = false;
         std::string username;
+        std::string displayName;
         bool alreadyIntroduced = false;
         uint32_t participantCount = 0;
         std::string error;

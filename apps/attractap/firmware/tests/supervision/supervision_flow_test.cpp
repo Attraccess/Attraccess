@@ -215,6 +215,23 @@ void disconnectClearsActivePendingAndQueuedWork() {
            "disconnect must discard queued terminal outcomes");
 }
 
+void webStartShowsTheRequesterDisplayName() {
+    Fixture fixture;
+    supervisionTestNowMs = 100;
+    fixture.flow.armWebInitiated(
+        {.resourceId = 42, .timeoutMs = 30000, .requesterUsername = "ada", .requesterDisplayName = "Ada Lovelace"});
+    expect(fixture.flow.takePendingWebStart(101, false), "web arm must start the flow");
+    expect(fixture.screen.lastView.requesterName == "Ada Lovelace", "the screen shows the requester display name");
+}
+
+void webStartFromAnOlderServerShowsTheUsername() {
+    Fixture fixture;
+    supervisionTestNowMs = 100;
+    fixture.flow.armWebInitiated({.resourceId = 42, .timeoutMs = 30000, .requesterUsername = "ada"});
+    expect(fixture.flow.takePendingWebStart(101, false), "web arm must start the flow");
+    expect(fixture.screen.lastView.requesterName == "ada", "without a display name the username is shown");
+}
+
 void timeoutReturnsToRouting() {
     Fixture fixture;
     fixture.beginReader();
@@ -237,6 +254,8 @@ int main() {
     resolutionWinsOverCardAuthentication();
     terminalFailureWinsOverCardRejection();
     disconnectClearsActivePendingAndQueuedWork();
+    webStartShowsTheRequesterDisplayName();
+    webStartFromAnOlderServerShowsTheUsername();
     timeoutReturnsToRouting();
     return 0;
 }

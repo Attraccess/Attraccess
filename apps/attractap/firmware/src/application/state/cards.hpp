@@ -19,6 +19,7 @@ enum ExternalStates_t
 struct ApiEnrollNewCardGetAvailableKeyNoData_t
     {
         std::string username;
+        std::string displayName; // shown on the screen
     };
 #endif
 
@@ -88,6 +89,7 @@ static constexpr uint32_t ENROLL_ERROR_DWELL_MS = 1800;
 struct ApiResetNfcCardData_t
     {
         std::string username;
+        std::string displayName; // shown on the screen
     };
 #endif
 

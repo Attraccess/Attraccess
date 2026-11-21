@@ -50,7 +50,7 @@ void Application::showActionFailure(uint32_t resourceId, const std::string &erro
   // An action started from the list (its form may have opened the details) fails on its row.
   if (returnToList && !this->resourceIsSelected && Display::isActive(&Display::resourceDetailsScreen)) {
     this->state = APPLICATION_STATE_RESOURCE_LIST_AUTHENTICATED;
-    Display::resourceListScreen.setAuthenticatedUser(this->cardAuthenticationData.username);
+    Display::resourceListScreen.setAuthenticatedUser(this->cardAuthenticationData.username, this->cardAuthenticationData.displayName);
     Display::transitionToScreen(&Display::resourceListScreen);
   }
   FirmwareI18n::Text text = preferred.empty() ? FirmwareI18n::knownReaderError(errorCode) : preferred;

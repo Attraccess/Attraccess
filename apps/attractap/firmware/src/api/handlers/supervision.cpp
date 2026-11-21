@@ -37,6 +37,10 @@ void API::onSupervisionStart(JsonObject data)
     command.requesterUsername = payload["requesterUsername"].is<const char *>()
                                     ? payload["requesterUsername"].as<std::string>()
                                     : std::string("");
+    command.requesterDisplayName = payload["requesterDisplayName"].is<const char *>()
+                                       ? payload["requesterDisplayName"].as<std::string>()
+                                       : std::string("");
+    if (command.requesterDisplayName.empty()) command.requesterDisplayName = command.requesterUsername;
     this->supervisionStartCallback(command);
 }
 
@@ -78,6 +82,14 @@ void API::onSupervisionRequestResult(JsonObject data)
             result.supervisorNames[result.supervisorCount++] = name.as<std::string>();
         }
     }
+    // Display names come in the same order; an older server sends none, then the usernames are shown.
+    for (uint8_t i = 0; i < result.supervisorCount; ++i)
+    {
+        JsonVariant displayName = payload["supervisorDisplayNames"][i];
+        result.supervisorDisplayNames[i] = displayName.is<const char *>() && displayName.as<std::string>().length() > 0
+                                               ? displayName.as<std::string>()
+                                               : result.supervisorNames[i];
+    }
     this->supervisionRequestResultCallback(result);
 }
 
@@ -91,6 +103,8 @@ void API::onSupervisorCardAuthenticationData(JsonObject data)
     SupervisorCardAuthenticationResponse response;
     response.error = payload["error"].is<const char *>() ? payload["error"].as<std::string>() : std::string("");
     response.username = payload["username"].is<const char *>() ? payload["username"].as<std::string>() : std::string("");
+    response.displayName = payload["displayName"].is<const char *>() ? payload["displayName"].as<std::string>() : std::string("");
+    if (response.displayName.empty()) response.displayName = response.username;
 
     this->supervisorCardAuthenticationResponseCallback(response);
 }
@@ -106,5 +120,7 @@ void API::onSupervisionResolved(JsonObject data)
     result.success = payload["success"].is<bool>() ? payload["success"].as<bool>() : false;
     result.error = payload["error"].is<const char *>() ? payload["error"].as<std::string>() : std::string("");
     result.supervisorUsername = payload["supervisorUsername"].is<const char *>() ? payload["supervisorUsername"].as<std::string>() : std::string("");
+    result.supervisorDisplayName = payload["supervisorDisplayName"].is<const char *>() ? payload["supervisorDisplayName"].as<std::string>() : std::string("");
+    if (result.supervisorDisplayName.empty()) result.supervisorDisplayName = result.supervisorUsername;
     this->supervisionResolvedCallback(result);
 }

@@ -453,7 +453,7 @@ void Application::leaveTopUp() {
     Display::transitionToScreen(&Display::resourceDetailsScreen);
   } else {
     this->state = APPLICATION_STATE_RESOURCE_LIST_AUTHENTICATED;
-    Display::resourceListScreen.setAuthenticatedUser(this->cardAuthenticationData.username);
+    Display::resourceListScreen.setAuthenticatedUser(this->cardAuthenticationData.username, this->cardAuthenticationData.displayName);
     Display::transitionToScreen(&Display::resourceListScreen);
   }
 }
@@ -469,7 +469,8 @@ void Application::leaveForms() {
     return;
   }
   this->state = this->unlocked ? APPLICATION_STATE_RESOURCE_LIST_AUTHENTICATED : APPLICATION_STATE_RESOURCE_LIST;
-  Display::resourceListScreen.setAuthenticatedUser(this->unlocked ? this->cardAuthenticationData.username : "");
+  Display::resourceListScreen.setAuthenticatedUser(this->unlocked ? this->cardAuthenticationData.username : "",
+                                                         this->unlocked ? this->cardAuthenticationData.displayName : "");
   Display::transitionToScreen(&Display::resourceListScreen);
 }
 

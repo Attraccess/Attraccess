@@ -74,7 +74,9 @@ void SupervisionFlow::armWebInitiated(const API::SupervisionStartCommand &comman
     event.resourceId = command.resourceId;
     event.timeoutMs = command.timeoutMs;
     event.receivedAtMs = millis();
-    strlcpy(event.requesterName, command.requesterUsername.c_str(), sizeof(event.requesterName));
+    const std::string &shownRequester =
+        command.requesterDisplayName.empty() ? command.requesterUsername : command.requesterDisplayName;
+    strlcpy(event.requesterName, shownRequester.c_str(), sizeof(event.requesterName));
     enqueueEvent(event);
 }
 
@@ -142,8 +144,9 @@ void SupervisionFlow::onRequestResult(const API::SupervisionRequestResult &resul
     event.supervisorCount = result.supervisorCount;
     strlcpy(event.error, result.error.c_str(), sizeof(event.error));
     for (uint8_t i = 0; i < result.supervisorCount; ++i) {
-        strlcpy(event.supervisorNames[i], result.supervisorNames[i].c_str(),
-                sizeof(event.supervisorNames[i]));
+        const std::string &shown =
+            result.supervisorDisplayNames[i].empty() ? result.supervisorNames[i] : result.supervisorDisplayNames[i];
+        strlcpy(event.supervisorNames[i], shown.c_str(), sizeof(event.supervisorNames[i]));
     }
     enqueueEvent(event);
 }

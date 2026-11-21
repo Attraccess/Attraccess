@@ -414,8 +414,7 @@ bool Application::processAuthenticationState()
             .username = this->cardAuthenticationData.username,
             .canManageResource = this->cardAuthenticationData.canManageResource,
             .hasIntroduction = this->cardAuthenticationData.hasIntroduction,
-            .isIntroducer = this->cardAuthenticationData.isIntroducer,
-            .requiresSupervisor = this->cardAuthenticationData.requiresSupervisor});
+            .isIntroducer = this->cardAuthenticationData.isIntroducer, .requiresSupervisor = this->cardAuthenticationData.requiresSupervisor, .displayName = this->cardAuthenticationData.displayName});
 #endif
 
     this->state = APPLICATION_STATE_AUTHENTICATE_CARD;
@@ -495,7 +494,7 @@ void Application::renderResourceState()
   const bool reroute = this->rerouteRequested;
   this->rerouteRequested = false;
   if (!this->resourceIsSelected) {
-    Display::resourceListScreen.setAuthenticatedUser(this->unlocked ? this->cardAuthenticationData.username : "");
+    Display::resourceListScreen.setAuthenticatedUser(this->unlocked ? this->cardAuthenticationData.username : "", this->unlocked ? this->cardAuthenticationData.displayName : "");
     const auto target = this->unlocked ? APPLICATION_STATE_RESOURCE_LIST_AUTHENTICATED : APPLICATION_STATE_RESOURCE_LIST;
     if (this->state != target || reroute) {
       this->state = target;

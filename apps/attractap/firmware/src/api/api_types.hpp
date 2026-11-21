@@ -15,6 +15,10 @@ struct ApiResources
     // 32 username characters plus the terminator.
     static constexpr size_t MAX_USERNAME_LEN = 33;
 
+    // Display names ("First Last", or the username) are for the screen only; the username stays the identity key.
+    // Room for 79 bytes plus the terminator; a longer name is cut and the screen shows it with an ellipsis.
+    static constexpr size_t MAX_DISPLAY_NAME_LEN = 80;
+
     static constexpr size_t MAX_HEALTH_REASON_LEN = 160;
 
     static constexpr size_t MAX_INTRODUCERS = 8;
@@ -45,6 +49,8 @@ struct ActiveSession
     {
         uint32_t id = 0;
         char username[MAX_USERNAME_LEN] = {};
+        // What the screen shows; the username when the server sends no display name.
+        char displayName[MAX_DISPLAY_NAME_LEN] = {};
     };
 
 struct ResourceBrief
@@ -91,9 +97,12 @@ struct ResourceBrief
         bool isHealthy;
         char healthReason[MAX_HEALTH_REASON_LEN];
         char activeUser[MAX_USERNAME_LEN];
+        char activeUserDisplayName[MAX_DISPLAY_NAME_LEN]; // display only, never compared
         uint32_t activeStartEpoch;          // seconds since epoch (UTC)
         int16_t activeStartUtcOffsetMinutes; // server tz offset (minutes east of UTC) for that instant
         std::vector<std::string> introducers;
+        // Same order as `introducers`; empty (an older server) or a different length means show the usernames.
+        std::vector<std::string> introducerDisplayNames;
         uint8_t flowButtonCount;
         FlowButton flowButtons[MAX_FLOW_BUTTONS];
     };
@@ -103,6 +112,7 @@ struct ResourceList
         uint32_t requestId = 0;
         uint16_t count;
         char authenticatedUsername[MAX_USERNAME_LEN] = {};
+        char authenticatedDisplayName[MAX_DISPLAY_NAME_LEN] = {};
         ResourceBrief items[MAX_RESOURCES];
     };
 
@@ -289,6 +299,8 @@ struct CardAuthenticationDetailsResponse
     {
         std::string error;
         std::string username;
+        // For the screen; the username when the server sends none.
+        std::string displayName;
         std::string language;
         // Issued per card authentication; sent back on START and on CARD_SESSION_ENDED.
         std::string cardSessionId;
@@ -309,12 +321,15 @@ struct SupervisionRequestResult
         uint32_t timeoutMs = 0;
         uint8_t supervisorCount = 0;
         std::string supervisorNames[MAX_INTRODUCERS];
+        // Same order as supervisorNames, shown on screen; the usernames when the server sends none.
+        std::string supervisorDisplayNames[MAX_INTRODUCERS];
     };
 
 struct SupervisorCardAuthenticationResponse
     {
         std::string error;
         std::string username;
+        std::string displayName;
     };
 
 struct SupervisionResolvedResult
@@ -322,6 +337,7 @@ struct SupervisionResolvedResult
         bool success = false;
         std::string error;
         std::string supervisorUsername;
+        std::string supervisorDisplayName;
     };
 
 struct SupervisionStartCommand
@@ -329,5 +345,6 @@ struct SupervisionStartCommand
         uint32_t resourceId = 0;
         uint32_t timeoutMs = 0;
         std::string requesterUsername;
+        std::string requesterDisplayName;
     };
 };

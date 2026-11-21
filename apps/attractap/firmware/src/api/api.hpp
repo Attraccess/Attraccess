@@ -57,10 +57,10 @@ protected:
     std::function<void(const ResourceUsageFormRequest &)> resourceFormsRequestCallback;
     std::function<void(const ResourceUsageFormFieldsPage &)> resourceFormFieldsCallback;
     std::function<void(const ResourceUsageFormPageResult &)> resourceFormPageResultCallback;
-    std::function<void(std::string username)> enrollNewCardGetAvailableKeyNoCallback;
+    std::function<void(std::string username, std::string displayName)> enrollNewCardGetAvailableKeyNoCallback;
     std::function<void()> enrollNewCardSucceededCallback;
     std::function<void(std::string error)> enrollNewCardErrorCallback;
-    std::function<void(std::string username)> resetNfcCardCallback;
+    std::function<void(std::string username, std::string displayName)> resetNfcCardCallback;
     std::function<void(bool success, std::string error)> resetNfcCardResultCallback;
     std::function<void(uint32_t detectionId, const char *conversationId, uint32_t seq, const uint8_t *apdu,
                        uint8_t length)>
@@ -160,7 +160,7 @@ public:
     void setMassIntroductionResultCallback(std::function<void(const MassIntroductionResult &)> callback);
     void setMassIntroductionEndCallback(std::function<void(const MassIntroductionEnd &)> callback);
 
-    void setEnrollNewCardGetAvailableKeyNoCallback(std::function<void(std::string username)> callback);
+    void setEnrollNewCardGetAvailableKeyNoCallback(std::function<void(std::string username, std::string displayName)> callback);
     void setEnrollNewCardSucceededCallback(std::function<void()> callback);
     void setEnrollNewCardErrorCallback(std::function<void(std::string error)> callback);
 
@@ -168,7 +168,7 @@ public:
 
     // Card reset. RESET_NFC_CARD arms the reader (username only); the server then resets the card
     // through the relay and reports the outcome with a second RESET_NFC_CARD.
-    void setResetNfcCardCallback(std::function<void(std::string username)> callback);
+    void setResetNfcCardCallback(std::function<void(std::string username, std::string displayName)> callback);
     void setResetNfcCardResultCallback(std::function<void(bool success, std::string error)> callback);
     void sendResetNfcCardCancel();
 

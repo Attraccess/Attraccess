@@ -53,8 +53,9 @@ private:
         uint8_t cardUidLength;
         uint8_t supervisorCount;
         char error[64];
-        char requesterName[64];
-        char supervisorNames[API::MAX_INTRODUCERS][API::MAX_USERNAME_LEN];
+        // Display names only (never compared): the screen shows people by their display name.
+        char requesterName[API::MAX_DISPLAY_NAME_LEN];
+        char supervisorNames[API::MAX_INTRODUCERS][API::MAX_DISPLAY_NAME_LEN];
         uint32_t resourceId;
         uint32_t timeoutMs;
         uint32_t receivedAtMs;
@@ -86,9 +87,9 @@ private:
     uint8_t cardUidLength = 0;
     FirmwareI18n::Text errorMessage;
     FirmwareI18n::Text hintMessage;
-    char requesterName[64] = {0};
+    char requesterName[API::MAX_DISPLAY_NAME_LEN] = {0};
     uint32_t resourceId = 0;
-    char armedRequesterName[64] = {0};
+    char armedRequesterName[API::MAX_DISPLAY_NAME_LEN] = {0};
     uint32_t armedResourceId = 0;
     uint32_t requestedAtMs = 0;
     uint32_t requestedTimeoutMs = 0;
