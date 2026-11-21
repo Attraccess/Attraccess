@@ -28,7 +28,7 @@ function renderSetup() {
   );
 }
 
-it('confirms a bridge set up with a toast once its drawer closed for the reader editor', () => {
+it('confirms a reader or bridge set up with a toast once its drawer closed for the reader editor', () => {
   const view = renderSetup();
   expect(state.toast.success).not.toHaveBeenCalled();
 
@@ -41,8 +41,8 @@ it('confirms a bridge set up with a toast once its drawer closed for the reader 
 
   expect(state.toast.success).toHaveBeenCalledOnce();
   expect(state.toast.success).toHaveBeenCalledWith({
-    title: 'Bridge set up',
-    description: 'The bridge is connected to Attraccess and closed its Bluetooth connection, as expected.',
+    title: 'Setup complete',
+    description: 'The device is connected to Attraccess and closed its Bluetooth connection, as expected.',
   });
 });
 
