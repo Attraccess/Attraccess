@@ -21,7 +21,7 @@ The database holds the core data **and the tables of all plugins** together with
 - Restore the database together with the `plugins/` folder, and start the Attraccess version the backup was made with or a newer one. Newer versions upgrade the database on start; an older version cannot open a database that a newer one has migrated.
 - Balances, price snapshots and meter values are stored as exact values and come back unchanged.
 - Keep `AUTH_SESSION_SECRET` from the time of the backup. It protects the stored reader-pairing keys.
-- A 1.x **SQLite** backup (`attraccess.sqlite`) is not restored with `pg_restore`. Put the file into the storage directory and start Attraccess 2.0 against an empty PostgreSQL database: the start imports its core data (not the plugin data), see [Updating](installation/updating.md#moving-from-sqlite-to-postgresql).
+- A 1.x **SQLite** backup (`attraccess.sqlite`) is not restored with `pg_restore`. Put the file into the storage directory as `attraccess.sqlite` (a timestamped name from `sqlite-backup/` is ignored) and start Attraccess 2.0 against an empty PostgreSQL database: the start imports its core data (not the plugin data), see [Updating](installation/updating.md#moving-from-sqlite-to-postgresql).
 
 Backups of Attraccess 2.0 are PostgreSQL backups. The same requirements (stable identifiers, timestamps, exact values, plugin data and migration state) define the [backup and restore contract](developer/adding-a-database-backend.md#backup-and-restore-contract) that every database backend has to keep.
 

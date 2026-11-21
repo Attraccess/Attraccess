@@ -33,9 +33,9 @@ Attraccess now runs on PostgreSQL only. This is a breaking change and ships in a
 
 ### Before you upgrade
 
-1. Create a [backup](installation/backup-restore.md) of the storage volume (it contains `attraccess.sqlite`). The first start migrates the SQLite file in place, so this backup is the only untouched copy of it.
+1. **Stop the old instance** (every container that uses the storage volume) and create a [backup](installation/backup-restore.md) of the storage volume (it contains `attraccess.sqlite`). The first start migrates the SQLite file in place, so this backup is the only untouched copy of it. A 1.x instance that keeps running would write into a file that has already been copied.
 2. **Add a PostgreSQL service** and point `DATABASE_URL` at an **empty** database. The shipped Compose files (Docker Compose, Portainer, Coolify, balena) already contain one (`postgres:18.6-alpine`, not part of the Attraccess image); see [Docker Compose](installation/docker-compose.md) and [Portainer](installation/portainer.md). If you started Attraccess with a bare `docker run`, you must start a PostgreSQL container and set `DATABASE_URL` **before** you pull the new image, because the new version does not start without it.
-3. Plan for disk space: the old SQLite file stays on disk after the import (see below), next to the new PostgreSQL data. The storage folder and the SQLite file must be writable by the Attraccess container, because the file is migrated in place and then moved. A read-only file stops the start before anything is imported (`attempt to write a readonly database`).
+3. Plan for disk space: the old SQLite file stays on disk after the import (see below), next to the new PostgreSQL data. The storage folder and the SQLite file must be writable by the Attraccess container, because the file is migrated in place and then moved. If the file still needs SQLite migrations, a read-only file stops the start before anything is imported (`attempt to write a readonly database`); otherwise the import finishes and only the move fails (see [Failure and retry](#failure-and-retry)).
 4. Write down how your plugins are configured. Plugin data is not moved (see [Plugin data is not moved](#plugin-data-is-not-moved)).
 5. **balena:** the stack no longer contains Duplicati; its backup jobs are gone. Take a last Duplicati backup before you upgrade, then set the `BACKUP_*` variables of the new [restic sidecar](installation/backup-restore.md#balena-restic-sidecar).
 
@@ -46,7 +46,7 @@ Do not set `DATABASE_TYPE=sqlite`: the start fails with a message that links to 
 On every start Attraccess waits for PostgreSQL and applies the pending database migrations **before** it checks the license, starts plugins, accepts HTTP requests or talks to devices. On the first start of 2.0 these are:
 
 1. The baseline migration creates the PostgreSQL schema, equal to the last SQLite schema.
-2. The import migration looks for `<STORAGE_ROOT>/attraccess.sqlite`. Without the file it does nothing (a new installation). With the file, it first applies the released SQLite migrations **to the file itself**, so the file is changed in place.
+2. The import migration looks for `<STORAGE_ROOT>/attraccess.sqlite`. Without the file it does nothing (a new installation) and logs `No SQLite file at <file>: nothing to import.` Check that line if you expected an import: the import runs only once, so a first start without the file (volume not mounted, other `STORAGE_ROOT`) leaves an empty installation. With the file, it first applies the released SQLite migrations **to the file itself**, so the file is changed in place.
 3. It copies every core table into PostgreSQL in **one transaction**. Identifiers and sequences are preserved (new identifiers continue after the highest one SQLite ever issued), points in time are stored as UTC (a time without offset counts as UTC), decimal values stay exact, JSON is kept, and balances are taken as they are, not applied twice. Foreign keys are checked before the commit.
 4. After the commit the SQLite file is moved out of the way (see below). Later migrations, for example the global forms, then run on the imported data like on any other installation.
 
@@ -56,21 +56,22 @@ The import migration runs only once. Large installations take longer to start th
 
 After a successful import the SQLite file and its `-wal`, `-shm` and `-journal` files are moved to `<STORAGE_ROOT>/sqlite-backup/`. An existing file is never overwritten: if `sqlite-backup/attraccess.sqlite` already exists, the new file gets a UTC timestamp in its name, for example `attraccess-20261121T093000123Z.sqlite`.
 
-Attraccess **keeps the file and never deletes it**. Delete it yourself once you have verified the installation and have a PostgreSQL backup.
+Attraccess **keeps the file and never deletes it**. Delete it yourself once you have verified the installation and have a PostgreSQL backup. The file in `sqlite-backup/` is the migrated file, not the original: to go back to 1.x, restore the storage-volume backup you made before the upgrade.
 
 ### Plugin data is not moved
 
 The import copies only the core tables. Tables PostgreSQL has no table for, which are the tables of plugins, their `plugin_migrations_*` tables and the plugin storage bookkeeping, are not copied. Their names are logged once as a warning that also names the backup file.
 
-Plugins therefore start with empty storage on PostgreSQL. Install their 2.0 builds as usual and set them up again; plugins built for 1.x do not load on 2.0 (see [Upgrading to Attraccess 2.0](plugins/installing-plugins.md#upgrading-to-attraccess-20)). The old plugin data stays only in the backup file.
+Plugins therefore start with empty storage on PostgreSQL. Install their 2.0 builds as usual and set them up again; plugins built for 1.x do not load on 2.0 (see [Upgrading to Attraccess 2.0](plugins/installing-plugins.md#upgrading-to-attraccess-20)). The old plugin data stays in the backup file (and in your pre-upgrade backup).
 
 ### Failure and retry
 
-If the import fails before the commit, nothing is imported, the SQLite file stays where it is, and the API stops with an error. A row that cannot be stored (an invalid point in time, a broken foreign key, a violated constraint) fails the whole import; the message names the table, the row key or the constraint and the offending keys. Fix the cause and start again: the next start retries the import. The file may already be at the last SQLite schema by then, which is harmless. Each migration runs in its own transaction, so the baseline stays applied; the import empties the baseline's seed rows before it copies.
+If the import fails before the commit, nothing is imported, the SQLite file stays where it is, and the API stops with an error. A row that cannot be stored (an invalid point in time, a broken foreign key, a violated constraint) fails the whole import; the message names the table, the row (by its key) and the column or constraint; a broken foreign key names the constraint and up to five offending keys. Other values of the row are never shown. Correct or delete the row in `attraccess.sqlite` (for example with the `sqlite3` tool, on a copy first) or report the message on GitHub, then start again: the next start retries the import. The file may already be at the last SQLite schema by then, which is harmless. Each migration runs in its own transaction, so the baseline stays applied; the import empties the baseline's seed rows before it copies.
 
-- **PostgreSQL already holds users and the SQLite file exists.** The start fails with an error that names the file, and nothing is changed. Either empty the PostgreSQL database (drop and create it) and start again, or, if PostgreSQL already holds your data, move the SQLite file out of the storage folder.
-- **Two instances start at once.** The migrations run under a PostgreSQL advisory lock: one instance runs them, the other waits and then finds nothing left to do.
-- **Moving the file fails after the commit** (for example because a file named `sqlite-backup` is in the way). Attraccess logs a warning and starts anyway: the data is already in PostgreSQL and the import counts as done, so it never runs again. Move or delete `attraccess.sqlite` yourself.
+- **PostgreSQL already holds users and the SQLite file exists.** The start fails with an error that names the file, and nothing is changed. Either empty the PostgreSQL database (drop and recreate the database or its schema) and start again, or, if PostgreSQL already holds your data, move the SQLite file out of the storage folder. This also happens when an earlier start imported the file but stopped before moving it (the log then shows `Copied <rows> rows into PostgreSQL (committed).`): PostgreSQL holds your data, so move the file to `<STORAGE_ROOT>/sqlite-backup/`.
+- **Upgrading from 2.0.0-beta.1.** That release moved the SQLite data with its own transfer. A database it set up never takes a SQLite import: a leftover `attraccess.sqlite` is left alone with a warning (`... is not imported: this PostgreSQL database was set up by an earlier Attraccess 2.0 release.`). Move or delete it once you are sure PostgreSQL holds your data.
+- **Two instances start at once.** The migrations run under a PostgreSQL advisory lock: one instance runs them, the other logs `Waiting for another instance to finish the database migrations...`, waits and then finds nothing left to do.
+- **Moving the file fails after the commit** (for example because a file named `sqlite-backup` is in the way). Attraccess logs a warning and starts anyway: the data is already in PostgreSQL and the import counts as done, so it never runs again. Move or delete `attraccess.sqlite` (and its `-wal`, `-shm` and `-journal` files) yourself.
 
 ### Log lines to look for
 
@@ -79,7 +80,8 @@ Follow the start with `docker compose logs -f attraccess`. The import logs under
 ```text
 Importing the SQLite database <file> into PostgreSQL...
 Brought the SQLite file to the last SQLite migration (N migration(s) applied).
-SQLite import complete: <rows> rows in <n> tables; the SQLite file is now <path>.
+Copied <rows> rows into PostgreSQL (committed).
+SQLite import complete: <rows> rows in <n> tables; the SQLite file is at <path>.
   <table>: <rows>
 Not imported (plugin data and other tables PostgreSQL has no table for): ...
 ```
