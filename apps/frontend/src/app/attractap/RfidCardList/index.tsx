@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { formatUserDisplayName } from '@attraccess/shared';
 import { NotFound } from '../../not-found/index';
 import {
   Button,
@@ -321,7 +322,11 @@ export function RfidCardList({ userId }: { userId?: number }) {
   return (
     <>
       <PageHeader
-        title={userId === undefined ? t('nfcCards') : t('userCards', { username: owner?.username ?? `#${userId}` })}
+        title={
+          userId === undefined
+            ? t('nfcCards')
+            : t('userCards', { name: owner ? formatUserDisplayName(owner) : `#${userId}` })
+        }
         backTo={userId === undefined ? undefined : canReadUser ? `/users/${userId}` : '/attractap/nfc-cards'}
         actions={
           [

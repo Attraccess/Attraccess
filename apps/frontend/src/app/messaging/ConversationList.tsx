@@ -1,6 +1,7 @@
 // Inbox list of conversations showing the other participant and last message
 // FEATURE: Messaging inbox conversation list
 import { ConversationListItemDto } from '@attraccess/react-query-client';
+import { formatUserDisplayName } from '@attraccess/shared';
 import { Chip, Skeleton, cn } from '@heroui/react';
 import { EmptyState, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
@@ -36,7 +37,9 @@ export function ConversationList(props: Props) {
   return (
     <div className="flex flex-col">
       {conversations.map((conversation) => {
-        const username = conversation.otherParticipant?.username ?? t('conversations.unknownUser');
+        const username = conversation.otherParticipant
+          ? formatUserDisplayName(conversation.otherParticipant)
+          : t('conversations.unknownUser');
         const preview = conversation.lastMessage?.content ?? t('conversations.noMessages');
         const unreadCount = conversation.unreadCount ?? 0;
         const hasUnread = unreadCount > 0;

@@ -1,4 +1,5 @@
 import { ReactNode, useCallback, useMemo, useState } from 'react';
+import { formatUserDisplayName } from '@attraccess/shared';
 import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, useOverlayState } from '@heroui/react';
 import { Select } from '../../../../../components/select';
 import { useQueryClient } from '@tanstack/react-query';
@@ -60,7 +61,9 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
     onSuccess: (invitation) => {
       toast.success({
         title: t('success.title'),
-        description: t('success.description', { username: invitation.invitedUser?.username ?? '' }),
+        description: t('success.description', {
+          name: invitation.invitedUser ? formatUserDisplayName(invitation.invitedUser) : '',
+        }),
       });
       invalidateCollaboratorQueries();
       close();
@@ -111,7 +114,9 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
             label={t('inputs.user')}
             onSelectionChange={setSelectedUser}
             afterSelection={
-              selectedUser ? <span className="text-tiny text-default-500">{selectedUser.username}</span> : null
+              selectedUser ? (
+                <span className="text-tiny text-default-500">{formatUserDisplayName(selectedUser)}</span>
+              ) : null
             }
           />
           <Select

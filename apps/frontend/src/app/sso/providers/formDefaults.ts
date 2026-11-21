@@ -11,6 +11,8 @@ export const getDefaultOidcConfiguration = () => ({
   jwksURL: '',
   signingAlgorithms: ['RS256'],
   permissionSyncTtlMinutes: null as number | null,
+  firstNameClaimPath: '' as string | null,
+  lastNameClaimPath: '' as string | null,
 });
 
 export { MAX_PERMISSION_SYNC_TTL_MINUTES } from '@attraccess/application-models';
@@ -29,6 +31,8 @@ export const getDefaultSamlConfiguration = () => ({
   provisioningSecret: '',
   spSigningCertificate: '',
   spSigningPrivateKey: '',
+  firstNameClaimPath: '' as string | null,
+  lastNameClaimPath: '' as string | null,
 });
 
 export const defaultProviderValues: CreateSsoProviderDtoWritable = {

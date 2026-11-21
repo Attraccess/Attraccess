@@ -4,10 +4,12 @@ import { Select } from '../../../../components/select/index';
 import en from './en.json';
 import de from './de.json';
 
-/** Which CSV columns hold the email, the username and (optionally) the role key. */
+/** Which CSV columns hold the email, the username and (optionally) the first name, last name and role key. */
 export interface CsvColumnMapping {
   emailKey?: string;
   usernameKey?: string;
+  firstNameKey?: string;
+  lastNameKey?: string;
   roleKeyColumn?: string;
 }
 
@@ -39,6 +41,23 @@ export function CsvFieldMapping({ csvHeaders, mapping, onChange }: Readonly<CsvF
         items={headerItems}
         isRequired
       />
+
+      {csvHeaders.length > 0 && (
+        <>
+          <Select
+            label={t('inputs.fieldMapping.firstName')}
+            value={mapping.firstNameKey ?? ''}
+            onChange={(v) => onChange({ firstNameKey: v || undefined })}
+            items={[{ label: '—', key: '' }, ...headerItems]}
+          />
+          <Select
+            label={t('inputs.fieldMapping.lastName')}
+            value={mapping.lastNameKey ?? ''}
+            onChange={(v) => onChange({ lastNameKey: v || undefined })}
+            items={[{ label: '—', key: '' }, ...headerItems]}
+          />
+        </>
+      )}
 
       {csvHeaders.length > 0 && (availableRoles ?? []).length > 0 && (
         <Select

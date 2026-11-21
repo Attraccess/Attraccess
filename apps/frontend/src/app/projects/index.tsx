@@ -1,4 +1,5 @@
 import { Card, Skeleton, Chip } from '@heroui/react';
+import { formatUserDisplayName } from '@attraccess/shared';
 import { FolderIcon, PlusIcon } from 'lucide-react';
 import { UpsertProjectModal } from './upsertModal/index';
 import { ProjectCard } from './projectCard/index';
@@ -131,7 +132,9 @@ export function ProjectsListPage() {
           <div>
             <p className="font-medium">{invitation.project?.name ?? '—'}</p>
             <p className="text-small text-default-500">
-              {t('invitations.invitedBy', { username: invitation.inviter?.username ?? '—' })}
+              {t('invitations.invitedBy', {
+                name: invitation.inviter ? formatUserDisplayName(invitation.inviter) : '—',
+              })}
             </p>
           </div>
           <Chip variant="soft">{t(`invitations.roles.${invitation.requestedRole}` as const)}</Chip>

@@ -4,6 +4,8 @@
     "fieldMapping": {
       "email": "E-Mail",
       "username": "Benutzername",
+      "firstName": "Vorname (optional)",
+      "lastName": "Nachname (optional)",
       "roleKeyColumn": "Rollenspalte (optional)"
     }
   },
@@ -11,6 +13,7 @@
     "columns": {
       "index": "Index",
       "username": "Benutzername",
+      "name": "Name",
       "email": "E-Mail"
     }
   },
@@ -33,6 +36,7 @@
     "reasons": {
       "DUPLICATE_IN_DB": "Wird bereits von einem bestehenden Konto verwendet",
       "DUPLICATE_IN_CSV": "Kommt mehrfach in der Datei vor",
+      "TOO_LONG": "Länger als 100 Zeichen",
       "REQUIRED": "Pflichtangabe fehlt",
       "INVALID": "Ungültiger Wert",
       "ROW_IS_EMPTY": "Zeile ist leer",

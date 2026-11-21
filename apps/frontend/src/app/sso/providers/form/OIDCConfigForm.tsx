@@ -232,6 +232,22 @@ export function OIDCConfigForm({ form }: OIDCConfigFormProps) {
           emptyHint={t('defaultsUsed', { defaults: EMAIL_CLAIM_PATHS_DEFAULT })}
           data-cy="sso-provider-form-oidc-email-claims-input"
         />
+        <TextField
+          value={formValues.oidcConfiguration?.firstNameClaimPath ?? ''}
+          onChange={(v) => setOidc('firstNameClaimPath', v)}
+        >
+          <Label>{t('firstNameClaimPath')}</Label>
+          <Input placeholder="given_name" data-cy="sso-provider-form-oidc-first-name-claim-input" />
+          <Description>{t('nameClaimPathHint', { defaults: 'given_name' })}</Description>
+        </TextField>
+        <TextField
+          value={formValues.oidcConfiguration?.lastNameClaimPath ?? ''}
+          onChange={(v) => setOidc('lastNameClaimPath', v)}
+        >
+          <Label>{t('lastNameClaimPath')}</Label>
+          <Input placeholder="family_name" data-cy="sso-provider-form-oidc-last-name-claim-input" />
+          <Description>{t('nameClaimPathHint', { defaults: 'family_name' })}</Description>
+        </TextField>
         <StringListField
           label={t('roleClaimPaths')}
           description={t('roleClaimPathsHint')}

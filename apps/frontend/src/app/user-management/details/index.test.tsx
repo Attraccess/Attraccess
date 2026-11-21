@@ -69,6 +69,7 @@ vi.mock('./components/permissionsForm', () => ({
 }));
 vi.mock('./components/setPasswordForm', () => ({ SetPasswordForm: () => <div>Password editor</div> }));
 vi.mock('./components/changeUsername', () => ({ ChangeUsernameForm: () => <div>Username editor</div> }));
+vi.mock('./components/changeName', () => ({ ChangeNameForm: () => <div>Name editor</div> }));
 vi.mock('./components/changeEmail', () => ({ ChangeEmailForm: () => <div>Email editor</div> }));
 vi.mock('../../not-found', () => ({ NotFound: () => <div>Not found</div> }));
 function Location() {

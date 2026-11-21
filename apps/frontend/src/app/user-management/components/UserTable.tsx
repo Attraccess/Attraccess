@@ -61,7 +61,7 @@ export function UserTable({ searchResult, roleIds, assignRoleId }: UserTableProp
               {t('table.columns.isEmailVerified')}
             </TableColumn>
             <TableColumn width="0">{t('table.columns.id')}</TableColumn>
-            <TableColumn isRowHeader>{t('table.columns.username')}</TableColumn>
+            <TableColumn isRowHeader>{t('table.columns.name')}</TableColumn>
             <TableColumn className="hidden md:table-cell">{t('table.columns.externalIdentifier')}</TableColumn>
             <TableColumn className="hidden lg:table-cell">{t('table.columns.roles')}</TableColumn>
             <TableColumn width="0" className="text-center">

@@ -14,6 +14,6 @@
   },
   "success": {
     "title": "Einladung gesendet",
-    "description": "{{username}} erhält eine E-Mail."
+    "description": "{{name}} erhält eine E-Mail."
   }
 }

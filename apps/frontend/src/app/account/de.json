@@ -26,6 +26,7 @@
   "searchTerms": {
     "email": "E-Mail",
     "username": "Benutzername",
+    "name": "Name",
     "authenticator": "Authenticator 2FA",
     "push": "Push",
     "mcp": "MCP KI Assistent"

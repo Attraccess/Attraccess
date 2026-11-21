@@ -10,6 +10,8 @@
     "format": "Only letters, numbers, underscores, hyphens, and dots are allowed."
   },
   "email": "Email address",
+  "firstName": "First name (optional)",
+  "lastName": "Last name (optional)",
   "password": "Password",
   "passwordConfirmation": "Confirm your password",
   "createAccountButton": "Create account",

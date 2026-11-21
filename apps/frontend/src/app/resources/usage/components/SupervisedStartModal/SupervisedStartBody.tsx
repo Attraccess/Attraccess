@@ -1,3 +1,4 @@
+import { userIdentityFromDisplayName } from '../../../../../utils/userIdentityFromDisplayName';
 import {
   Accordion,
   AccordionBody,
@@ -111,7 +112,7 @@ export function SupervisedStartBody(props: Readonly<SupervisedStartBodyProps>) {
               onPress={() => onSelectSupervisor(supervisor.userId)}
             >
               <AttraccessUser
-                user={{ id: supervisor.userId, username: supervisor.username }}
+                user={userIdentityFromDisplayName({ id: supervisor.userId, ...supervisor })}
                 description={t('select.role.introducer')}
               />
             </Button>

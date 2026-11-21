@@ -36,6 +36,8 @@ export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps
 
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [serverErrors, setServerErrors] = useState<PolicyError[]>([]);
@@ -104,10 +106,12 @@ export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps
         email: trimmedEmail,
         password,
         strategy: AuthenticationType.LOCAL_PASSWORD,
+        ...(firstName.trim() ? { firstName: firstName.trim() } : {}),
+        ...(lastName.trim() ? { lastName: lastName.trim() } : {}),
         ...(isOverwrite ? { overwriteFirstTimeAdmin: true } : {}),
       },
     });
-  }, [canSubmit, createUser, isOverwrite, password, trimmedEmail, trimmedUsername]);
+  }, [canSubmit, createUser, isOverwrite, password, trimmedEmail, trimmedUsername, firstName, lastName]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -134,6 +138,14 @@ export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps
         <TextField value={email} onChange={setEmail} isRequired>
           <Label>{t('email')}</Label>
           <Input type="email" />
+        </TextField>
+        <TextField value={firstName} onChange={setFirstName} maxLength={100}>
+          <Label>{t('firstName')}</Label>
+          <Input autoComplete="given-name" />
+        </TextField>
+        <TextField value={lastName} onChange={setLastName} maxLength={100}>
+          <Label>{t('lastName')}</Label>
+          <Input autoComplete="family-name" />
         </TextField>
         <PasswordField
           value={password}

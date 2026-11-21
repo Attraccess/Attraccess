@@ -65,5 +65,3 @@ describe('hasRequiredSamlSigningMaterial', () => {
     ).toBe(true);
   });
 });
-
-

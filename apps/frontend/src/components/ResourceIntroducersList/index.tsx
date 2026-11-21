@@ -1,4 +1,5 @@
 import { Separator, Spinner } from '@heroui/react';
+import { userIdentityFromDisplayName } from '../../utils/userIdentityFromDisplayName';
 import { Users } from 'lucide-react';
 import { useTranslations, AttraccessUser } from '@attraccess/plugins-frontend-ui';
 import { useResourceIntroducersGetNames, ResourceIntroducerType } from '@attraccess/react-query-client';
@@ -56,7 +57,10 @@ export function ResourceIntroducersList({
       <Separator className="my-2" />
       <div className="space-y-2 mt-2">
         {introducers.map((introducer) => (
-          <AttraccessUser key={introducer.userId} user={{ id: introducer.userId, username: introducer.username }} />
+          <AttraccessUser
+            key={introducer.userId}
+            user={userIdentityFromDisplayName({ id: introducer.userId, ...introducer })}
+          />
         ))}
       </div>
     </div>

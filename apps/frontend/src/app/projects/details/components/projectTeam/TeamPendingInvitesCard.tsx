@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { formatUserDisplayName } from '@attraccess/shared';
 import { Card, Chip, Skeleton } from '@heroui/react';
 import {
   ApiError,
@@ -160,7 +161,7 @@ function PendingInvitationRow(props: Readonly<PendingInvitationRowProps>) {
         <span>
           {t(`roles.${invitation.requestedRole}` as const)} · {formatDateTime(invitation.createdAt)}
         </span>
-        {invitation.inviter && <span>{invitation.inviter.username}</span>}
+        {invitation.inviter && <span>{formatUserDisplayName(invitation.inviter)}</span>}
       </div>
       <div className="flex items-center justify-end gap-2">
         <Button

@@ -107,3 +107,24 @@ it('clears preview data for malformed CSV and propagates errors without row deta
   expect(failed).toHaveBeenCalledWith(error);
   expect(screen.queryByText('errors.title')).toBeNull();
 });
+
+it('maps optional first and last name columns, shows them in the preview and sends their keys', async () => {
+  state.file = new File(['email,user,first,last\r\nada@example.test,ada,Ada,Lovelace\r\n'], 'people.csv', {
+    type: 'text/csv',
+  });
+  render(<CsvInvite />);
+  fireEvent.click(screen.getByRole('button', { name: 'inputs.file' }));
+  await screen.findByRole('button', { name: /inputs.fieldMapping.firstName$/ });
+  await map('inputs.fieldMapping.email', 'email');
+  await map('inputs.fieldMapping.username', 'user');
+  await map('inputs.fieldMapping.firstName', 'first');
+  await map('inputs.fieldMapping.lastName', 'last');
+  expect(await screen.findByText('Ada Lovelace')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'actions.invite' }));
+  expect(state.invite).toHaveBeenLastCalledWith({
+    body: {
+      file: state.file,
+      config: { emailKey: 'email', usernameKey: 'user', firstNameKey: 'first', lastNameKey: 'last', ignoredRows: [] },
+    },
+  });
+});
