@@ -13,8 +13,8 @@ import { PersistenceCoreModule } from './persistence-core.module';
  */
 /**
  * The Swagger and AsyncAPI export builds the whole application without a database (SKIP_DATABASE_MIGRATIONS=true and no
- * DATABASE_URL, e.g. inside the image build): the entity metadata is enough and every statement answers with an empty
- * result, so nothing connects and settings read as unset.
+ * DATABASE_URL; `api:export-swagger` clears a DATABASE_URL from the developer's .env): the entity metadata is enough and
+ * every statement answers with an empty result, so nothing connects and settings read as unset.
  */
 function offlineIfExporting(source: DataSource): DataSource {
   if (process.env.SKIP_DATABASE_MIGRATIONS !== 'true' || process.env.DATABASE_URL) return source;
@@ -39,7 +39,8 @@ function offlineIfExporting(source: DataSource): DataSource {
     TypeOrmModule.forRootAsync({
       useFactory: () => dataSourceConfig,
       // The main connection shares the database file with the resource-lifecycle and audit connections.
-      dataSourceFactory: async (options) => offlineIfExporting(databaseBackend.createDataSource(options as DataSourceOptions)),
+      dataSourceFactory: async (options) =>
+        offlineIfExporting(databaseBackend.createDataSource(options as DataSourceOptions)),
     }),
     PersistenceCoreModule,
   ],

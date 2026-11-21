@@ -125,7 +125,7 @@
       "inputs": ["swagger", "^production"],
       "outputs": ["{workspaceRoot}/dist/apps/{projectName}-swagger/swagger.json"],
       "options": {
-        "command": "AUTH_SESSION_SECRET=super-secret ATTRACCESS_URL=http://localhost:3000 SKIP_DATABASE_MIGRATIONS=true node dist/apps/api-swagger/main.js"
+        "command": "DATABASE_URL= AUTH_SESSION_SECRET=super-secret ATTRACCESS_URL=http://localhost:3000 SKIP_DATABASE_MIGRATIONS=true node dist/apps/api-swagger/main.js"
       }
     },
     "asyncapi-build": {

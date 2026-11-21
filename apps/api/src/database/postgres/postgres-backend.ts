@@ -69,8 +69,10 @@ function createDataSourceOptions(): DataSourceOptions {
     migrations: [...postgresMigrations],
     migrationsTableName: POSTGRES_MIGRATIONS_TABLE,
     migrationsTransactionMode: POSTGRES_MIGRATIONS_TRANSACTION_MODE,
-    // Providers access database-backed settings while Nest constructs AppModule.
-    migrationsRun: true,
+    // Providers access database-backed settings while Nest constructs AppModule. SKIP_DATABASE_MIGRATIONS=true must
+    // run nothing: PostgresImportSqlite1760000000001 would otherwise import and move <STORAGE_ROOT>/attraccess.sqlite
+    // in a process that only builds the application (the Swagger and AsyncAPI export) or was told not to migrate.
+    migrationsRun: process.env.SKIP_DATABASE_MIGRATIONS !== 'true',
     entities: entityList,
   } as DataSourceOptions;
 }
