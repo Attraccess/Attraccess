@@ -133,12 +133,15 @@ it('retries a write the link rejected while pairing, then gives up', async () =>
   await expect(sent).resolves.toBeNull();
   expect(device.rx.writeValueWithResponse).toHaveBeenCalledTimes(3);
 
+  // Long enough for a person to accept the OS pairing prompt, then it gives up.
+  const { SECURITY_RETRIES } = await import('./ble-configurator');
+  expect(SECURITY_RETRIES).toBeGreaterThanOrEqual(30);
   device.rx.writeValueWithResponse.mockReset().mockRejectedValue(insecure());
   const failing = ble.sendCommand({ topic: 'auth.status.get' }, false);
   const assertion = expect(failing).rejects.toThrow('insufficient encryption');
-  await vi.advanceTimersByTimeAsync(3000);
+  await vi.advanceTimersByTimeAsync(SECURITY_RETRIES * 1000);
   await assertion;
-  expect(device.rx.writeValueWithResponse).toHaveBeenCalledTimes(4);
+  expect(device.rx.writeValueWithResponse).toHaveBeenCalledTimes(SECURITY_RETRIES + 1);
 });
 
 it('does not retry other write errors', async () => {
