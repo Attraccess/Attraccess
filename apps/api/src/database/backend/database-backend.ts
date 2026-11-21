@@ -6,7 +6,6 @@ import type {
 import type { PluginPersistenceHost } from '../../plugin-system/persistence/plugin-persistence-host.port';
 import type { StandaloneSettingsRows } from '../../settings/settings-rows.port';
 import type { PersistenceErrorClassifier } from '../persistence-errors';
-import type { DatabaseTransfer } from '../transfer-snapshot';
 import type { ScopedUnitOfWork, TransactionScope, UnitOfWork } from '../unit-of-work';
 import type { DatabaseType } from './database-type';
 
@@ -77,8 +76,6 @@ export interface DatabaseBackend<TSource = unknown, TOptions = unknown, THandle 
   /** The unit of work of a connection, with the engine's transaction rules (PostgreSQL: one transaction per scope on its own pooled connection). */
   createUnitOfWork(source: TSource): ScopedUnitOfWork<THandle>;
   readonly errors: PersistenceErrorClassifier;
-  /** Neutral export and import of the whole database for backup, restore and engine transfer. */
-  readonly transfer: DatabaseTransfer<TSource>;
   readonly plugins: DatabaseBackendPluginHooks;
   /**
    * Applies `hook` to every connection the backend opens beside the application connection (none on PostgreSQL),

@@ -1,79 +1,89 @@
-import { postgresBackend } from '../../database/postgres/postgres-backend';
-import { postgresIntegrityViolations } from '../../database/postgres/postgres-transfer';
-import { disposeMigratedSqliteTemplate } from '../../database/transfer/sqlite-import.test-fixture';
-import { compareSnapshots, rowCounts } from '../../database/transfer/snapshot-compare.test-fixture';
-import type { DatabaseSnapshot } from '../../database/transfer-snapshot';
+import { Logger } from '@nestjs/common';
+import { readdir } from 'node:fs/promises';
+import type { DataSource } from 'typeorm';
+import { disposeMigratedSqliteTemplate } from '../../database/sqlite/sqlite-import.test-fixture';
 import { olderStates } from './fixtures/older-states.test-fixture';
 import { postgresExpectations } from './fixtures/older-states-postgres.test-fixture';
-import { recordedMigrations, trackMigrationNames } from './fixtures/postgres-lifecycle.test-fixture';
 import {
+  createLifecycleDatabase,
+  recordedMigrations,
+  trackMigrationNames,
+  type LifecycleDatabase,
+} from './fixtures/postgres-lifecycle.test-fixture';
+import {
+  compareWithSqlite,
   createOldInstallation,
-  createPostgresTarget,
-  sha256,
-  type CapturedTransfer,
+  sequencesBehindSqlite,
+  withStorageRoot,
   type OldInstallation,
-  type PostgresTarget,
-} from './fixtures/sqlite-transfer.test-fixture';
+} from './fixtures/sqlite-installation.test-fixture';
 
 jest.setTimeout(600_000);
 
 afterAll(disposeMigratedSqliteTemplate);
 
 /**
- * The upgrade path of a SQLite installation: the database of each older release (its schema exactly as that release
- * created it, with the data that release wrote) moves into PostgreSQL. The final state of the SQLite data, after the
- * frozen migrations ran on a private copy, is compared with what PostgreSQL holds, table by table.
+ * The upgrade path of a SQLite installation: the PostgreSQL track runs on a blank database with STORAGE_ROOT holding
+ * the SQLite file of an older release (its schema exactly as that release created it, with the data that release
+ * wrote). The import migration brings the file to the last SQLite migration, copies it and moves it to the backup
+ * folder; that moved file is the final SQLite state every core table is compared with.
  */
-describe.each(olderStates)('transfer of the SQLite database of the $name', (state) => {
+describe.each(olderStates)('starting PostgreSQL on the SQLite database of the $name', (state) => {
   let installation: OldInstallation;
-  let target: PostgresTarget;
-  let summary: CapturedTransfer;
-  let before: string;
-  let finalSqlite: DatabaseSnapshot;
-  let imported: DatabaseSnapshot;
+  let lifecycle: LifecycleDatabase;
+  let pg: DataSource;
+  let applied: string[];
+  let warn: jest.SpyInstance;
 
   beforeAll(async () => {
+    warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     installation = await createOldInstallation(state);
-    before = await sha256(installation.workspace.file);
-    target = await createPostgresTarget();
-    summary = await target.transfer(installation);
-    finalSqlite = summary.snapshot;
-    imported = await postgresBackend.transfer.exportSnapshot(target.source, { plugins: installation.plugins });
+    lifecycle = await createLifecycleDatabase();
+    pg = await lifecycle.open();
+    applied = await withStorageRoot(installation.storageRoot, async () =>
+      (await pg.runMigrations()).map((migration) => migration.name),
+    );
   });
 
   afterAll(async () => {
-    await target?.close();
-    await installation?.workspace.remove();
+    jest.restoreAllMocks();
+    await lifecycle?.close();
+    await installation?.remove();
   });
 
-  it('carries every table, column and row of the final SQLite state into PostgreSQL', () => {
-    expect(compareSnapshots(finalSqlite, imported)).toEqual([]);
-    expect(rowCounts(imported)).toEqual(rowCounts(finalSqlite));
-    const nonEmpty = Object.entries(rowCounts(finalSqlite)).filter(([, count]) => count > 0);
-    expect(nonEmpty.length).toBeGreaterThan(2);
-    expect(summary.totalRows).toBe(nonEmpty.reduce((sum, [, count]) => sum + count, 0));
-    expect(summary.warnings).toEqual([]);
+  it('runs the whole PostgreSQL track, the import included, and moves the SQLite file to the backup folder', async () => {
+    expect(applied).toEqual(trackMigrationNames());
+    expect(await recordedMigrations(pg)).toEqual(trackMigrationNames());
+    expect(await readdir(installation.storageRoot)).toEqual(['sqlite-backup']);
+    expect(await readdir(`${installation.storageRoot}/sqlite-backup`)).toEqual(['attraccess.sqlite']);
   });
 
-  it('leaves the SQLite file byte for byte as it was and the PostgreSQL track at its own baseline', async () => {
-    expect(await sha256(installation.workspace.file)).toBe(before);
-    expect(await recordedMigrations(target.source)).toEqual(trackMigrationNames());
+  it('holds every core table of the migrated SQLite file, row by row', async () => {
+    expect(await compareWithSqlite(pg, installation.backup)).toEqual([]);
+    const [{ users }] = await pg.query('SELECT COUNT(*)::int AS users FROM "user"');
+    expect(users).toBeGreaterThan(0);
   });
 
-  it('keeps foreign keys valid and balances equal to the completed transactions', async () => {
-    expect(await target.source.query('SELECT conname FROM pg_constraint WHERE NOT convalidated')).toEqual([]);
-    expect(await postgresIntegrityViolations(target.source)).toEqual([]);
+  it('keeps foreign keys valid and continues generated ids after the highest id SQLite issued', async () => {
+    expect(await pg.query('SELECT conname FROM pg_constraint WHERE NOT convalidated')).toEqual([]);
+    expect(await sequencesBehindSqlite(pg, installation.backup)).toEqual([]);
   });
 
-  it('continues generated ids after the highest id of the source in every table', () => {
-    for (const [table, issued] of Object.entries(finalSqlite.sequences)) {
-      if (!(table in rowCounts(imported))) continue;
-      expect([table, imported.sequences[table] ?? 0]).toEqual([table, expect.any(Number)]);
-      expect(imported.sequences[table] ?? 0).toBeGreaterThanOrEqual(issued);
+  it('holds the data of that release with its types', async () => {
+    await postgresExpectations[state.name](pg);
+  });
+
+  it('applies the later migrations on the imported data: every form is a resource form', async () => {
+    expect(await pg.query(`SELECT id FROM form WHERE scope <> 'resource'`)).toEqual([]);
+  });
+
+  it('names the SQLite tables it did not copy (plugin data) once', async () => {
+    const skipped = warn.mock.calls.filter(([message]) => String(message).startsWith('Not imported'));
+    if (state.name.startsWith('release with open work')) {
+      expect(skipped).toEqual([[expect.stringContaining('plugin_bookings_booking, plugin_migrations_bookings')]]);
+    } else {
+      expect(skipped).toEqual([]);
     }
-  });
-
-  it('holds the data of that release with its types in PostgreSQL', async () => {
-    await postgresExpectations[state.name](target.source);
   });
 });
