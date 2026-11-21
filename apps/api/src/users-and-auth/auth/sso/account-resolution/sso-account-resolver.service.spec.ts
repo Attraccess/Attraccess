@@ -20,11 +20,18 @@ describe('SsoAccountResolver', () => {
     bound = null,
     byEmail = null,
     hook,
-  }: { bound?: number | null; byEmail?: Partial<UserRecord> | null; hook?: SsoProvisioningHook } = {}) {
+    boundNames = {},
+  }: {
+    bound?: number | null;
+    byEmail?: Partial<UserRecord> | null;
+    hook?: SsoProvisioningHook;
+    boundNames?: Partial<UserRecord>;
+  } = {}) {
     const users = {
       findOne: jest.fn(async (query: Record<string, unknown>) =>
-        'id' in query ? ({ id: query.id } as UserRecord) : (byEmail as UserRecord | null),
+        'id' in query ? ({ id: query.id, ...boundNames } as UserRecord) : (byEmail as UserRecord | null),
       ),
+      updateOne: jest.fn(async (id: number, changes: object) => ({ id, ...boundNames, ...changes }) as UserRecord),
       createOne: jest.fn(async () => ({ id: 77 }) as UserRecord),
       buildUsernameFromSSOClaim: jest.fn((value: string) => `built:${value}`),
       recordCreatedUser: jest.fn(),
@@ -168,5 +175,30 @@ describe('SsoAccountResolver', () => {
     const failing = setup();
     failing.auth.addAuthenticationDetails.mockRejectedValue(new Error('binding failed'));
     await expect(failing.resolver.resolveSsoUser(input)).rejects.toThrow('binding failed');
+  });
+
+  describe('names from the identity provider', () => {
+    it('stores the released names when it creates the account', async () => {
+      const { resolver, users } = setup();
+      await resolver.resolveSsoUser({ ...input, firstName: 'Ada', lastName: 'Lovelace' });
+      expect(users.createOne).toHaveBeenCalledWith(
+        expect.objectContaining({ firstName: 'Ada', lastName: 'Lovelace' }),
+        manager,
+      );
+    });
+
+    it('updates a bound user whose names changed, writing only the changed ones', async () => {
+      const { resolver, users } = setup({ bound: 5, boundNames: { firstName: 'Ada', lastName: 'Byron' } });
+      const result = await resolver.resolveSsoUser({ ...input, firstName: 'Ada', lastName: 'Lovelace' });
+      expect(users.updateOne).toHaveBeenCalledWith(5, { lastName: 'Lovelace' });
+      expect(result.user).toMatchObject({ firstName: 'Ada', lastName: 'Lovelace' });
+    });
+
+    it('writes nothing when the names did not change or the claims are missing', async () => {
+      const { resolver, users } = setup({ bound: 5, boundNames: { firstName: 'Ada', lastName: 'Lovelace' } });
+      await resolver.resolveSsoUser({ ...input, firstName: 'Ada', lastName: 'Lovelace' });
+      await resolver.resolveSsoUser({ ...input, firstName: undefined, lastName: undefined });
+      expect(users.updateOne).not.toHaveBeenCalled();
+    });
   });
 });

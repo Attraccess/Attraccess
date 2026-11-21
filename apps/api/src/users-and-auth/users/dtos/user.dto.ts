@@ -81,6 +81,12 @@ export class UserDto implements UserProfile {
   @ApiProperty({ description: 'The username of the user', example: 'johndoe' })
   username!: string;
 
+  @ApiProperty({ type: String, nullable: true, description: 'The first name of the user', example: 'Ada' })
+  firstName!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: 'The last name of the user', example: 'Lovelace' })
+  lastName!: string | null;
+
   @ApiProperty({ description: "The user's preferred locale (BCP 47 language tag)", example: 'en' })
   locale!: string;
 
@@ -134,6 +140,8 @@ export function toUserDto(user: UserProfile): UserDto {
   return {
     id: user.id,
     username: user.username,
+    firstName: user.firstName,
+    lastName: user.lastName,
     locale: user.locale,
     dateTimeLocale: user.dateTimeLocale,
     isEmailVerified: user.isEmailVerified,

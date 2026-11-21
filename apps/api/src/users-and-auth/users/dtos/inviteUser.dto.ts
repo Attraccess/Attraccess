@@ -1,4 +1,4 @@
-import { IsEmail, IsString } from 'class-validator';
+import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class InviteUserDto {
@@ -8,6 +8,18 @@ export class InviteUserDto {
   })
   @IsString()
   username: string;
+
+  @ApiProperty({ required: false, type: String, nullable: true, maxLength: 100, description: 'Optional first name' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  firstName?: string | null;
+
+  @ApiProperty({ required: false, type: String, nullable: true, maxLength: 100, description: 'Optional last name' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  lastName?: string | null;
 
   @ApiProperty({
     example: 'john.doe@example.com',

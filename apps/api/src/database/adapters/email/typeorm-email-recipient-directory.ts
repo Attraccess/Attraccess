@@ -11,6 +11,15 @@ export class TypeOrmEmailRecipientDirectory implements EmailRecipientDirectory {
 
   async findById(id: number): Promise<NotificationRecipient | null> {
     const user = await this.users.findOne({ where: { id } });
-    return user ? { id: user.id, username: user.username, email: user.email, locale: user.locale } : null;
+    return user
+      ? {
+          id: user.id,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          locale: user.locale,
+        }
+      : null;
   }
 }

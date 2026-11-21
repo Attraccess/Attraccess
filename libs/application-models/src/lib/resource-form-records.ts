@@ -67,7 +67,7 @@ export interface FormSubmissionListRecord {
   createdAt: Date;
   formId: number;
   action: ResourceFormAction;
-  user: { id: number; username: string } | null;
+  user: { id: number; username: string; firstName: string | null; lastName: string | null } | null;
   resource: { id: number; name: string } | null;
   data: Record<string, { value: string; fieldDefinition: FormFieldRecord }>;
 }

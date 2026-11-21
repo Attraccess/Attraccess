@@ -22,6 +22,8 @@ export function aUserRecord(overrides: Partial<UserRecord> = {}): UserRecord {
   return {
     id: 1,
     username: 'alice',
+    firstName: null,
+    lastName: null,
     email: 'alice@example.com',
     locale: 'en',
     dateTimeLocale: null,
@@ -167,7 +169,13 @@ export class InMemoryUserStore implements UserStore {
 
   async insertUsers(users: NewUser[]) {
     return users.map((user) => {
-      const record = aUserRecord({ ...user, id: this.nextId++, isEmailVerified: user.isEmailVerified });
+      const record = aUserRecord({
+        ...user,
+        firstName: user.firstName ?? null,
+        lastName: user.lastName ?? null,
+        id: this.nextId++,
+        isEmailVerified: user.isEmailVerified,
+      });
       this.users.push(record);
       return record;
     });

@@ -5,7 +5,10 @@ import { AuthenticatedRequest, AuthenticatedUser, SessionAuth } from '@attracces
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
 import { AuthRateLimit } from '../rate-limiting/rate-limit.decorator';
 import { UsersService } from './users.service';
+import { UserAdministrationService } from './user-administration.service';
+import { auditOriginOf } from '../../audit/recorder/audit-event';
 import { ChangeUsernameDto } from './dtos/changeUsername.dto';
+import { ChangeNameDto } from './dtos/changeName.dto';
 import { ChangeEmailDto } from './dtos/changeEmail.dto';
 import { DeleteAccountConfirmDto } from './dtos/deleteAccountConfirm.dto';
 import { UpdateLocaleDto } from './dtos/updateLocale.dto';
@@ -18,7 +21,10 @@ import { UserDto, toUserAccountDto } from './dtos/user.dto';
 @Controller('users')
 @UseInterceptors(AuthRateLimitInterceptor)
 export class UserProfileController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly administration: UserAdministrationService,
+  ) {}
 
   @SessionAuth()
   @Get('me')
@@ -37,6 +43,8 @@ export class UserProfileController {
     return {
       id: user.id,
       username: user.username,
+      firstName: user.firstName ?? null,
+      lastName: user.lastName ?? null,
       email: user.email,
       locale: user.locale,
       ...resolveDateTimePreferences(user.dateTimeLocale),
@@ -87,6 +95,15 @@ export class UserProfileController {
   @ApiResponse({ status: 200, description: 'Username changed.', type: UserDto })
   async changeMyUsername(@Req() request: AuthenticatedRequest, @Body() body: ChangeUsernameDto): Promise<UserDto> {
     return toUserAccountDto(await this.usersService.changeUsername(request.user.id, body.username, request.user));
+  }
+
+  @SessionAuth()
+  @Patch('me/name')
+  @ApiOperation({ summary: 'Change current user first and last name', operationId: 'changeMyName' })
+  @ApiResponse({ status: 200, description: 'Name changed.', type: UserDto })
+  @ApiResponse({ status: 403, description: 'The identity provider manages the name of SSO users.' })
+  async changeMyName(@Req() request: AuthenticatedRequest, @Body() body: ChangeNameDto): Promise<UserDto> {
+    return toUserAccountDto(await this.administration.changeName(request.user.id, body, auditOriginOf(request)));
   }
 
   @SessionAuth()

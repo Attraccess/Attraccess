@@ -8,6 +8,10 @@ import type { SupervisionMode } from './resource-supervision';
 export interface PluginUserModel {
   id: number;
   username: string;
+  firstName: string | null;
+  lastName: string | null;
+  /** "First Last", or the username when no name is set. Show this to people, not `username`. */
+  readonly displayName: string;
   /** BCP 47 tag of the user's preferred language. */
   locale: string;
   isDisabled: boolean;

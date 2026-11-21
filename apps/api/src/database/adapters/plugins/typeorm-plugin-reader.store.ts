@@ -1,3 +1,4 @@
+import { formatUserDisplayName } from '@attraccess/shared';
 import { NFCCard, PluginReaderEntity, Resource, User } from '@attraccess/database-entities';
 import type { PluginReaderRecord, PluginReaderResource } from '@attraccess/application-models';
 import { In, type DataSource } from 'typeorm';
@@ -84,8 +85,18 @@ export function createTypeOrmPluginReaderStore(source: () => DataSource): Plugin
     async findCardOwner(userId) {
       const row = await source()
         .getRepository(User)
-        .findOne({ where: { id: userId }, select: { id: true, username: true, isDisabled: true } });
-      return row ? { id: row.id, username: row.username, isDisabled: Boolean(row.isDisabled) } : null;
+        .findOne({
+          where: { id: userId },
+          select: { id: true, username: true, firstName: true, lastName: true, isDisabled: true },
+        });
+      return row
+        ? {
+            id: row.id,
+            username: row.username,
+            displayName: formatUserDisplayName(row),
+            isDisabled: Boolean(row.isDisabled),
+          }
+        : null;
     },
 
     isActiveCardOf(cardId, userId) {

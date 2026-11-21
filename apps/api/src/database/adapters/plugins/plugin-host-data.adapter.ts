@@ -1,3 +1,4 @@
+import { formatUserDisplayName } from '@attraccess/shared';
 import {
   Resource,
   ResourceFlowNode,
@@ -175,6 +176,18 @@ class UserDirectory implements PluginUserDirectory {
       .where('user.id IN (:...ids)', { ids })
       .getMany();
     return new Map(rows.map((row) => [row.id, row.username]));
+  }
+
+  async getDisplayNames(userIds: number[]): Promise<Map<number, string>> {
+    const ids = unique(userIds);
+    if (ids.length === 0) return new Map();
+    const rows = await this.source()
+      .getRepository(User)
+      .createQueryBuilder('user')
+      .select(['user.id', 'user.username', 'user.firstName', 'user.lastName'])
+      .where('user.id IN (:...ids)', { ids })
+      .getMany();
+    return new Map(rows.map((row) => [row.id, formatUserDisplayName(row)]));
   }
 
   async getLocales(userIds: number[]): Promise<Map<number, string | null>> {

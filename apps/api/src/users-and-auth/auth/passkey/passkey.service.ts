@@ -1,3 +1,4 @@
+import { formatUserDisplayName } from '@attraccess/shared';
 import type { AuthenticatedSessionUser, PasskeyRecord } from '@attraccess/application-models';
 
 import {
@@ -255,7 +256,8 @@ export class PasskeyService {
   }
 
   async createRegistrationOptions(
-    user: Pick<AuthenticatedSessionUser, 'id' | 'username'>,
+    user: Pick<AuthenticatedSessionUser, 'id' | 'username'> &
+      Partial<Pick<AuthenticatedSessionUser, 'firstName' | 'lastName'>>,
     requestOrigin?: string,
   ): Promise<PublicKeyCredentialCreationOptionsJSON> {
     const { rpID } = await this.resolveRelyingParty(requestOrigin);
@@ -265,7 +267,7 @@ export class PasskeyService {
       rpName: RP_NAME,
       rpID,
       userName: user.username,
-      userDisplayName: user.username,
+      userDisplayName: formatUserDisplayName(user),
       // The user handle must be stable so authenticators overwrite rather than pile up credentials
       userID: new TextEncoder().encode(String(user.id)),
       attestationType: 'none',

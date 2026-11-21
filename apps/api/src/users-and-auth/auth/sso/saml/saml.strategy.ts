@@ -1,3 +1,4 @@
+import { resolveSamlNameClaims } from '../sso-name-claims';
 import { SsoSessionRequest } from '../sso-session-request';
 import type { AuthenticatedSessionUser, SsoSamlConfigurationRecord } from '@attraccess/application-models';
 import { SSOProviderType } from '@attraccess/application-models';
@@ -116,6 +117,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
         email,
         emailVerified: undefined,
         usernameClaim: this.resolveDisplayName(profile, email),
+        ...resolveSamlNameClaims(profile, config),
       })
       .catch((error: unknown) => {
         if (error instanceof AccountLinkingRequiredException) throw error;

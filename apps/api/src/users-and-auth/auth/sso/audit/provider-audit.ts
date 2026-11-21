@@ -93,6 +93,10 @@ export function ssoAuditSnapshot(provider: SsoProviderRecord): string {
           ),
           emailClaimPaths: boundedArray(provider.oidcConfiguration?.emailClaimPaths, 'emailClaimPaths', omitted),
           roleClaimPaths: boundedArray(provider.oidcConfiguration?.roleClaimPaths, 'roleClaimPaths', omitted),
+          firstNameClaimPath:
+            boundedString(provider.oidcConfiguration?.firstNameClaimPath, 'firstNameClaimPath', omitted) || null,
+          lastNameClaimPath:
+            boundedString(provider.oidcConfiguration?.lastNameClaimPath, 'lastNameClaimPath', omitted) || null,
           roleMappings: auditRoleMappings(provider.oidcConfiguration?.roleMappings),
           omitted,
         }
@@ -112,6 +116,10 @@ export function ssoAuditSnapshot(provider: SsoProviderRecord): string {
             omitted,
           ),
           roleAttributeKeys: boundedArray(provider.samlConfiguration?.roleAttributeKeys, 'roleAttributeKeys', omitted),
+          firstNameClaimPath:
+            boundedString(provider.samlConfiguration?.firstNameClaimPath, 'firstNameClaimPath', omitted) || null,
+          lastNameClaimPath:
+            boundedString(provider.samlConfiguration?.lastNameClaimPath, 'lastNameClaimPath', omitted) || null,
           roleMappings: auditRoleMappings(provider.samlConfiguration?.roleMappings),
           signingMaterial: {
             identityProviderCertificateConfigured: Boolean(provider.samlConfiguration?.certificate),
@@ -181,6 +189,8 @@ export function ssoProviderChanges(before: SsoProviderRecord, after: SsoProvider
           'usernameClaimPaths',
           'emailClaimPaths',
           'roleClaimPaths',
+          'firstNameClaimPath',
+          'lastNameClaimPath',
           'roleMappings',
           'permissionSyncTtlMinutes',
         ]
@@ -194,6 +204,8 @@ export function ssoProviderChanges(before: SsoProviderRecord, after: SsoProvider
           'forceAuthn',
           'emailAttributeKeys',
           'roleAttributeKeys',
+          'firstNameClaimPath',
+          'lastNameClaimPath',
           'roleMappings',
         ];
   const changed = [

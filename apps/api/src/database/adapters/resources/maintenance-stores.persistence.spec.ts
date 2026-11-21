@@ -78,9 +78,11 @@ describe('maintenance stores on real PostgreSQL', () => {
           'dateTimeLocale',
           'deletedAt',
           'externalIdentifier',
+          'firstName',
           'id',
           'isDisabled',
           'isEmailVerified',
+          'lastName',
           'locale',
           'updatedAt',
           'username',
@@ -264,6 +266,7 @@ describe('maintenance stores on real PostgreSQL', () => {
         id: request.id,
         reason: 'Noise',
         createdByUsername: 'alice',
+        createdByDisplayName: 'alice',
       });
       expect(await notifications.findResource(resourceId)).toEqual({
         id: resourceId,
@@ -272,7 +275,14 @@ describe('maintenance stores on real PostgreSQL', () => {
       });
       expect(await notifications.findResource(999)).toBeNull();
       expect(await notifications.findIntroducerUsers(resourceId, [group.id])).toEqual([
-        { id: introducer.id, username: 'intro', email: 'intro@example.test', locale: 'en' },
+        {
+          id: introducer.id,
+          username: 'intro',
+          firstName: null,
+          lastName: null,
+          email: 'intro@example.test',
+          locale: 'en',
+        },
       ]);
       expect(await notifications.findIntroducerUsers(resourceId, [])).toEqual([]);
       expect((await notifications.findUsersByIds([userId, introducer.id])).map((user) => user.id).sort()).toEqual(

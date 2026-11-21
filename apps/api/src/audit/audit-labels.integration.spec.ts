@@ -88,6 +88,7 @@ describe('persisted audit names', () => {
       expect.objectContaining({
         actorId: 7,
         actorUsername: 'Current admin',
+        actorDisplayName: 'Current admin',
         actorUsernameSource: 'current',
         subjectId: 7,
         subjectLabel: 'Current lathe',
@@ -95,9 +96,28 @@ describe('persisted audit names', () => {
       }),
     ]);
     const nameQueries = queries.filter((sql) => sql.includes('"subject"'));
-    expect(nameQueries).toHaveLength(2);
+    // One per kind: the actor's display name, the actor's username and the resource name.
+    expect(nameQueries).toHaveLength(3);
     expect(nameQueries.join('\n')).not.toMatch(/email|password|documentation|SELECT \*/i);
     expect(JSON.stringify(items)).not.toContain('private');
+  });
+
+  it('labels a user by display name and keeps the username next to it', async () => {
+    await source.getRepository(User).update({ id: 7 }, { firstName: 'Ada', lastName: 'Lovelace' });
+    await service.record({
+      domain: 'identity',
+      action: 'identity.user_updated',
+      actor: { id: 7, authenticationMethod: 'session' },
+      subject: { type: 'identity.user', id: 7 },
+      details: { field: 'username' },
+    });
+    const { items } = await controller.list({ limit: 50 });
+    expect(items[0]).toMatchObject({
+      actorUsername: 'Current admin',
+      actorDisplayName: 'Ada Lovelace',
+      subjectLabel: 'Ada Lovelace',
+      subjectLabelSource: 'current',
+    });
   });
 
   it('persists flow events, including a degraded large snapshot, and labels them', async () => {

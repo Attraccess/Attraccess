@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { formatUserDisplayName } from '@attraccess/shared';
 import { ConversationParticipant, User } from '@attraccess/database-entities';
 import { MessageNotificationStore, NotifiableParticipant } from '../../../messaging/message-notification-store.port';
 
@@ -19,14 +20,21 @@ export class TypeOrmMessageNotificationStore implements MessageNotificationStore
       lastReadAt: row.lastReadAt,
       lastNotifiedAt: row.lastNotifiedAt,
       recipient: row.user
-        ? { id: row.user.id, username: row.user.username, email: row.user.email, locale: row.user.locale }
+        ? {
+            id: row.user.id,
+            username: row.user.username,
+            firstName: row.user.firstName,
+            lastName: row.user.lastName,
+            email: row.user.email,
+            locale: row.user.locale,
+          }
         : null,
     }));
   }
 
-  async findUsername(userId: number): Promise<string | null> {
+  async findDisplayName(userId: number): Promise<string | null> {
     const user = await this.users.findOne({ where: { id: userId } });
-    return user?.username ?? null;
+    return user ? formatUserDisplayName(user) : null;
   }
 
   async markNotified(participantId: number, notifiedAt: Date): Promise<void> {

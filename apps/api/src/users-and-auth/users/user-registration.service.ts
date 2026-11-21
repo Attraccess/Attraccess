@@ -139,6 +139,8 @@ export class UserRegistrationService {
       const user = await this.usersService.createOne(
         {
           username: body.username,
+          firstName: body.firstName,
+          lastName: body.lastName,
           email: body.email,
           externalIdentifier: null,
           locale,

@@ -34,9 +34,11 @@ const PUBLIC_FIELDS = [
   'dateTimeLocale',
   'deletedAt',
   'externalIdentifier',
+  'firstName',
   'id',
   'isDisabled',
   'isEmailVerified',
+  'lastName',
   'locale',
   'updatedAt',
   'username',
@@ -143,7 +145,7 @@ describe('user responses', () => {
         ip: '::1',
         headers: {},
       };
-      const profile = new UserProfileController(usersService as never);
+      const profile = new UserProfileController(usersService as never, {} as never);
       const admin = new UsersAdminController(usersService as never, administration as never);
       const registration = new UsersRegistrationController(
         {} as never,

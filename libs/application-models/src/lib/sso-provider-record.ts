@@ -13,6 +13,8 @@ export interface SsoOidcConfigurationRecord {
   scopes: string[] | null;
   usernameClaimPaths: string[] | null;
   emailClaimPaths: string[] | null;
+  firstNameClaimPath?: string | null;
+  lastNameClaimPath?: string | null;
   roleClaimPaths?: string[] | null;
   roleMappings?: Record<string, string[]> | null;
   endSessionURL?: string | null;
@@ -35,6 +37,8 @@ export interface SsoSamlConfigurationRecord {
   wantAuthnResponseSigned: boolean;
   forceAuthn: boolean;
   emailAttributeKeys?: string[] | null;
+  firstNameClaimPath?: string | null;
+  lastNameClaimPath?: string | null;
   roleAttributeKeys?: string[] | null;
   provisioningSecret?: string | null;
   roleMappings?: Record<string, string[]> | null;

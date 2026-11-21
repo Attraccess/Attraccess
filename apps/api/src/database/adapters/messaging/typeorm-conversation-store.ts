@@ -14,6 +14,8 @@ import { ConversationStore } from '../../../messaging/conversation-store.port';
 export const toMessagingUser = (user: User): MessagingUser => ({
   id: user.id,
   username: user.username,
+  firstName: user.firstName,
+  lastName: user.lastName,
   locale: user.locale,
   dateTimeLocale: user.dateTimeLocale,
   isEmailVerified: user.isEmailVerified,

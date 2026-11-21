@@ -57,6 +57,9 @@ const SAML_UPDATE_PASSTHROUGH_FIELDS = [
 /** An empty list means "use the defaults"; store it as null rather than the `simple-array` empty string. */
 const emptyListToNull = <T>(value: T[] | null | undefined) => (value?.length === 0 ? null : value);
 
+/** A claim path left blank means "use the defaults". */
+const blankToNull = (value: string | null | undefined) => value?.trim() || null;
+
 @Injectable()
 export class SSOService {
   public constructor(
@@ -209,6 +212,8 @@ export class SSOService {
     return {
       ...persistableConfig,
       emailAttributeKeys: emptyListToNull(persistableConfig.emailAttributeKeys),
+      firstNameClaimPath: blankToNull(persistableConfig.firstNameClaimPath),
+      lastNameClaimPath: blankToNull(persistableConfig.lastNameClaimPath),
       roleAttributeKeys: emptyListToNull(persistableConfig.roleAttributeKeys),
       certificate: normalizedCertificate,
       provisioningSecret: encryptedProvisioningSecret,
@@ -243,6 +248,9 @@ export class SSOService {
     }
     for (const key of ['emailAttributeKeys', 'roleAttributeKeys'] as const) {
       if (config[key] !== undefined) Object.assign(payload, { [key]: emptyListToNull(config[key]) });
+    }
+    for (const key of ['firstNameClaimPath', 'lastNameClaimPath'] as const) {
+      if (config[key] !== undefined) Object.assign(payload, { [key]: blankToNull(config[key]) });
     }
     if (typeof config.certificate !== 'undefined') {
       payload.certificate = this.normalizeCertificate(config.certificate);
@@ -363,6 +371,8 @@ export class SSOService {
       scopes: emptyListToNull(config.scopes),
       usernameClaimPaths: emptyListToNull(config.usernameClaimPaths),
       emailClaimPaths: emptyListToNull(config.emailClaimPaths),
+      firstNameClaimPath: blankToNull(config.firstNameClaimPath),
+      lastNameClaimPath: blankToNull(config.lastNameClaimPath),
       roleClaimPaths: emptyListToNull(config.roleClaimPaths),
       clientSecret: encryptedSecret,
     } as NewSsoOidcConfiguration;
@@ -405,6 +415,9 @@ export class SSOService {
     }
     if (typeof updateConfig.emailClaimPaths !== 'undefined') {
       payload.emailClaimPaths = emptyListToNull(updateConfig.emailClaimPaths);
+    }
+    for (const key of ['firstNameClaimPath', 'lastNameClaimPath'] as const) {
+      if (typeof updateConfig[key] !== 'undefined') payload[key] = blankToNull(updateConfig[key]);
     }
     if (typeof updateConfig.roleClaimPaths !== 'undefined') {
       // explicit null clears the column

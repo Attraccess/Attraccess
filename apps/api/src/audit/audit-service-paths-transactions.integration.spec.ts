@@ -236,6 +236,8 @@ describe('audit recorded by an owning service inside its transaction', () => {
             usernameClaimPaths: null,
             emailClaimPaths: null,
             roleClaimPaths: null,
+            firstNameClaimPath: null,
+            lastNameClaimPath: null,
             roleMappings: null,
             omitted: {},
           },
