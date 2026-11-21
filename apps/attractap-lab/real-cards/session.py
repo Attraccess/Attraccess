@@ -57,6 +57,7 @@ class Kit:
         self.prompts = 0
         self.api = Api(os.environ["API_URL"], os.environ["DATABASE_URL"])
         self.admin = self.api.login("admin")
+        self.api.store_license(self.admin)
         self.emulator = None
         self.console = None
         self.hooks = None
