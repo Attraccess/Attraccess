@@ -1,0 +1,65 @@
+{
+  "sidebar": "Status walls",
+  "failed": "That did not work",
+  "common": { "cancel": "Cancel", "save": "Save", "done": "Done" },
+  "page": {
+    "title": "Status walls",
+    "description": "Big-screen pages that show at a glance which machines are ready, in use or under maintenance. Screens open them by link, without signing in.",
+    "create": "New status wall",
+    "empty": "No status walls yet",
+    "loadFailed": "Could not load the status walls"
+  },
+  "table": { "name": "Name", "shows": "Shows" },
+  "selection": {
+    "all": "All resources",
+    "groups": "{{count}} group(s)",
+    "resources": "{{count}} resource(s)"
+  },
+  "actions": {
+    "open": "Open wall",
+    "link": "Show link",
+    "edit": "Edit",
+    "regenerate": "New link",
+    "delete": "Delete"
+  },
+  "regenerate": {
+    "title": "New link for {{name}}?",
+    "body": "Screens that show the current link stop showing the wall and need the new link.",
+    "confirm": "Create new link"
+  },
+  "delete": {
+    "title": "Delete {{name}}?",
+    "body": "Screens that show this wall stop showing it. This cannot be undone.",
+    "confirm": "Delete"
+  },
+  "form": {
+    "createTitle": "New status wall",
+    "editTitle": "Edit status wall",
+    "name": "Name",
+    "namePlaceholder": "e.g. Workshop hall",
+    "all": "Show all resources",
+    "groups": "Resource groups",
+    "noGroups": "There are no resource groups.",
+    "resources": "Resources",
+    "selectedCount": "{{count}} selected",
+    "needSelection": "Choose at least one group or resource.",
+    "create": "Create"
+  },
+  "link": {
+    "title": "Link of {{name}}",
+    "body": "Open this link on the screen. Anyone with the link sees the wall without signing in; use \"New link\" to revoke it. Double-click the wall to switch to full screen.",
+    "url": "Wall link",
+    "copy": "Copy link",
+    "copied": "Copied",
+    "open": "Open"
+  },
+  "state": { "ready": "Ready", "in-use": "In use", "maintenance": "Maintenance" },
+  "display": {
+    "empty": "This wall shows no resources.",
+    "offline": "No connection to the server: the wall may be out of date",
+    "gone": {
+      "title": "This link is no longer valid",
+      "body": "Ask a manager for the current link of this status wall."
+    }
+  }
+}

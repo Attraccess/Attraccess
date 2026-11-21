@@ -28,6 +28,9 @@ export interface StorageConfigType {
   };
 }
 
+/** URL prefix under which the API serves stored public files (resource images) without authentication. */
+export const CDN_SERVE_ROOT = '/cdn';
+
 const storageConfigFactory = (): StorageConfigType => {
   const validatedEnv = StorageEnvSchema.parse(process.env);
   const storageRoot = resolveStorageRoot({ STORAGE_ROOT: validatedEnv.STORAGE_ROOT });
@@ -40,7 +43,7 @@ const storageConfigFactory = (): StorageConfigType => {
       maxAgeDays: validatedEnv.CACHE_MAX_AGE_DAYS,
       directory: path.join(storageRoot, 'cache'),
     },
-    cdn: { serveRoot: '/cdn', root: path.join(storageRoot, 'cdn') },
+    cdn: { serveRoot: CDN_SERVE_ROOT, root: path.join(storageRoot, 'cdn') },
   };
 };
 

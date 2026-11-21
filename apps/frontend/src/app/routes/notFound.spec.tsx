@@ -39,6 +39,7 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
 
 const { useAuth } = await import('../../hooks/useAuth');
 const { AppRoutes } = await import('../app');
+const { default: usePluginState } = await import('../plugins/plugin.state');
 
 function mockOperator(granted: SystemPermission[]) {
   vi.mocked(useAuth).mockReturnValue({
@@ -68,6 +69,17 @@ describe('not-found route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockOperator(['system.settings.manage', 'users.read']);
+    usePluginState.setState({ isInitialized: true });
+  });
+
+  // A public plugin page opened straight from its link is unknown until plugins have loaded.
+  it('shows a loading state instead of not-found while plugins are still loading', () => {
+    usePluginState.setState({ isInitialized: false });
+
+    renderAt('/status-wall/some-token');
+
+    expect(byCy('plugins-loading')).toBeInTheDocument();
+    expect(byCy('not-found')).toBeNull();
   });
 
   // ATT-866 deleted twelve admin routes on a "move, don't redirect" decision. Without a catch-all

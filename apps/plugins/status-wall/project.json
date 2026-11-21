@@ -1,0 +1,162 @@
+{
+  "name": "plugin-status-wall",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/plugins/status-wall",
+  "// lint": "lint runs from the workspace root on purpose: @nx/enforce-module-boundaries no-ops when eslint runs from inside a project directory. See eslint.config.cjs for the plugin isolation rules.",
+  "tags": ["type:plugin", "scope:plugin"],
+  "targets": {
+    "install-dev": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["build"],
+      "options": {
+        "command": "node apps/plugins/scripts/install-dev-plugin.mjs --src apps/plugins/status-wall/package"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/frontend/src/**/*", "{workspaceRoot}/eslint.config.cjs"],
+      "outputs": [],
+      "options": {
+        "command": "eslint apps/plugins/status-wall/backend apps/plugins/status-wall/frontend/src --max-warnings=0 && prettier --check apps/plugins/status-wall/backend apps/plugins/status-wall/frontend/src"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/backend/**/*",
+        "{projectRoot}/frontend/**/*",
+        "{projectRoot}/tsconfig.spec.json",
+        "{workspaceRoot}/tsconfig.base.json",
+        "{workspaceRoot}/libs/plugins-backend-sdk/src/**/*",
+        "{workspaceRoot}/libs/plugins-frontend-sdk/src/**/*",
+        "{workspaceRoot}/libs/plugins-frontend-ui/src/**/*",
+        {
+          "externalDependencies": ["typescript"]
+        }
+      ],
+      "outputs": [],
+      "options": {
+        "command": "tsc --noEmit -p apps/plugins/status-wall/backend/tsconfig.json && tsc --noEmit -p apps/plugins/status-wall/frontend/tsconfig.json && tsc --noEmit -p apps/plugins/status-wall/tsconfig.spec.json --module esnext --moduleResolution bundler"
+      }
+    },
+    "test-frontend": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/frontend/**/*",
+        "{workspaceRoot}/libs/plugins-frontend-sdk/src/**/*",
+        "{workspaceRoot}/libs/plugins-frontend-ui/src/**/*"
+      ],
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/status-wall/test-frontend"],
+      "options": {
+        "cwd": "apps/plugins/status-wall",
+        "command": "pnpm exec vitest run --root frontend"
+      }
+    },
+    "test": {
+      "dependsOn": ["test-frontend"],
+      "options": {
+        "passWithNoTests": true
+      }
+    },
+    "build-backend": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["{projectRoot}/backend/**/*", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
+      "outputs": ["{projectRoot}/package/dist"],
+      "options": {
+        "cwd": "apps/plugins/status-wall",
+        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js"
+      }
+    },
+    "build-frontend": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/frontend/**/*",
+        "{workspaceRoot}/libs/plugins-frontend-sdk/src/**/*",
+        "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs",
+        "{workspaceRoot}/apps/plugins/scripts/host-shared-placeholder.mjs"
+      ],
+      "outputs": ["{projectRoot}/package/frontend"],
+      "options": {
+        "cwd": "apps/plugins/status-wall",
+        "command": "pnpm exec vite build --config frontend/vite.config.ts"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build-backend", "build-frontend"],
+      "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json", "{projectRoot}/LICENSE.md"],
+      "outputs": [
+        "{projectRoot}/package/package.json",
+        "{projectRoot}/package/plugin.json",
+        "{projectRoot}/package/LICENSE.md"
+      ],
+      "options": {
+        "cwd": "apps/plugins/status-wall",
+        "command": "node -e \"for (const file of ['package.json', 'plugin.json', 'LICENSE.md']) require('fs').copyFileSync(file, 'package/' + file)\""
+      }
+    },
+    "zip": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build"],
+      "inputs": ["{projectRoot}/package/**/*", "{workspaceRoot}/apps/plugins/scripts/zip-plugin.mjs"],
+      "outputs": ["{projectRoot}/dist/plugin-status-wall.zip"],
+      "options": {
+        "cwd": "apps/plugins/status-wall",
+        "command": "node ../scripts/zip-plugin.mjs --src package --out dist/plugin-status-wall.zip"
+      }
+    },
+    "pack": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build"],
+      "inputs": ["{projectRoot}/package/**/*"],
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "cwd": "apps/plugins/status-wall",
+        "command": "rm -rf dist && mkdir dist && (cd package && npm pack --pack-destination ../dist)"
+      }
+    },
+    "pack-test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["pack", "plugins-backend-sdk:build"],
+      "inputs": [
+        "{projectRoot}/package/**/*",
+        "{workspaceRoot}/apps/plugins/scripts/verify-packed-plugin.mjs",
+        "{workspaceRoot}/package.json"
+      ],
+      "options": {
+        "cwd": "apps/plugins/status-wall",
+        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js frontend/remoteEntry.js frontend/style.css",
+        "env": {
+          "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "2.0.0"
+        }
+      }
+    },
+    "publish": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["pack-test"],
+      "options": {
+        "cwd": "apps/plugins/status-wall",
+        "command": "node ../scripts/publish-plugin.mjs package dist"
+      }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["test", "test-frontend"],
+      "options": {
+        "command": "node scripts/crap-score/run.mjs apps/plugins/status-wall"
+      }
+    }
+  }
+}
