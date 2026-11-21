@@ -66,10 +66,11 @@ afterEach(() => {
   Reflect.deleteProperty(navigator, 'bluetooth');
 });
 
-it('asks for the bridge service and subscribes to notifications before the first write', async () => {
+it('lists readers and bridges in setup mode and subscribes to notifications before the first write', async () => {
   const ble = await connected();
+  // The setup service, or a name like "Attractap Touch 71C8", "Attractap Lite 71C8" or "Attractap Bridge 71C8".
   expect(requestDevice).toHaveBeenCalledWith({
-    filters: [{ services: [SERVICE] }, { namePrefix: 'Attractap Bridge' }],
+    filters: [{ services: [SERVICE] }, { namePrefix: 'Attractap' }],
     optionalServices: [SERVICE],
   });
   expect(device.tx.startNotifications).toHaveBeenCalledOnce();
@@ -132,12 +133,15 @@ it('retries a write the link rejected while pairing, then gives up', async () =>
   await expect(sent).resolves.toBeNull();
   expect(device.rx.writeValueWithResponse).toHaveBeenCalledTimes(3);
 
+  // Long enough for a person to accept the OS pairing prompt, then it gives up.
+  const { SECURITY_RETRIES } = await import('./ble-configurator');
+  expect(SECURITY_RETRIES).toBeGreaterThanOrEqual(30);
   device.rx.writeValueWithResponse.mockReset().mockRejectedValue(insecure());
   const failing = ble.sendCommand({ topic: 'auth.status.get' }, false);
   const assertion = expect(failing).rejects.toThrow('insufficient encryption');
-  await vi.advanceTimersByTimeAsync(3000);
+  await vi.advanceTimersByTimeAsync(SECURITY_RETRIES * 1000);
   await assertion;
-  expect(device.rx.writeValueWithResponse).toHaveBeenCalledTimes(4);
+  expect(device.rx.writeValueWithResponse).toHaveBeenCalledTimes(SECURITY_RETRIES + 1);
 });
 
 it('does not retry other write errors', async () => {

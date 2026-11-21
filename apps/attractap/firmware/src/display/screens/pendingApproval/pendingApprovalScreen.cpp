@@ -78,6 +78,8 @@ void PendingApprovalScreen::init()
    lv_obj_set_style_text_font(this->hintLabel, &attractap_font_montserrat_latin1_20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->hintLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
+   this->bluetoothSetupStatus.create(this->screen);
+
    this->resetShown();
    this->loop();
 }
@@ -119,6 +121,7 @@ void PendingApprovalScreen::loop()
    {
       return;
    }
+   this->bluetoothSetupStatus.update();
    const State::EnrollmentState enrollment = State::getEnrollmentState();
    View view = View::Code;
    if (enrollment.pairingRemoved)
@@ -238,6 +241,7 @@ void PendingApprovalScreen::destroy()
    this->codeLabel = nullptr;
    this->instructionLabel = nullptr;
    this->hintLabel = nullptr;
+   this->bluetoothSetupStatus.forget();
    this->qrUrl.clear();
    this->resetShown();
 }

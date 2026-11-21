@@ -6,18 +6,25 @@ import {
   type ConnectionStateEvent,
 } from './configurator-transport';
 
-/** GATT service of the Attractap BLE Bridge configurator; advertised only while its provisioning window is open. */
-export const BRIDGE_SERVICE_UUID = '2665a001-44cd-4fe2-a450-916b627619d7';
-/** Client → bridge: `CMND` lines, written with response. Needs an encrypted link (Just Works pairing). */
-export const BRIDGE_RX_CHARACTERISTIC_UUID = '2665a002-44cd-4fe2-a450-916b627619d7';
-/** Bridge → client: `RESP` lines, split across notifications of any size. */
-export const BRIDGE_TX_CHARACTERISTIC_UUID = '2665a003-44cd-4fe2-a450-916b627619d7';
-export const BRIDGE_NAME_PREFIX = 'Attractap Bridge';
+/**
+ * GATT service of the Attractap Bluetooth setup, on readers and BLE Bridges alike. A device advertises it only while
+ * its setup window is open (an unpaired reader after boot, a Touch's "Bluetooth setup" button, the bridge's 3 s hold).
+ */
+export const SETUP_SERVICE_UUID = '2665a001-44cd-4fe2-a450-916b627619d7';
+/** Client → device: `CMND` lines, written with response. Needs an encrypted link (Just Works pairing). */
+export const SETUP_RX_CHARACTERISTIC_UUID = '2665a002-44cd-4fe2-a450-916b627619d7';
+/** Device → client: `RESP` lines, split across notifications of any size. */
+export const SETUP_TX_CHARACTERISTIC_UUID = '2665a003-44cd-4fe2-a450-916b627619d7';
+/** Advertised names: "Attractap Touch 71C8", "Attractap Lite 71C8", "Attractap Bridge 71C8". */
+export const SETUP_NAME_PREFIX = 'Attractap';
 
 /** Largest single GATT write; a longer command line is split into several sequential writes. */
 export const MAX_WRITE_CHUNK_BYTES = 180;
-/** The first write triggers OS pairing, which can reject a write or two until the link is encrypted. */
-const SECURITY_RETRIES = 3;
+/**
+ * The first write triggers OS pairing, which rejects writes until the link is encrypted. macOS first asks the user to
+ * accept the pairing (ATT-1371 lab test), so keep retrying for about as long as its 30 s pairing timeout.
+ */
+export const SECURITY_RETRIES = 30;
 const SECURITY_RETRY_DELAY_MS = 1000;
 /** Inbound lines are at most 256 bytes; a buffer far beyond that without a newline is garbage. */
 const MAX_LINE_BUFFER_CHARS = 4096;
@@ -39,7 +46,7 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 type LineListener = (line: string) => void;
 
-/** The Attractap BLE Bridge configurator over Web Bluetooth; the same line protocol as the serial configurator. */
+/** The Attractap configurator over Web Bluetooth (readers and BLE Bridges); the same line protocol as over serial. */
 export class BleConfigurator implements ConfiguratorTransport {
   public readonly kind = 'bluetooth' as const;
 
@@ -65,7 +72,7 @@ export class BleConfigurator implements ConfiguratorTransport {
   private readonly lineListeners = new Set<LineListener>();
   private readonly pendingAborts = new Set<() => void>();
   private readonly listeners = new Set<(event: ConnectionStateEvent) => void>();
-  /** The last `status` the bridge reported for api.status.get; `authenticated` makes the coming disconnect expected. */
+  /** The last `status` the device reported for api.status.get; `authenticated` makes the coming disconnect expected. */
   private lastApiStatus: string | null = null;
 
   public get isConnected(): boolean {
@@ -73,7 +80,7 @@ export class BleConfigurator implements ConfiguratorTransport {
   }
 
   /**
-   * Opens the browser's device picker and connects to the chosen bridge.
+   * Opens the browser's device picker and connects to the chosen reader or bridge.
    * Resolves false when the user closed the picker; rejects when connecting failed.
    */
   public async connect(): Promise<boolean> {
@@ -83,8 +90,8 @@ export class BleConfigurator implements ConfiguratorTransport {
     let device: BluetoothDevice;
     try {
       device = await navigator.bluetooth.requestDevice({
-        filters: [{ services: [BRIDGE_SERVICE_UUID] }, { namePrefix: BRIDGE_NAME_PREFIX }],
-        optionalServices: [BRIDGE_SERVICE_UUID],
+        filters: [{ services: [SETUP_SERVICE_UUID] }, { namePrefix: SETUP_NAME_PREFIX }],
+        optionalServices: [SETUP_SERVICE_UUID],
       });
     } catch (err) {
       if (err instanceof Error && err.name === 'NotFoundError') return false;
@@ -95,9 +102,9 @@ export class BleConfigurator implements ConfiguratorTransport {
     try {
       if (!device.gatt) throw new Error('GATT_UNAVAILABLE');
       const server = await device.gatt.connect();
-      const service = await server.getPrimaryService(BRIDGE_SERVICE_UUID);
-      const rx = await service.getCharacteristic(BRIDGE_RX_CHARACTERISTIC_UUID);
-      const tx = await service.getCharacteristic(BRIDGE_TX_CHARACTERISTIC_UUID);
+      const service = await server.getPrimaryService(SETUP_SERVICE_UUID);
+      const rx = await service.getCharacteristic(SETUP_RX_CHARACTERISTIC_UUID);
+      const tx = await service.getCharacteristic(SETUP_TX_CHARACTERISTIC_UUID);
 
       this.resetStream();
       tx.addEventListener('characteristicvaluechanged', this.handleNotification);
@@ -163,7 +170,7 @@ export class BleConfigurator implements ConfiguratorTransport {
     try {
       await this.tx?.stopNotifications();
     } catch (err) {
-      console.debug('Failed to stop bridge notifications', err);
+      console.debug('Failed to stop Bluetooth setup notifications', err);
     }
     device.gatt?.disconnect();
     this.teardown(false);
@@ -193,7 +200,7 @@ export class BleConfigurator implements ConfiguratorTransport {
         return await operation();
       } catch (err) {
         if (attempt >= SECURITY_RETRIES || !isSecurityError(err) || !stillConnected()) throw err;
-        console.debug('Bridge rejected the operation while pairing, retrying', err);
+        console.debug('The device rejected the operation while pairing, retrying', err);
         await delay(SECURITY_RETRY_DELAY_MS);
       }
     }

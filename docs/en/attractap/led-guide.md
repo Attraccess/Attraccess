@@ -21,6 +21,7 @@ These animations run continuously while the device is in a given state.
 | **Ready / Wait for Card** | Green | Six alternating segments breathing in and out of phase (circular) or gentle pulsing (linear) | The device is ready. Present an RFID card to authenticate. |
 | **Authenticating** | Cyan | Fast-moving dot with 6-LED fading tail (circular) or quick pulsing (linear) | A card is being read and authenticated. |
 | **No Resources** | Orange | Alternating on/off flash of the entire ring | No resources are assigned to this device. Assign at least one resource in Attraccess. |
+| **Bluetooth setup** | Blue | The whole ring pulses blue twice every 1.5 seconds; steady blue while a browser is connected | The reader is not paired yet and its Bluetooth setup is open (10 minutes after power-up). Set it up with **Set up over Bluetooth**; see [Attractap Setup](attractap/setup.md#set-up-over-bluetooth). Shown instead of Configuration Required and Initializing; the pairing pattern takes priority. |
 | **Pairing (waiting for approval)** | 8 colour segments | 24 LEDs in 8 segments of 3. The start segment blinks, the colours follow clockwise. Slowly breathing white means there is no pattern yet. | The reader waits for an admin to approve it. Compare the colours with the approval page. See [Reader Pairing](attractap/pairing.md). |
 | **Firmware Update** | Blue / White | Static alternating blue and white pixels | A firmware update is in progress. Do not power off. |
 
@@ -46,6 +47,8 @@ These are short overlays that interrupt the current state animation for a few hu
 | Cyan fast-moving dot with tail | Card is being read |
 | Orange full-ring flash | No resources assigned |
 | Alternating blue and white pixels (static) | Firmware update in progress |
+| Whole ring pulsing blue twice, then dim | Bluetooth setup open: set the reader up from the browser |
+| Whole ring steady blue | Bluetooth setup: a browser is connected |
 | Coloured segments, one blinking | Waiting for pairing approval; read clockwise from the blinking segment |
 | White breathing ring | No pairing pattern yet |
 | Solid green flash | Success — access granted |

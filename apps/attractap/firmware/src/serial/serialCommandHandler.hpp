@@ -12,8 +12,9 @@
 class SerialCommandHandler
 {
 public:
-    // Host tests have no USB; the secure profile (ATT-1166) has no serial config path at all.
-#if defined(ATTRACTAP_HOST) || defined(ATTRACTAP_SECURE_PROFILE)
+    // Host tests have no USB. The secure profile (ATT-1166) has no console: there the commands arrive only over the
+    // Bluetooth setup channel (ATT-1371), see serialConsoleInput.cpp.
+#if defined(ATTRACTAP_HOST)
     static void setup() {}
     static void loop() {}
 #else
@@ -24,9 +25,9 @@ public:
 #ifndef ATTRACTAP_HOST
     static constexpr size_t MAX_COMMAND_LENGTH = 256;
 
-    // A command source besides the console: the BLE bridge's Bluetooth setup (src/bridge/provisioning). Its lines
-    // go through the same commands and PIN rules, on the main loop like console lines; the replies (`RESP ...\n`)
-    // go back to the channel the command came from instead of the console.
+    // A command source besides the console: the Bluetooth setup of the bridge and the readers (src/bt_setup). Its
+    // lines go through the same commands and PIN rules, on the main loop like console lines; the replies
+    // (`RESP ...\n`) go back to the channel the command came from instead of the console.
     class Channel
     {
     public:
@@ -44,7 +45,10 @@ public:
 
 private:
 #ifndef ATTRACTAP_HOST
+#ifndef ATTRACTAP_SECURE_PROFILE
     static std::string inputBuffer;
+    static void readConsole();
+#endif
     static Logger logger;
     static Channel *extraChannel;
     // The channel of the command being handled; null for the console.

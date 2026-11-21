@@ -54,7 +54,7 @@ CONFIG_BOOTLOADER_APP_SECURE_VERSION=1
 # CONFIG_BOOTLOADER_EFUSE_SECURE_VERSION_EMULATE is not set
 
 # --- No console, serial config, debugger or coredumps on the secure profile ---
-# (the serial config handler is compiled out via ATTRACTAP_SECURE_PROFILE)
+# (ATTRACTAP_SECURE_PROFILE compiles the console input out; setup commands arrive only over Bluetooth)
 # CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG is not set
 CONFIG_ESP_CONSOLE_NONE=y
 CONFIG_ESP_CONSOLE_SECONDARY_NONE=y

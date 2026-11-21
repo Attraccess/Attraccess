@@ -97,12 +97,13 @@ if(ATTRACTAP_SECURE_PROFILE)
         list(APPEND SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.secure-lab")
         list(APPEND ATTRACTAP_DEFINES ATTRACTAP_SECURE_LAB=1)
     else()
-        # Compiles out the USB serial config handler and console driver.
+        # Compiles out the console: its driver (main.cpp) and the console command input (serialConsoleInput.cpp).
+        # The command handler stays for the Bluetooth setup channel (ATT-1371), the only way commands arrive.
         list(APPEND ATTRACTAP_DEFINES ATTRACTAP_SECURE_PROFILE=1)
         if(DEFINED ATTRACTAP_EXCLUDE_REGEX AND NOT "${ATTRACTAP_EXCLUDE_REGEX}" STREQUAL "")
-            set(ATTRACTAP_EXCLUDE_REGEX "${ATTRACTAP_EXCLUDE_REGEX}|src/serial/")
+            set(ATTRACTAP_EXCLUDE_REGEX "${ATTRACTAP_EXCLUDE_REGEX}|src/serial/serialConsoleInput\\.cpp$")
         else()
-            set(ATTRACTAP_EXCLUDE_REGEX "src/serial/")
+            set(ATTRACTAP_EXCLUDE_REGEX "src/serial/serialConsoleInput\\.cpp$")
         endif()
     endif()
 endif()

@@ -35,7 +35,7 @@ Every Attractap reader contains the following components:
 
 ### WiFi
 
-WiFi variants connect to your local wireless network. During initial setup, the reader creates a temporary access point for configuration.
+WiFi variants connect to your local wireless network. You enter the network over USB, on the reader's screen or over Bluetooth; see [Attractap Setup](attractap/setup.md). The reader does not open an access point of its own.
 
 | Setting | Description |
 |---------|-------------|

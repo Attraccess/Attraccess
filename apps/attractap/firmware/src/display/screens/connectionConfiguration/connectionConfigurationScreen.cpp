@@ -104,6 +104,9 @@ void ConnectionConfigurationScreen::destroy()
    this->wifiScanCompleted = false;
    this->wifiDropdownHasNetworks = false;
    this->wifiScanStartMs = 0;
+   for (BtSetupStatus &status : this->bluetoothSetupStatus)
+      status.forget();
+   this->bluetoothSetupStatusCount = 0;
 }
 
 void ConnectionConfigurationScreen::createApiTab(const AttraccessApiConfig &apiConfig)

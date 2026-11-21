@@ -35,7 +35,7 @@ Jeder Attractap-Leser enthaelt die folgenden Komponenten:
 
 ### WiFi
 
-WiFi-Varianten verbinden sich mit Ihrem lokalen drahtlosen Netzwerk. Bei der Ersteinrichtung erstellt der Leser einen temporaeren Zugangspunkt zur Konfiguration.
+WiFi-Varianten verbinden sich mit Ihrem lokalen drahtlosen Netzwerk. Das Netzwerk geben Sie per USB, am Display des Lesers oder per Bluetooth ein; siehe [Attractap Einrichtung](attractap/setup.md). Der Leser öffnet keinen eigenen Zugangspunkt.
 
 | Einstellung | Beschreibung |
 |-------------|-------------|

@@ -626,6 +626,25 @@ HIL_WSS=1 READER_PROFILE=secure-lab pnpm nx run attractap-lab:hil -- -k ram
   over `wss://` up to 77 of them waited in the reader's buffer of 128 (a buffer of 64
   overflowed in 1 of 4 runs).
 
+### Bluetooth setup (opt-in)
+
+`hil/test_bt_setup.py` checks the readers' Bluetooth setup (ATT-1371) on a Touch place. It skips unless
+`HIL_BT_SETUP=1` and `BT_CENTRAL_PYTHON` points to a Python with `bleak` on a machine in Bluetooth range of the
+reader (for example this Mac: `python3 -m venv /tmp/ble && /tmp/ble/bin/pip install bleak`). `hil/bt_central.py`
+plays the web app: it scans for the setup service and writes the command lines over the encrypted link. Each test
+flashes the reader erased. The first sets the PIN and the server over Bluetooth (Wi-Fi still from the lab host over
+the serial console, so its secret never leaves the host), approves the pairing and checks that the reader closes
+the link and the window about 10 s later, and that a restarted paired reader no longer advertises. With
+`HIL_BLE=1` too, it runs a plugin BLE scan after the window closed. The second waits out the 10-minute window and
+reopens it with the on-screen button.
+
+```sh
+HIL_BT_SETUP=1 BT_CENTRAL_PYTHON=/tmp/ble/bin/python apps/attractap-lab/hil/run.sh -k bt_setup
+```
+
+Names, replies, timings and the internal heap with the window open, after it closed and on the paired reader land
+in `bt-setup-*.json`.
+
 ### In CI
 
 `.github/workflows/attractap-lab-hil.yml` runs these tests from the release

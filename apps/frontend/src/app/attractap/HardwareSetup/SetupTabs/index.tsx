@@ -69,7 +69,7 @@ function AutoFetchConfiguration() {
 interface Props {
   openDeviceSettings: OpenDeviceSettings;
   onClose: () => void;
-  /** Over Bluetooth the bridge already runs its firmware: no Firmware tab, start with the PIN. */
+  /** Over Bluetooth the reader or bridge already runs its firmware: no Firmware tab, start with the PIN. */
   transport?: ConfiguratorTransportKind;
 }
 

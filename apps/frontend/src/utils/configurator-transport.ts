@@ -8,15 +8,15 @@ export interface ConnectionStateEvent {
   connected: boolean;
   timestamp: number;
   /**
-   * The device closed the link on purpose: a BLE bridge drops Bluetooth shortly after the reader reported
-   * `authenticated`. Not an error.
+   * The device closed the link on purpose: a reader or BLE Bridge drops Bluetooth shortly after it reported
+   * `authenticated` (its setup window closes). Not an error.
    */
   closedAfterPairing?: boolean;
 }
 
 export type ConfiguratorTransportKind = 'serial' | 'bluetooth';
 
-/** How the hardware setup screens talk to a reader's configurator: USB serial (ESPTools) or Bluetooth (bridge). */
+/** How the hardware setup screens talk to a reader's configurator: USB serial (ESPTools) or Bluetooth (BleConfigurator). */
 export interface ConfiguratorTransport {
   readonly kind: ConfiguratorTransportKind;
   readonly isConnected: boolean;

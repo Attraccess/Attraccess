@@ -40,6 +40,7 @@ void Application::handleConnectionConfigurationSave(
     Settings::setBeeperEnabled(cfg.beeperEnabled);
 
     this->state = APPLICATION_STATE_INIT;
+    this->settingsOpenedByUser = false;
     this->api.enableConnectionAttempts();
     Display::transitionToScreen(&Display::initScreen);
 };
