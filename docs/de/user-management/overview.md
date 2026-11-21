@@ -15,7 +15,7 @@ Navigieren Sie zu **Benutzer** in der Seitenleiste. Sie benötigen die Berechtig
 
 Die Benutzerliste zeigt alle registrierten Benutzer mit:
 
-- Benutzername und E-Mail
+- Name (Vor- und Nachname, ersatzweise der Benutzername) mit dem Benutzernamen darunter sowie E-Mail
 - Anmeldemethode (Passwort oder SSO-Anbieter)
 - Systemberechtigungen
 
@@ -25,7 +25,7 @@ Die Liste kann durchsucht und seitenweise durchblättert werden.
 
 Klicken Sie auf einen Benutzer, um seine Details zu sehen und zu bearbeiten:
 
-- Kontoinformationen (Benutzername, E-Mail)
+- Kontoinformationen (Benutzername, optionaler Vor- und Nachname, E-Mail). Administratoren mit der Berechtigung **Benutzer aktualisieren** können den Namen ändern; er wird in ganz Attraccess statt des Benutzernamens angezeigt, ohne Namen dient der Benutzername als Ersatz. Namen von Benutzern, die sich per SSO anmelden, sind schreibgeschützt, weil der Identity Provider sie verwaltet.
 - Anmeldemethoden (lokales Passwort, SSO-Verknüpfungen)
 - Systemberechtigungen
 - Verknüpfte RFID-Karten

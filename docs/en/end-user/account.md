@@ -8,6 +8,18 @@ Use the search box to find a setting, then open its row to make changes. Setting
 
 ## Profile Settings
 
+### Change Your Name
+
+1. Navigate to **My Account**
+2. Open **Personal details** and find the **Name** form
+3. Enter your first and last name (both optional, at most 100 characters each)
+4. Save the changes
+
+Attraccess then shows your name instead of your username (for example in lists, emails and on the reader); the username stays your login and appears as secondary text. Clear both fields to be shown by username again.
+
+> [!NOTE]
+> If you log in via SSO, your name comes from the identity provider on every login and is read-only here.
+
 ### Change Email
 
 1. Navigate to **My Account**

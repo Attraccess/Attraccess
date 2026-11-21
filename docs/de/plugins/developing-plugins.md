@@ -1029,7 +1029,7 @@ const plugin: PluginBackendModule = {
       variables: ['booking.id', 'booking.start'], // im Editor unter „Variablen“ angeboten
       subject: '{{t "subject" "Reminder: booking {id}" id=booking.id}}',
       body: `<mj-section><mj-column>
-  <mj-text>{{t "greeting" "Hello {name}," name=user.username}}</mj-text>
+  <mj-text>{{t "greeting" "Hello {name}," name=user.displayName}}</mj-text>
   <mj-text>{{t "body" "Your booking starts at {start}." start=booking.start}}</mj-text>
   <mj-button href="{{host.frontend}}/reservations/{{booking.id}}">{{t "open" "Open booking"}}</mj-button>
 </mj-column></mj-section>`,
@@ -1147,11 +1147,11 @@ Entitäten oder Abfrage-Handles. Jede Gruppe prüft beim Aufruf einer Methode ih
 | Gruppe               | Berechtigung       | Methoden                                                                                                                                                                                                                                                                                                             |
 | -------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `hostData.resources` | `ACCESS_RESOURCES` | `get(id, scope?)` (ein `PluginResourceModel` oder `null`; mit einem Transaktions-Scope liest es innerhalb dieser Transaktion), `getNames(ids)`, `filterVisible(userId, ids, { seeAll? })`, `filterRequiringSupervision(ids)`, `listIdsInGroups(groupIds)`, `countUnhealthyEntries(id)`, `listIntroducerUserIds(id)`. |
-| `hostData.users`     | `READ_USERS`       | `getUsernames(ids)`, `getLocales(ids)`, `isActive(id)` (existiert, nicht gelöscht, nicht deaktiviert), `listIdsWithAnyPermission(keys)`.                                                                                                                                                                             |
+| `hostData.users`     | `READ_USERS`       | `getUsernames(ids)` (aus Kompatibilitätsgründen beibehalten), `getDisplayNames(ids)` (Map von Benutzer-ID auf Anzeigenamen: „Vorname Nachname“, ersatzweise der Benutzername), `getLocales(ids)`, `isActive(id)` (existiert, nicht gelöscht, nicht deaktiviert), `listIdsWithAnyPermission(keys)`.                                                                                                                                                                             |
 | `hostData.settings`  | `READ_SETTINGS`    | `getApp(key)`: der getrimmte Wert einer Anwendungseinstellung oder `null`.                                                                                                                                                                                                                                           |
 | `hostData.flows`     | `TRIGGER_FLOWS`    | `findNodes(query)`: Flow-Knoten nach `type`, `typePrefix`, `dataEquals`, `dataIn`, `resourceId`, `excludeResourceId`, `excludeFlowId`, `orderById` und `limit`, als `{ id, type, resourceId, resourceName, flowId, flowName, data }`.                                                                                |
 
-`PluginUserModel` (`id`, `username`, `locale`, `isDisabled`) und `PluginResourceModel` (`id`, `name`, `type`,
+`PluginUserModel` (`id`, `username`, `firstName`, `lastName`, `displayName`, `locale`, `isDisabled`; `displayName` ist der berechnete Name „Vorname Nachname“ bzw. der Benutzername, zeigen Sie ihn Menschen an) und `PluginResourceModel` (`id`, `name`, `type`,
 `description`, `allowTakeOver`, `maxParallelSessions`, `supervisionMode`) stammen aus `@attraccess/application-models`
 und werden vom SDK-Root re-exportiert. Sie sind auch die Nutzlast der Events `RESOURCE_USAGE_STARTED` und
 `RESOURCE_USAGE_ENDED` sowie der Benutzer von `AuthenticatedRequest`: Tokens, Kontaktdaten und andere Kontofelder

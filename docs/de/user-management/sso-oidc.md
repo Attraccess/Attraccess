@@ -62,8 +62,16 @@ Attraccess muss wissen, welche Felder im OIDC-Token den Benutzernamen und die E-
 |------|----------|-------------|
 | **Benutzername-Claim-Pfade** | `preferred_username, email, sub` | Geordnete Liste von Token-Feldern für den Benutzernamen |
 | **E-Mail-Claim-Pfade** | `email, emails[0].value, upn` | Geordnete Liste von Token-Feldern für die E-Mail |
+| **Vorname-Claim-Pfad** (optional) | `given_name` | Token-Feld für den Vornamen |
+| **Nachname-Claim-Pfad** (optional) | `family_name` | Token-Feld für den Nachnamen |
 
 Attraccess prüft die Pfade in der angegebenen Reihenfolge und verwendet den ersten Treffer.
+
+### Namen
+
+<a id="namen"></a>
+
+Attraccess liest Vor- und Nachname aus `given_name` und `family_name` (Profil-, UserInfo- und ID-Token-Claims), sofern Sie keinen **Vorname-Claim-Pfad** oder **Nachname-Claim-Pfad** festlegen. Namen werden beim Anlegen des Kontos gesetzt und bei jeder Anmeldung synchronisiert: Ein geänderter Claim aktualisiert den gespeicherten Namen, ein fehlender oder leerer Claim lässt ihn unverändert, und ohne Änderung wird nichts geschrieben. Da der Identity Provider die Namen verwaltet, sind die Namensfelder von SSO-Benutzern in Attraccess schreibgeschützt (weder Benutzer noch Administratoren können sie ändern). Gibt Ihr Anbieter keine Namens-Claims aus, haben diese Benutzer keine Namen und werden mit dem Benutzernamen angezeigt; geben Sie `given_name`/`family_name` frei oder konfigurieren Sie die Claim-Pfade.
 
 ### Rollen-Claim-Pfade
 

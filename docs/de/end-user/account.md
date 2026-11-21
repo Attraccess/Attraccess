@@ -8,6 +8,18 @@ Suchen Sie eine Einstellung über das Suchfeld und öffnen Sie dann den zugehör
 
 ## Profileinstellungen
 
+### Namen ändern
+
+1. Navigieren Sie zu **Mein Konto**
+2. Öffnen Sie **Persönliche Daten** und finden Sie das Formular **Name**
+3. Geben Sie Vor- und Nachname ein (beide optional, höchstens 100 Zeichen)
+4. Speichern Sie die Änderungen
+
+Attraccess zeigt dann Ihren Namen statt Ihres Benutzernamens an (z. B. in Listen, E-Mails und am Leser); der Benutzername bleibt Ihre Anmeldung und erscheint als Zusatztext. Leeren Sie beide Felder, um wieder mit dem Benutzernamen angezeigt zu werden.
+
+> [!NOTE]
+> Melden Sie sich per SSO an, kommt Ihr Name bei jeder Anmeldung vom Identity Provider und ist hier schreibgeschützt.
+
 ### E-Mail-Adresse ändern
 
 1. Navigieren Sie zu **Mein Konto**
