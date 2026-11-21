@@ -1,6 +1,11 @@
 {
   "name": "@attraccess/application-models",
   "version": "2.0.0-beta.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Attraccess/Attraccess.git",
+    "directory": "libs/application-models"
+  },
   "private": false,
   "type": "commonjs",
   "main": "./src/index.js",
