@@ -3,7 +3,7 @@ import { UPGRADE_DOCS_URL } from '../../../backend/database-type';
 import { migrateFrozenSqlite, openFrozenSqlite } from '../../../sqlite/sqlite-frozen-track';
 import { createSqliteSource } from '../../../sqlite/sqlite-source';
 import { copySqliteTables, type CopyResult } from './copy-tables';
-import { holdsUsers, predatesImport } from './postgres-catalog';
+import { holdsUsers } from './postgres-catalog';
 import { fileExists, moveToBackup, PartialBackupMoveError, sqliteBackupDirectory } from './sqlite-backup';
 import { SqliteImportError } from './sqlite-values';
 
@@ -148,15 +148,6 @@ export async function importSqliteInstallation(pg: QueryRunner, options: ImportS
   const { sqliteFile, logger } = options;
   if (!(await fileExists(sqliteFile))) {
     logger.log(`No SQLite file at ${sqliteFile}: nothing to import.`);
-    return;
-  }
-  // A database set up by an earlier 2.0 release (later migrations already recorded) handled its SQLite file then.
-  if (await predatesImport(pg)) {
-    logger.warn(
-      `${sqliteFile} is not imported: this PostgreSQL database was set up by an earlier Attraccess 2.0 release. ` +
-        `Move the file to ${sqliteBackupDirectory(sqliteFile)} or delete it once you are sure PostgreSQL holds your data ` +
-        `(to import it instead, empty the PostgreSQL database and start again).`,
-    );
     return;
   }
   // Checked before the file is touched: a refused import changes nothing.

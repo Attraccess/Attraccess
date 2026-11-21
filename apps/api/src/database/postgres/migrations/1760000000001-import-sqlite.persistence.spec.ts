@@ -83,22 +83,6 @@ describe('PostgresImportSqlite1760000000001', () => {
     expect(logger.log).toHaveBeenCalledWith(`No SQLite file at ${sqliteFile}: nothing to import.`);
   });
 
-  it('leaves the SQLite file alone in a database an earlier 2.0 release set up, with a warning', async () => {
-    await copyMigratedSqlite(sqliteFile);
-    await pg.query(`INSERT INTO "user" (username, email) VALUES ('here', 'here@example.com')`);
-    await pg.query(
-      `INSERT INTO migrations ("timestamp", name) VALUES (1795700000000, 'PostgresGlobalForms1795700000000')`,
-    );
-    const before = await sha256(sqliteFile);
-
-    await runImport();
-
-    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('set up by an earlier Attraccess 2.0 release'));
-    expect(await sha256(sqliteFile)).toBe(before);
-    expect(await readdir(storageRoot)).toEqual(['attraccess.sqlite']);
-    expect(await q('SELECT username FROM "user"')).toEqual([{ username: 'here' }]);
-  });
-
   it('runs inside the track as a migration that owns its transaction and resolves the file under STORAGE_ROOT', async () => {
     const migration = new PostgresImportSqlite1760000000001();
     expect(migration.transaction).toBe(false);

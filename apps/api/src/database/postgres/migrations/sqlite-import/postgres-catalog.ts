@@ -146,19 +146,6 @@ export async function holdsUsers(manager: Query): Promise<boolean> {
   return (await manager.query('SELECT 1 FROM "user" LIMIT 1')).length > 0;
 }
 
-/**
- * Whether the database was set up before this import existed: a migration after it is already recorded (Attraccess
- * 2.0.0-beta.1 shipped the baseline and later migrations without it). Such a database never takes a SQLite import.
- */
-export async function predatesImport(pg: Pick<QueryRunner, 'query' | 'connection'>): Promise<boolean> {
-  const table = pg.connection.options.migrationsTableName ?? 'migrations';
-  const rows = await pg.query(`SELECT 1 FROM ${quote(table)} WHERE "timestamp" > $1 LIMIT 1`, [IMPORT_TIMESTAMP]);
-  return rows.length > 0;
-}
-
-/** The timestamp of PostgresImportSqlite1760000000001. */
-const IMPORT_TIMESTAMP = 1760000000001;
-
 /** What the common SQLSTATE codes of a refused row mean. */
 const SQLSTATE_MEANING: Readonly<Record<string, string>> = {
   '23502': 'a required value is missing',

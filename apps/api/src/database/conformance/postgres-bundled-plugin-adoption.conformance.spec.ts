@@ -25,7 +25,7 @@ type Tables = Record<
 
 /**
  * Adoption of existing plugin tables by the host engine, on real PostgreSQL: each bundled plugin's own storage
- * declaration. 1.x ran on SQLite only and the SQLite import moves no plugin data; PostgreSQL holds such tables only when the 2.0.0-beta.1 transfer moved them. So the adopted layout here is what
+ * declaration. 1.x ran on SQLite only and the SQLite import moves no plugin data, so the adopted layout here is what
  * this engine's DDL creates for the declaration's baseline, stripped of the host's version bookkeeping and given the
  * legacy migrations table a 1.x installation carried. The baseline is version 1; later versions run after adoption.
  */
