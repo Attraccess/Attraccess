@@ -104,7 +104,7 @@ export function auditCsv(entries: AuditEntryDto[]): string {
       'Actor ID',
       'Actor',
       'Actor username',
-      'Actor name source',
+      'Actor username source',
       'Authentication method',
       'API token ID',
       'Integration ID',

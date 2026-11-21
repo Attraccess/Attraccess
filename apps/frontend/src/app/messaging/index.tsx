@@ -1,7 +1,7 @@
 // Inbox page combining conversation list, thread view and live SSE updates
 // FEATURE: Messaging inbox page
 import { useMessagingListConversations, useMessagingMarkConversationRead } from '@attraccess/react-query-client';
-import { formatUserDisplayName } from '@attraccess/shared';
+import { formatUserDisplayName, hasUserName } from '@attraccess/shared';
 import { cn } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
@@ -39,6 +39,11 @@ export function MessagesPage() {
   const partnerName = selectedConversation?.otherParticipant
     ? formatUserDisplayName(selectedConversation.otherParticipant)
     : t('conversations.unknownUser');
+  // The username goes below the name as muted text, only when a name is set (otherwise the name is the username).
+  const partnerUsername =
+    selectedConversation?.otherParticipant && hasUserName(selectedConversation.otherParticipant)
+      ? selectedConversation.otherParticipant.username
+      : undefined;
 
   const deepLinkResourceId = Number(searchParams.get('resourceRef'));
   const pendingResourceId =
@@ -145,9 +150,16 @@ export function MessagesPage() {
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-small font-medium uppercase text-zinc-600 dark:bg-zinc-700 dark:text-zinc-200">
                     {partnerName.charAt(0)}
                   </div>
-                  <p className="truncate font-medium" data-cy="thread-partner-name">
-                    {partnerName}
-                  </p>
+                  <div className="flex min-w-0 flex-col">
+                    <p className="truncate font-medium" data-cy="thread-partner-name">
+                      {partnerName}
+                    </p>
+                    {partnerUsername && (
+                      <p className="truncate text-xs text-muted" data-cy="thread-partner-username">
+                        {partnerUsername}
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <div className="min-h-0 flex-1">
                   <MessageThread

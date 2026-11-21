@@ -17,6 +17,7 @@ const state = vi.hoisted(() => ({
     refundOfId?: number;
     resourceUsageId?: number;
     initiatorId?: number;
+    initiator?: { id: number; username: string; firstName?: string | null; lastName?: string | null };
     externalReference?: string;
   }[],
   balanceQuery: vi.fn(),
@@ -30,11 +31,19 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
     useTranslations: () => ({
       t: (
         key: string,
-        params?: { balance?: string; currency?: string; originalId?: number; originalDetails?: string },
+        params?: {
+          balance?: string;
+          currency?: string;
+          originalId?: number;
+          originalDetails?: string;
+          initiatorName?: string;
+        },
       ) =>
         key === 'balance'
           ? `${params?.currency} ${params?.balance}`
-          : params?.originalId
+          : params?.initiatorName
+            ? `${key} ${params.initiatorName}`
+            : params?.originalId
             ? `${key} #${params.originalId} ${params.originalDetails}`
             : key,
     }),
@@ -156,6 +165,21 @@ it('labels usage, manual, top-up, missing originals and nested refunds and opens
   expect(screen.getByRole('button', { name: 'Details #1' })).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Details #1' }));
   expect(screen.queryByRole('button', { name: 'Details #1' })).toBeNull();
+});
+
+it('names the initiator of a manual transaction by display name', () => {
+  state.transactions = [
+    {
+      id: 1,
+      amount: 500,
+      status: 'completed',
+      createdAt: '2026-09-01',
+      initiatorId: 3,
+      initiator: { id: 3, username: 'ada', firstName: 'Ada', lastName: 'Lovelace' },
+    },
+  ];
+  open();
+  expect(screen.getByText('transactions.table.cells.details.manual Ada Lovelace')).toBeTruthy();
 });
 
 it('preserves every minor currency unit in settled transaction rows and balances', () => {

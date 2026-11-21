@@ -34,7 +34,13 @@ import {
   useGetBillingConfiguration,
   useGetBillingTransactions,
 } from '@attraccess/react-query-client';
+import { formatUserDisplayName } from '@attraccess/shared';
 import { useCallback, useMemo, useState } from 'react';
+
+/** Who made a manual transaction, as display name; empty when the initiator was not loaded. */
+function initiatorDisplayName(transaction: BillingTransaction): string {
+  return transaction.initiator ? formatUserDisplayName(transaction.initiator) : '';
+}
 
 export interface Props {
   className?: string;
@@ -92,7 +98,7 @@ export function SummaryCard(props: Props) {
               originalDetails = tmp;
             } else if (originalTransaction.initiatorId) {
               const tmp = t('transactions.table.cells.details.manual', {
-                initiator: originalTransaction.initiator,
+                initiatorName: initiatorDisplayName(originalTransaction),
               }) as string;
               originalDetails = tmp;
             } else if (originalTransaction.externalReference?.startsWith('sumup_topup_transaction')) {
@@ -123,7 +129,7 @@ export function SummaryCard(props: Props) {
         details = { resourceUsage: transaction.resourceUsage };
       } else if (transaction.initiatorId) {
         type = 'manual';
-        details = { initiator: transaction.initiator };
+        details = { initiatorName: initiatorDisplayName(transaction) };
       } else if (transaction.externalReference?.startsWith('sumup_topup_transaction')) {
         type = 'sumup:topup';
       } else {

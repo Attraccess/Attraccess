@@ -42,7 +42,7 @@
     },
     "success": {
       "title": "User deleted",
-      "description": "Deleted {{username}}."
+      "description": "Deleted {{name}}."
     }
   },
   "rfidCards": {

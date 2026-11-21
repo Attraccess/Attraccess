@@ -5,5 +5,6 @@
   "ssoManaged": "Your identity provider manages the name. It is updated every time you sign in with SSO.",
   "ssoManagedAdmin": "The identity provider manages this user's name. It is updated every time the user signs in with SSO.",
   "updated": "Name updated",
-  "updateFailed": "Failed to update name"
+  "updateFailed": "Failed to update name",
+  "ssoNameChangeForbidden": "The identity provider manages this name, so it cannot be changed here."
 }

@@ -17,7 +17,11 @@ const state = vi.hoisted(() => ({
   conversations: [
     { id: 7, otherParticipant: { username: 'Alex' }, unreadCount: 2 },
     { id: 8, otherParticipant: null, unreadCount: 1 },
-  ],
+  ] as {
+    id: number;
+    otherParticipant: { username: string; firstName?: string | null; lastName?: string | null } | null;
+    unreadCount: number;
+  }[],
 }));
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ user: state.user, hasPermission: () => state.permission }),
@@ -107,6 +111,23 @@ it('opens deep links, marks them read and removes resource references when switc
   fireEvent.click(screen.getByRole('button', { name: 'Inbox' }));
   expect(screen.queryByRole('status')).toBeNull();
   expect(screen.getByTestId('location')).toHaveTextContent('/messages?keep=yes');
+});
+it('shows the partner name with the username as muted text in the thread header', () => {
+  const conversations = state.conversations;
+  state.conversations = [
+    { id: 7, otherParticipant: { username: 'ada', firstName: 'Ada', lastName: 'Lovelace' }, unreadCount: 0 },
+  ];
+  try {
+    mount('/messages?conversation=7');
+    expect(screen.getByText('Ada Lovelace')).toBeTruthy();
+    expect(screen.getByText('ada')).toBeTruthy();
+  } finally {
+    state.conversations = conversations;
+  }
+});
+it('shows no username below a partner without a name', () => {
+  mount('/messages?conversation=7');
+  expect(screen.getAllByText('Alex')).toHaveLength(1);
 });
 it('ignores invalid conversation links and routes permitted users to messaging settings', () => {
   mount('/messages?conversation=-2&resourceRef=bad');

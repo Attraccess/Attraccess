@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useFindManyKey, useGetCurrentKey, useGetOneUserByIdKey } from '@attraccess/react-query-client';
+import { ApiError, useFindManyKey, useGetCurrentKey, useGetOneUserByIdKey } from '@attraccess/react-query-client';
 import { NameForm } from './name';
 import { ChangeNameForm } from '../user-management/details/components/changeName';
 
@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({
     lastName: null as string | null,
     authenticationDetails: [] as unknown[],
   },
+  detailsPending: false,
   mutate: vi.fn(),
   invalidate: vi.fn(),
   success: vi.fn(),
@@ -35,7 +36,8 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
   return {
     ...actual,
     useGetCurrent: () => ({ data: state.user }),
-    useGetOneUserById: () => ({ data: state.user }),
+    useGetOneUserById: () =>
+      state.detailsPending ? { data: undefined, isPending: true } : { data: state.user, isPending: false },
     useChangeMyName: mutation,
     useChangeUserName: mutation,
   };
@@ -44,7 +46,16 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
 beforeEach(() => {
   vi.clearAllMocks();
   state.user.authenticationDetails = [];
+  state.detailsPending = false;
 });
+
+function apiError(message: string | string[]) {
+  return new ApiError(
+    { method: 'PATCH', url: '/api/users/me/name' },
+    { url: '/api/users/me/name', ok: false, status: 403, statusText: 'Forbidden', body: { message } },
+    'Forbidden',
+  );
+}
 afterEach(cleanup);
 
 describe.each([
@@ -63,7 +74,7 @@ describe.each([
     act(() => state.options.onSuccess());
     expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [useGetOneUserByIdKey] });
     expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [useFindManyKey] });
-    if (admin) expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [useGetCurrentKey] });
+    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [useGetCurrentKey] });
     expect(state.success).toHaveBeenCalledWith({ title: 'updated' });
   });
 
@@ -79,5 +90,24 @@ describe.each([
     render(component);
     act(() => state.options.onError(new Error('x')));
     expect(state.error).toHaveBeenLastCalledWith({ title: 'updateFailed' });
+    act(() => state.options.onError(apiError(['firstName must be shorter than or equal to 100 characters'])));
+    expect(state.error).toHaveBeenLastCalledWith({
+      title: 'firstName must be shorter than or equal to 100 characters',
+    });
+  });
+
+  it('translates the SSO refusal instead of showing its code', () => {
+    render(component);
+    act(() => state.options.onError(apiError('SSO_NAME_CHANGE_FORBIDDEN')));
+    expect(state.error).toHaveBeenLastCalledWith({ title: 'ssoNameChangeForbidden' });
+  });
+});
+
+describe('my name while the user details load', () => {
+  it('keeps the fields disabled until it knows whether SSO manages the name', () => {
+    state.detailsPending = true;
+    render(<NameForm />);
+    expect(screen.getByRole('textbox', { name: 'firstName' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'save' })).toBeDisabled();
   });
 });

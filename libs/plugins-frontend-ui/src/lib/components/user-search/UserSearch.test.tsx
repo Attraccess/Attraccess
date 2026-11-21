@@ -94,6 +94,39 @@ describe('UserSearch', () => {
     expect(screen.getByText('bob')).toBeInTheDocument();
   });
 
+  it('labels and groups options by display name, with the username as secondary text', async () => {
+    const named = { ...user(1, 'zed'), firstName: 'Ada', lastName: 'Lovelace' } as User;
+    mocks.useFindManyInfinite.mockReturnValue(infiniteQueryResult([named, user(2, 'bob')]));
+    const onSelectionChange = vi.fn();
+    const pointer = userEvent.setup();
+
+    render(<UserSearch onSelectionChange={onSelectionChange} />);
+    await pointer.click(screen.getByRole('button', { name: /choose user/i }));
+
+    expect(screen.getByText('A')).toBeInTheDocument();
+    expect(screen.queryByText('Z')).not.toBeInTheDocument();
+    const option = screen.getByRole('option', { name: /Ada Lovelace/ });
+    expect(option).toHaveTextContent('Ada Lovelace');
+    expect(option).toHaveTextContent('zed');
+
+    await pointer.click(option);
+    expect(onSelectionChange).toHaveBeenLastCalledWith(named);
+    expect(screen.getByRole('button', { name: /Ada Lovelace/ })).toBeInTheDocument();
+  });
+
+  it('finds an option by its display name through typeahead', async () => {
+    const named = { ...user(1, 'zed'), firstName: 'Ada', lastName: 'Lovelace' } as User;
+    mocks.useFindManyInfinite.mockReturnValue(infiniteQueryResult([user(2, 'bob'), named]));
+    const pointer = userEvent.setup();
+
+    render(<UserSearch />);
+    await pointer.click(screen.getByRole('button', { name: /choose user/i }));
+    act(() => screen.getByRole('listbox').focus());
+    await pointer.keyboard('Ada');
+
+    expect(screen.getByRole('option', { name: /Ada Lovelace/ })).toHaveFocus();
+  });
+
   it('fetches the next page when the sentinel intersects', async () => {
     const result = infiniteQueryResult([user(1, 'alan')]);
     mocks.useFindManyInfinite.mockReturnValue(result);

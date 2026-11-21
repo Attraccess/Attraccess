@@ -8,6 +8,7 @@ import { ChangeEmailForm } from './components/changeEmail/index';
 import { Chip, Separator } from '@heroui/react';
 import { EffectivePermissionsSection } from './components/EffectivePermissionsSection';
 import { useSsoProviders } from '../useSsoProviders';
+import { getSsoAuthenticationDetails } from '../../../components/userNameForm/getSsoAuthenticationDetails';
 import {
   AlertTriangleIcon,
   KeyRoundIcon,
@@ -22,7 +23,6 @@ import {
   ApiError,
   SsoProvider,
   SsoProviderType,
-  User,
   useGetLicenseInformation,
   useDeleteUser,
   useGetOneUserById,
@@ -55,22 +55,7 @@ export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign
     () => new Map((ssoProviders ?? []).map((provider: SsoProvider) => [provider.id, provider])),
     [ssoProviders],
   );
-  type AuthenticationDetailSummary = {
-    providerId?: number | null;
-    providerType?: string | null;
-    ssoSubject?: string | null;
-    type?: string | null;
-  };
-  type UserWithAuthDetails = Omit<User, 'authenticationDetails'> & {
-    authenticationDetails?: AuthenticationDetailSummary[];
-  };
-  const ssoDetails = useMemo(
-    () =>
-      (user as UserWithAuthDetails | undefined)?.authenticationDetails?.filter(
-        (detail) => detail.ssoSubject || detail.providerId || detail.providerType,
-      ) ?? [],
-    [user],
-  );
+  const ssoDetails = useMemo(() => getSsoAuthenticationDetails(user), [user]);
 
   const ssoManagedProviders = useMemo(() => {
     if (ssoDetails.length === 0) {
@@ -135,7 +120,7 @@ export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign
     onSuccess: () => {
       toast.success({
         title: t('delete.success.title'),
-        description: t('delete.success.description', { username: user ? formatUserDisplayName(user) : '' }),
+        description: t('delete.success.description', { name: user ? formatUserDisplayName(user) : '' }),
       });
       navigate('/users');
     },

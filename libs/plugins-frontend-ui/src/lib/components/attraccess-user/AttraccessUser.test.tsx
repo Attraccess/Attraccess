@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { AttraccessUser, getUserInitials } from './AttraccessUser';
+import { AttraccessUser } from './AttraccessUser';
+import { getUserInitials } from './getUserInitials';
 
 describe('AttraccessUser', () => {
   it('names the user popover with the displayed username', async () => {
@@ -47,6 +48,30 @@ describe('AttraccessUser', () => {
   it('shows only the username without a name', () => {
     render(<AttraccessUser user={{ id: 7, username: 'ada', firstName: null, lastName: null }} interactive={false} />);
     expect(screen.getAllByText('ada')).toHaveLength(1);
+  });
+
+  it('shows the username next to a description when a name is set', () => {
+    render(
+      <AttraccessUser
+        user={{ id: 7, username: 'ada', firstName: 'Ada', lastName: 'Lovelace' }}
+        description="Introducer"
+        interactive={false}
+      />,
+    );
+    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
+    expect(screen.getByText('ada')).toBeInTheDocument();
+    expect(screen.getByText('Introducer')).toBeInTheDocument();
+  });
+
+  it('hides the username when it equals the display name', () => {
+    render(<AttraccessUser user={{ id: 7, username: 'Ada', firstName: 'Ada', lastName: null }} interactive={false} />);
+    expect(screen.getAllByText('Ada')).toHaveLength(1);
+  });
+
+  it('accepts a user with only an id and a username', () => {
+    render(<AttraccessUser user={{ id: 7, username: 'ada' }} interactive={false} />);
+    expect(screen.getAllByText('ada')).toHaveLength(1);
+    expect(screen.getByText('AD')).toBeInTheDocument();
   });
 });
 

@@ -1,49 +1,23 @@
-import {
-  ApiError,
-  useChangeMyName,
-  useGetCurrent,
-  useGetCurrentKey,
-  useGetOneUserById,
-  useGetOneUserByIdKey,
-  useFindManyKey,
-} from '@attraccess/react-query-client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useChangeMyName, useGetCurrent, useGetOneUserById } from '@attraccess/react-query-client';
 import { useCallback } from 'react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useToastMessage } from '../../../components/toastProvider';
 import { isSsoLinkedUser } from '../../../components/userNameForm/isSsoLinkedUser';
 import { UserNameFormView } from '../../../components/userNameForm/UserNameFormView';
-import { useUserNameFields } from '../../../components/userNameForm/useUserNameFields';
-import de from '../../../components/userNameForm/de.json';
-import en from '../../../components/userNameForm/en.json';
+import { useUserNameForm } from '../../../components/userNameForm/useUserNameForm';
 
 /** Account settings → Profile: change the own first and last name. Read-only for SSO users. */
 export function NameForm() {
-  const { t } = useTranslations({ en, de });
-  const queryClient = useQueryClient();
-  const { success: showSuccess, error: showError } = useToastMessage();
-
   const { data: me, isLoading: isLoadingMe } = useGetCurrent();
-  const { data: details } = useGetOneUserById({ path: { id: me?.id ?? 0 } }, undefined, { enabled: !!me });
-  const { firstName, setFirstName, lastName, setLastName } = useUserNameFields(me);
-
-  const { mutate, isPending } = useChangeMyName(undefined, {
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [useGetCurrentKey] });
-      queryClient.invalidateQueries({ queryKey: [useGetOneUserByIdKey] });
-      queryClient.invalidateQueries({ queryKey: [useFindManyKey] });
-      showSuccess({ title: t('updated') });
-    },
-    onError: (error) => {
-      const body = error instanceof ApiError ? (error.body as { message?: string | string[] } | undefined) : undefined;
-      const message = Array.isArray(body?.message) ? body?.message[0] : body?.message;
-      showError({ title: typeof message === 'string' && message.trim() ? message : t('updateFailed') });
-    },
+  // The sign-in methods, which tell whether SSO manages the name, come only with the user details.
+  const { data: details, isPending: isPendingDetails } = useGetOneUserById({ path: { id: me?.id ?? 0 } }, undefined, {
+    enabled: !!me,
   });
+  const { firstName, setFirstName, lastName, setLastName, body, mutationOptions } = useUserNameForm(me);
+
+  const { mutate, isPending } = useChangeMyName(undefined, mutationOptions);
 
   const onSubmit = useCallback(() => {
-    mutate({ body: { firstName: firstName.trim() || null, lastName: lastName.trim() || null } });
-  }, [mutate, firstName, lastName]);
+    mutate({ body });
+  }, [mutate, body]);
 
   return (
     <UserNameFormView
@@ -52,7 +26,8 @@ export function NameForm() {
       onFirstNameChange={setFirstName}
       onLastNameChange={setLastName}
       onSubmit={onSubmit}
-      isLoading={isLoadingMe}
+      // Stay loading until the details tell whether SSO manages the name, so SSO users never see an editable form.
+      isLoading={isLoadingMe || (!!me && isPendingDetails)}
       isPending={isPending}
       isSsoManaged={isSsoLinkedUser(details)}
     />

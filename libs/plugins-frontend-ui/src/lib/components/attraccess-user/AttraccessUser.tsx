@@ -8,22 +8,12 @@ import { toSvg } from 'jdenticon';
 import { useMemo, ReactNode, useCallback } from 'react';
 import { AlertTriangleIcon, ChevronDownIcon, MessageCircleIcon } from 'lucide-react';
 import { useAttraccessUserActions } from './AttraccessUserActionsContext';
+import { getUserInitials } from './getUserInitials';
 import en from './en.json';
 import de from './de.json';
 
-export type UserIdentity = Pick<User, 'id' | 'username' | 'firstName' | 'lastName'>;
-
-/** Initials from the first and last name when set, otherwise the first two characters of the username. */
-export function getUserInitials(user: Pick<UserIdentity, 'username' | 'firstName' | 'lastName'>): string {
-  const parts = [user.firstName, user.lastName].map((part) => part?.trim() ?? '').filter(Boolean);
-  if (parts.length > 0) {
-    return parts
-      .map((part) => Array.from(part)[0])
-      .join('')
-      .toUpperCase();
-  }
-  return user.username.slice(0, 2).toUpperCase();
-}
+/** A user to show. The names are optional so plugins that only know the id and username keep working. */
+export type UserIdentity = Pick<User, 'id' | 'username'> & Partial<Pick<User, 'firstName' | 'lastName'>>;
 
 interface AttraccessUserProps {
   user?: UserIdentity & Partial<Pick<User, 'deletedAt'>>;
@@ -55,7 +45,8 @@ export function AttraccessUser({
   }, [isDeleted, user]);
 
   const name = user ? formatUserDisplayName(user) || t('unknown') : t('unknown');
-  const secondaryUsername = user && hasUserName(user) ? user.username : undefined;
+  // The username is shown below the name only when it adds something: a name is set and differs from it.
+  const secondaryUsername = user && hasUserName(user) && user.username !== name ? user.username : undefined;
 
   const startDirectMessage = useCallback(() => {
     if (onStartDirectMessage) {
@@ -83,16 +74,16 @@ export function AttraccessUser({
           {/* A long name wraps, also inside a word, instead of pushing its table or list wider than the screen. */}
           <span className="text-sm font-medium [overflow-wrap:anywhere] group-hover:underline">{isDeleted ? <del>{name}</del> : name}</span>
           {isInteractive && (
-            <ChevronDownIcon className="h-3 w-3 text-muted-foreground shrink-0" aria-hidden="true" focusable="false" />
+            <ChevronDownIcon className="h-3 w-3 text-muted shrink-0" aria-hidden="true" focusable="false" />
           )}
         </div>
-        {secondaryUsername && !description && (
-          <span className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
+        {secondaryUsername && (
+          <span className="text-xs text-muted [overflow-wrap:anywhere]">
             {isDeleted ? <del>{secondaryUsername}</del> : secondaryUsername}
           </span>
         )}
         {description && (
-          <span className="text-xs text-muted-foreground">{isDeleted ? <del>{description}</del> : description}</span>
+          <span className="text-xs text-muted">{isDeleted ? <del>{description}</del> : description}</span>
         )}
       </div>
     </div>
