@@ -49,6 +49,10 @@ it('reports a failed Bluetooth connection', async () => {
   render(<ConnectScreen />);
   fireEvent.click(screen.getByRole('button', { name: 'Set up over Bluetooth' }));
   expect(await screen.findByText('Could not connect over Bluetooth')).toBeTruthy();
+  // A Lite or a bridge has no screen: only a Touch shows its name.
+  const description = screen.getByText(/Bluetooth setup is still open/).textContent;
+  expect(description).toMatch(/an Attractap Touch shows its name on its screen/);
+  expect(description).not.toMatch(/the reader shows on its screen/);
 });
 
 it('explains a Bluetooth link that dropped during setup', () => {

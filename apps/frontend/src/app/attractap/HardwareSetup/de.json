@@ -24,7 +24,7 @@
       },
       "failed": {
         "title": "Bluetooth-Verbindung fehlgeschlagen",
-        "description": "Prüfe, ob die Bluetooth-Einrichtung des Geräts noch offen ist (sie schließt nach 10 Minuten), halte es nah an dieses Gerät und versuche es erneut. Wähle den Namen, den der Leser auf seinem Display zeigt. Klappt es weiterhin nicht, richte es per USB ein."
+        "description": "Prüfe, ob die Bluetooth-Einrichtung des Geräts noch offen ist (sie schließt nach 10 Minuten), halte es nah an dieses Gerät und versuche es erneut. Wähle in der Liste des Browsers das richtige Gerät (ein Attractap Touch zeigt seinen Namen auf dem Display). Klappt es weiterhin nicht, richte es per USB ein."
       },
       "lost": {
         "title": "Bluetooth-Verbindung getrennt",

@@ -24,7 +24,7 @@
       },
       "failed": {
         "title": "Could not connect over Bluetooth",
-        "description": "Make sure the device's Bluetooth setup is still open (it closes after 10 minutes), keep it close to this device and try again. Pick the name the reader shows on its screen. If it keeps failing, set it up via USB."
+        "description": "Make sure the device's Bluetooth setup is still open (it closes after 10 minutes), keep it close to this device and try again. In the browser list, pick the right device (an Attractap Touch shows its name on its screen). If it keeps failing, set it up via USB."
       },
       "lost": {
         "title": "Bluetooth connection lost",
