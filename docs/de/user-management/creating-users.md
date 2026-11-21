@@ -24,7 +24,7 @@ Benutzer können über [Projekteinladungen](projects/team-management.md) zu Attr
 
 ## Namen
 
-Vor- und Nachname sind überall optional, wo ein Konto entsteht: Selbstregistrierung, Ersteinrichtung, einzelne Einladungen, CSV-Einladungen und Anlegen durch einen Administrator. Ist ein Name gesetzt, zeigt Attraccess „Vorname Nachname" statt des Benutzernamens (z. B. in Listen, Suche, E-Mails, Benachrichtigungen und am Leser); der Benutzername erscheint dort, wo Platz ist, als Zusatztext. Ohne Namen wird wie bisher der Benutzername angezeigt. Jeder Name hat höchstens 100 Zeichen; leere Werte werden als nicht gesetzt gespeichert. Benutzer ändern ihren Namen unter **Mein Konto**, Administratoren unter **Benutzer** > Benutzer > **Profil**.
+Vor- und Nachname sind überall optional, wo ein Konto entsteht: Selbstregistrierung, Ersteinrichtung, einzelne Einladungen, CSV-Einladungen und Anlegen durch einen Administrator. Ist ein Name gesetzt, zeigt Attraccess „Vorname Nachname“ statt des Benutzernamens (z. B. in Listen, Suche, E-Mails, Benachrichtigungen und am Leser); der Benutzername erscheint dort, wo Platz ist, als Zusatztext. Ohne Namen wird wie bisher der Benutzername angezeigt. Jeder Name hat höchstens 100 Zeichen; leere Werte werden als nicht gesetzt gespeichert. Benutzer ändern ihren Namen unter **Mein Konto**, Administratoren unter **Benutzer** > Benutzer > **Profil**.
 
 ## CSV-Einladungen
 

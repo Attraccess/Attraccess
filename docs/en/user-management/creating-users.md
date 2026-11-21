@@ -24,7 +24,7 @@ Users can be invited to Attraccess via [project invitations](projects/team-manag
 
 ## Names
 
-First and last name are optional everywhere an account is created: self-registration, first-time setup, single invitations, CSV invitations and creation by an administrator. Where a name is set, Attraccess shows "First Last" instead of the username (for example in lists, search, emails, notifications and on the reader); the username appears as secondary text where there is room. Without a name, the username is shown as before. Each name has at most 100 characters; blank values are stored as empty. Users change their own name under **My Account**, administrators under **Users** > the user > **Profile**.
+First and last name are optional everywhere an account is created: self-registration, first-time setup, single invitations, CSV invitations and creation by an administrator. Where a name is set, Attraccess shows "First Last" instead of the username (for example in lists, search, emails, notifications and on the reader); the username appears as secondary text where there is room. Without a name, the username is shown as before. Each name has at most 100 characters; blank values are stored as not set. Users change their own name under **My Account**, administrators under **Users** > the user > **Profile**.
 
 ## CSV Invitations
 
