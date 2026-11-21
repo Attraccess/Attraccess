@@ -44,6 +44,7 @@ kicad/                      KiCad 10 project. This is the source of truth.
 scripts/export_fab.py       Gerbers, drill, BOM and placement files for JLCPCB
 scripts/bootstrap/          the generator that produced revision A (see below)
 docs/                       design notes, pin map, bring-up plan, compliance checklist
+case/                       3D-printable case: design, print files, installation manual (case/README.md)
 ```
 
 ### Schematic structure
@@ -186,4 +187,5 @@ run them once the project has been edited by hand. See
 
 Further reading: [design notes](docs/design-notes.md),
 [pin map and firmware port](docs/firmware-port.md),
-[bring-up plan](docs/bring-up.md), [compliance checklist](docs/compliance.md).
+[bring-up plan](docs/bring-up.md), [compliance checklist](docs/compliance.md),
+[case and installation manual](case/README.md).

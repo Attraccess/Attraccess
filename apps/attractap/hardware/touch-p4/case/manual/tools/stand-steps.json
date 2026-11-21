@@ -1,0 +1,307 @@
+{
+ "commands": [
+  {
+   "command": "timeline.delete",
+   "params": {
+    "feature": "StandRearCableNotch"
+   }
+  },
+  {
+   "command": "sketch.create",
+   "params": {
+    "plane": "YZ",
+    "offset": -6,
+    "name": "StandCableGateSketch"
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "points": [
+     [
+      -21.197776610083782,
+      -140.59461361509813
+     ],
+     [
+      -28.940439294641934,
+      -129.53562747019538
+     ],
+     [
+      -18.291045229180035,
+      -122.07973007025048
+     ],
+     [
+      -10.548382544621886,
+      -133.13871621515324
+     ]
+    ],
+    "closed": true
+   }
+  },
+  {
+   "command": "sketch.constraint.fix",
+   "params": {
+    "entities": [
+     "l1",
+     "l2",
+     "l3",
+     "l4"
+    ]
+   }
+  },
+  {
+   "command": "sketch.solve",
+   "params": {}
+  },
+  {
+   "command": "sketch.finish",
+   "params": {}
+  },
+  {
+   "command": "solid.extrude",
+   "params": {
+    "sketch": "StandCableGateSketch",
+    "distance": 12,
+    "operation": "cut",
+    "targets": [
+     "Stand"
+    ],
+    "name": "StandCableGate"
+   }
+  },
+  {
+   "command": "sketch.create",
+   "params": {
+    "plane": "YZ",
+    "offset": 6,
+    "name": "StandTieFinRSketch"
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "points": [
+     [
+      -22.427061138453062,
+      -135.35163168223664
+     ],
+     [
+      -33.897672522983655,
+      -118.96794850460296
+     ],
+     [
+      -28.163383410811864,
+      -114.95323452001725
+     ],
+     [
+      -19.971033531948272,
+      -115.32120661445322
+     ],
+     [
+      -15.554848148903991,
+      -121.62892463784218
+     ]
+    ],
+    "closed": true
+   }
+  },
+  {
+   "command": "sketch.constraint.fix",
+   "params": {
+    "entities": [
+     "l1",
+     "l2",
+     "l3",
+     "l4",
+     "l5"
+    ]
+   }
+  },
+  {
+   "command": "sketch.solve",
+   "params": {}
+  },
+  {
+   "command": "sketch.finish",
+   "params": {}
+  },
+  {
+   "command": "solid.extrude",
+   "params": {
+    "sketch": "StandTieFinRSketch",
+    "distance": 3.2,
+    "operation": "join",
+    "targets": [
+     "Stand"
+    ],
+    "name": "StandTieFinR"
+   }
+  },
+  {
+   "command": "sketch.create",
+   "params": {
+    "plane": "YZ",
+    "offset": -9.2,
+    "name": "StandTieFinLSketch"
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "points": [
+     [
+      -22.427061138453062,
+      -135.35163168223664
+     ],
+     [
+      -33.897672522983655,
+      -118.96794850460296
+     ],
+     [
+      -28.163383410811864,
+      -114.95323452001725
+     ],
+     [
+      -19.971033531948272,
+      -115.32120661445322
+     ],
+     [
+      -15.554848148903991,
+      -121.62892463784218
+     ]
+    ],
+    "closed": true
+   }
+  },
+  {
+   "command": "sketch.constraint.fix",
+   "params": {
+    "entities": [
+     "l1",
+     "l2",
+     "l3",
+     "l4",
+     "l5"
+    ]
+   }
+  },
+  {
+   "command": "sketch.solve",
+   "params": {}
+  },
+  {
+   "command": "sketch.finish",
+   "params": {}
+  },
+  {
+   "command": "solid.extrude",
+   "params": {
+    "sketch": "StandTieFinLSketch",
+    "distance": 3.2,
+    "operation": "join",
+    "targets": [
+     "Stand"
+    ],
+    "name": "StandTieFinL"
+   }
+  },
+  {
+   "command": "sketch.create",
+   "params": {
+    "plane": "YZ",
+    "offset": -10,
+    "name": "StandTieSlotSketch"
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "points": [
+     [
+      -20.789709400783202,
+      -121.99801497038104
+     ],
+     [
+      -23.370596962302585,
+      -118.31168625541345
+     ],
+     [
+      -21.73222864453922,
+      -117.16462511696038
+     ],
+     [
+      -19.151341083019837,
+      -120.85095383192797
+     ]
+    ],
+    "closed": true
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "points": [
+     [
+      -26.523998512954993,
+      -126.01272895496675
+     ],
+     [
+      -29.104886074474376,
+      -122.32640023999916
+     ],
+     [
+      -27.466517756711006,
+      -121.17933910154609
+     ],
+     [
+      -24.885630195191624,
+      -124.86566781651368
+     ]
+    ],
+    "closed": true
+   }
+  },
+  {
+   "command": "sketch.constraint.fix",
+   "params": {
+    "entities": [
+     "l1",
+     "l2",
+     "l3",
+     "l4",
+     "l5",
+     "l6",
+     "l7",
+     "l8"
+    ]
+   }
+  },
+  {
+   "command": "sketch.solve",
+   "params": {}
+  },
+  {
+   "command": "sketch.finish",
+   "params": {}
+  },
+  {
+   "command": "solid.extrude",
+   "params": {
+    "sketch": "StandTieSlotSketch",
+    "distance": 20,
+    "operation": "cut",
+    "targets": [
+     "Stand"
+    ],
+    "name": "StandTieSlots"
+   }
+  },
+  {
+   "command": "measure",
+   "params": {
+    "body": "Stand",
+    "summary": true
+   }
+  }
+ ]
+}
