@@ -17,7 +17,7 @@ A new reader (freshly flashed, or reset) needs a PIN, its network and the addres
 
 - **Over USB** with the web flasher: open **Devices** > **Attractap Readers**, choose **Set up Attractap** and click **Connect via USB**. It installs the firmware and then configures the PIN, Wi-Fi and server (Serial Configurator).
 - **On the reader itself** (Attractap Touch): a reader without a server address shows its settings on the screen. Enter the Wi-Fi network, the server and a PIN there.
-- **Over Bluetooth**, without a cable (firmware 2.9.0 or later): see below.
+- **Over Bluetooth**, without a cable (firmware 2.11.0 or later): see below.
 
 Ethernet variants (Attractap Lite) take their address from DHCP as soon as the cable is plugged in; they only need the PIN and the server.
 

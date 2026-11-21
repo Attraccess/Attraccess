@@ -176,7 +176,7 @@ reports `nfc: true`; firmware before 2.10.0 omits the field, which means true.
 ESP-IDF as `IDF_TARGET` (default `esp32s3`), and `build_firmwares.py` reads it for esptool `--chip` and
 the manifest (`chip`, `boardFamily` `ESP32`, `bleBridge: true`, and the image's own flash settings
 `dio`/`40m`/`4MB`). ESP-IDF applies `sdkconfig.defaults.esp32` after `sdkconfig.defaults` for that target
-only. (2.8.0 kept the S3 `sdkconfig` byte-identical; 2.9.0 turns the setup's NimBLE options on for the S3
+only. (Through 2.10.0 the S3 `sdkconfig` stayed byte-identical; 2.11.0 turns the setup's NimBLE options on for the S3
 too, see "Bluetooth setup".) The overlay sets 4 MB DIO
 flash at 40 MHz, no PSRAM, the BLE-only controller with one connection, Wi-Fi/BT software coexistence,
 the UART0 console, the internal EMAC and `partitions-4mb.csv`. The secure profile is refused for this
@@ -259,7 +259,7 @@ between 3 and 10 s asks for the Bluetooth setup; at 10 s the bridge erases NVS (
 pairing credentials, PIN), lights all LEDs and reboots unconfigured. Releasing between 2 and 3 s does
 nothing. GPIO0 stays the download button.
 
-**Bluetooth setup** (shared with the readers, see "Bluetooth setup (2.9.0)"). On a bridge without pairing
+**Bluetooth setup** (shared with the readers, see "Bluetooth setup (2.11.0)"). On a bridge without pairing
 credentials, releasing the button after 3 s opens a 10-minute window, advertised as `Attractap Bridge XXXX`. A
 bridge that is paired ignores the 3 s hold. If the proxy already holds NimBLE (a bridge unpaired at runtime), the
 setup fails to open until a reboot.
@@ -292,7 +292,7 @@ secure profile; development units stay unfused. A later secure bridge build need
 Installations that rely on the reader secure profile get bridges without it; physical access to a
 bridge exposes its flash, including its pairing credentials.
 
-## Bluetooth setup (2.9.0)
+## Bluetooth setup (2.11.0)
 
 `src/bt_setup/` (ATT-1315 for the bridge, ATT-1371 for the readers): the web app's **Set up over Bluetooth**
 sets the PIN, Wi-Fi and server address of a device that is not paired yet. Every variant with NimBLE and an API
