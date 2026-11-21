@@ -4,6 +4,7 @@
   "sourceRoot": "apps/attractap-lab/src",
   "projectType": "application",
   "tags": ["scope:hardware"],
+  "implicitDependencies": ["api"],
   "targets": {
     "check": {
       "executor": "nx:run-commands",
@@ -33,13 +34,15 @@
       "inputs": [
         "default",
         "{workspaceRoot}/apps/attractap/firmware/tests/reference-recordings/recordings/**/*",
+        "{workspaceRoot}/apps/api/scripts/lib/database-provider.mjs",
+        { "env": "TEST_DATABASE_URL" },
         {
           "runtime": "node -p \"process.platform + '-' + process.arch + '-' + process.version\""
         }
       ],
       "outputs": ["{workspaceRoot}/coverage/apps/attractap-lab/test-scripts"],
       "options": {
-        "command": "node scripts/crap-score/node-test.mjs apps/attractap-lab coverage/apps/attractap-lab/test-scripts apps/attractap-lab/real-cards/*.test.mjs apps/attractap-lab/real-cards/replay/*.test.mjs apps/attractap-lab/ble-fixture-plugin/*.test.mjs"
+        "command": "node scripts/crap-score/node-test.mjs apps/attractap-lab coverage/apps/attractap-lab/test-scripts apps/attractap-lab/real-cards/*.test.mjs apps/attractap-lab/real-cards/replay/*.test.mjs apps/attractap-lab/ble-fixture-plugin/*.test.mjs apps/attractap-lab/hil/*.test.mjs"
       }
     },
     "smoke": {
