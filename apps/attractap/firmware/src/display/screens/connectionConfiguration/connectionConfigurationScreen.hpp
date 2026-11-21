@@ -7,6 +7,7 @@
 #include "../../../settings/settings.hpp"
 #include "../../shared/pinInput/pinInputPage.hpp"
 #include "../../shared/powerOff/powerOffButton.hpp"
+#include "../../shared/btSetupStatus.hpp"
 
 class ConnectionConfigurationScreen : public IScreen
 {
@@ -51,6 +52,11 @@ private:
 
     PinInputPage pinInputPage;
     lv_obj_t *screen = nullptr;
+    // Left of Save on every tab (ATT-1371): a fresh reader shows this screen first, so the Bluetooth setup's state and
+    // the name to pick in the browser show here too.
+    static constexpr uint8_t TAB_COUNT = 3;
+    BtSetupStatus bluetoothSetupStatus[TAB_COUNT];
+    uint8_t bluetoothSetupStatusCount = 0;
 
     lv_obj_t *pinLockOverlay = nullptr;
     bool pinLockEnabled = true;

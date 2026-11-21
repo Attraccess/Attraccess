@@ -148,9 +148,16 @@ lv_obj_t *ConnectionConfigurationScreen::createSaveContainer(lv_obj_t *parent)
    lv_obj_set_height(container, LV_SIZE_CONTENT);
    lv_obj_set_align(container, LV_ALIGN_CENTER);
    lv_obj_set_flex_flow(container, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(container, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
    lv_obj_remove_flag(container, LV_OBJ_FLAG_CLICKABLE);
    lv_obj_remove_flag(container, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_flex_align(container, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+   lv_obj_set_style_pad_column(container, 12, LV_PART_MAIN);
+   if (this->bluetoothSetupStatusCount < TAB_COUNT)
+   {
+      lv_obj_t *status = this->bluetoothSetupStatus[this->bluetoothSetupStatusCount++].create(container);
+      lv_obj_set_flex_grow(status, 1);
+      lv_obj_set_style_text_align(status, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+   }
    return container;
 }
 
