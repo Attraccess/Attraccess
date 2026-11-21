@@ -343,8 +343,11 @@ bool rowLineFits(lv_obj_t *root, const char *resourceName)
     auto *line = lv_obj_get_child(lv_obj_get_child(row, 0), 1);
     lv_obj_update_layout(row);
     lv_point_t size{};
-    lv_text_get_size(&size, lv_label_get_text(line), lv_obj_get_style_text_font(line, LV_PART_MAIN), 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
-    return size.x <= lv_obj_get_content_width(line);
+    const std::string text = lv_label_get_text(line);
+    lv_text_get_size(&size, text.c_str(), lv_obj_get_style_text_font(line, LV_PART_MAIN), 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    // LV_LABEL_LONG_DOT rewrites the label's text in place: a cut line is short but ends in dots.
+    const bool cutByLabel = text.size() >= 3 && text.compare(text.size() - 3, 3, "...") == 0;
+    return size.x <= lv_obj_get_content_width(line) && !cutByLabel;
 }
 }
 
@@ -421,4 +424,62 @@ void testParallelSessionUsers(Renderer &renderer)
     expect(rowStatusLine(guard.root, "Own") == "You, Alex \u00B7 2/3", "English token");
     expect(rowLineFits(guard.root, "Crowd") && rowLineFits(guard.root, "Twenty"), "English rows fit");
     renderer.capture("parallel-sessions-users-english");
+}
+
+// Edge cases of the users caption: one name, a name wider than the line, names the font cannot draw, an empty name.
+void testParallelSessionUserEdges(Renderer &renderer)
+{
+    API::ResourceList resources{};
+    resources.count = 5;
+    std::strcpy(resources.authenticatedUsername, "Sam");
+    const char *names[] = {"One", "Long name", "Not Latin-1", "Empty name", "Own among many"};
+    for (int i = 0; i < 5; ++i) {
+        resources.items[i] = machine(names[i], 6, 0);
+        resources.items[i].id = i + 1;
+    }
+    resources.items[0].activeSessionCount = 1;
+    addSession(resources.items[0], 10, "Alex", false);
+    // The longest name the server can send (32 characters), with more users behind it.
+    resources.items[1].activeSessionCount = 4;
+    addSession(resources.items[1], 20, "Bartholomaeus-Maximilian-Hohenzo", false);
+    addSession(resources.items[1], 21, "Kim", false);
+    // Glyphs outside Latin-1 render as missing glyphs (known limit) but must not overflow or crash.
+    resources.items[2].activeSessionCount = 2;
+    addSession(resources.items[2], 30, "\xD0\x96\xD0\xB0\xD0\xBD", false);
+    addSession(resources.items[2], 31, "Sam \xF0\x9F\x98\x80", false);
+    resources.items[3].activeSessionCount = 2;
+    addSession(resources.items[3], 40, "", false);
+    addSession(resources.items[3], 41, "Kim", false);
+    // The own session in the middle of many: shown once, as the you token.
+    resources.items[4].activeSessionCount = 4;
+    for (const char *user : {"Alex", "Robin", "Sam", "Kim"}) addSession(resources.items[4], 50 + resources.items[4].activeSessions.size(), user, std::string(user) == "Sam");
+
+    ResourceListScreen signedOut;
+    signedOut.setResourceList(resources);
+    signedOut.init();
+    {
+        ScreenGuard guard(signedOut.getScreen(), &signedOut);
+        FirmwareI18n::refreshTree(guard.root, "de");
+        expect(rowStatusLine(guard.root, "One") == "Alex · 1/6", "One name reads 'Alex · 1/6' without a stray separator");
+        for (const char *row : {"One", "Long name", "Not Latin-1", "Empty name", "Own among many"})
+            expect(rowLineFits(guard.root, row), std::string("The users line of '") + row + "' fits the label");
+        renderer.capture("parallel-sessions-user-edges-signed-out");
+    }
+    ResourceListScreen signedIn;
+    signedIn.setResourceList(resources);
+    signedIn.setAuthenticatedUser("Sam");
+    signedIn.init();
+    ScreenGuard guard(signedIn.getScreen(), &signedIn);
+    FirmwareI18n::refreshTree(guard.root, "en");
+    const auto longName = rowStatusLine(guard.root, "Long name");
+    const std::string tail = " +3 \u00B7 4/6";
+    expect(longName.rfind("Bartholo", 0) == 0 && longName.find("...") != std::string::npos && longName.size() > tail.size() &&
+               longName.compare(longName.size() - tail.size(), tail.size(), tail) == 0,
+           "A name wider than the line is shortened and keeps the +N and the count");
+    expect(rowStatusLine(guard.root, "Own among many") == "You, Alex, Robin +1 · 4/6" ||
+               rowStatusLine(guard.root, "Own among many") == "You, Alex, Robin, Kim · 4/6",
+           "The own session is listed once, as the you token, first");
+    for (const char *row : {"One", "Long name", "Not Latin-1", "Empty name", "Own among many"})
+        expect(rowLineFits(guard.root, row), std::string("The signed-in users line of '") + row + "' fits the label");
+    renderer.capture("parallel-sessions-user-edges-signed-in");
 }

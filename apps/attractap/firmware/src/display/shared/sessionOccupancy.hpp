@@ -70,7 +70,7 @@ namespace SessionOccupancy
     // "Alex, Sam +2 \u00B7 4/6": who uses a parallel machine, then the count ("Full" once no slot is left).
     // The own session (`ownSessionId`, 0 for none) comes first as "you", then the server's order. Only whole names
     // that fit `width` are listed; the rest is "+N" (counted against `activeCount`, which may exceed the capped list).
-    // Returns an empty caption when no session is listed so the caller falls back to caption().
+    // Returns an empty caption when no session has a name so the caller falls back to caption().
     inline FirmwareI18n::Text usersCaption(const std::vector<API::ActiveSession> &sessions, uint16_t activeCount,
                                            uint16_t limit, uint32_t ownSessionId, const lv_font_t *font, int32_t width)
     {
@@ -82,23 +82,40 @@ namespace SessionOccupancy
         for (const auto &session : sessions)
         {
             if (ownSessionId != 0 && session.id == ownSessionId) names.insert(names.begin(), Text(Message::SessionYou));
-            else names.push_back(Text::literal(session.username) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */);
+            else if (session.username[0] != '\0') names.push_back(Text::literal(session.username) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */);
         }
+        if (names.empty()) return Text(); // Only nameless sessions: the caller shows the plain count.
         const unsigned total = std::max<unsigned>(activeCount, names.size());
         const Text count = level(activeCount, limit) == Level::Full
                                ? Text(Message::ResourceFull)
                                : Text::format(Message::SessionCountOf, {number(activeCount), number(limit)});
-        auto line = [&](size_t shown) {
-            Text list = names[0];
+        auto line = [&](size_t shown, const Text &first) {
+            Text list = first;
             for (size_t i = 1; i < shown; ++i) list = Text::format(Message::SessionNameJoin, {list, names[i]});
             if (total > shown) list = Text::format(Message::SessionNamesMore, {list, number(total - shown)});
             return Text::format(Message::SessionUsersLine, {list, count});
         };
         for (size_t shown = names.size(); shown > 1; --shown)
         {
-            const Text candidate = line(shown);
+            const Text candidate = line(shown, names[0]);
             if (fitsLine(candidate, font, width)) return candidate;
         }
-        return line(1); // Not even the first name fits: the label cuts it with its ellipsis.
+        const Text single = line(1, names[0]);
+        if (!names[0].isLiteral || fitsLine(single, font, width)) return single;
+        // Not even the first name fits: shorten it here (whole UTF-8 characters) so the label's own ellipsis does not
+        // swallow the "+N \u00B7 k/N" tail.
+        std::string cut = names[0].value;
+        while (!cut.empty())
+        {
+            unsigned char last;
+            do
+            {
+                last = static_cast<unsigned char>(cut.back());
+                cut.pop_back();
+            } while ((last & 0xC0) == 0x80 && !cut.empty());
+            const Text candidate = line(1, Text::literal(cut + "...") /* i18n-data: Server-supplied user name, shortened to fit; preserve the contents. */);
+            if (fitsLine(candidate, font, width)) return candidate;
+        }
+        return single;
     }
 }

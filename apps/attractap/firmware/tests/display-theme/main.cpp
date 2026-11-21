@@ -255,6 +255,7 @@ int main(int argc, char **argv)
         test("screen/parallel-sessions-policy", [&] { testParallelSessionPolicy(); });
         test("screen/parallel-sessions-list", [&] { testParallelSessionList(renderer); });
         test("screen/parallel-sessions-users", [&] { testParallelSessionUsers(renderer); });
+        test("screen/parallel-sessions-user-edges", [&] { testParallelSessionUserEdges(renderer); });
         test("screen/parallel-sessions-details", [&] { testParallelSessionDetails(renderer); });
         test("screen/parallel-sessions-single-unchanged", [&] { testSingleSessionDetailsUnchanged(); });
         test("screen/parallel-sessions-lowered-limit", [&] { testLoweredLimitDetails(renderer); });
