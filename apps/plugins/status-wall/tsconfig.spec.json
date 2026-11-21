@@ -1,0 +1,17 @@
+{
+  // Extends the workspace base so `@attraccess/*` path mappings resolve — plugin
+  // sources import the host SDK, which only exists as a workspace path alias.
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "es2021",
+    "module": "commonjs",
+    "moduleResolution": "node16",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "types": ["jest", "node"]
+  },
+  "include": ["backend/**/*.ts", "jest.config.ts"]
+}

@@ -126,6 +126,9 @@ The documentation pages are plain Markdown files. English pages live under https
 ## English: Shelly
 - [Overview](https://docs.attraccess.org/en/plugins/shelly/overview.md): The Shelly plugin keeps a registry of Shelly devices on your network, with discovery, device info, admin password management and firmware updates.
 
+## English: Status Wall
+- [Overview](https://docs.attraccess.org/en/plugins/status-wall/overview.md): The Status Wall plugin shows on a big screen which machines are ready, in use or under maintenance, live and without signing in.
+
 ## English: Monitoring & Metrics
 - [Overview](https://docs.attraccess.org/en/monitoring/overview.md): Overview of built-in Prometheus metrics and Grafana dashboards for monitoring Attraccess, with security notes.
 - [Setup](https://docs.attraccess.org/en/monitoring/setup.md): How to enable the metrics endpoint and generate the API key Prometheus uses to scrape Attraccess.
@@ -281,6 +284,9 @@ The documentation pages are plain Markdown files. English pages live under https
 
 ## Deutsch: Shelly
 - [Überblick](https://docs.attraccess.org/de/plugins/shelly/overview.md): Das Plugin Shelly führt ein Register der Shelly-Geräte in Ihrem Netzwerk mit Suche, Geräteinformationen, Admin-Passwort-Verwaltung und Firmware-Updates.
+
+## Deutsch: Status Wall
+- [Überblick](https://docs.attraccess.org/de/plugins/status-wall/overview.md): Das Statuswand-Plugin zeigt auf einem großen Bildschirm live und ohne Anmeldung, welche Maschinen frei, in Benutzung oder in Wartung sind.
 
 ## Deutsch: Monitoring & Metriken
 - [Überblick](https://docs.attraccess.org/de/monitoring/overview.md): Überblick über integrierte Prometheus-Metriken und Grafana-Dashboards zur Überwachung von Attraccess, inklusive Sicherheitshinweisen.

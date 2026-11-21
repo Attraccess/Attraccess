@@ -113,6 +113,8 @@
     - [Overview](plugins/rabbitmq/overview.md)
   - **Shelly**
     - [Overview](plugins/shelly/overview.md)
+  - **Status Wall**
+    - [Overview](plugins/status-wall/overview.md)
 
 - **Monitoring & Metrics**
   - [Overview](monitoring/overview.md)

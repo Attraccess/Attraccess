@@ -1,0 +1,20 @@
+{
+  "name": "status-wall",
+  "version": "0.1.0",
+  "main": {
+    "backend": {
+      "directory": "dist",
+      "entryPoint": "index.js"
+    },
+    "frontend": {
+      "directory": "frontend",
+      "entryPoint": "remoteEntry.js",
+      "styles": "style.css",
+      "dashboardPaths": ["/status-walls"]
+    }
+  },
+  "attraccessVersion": {
+    "min": "2.0.0-0"
+  },
+  "permissions": ["PLUGIN_STORAGE", "ACCESS_RESOURCES", "LISTEN_EVENTS"]
+}

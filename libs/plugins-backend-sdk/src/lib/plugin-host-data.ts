@@ -1,4 +1,4 @@
-import type { PluginResourceModel } from '@attraccess/application-models';
+import type { PluginResourceDisplayModel, PluginResourceModel } from '@attraccess/application-models';
 import type { PluginTransactionScope } from './plugin-persistence';
 
 /**
@@ -16,6 +16,11 @@ export interface PluginResourceDirectory {
   get(resourceId: number, scope?: PluginTransactionScope): Promise<PluginResourceModel | null>;
   /** Names of the existing resources among `resourceIds`. */
   getNames(resourceIds: number[]): Promise<Map<number, string>>;
+  /**
+   * Name and image of the existing resources among `resourceIds`, or of every resource when `resourceIds` is omitted,
+   * sorted by name. For screens that show resources to people.
+   */
+  listDisplay(resourceIds?: number[]): Promise<PluginResourceDisplayModel[]>;
   /**
    * The subset of `resourceIds` (existing resources) the user may see. Core hides resources that only belong to hidden
    * resource groups unless the user is an introducer of the group or holds a granted group introduction.

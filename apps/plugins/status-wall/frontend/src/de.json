@@ -1,0 +1,65 @@
+{
+  "sidebar": "Statuswände",
+  "failed": "Das hat nicht geklappt",
+  "common": { "cancel": "Abbrechen", "save": "Speichern", "done": "Fertig" },
+  "page": {
+    "title": "Statuswände",
+    "description": "Seiten für große Bildschirme, die auf einen Blick zeigen, welche Maschinen frei, in Benutzung oder in Wartung sind. Bildschirme öffnen sie per Link, ohne Anmeldung.",
+    "create": "Neue Statuswand",
+    "empty": "Noch keine Statuswände",
+    "loadFailed": "Die Statuswände konnten nicht geladen werden"
+  },
+  "table": { "name": "Name", "shows": "Zeigt" },
+  "selection": {
+    "all": "Alle Ressourcen",
+    "groups": "{{count}} Gruppe(n)",
+    "resources": "{{count}} Ressource(n)"
+  },
+  "actions": {
+    "open": "Wand öffnen",
+    "link": "Link anzeigen",
+    "edit": "Bearbeiten",
+    "regenerate": "Neuer Link",
+    "delete": "Löschen"
+  },
+  "regenerate": {
+    "title": "Neuer Link für {{name}}?",
+    "body": "Bildschirme mit dem bisherigen Link zeigen die Wand nicht mehr und brauchen den neuen Link.",
+    "confirm": "Neuen Link erstellen"
+  },
+  "delete": {
+    "title": "{{name}} löschen?",
+    "body": "Bildschirme mit dieser Wand zeigen sie nicht mehr. Das lässt sich nicht rückgängig machen.",
+    "confirm": "Löschen"
+  },
+  "form": {
+    "createTitle": "Neue Statuswand",
+    "editTitle": "Statuswand bearbeiten",
+    "name": "Name",
+    "namePlaceholder": "z. B. Werkstatthalle",
+    "all": "Alle Ressourcen zeigen",
+    "groups": "Ressourcengruppen",
+    "noGroups": "Es gibt keine Ressourcengruppen.",
+    "resources": "Ressourcen",
+    "selectedCount": "{{count}} ausgewählt",
+    "needSelection": "Wähle mindestens eine Gruppe oder Ressource.",
+    "create": "Erstellen"
+  },
+  "link": {
+    "title": "Link von {{name}}",
+    "body": "Öffne diesen Link auf dem Bildschirm. Wer den Link hat, sieht die Wand ohne Anmeldung; mit „Neuer Link“ widerrufst du ihn. Ein Doppelklick auf die Wand schaltet auf Vollbild.",
+    "url": "Link der Wand",
+    "copy": "Link kopieren",
+    "copied": "Kopiert",
+    "open": "Öffnen"
+  },
+  "state": { "ready": "Frei", "in-use": "In Benutzung", "maintenance": "Wartung" },
+  "display": {
+    "empty": "Diese Wand zeigt keine Ressourcen.",
+    "offline": "Keine Verbindung zum Server: Die Wand ist eventuell nicht aktuell",
+    "gone": {
+      "title": "Dieser Link ist nicht mehr gültig",
+      "body": "Frag eine verwaltende Person nach dem aktuellen Link dieser Statuswand."
+    }
+  }
+}

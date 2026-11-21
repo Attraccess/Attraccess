@@ -59,8 +59,8 @@ describe('MCP reviewed manifest drift', () => {
 
   it('exposes no plugin operations', () => {
     const { tools } = analyzeMcpManifest(document, readManifest());
-    expect(tools.filter((tool) => /^\/api\/(wago|matter|shelly|rabbitmq|reservations)(\/|$)/.test(tool.path))).toEqual(
-      [],
-    );
+    expect(
+      tools.filter((tool) => /^\/api\/(wago|matter|shelly|rabbitmq|reservations|status-wall)(\/|$)/.test(tool.path)),
+    ).toEqual([]);
   });
 });

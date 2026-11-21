@@ -32,6 +32,11 @@ export const checks = {
     ['-p', 'apps/plugins/reservations/backend/tsconfig.json'],
     ['-p', 'apps/plugins/reservations/tsconfig.spec.json', '--module', 'esnext', '--moduleResolution', 'bundler'],
   ],
+  'apps/plugins/status-wall': [
+    ['-p', 'apps/plugins/status-wall/backend/tsconfig.json'],
+    ['-p', 'apps/plugins/status-wall/frontend/tsconfig.json'],
+    ['-p', 'apps/plugins/status-wall/tsconfig.spec.json', '--module', 'esnext', '--moduleResolution', 'bundler'],
+  ],
   'apps/plugins/wago': [
     ['-p', 'apps/plugins/wago/tsconfig.spec.json'],
     ['-p', 'apps/plugins/wago/acceptance/tsconfig.json'],
