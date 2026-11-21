@@ -115,7 +115,7 @@ namespace SessionOccupancy
         for (const auto &session : sessions)
         {
             if (ownSessionId != 0 && session.id == ownSessionId) continue;
-            std::string name = detail::oneLine(session.username);
+            std::string name = detail::oneLine(session.displayName[0] != '\0' ? session.displayName : session.username);
             if (!name.empty()) names.push_back(Text::literal(std::move(name)) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */);
         }
         if (sessions.empty() || names.empty())
