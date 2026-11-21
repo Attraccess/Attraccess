@@ -64,4 +64,4 @@ The web interface at `http://your-server:8025` shows all sent emails.
 
 - [First-Time Setup](setup/first-time-setup.md)
 - [Email Templates](setup/email-templates.md)
-- [Environment Variables](installation/environment-variables.md)
+- [Settings](settings/overview.md)

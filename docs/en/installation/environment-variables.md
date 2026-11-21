@@ -1,6 +1,6 @@
 # Environment Variables
 
-<!-- llms-description: Reference of all environment variables that configure Attraccess: required settings, application, logging, database, backup, storage, SMTP and TLS. -->
+<!-- llms-description: Reference of all environment variables that configure Attraccess: required settings, application, logging, database, backup, storage and TLS. -->
 
 All configuration options for Attraccess that can be set via environment variables.
 
@@ -16,7 +16,7 @@ All configuration options for Attraccess that can be set via environment variabl
 | Variable                         | Default                  | Description                                                                                                                                                                                                                                                                            |
 | -------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ATTRACCESS_URL`                 | –                        | Main application URL. It is an [approved website](settings/security.md#approved-websites).                                                                                                                                                                                             |
-| `ATTRACCESS_PUBLIC_INTERNET_URL` | –                        | Public URL for external callbacks (e.g. SumUp payments). Only needed if different from `ATTRACCESS_URL`.                                                                                                                                                                               |
+| `ATTRACCESS_PUBLIC_INTERNET_URL` | –                        | Public address, if it differs from `ATTRACCESS_URL`. It is an [approved website](settings/security.md#approved-websites). Payment callbacks (SumUp) use **Public Internet URL** under Settings → Application Settings instead.                                                         |
 | `ATTRACCESS_FRONTEND_URL`        | –                        | Address of a separately served frontend. It is an [approved website](settings/security.md#approved-websites) and is used for SSO logout returns.                                                                                                                                       |
 | `ATTRACCESS_TRUSTED_ORIGINS`     | –                        | Comma-separated list of additional [approved websites](settings/security.md#approved-websites), as exact origins such as `https://portal.example.com`. No wildcards, no paths. Invalid entries are logged and skipped.                                                                 |
 | `LOG_LEVELS`                     | `error,warn,log`         | Comma-separated log levels: `error`, `warn`, `log`, `debug`, `verbose`                                                                                                                                                                                                                 |

@@ -282,8 +282,8 @@ in Attraccess.
 - Das Öffnen des Links ändert nichts. Die Seite fragt in einem Dialog nach Ihrer Bestätigung, bevor sie die Buchung
   behält oder storniert.
 
-Die Links in E-Mails werden aus der öffentlichen URL der Anwendung (`backend_url`) gebildet, die konfiguriert sein
-muss, wie bei jeder Attraccess-E-Mail; siehe [Umgebungsvariablen](installation/environment-variables.md).
+Die Links in E-Mails werden aus der **Anwendungs-URL** gebildet, die konfiguriert sein muss, wie bei jeder
+Attraccess-E-Mail; siehe [Einstellungen → Anwendungseinstellungen](settings/overview.md#anwendungseinstellungen).
 
 ## Kalender-Feeds (iCal)
 

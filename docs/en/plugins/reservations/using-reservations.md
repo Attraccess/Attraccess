@@ -262,8 +262,8 @@ Action links in emails ("Keep", "Cancel") are plain links to `/reservations/<id>
 - Opening the link changes nothing. The page asks for your confirmation in a dialog before it keeps or cancels
   the booking.
 
-The links in emails are built from the application's public URL (`backend_url`), which has to be configured, as for
-every Attraccess email; see [Environment variables](installation/environment-variables.md).
+The links in emails are built from the **Application URL**, which has to be configured, as for every Attraccess email;
+see [Settings → Application Settings](settings/overview.md#application-settings).
 
 ## Calendar feeds (iCal)
 

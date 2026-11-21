@@ -30,7 +30,7 @@ You can configure both models on the same resource. In that case, the user is ch
 Attraccess supports **SumUp** as a payment provider. When SumUp is configured, users can purchase credits through the application.
 
 > [!NOTE]
-> SumUp integration requires the `ATTRACCESS_PUBLIC_INTERNET_URL` environment variable to be set if your public URL differs from the internal `ATTRACCESS_URL`. See [Environment Variables](installation/environment-variables.md).
+> SumUp sends its payment callbacks to the **Public Internet URL** under [Settings → Application Settings](settings/overview.md#application-settings); SumUp gets a callback address only when that URL starts with `https://`.
 
 ## Required Permission
 
