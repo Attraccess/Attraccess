@@ -26,6 +26,7 @@ import { SupervisionRequestDto } from './dtos/supervisionRequest.dto';
 import { SupervisionDecisionResponseDto } from './dtos/supervisionDecision.response.dto';
 
 import { randomUUID } from 'crypto';
+import { formatUserDisplayName } from '@attraccess/shared';
 
 import { PreStartService } from '../usage/pre-start/pre-start.service';
 
@@ -118,6 +119,7 @@ export class SupervisionService {
       resourceId: request.resourceId,
       requesterUserId: request.requester.id,
       requesterUsername: request.requester.username,
+      requesterDisplayName: formatUserDisplayName(request.requester),
       // For reader requests (no single named supervisor) report the recipient so the web popup
       // shows up consistently for whoever received it.
       supervisorUserId: request.supervisorUserId ?? recipientSupervisorId,
@@ -174,7 +176,11 @@ export class SupervisionService {
       });
       // Reader-originated requests surface the result to the reader websocket; the session was just
       // started here (the web popup won the race against an on-reader card tap).
-      request.readerCallbacks?.onResolved(session, { id: supervisor.id, username: supervisor.username });
+      request.readerCallbacks?.onResolved(session, {
+        id: supervisor.id,
+        username: supervisor.username,
+        displayName: formatUserDisplayName(supervisor),
+      });
       this.emitToEligible(request, SupervisionLiveEventType.RESOLVED);
       return session;
     } catch (error) {

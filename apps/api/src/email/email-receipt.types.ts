@@ -56,7 +56,7 @@ export interface InvitedProject {
 
 export interface ProjectInvitationDetails {
   id: number;
-  inviter?: { username: string; email: string } | null;
+  inviter?: { username: string; firstName?: string | null; lastName?: string | null; email: string } | null;
   requestedRole: string;
 }
 

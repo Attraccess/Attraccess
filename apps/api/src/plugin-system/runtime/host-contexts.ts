@@ -60,7 +60,13 @@ const HOST_DATA_METHODS: { [K in keyof PluginHostDataContext]: Record<keyof Plug
     countUnhealthyEntries: true,
     listIntroducerUserIds: true,
   },
-  users: { getUsernames: true, getLocales: true, isActive: true, listIdsWithAnyPermission: true },
+  users: {
+    getUsernames: true,
+    getDisplayNames: true,
+    getLocales: true,
+    isActive: true,
+    listIdsWithAnyPermission: true,
+  },
   settings: { getApp: true },
   flows: { findNodes: true },
 };

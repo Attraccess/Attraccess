@@ -44,6 +44,7 @@ describe('AttractapCardHandler', () => {
             type: AttractapEventType.CARD_AUTHENTICATION_DATA,
             payload: expect.objectContaining({
               username: handleCardAuthenticationRequestScope.activeCard.user.username,
+              displayName: 'Grace Hopper',
               language: 'en',
             }),
           }),
@@ -223,6 +224,7 @@ describe('AttractapCardHandler', () => {
             type: AttractapEventType.CARD_AUTHENTICATION_DATA,
             payload: {
               username: handleCardAuthenticationRequestScope.activeCard.user.username,
+              displayName: 'Grace Hopper',
               language: 'en',
               cardSessionId: socket.state.cardSession.id,
               languageFallback: true,

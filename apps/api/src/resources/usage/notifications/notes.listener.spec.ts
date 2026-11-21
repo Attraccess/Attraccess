@@ -61,6 +61,22 @@ describe('ResourceUsageNoteNotificationListener', () => {
     expect(request.body(enUser)).toBe('alice: Bed needs leveling');
   });
 
+  it('names the note author by display name in the push text and the email', async () => {
+    recipients.findIntroducerUsers.mockResolvedValue([{ id: 3, email: 'intro@example.com' }]);
+
+    await listener.handleNoteAdded(
+      new ResourceUsageNoteAddedEvent(RESOURCE_ID, 'Bed needs leveling', 'end', {
+        id: AUTHOR_ID,
+        username: 'alice',
+        firstName: 'Alice',
+        lastName: null,
+      }),
+    );
+
+    const request = notifications.dispatch.mock.calls[0][0];
+    expect(request.body({ locale: 'en' })).toBe('Alice: Bed needs leveling');
+  });
+
   it('skips users without an email', async () => {
     recipients.findIntroducerUsers.mockResolvedValue([{ id: 3, email: null }]);
 

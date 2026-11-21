@@ -43,7 +43,7 @@ const paragraph = ([key, en, , condition]: Paragraph): string =>
   wrap(condition, `<mj-text padding="0 0 12px 0">${tCall(key, en)}</mj-text>`);
 
 function body(spec: TemplateSpec): string {
-  const greeting = `<mj-text padding="0 0 12px 0">{{t "greeting" "${GREETING.en}" name=user.username}}</mj-text>`;
+  const greeting = `<mj-text padding="0 0 12px 0">{{t "greeting" "${GREETING.en}" name=user.displayName}}</mj-text>`;
   const buttons = (spec.buttons ?? []).map((b) =>
     wrap(
       b.condition,

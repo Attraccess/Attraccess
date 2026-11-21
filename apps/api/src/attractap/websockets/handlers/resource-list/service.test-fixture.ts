@@ -46,7 +46,7 @@ export function registerResourceListServiceFixture() {
           separateUnlockAndUnlatch: true,
           description: 'A printer',
           allowTakeOver: false,
-          introducers: [{ user: { username: 'introducer-a' } }],
+          introducers: [{ user: { username: 'introducer-a', firstName: 'Ina', lastName: 'Tutor' } }],
         },
       ],
       ...overrides,
@@ -79,11 +79,22 @@ export function registerResourceListServiceFixture() {
     resourceHealthService = { listForResources: jest.fn().mockResolvedValue(new Map([[10, []]])) };
     resourceFlowsService = { getNodesForResources: jest.fn().mockResolvedValue(new Map([[10, []]])) };
     resourceIntroducersService = {
-      getManyForResources: jest.fn().mockResolvedValue(new Map([[10, [{ user: { username: 'introducer-a' } }]]])),
+      getManyForResources: jest
+        .fn()
+        .mockResolvedValue(
+          new Map([[10, [{ user: { username: 'introducer-a', firstName: 'Ina', lastName: 'Tutor' } }]]]),
+        ),
       canMaintain: jest.fn().mockResolvedValue(false),
     };
 
-    (service as any).usersService = { findOne: jest.fn(async ({ id }) => ({ id, username: `user-${id}` })) };
+    (service as any).usersService = {
+      findOne: jest.fn(async ({ id }) => ({
+        id,
+        username: `user-${id}`,
+        firstName: id === 1 ? 'Una' : null,
+        lastName: id === 1 ? 'User' : null,
+      })),
+    };
     (service as any).readerTimeZone = readerTimeZoneStub();
     (service as any).rbacService = { getEffectivePermissions: jest.fn().mockResolvedValue(new Set()) };
     (service as any).websocketService = websocketService;

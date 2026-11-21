@@ -1,3 +1,4 @@
+import { formatUserDisplayName } from '@attraccess/shared';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ResourceFlowNodeType } from '@attraccess/application-models';
@@ -75,7 +76,13 @@ export class FlowEventTriggersService {
           status: request.status,
           createdAt: request.createdAt.toISOString(),
           createdByUser: request.createdByUser
-            ? { id: request.createdByUser.id, username: request.createdByUser.username }
+            ? {
+                id: request.createdByUser.id,
+                username: request.createdByUser.username,
+                firstName: request.createdByUser.firstName ?? null,
+                lastName: request.createdByUser.lastName ?? null,
+                displayName: formatUserDisplayName(request.createdByUser),
+              }
             : null,
         },
       });

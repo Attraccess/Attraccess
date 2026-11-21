@@ -2,7 +2,7 @@
   "label": "Benutzer",
   "chooseUser": "Benutzer auswählen",
   "modalTitle": "Benutzer auswählen",
-  "searchPlaceholder": "Nach Benutzername oder E-Mail suchen",
+  "searchPlaceholder": "Nach Name, Benutzername oder E-Mail suchen",
   "usersListLabel": "Benutzer",
   "clear": "Auswahl entfernen",
   "resultCount": {

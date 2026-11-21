@@ -47,6 +47,7 @@ describe('AttractapMassIntroductionHandler', () => {
       sessionId: SESSION_ID,
       targetName: 'Laser',
       introducerUsername: 'tutor',
+      introducerDisplayName: 'Tia Tutor',
       expiresAt: new Date(Date.now() + 60_000),
     });
   const event = (payload: unknown) => ({ type: AttractapEventType.MASS_INTRODUCTION_CANCEL, payload });
@@ -63,9 +64,10 @@ describe('AttractapMassIntroductionHandler', () => {
     };
     // The card proof is covered by card-relay.spec.ts and card-pending-records.spec.ts.
     cardOperations = {
-      verifyCard: jest
-        .fn()
-        .mockResolvedValue({ ok: true, card: { isActive: true, user: { id: 7, username: 'alice' } } }),
+      verifyCard: jest.fn().mockResolvedValue({
+        ok: true,
+        card: { isActive: true, user: { id: 7, username: 'alice', firstName: 'Alice', lastName: 'Liddell' } },
+      }),
     };
     websocketService = { sockets: new Map() };
     resourceUsageService = { getActiveSession: jest.fn().mockResolvedValue(null) };
@@ -100,7 +102,12 @@ describe('AttractapMassIntroductionHandler', () => {
       const [start] = sent(socket);
       expect(start.type).toBe(AttractapEventType.MASS_INTRODUCTION_START);
       expect(start.payload).toEqual(
-        expect.objectContaining({ sessionId: SESSION_ID, targetName: 'Laser', introducerUsername: 'tutor' }),
+        expect.objectContaining({
+          sessionId: SESSION_ID,
+          targetName: 'Laser',
+          introducerUsername: 'tutor',
+          introducerDisplayName: 'Tia Tutor',
+        }),
       );
       expect(start.payload.remainingMs).toBeGreaterThan(0);
     });
@@ -236,6 +243,7 @@ describe('AttractapMassIntroductionHandler', () => {
             sessionId: SESSION_ID,
             success: true,
             username: 'alice',
+            displayName: 'Alice Liddell',
             alreadyIntroduced: false,
             participantCount: 1,
           },
@@ -244,6 +252,8 @@ describe('AttractapMassIntroductionHandler', () => {
       expect(massIntroductionService.redeemCard).toHaveBeenCalledWith(SESSION_ID, READER_ID, {
         id: 7,
         username: 'alice',
+        firstName: 'Alice',
+        lastName: 'Liddell',
       });
     });
 

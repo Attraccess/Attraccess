@@ -9,6 +9,9 @@ describe('DualAuthGuard', () => {
   const mockUser: PluginUserModel = {
     id: 1,
     username: 'testuser',
+    firstName: null,
+    lastName: null,
+    displayName: 'testuser',
     locale: 'en',
     isDisabled: false,
   };

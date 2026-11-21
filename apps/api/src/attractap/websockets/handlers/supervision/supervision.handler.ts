@@ -1,3 +1,4 @@
+import { formatUserDisplayName } from '@attraccess/shared';
 import { SupervisionMode } from '@attraccess/application-models';
 
 import {
@@ -132,7 +133,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
       await this.approveWebRequest(socket, socket.state.supervisionFlow, asCoreUser(nfcCard.user));
       return;
     }
-    await reply({ username: nfcCard.user.username });
+    await reply({ username: nfcCard.user.username, displayName: formatUserDisplayName(nfcCard.user) });
   }
 
   /**
@@ -241,6 +242,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
               success: true,
               resourceId,
               supervisorUsername: supervisor.username,
+              supervisorDisplayName: formatUserDisplayName(supervisor),
             }),
           );
         },
@@ -268,7 +270,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
       approvedSupervisorUserId: null,
     };
 
-    const supervisorNames = await this.getSupervisorNames(eligibleSupervisorIds);
+    const { supervisorNames, supervisorDisplayNames } = await this.getSupervisorNames(eligibleSupervisorIds);
 
     await socket.sendMessage(
       new AttractapEvent(AttractapEventType.SUPERVISION_REQUEST, {
@@ -277,6 +279,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
         expiresAt: expiresAt.toISOString(),
         timeoutMs: SupervisionService.APPROVAL_TTL_MS,
         supervisorNames,
+        supervisorDisplayNames,
       }),
     );
   }
@@ -364,6 +367,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
               requestId,
               resourceId,
               requesterUsername: requester.username,
+              requesterDisplayName: formatUserDisplayName(requester),
               timeoutMs: SupervisionService.APPROVAL_TTL_MS,
             }),
           )
@@ -398,19 +402,29 @@ export class AttractapSupervisionHandler implements OnModuleInit {
 
     return {
       onResolved: (_session, supervisor) =>
-        notifyReader({ success: true, resourceId, supervisorUsername: supervisor.username }),
+        notifyReader({
+          success: true,
+          resourceId,
+          supervisorUsername: supervisor.username,
+          supervisorDisplayName: formatUserDisplayName(supervisor),
+        }),
       onFailed: (error) => notifyReader({ success: false, resourceId, error: error?.message ?? 'SUPERVISION_FAILED' }),
     };
   }
 
-  protected async getSupervisorNames(supervisorIds: number[]): Promise<string[]> {
-    const names: string[] = [];
+  /** The eligible supervisors for the reader's list: usernames (identity) and, in the same order, display names. */
+  protected async getSupervisorNames(
+    supervisorIds: number[],
+  ): Promise<{ supervisorNames: string[]; supervisorDisplayNames: string[] }> {
+    const supervisorNames: string[] = [];
+    const supervisorDisplayNames: string[] = [];
     for (const id of supervisorIds) {
       const user = await this.usersService.findOne({ id });
       if (user) {
-        names.push(user.username);
+        supervisorNames.push(user.username);
+        supervisorDisplayNames.push(formatUserDisplayName(user));
       }
     }
-    return names;
+    return { supervisorNames, supervisorDisplayNames };
   }
 }

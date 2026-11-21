@@ -1,4 +1,4 @@
-import { getSupportedDeviceLanguage } from '@attraccess/shared';
+import { formatUserDisplayName, getSupportedDeviceLanguage } from '@attraccess/shared';
 import { SupervisionMode } from '@attraccess/application-models';
 
 import { SettingsService } from '../../../../settings/settings.service';
@@ -168,6 +168,7 @@ export class AttractapCardHandler {
 
     await reply({
       username: nfcCard.user.username,
+      displayName: formatUserDisplayName(nfcCard.user),
       language,
       cardSessionId: cardSession.id,
       languageFallback: !getSupportedDeviceLanguage(nfcCard.user.locale),
@@ -255,7 +256,10 @@ export class AttractapCardHandler {
 
     try {
       await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.RESET_NFC_CARD, { username: nfcCard.user.username }),
+        new AttractapEvent(AttractapEventType.RESET_NFC_CARD, {
+          username: nfcCard.user.username,
+          displayName: formatUserDisplayName(nfcCard.user),
+        }),
       );
     } catch (error) {
       if (socket.state.resetNfcCardData === reset) socket.state.resetNfcCardData = null;
@@ -350,6 +354,7 @@ export class AttractapCardHandler {
         const delivered = await socket.sendMessage(
           new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO, {
             username: user.username,
+            displayName: formatUserDisplayName(user),
           }),
         );
         if (!delivered && socket.state.enrollment === enrollment) socket.state.enrollment = null;

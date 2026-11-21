@@ -106,6 +106,15 @@ describe('SupervisionService', () => {
     expect(expiredEvent).toBeDefined();
   });
 
+  it('reports the requester with the username and the display name', async () => {
+    await fixture.createRequest();
+
+    expect(fixture.service.listPendingForSupervisor(2)[0]).toMatchObject({
+      requesterUsername: 'requester',
+      requesterDisplayName: 'requester',
+    });
+  });
+
   it('rejects approval from someone other than the requested supervisor', async () => {
     const { requestId } = await fixture.createRequest();
     const stranger = { id: 3, username: 'stranger' } as SupervisionUser;
@@ -182,7 +191,11 @@ describe('SupervisionService', () => {
         },
       );
       expect(session).toBe(fixture.startedSession);
-      expect(onResolved).toHaveBeenCalledWith(fixture.startedSession, { id: 3, username: 'other' });
+      expect(onResolved).toHaveBeenCalledWith(fixture.startedSession, {
+        id: 3,
+        username: 'other',
+        displayName: 'other',
+      });
       const resolvedTargets = fixture.live.emitToSupervisor.mock.calls
         .filter((c) => c[1].type === SupervisionLiveEventType.RESOLVED && c[1].requestId === requestId)
         .map((c) => c[0]);
@@ -218,7 +231,11 @@ describe('SupervisionService', () => {
         },
       );
       expect(session).toBe(fixture.startedSession);
-      expect(onResolved).toHaveBeenCalledWith(fixture.startedSession, { id: 9, username: 'new-introducer' });
+      expect(onResolved).toHaveBeenCalledWith(fixture.startedSession, {
+        id: 9,
+        username: 'new-introducer',
+        displayName: 'new-introducer',
+      });
     });
 
     it('settleByCard closes the web popups without starting a session again', () => {
@@ -309,6 +326,7 @@ describe('SupervisionService', () => {
       expect(readerCallbacks.onResolved).toHaveBeenCalledWith(fixture.startedSession, {
         id: 2,
         username: 'supervisor',
+        displayName: 'supervisor',
       });
     });
 

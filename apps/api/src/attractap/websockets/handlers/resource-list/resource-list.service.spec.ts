@@ -68,6 +68,8 @@ describe('ResourceListService', () => {
       await fixture.service.sendResourceList(42);
       const payload = (socket: any) => socket.sendMessage.mock.calls[0][0].data.payload;
       expect(payload(a).authenticatedUsername).toBe('user-1');
+      expect(payload(a).authenticatedDisplayName).toBe('Una User');
+      expect(payload(b).authenticatedDisplayName).toBe('user-2');
       expect(payload(b).authenticatedUsername).toBe('user-2');
       expect(payload(c)).toBe(payload(a));
       expect(payload(a).resources[0]).toMatchObject({ hasIntroduction: true, requiresSupervisor: false });
@@ -230,7 +232,9 @@ describe('ResourceListService', () => {
       const startTime = new Date('2026-06-04T10:00:00.000Z');
       fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
       fixture.resourceUsageService.getActiveSessions.mockResolvedValue(
-        new Map([[10, [{ id: 99, user: { username: 'active-user' }, startTime }]]]),
+        new Map([
+          [10, [{ id: 99, user: { username: 'active-user', firstName: 'Ada', lastName: 'Active' }, startTime }]],
+        ]),
       );
       fixture.resourceMaintenanceService.getActiveMaintenanceResourceIds.mockResolvedValue(new Set([10]));
       fixture.resourceFlowsService.getNodesForResources.mockResolvedValue(
@@ -271,6 +275,7 @@ describe('ResourceListService', () => {
                   description: 'A printer',
                   allowTakeOver: false,
                   introducers: ['introducer-a'],
+                  introducerDisplayNames: ['Ina Tutor'],
                   isUnderMaintenance: true,
                   isHealthy: true,
                   healthReason: '',
@@ -280,14 +285,14 @@ describe('ResourceListService', () => {
                   ownUsageSession: null,
                   activeUsageSession: {
                     id: 99,
-                    user: { username: 'active-user' },
+                    user: { username: 'active-user', displayName: 'Ada Active' },
                     startTime: startTime.toISOString(),
                     startTimeUtcOffsetMinutes: -startTime.getTimezoneOffset() || 0,
                   },
                   activeUsageSessions: [
                     {
                       id: 99,
-                      user: { username: 'active-user' },
+                      user: { username: 'active-user', displayName: 'Ada Active' },
                       startTime: startTime.toISOString(),
                       startTimeUtcOffsetMinutes: -startTime.getTimezoneOffset() || 0,
                     },
