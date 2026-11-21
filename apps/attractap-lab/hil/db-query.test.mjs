@@ -7,12 +7,15 @@ import { fileURLToPath } from 'node:url';
 
 const DB_QUERY = fileURLToPath(new URL('./db-query.mjs', import.meta.url));
 const server = process.env.TEST_DATABASE_URL;
-const skip = server ? false : 'TEST_DATABASE_URL is not set';
+// CI always has a test database: there a missing TEST_DATABASE_URL fails the tests instead of skipping them.
+const skip = server || process.env.CI ? false : 'TEST_DATABASE_URL is not set';
 
 function query(sql, params = []) {
   const done = spawnSync(process.execPath, [DB_QUERY], {
     input: JSON.stringify({ sql, params }),
     encoding: 'utf8',
+    // A server that accepts the connection but never answers would otherwise hang the run.
+    timeout: 30_000,
     env: { ...process.env, DATABASE_URL: server },
   });
   return { status: done.status, stderr: done.stderr, answer: done.status === 0 ? JSON.parse(done.stdout) : null };

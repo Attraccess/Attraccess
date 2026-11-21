@@ -9,6 +9,7 @@ import { postgresProvider, toPositionalParameters } from '../../api/scripts/lib/
 
 // bigint (int8: bigint columns, COUNT) arrives as a number, as the API reads it (database/postgres/postgres-connection.ts);
 // pg's default is a string, which no test compares equal to the number it expects. Beyond 2^53 it fails loudly.
+// bigint arrays (int8[]) stay arrays of strings, as in the API; no HIL test reads one.
 pg.types.setTypeParser(pg.types.builtins.INT8, (text) => {
   const value = Number(text);
   if (!Number.isSafeInteger(value)) throw new RangeError(`bigint ${text} exceeds the safe integer range`);
