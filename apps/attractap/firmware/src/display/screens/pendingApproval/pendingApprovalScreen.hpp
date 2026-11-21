@@ -32,6 +32,7 @@ private:
     void resetShown();
     void updateQrCode(const std::string &url);
     void showQrCode(bool visible);
+    void fitQrCanvas(int32_t px);
 
     enum class View : uint8_t
     {
@@ -54,6 +55,7 @@ private:
     std::string shownCode;
     uint32_t shownSeconds = 0;
     std::string qrUrl;
+    int32_t qrCanvasPx = 0;
     // While a Bluetooth setup window is open (ATT-1371).
     BtSetupStatus bluetoothSetupStatus;
     Logger logger;

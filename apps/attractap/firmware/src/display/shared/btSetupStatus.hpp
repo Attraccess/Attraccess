@@ -36,6 +36,9 @@ public:
 
     void forget() { label = nullptr; }
 
+    // The status takes two lines while a window is open; a screen short of room can lay itself out tighter then.
+    bool visible() const { return label && !lv_obj_has_flag(label, LV_OBJ_FLAG_HIDDEN); }
+
     void update()
     {
         if (!label) return;
