@@ -2,14 +2,14 @@
 // FEATURE: application-form-flow
 
 #include "application.hpp"
+#include "form_request_gate.hpp"
 #include <string>
 
 #ifdef HAS_LVGL_DISPLAY
 void Application::handleFormsRequest(
     const API::ResourceUsageFormRequest &request) {
-  // The server retries un-acked messages (RETRY_COUNT in the gateway). A duplicate
-  // RESOURCE_USAGE_FORM_REQUEST must not reset an in-progress form, nor reopen one
-  // that was already submitted while the START/STOP result is in flight (ATT-545).
+  // Duplicates and retries must not reset or reopen a form; the request for a
+  // re-sent action is the next batch of forms (see form_request_gate.hpp).
   API::ResourceUsageFormActionType expectedAction =
       API::ResourceUsageFormActionType::UNKNOWN;
   if (this->pendingActionType == PENDING_ACTION_START_SESSION) {
@@ -19,12 +19,19 @@ void Application::handleFormsRequest(
   } else if (this->pendingActionType == PENDING_ACTION_STOP_SESSION) {
     expectedAction = API::ResourceUsageFormActionType::END;
   }
-  if (!this->api.isCurrentResourceAction(request.requestId) || this->hasPendingFormRequest || this->formFlowSubmitted ||
-      this->pendingActionType == PENDING_ACTION_NONE ||
-      request.resourceId != this->pendingActionResourceId ||
-      request.action != expectedAction) {
+  const FormRequestGate::State gate{
+      this->api.isCurrentResourceAction(request.requestId),
+      this->pendingActionType != PENDING_ACTION_NONE,
+      request.resourceId == this->pendingActionResourceId && request.action == expectedAction,
+      this->hasPendingFormRequest,
+      this->formFlowSubmitted,
+      request.requestId,
+      this->pendingFormRequest.requestId,
+  };
+  if (!FormRequestGate::accepts(gate)) {
     return;
   }
+  this->formFlowSubmitted = false;
   // This runs on the LVGL thread, which owns all pending-action state.
   this->pendingFormRequest = request;
   this->pendingFormRequestResourceId = request.resourceId;
