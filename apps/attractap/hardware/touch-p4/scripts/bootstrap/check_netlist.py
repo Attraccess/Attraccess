@@ -17,6 +17,7 @@ I2C_ADDRESS = {
     'TCA9554PWR': lambda net: (0x20 + sum(1 << bit for bit, pin in enumerate('123') if net(pin) == '+3V3'),),
     'PN5321A3HN/C106': lambda net: (0x24,),
     'LCD 40P 0.5mm': lambda net: (0x5D, 0x14),      # GT911 on the panel: one of the two, set by TP_INT at reset
+    'LIS2DH12TR': lambda net: (0x18 if net('3') == 'GND' else 0x19,),    # SA0: pulled up unless grounded
 }
 I2C_STRAPS = {'TCA9554PWR': '123'}                  # address pins: each must be tied to GND or +3V3
 

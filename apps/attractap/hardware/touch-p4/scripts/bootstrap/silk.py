@@ -23,12 +23,13 @@ URL = 'github.com/Attraccess/Attraccess'
 LINE = 0.15
 ALIGN = {'l': pcbnew.GR_TEXT_H_ALIGN_LEFT, 'c': pcbnew.GR_TEXT_H_ALIGN_CENTER, 'r': pcbnew.GR_TEXT_H_ALIGN_RIGHT}
 
-# Test points: label and where it goes ('r': right of the pad, 'b': below it, 'a': above it).
+# Test points: label and where it goes ('r': right of the pad, 'l': left of it, 'b': below it, 'a': above it).
 TEST_POINTS = {
     'TP801': ('5V', 'r'), 'TP802': ('3V3', 'r'), 'TP803': ('VDD_HP', 'r'), 'TP804': ('GND', 'b'),
     'TP805': ('GND', 'b'),
     'TP806': ('EN', 'r'), 'TP807': ('BOOT', 'r'), 'TP808': ('TX0', 'r'), 'TP809': ('RX0', 'r'),
     'TP810': ('EN', 'a'), 'TP811': ('BOOT', 'b'), 'TP812': ('TX', 'a'), 'TP813': ('RX', 'b'),
+    'TP814': ('INT', 'l'),
 }
 
 
@@ -200,8 +201,8 @@ def component_side(S):
     # ---- test points, in groups
     for ref, (label, where) in TEST_POINTS.items():
         x, y = unV(B.fp[ref].GetPosition())
-        if where == 'r':
-            S.text(label, x + 1.7, y, align='l')
+        if where in 'rl':
+            S.text(label, x + (1.7 if where == 'r' else -1.7), y, align='l' if where == 'r' else 'r')
         else:
             S.text(label, x, y + (1.8 if where == 'b' else -1.8), 0.9)
     S.text('C6', 10.4, 11.2, 0.9, tag=True)
@@ -215,8 +216,12 @@ def component_side(S):
     S.text('HOLD BOOT, TAP RST:', 1.3, 34.2, 0.9, align='l')
     S.text('DOWNLOAD MODE', 1.3, 35.8, 0.9, align='l')
     # ---- a field for a serial number or a note
-    S.text('S/N', 4.0, 38.4, 0.9, align='l')
-    S.field(4.0, 39.4, 22.0, 44.4)
+    S.text('S/N', 16.0, 40.0, 0.9, align='l')
+    S.field(16.0, 41.0, 28.0, 46.0)
+    # ---- tamper sensors
+    hx, hy = G.HALL
+    S.text('DOCK', hx, hy + 2.75, 0.9)
+    S.text('ACCEL', 6.0, 45.4, 0.9)
     # ---- connectors
     S.text('USB-C', 82.3, 9.2)
     S.text('SERVICE', 82.3, 10.9, 0.9)

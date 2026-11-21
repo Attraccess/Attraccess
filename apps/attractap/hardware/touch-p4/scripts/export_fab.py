@@ -46,6 +46,8 @@ COPPER = 'F.Cu,In1.Cu,In2.Cu,B.Cu'
 # changes.
 JLC_ROTATION = {
     ('Package_TO_SOT_SMD:SOT-23', 'C20917'): 180,          # KiCad draws pin 3 on the right, the library on the left
+    ('Package_TO_SOT_SMD:SOT-23', 'C140921'): 180,         # the hall switch: the same
+    ('Package_LGA:LGA-12_2x2mm_P0.5mm', 'C110926'): 270,   # accelerometer: the library starts pin 1 on another side
     ('Resistor_SMD:R_Array_Convex_4x0402', 'C25501'): 90,  # KiCad: pads in two columns, library: in two rows
     # The footprint is the one of the NXP PN532 (C28925). The library footprint of the Tokmas part is
     # drawn a quarter turn on from it.

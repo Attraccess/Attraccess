@@ -57,7 +57,9 @@ as the schematic (`P4_GPIO` in `scripts/bootstrap/circuit_core.py`).
 | P2 | LCD_SDA | out |
 | P3 | LCD_RST | out |
 | P4 | ETH_RST_N | out, low = PHY in reset. Must be pulsed low, see "Ethernet" below |
-| P5 to P7 | unused | |
+| P5 | unused | |
+| P6 | DOCK_N | in: low while the reader is on its dock (hall switch U703), see "Tamper detection" below |
+| P7 | unused | |
 
 All expander pins are inputs with weak pull-ups after power-up.
 
@@ -67,6 +69,7 @@ All expander pins are inputs with weak pull-ups after power-up.
 |---|---|---|
 | I2C0 (GPIO1/2) | GT911 touch | 0x5D or 0x14 (chosen by INT level at reset) |
 | I2C0 | TCA9554 | 0x20 |
+| I2C0 | LIS2DH12 accelerometer | 0x19 |
 | I2C1 (GPIO51/52) | PN532 | 0x24 |
 
 The PN532 has a bus of its own. Its address is fixed at 0x24, and on the
@@ -88,6 +91,29 @@ longer delays touch polling.
 `scripts/bootstrap/check_netlist.py` reads the schematic and prints the devices
 and addresses on each I2C bus. It fails when two devices on one bus share an
 address or when a device has no entry in its address table.
+
+## Tamper detection
+
+The board has two sensors for this and the firmware does not use them yet.
+
+- **Hall switch U703 (DRV5032FA)** on IO expander pin P6, net `DOCK_N`. Leave
+  P6 an input. It reads 0 while the magnet in the dock is in front of the
+  switch and 1 when the reader is off the dock. The switch samples its field
+  20 times a second, so reading the expander's input register a few times a
+  second is enough. The expander's interrupt output is not connected.
+- **Accelerometer U702 (LIS2DH12)** on I2C0 at 0x19 (`WHO_AM_I`, register
+  0x0F, reads 0x33). Its interrupt sources latch (bit `LIR` in `CTRL_REG5`), so
+  the firmware can poll `INT1_SRC` and `CLICK_SRC` and needs no interrupt pin.
+  INT1 is on test point TP814 for the bench. The two sources worth setting up:
+  the click detection for knocks, and the 6D or activity function against the
+  direction of gravity stored at installation, for the reader being swung open
+  or pulled off.
+- The buzzer shakes the board at 2.7 kHz: ignore the accelerometer while it
+  sounds and for a few milliseconds after.
+- A reader on the desk stand gets moved; the tilt alarm should be a setting.
+- A reader without a dock magnet reads `DOCK_N` = 1 all the time. The firmware
+  cannot tell that from a removed reader, so the dock state should only count
+  once it has been seen as 0.
 
 ## What changes compared with the ESP32-S3 firmware
 

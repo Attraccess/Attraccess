@@ -32,6 +32,7 @@ One reader needs five printed parts for the wall, six for the desk. The print fi
 | M3 × 8 countersunk screw, ideally Torx with pin | 2 | Lock screws, from below |
 | Double-sided tape, 0.3 mm thick | 3 strips | Display glass to frame |
 | Polyimide tape (Kapton), 25 mm wide | 30 mm | Back of the display, over the Ethernet jack's solder pins (Ethernet version) |
+| Neodymium disc magnet, 10 mm across, 3 mm thick | 1 | Ring on the dock's inner face. The reader senses it and knows when it is taken off the dock |
 | Countersunk wall screw, 4 mm shank, head up to 8.6 mm, with plugs | 3 to 5 | Dock to wall |
 | Cable tie, 2.5 mm wide, about 100 mm long | 1 per cable | Strain relief, only for a cable that leaves through the bottom notch or on the desk stand |
 | M3 heat-set insert, standard (5.7 mm long) | 4 | Stand (desk only) |
@@ -43,7 +44,7 @@ The PCB screws are M3 × 4. Earlier parts lists said M3 × 6, but since the scre
 
 ## Prepare the printed parts
 
-Six inserts go into the cap, then the two LED diffusers. Do all hot work before any electronics are on the bench.
+Six inserts go into the cap, the magnet into the dock, then the two LED diffusers into the cap. Do all hot work before any electronics are on the bench.
 
 ![Cap lying face-down with four short inserts above the PCB bosses, two standard inserts in front of the bottom wall, and the two saddles for cable ties marked](02-inserts.png)
 
@@ -55,7 +56,8 @@ The short inserts go straight down into the bosses. The two standard ones enter 
 4. Stand the cap on its top edge, bottom wall up. Put a standard insert on the iron tip, pass it through one of the two round holes in the bottom wall and across the slot, and press it into the lock bar until it is flush. Repeat for the second hole.
 5. Check that nothing sticks out into the slot between bottom wall and lock bar. The dock's tongue has to slide in there.
 6. Let everything cool, then run an M3 screw through each insert once.
-7. Drop the two LED diffusers into the cap from behind: the four pills into the four light windows, the side with the four funnels facing you. One row sits above the card target, one below. They stay loose until the PCB holds them.
+7. Put a drop of superglue into the ring on the dock's inner face and press the magnet in, either side up. It must not stand above the ring.
+8. Drop the two LED diffusers into the cap from behind: the four pills into the four light windows, the side with the four funnels facing you. One row sits above the card target, one below. They stay loose until the PCB holds them.
 
 ## Assemble the reader
 
@@ -193,6 +195,7 @@ Nothing below has been checked on real parts. Each item can change a step or a p
 - [ ] **Display dimensions.** Cover lens 0.55 mm and total thickness 3.14 mm are taken from the drawing on the display's product page, a corner radius of at least 1 mm is assumed. They decide whether the screen sits flush. Measure the panel before printing.
 - [ ] **Inserts in the PCB bosses.** Their holes reach into the front wall and leave 1.5 mm of it. Check on the first print that the front shows no marks after the inserts are pressed in.
 - [ ] **Display distance and flex.** The frame holds the display 1.5 mm off the PCB; by the panel's drawing the flex allows 2 mm at most (see the case README). Check with the real panel that the stiff parts of the flex lie flat behind the PCB and that the flex reaches its connector.
+- [ ] **Dock magnet.** With the reader hung on the dock the board must report "on the dock", and "off" once it is lifted away. The figures do not show the magnet's ring yet.
 - [ ] **Figures.** The figures show the case before its depth changed: the cap was 1.2 mm deeper. The steps are the same.
 - [ ] **Jack pins behind the display.** Clipped to 1 mm they should clear the display's metal back by 0.5 mm or more. Measure how far the pins of a soldered jack stand out, and check the gap with the display fitted.
 - [ ] **PoE module height.** Assumed 10 mm.

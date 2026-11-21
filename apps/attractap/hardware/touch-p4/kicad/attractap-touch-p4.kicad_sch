@@ -1364,120 +1364,130 @@
 		(stroke (width 0) (type default))
 		(uuid "8591dbed-c98e-5a0b-90da-d8f396b6ae03")
 	)
-	(label "ETH_RST_N"
+	(label "DOCK_N"
 		(at 167.64 88.9 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "c94142d5-9d66-5e7e-80ed-ff06fb99ca94")
+		(uuid "4b951aa8-509d-500b-bc44-ebe97b1f715c")
 	)
 	(wire
 		(pts (xy 170.18 91.44) (xy 167.64 91.44))
 		(stroke (width 0) (type default))
 		(uuid "0db95fe0-3062-54a3-b663-687ab5e4e957")
 	)
-	(label "I2C0_SCL"
+	(label "ETH_RST_N"
 		(at 167.64 91.44 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "526a4ecb-98bc-5635-86f4-df792bd7fd4c")
+		(uuid "c64aafae-dad9-503a-bfd4-abcabb7773fd")
 	)
 	(wire
 		(pts (xy 170.18 93.98) (xy 167.64 93.98))
 		(stroke (width 0) (type default))
 		(uuid "d22a19fd-acbe-524d-abe3-7460ed5337fe")
 	)
-	(label "I2C0_SDA"
+	(label "I2C0_SCL"
 		(at 167.64 93.98 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "fcc4b6a2-d861-54a9-95f3-7a4f0b8e64f6")
+		(uuid "092d90d1-4db0-51d4-a3a3-d5c7da60d8eb")
 	)
 	(wire
 		(pts (xy 170.18 96.52) (xy 167.64 96.52))
 		(stroke (width 0) (type default))
 		(uuid "6e0efbd7-cd3b-5047-a54f-0a4c298e3cba")
 	)
-	(label "LCD_B1_M"
+	(label "I2C0_SDA"
 		(at 167.64 96.52 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "ebd5f565-d210-5c02-b401-d4aeefb97510")
+		(uuid "642dca05-6486-53f0-a10d-a0a1672a781c")
 	)
 	(wire
 		(pts (xy 170.18 99.06) (xy 167.64 99.06))
 		(stroke (width 0) (type default))
 		(uuid "7fdf142b-a7a8-5d7a-a546-dbd1dafcdab9")
 	)
-	(label "LCD_B2_M"
+	(label "LCD_B1_M"
 		(at 167.64 99.06 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "9c6f0540-9f30-53a6-bfad-398be77d23da")
+		(uuid "651cdc88-9de9-5401-ad7f-cb06e036de27")
 	)
 	(wire
 		(pts (xy 170.18 101.6) (xy 167.64 101.6))
 		(stroke (width 0) (type default))
 		(uuid "c1d69e5a-31ed-5ff3-9847-cdcac7fdd32d")
 	)
-	(label "LCD_B3_M"
+	(label "LCD_B2_M"
 		(at 167.64 101.6 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "3468c0a5-8b3f-594a-9154-34a60e1e7d0b")
+		(uuid "f2f1d421-9126-5635-b373-b778bb662450")
 	)
 	(wire
 		(pts (xy 170.18 104.14) (xy 167.64 104.14))
 		(stroke (width 0) (type default))
 		(uuid "121f03be-ebf9-5b91-a028-454b7496fd46")
 	)
-	(label "LCD_B4_M"
+	(label "LCD_B3_M"
 		(at 167.64 104.14 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "ba9e20e2-3cde-5fee-bead-19431f826cbb")
+		(uuid "3d8392ae-91c1-5e33-86e7-48a5239de3bc")
 	)
 	(wire
 		(pts (xy 170.18 106.68) (xy 167.64 106.68))
 		(stroke (width 0) (type default))
 		(uuid "5858c56d-1ca7-5fa5-aa11-c12e1feeb5b8")
 	)
-	(label "LCD_B5_M"
+	(label "LCD_B4_M"
 		(at 167.64 106.68 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "0c7001bb-6e6d-5d0a-85c4-b3d3dd5ce9f5")
+		(uuid "3112add4-e6db-5d75-9b1a-58e86ede9d52")
 	)
 	(wire
 		(pts (xy 170.18 109.22) (xy 167.64 109.22))
 		(stroke (width 0) (type default))
 		(uuid "23c8ca6c-461f-56e4-9c19-02feaa8c2078")
 	)
-	(label "LCD_DE_M"
+	(label "LCD_B5_M"
 		(at 167.64 109.22 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "84d55b05-4b5e-5543-8861-8dede9c3abba")
+		(uuid "a5febf65-d23e-5ca7-86a7-21de853b090d")
 	)
 	(wire
 		(pts (xy 170.18 111.76) (xy 167.64 111.76))
 		(stroke (width 0) (type default))
 		(uuid "4fd1e18d-21d3-5a18-acb4-ce67a8ca93c7")
 	)
-	(label "LCD_G0_M"
+	(label "LCD_DE_M"
 		(at 167.64 111.76 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "7aced83e-fd7c-57b5-a0f7-3c48c11817c4")
+		(uuid "00e37b3b-21b0-536b-b927-83a60d012491")
 	)
 	(wire
 		(pts (xy 170.18 114.3) (xy 167.64 114.3))
 		(stroke (width 0) (type default))
 		(uuid "41b58a8c-c749-5efa-8628-becafebac118")
 	)
-	(label "LCD_G1_M"
+	(label "LCD_G0_M"
 		(at 167.64 114.3 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "70644d4c-a4ed-5a64-984a-f166be034fef")
+		(uuid "9e2e40b1-a809-5acf-8224-2058fc5205a3")
 	)
 	(wire
 		(pts (xy 170.18 116.84) (xy 167.64 116.84))
 		(stroke (width 0) (type default))
 		(uuid "5f2a12cd-59bb-5163-be83-5bca6149c970")
 	)
-	(label "LCD_G2_M"
+	(label "LCD_G1_M"
 		(at 167.64 116.84 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "7a49d8d7-cf3d-5f7e-9a35-adfe924b95af")
+		(uuid "4188f28b-d480-5bc8-9b19-1ba39e914410")
+	)
+	(wire
+		(pts (xy 170.18 119.38) (xy 167.64 119.38))
+		(stroke (width 0) (type default))
+		(uuid "4127b14b-cf9c-51cc-9b8d-66d77457f789")
+	)
+	(label "LCD_G2_M"
+		(at 167.64 119.38 180)
+		(effects (font (size 1.27 1.27)) (justify right bottom))
+		(uuid "598a15a1-486f-5354-8fd0-14f783f88c2f")
 	)
 	(wire
 		(pts (xy 246.38 86.36) (xy 248.92 86.36))
@@ -1611,7 +1621,7 @@
 	)
 	(sheet
 		(at 170.18 81.28)
-		(size 76.2 40.64)
+		(size 76.2 43.18)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
@@ -1624,7 +1634,7 @@
 			(effects (font (size 2 2)) (justify left bottom))
 		)
 		(property "Sheetfile" "attractap-touch-p4-display.kicad_sch"
-			(at 170.18 122.52 0)
+			(at 170.18 125.06 0)
 			(effects (font (size 1.27 1.27)) (justify left top))
 		)
 		(pin "BL_PWM" passive
@@ -1632,63 +1642,68 @@
 			(uuid "c258b11f-180f-599d-ac32-f1ea0d8f18d8")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
-		(pin "ETH_RST_N" passive
+		(pin "DOCK_N" passive
 			(at 170.18 88.9 180)
+			(uuid "4a0c5d5b-e185-55e2-a881-b7fb5d8c732a")
+			(effects (font (size 1.27 1.27)) (justify left))
+		)
+		(pin "ETH_RST_N" passive
+			(at 170.18 91.44 180)
 			(uuid "3a97ea9e-70f4-5f3d-ac1e-f68f24f41b2d")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "I2C0_SCL" passive
-			(at 170.18 91.44 180)
+			(at 170.18 93.98 180)
 			(uuid "59bcfffe-898d-5028-9c27-af3c62659347")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "I2C0_SDA" passive
-			(at 170.18 93.98 180)
+			(at 170.18 96.52 180)
 			(uuid "0b027a98-3162-5073-8058-16ff391619c5")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_B1_M" passive
-			(at 170.18 96.52 180)
+			(at 170.18 99.06 180)
 			(uuid "85083405-6f95-5f26-820c-31772a77e777")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_B2_M" passive
-			(at 170.18 99.06 180)
+			(at 170.18 101.6 180)
 			(uuid "de05b17c-9bb6-562e-8cda-79473d61e890")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_B3_M" passive
-			(at 170.18 101.6 180)
+			(at 170.18 104.14 180)
 			(uuid "4f1aa315-30b3-596c-a968-1149b585020e")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_B4_M" passive
-			(at 170.18 104.14 180)
+			(at 170.18 106.68 180)
 			(uuid "06293819-394f-53c4-80b0-734339dc5572")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_B5_M" passive
-			(at 170.18 106.68 180)
+			(at 170.18 109.22 180)
 			(uuid "4f8303f8-39a4-5482-ab08-b249f77fc4cd")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_DE_M" passive
-			(at 170.18 109.22 180)
+			(at 170.18 111.76 180)
 			(uuid "3f5cf34c-4e41-5b5f-a483-c90e82f55013")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_G0_M" passive
-			(at 170.18 111.76 180)
+			(at 170.18 114.3 180)
 			(uuid "24aa3b71-2c3a-5bf0-a87c-47645ec6b762")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_G1_M" passive
-			(at 170.18 114.3 180)
+			(at 170.18 116.84 180)
 			(uuid "3f47c5a3-988b-5ddd-9f33-70695a8d0fb7")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_G2_M" passive
-			(at 170.18 116.84 180)
+			(at 170.18 119.38 180)
 			(uuid "d1fd7f40-186f-562b-b3d3-58b7ed13fe17")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
@@ -1761,32 +1776,62 @@
 	)
 	(text "40-pin panel connector, backlight driver, IO expander"
 		(exclude_from_sim no)
-		(at 170.18 127.12 0)
+		(at 170.18 129.66 0)
 		(effects (font (size 1 1)) (justify left bottom))
-		(uuid "6999db0d-3d04-5996-9398-84aeda929dea")
+		(uuid "b590ee91-087e-561a-97f9-206b5fd0f5b3")
 	)
 	(wire
-		(pts (xy 170.18 140.97) (xy 167.64 140.97))
+		(pts (xy 170.18 143.51) (xy 167.64 143.51))
 		(stroke (width 0) (type default))
-		(uuid "9d78ab47-a8d4-5a52-84a1-b45594e728d6")
+		(uuid "e5f6d123-6c64-5e96-b930-8df83a9d5462")
 	)
 	(label "BUZZER"
-		(at 167.64 140.97 180)
+		(at 167.64 143.51 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "407981e5-1786-5d8c-a724-50ac8cbdc2c9")
+		(uuid "4dee1961-1eff-5c17-815f-63082056f85e")
 	)
 	(wire
-		(pts (xy 246.38 140.97) (xy 248.92 140.97))
+		(pts (xy 170.18 146.05) (xy 167.64 146.05))
 		(stroke (width 0) (type default))
-		(uuid "639ecea7-a0ec-5066-a406-f0fd2cdd2276")
+		(uuid "6d7a63d5-4ff6-5621-9afc-5f61e0e4d1ef")
+	)
+	(label "DOCK_N"
+		(at 167.64 146.05 180)
+		(effects (font (size 1.27 1.27)) (justify right bottom))
+		(uuid "cc01aa00-efea-55c1-b34d-c02f0720cbfe")
+	)
+	(wire
+		(pts (xy 170.18 148.59) (xy 167.64 148.59))
+		(stroke (width 0) (type default))
+		(uuid "faf96239-44d3-59af-8786-4501f722ef72")
+	)
+	(label "I2C0_SCL"
+		(at 167.64 148.59 180)
+		(effects (font (size 1.27 1.27)) (justify right bottom))
+		(uuid "fa1d66dc-7078-5b2a-b00e-1ed7b8db6420")
+	)
+	(wire
+		(pts (xy 246.38 143.51) (xy 248.92 143.51))
+		(stroke (width 0) (type default))
+		(uuid "48d717aa-e2f6-535e-b676-ca79bbcf76cf")
+	)
+	(label "I2C0_SDA"
+		(at 248.92 143.51 0)
+		(effects (font (size 1.27 1.27)) (justify left bottom))
+		(uuid "db5fe83a-a553-5ba9-99ea-9064aa420d53")
+	)
+	(wire
+		(pts (xy 246.38 146.05) (xy 248.92 146.05))
+		(stroke (width 0) (type default))
+		(uuid "6549a331-c236-53f7-9836-56f9eac87e98")
 	)
 	(label "LED_DATA"
-		(at 248.92 140.97 0)
+		(at 248.92 146.05 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "af4d1043-df01-528b-8e24-8aec3545c4c2")
+		(uuid "4bdd903e-1b27-5c47-aada-f2a6543437bd")
 	)
 	(sheet
-		(at 170.18 135.89)
+		(at 170.18 138.43)
 		(size 76.2 15.24)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -1795,31 +1840,46 @@
 		(stroke (width 0.1524) (type solid))
 		(fill (color 255 255 194 1))
 		(uuid "4900b572-2212-5fdb-acc3-3028c13c8b5e")
-		(property "Sheetname" "UI" (at 170.18 135.19 0) (effects (font (size 2 2)) (justify left bottom)))
+		(property "Sheetname" "UI" (at 170.18 137.73 0) (effects (font (size 2 2)) (justify left bottom)))
 		(property "Sheetfile" "attractap-touch-p4-ui.kicad_sch"
-			(at 170.18 151.73 0)
+			(at 170.18 154.27 0)
 			(effects (font (size 1.27 1.27)) (justify left top))
 		)
 		(pin "BUZZER" passive
-			(at 170.18 140.97 180)
+			(at 170.18 143.51 180)
 			(uuid "80d68238-9514-574c-b140-49193c78e6f0")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
+		(pin "DOCK_N" passive
+			(at 170.18 146.05 180)
+			(uuid "9ea9c18d-2646-5ce9-aa09-59d2c8fa059d")
+			(effects (font (size 1.27 1.27)) (justify left))
+		)
+		(pin "I2C0_SCL" passive
+			(at 170.18 148.59 180)
+			(uuid "3521630f-7c08-5e5d-a8c1-0707e157457a")
+			(effects (font (size 1.27 1.27)) (justify left))
+		)
+		(pin "I2C0_SDA" passive
+			(at 246.38 143.51 0)
+			(uuid "6a337699-4981-5ab4-bec8-6074278925f1")
+			(effects (font (size 1.27 1.27)) (justify right))
+		)
 		(pin "LED_DATA" passive
-			(at 246.38 140.97 0)
+			(at 246.38 146.05 0)
 			(uuid "d2b38c60-9093-52e9-bd30-cdf0b8db2220")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(instances (project "attractap-touch-p4" (path "/c397a859-95c6-54a3-93b8-1e7535e299df" (page "9"))))
 	)
-	(text "Addressable RGB LEDs, level shifter, buzzer driver"
+	(text "Addressable RGB LEDs, level shifter, buzzer driver, tamper sensors"
 		(exclude_from_sim no)
-		(at 170.18 156.33 0)
+		(at 170.18 158.87 0)
 		(effects (font (size 1 1)) (justify left bottom))
-		(uuid "dadb126e-1bff-5e00-91e9-f2aef7e0d0af")
+		(uuid "87f4eebd-6288-5ee2-8b35-6136ea0ab1f4")
 	)
 	(sheet
-		(at 170.18 165.1)
+		(at 170.18 167.64)
 		(size 76.2 15.24)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -1829,11 +1889,11 @@
 		(fill (color 255 255 194 1))
 		(uuid "7a51f2ad-2d48-5a47-9b66-64864065023d")
 		(property "Sheetname" "Mechanical"
-			(at 170.18 164.4 0)
+			(at 170.18 166.94 0)
 			(effects (font (size 2 2)) (justify left bottom))
 		)
 		(property "Sheetfile" "attractap-touch-p4-mech.kicad_sch"
-			(at 170.18 180.94 0)
+			(at 170.18 183.48 0)
 			(effects (font (size 1.27 1.27)) (justify left top))
 		)
 		(instances
@@ -1842,9 +1902,9 @@
 	)
 	(text "Mounting holes and fiducials"
 		(exclude_from_sim no)
-		(at 170.18 185.54 0)
+		(at 170.18 188.08 0)
 		(effects (font (size 1 1)) (justify left bottom))
-		(uuid "4b8b2f59-0ee7-5f4c-a735-de454a8c0641")
+		(uuid "cd87c1d8-1007-5ea0-bb2b-824784fb3d85")
 	)
 	(sheet_instances (path "/" (page "1")))
 	(embedded_fonts no)

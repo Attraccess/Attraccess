@@ -16,6 +16,7 @@ Why the board looks the way it does, and what is still an assumption.
 | DC connectors | barrel jack (5.5 / 2.1 mm) and WAGO 250 push-button terminal in parallel | Plug-in supplies and bare wires from an existing installation both work. The terminal footprint also takes the WAGO 2601 lever terminal, which costs 13 times as much. |
 | Ethernet jack | behind the lower right corner of the display, 51 mm above the lower board edge | A plug with its boot and the cable's bend into the wall need 49 mm below the jack, inside the case. The price: the jack's pins stand out of the display side behind the display. The display sits 1.5 to 2 mm off the board and the pins are clipped (see "Display mounting and flex"). Below the display the jack would need a case 19 mm longer. |
 | USB-C | service port at the board edge next to the MCU | Only used for flashing and debugging, never offered to users. |
+| Tamper detection | an accelerometer and a hall switch facing a magnet in the dock | The accelerometer notices knocks, tilting and tearing off; the hall switch says for certain that the reader has left its dock. Both are read over I2C, because the MCU's four free pins are blocked by capacitors at the pad row. |
 | Wi-Fi antenna | PCB antenna of the module, or external antenna | The ESP32-C6-MINI-1U (U.FL connector) fits the same pads. |
 | Assembly | all parts on one side | The display is taped to the other side; cheaper assembly. |
 
@@ -180,7 +181,7 @@ new display section, not a part swap.
 - The display's metal back should be tied to the board's ground: it is a large
   plate close to the board, and discharges onto the glass end up on it. The
   display side of the board has four bare ground pads of 5 x 5 mm behind the
-  LCD module, at (11.5, 38), (66, 38), (48, 17) and (43, 80). Put conductive
+  LCD module, at (13.5, 18.5), (66, 38), (48, 17) and (43, 80). Put conductive
   tape or foam on at least two of them before the display goes on; leave them
   out of the area the mounting tape covers.
 
@@ -350,6 +351,40 @@ The 25 MHz crystal (ESR up to 50 ohm) is above what the PHY datasheet allows
 (40 ohm). Typical parts are far below both. If a board ever fails to bring up
 the Ethernet clock in the cold, look here first.
 
+## Tamper detection
+
+Two sensors tell the firmware that someone is handling the reader. The firmware
+does not read them yet; this is what it will find.
+
+| Sensor | Part | Detects | How it is read |
+|---|---|---|---|
+| Accelerometer U702 | LIS2DH12TR | knocks and drilling (shock), the reader being swung open or torn off (tilt against the direction it had when installed), falling | I2C0, address 0x19. Its event registers latch, so polling them is enough. INT1 is on test point TP814 (`INT`) |
+| Hall switch U703 | DRV5032FA | the reader on or off its dock: a magnet in the dock lies in front of the switch | `DOCK_N` on the IO expander's P6: low on the dock, high off it. The switch samples 20 times a second |
+
+- The magnet is a neodymium disc of 10 x 3 mm (N35 or stronger, magnetised
+  through its thickness, either pole up). It lies in a ring on the dock plate,
+  in front of board point (12.5, 38.2), 10.3 mm from the switch. That gives
+  about 22 mT at the switch. The switch turns on for certain within 19 mm
+  (4.8 mT) and lets go for certain beyond 45 mm (0.5 mT), typically at 29 mm.
+- So the hall switch reports the reader as removed once it is lifted off, not
+  when the two lock screws come out: swinging the bottom out by 20 mm moves the
+  switch only 5 mm away. The accelerometer covers that part: the same swing
+  tilts the reader by 7 degrees.
+- A second magnet held to the case from outside can keep the switch on. The
+  accelerometer still sees the reader move.
+- What the hardware does not sense: a cut cable or lost supply (the server
+  sees the reader go offline), and the board being taken out of the cap (that
+  needs the reader off its dock first).
+- Both sensors are fitted on both versions. Their place, left of the MCU, is
+  15 mm from the middle of the buzzer and 22 mm from the nearest inductor, so that the
+  magnet does not disturb them. Do not move the magnet towards the PoE module,
+  the converter inductors or the NFC matching network.
+- The buzzer shakes the board at 2.7 kHz. The firmware should ignore the
+  accelerometer while it beeps.
+- The MCU's free pins (GPIO27, 48, 53, 54) could not be used: capacitors sit
+  in front of three of them at the pad row and the fourth is boxed in by the
+  Ethernet signals. That is why the hall switch goes through the IO expander.
+
 ## Layout rules used
 
 | Class | Track | Clearance | Nets |
@@ -385,6 +420,8 @@ Routed by hand (script) and locked:
   converter, the buzzer circuit and the output of the PoE module,
 - the PHY pins on its left and lower side,
 - the antenna feeds,
+- the accelerometer's supply, ground and address links (its pads are 0.5 mm
+  apart),
 - the 5 V bus of the top LED row, in the strip between the flex slot and the
   LED windows,
 - the LED data link between the two LED rows, on the inner layer next to the
@@ -495,7 +532,9 @@ Parts at JLCPCB per board, in USD, prices of November 2026:
 
 The table is from before the design review. The review added parts worth about
 0.3 USD per board (input filter, three resistors, another level shifter) and
-one extended part line, the buzzer resistor.
+one extended part line, the buzzer resistor. The tamper sensors add about
+1.1 USD per board (accelerometer 0.89, hall switch 0.17, three capacitors, a
+resistor) and two extended part lines; the dock needs a magnet of a few cents.
 
 Once per order JLCPCB adds 3 USD for every extended part line (33 lines on the
 Wi-Fi version, 38 on the Ethernet/PoE version), the setup and stencil fees, the
@@ -601,6 +640,9 @@ display and the connectors. Nothing was built or measured.
   Ethernet plug and cable next to the loop on the lan version.
 - **Wi-Fi range** with the antenna 7 mm from the display's metal back.
 - **Isolation of the PoE side** under a 1500 V test (see "PoE isolation").
+- **Tamper sensors.** Whether the hall switch turns on and lets go at the
+  distances calculated, whether the dock's magnet changes the buzzer's sound,
+  and which accelerometer thresholds tell a knock from a door closing.
 - **Hot-plugging a 24 V supply.** The TVS holds the peak below the converter's
   40 V limit by calculation. A 47 uF / 50 V electrolytic capacitor across C117
   would take the stress off the TVS; the board has no place for one.

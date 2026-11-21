@@ -3475,7 +3475,12 @@
 		(uuid "c9a926be-eefa-517b-a7a6-57b0c7d62cd4")
 	)
 	(no_connect (at 227.33 205.74) (uuid "379a6364-38df-5f55-b440-19049e10de01"))
-	(no_connect (at 227.33 203.2) (uuid "74ffddda-b893-56a4-9bbb-87aa3b73977c"))
+	(hierarchical_label "DOCK_N"
+		(shape passive)
+		(at 227.33 203.2 0)
+		(effects (font (size 1.27 1.27)) (justify left))
+		(uuid "df91dd1d-2551-5133-8083-b54a24b07318")
+	)
 	(no_connect (at 227.33 200.66) (uuid "a1b1b2cd-c953-5608-9002-87f0f26a6ee1"))
 	(no_connect (at 227.33 198.12) (uuid "7bbd5a91-877f-5547-8f71-c8b9724a5679"))
 	(hierarchical_label "I2C0_SCL"

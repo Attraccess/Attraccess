@@ -35,7 +35,7 @@ SHEETS = [
     ('eth', 'Ethernet', 'Ethernet', 'IP101GRI RMII PHY, RJ45 with magnetics and PoE rectifiers (LAN version only)'),
     ('nfc', 'NFC', 'NFC', 'PN532 reader, EMC filter, antenna matching, PCB loop antenna'),
     ('display', 'Display', 'Display', '40-pin panel connector, backlight driver, IO expander'),
-    ('ui', 'UI', 'LEDs and buzzer', 'Addressable RGB LEDs, level shifter, buzzer driver'),
+    ('ui', 'UI', 'LEDs, buzzer, tamper', 'Addressable RGB LEDs, level shifter, buzzer driver, tamper sensors'),
     ('mech', 'Mechanical', 'Mechanical', 'Mounting holes and fiducials'),
 ]
 NOTES = {
@@ -86,6 +86,8 @@ NOTES = {
         'LEDs are reverse-mount parts shining through the board. Data flows D701 -> D708.',
         'Buzzer: drive BUZZER with a 2.7 kHz square wave (LEDC). Its coil is between pads 1 and 2;',
         'pads 3 and 4 only hold the part. R705 keeps the LED data line low while the MCU is in reset.',
+        'Tamper: U702 accelerometer on I2C0 at 0x19, events read over I2C (INT1 on TP814). U703 hall switch:',
+        'DOCK_N (IO expander P6) is low while the magnet in the dock is in front of it.',
     ],
     'mech': [],
 }

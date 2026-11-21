@@ -178,13 +178,13 @@ def display(d):
     d.group('IO expander')
     d.add('U', 'TCA9554PWR', 'attractap:TCA9554PWR', 'attractap:TSSOP-16_L5.0-W4.4-P0.65-LS6.4-TL', {
         '1': 'GND', '2': 'GND', '3': 'GND', '8': 'GND', '16': '+3V3', '14': 'I2C0_SCL', '15': 'I2C0_SDA',
-        '4': 'LCD_CS', '5': 'LCD_SCK', '6': 'LCD_SDA', '7': 'LCD_RST', '9': 'ETH_RST_N',
-    }, nc=('10', '11', '12', '13'), lcsc='C477924', mpn='TCA9554PWR', desc='IO expander, I2C address 0x20')
+        '4': 'LCD_CS', '5': 'LCD_SCK', '6': 'LCD_SDA', '7': 'LCD_RST', '9': 'ETH_RST_N', '11': 'DOCK_N',
+    }, nc=('10', '12', '13'), lcsc='C477924', mpn='TCA9554PWR', desc='IO expander, I2C address 0x20')
     d.C('100n', '+3V3', desc='IO expander')
 
 
 def ui(d):
-    """User feedback: addressable LEDs and buzzer."""
+    """User feedback (addressable LEDs and buzzer) and tamper detection."""
     d.begin('ui', 700)
     d.group('LED data level shifter')
     # 74LV1T125: same pinout as the 74AHCT1G125, but specified from 1.6 V supply. The 5 V rail sits one
@@ -223,6 +223,25 @@ def ui(d):
     # GPIO47 has no pull resistor while the MCU is in reset: without this the level shifter's input
     # floats and the LEDs can light up at random during power-up
     d.R('100k', 'LED_DATA', 'GND', desc='LED data low while the MCU is in reset')
+    # Two sensors that tell the firmware when someone handles the reader. (New parts go at the end of
+    # the sheet: the reference designators of the parts above must not change.)
+    d.group('Tamper detection')
+    # Accelerometer: knocks, tilting, the reader being torn off. On the touch bus; SA0 high gives
+    # address 0x19. The firmware reads its latched events over I2C; INT1 is on a test point.
+    d.add('U', 'LIS2DH12TR', 'Sensor_Motion:LIS2DE12', 'Package_LGA:LGA-12_2x2mm_P0.5mm', {
+        '1': 'I2C0_SCL', '2': '+3V3', '3': 'ACC_SA0', '4': 'I2C0_SDA', '5': 'GND', '6': 'GND', '7': 'GND', '8': 'GND',
+        '9': '+3V3', '10': '+3V3', '12': 'ACC_INT',
+    }, nc=('11',), lcsc='C110926', mpn='LIS2DH12TR', desc='Accelerometer, I2C address 0x19')
+    d.C('100n', '+3V3', desc='accelerometer')
+    d.C('10u', '+3V3', size='0603', desc='accelerometer')
+    # SA0 has a pull-up inside the part that firmware can switch off; this one keeps the address at 0x19
+    d.R('10k', '+3V3', 'ACC_SA0', desc='accelerometer address: SA0 high')
+    # Hall switch: its output is low while the magnet in the dock is in front of it (more than 4.8 mT),
+    # high when the reader is off the dock (less than 0.5 mT). Read through the IO expander.
+    d.add('U', 'DRV5032FA', 'Sensor_Magnetic:DRV5033FAxDBZ', 'Package_TO_SOT_SMD:SOT-23',
+          {'1': '+3V3', '2': 'DOCK_N', '3': 'GND'},
+          lcsc='C140921', mpn='DRV5032FADBZR', desc='Hall switch: output low with the dock magnet present')
+    d.C('100n', '+3V3', desc='hall switch')
 
 
 def mech(d):
@@ -235,6 +254,7 @@ def mech(d):
         ('UART0_RX', 'RX0', 'mcu'),
         ('C6_EN', 'C6_EN', 'wifi'), ('C6_IO9', 'C6_BOOT', 'wifi'), ('C6_TXD0', 'C6_TX', 'wifi'),
         ('C6_RXD0', 'C6_RX', 'wifi'),
+        ('ACC_INT', 'ACC_INT', 'ui'),
     ):
         d.TP(net, label, sheet=sheet)
     d.group('Mounting holes')

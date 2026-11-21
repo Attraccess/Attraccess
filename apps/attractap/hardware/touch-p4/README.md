@@ -23,6 +23,7 @@ plus PN532 module of the current readers with one board.
 | PoE (LAN version) | DP9900M-5V isolated module | 802.3af; footprint also takes a Silvertel Ag9905M |
 | Power | DC 12 to 24 V (barrel jack or WAGO push-button terminal), PoE, or USB-C 5 V | each source feeds the 5 V rail through its own diode; 3.3 V buck AP63203. The DC input has a filter towards the supply cable. USB-C is the service port for flashing and debugging |
 | Feedback | 8 RGB LEDs (SK6812MINI-E), buzzer | LEDs shine through the board above and below the NFC area |
+| Tamper detection | LIS2DH12 accelerometer, DRV5032 hall switch | knocks, tilting, and the reader leaving its dock (a magnet in the dock). Hardware only so far; the firmware does not read them yet |
 
 Two assembly versions come from the same PCB:
 
@@ -124,7 +125,7 @@ What the board needs, for the order form:
 | Outline tolerance | the regular +/-0.2 mm is enough |
 | Surface finish | ENIG is the safe choice for the 0.35 mm pitch MCU and the 0.5 mm display connector |
 | Impedance control | not needed |
-| Assembly | top side only: 198 parts in 68 lines (Wi-Fi version), 233 parts in 78 lines (Ethernet/PoE version) |
+| Assembly | top side only: 204 parts in 70 lines (Wi-Fi version), 239 parts in 80 lines (Ethernet/PoE version) |
 | Through-hole parts | DC jack J102, DC terminal J103 (two pins in a four-hole footprint, see below), and on the Ethernet/PoE version the jack J401 |
 | Not assembled by JLCPCB | the display panel (taped on, flex plugged into J601) |
 | Order number on the board | choose the option that lets you set its position ("Specify Position" / "Specify a location"): JLCPCB then prints its order number in place of the text `JLCJLCJLCJLC`, which is on the display side and hidden behind the display. Otherwise it picks a place itself |

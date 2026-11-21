@@ -311,12 +311,22 @@ def place(B):
     put('R704', 16.6, 57.6, 0)
     put('R705', 8.85, 63.75, 270)  # LED data pull-down, signal on top, below the level shifter
 
+    # ================================== tamper detection, in the free area left of the MCU
+    hx, hy = G.HALL
+    put('U703', hx, hy, 0)                 # hall switch, facing the magnet in the dock
+    put('C713', hx - 3.1, hy - 0.95, 180)  # 3.3 V pad towards the switch's supply pin
+    put('U702', 6.0, 41.6, 0)              # accelerometer: supply pins on the right, bus pins on the left
+    put('C711', 8.3, 41.35, 0)             # 100 nF straight beside the supply pins
+    put('C712', 6.9, 43.85, 180)           # 10 uF below, ground pad under the accelerometer's ground pins
+    put('R706', 2.75, 41.85, 0)            # address pull-up, level with the accelerometer's SA0 pin
+
     # ============================================================ test points
     tps = {
         'TP801': (26.0, 24.6), 'TP802': (26.0, 27.8), 'TP803': (26.0, 31.0), 'TP804': (22.6, 27.8),
         'TP805': (57.0, 37.0), 'TP806': (14.6, 21.0), 'TP807': (14.6, 24.2), 'TP808': (14.6, 27.4),
         'TP809': (14.6, 30.6), 'TP810': (3.0, 9.6), 'TP811': (3.0, 12.8), 'TP812': (7.6, 9.6),
         'TP813': (7.6, 12.8),               # 4.6 mm apart: the labels C6_BOOT and C6_RX need that much
+        'TP814': (5.75, 38.6),              # accelerometer INT1, straight above its pin 12
     }
     for ref, (x, y) in tps.items():
         put(ref, x, y, 0)

@@ -16,7 +16,7 @@ LCM = (5.6, 12.8, 80.4, 89.4)              # metal-backed LCD module behind the 
 # Bare ground pads on the display side, behind the LCD module: for conductive tape or foam that ties
 # the LCD's metal back to ground (centre x, y; each LCD_GROUND_PAD mm square). They are openings in
 # the solder mask over the ground fill, placed where that fill has no track and no via.
-LCD_GROUND_PADS = ((11.5, 38.0), (66.0, 38.0), (48.0, 17.0), (43.0, 80.0))
+LCD_GROUND_PADS = ((13.5, 18.5), (66.0, 38.0), (48.0, 17.0), (43.0, 80.0))
 LCD_GROUND_PAD = 5.0
 
 # Slot the display flex passes through, directly below the LCD module edge
@@ -86,6 +86,9 @@ JACK_REAR_CLEAR_Y = 70.0
 POE_ROUTER_KEEPOUT = [(77.95, 35.0, 86.0, 71.4), (79.0, 30.6, 86.0, 35.0), (79.6, 71.4, 86.0, 78.6)]
 
 MOUNT_HOLES = ((4.0, 3.5), (82.0, 3.5), (17.9, 139.4), (66.3, 117.0))
+# Hall switch U703 that senses the magnet in the dock: the magnet sits in front of this point, on the
+# component side. Free board area away from the buzzer (15 mm) and the inductors (22 mm and more).
+HALL = (12.5, 38.2)
 MOUNT_KEEPOUT_R = 3.3                       # screw head / standoff: no tracks on the outer layers
 
 # The 3.3 V plane (In2) covers the display area and reaches the NFC parts left of the antenna: (x, y) corner

@@ -253,6 +253,37 @@ def small_links(B):
     B.track([u, (r[0], u[1]), r], 'LED_DATA', 0.15)
 
 
+def tamper_routes(B):
+    """Accelerometer and hall switch: the links between their pins and capacitors. The accelerometer's
+    pads are 0.5 mm apart, so its supply and ground pins are joined right at the part. The bus pins and
+    the hall switch's output are left to finish_route.py."""
+    p = B.pad
+    w = 0.2
+    u = lambda n: p('U702', str(n))
+    # supply: pins 10 and 9 -> 100 nF -> 10 uF; CS (pin 2) through a via into the 3.3 V plane
+    c1, c2 = p('C711', '1'), p('C712', '1')
+    B.track([u(10), u(9), c1], '+3V3', w)
+    B.track(dog(c1, c2), '+3V3', w)
+    v = (round(u(2)[0] - 0.94, 3), u(2)[1])
+    B.track([u(2), v], '+3V3', 0.15)
+    B.via(*v, '+3V3')
+    # address pin SA0 (pin 3) straight left to its pull-up, and the pull-up into the 3.3 V plane
+    r1, r2 = p('R706', '1'), p('R706', '2')
+    B.track([u(3), r2], 'ACC_SA0', 0.15)
+    vr = (r1[0], round(r1[1] - 0.95, 3))
+    B.track([r1, vr], '+3V3', w)
+    B.via(*vr, '+3V3')
+    # ground: pins 5 to 8 joined, then down to the 10 uF capacitor
+    B.track([u(5), u(6)], 'GND', 0.15)
+    B.track(dog(u(6), u(7)), 'GND', 0.15)
+    B.track([u(7), u(8)], 'GND', 0.15)
+    B.track(dog(u(6), p('C712', '2')), 'GND', w)
+    # interrupt output to its test point
+    B.track([u(12), p('TP814', '1')], 'ACC_INT', 0.15)
+    # hall switch: supply pin to its capacitor
+    B.track([p('U703', '1'), p('C713', '1')], '+3V3', w)
+
+
 def buzzer_routes(B):
     """Buzzer and its driver. The coil is between pads 1 (+) and 2 (-), both on the side away from the
     sound port. Pad 1 is next to the series resistor. Pad 2 is on the far side of the part: its

@@ -11,7 +11,7 @@ A 3D-printable case for the [Attractap Touch P4 board](../README.md), revision A
 ## How it works
 
 - **Cap**: the front shell. It carries the display, flush with the front, and the board. Eight light windows for the status LEDs, the Attraccess wordmark and a tap ring over the NFC antenna.
-- **Dock**: the back plate. It is screwed to the wall (five holes; the lower pair matches the 60 mm spacing of a flush-mount box) or onto the stand.
+- **Dock**: the back plate. It is screwed to the wall (five holes; the lower pair matches the 60 mm spacing of a flush-mount box) or onto the stand. A ring on its inner face holds a 10 x 3 mm magnet: the board's hall switch senses it, so the reader knows when it is taken off the dock.
 - **Stand**: a hollow wedge for the desk. The reader leans back 35°.
 - The cap hooks onto a 45° cleat at the top of the dock, swings shut and is locked by two M3 screws from below. Plugs and cables end up enclosed between cap and dock.
 - A cable either disappears into the wall behind the dock or leaves through a notch at the bottom, where a cable tie on a saddle inside the cap takes the pull off the jack.
@@ -72,7 +72,7 @@ The design files are SolidCraft documents (made with version 0.45.0).
 
 - Coordinates: the origin is the centre of the display seen from the front, Z is 0 at the wall and the front face is at Z = `D`. A point (x, y) in the board's own coordinates, as used in its [design notes](../docs/design-notes.md#mechanics), is at case X = 43 − x and Y = 49.15 − y. In the coordinates of the KiCad file, where the board's corner is at (60, 30), that is X = 103 − x and Y = 79.15 − y.
 - The depth stack is parametric (`plate_t`, `cav`, `pcb_t`, `disp_gap`, `disp_t`, `lens_t`, `tape_t`, `lens_recess`, `wall`, `pcb_ins_depth`). Positions in X and Y are plain numbers taken from the board.
-- After a change to the depth stack, `cad/tools/export_depth_parts.py` writes the files of the parts that follow it again: cap, display frame, LED diffuser, mock display and the assembly. Dock, stand and mock board do not depend on it.
+- After a change to the design, `cad/tools/export_parts.py` writes the files of its parts again: cap, dock, display frame, LED diffuser, mock display and the assembly. Stand and mock board are not exported by it.
 - `manual/attractap-manual-scenes.sc` and `renders/finishes/attractap-finish-study.sc` are copies of the design with extra bodies for illustration. Print files are exported only from the designs in `cad/`. The copies, the renders and the manual's figures still show the earlier depth stack: a cap 1.2 mm deeper, with the display 2 mm off the board.
 - The 3MF files are saved lying on their print face. In SolidCraft 0.45.0 the option that lays parts on their marked print face had no effect, so each part is turned with a temporary move before the export.
 
@@ -80,7 +80,7 @@ The scripts are plain Python without dependencies; run them with `python3 -I`. T
 
 | Script | What it makes |
 | --- | --- |
-| `cad/tools/export_depth_parts.py` | The STEP, 3MF and STL files of the parts that follow the depth stack, laid on their print faces |
+| `cad/tools/export_parts.py` | The STEP, 3MF and STL files of cap, dock, display frame, LED diffuser, mock display and assembly, laid on their print faces |
 | `cad/faceplate/tools/plate_outline.py` | The sheet cutting outlines (SVG and DXF) |
 | `renders/faceplate/tools/gen_faceplate.py` | Renders and print files of the face-plate variant |
 | `renders/faceplate/tools/clip_figure.py` | The two explanatory figures of the face plate |
@@ -106,6 +106,7 @@ The scripts are plain Python without dependencies; run them with `python3 -I`. T
   - The two 48 V pins of the jack come out 0.5 mm beside the LCD's metal edge, inside the frame's pocket for the pins. The frame cannot put a wall between them: the solder pad of the nearer pin ends 0.1 mm from the LCD's edge. The tape on the LCD is the insulation there.
   - The other way round does not work without a longer case: with the jack below the display its plug room shrinks from 51 to 32 mm, and a cable from the wall would need a plug that ends 12 mm below the jack.
 - **Inserts close to the front face.** With this display and distance only 2.3 mm lie between the board and the front wall. The insert holes of the four PCB bosses are 3.2 mm deep (`pcb_ins_depth`), so they reach 0.9 mm into the 2.4 mm front wall and leave 1.5 mm. Check on the first print that pressing the inserts in does not mark the front.
+- **Dock magnet.** The ring is at X 30.5, Y 10.95 (board point 12.5, 38.2), and the magnet's face is 10.3 mm from the hall switch. By calculation that gives 22 mT, four times what the switch needs. Check on the first board that the switch reads "on the dock" with the reader hung and "off" once it is lifted away. The pocket is 10.2 mm wide for a drop of glue; tune it for the magnets you buy.
 - **PoE module height.** Assumed 10 mm.
 - **Outdoor use.** There are no seals, the buzzer holes and cable notches are open, and ABS+ ages in sunlight. Treat it as an indoor case.
 

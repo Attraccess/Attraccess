@@ -61,6 +61,18 @@ class DesignTest(unittest.TestCase):
             self.assertEqual(len(to_ground), 1, net)
 
 
+    def test_tamper_sensors(self):
+        # hall switch: supply, output to the IO expander's P6 (pin 11), ground. Both versions have it.
+        hall = self.d.parts['U703']
+        self.assertEqual(hall.nets, {'1': '+3V3', '2': 'DOCK_N', '3': 'GND'})
+        self.assertEqual(self.d.parts['U602'].nets['11'], 'DOCK_N')
+        # accelerometer: on the touch bus, I2C mode (CS high), address pin pulled up
+        acc = self.d.parts['U702']
+        self.assertEqual((acc.nets['1'], acc.nets['4'], acc.nets['2']), ('I2C0_SCL', 'I2C0_SDA', '+3V3'))
+        self.assertEqual({ref for ref, _pin in self.nets[acc.nets['3']]}, {'U702', 'R706'})
+        self.assertEqual({hall.variant, acc.variant}, {''})
+
+
 class GeometryTest(unittest.TestCase):
     def behind_metal_back(self, pin, margin=0.0):
         x, y = geometry.JACK_X + pin[0], geometry.JACK_Y + pin[1]

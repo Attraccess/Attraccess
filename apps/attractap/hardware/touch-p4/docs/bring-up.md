@@ -127,6 +127,19 @@ when a step fails. Use a current-limited bench supply for the first power-up.
    on its side that faces the lower board edge. Never leave the buzzer pin
    high: the coil and its resistor are made for a tone, not for direct current.
 
+## Tamper sensors
+
+1. I2C0 scan: the accelerometer answers at 0x19, register 0x0F reads 0x33.
+2. Read its three axes with the board lying flat, then standing: 1 g moves to
+   the axis that points down.
+3. Hall switch: read IO expander P6. It is 1 on the bench. Bring the dock's
+   magnet towards U703 (marked `DOCK`) from the component side: note the
+   distance at which P6 goes to 0 and the distance at which it returns to 1.
+   Expected: on at 19 mm or more, off again at 45 mm at the latest.
+4. Reader on its dock with the magnet fitted: P6 = 0. Lift it off: P6 = 1.
+5. Sound the buzzer with and without the magnet in front of the board: the
+   tone must not change. Watch the accelerometer's output while it sounds.
+
 ## Before the test lab
 
 1. Soak test: 24 hours in the enclosure with normal use pattern.

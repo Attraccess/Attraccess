@@ -42,6 +42,7 @@ from routes_board import (
     plane_fanout,
     poe_routes,
     small_links,
+    tamper_routes,
 )
 from routes_mcu import (
     flash_routes,
@@ -87,6 +88,7 @@ def build():
     led_link(B)
     dc_route(B)
     small_links(B)
+    tamper_routes(B)
     buzzer_routes(B)
     phy_fanout(B)
     mcu_escape(B)
@@ -109,6 +111,7 @@ def build():
 # parts below are removed and routed again. Empty both when a new autorouter result is committed.
 STALE_NETS = {'BUZ_P', 'BUZ_N', 'ETH_CT_RX', 'ETH_CT_TX', '+5V_POE'}
 STALE_PARTS = {'R104', 'R105', 'R705', 'L103', 'C117', 'D106', 'D103', 'FB102', 'FB103', 'C408', 'C409',
+               'U702', 'U703', 'C711', 'C712', 'C713', 'R706', 'TP814',
                'D701', 'D702', 'D703', 'D704', 'D705', 'D706', 'D707', 'D708'}
 
 

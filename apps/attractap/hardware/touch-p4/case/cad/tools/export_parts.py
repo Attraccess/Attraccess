@@ -1,10 +1,10 @@
-"""Exports the files of the parts that follow the case's depth stack: cap (plain and multi-colour), display frame,
-LED diffuser, mock display and the whole assembly.
+"""Exports the files of the case's parts from the design: cap (plain and multi-colour), dock, display frame, LED
+diffuser, mock display and the whole assembly.
 
-    python3 -I export_depth_parts.py [design.sc] [output folder]
+    python3 -I export_parts.py [design.sc] [output folder]
 
-Run it after a change to `disp_gap`, `disp_t`, `lens_t` or any other parameter of the depth stack. The dock, the stand
-and the mock board do not depend on those parameters; their files stay as they are.
+Run it after a change to the design, for example to `disp_gap`, `disp_t`, `lens_t` or the dock's magnet holder. The
+stand and the mock board are not exported here; their files stay as they are.
 
 STEP files keep the parts where they are in the design. 3MF and STL files are laid on the print face with the centre of
 mass over the origin: SolidCraft 0.45.0 ignores `lay_on_print_faces`, so each part is moved before its export. The
@@ -47,12 +47,14 @@ def groups(design):
     return [
         [export("attractap-cap.step", ["Cap"]), export("attractap-cap-multicolor.step", ["Cap"] + inlays),
          export("attractap-display-frame.step", ["Display frame"]), export("attractap-led-diffuser.step", ["LED diffuser"]),
-         export("attractap-assembly.step", assembly)],
+         export("attractap-dock.step", ["Dock"]), export("attractap-assembly.step", assembly)],
         # the cap lies on its front face; the multi-colour file keeps the inlays in place, the plain one is centred
         [move(["Cap"] + inlays, "CapLay", translate=[0, 0, depth], **face_down),
          export("attractap-cap-multicolor.3mf", ["Cap"] + inlays, **FINE),
          move(["Cap"], "CapCentre", translate=[-cap_x, cap_y, 0]),
          export("attractap-cap.3mf", ["Cap"], **FINE)],
+        # the dock lies on its back, as it is in the design
+        [move(["Dock"], "DockCentre", translate=centred("Dock")), export("attractap-dock.3mf", ["Dock"], **FINE)],
         # frame and diffuser lie on their board side
         [move(["Display frame"], "FrameLay", translate=centred("Display frame")),
          export("attractap-display-frame.3mf", ["Display frame"], **FINE)],
