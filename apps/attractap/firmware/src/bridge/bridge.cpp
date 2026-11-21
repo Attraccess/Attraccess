@@ -32,7 +32,7 @@ namespace bridge
 
         void requestSetup(uint32_t now)
         {
-            switch (bt_setup::request(now))
+            switch (bt_setup::request(now, bt_setup::Trigger::User))
             {
             case bt_setup::Request::Opened:
                 logger.info("Button held 3 s: Bluetooth setup open for 10 minutes");

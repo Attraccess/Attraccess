@@ -73,7 +73,7 @@ Eine noch nicht gekoppelte Bridge (frisch geflasht oder nach einem Werksreset) l
 
 Die Einrichtung schließt nach 10 Minuten, etwa 10 Sekunden nachdem die Bridge gekoppelt ist, oder bei einem Neustart der Bridge. Von selbst öffnet sie nicht wieder. Bei einer bereits gekoppelten Bridge bewirkt das 3-Sekunden-Halten nichts.
 
-Die Verbindung ist verschlüsselt (Bluetooth LE Secure Connections); das WLAN-Passwort wird also nie im Klartext übertragen. Es gelten dieselben PIN-Regeln wie über die serielle Schnittstelle, mit zwei Ergänzungen für die Funkverbindung: Nach 5 falschen PINs lehnt die Einrichtung jeden weiteren Befehl ab, bis sie erneut geöffnet wird (Bridge neu starten und die Taste halten), und die Bridge trennt eine Verbindung, die nicht innerhalb von 30 Sekunden verschlüsselt ist oder 5 Minuten lang nichts sendet, damit niemand in der Nähe die Einrichtung blockieren kann.
+Die Verbindung ist verschlüsselt (Bluetooth LE Secure Connections); das WLAN-Passwort wird also nie im Klartext übertragen. Es gelten dieselben PIN-Regeln wie über die serielle Schnittstelle, mit zwei Ergänzungen für die Funkverbindung: Nach 5 falschen PINs lehnt die Bridge PIN-Befehle ab, bis sie kurz vom Strom getrennt wird oder ihre Taste die Einrichtung erneut öffnet, und die Bridge trennt eine Verbindung, die nicht innerhalb von 30 Sekunden verschlüsselt ist oder 5 Minuten lang nichts sendet, damit niemand in der Nähe die Einrichtung blockieren kann.
 
 Attractap-Leser nutzen dieselbe Bluetooth-Einrichtung; sie öffnen sie von selbst, solange sie nicht gekoppelt sind, und ein Touch hat dafür auch eine Schaltfläche. Siehe [Attractap Einrichtung](attractap/setup.md#per-bluetooth-einrichten).
 

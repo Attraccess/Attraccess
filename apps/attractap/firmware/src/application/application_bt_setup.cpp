@@ -21,7 +21,7 @@ void Application::tickBtSetup() {
   if (!this->btSetupStarted) {
     this->btSetupStarted = true;
     bt_setup::registerChannel();
-    switch (bt_setup::request(millis())) {
+    switch (bt_setup::request(millis(), bt_setup::Trigger::Boot)) {
     case bt_setup::Request::Opened:
       this->logger.info("Not paired yet: Bluetooth setup open for 10 minutes");
       break;
@@ -38,7 +38,7 @@ void Application::tickBtSetup() {
     return;
   }
 
-  if (buttonPressed.exchange(false) && bt_setup::request(millis()) == bt_setup::Request::NoMemory) {
+  if (buttonPressed.exchange(false) && bt_setup::request(millis(), bt_setup::Trigger::User) == bt_setup::Request::NoMemory) {
 #ifdef HAS_LVGL_DISPLAY
     lv_lock();
     Display::initScreen.showBluetoothSetupError();

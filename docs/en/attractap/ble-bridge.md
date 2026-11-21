@@ -73,7 +73,7 @@ A bridge that is not paired yet (freshly flashed, or after a factory reset) can 
 
 The setup closes after 10 minutes, about 10 seconds after the bridge is paired, or when the bridge restarts. It does not open again by itself. On a bridge that is already paired, holding the button for 3 seconds does nothing.
 
-The connection is encrypted (Bluetooth LE Secure Connections), so the Wi-Fi password is never sent in clear text. The same PIN rules apply as over the serial port, with two additions for the radio: after 5 wrong PINs the setup refuses every further command until it is opened again (restart the bridge and hold the button), and the bridge drops a connection that is not encrypted within 30 seconds or sends nothing for 5 minutes, so nobody nearby can block the setup.
+The connection is encrypted (Bluetooth LE Secure Connections), so the Wi-Fi password is never sent in clear text. The same PIN rules apply as over the serial port, with two additions for the radio: after 5 wrong PINs the bridge refuses PIN commands until it is unplugged briefly or its button opens the setup again, and the bridge drops a connection that is not encrypted within 30 seconds or sends nothing for 5 minutes, so nobody nearby can block the setup.
 
 Attractap readers use the same Bluetooth setup; they open it by themselves while they are not paired, and a Touch also has a button for it. See [Attractap Setup](attractap/setup.md#set-up-over-bluetooth).
 

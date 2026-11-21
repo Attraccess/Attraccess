@@ -324,9 +324,11 @@ by itself (`Application::settingsOpenedByUser` keeps settings the user opened on
 required) takes the bytes of Serial Configurator lines (`CMND <topic> <json>\n`, a line may span several writes, at
 most 256 bytes; a longer one is dropped whole); TX `...a003` notifies the replies (`RESP <topic> <json>\n`, split
 into ATT MTU - 3 pieces). The lines run through `SerialCommandHandler` on the main loop with the serial PIN rules
-(`SerialCommandHandler::Channel`). A reply goes only to the link its command came from. After 5 wrong PINs in one
-window the PIN-checked commands answer `TOO_MANY_PIN_ATTEMPTS` until a new window opens (`PinGuard`; the console
-has no such limit, it needs the cable). Pairing is LE Secure Connections, Just Works, without stored bonds. The host task
+(`SerialCommandHandler::Channel`). A reply goes only to the link its command came from. After 5 wrong PINs the
+PIN-checked commands answer `TOO_MANY_PIN_ATTEMPTS` until a power cycle or a window opened at the device (the
+Touch's or the bridge's button, `Trigger::User`); the count lives in RTC memory, so the reader's own restarts (an
+unreachable server reboots it every 90 s, each boot opens a window) keep it (`PinGuard`; the console has no such
+limit, it needs the cable). Pairing is LE Secure Connections, Just Works, without stored bonds. The host task
 stack (4 KB) stays in internal RAM. macOS asks the user to accept the pairing (a system prompt): the web app keeps
 retrying the first write for about 30 s, the OS's pairing timeout.
 

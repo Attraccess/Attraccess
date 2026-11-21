@@ -105,9 +105,9 @@ gesicherte Reader ebenfalls, denn sie haben keine USB-Einrichtung:
 - Nur über eine **verschlüsselte** Verbindung (Bluetooth LE Secure Connections). Jedes Einrichtungsfenster nutzt
   eine neue Bluetooth-Adresse und speichert keine Kopplung: Ein Computer koppelt sich für jedes Fenster neu.
 - Mit **denselben PIN-Regeln** wie per USB: Sobald eine PIN gesetzt ist, braucht jede Änderung sie.
-- Nach **5 falschen PINs** in einem Einrichtungsfenster lehnt der Reader jeden Befehl ab, der die PIN braucht, bis
-  ein neues Fenster öffnet: nach einem Neustart, oder beim Touch mit seiner Schaltfläche, sobald das Fenster
-  geschlossen ist.
+- Nach **5 falschen PINs** lehnt der Reader jeden Befehl ab, der die PIN braucht, auch die richtige, bis jemand am
+  Gerät ihn zurücksetzt: kurz vom Strom trennen oder beim Touch **Bluetooth-Einrichtung** drücken, sobald das
+  Fenster geschlossen ist. Eigene Neustarts des Readers behalten den Zähler.
 - Ein gesicherter Reader hat weiterhin **keinen USB-Konfigurator**: Seine USB-Konsole bleibt aus.
 
 Da ein ungekoppelter Reader die Einrichtung nach dem Start 10 Minuten lang von selbst öffnet, kann ihn in dieser

@@ -182,7 +182,7 @@ it('waits for the device, validates a PIN, reports authentication failure and un
   state.send.mockResolvedValueOnce('{"error":"TOO_MANY_PIN_ATTEMPTS"}');
   fireEvent.submit(pin.closest('form') as HTMLFormElement);
   await waitFor(() =>
-    expect(screen.getByText('Too many wrong PINs over Bluetooth. Restart the device to try again.')).toBeTruthy(),
+    expect(screen.getByText(/Too many wrong PINs over Bluetooth/)).toBeTruthy(),
   );
   state.send.mockResolvedValueOnce('{}');
   fireEvent.submit(pin.closest('form')!);

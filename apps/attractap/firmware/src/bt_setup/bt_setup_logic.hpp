@@ -88,12 +88,18 @@ namespace bt_setup
     }
 
     // Wrong PINs over Bluetooth: anyone in range can connect to an open window, so the PIN must not be guessable
-    // there. After MAX_WRONG wrong PINs in one window every PIN-checked command is refused until a new window opens,
-    // and a new window needs the reader's power or its screen. The console has no limit: it needs the cable.
+    // there. After MAX_WRONG wrong PINs every PIN-checked command is refused until reset(): a power cycle or a window
+    // opened by someone at the device (bt_setup.cpp keeps the count across the reader's own restarts). The console
+    // has no limit: it needs the cable.
     class PinGuard
     {
     public:
         static constexpr uint8_t MAX_WRONG = 5;
+
+        PinGuard() = default;
+        // A count kept elsewhere (RTC memory); anything above the limit counts as the limit.
+        explicit PinGuard(uint32_t stored) : wrong(stored > MAX_WRONG ? MAX_WRONG : static_cast<uint8_t>(stored)) {}
+        uint8_t count() const { return wrong; }
 
         bool allowed() const { return wrong < MAX_WRONG; }
         void rejected()

@@ -53,7 +53,7 @@ export function AttractapSerialCommGate({ children }: PropsWithChildren) {
         setAuthCode(pinInput);
       } catch (err) {
         console.error(err);
-        // The Bluetooth setup refuses PINs after 5 wrong ones in a window (firmware bt_setup::PinGuard).
+        // The Bluetooth setup refuses PINs after 5 wrong ones until a power cycle or its button (firmware bt_setup::PinGuard).
         const tooMany = err instanceof Error && err.message === 'TOO_MANY_PIN_ATTEMPTS';
         setError(t(tooMany ? 'errors.tooManyAttempts' : 'errors.auth'));
       } finally {

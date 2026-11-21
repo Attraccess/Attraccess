@@ -165,7 +165,7 @@ static void names()
     CHECK(std::string(name).substr(MAX_NAME_LENGTH - NAME_SUFFIX_LENGTH) == " 71C8");
 }
 
-// Wrong PINs over Bluetooth: 5 in a window, then nothing until a new window resets the count.
+// Wrong PINs over Bluetooth: 5, then nothing until reset (a power cycle or a window opened at the device).
 static void pinGuard()
 {
     PinGuard guard;
@@ -179,6 +179,12 @@ static void pinGuard()
     CHECK(!guard.allowed());
     guard.reset();
     CHECK(guard.allowed());
+
+    // Restored after a restart: the count carries over, garbage clamps to "refused".
+    CHECK(PinGuard(PinGuard::MAX_WRONG - 1).allowed());
+    CHECK(PinGuard(PinGuard::MAX_WRONG - 1).count() == PinGuard::MAX_WRONG - 1);
+    CHECK(!PinGuard(PinGuard::MAX_WRONG).allowed());
+    CHECK(!PinGuard(0xDEADBEEFu).allowed());
 }
 
 // The 10 s close after an authenticated session also across the millis() wrap.

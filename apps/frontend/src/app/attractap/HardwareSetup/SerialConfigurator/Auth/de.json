@@ -29,6 +29,6 @@
     "invalid": "PIN muss 4-stellig sein.",
     "mismatch": "PINs stimmen nicht überein.",
     "auth": "Ungültige PIN. Bitte versuche es erneut.",
-    "tooManyAttempts": "Zu viele falsche PINs per Bluetooth. Starte das Gerät neu, um es erneut zu versuchen."
+    "tooManyAttempts": "Zu viele falsche PINs per Bluetooth. Trenne das Gerät kurz vom Strom oder drücke seine Bluetooth-Taste bzw. -Schaltfläche, um es erneut zu versuchen."
   }
 }

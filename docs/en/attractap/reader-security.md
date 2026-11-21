@@ -94,8 +94,9 @@ and secured readers do too, as secured readers have no USB setup:
 - Only over an **encrypted** link (Bluetooth LE Secure Connections). Every setup window uses a new Bluetooth
   address and stores no pairing: a computer pairs anew for every window.
 - With the **same PIN rules** as over USB: once a PIN is set, every change needs it.
-- After **5 wrong PINs** in one setup window the reader refuses every command that needs the PIN until a new
-  window opens: after a restart, or on a Touch with its button once the window has closed.
+- After **5 wrong PINs** the reader refuses every command that needs the PIN, also the right one, until someone
+  at the device resets it: unplug it briefly, or, on a Touch, press **Bluetooth setup** once the window has closed.
+  The reader's own restarts keep the count.
 - A secured reader still has **no USB configurator**: its USB console stays off.
 
 Because an unpaired reader opens the setup by itself for 10 minutes after it starts, anyone in Bluetooth range

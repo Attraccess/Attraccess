@@ -16,6 +16,7 @@
 #include <cstring>
 #include <string>
 
+#include "esp_attr.h"
 #include "esp_mac.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -89,11 +90,25 @@ namespace bt_setup
         std::mutex linesMutex;
         LineAssembler assembler(SerialCommandHandler::MAX_COMMAND_LENGTH);
         std::deque<std::string> lines;
-        // Counts links (under linesMutex): a reply goes only to the link its command came from, never to a later one.
-        uint32_t linkGeneration = 0;
-        // Wrong PINs in this window (the main loop's); open() asks for a fresh count.
+        // Counts links (changed under linesMutex): a reply goes only to the link its command came from, never to a
+        // later one, also when that one connects while the reply is being sent.
+        std::atomic<uint32_t> linkGeneration{0};
+        // Wrong PINs (the main loop's). The count survives software restarts in RTC memory: an unpaired reader that
+        // keeps restarting itself (an unreachable server, every 90 s) opens a window at every boot, which must not
+        // hand out 5 new guesses each time. Only a power cycle or someone at the device (the Touch's button, the
+        // bridge's button) starts a fresh count.
         PinGuard pinGuard;
-        std::atomic<bool> pinGuardStale{false};
+        bool pinGuardRestored = false;
+        std::atomic<bool> pinGuardReset{false};
+        constexpr uint32_t PIN_GUARD_MAGIC = 0x50494e47; // "PING"
+        RTC_NOINIT_ATTR uint32_t rtcPinGuardMagic;
+        RTC_NOINIT_ATTR uint32_t rtcPinGuardWrong;
+
+        void storePinGuard()
+        {
+            rtcPinGuardWrong = pinGuard.count();
+            rtcPinGuardMagic = PIN_GUARD_MAGIC;
+        }
 
         int gapEvent(struct ble_gap_event *event, void *arg);
 
@@ -242,11 +257,12 @@ namespace bt_setup
                                            nullptr, CONFIG_BT_NIMBLE_PINNED_TO_CORE) == pdPASS;
         }
 
-        bool notify(uint16_t conn, const char *data, size_t size)
+        bool notify(uint16_t conn, uint32_t generation, const char *data, size_t size)
         {
             for (int attempt = 0; attempt < NOTIFY_RETRIES; attempt++)
             {
-                if (!connected || connHandle != conn) return false;
+                // NimBLE reuses connection handles: the generation tells a new link from the one that asked.
+                if (!connected || connHandle != conn || linkGeneration != generation) return false;
                 struct os_mbuf *om = ble_hs_mbuf_from_flat(data, size);
                 // ble_gatts_notify_custom() frees the buffer, also on failure.
                 const int rc = om ? ble_gatts_notify_custom(conn, txHandle, om) : BLE_HS_ENOMEM;
@@ -278,25 +294,37 @@ namespace bt_setup
                     std::lock_guard<std::mutex> lock(linesMutex);
                     if (lineGeneration != linkGeneration) return;
                 }
+                const uint32_t generation = lineGeneration;
                 const uint16_t conn = connHandle;
                 if (!connected || conn == BLE_HS_CONN_HANDLE_NONE) return;
                 uint16_t mtu = ble_att_mtu(conn);
                 if (mtu < MIN_MTU) mtu = MIN_MTU;
                 if (!forEachChunk(line.size(), mtu - 3,
-                                  [&](size_t offset, size_t size) { return notify(conn, line.data() + offset, size); }))
+                                  [&](size_t offset, size_t size) { return notify(conn, generation, line.data() + offset, size); }))
                     logger.error("Setup reply lost");
             }
 
             bool pinAttemptAllowed() override
             {
-                if (pinGuardStale.exchange(false)) pinGuard.reset();
+                if (!pinGuardRestored)
+                {
+                    pinGuardRestored = true;
+                    if (rtcPinGuardMagic == PIN_GUARD_MAGIC) pinGuard = PinGuard(rtcPinGuardWrong);
+                }
+                if (pinGuardReset.exchange(false))
+                {
+                    pinGuard.reset();
+                    storePinGuard();
+                }
                 return pinGuard.allowed();
             }
 
             void pinRejected() override
             {
                 pinGuard.rejected();
-                if (!pinGuard.allowed()) logger.warn("Too many wrong PINs: PIN commands refused until the next window");
+                storePinGuard();
+                if (!pinGuard.allowed())
+                    logger.warn("Too many wrong PINs: PIN commands refused until a power cycle or the device's button");
             }
 
         private:
@@ -306,7 +334,7 @@ namespace bt_setup
         SetupChannel setupChannel;
 
         // Brings NimBLE up and advertises. False when there is not enough memory (nothing stays allocated).
-        bool open()
+        bool open(Trigger trigger)
         {
             if (owned) return true;
             owned = true;
@@ -314,7 +342,7 @@ namespace bt_setup
             esp_read_mac(mac, ESP_MAC_BT);
             formatName(deviceName, sizeof deviceName, BT_SETUP_NAME_PREFIX, mac);
             forgetPartialInput();
-            pinGuardStale = true;
+            if (trigger == Trigger::User) pinGuardReset = true;
 
             if (nimble_port_init() != ESP_OK)
             {
@@ -379,13 +407,13 @@ namespace bt_setup
 
     void registerChannel() { SerialCommandHandler::setChannel(&setupChannel); }
 
-    Request request(uint32_t now)
+    Request request(uint32_t now, Trigger trigger)
     {
         const bool isPaired = CredentialStore::load().paired();
         paired = isPaired;
         if (window.request(isPaired, now) != SetupWindow::Change::Open)
             return isPaired ? Request::Paired : Request::AlreadyOpen;
-        if (!open())
+        if (!open(trigger))
         {
             window = SetupWindow();
             return Request::NoMemory;
@@ -420,7 +448,7 @@ namespace bt_setup
 namespace bt_setup
 {
     void registerChannel() {}
-    Request request(uint32_t) { return Request::Unsupported; }
+    Request request(uint32_t, Trigger) { return Request::Unsupported; }
     void update(bool, uint32_t) {}
     bool isOpen() { return false; }
     bool linked() { return false; }
