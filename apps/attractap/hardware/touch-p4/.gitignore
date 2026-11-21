@@ -1,0 +1,15 @@
+# manufacturing output (regenerate with the build target). Only the JLCPCB upload package is kept.
+fab/*
+!fab/jlcpcb/
+# KiCad local state and backups
+*.kicad_prl
+*-backups/
+fp-info-cache
+*.lck
+_autosave-*
+\#auto_saved_files#
+# autorouter input and rules (regenerated from the placed board). The autorouter's result, the .ses
+# file, is committed: the autorouter gives a different result on every run.
+*.dsn
+*.rules
+__pycache__/
