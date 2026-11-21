@@ -54,6 +54,7 @@ from routes_mcu import (
     psram_ring,
     uart_escape,
 )
+from silk import check as check_silk, silkscreen
 
 
 def build():
@@ -71,6 +72,9 @@ def build():
     if missing:
         raise SystemExit('not placed: ' + ' '.join(missing))
     documentation(B)
+    bad = check_silk(silkscreen(B))
+    if bad:
+        raise SystemExit('silkscreen: ' + '; '.join('"%s" %s' % item for item in bad))
     display_ground_pads(board)
     zones(B)
     mcu_power_vias(B)

@@ -52,7 +52,7 @@ def outline(B):
 
 
 def documentation(B):
-    """Mechanical reference drawings on user layers and silkscreen notes."""
+    """Mechanical reference drawings on user layers. (The silkscreen is in silk.py.)"""
     Dw = pcbnew.Dwgs_User
     B.edge(rect(*G.LENS), layer=Dw, width=0.15)
     B.edge(rect(*G.LCM), layer=Dw, width=0.1)
@@ -62,15 +62,6 @@ def documentation(B):
         B.edge(rect(x1, y1, x2, y2), layer=pcbnew.Cmts_User, width=0.1)
     B.text('folded display flex lies here: no tall parts', 37, 82.5, 1.0, pcbnew.Cmts_User)
     B.text('Ethernet plug', 77.8, G.NOTCH_Y + 15, 1.0, Dw, rot=90)
-    B.text('Attractap Touch P4', 44, 100.3, 1.0, pcbnew.F_SilkS)
-    B.text('rev A', 62.0, 100.3, 0.8, pcbnew.F_SilkS)
-    B.text('PoE 48V', 82.0, G.JACK_Y - 0.9, 0.8, pcbnew.F_SilkS)
-    for num, mark in (('1', '+'), ('2', '-')):
-        x, y = min(B.pads_num('J103', num), key=lambda p: p[1])
-        B.text(mark, x, y - 3.6, 1.0, pcbnew.F_SilkS)
-    for ref, label in (('SW201', 'RST'), ('SW202', 'BOOT')):
-        x, y = unV(B.fp[ref].GetPosition())
-        B.text(label, x + 5.6, y, 0.8, pcbnew.F_SilkS)
 
 
 def display_ground_pads(board):

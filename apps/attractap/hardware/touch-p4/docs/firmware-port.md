@@ -45,6 +45,9 @@ What the firmware needs to know to run on the Attractap Touch P4 board.
 | 52 | NFC_SCL | |
 | 53, 54 | not connected | |
 
+The component side of the board carries a short version of this map. Its numbers are generated from the same table
+as the schematic (`P4_GPIO` in `scripts/bootstrap/circuit_core.py`).
+
 ## IO expander (TCA9554 at 0x20 on I2C0)
 
 | Pin | Signal | Direction |

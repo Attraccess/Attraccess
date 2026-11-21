@@ -18,7 +18,8 @@ edited by hand, treat the KiCad files as the source of truth and do not run
 | `placement.py` | Position and rotation of every part. |
 | `build_pcb.py` | Builds the board (`place`), exports and imports the autorouter exchange files (`dsn`, `ses`), fills the zones (`finish`). |
 | `board.py` | Paths, coordinate helpers and the `Board` wrapper around pcbnew that the builder modules share. |
-| `board_setup.py` | Outline, labels, zones and keep-outs, ground pads for the display, design rules, net classes, project file. |
+| `board_setup.py` | Outline, zones and keep-outs, ground pads for the display, design rules, net classes, project file. |
+| `silk.py` | The silkscreen of both sides: logo from the vector files in `case/logo/`, labels, the GPIO map (from `circuit_core.P4_GPIO`), notes. Checks that no text lies on a pad, on another text or off the board. |
 | `routes_mcu.py` | Fixed routes at the MCU: supply vias, the fan-out of all four sides, the flash, the display bus, and the NFC host signals at the PN532. |
 | `routes_board.py` | Fixed routes elsewhere: 48 V nets, Ethernet pairs, antenna feeds, DC input with its filter, buzzer, LED link, ground vias, and the via fan-out of the supply pads. |
 | `finish_route.py` | Grid router that closes the connections the autorouter leaves open, including the ground and 3.3 V pads that are cut off from their pours. |

@@ -106,13 +106,6 @@ class Board:
         # on the silkscreen they would overlap each other and the test point labels.
         fp.Reference().SetLayer(pcbnew.F_Fab)
         fp.Reference().SetVisible(not ref.startswith(('H', 'FID')))
-        if ref.startswith('TP'):
-            val = fp.Value()
-            val.SetLayer(pcbnew.F_SilkS)
-            val.SetVisible(True)
-            val.SetTextSize(pcbnew.VECTOR2I(mm(0.8), mm(0.8)))
-            val.SetTextThickness(mm(0.15))        # JLCPCB prints no line thinner than 0.15 mm
-            val.SetPosition(V(x, y + 1.5))
         self.b.Add(fp)
         for pad in fp.Pads():
             n = part.nets.get(pad.GetNumber())

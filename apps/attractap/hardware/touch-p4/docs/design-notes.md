@@ -460,9 +460,29 @@ test point are about 70 mm away. They hang behind a 1 kohm resistor (R217) that
 sits at the line, next to the strap resistor, so the 50 MHz line has no long
 open branch. With the button pressed the pin sees 0.3 V.
 
-The silkscreen carries only functional labels (test points, buttons, polarity
-marks). Reference designators are on the assembly drawing layer
-(`fab/board-front.pdf`): on a board this dense they would overlap.
+The silkscreen (`scripts/bootstrap/silk.py`) is for the person with the reader
+open in front of them. Reference designators are not on it: on a board this
+dense they would overlap. They are on the assembly drawing layer
+(`fab/board-front.pdf`).
+
+- Component side, the side one sees with the reader off its dock: test points
+  in named groups (C6, P4 UART0, power), how to get into download mode, the
+  limits of the connectors, the border of the 48 V side, the LED numbers as the
+  firmware counts them, and a field for a serial number. The free area behind
+  the NFC loop holds the logo, the board's name and revision, a short GPIO map
+  and where the documents are. The numbers of the GPIO map are taken from the
+  circuit description (`circuit_core.P4_GPIO`), so they cannot drift from the
+  netlist.
+- Display side, hidden in the finished reader: the assembly hints for the
+  display (the four ground pads, the jack's pins to clip, which of them carry
+  48 V), the LED numbers, the keyhole at the tap point, and a note for whoever
+  takes the display off. The text `JLCJLCJLCJLC` there is where JLCPCB prints
+  its order number, if the order asks for that (see the README).
+- Texts are 0.9 or 1.0 mm high with 0.15 mm lines. The build stops if a text
+  lies on a pad, on another text or within 0.3 mm of the board edge.
+- The logo is drawn from the vector files in `case/logo/`. The mascot is not
+  used: by the brand rules it keeps its natural colours, and a silkscreen has
+  one.
 
 ## Cost
 

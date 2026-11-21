@@ -109,7 +109,8 @@ can be found again; `check` fails when it does not match the board.
 | `bom-*-external-antenna.csv` | The same parts lists with the Wi-Fi module that has an antenna connector. |
 
 `fab/board-front.pdf` (not in git) is the assembly drawing with the reference designators; the
-silkscreen has none.
+silkscreen has none. What the silkscreen does carry is described in the
+[design notes](docs/design-notes.md#layout-rules-used).
 
 What the board needs, for the order form:
 
@@ -126,6 +127,7 @@ What the board needs, for the order form:
 | Assembly | top side only: 198 parts in 68 lines (Wi-Fi version), 233 parts in 78 lines (Ethernet/PoE version) |
 | Through-hole parts | DC jack J102, DC terminal J103 (two pins in a four-hole footprint, see below), and on the Ethernet/PoE version the jack J401 |
 | Not assembled by JLCPCB | the display panel (taped on, flex plugged into J601) |
+| Order number on the board | choose the option that lets you set its position ("Specify Position" / "Specify a location"): JLCPCB then prints its order number in place of the text `JLCJLCJLCJLC`, which is on the display side and hidden behind the display. Otherwise it picks a place itself |
 
 What the parts cost, what JLCPCB charges once per order, and which cheaper parts were considered:
 [docs/design-notes.md](docs/design-notes.md#cost).

@@ -106,24 +106,27 @@ def power(d):
           lcsc='C8678', mpn='SS34', desc='Supply OR-ing, DC input')
 
 
+# ESP32-P4 GPIO number -> net. silk.py prints part of this map on the board.
+P4_GPIO = {
+    0: 'TP_RST', 1: 'I2C0_SCL', 2: 'I2C0_SDA', 3: 'TP_INT',
+    4: 'LCD_R5_M', 5: 'LCD_R4_M', 6: 'LCD_R3_M', 7: 'LCD_R2_M', 8: 'LCD_R1_M',
+    9: 'LCD_G5_M', 10: 'LCD_G4_M', 11: 'LCD_G3_M', 12: 'LCD_G2_M', 13: 'LCD_G1_M', 14: 'LCD_G0_M',
+    15: 'LCD_B5_M', 16: 'LCD_B4_M', 17: 'LCD_B3_M', 18: 'LCD_B2_M', 19: 'LCD_B1_M',
+    20: 'LCD_HSYNC_M', 21: 'LCD_VSYNC_M', 22: 'LCD_DE_M', 23: 'LCD_PCLK_M',
+    24: 'USB_DN_M', 25: 'USB_DP_M', 26: 'BL_PWM',
+    28: 'RMII_CRS_DV', 29: 'RMII_RXD0', 30: 'RMII_RXD1', 31: 'ETH_MDC', 32: 'RMII_REF_CLK',
+    33: 'RMII_TX_EN', 34: 'RMII_TXD0', 35: 'RMII_TXD1', 36: 'ETH_MDIO',
+    37: 'UART0_TX', 38: 'UART0_RX',
+    39: 'SDIO_D0', 40: 'SDIO_D1', 41: 'SDIO_D2', 42: 'SDIO_D3', 43: 'SDIO_CLK_M', 44: 'SDIO_CMD',
+    45: 'C6_EN_M', 46: 'BUZZER', 47: 'LED_DATA',
+    49: 'NFC_IRQ', 50: 'NFC_RST', 51: 'NFC_SDA', 52: 'NFC_SCL',
+}
+
+
 def mcu(d):
     """MCU: ESP32-P4 core, core DC-DC, flash, clock, reset, straps."""
     d.begin('mcu', 200)
-    g = {  # GPIO number -> net
-        0: 'TP_RST', 1: 'I2C0_SCL', 2: 'I2C0_SDA', 3: 'TP_INT',
-        4: 'LCD_R5_M', 5: 'LCD_R4_M', 6: 'LCD_R3_M', 7: 'LCD_R2_M', 8: 'LCD_R1_M',
-        9: 'LCD_G5_M', 10: 'LCD_G4_M', 11: 'LCD_G3_M', 12: 'LCD_G2_M', 13: 'LCD_G1_M', 14: 'LCD_G0_M',
-        15: 'LCD_B5_M', 16: 'LCD_B4_M', 17: 'LCD_B3_M', 18: 'LCD_B2_M', 19: 'LCD_B1_M',
-        20: 'LCD_HSYNC_M', 21: 'LCD_VSYNC_M', 22: 'LCD_DE_M', 23: 'LCD_PCLK_M',
-        24: 'USB_DN_M', 25: 'USB_DP_M', 26: 'BL_PWM',
-        28: 'RMII_CRS_DV', 29: 'RMII_RXD0', 30: 'RMII_RXD1', 31: 'ETH_MDC', 32: 'RMII_REF_CLK',
-        33: 'RMII_TX_EN', 34: 'RMII_TXD0', 35: 'RMII_TXD1', 36: 'ETH_MDIO',
-        37: 'UART0_TX', 38: 'UART0_RX',
-        39: 'SDIO_D0', 40: 'SDIO_D1', 41: 'SDIO_D2', 42: 'SDIO_D3', 43: 'SDIO_CLK_M', 44: 'SDIO_CMD',
-        45: 'C6_EN_M', 46: 'BUZZER', 47: 'LED_DATA',
-        49: 'NFC_IRQ', 50: 'NFC_RST', 51: 'NFC_SDA', 52: 'NFC_SCL',
-    }
-    p4 = {('GPIO%d' % n): net for n, net in g.items()}
+    p4 = {('GPIO%d' % n): net for n, net in P4_GPIO.items()}
     p4.update({
         'VDD_LP': '+3V3', 'VDD_IO_0': '+3V3', 'VDD_IO_4': '+3V3', 'VDD_IO_5': '+3V3', 'VDD_IO_6': '+3V3',
         'VDD_LDO': '+3V3', 'VDD_DCDCC': '+3V3', 'VDD_ANA': '+3V3', 'VDD_BAT': 'VDD_BAT',
