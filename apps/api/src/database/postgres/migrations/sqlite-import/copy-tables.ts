@@ -3,6 +3,7 @@ import {
   coreTables,
   describePostgresError,
   foreignKeys,
+  isSecretColumn,
   orphanKeys,
   ownedSequences,
   primaryKey,
@@ -55,9 +56,15 @@ async function planTable(pg: QueryRunner, sqlite: DataSource, table: string): Pr
   return { table, sqliteColumns: copied, targets, keyIndexes: keys.map((key) => copied.indexOf(key)) };
 }
 
-function rowName(plan: TablePlan, row: SqliteCell[], index: number): string {
+/** Names a row by its primary key, or by its position when the key is missing or secret. */
+export function rowName(
+  plan: Pick<TablePlan, 'sqliteColumns' | 'keyIndexes'>,
+  row: SqliteCell[],
+  index: number,
+): string {
   const key = plan.keyIndexes.filter((at) => at >= 0);
-  if (key.length === 0 || key.length !== plan.keyIndexes.length) return `row ${index + 1}`;
+  const secret = key.some((at) => isSecretColumn(plan.sqliteColumns[at]));
+  if (key.length === 0 || key.length !== plan.keyIndexes.length || secret) return `row ${index + 1}`;
   return `row ${key.map((at) => `${plan.sqliteColumns[at]}=${String(row[at].exact ?? row[at].value)}`).join(', ')}`;
 }
 

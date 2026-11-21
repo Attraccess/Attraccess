@@ -3,7 +3,7 @@ import { migrateFrozenSqlite, openFrozenSqlite } from '../../../sqlite/sqlite-fr
 import { createSqliteSource } from '../../../sqlite/sqlite-source';
 import { copySqliteTables, type CopyResult } from './copy-tables';
 import { holdsUsers } from './postgres-catalog';
-import { fileExists, moveToBackup, sqliteBackupDirectory } from './sqlite-backup';
+import { fileExists, moveToBackup, PartialBackupMoveError, sqliteBackupDirectory } from './sqlite-backup';
 import { SqliteImportError } from './sqlite-values';
 
 export interface ImportLog {
@@ -97,6 +97,7 @@ export async function importSqliteInstallation(pg: QueryRunner, options: ImportS
   try {
     location = await moveToBackup(sqliteFile, options.now?.());
   } catch (error) {
+    if (error instanceof PartialBackupMoveError) location = error.location;
     logger.warn(
       `The SQLite data is in PostgreSQL, but moving ${sqliteFile} to ${sqliteBackupDirectory(sqliteFile)} failed: ` +
         `${(error as Error).message}. Move or delete the SQLite file (and its -wal, -shm and -journal files) yourself.`,

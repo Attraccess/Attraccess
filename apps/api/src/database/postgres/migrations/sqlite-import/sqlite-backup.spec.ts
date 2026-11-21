@@ -1,7 +1,18 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { moveToBackup, sqliteBackupDirectory } from './sqlite-backup';
+import { moveToBackup, PartialBackupMoveError, sqliteBackupDirectory } from './sqlite-backup';
+
+/** Set by a test to make renaming one path fail; every other call goes to the real fs. */
+let failRenameOf: string | undefined;
+jest.mock('node:fs/promises', () => {
+  const actual = jest.requireActual('node:fs/promises');
+  return {
+    ...actual,
+    rename: (from: string, to: string) =>
+      from === failRenameOf ? Promise.reject(new Error('EACCES: permission denied')) : actual.rename(from, to),
+  };
+});
 
 describe('moveToBackup', () => {
   let root: string;
@@ -15,6 +26,7 @@ describe('moveToBackup', () => {
   });
 
   afterEach(async () => {
+    failRenameOf = undefined;
     await rm(root, { recursive: true, force: true });
   });
 
@@ -54,5 +66,20 @@ describe('moveToBackup', () => {
 
     await expect(moveToBackup(file, now)).rejects.toThrow('already exists');
     expect(await readFile(file, 'utf8')).toBe('data');
+  });
+
+  it('names where the SQLite file is now when a -wal file cannot follow it', async () => {
+    await writeFile(file + '-wal', 'wal');
+    failRenameOf = file + '-wal';
+
+    const failure = await moveToBackup(file, now).catch((error: unknown) => error);
+
+    const target = join(root, 'sqlite-backup', 'attraccess.sqlite');
+    expect(failure).toBeInstanceOf(PartialBackupMoveError);
+    expect((failure as PartialBackupMoveError).location).toBe(target);
+    expect((failure as Error).message).toBe(
+      `${file} moved to ${target}, but ${file}-wal did not: EACCES: permission denied`,
+    );
+    expect(await readFile(target, 'utf8')).toBe('data');
   });
 });

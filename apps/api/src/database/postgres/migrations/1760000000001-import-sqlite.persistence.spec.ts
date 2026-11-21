@@ -236,7 +236,7 @@ describe('PostgresImportSqlite1760000000001', () => {
       );
 
       await expect(runImport()).rejects.toThrow(
-        /Table billing_transaction breaks the foreign key \S+ \(references user\).*\[\{"userId":"99"\}\]/,
+        /Table billing_transaction breaks the foreign key \S+ \(references user\).*\[\{"id":"5","userId":"99"\}\]/,
       );
 
       expect(await q('SELECT 1 FROM "user"')).toEqual([]);

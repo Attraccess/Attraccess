@@ -88,11 +88,22 @@ export async function foreignKeys(manager: Query): Promise<ForeignKey[]> {
   }));
 }
 
-/** The first child keys that break a foreign key: only the key columns, never other columns of the row. */
+/** Key columns whose values are credential material (e.g. `mcp_oauth_token.tokenHash`): never printed in an error. */
+export function isSecretColumn(column: string): boolean {
+  return /hash|token|secret/i.test(column);
+}
+
+/**
+ * The first child rows that break a foreign key, named by their primary key and the foreign key columns: only key
+ * columns, never other columns of the row, and never a key that is credential material.
+ */
 export async function orphanKeys(manager: Query, key: ForeignKey): Promise<string> {
   const join = key.childColumns.map((c, i) => `p.${quote(key.parentColumns[i])} = c.${quote(c)}`).join(' AND ');
   const notNull = key.childColumns.map((c) => `c.${quote(c)} IS NOT NULL`).join(' AND ');
-  const select = key.childColumns.map((c) => `c.${quote(c)}::text AS ${quote(c)}`).join(', ');
+  const rowKey = (await primaryKey(manager, key.child)).filter((c) => !key.childColumns.includes(c));
+  const shown = [...rowKey, ...key.childColumns].filter((c) => !isSecretColumn(c));
+  if (shown.length === 0) return '(not shown: the key columns hold credentials)';
+  const select = shown.map((c) => `c.${quote(c)}::text AS ${quote(c)}`).join(', ');
   const rows = await manager.query(
     `SELECT ${select} FROM ${quote(key.child)} c WHERE ${notNull}
        AND NOT EXISTS (SELECT 1 FROM ${quote(key.parent)} p WHERE ${join}) LIMIT 5`,
