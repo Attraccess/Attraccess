@@ -39,7 +39,7 @@ One reader needs five printed parts for the wall, six for the desk. The print fi
 
 Tools: soldering iron with a tip slimmer than 6 mm and at least 10 mm long, a driver for the M3 screws, side cutters, flush cutters for the jack's pins (Ethernet version), and a drill for the wall.
 
-The PCB screws are M3 × 4. Earlier parts lists said M3 × 6, but since the screen went flush the bosses are only 3.4 mm deep, and a 6 mm screw bottoms out before it clamps the board.
+The PCB screws are M3 × 4. Earlier parts lists said M3 × 6, but since the screen went flush the insert holes in the bosses are only 3.2 mm deep, and a 6 mm screw bottoms out before it clamps the board.
 
 ## Prepare the printed parts
 
@@ -51,7 +51,7 @@ The short inserts go straight down into the bosses. The two standard ones enter 
 
 1. Lay the cap face-down on a soft cloth, inside facing up.
 2. Heat the soldering iron to about 250 °C.
-3. Press one short insert into each of the four PCB bosses, flush with the top of the boss or 0.2 mm below. A proud insert lifts the PCB and loosens the display behind it.
+3. Press one short insert into each of the four PCB bosses, flush with the top of the boss or 0.2 mm below. A proud insert lifts the PCB and loosens the display behind it. These holes end 1.5 mm behind the front face: take the iron away as soon as the insert is flush, or the front can mark.
 4. Stand the cap on its top edge, bottom wall up. Put a standard insert on the iron tip, pass it through one of the two round holes in the bottom wall and across the slot, and press it into the lock bar until it is flush. Repeat for the second hole.
 5. Check that nothing sticks out into the slot between bottom wall and lock bar. The dock's tongue has to slide in there.
 6. Let everything cool, then run an M3 screw through each insert once.
@@ -190,8 +190,10 @@ Two screws release the reader; four more release the PCB.
 Nothing below has been checked on real parts. Each item can change a step or a part.
 
 - [ ] **Printed fits.** Glass in its window (0.25 mm gap per side), tongue in its slot (0.4 mm), hook on the cleat (0.1 mm). Tune on the first print.
-- [ ] **Display dimensions.** Glass thickness 1.3 mm, total thickness 3.8 mm and corner radius of at least 1 mm are assumed. They decide whether the screen sits flush.
-- [ ] **Display distance and flex.** The frame holds the display 2 mm off the PCB, which is the most the flex allows by the panel's drawing; 1.5 mm is the target (see the case README). Check with the real panel that the stiff parts of the flex lie flat behind the PCB and that the flex reaches its connector.
+- [ ] **Display dimensions.** Glass with touch sensor 0.9 mm and total thickness 3.14 mm are taken from the panel's drawing, a corner radius of at least 1 mm is assumed. They decide whether the screen sits flush. Other panels of this type can be up to 0.7 mm thicker.
+- [ ] **Display distance and flex.** The frame holds the display 1.5 mm off the PCB; by the panel's drawing the flex allows 2 mm at most (see the case README). Check with the real panel that the stiff parts of the flex lie flat behind the PCB and that the flex reaches its connector.
+- [ ] **Inserts in the PCB bosses.** Their holes reach into the front wall and leave 1.5 mm of it. Check on the first print that the front shows no marks after the inserts are pressed in.
+- [ ] **Figures.** The figures show the case before its depth changed: the cap was 1.2 mm deeper. The steps are the same.
 - [ ] **Jack pins behind the display.** Clipped to 1 mm they should clear the display's metal back by 0.5 mm or more. Measure how far the pins of a soldered jack stand out, and check the gap with the display fitted.
 - [ ] **PoE module height.** Assumed 10 mm.
 - [ ] **Swing-on motion.** Collision-free in CAD at five angles between 7° and closed, after the dock's tongue was tapered on 19 Nov 2026. Docks sliced before that need re-slicing.

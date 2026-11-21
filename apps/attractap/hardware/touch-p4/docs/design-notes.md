@@ -146,8 +146,12 @@ new display section, not a part swap.
   to 86, y 71 to 88: behind the corner of the LCD module and under the edge of
   the lens. The enclosure must not press on them and no metal may touch them;
   pins 9 and 10 (x 81.2 and 82.5, the two nearest the board edge in the upper
-  rows) carry 48 V. A wall of the display frame between pin 9 and the LCD
-  module's edge is worth having: there are 0.5 mm between them.
+  rows) carry 48 V. No wall of a display frame fits between pin 9 and the LCD
+  module's edge: the pin is 0.5 mm from it and its solder pad 0.1 mm. The tape
+  on the LCD is the insulation there.
+- Depth between board and front: the display side of the board is 4.74 mm
+  behind the front of the glass (1.5 mm distance, 3.14 mm display, 0.1 mm
+  recess). The case in `case/` is drawn for that.
 - The DC cut-away is sized for a straight 5.5 mm barrel plug up to 11 mm
   thick. Check it with the plug of the supply you plan to ship.
 - The DC terminal (WAGO 250-202, push-button) sits next to the DC jack. Its
