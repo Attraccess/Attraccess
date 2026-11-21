@@ -14,7 +14,7 @@ Why the board looks the way it does, and what is still an assumption.
 | PoE | ready-made isolated module | No transformer design; the footprint takes SDAPO DP9900M-5V or Silvertel Ag9905M. |
 | Supply | DC 12 to 24 V, PoE or USB-C, each through its own Schottky diode onto one 5 V rail | Any combination may be connected; no source feeds another. |
 | DC connectors | barrel jack (5.5 / 2.1 mm) and WAGO 250 push-button terminal in parallel | Plug-in supplies and bare wires from an existing installation both work. The terminal footprint also takes the WAGO 2601 lever terminal, which costs 13 times as much. |
-| Ethernet jack | below the display, not behind it | Its through-hole pins stand 1.5 to 2 mm out of the display side of the board. The display's metal back lies flat on that side. |
+| Ethernet jack | behind the lower right corner of the display, 51 mm above the lower board edge | A plug with its boot and the cable's bend into the wall need 49 mm below the jack, inside the case. The price: the jack's pins stand out of the display side behind the display. The display sits 1.5 to 2 mm off the board and the pins are clipped (see "Display mounting and flex"). Below the display the jack would need a case 19 mm longer. |
 | USB-C | service port at the board edge next to the MCU | Only used for flashing and debugging, never offered to users. |
 | Wi-Fi antenna | PCB antenna of the module, or external antenna | The ESP32-C6-MINI-1U (U.FL connector) fits the same pads. |
 | Assembly | all parts on one side | The display is taped to the other side; cheaper assembly. |
@@ -37,8 +37,8 @@ board, x right, y down, millimetres. The user looks at the other side.
 | Display cover lens (84.3 x 84.3) | x 0.85 to 85.15, y 7.0 to 91.3 |
 | LCD module (metal back) | x 5.6 to 80.4, y 12.8 to 89.4 |
 | Flex slot | x 11.5 to 62.0, y 89.5 to 92.5 |
-| Ethernet jack | x 68.8 to 84.9, y 90.5 to 112.1, opens downwards into its cut-away. Pin rows at y 92.3 and 94.85, below the lower edge of the lens |
-| Cut-away for the Ethernet plug | x above 69.5, y above 111.8 |
+| Ethernet jack | x 68.8 to 84.9, y 71.2 to 92.8, opens downwards into its cut-away. Pin rows at y 73.0 and 75.55, behind the display |
+| Cut-away for the Ethernet plug | x above 69.5, y above 92.5 (16.5 x 51 mm) |
 | Cut-away for the DC plug | x below 12, y above 107.5 |
 | NFC loop | 35 x 37, centre (44.5, 117), on the display side |
 | LEDs | x 29.5, 39.5, 49.5, 59.5 at y 95.6 and y 139.0, each in a 3.4 x 3.0 window with relieved corners |
@@ -54,11 +54,28 @@ the Waveshare ESP32-S3-Touch-LCD-4). Points that drive the layout:
 
 - The flex leaves the bottom edge of the LCD module, 1.9 mm above the lens edge,
   and is 25 mm long measured from the lens edge. Its contacts face away from
-  the glass and there is a steel-stiffened touch joint 3.7 mm from the module
-  edge.
-- The flex goes through the slot and folds onto the component side. For that
-  fold the display has to sit at most about 1 mm in front of the board (thin
-  double-sided tape).
+  the glass. The touch panel has a tail of its own, soldered onto the main
+  tail at a steel-stiffened joint.
+- The flex goes through the slot and folds onto the component side. The stiff
+  parts of the flex must lie flat behind the board after that turn. Measured
+  from the edge of the LCD module they begin at 4.8 mm (components on the main
+  tail), 5.3 mm (the soldered joint of the touch tail) and 6.4 mm (the touch
+  controller on the touch tail, which starts 2.2 mm further forward, at the
+  front of the LCD). That limits the distance between the board and the LCD's
+  metal back to **2.0 mm**; at 1.5 mm there is 0.5 mm to spare. These figures
+  are scaled from the drawing, +-0.4 mm.
+- The distance cannot be small either, because of the Ethernet jack. Its pins
+  come out of the display side of the board behind the lower right corner of
+  the LCD module, at least 1.45 mm long (the datasheet gives a minimum pin
+  length of 3.05 mm and no maximum). Behind the metal back are pins 1 to 8, 11
+  and 12 (signals, 3.3 V), one shield tab and one plastic post. The two 48 V
+  pins 9 and 10 come out 0.8 and 2.1 mm beside the metal back (centre of the
+  pin to the module's edge).
+- So: **clip the jack's pins, tabs and posts to 1 mm** on the display side after
+  soldering, stick **polyimide tape** on the LCD's metal back over that corner
+  (x 66 to 80.4, y 69 to 89.4), wrapped 2 mm round the module's side edge next
+  to pin 9, and mount the display **1.5 mm** in front of the board. Unclipped
+  pins touch the metal back at 1.5 mm and may touch it at 2 mm.
 - After the fold the contacts face the board, so J601 is a **bottom-contact**
   connector (Hirose FH12-40S-0.5SH) with its opening towards the slot.
 - Seen from the component side, panel pin 1 is on the right. The connector's
@@ -67,8 +84,9 @@ the Waveshare ESP32-S3-Touch-LCD-4). Points that drive the layout:
 - The folded flex covers the area x 11.5 to 62, y 76 to 89.5 and the tail up to
   the connector. No tall parts are placed there.
 
-Not verified with a real panel: the exact fold length. The connector sits about
-1.5 mm closer to the slot than the nominal flex end, so the flex bows slightly
+Not verified with a real panel: the exact fold length. With the display 1.5 mm
+off the board the connector sits about 1.5 mm closer to the slot than the flex
+end (0.7 mm for the shorter flex of a second drawing), so the flex bows slightly
 instead of being stretched. Check with a sample panel before ordering boards.
 Other panel suppliers with the same 40-pin pinout can differ in flex length.
 
@@ -104,16 +122,32 @@ new display section, not a part swap.
   less range than on a development board. The version with an external antenna
   does not depend on this.
 - Both bottom corners of the board are cut away. The Ethernet jack opens
-  downwards into the one on the right (16.5 x 31.7 mm), the DC jack into the
-  one in the other corner (12 x 36 mm). A DC plug and its cable stay inside the
-  board outline there and can go down or straight back into the wall. The
-  Ethernet cut-away takes a plug with a short boot (about 25 mm from the jack);
-  the cable then turns back into the wall or leaves past the lower board edge.
-  Check it with the patch cable you plan to use.
-- Nothing may press on the board from the display side below the display at
-  the Ethernet jack: its pins and two plastic posts stand up to 2 mm out of the
-  board there (x 68 to 86, y 91 to 107). Keep the enclosure 2.5 mm clear and do
-  not let metal touch them; two of the pins carry 48 V.
+  downwards into the one on the right (16.5 x 51 mm), the DC jack into the
+  one in the other corner (12 x 36 mm). Plugs and cables stay inside the board
+  outline there and can go down or back into the wall.
+- Room for the Ethernet plug, with the case in `case/`. What counts is the
+  stiff part of the plug below the jack: body and boot, less the 13.5 mm that
+  are inside the jack. Common moulded patch cables measure 24 to 31 mm there
+  (37 to 44 mm over all).
+
+  | Cable | Bend radius (4 x diameter) | Stiff part may end below the jack: cable into the wall behind the reader | Straight down through the bottom notch |
+  |---|---|---|---|
+  | Patch cable 5.5 mm | 22 mm | 31 mm | 49 mm |
+  | Cat 6 patch cable 6.3 mm | 25 mm | 29 mm | 49 mm |
+  | Slim patch cable 3.8 mm (28 AWG) | 15 mm | 37 mm | 49 mm |
+
+  So a normal patch cable fits either way, with little to spare on the way into
+  the wall; a slim one leaves the most room and carries this reader's PoE
+  current (below 0.3 A) without trouble. Plugs for field termination are
+  longer and sit on 7 to 8 mm installation cable that wants a 30 mm bend: they
+  fit the bottom exit only. End installation cable in a socket and use a short
+  patch cable from there.
+- The Ethernet jack's pins stand out of the display side of the board at x 68
+  to 86, y 71 to 88: behind the corner of the LCD module and under the edge of
+  the lens. The enclosure must not press on them and no metal may touch them;
+  pins 9 and 10 (x 81.2 and 82.5, the two nearest the board edge in the upper
+  rows) carry 48 V. A wall of the display frame between pin 9 and the LCD
+  module's edge is worth having: there are 0.5 mm between them.
 - The DC cut-away is sized for a straight 5.5 mm barrel plug up to 11 mm
   thick. Check it with the plug of the supply you plan to ship.
 - The DC terminal (WAGO 250-202, push-button) sits next to the DC jack. Its
@@ -222,14 +256,17 @@ copper on one layer:
   none). From that line to the 48 V pins the board has no copper on any layer.
 - At the jack's metal shell. The shell is on the secondary side (shield). No
   48 V copper and no part at 48 V lies on the component side within 1 mm of the
-  shell's rear wall; the two 48 V nets pass under that wall on the back layer.
-- At the display. The back layer faces the display's metal back. The jack's
-  48 V pins are below the display, and the 48 V tracks on the back layer keep
-  2 mm from the outline of the LCD module.
+  shell's rear wall; the two 48 V nets pass under that wall on the inner layer.
+- At the display. The jack's two 48 V pins come out of the display side of the
+  board beside the LCD module's metal back: pin 9 with 0.5 mm between pin and
+  module edge, pin 10 with 1.8 mm. Air alone does not hold 1500 V over 0.5 mm.
+  The polyimide tape on that corner of the LCD, wrapped round its edge, is the
+  insulation (see "Display mounting and flex"). No 48 V track runs on the back
+  layer, which faces the display.
 
 The 2 mm figure is a design choice, not a certified creepage distance.
-Silvertel asks for 3 mm between the two sides of the barrier; the board has 2.0
-to 2.6 mm. The jack itself has 2.3 mm between its PoE pins and its signal
+Silvertel asks for 3 mm between the two sides of the barrier; the board has
+2.0 mm and more. The jack itself has 2.3 mm between its PoE pins and its signal
 pins. IEEE 802.3 wants the port to stand 1500 V RMS against everything that
 can be touched; C102 and C410 are 2 kV DC parts, which is below the peak of
 that test (2.1 kV). Test the isolation on an assembled unit before the lab
@@ -241,8 +278,8 @@ sides are safe to touch.
 - Loop: 4 turns, 35 x 37 mm, 0.5 mm track, 0.9 mm pitch, on the display side.
   Calculated from the track geometry it has 1.28 uH in free air. The copper
   around it, the display, one mounting screw 3 mm beside it, the DC terminal
-  6 mm away and, on the lan version, the Ethernet jack 7 mm beside its upper
-  right part all lower that. Expect 1.1 to 1.25 uH.
+  6 mm away and, on the lan version, the Ethernet plug and cable 8 mm beside
+  its right edge all lower that. Expect 1.1 to 1.25 uH.
 - Damping: 1.5 ohm in each leg, giving a quality factor of about 25.
 - EMC filter: 560 nH and 220 pF per side (corner at 14.3 MHz).
 - Matching: series 39 pF, parallel 180 pF + 18 pF. These are not the values
@@ -266,8 +303,8 @@ sides are safe to touch.
 These are starting values. Measure the loop first, then tune C513/C517,
 C514/C515/C518/C519 and R504/R505 with a network analyser on an assembled unit
 with the display fitted, and check the read range with the cards in use. The
-two assembly versions differ here: the jack is metal next to the loop, so tune
-each version on its own.
+two assembly versions differ here: a shielded plug and its cable lie next to
+the loop, so tune the lan version on its own, with the cable plugged in.
 
 Copper around the loop is open at one place (a 2.5 mm gap in all layers on the
 side towards the Ethernet cut-away). A closed ring of copper around the loop
@@ -290,15 +327,11 @@ layer through one via, and there the two swap sides. (A swapped pair would
 still link: 10BASE-T receivers correct it and 100BASE-TX does not depend on
 polarity.)
 
-The jack is 19 mm further from the PHY than the shortest place for it,
-because of the display: every through-hole pin of the jack is below the lower
-edge of the cover lens. Behind the display the pins would stand 1.5 to 2 mm out
-of the board into the LCD's metal back, which has to lie within 1 mm of the
-board for the flex to reach its connector. The pairs and the 48 V nets pass
-under the rear wall of the jack's metal shell on the back layer, and no part
-sits within 1 mm of it. Only the two centre-tap tracks and, at the shell's left
-side, the LED and shield tracks run under the shell on the component side;
-a contact between one of those and the shell would do no harm.
+The pairs pass under the rear wall of the jack's metal shell on the back layer,
+the two 48 V nets on the inner layer, and no part sits within 1 mm of that
+wall. Only the two centre-tap tracks and, at the shell's left side, the LED and
+shield tracks run under the shell on the component side; a contact between one
+of those and the shell would do no harm.
 
 The PHY has no reset circuit of its own. Its reset pin hangs on an IO expander
 pin that is an input with a weak pull-up after power-up, so the PHY starts
@@ -341,7 +374,7 @@ their exposed pads.
 
 Routed by hand (script) and locked:
 
-- the 48 V nets, the Ethernet pairs, the jack's LED and shield nets,
+- the 48 V nets, the Ethernet pairs and the centre-tap tracks,
 - the DC input from the connectors through fuse, diode and filter to the
   converter, the buzzer circuit and the output of the PoE module,
 - the PHY pins on its left and lower side,
@@ -405,7 +438,7 @@ for 100 ohm.
 Lengths of the fast buses on the routed board: the six SDIO lines to the Wi-Fi
 module are 39 to 47 mm, the RMII lines to the PHY 35 to 51 mm with two to four
 vias each. Both are well inside what these interfaces tolerate. The Ethernet
-pairs from the PHY to the jack are 27 to 31 mm.
+pairs from the PHY to the jack are 11 to 18 mm.
 
 Solder paste on the MCU's exposed pad is printed as nine windows of 2.1 mm
 (70 % of the pad), not as one opening of 7.5 mm: with paste over the whole pad
@@ -486,10 +519,10 @@ display and the connectors. Nothing was built or measured.
 | Finding | Change |
 |---|---|
 | Buzzer: both coil pads were on one net, the transistor switched two pads that only hold the part. It would have stayed silent. | Coil pads 1 and 2 on the two nets, pads 3 and 4 unconnected. |
-| Ethernet jack behind the display: its pins stand 1.5 to 2 mm out of the display side, into the LCD's metal back; two of them carry 48 V. | Jack moved 19 mm down, below the display. The cut-away for the plug is 31.7 mm deep instead of 51. |
+| Ethernet jack behind the display: its pins stand at least 1.45 mm out of the display side, and the notes asked for the display within 1 mm of the board. | The jack stays (moving it below the display would cost 19 mm of plug room, and the case would have to grow by that). Instead the display distance is set from both sides: 1.5 mm, 2.0 at most for the flex, with the jack's pins clipped to 1 mm and polyimide tape on that corner of the LCD. The two 48 V pins are beside the metal back, not behind it. |
 | Placement angle of four parts differed from JLCPCB's library: the PN532 (second source), the transistor and the resistor arrays (KiCad's footprints), later the new level shifter. The PN532 would have been placed a quarter turn off. | The export corrects these angles. New target `check-footprints`. |
 | NFC matching was calculated for a larger loop: about 140 mA transmitter current with the loop on the board, limit 100 mA. | Values that stay below 90 mA for any loop between 1.0 and 1.3 uH. |
-| 48 V parts and tracks directly at the rear wall of the jack's metal shell (0.1 to 0.3 mm), and the centre-tap capacitors as well. | Parts moved away, 48 V nets under the shell on the back layer. |
+| 48 V parts and tracks directly at the rear wall of the jack's metal shell (0.1 to 0.3 mm), and the centre-tap capacitors as well. | Parts moved 2 mm away, 48 V nets under the shell on the inner layer, Ethernet pairs on the back layer. |
 | Copper pour under the PoE module where its isolation barrier lies. | No copper there on any layer. |
 | DC input without a filter: the converter's ripple would go out on the supply cable. | Pi filter C117, L103. |
 | Unpowered inputs float up through the leakage of the OR-ing diodes; a USB-C host may then not power the port. | Bleed resistors R104, R105. |
@@ -522,13 +555,16 @@ display and the connectors. Nothing was built or measured.
 
 ### Open: cannot be settled on paper
 
-- **The display flex.** From the drawing the flex reaches its connector with
-  0.2 to 3 mm to spare, depending on the tape under the display. A second
-  drawing of the same panel shows a flex 0.8 mm shorter. The fold also has to
-  be finished within 5 mm of the LCD edge, where a stiffened part of the flex
-  begins. A board cannot be repaired if the flex is short. Lay a panel on a 1:1
-  print before ordering (first step of the bring-up plan), and use the thinnest
-  tape that holds.
+- **The display flex and the jack's pins.** They pull in opposite directions:
+  the flex wants the display close to the board (2.0 mm at most by the
+  drawing, +-0.4 mm), the jack's pins want it away (they are at least 1.45 mm
+  long). At 1.5 mm with clipped pins each side has 0.5 mm. A second drawing of
+  the same panel shows a flex 0.8 mm shorter, and panels from other makers may
+  differ. A board cannot be repaired if the flex is short. Before ordering, lay
+  the panel you will buy on a 1:1 print with a 1.5 mm spacer (first step of the
+  bring-up plan), and measure how far the pins of a real jack stand out. If the
+  flex does not reach at 1.5 mm, the fallback is the jack below the display
+  (commit 74add084d has that board) with a case 19 mm longer.
 - **Decoupling at the MCU.** The capacitors of several supply pins are 4 to
   9 mm from their pin; Espressif asks for one at each pin. They connect through
   vias into the planes. The space next to the pins is taken by the signals
@@ -536,7 +572,7 @@ display and the connectors. Nothing was built or measured.
   display. If the MCU proves unstable at full clock speed, this is the first
   suspect, and it needs a new layout to change.
 - **NFC range and tuning**, the second-source PN532, and the effect of the
-  jack next to the loop on the Ethernet version.
+  Ethernet plug and cable next to the loop on the lan version.
 - **Wi-Fi range** with the antenna 7 mm from the display's metal back.
 - **Isolation of the PoE side** under a 1500 V test (see "PoE isolation").
 - **Hot-plugging a 24 V supply.** The TVS holds the peak below the converter's

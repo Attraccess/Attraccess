@@ -20,7 +20,7 @@ edited by hand, treat the KiCad files as the source of truth and do not run
 | `board.py` | Paths, coordinate helpers and the `Board` wrapper around pcbnew that the builder modules share. |
 | `board_setup.py` | Outline, labels, zones and keep-outs, ground pads for the display, design rules, net classes, project file. |
 | `routes_mcu.py` | Fixed routes at the MCU: supply vias, the fan-out of all four sides, the flash, the display bus, and the NFC host signals at the PN532. |
-| `routes_board.py` | Fixed routes elsewhere: 48 V nets, Ethernet pairs, the jack's LED and shield nets, antenna feeds, DC input with its filter, buzzer, LED link, ground vias, and the via fan-out of the supply pads. |
+| `routes_board.py` | Fixed routes elsewhere: 48 V nets, Ethernet pairs, antenna feeds, DC input with its filter, buzzer, LED link, ground vias, and the via fan-out of the supply pads. |
 | `finish_route.py` | Grid router that closes the connections the autorouter leaves open, including the ground and 3.3 V pads that are cut off from their pours. |
 | `route_grid.py` | Its engine: obstacle raster, net connectivity, path search, conversion to tracks and vias. |
 | `check_overlap.py` | Reports overlapping part bodies. |
@@ -73,8 +73,8 @@ it led to.
 
 ### Changes after the autorouter ran
 
-The committed `.ses` is older than the design review of November 2026, which moved parts (the
-Ethernet jack among them), changed nets and added parts. The rebuild copes with that without a new
+The committed `.ses` is older than the design review of November 2026, which moved parts, changed
+nets and added parts. The rebuild copes with that without a new
 autorouter run:
 
 - The session file also records where every part was, and KiCad would move the parts back there on
@@ -82,17 +82,17 @@ autorouter run:
 - `build_pcb.py` has two lists, `STALE_NETS` and `STALE_PARTS`. The autorouter's tracks for the nets in
   the first are not taken over; they have fixed routes in `routes_board.py` now. Its tracks that come
   too close to a pad of a part in the second are removed, and `finish_route.py` routes them again.
-- One fixed route starts where an autorouter track ends (`routes_board.PHY_LED3_TAP`).
 
-When the autorouter is run again, empty both lists and take that point from the new board.
+When the autorouter is run again, empty both lists.
 
 Lessons from revision A, in case the generator is used again:
 
 - A footprint's angle in KiCad is not always the angle JLCPCB wants: it counts from its own library
   footprint of the part number. `tools/pcb.sh check-footprints` compares the two for every part; the
   corrections are in `scripts/export_fab.py`.
-- Through-hole parts stand out of the display side of the board. Nothing with pins belongs behind the
-  display (`test_design.py` checks the Ethernet jack).
+- Through-hole parts stand out of the display side of the board. Keep them from behind the display
+  where the mechanics allow. Where they do not (the Ethernet jack), keep 48 V pins beside the
+  display's metal back and set the display distance for clipped pins (`test_design.py` checks both).
 
 - Fixed routes must end on a pad or a via, use only horizontal, vertical and 45 degree segments, and
   meet other tracks at their end points. The autorouter gives up on a net that has a fixed track

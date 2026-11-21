@@ -142,9 +142,7 @@ def zones(B):
     B.zone('GND', B_, full, priority=0, thermal=None, name='GND bottom fill')
     # 3.3 V plane on In2, display area only (nothing below the slot needs it as a plane)
     x3, y3 = G.PLANE_3V3_TONGUE
-    jx1, jx2, jy = G.PLANE_3V3_JACK
-    B.zone('+3V3', IN2, [(0.3, 0.3), (W - 0.3, 0.3), (W - 0.3, 89.0), (jx2, 89.0), (jx2, jy), (jx1, jy), (jx1, 89.0),
-                         (x3, 89.0), (x3, y3), (0.3, y3)],
+    B.zone('+3V3', IN2, [(0.3, 0.3), (W - 0.3, 0.3), (W - 0.3, 89.0), (x3, 89.0), (x3, y3), (0.3, y3)],
            priority=0, thermal=None, name='3V3 plane')
     # core rail under the MCU on the bottom layer, reaching the DC-DC output capacitors
     cx, cy = unV(B.fp['U201'].GetPosition())

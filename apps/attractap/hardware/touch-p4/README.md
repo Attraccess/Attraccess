@@ -182,8 +182,11 @@ run them once the project has been edited by hand. See
   antenna.
 - Order with JLCPCB's JLC04161H-7628 stack-up, ENIG finish (0.35 mm pitch QFN),
   and Standard PCBA.
-- The Ethernet jack sits below the display, not behind it: its pins stand out of
-  the display side of the board, where the display's metal back lies flat.
+- The Ethernet jack sits behind the lower right corner of the display, so that
+  its plug and the cable's bend fit inside the case. Its pins stand out of the
+  display side of the board there. Clip them to 1 mm and mount the display
+  1.5 mm off the board (2 mm at most), see the
+  [design notes](docs/design-notes.md#display-mounting-and-flex).
 
 Further reading: [design notes](docs/design-notes.md),
 [pin map and firmware port](docs/firmware-port.md),

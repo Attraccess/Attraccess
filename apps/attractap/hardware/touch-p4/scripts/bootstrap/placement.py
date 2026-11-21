@@ -199,10 +199,10 @@ def place(B):
     put('D106', 5.5, 75.6, 0)
 
     # ===================================================== Ethernet and PoE (right)
-    put('J401', 76.8, G.JACK_Y, 90)  # opens downwards into the cut-away; all its pins are below the display
+    put('J401', G.JACK_X, G.JACK_Y, 90)  # opens downwards into the cut-away
     put('U102', 76.5, 45.4, 270)   # secondary pins on the left, 48 V pins on the right
     # The two beads and everything else at 48 V stay clear of the jack's metal shell, which ends at
-    # y = 71.3 at most (geometry.JACK_REAR_CLEAR_Y).
+    # y = 71.0 at most (geometry.JACK_REAR_CLEAR_Y).
     put('D103', 82.6, 62.0, 90)    # PoE TVS, cathode at the bottom
     put('FB102', 81.24, 67.15, 90)  # straight above jack pin 9
     put('FB103', 83.9, 67.15, 90)
@@ -239,10 +239,10 @@ def place(B):
     yj = G.JACK_Y - 6.49                # first pin row of the jack
     put('C408', 73.63, yj - 4.06, 90)  # RX centre tap, straight above jack pin 3, clear of the jack's shell
     put('C409', 74.89, yj - 4.06, 90)  # TX centre tap, above jack pin 4
-    put('R411', 64.6, 83.6, 90)        # yellow LED: at the PHY's side of the long run to the jack
-    put('R412', 67.0, 107.2, 180)      # green LED to ground: left of the jack, level with its LED pins
-    put('C410', 69.05, 86.6, 90)       # shield to ground, straight above the jack's left shield tab
-    put('R413', 66.6, 86.6, 90)
+    put('R411', 64.6, 83.6, 90)
+    put('R412', 66.2, 83.6, 90)
+    put('C410', 66.6, 76.6, 90)        # shield to ground
+    put('R413', 64.2, 76.6, 90)
 
     # ================================================= NFC (tongue, left margin)
     put('ANT501', G.ANT_C[0], G.ANT_C[1], 0)

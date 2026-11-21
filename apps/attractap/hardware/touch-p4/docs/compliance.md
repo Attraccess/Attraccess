@@ -203,7 +203,7 @@ A terminal for wires "from an existing installation" means cables longer than
 | Display bus | 33 ohm series resistors on all RGB and sync lines; reduce GPIO drive strength in firmware if needed. |
 | Clocks | Series resistors on the 50 MHz RMII clock, the SDIO clock and the flash clock. |
 | USB | TVS and ESD array at the connector, fuse, ferrite bead in the supply. |
-| Ethernet / PoE | Isolated PD module, 48 V side in its own area with 2 mm clearance and no copper under the module's isolation barrier, ferrite beads and TVS at the PoE input, capacitor across the barrier, RC from jack shield to ground. The Ethernet pairs and the 48 V nets pass under the jack's shell on the back layer. |
+| Ethernet / PoE | Isolated PD module, 48 V side in its own area with 2 mm clearance and no copper under the module's isolation barrier, ferrite beads and TVS at the PoE input, capacitor across the barrier, RC from jack shield to ground. The Ethernet pairs pass under the jack's shell on the back layer, the 48 V nets on the inner layer. |
 | NFC | Low-pass (560 nH / 220 pF) between transmitter and antenna, damping resistors, no closed copper ring around the loop. |
 | Supply faults | USB, DC and PoE are diode-ORed, so no source feeds another; bleed resistors keep unpowered inputs at 0 V. |
 | LEDs | Capacitor at each LED, series resistor and pull-down in the data line. |

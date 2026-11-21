@@ -31,12 +31,13 @@ One reader needs five printed parts for the wall, six for the desk. The print fi
 | M3 × 4 pan head screw | 4 | PCB to cap |
 | M3 × 8 countersunk screw, ideally Torx with pin | 2 | Lock screws, from below |
 | Double-sided tape, 0.3 mm thick | 3 strips | Display glass to frame |
+| Polyimide tape (Kapton), 25 mm wide | 30 mm | Back of the display, over the Ethernet jack's solder pins (Ethernet version) |
 | Countersunk wall screw, 4 mm shank, head up to 8.6 mm, with plugs | 3 to 5 | Dock to wall |
 | Cable tie, 2.5 mm wide, about 100 mm long | 1 per cable | Strain relief, only for a cable that leaves through the bottom notch or on the desk stand |
 | M3 heat-set insert, standard (5.7 mm long) | 4 | Stand (desk only) |
 | M3 × 8 countersunk screw | 4 | Dock to stand (desk only) |
 
-Tools: soldering iron with a tip slimmer than 6 mm and at least 10 mm long, a driver for the M3 screws, side cutters, and a drill for the wall.
+Tools: soldering iron with a tip slimmer than 6 mm and at least 10 mm long, a driver for the M3 screws, side cutters, flush cutters for the jack's pins (Ethernet version), and a drill for the wall.
 
 The PCB screws are M3 × 4. Earlier parts lists said M3 × 6, but since the screen went flush the bosses are only 3.4 mm deep, and a 6 mm screw bottoms out before it clamps the board.
 
@@ -58,19 +59,21 @@ The short inserts go straight down into the bosses. The two standard ones enter 
 
 ## Assemble the reader
 
-Everything drops into the face-down cap from behind, in this order: display on its frame, PCB, four screws.
+Everything drops into the face-down cap from behind, in this order: display on its frame, PCB, four screws. On the Ethernet version the PCB and the display each get one preparation step first.
 
 ![Exploded stack: cap, LED diffusers, display, display frame, PCB and four screws](03-reader-stack.png)
 
 Everything is shown lifted out of the cap in the order it goes in, lowest first.
 
-1. Stick 0.3 mm double-sided tape onto the raised rim of the display frame: one strip each on the left, right and top. The fourth side is open for the display's flex cable.
-2. Lay the display glass-down on a clean cloth. Place the frame onto the back of the glass, rim down, with the open side over the flex cable. Line the frame up with the glass edges and press along the three strips.
-3. Lower display and frame into the cap so the glass drops into the window. Turn the cap over once and check that the glass sits flush with an even gap all round.
-4. Hold the PCB with its components facing you and the Ethernet jack toward the bottom of the cap. Thread the display flex through the slot in the PCB, then lower the PCB onto the four bosses.
-5. Plug the flex into its connector on the PCB and close the latch.
-6. Fasten the PCB with the four M3 × 4 screws. Hand-tight is enough; the inserts sit in plastic.
-7. Power the board over USB-C and check display, touch, LEDs and buzzer before the reader goes on the wall. USB-C, reset and boot are only reachable while the reader is off the dock.
+1. Ethernet version only: turn the PCB so the side without components faces you. The Ethernet jack's solder pins stand out of it in one corner: 16 pins, two wider shield tabs and two plastic posts. Clip every one of them to 1 mm with flush cutters. Cut above the solder cone, not through it.
+2. Ethernet version only: lay the display glass-down, flex cable toward you. Stick a 25 × 30 mm piece of polyimide tape onto the metal back in the corner at the lower right, flush with the lower edge, and fold 2 mm of it round the right side edge of the metal. That is the corner that will lie over the clipped pins; two of them carry 48 V.
+3. Stick 0.3 mm double-sided tape onto the raised rim of the display frame: one strip each on the left, right and top. The fourth side is open for the display's flex cable.
+4. Lay the display glass-down on a clean cloth. Place the frame onto the back of the glass, rim down, with the open side over the flex cable. Line the frame up with the glass edges and press along the three strips.
+5. Lower display and frame into the cap so the glass drops into the window. Turn the cap over once and check that the glass sits flush with an even gap all round.
+6. Hold the PCB with its components facing you and the Ethernet jack toward the bottom of the cap. Thread the display flex through the slot in the PCB, then lower the PCB onto the four bosses. The flex turns round the edge of the slot; its stiff parts must end up flat on the component side, not in the turn.
+7. Plug the flex into its connector on the PCB and close the latch.
+8. Fasten the PCB with the four M3 × 4 screws. Hand-tight is enough; the inserts sit in plastic.
+9. Power the board over USB-C and check display, touch, LEDs and buzzer before the reader goes on the wall. USB-C, reset and boot are only reachable while the reader is off the dock.
 
 ## Mount the dock on a wall
 
@@ -130,7 +133,7 @@ Cut through the Ethernet jack, seen from the left with the wall on the left. The
 The reader on the wall with its front, display and board left out. Ethernet is on the left. On the right, a barrel plug sits in the DC jack and its lead runs above the lock bar to the same hole.
 
 - **Bend.** The Ethernet cable makes a quarter turn with a radius of about 18 to 20 mm. Use a flexible patch cable; stiff installation cable does not make this turn.
-- **Plug length.** The drawing assumes that plug and boot end 30 mm below the jack. A longer boot pushes the bend down and makes it tighter.
+- **Plug length.** The drawing assumes that plug and boot end 30 mm below the jack. A longer boot pushes the bend down and makes it tighter. Common moulded patch cables end 24 to 31 mm below the jack. A slim patch cable (28 AWG, under 4 mm thick) bends tighter and leaves the most room.
 - **Slack.** Leave about 10 cm of cable outside the wall for plugging in. All but about 2 cm of it slides back into the hole when the reader swings shut, so there has to be free space behind the hole: a conduit, a cavity or a box.
 - **Power.** If the board is powered over PoE, the Ethernet cable is the only cable. Otherwise bring two wires out of the same hole to the DC terminal beside the DC jack, or use a barrel plug as shown. A 3.5 mm lead fits through the hole beside the Ethernet cable.
 - **Flush-mount box.** A box sits higher than this hole, level with the plug instead of below it. A cable from the box has to run down beside the plug and make a U-turn of at most 19 mm radius inside the reader. Only a thin, very flexible patch cable will do that, and this route is not modelled.
@@ -188,7 +191,8 @@ Nothing below has been checked on real parts. Each item can change a step or a p
 
 - [ ] **Printed fits.** Glass in its window (0.25 mm gap per side), tongue in its slot (0.4 mm), hook on the cleat (0.1 mm). Tune on the first print.
 - [ ] **Display dimensions.** Glass thickness 1.3 mm, total thickness 3.8 mm and corner radius of at least 1 mm are assumed. They decide whether the screen sits flush.
-- [ ] **Display flex length.** The frame holds the display 2 mm off the PCB. The flex has to reach its connector across that gap.
+- [ ] **Display distance and flex.** The frame holds the display 2 mm off the PCB, which is the most the flex allows by the panel's drawing; 1.5 mm is the target (see the case README). Check with the real panel that the stiff parts of the flex lie flat behind the PCB and that the flex reaches its connector.
+- [ ] **Jack pins behind the display.** Clipped to 1 mm they should clear the display's metal back by 0.5 mm or more. Measure how far the pins of a soldered jack stand out, and check the gap with the display fitted.
 - [ ] **PoE module height.** Assumed 10 mm.
 - [ ] **Swing-on motion.** Collision-free in CAD at five angles between 7° and closed, after the dock's tongue was tapered on 19 Nov 2026. Docks sliced before that need re-slicing.
 - [ ] **Strain relief.** The tie saddles in the cap and the tie fins in the stand were added on 19 Nov 2026 and are checked in CAD only. On the first print, thread a tie and pull on the cable. The stand's cable notch was raised to 11 mm in the same change; before, it was too low for an Ethernet cable. Caps and stands sliced before that need re-slicing.

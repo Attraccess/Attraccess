@@ -6,7 +6,7 @@ A 3D-printable case for the [Attractap Touch P4 board](../README.md), revision A
 | --- | --- |
 | ![Reader on a wall](renders/01-wall-hero.png) | ![Reader on the desk stand](renders/04-desk-front.png) |
 
-> **Status: CAD only.** No part has been printed, sliced or test-fitted yet. Fits, screw lengths and the display dimensions are untested, and the display sits further from the board than the board's design notes allow; see [Not yet verified](#not-yet-verified).
+> **Status: CAD only.** No part has been printed, sliced or test-fitted yet. Fits, screw lengths and the display dimensions are untested, and the display's distance to the board has to be set from a measured panel; see [Not yet verified](#not-yet-verified).
 
 ## How it works
 
@@ -25,7 +25,7 @@ The [installation manual](manual/README.md) ([PDF](manual/attractap-installation
 | --- | --- |
 | [`cad/`](cad/) | The design (`attractap-touch-case.sc`, SolidCraft) and the files made from it: one 3MF and one STEP per part, the whole assembly as STEP, and a mock board and mock display for test fitting |
 | [`cad/faceplate/`](cad/faceplate/) | A variant with a swappable face plate, see [below](#variant-swappable-face-plate) |
-| [`board/`](board/) | STEP export of the board ([`../kicad/attractap-touch-p4.kicad_pcb`](../kicad/), revision A) that the case is built around. The design files embed the same model |
+| [`board/`](board/) | STEP export of the board ([`../kicad/attractap-touch-p4.kicad_pcb`](../kicad/), revision A) that the case is built around. The design files embed the same model. It was exported before the board's design review; the review moved nothing the case touches (it cut the top edge away under the Wi-Fi antenna, reshaped the LED windows and added small parts) |
 | [`logo/`](logo/) | The wordmark and keyhole outlines used for the logo inlays |
 | [`manual/`](manual/) | The installation manual as Markdown and PDF, its figures, the SolidCraft file the figures are rendered from, and the scripts that make them |
 | [`renders/`](renders/) | Renders of the case, a study of other materials (`finishes/`) and the face-plate variant (`faceplate/`) |
@@ -90,8 +90,13 @@ The scripts are plain Python without dependencies; run them with `python3 -I`. T
 ## Not yet verified
 
 - **Nothing has been printed.** Printed fits, the swing-on motion and the strain relief are checked in CAD only.
-- **Display dimensions.** Total thickness 3.8 mm, glass 1.3 mm and a corner radius of at least 1 mm are assumed, not measured. They decide whether the screen sits flush.
-- **Display distance to the board, unresolved.** The board's [design notes](../docs/design-notes.md#display-mounting-and-flex) want the display at most about 1 mm in front of the board, so that its 25 mm flex can fold onto the connector, and give the flex about 1.5 mm of slack. This case holds the display 2 mm in front (3.2 mm in the face-plate variant), because solder joints stick out of the board behind the display: on the Ethernet version the jack J401 has 16 through-hole pins there, 11 of them behind the LCD's metal back, and the USB-C socket has its shell tabs under the edge of the glass. By estimate the 2 mm take about 1 mm of the flex's slack in the main case, and the face-plate variant takes more than there is. A smaller gap (parameter `disp_gap`) brings the metal back within reach of the jack's pins; a larger one needs a panel with a longer flex. Measure a real panel and how far the pins stick out before printing.
+- **Display dimensions.** Total thickness 3.8 mm, glass 1.3 mm and a corner radius of at least 1 mm are assumed, not measured. They decide whether the screen sits flush, and how far the display's metal back is from the board. The panel drawing the board was laid out from (Hongxiangrui HXR040WQI) gives other values: 3.14 mm in total, of which the glass with the touch sensor is 0.9 mm and the LCD module 2.06 mm. Such a panel would sit 0.4 mm below the front of this case, with its metal back 2.3 mm from the board instead of 2.0. Measure the panel you buy and set `disp_t` and `lens_t` from it.
+- **Display distance to the board.** Two things set it, from opposite sides (details in the board's [design notes](../docs/design-notes.md#display-mounting-and-flex)):
+  - The display's flex wraps round the board, and its stiff parts must lie flat behind the board after the turn. By the panel drawing that works up to **2.0 mm** between the board and the LCD's metal back, with 0.5 mm to spare at 1.5 mm.
+  - On the Ethernet version the jack J401 has its solder pins behind the display: 16 pins, two shield tabs and two plastic posts, 11 of them behind the LCD's metal back. They stand at least 1.45 mm out of the board. The USB-C socket has its shell tabs under the edge of the glass.
+  - So the target is **1.5 mm**, with the jack's pins clipped to 1 mm and polyimide tape on that corner of the LCD (the manual has both steps). This case is drawn with 2 mm (`disp_gap`), the limit; set it to 1.5 mm together with the measured display dimensions. The face-plate variant holds the display 3.2 mm in front, which is more than the flex allows; it needs its depth stack reworked or a panel with a longer flex.
+  - The two 48 V pins of the jack come out 0.5 mm beside the LCD's metal edge, inside the frame's pocket for the pins. A thin wall of the frame between pocket and LCD opening would back up the tape there; the pocket currently opens into the LCD opening.
+  - The other way round does not work without a longer case: with the jack below the display its plug room shrinks from 51 to 32 mm, and a cable from the wall would need a plug that ends 12 mm below the jack.
 - **PoE module height.** Assumed 10 mm.
 - **Outdoor use.** There are no seals, the buzzer holes and cable notches are open, and ABS+ ages in sunlight. Treat it as an indoor case.
 

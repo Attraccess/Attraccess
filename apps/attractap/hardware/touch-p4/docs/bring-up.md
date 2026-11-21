@@ -6,12 +6,13 @@ when a step fails. Use a current-limited bench supply for the first power-up.
 ## Before ordering
 
 1. Lay a sample display on a 1:1 print of the board (`fab/board-front.pdf` and
-   `fab/board-back.pdf`, glued back to back on 1.6 mm card), with
-   the tape you plan to use under it: check that the flex reaches J601 through
-   the slot with the fold described in the design notes, that it goes into the
-   connector to its stop without being stretched, and that the contacts face
-   the board. This is the one check that no calculation replaces: the reserve
-   is 0 to 3 mm, and a board with a flex that is too short cannot be repaired.
+   `fab/board-back.pdf`, glued back to back on 1.6 mm card), on a spacer of
+   1.5 mm: check that the flex reaches J601 through the slot with the fold
+   described in the design notes, that its stiff parts lie flat behind the
+   board, that it goes into the connector to its stop without being stretched,
+   and that the contacts face the board. Try 2.0 mm as well; that is the limit
+   by the drawing. This is the one check that no calculation replaces: a board
+   with a flex that is too short cannot be repaired.
 2. Have an electronics engineer look at the open points listed under "Design
    review" in the design notes.
 3. Check that JLCPCB (or the chosen assembler) can supply every BOM line, in
@@ -88,7 +89,7 @@ when a step fails. Use a current-limited bench supply for the first power-up.
 4. Tune the antenna with a network analyser between the EMC filter and the
    matching network (see design notes). Record the final values of C513 to
    C519, R504, R505 in the circuit description. Tune the Ethernet version on
-   its own: the jack is next to the loop.
+   its own, with the cable plugged in: plug and cable lie next to the loop.
 5. Measure read distance with the cards and tags in use (DESFire, NTAG 424),
    with display on, LEDs on and Wi-Fi transmitting.
 
@@ -104,9 +105,14 @@ when a step fails. Use a current-limited bench supply for the first power-up.
    0 V), and no voltage on the open DC connectors.
 4. PoE module temperature after 30 minutes at full load.
 5. Unplug and replug PoE ten times: the board restarts cleanly each time.
-6. Before the display goes on: look at the display side of the board at the
-   jack. Its pins and posts stand up to 2 mm out of the board, below where the
-   display ends. Nothing of the display or the housing may touch them.
+6. Before the display goes on: measure how far the jack's pins stand out of the
+   display side of the board (expected 1.5 to 1.9 mm). Clip all of them, the
+   two shield tabs and the two plastic posts to 1 mm with flush cutters; cut
+   above the solder, not through it. Stick polyimide tape on the LCD's metal
+   back over the corner that will lie on them, wrapped 2 mm round the module's
+   edge at the two 48 V pins (the two nearest the board edge in the upper rows).
+   The display sits 1.5 mm off the board. Nothing of the display or the housing
+   may touch the pins.
 7. Isolation, on a unit you can afford to lose: 1500 V RMS (or 2250 V DC) for a
    minute between the eight contacts of the jack tied together and the board's
    ground. Remove the display first.

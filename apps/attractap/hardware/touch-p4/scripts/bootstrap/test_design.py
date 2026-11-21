@@ -62,17 +62,32 @@ class DesignTest(unittest.TestCase):
 
 
 class GeometryTest(unittest.TestCase):
-    def test_no_jack_pin_behind_the_display(self):
-        # The jack's through-hole pins stand out of the display side of the board; the display's metal
-        # back lies flat on that side. The first pin row (6.49 mm behind the jack's origin, pads 1.5 mm)
-        # must be below the lower edge of the cover lens.
-        first_row = geometry.JACK_Y - 6.49
-        self.assertGreater(first_row - 0.75, geometry.LENS[3])
+    def behind_metal_back(self, pin, margin=0.0):
+        x, y = geometry.JACK_X + pin[0], geometry.JACK_Y + pin[1]
+        x1, y1, x2, y2 = geometry.LCM
+        return x1 - margin < x < x2 + margin and y1 - margin < y < y2 + margin
+
+    def test_no_48_v_pin_behind_the_display(self):
+        # The jack's pins stand out of the display side of the board, behind the lower right corner of
+        # the display. The two 48 V pins must be beside the LCD module's metal back, not behind it
+        # (0.3 mm: half the pin).
+        for pin in geometry.JACK_PINS_48V:
+            self.assertFalse(self.behind_metal_back(pin, 0.3), pin)
+        # the others are behind it: this is why DISPLAY_GAP has a lower limit
+        self.assertTrue(any(self.behind_metal_back(pin) for pin in geometry.JACK_PINS_OTHER))
+
+    def test_display_clears_the_clipped_pins(self):
+        self.assertGreaterEqual(geometry.DISPLAY_GAP[0] - geometry.JACK_PIN_CLIPPED, 0.5)
+        self.assertLessEqual(geometry.DISPLAY_GAP[1], 2.0)      # the display's flex reaches no further
 
     def test_jack_opens_into_the_cut_away(self):
         front = geometry.JACK_Y + 13.32
         self.assertGreaterEqual(front, geometry.NOTCH_Y)
         self.assertLess(front - geometry.NOTCH_Y, 0.5)
+
+    def test_room_for_the_plug(self):
+        # plug with boot (30 mm) and the cable's bend into the wall (19 mm for a 5.5 mm cable)
+        self.assertGreaterEqual(geometry.BOARD_H - geometry.NOTCH_Y, 49.0)
 
 
 class I2cBusTest(unittest.TestCase):

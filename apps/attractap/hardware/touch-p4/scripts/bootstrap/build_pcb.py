@@ -33,7 +33,6 @@ from routes_board import (
     buzzer_routes,
     dc_route,
     ep_vias,
-    jack_leds,
     led_link,
     led_power,
     mdi_routes,
@@ -80,7 +79,6 @@ def build():
     ep_vias(board)
     poe_routes(B)
     mdi_routes(B)
-    jack_leds(B)
     nfc_feeds(B)
     led_link(B)
     dc_route(B)
@@ -105,9 +103,9 @@ def build():
 # placement. Its tracks for the nets below are not taken over: they have fixed routes now, or
 # finish_route.py routes them. Of its other tracks, those that come too close to a pad of one of the
 # parts below are removed and routed again. Empty both when a new autorouter result is committed.
-STALE_NETS = {'BUZ_P', 'BUZ_N', 'ETH_CT_RX', 'ETH_CT_TX', '+5V_POE', 'ETH_SHIELD', 'ETH_LED_Y_K', 'ETH_LED_G_K'}
+STALE_NETS = {'BUZ_P', 'BUZ_N', 'ETH_CT_RX', 'ETH_CT_TX', '+5V_POE'}
 STALE_PARTS = {'R104', 'R105', 'R705', 'L103', 'C117', 'D106', 'D103', 'FB102', 'FB103', 'C408', 'C409',
-               'D701', 'D702', 'D703', 'D704', 'D705', 'D706', 'D707', 'D708', 'J401', 'R412', 'C410', 'R413'}
+               'D701', 'D702', 'D703', 'D704', 'D705', 'D706', 'D707', 'D708'}
 
 
 def routes_of_session(path):
