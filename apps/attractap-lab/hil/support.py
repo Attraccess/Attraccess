@@ -15,6 +15,9 @@ from pathlib import Path
 from pexpect import TIMEOUT
 
 DB_QUERY = Path(__file__).with_name("db-query.mjs")
+# The key LICENSE.md grants non-profit use with; it licenses the Attractap module that reader pairing needs.
+NON_PROFIT_LICENSE_KEY = ("I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at "
+                          "https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md")
 
 
 class ReaderConsole:
@@ -180,6 +183,16 @@ class Api:
                                  {"username": username, "password": password, "tokenLocation": "body"})
         assert status in (200, 201), body
         return body["authToken"]
+
+    def store_license(self, token, key=NON_PROFIT_LICENSE_KEY):
+        """Enter the license key as an administrator does under Settings -> Application Settings.
+
+        A new database has no license (the API never takes one from the environment), and without one the API
+        closes every reader pairing connection.
+        """
+        status, body = self.call("PATCH", "/settings", {"app": {"licenseKey": key}}, token=token)
+        assert status == 200, body
+        return body
 
     def create_user(self, username):
         """Create a verified user without roles, sharing the admin's password.

@@ -30,7 +30,7 @@ Sie koennen beide Modelle fuer dieselbe Ressource konfigurieren. In diesem Fall 
 Attraccess unterstuetzt **SumUp** als Zahlungsanbieter. Wenn SumUp konfiguriert ist, koennen Benutzer Credits ueber die Anwendung kaufen.
 
 > [!NOTE]
-> Die SumUp-Integration erfordert, dass die Umgebungsvariable `ATTRACCESS_PUBLIC_INTERNET_URL` gesetzt ist, falls sich Ihre oeffentliche URL von der internen `ATTRACCESS_URL` unterscheidet. Siehe [Umgebungsvariablen](installation/environment-variables.md).
+> SumUp sendet seine Zahlungs-Callbacks an die **Oeffentliche Internet-URL** unter [Einstellungen → Anwendungseinstellungen](settings/overview.md#anwendungseinstellungen); SumUp erhält nur dann eine Callback-Adresse, wenn diese URL mit `https://` beginnt.
 
 ## Erforderliche Berechtigung
 

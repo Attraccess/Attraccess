@@ -133,8 +133,9 @@ Anything declared here is a hard requirement. The host evaluates the license **o
 plugin. If the requirement is not met, the plugin is not loaded at all: no backend, migrations, flow nodes, audit
 domains, reader UI, hooks or frontend. **Settings → Plugins** shows it as **License missing**, with the missing modules.
 If the license cannot be determined (no key, a key that does not verify, unreadable settings), a gated plugin counts as
-unlicensed. On a fresh install, the host uses the `LICENSE_KEY` environment variable. A plugin that has a required
-dependency on an unlicensed plugin does not load either; it shows the usual dependency error.
+unlicensed. A fresh install has no key until an administrator enters one in Settings, so its gated plugins load after
+the next restart. A plugin that has a required dependency on an unlicensed plugin does not load either; it shows the
+usual dependency error.
 
 Not loading for license reasons is not a failure: the plugin is not quarantined, and it loads after the next restart
 once the license covers it. An invalid `license` block (wrong types, unknown keys) is a manifest error: the plugin does

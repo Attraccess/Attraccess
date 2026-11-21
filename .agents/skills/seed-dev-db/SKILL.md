@@ -5,7 +5,7 @@ Use this skill when local work needs a login or repeatable database fixtures wit
 ## Prerequisites
 
 1. Ensure dependencies are installed with `pnpm install`.
-2. Create `.env` from `.env.example` if it is missing. Set `AUTH_SESSION_SECRET`, `LICENSE_KEY` and `DATABASE_URL` (PostgreSQL; the worktree bootstrap writes this worktree's own database). The non-profit `LICENSE_KEY` in `.env.example` is valid for local qualifying development.
+2. Create `.env` from `.env.example` if it is missing. Set `AUTH_SESSION_SECRET` and `DATABASE_URL` (PostgreSQL; the worktree bootstrap writes this worktree's own database). The license key is not an environment variable: enter it under Settings → Application Settings (or `PATCH /api/settings` with `{"app":{"licenseKey":…}}`); the non-profit key from README.md is valid for local qualifying development.
 3. Start the API with `pnpm serve --only=api`. Do not use `pnpm nx serve api`.
 4. Read the API URL from `.dev-serve-ports.json`, set `ATTRACCESS_URL` in `.env` to that URL, then restart the API so generated links use this worktree's actual port.
 5. Wait until the API has finished its startup migrations on the PostgreSQL database `DATABASE_URL` names, then run `pnpm seed:dev`.

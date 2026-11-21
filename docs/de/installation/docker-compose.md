@@ -25,18 +25,6 @@ AUTH_SESSION_SECRET=ihr-zufaelliger-sicherer-schluessel
 POSTGRES_PASSWORD=ihr-datenbankpasswort
 ATTRACCESS_URL=https://attraccess.ihre-domain.de
 
-# E-Mail (SMTP)
-SMTP_SERVICE=SMTP
-SMTP_HOST=smtp.ihre-domain.de
-SMTP_PORT=587
-SMTP_SECURE=true
-SMTP_USER=no-reply@ihre-domain.de
-SMTP_PASS=ihr-smtp-passwort
-SMTP_FROM=no-reply@ihre-domain.de
-
-# Lizenz
-LICENSE_KEY=ihr-lizenzschluessel
-
 # Optional
 LOG_LEVELS=error,warn,log
 TZ=Europe/Berlin

@@ -64,4 +64,4 @@ Die Web-Oberfläche unter `http://ihr-server:8025` zeigt alle versendeten E-Mail
 
 - [Ersteinrichtung](setup/first-time-setup.md)
 - [E-Mail-Vorlagen](setup/email-templates.md)
-- [Umgebungsvariablen](installation/environment-variables.md)
+- [Einstellungen](settings/overview.md)

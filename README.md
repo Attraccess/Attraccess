@@ -176,49 +176,16 @@ Swagger documentation is available at `/api` when the server is running.
 
 ## Licensing & Activation
 
-Attraccess includes license verification. Configure your key in the setup wizard or under **Settings → Application Settings**. New installations can also seed the key with the `LICENSE_KEY` environment variable before the database is initialized. Existing installations use the stored key; change it in Settings.
+Attraccess includes license verification. Enter your key in the setup wizard or under **Settings → Application Settings**; Attraccess does not read it from environment variables.
 
 - Commercial users: Use the license key you received after purchasing a license.
-- Non-profit organizations: You can use Attraccess for free by setting `LICENSE_KEY` to the following special key:
+- Non-profit organizations: You can use Attraccess for free by entering the following special key:
 
 ```
 I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md
 ```
 
-### How to set `LICENSE_KEY`
-
-The examples below seed a new installation. To change the key after setup, use **Settings → Application Settings**.
-
-- Shell / local `.env` file
-
-```bash
-export LICENSE_KEY="I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md"
-```
-
-Attraccess needs a PostgreSQL database and does not start without `DATABASE_URL`. The snippets below only show where
-`LICENSE_KEY` goes; add it to a complete setup such as the Compose file (with its `postgres` service and `DATABASE_URL`)
-from the [Docker Compose installation guide](docs/en/installation/docker-compose.md).
-
-- Docker Compose (the `attraccess` service of that file)
-
-```yaml
-services:
-  attraccess:
-    image: attraccess/attraccess:latest
-    environment:
-      DATABASE_URL: postgres://attraccess:${POSTGRES_PASSWORD}@postgres:5432/attraccess
-      LICENSE_KEY: 'I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md'
-  # postgres: ... (see the installation guide)
-```
-
-- Docker CLI (with a PostgreSQL server that the container can reach)
-
-```bash
-docker run -e DATABASE_URL="postgres://attraccess:<password>@<postgres-host>:5432/attraccess" \
-  -e LICENSE_KEY="I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md" attraccess/attraccess:latest
-```
-
-Licensed features require a valid configured key. Qualifying non-commercial users can enter the special key above in the setup wizard or application settings.
+Licensed features require a valid configured key.
 
 Plugins fall under the core license unless they ship their own `LICENSE.md`. The WAGO and Reservations plugins have their own commercial license and need a paid license module (`wago`, `reservations`); the non-profit key does not unlock them.
 

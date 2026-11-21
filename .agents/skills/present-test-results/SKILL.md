@@ -6,7 +6,7 @@ Use this skill when handing a locally testable implementation to the user.
 
 The frontend requires the API. Never start or present the frontend by itself.
 
-1. Ensure `.env` exists and contains `AUTH_SESSION_SECRET` and `LICENSE_KEY`. For local development, use the non-profit `LICENSE_KEY` from `.env.example` when applicable.
+1. Ensure `.env` exists and contains `AUTH_SESSION_SECRET`. The license key is stored in Settings, not `.env`; for local development, enter the non-profit key from README.md under Settings → Application Settings when applicable.
 2. Start both services with `pnpm serve` whenever the user needs to test the UI.
 3. Start only the API with `pnpm serve --only=api` only when the work is API-only or the user does not need the UI.
 4. Never use `pnpm nx serve api` or assume ports 3000 and 4200.

@@ -162,7 +162,10 @@ def api():
 
 @pytest.fixture(scope="session")
 def admin(api):
-    return api.login("admin")
+    """The admin's token, after it entered the license key: readers can pair only with a licensed API."""
+    token = api.login("admin")
+    api.store_license(token)
+    return token
 
 
 @pytest.fixture(scope="session")
