@@ -80,15 +80,39 @@ namespace bt_setup
     // in hex, so the user can pick the right device in the browser's list. It must fit the 31-byte scan response
     // with its two header bytes: at most MAX_NAME_LENGTH characters (longer prefixes are cut).
     constexpr size_t MAX_NAME_LENGTH = 29;
+    constexpr size_t NAME_SUFFIX_LENGTH = 5; // " XXXX"
     inline void formatName(char *out, size_t size, const char *prefix, const uint8_t mac[6])
     {
-        snprintf(out, size, "%.*s %02X%02X", static_cast<int>(MAX_NAME_LENGTH - 5), prefix, mac[4], mac[5]);
+        snprintf(out, size, "%.*s %02X%02X", static_cast<int>(MAX_NAME_LENGTH - NAME_SUFFIX_LENGTH), prefix, mac[4],
+                 mac[5]);
     }
 
-    // "mm:ss" of a remaining time, rounded up to the next second (the countdown never shows 00:00 while open).
+    // Wrong PINs over Bluetooth: anyone in range can connect to an open window, so the PIN must not be guessable
+    // there. After MAX_WRONG wrong PINs in one window every PIN-checked command is refused until a new window opens,
+    // and a new window needs the reader's power or its screen. The console has no limit: it needs the cable.
+    class PinGuard
+    {
+    public:
+        static constexpr uint8_t MAX_WRONG = 5;
+
+        bool allowed() const { return wrong < MAX_WRONG; }
+        void rejected()
+        {
+            if (wrong < MAX_WRONG) wrong++;
+        }
+        void reset() { wrong = 0; }
+
+    private:
+        uint8_t wrong = 0;
+    };
+
+    // A remaining time in whole seconds, rounded up (the countdown never shows 00:00 while open).
+    inline uint32_t countdownSeconds(uint32_t remainingMs) { return remainingMs / 1000 + (remainingMs % 1000 != 0); }
+
+    // "mm:ss" of a remaining time (countdownSeconds).
     inline std::string countdown(uint32_t remainingMs)
     {
-        const uint32_t seconds = (remainingMs + 999) / 1000;
+        const uint32_t seconds = countdownSeconds(remainingMs);
         char text[12];
         snprintf(text, sizeof text, "%02u:%02u", static_cast<unsigned>(seconds / 60), static_cast<unsigned>(seconds % 60));
         return text;

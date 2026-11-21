@@ -51,7 +51,7 @@ public:
         }
         const bool linked = bt_setup::linked();
         const uint32_t remaining = bt_setup::remainingMs(millis());
-        const uint32_t seconds = linked ? 0 : (remaining + 999) / 1000;
+        const uint32_t seconds = linked ? 0 : bt_setup::countdownSeconds(remaining);
         if (linked == shownLinked && seconds == shownSeconds) return;
         shownLinked = linked;
         shownSeconds = seconds;

@@ -94,11 +94,15 @@ and secured readers do too, as secured readers have no USB setup:
 - Only over an **encrypted** link (Bluetooth LE Secure Connections). Every setup window uses a new Bluetooth
   address and stores no pairing: a computer pairs anew for every window.
 - With the **same PIN rules** as over USB: once a PIN is set, every change needs it.
+- After **5 wrong PINs** in one setup window the reader refuses every command that needs the PIN until a new
+  window opens: after a restart, or on a Touch with its button once the window has closed.
 - A secured reader still has **no USB configurator**: its USB console stays off.
 
 Because an unpaired reader opens the setup by itself for 10 minutes after it starts, anyone in Bluetooth range
-during that time can configure it. That is no more than the on-screen settings of an unpaired Touch already
-allow, and it never applies to a paired reader. A reader that someone set up this way still cannot do anything
+during that time can configure it as long as no PIN is set, and nobody can without the PIN once it is set. On a
+Touch that is no more than its on-screen settings already allow; a Lite or a secured reader, which needed a cable
+or had no setup at all before, can now be configured from nearby. Set the PIN first. It never applies to a paired
+reader. A reader that someone set up this way still cannot do anything
 until an admin approves its pairing in Attraccess: approve only the reader you expect (compare its code or
 colour pattern).
 

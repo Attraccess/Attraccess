@@ -98,19 +98,24 @@ Installation eingebrannt sind.
 
 ## Einrichtung per Bluetooth
 
-Leser nehmen PIN, WLAN und Serveradresse per Bluetooth an ([Attractap Einrichtung](attractap/setup.md#per-bluetooth-einrichten)),
-gesicherte Leser ebenfalls, denn sie haben keine USB-Einrichtung:
+Reader nehmen PIN, WLAN und Serveradresse per Bluetooth an ([Attractap Einrichtung](attractap/setup.md#per-bluetooth-einrichten)),
+gesicherte Reader ebenfalls, denn sie haben keine USB-Einrichtung:
 
-- Nur solange der Leser **nicht gekoppelt** ist: Ein gekoppelter Leser öffnet die Bluetooth-Einrichtung nie.
+- Nur solange der Reader **nicht gekoppelt** ist: Ein gekoppelter Reader öffnet die Bluetooth-Einrichtung nie.
 - Nur über eine **verschlüsselte** Verbindung (Bluetooth LE Secure Connections). Jedes Einrichtungsfenster nutzt
   eine neue Bluetooth-Adresse und speichert keine Kopplung: Ein Computer koppelt sich für jedes Fenster neu.
 - Mit **denselben PIN-Regeln** wie per USB: Sobald eine PIN gesetzt ist, braucht jede Änderung sie.
-- Ein gesicherter Leser hat weiterhin **keinen USB-Konfigurator**: Seine USB-Konsole bleibt aus.
+- Nach **5 falschen PINs** in einem Einrichtungsfenster lehnt der Reader jeden Befehl ab, der die PIN braucht, bis
+  ein neues Fenster öffnet: nach einem Neustart, oder beim Touch mit seiner Schaltfläche, sobald das Fenster
+  geschlossen ist.
+- Ein gesicherter Reader hat weiterhin **keinen USB-Konfigurator**: Seine USB-Konsole bleibt aus.
 
-Da ein ungekoppelter Leser die Einrichtung nach dem Start 10 Minuten lang von selbst öffnet, kann ihn in dieser
-Zeit jeder in Bluetooth-Reichweite einrichten. Das ist nicht mehr, als die Einstellungen auf dem Display eines
-ungekoppelten Touch ohnehin erlauben, und es gilt nie für einen gekoppelten Leser. Ein so eingerichteter Leser
-kann trotzdem nichts tun, bis ein Admin seine Kopplung in Attraccess freigibt: Geben Sie nur den Leser frei, den
+Da ein ungekoppelter Reader die Einrichtung nach dem Start 10 Minuten lang von selbst öffnet, kann ihn in dieser
+Zeit jeder in Bluetooth-Reichweite einrichten, solange keine PIN gesetzt ist; ist sie gesetzt, geht es nur mit
+ihr. Beim Touch ist das nicht mehr, als seine Einstellungen auf dem Display ohnehin erlauben; ein Lite oder ein
+gesicherter Reader, die bisher ein Kabel brauchten oder gar keine Einrichtung hatten, lassen sich jetzt aus der
+Nähe einrichten. Setzen Sie die PIN zuerst. Für einen gekoppelten Reader gilt das nie. Ein so eingerichteter Reader
+kann trotzdem nichts tun, bis ein Admin seine Kopplung in Attraccess freigibt: Geben Sie nur den Reader frei, den
 Sie erwarten (vergleichen Sie Code oder Farbmuster).
 
 ## Grenzen

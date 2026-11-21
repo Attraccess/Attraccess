@@ -32,6 +32,10 @@
     !CONFIG_BT_NIMBLE_SM_SC
 #error "The Bluetooth setup needs the NimBLE peripheral and broadcaster roles and LE Secure Connections (sdkconfig)"
 #endif
+// Only LE Secure Connections, with real keys, and no bond outlives a window (sdkconfig.defaults*).
+#if CONFIG_BT_NIMBLE_SM_LEGACY || CONFIG_BT_NIMBLE_SM_SC_DEBUG_KEYS || CONFIG_BT_NIMBLE_NVS_PERSIST
+#error "The Bluetooth setup must not allow legacy pairing, SC debug keys or stored bonds (sdkconfig)"
+#endif
 // Per variant (variants/*.cmake): "Attractap Bridge", "Attractap Touch", "Attractap Lite".
 #ifndef BT_SETUP_NAME_PREFIX
 #error "BT_SETUP_NAME_PREFIX must be defined by the variant"
@@ -85,6 +89,11 @@ namespace bt_setup
         std::mutex linesMutex;
         LineAssembler assembler(SerialCommandHandler::MAX_COMMAND_LENGTH);
         std::deque<std::string> lines;
+        // Counts links (under linesMutex): a reply goes only to the link its command came from, never to a later one.
+        uint32_t linkGeneration = 0;
+        // Wrong PINs in this window (the main loop's); open() asks for a fresh count.
+        PinGuard pinGuard;
+        std::atomic<bool> pinGuardStale{false};
 
         int gapEvent(struct ble_gap_event *event, void *arg);
 
@@ -137,6 +146,7 @@ namespace bt_setup
             std::lock_guard<std::mutex> lock(linesMutex);
             assembler.reset();
             lines.clear();
+            linkGeneration++;
         }
 
         int gapEvent(struct ble_gap_event *event, void *)
@@ -256,11 +266,18 @@ namespace bt_setup
                 if (lines.empty()) return false;
                 line = std::move(lines.front());
                 lines.pop_front();
+                lineGeneration = linkGeneration;
                 return true;
             }
 
             void reply(const std::string &line) override
             {
+                {
+                    // The link dropped while the command ran (a Wi-Fi scan takes seconds): its reply is not for
+                    // whoever connected since.
+                    std::lock_guard<std::mutex> lock(linesMutex);
+                    if (lineGeneration != linkGeneration) return;
+                }
                 const uint16_t conn = connHandle;
                 if (!connected || conn == BLE_HS_CONN_HANDLE_NONE) return;
                 uint16_t mtu = ble_att_mtu(conn);
@@ -269,6 +286,21 @@ namespace bt_setup
                                   [&](size_t offset, size_t size) { return notify(conn, line.data() + offset, size); }))
                     logger.error("Setup reply lost");
             }
+
+            bool pinAttemptAllowed() override
+            {
+                if (pinGuardStale.exchange(false)) pinGuard.reset();
+                return pinGuard.allowed();
+            }
+
+            void pinRejected() override
+            {
+                pinGuard.rejected();
+                if (!pinGuard.allowed()) logger.warn("Too many wrong PINs: PIN commands refused until the next window");
+            }
+
+        private:
+            uint32_t lineGeneration = 0;
         };
 
         SetupChannel setupChannel;
@@ -282,6 +314,7 @@ namespace bt_setup
             esp_read_mac(mac, ESP_MAC_BT);
             formatName(deviceName, sizeof deviceName, BT_SETUP_NAME_PREFIX, mac);
             forgetPartialInput();
+            pinGuardStale = true;
 
             if (nimble_port_init() != ESP_OK)
             {
@@ -350,8 +383,8 @@ namespace bt_setup
     {
         const bool isPaired = CredentialStore::load().paired();
         paired = isPaired;
-        if (isPaired) return Request::Paired;
-        if (window.request(false, now) != SetupWindow::Change::Open) return Request::AlreadyOpen;
+        if (window.request(isPaired, now) != SetupWindow::Change::Open)
+            return isPaired ? Request::Paired : Request::AlreadyOpen;
         if (!open())
         {
             window = SetupWindow();

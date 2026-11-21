@@ -35,8 +35,9 @@ public:
         // The next complete command line, without its newline. Called from the main loop.
         virtual bool nextLine(std::string &line) = 0;
         virtual void reply(const std::string &line) = 0;
-        // A command on this channel carried a wrong PIN (the console has physical access and no limit).
-        virtual void authFailed() {}
+        // A limit on wrong PINs (the Bluetooth setup: bt_setup::PinGuard). The console has none: it needs the cable.
+        virtual bool pinAttemptAllowed() { return true; }
+        virtual void pinRejected() {}
     };
     // At most one extra channel; it must live until reboot.
     static void setChannel(Channel *channel) { extraChannel = channel; }

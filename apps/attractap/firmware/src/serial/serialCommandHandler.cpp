@@ -176,10 +176,16 @@ bool SerialCommandHandler::ensureAuthorized(const char *codeFromPayload, std::st
         return false;
     }
 
+    if (replyChannel && !replyChannel->pinAttemptAllowed())
+    {
+        errorOut = "TOO_MANY_PIN_ATTEMPTS";
+        return false;
+    }
+
     if (Settings::getDeviceConfig().passCode != std::string(codeFromPayload))
     {
+        if (replyChannel) replyChannel->pinRejected();
         errorOut = "INVALID_AUTH_CODE";
-        if (replyChannel) replyChannel->authFailed();
         return false;
     }
 

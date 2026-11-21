@@ -162,7 +162,33 @@ static void names()
     // A prefix too long for the scan response is cut; the MAC part always stays.
     formatName(name, sizeof name, "Attractap Something Much Too Long", mac);
     CHECK(std::strlen(name) == MAX_NAME_LENGTH);
-    CHECK(std::string(name).substr(MAX_NAME_LENGTH - 5) == " 71C8");
+    CHECK(std::string(name).substr(MAX_NAME_LENGTH - NAME_SUFFIX_LENGTH) == " 71C8");
+}
+
+// Wrong PINs over Bluetooth: 5 in a window, then nothing until a new window resets the count.
+static void pinGuard()
+{
+    PinGuard guard;
+    for (int i = 0; i < PinGuard::MAX_WRONG; i++)
+    {
+        CHECK(guard.allowed());
+        guard.rejected();
+    }
+    CHECK(!guard.allowed());
+    for (int i = 0; i < 300; i++) guard.rejected(); // no wrap back to "allowed"
+    CHECK(!guard.allowed());
+    guard.reset();
+    CHECK(guard.allowed());
+}
+
+// The 10 s close after an authenticated session also across the millis() wrap.
+static void closeAfterPairedAcrossWrap()
+{
+    SetupWindow w;
+    CHECK(w.request(false, 0xFFFFF000u) == SetupWindow::Change::Open);
+    CHECK(w.update(true, 0xFFFFFFF0u) == SetupWindow::Change::None);
+    CHECK(w.update(true, 0xFFFFFFF0u + SetupWindow::CLOSE_AFTER_PAIRED_MS - 1) == SetupWindow::Change::None);
+    CHECK(w.update(true, 0xFFFFFFF0u + SetupWindow::CLOSE_AFTER_PAIRED_MS) == SetupWindow::Change::Close);
 }
 
 // The Lite ring: the pairing pattern above the Bluetooth setup above "Configuration Required" and "Initializing".
@@ -193,6 +219,8 @@ int main()
     lineAssembly();
     chunking();
     liteRing();
+    pinGuard();
+    closeAfterPairedAcrossWrap();
     if (failures) return 1;
     std::puts("bt setup logic ok");
     return 0;

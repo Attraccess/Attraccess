@@ -305,8 +305,9 @@ reads the new status first), when it times out, or with a reboot; nothing is per
 changes nothing. Who opens it:
 
 - Touch / Touch V2: at every boot while unpaired (`Application::tickBtSetup`, first main-loop pass), and the **Bluetooth setup**
-  button next to **Settings** on `InitScreen` (shown only while unpaired and no window is open; no PIN, the commands
-  check it). If NimBLE cannot start, the button shows "Bluetooth unavailable". While the window is open,
+  button under **Settings** on `InitScreen` (shown only while unpaired and no window is open; no PIN, the commands
+  check it). Its click only sets a flag; `tickBtSetup` opens the window on the main loop, never on LvglTask. If
+  NimBLE cannot start, the button shows "Could not start, restart". While the window is open,
   `InitScreen`, the pairing-code screen and the settings a fresh reader opens on (left of Save) show "Bluetooth setup open · mm:ss" over the name `Attractap Touch XXXX`, or
   "Bluetooth setup: browser connected" (`display/shared/btSetupStatus.hpp`, `messages.catalog.bt-setup.hpp`).
 - Lite: at every boot while unpaired. The ring shows `LED_STATE_BT_SETUP` (`led/led_bt_setup.hpp`): two short
@@ -323,7 +324,9 @@ by itself (`Application::settingsOpenedByUser` keeps settings the user opened on
 required) takes the bytes of Serial Configurator lines (`CMND <topic> <json>\n`, a line may span several writes, at
 most 256 bytes; a longer one is dropped whole); TX `...a003` notifies the replies (`RESP <topic> <json>\n`, split
 into ATT MTU - 3 pieces). The lines run through `SerialCommandHandler` on the main loop with the serial PIN rules
-(`SerialCommandHandler::Channel`). Pairing is LE Secure Connections, Just Works, without stored bonds. The host task
+(`SerialCommandHandler::Channel`). A reply goes only to the link its command came from. After 5 wrong PINs in one
+window the PIN-checked commands answer `TOO_MANY_PIN_ATTEMPTS` until a new window opens (`PinGuard`; the console
+has no such limit, it needs the cable). Pairing is LE Secure Connections, Just Works, without stored bonds. The host task
 stack (4 KB) stays in internal RAM. macOS asks the user to accept the pairing (a system prompt): the web app keeps
 retrying the first write for about 30 s, the OS's pairing timeout.
 
@@ -332,7 +335,8 @@ retryable). Closing drops the link, stops advertising, frees NimBLE and restores
 setup (pairing settings, bond store, callbacks), so the proxy brings NimBLE up again as a plain central without a
 reboot.
 
-**sdkconfig (S3).** `sdkconfig.defaults` turns on the peripheral and broadcaster roles, NimBLE security with SM SC
+**sdkconfig (S3).** `bt_setup.cpp` refuses to build without the roles and SC, or with legacy pairing, SC debug keys
+or NVS bonds. `sdkconfig.defaults` turns on the peripheral and broadcaster roles, NimBLE security with SM SC
 only (no legacy pairing, no signed writes), no NVS persistence of bonds, the controller's advertising and BLE
 security, and leaves NimBLE's example GATT services out. NimBLE memory stays in PSRAM
 (`CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL`). The options also apply to paired readers that never open a window;

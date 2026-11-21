@@ -28,6 +28,7 @@
   "errors": {
     "invalid": "PIN must be 4 digits.",
     "mismatch": "PINs do not match.",
-    "auth": "Invalid PIN. Please try again."
+    "auth": "Invalid PIN. Please try again.",
+    "tooManyAttempts": "Too many wrong PINs over Bluetooth. Restart the device to try again."
   }
 }

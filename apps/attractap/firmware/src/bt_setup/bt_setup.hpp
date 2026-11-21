@@ -13,7 +13,9 @@
 //
 // Service 2665a001-44cd-4fe2-a450-916b627619d7
 //   RX 2665a002-...: write, encryption required. Bytes of command lines; a line may span several writes.
-//   TX 2665a003-...: notify. Bytes of reply lines, split into pieces of the ATT MTU minus 3.
+//   TX 2665a003-...: notify. Bytes of reply lines, split into pieces of the ATT MTU minus 3; a reply goes only to the
+//                    link its command came from.
+// After 5 wrong PINs in one window the PIN-checked commands are refused (`TOO_MANY_PIN_ATTEMPTS`) until a new window.
 
 #include <cstdint>
 
@@ -31,8 +33,6 @@
 
 namespace bt_setup
 {
-    constexpr bool supported() { return ATTRACTAP_BT_SETUP; }
-
     enum class Request : uint8_t
     {
         Opened,
@@ -45,7 +45,8 @@ namespace bt_setup
     // Makes the setup the command channel of SerialCommandHandler. Once, before the first request.
     void registerChannel();
     // Opens a 10-minute window: the bridge's button, a reader at boot or the Touch's "Bluetooth setup" button. Reads
-    // the pairing credentials. Call from one task only (the bridge task, or the reader's main loop).
+    // the pairing credentials. Call from one task only (the bridge task, or the reader's main loop, also for the
+    // Touch's button).
     Request request(uint32_t now);
     // Periodic, on the task that calls request(): closes the window when it times out or 10 s after the reader runs
     // an authenticated session. Closing drops the link, stops advertising and frees NimBLE.
