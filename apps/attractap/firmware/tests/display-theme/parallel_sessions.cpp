@@ -516,6 +516,8 @@ void testParallelSessionUserEdges(Renderer &renderer)
         ScreenGuard guard(signedOut.getScreen(), &signedOut);
         FirmwareI18n::refreshTree(guard.root, "de");
         expect(rowStatusLine(guard.root, "One") == "Alex \u00B7 1/6", "One name reads 'Alex · 1/6' without a stray separator");
+        expect(rowStatusLine(guard.root, "Not Latin-1") == "\xD0\x96\xD0\xB0\xD0\xBD, Sam \xF0\x9F\x98\x80 \u00B7 2/6",
+               "Names the font cannot draw are still listed, not replaced by the count: " + rowStatusLine(guard.root, "Not Latin-1"));
         expect(rowStatusLine(guard.root, "Empty name") == "Kim, Al ex +2 \u00B7 4/6",
                "Nameless sessions are only counted, control characters become single spaces: " + rowStatusLine(guard.root, "Empty name"));
         expect(rowStatusLine(guard.root, "Only nameless") == "In Verwendung 2/6", "Only nameless sessions fall back to the count");
