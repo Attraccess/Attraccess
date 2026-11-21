@@ -144,6 +144,22 @@ it('retries a write the link rejected while pairing, then gives up', async () =>
   expect(device.rx.writeValueWithResponse).toHaveBeenCalledTimes(SECURITY_RETRIES + 1);
 });
 
+it('stops waiting for the pairing prompt when disconnected during connect', async () => {
+  const { BleConfigurator } = await import('./ble-configurator');
+  const ble = BleConfigurator.getInstance();
+  vi.useFakeTimers();
+  const insecure = () => Object.assign(new Error('GATT operation failed: insufficient encryption'), { name: 'NetworkError' });
+  device.tx.startNotifications.mockRejectedValue(insecure());
+  const connecting = ble.connect();
+  const assertion = expect(connecting).rejects.toThrow('insufficient encryption');
+  await vi.advanceTimersByTimeAsync(2000);
+  await ble.disconnect();
+  expect(device.gatt.disconnect).toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1000);
+  await assertion;
+  expect(device.tx.startNotifications.mock.calls.length).toBeLessThan(5);
+});
+
 it('does not retry other write errors', async () => {
   const ble = await connected();
   device.rx.writeValueWithResponse.mockRejectedValueOnce(new TypeError('bad value'));

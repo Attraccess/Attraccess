@@ -64,6 +64,8 @@ export class BleConfigurator implements ConfiguratorTransport {
   }
 
   private device: BluetoothDevice | null = null;
+  /** The device connect() is still pairing with; disconnect() drops it, which ends the retries. */
+  private connecting: BluetoothDevice | null = null;
   private rx: BluetoothRemoteGATTCharacteristic | null = null;
   private tx: BluetoothRemoteGATTCharacteristic | null = null;
   private readonly mutex = new Mutex();
@@ -99,6 +101,7 @@ export class BleConfigurator implements ConfiguratorTransport {
     }
 
     device.addEventListener('gattserverdisconnected', this.handleDisconnected);
+    this.connecting = device;
     try {
       if (!device.gatt) throw new Error('GATT_UNAVAILABLE');
       const server = await device.gatt.connect();
@@ -120,6 +123,8 @@ export class BleConfigurator implements ConfiguratorTransport {
       device.removeEventListener('gattserverdisconnected', this.handleDisconnected);
       device.gatt?.disconnect();
       throw err;
+    } finally {
+      this.connecting = null;
     }
 
     this.emit({ connected: true, timestamp: Date.now() });
@@ -165,7 +170,11 @@ export class BleConfigurator implements ConfiguratorTransport {
 
   public async disconnect(): Promise<void> {
     const device = this.device;
-    if (!device) return;
+    if (!device) {
+      // Still waiting for the OS pairing prompt: stop instead of holding the device's only connection.
+      this.connecting?.gatt?.disconnect();
+      return;
+    }
     device.removeEventListener('gattserverdisconnected', this.handleDisconnected);
     try {
       await this.tx?.stopNotifications();
