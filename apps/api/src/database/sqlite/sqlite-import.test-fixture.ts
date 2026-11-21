@@ -2,8 +2,8 @@ import { copyFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DataSource } from 'typeorm';
-import { sqliteFrozenTrack } from '../sqlite/sqlite-frozen-track';
-import { createSqliteSource } from '../sqlite/sqlite-source';
+import { sqliteFrozenTrack } from './sqlite-frozen-track';
+import { createSqliteSource } from './sqlite-source';
 
 /** A temporary directory that holds the SQLite file of one spec case. */
 export interface SqliteWorkspace {
@@ -38,8 +38,8 @@ function frozenMigrations(): FrozenMigration[] {
     .sort((a, b) => a.timestamp - b.timestamp);
 }
 
-/** Timestamp of the newest frozen SQLite migration (the last release before PostgreSQL). */
-export const latestFrozenTimestamp = (): number => frozenMigrations().at(-1)?.timestamp as number;
+/** Timestamps of the frozen SQLite migrations, oldest first. */
+export const frozenTimestamps = (): number[] => frozenMigrations().map((entry) => entry.timestamp);
 
 /**
  * Creates the SQLite file as a release left it: the frozen track applied up to and including `timestamp` (the whole

@@ -106,7 +106,7 @@ describe('a SQLite import that fails', () => {
     await closeTestDataSource(baseline);
 
     await expect(start()).rejects.toThrow(
-      /Table billing_transaction_item, row id=\d+ cannot be stored: SQLSTATE 23514, constraint refuse_usage/,
+      /Table billing_transaction_item, row id=\d+ cannot be stored: .*\(SQLSTATE 23514\), constraint refuse_usage/,
     );
     expect(await users()).toBe(0);
     expect(await readdir(installation.storageRoot)).toEqual(['attraccess.sqlite']);

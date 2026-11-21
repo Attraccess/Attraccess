@@ -11,7 +11,6 @@ import {
 } from '../../../database/postgres/migrations/sqlite-import/postgres-catalog';
 import {
   sqliteColumns,
-  sqliteRows,
   sqliteSequences,
   sqliteTables,
 } from '../../../database/postgres/migrations/sqlite-import/sqlite-rows';
@@ -115,6 +114,24 @@ function postgresValue(value: unknown, dataType: string): unknown {
   return value;
 }
 
+/** The rows of a SQLite table, read here and not by the import: numbers as SQLite's own text, never via a double. */
+async function readSqliteRows(sqlite: DataSource, table: string, columns: readonly string[]): Promise<SqliteCell[][]> {
+  if (columns.length === 0) return [];
+  const selects = columns.map(
+    (column, at) =>
+      `typeof(${quote(column)}) AS t${at}, CASE WHEN typeof(${quote(column)}) IN ('integer', 'real') ` +
+      `THEN CAST(${quote(column)} AS TEXT) ELSE ${quote(column)} END AS v${at}`,
+  );
+  const rows: Record<string, unknown>[] = await sqlite.query(`SELECT ${selects.join(', ')} FROM ${quote(table)}`);
+  return rows.map((row) =>
+    columns.map((_, at) => {
+      const storage = row[`t${at}`] as SqliteCell['storage'];
+      const value = row[`v${at}`];
+      return { value, storage, exact: storage === 'integer' || storage === 'real' ? String(value) : null };
+    }),
+  );
+}
+
 /**
  * Compares every core table that the SQLite file has with PostgreSQL, column by column (the columns SQLite has), row
  * by row (in a canonical order). Returns the differences; empty means equal.
@@ -129,7 +146,7 @@ export async function compareWithSqlite(pg: DataSource, sqliteFile: string): Pro
       const { stored } = await tableColumns(pg, table);
       const types = new Map(stored.map((column) => [column.name, column.dataType]));
       const columns = (await sqliteColumns(sqlite, table)).filter((column) => types.has(column));
-      const expected = (await sqliteRows(sqlite, table, columns))
+      const expected = (await readSqliteRows(sqlite, table, columns))
         .map((row) => canonical(row.map((cell, at) => sqliteValue(cell, types.get(columns[at]) as string))))
         .sort();
       const selects = columns.map(

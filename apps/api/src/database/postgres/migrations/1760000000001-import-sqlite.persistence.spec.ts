@@ -6,7 +6,12 @@ import { Logger } from '@nestjs/common';
 import type { DataSource } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { createSqliteSource } from '../../sqlite/sqlite-source';
-import { copyMigratedSqlite, disposeMigratedSqliteTemplate } from '../../sqlite/sqlite-import.test-fixture';
+import {
+  copyMigratedSqlite,
+  disposeMigratedSqliteTemplate,
+  frozenTimestamps,
+  migrateSqliteTo,
+} from '../../sqlite/sqlite-import.test-fixture';
 import { PostgresBaseline1760000000000 } from './1760000000000-baseline';
 import { PostgresImportSqlite1760000000001 } from './1760000000001-import-sqlite';
 import { importSqliteInstallation, type ImportLog } from './sqlite-import/import-sqlite';
@@ -52,6 +57,11 @@ describe('PostgresImportSqlite1760000000001', () => {
 
   const q = <T = Record<string, unknown>>(sql: string): Promise<T[]> => pg.query(sql);
 
+  /** User triggers left disabled: none may remain after an import, whether it committed or not. */
+  const disabledTriggers = () => q(`SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgenabled = 'D'`);
+  const foreignKeyCount = async () =>
+    Number((await q<{ n: string }>(`SELECT count(*)::text AS n FROM pg_constraint WHERE contype = 'f'`))[0].n);
+
   beforeEach(async () => {
     storageRoot = await mkdtemp(join(tmpdir(), 'attraccess-sqlite-import-'));
     sqliteFile = join(storageRoot, 'attraccess.sqlite');
@@ -69,8 +79,24 @@ describe('PostgresImportSqlite1760000000001', () => {
     const roles = await q('SELECT key FROM role ORDER BY key');
     await runImport();
     expect(await q('SELECT key FROM role ORDER BY key')).toEqual(roles);
-    expect(logger.log).not.toHaveBeenCalled();
-    expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('nothing to import'));
+    expect(logger.log).toHaveBeenCalledTimes(1);
+    expect(logger.log).toHaveBeenCalledWith(`No SQLite file at ${sqliteFile}: nothing to import.`);
+  });
+
+  it('leaves the SQLite file alone in a database an earlier 2.0 release set up, with a warning', async () => {
+    await copyMigratedSqlite(sqliteFile);
+    await pg.query(`INSERT INTO "user" (username, email) VALUES ('here', 'here@example.com')`);
+    await pg.query(
+      `INSERT INTO migrations ("timestamp", name) VALUES (1795700000000, 'PostgresGlobalForms1795700000000')`,
+    );
+    const before = await sha256(sqliteFile);
+
+    await runImport();
+
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('set up by an earlier Attraccess 2.0 release'));
+    expect(await sha256(sqliteFile)).toBe(before);
+    expect(await readdir(storageRoot)).toEqual(['attraccess.sqlite']);
+    expect(await q('SELECT username FROM "user"')).toEqual([{ username: 'here' }]);
   });
 
   it('runs inside the track as a migration that owns its transaction and resolves the file under STORAGE_ROOT', async () => {
@@ -89,7 +115,8 @@ describe('PostgresImportSqlite1760000000001', () => {
         await runner.release();
       }
     } finally {
-      process.env.STORAGE_ROOT = saved;
+      if (saved === undefined) delete process.env.STORAGE_ROOT;
+      else process.env.STORAGE_ROOT = saved;
     }
     expect(await q('SELECT username FROM "user"')).toEqual([{ username: 'ada' }]);
     expect(await readdir(storageRoot)).toEqual(['sqlite-backup']);
@@ -103,11 +130,15 @@ describe('PostgresImportSqlite1760000000001', () => {
     });
 
     it('refuses a PostgreSQL database that already holds users, and changes nothing', async () => {
-      await sqlite(`INSERT INTO "user" (id, username, email) VALUES (1, 'ada', 'ada@example.com')`);
+      // A file one SQLite migration behind: a refused import must not migrate it either.
+      await rm(sqliteFile);
+      await (await migrateSqliteTo(sqliteFile, frozenTimestamps().at(-2))).destroy();
       await pg.query(`INSERT INTO "user" (username, email) VALUES ('here', 'here@example.com')`);
       const before = await sha256(sqliteFile);
 
-      await expect(runImport()).rejects.toThrow(/already holds Attraccess data.*empty the PostgreSQL database.*move/s);
+      await expect(runImport()).rejects.toThrow(
+        /already holds Attraccess data.*earlier start already imported.*sqlite-backup.*empty the PostgreSQL database.*move/s,
+      );
 
       expect(await sha256(sqliteFile)).toBe(before);
       expect(await q('SELECT username FROM "user"')).toEqual([{ username: 'here' }]);
@@ -116,9 +147,10 @@ describe('PostgresImportSqlite1760000000001', () => {
 
     it('converts values by the PostgreSQL column type', async () => {
       await sqlite(
-        `INSERT INTO "user" (id, username, email, isEmailVerified, createdAt) VALUES
-          (1, 'ada', 'ada@example.com', 1, '2026-01-02 03:04:05'),
-          (2, 'bob', 'bob@example.com', 0, '2026-01-02T03:04:05.678+02:00')`,
+        // creditBalance above 2^53: exact only when it never passes through a double.
+        `INSERT INTO "user" (id, username, email, isEmailVerified, createdAt, creditBalance) VALUES
+          (1, 'ada', 'ada@example.com', 1, '2026-01-02 03:04:05', 9007199254740993),
+          (2, 'bob', 'bob@example.com', 0, '2026-01-02T03:04:05.678+02:00', 0)`,
         `INSERT INTO resource (id, name, type) VALUES (1, 'Laser', 'machine')`,
         `INSERT INTO resource_flow_node (id, type, data, resourceId, positionX, positionY) VALUES
           ('n1', 'input', '{"label":"Start","nested":{"a":[1,2]}}', 1, 76.0425, -12)`,
@@ -138,6 +170,9 @@ describe('PostgresImportSqlite1760000000001', () => {
         { id: 1, isEmailVerified: true, createdAt: '2026-01-02T03:04:05.000Z' },
         { id: 2, isEmailVerified: false, createdAt: '2026-01-02T01:04:05.678Z' },
       ]);
+      expect(await q(`SELECT "creditBalance"::text AS balance FROM "user" WHERE id = 1`)).toEqual([
+        { balance: '9007199254740993' },
+      ]);
       expect(await q(`SELECT data, "positionX", "positionY" FROM resource_flow_node`)).toEqual([
         { data: { label: 'Start', nested: { a: [1, 2] } }, positionX: 76.0425, positionY: -12 },
       ]);
@@ -152,10 +187,14 @@ describe('PostgresImportSqlite1760000000001', () => {
         `INSERT INTO resource (id, name, type, createdAt) VALUES (7, 'Laser', 'machine', 'yesterday at noon')`,
       );
 
-      await expect(runImport()).rejects.toThrow(
-        'Table resource, row id=7, column createdAt: the value is not an instant',
-      );
+      const roles = await q('SELECT key FROM role ORDER BY key');
+      const failure = runImport();
+      await expect(failure).rejects.toThrow('Table resource, row id=7, column createdAt: the value is not an instant');
+      await expect(failure).rejects.toThrow(/nothing was imported and the file stays where it is/);
+      await expect(failure).rejects.not.toThrow(/yesterday at noon/);
       expect(await q('SELECT 1 FROM "user"')).toEqual([]);
+      expect(await q('SELECT key FROM role ORDER BY key')).toEqual(roles);
+      expect(await disabledTriggers()).toEqual([]);
       expect(await readdir(storageRoot)).toEqual(['attraccess.sqlite']);
     });
 
@@ -173,10 +212,49 @@ describe('PostgresImportSqlite1760000000001', () => {
       expect(await q('SELECT "creditBalance" FROM "user"')).toEqual([{ creditBalance: 800 }]);
     });
 
+    it('copies legacy rows the integrity triggers would refuse today, and enables the triggers again', async () => {
+      const source = createSqliteSource(sqliteFile);
+      await source.initialize();
+      try {
+        const triggers: { name: string }[] = await source.query(
+          `SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'resource_usage'`,
+        );
+        for (const { name } of triggers) await source.query(`DROP TRIGGER "${name}"`);
+      } finally {
+        await source.destroy();
+      }
+      await sqlite(
+        `INSERT INTO "user" (id, username, email) VALUES (1, 'ada', 'ada@example.com')`,
+        `INSERT INTO resource (id, name, type) VALUES (1, 'Laser', 'machine')`,
+        // Two published open sessions of one user on one resource: a legacy duplicate.
+        `INSERT INTO resource_usage (id, usageAction, resourceId, userId, startTime, isFinalized, lifecyclePending)
+          VALUES (1, 'usage', 1, 1, '2026-01-01 10:00:00', 1, 0), (2, 'usage', 1, 1, '2026-01-01 11:00:00', 1, 0)`,
+      );
+
+      await runImport();
+
+      expect(await q('SELECT id FROM resource_usage ORDER BY id')).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(await disabledTriggers()).toEqual([]);
+    });
+
     it('continues generated ids after the highest id SQLite ever issued', async () => {
       await sqlite(
         `INSERT INTO "user" (id, username, email) VALUES (1, 'ada', 'ada@example.com'), (40, 'gone', 'gone@example.com')`,
         `DELETE FROM "user" WHERE id = 40`,
+      );
+
+      await runImport();
+
+      const [{ id }] = await q<{ id: number }>(
+        `INSERT INTO "user" (username, email) VALUES ('next', 'next@example.com') RETURNING id`,
+      );
+      expect(id).toBe(41);
+    });
+
+    it('continues generated ids after the highest id in the table when sqlite_sequence is lower', async () => {
+      await sqlite(
+        `INSERT INTO "user" (id, username, email) VALUES (1, 'ada', 'ada@example.com'), (40, 'eve', 'eve@example.com')`,
+        `DELETE FROM sqlite_sequence WHERE name = 'user'`,
       );
 
       await runImport();
@@ -235,9 +313,12 @@ describe('PostgresImportSqlite1760000000001', () => {
         `INSERT INTO billing_transaction (id, userId, amount, status) VALUES (5, 99, 10, 'pending')`,
       );
 
+      const keys = await foreignKeyCount();
       await expect(runImport()).rejects.toThrow(
         /Table billing_transaction breaks the foreign key \S+ \(references user\).*\[\{"id":"5","userId":"99"\}\]/,
       );
+      expect(await foreignKeyCount()).toBe(keys);
+      expect(await disabledTriggers()).toEqual([]);
 
       expect(await q('SELECT 1 FROM "user"')).toEqual([]);
       expect((await q('SELECT 1 FROM role')).length).toBeGreaterThan(0);
@@ -261,7 +342,9 @@ describe('PostgresImportSqlite1760000000001', () => {
       expect((await readdir(backups)).sort()).toEqual(['attraccess-20261121T093000123Z.sqlite', 'attraccess.sqlite']);
       expect(await readFile(join(backups, 'attraccess.sqlite'), 'utf8')).toBe('earlier backup');
       expect(logger.log).toHaveBeenCalledWith(
-        expect.stringMatching(/SQLite import complete: \d+ rows in \d+ tables.*attraccess-20261121T093000123Z/),
+        expect.stringMatching(
+          /SQLite import complete: \d+ rows in \d+ tables; the SQLite file is at .*attraccess-20261121T093000123Z/,
+        ),
       );
     });
 

@@ -68,7 +68,7 @@ export async function moveToBackup(sqliteFile: string, now: Date = new Date()): 
     } catch (error) {
       throw new PartialBackupMoveError(
         target,
-        `${sqliteFile} moved to ${target}, but ${sqliteFile + suffix} did not: ${(error as Error).message}`,
+        `${sqliteFile + suffix} did not follow it: ${(error as Error).message}`,
         { cause: error },
       );
     }

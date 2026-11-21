@@ -110,8 +110,8 @@ describe('startup with a SQLite installation (e2e)', () => {
   it('stops the start when PostgreSQL already holds users and a SQLite file is present, and changes nothing', async () => {
     await migrateDatabaseAtStartup();
     await query(`INSERT INTO "user" (username, email) VALUES ('already-here', 'here@example.com')`);
-    // The database predates the import migration: it is pending again.
-    await query(`DELETE FROM migrations WHERE name = 'PostgresImportSqlite1760000000001'`);
+    // Only the baseline recorded (e.g. a crash after the import committed): the import and later migrations are pending.
+    await query(`DELETE FROM migrations WHERE name <> 'PostgresBaseline1760000000000'`);
     await installSqlite('billing release');
     const before = await sha256(sqliteFile());
 
@@ -119,6 +119,24 @@ describe('startup with a SQLite installation (e2e)', () => {
       /already holds Attraccess data.*empty the PostgreSQL database.*move .*attraccess\.sqlite/s,
     );
 
+    expect(await filesInStorage()).toEqual(['attraccess.sqlite']);
+    expect(await sha256(sqliteFile())).toBe(before);
+    expect(await count('user')).toBe(1);
+    expect(imports()).toHaveLength(0);
+  });
+
+  it('leaves a SQLite file alone in a database set up by 2.0.0-beta.1 (later migrations recorded), with a warning', async () => {
+    await migrateDatabaseAtStartup();
+    await query(`INSERT INTO "user" (username, email) VALUES ('already-here', 'here@example.com')`);
+    // beta.1 shipped the baseline and the global forms, not the import: the import is pending on such a database.
+    await query(`DELETE FROM migrations WHERE name = 'PostgresImportSqlite1760000000001'`);
+    await installSqlite('billing release');
+    const before = await sha256(sqliteFile());
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+
+    await migrateDatabaseAtStartup();
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('set up by an earlier Attraccess 2.0 release'));
     expect(await filesInStorage()).toEqual(['attraccess.sqlite']);
     expect(await sha256(sqliteFile())).toBe(before);
     expect(await count('user')).toBe(1);

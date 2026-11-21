@@ -88,9 +88,12 @@ export async function foreignKeys(manager: Query): Promise<ForeignKey[]> {
   }));
 }
 
-/** Key columns whose values are credential material (e.g. `mcp_oauth_token.tokenHash`): never printed in an error. */
+/**
+ * Key columns whose values are credential material (e.g. `mcp_oauth_token.tokenHash`, `sso_logout_state.key`): never
+ * printed in an error.
+ */
 export function isSecretColumn(column: string): boolean {
-  return /hash|token|secret/i.test(column);
+  return /hash|token|secret|^key$/i.test(column);
 }
 
 /**
@@ -144,13 +147,38 @@ export async function holdsUsers(manager: Query): Promise<boolean> {
 }
 
 /**
+ * Whether the database was set up before this import existed: a migration after it is already recorded (Attraccess
+ * 2.0.0-beta.1 shipped the baseline and later migrations without it). Such a database never takes a SQLite import.
+ */
+export async function predatesImport(pg: Pick<QueryRunner, 'query' | 'connection'>): Promise<boolean> {
+  const table = pg.connection.options.migrationsTableName ?? 'migrations';
+  const rows = await pg.query(`SELECT 1 FROM ${quote(table)} WHERE "timestamp" > $1 LIMIT 1`, [IMPORT_TIMESTAMP]);
+  return rows.length > 0;
+}
+
+/** The timestamp of PostgresImportSqlite1760000000001. */
+const IMPORT_TIMESTAMP = 1760000000001;
+
+/** What the common SQLSTATE codes of a refused row mean. */
+const SQLSTATE_MEANING: Readonly<Record<string, string>> = {
+  '23502': 'a required value is missing',
+  '23505': 'a duplicate of a unique value',
+  '23514': 'a check constraint is broken',
+  '23503': 'a foreign key is broken',
+  '23000': 'an integrity rule is broken',
+  '22P02': 'the text is not valid for the column type',
+  '22001': 'the value is too long',
+};
+
+/**
  * A failure as it may be logged: the SQLSTATE, the constraint and the column. Never the driver's message or detail
  * (they can quote row values such as password hashes or tokens).
  */
 export function describePostgresError(error: unknown): string {
   const failure =
     (error as { driverError?: Record<string, unknown> })?.driverError ?? (error as Record<string, unknown>);
-  const parts = [`SQLSTATE ${String(failure?.code ?? 'unknown')}`];
+  const code = String(failure?.code ?? 'unknown');
+  const parts = [SQLSTATE_MEANING[code] ? `${SQLSTATE_MEANING[code]} (SQLSTATE ${code})` : `SQLSTATE ${code}`];
   if (failure?.constraint) parts.push(`constraint ${String(failure.constraint)}`);
   if (failure?.column) parts.push(`column ${String(failure.column)}`);
   return parts.join(', ');

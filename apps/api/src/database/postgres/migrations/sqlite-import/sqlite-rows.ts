@@ -1,7 +1,6 @@
 import type { DataSource } from 'typeorm';
+import { quote } from './postgres-catalog';
 import type { SqliteCell } from './sqlite-values';
-
-const quote = (identifier: string): string => `"${identifier.replace(/"/g, '""')}"`;
 
 /** The migration bookkeeping of the SQLite track: it has no meaning in PostgreSQL. */
 const SQLITE_BOOKKEEPING = new Set(['migrations', 'typeorm_metadata']);
@@ -20,13 +19,17 @@ export async function sqliteColumns(source: DataSource, table: string): Promise<
   return columns.filter((column) => column.hidden === 0).map((column) => column.name);
 }
 
-/** The rows of a table, each cell with its storage class and SQLite's exact text of a number. */
-export async function sqliteRows(
+/**
+ * The rows of a table in rowid order, a page at a time (a large table never sits in memory whole), each cell with its
+ * storage class and SQLite's exact text of a number.
+ */
+export async function* sqliteRowPages(
   source: DataSource,
   table: string,
   columns: readonly string[],
-): Promise<SqliteCell[][]> {
-  if (columns.length === 0) return [];
+  pageSize: number,
+): AsyncGenerator<SqliteCell[][]> {
+  if (columns.length === 0) return;
   const selects = columns.flatMap((column, index) => {
     const name = quote(column);
     return [
@@ -35,14 +38,21 @@ export async function sqliteRows(
       `CASE WHEN typeof(${name}) IN ('integer', 'real') THEN CAST(${name} AS TEXT) END AS x${index}`,
     ];
   });
-  const rows: Record<string, unknown>[] = await source.query(`SELECT ${selects.join(', ')} FROM ${quote(table)}`);
-  return rows.map((row) =>
-    columns.map((_, index) => ({
-      value: row[`v${index}`],
-      storage: row[`t${index}`] as SqliteCell['storage'],
-      exact: (row[`x${index}`] as string | null) ?? null,
-    })),
-  );
+  const sql = `SELECT rowid AS r, ${selects.join(', ')} FROM ${quote(table)} WHERE rowid > ? ORDER BY rowid LIMIT ?`;
+  let after = Number.MIN_SAFE_INTEGER;
+  for (;;) {
+    const rows: Record<string, unknown>[] = await source.query(sql, [after, pageSize]);
+    if (rows.length === 0) return;
+    after = Number(rows[rows.length - 1].r);
+    yield rows.map((row) =>
+      columns.map((_, index) => ({
+        value: row[`v${index}`],
+        storage: row[`t${index}`] as SqliteCell['storage'],
+        exact: (row[`x${index}`] as string | null) ?? null,
+      })),
+    );
+    if (rows.length < pageSize) return;
+  }
 }
 
 /** The highest id SQLite ever issued per AUTOINCREMENT table, also after deletes. Empty without such tables. */

@@ -11,11 +11,13 @@ import {
   tableColumns,
   triggerTables,
 } from './postgres-catalog';
-import { sqliteColumns, sqliteRows, sqliteSequences, sqliteTables } from './sqlite-rows';
+import { sqliteColumns, sqliteRowPages, sqliteSequences, sqliteTables } from './sqlite-rows';
 import { placeholder, SqliteImportError, toPostgresValue, type PostgresColumn, type SqliteCell } from './sqlite-values';
 
 /** PostgreSQL accepts 65535 bind parameters per statement. */
 const MAX_PARAMETERS = 60_000;
+/** Rows per statement at most, so a table with large values (crash report core dumps) keeps messages small. */
+const MAX_ROWS = 500;
 
 interface TablePlan {
   readonly table: string;
@@ -56,7 +58,7 @@ async function planTable(pg: QueryRunner, sqlite: DataSource, table: string): Pr
   return { table, sqliteColumns: copied, targets, keyIndexes: keys.map((key) => copied.indexOf(key)) };
 }
 
-/** Names a row by its primary key, or by its position when the key is missing or secret. */
+/** Names a row by its primary key, or by its position in rowid order when the key is missing or secret. */
 export function rowName(
   plan: Pick<TablePlan, 'sqliteColumns' | 'keyIndexes'>,
   row: SqliteCell[],
@@ -89,37 +91,44 @@ function insertSql(plan: TablePlan, rows: number): string {
   return `INSERT INTO ${quote(plan.table)} (${plan.targets.map((t) => quote(t.name)).join(', ')}) VALUES ${tuples.join(', ')}`;
 }
 
-/** Inserts the rows in chunks. A failing chunk is retried row by row to name the first offending row. */
-async function loadRows(pg: QueryRunner, plan: TablePlan, rows: SqliteCell[][]): Promise<void> {
-  if (plan.targets.length === 0 || rows.length === 0) return;
-  const perStatement = Math.max(1, Math.floor(MAX_PARAMETERS / plan.targets.length));
-  for (let start = 0; start < rows.length; start += perStatement) {
-    const chunk = rows.slice(start, start + perStatement);
-    const values = chunk.flatMap((row, offset) => parameters(plan, row, start + offset));
+/**
+ * Inserts one page of rows as one statement. A failing page is retried row by row to name the first offending row; a
+ * page whose rows all go in one by one (a statement that was too large) is not an error.
+ */
+async function loadPage(pg: QueryRunner, plan: TablePlan, page: SqliteCell[][], first: number): Promise<void> {
+  const values = page.flatMap((row, offset) => parameters(plan, row, first + offset));
+  try {
+    await pg.query('SAVEPOINT sqlite_import_chunk');
+    await pg.query(insertSql(plan, page.length), values);
+    await pg.query('RELEASE SAVEPOINT sqlite_import_chunk');
+    return;
+  } catch {
+    await pg.query('ROLLBACK TO SAVEPOINT sqlite_import_chunk');
+  }
+  for (const [offset, row] of page.entries()) {
     try {
-      await pg.query('SAVEPOINT sqlite_import_chunk');
-      await pg.query(insertSql(plan, chunk.length), values);
-      await pg.query('RELEASE SAVEPOINT sqlite_import_chunk');
-    } catch (chunkError) {
-      if (chunkError instanceof SqliteImportError) throw chunkError;
-      await pg.query('ROLLBACK TO SAVEPOINT sqlite_import_chunk');
-      for (const [offset, row] of chunk.entries()) {
-        try {
-          await pg.query('SAVEPOINT sqlite_import_row');
-          await pg.query(insertSql(plan, 1), parameters(plan, row, start + offset));
-          await pg.query('RELEASE SAVEPOINT sqlite_import_row');
-        } catch (rowError) {
-          throw new SqliteImportError(
-            `Table ${plan.table}, ${rowName(plan, row, start + offset)} cannot be stored: ${describePostgresError(rowError)}`,
-            { cause: rowError },
-          );
-        }
-      }
-      throw new SqliteImportError(`Table ${plan.table} cannot be stored: ${describePostgresError(chunkError)}`, {
-        cause: chunkError,
-      });
+      await pg.query('SAVEPOINT sqlite_import_row');
+      await pg.query(insertSql(plan, 1), parameters(plan, row, first + offset));
+      await pg.query('RELEASE SAVEPOINT sqlite_import_row');
+    } catch (rowError) {
+      throw new SqliteImportError(
+        `Table ${plan.table}, ${rowName(plan, row, first + offset)} cannot be stored: ${describePostgresError(rowError)}`,
+        { cause: rowError },
+      );
     }
   }
+}
+
+/** Copies a table page by page; returns the number of rows. */
+async function copyTable(pg: QueryRunner, sqlite: DataSource, plan: TablePlan): Promise<number> {
+  if (plan.targets.length === 0) return 0;
+  const pageSize = Math.max(1, Math.min(MAX_ROWS, Math.floor(MAX_PARAMETERS / plan.targets.length)));
+  let copied = 0;
+  for await (const page of sqliteRowPages(sqlite, plan.table, plan.sqliteColumns, pageSize)) {
+    await loadPage(pg, plan, page, copied);
+    copied += page.length;
+  }
+  return copied;
 }
 
 /** Generated keys continue after the highest id SQLite ever issued: max(id) or sqlite_sequence, whichever is higher. */
@@ -160,11 +169,7 @@ export async function copySqliteTables(pg: QueryRunner, sqlite: DataSource): Pro
   // The baseline's seed rows (roles, settings, templates) are replaced by the installation's own.
   if (copied.size > 0) await pg.query(`TRUNCATE ${[...copied].map(quote).join(', ')} RESTART IDENTITY`);
   const counts = new Map<string, number>();
-  for (const plan of plans) {
-    const rows = await sqliteRows(sqlite, plan.table, plan.sqliteColumns);
-    await loadRows(pg, plan, rows);
-    counts.set(plan.table, rows.length);
-  }
+  for (const plan of plans) counts.set(plan.table, await copyTable(pg, sqlite, plan));
 
   for (const key of keys) {
     try {
@@ -174,8 +179,8 @@ export async function copySqliteTables(pg: QueryRunner, sqlite: DataSource): Pro
     } catch (error) {
       await pg.query('ROLLBACK TO SAVEPOINT sqlite_import_fk');
       throw new SqliteImportError(
-        `Table ${key.child} breaks the foreign key ${key.name} (references ${key.parent}): ` +
-          `${describePostgresError(error)}; offending keys ${await orphanKeys(pg, key)}`,
+        `Table ${key.child} breaks the foreign key ${key.name} (references ${key.parent}): a referenced row is ` +
+          `missing; offending keys ${await orphanKeys(pg, key)}`,
         { cause: error },
       );
     }

@@ -20,7 +20,9 @@ export async function migrateDatabaseAtStartup(): Promise<void> {
   const config = parsePostgresConfig();
   logger.log(`Database: PostgreSQL ${redactDatabaseUrl(config.url)} (schema ${config.schema})`);
   await waitForPostgres(config);
-  const lock = await acquireAdvisoryLock(config, POSTGRES_MIGRATION_LOCK_KEY);
+  const lock = await acquireAdvisoryLock(config, POSTGRES_MIGRATION_LOCK_KEY, () =>
+    logger.log('Waiting for another instance to finish the database migrations...'),
+  );
   let source: DataSource | undefined;
   try {
     source = backend.createDataSource({
@@ -32,6 +34,8 @@ export async function migrateDatabaseAtStartup(): Promise<void> {
     await source.runMigrations();
   } finally {
     if (source?.isInitialized) await source.destroy().catch(() => undefined);
-    await lock.release();
+    // A lock connection that dropped during a long import has released the lock already; its error must not hide the
+    // migration's own.
+    await lock.release().catch((error: Error) => logger.warn(`Releasing the migration lock failed: ${error.message}`));
   }
 }

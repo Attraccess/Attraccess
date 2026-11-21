@@ -77,9 +77,7 @@ describe('moveToBackup', () => {
     const target = join(root, 'sqlite-backup', 'attraccess.sqlite');
     expect(failure).toBeInstanceOf(PartialBackupMoveError);
     expect((failure as PartialBackupMoveError).location).toBe(target);
-    expect((failure as Error).message).toBe(
-      `${file} moved to ${target}, but ${file}-wal did not: EACCES: permission denied`,
-    );
+    expect((failure as Error).message).toBe(`${file}-wal did not follow it: EACCES: permission denied`);
     expect(await readFile(target, 'utf8')).toBe('data');
   });
 });
