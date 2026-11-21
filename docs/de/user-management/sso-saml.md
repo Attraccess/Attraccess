@@ -55,6 +55,10 @@ Häufige Attributnamen:
 
 Optional können Sie ein Provisioning-Secret festlegen. Damit kann Ihr Identity Provider über die Provisioning-API Benutzer und Berechtigungen in Attraccess verwalten.
 
+### Namensattribute
+
+Optional legen Sie einen **Vorname-Claim-Pfad** und **Nachname-Claim-Pfad** mit den SAML-Attributnamen für Vor- und Nachnamen fest. Ohne Angabe liest Attraccess `givenName` / `surname` sowie die Claim-URIs `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname` und `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname`. Namen werden beim Anlegen des Kontos gesetzt und bei jeder Anmeldung synchronisiert; ein fehlendes oder leeres Attribut lässt den gespeicherten Namen unverändert. Die Namen von SSO-Benutzern sind in Attraccess schreibgeschützt.
+
 ### Rollen-Attributschlüssel
 
 Standardmäßig liest Attraccess Rollen aus den Attributen `roles`, `role`, `groups`, `group`, `memberof` sowie den Microsoft/ADFS-Claim-URIs `http://schemas.microsoft.com/ws/2008/06/identity/claims/groups`, `http://schemas.microsoft.com/ws/2008/06/identity/claims/role` und `http://schemas.xmlsoap.org/claims/group`. Um andere Attribute zu lesen, fügen Sie sie unter **Rollen-Attributschlüssel** einzeln hinzu (höchstens 20, je bis zu 256 Zeichen, ohne Kommas; Groß-/Kleinschreibung wird ignoriert). Das Ändern dieser Einstellung erfordert die Berechtigung `users.roles.manage`.

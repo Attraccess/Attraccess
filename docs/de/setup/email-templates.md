@@ -39,10 +39,16 @@ Vorlagen unterstützen Platzhalter, die beim Versand automatisch ersetzt werden:
 
 | Platzhalter | Beschreibung |
 |-------------|-------------|
-| `{{username}}` | Benutzername des Empfängers |
+| `{{user.displayName}}` | Name des Empfängers: „Vorname Nachname“, ersatzweise der Benutzername |
+| `{{user.firstName}}`, `{{user.lastName}}` | Vor- und Nachname des Empfängers (kann leer sein) |
+| `{{user.username}}` | Benutzername des Empfängers |
+| `{{inviter.displayName}}` | Anzeigename des Einladenden (Projekteinladung) |
 | `{{email}}` | E-Mail-Adresse des Empfängers |
 | `{{link}}` | Aktionslink (Bestätigung, Zurücksetzung etc.) |
 | `{{appName}}` | Name der Anwendung |
+
+> [!NOTE]
+> Die Standardvorlagen begrüßen den Empfänger mit `user.displayName`. Vorlagen, die Sie vorher angepasst haben, begrüßen weiterhin mit `user.username`; sie werden nicht aktualisiert. Verwenden Sie für die neue Anrede **Auf Standard zurücksetzen** oder ersetzen Sie in Ihrer Vorlage `user.username` durch `user.displayName`.
 
 ## Siehe auch
 

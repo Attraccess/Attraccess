@@ -235,8 +235,8 @@ class HelloWorldService implements OnModuleInit {
   async greetUsers(): Promise<string[]> {
     // Host data is read through context.hostData as neutral values, never as
     // entities. The users group is gated behind READ_USERS.
-    const names = await this.context.hostData.users.getUsernames([1, 2, 3, 4, 5]);
-    return [...names.values()].map((username) => `Hello, ${username}!`);
+    const names = await this.context.hostData.users.getDisplayNames([1, 2, 3, 4, 5]);
+    return [...names.values()].map((name) => `Hello, ${name}!`);
   }
 }
 
@@ -625,7 +625,7 @@ const plugin: PluginBackendModule = {
       variables: ['booking.id', 'booking.start'], // offered in the editor ("Variables")
       subject: '{{t "subject" "Reminder: booking {id}" id=booking.id}}',
       body: `<mj-section><mj-column>
-  <mj-text>{{t "greeting" "Hello {name}," name=user.username}}</mj-text>
+  <mj-text>{{t "greeting" "Hello {name}," name=user.displayName}}</mj-text>
   <mj-text>{{t "body" "Your booking starts at {start}." start=booking.start}}</mj-text>
   <mj-button href="{{host.frontend}}/reservations/{{booking.id}}">{{t "open" "Open booking"}}</mj-button>
 </mj-column></mj-section>`,
@@ -742,14 +742,14 @@ query handles. Each group checks its own permission when a method is called.
 | Group                | Permission         | Methods                                                                                                                                                                                                                                                                                                 |
 | -------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `hostData.resources` | `ACCESS_RESOURCES` | `get(id, scope?)` (a `PluginResourceModel` or `null`; with a transaction scope it reads inside that transaction), `getNames(ids)`, `filterVisible(userId, ids, { seeAll? })`, `filterRequiringSupervision(ids)`, `listIdsInGroups(groupIds)`, `countUnhealthyEntries(id)`, `listIntroducerUserIds(id)`. |
-| `hostData.users`     | `READ_USERS`       | `getUsernames(ids)`, `getLocales(ids)`, `isActive(id)` (exists, not deleted, not disabled), `listIdsWithAnyPermission(keys)`.                                                                                                                                                                           |
+| `hostData.users`     | `READ_USERS`       | `getUsernames(ids)` (kept for compatibility), `getDisplayNames(ids)` (a map of user id to display name: "First Last", or the username), `getLocales(ids)`, `isActive(id)` (exists, not deleted, not disabled), `listIdsWithAnyPermission(keys)`.                                                                                                                                                                           |
 | `hostData.settings`  | `READ_SETTINGS`    | `getApp(key)`: the trimmed value of an application setting, or `null`.                                                                                                                                                                                                                                  |
 | `hostData.flows`     | `TRIGGER_FLOWS`    | `findNodes(query)`: flow nodes by `type`, `typePrefix`, `dataEquals`, `dataIn`, `resourceId`, `excludeResourceId`, `excludeFlowId`, `orderById` and `limit`, as `{ id, type, resourceId, resourceName, flowId, flowName, data }`.                                                                       |
 
-`PluginUserModel` (`id`, `username`, `locale`, `isDisabled`) and `PluginResourceModel` (`id`, `name`, `type`,
+`PluginUserModel` (`id`, `username`, `firstName`, `lastName`, `displayName`, `locale`, `isDisabled`; `displayName` is the computed "First Last" or the username, show it to people) and `PluginResourceModel` (`id`, `name`, `type`,
 `description`, `allowTakeOver`, `maxParallelSessions`, `supervisionMode`) come from `@attraccess/application-models` and
 are re-exported by the SDK root. They are also the payload of the `RESOURCE_USAGE_STARTED` and `RESOURCE_USAGE_ENDED`
-events and the user of `AuthenticatedRequest`: tokens, contact data and other account fields never reach plugin code.
+events and the user of `AuthenticatedRequest` (`AuthenticatedUser`, with the same name fields): tokens, contact data and other account fields never reach plugin code.
 
 ### Transactions
 

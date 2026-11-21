@@ -55,6 +55,10 @@ Common attribute names:
 
 Optionally set a provisioning secret. This allows your identity provider to manage users and permissions in Attraccess via the provisioning API.
 
+### Name Attributes
+
+Optionally set a **First Name Claim Path** and **Last Name Claim Path** with the SAML attribute names for first and last name. Without them Attraccess reads `givenName` / `surname` and the claim URIs `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname` and `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname`. Names are set at account creation and synchronised on every login; a missing or empty attribute leaves the stored name unchanged. The names of SSO users are read-only in Attraccess.
+
 ### Role Attribute Keys
 
 By default Attraccess reads roles from the attributes `roles`, `role`, `groups`, `group`, `memberof` and the Microsoft/ADFS claim URIs `http://schemas.microsoft.com/ws/2008/06/identity/claims/groups`, `http://schemas.microsoft.com/ws/2008/06/identity/claims/role` and `http://schemas.xmlsoap.org/claims/group`. To read other attributes, add them one by one in **Role Attribute Keys** (at most 20, up to 256 characters each, no commas; matched case-insensitively). Changing this setting requires the `users.roles.manage` permission.

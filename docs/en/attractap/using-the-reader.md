@@ -16,6 +16,8 @@ You need an RFID card linked to your Attraccess account. If you do not have one 
 
 _Your name and the remaining sign-in time appear at the top. The screenshots show the German display labels used in this guide._
 
+The reader shows your display name: your first and last name when your account has them, otherwise your username. This applies to the header, the lock screen, enrollment and reset screens, mass introductions, supervision and the session summary. Readers on an older firmware or server keep showing the username. Characters outside the reader font (Latin-1) are replaced, and very long names are shortened on screen.
+
 You can also choose a resource **before** signing in. Tap its name, then hold your card against the reader when prompted. Its details open after you sign in. The left-arrow button at the far left of the header returns to the list.
 
 ![Card prompt for a selected resource, with a back arrow in the top-left corner](../../_media/attractap/card-prompt.png)
@@ -92,7 +94,7 @@ _The back arrow returns to the resource list. You remain signed in when you move
 
 ### Session finished summary
 
-After you successfully stop your own machine session, the reader shows **Danke, {name}!** with your account username. **Dauer** is the elapsed session time in hours, minutes and seconds, not machine operating time or billed minutes. Hours can exceed 24. **Abgerechnet** shows the final formatted charge when there is a nonzero charge; otherwise only the centered duration appears.
+After you successfully stop your own machine session, the reader shows **Danke, {name}!** with your display name (your name, or your username when none is set). **Dauer** is the elapsed session time in hours, minutes and seconds, not machine operating time or billed minutes. Hours can exceed 24. **Abgerechnet** shows the final formatted charge when there is a nonzero charge; otherwise only the centered duration appears.
 
 ![Full-screen goodbye with elapsed duration and final charge](../../_media/attractap/session-summary-billed.png)
 
