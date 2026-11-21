@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <lvgl.h>
 #include "../../images/logo_40h.hpp"
 #include "../IScreen.hpp"
@@ -66,6 +67,7 @@ private:
     bool multiSession = false;
     uint16_t occupancyActiveCount = 0;
     uint16_t occupancyLimit = 1;
+    std::vector<API::ActiveSession> occupancySessions;
 
     // The reservation (or other plugin) status of the resource, shown in place of "Available". Only ever a
     // contribution built without a card session: the firmware drops row contributions when a card session ends.

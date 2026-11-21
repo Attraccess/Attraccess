@@ -3,7 +3,9 @@
 #include "../../api/api.hpp"
 #include "../messages.hpp"
 #include "../theme.hpp"
+#include <algorithm>
 #include <string>
+#include <vector>
 
 // Occupancy captions for machines that allow several people at once (ATT-1189).
 // Machines limited to one session keep the classic "In use: <name>" wording.
@@ -44,5 +46,59 @@ namespace SessionOccupancy
     inline FirmwareI18n::Text caption(const API::ResourceBrief &resource, bool ownsUsage)
     {
         return caption(resource.activeSessionCount, resource.maxParallelSessions, ownsUsage);
+    }
+
+    // The caption's pieces are literals for user names and catalog entries for everything else.
+    inline FirmwareI18n::Text number(unsigned value)
+    {
+        return FirmwareI18n::Text::literal(std::to_string(value)) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */;
+    }
+
+    // Whether `text` fits one line of `width` pixels in the label font, in both firmware languages (the Text is
+    // rendered again on a language switch, so the fit must hold for either wording).
+    inline bool fitsLine(const FirmwareI18n::Text &text, const lv_font_t *font, int32_t width)
+    {
+        for (const char *locale : {"de", "en"})
+        {
+            lv_point_t size{};
+            lv_text_get_size(&size, text.render(locale).c_str(), font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+            if (size.x > width) return false;
+        }
+        return true;
+    }
+
+    // "Alex, Sam +2 \u00B7 4/6": who uses a parallel machine, then the count ("Full" once no slot is left).
+    // The own session (`ownSessionId`, 0 for none) comes first as "you", then the server's order. Only whole names
+    // that fit `width` are listed; the rest is "+N" (counted against `activeCount`, which may exceed the capped list).
+    // Returns an empty caption when no session is listed so the caller falls back to caption().
+    inline FirmwareI18n::Text usersCaption(const std::vector<API::ActiveSession> &sessions, uint16_t activeCount,
+                                           uint16_t limit, uint32_t ownSessionId, const lv_font_t *font, int32_t width)
+    {
+        using FirmwareI18n::Message;
+        using FirmwareI18n::Text;
+        if (sessions.empty() || activeCount == 0) return Text();
+        std::vector<Text> names;
+        names.reserve(sessions.size());
+        for (const auto &session : sessions)
+        {
+            if (ownSessionId != 0 && session.id == ownSessionId) names.insert(names.begin(), Text(Message::SessionYou));
+            else names.push_back(Text::literal(session.username) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */);
+        }
+        const unsigned total = std::max<unsigned>(activeCount, names.size());
+        const Text count = level(activeCount, limit) == Level::Full
+                               ? Text(Message::ResourceFull)
+                               : Text::format(Message::SessionCountOf, {number(activeCount), number(limit)});
+        auto line = [&](size_t shown) {
+            Text list = names[0];
+            for (size_t i = 1; i < shown; ++i) list = Text::format(Message::SessionNameJoin, {list, names[i]});
+            if (total > shown) list = Text::format(Message::SessionNamesMore, {list, number(total - shown)});
+            return Text::format(Message::SessionUsersLine, {list, count});
+        };
+        for (size_t shown = names.size(); shown > 1; --shown)
+        {
+            const Text candidate = line(shown);
+            if (fitsLine(candidate, font, width)) return candidate;
+        }
+        return line(1); // Not even the first name fits: the label cuts it with its ellipsis.
     }
 }

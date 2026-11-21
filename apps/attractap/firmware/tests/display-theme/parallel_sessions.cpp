@@ -114,9 +114,9 @@ void testParallelSessionList(Renderer &renderer)
     list.setAuthenticatedUser("Alex");
     list.init();
     ScreenGuard guard(list.getScreen(), &list);
-    requireObject(guard.root, &lv_label_class, "In Verwendung 2/3");
-    requireObject(guard.root, &lv_label_class, "Voll");
-    requireObject(guard.root, &lv_label_class, "Von dir verwendet");
+    requireObject(guard.root, &lv_label_class, "Robin, Sam \u00B7 2/3");
+    requireObject(guard.root, &lv_label_class, "Robin, Robin, Robin \u00B7 Voll");
+    requireObject(guard.root, &lv_label_class, "Du \u00B7 1/3");
     requireObject(guard.root, &lv_label_class, "In Verwendung: Robin");
     requireObject(guard.root, &lv_label_class, "Stop");
     renderer.capture("parallel-sessions-list");
@@ -129,9 +129,9 @@ void testParallelSessionList(Renderer &renderer)
     auto *fullRow = lv_obj_get_parent(lv_obj_get_parent(requireObject(guard.root, &lv_label_class, "Full printer")));
     expect(!lv_obj_has_flag(lv_obj_get_child(fullRow, 1), LV_OBJ_FLAG_CLICKABLE), "Full machine row cannot start");
     FirmwareI18n::refreshTree(guard.root, "en");
-    requireObject(guard.root, &lv_label_class, "In use 2/3");
-    requireObject(guard.root, &lv_label_class, "Full");
-    requireObject(guard.root, &lv_label_class, "In use by you");
+    requireObject(guard.root, &lv_label_class, "Robin, Sam \u00B7 2/3");
+    requireObject(guard.root, &lv_label_class, "Robin, Robin, Robin \u00B7 Full");
+    requireObject(guard.root, &lv_label_class, "You \u00B7 1/3");
     requireObject(guard.root, &lv_label_class, "In use: Robin");
     renderer.capture("parallel-sessions-list-english");
 }
@@ -312,13 +312,113 @@ void testParallelSessionLockscreen(Renderer &renderer)
     auto resource = machine("Printer", 3, 1);
     addSession(resource, 1, "Robin", false);
     lock.setUsageInfo(resource);
-    requireObject(guard.root, &lv_label_class, "In Verwendung 1/3");
+    requireObject(guard.root, &lv_label_class, "Robin \u00B7 1/3");
     renderer.capture("parallel-sessions-lockscreen");
     resource.activeSessionCount = 3;
+    lock.setUsageInfo(resource);
+    requireObject(guard.root, &lv_label_class, "Robin +2 \u00B7 Voll");
+    resource.activeSessions.clear(); // no names from an older API: the count caption stays
     lock.setUsageInfo(resource);
     requireObject(guard.root, &lv_label_class, "Voll");
     resource.activeSessionCount = 0;
     resource.hasActiveUsage = false;
     lock.setUsageInfo(resource);
     requireObject(guard.root, &lv_label_class, "Verfügbar");
+}
+
+namespace {
+// The text of the row's second line (the muted 14 px label of the details half) for the named resource.
+std::string rowStatusLine(lv_obj_t *root, const char *resourceName)
+{
+    auto *row = lv_obj_get_parent(lv_obj_get_parent(requireObject(root, &lv_label_class, resourceName)));
+    auto *details = lv_obj_get_child(row, 0);
+    auto *line = lv_obj_get_child(details, 1);
+    return lv_label_get_text(line);
+}
+
+// The rendered text must not be cut by the label: the widest rendered line fits the label's content width.
+bool rowLineFits(lv_obj_t *root, const char *resourceName)
+{
+    auto *row = lv_obj_get_parent(lv_obj_get_parent(requireObject(root, &lv_label_class, resourceName)));
+    auto *line = lv_obj_get_child(lv_obj_get_child(row, 0), 1);
+    lv_obj_update_layout(row);
+    lv_point_t size{};
+    lv_text_get_size(&size, lv_label_get_text(line), lv_obj_get_style_text_font(line, LV_PART_MAIN), 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    return size.x <= lv_obj_get_content_width(line);
+}
+}
+
+void testParallelSessionUsers(Renderer &renderer)
+{
+    API::ResourceList resources{};
+    resources.count = 6;
+    std::strcpy(resources.authenticatedUsername, "Sam");
+    const char *names[] = {"Alex and Sam", "Own", "Crowd", "Twenty", "No names", "Lowered"};
+    for (int i = 0; i < 6; ++i) {
+        resources.items[i] = machine(names[i], 3, 0);
+        resources.items[i].id = i + 1;
+    }
+    resources.items[0].activeSessionCount = 2;
+    addSession(resources.items[0], 10, "Alex", false);
+    addSession(resources.items[0], 11, "Sam", false);
+    // Personalised for Sam: the own session comes first as "you" although the server listed it last.
+    resources.items[1].activeSessionCount = 2;
+    resources.items[1].canStart = false;
+    addSession(resources.items[1], 20, "Alex", false);
+    addSession(resources.items[1], 21, "Sam", true);
+    // Long names: only whole names fit, the rest is counted.
+    resources.items[2].maxParallelSessions = 8;
+    resources.items[2].activeSessionCount = 6;
+    for (const char *user : {"Maximiliane", "Konstantin", "Bartholomaeus", "Wolfgang", "Annabelle", "Sebastian"})
+        addSession(resources.items[2], 30 + resources.items[2].activeSessions.size(), user, false);
+    // The server caps the list at 16: the count stays exact.
+    resources.items[3].maxParallelSessions = 40;
+    resources.items[3].activeSessionCount = 20;
+    for (int i = 0; i < 16; ++i) addSession(resources.items[3], 50 + i, "Alex", false);
+    // Sessions without names (older API): the plain count.
+    resources.items[4].activeSessionCount = 2;
+    resources.items[4].hasActiveUsage = true;
+    std::strcpy(resources.items[4].activeUser, "Robin");
+    // A limit lowered while several sessions run.
+    resources.items[5].maxParallelSessions = 1;
+    resources.items[5].activeSessionCount = 2;
+    resources.items[5].canStart = false;
+    addSession(resources.items[5], 70, "Robin", false);
+    addSession(resources.items[5], 71, "Kim", false);
+
+    auto check = [&](ResourceListScreen &list, const char *language, const char *capture) {
+        ScreenGuard guard(list.getScreen(), &list);
+        FirmwareI18n::refreshTree(guard.root, language);
+        const bool english = std::string(language) == "en";
+        const auto line = [&](const char *name) { return rowStatusLine(guard.root, name); };
+        expect(line("Crowd") == "Maximiliane, Konstantin, Bartholomaeus +3 \u00B7 6/8",
+               "Long names list whole names, then +N and the count");
+        expect(rowLineFits(guard.root, "Crowd"), "The overflow line fits the label");
+        expect(line("Twenty").find(" +") != std::string::npos && line("Twenty").find("\u00B7 20/40") != std::string::npos,
+               "More sessions than the capped list count against the real number");
+        expect(rowLineFits(guard.root, "Twenty"), "The capped list line fits the label");
+        expect(line("No names") == (english ? "In use 2/3" : "In Verwendung 2/3"), "No names falls back to the count caption");
+        expect(line("Lowered") == (english ? "Robin, Kim \u00B7 Full" : "Robin, Kim \u00B7 Voll"), "A lowered limit reads full");
+        expect(line("Own") == "Alex, Sam \u00B7 2/3" || line("Own") == (english ? "You, Alex \u00B7 2/3" : "Du, Alex \u00B7 2/3"),
+               "Own session is named in the server order signed out and first as the you token signed in");
+        renderer.capture(capture);
+        return line("Alex and Sam");
+    };
+    ResourceListScreen signedOut;
+    signedOut.setResourceList(resources);
+    signedOut.init();
+    expect(check(signedOut, "de", "parallel-sessions-users-signed-out") == "Alex, Sam \u00B7 2/3", "Signed-out rows name the users");
+
+
+    ResourceListScreen signedIn;
+    signedIn.setResourceList(resources);
+    signedIn.setAuthenticatedUser("Sam");
+    signedIn.init();
+    ScreenGuard guard(signedIn.getScreen(), &signedIn);
+    expect(rowStatusLine(guard.root, "Own") == "Du, Alex \u00B7 2/3", "Signed-in rows put the own session first");
+    renderer.capture("parallel-sessions-users-signed-in");
+    FirmwareI18n::refreshTree(guard.root, "en");
+    expect(rowStatusLine(guard.root, "Own") == "You, Alex \u00B7 2/3", "English token");
+    expect(rowLineFits(guard.root, "Crowd") && rowLineFits(guard.root, "Twenty"), "English rows fit");
+    renderer.capture("parallel-sessions-users-english");
 }

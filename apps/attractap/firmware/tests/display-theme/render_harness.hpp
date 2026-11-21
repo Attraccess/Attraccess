@@ -257,6 +257,7 @@ void testDoorUnlatchVisibility(Renderer &renderer);
 void testReaderUiClauseLines();
 void testParallelSessionPolicy();
 void testParallelSessionList(Renderer &renderer);
+void testParallelSessionUsers(Renderer &renderer);
 void testParallelSessionDetails(Renderer &renderer);
 void testSingleSessionDetailsUnchanged();
 void testLoweredLimitDetails(Renderer &renderer);

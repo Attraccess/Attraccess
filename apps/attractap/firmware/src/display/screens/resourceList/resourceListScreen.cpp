@@ -137,6 +137,15 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
     auto *description = text(details, status, &attractap_font_montserrat_latin1_14, DisplayTheme::muted());
     lv_obj_set_height(description, 18);
     lv_obj_align(description, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+    // The users of a parallel machine, cut to whole names that fit the line once the row has its final width.
+    auto showUsers = [&] {
+        if (!multi || resource.activeSessions.empty()) return;
+        lv_obj_update_layout(row);
+        const auto users = SessionOccupancy::usersCaption(resource.activeSessions, resource.activeSessionCount,
+            resource.maxParallelSessions, ownsUsage ? (resource.hasOwnUsage ? resource.ownUsageId : resource.activeUsageId) : 0,
+            &attractap_font_montserrat_latin1_14, lv_obj_get_content_width(description));
+        if (!users.empty()) FirmwareI18n::setLabel(description, users);
+    };
     if (rowStatusCount < API::MAX_RESOURCES) {
         // Core status always wins; a plugin only gets the line that would show the description or "Available".
         RowStatus &row = rowStatus[rowStatusCount++];
@@ -148,6 +157,7 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
     if (!signedIn) {
         lv_obj_set_style_border_side(details, LV_BORDER_SIDE_RIGHT, 0);
         lv_obj_set_style_border_width(details, 20, 0);
+        showUsers();
         // A single-session machine in use reads like a full one.
         using SessionOccupancy::Level;
         const Level level = multi ? SessionOccupancy::level(resource) : resource.hasActiveUsage ? Level::Full : Level::Free;
@@ -176,6 +186,7 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
     auto *actionLabel = text(primary, caption, &attractap_font_montserrat_latin1_20, DisplayTheme::onPrimary());
     lv_obj_set_style_text_align(actionLabel, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_center(actionLabel);
+    showUsers();
     if (action == ResourceListAction::None) {
         // This half explains availability; the adjacent details half remains usable.
         lv_obj_remove_flag(primary, LV_OBJ_FLAG_CLICKABLE);

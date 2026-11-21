@@ -108,10 +108,10 @@ Die Gerätebeschriftungen bleiben vorerst deutsch, einschließlich **Bis bald!**
 
 Manche Maschinen erlauben es, dass mehrere Personen gleichzeitig arbeiten (siehe [Ressourcen nutzen](end-user/using-resources.md#gemeinsam-genutzte-maschine-verwenden)). Am Touchleser gilt:
 
-- Liste und Details zeigen **In Verwendung k/N**, solange einige Plätze belegt sind. Die Aktion **Start** bleibt in der Liste (in den Details **Ressource verwenden**) verfügbar, solange ein Platz frei ist und Sie keine eigene Sitzung haben. Sind alle Plätze belegt, zeigt die Maschine **Voll**.
-- Haben Sie eine Sitzung an der Maschine, steht dort **Von dir verwendet** mit **Stop** in der Liste und **Sitzung beenden** in den Details. Die Live-Statistiken auf dem Detailbildschirm gelten für Ihre eigene Sitzung.
+- Die Liste zeigt, wer die Maschine nutzt, zum Beispiel **Alex, Sam · 2/3**: zuerst Ihre eigene Sitzung (als **Du**), dann die anderen, dann die Zahl der belegten Plätze. Namen, die nicht passen, werden als **+N** gekürzt (**Alex, Sam +2 · 4/6**). Die Details zeigen **In Verwendung k/N**, solange einige Plätze belegt sind. Die Aktion **Start** bleibt in der Liste (in den Details **Ressource verwenden**) verfügbar, solange ein Platz frei ist und Sie keine eigene Sitzung haben. Sind alle Plätze belegt, zeigt die Maschine **Voll**.
+- Haben Sie eine Sitzung an der Maschine, nennt die Liste Sie (**Du**) und bietet **Stop** an; die Details zeigen **Von dir verwendet** und **Sitzung beenden**. Die Live-Statistiken auf dem Detailbildschirm gelten für Ihre eigene Sitzung.
 - Ressourcenverwalter, Einweiser und Wartende erhalten auf dem Detailbildschirm die Liste **Andere Sitzung beenden:** mit einer Schaltfläche je weiterer Sitzung, um genau diese Sitzung zu beenden. Der Leser listet höchstens 16 Sitzungen auf; weitere Sitzungen beenden Sie auf der [Detailseite](resources/resource-details.md) in der Weboberfläche.
-- Der Sperrbildschirm zeigt, ob die Maschine in Verwendung (**In Verwendung k/N**) oder voll (**Voll**) ist.
+- Der Sperrbildschirm zeigt, wer die Maschine nutzt, und die Zahl der belegten Plätze (**Alex, Sam · 2/3**), bei voller Maschine **Voll** statt der Zahl.
 
 An Maschinen mit einem Limit von 1 arbeitet der Leser wie in den Abschnitten oben beschrieben, einschließlich Übernahme und Beenden der Sitzung einer anderen Person. Wurde das Limit auf 1 gesenkt, während mehrere Sitzungen laufen, listet der Leser sie wie an einer gemeinsam genutzten Maschine auf, damit jede beendet werden kann.
 

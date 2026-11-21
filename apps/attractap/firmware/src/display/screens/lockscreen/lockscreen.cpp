@@ -257,6 +257,7 @@ void Lockscreen::setUsageInfo(const API::ResourceBrief &resource)
     {
         this->occupancyActiveCount = resource.activeSessionCount;
         this->occupancyLimit = resource.maxParallelSessions;
+        this->occupancySessions = resource.activeSessions;
     }
     this->updateUsageInfo();
     this->updateWallClock();
@@ -275,9 +276,16 @@ void Lockscreen::updateUsageInfo()
     FirmwareI18n::setDynamicLabel(this->resourceNameLabel, this->resourceName) /* i18n-data: Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents. */;
 
     // Status priority mirrors the web resource list: in use > maintenance > available.
-    const auto occupancyText = this->multiSession
-                                   ? SessionOccupancy::caption(this->occupancyActiveCount, this->occupancyLimit, false)
-                                   : FirmwareI18n::Text();
+    auto occupancyText = FirmwareI18n::Text();
+    if (this->multiSession)
+    {
+        // Names of the users when the server sent them, else the plain count. The reader is signed out here.
+        lv_obj_update_layout(this->usageInfoLabel);
+        occupancyText = SessionOccupancy::usersCaption(this->occupancySessions, this->occupancyActiveCount, this->occupancyLimit, 0,
+                                                       &attractap_font_montserrat_latin1_14, lv_obj_get_content_width(this->usageInfoLabel));
+        if (occupancyText.empty())
+            occupancyText = SessionOccupancy::caption(this->occupancyActiveCount, this->occupancyLimit, false);
+    }
     if (!occupancyText.empty())
     {
         FirmwareI18n::setLabel(this->usageInfoLabel, occupancyText);

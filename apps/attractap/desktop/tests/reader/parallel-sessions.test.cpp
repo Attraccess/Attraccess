@@ -57,7 +57,7 @@ void ReaderWorkflow::testParallelSessions()
     supervised = false; active = false;
     login(false);
     parallelList({3, false, true, {{7, "Robin"}, {8, "Sam"}}});
-    assert(label(lv_screen_active(), "In Verwendung 2/3"));
+    assert(label(lv_screen_active(), "Robin, Sam \xC2\xB7 2/3"));
     display.capture(output, "parallel-01-list-in-use-k-of-n");
     const auto starts = server.count("START_RESOURCE_USAGE_SESSION");
     click("Start");
@@ -69,7 +69,7 @@ void ReaderWorkflow::testParallelSessions()
     // resource full, so the failed Start button is gone and the row reads "Voll".
     actionReply("START_RESOURCE_USAGE_SESSION", R"("error":"ResourceFullError")");
     parallelList({3, false, false, {{7, "Robin"}, {8, "Sam"}, {10, "Kim"}}});
-    assert(label(lv_screen_active(), "Voll"));
+    assert(label(lv_screen_active(), "Robin, Sam, Kim \xC2\xB7 Voll"));
     assert(!label(lv_screen_active(), "Start"));
     display.capture(output, "parallel-02-list-full");
 
@@ -143,7 +143,7 @@ void ReaderWorkflow::testParallelSessions()
 
     // The limit was lowered to 1 while two sessions run: list each so either can be ended.
     parallelList({1, false, false, {{7, "Robin"}, {12, "Sam"}}});
-    assert(label(lv_screen_active(), "Voll"));
+    assert(label(lv_screen_active(), "Robin, Sam \xC2\xB7 Voll"));
     assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Ressource verwenden")));
     assert(label(lv_screen_active(), "Sitzung von Robin beenden"));
     assert(label(lv_screen_active(), "Sitzung von Sam beenden"));
@@ -158,7 +158,7 @@ void ReaderWorkflow::testParallelSessions()
     click(LV_SYMBOL_LEFT);
     assert(label(lv_screen_active(), "In Verwendung: Sam"));
     parallelList({1, false, false, {{7, "Robin"}, {12, "Sam"}}});
-    assert(label(lv_screen_active(), "Voll"));
+    assert(label(lv_screen_active(), "Robin, Sam \xC2\xB7 Voll"));
     display.capture(output, "parallel-06-list-lowered-limit");
     click("Drucker");
     assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
