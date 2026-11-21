@@ -105,9 +105,9 @@ def nfc(d):
         d.add('L', '560nH', 'Device:L', 'attractap:IND-SMD_L1.6-W0.8-1', {'1': tx, '2': f},
               lcsc='C91630', mpn='LQW18CNR56J00D', desc='EMC filter L0')
         d.C('220p', f, desc='EMC filter C0')
-        d.C('27p', f, m, desc='matching C1 (tune)')
-        d.C('150p', m, desc='matching C2 (tune)')
-        d.C('22p', m, desc='matching C2, second part (tune)')
+        d.C('39p', f, m, desc='matching C1 (tune)')
+        d.C('180p', m, desc='matching C2 (tune)')
+        d.C('18p', m, desc='matching C2, second part (tune)')
         d.R('1.5R', m, a, size='0603', desc='damping Rq (tune)')
     d.group('Receive path')
     d.R('2.7k', 'NFC_F2', 'NFC_RXC', desc='receive divider R2 (tune)')
@@ -187,9 +187,11 @@ def ui(d):
     """User feedback: addressable LEDs and buzzer."""
     d.begin('ui', 700)
     d.group('LED data level shifter')
-    d.add('U', '74AHCT1G125', 'attractap:SN74AHCT1G125DBVR', 'attractap:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR', {
+    # 74LV1T125: same pinout as the 74AHCT1G125, but specified from 1.6 V supply. The 5 V rail sits one
+    # diode drop below its source and can be under the 4.5 V an AHCT part asks for.
+    d.add('U', '74LV1T125', 'attractap:SN74AHCT1G125DBVR', 'attractap:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR', {
         '1': 'GND', '2': 'LED_DATA', '3': 'GND', '4': 'LED_DATA_5V', '5': '+5V',
-    }, lcsc='C7484', mpn='SN74AHCT1G125DBVR', desc='3.3 V to 5 V level shifter for the LED data line')
+    }, lcsc='C473338', mpn='SN74LV1T125DBVR', desc='3.3 V to 5 V level shifter for the LED data line')
     d.C('100n', '+5V', desc='level shifter')
     d.R('100R', 'LED_DATA_5V', 'LED_D0')
     d.C('22u', '+5V', size='0805', desc='LED supply')
@@ -200,14 +202,17 @@ def ui(d):
         if i + 1 < n_led:
             nets['4'] = 'LED_D%d' % (i + 1)
         d.add('D', 'SK6812MINI-E', 'attractap:SK6812MINI-E_C5149201',
-              'attractap:LED-SMD_4P-L3.2-W2.8-LS5.9_SK6812MINI-E', nets, nc=() if i + 1 < n_led else ('4',),
+              'LED_SMD:LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount', nets, nc=() if i + 1 < n_led else ('4',),
               lcsc='C5149201', mpn='SK6812MINI-E', desc='RGB LED, reverse mount')
         d.C('100n', '+5V', desc='LED %d' % (i + 1))
     d.group('Buzzer')
+    # The coil is between pads 1 (+) and 2 (-), which lie side by side opposite the sound port. Pads 3
+    # and 4, next to the port, only hold the part down.
     d.add('BZ', 'MLT-8530', 'attractap:MLT-8530', 'attractap:BUZ-SMD_4P-L8.5-W8.5-P8.50-BR', {
-        '1': 'BUZ_P', '2': 'BUZ_P', '3': 'BUZ_N', '4': 'BUZ_N',
-    }, lcsc='C94599', mpn='MLT-8530', desc='Electromagnetic buzzer 2.7 kHz, 16 ohm')
-    d.R('10R', '+5V', 'BUZ_P', size='0603')
+        '1': 'BUZ_P', '2': 'BUZ_N',
+    }, nc=('3', '4'), lcsc='C94599', mpn='MLT-8530', desc='Electromagnetic buzzer 2.7 kHz, 16 ohm')
+    # 0.16 W at a 50 % tone: a 0.25 W part in the 0603 size (an ordinary 0603 is rated 0.1 W)
+    d.R('10R', '+5V', 'BUZ_P', size='0603', lcsc='C253327', mpn='ESR03EZPJ100', desc='buzzer current limit, 0.25 W type')
     d.add('D', '1N4148W', 'Device:D', 'attractap:SOD-123F_L2.7-W1.6-LS3.8-RD', {'1': 'BUZ_P', '2': 'BUZ_N'},
           lcsc='C81598', mpn='1N4148W', desc='flyback diode')
     d.add('Q', 'AO3400A', 'Transistor_FET:AO3400A', 'Package_TO_SOT_SMD:SOT-23', {
@@ -215,6 +220,9 @@ def ui(d):
     }, lcsc='C20917', mpn='AO3400A')
     d.R('100R', 'BUZZER', 'BUZ_G')
     d.R('100k', 'BUZ_G', 'GND')
+    # GPIO47 has no pull resistor while the MCU is in reset: without this the level shifter's input
+    # floats and the LEDs can light up at random during power-up
+    d.R('100k', 'LED_DATA', 'GND', desc='LED data low while the MCU is in reset')
 
 
 def mech(d):

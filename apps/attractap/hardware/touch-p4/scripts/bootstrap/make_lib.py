@@ -20,6 +20,9 @@ NICK = 'attractap'
 import geometry
 
 ANT_W, ANT_H, ANT_TURNS, ANT_TRACK, ANT_PITCH = geometry.ANT_W, geometry.ANT_H, 4, 0.5, 0.9
+# Symbols whose footprint is not the converted one. The LED uses KiCad's footprint: it has the board
+# cut-out with relieved corners and pads that keep their distance from it.
+FOOTPRINT_OVERRIDE = {'SK6812MINI-E_C5149201': 'LED_SMD:LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount'}
 ANT_FEED_Y = -12.0   # where the outer end starts on the left side, relative to the loop centre
 
 
@@ -157,11 +160,34 @@ def fits_wago_250(tree):
                      [Sym('width'), 0.1]])
 
 
+# Solder paste on the exposed pad of the ESP32-P4: nine windows instead of one opening as large as
+# the pad (which is what the converted footprint has). Paste over the whole 7.5 mm pad can lift the
+# package off its 0.35 mm pitch pins. Espressif's own footprint uses the same pattern, about 70 %.
+P4_PASTE_WINDOW, P4_PASTE_PITCH = 2.1, 2.5
+
+
+def paste_windows(tree, size, pitch):
+    """Take the paste off the largest pad and add a 3 x 3 grid of paste-only openings in its place."""
+    S = Sym
+    ep = max((p for p in find(tree, 'pad') if p[2] == 'smd'), key=lambda p: float(first(p, 'size')[1]))
+    layers = first(ep, 'layers')
+    if 'F.Paste' not in [str(v) for v in layers[1:]]:
+        return                                            # done before
+    layers[:] = [layers[0]] + [v for v in layers[1:] if str(v) != 'F.Paste']
+    x0, y0 = float(first(ep, 'at')[1]), float(first(ep, 'at')[2])
+    for i in (-1, 0, 1):
+        for j in (-1, 0, 1):
+            tree.append([S('pad'), '', S('smd'), S('rect'), [S('at'), x0 + i * pitch, y0 + j * pitch],
+                         [S('size'), size, size], [S('layers'), S('F.Paste')]])
+
+
 def fix_footprint(name, text):
     """Repair two habits of the converter: mechanical holes as plated pads, thermal vias without a number."""
     tree = loads(text)
     if name == 'CONN-TH_4P-P3.5-2601-3102':
         fits_wago_250(tree)
+    if name.startswith('QFN-104'):
+        paste_windows(tree, P4_PASTE_WINDOW, P4_PASTE_PITCH)
     ep = None
     for pad in find(tree, 'pad'):
         if str(pad[1]) and first(pad, 'size') and float(first(pad, 'size')[1]) > 2.5 and pad[2] == 'smd':
@@ -207,7 +233,7 @@ def main(src):
             s = multi_unit_symbol(name, s, P4_UNITS, NICK + ':QFN-104_L10.0-W10.0-P0.35-TL-EP7.5', 'C54540373')
         for prop in find(s, 'property'):
             if prop[1] == 'Footprint':
-                prop[2] = prop[2].replace('lcsc:', NICK + ':')
+                prop[2] = FOOTPRINT_OVERRIDE.get(name, prop[2].replace('lcsc:', NICK + ':'))
         # Arcs in these old-format symbols make KiCad report "symbol doesn't match copy in library"
         # (they are rebuilt with rounding on every load). They are decoration only.
         for sub in find(s, 'symbol'):

@@ -12,15 +12,15 @@ edited by hand, treat the KiCad files as the source of truth and do not run
 | `design.py` | The circuit description: part model, part numbers of the passives, and `build()`. |
 | `circuit_core.py`, `circuit_io.py` | Every part, sheet by sheet, with value, footprint, LCSC number, variant, group and the net on each pin. |
 | `libs.py` | Reads symbol and footprint libraries, checks every part against both. |
-| `make_lib.py` | Builds `kicad/lib/` from LCSC/EasyEDA conversions, generates the NFC antenna footprint and the three-unit ESP32-P4 symbol. |
+| `make_lib.py` | Builds `kicad/lib/` from LCSC/EasyEDA conversions, generates the NFC antenna footprint and the three-unit ESP32-P4 symbol, and windows the solder paste on the ESP32-P4's exposed pad. |
 | `build_sch.py` | Writes the hierarchical schematic (root + one sheet per block). |
 | `geometry.py` | Board outline, display position, slot, antenna and LED positions. |
 | `placement.py` | Position and rotation of every part. |
 | `build_pcb.py` | Builds the board (`place`), exports and imports the autorouter exchange files (`dsn`, `ses`), fills the zones (`finish`). |
 | `board.py` | Paths, coordinate helpers and the `Board` wrapper around pcbnew that the builder modules share. |
-| `board_setup.py` | Outline, labels, zones and keep-outs, design rules, net classes, project file. |
+| `board_setup.py` | Outline, labels, zones and keep-outs, ground pads for the display, design rules, net classes, project file. |
 | `routes_mcu.py` | Fixed routes at the MCU: supply vias, the fan-out of all four sides, the flash, the display bus, and the NFC host signals at the PN532. |
-| `routes_board.py` | Fixed routes elsewhere: 48 V nets, Ethernet pairs, antenna feeds, DC input, LED link, ground vias, and the via fan-out of the supply pads. |
+| `routes_board.py` | Fixed routes elsewhere: 48 V nets, Ethernet pairs, the jack's LED and shield nets, antenna feeds, DC input with its filter, buzzer, LED link, ground vias, and the via fan-out of the supply pads. |
 | `finish_route.py` | Grid router that closes the connections the autorouter leaves open, including the ground and 3.3 V pads that are cut off from their pours. |
 | `route_grid.py` | Its engine: obstacle raster, net connectivity, path search, conversion to tracks and vias. |
 | `check_overlap.py` | Reports overlapping part bodies. |
@@ -71,7 +71,28 @@ pnpm nx run attractap-touch-p4-pcb:route-finish    # imports the .ses, finishes 
 `route` replaces the `.ses` with a new autorouter result. Commit the new file together with the board
 it led to.
 
+### Changes after the autorouter ran
+
+The committed `.ses` is older than the design review of November 2026, which moved parts (the
+Ethernet jack among them), changed nets and added parts. The rebuild copes with that without a new
+autorouter run:
+
+- The session file also records where every part was, and KiCad would move the parts back there on
+  import. `build_pcb.py ses` imports the routes only.
+- `build_pcb.py` has two lists, `STALE_NETS` and `STALE_PARTS`. The autorouter's tracks for the nets in
+  the first are not taken over; they have fixed routes in `routes_board.py` now. Its tracks that come
+  too close to a pad of a part in the second are removed, and `finish_route.py` routes them again.
+- One fixed route starts where an autorouter track ends (`routes_board.PHY_LED3_TAP`).
+
+When the autorouter is run again, empty both lists and take that point from the new board.
+
 Lessons from revision A, in case the generator is used again:
+
+- A footprint's angle in KiCad is not always the angle JLCPCB wants: it counts from its own library
+  footprint of the part number. `tools/pcb.sh check-footprints` compares the two for every part; the
+  corrections are in `scripts/export_fab.py`.
+- Through-hole parts stand out of the display side of the board. Nothing with pins belongs behind the
+  display (`test_design.py` checks the Ethernet jack).
 
 - Fixed routes must end on a pad or a via, use only horizontal, vertical and 45 degree segments, and
   meet other tracks at their end points. The autorouter gives up on a net that has a fixed track

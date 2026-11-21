@@ -10,6 +10,7 @@ Usage (see README for the environment):
 import math
 import os
 import sys
+import tempfile
 
 import pcbnew
 
@@ -18,10 +19,21 @@ import geometry as G
 import libs
 import placement
 from board import B_, Board, F, IN1, IN2, NAME, PCB, PROJECT, mm, rect, schematic_net_names, unV
-from board_setup import documentation, outline, setup, write_project, zones
+from board_setup import (
+    check_display_ground_pads,
+    display_ground_pads,
+    documentation,
+    outline,
+    setup,
+    write_project,
+    zones,
+)
+from route_grid import class_of, short
 from routes_board import (
+    buzzer_routes,
     dc_route,
     ep_vias,
+    jack_leds,
     led_link,
     led_power,
     mdi_routes,
@@ -30,6 +42,7 @@ from routes_board import (
     phy_fanout,
     plane_fanout,
     poe_routes,
+    small_links,
 )
 from routes_mcu import (
     flash_routes,
@@ -59,6 +72,7 @@ def build():
     if missing:
         raise SystemExit('not placed: ' + ' '.join(missing))
     documentation(B)
+    display_ground_pads(board)
     zones(B)
     mcu_power_vias(B)
     module_ground(B)
@@ -66,9 +80,12 @@ def build():
     ep_vias(board)
     poe_routes(B)
     mdi_routes(B)
+    jack_leds(B)
     nfc_feeds(B)
     led_link(B)
     dc_route(B)
+    small_links(B)
+    buzzer_routes(B)
     phy_fanout(B)
     mcu_escape(B)
     led_power(B)
@@ -84,11 +101,72 @@ def build():
     print('wrote', PCB, len(B.fp), 'footprints', len(B.nets), 'nets')
 
 
+# The committed autorouter result (the .ses file) is older than some changes to the circuit and the
+# placement. Its tracks for the nets below are not taken over: they have fixed routes now, or
+# finish_route.py routes them. Of its other tracks, those that come too close to a pad of one of the
+# parts below are removed and routed again. Empty both when a new autorouter result is committed.
+STALE_NETS = {'BUZ_P', 'BUZ_N', 'ETH_CT_RX', 'ETH_CT_TX', '+5V_POE', 'ETH_SHIELD', 'ETH_LED_Y_K', 'ETH_LED_G_K'}
+STALE_PARTS = {'R104', 'R105', 'R705', 'L103', 'C117', 'D106', 'D103', 'FB102', 'FB103', 'C408', 'C409',
+               'D701', 'D702', 'D703', 'D704', 'D705', 'D706', 'D707', 'D708', 'J401', 'R412', 'C410', 'R413'}
+
+
+def routes_of_session(path):
+    """A copy of the session file without its placement section. The session also records where every
+    part was when the autorouter ran, and KiCad moves the parts back there on import. Parts moved
+    since then must stay where placement.py puts them."""
+    text = open(path, encoding='utf-8').read()
+    start, end = text.index('  (placement'), text.index('  (was_is')
+    with tempfile.NamedTemporaryFile('w', suffix='.ses', delete=False, encoding='utf-8') as tmp:
+        tmp.write(text[:start] + text[end:])
+    return tmp.name
+
+
+def drop_stale(board):
+    """Remove the autorouter's tracks and vias for STALE_NETS and those in the way of STALE_PARTS."""
+    pads = []
+    for fp in board.GetFootprints():
+        if fp.GetReference() not in STALE_PARTS:
+            continue
+        for pad in fp.Pads():
+            bb = pad.GetBoundingBox()
+            x1, y1 = unV(pcbnew.VECTOR2I(bb.GetLeft(), bb.GetTop()))
+            x2, y2 = unV(pcbnew.VECTOR2I(bb.GetRight(), bb.GetBottom()))
+            pads.append((pad.GetNetname(), x1, y1, x2, y2, pad.GetAttribute() != pcbnew.PAD_ATTRIB_SMD))
+    gone = []
+    for t in board.GetTracks():
+        if t.IsLocked():
+            continue
+        net = t.GetNetname()
+        if short(net) in STALE_NETS:
+            gone.append(t)
+            continue
+        via = t.GetClass() == 'PCB_VIA'
+        (xa, ya), (xb, yb) = (unV(t.GetPosition()),) * 2 if via else (unV(t.GetStart()), unV(t.GetEnd()))
+        half = pcbnew.ToMM(t.GetWidth(F) if via else t.GetWidth()) / 2
+        n = int(math.hypot(xb - xa, yb - ya) / 0.02) + 1
+        for pnet, x1, y1, x2, y2, through in pads:
+            if pnet == net or not (via or through or t.GetLayer() == F):
+                continue
+            need = max(class_of(net)[0], class_of(pnet)[0]) + half - 1e-3
+            if (min(xa, xb) - need > x2 or max(xa, xb) + need < x1 or min(ya, yb) - need > y2 or
+                    max(ya, yb) + need < y1):
+                continue
+            if any(math.hypot(max(x1 - x, 0, x - x2), max(y1 - y, 0, y - y2)) < need
+                   for x, y in ((xa + (xb - xa) * k / n, ya + (yb - ya) * k / n) for k in range(n + 1))):
+                gone.append(t)
+                break
+    for t in gone:
+        board.Remove(t)
+    _KEEP.extend(gone)
+    return len(gone)
+
+
 def drop_edge_violations(board, clearance=0.3):
     """Remove the autorouter's tracks and vias that come closer than the edge clearance to the board edge
     or a cut-out (it keeps a slightly smaller distance of its own). finish_route.py routes them again."""
-    w, h = G.LED_WINDOW
-    holes = [(G.NOTCH_X, G.NOTCH_Y, G.BOARD_W + 9, G.BOARD_H + 9), (-9, G.POCKET_Y, G.POCKET_X, G.BOARD_H + 9), G.SLOT]
+    w, h = G.LED_CUTOUT
+    holes = [(G.NOTCH_X, G.NOTCH_Y, G.BOARD_W + 9, G.BOARD_H + 9), (-9, G.POCKET_Y, G.POCKET_X, G.BOARD_H + 9), G.SLOT,
+             (G.C6_NOTCH[0], -9, G.C6_NOTCH[1], G.C6_NOTCH[2])]
     holes += [(x - w / 2, y - h / 2, x + w / 2, y + h / 2) for y in (G.LED_Y_TOP, G.LED_Y_BOT) for x in G.LED_X]
     # outside the board outline: four half planes as wide rectangles
     holes += [(-9, -9, 0, G.BOARD_H + 9), (G.BOARD_W, -9, G.BOARD_W + 9, G.BOARD_H + 9), (-9, -9, G.BOARD_W + 9, 0),
@@ -129,7 +207,7 @@ if __name__ == '__main__':
         # only for the autorouter (not saved): keep it out of the isolated 48 V area
         helper = Board(b, None, {})
         boxes = list(G.POE_ROUTER_KEEPOUT)
-        w, h = G.LED_WINDOW                       # the router does not keep its tracks off board cut-outs
+        w, h = G.LED_CUTOUT                       # the router does not keep its tracks off board cut-outs
         boxes += [(x - w / 2 - 0.14, y - h / 2 - 0.3, x + w / 2 + 0.14, y + h / 2 + 0.3)
                   for y in (G.LED_Y_TOP, G.LED_Y_BOT) for x in G.LED_X]
         x1, y1, x2, y2 = G.SLOT
@@ -143,11 +221,14 @@ if __name__ == '__main__':
     elif cmd == 'ses':
         b = pcbnew.LoadBoard(PCB)
         # tracks placed by this script are locked and stay; everything else is replaced by the result
-        print('ses', pcbnew.ImportSpecctraSES(b, os.path.join(PROJECT, NAME + '.ses')))
+        routes = routes_of_session(os.path.join(PROJECT, NAME + '.ses'))
+        print('ses', pcbnew.ImportSpecctraSES(b, routes))
+        os.remove(routes)
         thin = [t for t in b.GetTracks() if t.GetClass() == 'PCB_TRACK' and t.GetWidth() < mm(0.11)]
         for t in thin:                            # the autorouter's neck-downs go below the board minimum
             t.SetWidth(mm(0.11))
         print('widened %d tracks to 0.11 mm' % len(thin))
+        print('removed %d tracks and vias that later changes made obsolete' % drop_stale(b))
         print('removed %d tracks and vias too close to the board edge' % drop_edge_violations(b))
         pcbnew.SaveBoard(PCB, b)
     elif cmd == 'finish':
@@ -155,3 +236,6 @@ if __name__ == '__main__':
         ep_vias(b)
         pcbnew.ZONE_FILLER(b).Fill(b.Zones())
         pcbnew.SaveBoard(sys.argv[2] if len(sys.argv) > 2 else PCB, b)
+        bad = check_display_ground_pads(b)
+        if bad:
+            raise SystemExit('ground pads for the display are not on clean ground fill: %s' % bad)

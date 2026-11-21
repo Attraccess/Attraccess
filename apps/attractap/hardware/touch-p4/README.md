@@ -4,9 +4,12 @@ Custom PCB for the Attractap touch reader. It replaces the Waveshare dev board
 plus PN532 module of the current readers with one board.
 
 > **Status: revision A design, not yet built.** Nobody has assembled or measured
-> this board. Have an electronics engineer review it before ordering, and expect
-> a bring-up round (see [docs/bring-up.md](docs/bring-up.md)). CE marking needs lab
-> tests on the finished product (see [docs/compliance.md](docs/compliance.md)).
+> this board. It has been checked against the datasheets of its parts, against
+> JLCPCB's manufacturing limits and against JLCPCB's part library; what that
+> check found and changed, and what it could not settle, is in
+> [docs/design-notes.md](docs/design-notes.md#design-review). Expect a bring-up
+> round (see [docs/bring-up.md](docs/bring-up.md)). CE marking needs lab tests on
+> the finished product (see [docs/compliance.md](docs/compliance.md)).
 
 ## What is on the board
 
@@ -18,7 +21,7 @@ plus PN532 module of the current readers with one board.
 | NFC | PN532 + PCB loop antenna | same chip and I2C protocol as today |
 | Ethernet (LAN version) | IP101GRI PHY + HY931147C jack | 10/100, RMII |
 | PoE (LAN version) | DP9900M-5V isolated module | 802.3af; footprint also takes a Silvertel Ag9905M |
-| Power | DC 12 to 24 V (barrel jack or WAGO push-button terminal), PoE, or USB-C 5 V | each source feeds the 5 V rail through its own diode; 3.3 V buck AP63203. USB-C is the service port for flashing and debugging |
+| Power | DC 12 to 24 V (barrel jack or WAGO push-button terminal), PoE, or USB-C 5 V | each source feeds the 5 V rail through its own diode; 3.3 V buck AP63203. The DC input has a filter towards the supply cable. USB-C is the service port for flashing and debugging |
 | Feedback | 8 RGB LEDs (SK6812MINI-E), buzzer | LEDs shine through the board above and below the NFC area |
 
 Two assembly versions come from the same PCB:
@@ -74,7 +77,8 @@ The board is the Nx project `attractap-touch-p4-pcb`. Every operation is a targe
 | Command | What it does |
 |---|---|
 | `pnpm nx run attractap-touch-p4-pcb:setup-toolchain` | Checks KiCad 10 and its Python, downloads the autorouter into `.tools/kicad`. Run once. |
-| `pnpm nx run attractap-touch-p4-pcb:check` | All checks below, and that `fab/jlcpcb/` matches the board. Run before ordering. |
+| `pnpm nx run attractap-touch-p4-pcb:check` | All checks below except `check-footprints`, and that `fab/jlcpcb/` matches the board. Run before ordering. |
+| `pnpm nx run attractap-touch-p4-pcb:check-footprints` | Every footprint against JLCPCB's library footprint of its part number: do the pads fit, and is the angle in the placement file right. Needs the internet. Run it after a part number or a footprint has changed. |
 | `pnpm nx run attractap-touch-p4-pcb:test` | Checks of the circuit description and of the I2C address check. Needs no KiCad. |
 | `pnpm nx run attractap-touch-p4-pcb:erc` | Electrical rules check of the schematic. |
 | `pnpm nx run attractap-touch-p4-pcb:check-netlist` | Schematic against the circuit description; devices and addresses on each I2C bus. |
@@ -111,12 +115,14 @@ What the board needs, for the order form:
 | | |
 |---|---|
 | Board | 4 layers, 86 x 143.5 mm, 1.6 mm FR-4 |
-| Smallest track and gap | 0.11 mm and 0.127 mm |
-| Smallest via | 0.45 mm pad with 0.2 mm hole |
-| Milled openings | flex slot 3 mm wide, eight LED windows 3.4 x 3.0 mm, two cut-away corners, plated slots at the DC jack and USB-C |
+| Smallest track and gap | 0.11 mm and 0.127 mm, 0.1 mm between the pads of the USB-C connector (JLCPCB's limit for four layers: 0.09 mm each) |
+| Smallest via | 0.45 mm pad with 0.2 mm hole. JLCPCB charges extra only for vias smaller than that |
+| Vias | covered with solder mask on both sides (tented) |
+| Milled openings | flex slot 3 mm wide, eight LED windows 3.4 x 3.0 mm with relieved corners, a cut 14.2 x 5.65 mm in the top edge under the Wi-Fi antenna, two cut-away corners, plated slots at the DC jack and USB-C |
+| Outline tolerance | the regular +/-0.2 mm is enough |
 | Surface finish | ENIG is the safe choice for the 0.35 mm pitch MCU and the 0.5 mm display connector |
 | Impedance control | not needed |
-| Assembly | top side only: 193 parts in 67 lines (Wi-Fi version), 228 parts in 77 lines (Ethernet/PoE version) |
+| Assembly | top side only: 198 parts in 68 lines (Wi-Fi version), 233 parts in 78 lines (Ethernet/PoE version) |
 | Through-hole parts | DC jack J102, DC terminal J103 (two pins in a four-hole footprint, see below), and on the Ethernet/PoE version the jack J401 |
 | Not assembled by JLCPCB | the display panel (taped on, flex plugged into J601) |
 
@@ -125,14 +131,19 @@ What the parts cost, what JLCPCB charges once per order, and which cheaper parts
 
 Check before paying:
 
-- Stock. JLCPCB's parts list shows what it does not have. The ESP32-P4 (U201) had no stock at LCSC
-  in November 2026; see the sourcing risks in [docs/design-notes.md](docs/design-notes.md).
+- Stock. JLCPCB's parts list shows what it does not have. On 20 November 2026 it had no ESP32-P4
+  (U201) and two pieces of the 3.3 V converter AP63203WU-7 (U103); both have to be ordered in
+  through JLCPCB's parts sourcing before the assembly order. See the sourcing risks in
+  [docs/design-notes.md](docs/design-notes.md).
 - DC terminal J103. The WAGO 250-202 has two pins and the footprint four holes (it also takes the
   WAGO 2601-3102 lever terminal). Write in the order remark: pins in the upper left and the lower
   right hole, wire entry towards the board edge with the two cut-away corners. The fabrication
   drawing shows the body outline.
-- Rotation. Look at every polarised part in JLCPCB's placement preview, in particular the diodes D101
-  to D107, C103, Q701, the LEDs and the ICs. KiCad and JLCPCB do not always agree on what 0 degrees is.
+- Rotation. The placement files already carry JLCPCB's angle for the four parts where it differs
+  from KiCad's (the PN532 U501, the level shifter U701, the transistor Q701 and the resistor arrays);
+  `check-footprints` compares every part with JLCPCB's library. Still look at every polarised part
+  in JLCPCB's placement preview, in particular the PoE module U102 (its pads are the same when it is
+  turned by 180 degrees), the diodes D101 to D107, C103, the LEDs and the ICs.
 
 ### Parts and library
 
@@ -170,6 +181,8 @@ run them once the project has been edited by hand. See
   antenna.
 - Order with JLCPCB's JLC04161H-7628 stack-up, ENIG finish (0.35 mm pitch QFN),
   and Standard PCBA.
+- The Ethernet jack sits below the display, not behind it: its pins stand out of
+  the display side of the board, where the display's metal back lies flat.
 
 Further reading: [design notes](docs/design-notes.md),
 [pin map and firmware port](docs/firmware-port.md),

@@ -169,6 +169,7 @@ def place(B):
     c('L102', 4.6, 0, 0)
     c('C115', 8.6, -0.2, 90)
     c('C116', 10.8, -0.2, 90)
+    c('R105', 10.8, 2.55, 270)     # bleed resistor, +5V_DC on top, straight below C116
     c('D107', 15.4, 0, 180)        # OR diode, +5V on the right
 
     # ========= USB-C: service port only, at the right board edge next to the MCU's USB pins
@@ -181,23 +182,30 @@ def place(B):
     u('D101', -13.2, 0.8, 180)
     u('FB101', -14.2, -2.8, 180)
     u('C101', -18.2, -2.6, 90)
+    u('R104', -18.2, 0.1, 270)     # bleed resistor, +5V_USB on top, straight below C101
     u('D102', -21.4, -1.6, 90)     # USB OR diode
 
     # ===== DC input: both connectors at the top of the tongue's left margin. The jack opens downwards
     # into the second cut-away (see geometry.POCKET_X / POCKET_Y), so its plug stays inside the outline.
     put('J102', 8.05, 97.3, 90)    # barrel jack
     put('J103', 16.7, 100.2, 0)    # DC terminal, wires enter from below at 40 degrees; + on the left
-    # fuse, reverse-polarity diode and TVS next to the converter, in the left column behind the display
+    # fuse, reverse-polarity diode, input filter and TVS next to the converter, in the left column behind
+    # the display. From the bottom up: fuse, diode, filter (inductor on the left, its capacitor on the
+    # right), TVS, converter.
     put('F102', 5.5, 85.5, 0)
     put('D105', 5.5, 81.4, 0)
-    put('D106', 5.5, 78.0, 0)
+    put('L103', 3.3, 78.5, 90)     # VDC_R below (at the diode's cathode), VDC on top
+    put('C117', 7.0, 78.5, 0)      # VDC_R on the left
+    put('D106', 5.5, 75.6, 0)
 
     # ===================================================== Ethernet and PoE (right)
-    put('J401', 76.8, 79.5, 90)
+    put('J401', 76.8, G.JACK_Y, 90)  # opens downwards into the cut-away; all its pins are below the display
     put('U102', 76.5, 45.4, 270)   # secondary pins on the left, 48 V pins on the right
-    put('D103', 82.6, 64.2, 90)    # PoE TVS, cathode at the bottom
-    put('FB102', 81.24, 69.6, 90)  # straight above jack pin 9
-    put('FB103', 83.9, 69.6, 90)
+    # The two beads and everything else at 48 V stay clear of the jack's metal shell, which ends at
+    # y = 71.3 at most (geometry.JACK_REAR_CLEAR_Y).
+    put('D103', 82.6, 62.0, 90)    # PoE TVS, cathode at the bottom
+    put('FB102', 81.24, 67.15, 90)  # straight above jack pin 9
+    put('FB103', 83.9, 67.15, 90)
     put('C102', 80.6, 32.4, 180)   # 1 nF / 2 kV across the barrier
     put('C103', 72.6, 30.7, 0)     # 100u PoE output (+ pad above the module output pins)
     put('C104', 72.6, 25.4, 0)
@@ -228,12 +236,13 @@ def place(B):
     e('R408', -1.6, 4.3, 270)
     e('R410', -0.5, 4.3, 270)
     e('R403', 0.6, 4.3, 90)
-    put('C408', 73.63, 70.2, 90)   # RX centre tap, straight above jack pin 3
-    put('C409', 74.89, 70.2, 90)   # TX centre tap, above jack pin 4
-    put('R411', 64.6, 83.6, 90)
-    put('R412', 66.2, 83.6, 90)
-    put('C410', 66.6, 76.6, 90)    # shield to ground
-    put('R413', 64.2, 76.6, 90)
+    yj = G.JACK_Y - 6.49                # first pin row of the jack
+    put('C408', 73.63, yj - 4.06, 90)  # RX centre tap, straight above jack pin 3, clear of the jack's shell
+    put('C409', 74.89, yj - 4.06, 90)  # TX centre tap, above jack pin 4
+    put('R411', 64.6, 83.6, 90)        # yellow LED: at the PHY's side of the long run to the jack
+    put('R412', 67.0, 107.2, 180)      # green LED to ground: left of the jack, level with its LED pins
+    put('C410', 69.05, 86.6, 90)       # shield to ground, straight above the jack's left shield tab
+    put('R413', 66.6, 86.6, 90)
 
     # ================================================= NFC (tongue, left margin)
     put('ANT501', G.ANT_C[0], G.ANT_C[1], 0)
@@ -300,13 +309,14 @@ def place(B):
     put('Q701', 13.2, 56.6, 0)
     put('R703', 16.6, 55.6, 0)
     put('R704', 16.6, 57.6, 0)
+    put('R705', 8.85, 63.75, 270)  # LED data pull-down, signal on top, below the level shifter
 
     # ============================================================ test points
     tps = {
         'TP801': (26.0, 24.6), 'TP802': (26.0, 27.8), 'TP803': (26.0, 31.0), 'TP804': (22.6, 27.8),
         'TP805': (57.0, 37.0), 'TP806': (14.6, 21.0), 'TP807': (14.6, 24.2), 'TP808': (14.6, 27.4),
-        'TP809': (14.6, 30.6), 'TP810': (3.0, 9.6), 'TP811': (3.0, 12.8), 'TP812': (6.2, 9.6),
-        'TP813': (6.2, 12.8),
+        'TP809': (14.6, 30.6), 'TP810': (3.0, 9.6), 'TP811': (3.0, 12.8), 'TP812': (7.6, 9.6),
+        'TP813': (7.6, 12.8),               # 4.6 mm apart: the labels C6_BOOT and C6_RX need that much
     }
     for ref, (x, y) in tps.items():
         put(ref, x, y, 0)

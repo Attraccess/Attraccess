@@ -5,13 +5,21 @@ when a step fails. Use a current-limited bench supply for the first power-up.
 
 ## Before ordering
 
-1. Have an electronics engineer review schematic and layout.
-2. Lay a sample display on a 1:1 print of the board: check the flex reaches J601
-   through the slot with the fold described in the design notes, and that the
-   contacts face the board.
+1. Lay a sample display on a 1:1 print of the board (`fab/board-front.pdf` and
+   `fab/board-back.pdf`, glued back to back on 1.6 mm card), with
+   the tape you plan to use under it: check that the flex reaches J601 through
+   the slot with the fold described in the design notes, that it goes into the
+   connector to its stop without being stretched, and that the contacts face
+   the board. This is the one check that no calculation replaces: the reserve
+   is 0 to 3 mm, and a board with a flex that is too short cannot be repaired.
+2. Have an electronics engineer look at the open points listed under "Design
+   review" in the design notes.
 3. Check that JLCPCB (or the chosen assembler) can supply every BOM line, in
-   particular the ESP32-P4NRW32X.
-4. Run ERC and DRC (commands in the README) and look at the Gerbers in a viewer.
+   particular the ESP32-P4NRW32X and the AP63203WU-7.
+4. Run the `check` and `check-footprints` targets (README) and look at the
+   Gerbers in a viewer.
+5. When the bare boards arrive before assembly: drop an LED into one of its
+   windows. It must go in without force.
 
 ## Power, without display
 
@@ -21,16 +29,23 @@ when a step fails. Use a current-limited bench supply for the first power-up.
 3. Feed 5 V into USB-C with the supply limited to 200 mA.
    - `5V` test point: about 4.6 V.
    - `3V3`: 3.3 V +/- 3 %.
-   - `VDD_HP`: 0 V while the chip has no firmware (EN_DCDC stays low), about
-     1.1 V once firmware runs.
+   - `VDD_HP`: about 1.1 V, also without firmware. The chip makes it with an
+     internal regulator until firmware switches the converter U202 on (its
+     enable signal EN_DCDC is 0 V without firmware and in download mode). 0 V
+     at `VDD_HP` means a fault: a short on the rail, no 3.3 V at the chip, or
+     the chip held in reset.
 4. Current without firmware: a few tens of mA. Raise the limit to 1 A.
-5. DC lever terminal, USB unplugged: feed 12 V limited to 200 mA (`+` and `-`
-   are printed next to the terminal). `5V` test point: about 4.6 V. Repeat at
+5. DC terminal, USB unplugged: feed 12 V limited to 200 mA (`+` and `-` are
+   printed next to the terminal). `5V` test point: about 4.6 V. Repeat at
    24 V.
 6. DC jack: check with a meter that the centre pin of the jack is the `+` of
-   the lever terminal before the first use (the jack's pin numbering was taken
-   from the library part, not measured). Then feed 12 V through a plug.
+   the terminal before the first use. Then feed 12 V through a plug.
 7. DC input with reversed polarity: no current flows and nothing gets warm.
+8. Plug a 24 V supply in live a few times with an oscilloscope at the cathode
+   of D106 (the TVS): the peak must stay below 40 V.
+9. With the board running from the DC input, measure the unplugged USB-C
+   connector's VBUS (at F101): below 0.5 V. Then plug it into a USB-C port of a
+   computer: the port must come up.
 
 ## MCU
 
@@ -62,30 +77,49 @@ when a step fails. Use a current-limited bench supply for the first power-up.
 ## NFC
 
 1. PN532 answers on I2C1 at 0x24 after NFC_RST goes high; read the firmware
-   version.
-2. Tune the antenna with a network analyser between the EMC filter and the
+   version. The fitted part is a second source: it must answer as a PN532
+   (IC 0x32, version 1.6). If it does not, fit the NXP part.
+2. Before the field is switched on for the first time, measure the loop: with
+   the display fitted, an LCR meter or network analyser across R504/R505 on the
+   antenna side (remove both resistors for that). The fitted matching values
+   are safe for 1.0 to 1.3 uH. Outside that range change them first.
+3. Switch the field on and measure the transmitter current: the voltage across
+   FB503 (0.15 ohm) or the rise of the 5 V current. It must stay below 100 mA.
+4. Tune the antenna with a network analyser between the EMC filter and the
    matching network (see design notes). Record the final values of C513 to
-   C519, R504, R505 in the schematic.
-3. Measure read distance with the cards and tags in use (DESFire, NTAG 424),
+   C519, R504, R505 in the circuit description. Tune the Ethernet version on
+   its own: the jack is next to the loop.
+5. Measure read distance with the cards and tags in use (DESFire, NTAG 424),
    with display on, LEDs on and Wi-Fi transmitting.
-4. Check transmitter current (TVDD) stays below 100 mA.
 
 ## Ethernet and PoE (lan version)
 
 1. USB-powered: link comes up at 100 Mbit/s full duplex, DHCP works, ping
-   without loss. Try a second switch and a crossed cable.
+   without loss. Try a second switch and a crossed cable. The firmware has to
+   pulse the PHY reset low through the IO expander first (see firmware-port.md);
+   without that pulse the PHY may come up with a wrong address or no clock.
 2. PoE-powered, USB unplugged: board starts.
 3. Two supplies connected at once (PoE or DC together with USB): no back-feed
    into the USB host (measure VBUS with the PC side disconnected: it must read
    0 V), and no voltage on the open DC connectors.
 4. PoE module temperature after 30 minutes at full load.
 5. Unplug and replug PoE ten times: the board restarts cleanly each time.
+6. Before the display goes on: look at the display side of the board at the
+   jack. Its pins and posts stand up to 2 mm out of the board, below where the
+   display ends. Nothing of the display or the housing may touch them.
+7. Isolation, on a unit you can afford to lose: 1500 V RMS (or 2250 V DC) for a
+   minute between the eight contacts of the jack tied together and the board's
+   ground. Remove the display first.
 
 ## LEDs and buzzer
 
-1. Light each LED in turn: order and colours.
+1. Hold the MCU in reset: all LEDs stay dark. Then light each LED in turn:
+   order and colours. Do not run all eight at full white: the LED's datasheet
+   allows 70 % for white.
 2. Beep at 2.7 kHz: loud enough in the workshop, no audible noise on the
-   display or NFC performance loss while beeping.
+   display or NFC performance loss while beeping. The sound leaves the buzzer
+   on its side that faces the lower board edge. Never leave the buzzer pin
+   high: the coil and its resistor are made for a tone, not for direct current.
 
 ## Before the test lab
 

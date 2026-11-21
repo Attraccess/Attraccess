@@ -111,7 +111,7 @@ class Board:
             val.SetLayer(pcbnew.F_SilkS)
             val.SetVisible(True)
             val.SetTextSize(pcbnew.VECTOR2I(mm(0.8), mm(0.8)))
-            val.SetTextThickness(mm(0.12))
+            val.SetTextThickness(mm(0.15))        # JLCPCB prints no line thinner than 0.15 mm
             val.SetPosition(V(x, y + 1.5))
         self.b.Add(fp)
         for pad in fp.Pads():

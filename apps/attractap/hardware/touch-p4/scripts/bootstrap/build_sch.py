@@ -42,6 +42,8 @@ NOTES = {
     'power': [
         'Supply: USB-C 5 V, DC 12 to 24 V (barrel jack or spring terminal) or PoE (802.3af, isolated module).',
         'All three end on the +5V rail through Schottky diodes, so any combination may be connected.',
+        'R104 / R105 take up the leakage of those diodes, so an unpowered input stays at 0 V.',
+        'DC input: C117 - L103 - C112/C113 filter the converter ripple off the supply cable; D106 clamps behind L103.',
         'Do not add capacitance across the PoE input (POE_VPF / POE_VNF): it would break PoE detection.',
         'The PoE module needs a minimum load: 100 mA (DP9900M) or 200 mA (Ag9905M).',
     ],
@@ -66,10 +68,12 @@ NOTES = {
         'Centre taps go to ground through 100 nF (voltage-mode PHY). PoE V+/V- come rectified from the jack.',
         'The jack datasheet does not label the polarity within each pair;',
         'the PHY and the link partner correct a swapped pair automatically.',
+        'ETH_RST_N has no reset circuit: the firmware must pulse it low for 10 ms through the IO expander.',
     ],
     'nfc': [
         'I2C address 0x24. I0 high / I1 low selects I2C. VBAT runs from 5 V, PVDD (interface) from 3.3 V.',
-        'C513/C517 (series), C514/C518 + C515/C519 (parallel) and R504/R505 are calculated starting values.',
+        'C513/C517 (series), C514/C518 + C515/C519 (parallel) and R504/R505 are calculated starting values',
+        'for a loop of 1.0 to 1.3 uH: the transmitter current stays below 90 mA anywhere in that range.',
         'Tune them on an assembled unit with the display fitted, using a network analyser (about 40 ohm at TX).',
     ],
     'display': [
@@ -79,8 +83,9 @@ NOTES = {
         'Backlight: 8 LEDs 4S2P, 39 mA. Brightness: PWM on BL_PWM at 25-40 kHz (low = off).',
     ],
     'ui': [
-        'LEDs are reverse-mount parts shining through the board. Data flows D701 -> D710.',
-        'Buzzer: drive BUZZER with a 2.7 kHz square wave (LEDC).',
+        'LEDs are reverse-mount parts shining through the board. Data flows D701 -> D708.',
+        'Buzzer: drive BUZZER with a 2.7 kHz square wave (LEDC). Its coil is between pads 1 and 2;',
+        'pads 3 and 4 only hold the part. R705 keeps the LED data line low while the MCU is in reset.',
     ],
     'mech': [],
 }

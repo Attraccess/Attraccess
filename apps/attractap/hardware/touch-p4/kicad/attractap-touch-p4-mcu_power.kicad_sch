@@ -4055,7 +4055,7 @@
 		(dnp no)
 		(uuid "5c864f6a-3e30-5ade-b5c8-3a1080979323")
 		(property "Reference" "L201" (at 284.48 144.72 90) (effects (font (size 1 1))))
-		(property "Value" "2.2uH 2.6A" (at 284.48 150.22 90) (effects (font (size 1 1))))
+		(property "Value" "2.2uH 2.3A" (at 284.48 150.22 90) (effects (font (size 1 1))))
 		(property "Footprint" "attractap:IND-SMD_L2.5-W2.0_CKCSA252012"
 			(at 284.48 147.32 90)
 			(effects (font (size 1 1)) (hide yes))

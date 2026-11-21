@@ -24,6 +24,10 @@ def power(d):
     }, lcsc='C7519', mpn='USBLC6-2SC6', desc='USB ESD protection')
     d.FB('VBUS_F', '+5V_USB', big=True)
     d.C('10u/25V', '+5V_USB', size='0805')
+    # The OR-ing diode leaks a little of the 5 V rail back to this net when another source powers the
+    # board. Without a load the unplugged connector's VBUS would float at several volts, and a USB-C
+    # host only switches its supply on when it finds VBUS at 0 V.
+    d.R('4.7k', '+5V_USB', 'GND', ref='R104', desc='bleed: keeps VBUS at 0 V while another source powers the board')
     d.add('D', 'SS34', 'Device:D_Schottky', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': '+5V', '2': '+5V_USB'},
           lcsc='C8678', mpn='SS34', desc='Supply OR-ing, USB')
 
@@ -74,10 +78,17 @@ def power(d):
                'left pole = +, right pole = -')
     d.add('F', '1.1A PTC 33V', 'Device:Polyfuse', 'attractap:F1812', {'1': 'VDC_IN', '2': 'VDC_F'},
           lcsc='C21000', mpn='SMD1812P110TF/33', desc='Resettable fuse 1.1 A hold, 33 V')
-    d.add('D', 'SS34', 'Device:D_Schottky', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': 'VDC', '2': 'VDC_F'},
+    d.add('D', 'SS34', 'Device:D_Schottky', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': 'VDC_R', '2': 'VDC_F'},
           lcsc='C8678', mpn='SS34', desc='Reverse polarity protection')
+    # Input filter: without it the converter's 1.1 MHz ripple current runs straight out on the supply
+    # cable (conducted emission). C117 - L103 - C112/C113 form a pi filter; the TVS sits behind the
+    # inductor, at the converter, and so also clamps what the filter rings up to when a live supply
+    # is plugged in.
+    d.C('10u/50V', 'VDC_R', size='1206', ref='C117', desc='DC input filter, connector side')
+    d.add('L', '2.2uH 2.3A', 'Device:L', 'attractap:IND-SMD_L2.5-W2.0_CKCSA252012', {'1': 'VDC_R', '2': 'VDC'},
+          ref='L103', lcsc='C354540', mpn='CKCSA252012-2.2uH/M', desc='DC input filter')
     d.add('D', 'SMAJ28A', 'Device:D_Zener', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': 'VDC', '2': 'GND'},
-          lcsc='C19077545', mpn='SMAJ28A', desc='TVS, DC input (breaks down below the 35 V limit of U104)')
+          lcsc='C19077545', mpn='SMAJ28A', desc='TVS, DC input (starts to conduct at 31 V; U104 stands 40 V for 0.4 s)')
     d.C('10u/50V', 'VDC', size='1206')
     d.C('10u/50V', 'VDC', size='1206')
     d.add('U', 'AP63205WU-7', 'attractap:AP63203WU-7', 'attractap:TSOT-26_L2.9-W1.6-P0.95-LS2.8-BL', {
@@ -89,6 +100,8 @@ def power(d):
           lcsc='C5291940', mpn='CKCSA4020-6.8uH/M')
     d.C('22u', '+5V_DC', size='0805')
     d.C('22u', '+5V_DC', size='0805')
+    # as R104: the leakage of D107 must not lift this net (and through the converter its input and EN)
+    d.R('4.7k', '+5V_DC', 'GND', ref='R105', desc='bleed: keeps the unpowered converter output at 0 V')
     d.add('D', 'SS34', 'Device:D_Schottky', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': '+5V', '2': '+5V_DC'},
           lcsc='C8678', mpn='SS34', desc='Supply OR-ing, DC input')
 
@@ -182,7 +195,7 @@ def mcu(d):
     }, lcsc='C141836', mpn='TLV62569DBVR', desc='Core buck. Use exactly this part: no output discharge')
     d.C('10u', '+3V3', size='0603', desc='DCDC input')
     d.C('100n', '+3V3', desc='DCDC input')
-    d.add('L', '2.2uH 2.6A', 'Device:L', 'attractap:IND-SMD_L2.5-W2.0_CKCSA252012', {'1': 'DCDC_SW', '2': 'VDD_HP'},
+    d.add('L', '2.2uH 2.3A', 'Device:L', 'attractap:IND-SMD_L2.5-W2.0_CKCSA252012', {'1': 'DCDC_SW', '2': 'VDD_HP'},
           lcsc='C354540', mpn='CKCSA252012-2.2uH/M')
     d.C('22u', 'VDD_HP', size='0805')
     d.C('22u', 'VDD_HP', size='0805')

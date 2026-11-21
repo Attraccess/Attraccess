@@ -18,8 +18,12 @@ def outline(B):
     px, py = G.POCKET_X, G.POCKET_Y
     # outer contour: rectangle with both bottom corners cut away (Ethernet plug on the right, DC plug on
     # the left), rounded corners
+    ax1, ax2, ad = G.C6_NOTCH                 # cut under the Wi-Fi antenna, inside corners rounded
+    ar = 1.0
+    ak = ar * (1 - math.sqrt(0.5))
     pts_lines = [
-        ((r, 0), (W - r, 0)), ((W, r), (W, ny - r)), ((W - r, ny), (nx + r, ny)),
+        ((r, 0), (ax1, 0)), ((ax1, 0), (ax1, ad - ar)), ((ax1 + ar, ad), (ax2 - ar, ad)), ((ax2, ad - ar), (ax2, 0)),
+        ((ax2, 0), (W - r, 0)), ((W, r), (W, ny - r)), ((W - r, ny), (nx + r, ny)),
         ((nx, ny + r), (nx, H - r)), ((nx - r, H), (px + r, H)), ((px, H - r), (px, py + r)),
         ((px - r, py), (r, py)), ((0, py - r), (0, r)),
     ]
@@ -31,6 +35,8 @@ def outline(B):
         s.SetShape(pcbnew.SHAPE_T_ARC)
         s.SetArcGeometry(V(*start), V(*mid), V(*end))
         s.SetLayer(pcbnew.Edge_Cuts); s.SetWidth(mm(0.1)); B.b.Add(s)
+    arc((ax1, ad - ar), (ax1 + ak, ad - ak), (ax1 + ar, ad))
+    arc((ax2 - ar, ad), (ax2 - ak, ad - ak), (ax2, ad - ar))
     arc((W - r, 0), (W - k, k), (W, r))
     arc((W, ny - r), (W - k, ny - k), (W - r, ny))
     arc((nx + r, ny), (nx + k, ny + k), (nx, ny + r))          # inside corner of the notch
@@ -41,11 +47,8 @@ def outline(B):
     arc((0, r), (k, k), (r, 0))
     # flex slot
     B.rounded_rect(*G.SLOT, r=1.0)
-    # LED windows (the reverse-mount LEDs shine through the board)
-    w, h = G.LED_WINDOW
-    for y in (G.LED_Y_TOP, G.LED_Y_BOT):
-        for x in G.LED_X:
-            B.rounded_rect(x - w / 2, y - h / 2, x + w / 2, y + h / 2, r=0.4)
+    # The LED windows (the reverse-mount LEDs shine through the board) come with the LED footprint:
+    # 3.4 x 3.0 mm with relieved corners, so a body with square corners fits a milled opening.
 
 
 def documentation(B):
@@ -58,16 +61,42 @@ def documentation(B):
     for x1, y1, x2, y2 in G.FLEX_KEEPOUT:
         B.edge(rect(x1, y1, x2, y2), layer=pcbnew.Cmts_User, width=0.1)
     B.text('folded display flex lies here: no tall parts', 37, 82.5, 1.0, pcbnew.Cmts_User)
-    B.text('Ethernet plug', 77.8, 110, 1.0, Dw, rot=90)
+    B.text('Ethernet plug', 77.8, G.NOTCH_Y + 15, 1.0, Dw, rot=90)
     B.text('Attractap Touch P4', 44, 100.3, 1.0, pcbnew.F_SilkS)
     B.text('rev A', 62.0, 100.3, 0.8, pcbnew.F_SilkS)
-    B.text('PoE 48V', 82.0, 78.6, 0.8, pcbnew.F_SilkS)
+    B.text('PoE 48V', 82.0, G.JACK_Y - 0.9, 0.8, pcbnew.F_SilkS)
     for num, mark in (('1', '+'), ('2', '-')):
         x, y = min(B.pads_num('J103', num), key=lambda p: p[1])
         B.text(mark, x, y - 3.6, 1.0, pcbnew.F_SilkS)
     for ref, label in (('SW201', 'RST'), ('SW202', 'BOOT')):
         x, y = unV(B.fp[ref].GetPosition())
         B.text(label, x + 5.6, y, 0.8, pcbnew.F_SilkS)
+
+
+def display_ground_pads(board):
+    """Solder mask openings on the display side that leave the ground fill bare (see geometry)."""
+    h = G.LCD_GROUND_PAD / 2
+    for x, y in G.LCD_GROUND_PADS:
+        s = pcbnew.PCB_SHAPE(board)
+        s.SetShape(pcbnew.SHAPE_T_RECT)
+        s.SetStart(V(x - h, y - h)); s.SetEnd(V(x + h, y + h))
+        s.SetLayer(pcbnew.B_Mask); s.SetFilled(True); s.SetWidth(0)
+        board.Add(s)
+
+
+def check_display_ground_pads(board):
+    """After the zone fill: every pad must lie on ground fill, clear of vias. Returns the bad ones."""
+    fill = next(z for z in board.Zones() if not z.GetIsRuleArea() and z.IsOnLayer(B_) and z.GetNetname() == 'GND')
+    vias = [unV(t.GetPosition()) for t in board.GetTracks() if t.GetClass() == 'PCB_VIA']
+    h = G.LCD_GROUND_PAD / 2
+    bad = []
+    for x, y in G.LCD_GROUND_PADS:
+        n = int(2 * h / 0.25)
+        on_fill = all(fill.HitTestFilledArea(B_, V(x - h + i * 0.25, y - h + j * 0.25), 0)
+                      for i in range(n + 1) for j in range(n + 1))
+        if not on_fill or any(abs(vx - x) < h + 0.3 and abs(vy - y) < h + 0.3 for vx, vy in vias):
+            bad.append((x, y))
+    return bad
 
 
 def zones(B):
@@ -89,6 +118,8 @@ def zones(B):
     B.keepout(rect(*G.C6_KEEPOUT), all_cu, 'Wi-Fi antenna: no copper', pours=True, tracks=True, vias=True)
     for x1, y1, x2, y2 in G.POE_PRIMARY:
         B.keepout(rect(x1, y1, x2, y2), all_cu, 'PoE primary side: no secondary copper pour', pours=True)
+    B.keepout(G.POE_UNDER_MODULE, all_cu, 'PoE module: primary side and isolation barrier, no copper', pours=True,
+              tracks=True, vias=True)
     # the 3.3 V pour under the MCU feeds its supply pins through vias inside the pad ring
     cx, cy = unV(B.fp['U201'].GetPosition())
     # (above and left of the MCU it ends at the pad row: signals change to this layer right there)
@@ -111,7 +142,9 @@ def zones(B):
     B.zone('GND', B_, full, priority=0, thermal=None, name='GND bottom fill')
     # 3.3 V plane on In2, display area only (nothing below the slot needs it as a plane)
     x3, y3 = G.PLANE_3V3_TONGUE
-    B.zone('+3V3', IN2, [(0.3, 0.3), (W - 0.3, 0.3), (W - 0.3, 89.0), (x3, 89.0), (x3, y3), (0.3, y3)],
+    jx1, jx2, jy = G.PLANE_3V3_JACK
+    B.zone('+3V3', IN2, [(0.3, 0.3), (W - 0.3, 0.3), (W - 0.3, 89.0), (jx2, 89.0), (jx2, jy), (jx1, jy), (jx1, 89.0),
+                         (x3, 89.0), (x3, y3), (0.3, y3)],
            priority=0, thermal=None, name='3V3 plane')
     # core rail under the MCU on the bottom layer, reaching the DC-DC output capacitors
     cx, cy = unV(B.fp['U201'].GetPosition())
@@ -149,7 +182,7 @@ NETCLASSES = [
                                      'BL_SW', 'BL_A', 'BL_K', 'BUZ_P', 'BUZ_N']),
     ('Power5V', 0.15, 0.5, 0.8, 0.4, ['+5V', '+5V_USB', '+5V_POE', '+5V_DC', 'VBUS_F', 'BUCK_SW']),
     # DC input, up to 28 V
-    ('DCIN', 0.25, 0.6, 0.8, 0.4, ['VDC_IN', 'VDC_F', 'VDC', 'DC_SW']),
+    ('DCIN', 0.25, 0.6, 0.8, 0.4, ['VDC_IN', 'VDC_F', 'VDC_R', 'VDC', 'DC_SW']),
     ('DCSig', 0.2, 0.25, 0.6, 0.3, ['DC_EN', 'DC_BST']),
     # the USB-C connector has 0.1 mm between its VBUS and GND pads
     ('VBUS', 0.1, 0.6, 0.8, 0.4, ['VBUS']),

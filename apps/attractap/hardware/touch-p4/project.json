@@ -58,6 +58,14 @@
         "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh check-package"
       }
     },
+    "check-footprints": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "parallelism": false,
+      "options": {
+        "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh check-footprints"
+      }
+    },
     "check": {
       "executor": "nx:noop",
       "dependsOn": ["test", "erc", "check-netlist", "drc", "check-package"]

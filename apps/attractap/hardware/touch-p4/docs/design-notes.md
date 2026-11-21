@@ -14,6 +14,7 @@ Why the board looks the way it does, and what is still an assumption.
 | PoE | ready-made isolated module | No transformer design; the footprint takes SDAPO DP9900M-5V or Silvertel Ag9905M. |
 | Supply | DC 12 to 24 V, PoE or USB-C, each through its own Schottky diode onto one 5 V rail | Any combination may be connected; no source feeds another. |
 | DC connectors | barrel jack (5.5 / 2.1 mm) and WAGO 250 push-button terminal in parallel | Plug-in supplies and bare wires from an existing installation both work. The terminal footprint also takes the WAGO 2601 lever terminal, which costs 13 times as much. |
+| Ethernet jack | below the display, not behind it | Its through-hole pins stand 1.5 to 2 mm out of the display side of the board. The display's metal back lies flat on that side. |
 | USB-C | service port at the board edge next to the MCU | Only used for flashing and debugging, never offered to users. |
 | Wi-Fi antenna | PCB antenna of the module, or external antenna | The ESP32-C6-MINI-1U (U.FL connector) fits the same pads. |
 | Assembly | all parts on one side | The display is taped to the other side; cheaper assembly. |
@@ -32,13 +33,15 @@ board, x right, y down, millimetres. The user looks at the other side.
 |---|---|
 | Board | 86 x 143.5, corner radius 2, both bottom corners cut away |
 | Strip above the display | y 0 to 7: Wi-Fi antenna, two mounting holes |
+| Cut under the Wi-Fi antenna | x 14.9 to 29.1, y 0 to 5.65: the module's antenna stands free over it |
 | Display cover lens (84.3 x 84.3) | x 0.85 to 85.15, y 7.0 to 91.3 |
 | LCD module (metal back) | x 5.6 to 80.4, y 12.8 to 89.4 |
 | Flex slot | x 11.5 to 62.0, y 89.5 to 92.5 |
-| Cut-away for the Ethernet plug | x above 69.5, y above 92.5 |
+| Ethernet jack | x 68.8 to 84.9, y 90.5 to 112.1, opens downwards into its cut-away. Pin rows at y 92.3 and 94.85, below the lower edge of the lens |
+| Cut-away for the Ethernet plug | x above 69.5, y above 111.8 |
 | Cut-away for the DC plug | x below 12, y above 107.5 |
 | NFC loop | 35 x 37, centre (44.5, 117), on the display side |
-| LEDs | x 29.5, 39.5, 49.5, 59.5 at y 95.6 and y 139.0, each in a 3.4 x 3.0 window |
+| LEDs | x 29.5, 39.5, 49.5, 59.5 at y 95.6 and y 139.0, each in a 3.4 x 3.0 window with relieved corners |
 | Mounting holes (3.2 mm) | (4, 3.5), (82, 3.5), (17.9, 139.4), (66.3, 117) |
 | DC jack | x 1.2 to 10.2, y 93.6 to 108, opens downwards into the DC cut-away |
 | DC terminal | centre (16.7, 100.2), next to the jack, wires enter from below at 40 degrees |
@@ -94,11 +97,23 @@ new display section, not a part swap.
 
 ### Enclosure hints
 
-- Wi-Fi antenna: keep metal and the display away from the top 7 mm strip.
+- Wi-Fi antenna: keep metal and the display away from the top 7 mm strip. The
+  board has no copper there over a width of 44 mm and is cut away under the
+  antenna itself. Espressif asks for 15 mm without metal around the antenna;
+  the display's metal back is 7 mm away and one mounting screw 11 mm. Expect
+  less range than on a development board. The version with an external antenna
+  does not depend on this.
 - Both bottom corners of the board are cut away. The Ethernet jack opens
-  downwards into the larger one (16.5 x 51 mm), the DC jack into the smaller
-  one in the other corner (12 x 36 mm). Plugs and cables stay inside the
-  board outline there and can go down or straight back into the wall.
+  downwards into the one on the right (16.5 x 31.7 mm), the DC jack into the
+  one in the other corner (12 x 36 mm). A DC plug and its cable stay inside the
+  board outline there and can go down or straight back into the wall. The
+  Ethernet cut-away takes a plug with a short boot (about 25 mm from the jack);
+  the cable then turns back into the wall or leaves past the lower board edge.
+  Check it with the patch cable you plan to use.
+- Nothing may press on the board from the display side below the display at
+  the Ethernet jack: its pins and two plastic posts stand up to 2 mm out of the
+  board there (x 68 to 86, y 91 to 107). Keep the enclosure 2.5 mm clear and do
+  not let metal touch them; two of the pins carry 48 V.
 - The DC cut-away is sized for a straight 5.5 mm barrel plug up to 11 mm
   thick. Check it with the plug of the supply you plan to ship.
 - The DC terminal (WAGO 250-202, push-button) sits next to the DC jack. Its
@@ -116,17 +131,25 @@ new display section, not a part swap.
   Plan a place for the antenna or a bulkhead connector and for the pigtail.
 - No tracks run on the outer layers within 3.3 mm of a mounting hole centre,
   so a screw head or standoff up to 6.6 mm across is safe.
-- Buzzer BZ701 fires sideways towards the nearest board edge: leave an opening.
+- Buzzer BZ701 fires sideways, along the board towards its lower edge (its
+  sound port is on the side of the part that faces the level shifter U701).
+  Leave an opening or a slot in the housing near it.
 - LEDs need a diffuser in front of the windows.
 - Do not put metal (screws, plates, shielded cable) inside or right behind the
   NFC loop.
+- The display's metal back should be tied to the board's ground: it is a large
+  plate close to the board, and discharges onto the glass end up on it. The
+  display side of the board has four bare ground pads of 5 x 5 mm behind the
+  LCD module, at (11.5, 38), (66, 38), (48, 17) and (43, 80). Put conductive
+  tape or foam on at least two of them before the display goes on; leave them
+  out of the area the mounting tape covers.
 
 ## Power
 
 | Rail | Source | Loads |
 |---|---|---|
 | +5V | USB-C (PTC fuse, TVS, ferrite, Schottky), DC converter (Schottky) or PoE module (Schottky) | 3.3 V buck, backlight, LEDs, buzzer, PN532 |
-| +5V_DC | AP63205 buck, 2 A, from the DC connectors (PTC fuse, reverse-polarity diode, TVS) | feeds +5V |
+| +5V_DC | AP63205 buck, 2 A, from the DC connectors (PTC fuse, reverse-polarity diode, input filter, TVS) | feeds +5V |
 | +3V3 | AP63203 buck, 2 A | P4, C6, PHY, flash, panel logic |
 | VDD_HP 1.1 V | TLV62569 controlled by the P4 | P4 core |
 | P4 internal LDOs | VDDO_FLASH 3.3 V, VDDO_PSRAM 1.9 V | flash, in-package PSRAM |
@@ -146,9 +169,33 @@ Notes:
   backlight on the board draws more than that. A deep-sleep mode would need a
   dummy load.
 - DC input: meant for 12 V or 24 V supplies. The jack is rated 24 V. The
-  converter (AP63205) works up to 32 V and must never see more than 35 V, so
-  the TVS is an SMAJ28A (it starts to conduct at 31 V). Reversed polarity does
-  no harm (series diode D105).
+  converter (AP63205) works up to 32 V, stands 35 V continuously and 40 V for
+  0.4 s. The TVS is an SMAJ28A: it starts to conduct between 31 and 34 V and
+  holds short peaks below 40 V, as when a live 24 V supply is plugged in. It
+  cannot hold a lasting overvoltage. Reversed polarity does no harm (series
+  diode D105). The inductor L102 is rated for 25 V across it, which is reached
+  at 30 V input.
+- DC input filter: C117 (10 uF), L103 (2.2 uH) and the converter's own input
+  capacitors C112/C113 form a pi filter. Without it the converter's 1.1 MHz
+  ripple current would run straight out on the supply cable; conducted
+  emission on that cable is measured when it may be longer than 3 m. The
+  filter takes 40 to 50 dB off at 1.1 MHz (calculated, not measured). It has no
+  common-mode choke: if the lab finds emissions from the cable above 30 MHz, a
+  clip-on ferrite at the cable is the first remedy. The TVS sits behind the
+  inductor, at the converter, so it also clamps what the filter rings up to
+  when a supply is plugged in live. The capacitors are 50 V parts whose
+  capacitance drops to about 1.5 uF each at 24 V; the values were chosen with
+  that in mind.
+- Bleed resistors: R104 (USB) and R105 (DC converter output), 4.7 k each. The
+  OR-ing diodes leak up to 0.1 mA when hot. Without a load that lifts the
+  unpowered input to several volts: a USB-C host then does not switch its
+  supply on (it wants to see 0 V first), and the DC converter gets a supply
+  through its own output. Each resistor costs 1 mA while its source is on.
+- With two supplies connected the higher one feeds the board. A PoE module
+  that is connected but carries no load runs below its minimum load: it may
+  whistle, and the switch may turn the port off and on. Nothing is damaged.
+- USB-C is a service port: the board draws up to about 1 A from it without
+  asking what the port can give. Use a port or supply that delivers that.
 - The DC converter, with fuse, diode and TVS, sits in the left column behind
   the display, right above the two DC connectors. A switching converter next
   to the NFC loop can cost read range, so it is not on the NFC part of the
@@ -166,28 +213,61 @@ copper is poured there, and the PoE net class keeps 2 mm from every other net.
 C102 (1 nF, 2 kV) bridges the barrier for EMC, C410/R413 tie the jack shield to
 ground.
 
-The 2 mm figure is a design choice, not a certified creepage distance. The
-jack itself has 2.3 mm between its PoE pins and its signal pins. A test lab
-decides whether this is sufficient for the intended installation.
+Three places need more than the 2 mm rule, which only looks at copper against
+copper on one layer:
+
+- Under the PoE module. Its isolation barrier is not at the pin row but under
+  the module body, 2.3 mm from the output pins at one end and 5.3 mm at the
+  other (Silvertel's drawing for the Ag9900 family; the SDAPO datasheet shows
+  none). From that line to the 48 V pins the board has no copper on any layer.
+- At the jack's metal shell. The shell is on the secondary side (shield). No
+  48 V copper and no part at 48 V lies on the component side within 1 mm of the
+  shell's rear wall; the two 48 V nets pass under that wall on the back layer.
+- At the display. The back layer faces the display's metal back. The jack's
+  48 V pins are below the display, and the 48 V tracks on the back layer keep
+  2 mm from the outline of the LCD module.
+
+The 2 mm figure is a design choice, not a certified creepage distance.
+Silvertel asks for 3 mm between the two sides of the barrier; the board has 2.0
+to 2.6 mm. The jack itself has 2.3 mm between its PoE pins and its signal
+pins. IEEE 802.3 wants the port to stand 1500 V RMS against everything that
+can be touched; C102 and C410 are 2 kV DC parts, which is below the peak of
+that test (2.1 kV). Test the isolation on an assembled unit before the lab
+does, and ask the lab whether it tests it at all: for the safety standard both
+sides are safe to touch.
 
 ## NFC
 
 - Loop: 4 turns, 35 x 37 mm, 0.5 mm track, 0.9 mm pitch, on the display side.
-  The matching values below were calculated for a 40 x 37 mm loop (about
-  1.35 uH with the display nearby); the 35 mm loop is roughly 10 % lower.
-  One mounting screw sits about 3 mm beside the loop and the DC terminal
-  6 mm, which shifts it further, so tuning on an assembled unit is required
-  anyway.
-- Damping: 1.5 ohm in each leg, giving a quality factor of about 27.
+  Calculated from the track geometry it has 1.28 uH in free air. The copper
+  around it, the display, one mounting screw 3 mm beside it, the DC terminal
+  6 mm away and, on the lan version, the Ethernet jack 7 mm beside its upper
+  right part all lower that. Expect 1.1 to 1.25 uH.
+- Damping: 1.5 ohm in each leg, giving a quality factor of about 25.
 - EMC filter: 560 nH and 220 pF per side (corner at 14.3 MHz).
-- Matching for 50 ohm at the transmitter: series 30.6 pF (27 pF fitted),
-  parallel 173 pF (150 pF + 22 pF fitted).
+- Matching: series 39 pF, parallel 180 pF + 18 pF. These are not the values
+  for the best match at one inductance. They are chosen so that the
+  transmitter stays inside its limit wherever the real loop lands:
+
+  | Loop | Load between TX1 and TX2 | Transmitter supply current |
+  |---|---|---|
+  | 1.00 uH | 4 + 16j ohm | about 73 mA |
+  | 1.10 uH | 13 + 26j ohm | about 45 mA |
+  | 1.20 uH | 58 - 7j ohm | about 37 mA |
+  | 1.30 uH | 10 - 19j ohm | about 64 mA |
+
+  The PN532 allows 100 mA (60 mA typical, 150 mA absolute). The values first
+  fitted (27 pF, 150 pF + 22 pF) were calculated for a larger loop of 1.35 to
+  1.4 uH; with 1.2 uH they would have drawn about 140 mA. The currents are
+  calculated with a simple model (driver 4 ohm per side, coil 1 ohm), not
+  measured.
 - Receive path: 2.7 k, 1 nF, 1 k to VMID as in the NXP reference.
 
-These are calculated starting values. The real inductance depends on the
-display, the LED wiring and, on the lan version, the jack. Tune C513/C517,
+These are starting values. Measure the loop first, then tune C513/C517,
 C514/C515/C518/C519 and R504/R505 with a network analyser on an assembled unit
-with the display fitted, then check the read range with the cards in use.
+with the display fitted, and check the read range with the cards in use. The
+two assembly versions differ here: the jack is metal next to the loop, so tune
+each version on its own.
 
 Copper around the loop is open at one place (a 2.5 mm gap in all layers on the
 side towards the Ethernet cut-away). A closed ring of copper around the loop
@@ -204,10 +284,32 @@ The jack datasheet prints no + and - at the transformer pins. The polarity
 follows from the winding dots in its schematic and the standard contacts of the
 jack (1 TX+, 2 TX-, 3 RX+, 6 RX-): pin 1 is RD+, pin 2 RD-, pin 5 TD+, pin 6
 TD-. At the PHY the positive pin of each pair leads to the outer of the two
-tracks, at the jack it is the inner pin. The negative line of each pair
-therefore changes to the back layer through one via and reaches its jack pin
-there. (A swapped pair would still link: 10BASE-T receivers correct it and
-100BASE-TX does not depend on polarity.)
+tracks, at the jack it is the inner pin. Both lines of a pair run side by side
+on the component side down to the jack. Just above it each changes to the back
+layer through one via, and there the two swap sides. (A swapped pair would
+still link: 10BASE-T receivers correct it and 100BASE-TX does not depend on
+polarity.)
+
+The jack is 19 mm further from the PHY than the shortest place for it,
+because of the display: every through-hole pin of the jack is below the lower
+edge of the cover lens. Behind the display the pins would stand 1.5 to 2 mm out
+of the board into the LCD's metal back, which has to lie within 1 mm of the
+board for the flex to reach its connector. The pairs and the 48 V nets pass
+under the rear wall of the jack's metal shell on the back layer, and no part
+sits within 1 mm of it. Only the two centre-tap tracks and, at the shell's left
+side, the LED and shield tracks run under the shell on the component side;
+a contact between one of those and the shell would do no harm.
+
+The PHY has no reset circuit of its own. Its reset pin hangs on an IO expander
+pin that is an input with a weak pull-up after power-up, so the PHY starts
+together with the supply, without the 10 ms of reset its datasheet asks for.
+The firmware has to pulse the pin low before it uses the PHY (see
+[firmware-port.md](firmware-port.md)). The Espressif ESP32-P4 board works the
+same way.
+
+The 25 MHz crystal (ESR up to 50 ohm) is above what the PHY datasheet allows
+(40 ohm). Typical parts are far below both. If a board ever fails to bring up
+the Ethernet clock in the cold, look here first.
 
 ## Layout rules used
 
@@ -239,10 +341,11 @@ their exposed pads.
 
 Routed by hand (script) and locked:
 
-- the 48 V nets and the Ethernet pairs,
+- the 48 V nets, the Ethernet pairs, the jack's LED and shield nets,
+- the DC input from the connectors through fuse, diode and filter to the
+  converter, the buzzer circuit and the output of the PoE module,
 - the PHY pins on its left and lower side,
 - the antenna feeds,
-- the DC input from the two connectors to the fuse,
 - the 5 V bus of the top LED row, in the strip between the flex slot and the
   LED windows,
 - the LED data link between the two LED rows, on the inner layer next to the
@@ -301,7 +404,17 @@ for 100 ohm.
 
 Lengths of the fast buses on the routed board: the six SDIO lines to the Wi-Fi
 module are 39 to 47 mm, the RMII lines to the PHY 35 to 51 mm with two to four
-vias each. Both are well inside what these interfaces tolerate.
+vias each. Both are well inside what these interfaces tolerate. The Ethernet
+pairs from the PHY to the jack are 27 to 31 mm.
+
+Solder paste on the MCU's exposed pad is printed as nine windows of 2.1 mm
+(70 % of the pad), not as one opening of 7.5 mm: with paste over the whole pad
+the package can float on it and lift off its 0.35 mm pitch pins. The pad has
+25 ground vias of 0.3 mm, open on the component side.
+
+The LEDs use KiCad's footprint for this part. Its cut-out is 3.4 x 3.0 mm with
+relieved corners: a milled opening has round inside corners, and the LED body
+(3.2 x 2.8 mm) has square ones.
 
 RMII_TXD1 is GPIO35, which is also the boot-mode pin. The BOOT button and its
 test point are about 70 mm away. They hang behind a 1 kohm resistor (R217) that
@@ -321,8 +434,12 @@ Parts at JLCPCB per board, in USD, prices of November 2026:
 | Wi-Fi version | 27.90 | 19.80 |
 | Ethernet/PoE version | 38.70 | 27.60 |
 
-Once per order JLCPCB adds 3 USD for every extended part line (32 lines on the
-Wi-Fi version, 37 on the Ethernet/PoE version), the setup and stencil fees, the
+The table is from before the design review. The review added parts worth about
+0.3 USD per board (input filter, three resistors, another level shifter) and
+one extended part line, the buzzer resistor.
+
+Once per order JLCPCB adds 3 USD for every extended part line (33 lines on the
+Wi-Fi version, 38 on the Ethernet/PoE version), the setup and stencil fees, the
 bare boards and shipping. On five boards the extended-part fees alone are about
 20 USD per board, so a small prototype order costs far more per board than the
 table shows.
@@ -346,9 +463,82 @@ core converter's divider, where only the ratio counts).
 
 ## Sourcing risks
 
+Stock figures are JLCPCB's of 20 November 2026.
+
 | Part | Risk |
 |---|---|
-| ESP32-P4NRW32X | LCSC showed no stock in November 2026. Use the X part (silicon v3.x); the part without X is end of life. |
-| PN532 | Fitted is the Tokmas PN5321A3HN (C53457895, about 6 USD): same package and pinout as the NXP part, but not yet proven with our firmware. If it misbehaves, the NXP original (C28925, about 13 USD) fits without any other change. NXP steers new designs to the PN7160. |
-| DP9900M-5V | Low stock at LCSC; Silvertel Ag9905M fits the same footprint. |
+| ESP32-P4NRW32X | No stock at JLCPCB or LCSC. Has to be ordered in before assembly. Use the X part (silicon v3.x); the part without X is end of life. |
+| AP63203WU-7 (U103, 3.3 V converter) | Two pieces in stock. A common part elsewhere; order it in. The adjustable types of the family do not fit: this one has its divider inside. |
+| PN532 | Fitted is the Tokmas PN5321A3HN (C53457895, about 6 USD, 48 in stock): same package and pinout as the NXP part, but its datasheet says nothing about the firmware inside, and it is not yet proven with ours. If it misbehaves, the NXP original (C28925, about 13 USD, none in stock) fits the same pads. JLCPCB's library draws the two parts a quarter turn apart: the placement file corrects the angle for the Tokmas part and for no other, so run `check-footprints` after changing the part number. NXP steers new designs to the PN7160. |
+| DP9900M-5V | 48 in stock. Of the Silvertel Ag9905 only the types Ag9905-M and Ag9905-MT fit the footprint; the Ag9905-MTB and -LPB that Silvertel prefers have five pins in another order. |
 | Display panel | Commodity part without a guaranteed part number. Agree on a fixed type with the supplier. |
+
+## Design review
+
+In November 2026 the design was checked before the first order: every part
+against its datasheet (pin numbers, supply scheme, values), every footprint
+against JLCPCB's library footprint of the same part number, the board against
+JLCPCB's published limits, and the mechanics against the drawings of the
+display and the connectors. Nothing was built or measured.
+
+### Found and changed
+
+| Finding | Change |
+|---|---|
+| Buzzer: both coil pads were on one net, the transistor switched two pads that only hold the part. It would have stayed silent. | Coil pads 1 and 2 on the two nets, pads 3 and 4 unconnected. |
+| Ethernet jack behind the display: its pins stand 1.5 to 2 mm out of the display side, into the LCD's metal back; two of them carry 48 V. | Jack moved 19 mm down, below the display. The cut-away for the plug is 31.7 mm deep instead of 51. |
+| Placement angle of four parts differed from JLCPCB's library: the PN532 (second source), the transistor and the resistor arrays (KiCad's footprints), later the new level shifter. The PN532 would have been placed a quarter turn off. | The export corrects these angles. New target `check-footprints`. |
+| NFC matching was calculated for a larger loop: about 140 mA transmitter current with the loop on the board, limit 100 mA. | Values that stay below 90 mA for any loop between 1.0 and 1.3 uH. |
+| 48 V parts and tracks directly at the rear wall of the jack's metal shell (0.1 to 0.3 mm), and the centre-tap capacitors as well. | Parts moved away, 48 V nets under the shell on the back layer. |
+| Copper pour under the PoE module where its isolation barrier lies. | No copper there on any layer. |
+| DC input without a filter: the converter's ripple would go out on the supply cable. | Pi filter C117, L103. |
+| Unpowered inputs float up through the leakage of the OR-ing diodes; a USB-C host may then not power the port. | Bleed resistors R104, R105. |
+| Buzzer resistor: 0.16 W in a 0.1 W part. | 0.25 W part of the same size. |
+| Level shifter 74AHCT1G125 is specified from 4.5 V; the 5 V rail can be lower. | 74LV1T125 (1.6 to 5.5 V), same pads. |
+| LED data line floats while the MCU is in reset. | Pull-down R705. |
+| LED windows 3.4 x 3.0 mm with round inside corners for a body of 3.2 x 2.8 mm with square ones. | KiCad's footprint with relieved corners. |
+| MCU exposed pad: paste over the whole 7.5 mm pad. | Nine windows, 70 %. |
+| Wi-Fi antenna: copper 3.4 mm beside it, board under it. | No copper for 44 mm along the edge, board cut away under the antenna. |
+| Labels of the four Wi-Fi test points overlapped. | Two of them moved 1.4 mm. |
+| The display's metal back had no connection to ground. | Four bare ground pads on the display side for conductive tape. |
+
+### Checked and found right
+
+- Every pin of the ESP32-P4, the ESP32-C6 module, the PHY, the jack, the PoE
+  module, the PN532, the converters and the small ICs against the
+  manufacturers' pin tables. The P4's supply scheme, straps, flash wiring and
+  pin functions (RMII, SDIO slot 0, USB) against Espressif's documents.
+- The panel's pin table against the panel datasheet and Waveshare's schematic,
+  the backlight (two strings of four LEDs, 40 mA together), and the mirrored
+  pin order at the connector: panel pin 1 lands on connector pad 40, and the
+  contacts face the board after the fold.
+- The polarity of all diodes and of the electrolytic capacitor in JLCPCB's
+  library against the board.
+- All part numbers of the parts list: each is the value, size and rating the
+  design means.
+- Electrical and design rule checks, schematic against board, and the board
+  against JLCPCB's limits (tracks 0.11 mm against 0.09, vias 0.45 / 0.2 mm
+  without surcharge, copper to milled edges 0.23 mm against 0.2).
+
+### Open: cannot be settled on paper
+
+- **The display flex.** From the drawing the flex reaches its connector with
+  0.2 to 3 mm to spare, depending on the tape under the display. A second
+  drawing of the same panel shows a flex 0.8 mm shorter. The fold also has to
+  be finished within 5 mm of the LCD edge, where a stiffened part of the flex
+  begins. A board cannot be repaired if the flex is short. Lay a panel on a 1:1
+  print before ordering (first step of the bring-up plan), and use the thinnest
+  tape that holds.
+- **Decoupling at the MCU.** The capacitors of several supply pins are 4 to
+  9 mm from their pin; Espressif asks for one at each pin. They connect through
+  vias into the planes. The space next to the pins is taken by the signals
+  that leave the 0.35 mm pitch pad row, and the back of the board is under the
+  display. If the MCU proves unstable at full clock speed, this is the first
+  suspect, and it needs a new layout to change.
+- **NFC range and tuning**, the second-source PN532, and the effect of the
+  jack next to the loop on the Ethernet version.
+- **Wi-Fi range** with the antenna 7 mm from the display's metal back.
+- **Isolation of the PoE side** under a 1500 V test (see "PoE isolation").
+- **Hot-plugging a 24 V supply.** The TVS holds the peak below the converter's
+  40 V limit by calculation. A 47 uF / 50 V electrolytic capacitor across C117
+  would take the stress off the TVS; the board has no place for one.

@@ -70,8 +70,15 @@ def poe_routes(B):
     dk, da = p('D103', '1'), p('D103', '2')              # TVS cathode (VPF, bottom), anode (VNF, top)
     m5, m6, m7, m8 = (p('U102', n) for n in '5678')
     c1 = p('C102', '1')
-    B.track([j9, f2a], 'POE_VP', w)
-    B.track([j10, (f3a[0], j10[1] - (f3a[0] - j10[0])), f3a], 'POE_VN', w)
+    # Jack to the beads. Under the rear wall of the jack's metal shell the two nets run on the back
+    # layer: on the component side there would be 48 V against the shield with nothing but solder mask
+    # in between. The back layer is the display's side, so there they first turn away from the corner of
+    # the LCD's metal back (2 mm and more). From the vias they run up the 48 V strip on the component side.
+    yv = G.JACK_REAR_CLEAR_Y - 0.4                       # the via's copper ends where the limit is
+    for name, pin, xv, bead in (('POE_VP', j9, 83.0, f2a), ('POE_VN', j10, 84.9, f3a)):
+        B.track([pin, (xv, pin[1] - (xv - pin[0])), (xv, yv)], name, w, layer=B_)
+        B.via(xv, yv, name, size=0.8, drill=0.4)
+        B.track([(xv, yv), (bead[0], yv - (xv - bead[0])), bead], name, w)
     # filtered + : bead -> TVS cathode -> up the left side of the strip -> module pins 5 and 6
     xl = dk[0] - 1.9
     B.track([f2b, (dk[0] - 0.7, dk[1] + 0.5)], 'POE_VPF', w)
@@ -91,6 +98,14 @@ def poe_routes(B):
     B.track([m7, (m7[0], v2[1]), m8], 'POE_VNF', w)
     B.track([v2, (m7[0], v2[1])], 'POE_VNF', w)
     B.track([m8, (m8[0], c1[1] + 1.2), c1], 'POE_VNF', w)
+    # Module output: the two pins are joined between their pads, not around the pad ends, which would
+    # be inside the module's isolation barrier (geometry.POE_UNDER_MODULE). Then on to the output
+    # capacitors and the OR-ing diode.
+    w5 = 0.5
+    o1, o2, c103, c104, d104 = p('U102', '1'), p('U102', '2'), p('C103', '1'), p('C104', '1'), p('D104', '2')
+    B.track([o2, o1, (o1[0], c103[1] + 5.08), (c103[0], c103[1] + 5.08 - (c103[0] - o1[0])), c103], '+5V_POE', w5)
+    B.track([c103, (c103[0], d104[1]), d104], '+5V_POE', w5)
+    B.track([c103, (c104[0], c103[1] - (c104[0] - c103[0])), c104], '+5V_POE', w5)
 
 
 def mdi_routes(B):
@@ -102,20 +117,62 @@ def mdi_routes(B):
     p = B.pad
     tp, tn, reg, rp, rn, iset = (p('U401', n) for n in ('30', '29', '28', '27', '26', '25'))
     # At the PHY the positive pin of each pair is the upper one and so takes the outer lane; at the jack
-    # the positive pin is the inner one. The pairs therefore swap lanes on the way: the negative line
-    # changes to the back layer and runs to its (through-hole) jack pin there.
-    for pos, neg, name, jp, jn, d_pos, d_neg, drop in ((tp, tn, 'MDI_T', '5', '6', 0.83, 0.4, 3.0),
-                                                       (rp, rn, 'MDI_R', '1', '2', 0.25, 0.28, 2.8)):
+    # the positive pin is the inner one. The pairs therefore swap lanes on the way.
+    # Both lines of a pair run side by side on the component side down to the jack. There, before the
+    # rear wall of its shell, they change to the back layer through one via each and swap lanes.
+    for pos, neg, name, jp, jn, d_pos, d_neg in ((tp, tn, 'MDI_T', '5', '6', 0.83, 0.4),
+                                                 (rp, rn, 'MDI_R', '1', '2', 0.25, 0.28)):
         (xi, yp), (xo, yn) = p('J401', jp), p('J401', jn)       # inner lane and jack pin +, outer lane and pin -
-        yc = pos[1] + drop
-        B.track([pos, (xo - d_pos, pos[1]), (xo, pos[1] + d_pos), (xo, yc + 0.6), (xi, yc + 0.6 + (xo - xi)), (xi, yp)],
-                name + 'P', w)
+        yc = G.JACK_REAR_CLEAR_Y - 2.4                           # the lower via's copper ends at the limit
+        vp = (xi, yc + 0.6 + (xo - xi))
+        B.track([pos, (xo - d_pos, pos[1]), (xo, pos[1] + d_pos), (xo, yc + 0.6), vp], name + 'P', w)
+        B.via(*vp, name + 'P')
+        B.track([vp, (xi, yp)], name + 'P', w, layer=B_)
         B.track([neg, (xi - d_neg, neg[1]), (xi, neg[1] + d_neg), (xi, yc)], name + 'N', w)
         B.via(xi, yc, name + 'N')
         B.track([(xi, yc), (xo, yc + (xo - xi)), (xo, yn)], name + 'N', w, layer=B_)
+    # centre taps: from the capacitors straight down to jack pins 3 and 4
+    B.track([p('C408', '1'), p('J401', '3')], 'ETH_CT_RX', 0.15)
+    B.track([p('C409', '1'), p('J401', '4')], 'ETH_CT_TX', 0.15)
     c405, c404, r401 = p('C405', '1'), p('C404', '1'), p('R401', '1')
     B.track([reg, (c405[0] - 0.42, reg[1]), c405, c404], 'PHY_REG', 0.25)
     B.track([iset, (iset[0], iset[1] + 0.9), (r401[0], r401[1] - 0.42), r401], 'PHY_ISET', 0.15)
+
+
+# Where the autorouter's track of the green LED signal (PHY_LED3, on the inner layer) turns towards the
+# jack's former place. The fixed route to the jack starts here. Take the new point from the board when a
+# new autorouter result is committed.
+PHY_LED3_TAP = (65.91, 80.069)
+
+
+def jack_leds(B):
+    """The jack's two LEDs and its shield, which the long way down to the jack makes fixed routes: the
+    autorouter's result has them at the jack's former place."""
+    if 'J401' not in B.fp:
+        return
+    p = B.pad
+    w = 0.15
+    tab1, tab2 = sorted(B.pads_num('J401', 'GND1') + B.pads_num('J401', 'GND2'))
+    j12, j13, j14 = p('J401', '12'), p('J401', '13'), p('J401', '14')
+    # shield: resistor and capacitor above the jack, down its left edge to the tab, across under the jack
+    r413, c410 = p('R413', '1'), p('C410', '1')
+    B.track([r413, (c410[0], r413[1])], 'ETH_SHIELD', w)
+    B.track([c410, tab1], 'ETH_SHIELD', w)
+    B.track([tab1, tab2], 'ETH_SHIELD', w)
+    # yellow LED cathode: from its resistor down the strip beside the antenna zone, then under the jack
+    # between its posts and its LED pins
+    r411 = p('R411', '1')
+    xl, ye = 65.3, j12[1] - 1.64
+    B.track([r411, (r411[0], r411[1] + 0.49), (xl, r411[1] + 0.49 + (xl - r411[0])), (xl, ye - 0.7), (xl + 0.7, ye),
+             (j12[0] - 1.64, ye), j12], 'ETH_LED_Y_K', w)
+    # green LED anode: on the inner layer from where the autorouter left it, down the same strip and
+    # under the jack below its LED pins. (Above them it would cut the 3.3 V pour off from LED pin 11.)
+    tx, ty = PHY_LED3_TAP
+    yi = j13[1] + 2.31
+    B.track([(tx, ty), (tx, yi - 0.7), (tx + 0.7, yi), (j13[0] - 2.31, yi), j13], 'PHY_LED3', w, layer=IN2)
+    # green LED cathode: under the jack's front part to its resistor on the left
+    r412 = p('R412', '1')
+    B.track([j14, (j14[0] - (r412[1] - j14[1]), r412[1]), r412], 'ETH_LED_G_K', w)
 
 
 def nfc_feeds(B):
@@ -202,8 +259,8 @@ def phy_fanout(B):
 
 
 def dc_route(B):
-    """DC input: terminal and jack joined, then up through the board bridge to the fuse, diode and
-    TVS beside the converter."""
+    """DC input: terminal and jack joined, then up through the board bridge to the fuse, the diode, the
+    input filter and the TVS beside the converter."""
     w = 0.6
     p = B.pad
     top, bot = sorted(B.pads_num('J103', '1'), key=lambda q: q[1])
@@ -211,9 +268,52 @@ def dc_route(B):
     B.track([bot, top, (top[0], jack[1]), jack], 'VDC_IN', w)     # both pins of the + pole, then the jack
     B.track(dog(jack, f1), 'VDC_IN', w)
     B.track(dog(p('F102', '2'), p('D105', '2')), 'VDC_F', w)
-    d105, d106, c112 = p('D105', '1'), p('D106', '1'), p('C112', '1')
+    # diode cathode -> filter inductor (straight above it) and the filter capacitor beside the inductor
+    d105, l_in, c117 = p('D105', '1'), p('L103', '1'), p('C117', '1')
+    B.track([d105, l_in], 'VDC_R', w)
+    B.track(dog(l_in, c117), 'VDC_R', w)
+    # filter output -> TVS -> along the board edge up to the converter's input capacitors
+    l_out, d106, c112 = p('L103', '2'), p('D106', '1'), p('C112', '1')
     xe = 1.3
-    B.track([d105, d106, (xe, d106[1] - (d106[0] - xe)), (xe, c112[1] + (c112[0] - xe)), c112], 'VDC', w)
+    B.track([l_out, d106, (xe, d106[1] - (d106[0] - xe)), (xe, c112[1] + (c112[0] - xe)), c112], 'VDC', w)
+
+
+def small_links(B):
+    """Short links of the parts that were added after the autorouter ran: the two bleed resistors and
+    the pull-down of the LED data line."""
+    p = B.pad
+    B.track([p('C101', '1'), p('R104', '1')], '+5V_USB', 0.3)
+    B.track([p('C116', '1'), p('R105', '1')], '+5V_DC', 0.3)
+    u, r = p('U701', '2'), p('R705', '1')
+    B.track([u, (r[0], u[1]), r], 'LED_DATA', 0.15)
+
+
+def buzzer_routes(B):
+    """Buzzer and its driver. The coil is between pads 1 (+) and 2 (-), both on the side away from the
+    sound port. Pad 1 is next to the series resistor. Pad 2 is on the far side of the part: its
+    track runs on the inner layer above the buzzer and comes back to the flyback diode and the
+    transistor."""
+    p = B.pad
+    w = 0.25
+    b1, b2 = p('BZ701', '1'), p('BZ701', '2')
+    r2, dk, da, q3 = p('R702', '2'), p('D709', '1'), p('D709', '2'), p('Q701', '3')
+    # + : buzzer pad 1 -> below the resistor's supply pad -> resistor pad 2, with a branch to the diode's cathode
+    xa, yk, xk = b1[0] + 1.454, r2[1] + 0.794, dk[0] - 0.9
+    B.track([b1, (xa, b1[1]), (xa, yk - 0.496), (xa + 0.496, yk), (xk, yk)], 'BUZ_P', w)
+    B.track([(xk, yk), (r2[0] - 0.794, yk), r2], 'BUZ_P', w)
+    B.track([(xk, yk), (xk, dk[1] - 0.9), dk], 'BUZ_P', w)
+    # - : buzzer pad 2 -> via -> inner layer -> via beside the resistor -> diode anode -> transistor
+    vb = (r2[0] + 1.509, r2[1] - 0.705)
+    d = 2.227
+    va = (b2[0] - 0.573, vb[1] - d)
+    B.track([b2, (b2[0], b2[1] - 1.454), (va[0], b2[1] - 2.027), va], 'BUZ_N', w)
+    B.via(*va, 'BUZ_N', size=0.6, drill=0.3)
+    B.track([va, (vb[0] - d, va[1]), vb], 'BUZ_N', w, layer=IN2)
+    B.via(*vb, 'BUZ_N', size=0.6, drill=0.3)
+    xn = da[0] + 0.9
+    B.track([vb, (vb[0], da[1] - (vb[0] - xn)), (xn, da[1])], 'BUZ_N', w)
+    B.track([(xn, da[1]), da], 'BUZ_N', w)
+    B.track([(xn, da[1]), (xn, q3[1] - (xn - q3[0])), q3], 'BUZ_N', w)
 
 
 def plane_fanout(B):

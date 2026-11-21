@@ -38,6 +38,21 @@ CLI = os.environ.get('KICAD_CLI') or (
 VARIANTS = {'wifi': {''}, 'lan': {'', 'lan'}}
 NOT_ASSEMBLED = ('TP', 'H', 'FID', 'ANT')          # bare copper / holes, nothing to place
 COPPER = 'F.Cu,In1.Cu,In2.Cu,B.Cu'
+# JLCPCB counts a part's angle from the orientation of its own library footprint for that part number
+# (the JLCEDA/EasyEDA library, https://easyeda.com). Most footprints of this board were converted from
+# that library, so KiCad's angle is JLCPCB's. For these it is not: (footprint, LCSC number) -> degrees
+# to add, counter-clockwise. Found by comparing every footprint pad by pad with the library entry of
+# its part number (scripts/check_jlc_footprints.py); run that again when a part number or a footprint
+# changes.
+JLC_ROTATION = {
+    ('Package_TO_SOT_SMD:SOT-23', 'C20917'): 180,          # KiCad draws pin 3 on the right, the library on the left
+    ('Resistor_SMD:R_Array_Convex_4x0402', 'C25501'): 90,  # KiCad: pads in two columns, library: in two rows
+    # The footprint is the one of the NXP PN532 (C28925). The library footprint of the Tokmas part is
+    # drawn a quarter turn on from it.
+    ('attractap:QFN-40_L6.0-W6.0-P0.50-BL-EP', 'C53457895'): 90,
+    # the same for the level shifter: footprint of the 74AHCT1G125 (C7484), part 74LV1T125
+    ('attractap:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR', 'C473338'): 90,
+}
 
 
 def run(*args):
@@ -124,8 +139,10 @@ def main():
                 if p is None:
                     print('WARNING: %s is in the schematic but has no position on the board' % r['Reference'])
                     continue
+                turn = JLC_ROTATION.get((r['Footprint'], r['LCSC']), 0)
+                rot = '%.6f' % ((float(p['Rot']) + turn + 180) % 360 - 180) if turn else p['Rot']
                 w.writerow([r['Reference'], p['PosX'] + 'mm', p['PosY'] + 'mm',
-                            'Top' if p['Side'].lower().startswith('top') else 'Bottom', p['Rot']])
+                            'Top' if p['Side'].lower().startswith('top') else 'Bottom', rot])
         print('%s: %d parts, %d BOM lines' % (variant, len(fitted), len(groups)))
 
 

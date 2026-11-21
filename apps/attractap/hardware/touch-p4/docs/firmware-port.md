@@ -37,7 +37,7 @@ What the firmware needs to know to run on the Attractap Touch P4 board.
 | 44 | SDIO CMD | 51 k pull-up |
 | 45 | C6_EN | resets the ESP32-C6 (through 1 k) |
 | 46 | BUZZER | 2.7 kHz square wave, high = coil on |
-| 47 | LED_DATA | 8 x SK6812, GRB, 800 kbit/s |
+| 47 | LED_DATA | 8 x SK6812, GRB, 800 kbit/s; 100 k pull-down on the board |
 | 48 | not connected | |
 | 49 | NFC_IRQ | PN532 P70_IRQ, active low |
 | 50 | NFC_RST | PN532 RSTPD_N, 10 k pull-down: drive high to run |
@@ -53,7 +53,7 @@ What the firmware needs to know to run on the Attractap Touch P4 board.
 | P1 | LCD_SCK | out |
 | P2 | LCD_SDA | out |
 | P3 | LCD_RST | out |
-| P4 | ETH_RST_N | out, low = PHY in reset |
+| P4 | ETH_RST_N | out, low = PHY in reset. Must be pulsed low, see "Ethernet" below |
 | P5 to P7 | unused | |
 
 All expander pins are inputs with weak pull-ups after power-up.
@@ -108,27 +108,58 @@ address or when a device has no entry in its address table.
    MINI-1U module (external antenna) need no firmware change.
 5. **Ethernet**: internal EMAC with RMII instead of the W5500. PHY driver
    `ip101`, address 1, external 50 MHz clock on GPIO32
-   (`EMAC_CLK_EXT_IN`), MDC 31, MDIO 36, data pins as in the table. Release
-   the PHY reset through expander P4 before starting the driver. Set the
+   (`EMAC_CLK_EXT_IN`), MDC 31, MDIO 36, data pins as in the table. Set the
    drive strength of the transmit pins (GPIO33 to 35) to the lowest value
    that works; that keeps the emissions down. On the wifi
    version the PHY is not fitted: probe it and fall back to Wi-Fi.
+
+   **Reset the PHY before the driver starts.** The board has no reset circuit
+   for it: after power-up the expander pin is an input with a pull-up, so the
+   PHY comes out of reset together with its supply and may have read its
+   configuration pins wrongly (address, RMII mode). The firmware has to make
+   the reset pulse the PHY datasheet asks for:
+   1. write 0 to bit 4 of the expander's output register (it is 1 after
+      power-up, so switching the pin to output alone gives no pulse),
+   2. switch P4 to output and wait at least 10 ms,
+   3. write 1, wait at least 10 ms more, then start the EMAC and the driver.
+
+   The ESP-IDF `ip101` driver cannot do this itself: its reset works on a GPIO
+   of the MCU only. Give it `reset_gpio_num = -1`.
 6. **NFC**: unchanged PN532 protocol, now on its own I2C bus, with IRQ and a
-   reset line the MCU controls.
+   reset line the MCU controls. Do not update the LEDs during a card exchange:
+   their 800 kHz data signal is close to the 848 kHz the card answers on.
 7. **Buzzer**: a passive buzzer on a GPIO. Generate 2.7 kHz with LEDC for the
-   duration of a beep instead of switching an expander pin.
+   duration of a beep instead of switching an expander pin. Never leave the pin
+   high: the coil then carries 180 mA of direct current, twice its rating, and
+   its series resistor more than it is made for. Stop the tone in every error
+   path and after a few seconds at the latest.
 8. **LEDs**: 8 addressable LEDs on GPIO47 (`led_strip`, RMT). Seen from the
    user's side the chain starts at the top right of the NFC field, runs right
    to left along the top (LED 1 to 4), then left to right along the bottom
-   (LED 5 to 8).
+   (LED 5 to 8). Limit white to 70 % (the LED's datasheet does for all three
+   colours together). The data line is held low by a resistor until the
+   firmware drives it, so the LEDs stay dark during reset.
 9. **Secure boot**: use RSA-3072 Secure Boot v2 on the P4. ESP-IDF marks
    ECDSA secure boot on the P4 as not recommended because of a chip erratum.
    Flash encryption, HMAC and the digital-signature peripheral exist on the P4.
+   Before Secure Download Mode is enabled in production, check the chip
+   revision: on v3.1 the ROM then cannot switch the flash supply on in download
+   mode (erratum ROM-770, fixed in v3.2), and this board powers the flash from
+   the chip only. Such a chip could no longer be flashed through the ROM.
 10. **Strapping pins**: GPIO34, 35 and 36 carry Ethernet signals. Keep them
     high-impedance or high during reset; the pull-ups on the board do that as
     long as the firmware does not drive them low before a reset.
 11. **Power source**: USB, DC and PoE end on the same 5 V rail. The firmware
     cannot tell them apart.
+12. **Wi-Fi transmit power**: keep it a setting, not a constant. The module is
+    certified up to 19.8 dBm against a limit of 20 dBm; if the reader's
+    surroundings raise the antenna gain by more than 0.2 dB, the test lab will
+    ask for less power.
+13. **Chip revision**: the same part number ships as v3.0, v3.1 and v3.2. v3.0
+    can need a second start now and then (erratum MSPI-749; the watchdog
+    restarts it), and must not switch the peripheral power domain off in light
+    sleep, because the flash is supplied by one of the chip's regulators
+    (erratum Analog-765).
 
 Not verified on hardware: everything in this list. It follows the Espressif
 documentation for the parts used.

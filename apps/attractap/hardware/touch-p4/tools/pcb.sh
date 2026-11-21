@@ -86,6 +86,9 @@ finish_routing() {
 
 export_fab() { (cd "$PCB_ROOT/scripts" && "${KICAD_PYTHON:-python3}" export_fab.py); }
 
+# Every footprint against JLCPCB's library footprint of its part number. Needs the internet.
+check_footprints() { (cd "$PCB_ROOT/scripts" && kicad_python check_jlc_footprints.py); }
+
 # The JLCPCB package in git must be the one this board gives. The export leaves out dates, so an
 # unchanged board gives byte-identical files.
 check_package() {
@@ -107,6 +110,7 @@ case "${1:-}" in
     check-netlist) check_netlist ;;
     export) export_fab ;;
     check-package) check_package ;;
+    check-footprints) check_footprints ;;
     render) render ;;
     # The three generator steps overwrite the KiCad files. See scripts/bootstrap/README.md.
     generate-library) shift; bootstrap make_lib.py "$@" ;;
@@ -114,6 +118,6 @@ case "${1:-}" in
     place) bootstrap build_pcb.py place && bootstrap check_overlap.py ;;
     route) autoroute && finish_routing ;;
     route-finish) finish_routing ;;
-    *) echo "Usage: $0 erc|drc|check-netlist|check-package|export|render|generate-library <dir>|generate-schematic|place|route|route-finish" >&2
+    *) echo "Usage: $0 erc|drc|check-netlist|check-package|check-footprints|export|render|generate-library <dir>|generate-schematic|place|route|route-finish" >&2
        exit 1 ;;
 esac

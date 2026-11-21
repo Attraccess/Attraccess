@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import check_netlist  # noqa: E402
 import design  # noqa: E402
+import geometry  # noqa: E402
 
 
 class DesignTest(unittest.TestCase):
@@ -41,6 +42,37 @@ class DesignTest(unittest.TestCase):
     def test_ethernet_pair_polarity_at_the_jack(self):
         jack = self.d.parts['J401'].nets
         self.assertEqual([jack[n] for n in ('1', '2', '5', '6')], ['MDI_RP', 'MDI_RN', 'MDI_TP', 'MDI_TN'])
+
+    def test_buzzer_coil_is_between_its_two_pads(self):
+        # pads 1 and 2 are the coil, pads 3 and 4 only hold the part: both ends on one net stay silent
+        buzzer = self.d.parts['BZ701']
+        self.assertEqual(buzzer.nets, {'1': 'BUZ_P', '2': 'BUZ_N'})
+        self.assertEqual(buzzer.nc, {'3', '4'})
+
+    def test_diodes_point_from_their_source_to_the_5v_rail(self):
+        # KiCad's diode symbols: pin 1 = cathode
+        for ref, source in (('D102', '+5V_USB'), ('D104', '+5V_POE'), ('D107', '+5V_DC')):
+            self.assertEqual(self.d.parts[ref].nets, {'1': '+5V', '2': source})
+
+    def test_unpowered_sources_have_a_bleed_resistor(self):
+        for net in ('+5V_USB', '+5V_DC'):
+            to_ground = [ref for ref, _pin in self.nets[net] if ref.startswith('R') and
+                         'GND' in self.d.parts[ref].nets.values()]
+            self.assertEqual(len(to_ground), 1, net)
+
+
+class GeometryTest(unittest.TestCase):
+    def test_no_jack_pin_behind_the_display(self):
+        # The jack's through-hole pins stand out of the display side of the board; the display's metal
+        # back lies flat on that side. The first pin row (6.49 mm behind the jack's origin, pads 1.5 mm)
+        # must be below the lower edge of the cover lens.
+        first_row = geometry.JACK_Y - 6.49
+        self.assertGreater(first_row - 0.75, geometry.LENS[3])
+
+    def test_jack_opens_into_the_cut_away(self):
+        front = geometry.JACK_Y + 13.32
+        self.assertGreaterEqual(front, geometry.NOTCH_Y)
+        self.assertLess(front - geometry.NOTCH_Y, 0.5)
 
 
 class I2cBusTest(unittest.TestCase):
