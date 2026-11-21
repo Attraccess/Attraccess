@@ -27,7 +27,7 @@ A reader that is **not paired yet** opens its Bluetooth setup by itself:
 
 | Reader | How the setup opens | What it shows |
 |--------|---------------------|---------------|
-| **Attractap Touch** (and Touch V2) | For 10 minutes after every start. Later, press **Bluetooth setup** next to **Settings** on the connecting screen for another 10 minutes. | Two lines on the screen: "Bluetooth setup open · 09:41" and its name, for example "Attractap Touch 71C8"; and "Bluetooth setup: browser connected" while your browser is connected. |
+| **Attractap Touch** (and Touch V2) | For 10 minutes after every start. Later, press **Bluetooth setup** next to **Settings** on the connecting screen for another 10 minutes. | On the settings or connecting screen: "Bluetooth setup open · 09:41" and its name, for example "Attractap Touch 71C8"; and "Bluetooth setup: browser connected" while your browser is connected. |
 | **Attractap Lite** | For 10 minutes after every power-up. Unplug and plug in again for another 10 minutes. | The LED ring pulses blue twice every 1.5 seconds; it stays blue while your browser is connected. See the [LED Guide](attractap/led-guide.md). |
 | **BLE Bridge** | Hold its button for 3 seconds. | See [BLE Bridge](attractap/ble-bridge.md). |
 
