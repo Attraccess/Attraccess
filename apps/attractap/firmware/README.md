@@ -164,13 +164,13 @@ of Lock, Unlock and Release latch, and a Lite reader opens it on any tap, short 
 as the existing unlock request; the server records it as the door being opened. A resource list
 without the field (an older server) means a regular door.
 
-## BLE bridge (2.8.0)
+## BLE bridge (2.9.0)
 
 `attractap-bridge-gl-s10` turns a GL.iNet GL-S10 BLE gateway into a headless BLE proxy for plugins
 (ATT-1315). The API treats it as a reader that announces `capabilities.ble` v1, so `context.ble` and
 `ReaderBleDriver` work through it unchanged. It reports `capabilities.nfc: false` (and no `cardRelay`),
 so the API never assigns it a resource or sends it card or resource-list traffic. Every other firmware
-reports `nfc: true`; firmware before 2.8.0 omits the field, which means true.
+reports `nfc: true`; firmware before 2.9.0 omits the field, which means true.
 
 **Target and build.** The variant sets `set(ATTRACTAP_IDF_TARGET "esp32")`; `CMakeLists.txt` passes it to
 ESP-IDF as `IDF_TARGET` (default `esp32s3`), and `build_firmwares.py` reads it for esptool `--chip` and
@@ -185,7 +185,7 @@ target.
 slots of `0x1f0000` (1.94 MB) at `0x10000` and `0x200000`, and a 64 KB `coredump` at `0x3f0000`. No
 SPIFFS. The bootloader sits at `0x1000` on the classic ESP32. `tools/check_release_build.py` fails a
 release image that leaves less than 10 % of its smallest app slot free. Release build (log level
-ERROR, 2.8.0, with the Bluetooth setup): app image 1,543,312 bytes (24 % of the slot free, 477 KB),
+ERROR, with the Bluetooth setup, measured before 2.9.0): app image 1,543,312 bytes (24 % of the slot free, 477 KB),
 static DRAM 67.4 KB, IRAM 91 %, bootloader 26,096 bytes (9 % of its 28 KB free).
 
 **PSRAM.** Not used. The S10 drives the 50 MHz RMII reference clock out on GPIO17, which the ESP32's
@@ -213,7 +213,7 @@ Wi-Fi up, no API session: 73,068 B free, 53,896 B minimum, largest block 69,632 
 
 Hardware QA of 2.7.0 then showed two aborts and a tight budget. With a session and a GATT session up,
 the minimum free heap fell to about 8 KB, and a failed allocation reboots the reader: the firmware builds
-without C++ exceptions, so a failed `new` or container growth calls `abort()`. Since 2.8.0:
+without C++ exceptions, so a failed `new` or container growth calls `abort()`. Since 2.9.0:
 
 - **Heap guard** (`src/heap_guard.hpp`). Work that grows on behalf of the network first checks the largest
   free block and keeps a reserve (8 KB for bulk BLE work, 2 KB for received TLS bytes). The proxy refuses a
