@@ -40,6 +40,9 @@ One composition seam, `apps/api/src/database/backend`, selects the engine:
 - A **migration track** is one ordered, released history for one engine. The PostgreSQL track is one baseline
   migration with later PostgreSQL-only migrations. The released SQLite migrations are kept byte for byte but only run on a
   temporary copy during the transfer. Another engine adds its own track instead of re-using PostgreSQL SQL.
+- The SQLite data has the shape of the baseline. A PostgreSQL migration after the baseline that adds a table or a column
+  also adds it to `database/transfer/sqlite-snapshot-upgrades.ts`, with the value existing rows get, so the transfer
+  fills the current schema.
 
 ## Neutral error categories
 

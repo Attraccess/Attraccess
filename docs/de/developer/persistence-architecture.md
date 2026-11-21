@@ -43,6 +43,9 @@ Eine Kompositionsnaht, `apps/api/src/database/backend`, wählt die Engine:
   Baseline-Migration mit späteren PostgreSQL-only-Migrationen. Die veröffentlichten SQLite-Migrationen bleiben Byte für
   Byte erhalten, laufen aber nur auf einer temporären Kopie während der Übernahme. Eine andere Engine bekommt eine
   eigene Spur statt PostgreSQL-SQL wiederzuverwenden.
+- Die SQLite-Daten haben die Form der Baseline. Eine PostgreSQL-Migration nach der Baseline, die eine Tabelle oder Spalte
+  hinzufügt, trägt sie auch in `database/transfer/sqlite-snapshot-upgrades.ts` ein, mit dem Wert, den bestehende Zeilen
+  bekommen. So füllt die Übernahme das aktuelle Schema.
 
 ## Neutrale Fehlerkategorien
 
