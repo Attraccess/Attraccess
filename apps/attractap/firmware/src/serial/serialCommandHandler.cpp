@@ -6,7 +6,7 @@
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/usb_serial_jtag.h"
+#include "console_io.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -24,6 +24,8 @@
 
 std::string SerialCommandHandler::inputBuffer = "";
 Logger SerialCommandHandler::logger("SerialCmd");
+SerialCommandHandler::Channel *SerialCommandHandler::extraChannel = nullptr;
+SerialCommandHandler::Channel *SerialCommandHandler::replyChannel = nullptr;
 
 void SerialCommandHandler::setup()
 {
@@ -34,10 +36,10 @@ void SerialCommandHandler::setup()
 
 void SerialCommandHandler::loop()
 {
-    // Non-blocking drain of the USB-Serial-JTAG RX buffer (driver installed in
-    // main.cpp during startup; 0-tick timeout = don't wait for more bytes).
+    // Non-blocking drain of the console RX buffer (USB-Serial-JTAG, or UART0 on the BLE bridge; driver
+    // installed in main.cpp during startup).
     uint8_t byte;
-    while (usb_serial_jtag_read_bytes(&byte, 1, 0) == 1)
+    while (console_io::readByte(byte))
     {
         char c = static_cast<char>(byte);
 
@@ -64,6 +66,17 @@ void SerialCommandHandler::loop()
         }
 
         inputBuffer += c;
+    }
+
+    if (extraChannel)
+    {
+        std::string line;
+        while (extraChannel->nextLine(line))
+        {
+            replyChannel = extraChannel;
+            processLine(line);
+            replyChannel = nullptr;
+        }
     }
 }
 
@@ -115,6 +128,11 @@ void SerialCommandHandler::processLine(const std::string &line)
 void SerialCommandHandler::sendJsonResponse(const std::string &topic, const std::string &payload)
 {
     // Exact wire format "RESP <topic> <payload>\n" — the provisioning tooling parses it.
+    if (replyChannel)
+    {
+        replyChannel->reply("RESP " + topic + " " + payload + "\n");
+        return;
+    }
     printf("RESP %s %s\n", topic.c_str(), payload.c_str());
 }
 
@@ -133,7 +151,7 @@ void SerialCommandHandler::sendErrorResponse(const std::string &topic, const cha
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/usb_serial_jtag.h"
+#include "console_io.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -234,7 +252,7 @@ const char *SerialCommandHandler::encryptionTypeToString(wifi_auth_mode_t mode)
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/usb_serial_jtag.h"
+#include "console_io.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -332,6 +350,10 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
     }
 #endif
 
+#ifdef ATTRACTAP_BLE_BRIDGE
+    if (topic == "heap") return sendHeapStatus(topic); // read-only, no PIN: release logs no heap (ATT-1315)
+#endif
+
     if (topic == "auth.status.get")
     {
         DynamicJsonDocument resp(64);
@@ -399,7 +421,7 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/usb_serial_jtag.h"
+#include "console_io.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -575,3 +597,4 @@ void SerialCommandHandler::handleAuthorizedCommand(const std::string &topic, Jso
 }
 
 #endif
+

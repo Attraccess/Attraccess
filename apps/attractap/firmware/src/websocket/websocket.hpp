@@ -91,7 +91,12 @@ private:
     // loop() only signals the task via a task notification (coalescing).
     // The stack is in PSRAM; nothing on this task may map flash (OTA, esp_partition_mmap, reads of
     // an encrypted partition): ESP-IDF asserts on a PSRAM stack while it remaps.
+#ifdef ATTRACTAP_BLE_BRIDGE
+    // QA (ATT-1315) measured 1.9 KB in use on the bridge, across network switches: the high-water mark plus 2 KB.
+    static constexpr uint32_t CONNECT_TASK_STACK = 4096;
+#else
     static constexpr uint32_t CONNECT_TASK_STACK = 8192;
+#endif
     static constexpr UBaseType_t CONNECT_TASK_PRIORITY = 2;
     TaskHandle_t connect_task = nullptr;
     static void connectTaskEntry(void *arg);

@@ -2,6 +2,7 @@ import { postgresBackend } from '../../database/postgres/postgres-backend';
 import { postgresHasUserData } from '../../database/transfer/startup-transfer';
 import { createSqliteSource } from '../../database/sqlite/sqlite-source';
 import { disposeMigratedSqliteTemplate } from '../../database/transfer/sqlite-import.test-fixture';
+import { columnsAddedAfterBaseline } from '../../database/postgres/migrations-after-baseline.test-fixture';
 import { compareSnapshots, rowCounts } from '../../database/transfer/snapshot-compare.test-fixture';
 import { olderStates } from './fixtures/older-states.test-fixture';
 import {
@@ -81,7 +82,7 @@ describe('a SQLite to PostgreSQL transfer that fails', () => {
     expect(summary.totalRows).toBeGreaterThan(0);
     expect(await postgresHasUserData(target.source)).toBe(true);
     const imported = await postgresBackend.transfer.exportSnapshot(target.source);
-    expect(compareSnapshots(summary.snapshot, imported)).toEqual([]);
+    expect(compareSnapshots(summary.snapshot, imported, await columnsAddedAfterBaseline())).toEqual([]);
     expect(await target.source.query('SELECT "creditBalance" FROM "user" ORDER BY id')).toEqual([
       { creditBalance: 900 },
       { creditBalance: 250 },

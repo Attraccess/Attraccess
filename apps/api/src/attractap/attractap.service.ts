@@ -49,7 +49,13 @@ import { ATTRACTAP_READER_STORE, type AttractapReaderStore } from './reader-stor
 import { isSecurableBuild } from './security/secured-eligibility';
 import type { ReportedBuild } from './security/session-security-state';
 
-import { ATTRACTAP_READER_CAPABILITIES, canAssign } from '../resources/reader-capabilities/reader-capabilities';
+import {
+  BLE_BRIDGE_MESSAGE,
+  BLE_BRIDGE_READER_CAPABILITIES,
+  attractapReaderCapabilities,
+  canAssign,
+  isBleBridge,
+} from '../resources/reader-capabilities/reader-capabilities';
 
 import { NotificationCategory } from '../notifications/notification-types';
 
@@ -285,8 +291,18 @@ export class AttractapService {
     }
 
     const firmware = updateData.firmware ?? reader.firmware;
+    let openedForPlugins = false;
+    let droppedResources = false;
     if (updateData.firmware) {
       this.logger.debug('Updating reader firmware info', updateData.firmware);
+      const becameBridge = !isBleBridge(reader) && isBleBridge(updateData);
+      // A BLE Bridge exists to carry plugin Bluetooth traffic, so it starts open for plugins. Only when the
+      // reader becomes a bridge: an administrator who turns it off later keeps it off across reconnects.
+      openedForPlugins = becameBridge && !reader.allowPluginBle;
+      if (openedForPlugins) edit.allowPluginBle = true;
+      // A bridge cannot serve resources: drop the links it kept from before, instead of waiting for an admin's save.
+      droppedResources = becameBridge && (reader.resources?.length ?? 0) > 0;
+      if (droppedResources) edit.resourceIds = [];
       edit.firmware = updateData.firmware;
     }
 
@@ -296,10 +312,13 @@ export class AttractapService {
       let resources = await this.readerStore.findResourcesByIds(updateData.connectedResourceIds);
 
       this.logger.debug('resources from db', resources);
-      const unserved = resources.filter((resource) => !canAssign(ATTRACTAP_READER_CAPABILITIES, resource));
+      const capabilities = attractapReaderCapabilities(reader);
+      const unserved = resources.filter((resource) => !canAssign(capabilities, resource));
       if (unserved.length > 0) {
         throw new BadRequestException(
-          `This reader cannot serve ${unserved.map((resource) => `"${resource.name}"`).join(', ')}`,
+          capabilities === BLE_BRIDGE_READER_CAPABILITIES
+            ? BLE_BRIDGE_MESSAGE
+            : `This reader cannot serve ${unserved.map((resource) => `"${resource.name}"`).join(', ')}`,
         );
       }
 
@@ -319,7 +338,9 @@ export class AttractapService {
     await this.readerStore.applyEdit(id, edit);
     const response = (await this.findReaderById(id)) ?? reader;
 
-    if (emitEvent) {
+    // Opening a new bridge for plugins is always announced: running advertisement watches add it from the event.
+    // Dropping a new bridge's resources is too, so resource pages stop listing it.
+    if (emitEvent || openedForPlugins || droppedResources) {
       this.eventEmitter.emit(ReaderUpdatedEvent.EVENT_NAME, new ReaderUpdatedEvent(response));
     }
 

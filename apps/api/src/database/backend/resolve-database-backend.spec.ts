@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { UPGRADE_DOCS_URL as POSTGRES_CONFIG_DOCS_URL } from '../postgres/postgres-config';
+import { PostgresBaseline1760000000000 } from '../postgres/migrations/1760000000000-baseline';
 import { postgresBackend } from '../postgres/postgres-backend';
 import { UPGRADE_DOCS_URL } from './database-type';
 import { parseDatabaseType, resolveDatabaseBackend, UnsupportedDatabaseTypeError } from './resolve-database-backend';
@@ -19,7 +20,9 @@ describe('database backend selection', () => {
     expect(track.name).toBe('postgres');
     expect(track.tableName).toBe('migrations');
     expect(track.directory).toBe('apps/api/src/database/postgres/migrations');
-    expect(track.migrations.filter((candidate) => typeof candidate === 'function')).toHaveLength(1);
+    // The baseline first: SQLite data is imported there, and the migrations after it run on that data.
+    expect(track.migrations[0]).toBe(PostgresBaseline1760000000000);
+    expect(track.foreignBaseline).toBe(new PostgresBaseline1760000000000().name);
   });
 
   it('rejects sqlite before touching a database and points to the upgrade instructions', () => {

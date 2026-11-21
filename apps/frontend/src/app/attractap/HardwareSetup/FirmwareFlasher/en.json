@@ -2,7 +2,7 @@
   "success": {
     "toast": {
       "title": "Installation successful",
-      "description": "You can now set up and use the RFID reader."
+      "description": "You can now set up and use the reader."
     }
   },
   "action": {
@@ -17,6 +17,7 @@
     "DEVICE_NOT_FOUND": "Device not found",
     "FIRMWARE_READ_FAILED": "Firmware could not be read",
     "RESET_FAILED": "RFID reader restart failed",
+    "CHIP_MISMATCH": "Wrong chip for this firmware",
     "UNKNOWN_ERROR": "Unknown error"
   },
   "downloading": {
@@ -24,5 +25,23 @@
   },
   "terminal": {
     "title": "Terminal Output"
+  },
+  "bridgeWarning": {
+    "title": "Prepare the GL.iNet GL-S10",
+    "power": "Never power the GL-S10 through USB and PoE at the same time.",
+    "wiring": "Open the case and connect a 3.3 V USB-TTL adapter to the serial pads: TX to RX, RX to TX and GND to GND. Leave the adapter's 3.3 V pin unconnected: it cannot supply the radio, and the bridge would keep restarting. Never use a 5 V adapter.",
+    "downloadMode": "Hold the download button (GPIO0) while you plug in the GL-S10's micro-USB power, then start the installation.",
+    "docsLink": "Step-by-step guide to the pads and wiring",
+    "docsUrl": "https://docs.attraccess.org/#/en/attractap/ble-bridge",
+    "confirm": "Install now"
+  },
+  "powerCycle": {
+    "title": "Restart the bridge",
+    "description": "The firmware is installed. The bridge cannot be restarted automatically: unplug its micro-USB power and plug it in again without holding GPIO0, and keep the USB-TTL adapter connected. Then continue with the PIN, network and server settings over the same connection. Later changes can also be made over Bluetooth: hold the bridge's button for 3 seconds and choose \"Set up over Bluetooth\".",
+    "continue": "Continue setup"
+  },
+  "chipMismatch": {
+    "title": "Wrong chip for this firmware",
+    "description": "This firmware is built for {{expected}}, but the connected device is an {{detected}}. Nothing was installed. Choose the firmware for this device."
   }
 }

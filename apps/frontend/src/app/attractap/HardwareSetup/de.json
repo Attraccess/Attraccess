@@ -2,14 +2,34 @@
   "title": "Attractap Einrichtung",
   "subtitle": "Firmware installieren und Leser konfigurieren",
   "connection": {
-    "connected": "Verbunden",
+    "connected": {
+      "serial": "Per USB verbunden",
+      "bluetooth": "Per Bluetooth verbunden"
+    },
     "disconnected": "Nicht verbunden"
   },
   "connect": {
     "title": "Attractap verbinden",
     "description": "Schließe deinen Attractap an einen USB-Port an, klicke auf Verbinden und wähle im Browser-Dialog den richtigen seriellen Port aus.",
+    "bleBridgeHint": "Du installierst Firmware auf einer Attractap BLE-Bridge (GL.iNet GL-S10)? Schließe stattdessen deinen 3,3-V-USB-TTL-Adapter an und versetze die Bridge zuerst in den Download-Modus.",
     "button": {
       "label": "Per USB verbinden"
+    },
+    "bluetooth": {
+      "hint": "Ist die Firmware schon auf deiner Attractap BLE-Bridge? Halte den Taster der Bridge 3 Sekunden gedrückt, bis die Bluetooth-LED doppelt blinkt, und richte sie dann ohne Kabel ein. Das geht nur mit der BLE-Bridge.",
+      "button": "Per Bluetooth einrichten",
+      "unavailable": {
+        "title": "Bluetooth-Einrichtung ist in diesem Browser nicht verfügbar",
+        "description": "Die Einrichtung per Bluetooth braucht Web Bluetooth, das Chrome und Edge auf dem Desktop und unter Android (über HTTPS) bieten. Öffne die Seite dort oder verbinde die Bridge per USB; auch das braucht Chrome oder Edge auf einem Computer."
+      },
+      "failed": {
+        "title": "Verbindung zur Bridge fehlgeschlagen",
+        "description": "Prüfe, ob die Bluetooth-LED der Bridge doppelt blinkt (das Einrichtungsfenster bleibt 10 Minuten offen), halte sie nah an dieses Gerät und versuche es erneut. Klappt es weiterhin nicht, richte sie per USB ein."
+      },
+      "closedAfterPairing": {
+        "title": "Bridge eingerichtet",
+        "description": "Die Bridge ist mit Attraccess verbunden und hat ihre Bluetooth-Verbindung wie erwartet getrennt."
+      }
     }
   },
   "tabs": {

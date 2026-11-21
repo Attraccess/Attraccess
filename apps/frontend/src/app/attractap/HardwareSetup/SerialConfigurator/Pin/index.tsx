@@ -1,6 +1,7 @@
 import { AlertStatusIcon, Button, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Alert, AlertContent, AlertDescription, Input, Label, TextField, cn } from '@heroui/react';
 import { useCallback, useState, type FormEvent } from 'react';
+import { getActiveConfiguratorTransport } from '../../../../../utils/active-configurator-transport';
 import { useAttractapSerialComm } from '../Auth/context';
 
 import de from './de.json';
@@ -51,8 +52,7 @@ export function AttractapSerialConfiguratorPin({ className, mode = 'change' }: A
       try {
         if (mode === 'set') {
           const payload = JSON.stringify({ newCode: newPin });
-          const espTools = (await import('../../../../../utils/esp-tools')).ESPTools.getInstance();
-          const response = await espTools.sendCommand({ topic: 'auth.code.set', payload }, true, 5000);
+          const response = await getActiveConfiguratorTransport().sendCommand({ topic: 'auth.code.set', payload }, true, 5000);
 
           if (!response) {
             throw new Error('NO_RESPONSE');

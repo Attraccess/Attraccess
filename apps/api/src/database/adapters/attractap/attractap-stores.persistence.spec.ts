@@ -69,6 +69,19 @@ describe('Attractap persistence adapters on PostgreSQL', () => {
       expect(await readers.delete(created.id)).toBe(false);
     });
 
+    it('keeps the BLE Bridge flag (capabilities.nfc) of the firmware', async () => {
+      const readers = store();
+      const created = await readers.create({ apiTokenHash: 'bridge-hash', name: 'bridge' });
+      expect(created.firmware.capabilities.nfc).toBe(true);
+
+      const capabilities = { ...created.firmware.capabilities, nfc: false };
+      await readers.applyEdit(created.id, { firmware: { ...created.firmware, capabilities }, allowPluginBle: true });
+
+      const read = await readers.findById(created.id);
+      expect(read.firmware.capabilities.nfc).toBe(false);
+      expect(read.allowPluginBle).toBe(true);
+    });
+
     it('finds only the resources that exist', async () => {
       const lathe = await source.getRepository(Resource).save({ name: 'Press', type: ResourceType.Machine });
       expect((await store().findResourcesByIds([lathe.id, 9999])).map((r) => r.name)).toEqual(['Press']);

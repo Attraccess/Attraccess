@@ -55,6 +55,9 @@ namespace ble
         virtual void cancelConnect() = 0;
         // Reports onDisconnected once the link is down.
         virtual void disconnect() = 0;
+        // Recovers the connect or link state when NimBLE owes an event that never came (ble_link_watchdog.hpp).
+        // Called on every tick and before a connect. Returns what it did (logged), or nullptr when nothing was due.
+        virtual const char *superviseLink() = 0;
         virtual Start read(uint32_t token, const Uuid &service, const Uuid &characteristic, Error &error) = 0;
         virtual Start write(uint32_t token, const Uuid &service, const Uuid &characteristic, const Bytes &value,
                             bool withoutResponse, Error &error) = 0;
@@ -244,6 +247,8 @@ namespace ble
         }
         bool ensureRadio(const Command &command);
         void shutdownIdleStack(uint32_t now);
+        // Lets the radio recover a link whose NimBLE event never came, and logs what it did.
+        void superviseLink();
         void startScan(Command &&command, uint32_t now);
         void setWatch(Command &&command, uint32_t now);
         // Why the watch scan cannot run right now; null when it can.

@@ -1,5 +1,6 @@
 import type { DataSource } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../test-utils/test-database';
+import { PostgresBaseline1760000000000 } from './migrations/1760000000000-baseline';
 import { createSqliteWorkspace, migrateSqliteTo, type SqliteWorkspace } from '../transfer/sqlite-import.test-fixture';
 
 /**
@@ -217,7 +218,8 @@ describe('PostgreSQL schema parity with the final SQLite schema', () => {
   let current: Set<string>;
 
   beforeAll(async () => {
-    postgres = await createTestDataSource();
+    // The baseline alone: migrations after it change the schema of SQLite and PostgreSQL data alike.
+    postgres = await createTestDataSource({ migrations: [PostgresBaseline1760000000000], migrationsRun: true });
     workspace = await createSqliteWorkspace();
     process.env.AUTH_SESSION_SECRET ||= 'schema-parity-spec-secret';
     sqlite = await migrateSqliteTo(workspace.file);

@@ -2,14 +2,34 @@
   "title": "Attractap Setup",
   "subtitle": "Install firmware and configure your reader",
   "connection": {
-    "connected": "Connected",
+    "connected": {
+      "serial": "Connected via USB",
+      "bluetooth": "Connected via Bluetooth"
+    },
     "disconnected": "Not connected"
   },
   "connect": {
     "title": "Connect your Attractap",
     "description": "Plug your Attractap into a USB port, then click connect and pick the correct serial port in the browser dialog.",
+    "bleBridgeHint": "Installing firmware on an Attractap BLE Bridge (GL.iNet GL-S10)? Connect your 3.3 V USB-TTL adapter instead and put the bridge into download mode first.",
     "button": {
       "label": "Connect via USB"
+    },
+    "bluetooth": {
+      "hint": "Is the firmware already on your Attractap BLE Bridge? Hold the bridge's button for 3 seconds until the Bluetooth LED double-flashes, then set it up without a cable. This only works for the BLE Bridge.",
+      "button": "Set up over Bluetooth",
+      "unavailable": {
+        "title": "Bluetooth setup is not available in this browser",
+        "description": "Setting up over Bluetooth needs Web Bluetooth, which Chrome and Edge offer on desktop and Android (over HTTPS). Open this page there, or connect the bridge via USB, which also needs Chrome or Edge on a computer."
+      },
+      "failed": {
+        "title": "Could not connect to the bridge",
+        "description": "Make sure the bridge's Bluetooth LED double-flashes (its setup window stays open for 10 minutes), keep it close to this device and try again. If it keeps failing, set it up via USB."
+      },
+      "closedAfterPairing": {
+        "title": "Bridge set up",
+        "description": "The bridge is connected to Attraccess and closed its Bluetooth connection, as expected."
+      }
     }
   },
   "tabs": {

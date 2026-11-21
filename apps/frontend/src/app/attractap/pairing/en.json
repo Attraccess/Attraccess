@@ -40,6 +40,7 @@
     "findHint": "Enter the code shown on the reader.",
     "codeLabel": "Code on the reader",
     "typeCode": "Enter the code the reader shows right now.",
+    "typeBridgeCode": "Enter the code the bridge's setup page shows on its Server tab right now.",
     "scan": "Scan",
     "scanTitle": "Scan the QR code on the reader",
     "find": "Continue",
@@ -97,7 +98,7 @@
   },
   "toPair": {
     "title": "Not paired",
-    "description": "A new reader shows a code on its screen (Lite: colours on its ring). Press Pair, then type the code or compare the colours. A reader whose pairing was removed shows its code like a new reader and takes over its old record when you choose it. The reader must be switched on and connected.",
+    "description": "A new reader shows a code on its screen (Lite: colours on its ring; Bluetooth bridge: on its setup page). Press Pair, then type the code or compare the colours. A reader whose pairing was removed shows its code like a new reader and takes over its old record when you choose it. The reader must be switched on and connected.",
     "resources": "Resources: {{names}}",
     "pairingRemoved": "Pairing was removed",
     "newReader": "New reader",
@@ -110,7 +111,8 @@
   },
   "kind": {
     "touch": "Touch",
-    "lite": "Lite"
+    "lite": "Lite",
+    "bridge": "Bluetooth bridge"
   },
   "enrollLink": {
     "noPermissionTitle": "You can't approve readers",

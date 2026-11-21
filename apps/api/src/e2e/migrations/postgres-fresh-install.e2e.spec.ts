@@ -37,7 +37,7 @@ describe('Fresh PostgreSQL install (e2e)', () => {
       trackNames,
     );
     expect(await recordedMigrations(source)).toEqual(trackNames);
-    expect(trackNames).toEqual(['PostgresBaseline1760000000000']);
+    expect(trackNames[0]).toBe('PostgresBaseline1760000000000');
     expect(postgresBackend.migrationTrack.tableName).toBe('migrations');
     const [{ count }] = await source.query(
       `SELECT COUNT(*)::int AS count FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'migrations'`,

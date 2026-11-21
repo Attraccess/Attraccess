@@ -18,7 +18,7 @@ export function ProofStep(props: Readonly<{ flow: PairingFlow; current: PairingD
   }
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm text-default-500">{t('dialog.typeCode')}</p>
+      <p className="text-sm text-default-500">{t(flow.bleBridge ? 'dialog.typeBridgeCode' : 'dialog.typeCode')}</p>
       <CodeField flow={flow} insecure={props.insecure} />
     </div>
   );

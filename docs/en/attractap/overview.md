@@ -43,6 +43,10 @@ Multiple hardware configurations are available to suit different environments:
 
 See [Hardware](attractap/hardware.md) for detailed specifications of each variant.
 
+### Attractap BLE Bridge
+
+The **Attractap BLE Bridge** runs on a GL.iNet GL-S10 and has no NFC, display or card features. It only relays Bluetooth Low Energy for plugins, for example for Bluetooth door locks where no Attractap reader is close to the lock. It cannot be assigned to a resource. See [Attractap BLE Bridge](attractap/ble-bridge.md).
+
 > [!TIP]
 > Choose the variant that matches your site's network and display requirements: Ethernet for a wired connection, Wi-Fi for wireless access, and a touch display for interaction at the machine.
 
@@ -50,6 +54,7 @@ See [Hardware](attractap/hardware.md) for detailed specifications of each varian
 
 - [Using the Reader](attractap/using-the-reader.md) – Sign in with your card and use machines or doors
 - [Hardware](attractap/hardware.md) -- Hardware variants and components
+- [BLE Bridge](attractap/ble-bridge.md) -- Bluetooth-only bridge for plugins on a GL.iNet GL-S10
 - [Setup](attractap/setup.md) -- Register and configure readers
 - [RFID Cards](attractap/rfid-cards.md) -- Manage user RFID cards
 - [Firmware Updates](attractap/firmware-updates.md) -- Update reader firmware

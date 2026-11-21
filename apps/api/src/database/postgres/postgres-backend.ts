@@ -4,6 +4,7 @@ import { entities } from '@attraccess/database-entities';
 import type { MigrationTrack } from '../backend/database-backend';
 import type { TypeOrmDatabaseBackend } from '../backend/resolve-database-backend';
 import { postgresMigrations } from './migrations';
+import { PostgresBaseline1760000000000 } from './migrations/1760000000000-baseline';
 import { parsePostgresConfig, type PostgresConfig } from './postgres-config';
 import { postgresConnectionOptions, createDataSource } from './postgres-connection';
 import { postgresErrorClassifier } from './postgres-errors';
@@ -25,6 +26,7 @@ export const postgresMigrationTrack: MigrationTrack = {
   tableName: POSTGRES_MIGRATIONS_TABLE,
   directory: 'apps/api/src/database/postgres/migrations',
   migrations: postgresMigrations,
+  foreignBaseline: new PostgresBaseline1760000000000().name,
 };
 
 /**

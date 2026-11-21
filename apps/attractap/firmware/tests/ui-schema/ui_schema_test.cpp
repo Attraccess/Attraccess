@@ -142,7 +142,7 @@ static void roundTrip(const char *name, const ui::VariantTraits &traits, const c
           name << ": profile fields");
     CHECK(payload["capabilities"]["resourceSelection"] == traits.hasDisplay &&
               payload["capabilities"]["cardEnrollment"] == traits.hasDisplay &&
-              payload["capabilities"]["hasLeds"] == traits.hasLeds,
+              payload["capabilities"]["hasLeds"] == traits.hasLeds && payload["capabilities"]["nfc"] == traits.hasNfc,
           name << ": core capabilities");
     CHECK(payload["capabilities"]["cardRelay"] == true && payload["capabilities"]["ble"]["version"] == 1,
           name << ": cardRelay and ble blocks");
@@ -343,6 +343,7 @@ int main()
     // Touch V2: display, touch, beeper, no LED ring. Lite: LED ring and beeper, card-confirm.
     roundTrip("touch", {true, true, false, true, false, 480, 480}, "caps-touch.json");
     roundTrip("lite", {false, false, true, true, true, 0, 0}, "caps-lite.json");
+    roundTrip("bridge", {false, false, false, false, false, 0, 0, false}, "caps-bridge.json");
     {
         // A plain build reports its defaults: profile plain, no secureVersion.
         JsonDocument event;

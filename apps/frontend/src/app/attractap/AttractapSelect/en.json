@@ -1,5 +1,6 @@
 {
   "loading": "Loading readers...",
+  "bleBridgeLabel": "{{name}} (Bluetooth bridge)",
   "empty": {
     "noConnectedReader": {
       "title": "No paired reader connected",

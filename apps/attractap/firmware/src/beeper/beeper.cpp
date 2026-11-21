@@ -29,6 +29,9 @@ void Beeper::setup(IOExpander *expander)
 #else
 void Beeper::setup()
 {
+#ifdef ATTRACTAP_BLE_BRIDGE
+    return; // no beeper on the BLE bridge: no worker task (2 KB of internal RAM); beeps are dropped
+#endif
     this->patternQueue = xQueueCreate(1, sizeof(PatternRequest));
     if (this->patternQueue == nullptr || xTaskCreate(Beeper::workerTask, "Beeper", 2048, this, 1, nullptr) != pdPASS)
     {

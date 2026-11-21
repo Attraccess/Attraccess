@@ -40,6 +40,7 @@
     "findHint": "Gib den Code ein, den der Reader zeigt.",
     "codeLabel": "Code am Reader",
     "typeCode": "Gib den Code ein, den der Reader gerade zeigt.",
+    "typeBridgeCode": "Gib den Code ein, den die Einrichtungsseite der Bridge gerade im Tab „Server“ zeigt.",
     "scan": "Scannen",
     "scanTitle": "QR-Code am Reader scannen",
     "find": "Weiter",
@@ -97,7 +98,7 @@
   },
   "toPair": {
     "title": "Nicht gekoppelt",
-    "description": "Ein neuer Reader zeigt einen Code auf seinem Bildschirm (Lite: Farben auf seinem Ring). Wähle „Koppeln“ und gib dann den Code ein oder vergleiche die Farben. Ein Reader, dessen Kopplung entfernt wurde, zeigt seinen Code wie ein neuer Reader und übernimmt seinen alten Eintrag, wenn du ihn auswählst. Der Reader muss eingeschaltet und verbunden sein.",
+    "description": "Ein neuer Reader zeigt einen Code auf seinem Bildschirm (Lite: Farben auf seinem Ring; Bluetooth-Bridge: auf ihrer Einrichtungsseite). Wähle „Koppeln“ und gib dann den Code ein oder vergleiche die Farben. Ein Reader, dessen Kopplung entfernt wurde, zeigt seinen Code wie ein neuer Reader und übernimmt seinen alten Eintrag, wenn du ihn auswählst. Der Reader muss eingeschaltet und verbunden sein.",
     "resources": "Ressourcen: {{names}}",
     "pairingRemoved": "Kopplung wurde entfernt",
     "newReader": "Neuer Reader",
@@ -110,7 +111,8 @@
   },
   "kind": {
     "touch": "Touch",
-    "lite": "Lite"
+    "lite": "Lite",
+    "bridge": "Bluetooth-Bridge"
   },
   "enrollLink": {
     "noPermissionTitle": "Du kannst keine Reader freigeben",

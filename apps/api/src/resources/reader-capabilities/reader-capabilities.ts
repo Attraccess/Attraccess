@@ -24,6 +24,21 @@ export const ATTRACTAP_READER_CAPABILITIES: ReaderCapabilities = {
   actions: ['start', 'stop', 'lock', 'unlock', 'unlatch', 'open'],
 };
 
+/** The Attractap BLE Bridge has no NFC: it carries plugin Bluetooth traffic and serves no resource. */
+export const BLE_BRIDGE_READER_CAPABILITIES: ReaderCapabilities = { resourceTypes: [], actions: [] };
+
+export const BLE_BRIDGE_MESSAGE = 'This reader is a Bluetooth bridge and cannot serve resources';
+
+/** Whether an Attractap is a BLE Bridge. Firmware before 2.8.0 does not report `nfc`; those readers have NFC. */
+export function isBleBridge(reader: { firmware?: { capabilities?: { nfc?: boolean } | null } | null }): boolean {
+  return reader.firmware?.capabilities?.nfc === false;
+}
+
+/** The capabilities of an Attractap, from the firmware it reported. */
+export function attractapReaderCapabilities(reader: Parameters<typeof isBleBridge>[0]): ReaderCapabilities {
+  return isBleBridge(reader) ? BLE_BRIDGE_READER_CAPABILITIES : ATTRACTAP_READER_CAPABILITIES;
+}
+
 /** The actions a resource allows, whatever reader triggers them. */
 export function readerActionsFor(resource: ReaderCapabilityResource): ReaderAction[] {
   if (resource.type === ResourceType.Machine) return ['start', 'stop'];
@@ -59,6 +74,7 @@ export function readerActionRefusal(
 ): string | null {
   const action = effectiveReaderAction(requested, resource);
   if (allowedReaderActions(caps, resource).includes(action)) return null;
+  if (caps === BLE_BRIDGE_READER_CAPABILITIES) return BLE_BRIDGE_MESSAGE;
   if (!caps.resourceTypes.includes(resource.type)) return 'This reader cannot serve this resource';
   if (resource.type === ResourceType.Door && resource.accessOnly) return ACCESS_ONLY_DOOR_MESSAGE;
   if (action === 'unlatch' && resource.type === ResourceType.Door) return 'This door does not support unlatching';
