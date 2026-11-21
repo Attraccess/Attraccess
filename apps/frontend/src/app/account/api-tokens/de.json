@@ -26,24 +26,9 @@
     "cancel": "Abbrechen"
   },
   "expiryLabel": "Ablaufdatum (optional)",
-  "actions": {
-    "create": "API-Token erstellen",
-    "revoke": "Widerrufen",
-    "copy": "Token kopieren",
-    "dismiss": "Token ausblenden"
-  },
-  "revokeConfirm": {
-    "title": "API-Token {{name}} widerrufen?",
-    "message": "Alles, was dieses Token nutzt, verliert sofort den API-Zugriff. Das kann nicht rückgängig gemacht werden."
-  },
-  "secret": {
-    "title": "Token jetzt kopieren",
-    "description": "Dieses Geheimnis wird nur einmal angezeigt und kann nicht wiederhergestellt werden."
-  },
+  "actions": { "create": "API-Token erstellen", "revoke": "Widerrufen", "copy": "Token kopieren", "dismiss": "Token ausblenden" },
+  "revokeConfirm": { "title": "API-Token {{name}} widerrufen?", "message": "Alles, was dieses Token nutzt, verliert sofort den API-Zugriff. Das kann nicht rückgängig gemacht werden." },
+  "secret": { "title": "Token jetzt kopieren", "description": "Dieses Geheimnis wird nur einmal angezeigt und kann nicht wiederhergestellt werden." },
   "success": { "created": "API-Token erstellt", "revoked": "API-Token widerrufen", "copied": "API-Token kopiert" },
-  "errors": {
-    "loadFailed": "API-Token konnten nicht geladen werden",
-    "createFailed": "API-Token konnte nicht erstellt werden",
-    "revokeFailed": "API-Token konnte nicht widerrufen werden"
-  }
+  "errors": { "loadFailed": "API-Token konnten nicht geladen werden", "createFailed": "API-Token konnte nicht erstellt werden", "revokeFailed": "API-Token konnte nicht widerrufen werden" }
 }

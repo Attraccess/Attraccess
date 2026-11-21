@@ -27,18 +27,8 @@
   },
   "expiryLabel": "Expiry date (optional)",
   "actions": { "create": "Create API token", "revoke": "Revoke", "copy": "Copy token", "dismiss": "Dismiss token" },
-  "revokeConfirm": {
-    "title": "Revoke API token {{name}}?",
-    "message": "Anything using this token loses API access immediately. This cannot be undone."
-  },
-  "secret": {
-    "title": "Copy your token now",
-    "description": "This secret is shown only once and cannot be recovered."
-  },
+  "revokeConfirm": { "title": "Revoke API token {{name}}?", "message": "Anything using this token loses API access immediately. This cannot be undone." },
+  "secret": { "title": "Copy your token now", "description": "This secret is shown only once and cannot be recovered." },
   "success": { "created": "API token created", "revoked": "API token revoked", "copied": "API token copied" },
-  "errors": {
-    "loadFailed": "Could not load API tokens",
-    "createFailed": "Could not create API token",
-    "revokeFailed": "Could not revoke API token"
-  }
+  "errors": { "loadFailed": "Could not load API tokens", "createFailed": "Could not create API token", "revokeFailed": "Could not revoke API token" }
 }

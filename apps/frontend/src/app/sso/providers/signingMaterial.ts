@@ -40,3 +40,5 @@ export const hasRequiredSamlSigningMaterial = ({
 
   return Boolean(inputCert) && Boolean(inputKey);
 };
+
+

@@ -25,7 +25,7 @@ export function VerifyEmailStep({ onCorrectAdminDetails }: VerifyEmailStepProps)
         </div>
       </div>
 
-      <Alert status="default">
+      <Alert status="default" >
         <AlertContent>
           <AlertDescription>{t('message')}</AlertDescription>
         </AlertContent>
@@ -37,6 +37,7 @@ export function VerifyEmailStep({ onCorrectAdminDetails }: VerifyEmailStepProps)
 
       {onCorrectAdminDetails && (
         <Link
+
           className="text-sm cursor-pointer self-center"
           onPress={onCorrectAdminDetails}
           data-testid="wrong-admin-details-link"
