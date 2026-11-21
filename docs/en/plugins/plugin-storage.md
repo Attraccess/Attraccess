@@ -139,6 +139,9 @@ the host removes your tables itself on uninstall.
 
 ### Adoption of 1.x installations
 
+The upgrade from 1.x (SQLite) to 2.0 (PostgreSQL) does not move plugin data: plugins start empty and version 1 runs as
+on a fresh installation. Adoption applies only when the PostgreSQL database already holds the plugin's legacy tables.
+
 A plugin that stored data through TypeORM migrations in 1.x lists the class names of **all** its legacy migrations:
 
 ```ts

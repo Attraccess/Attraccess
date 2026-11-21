@@ -94,7 +94,8 @@ Plugins have no database access; they keep data in declared tables through the r
   namespace). The port serves only the tables of the plugin's own declaration; no core table, no other plugin's table.
 - **Atomic migrations.** Each neutral migration (DDL steps, data step and the history record) is one transaction, or it
   leaves nothing behind. Adoption of a 1.x installation records the baseline without running anything and refuses a
-  partial legacy history without mutation.
+  partial legacy history without mutation (the SQLite upgrade moves no plugin data, so it applies only to legacy tables
+  already in PostgreSQL).
 - **Atomic `update`.** The `where` of `update` is evaluated with the write, so it is a compare-and-set that returns 0
   when another writer won. Plugin transactions follow the unit-of-work contract above: `afterCommit` callbacks never
   run on rollback, nesting is rejected and a conflict is reported as `PluginStorageConflict`.

@@ -99,7 +99,8 @@ Plugins haben keinen Datenbankzugriff; sie halten Daten in deklarierten Tabellen
   keine Kerntabelle, keine Tabelle eines anderen Plugins.
 - **Atomare Migrationen.** Jede neutrale Migration (DDL-Schritte, Datenschritt und Verlaufseintrag) ist eine
   Transaktion oder hinterlässt nichts. Die Übernahme einer 1.x-Installation vermerkt die Baseline, ohne etwas
-  auszuführen, und verweigert einen partiellen Legacy-Verlauf ohne Änderung.
+  auszuführen, und verweigert einen partiellen Legacy-Verlauf ohne Änderung (das SQLite-Upgrade übernimmt keine
+  Plugin-Daten, sie gilt also nur für Legacy-Tabellen, die bereits in PostgreSQL liegen).
 - **Atomares `update`.** Das `where` von `update` wird zusammen mit dem Schreiben ausgewertet; es ist ein
   Compare-and-Set, das 0 liefert, wenn ein anderer Schreiber gewonnen hat. Plugin-Transaktionen folgen dem
   Unit-of-Work-Vertrag oben: `afterCommit`-Callbacks laufen nie bei Rollback, Verschachteln wird abgewiesen und ein
