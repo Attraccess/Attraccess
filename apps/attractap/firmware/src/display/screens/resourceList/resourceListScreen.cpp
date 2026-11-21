@@ -137,13 +137,12 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
     auto *description = text(details, status, &attractap_font_montserrat_latin1_14, DisplayTheme::muted());
     lv_obj_set_height(description, 18);
     lv_obj_align(description, LV_ALIGN_BOTTOM_LEFT, 0, 0);
-    // The users of a parallel machine, cut to whole names that fit the line once the row has its final width.
+    // The users of a parallel machine, cut to whole names that fit the line. Call it once the row has its final
+    // width: after the signed-out border or the signed-in action button.
     auto showUsers = [&] {
         if (!multi || resource.activeSessions.empty()) return;
-        lv_obj_update_layout(row);
         const auto users = SessionOccupancy::usersCaption(resource.activeSessions, resource.activeSessionCount,
-            resource.maxParallelSessions, ownsUsage ? (resource.hasOwnUsage ? resource.ownUsageId : resource.activeUsageId) : 0,
-            &attractap_font_montserrat_latin1_14, lv_obj_get_content_width(description));
+            resource.maxParallelSessions, ownsUsage ? resource.activeUsageId : 0, description);
         if (!users.empty()) FirmwareI18n::setLabel(description, users);
     };
     if (rowStatusCount < API::MAX_RESOURCES) {

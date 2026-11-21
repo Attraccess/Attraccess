@@ -39,6 +39,31 @@ bool hidden(lv_obj_t *label)
         if (lv_obj_has_flag(object, LV_OBJ_FLAG_HIDDEN)) return true;
     return false;
 }
+
+// The rendered text must not be cut by the label: the widest rendered line fits the label's content width.
+bool labelFits(lv_obj_t *line)
+{
+    lv_obj_update_layout(line);
+    lv_point_t size{};
+    const std::string text = lv_label_get_text(line);
+    lv_text_get_size(&size, text.c_str(), lv_obj_get_style_text_font(line, LV_PART_MAIN), 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    // LV_LABEL_LONG_DOT rewrites the label's text in place: a cut line is short but ends in dots.
+    const bool cutByLabel = text.size() >= 3 && text.compare(text.size() - 3, 3, "...") == 0;
+    return size.x <= lv_obj_get_content_width(line) && !cutByLabel;
+}
+
+// The first label whose text ends in `tail`.
+lv_obj_t *labelEndingWith(lv_obj_t *root, const std::string &tail)
+{
+    lv_obj_update_layout(root);
+    if (lv_obj_check_type(root, &lv_label_class)) {
+        const std::string text = lv_label_get_text(root);
+        if (text.size() >= tail.size() && text.compare(text.size() - tail.size(), tail.size(), tail) == 0) return root;
+    }
+    for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i)
+        if (auto *found = labelEndingWith(lv_obj_get_child(root, i), tail)) return found;
+    return nullptr;
+}
 }
 
 void testParallelSessionPolicy()
@@ -317,7 +342,32 @@ void testParallelSessionLockscreen(Renderer &renderer)
     resource.activeSessionCount = 3;
     lock.setUsageInfo(resource);
     requireObject(guard.root, &lv_label_class, "Robin +2 \u00B7 Voll");
+    addSession(resource, 2, "Alex", false);
+    resource.activeSessionCount = 2;
+    lock.setUsageInfo(resource);
+    requireObject(guard.root, &lv_label_class, "Robin, Alex \u00B7 2/3");
+    // Long names on a full machine: whole names that fit the lock screen's narrower line, then +N and "Voll"/"Full".
+    resource.maxParallelSessions = 6;
+    resource.activeSessionCount = 6;
+    resource.activeSessions.clear();
+    for (const char *user : {"Maximiliane", "Konstantin", "Bartholomaeus", "Wolfgang", "Annabelle", "Sebastian"})
+        addSession(resource, 10 + resource.activeSessions.size(), user, false);
+    lock.setUsageInfo(resource);
+    for (const char *language : {"de", "en"}) {
+        FirmwareI18n::refreshTree(guard.root, language);
+        auto *usage = labelEndingWith(guard.root, std::string(language) == "en" ? "\u00B7 Full" : "\u00B7 Voll");
+        expect(usage != nullptr, std::string("The lock screen reads full (") + language + ")");
+        if (!usage) continue;
+        const std::string text = lv_label_get_text(usage);
+        expect(text == std::string("Maximiliane +5 \u00B7 ") + (std::string(language) == "en" ? "Full" : "Voll"),
+               "The lock screen lists the whole names that fit, then +N: " + text);
+        expect(labelFits(usage), "The lock screen users line fits its label: " + text);
+    }
+    renderer.capture("parallel-sessions-lockscreen-crowd");
+    FirmwareI18n::refreshTree(guard.root, "de");
     resource.activeSessions.clear(); // no names from an older API: the count caption stays
+    resource.maxParallelSessions = 3;
+    resource.activeSessionCount = 3;
     lock.setUsageInfo(resource);
     requireObject(guard.root, &lv_label_class, "Voll");
     resource.activeSessionCount = 0;
@@ -336,18 +386,11 @@ std::string rowStatusLine(lv_obj_t *root, const char *resourceName)
     return lv_label_get_text(line);
 }
 
-// The rendered text must not be cut by the label: the widest rendered line fits the label's content width.
+// Whether the row's second line is shown uncut.
 bool rowLineFits(lv_obj_t *root, const char *resourceName)
 {
     auto *row = lv_obj_get_parent(lv_obj_get_parent(requireObject(root, &lv_label_class, resourceName)));
-    auto *line = lv_obj_get_child(lv_obj_get_child(row, 0), 1);
-    lv_obj_update_layout(row);
-    lv_point_t size{};
-    const std::string text = lv_label_get_text(line);
-    lv_text_get_size(&size, text.c_str(), lv_obj_get_style_text_font(line, LV_PART_MAIN), 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
-    // LV_LABEL_LONG_DOT rewrites the label's text in place: a cut line is short but ends in dots.
-    const bool cutByLabel = text.size() >= 3 && text.compare(text.size() - 3, 3, "...") == 0;
-    return size.x <= lv_obj_get_content_width(line) && !cutByLabel;
+    return labelFits(lv_obj_get_child(lv_obj_get_child(row, 0), 1));
 }
 }
 
@@ -389,29 +432,25 @@ void testParallelSessionUsers(Renderer &renderer)
     addSession(resources.items[5], 70, "Robin", false);
     addSession(resources.items[5], 71, "Kim", false);
 
-    auto check = [&](ResourceListScreen &list, const char *language, const char *capture) {
-        ScreenGuard guard(list.getScreen(), &list);
-        FirmwareI18n::refreshTree(guard.root, language);
-        const bool english = std::string(language) == "en";
-        const auto line = [&](const char *name) { return rowStatusLine(guard.root, name); };
-        expect(line("Crowd") == "Maximiliane, Konstantin, Bartholomaeus +3 \u00B7 6/8",
-               "Long names list whole names, then +N and the count");
-        expect(rowLineFits(guard.root, "Crowd"), "The overflow line fits the label");
-        expect(line("Twenty").find(" +") != std::string::npos && line("Twenty").find("\u00B7 20/40") != std::string::npos,
-               "More sessions than the capped list count against the real number");
-        expect(rowLineFits(guard.root, "Twenty"), "The capped list line fits the label");
-        expect(line("No names") == (english ? "In use 2/3" : "In Verwendung 2/3"), "No names falls back to the count caption");
-        expect(line("Lowered") == (english ? "Robin, Kim \u00B7 Full" : "Robin, Kim \u00B7 Voll"), "A lowered limit reads full");
-        expect(line("Own") == "Alex, Sam \u00B7 2/3" || line("Own") == (english ? "You, Alex \u00B7 2/3" : "Du, Alex \u00B7 2/3"),
-               "Own session is named in the server order signed out and first as the you token signed in");
-        renderer.capture(capture);
-        return line("Alex and Sam");
-    };
     ResourceListScreen signedOut;
     signedOut.setResourceList(resources);
     signedOut.init();
-    expect(check(signedOut, "de", "parallel-sessions-users-signed-out") == "Alex, Sam \u00B7 2/3", "Signed-out rows name the users");
-
+    {
+        ScreenGuard guard(signedOut.getScreen(), &signedOut);
+        FirmwareI18n::refreshTree(guard.root, "de");
+        const auto line = [&](const char *name) { return rowStatusLine(guard.root, name); };
+        expect(line("Alex and Sam") == "Alex, Sam \u00B7 2/3", "Signed-out rows name the users");
+        expect(line("Crowd") == "Maximiliane, Konstantin, Bartholomaeus +3 \u00B7 6/8",
+               "Long names list whole names, then +N and the count");
+        expect(rowLineFits(guard.root, "Crowd"), "The overflow line fits the label");
+        expect(line("Twenty") == "Alex, Alex, Alex, Alex, Alex, Alex, Alex, Alex +12 \u00B7 20/40",
+               "More sessions than the capped list count against the real number: " + line("Twenty"));
+        expect(rowLineFits(guard.root, "Twenty"), "The capped list line fits the label");
+        expect(line("No names") == "In Verwendung 2/3", "No names falls back to the count caption");
+        expect(line("Lowered") == "Robin, Kim \u00B7 Voll", "A lowered limit reads full");
+        expect(line("Own") == "Alex, Sam \u00B7 2/3", "Signed out, the own session is a name in the server order, never the you token");
+        renderer.capture("parallel-sessions-users-signed-out");
+    }
 
     ResourceListScreen signedIn;
     signedIn.setResourceList(resources);
@@ -419,6 +458,8 @@ void testParallelSessionUsers(Renderer &renderer)
     signedIn.init();
     ScreenGuard guard(signedIn.getScreen(), &signedIn);
     expect(rowStatusLine(guard.root, "Own") == "Du, Alex \u00B7 2/3", "Signed-in rows put the own session first");
+    requireObject(lv_obj_get_parent(lv_obj_get_parent(requireObject(guard.root, &lv_label_class, "Own"))), &lv_label_class, "Stop");
+    expect(rowLineFits(guard.root, "Crowd") && rowLineFits(guard.root, "Twenty"), "Signed-in rows fit");
     renderer.capture("parallel-sessions-users-signed-in");
     FirmwareI18n::refreshTree(guard.root, "en");
     expect(rowStatusLine(guard.root, "Own") == "You, Alex \u00B7 2/3", "English token");
@@ -430,10 +471,10 @@ void testParallelSessionUsers(Renderer &renderer)
 void testParallelSessionUserEdges(Renderer &renderer)
 {
     API::ResourceList resources{};
-    resources.count = 5;
+    resources.count = 7;
     std::strcpy(resources.authenticatedUsername, "Sam");
-    const char *names[] = {"One", "Long name", "Not Latin-1", "Empty name", "Own among many"};
-    for (int i = 0; i < 5; ++i) {
+    const char *names[] = {"One", "Long name", "Not Latin-1", "Empty name", "Own among many", "Only nameless", "Own unlisted"};
+    for (int i = 0; i < 7; ++i) {
         resources.items[i] = machine(names[i], 6, 0);
         resources.items[i].id = i + 1;
     }
@@ -453,6 +494,17 @@ void testParallelSessionUserEdges(Renderer &renderer)
     // The own session in the middle of many: shown once, as the you token.
     resources.items[4].activeSessionCount = 4;
     for (const char *user : {"Alex", "Robin", "Sam", "Kim"}) addSession(resources.items[4], 50 + resources.items[4].activeSessions.size(), user, std::string(user) == "Sam");
+    // Sessions that all lack a name: the plain count.
+    resources.items[5].activeSessionCount = 2;
+    addSession(resources.items[5], 60, "", false);
+    addSession(resources.items[5], 61, "", false);
+    // The own session is not among the listed ones (the server caps the list): still "you" first.
+    resources.items[6].activeSessionCount = 3;
+    addSession(resources.items[6], 70, "Alex", false);
+    addSession(resources.items[6], 71, "Robin", false);
+    resources.items[6].hasOwnUsage = true;
+    resources.items[6].ownUsageId = resources.items[6].activeUsageId = 79;
+    std::strcpy(resources.items[6].activeUser, "Sam");
 
     ResourceListScreen signedOut;
     signedOut.setResourceList(resources);
@@ -460,8 +512,11 @@ void testParallelSessionUserEdges(Renderer &renderer)
     {
         ScreenGuard guard(signedOut.getScreen(), &signedOut);
         FirmwareI18n::refreshTree(guard.root, "de");
-        expect(rowStatusLine(guard.root, "One") == "Alex · 1/6", "One name reads 'Alex · 1/6' without a stray separator");
-        for (const char *row : {"One", "Long name", "Not Latin-1", "Empty name", "Own among many"})
+        expect(rowStatusLine(guard.root, "One") == "Alex \u00B7 1/6", "One name reads 'Alex · 1/6' without a stray separator");
+        expect(rowStatusLine(guard.root, "Empty name") == "Kim +1 \u00B7 2/6", "A nameless session is only counted");
+        expect(rowStatusLine(guard.root, "Only nameless") == "In Verwendung 2/6", "Only nameless sessions fall back to the count");
+        expect(rowStatusLine(guard.root, "Own unlisted") == "Alex, Robin +1 \u00B7 3/6", "Signed out there is no you token");
+        for (const char *row : {"One", "Long name", "Not Latin-1", "Empty name", "Own among many", "Own unlisted"})
             expect(rowLineFits(guard.root, row), std::string("The users line of '") + row + "' fits the label");
         renderer.capture("parallel-sessions-user-edges-signed-out");
     }
@@ -476,10 +531,11 @@ void testParallelSessionUserEdges(Renderer &renderer)
     expect(longName.rfind("Bartholo", 0) == 0 && longName.find("...") != std::string::npos && longName.size() > tail.size() &&
                longName.compare(longName.size() - tail.size(), tail.size(), tail) == 0,
            "A name wider than the line is shortened and keeps the +N and the count");
-    expect(rowStatusLine(guard.root, "Own among many") == "You, Alex, Robin +1 · 4/6" ||
-               rowStatusLine(guard.root, "Own among many") == "You, Alex, Robin, Kim · 4/6",
-           "The own session is listed once, as the you token, first");
-    for (const char *row : {"One", "Long name", "Not Latin-1", "Empty name", "Own among many"})
+    expect(rowStatusLine(guard.root, "Own among many") == "You, Alex, Robin, Kim \u00B7 4/6",
+           "The own session is listed once, as the you token, first: " + rowStatusLine(guard.root, "Own among many"));
+    expect(rowStatusLine(guard.root, "Own unlisted") == "You, Alex, Robin \u00B7 3/6",
+           "An own session missing from the capped list still reads as you: " + rowStatusLine(guard.root, "Own unlisted"));
+    for (const char *row : {"One", "Long name", "Not Latin-1", "Empty name", "Own among many", "Own unlisted"})
         expect(rowLineFits(guard.root, row), std::string("The signed-in users line of '") + row + "' fits the label");
     renderer.capture("parallel-sessions-user-edges-signed-in");
 }

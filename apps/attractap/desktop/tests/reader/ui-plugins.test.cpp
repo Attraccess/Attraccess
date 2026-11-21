@@ -664,7 +664,8 @@ void ReaderWorkflow::testFooterClockAndLockscreenStatus()
     closeLockscreen();
     assert(label(lv_screen_active(), "Nicht betriebsbereit") && !label(lv_screen_active(), "Frei bis 14:00"));
     healthy = true; list(false);
-    // Several parallel sessions: "Voll" and "In Verwendung k/N" win, a free machine shows the plugin status.
+    // Several parallel sessions: the occupancy caption wins (here the count caption: this list sends no session
+    // names), a free machine shows the plugin status.
     parallelLimit = 2; parallelActive = 2; active = true; list(false);
     openLockscreen();
     assert(lockscreenShows("Voll") && !label(lv_screen_active(), "Frei bis 14:00"));

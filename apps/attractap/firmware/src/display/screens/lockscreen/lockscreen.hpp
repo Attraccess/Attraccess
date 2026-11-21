@@ -30,7 +30,8 @@ public:
 
     void setResourceName(const char *resourceName);
     void setUsageInfo(bool hasActiveUsage, const char *username, bool isUnderMaintenance, bool isHealthy = true);
-    // Machines with several parallel sessions show "In use k/N" or "Full" instead of one name.
+    // Machines with several parallel sessions show their users and the count ("Alex, Sam \u00B7 2/3"), or
+    // "In use k/N" / "Full" when the server sends no names.
     void setUsageInfo(const API::ResourceBrief &resource);
     // Re-reads the plugin status line now (slot updates, expiry); the loop does it twice a second.
     void refreshUiSlots() { this->patchPluginStatus(); }
@@ -63,7 +64,7 @@ private:
     bool hasActiveUsage;
     bool isUnderMaintenance;
     bool isHealthy = true;
-    // Parallel sessions: only the counts the occupancy caption needs.
+    // Parallel sessions: the counts and users the occupancy caption needs.
     bool multiSession = false;
     uint16_t occupancyActiveCount = 0;
     uint16_t occupancyLimit = 1;

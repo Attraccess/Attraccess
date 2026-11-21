@@ -280,11 +280,8 @@ void Lockscreen::updateUsageInfo()
     if (this->multiSession)
     {
         // Names of the users when the server sent them, else the plain count. The reader is signed out here.
-        lv_obj_update_layout(this->usageInfoLabel);
         occupancyText = SessionOccupancy::usersCaption(this->occupancySessions, this->occupancyActiveCount, this->occupancyLimit, 0,
-                                                       &attractap_font_montserrat_latin1_14, lv_obj_get_content_width(this->usageInfoLabel));
-        if (occupancyText.empty())
-            occupancyText = SessionOccupancy::caption(this->occupancyActiveCount, this->occupancyLimit, false);
+                                                       this->usageInfoLabel);
     }
     if (!occupancyText.empty())
     {
