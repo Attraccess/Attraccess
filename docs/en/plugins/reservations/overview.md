@@ -23,8 +23,8 @@ are not enabled, nothing changes.
   [Installing Plugins](plugins/installing-plugins.md#license-missing). Licenses:
   [contact@attraccess.org](mailto:contact@attraccess.org).
 - Attraccess 2.0 or newer.
-- Upgrading from 1.x: the plugin's 1.x tables and data are kept and adopted in place. Update to Attraccess 1.11
-  first (see [Upgrading to Attraccess 2.0](installation/updating.md#upgrading-to-attraccess-20)).
+- Upgrading a 1.x (SQLite) installation does not move the plugin's data: the plugin starts empty on PostgreSQL and
+  has to be set up again (see [Moving from SQLite to PostgreSQL](installation/updating.md#moving-from-sqlite-to-postgresql)).
 - The `reservations` plugin, installed as described in [Installing Plugins](plugins/installing-plugins.md). The
   permissions it requests are listed in [Administering Reservations](plugins/reservations/administration.md#installing-the-plugin).
 - Optional: a working [SMTP configuration](setup/smtp-email.md) for email notices. Without it, in-app and push

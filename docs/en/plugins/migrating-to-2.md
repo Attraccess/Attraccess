@@ -139,6 +139,11 @@ On the first start of the 2.0 build the host looks at the plugin's legacy migrat
 Version 1 must therefore match the legacy result exactly. A mismatch is not detected on adoption, it surfaces later as
 a failing query, so compare column by column.
 
+The move of a 1.x installation from SQLite to PostgreSQL copies only the core tables: plugin tables and their legacy
+migrations table are not moved (see [Plugin data is not moved](installation/updating.md#plugin-data-is-not-moved)).
+On an installation upgraded that way, your plugin finds no legacy history and version 1 runs as on a fresh
+installation; operators set the plugin up again.
+
 ## The record port and transactions
 
 ```ts
@@ -235,10 +240,7 @@ a declaration of their own any more: they are caught because they import TypeORM
 
 A refused plugin stays in the plugin list with the error, and its data is left untouched. Deleting it removes its
 files without running its code; **its tables stay** in the database. A 2.0 build of the same plugin adopts them later,
-or the operator drops them by hand. An exception is the first start after 1.x: the SQLite data moves to PostgreSQL
-only when a loadable build of every plugin with data is installed, so operators need your 2.0 build before they
-upgrade (see [Plugins with data](installation/updating.md#plugins-with-data)). Publish it before or with Attraccess
-2.0.
+or the operator drops them by hand.
 
 ## Frontend SDK
 

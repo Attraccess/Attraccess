@@ -107,18 +107,13 @@ plugin list with an error that names the plugin, states the reason and links the
 - the plugin targets the SDK 1.x (it declares no minimum host version of `2.0.0-0` or higher);
 - it requests the removed `DATABASE_ACCESS` permission (2.0 plugins ask for `PLUGIN_STORAGE`);
 - it still declares `persistence.backends` or a TypeORM migrations entry, or its bundle imports TypeORM or a database
-  driver;
-- the database holds only part of the plugin's old (1.x) migrations: the data comes from a release older than
-  Attraccess 1.11. Attraccess 2.0 adopts plugin data only from the last 1.x release (1.11). Update to Attraccess 1.11
-  and start it once so the plugin's migrations finish, then update to 2.0 (see
-  [Upgrading to Attraccess 2.0](installation/updating.md#upgrading-to-attraccess-20)).
+  driver.
 
-Every 1.x installation keeps its data in SQLite and moves it to PostgreSQL on the first start of 2.0. If a plugin's
-tables hold rows, its 2.0 build must be in the plugin folder **before** that first start: otherwise the transfer stops
-and the API does not start (the SQLite file stays untouched). Attraccess 1.11 cannot install 2.0 builds.
-[Plugins with data](installation/updating.md#plugins-with-data) shows how to put them in place. Plugins without data
-can be installed after the upgrade, or deleted from the list. Deleting a refused plugin removes its files without
-running its code.
+Every 1.x installation keeps its data in SQLite and moves it to PostgreSQL on the first start of 2.0. That move takes
+only the core data: plugin data is not moved, so every plugin starts with empty storage and has to be set up again (see
+[Plugin data is not moved](installation/updating.md#plugin-data-is-not-moved)). Install the 2.0 builds after the
+upgrade, and delete the refused 1.x builds from the list. Deleting a refused plugin removes its files without running
+its code.
 
 ## Troubleshooting
 

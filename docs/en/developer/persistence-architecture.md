@@ -15,15 +15,15 @@ public contracts.
 
 ## The layers
 
-| Layer                                                | Location                                                                    | May import `typeorm`, drivers, entities? |
-| ---------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------- |
-| Neutral models, enums, constants                     | `libs/application-models` (`@attraccess/application-models`)                | No, never                                |
-| Application, domain, HTTP/WebSocket transport        | `apps/api/src/**` (except `database/`)                                      | No (see the baseline below)              |
-| Backend seam, ports, error categories                | `apps/api/src/database/backend`, `persistence-errors.ts`, `unit-of-work.ts` | Seam only: types, no queries             |
-| PostgreSQL adapter                                   | `apps/api/src/database/postgres`                                            | Yes                                      |
-| SQLite import (frozen track, read adapter, transfer) | `apps/api/src/database/sqlite`, `apps/api/src/database/transfer`            | Yes, import only                         |
-| TypeORM schema (entities, columns, indexes)          | `libs/database-entities`                                                    | Yes                                      |
-| Released SQLite migrations (frozen, transfer only)   | `apps/api/src/database/migrations`                                          | Yes, frozen                              |
+| Layer                                            | Location                                                                    | May import `typeorm`, drivers, entities? |
+| ------------------------------------------------ | --------------------------------------------------------------------------- | ---------------------------------------- |
+| Neutral models, enums, constants                 | `libs/application-models` (`@attraccess/application-models`)                | No, never                                |
+| Application, domain, HTTP/WebSocket transport    | `apps/api/src/**` (except `database/`)                                      | No (see the baseline below)              |
+| Backend seam, ports, error categories            | `apps/api/src/database/backend`, `persistence-errors.ts`, `unit-of-work.ts` | Seam only: types, no queries             |
+| PostgreSQL adapter                               | `apps/api/src/database/postgres`                                            | Yes                                      |
+| SQLite import (frozen track, read adapter)       | `apps/api/src/database/sqlite`                                              | Yes, import only                         |
+| TypeORM schema (entities, columns, indexes)      | `libs/database-entities`                                                    | Yes                                      |
+| Released SQLite migrations (frozen, import only) | `apps/api/src/database/migrations`                                          | Yes, frozen                              |
 
 `libs/database-entities` imports from `libs/application-models`, never the other way round. The enums, singleton ids
 and the SSO session context type that used to live in the entity files now live in the neutral library. The entity
@@ -37,12 +37,15 @@ One composition seam, `apps/api/src/database/backend`, selects the engine:
   work. The error names the supported values and never echoes a value that does not look like a plain engine name.
 - A `DatabaseBackend` bundles the connection options, the entity set, the migration track, the connection factory,
   the interpretation of driver errors and the shutdown of extra connections.
-- A **migration track** is one ordered, released history for one engine. The PostgreSQL track is one baseline
-  migration with later PostgreSQL-only migrations. The released SQLite migrations are kept byte for byte but only run on a
-  temporary copy during the transfer. Another engine adds its own track instead of re-using PostgreSQL SQL.
-- The SQLite data has the shape of the baseline. A PostgreSQL migration after the baseline that adds a table or a column
-  also adds it to `database/transfer/sqlite-snapshot-upgrades.ts`, with the value existing rows get, so the transfer
-  fills the current schema.
+- A **migration track** is one ordered, released history for one engine. The PostgreSQL track is a baseline equal to
+  the last SQLite schema, the SQLite import (`postgres/migrations/1760000000001-import-sqlite.ts`, helpers in
+  `postgres/migrations/sqlite-import/`) and later PostgreSQL-only migrations. The released SQLite migrations are kept
+  byte for byte but only run, in place on the SQLite file, inside that import. Another engine adds its own track
+  instead of re-using PostgreSQL SQL.
+- The import fills the baseline, so imported data reaches every later migration through the normal track. A later
+  PostgreSQL migration needs no snapshot or upgrade list for SQLite data.
+- The core migrations run early in startup (`postgres/postgres-startup-migrations.ts`), before the license check,
+  plugins, HTTP and devices, under a PostgreSQL advisory lock and with one transaction per migration.
 
 ## Neutral error categories
 
@@ -64,11 +67,12 @@ imports, type-only imports, re-exports, dynamic `import()`, `require()`, `import
 
 Adapter internals are `apps/api/src/database/adapters/**`, `apps/api/src/database/postgres/**` and
 `libs/database-entities`. Only Nest composition files (`*.module.ts`) and tests may import them, so application,
-domain and transport code reaches persistence through ports alone. `apps/api/src/database/transfer/**` (the SQLite
-import at startup) may in addition be imported by the two process entry points, `main.ts` and `main.bootstrap.ts`.
+domain and transport code reaches persistence through ports alone. The startup migration step
+(`apps/api/src/database/postgres/postgres-startup-migrations.ts`) may in addition be imported by the two process entry
+points, `main.ts` and `main.bootstrap.ts`.
 
 PostgreSQL is the only runtime database. `apps/api/src/database/sqlite/**` exists for the one-way SQLite import: only
-the import path (`database/transfer`) and tests may use it, composition files and entry points may not. The removed
+the PostgreSQL migration that imports a SQLite file and tests may use it, composition files and entry points may not. The removed
 SQLite runtime (the process-wide write queue and file lock, `runSerializedTransaction`, the SQLite backend, unit of
 work and connection factory) may not return in any file, the persistence folders and tests included; the check reports
 those findings separately and never accepts them on the baseline. The neutral seam files in `apps/api/src/database`
@@ -88,7 +92,7 @@ library or adapter internals. "Port" names the application-owned persistence con
 
 | Feature area                                                           | Application code                                                | Port                                                                                                             | Adapter                                                 |
 | ---------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| Backend selection, connection, migrations, shutdown, transfer          | `database/backend`, `database/postgres`                         | `DatabaseBackend`                                                                                                | `database/postgres`                                     |
+| Backend selection, connection, migrations, shutdown                    | `database/backend`, `database/postgres`                         | `DatabaseBackend`                                                                                                | `database/postgres`                                     |
 | Error categories, transactions, post-commit hooks, bounded retry       | `database/persistence-errors.ts`, `database/unit-of-work.ts`    | `UnitOfWork`, error classifier                                                                                   | `database/postgres`                                     |
 | Usage sessions (start, end, takeover, recovery), operating intervals   | `resources/usage`, `resources/operating-intervals`              | `UsageSessionStore`, `OperatingTimelineStore`                                                                    | `adapters/usage`, `adapters/operating-intervals`        |
 | Metering                                                               | `resources/metering`                                            | `MeteringStore`                                                                                                  | `adapters/metering`                                     |
@@ -203,6 +207,7 @@ is created or changed:
   `DATABASE_TYPE` first (`scripts/check-database-type.sh`).
 - Tests open databases through `apps/api/src/test-utils/test-database.ts`, which uses the backend's connection factory.
 
-The real-database lifecycle tests live in `apps/api/src/e2e/migrations/migration-lifecycle.e2e.spec.ts` (fresh install,
-upgrade from four older release states with data, failure recovery, seeding). The export, import and backup contract
-is tested by `database/conformance/transfer.conformance.test-fixture.ts` through `api:test-conformance`.
+The real-database lifecycle tests live in `apps/api/src/e2e/migrations/`: a fresh install
+(`postgres-fresh-install`), the import from older SQLite release states with data (`sqlite-to-postgres-older-states`),
+the import at startup (`sqlite-startup-import`) and recovery after a failed import (`sqlite-to-postgres-recovery`).
+`postgres-schema-parity.persistence.spec.ts` proves that the baseline equals the final SQLite schema.

@@ -147,6 +147,12 @@ Beim ersten Start des 2.0-Builds prüft der Host die Legacy-Migrationstabelle de
 Version 1 muss das Legacy-Ergebnis daher exakt treffen. Eine Abweichung wird bei der Übernahme nicht erkannt, sie zeigt
 sich später als fehlschlagende Abfrage; vergleichen Sie deshalb Spalte für Spalte.
 
+Der Umzug einer 1.x-Installation von SQLite auf PostgreSQL kopiert nur die Kerntabellen: Plugin-Tabellen und ihre
+Legacy-Migrationstabelle werden nicht übernommen (siehe
+[Plugin-Daten werden nicht übernommen](installation/updating.md#plugin-daten-werden-nicht-übernommen)). Auf einer so
+aktualisierten Installation findet Ihr Plugin keinen Legacy-Verlauf, und Version 1 läuft wie bei einer Neuinstallation;
+Betreiber richten das Plugin neu ein.
+
 ## Record-Port und Transaktionen
 
 ```ts
@@ -245,11 +251,7 @@ eigene Deklaration mehr: Sie fallen auf, weil sie TypeORM importieren.
 
 Ein abgelehntes Plugin bleibt mit dem Fehler in der Plugin-Liste, und seine Daten bleiben unverändert. Das Löschen
 entfernt seine Dateien, ohne seinen Code auszuführen; **seine Tabellen bleiben** in der Datenbank. Ein 2.0-Build
-desselben Plugins übernimmt sie später, oder der Betreiber löscht sie von Hand. Eine Ausnahme ist der erste Start nach
-1.x: Die SQLite-Daten wandern nur nach PostgreSQL, wenn von jedem Plugin mit Daten ein ladbarer Build installiert ist.
-Betreiber brauchen Ihren 2.0-Build also vor dem Upgrade (siehe
-[Plugins mit Daten](installation/updating.md#plugins-mit-daten)). Veröffentlichen Sie ihn vor oder mit Attraccess
-2.0.
+desselben Plugins übernimmt sie später, oder der Betreiber löscht sie von Hand.
 
 ## Frontend-SDK
 

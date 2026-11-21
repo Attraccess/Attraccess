@@ -12,9 +12,9 @@ Das Hinzufügen oder Entfernen eines Eintrags im Register verändert die Geräte
 
 - Attraccess 2.0 oder neuer und das Plugin `shelly`, installiert wie unter
   [Plugins installieren](plugins/installing-plugins.md) beschrieben. Es benötigt die Berechtigung `PLUGIN_STORAGE` für seine eigenen Tabellen.
-- Upgrade von 1.x: Die 1.x-Tabellen und -Daten des Plugins bleiben erhalten und werden an Ort und Stelle übernommen.
-  Aktualisieren Sie vorher auf Attraccess 1.11 (siehe
-  [Upgrade auf Attraccess 2.0](installation/updating.md#upgrade-auf-attraccess-20)).
+- Das Upgrade einer 1.x-Installation (SQLite) übernimmt die Daten des Plugins nicht: Das Plugin startet auf
+  PostgreSQL leer und muss neu eingerichtet werden (siehe
+  [Umzug von SQLite auf PostgreSQL](installation/updating.md#umzug-von-sqlite-auf-postgresql)).
 - Shelly-Geräte, die der Attraccess-Server über das Netzwerk per IP-Adresse erreicht.
 - Nutzer benötigen die Berechtigung **Ressourcen verwalten** (`resources.update`), um die Seite zu öffnen.
 - Läuft Attraccess in einem Container, ist dessen Netzwerk nicht Ihr LAN. Geben Sie beim Suchen das Subnetz Ihrer Geräte

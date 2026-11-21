@@ -16,9 +16,9 @@ Geräte-Oberfläche.
 - Attraccess 2.0 oder neuer und das Plugin `matter`, installiert wie unter
   [Plugins installieren](plugins/installing-plugins.md) beschrieben. Es benötigt die Berechtigungen `PLUGIN_STORAGE`
   und `MANAGE_SECRETS`.
-- Upgrade von 1.x: Die 1.x-Tabellen und -Daten des Plugins bleiben erhalten und werden an Ort und Stelle übernommen.
-  Aktualisieren Sie vorher auf Attraccess 1.11 (siehe
-  [Upgrade auf Attraccess 2.0](installation/updating.md#upgrade-auf-attraccess-20)).
+- Das Upgrade einer 1.x-Installation (SQLite) übernimmt die Daten des Plugins nicht: Das Plugin startet auf
+  PostgreSQL leer und muss neu eingerichtet werden (siehe
+  [Umzug von SQLite auf PostgreSQL](installation/updating.md#umzug-von-sqlite-auf-postgresql)).
 - Der **Matter-Sidecar**, ein separater Node.js-Prozess oder Container (Node.js `>=26.13.0 <27`), den Sie selbst bauen,
   absichern und betreiben. Attraccess spricht ihn mit einem Service-Token an. Siehe die
   [Betriebsanleitung](plugins/matter/operator.md).
