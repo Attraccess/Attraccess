@@ -73,11 +73,14 @@ async function withoutLoggedParameters<T>(pg: QueryRunner, work: () => Promise<T
   }
 }
 
-/** Copies the core data in one transaction the import owns; nothing is imported unless it commits. */
+/**
+ * Copies the core data in one transaction the import owns; nothing is imported unless it commits. A failure before the
+ * commit is reported as such; closing the SQLite file afterwards cannot turn a committed import into a failure.
+ */
 async function copyInTransaction(pg: QueryRunner, sqliteFile: string): Promise<CopyResult> {
   const sqlite = createSqliteSource(sqliteFile);
-  await sqlite.initialize();
   try {
+    await sqlite.initialize();
     await pg.startTransaction();
     try {
       // Another session could only hold these fresh tables briefly; the import waits instead of failing.
@@ -91,8 +94,10 @@ async function copyInTransaction(pg: QueryRunner, sqliteFile: string): Promise<C
       await pg.rollbackTransaction().catch(() => undefined);
       throw error;
     }
+  } catch (error) {
+    throw importFailed(sqliteFile, error);
   } finally {
-    await sqlite.destroy();
+    if (sqlite.isInitialized) await sqlite.destroy().catch(() => undefined);
   }
 }
 
@@ -149,7 +154,8 @@ export async function importSqliteInstallation(pg: QueryRunner, options: ImportS
   if (await predatesImport(pg)) {
     logger.warn(
       `${sqliteFile} is not imported: this PostgreSQL database was set up by an earlier Attraccess 2.0 release. ` +
-        `Move the file to ${sqliteBackupDirectory(sqliteFile)} or delete it once you are sure PostgreSQL holds your data.`,
+        `Move the file to ${sqliteBackupDirectory(sqliteFile)} or delete it once you are sure PostgreSQL holds your data ` +
+        `(to import it instead, empty the PostgreSQL database and start again).`,
     );
     return;
   }
@@ -157,14 +163,14 @@ export async function importSqliteInstallation(pg: QueryRunner, options: ImportS
   if (await holdsUsers(pg)) throw refuseNonBlankTarget(sqliteFile);
 
   logger.log(`Importing the SQLite database ${sqliteFile} into PostgreSQL...`);
-  let result: CopyResult;
+  let applied: string[];
   try {
-    const applied = await migrateSqliteFile(sqliteFile);
-    logger.log(`Brought the SQLite file to the last SQLite migration (${applied.length} migration(s) applied).`);
-    result = await withoutLoggedParameters(pg, () => copyInTransaction(pg, sqliteFile));
+    applied = await migrateSqliteFile(sqliteFile);
   } catch (error) {
     throw importFailed(sqliteFile, error);
   }
+  logger.log(`Brought the SQLite file to the last SQLite migration (${applied.length} migration(s) applied).`);
+  const result = await withoutLoggedParameters(pg, () => copyInTransaction(pg, sqliteFile));
   logger.log(`Copied ${total(result)} rows into PostgreSQL (committed).`);
   logSummary(logger, result, await moveAfterImport(sqliteFile, logger, options.now?.()));
 }

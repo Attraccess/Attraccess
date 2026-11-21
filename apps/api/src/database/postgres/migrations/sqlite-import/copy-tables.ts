@@ -16,8 +16,10 @@ import { placeholder, SqliteImportError, toPostgresValue, type PostgresColumn, t
 
 /** PostgreSQL accepts 65535 bind parameters per statement. */
 const MAX_PARAMETERS = 60_000;
-/** Rows per statement at most, so a table with large values (crash report core dumps) keeps messages small. */
-const MAX_ROWS = 500;
+/** Rows per statement at most. */
+const MAX_ROWS = 2_000;
+/** Rows per statement at most for a table with binary columns (crash report core dumps), to keep messages small. */
+const MAX_BINARY_ROWS = 200;
 
 interface TablePlan {
   readonly table: string;
@@ -112,8 +114,8 @@ async function loadPage(pg: QueryRunner, plan: TablePlan, page: SqliteCell[][], 
       await pg.query('RELEASE SAVEPOINT sqlite_import_row');
     } catch (rowError) {
       throw new SqliteImportError(
+        // No cause: the driver error carries the row's values (password hashes, tokens) in its detail and parameters.
         `Table ${plan.table}, ${rowName(plan, row, first + offset)} cannot be stored: ${describePostgresError(rowError)}`,
-        { cause: rowError },
       );
     }
   }
@@ -122,11 +124,17 @@ async function loadPage(pg: QueryRunner, plan: TablePlan, page: SqliteCell[][], 
 /** Copies a table page by page; returns the number of rows. */
 async function copyTable(pg: QueryRunner, sqlite: DataSource, plan: TablePlan): Promise<number> {
   if (plan.targets.length === 0) return 0;
-  const pageSize = Math.max(1, Math.min(MAX_ROWS, Math.floor(MAX_PARAMETERS / plan.targets.length)));
+  const cap = plan.targets.some((target) => target.dataType === 'bytea') ? MAX_BINARY_ROWS : MAX_ROWS;
+  const pageSize = Math.max(1, Math.min(cap, Math.floor(MAX_PARAMETERS / plan.targets.length)));
   let copied = 0;
   for await (const page of sqliteRowPages(sqlite, plan.table, plan.sqliteColumns, pageSize)) {
     await loadPage(pg, plan, page, copied);
     copied += page.length;
+  }
+  // The paging must have read every row: a short count would be a silent loss.
+  const [{ rows }]: { rows: number }[] = await sqlite.query(`SELECT count(*) AS rows FROM ${quote(plan.table)}`);
+  if (copied !== Number(rows)) {
+    throw new SqliteImportError(`Table ${plan.table}: read ${copied} of its ${rows} rows from SQLite`);
   }
   return copied;
 }
@@ -176,12 +184,11 @@ export async function copySqliteTables(pg: QueryRunner, sqlite: DataSource): Pro
       await pg.query('SAVEPOINT sqlite_import_fk');
       await pg.query(`ALTER TABLE ${quote(key.child)} ADD CONSTRAINT ${quote(key.name)} ${key.definition}`);
       await pg.query('RELEASE SAVEPOINT sqlite_import_fk');
-    } catch (error) {
+    } catch {
       await pg.query('ROLLBACK TO SAVEPOINT sqlite_import_fk');
       throw new SqliteImportError(
         `Table ${key.child} breaks the foreign key ${key.name} (references ${key.parent}): a referenced row is ` +
           `missing; offending keys ${await orphanKeys(pg, key)}`,
-        { cause: error },
       );
     }
   }

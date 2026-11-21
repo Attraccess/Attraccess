@@ -38,12 +38,16 @@ export async function* sqliteRowPages(
       `CASE WHEN typeof(${name}) IN ('integer', 'real') THEN CAST(${name} AS TEXT) END AS x${index}`,
     ];
   });
-  const sql = `SELECT rowid AS r, ${selects.join(', ')} FROM ${quote(table)} WHERE rowid > ? ORDER BY rowid LIMIT ?`;
-  let after = Number.MIN_SAFE_INTEGER;
+  // The rowid is carried as text: an INTEGER PRIMARY KEY can hold ids beyond JavaScript's safe integers.
+  const select = `SELECT CAST(rowid AS TEXT) AS r, ${selects.join(', ')} FROM ${quote(table)}`;
+  let after: string | null = null;
   for (;;) {
-    const rows: Record<string, unknown>[] = await source.query(sql, [after, pageSize]);
+    const rows: Record<string, unknown>[] =
+      after === null
+        ? await source.query(`${select} ORDER BY rowid LIMIT ?`, [pageSize])
+        : await source.query(`${select} WHERE rowid > CAST(? AS INTEGER) ORDER BY rowid LIMIT ?`, [after, pageSize]);
     if (rows.length === 0) return;
-    after = Number(rows[rows.length - 1].r);
+    after = String(rows[rows.length - 1].r);
     yield rows.map((row) =>
       columns.map((_, index) => ({
         value: row[`v${index}`],
