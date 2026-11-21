@@ -11,7 +11,8 @@ inline constexpr Entry btSetupCatalog[] = {
     // a line of its own so it is never cut off.
     {Message::BluetoothSetupOpen, "Bluetooth-Einrichtung offen · {0}\n{1}", "Bluetooth setup open · {0}\n{1}"},
     {Message::BluetoothSetupLinked, "Bluetooth-Einrichtung: Browser verbunden", "Bluetooth setup: browser connected"},
-    {Message::BluetoothSetupUnavailable, "Bluetooth nicht verfügbar", "Bluetooth unavailable"},
+    // NimBLE could not start (not enough memory); a restart opens the setup again on an unpaired reader.
+    {Message::BluetoothSetupUnavailable, "Start fehlgeschlagen, neu starten", "Could not start, restart"},
 };
 static_assert(sizeof(catalog) / sizeof(Entry) + sizeof(cardRelayCatalog) / sizeof(Entry) +
                       sizeof(networkStatusCatalog) / sizeof(Entry) + sizeof(sessionUsersCatalog) / sizeof(Entry) +

@@ -233,9 +233,11 @@ void InitScreen::createButtons(lv_obj_t *statesContainer)
    lv_obj_t *row = lv_obj_create(statesContainer);
    lv_obj_remove_style_all(row);
    lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
-   lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+   // Side by side in English; the German captions ("Einstellungen", "Bluetooth-Einrichtung") need two lines.
+   lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW_WRAP);
    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
    lv_obj_set_style_pad_column(row, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_row(row, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_remove_flag(row, LV_OBJ_FLAG_CLICKABLE);
    lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
 
