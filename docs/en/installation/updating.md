@@ -35,7 +35,7 @@ Attraccess now runs on PostgreSQL only. This is a breaking change and ships in a
 
 1. Create a [backup](installation/backup-restore.md) of the storage volume (it contains `attraccess.sqlite`). The first start migrates the SQLite file in place, so this backup is the only untouched copy of it.
 2. **Add a PostgreSQL service** and point `DATABASE_URL` at an **empty** database. The shipped Compose files (Docker Compose, Portainer, Coolify, balena) already contain one (`postgres:18.6-alpine`, not part of the Attraccess image); see [Docker Compose](installation/docker-compose.md) and [Portainer](installation/portainer.md). If you started Attraccess with a bare `docker run`, you must start a PostgreSQL container and set `DATABASE_URL` **before** you pull the new image, because the new version does not start without it.
-3. Plan for disk space: the old SQLite file stays on disk after the import (see below), next to the new PostgreSQL data.
+3. Plan for disk space: the old SQLite file stays on disk after the import (see below), next to the new PostgreSQL data. The storage folder and the SQLite file must be writable by the Attraccess container, because the file is migrated in place and then moved. A read-only file stops the start before anything is imported (`attempt to write a readonly database`).
 4. Write down how your plugins are configured. Plugin data is not moved (see [Plugin data is not moved](#plugin-data-is-not-moved)).
 5. **balena:** the stack no longer contains Duplicati; its backup jobs are gone. Take a last Duplicati backup before you upgrade, then set the `BACKUP_*` variables of the new [restic sidecar](installation/backup-restore.md#balena-restic-sidecar).
 
@@ -70,7 +70,7 @@ If the import fails before the commit, nothing is imported, the SQLite file stay
 
 - **PostgreSQL already holds users and the SQLite file exists.** The start fails with an error that names the file, and nothing is changed. Either empty the PostgreSQL database (drop and create it) and start again, or, if PostgreSQL already holds your data, move the SQLite file out of the storage folder.
 - **Two instances start at once.** The migrations run under a PostgreSQL advisory lock: one instance runs them, the other waits and then finds nothing left to do.
-- **Moving the file fails after the commit** (for example on a read-only storage volume). Attraccess logs a warning and starts anyway: the data is already in PostgreSQL and the import counts as done, so it never runs again. Move or delete `attraccess.sqlite` yourself.
+- **Moving the file fails after the commit** (for example because a file named `sqlite-backup` is in the way). Attraccess logs a warning and starts anyway: the data is already in PostgreSQL and the import counts as done, so it never runs again. Move or delete `attraccess.sqlite` yourself.
 
 ### Log lines to look for
 
@@ -84,7 +84,7 @@ SQLite import complete: <rows> rows in <n> tables; the SQLite file is now <path>
 Not imported (plugin data and other tables PostgreSQL has no table for): ...
 ```
 
-The import line is followed by one line per table. Before that, `DatabaseStartup` logs `Database: PostgreSQL <url> (schema ...)` with the password removed from the URL.
+The completion line is followed by one line per table. Before that, `DatabaseStartup` logs `Database: PostgreSQL <url> (schema ...)` with the password removed from the URL.
 
 ## Docker Compose
 

@@ -36,7 +36,7 @@ Attraccess läuft jetzt ausschließlich auf PostgreSQL. Das ist ein Breaking Cha
 
 1. Erstellen Sie ein [Backup](installation/backup-restore.md) des Storage-Volumes (es enthält `attraccess.sqlite`). Der erste Start migriert die SQLite-Datei an Ort und Stelle; dieses Backup ist deshalb die einzige unveränderte Kopie.
 2. **Fügen Sie einen PostgreSQL-Dienst hinzu** und lassen Sie `DATABASE_URL` auf eine **leere** Datenbank zeigen. Die mitgelieferten Compose-Dateien (Docker Compose, Portainer, Coolify, balena) enthalten bereits einen (`postgres:18.6-alpine`, nicht Teil des Attraccess-Images); siehe [Docker Compose](installation/docker-compose.md) und [Portainer](installation/portainer.md). Haben Sie Attraccess mit einem einfachen `docker run` gestartet, müssen Sie einen PostgreSQL-Container starten und `DATABASE_URL` setzen, **bevor** Sie das neue Image laden, denn die neue Version startet ohne beides nicht.
-3. Planen Sie Speicherplatz ein: Die alte SQLite-Datei bleibt nach dem Import auf dem Datenträger (siehe unten), neben den neuen PostgreSQL-Daten.
+3. Planen Sie Speicherplatz ein: Die alte SQLite-Datei bleibt nach dem Import auf dem Datenträger (siehe unten), neben den neuen PostgreSQL-Daten. Der Storage-Ordner und die SQLite-Datei müssen für den Attraccess-Container beschreibbar sein, denn die Datei wird an Ort und Stelle migriert und danach verschoben. Eine schreibgeschützte Datei beendet den Start, bevor etwas importiert wird (`attempt to write a readonly database`).
 4. Notieren Sie, wie Ihre Plugins eingerichtet sind. Plugin-Daten werden nicht übernommen (siehe [Plugin-Daten werden nicht übernommen](#plugin-daten-werden-nicht-übernommen)).
 5. **balena:** Der Stack enthält kein Duplicati mehr; seine Backup-Jobs entfallen. Erstellen Sie vor dem Upgrade ein letztes Duplicati-Backup und setzen Sie danach die `BACKUP_*`-Variablen des neuen [restic-Sidecars](installation/backup-restore.md#balena-restic-sidecar).
 
@@ -71,7 +71,7 @@ Schlägt der Import vor dem Commit fehl, wird nichts importiert, die SQLite-Date
 
 - **PostgreSQL enthält bereits Benutzer und die SQLite-Datei ist vorhanden.** Der Start schlägt mit einer Fehlermeldung fehl, die die Datei nennt, und nichts wird verändert. Leeren Sie entweder die PostgreSQL-Datenbank (löschen und neu anlegen) und starten Sie erneut, oder verschieben Sie die SQLite-Datei aus dem Storage-Ordner, wenn PostgreSQL Ihre Daten bereits enthält.
 - **Zwei Instanzen starten gleichzeitig.** Die Migrationen laufen unter einem PostgreSQL-Advisory-Lock: Eine Instanz führt sie aus, die andere wartet und findet danach nichts mehr zu tun.
-- **Das Verschieben der Datei schlägt nach dem Commit fehl** (etwa auf einem schreibgeschützten Storage-Volume). Attraccess protokolliert eine Warnung und startet trotzdem: Die Daten liegen bereits in PostgreSQL, und der Import gilt als erledigt, er läuft also nie wieder. Verschieben oder löschen Sie `attraccess.sqlite` selbst.
+- **Das Verschieben der Datei schlägt nach dem Commit fehl** (etwa weil eine Datei namens `sqlite-backup` im Weg ist). Attraccess protokolliert eine Warnung und startet trotzdem: Die Daten liegen bereits in PostgreSQL, und der Import gilt als erledigt, er läuft also nie wieder. Verschieben oder löschen Sie `attraccess.sqlite` selbst.
 
 ### Logzeilen, auf die Sie achten sollten
 
