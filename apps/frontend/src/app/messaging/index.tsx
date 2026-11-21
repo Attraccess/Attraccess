@@ -41,7 +41,9 @@ export function MessagesPage() {
     : t('conversations.unknownUser');
   // The username goes below the name as muted text, only when a name is set (otherwise the name is the username).
   const partnerUsername =
-    selectedConversation?.otherParticipant && hasUserName(selectedConversation.otherParticipant)
+    selectedConversation?.otherParticipant &&
+    hasUserName(selectedConversation.otherParticipant) &&
+    selectedConversation.otherParticipant.username !== partnerName
       ? selectedConversation.otherParticipant.username
       : undefined;
 

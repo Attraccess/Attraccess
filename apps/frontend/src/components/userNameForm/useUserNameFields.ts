@@ -5,12 +5,16 @@ export function useUserNameFields(user: { firstName: string | null; lastName: st
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
 
+  const loaded = user !== undefined;
+  const storedFirstName = user?.firstName ?? '';
+  const storedLastName = user?.lastName ?? '';
+  // Reset only when the stored names change: a background refetch with the same names keeps unsaved typing.
   useEffect(() => {
-    if (user) {
-      setFirstName(user.firstName ?? '');
-      setLastName(user.lastName ?? '');
+    if (loaded) {
+      setFirstName(storedFirstName);
+      setLastName(storedLastName);
     }
-  }, [user]);
+  }, [loaded, storedFirstName, storedLastName]);
 
   return { firstName, setFirstName, lastName, setLastName };
 }
