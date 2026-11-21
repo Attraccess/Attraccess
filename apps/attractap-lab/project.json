@@ -39,7 +39,7 @@
       ],
       "outputs": ["{workspaceRoot}/coverage/apps/attractap-lab/test-scripts"],
       "options": {
-        "command": "node scripts/crap-score/node-test.mjs apps/attractap-lab coverage/apps/attractap-lab/test-scripts apps/attractap-lab/real-cards/*.test.mjs apps/attractap-lab/real-cards/replay/*.test.mjs apps/attractap-lab/ble-fixture-plugin/*.test.mjs"
+        "command": "node scripts/crap-score/node-test.mjs apps/attractap-lab coverage/apps/attractap-lab/test-scripts apps/attractap-lab/real-cards/*.test.mjs apps/attractap-lab/real-cards/replay/*.test.mjs apps/attractap-lab/ble-fixture-plugin/*.test.mjs apps/attractap-lab/hil/*.test.mjs"
       }
     },
     "smoke": {
