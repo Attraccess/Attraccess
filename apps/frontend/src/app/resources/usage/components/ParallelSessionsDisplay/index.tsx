@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { formatUserDisplayName } from '@attraccess/shared';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, UserX } from 'lucide-react';
 import { AttraccessUser, Button, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -103,7 +104,7 @@ export function ParallelSessionsDisplay({
             <ul className="space-y-3">
               {usages.map((usage) => {
                 const canEnd = canEndSession(usage);
-                const name = usage.user?.username ?? t('unknownUser');
+                const name = usage.user ? formatUserDisplayName(usage.user) : t('unknownUser');
                 return (
                   <li
                     key={usage.id}
@@ -169,7 +170,11 @@ export function ParallelSessionsDisplay({
         mode={SessionModalMode.END}
         isSubmitting={endSession.isPending}
         description={
-          usageToEnd ? t('endSession.confirm', { name: usageToEnd.user?.username ?? t('unknownUser') }) : undefined
+          usageToEnd
+            ? t('endSession.confirm', {
+                name: usageToEnd.user ? formatUserDisplayName(usageToEnd.user) : t('unknownUser'),
+              })
+            : undefined
         }
       />
       {formsModal}

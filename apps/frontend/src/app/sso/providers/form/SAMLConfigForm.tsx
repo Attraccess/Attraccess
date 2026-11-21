@@ -102,6 +102,22 @@ export function SAMLConfigForm({ form }: SAMLConfigFormProps) {
           emptyHint={t('emailAttributeKeysEmptyHint', { defaults: EMAIL_ATTRIBUTE_KEYS_DEFAULT })}
           data-cy="sso-provider-form-saml-email-attribute-keys-input"
         />
+        <TextField
+          value={formValues.samlConfiguration?.firstNameClaimPath ?? ''}
+          onChange={(v) => setSaml('firstNameClaimPath', v)}
+        >
+          <Label>{t('firstNameClaimPath')}</Label>
+          <Input placeholder="givenName" data-cy="sso-provider-form-saml-first-name-attribute-input" />
+          <Description>{t('nameClaimPathHint', { defaults: 'givenName' })}</Description>
+        </TextField>
+        <TextField
+          value={formValues.samlConfiguration?.lastNameClaimPath ?? ''}
+          onChange={(v) => setSaml('lastNameClaimPath', v)}
+        >
+          <Label>{t('lastNameClaimPath')}</Label>
+          <Input placeholder="surname" data-cy="sso-provider-form-saml-last-name-attribute-input" />
+          <Description>{t('nameClaimPathHint', { defaults: 'surname' })}</Description>
+        </TextField>
         <StringListField
           label={t('roleAttributeKeys')}
           description={t('roleAttributeKeysHint')}

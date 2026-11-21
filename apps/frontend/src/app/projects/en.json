@@ -11,7 +11,7 @@
   "invitations": {
     "title": "Project invitations",
     "description": "Accept or decline invitations to collaborate on shared projects.",
-    "invitedBy": "Invited by {{username}}",
+    "invitedBy": "Invited by {{name}}",
     "empty": "You have no pending invitations.",
     "roles": {
       "viewer": "Viewer"

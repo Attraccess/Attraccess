@@ -1,9 +1,11 @@
 {
   "columns": {
     "id": "ID",
+    "userDisplayName": "User Display Name",
     "user": "User",
     "createdAt": "Created at",
     "amount": "Amount",
+    "initiatorDisplayName": "Initiator Display Name",
     "initiator": "Initiator",
     "resourceUsage": "Resource / Usage",
     "refundOf": "Refund of",

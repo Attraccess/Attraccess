@@ -43,6 +43,8 @@ export function InviteUserModal({ children }: Readonly<Props>) {
 
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const [tab, setTab] = useState<'single' | 'csv'>('single');
 
@@ -69,7 +71,9 @@ export function InviteUserModal({ children }: Readonly<Props>) {
   const resetSingleInviteForm = useCallback(() => {
     setUsername('');
     setEmail('');
-  }, [setEmail, setUsername]);
+    setFirstName('');
+    setLastName('');
+  }, [setEmail, setUsername, setFirstName, setLastName]);
 
   const showApiError = (error: unknown) =>
     toast.apiError({
@@ -111,9 +115,11 @@ export function InviteUserModal({ children }: Readonly<Props>) {
       body: {
         username: trimmedUsername,
         email: trimmedEmail,
+        ...(firstName.trim() ? { firstName: firstName.trim() } : {}),
+        ...(lastName.trim() ? { lastName: lastName.trim() } : {}),
       },
     });
-  }, [inviteUser, trimmedEmail, trimmedUsername, usernameError]);
+  }, [inviteUser, trimmedEmail, trimmedUsername, usernameError, firstName, lastName]);
 
   return (
     <>
@@ -149,6 +155,10 @@ export function InviteUserModal({ children }: Readonly<Props>) {
                 onUsernameChange={setUsername}
                 email={email}
                 onEmailChange={setEmail}
+                firstName={firstName}
+                onFirstNameChange={setFirstName}
+                lastName={lastName}
+                onLastNameChange={setLastName}
                 usernameValidationMessages={usernameValidationMessages}
                 onSubmit={onSubmit}
               />

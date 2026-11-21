@@ -19,10 +19,19 @@ interface CsvPreviewTableProps {
   previewRows: string[][];
   usernameKey?: string;
   emailKey?: string;
+  firstNameKey?: string;
+  lastNameKey?: string;
 }
 
 /** The first rows of the CSV as they would be invited with the current column mapping. */
-export function CsvPreviewTable({ csvHeaders, previewRows, usernameKey, emailKey }: Readonly<CsvPreviewTableProps>) {
+export function CsvPreviewTable({
+  csvHeaders,
+  previewRows,
+  usernameKey,
+  emailKey,
+  firstNameKey,
+  lastNameKey,
+}: Readonly<CsvPreviewTableProps>) {
   const { t } = useTranslations({ en, de });
 
   const previewUsers = useMemo(() => {
@@ -40,9 +49,13 @@ export function CsvPreviewTable({ csvHeaders, previewRows, usernameKey, emailKey
         index: index + 1,
         username: data[usernameKey ?? ''] ?? '',
         email: data[emailKey ?? ''] ?? '',
+        name: [data[firstNameKey ?? ''], data[lastNameKey ?? '']]
+          .map((part) => part?.trim() ?? '')
+          .filter(Boolean)
+          .join(' '),
       };
     });
-  }, [csvHeaders, previewRows, usernameKey, emailKey]);
+  }, [csvHeaders, previewRows, usernameKey, emailKey, firstNameKey, lastNameKey]);
 
   return (
     <Table data-cy="csv-invite-table">
@@ -51,6 +64,7 @@ export function CsvPreviewTable({ csvHeaders, previewRows, usernameKey, emailKey
           <TableHeader>
             <TableColumn isRowHeader>{t('preview.columns.index')}</TableColumn>
             <TableColumn>{t('preview.columns.username')}</TableColumn>
+            <TableColumn>{t('preview.columns.name')}</TableColumn>
             <TableColumn>{t('preview.columns.email')}</TableColumn>
           </TableHeader>
           <TableBody items={previewUsers} renderEmptyState={() => <EmptyState />}>
@@ -58,6 +72,7 @@ export function CsvPreviewTable({ csvHeaders, previewRows, usernameKey, emailKey
               <TableRow key={user.index} id={user.index}>
                 <TableCell>#{user.index}</TableCell>
                 <TableCell className="w-full">{user.username}</TableCell>
+                <TableCell>{user.name}</TableCell>
                 <TableCell>{user.email}</TableCell>
               </TableRow>
             )}

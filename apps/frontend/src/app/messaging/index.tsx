@@ -1,6 +1,7 @@
 // Inbox page combining conversation list, thread view and live SSE updates
 // FEATURE: Messaging inbox page
 import { useMessagingListConversations, useMessagingMarkConversationRead } from '@attraccess/react-query-client';
+import { formatUserDisplayName } from '@attraccess/shared';
 import { cn } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
@@ -35,7 +36,9 @@ export function MessagesPage() {
   const { data: conversations, isLoading } = useMessagingListConversations();
 
   const selectedConversation = conversations?.find((conversation) => conversation.id === selectedConversationId);
-  const partnerName = selectedConversation?.otherParticipant?.username ?? t('conversations.unknownUser');
+  const partnerName = selectedConversation?.otherParticipant
+    ? formatUserDisplayName(selectedConversation.otherParticipant)
+    : t('conversations.unknownUser');
 
   const deepLinkResourceId = Number(searchParams.get('resourceRef'));
   const pendingResourceId =

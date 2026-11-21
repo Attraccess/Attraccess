@@ -46,6 +46,6 @@
     "cancel": "Cancel",
     "enroll": "Enroll"
   },
-  "userCards": "RFID Cards — {{username}}",
+  "userCards": "RFID Cards — {{name}}",
   "errorFetchCards": "Could not load RFID cards"
 }

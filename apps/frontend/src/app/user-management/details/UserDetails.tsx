@@ -2,6 +2,8 @@ import { useNavigate } from 'react-router-dom';
 import { UserPermissionForm } from './components/permissionsForm/index';
 import { SetPasswordForm } from './components/setPasswordForm/index';
 import { ChangeUsernameForm } from './components/changeUsername/index';
+import { ChangeNameForm } from './components/changeName';
+import { formatUserDisplayName, hasUserName } from '@attraccess/shared';
 import { ChangeEmailForm } from './components/changeEmail/index';
 import { Chip, Separator } from '@heroui/react';
 import { EffectivePermissionsSection } from './components/EffectivePermissionsSection';
@@ -133,7 +135,7 @@ export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign
     onSuccess: () => {
       toast.success({
         title: t('delete.success.title'),
-        description: t('delete.success.description', { username: user?.username ?? '' }),
+        description: t('delete.success.description', { username: user ? formatUserDisplayName(user) : '' }),
       });
       navigate('/users');
     },
@@ -150,7 +152,11 @@ export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign
   return (
     <div>
       <PageHeader
-        title={`${user?.username ?? ''} (ID: ${user?.id ?? ''})`}
+        title={
+          user && hasUserName(user)
+            ? `${formatUserDisplayName(user)} (${user.username}, ID: ${user.id})`
+            : `${user?.username ?? ''} (ID: ${user?.id ?? ''})`
+        }
         subtitle={
           user?.externalIdentifier
             ? t('details.externalIdentifier', { identifier: user.externalIdentifier })
@@ -175,6 +181,7 @@ export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign
         >
           <FlatSection icon={<UserIcon size={16} />} title={t('profile.title')} data-cy="user-details-profile-section">
             <div className="flex flex-col gap-6">
+              <ChangeNameForm userId={user.id} />
               <ChangeUsernameForm userId={user.id} />
               <ChangeEmailForm userId={user.id} />
             </div>

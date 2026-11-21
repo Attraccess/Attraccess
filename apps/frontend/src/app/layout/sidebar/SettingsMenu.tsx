@@ -1,4 +1,5 @@
 import { Settings, LogOut, User, Languages, Check, Moon, Sun, Monitor, Download } from 'lucide-react';
+import { formatUserDisplayName } from '@attraccess/shared';
 import {
   Dropdown,
   DropdownTrigger,
@@ -61,7 +62,7 @@ export function SettingsMenu({ isCollapsed }: SettingsMenuProps) {
           {!isCollapsed && (
             <div className="flex items-center text-sm">
               <User className="h-4 w-4 mr-2" />
-              <span>{user.username}</span>
+              <span>{formatUserDisplayName(user)}</span>
             </div>
           )}
           <Dropdown

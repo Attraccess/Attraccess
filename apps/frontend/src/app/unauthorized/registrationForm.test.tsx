@@ -178,6 +178,23 @@ describe('RegistrationForm', () => {
     });
   });
 
+  it('sends optional first and last name, trimmed, only when set', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.type(screen.getByLabelText('Username'), 'ada');
+    await user.type(screen.getByLabelText('Email address'), 'ada@example.com');
+    await user.type(screen.getByLabelText('First name (optional)'), ' Ada ');
+    await user.type(screen.getByLabelText('Last name (optional)'), 'Lovelace');
+    await user.type(screen.getByLabelText('Password'), 'correct-horse-battery-staple-42');
+    await user.type(screen.getByLabelText('Confirm your password'), 'correct-horse-battery-staple-42');
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+
+    expect(mutateMock).toHaveBeenCalledWith({
+      body: expect.objectContaining({ firstName: 'Ada', lastName: 'Lovelace' }),
+    });
+  });
+
   async function register(user: ReturnType<typeof userEvent.setup>) {
     renderForm();
     await user.type(screen.getByLabelText('Username'), 'jane');

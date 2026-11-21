@@ -1,0 +1,9 @@
+{
+  "firstName": "Vorname",
+  "lastName": "Nachname",
+  "save": "Speichern",
+  "ssoManaged": "Dein Identity Provider verwaltet den Namen. Er wird bei jeder Anmeldung per SSO aktualisiert.",
+  "ssoManagedAdmin": "Der Identity Provider verwaltet den Namen dieses Benutzers. Er wird bei jeder SSO-Anmeldung aktualisiert.",
+  "updated": "Name aktualisiert",
+  "updateFailed": "Name konnte nicht aktualisiert werden"
+}

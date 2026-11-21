@@ -56,7 +56,7 @@ const range = { start: new Date('2026-09-01T00:00:00Z'), end: new Date('2026-09-
 const transaction = {
   id: 21,
   userId: 3,
-  user: { id: 3, username: 'Alice', externalIdentifier: 'EXT-3' },
+  user: { id: 3, username: 'Alice', firstName: 'Alice', lastName: 'Smith', externalIdentifier: 'EXT-3' },
   userEmail: 'alice@example.com',
   createdAt: '2026-09-01T10:00:00Z',
   amount: 1250,
@@ -105,12 +105,14 @@ it('offers user id, emails, external identifier and resource metadata fields aft
     { refetchOnWindowFocus: false },
   );
   // existing keys stay stable and in order because templates reference them
-  expect(state.fields.slice(0, 11).map((c) => c.key)).toEqual([
+  expect(state.fields.slice(0, 13).map((c) => c.key)).toEqual([
     'id',
     'user',
+    'userDisplayName',
     'createdAt',
     'amount',
     'initiator',
+    'initiatorDisplayName',
     'resourceUsage',
     'refundOf',
     'correctionOf',
@@ -124,6 +126,8 @@ it('offers user id, emails, external identifier and resource metadata fields aft
     return state.items.map((row) => column?.getter(row as never));
   };
   expect(values('userId')).toEqual([3, 4]);
+  expect(values('userDisplayName')).toEqual(['Alice Smith', 'Bob']);
+  expect(values('initiatorDisplayName')).toEqual(['Mentor', 'Mentor']);
   expect(values('userEmail')).toEqual(['alice@example.com', '']);
   expect(values('userExternalIdentifier')).toEqual(['EXT-3', '']);
   expect(values('initiatorEmail')).toEqual(['mentor@example.com', '']);

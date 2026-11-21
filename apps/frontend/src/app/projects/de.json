@@ -11,7 +11,7 @@
   "invitations": {
     "title": "Projekteinladungen",
     "description": "Nimm Einladungen an oder lehne sie ab, um gemeinsam an Projekten zu arbeiten.",
-    "invitedBy": "Eingeladen von {{username}}",
+    "invitedBy": "Eingeladen von {{name}}",
     "empty": "Du hast keine offenen Einladungen.",
     "roles": {
       "viewer": "Betrachter"

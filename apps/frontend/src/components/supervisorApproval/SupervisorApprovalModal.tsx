@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
+import { userIdentityFromDisplayName } from '../../utils/userIdentityFromDisplayName';
 import { Card, Description, ModalBody, ModalFooter, ModalHeader, ModalHeading, Spinner } from '@heroui/react';
 import { AttraccessUser, Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { SupervisionRequestDto, User, useGetOneResourceById } from '@attraccess/react-query-client';
+import { SupervisionRequestDto, useGetOneResourceById } from '@attraccess/react-query-client';
 import en from './translations/en.json';
 import de from './translations/de.json';
 
@@ -71,12 +72,11 @@ export function SupervisorApprovalModal({
               <div className="space-y-1">
                 <Description>{t('requesterLabel')}</Description>
                 <AttraccessUser
-                  user={
-                    {
-                      id: request.requesterUserId,
-                      username: request.requesterUsername,
-                    } as unknown as User
-                  }
+                  user={userIdentityFromDisplayName({
+                    id: request.requesterUserId,
+                    username: request.requesterUsername,
+                    displayName: request.requesterDisplayName,
+                  })}
                 />
               </div>
 

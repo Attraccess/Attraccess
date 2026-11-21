@@ -1,3 +1,4 @@
+import { formatUserDisplayName } from '@attraccess/shared';
 import type { ReactNode } from 'react';
 import type { ResourceUsageExportRowDto } from '@attraccess/react-query-client';
 import type { TFunction } from '@attraccess/plugins-frontend-ui';
@@ -58,6 +59,11 @@ export function buildResourceUsageColumns({
       key: 'username',
       getter: (item) => item.user?.username,
       selectedByDefault: true,
+    },
+    {
+      label: t('columns.userDisplayName'),
+      key: 'userDisplayName',
+      getter: (item) => (item.user ? formatUserDisplayName(item.user) : ''),
     },
     {
       label: t('columns.startTimeISO'),
@@ -130,6 +136,11 @@ export function buildResourceUsageColumns({
       label: t('columns.supervisorUsername'),
       key: 'supervisorUsername',
       getter: (item) => item.supervisorUser?.username ?? '',
+    },
+    {
+      label: t('columns.supervisorDisplayName'),
+      key: 'supervisorDisplayName',
+      getter: (item) => (item.supervisorUser ? formatUserDisplayName(item.supervisorUser) : ''),
     },
     { label: t('columns.userEmail'), key: 'userEmail', getter: (item) => item.userEmail ?? '' },
     {

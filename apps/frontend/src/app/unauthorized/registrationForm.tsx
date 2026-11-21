@@ -57,6 +57,8 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
 
   const [username, setUsername] = useState<string>('');
   const [email, setEmail] = useState<string>('');
+  const [firstName, setFirstName] = useState<string>('');
+  const [lastName, setLastName] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [passwordConfirmation, setPasswordConfirmation] = useState<string>('');
   const [serverErrors, setServerErrors] = useState<PolicyError[]>([]);
@@ -156,10 +158,12 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           password,
           email: trimmedEmail,
           strategy: AuthenticationType.LOCAL_PASSWORD,
+          ...(firstName.trim() ? { firstName: firstName.trim() } : {}),
+          ...(lastName.trim() ? { lastName: lastName.trim() } : {}),
         },
       });
     },
-    [canSubmit, createUserMutate, password, trimmedEmail, trimmedUsername],
+    [canSubmit, createUserMutate, password, trimmedEmail, trimmedUsername, firstName, lastName],
   );
 
   if (registered) {
@@ -197,6 +201,21 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
         <TextField isRequired value={email} onChange={setEmail}>
           <Label>{t('email')}</Label>
           <Input id="email" name="email" type="email" required data-cy="registration-form-email-input" />
+        </TextField>
+
+        <TextField value={firstName} onChange={setFirstName} maxLength={100}>
+          <Label>{t('firstName')}</Label>
+          <Input
+            id="firstName"
+            name="firstName"
+            autoComplete="given-name"
+            data-cy="registration-form-first-name-input"
+          />
+        </TextField>
+
+        <TextField value={lastName} onChange={setLastName} maxLength={100}>
+          <Label>{t('lastName')}</Label>
+          <Input id="lastName" name="lastName" autoComplete="family-name" data-cy="registration-form-last-name-input" />
         </TextField>
 
         <PasswordField

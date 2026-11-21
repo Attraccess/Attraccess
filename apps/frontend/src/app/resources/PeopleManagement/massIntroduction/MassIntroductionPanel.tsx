@@ -229,7 +229,15 @@ function Participants({ participants }: Readonly<{ participants: MassIntroductio
         <ul className="flex flex-col gap-2 max-h-64 overflow-y-auto">
           {sorted.map((participant) => (
             <li key={participant.userId} className="flex items-center justify-between gap-2">
-              <AttraccessUser user={{ id: participant.userId, username: participant.username }} interactive={false} />
+              <AttraccessUser
+                user={{
+                  id: participant.userId,
+                  username: participant.username,
+                  firstName: participant.firstName,
+                  lastName: participant.lastName,
+                }}
+                interactive={false}
+              />
               <div className="flex flex-wrap justify-end gap-1">
                 {participant.alreadyIntroduced && (
                   <Chip size="sm" color="default">

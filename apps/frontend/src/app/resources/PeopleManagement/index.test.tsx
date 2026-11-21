@@ -92,7 +92,7 @@ vi.mock('./AddPersonDrawer', () => ({
         <input aria-label="Add comment" value={comment} onChange={(e) => onCommentChange(e.target.value)} />
         <button
           onClick={async () => {
-            await onAdd({ id: 9, username: 'New person' });
+            await onAdd({ id: 9, username: 'New person', firstName: null, lastName: null });
             onClose();
           }}
         >

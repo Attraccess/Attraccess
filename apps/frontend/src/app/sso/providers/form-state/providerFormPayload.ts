@@ -58,6 +58,9 @@ export function buildOidcPayload({
     clientSecret: base.clientSecret,
     // null turns session-time permission re-sync off
     permissionSyncTtlMinutes: base.permissionSyncTtlMinutes ?? null,
+    // blank claim paths fall back to the built-in given_name / family_name claims
+    firstNameClaimPath: sanitizeOptional(base.firstNameClaimPath ?? undefined) ?? null,
+    lastNameClaimPath: sanitizeOptional(base.lastNameClaimPath ?? undefined) ?? null,
   };
 
   const stored = providerDetails?.oidcConfiguration;
@@ -103,6 +106,8 @@ export function buildSamlPayload({
     idpIssuer: base.idpIssuer?.trim() || null,
     logoutURL: base.logoutURL?.trim() || null,
     audience: sanitizeOptional(base.audience),
+    firstNameClaimPath: sanitizeOptional(base.firstNameClaimPath ?? undefined) ?? null,
+    lastNameClaimPath: sanitizeOptional(base.lastNameClaimPath ?? undefined) ?? null,
   };
   const stored = providerDetails?.samlConfiguration;
   for (const [field, value] of [
