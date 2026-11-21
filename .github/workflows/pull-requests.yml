@@ -175,6 +175,9 @@ jobs:
       # apps/cesentry may only hold the pointer to the private submodule (CONTRIBUTING.md, "Private submodule").
       - name: Check the private submodule pointer
         run: node scripts/check-private-submodule.mjs
+      # Always repo-wide: npm provenance rejects a published release project without repository.url (ATT-1384).
+      - name: Check repository metadata of the published packages
+        run: node scripts/check-release-package-metadata.mjs
       # Public clones have no access to it: `update = none` must make them skip it, with this runner's git.
       - name: Clone with submodules, without access to the private submodule
         run: |
