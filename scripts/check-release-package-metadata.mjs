@@ -9,23 +9,28 @@ import { fileURLToPath } from 'node:url';
 
 export const REPOSITORY_URL = 'git+https://github.com/Attraccess/Attraccess.git';
 const PROJECT_PARENTS = ['apps', 'libs'];
+const SKIPPED_DIRECTORIES = new Set(['node_modules', 'dist', 'build', 'coverage']);
 
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
+
+/** Lists the directories below apps/ and libs/ at any depth, shallowest first, without build output. */
+function candidateDirectories(root) {
+  const directories = ['.'];
+  const queue = PROJECT_PARENTS.filter((parent) => existsSync(path.join(root, parent)));
+  while (queue.length) {
+    const directory = queue.shift();
+    directories.push(directory);
+    for (const entry of readdirSync(path.join(root, directory), { withFileTypes: true }))
+      if (entry.isDirectory() && !entry.name.startsWith('.') && !SKIPPED_DIRECTORIES.has(entry.name))
+        queue.push(`${directory}/${entry.name}`);
+  }
+  return directories;
+}
 
 /** Maps nx project names to their directories (relative to root), from project.json or package.json names. */
 function projectDirectories(root) {
   const directories = new Map();
-  const candidates = [
-    '.',
-    ...PROJECT_PARENTS.flatMap((parent) =>
-      existsSync(path.join(root, parent))
-        ? readdirSync(path.join(root, parent), { withFileTypes: true })
-            .filter((entry) => entry.isDirectory())
-            .map((entry) => `${parent}/${entry.name}`)
-        : [],
-    ),
-  ];
-  for (const directory of candidates) {
+  for (const directory of candidateDirectories(root)) {
     for (const file of ['project.json', 'package.json']) {
       const manifest = path.join(root, directory, file);
       const name = existsSync(manifest) ? readJson(manifest).name : undefined;

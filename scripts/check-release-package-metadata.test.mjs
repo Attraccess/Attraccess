@@ -36,6 +36,21 @@ test('accepts published projects that name this repository and their directory',
   assert.deepEqual(checkReleasePackageMetadata(root), []);
 });
 
+test('finds release projects nested below apps/ and libs/ and ignores node_modules', (t) => {
+  const root = workspace(t, {
+    projects: ['plugin-matter'],
+    files: {
+      'apps/plugins/node_modules/fake/package.json': { name: 'plugin-matter' },
+      'apps/plugins/matter/project.json': { name: 'plugin-matter' },
+      'apps/plugins/matter/package.json': {
+        name: '@scope/plugin-matter',
+        repository: repository('apps/plugins/matter'),
+      },
+    },
+  });
+  assert.deepEqual(checkReleasePackageMetadata(root), []);
+});
+
 test('reports a published project without repository, the 422 npm provenance failure', (t) => {
   const root = workspace(t, {
     projects: ['models'],
