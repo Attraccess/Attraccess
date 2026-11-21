@@ -289,6 +289,7 @@ enum class Message {
     LastMessageAge, LatestPing, AveragePing, PingTrend, ReconnectsLastMinute, SendQueueDepth, SendQueueFullLastMinute,
     SendFailuresLastMinute, ConnectionTimeoutsLastMinute, PingTimeoutsLastMinute, PingLossLastMinute,
     MissedHeartbeatsLastMinute, NotAvailable, Milliseconds, Percent,
+    SessionYou, SessionNameJoin, SessionNamesMore, SessionUsersLine, SessionCountOf,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
