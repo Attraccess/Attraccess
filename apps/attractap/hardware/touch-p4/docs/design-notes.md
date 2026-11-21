@@ -64,9 +64,8 @@ the Waveshare ESP32-S3-Touch-LCD-4). Points that drive the layout:
   front of the LCD). That limits the distance between the board and the LCD's
   metal back to **2.0 mm**; at 1.5 mm there is 0.5 mm to spare. These figures
   are scaled from the drawing, +-0.4 mm, and hold for its LCD module, which is
-  2.06 mm thick. The display's product page gives 3.8 mm in total with 1.3 mm
-  glass, that is an LCD module of 2.5 mm. If the panel is like that, the limit
-  is about 1.7 mm and 1.5 mm leaves 0.2 mm.
+  2.06 mm thick (3.14 mm with the bonding layer, the touch sensor and the
+  0.55 mm cover lens). The display's product page shows the same drawing.
 - The distance cannot be small either, because of the Ethernet jack. Its pins
   come out of the display side of the board behind the lower right corner of
   the LCD module, at least 1.45 mm long (the datasheet gives a minimum pin
@@ -152,9 +151,9 @@ new display section, not a part swap.
   rows) carry 48 V. No wall of a display frame fits between pin 9 and the LCD
   module's edge: the pin is 0.5 mm from it and its solder pad 0.1 mm. The tape
   on the LCD is the insulation there.
-- Depth between board and front: the display side of the board is 5.4 mm
-  behind the front of the case (1.5 mm distance, 3.8 mm display by its product
-  page, 0.1 mm recess). The case in `case/` is drawn for that.
+- Depth between board and front: the display side of the board is 4.74 mm
+  behind the front of the case (1.5 mm distance, 3.14 mm display, 0.1 mm
+  recess). The case in `case/` is drawn for that.
 - The DC cut-away is sized for a straight 5.5 mm barrel plug up to 11 mm
   thick. Check it with the plug of the supply you plan to ship.
 - The DC terminal (WAGO 250-202, push-button) sits next to the DC jack. Its
@@ -565,8 +564,7 @@ display and the connectors. Nothing was built or measured.
 - **The display flex and the jack's pins.** They pull in opposite directions:
   the flex wants the display close to the board (2.0 mm at most by the
   drawing, +-0.4 mm), the jack's pins want it away (they are at least 1.45 mm
-  long). At 1.5 mm with clipped pins the pins have 0.5 mm and the flex 0.2 to
-  0.5 mm, depending on how thick the display really is. A second drawing of
+  long). At 1.5 mm with clipped pins each side has 0.5 mm. A second drawing of
   the same panel shows a flex 0.8 mm shorter, and panels from other makers may
   differ. A board cannot be repaired if the flex is short. Before ordering, lay
   the panel you will buy on a 1:1 print with a 1.5 mm spacer (first step of the
