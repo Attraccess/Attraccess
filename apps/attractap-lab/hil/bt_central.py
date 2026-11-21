@@ -85,16 +85,22 @@ async def run(name, commands, hold):
                     topic = command.split(" ", 1)[0]
                     line = f"CMND {command}\n".encode()
                     started = time.monotonic()
-                    for offset in range(0, len(line), WRITE_CHUNK):
-                        await write(client, line[offset:offset + WRITE_CHUNK])
                     reply = None
-                    while reply is None and time.monotonic() - started < REPLY_SECONDS:
-                        try:
-                            got = await asyncio.wait_for(lines.get(), timeout=1)
-                        except asyncio.TimeoutError:
-                            continue
-                        if got.startswith(f"RESP {topic} "):
-                            reply = got[len(f"RESP {topic} "):]
+                    # The reply to the write that made the OS pair can get lost while the link turns encrypted (the
+                    # web app retries its first status request too): ask a read once more.
+                    for attempt in range(2 if topic.endswith(".get") else 1):
+                        sent = time.monotonic()
+                        for offset in range(0, len(line), WRITE_CHUNK):
+                            await write(client, line[offset:offset + WRITE_CHUNK])
+                        while reply is None and time.monotonic() - sent < REPLY_SECONDS:
+                            try:
+                                got = await asyncio.wait_for(lines.get(), timeout=1)
+                            except asyncio.TimeoutError:
+                                continue
+                            if got.startswith(f"RESP {topic} "):
+                                reply = got[len(f"RESP {topic} "):]
+                        if reply is not None:
+                            break
                     emit(topic=topic, reply=reply, ms=int((time.monotonic() - started) * 1000))
                     pending.pop(0)
                 if hold:
