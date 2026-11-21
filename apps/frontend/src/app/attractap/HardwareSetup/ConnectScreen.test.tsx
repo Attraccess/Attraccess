@@ -30,7 +30,10 @@ it('explains the USB fallback instead of connecting when Web Bluetooth is missin
   render(<ConnectScreen />);
   fireEvent.click(screen.getByRole('button', { name: 'Set up over Bluetooth' }));
   expect(await screen.findByText('Bluetooth setup is not available in this browser')).toBeTruthy();
-  expect(screen.getByText(/Chrome and Edge offer on desktop and Android/)).toBeTruthy();
+  // Edge has no Web Bluetooth on Android: only Chrome is named there.
+  expect(
+    screen.getByText(/Chrome and Edge offer on a computer and Chrome offers on Android/),
+  ).toBeTruthy();
   expect(state.connectBluetooth).not.toHaveBeenCalled();
 });
 
