@@ -20,8 +20,11 @@ export const SETUP_NAME_PREFIX = 'Attractap';
 
 /** Largest single GATT write; a longer command line is split into several sequential writes. */
 export const MAX_WRITE_CHUNK_BYTES = 180;
-/** The first write triggers OS pairing, which can reject a write or two until the link is encrypted. */
-const SECURITY_RETRIES = 3;
+/**
+ * The first write triggers OS pairing, which rejects writes until the link is encrypted. macOS first asks the user to
+ * accept the pairing (ATT-1371 lab test), so keep retrying for about as long as its 30 s pairing timeout.
+ */
+export const SECURITY_RETRIES = 30;
 const SECURITY_RETRY_DELAY_MS = 1000;
 /** Inbound lines are at most 256 bytes; a buffer far beyond that without a newline is garbage. */
 const MAX_LINE_BUFFER_CHARS = 4096;
