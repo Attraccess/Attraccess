@@ -223,6 +223,7 @@ void DemoWebsocket::respondResourceList(uint32_t requestId, const char *language
     doc["data"]["payload"]["revision"] = _resourceListMsgId;
     doc["data"]["payload"]["requestId"] = requestId;
     doc["data"]["payload"]["authenticatedUsername"] = _currentUser;
+    doc["data"]["payload"]["authenticatedDisplayName"] = _currentUser;
     doc["data"]["payload"]["readerName"] = DemoLocalization::readerName(english);
 
     // Introducers = enrolled admin cards (they can introduce others). Shown in
@@ -323,6 +324,7 @@ void DemoWebsocket::respondCardAuth(const std::string &uidHex, uint32_t resource
     respondResourceList(0, "en");
 
     doc["data"]["payload"]["username"] = DemoStore::displayName(card);
+    doc["data"]["payload"]["displayName"] = DemoStore::displayName(card);
     // Demo cards represent an English-speaking cardholder so the localized
     // fixture form is reachable in the normal demo card-authentication flow.
     doc["data"]["payload"]["language"] = "en";

@@ -33,6 +33,8 @@ struct UserDetails
         bool canEndOtherSessions = false;
         // The resource list was personalised for this card, so its own-session info is authoritative.
         bool listPersonalized = false;
+        // Shown in the header; empty means show the username. Last, so positional initialisers keep working.
+        std::string displayName;
     };
 
 struct ButtonClickEventData

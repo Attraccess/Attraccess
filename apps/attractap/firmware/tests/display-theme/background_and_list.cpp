@@ -52,6 +52,18 @@ void testBackgroundScreens(Renderer &renderer)
         auto *usage = requireObject(guard.root, &lv_label_class, "In use: Müller");
         expect(lv_obj_get_style_text_font(usage, LV_PART_MAIN) == &attractap_font_montserrat_latin1_14,
                "Lockscreen active username uses a Latin-1 font");
+        // The lock screen names the holder by display name; the username is only the fallback.
+        {
+            API::ResourceBrief named = {};
+            named.hasActiveUsage = true;
+            std::strcpy(named.activeUser, "ada");
+            std::strcpy(named.activeUserDisplayName, "Ada Lovelace");
+            lock.setUsageInfo(named);
+            requireObject(guard.root, &lv_label_class, "In use: Ada Lovelace");
+            named.activeUserDisplayName[0] = '\0';
+            lock.setUsageInfo(named);
+            requireObject(guard.root, &lv_label_class, "In use: ada");
+        }
         lock.setUsageInfo(false, "", true);
         requireObject(guard.root, &lv_label_class, "Under maintenance");
         Fixtures::activeLanguage = "de";
@@ -111,10 +123,12 @@ void testAuthenticatedList(Renderer &renderer)
     resources.items[2].type = 1;
     resources.items[3].hasIntroduction = false;
     list.setResourceList(resources);
-    list.setAuthenticatedUser("Alex Example");
+    // The header shows the display name while the username stays the identity compared with the list.
+    list.setAuthenticatedUser("Alex Example", "Alex Beispiel");
     list.setSessionTimeoutTime(Fixtures::nowMs + 30000);
     list.init();
     ScreenGuard guard(list.getScreen(), &list);
+    requireObject(guard.root, &lv_label_class, "Alex Beispiel");
     renderer.capture("att-880-authenticated-list");
     auto *logout = lv_obj_get_parent(requireObject(guard.root, &lv_label_class, "Abmelden"));
     setState(logout, LV_STATE_PRESSED);

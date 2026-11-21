@@ -18,7 +18,8 @@ public:
     std::string getName() override { return "ResourceListScreen"; }
     void destroy() override;
     void setResourceList(const API::ResourceList &resources);
-    void setAuthenticatedUser(const std::string &username);
+    // `username` is the identity (compared with the list); `displayName` is what the header shows and falls back to it.
+    void setAuthenticatedUser(const std::string &username, const std::string &displayName = "");
     // The signed-out header shows the wall clock (once the time is known): no second clock elsewhere.
     bool showsClockHeader() const { return clockHeader && username.empty(); }
     void setResourceSelectionCallback(std::function<void(const API::ResourceBrief &)> callback) { selectionCallback = std::move(callback); }
@@ -41,6 +42,7 @@ private:
     ActionOverlay overlay;
     API::ResourceList cachedResourceList{};
     std::string username;
+    std::string displayName;
     FirmwareI18n::Text actionTitle, actionResource;
     ButtonError rowError;
     struct ActionButton { lv_obj_t *button; ResourceListAction action; };

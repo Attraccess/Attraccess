@@ -36,7 +36,7 @@ void MassIntroductionFlow::onStart(const API::MassIntroductionStartCommand &comm
     event.receivedAtMs = millis();
     copyText(event.sessionId, command.sessionId, sizeof(event.sessionId));
     copyText(event.name, command.targetName, sizeof(event.name));
-    copyText(event.introducer, command.introducerUsername, sizeof(event.introducer));
+    copyText(event.introducer, command.introducerDisplayName, sizeof(event.introducer));
     enqueue(event);
 }
 
@@ -47,7 +47,7 @@ void MassIntroductionFlow::onResult(const API::MassIntroductionResult &result) {
     event.alreadyIntroduced = result.alreadyIntroduced;
     event.participantCount = result.participantCount;
     copyText(event.sessionId, result.sessionId, sizeof(event.sessionId));
-    copyText(event.name, result.username, sizeof(event.name));
+    copyText(event.name, result.displayName, sizeof(event.name));
     copyText(event.code, result.error, sizeof(event.code));
     enqueue(event);
 }

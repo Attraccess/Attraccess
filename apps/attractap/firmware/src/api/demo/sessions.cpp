@@ -17,6 +17,7 @@ void DemoWebsocket::addSessionJson(JsonObject target, const DemoSession &session
 {
     target["id"] = session.id;
     target["user"]["username"] = session.user;
+    target["user"]["displayName"] = session.user;
     target["startTime"] = toIso8601(session.startEpoch);
     target["startTimeUtcOffsetMinutes"] = DemoClock::utcOffsetMinutes(session.startEpoch);
 }

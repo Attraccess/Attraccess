@@ -16,9 +16,10 @@
 void Application::setupCardCallbacks()
 {
 #ifdef HAS_LVGL_DISPLAY
-  this->api.setEnrollNewCardGetAvailableKeyNoCallback([this](std::string username) {
+  this->api.setEnrollNewCardGetAvailableKeyNoCallback([this](std::string username, std::string displayName) {
     this->apiEnrollNewCardGetAvailableKeyNoData = {
-        username = username,
+        .username = username,
+        .displayName = displayName,
     };
     this->externalState = EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO;
   });
@@ -40,8 +41,9 @@ void Application::setupCardCallbacks()
   Display::enrollmentScreen.setOnCancelCallback(
       [this]() { this->enrollCancelRequested = true; });
 
-  this->api.setResetNfcCardCallback([this](std::string username) {
+  this->api.setResetNfcCardCallback([this](std::string username, std::string displayName) {
     this->apiResetNfcCardData.username = username;
+    this->apiResetNfcCardData.displayName = displayName;
 
     // The reset state machine takes over on the main loop (beginReset()).
     this->externalState = EXTERNAL_STATE_RESET_NFC_CARD;

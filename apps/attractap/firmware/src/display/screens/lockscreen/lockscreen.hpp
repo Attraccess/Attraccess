@@ -58,7 +58,7 @@ private:
     int64_t shownClockMinute = -2;
 
     char resourceName[API::MAX_RESOURCE_NAME_LEN];
-    char username[API::MAX_USERNAME_LEN];
+    char username[API::MAX_DISPLAY_NAME_LEN]; // the name shown (display name, or the username)
     bool hasActiveUsage;
     bool isUnderMaintenance;
     bool isHealthy = true;

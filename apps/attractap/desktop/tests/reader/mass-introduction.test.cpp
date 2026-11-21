@@ -11,12 +11,14 @@ lv_obj_t *labelWithPrefix(lv_obj_t *root, const std::string &prefix) {
 
 std::string start(const char *sessionId, uint32_t remainingMs = 900000) {
     return std::string("{\"sessionId\":\"") + sessionId +
-           R"(","targetName":"Lasercutter","introducerUsername":"Robin","remainingMs":)" + std::to_string(remainingMs) + "}";
+           R"(","targetName":"Lasercutter","introducerUsername":"Robin","introducerDisplayName":"Robin Hood","remainingMs":)" + std::to_string(remainingMs) + "}";
 }
 
-std::string result(const char *username, bool alreadyIntroduced, unsigned participantCount) {
+// `displayName` empty: an older server that sends only the username.
+std::string result(const char *username, bool alreadyIntroduced, unsigned participantCount, const char *displayName = "") {
     return std::string(R"({"sessionId":"session-a","success":true,"username":")") + username +
-           "\",\"alreadyIntroduced\":" + (alreadyIntroduced ? "true" : "false") +
+           "\"" + (displayName[0] ? std::string(",\"displayName\":\"") + displayName + "\"" : std::string()) +
+           ",\"alreadyIntroduced\":" + (alreadyIntroduced ? "true" : "false") +
            ",\"participantCount\":" + std::to_string(participantCount) + "}";
 }
 
@@ -41,13 +43,13 @@ void ReaderWorkflow::testMassIntroduction()
     requireLabel(lv_screen_active(), "Sammeleinweisung");
     requireLabel(lv_screen_active(), "Lasercutter");
     requireLabel(lv_screen_active(), "Bereit für die nächste Karte");
-    requireLabel(lv_screen_active(), "Karte auflegen, um eingewiesen zu werden\nEinweiser: Robin");
+    requireLabel(lv_screen_active(), "Karte auflegen, um eingewiesen zu werden\nEinweiser: Robin Hood");
     assert(label(lv_screen_active(), "0 eingewiesen · noch 15:00") || label(lv_screen_active(), "0 eingewiesen · noch 14:59"));
     display.capture(output, "13-mass-introduction-waiting");
     server.push("READER_LANGUAGE", R"({"language":"en"})"); pump();
     requireLabel(lv_screen_active(), "Mass introduction");
     requireLabel(lv_screen_active(), "Ready for the next card");
-    requireLabel(lv_screen_active(), "Tap your card to get introduced\nIntroducer: Robin");
+    requireLabel(lv_screen_active(), "Tap your card to get introduced\nIntroducer: Robin Hood");
     assert(labelWithPrefix(lv_screen_active(), "0 introduced · "));
     display.capture(output, "13-mass-introduction-waiting-english");
     server.push("READER_LANGUAGE", R"({"language":"de"})"); pump();
@@ -67,8 +69,8 @@ void ReaderWorkflow::testMassIntroduction()
     // A result for another session is not ours.
     server.push("MASS_INTRODUCTION_RESULT", R"({"sessionId":"other-session","success":true,"username":"Mallory"})"); pump();
     requireLabel(lv_screen_active(), "Karte gelesen...\nbitte nicht bewegen");
-    server.push("MASS_INTRODUCTION_RESULT", result("Alex", false, 1)); pump();
-    requireLabel(lv_screen_active(), "Alex eingewiesen");
+    server.push("MASS_INTRODUCTION_RESULT", result("alex", false, 1, "Alex Beispiel")); pump();
+    requireLabel(lv_screen_active(), "Alex Beispiel eingewiesen");
     assert(labelWithPrefix(lv_screen_active(), "1 eingewiesen · noch "));
     display.capture(output, "14-mass-introduction-introduced");
 

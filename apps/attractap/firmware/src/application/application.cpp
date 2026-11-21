@@ -216,7 +216,7 @@ void Application::beginSessionSummary(const API::ActionResult &result) {
   this->sessionSummaryDismissRequested = false;
   this->sessionSummaryTouchSequence = Display::touchPressSequence;
   this->state = APPLICATION_STATE_SESSION_SUMMARY;
-  Display::sessionSummaryScreen.setSummary(this->cardAuthenticationData.username, result.durationSeconds, result.billingTotal);
+  Display::sessionSummaryScreen.setSummary(this->cardAuthenticationData.displayName, result.durationSeconds, result.billingTotal);
   Display::transitionToScreen(&Display::sessionSummaryScreen, [this] {
     if (!this->sessionSummaryActive) return;
     this->sessionSummaryShownAt = millis();
@@ -343,7 +343,7 @@ void Application::beginEnrollment() {
   this->enrollPhaseChangedMs = this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs;
 
   Display::enrollmentScreen.setUserName(
-      this->apiEnrollNewCardGetAvailableKeyNoData.username);
+      this->apiEnrollNewCardGetAvailableKeyNoData.displayName);
   Display::enrollmentScreen.setEnrollmentTimeoutTime(
       this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs + ENROLLMENT_TIMEOUT_MS);
   Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_WAITING);
@@ -489,7 +489,7 @@ void Application::beginReset() {
   this->resetStartTimeMs = millis();
   this->resetPhaseChangedMs = this->resetStartTimeMs;
 
-  Display::resetScreen.setUserName(this->apiResetNfcCardData.username);
+  Display::resetScreen.setUserName(this->apiResetNfcCardData.displayName);
   Display::resetScreen.setTimeoutTime(this->resetStartTimeMs + RESET_TIMEOUT_MS);
   Display::resetScreen.setStatus(ResetScreen::STATUS_WAITING);
   Display::transitionToScreen(&Display::resetScreen);

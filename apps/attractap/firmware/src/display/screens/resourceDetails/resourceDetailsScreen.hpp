@@ -87,6 +87,7 @@ private:
     lv_obj_t *body = nullptr; // the scrolling part under the session header
 
     std::string loginUsernameCache;
+    std::string loginDisplayNameCache; // what the header shows
     SessionHeader sessionHeader;
     ActionOverlay actionOverlay;
     FirmwareI18n::Text actionTitle;
