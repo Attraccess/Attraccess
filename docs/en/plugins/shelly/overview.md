@@ -12,8 +12,8 @@ The registry does not change the devices when you add or remove an entry.
 
 - Attraccess 2.0 or newer and the `shelly` plugin, installed as described in
   [Installing Plugins](plugins/installing-plugins.md). It needs the `PLUGIN_STORAGE` permission for its own tables.
-- Upgrading from 1.x: the plugin's 1.x tables and data are kept and adopted in place. Update to Attraccess 1.11
-  first (see [Upgrading to Attraccess 2.0](installation/updating.md#upgrading-to-attraccess-20)).
+- Upgrading a 1.x (SQLite) installation does not move the plugin's data: the plugin starts empty on PostgreSQL and
+  has to be set up again (see [Moving from SQLite to PostgreSQL](installation/updating.md#moving-from-sqlite-to-postgresql)).
 - Shelly devices that the Attraccess server can reach over the network by IP address.
 - Users need the **Manage Resources** permission (`resources.update`) to open the page.
 - If Attraccess runs in a container, its network is not your LAN. Enter the subnet of your devices when you

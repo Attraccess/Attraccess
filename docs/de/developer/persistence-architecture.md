@@ -15,15 +15,15 @@ ein weiteres relationales Backend allein durch Adapter, Schema und Konfiguration
 
 ## Die Schichten
 
-| Schicht                                                         | Ort                                                                         | Darf `typeorm`, Treiber, Entities importieren? |
-| --------------------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------- |
-| Neutrale Modelle, Enums, Konstanten                             | `libs/application-models` (`@attraccess/application-models`)                | Nein, nie                                      |
-| Anwendung, Domäne, HTTP-/WebSocket-Transport                    | `apps/api/src/**` (außer `database/`)                                       | Nein (siehe Baseline unten)                    |
-| Backend-Naht, Ports, Fehlerkategorien                           | `apps/api/src/database/backend`, `persistence-errors.ts`, `unit-of-work.ts` | Nur die Naht: Typen, keine Abfragen            |
-| PostgreSQL-Adapter                                              | `apps/api/src/database/postgres`                                            | Ja                                             |
-| SQLite-Import (eingefrorene Spur, Leseadapter, Übernahme)       | `apps/api/src/database/sqlite`, `apps/api/src/database/transfer`            | Ja, nur Import                                 |
-| TypeORM-Schema (Entities, Spalten, Indizes)                     | `libs/database-entities`                                                    | Ja                                             |
-| Veröffentlichte SQLite-Migrationen (eingefroren, nur Übernahme) | `apps/api/src/database/migrations`                                          | Ja, eingefroren                                |
+| Schicht                                                      | Ort                                                                         | Darf `typeorm`, Treiber, Entities importieren? |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------- | ---------------------------------------------- |
+| Neutrale Modelle, Enums, Konstanten                          | `libs/application-models` (`@attraccess/application-models`)                | Nein, nie                                      |
+| Anwendung, Domäne, HTTP-/WebSocket-Transport                 | `apps/api/src/**` (außer `database/`)                                       | Nein (siehe Baseline unten)                    |
+| Backend-Naht, Ports, Fehlerkategorien                        | `apps/api/src/database/backend`, `persistence-errors.ts`, `unit-of-work.ts` | Nur die Naht: Typen, keine Abfragen            |
+| PostgreSQL-Adapter                                           | `apps/api/src/database/postgres`                                            | Ja                                             |
+| SQLite-Import (eingefrorene Spur, Leseadapter)               | `apps/api/src/database/sqlite`                                              | Ja, nur Import                                 |
+| TypeORM-Schema (Entities, Spalten, Indizes)                  | `libs/database-entities`                                                    | Ja                                             |
+| Veröffentlichte SQLite-Migrationen (eingefroren, nur Import) | `apps/api/src/database/migrations`                                          | Ja, eingefroren                                |
 
 `libs/database-entities` importiert aus `libs/application-models`, nie umgekehrt. Die Enums, Singleton-IDs und der
 SSO-Sitzungskontext, die früher in den Entity-Dateien lagen, liegen jetzt in der neutralen Bibliothek. Die
@@ -39,13 +39,16 @@ Eine Kompositionsnaht, `apps/api/src/database/backend`, wählt die Engine:
   ein einfacher Engine-Name aussieht.
 - Ein `DatabaseBackend` bündelt Verbindungsoptionen, Entity-Satz, Migrationsspur, Verbindungsfabrik, Deutung von
   Treiberfehlern und das Schließen zusätzlicher Verbindungen.
-- Eine **Migrationsspur** ist eine geordnete, veröffentlichte Historie für eine Engine. Die PostgreSQL-Spur besteht aus einer
-  Baseline-Migration mit späteren PostgreSQL-only-Migrationen. Die veröffentlichten SQLite-Migrationen bleiben Byte für
-  Byte erhalten, laufen aber nur auf einer temporären Kopie während der Übernahme. Eine andere Engine bekommt eine
-  eigene Spur statt PostgreSQL-SQL wiederzuverwenden.
-- Die SQLite-Daten haben die Form der Baseline. Eine PostgreSQL-Migration nach der Baseline, die eine Tabelle oder Spalte
-  hinzufügt, trägt sie auch in `database/transfer/sqlite-snapshot-upgrades.ts` ein, mit dem Wert, den bestehende Zeilen
-  bekommen. So füllt die Übernahme das aktuelle Schema.
+- Eine **Migrationsspur** ist eine geordnete, veröffentlichte Historie für eine Engine. Die PostgreSQL-Spur besteht aus
+  einer Baseline gleich dem letzten SQLite-Schema, dem SQLite-Import
+  (`postgres/migrations/1760000000001-import-sqlite.ts`, Hilfsmodule in `postgres/migrations/sqlite-import/`) und
+  späteren PostgreSQL-only-Migrationen. Die veröffentlichten SQLite-Migrationen bleiben Byte für Byte erhalten, laufen
+  aber nur innerhalb dieses Imports, an Ort und Stelle auf der SQLite-Datei. Eine andere Engine bekommt eine eigene Spur
+  statt PostgreSQL-SQL wiederzuverwenden.
+- Der Import füllt die Baseline, sodass importierte Daten jede spätere Migration über die normale Spur erreichen. Eine
+  spätere PostgreSQL-Migration braucht für SQLite-Daten keinen Snapshot und keine Upgrade-Liste.
+- Die Kernmigrationen laufen früh im Start (`postgres/postgres-startup-migrations.ts`), vor Lizenzprüfung, Plugins,
+  HTTP und Geräten, unter einem PostgreSQL-Advisory-Lock und mit einer Transaktion je Migration.
 
 ## Neutrale Fehlerkategorien
 
@@ -69,12 +72,12 @@ Adapter-Interna importiert. Erfasst werden statische Imports, reine Typ-Imports,
 
 Adapter-Interna sind `apps/api/src/database/adapters/**`, `apps/api/src/database/postgres/**` und
 `libs/database-entities`. Nur Nest-Kompositionsdateien (`*.module.ts`) und Tests dürfen sie importieren; Anwendungs-,
-Domänen- und Transportcode erreicht die Persistenz also nur über Ports. `apps/api/src/database/transfer/**` (der
-SQLite-Import beim Start) dürfen zusätzlich die beiden Prozess-Einstiegspunkte `main.ts` und `main.bootstrap.ts`
-importieren.
+Domänen- und Transportcode erreicht die Persistenz also nur über Ports. Den Migrationsschritt beim Start
+(`apps/api/src/database/postgres/postgres-startup-migrations.ts`) dürfen zusätzlich die beiden Prozess-Einstiegspunkte
+`main.ts` und `main.bootstrap.ts` importieren.
 
 PostgreSQL ist die einzige Laufzeit-Datenbank. `apps/api/src/database/sqlite/**` gibt es nur für den einmaligen
-SQLite-Import: nur der Importpfad (`database/transfer`) und Tests dürfen es nutzen, Kompositionsdateien und
+SQLite-Import: nur die PostgreSQL-Migration, die eine SQLite-Datei importiert, und Tests dürfen es nutzen, Kompositionsdateien und
 Einstiegspunkte nicht. Die entfernte SQLite-Laufzeit (prozessweite Schreibwarteschlange und Dateisperre,
 `runSerializedTransaction`, SQLite-Backend, Unit of Work und Verbindungsfabrik) darf in keiner Datei zurückkehren,
 auch nicht in den Persistenzordnern und Tests; die Prüfung meldet diese Funde getrennt und akzeptiert sie nie in der
@@ -96,7 +99,7 @@ Implementierung (`apps/api/src/database/adapters/<Bereich>`).
 
 | Funktionsbereich                                                                  | Anwendungscode                                                  | Port                                                                                                             | Adapter                                                   |
 | --------------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| Backend-Auswahl, Verbindung, Migrationen, Herunterfahren, Transfer                | `database/backend`, `database/postgres`                         | `DatabaseBackend`                                                                                                | `database/postgres`                                       |
+| Backend-Auswahl, Verbindung, Migrationen, Herunterfahren                          | `database/backend`, `database/postgres`                         | `DatabaseBackend`                                                                                                | `database/postgres`                                       |
 | Fehlerkategorien, Transaktionen, Post-Commit-Hooks, begrenzter Retry              | `database/persistence-errors.ts`, `database/unit-of-work.ts`    | `UnitOfWork`, Fehlerklassifizierer                                                                               | `database/postgres`                                       |
 | Nutzungssitzungen (Start, Ende, Übernahme, Wiederherstellung), Betriebsintervalle | `resources/usage`, `resources/operating-intervals`              | `UsageSessionStore`, `OperatingTimelineStore`                                                                    | `adapters/usage`, `adapters/operating-intervals`          |
 | Messung                                                                           | `resources/metering`                                            | `MeteringStore`                                                                                                  | `adapters/metering`                                       |
@@ -214,7 +217,8 @@ angelegt oder geändert wird:
   `scripts/create-worktree.sh` prüfen zuerst `DATABASE_TYPE` (`scripts/check-database-type.sh`).
 - Tests öffnen Datenbanken über `apps/api/src/test-utils/test-database.ts`, das die Verbindungsfabrik des Backends nutzt.
 
-Die Lebenszyklus-Tests mit echter Datenbank liegen in `apps/api/src/e2e/migrations/migration-lifecycle.e2e.spec.ts`
-(Neuinstallation, Upgrade aus vier älteren Release-Ständen mit Daten, Fehlerwiederherstellung, Seeding). Der Export-,
-Import- und Backup-Vertrag wird von `database/conformance/transfer.conformance.test-fixture.ts` über
-`api:test-conformance` getestet.
+Die Lebenszyklus-Tests mit echter Datenbank liegen in `apps/api/src/e2e/migrations/`: Neuinstallation
+(`postgres-fresh-install`), Import aus älteren SQLite-Release-Ständen mit Daten (`sqlite-to-postgres-older-states`),
+Import beim Start (`sqlite-startup-import`) und Wiederherstellung nach einem gescheiterten Import
+(`sqlite-to-postgres-recovery`). `postgres-schema-parity.persistence.spec.ts` belegt, dass die Baseline dem letzten
+SQLite-Schema entspricht.

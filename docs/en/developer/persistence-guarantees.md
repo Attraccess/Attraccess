@@ -7,7 +7,7 @@ promised when more than one API instance runs. It does not claim horizontal scal
 
 ## PostgreSQL semantics
 
-PostgreSQL is the only runtime backend (SQLite is only read by the one-time [transfer](installation/updating.md#moving-from-sqlite-to-postgresql)).
+PostgreSQL is the only runtime backend (SQLite is only read by the one-time [import migration](installation/updating.md#moving-from-sqlite-to-postgresql)).
 There is no process-wide write lock: independent transactions run in parallel, and correctness comes from the database.
 
 - **Isolation.** Transactions run at `READ COMMITTED`. Anything that must not interleave is guarded explicitly, not by a
@@ -34,9 +34,9 @@ There is no process-wide write lock: independent transactions run in parallel, a
   message.
 - **Types.** Points in time are `timestamptz` (UTC). Credits and meter values are `bigint` or exact decimals, never
   floating point.
-- **Migrations.** The PostgreSQL track is one baseline migration (`apps/api/src/database/postgres/migrations`); later
-  migrations are PostgreSQL-only. The released SQLite migrations are frozen and run only on the temporary copy during
-  the transfer.
+- **Migrations.** The PostgreSQL track (`apps/api/src/database/postgres/migrations`) is a baseline, the SQLite import
+  and later PostgreSQL-only migrations. They run at startup under a PostgreSQL advisory lock, one transaction per
+  migration. The released SQLite migrations are frozen and run only inside the import, in place on the SQLite file.
 
 ## Unit of work
 
@@ -100,8 +100,8 @@ Plugins have no database access; they keep data in declared tables through the r
   run on rollback, nesting is rejected and a conflict is reported as `PluginStorageConflict`.
 - **Neutral errors and values.** Unique violations, conflicts, missing rows and invalid input are the same neutral
   errors on every engine; timestamps are UTC instants, decimals are exact strings.
-- **Backup.** Plugin tables and each plugin's schema state (applied version) are part of the transfer snapshot and are
-  restored as one unit with the database.
+- **Backup.** Plugin tables and each plugin's schema state (applied version) live in the PostgreSQL database, so a
+  database backup contains them and restores them as one unit with the core data.
 
 These are covered by the plugin-storage conformance suite that every backend adapter has to pass.
 

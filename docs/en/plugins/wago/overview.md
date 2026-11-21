@@ -25,8 +25,8 @@ an output, react to an input or an event).
 - Attraccess 2.0 or newer and the `wago` plugin, installed as described in
   [Installing Plugins](plugins/installing-plugins.md). It needs the `PLUGIN_STORAGE`, `ACCESS_MQTT_SERVERS`,
   `TRIGGER_FLOWS` and `MANAGE_SECRETS` permissions.
-- Upgrading from 1.x: the plugin's 1.x tables and data are kept and adopted in place. Update to Attraccess 1.11
-  first (see [Upgrading to Attraccess 2.0](installation/updating.md#upgrading-to-attraccess-20)).
+- Upgrading a 1.x (SQLite) installation does not move the plugin's data: the plugin starts empty on PostgreSQL and
+  has to be set up again (see [Moving from SQLite to PostgreSQL](installation/updating.md#moving-from-sqlite-to-postgresql)).
 - An [MQTT server](devices/mqtt/server-setup.md) configured in Attraccess, reachable by the controller.
 - WAGO CC100 hardware (`751-9301`, firmware 31) on the same private network as Attraccess. See
   [production support](plugins/wago/production-support.md) for the tested compatibility.

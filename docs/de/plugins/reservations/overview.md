@@ -24,9 +24,9 @@ Ressource aktiviert. Bei Ressourcen ohne aktivierte Reservierungen ändert sich 
   Plugin. Siehe [Plugins installieren](plugins/installing-plugins.md#lizenz-fehlt). Lizenzen:
   [contact@attraccess.org](mailto:contact@attraccess.org).
 - Attraccess 2.0 oder neuer.
-- Upgrade von 1.x: Die 1.x-Tabellen und -Daten des Plugins bleiben erhalten und werden an Ort und Stelle übernommen.
-  Aktualisieren Sie vorher auf Attraccess 1.11 (siehe
-  [Upgrade auf Attraccess 2.0](installation/updating.md#upgrade-auf-attraccess-20)).
+- Das Upgrade einer 1.x-Installation (SQLite) übernimmt die Daten des Plugins nicht: Das Plugin startet auf
+  PostgreSQL leer und muss neu eingerichtet werden (siehe
+  [Umzug von SQLite auf PostgreSQL](installation/updating.md#umzug-von-sqlite-auf-postgresql)).
 - Das Plugin `reservations`, installiert wie unter [Plugins installieren](plugins/installing-plugins.md) beschrieben.
   Die angeforderten Berechtigungen stehen unter [Reservierungen administrieren](plugins/reservations/administration.md#plugin-installieren).
 - Optional: eine funktionierende [SMTP-Konfiguration](setup/smtp-email.md) für E-Mail-Hinweise. Ohne sie funktionieren

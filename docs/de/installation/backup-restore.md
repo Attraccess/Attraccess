@@ -21,9 +21,9 @@ Die Datenbank enthält die Kerndaten **und die Tabellen aller Plugins** samt Mig
 - Datenbank zusammen mit dem Ordner `plugins/` wiederherstellen und die Attraccess-Version starten, mit der das Backup erstellt wurde, oder eine neuere. Neuere Versionen aktualisieren die Datenbank beim Start; eine ältere Version kann eine von einer neueren migrierte Datenbank nicht öffnen.
 - Guthaben, Preis-Snapshots und Zählerwerte liegen als exakte Werte vor und kommen unverändert zurück.
 - Behalten Sie den `AUTH_SESSION_SECRET` aus der Zeit des Backups. Er schützt die gespeicherten Reader-Kopplungsschlüssel.
-- Ein 1.x-**SQLite**-Backup (`attraccess.sqlite`) wird über die automatische Übernahme eingespielt, siehe [Aktualisierung](installation/updating.md#umzug-von-sqlite-auf-postgresql).
+- Ein 1.x-**SQLite**-Backup (`attraccess.sqlite`) wird nicht mit `pg_restore` eingespielt. Legen Sie die Datei in das Storage-Verzeichnis und starten Sie Attraccess 2.0 mit einer leeren PostgreSQL-Datenbank: Der Start importiert ihre Kerndaten (nicht die Plugin-Daten), siehe [Aktualisierung](installation/updating.md#umzug-von-sqlite-auf-postgresql).
 
-Dieselben Anforderungen (stabile Bezeichner, Zeitstempel, exakte Werte, Plugin-Daten und Migrationsstand) bilden den [Export-/Import-Vertrag](developer/adding-a-database-backend.md) für die SQLite-Übernahme.
+Backups von Attraccess 2.0 sind PostgreSQL-Backups. Dieselben Anforderungen (stabile Bezeichner, Zeitstempel, exakte Werte, Plugin-Daten und Migrationsstand) bilden den [Backup- und Restore-Vertrag](developer/adding-a-database-backend.md#backup-und-restore-vertrag), den jedes Datenbank-Backend einhalten muss.
 
 ## Docker Compose und andere einfache Setups
 

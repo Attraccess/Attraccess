@@ -26,9 +26,9 @@ im Browser in Betrieb, benennen seine Ein- und Ausgänge, lesen Modbus-Zähler u
 - Attraccess 2.0 oder neuer und das Plugin `wago`, installiert wie unter
   [Plugins installieren](plugins/installing-plugins.md) beschrieben. Es benötigt die Berechtigungen `PLUGIN_STORAGE`,
   `ACCESS_MQTT_SERVERS`, `TRIGGER_FLOWS` und `MANAGE_SECRETS`.
-- Upgrade von 1.x: Die 1.x-Tabellen und -Daten des Plugins bleiben erhalten und werden an Ort und Stelle übernommen.
-  Aktualisieren Sie vorher auf Attraccess 1.11 (siehe
-  [Upgrade auf Attraccess 2.0](installation/updating.md#upgrade-auf-attraccess-20)).
+- Das Upgrade einer 1.x-Installation (SQLite) übernimmt die Daten des Plugins nicht: Das Plugin startet auf
+  PostgreSQL leer und muss neu eingerichtet werden (siehe
+  [Umzug von SQLite auf PostgreSQL](installation/updating.md#umzug-von-sqlite-auf-postgresql)).
 - Ein in Attraccess eingerichteter [MQTT-Server](mqtt/server-setup.md), den der Controller erreichen kann.
 - WAGO-CC100-Hardware (`751-9301`, Firmware 31) im selben privaten Netzwerk wie Attraccess. Die getestete Kompatibilität
   steht unter [Produktivbetrieb und Kompatibilität](plugins/wago/production-support.md).

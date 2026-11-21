@@ -1,10 +1,10 @@
 # Datenbank-Backend hinzufügen
 
-<!-- llms-description: Schritte, um Attraccess ein weiteres relationales Backend hinzuzufügen, und der Export-, Import- und Backup-Vertrag, den die Übernahme von SQLite nach PostgreSQL umsetzt. -->
+<!-- llms-description: Schritte, um Attraccess ein weiteres relationales Backend hinzuzufügen, der Backup- und Restore-Vertrag, den es einhalten muss, und wie der einmalige SQLite-Import dazu passt. -->
 
 PostgreSQL ist das umgesetzte und einzige laufende Backend. SQLite ist **nur noch Import**: Seine veröffentlichten
-Migrationen sind eingefroren und laufen nur auf einer temporären Kopie während der einmaligen
-[Übernahme nach PostgreSQL](installation/updating.md#umzug-von-sqlite-auf-postgresql).
+Migrationen sind eingefroren und laufen nur innerhalb der PostgreSQL-Migration, die eine 1.x-SQLite-Datei einmalig
+importiert ([Umzug von SQLite auf PostgreSQL](installation/updating.md#umzug-von-sqlite-auf-postgresql)).
 Diese Seite listet, was ein weiteres Backend liefern muss, damit keine Fachregel und kein öffentlicher Vertrag
 geändert werden muss, mit dem PostgreSQL-Backend (`apps/api/src/database/postgres`) als Vorlage.
 
@@ -20,9 +20,11 @@ geändert werden muss, mit dem PostgreSQL-Backend (`apps/api/src/database/postgr
    Entsprechungen für Guthabenpflege und Nutzungsintegrität.
 4. **Migrationsspur anlegen.** Migrationen einer Engine laufen nie auf einer anderen. Eine neue geordnete Spur
    (`MigrationTrack`) mit eigener Migrationstabelle anlegen und ihr Verzeichnis in `apps/api/migration-tracks.cjs`
-   eintragen, das die Spur für den Migrations-Build nach `DATABASE_TYPE` wählt. Die PostgreSQL-Spur ist eine
-   Baseline-Migration in `apps/api/src/database/postgres/migrations`; spätere Migrationen sind nur für PostgreSQL. Die
-   veröffentlichten SQLite-Migrationen (`apps/api/src/database/migrations`) sind eingefroren und werden nie geändert.
+   eintragen, das die Spur für den Migrations-Build nach `DATABASE_TYPE` wählt. Die PostgreSQL-Spur in
+   `apps/api/src/database/postgres/migrations` beginnt mit einer Baseline gleich dem letzten SQLite-Schema
+   (`PostgresBaseline1760000000000`) und dem SQLite-Import (`PostgresImportSqlite1760000000001`); spätere Migrationen
+   sind nur für PostgreSQL. Die veröffentlichten SQLite-Migrationen (`apps/api/src/database/migrations`) sind
+   eingefroren und werden nie geändert.
 5. **Seeds und Werkzeuge anbinden**: einen Provider in `apps/api/scripts/lib/database-provider.mjs` ergänzen (Dev-Seed,
    `reencrypt-card-keys`), `scripts/check-database-type.sh` und die Migrations-Nx-Targets weiter nach `DATABASE_TYPE`
    wählen lassen und `apps/api/src/test-utils/test-database.ts` die neue Engine öffnen lassen.
@@ -41,9 +43,9 @@ geändert werden muss, mit dem PostgreSQL-Backend (`apps/api/src/database/postgr
    Die Plugin-Speicher-Conformance-Suite darauf ausführen.
 9. **Betrieb dokumentieren**: Konfiguration, Backup und Restore der Engine (für PostgreSQL siehe [Umgebungsvariablen](installation/environment-variables.md#datenbank) und [Backup & Wiederherstellung](installation/backup-restore.md)).
 
-## Export-, Import- und Backup-Vertrag
+## Backup- und Restore-Vertrag
 
-Ein Transfer oder Restore muss, egal mit welchem Werkzeug, erhalten:
+Ein Backup und Restore muss, egal mit welchem Werkzeug, erhalten:
 
 - **Bezeichner und Beziehungen:** alle Primär- und Fremdschlüssel exakt, auch erzeugte IDs, damit Relationen und externe
   Verweise (Geräte-Enrollment, MQTT-IDs, Audit-Verweise) gültig bleiben.
@@ -57,25 +59,27 @@ Ein Transfer oder Restore muss, egal mit welchem Werkzeug, erhalten:
   Plugin-Version kopiert, sodass ein Restore nie Daten ohne den passenden Schemastand liefert.
 - **Kern-Migrationsstand:** die Migrationstabelle der Quellspur. Eine wiederhergestellte Datenbank ist nur mit der
   Anwendungsversion gültig, die ihrem Migrationsstand entspricht.
-- **Abgeleitete Daten:** Guthaben und Nutzungsinvarianten werden nach dem Import mit den Integritätsprüfungen der Engine
-  kontrolliert; Trigger oder Entsprechungen dürfen beim Import nicht doppelt wirken.
+- **Abgeleitete Daten:** Guthaben und Nutzungsinvarianten gelten nach einem Restore wie zuvor; Trigger oder
+  Entsprechungen dürfen beim Laden der Daten nicht doppelt wirken.
 
-Die Übernahme von SQLite nach PostgreSQL setzt diesen Vertrag um (`apps/api/src/database/transfer`): Die SQLite-Datei
-wird in eine Arbeitskopie kopiert, die eingefrorene SQLite-Spur bringt die Kopie auf die letzte SQLite-Migration, ein
-Snapshot wird gelesen und in einer Transaktion in PostgreSQL importiert, danach laufen Integritätsprüfungen.
-Neuinstallation und Upgrade aus älteren Migrationsständen mit Daten sind getestet (`apps/api/src/e2e/migrations`).
-Der Vertrag selbst ist ein
-neutraler Snapshot (`database/transfer-snapshot.ts`: Tabellen, gespeicherte Spalten in neutralen Arten, Zeitpunkte als
-ISO-8601 UTC, Ganzzahlen über 2^53 und Dezimaltext exakt, Sequenzen, Kern-Migrationsstand sowie je Plugin sein
-Speicher-Namensraum und die angewendeten Speicherversionen), den ein Backend über `DatabaseBackend.transfer` exportiert
-und importiert. Plugin-Spalten werden aus der Speicherdeklaration des Plugins typisiert, nicht aus dem Spaltentyp der
-Engine: Dezimalzahlen als exakter Text (Art `decimal`), `date` als `YYYY-MM-DD` (Art `date`), Zeitstempel als ISO-8601
-UTC, boolesche Werte als boolesche Werte. `importSnapshot` erhält die Plugin-Beschreibungen des Ziels (`{ plugins }`)
-und lehnt ein Plugin ab, das dort fehlt oder auf anderen Speicherversionen steht. `describeTransferConformance` (`database/conformance`,
-ausgeführt von `api:test-conformance`) prüft ihn je Backend: stabile IDs und Beziehungen, Zeitpunkte, exakte Geld- und
-Zählerwerte, Plugin-Tabellen und Plugin-Speicherversionen, Kern-Migrationsstand, nicht doppelt angewendete abgeleitete
-Guthaben und einen atomaren Restore, der einen Snapshot für einen anderen Migrationsstand ablehnt. Ein Backend ergänzt
-eine `TransferBackendFixture`.
+Für PostgreSQL ist das Backup ein `pg_dump` der Datenbank (siehe [Backup & Wiederherstellung](installation/backup-restore.md)).
+
+## Der einmalige SQLite-Import
+
+Eine 1.x-Installation gelangt über eine gewöhnliche Migration der PostgreSQL-Spur nach PostgreSQL,
+`apps/api/src/database/postgres/migrations/1760000000001-import-sqlite.ts`, mit ihren Hilfsmodulen in
+`postgres/migrations/sqlite-import/`. Sie läuft nach der Baseline und vor jeder späteren Migration, sodass die
+importierten Daten wie bei jeder anderen Installation durch alle späteren Migrationen laufen; eine neue Migration
+braucht keinen Snapshot und keine Upgrade-Liste. Die Migration bringt die SQLite-Datei an Ort und Stelle auf die
+letzte SQLite-Migration (die eingefrorene Spur in `apps/api/src/database/sqlite`), kopiert jede Kerntabelle in einer
+Transaktion (IDs und Sequenzen, UTC-Zeitpunkte, exakte Dezimalzahlen, JSON, Guthaben nicht doppelt angewendet,
+Fremdschlüssel vor dem Commit geprüft) und verschiebt die Datei danach nach `<STORAGE_ROOT>/sqlite-backup/`.
+Plugin-Tabellen und die Verwaltungsdaten des Plugin-Speichers werden nicht kopiert. Die Kernmigrationen laufen früh im
+Start (`postgres/postgres-startup-migrations.ts`) unter einem PostgreSQL-Advisory-Lock, eine Transaktion je Migration.
+`postgres-schema-parity.persistence.spec.ts` belegt, dass die Baseline dem letzten SQLite-Schema entspricht, und
+`apps/api/src/e2e/migrations` deckt Neuinstallation, Importe aus älteren SQLite-Ständen, den Import beim Start und die
+Wiederherstellung nach einem gescheiterten Import ab. Eine weitere Engine legt bei Bedarf eine eigene Spur mit eigenem
+Importschritt an.
 
 ## Nicht umgesetzt
 
