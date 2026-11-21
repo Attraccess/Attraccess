@@ -14,7 +14,14 @@ describe('visible resource existence', () => {
 
   beforeEach(async () => {
     source = await createTestDataSource();
-    service = new ResourceGroupsService(new TypeOrmResourceGroupStore(source), {} as never, {} as never, {} as never);
+    service = new ResourceGroupsService(
+      new TypeOrmResourceGroupStore(source),
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
   });
   afterEach(async () => {
     await closeTestDataSource(source);

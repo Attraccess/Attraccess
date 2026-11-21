@@ -18,7 +18,7 @@ import {
   FieldOptions,
   TextFieldOptions,
   NumberFieldOptions,
-} from '../../details/forms/types';
+} from '../../../forms/types';
 import en from '../translations/en.json';
 import de from '../translations/de.json';
 import { Select } from '../../../../components/select/index';
@@ -294,48 +294,56 @@ export function ResourceFormsModal({
     }
   }, [action, t]);
 
+  /** Checks every field so all problems show at once, and scrolls to the first one: with several forms it is out of view. */
   const handleSubmit = () => {
     const nextErrors: Record<number, string | null> = {};
-    try {
-      const submissions: FormSubmissionRequestDto[] = forms.map((form) => {
-        const answers: FormSubmissionRequestDto['answers'] = [];
-        form.fields.forEach((field) => {
-          const rawValue = values[field.id];
-          const hasValue = fieldHasValue(field.type, rawValue);
-          const selectOptions = field.type === FormFieldType.SELECT ? extractSelectOptions(field.options) : undefined;
+    let firstInvalidFieldId: number | null = null;
+    const fail = (fieldId: number, message?: string) => {
+      if (message) nextErrors[fieldId] = message;
+      firstInvalidFieldId ??= fieldId;
+    };
 
-          // For required boolean fields, the value must be true (checked)
-          if (field.type === FormFieldType.BOOLEAN && field.isRequired && rawValue !== true) {
-            nextErrors[field.id] = t('modal.booleanRequired');
-            throw new Error('VALIDATION_ERROR');
-          }
+    const submissions: FormSubmissionRequestDto[] = forms.map((form) => {
+      const answers: FormSubmissionRequestDto['answers'] = [];
+      form.fields.forEach((field) => {
+        const rawValue = values[field.id];
+        const selectOptions = field.type === FormFieldType.SELECT ? extractSelectOptions(field.options) : undefined;
 
-          if (!hasValue) {
-            if (field.isRequired) {
-              nextErrors[field.id] = t('modal.fieldRequired');
-              throw new Error('VALIDATION_ERROR');
-            }
-            return;
-          }
+        // For required boolean fields, the value must be true (checked)
+        if (field.type === FormFieldType.BOOLEAN && field.isRequired && rawValue !== true) {
+          fail(field.id, t('modal.booleanRequired'));
+          return;
+        }
 
-          const normalizedValue = normalizeValue(field.type, rawValue, t, nextErrors, field.id, selectOptions);
-          if (normalizedValue === undefined) {
-            throw new Error('VALIDATION_ERROR');
-          }
-          answers.push({ fieldId: field.id, value: normalizedValue });
-        });
+        if (!fieldHasValue(field.type, rawValue)) {
+          if (field.isRequired) fail(field.id, t('modal.fieldRequired'));
+          return;
+        }
 
-        return { formId: form.id, answers };
+        const normalizedValue = normalizeValue(field.type, rawValue, t, nextErrors, field.id, selectOptions);
+        if (normalizedValue === undefined) {
+          fail(field.id);
+          return;
+        }
+        answers.push({ fieldId: field.id, value: normalizedValue });
       });
 
-      setErrors({});
-      onSubmit(submissions);
-    } catch (error) {
-      setErrors((prev) => ({ ...prev, ...nextErrors }));
-      if ((error as Error).message !== 'VALIDATION_ERROR') {
-        console.error(error);
-      }
+      return { formId: form.id, answers };
+    });
+
+    if (firstInvalidFieldId !== null) {
+      setErrors(nextErrors);
+      const fieldId = firstInvalidFieldId;
+      requestAnimationFrame(() =>
+        document
+          .querySelector(`[data-form-field-id="${fieldId}"]`)
+          ?.scrollIntoView?.({ block: 'center', behavior: 'smooth' }),
+      );
+      return;
     }
+
+    setErrors({});
+    onSubmit(submissions);
   };
 
   const handleValueChange = (fieldId: number, value: FieldValue) => {
@@ -366,7 +374,7 @@ export function ResourceFormsModal({
               const selectOptions = field.type === FormFieldType.SELECT ? extractSelectOptions(field.options) : null;
 
               return (
-                <div key={field.id} className="space-y-2">
+                <div key={field.id} className="space-y-2" data-form-field-id={field.id}>
                   <div>
                     <p className="text-sm font-medium text-default-600">
                       {field.name}

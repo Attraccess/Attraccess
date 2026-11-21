@@ -60,6 +60,7 @@
     "title": "Confirm Deletion",
     "message": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
     "confirm": "Delete",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "forms": "Forms that apply to this group are deleted too. Their submissions are kept and stay visible in the usage history."
   }
 }

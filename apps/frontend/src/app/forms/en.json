@@ -1,0 +1,201 @@
+{
+  "editor": {
+    "createTitle": "Create form",
+    "editTitle": "{{formName}}",
+    "sections": {
+      "identity": "Form identity",
+      "behavior": "Defaults: when this form is required",
+      "fields": "Fields",
+      "preview": "Live preview",
+      "scope": "Scope"
+    },
+    "nameLabel": "Form name",
+    "namePlaceholder": "Machine safety checklist",
+    "resourceUsageStart": "Required by default at session start",
+    "resourceUsageTakeover": "Required by default at takeover",
+    "resourceUsageEnd": "Required by default at session end",
+    "addField": "Add field",
+    "reorderField": "Reorder field",
+    "emptyFieldsTitle": "No fields",
+    "emptyFieldsDescription": "Add at least one field so members have something to answer.",
+    "save": "Save form",
+    "delete": "Delete",
+    "deleteField": "Delete field",
+    "unsaved": "Unsaved changes",
+    "createSuccess": "Form created",
+    "updateSuccess": "Form updated",
+    "deleteSuccess": "Form deleted",
+    "deleteConfirmTitle": "Delete {{formName}}?",
+    "deleteConfirmDescription": {
+      "one": "The form is removed from the resource it applies to. Its submissions are kept and stay visible in the usage history.",
+      "many": "The form is removed from all {{count}} resources it applies to. Its submissions are kept and stay visible in the usage history."
+    },
+    "validation": {
+      "missingFieldName": "Please complete every field label before saving."
+    },
+    "defaultsHint": "Each resource can override these defaults under its Settings → Forms.",
+    "deleteCancel": "Cancel",
+    "sharedNotice": "Changes apply to all {{count}} resources.",
+    "tabs": {
+      "form": "Form",
+      "submissions": "Submissions"
+    },
+    "deleteConfirmDescriptionNone": "The form does not apply to any resource. Its submissions are kept and stay visible in the usage history."
+  },
+  "fields": {
+    "label": "Label",
+    "type": "Type",
+    "required": "Required",
+    "description": "Description",
+    "placeholder": {
+      "label": "-- Please enter a label --",
+      "description": "Shown below the label"
+    },
+    "optionsTitle": "Field options",
+    "options": {
+      "text": {
+        "placeholder": "Placeholder text",
+        "multiline": "Allow multiline input"
+      },
+      "number": {
+        "min": "Minimum value",
+        "max": "Maximum value",
+        "step": "Step size"
+      },
+      "select": {
+        "description": "Define the options that users can choose from.",
+        "optionPlaceholder": "Option value",
+        "addOption": "Add option",
+        "maxOptions": "Maximum number of options reached"
+      },
+      "boolean": {
+        "description": "Boolean fields use a yes/no switch and do not have additional options."
+      }
+    },
+    "types": {
+      "text": "Text",
+      "number": "Number",
+      "select": "Single choice",
+      "boolean": "Yes / No"
+    }
+  },
+  "preview": {
+    "booleanYes": "Yes",
+    "booleanNo": "No",
+    "booleanLabel": "Boolean field preview",
+    "selectPlaceholder": "Select an option",
+    "empty": "Add fields to see the preview."
+  },
+  "globalList": {
+    "title": "Forms",
+    "subtitle": "Forms members fill in when they start, take over or end a session. A form applies to one resource, a resource group or every resource.",
+    "create": "New form",
+    "tableLabel": "Forms",
+    "empty": "No forms yet",
+    "loadError": "The forms could not be loaded.",
+    "scopeFilter": "Scope",
+    "allScopes": "All scopes",
+    "columns": {
+      "name": "Name",
+      "scope": "Scope",
+      "fields": "Fields",
+      "appliesTo": "Applies to"
+    },
+    "appliesToCount": {
+      "one": "{{count}} resource",
+      "many": "{{count}} resources"
+    },
+    "fieldCount": {
+      "one": "{{count}} field",
+      "many": "{{count}} fields"
+    },
+    "emptyFiltered": "No forms match this filter.",
+    "editAction": "Edit form"
+  },
+  "scope": {
+    "label": "Scope",
+    "description": "Where the form applies.",
+    "resource": "Resource",
+    "group": "Group",
+    "global": "Global",
+    "groupWithName": "Group: {{name}}",
+    "resourceWithName": "Resource: {{name}}",
+    "groupPicker": "Group",
+    "groupPlaceholder": "Select a group",
+    "missingOwner": "Select a resource or group for this scope."
+  },
+  "appliesTo": {
+    "title": {
+      "one": "Applies to {{count}} resource",
+      "many": "Applies to {{count}} resources"
+    },
+    "empty": "This form does not apply to any resource yet.",
+    "disabled": "Switched off",
+    "overridden": "Overridden",
+    "inherited": "Defaults",
+    "tableLabel": "Resources the form applies to",
+    "resource": "Resource",
+    "state": "State",
+    "effective": "Required at",
+    "badges": {
+      "start": "On start",
+      "takeover": "On takeover",
+      "end": "On end"
+    },
+    "switchedOff": "{{count}} switched off"
+  },
+  "submissions": {
+    "tableLabel": "Submissions",
+    "empty": "No submissions yet.",
+    "resourceFilter": "Resource",
+    "allResources": "All resources",
+    "loadError": "The submissions could not be loaded.",
+    "columns": {
+      "date": "Date",
+      "user": "User",
+      "resource": "Resource",
+      "action": "Action",
+      "answers": "Answers"
+    },
+    "actions": {
+      "start": "Start",
+      "takeover": "Takeover",
+      "end": "End"
+    },
+    "showAnswers": "Show answers",
+    "hideAnswers": "Hide answers",
+    "noAnswers": "No answers",
+    "yes": "Yes",
+    "no": "No",
+    "unknown": "Unknown"
+  },
+  "resourceTab": {
+    "create": "New form",
+    "empty": "No forms apply to this resource yet.",
+    "tableLabel": "Forms of this resource",
+    "loadError": "The forms could not be loaded.",
+    "columns": {
+      "name": "Form",
+      "source": "Source",
+      "enabled": "Enabled",
+      "start": "Start",
+      "takeover": "Takeover",
+      "end": "End"
+    },
+    "toggle": "Use {{name}} on this resource",
+    "override": {
+      "required": "Required",
+      "notRequired": "Not required",
+      "label": "{{action}} for {{name}}",
+      "inheritsRequired": "Inherit (required)",
+      "inheritsNotRequired": "Inherit (not required)"
+    },
+    "saved": "Saved",
+    "editAction": "Edit form",
+    "submissionsAction": "Submissions"
+  },
+  "deleted": {
+    "title": "Deleted form #{{id}}",
+    "description": "This form was deleted and no longer applies to any resource. Its submissions are kept and listed below."
+  }
+}

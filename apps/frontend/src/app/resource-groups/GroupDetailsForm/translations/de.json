@@ -60,6 +60,7 @@
     "title": "Löschen bestätigen",
     "message": "Sind Sie sicher, dass Sie \"{{name}}\" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.",
     "confirm": "Löschen",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "forms": "Formulare, die für diese Gruppe gelten, werden ebenfalls gelöscht. Ihre Einreichungen bleiben erhalten und in der Nutzungshistorie sichtbar."
   }
 }

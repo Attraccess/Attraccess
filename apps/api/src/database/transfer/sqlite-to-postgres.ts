@@ -12,6 +12,7 @@ import { createSqliteTransfer } from '../sqlite/sqlite-transfer';
 import type { DatabaseSnapshot, PluginDescriptor } from '../transfer-snapshot';
 import { SqliteTransferError, safeDetail, type TransferFailureOutcome } from './transfer-errors';
 import { copyToWorkingDirectory, markMigrated } from './sqlite-working-copy';
+import { upgradeSqliteSnapshot } from './sqlite-snapshot-upgrades';
 
 export interface TransferLog {
   log(message: string): void;
@@ -97,7 +98,10 @@ async function withoutEmptyLeftovers(
   return { ...snapshot, tables: snapshot.tables.filter((table) => !names.has(table.name)) };
 }
 
-/** Exports the SQLite database through a private working copy: the original file is only read. */
+/**
+ * Exports the SQLite database through a private working copy: the original file is only read. The snapshot has the
+ * shape of the current PostgreSQL schema.
+ */
 export async function exportSqliteSnapshot(
   sqliteFile: string,
   plugins: readonly PluginDescriptor[],
@@ -126,7 +130,7 @@ export async function exportSqliteSnapshot(
       const snapshot = await step('exporting the SQLite data', () =>
         createSqliteTransfer(sqliteFrozenTrack).exportSnapshot(reader, { plugins }),
       );
-      return withoutAdoptedHistories(snapshot, plugins);
+      return upgradeSqliteSnapshot(withoutAdoptedHistories(snapshot, plugins));
     } finally {
       await reader.destroy();
     }

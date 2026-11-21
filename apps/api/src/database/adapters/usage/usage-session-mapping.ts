@@ -31,10 +31,13 @@ export function toUsageSessionForm(form: Form): UsageSessionForm {
     createdAt: form.createdAt,
     updatedAt: form.updatedAt,
     name: form.name,
+    scope: form.scope,
     isRequiredOnResourceUsageStart: form.isRequiredOnResourceUsageStart,
     isRequiredOnResourceUsageTakeOver: form.isRequiredOnResourceUsageTakeOver,
     isRequiredOnResourceUsageEnd: form.isRequiredOnResourceUsageEnd,
     resourceId: form.resourceId,
+    groupId: form.groupId,
+    deletedAt: form.deletedAt,
   };
 }
 

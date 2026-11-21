@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { FormFieldType } from '@attraccess/application-models';
+import { rawValue } from './raw-value.transform';
 
 export class FormFieldBaseDto {
   @ApiProperty({ description: 'Field display name', example: 'Project name' })
@@ -22,6 +23,7 @@ export class FormFieldBaseDto {
   type!: FormFieldType;
 
   @ApiProperty({ description: 'Whether the field is required', example: true })
+  @rawValue()
   @IsBoolean()
   isRequired!: boolean;
 

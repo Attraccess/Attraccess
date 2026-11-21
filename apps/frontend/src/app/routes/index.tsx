@@ -38,7 +38,8 @@ import { ResourceDiagnosticsTab } from '../resources/details/diagnostics/Resourc
 import FlowsPage from '../resources/details/flows/index';
 import { GlobalFlowEditorPage } from '../global-flows/GlobalFlowEditorPage';
 import { GlobalFlowsListPage } from '../global-flows/GlobalFlowsListPage';
-import { FormEditorPage, FormListPage } from '../resources/details/forms/index';
+import { LegacyFormEditorRedirect, ResourceFormsTab } from '../resources/details/forms/index';
+import { formsRoutes } from '../forms/routes';
 import { ResourceGroupsTab } from '../resources/details/groups/ResourceGroupsTab';
 import { ResourceHistoryTab } from '../resources/details/history/ResourceHistoryTab';
 import { ResourceTabsLayout } from '../resources/details/layout/ResourceTabsLayout';
@@ -220,14 +221,14 @@ const coreRoutes: RouteConfig[] = [
     path: '/resources/:id/forms',
     element: (
       <ResourceSettingsSection topic="forms">
-        <FormListPage />
+        <ResourceFormsTab />
       </ResourceSettingsSection>
     ),
     authRequired: 'resources.update',
   },
   {
     path: '/resources/:id/forms/:formId',
-    element: <FormEditorPage />,
+    element: <LegacyFormEditorRedirect />,
     authRequired: 'resources.update',
   },
   {
@@ -273,6 +274,7 @@ const coreRoutes: RouteConfig[] = [
     element: <GlobalFlowEditorPage />,
     authRequired: 'resources.update',
   },
+  ...formsRoutes,
   {
     path: '/devices/mqtt/servers',
     element: <MqttServersPage />,

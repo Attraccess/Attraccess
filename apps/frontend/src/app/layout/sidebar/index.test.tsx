@@ -68,6 +68,7 @@ vi.mock('../../routes/index', () => ({
     { path: '/printers', authRequired: true },
     { path: '/printers/bambulab', authRequired: 'resources.update' },
     { path: '/devices/flows', authRequired: 'resources.update' },
+    { path: '/forms', authRequired: 'resources.update' },
     { path: '/devices/mqtt/servers', authRequired: 'system.settings.manage' },
     { path: '/devices/companion', authRequired: 'system.settings.manage' },
   ],
@@ -134,8 +135,8 @@ describe('plugin sidebar placement', () => {
     expect(within(screen.getByRole('menu', { name: 'Devices' })).getByRole('menuitem', { name: 'WAGO' })).toBeVisible();
   });
 
-  it('shows Flows in Devices for operators who only have resources.update', async () => {
-    // No plugin entries, so Flows alone has to make the Devices group appear.
+  it('shows Flows and Forms in Devices for operators who only have resources.update', async () => {
+    // No plugin entries, so Flows and Forms alone have to make the Devices group appear.
     state.items = [];
     const user = userEvent.setup();
     renderSidebar();
@@ -150,10 +151,11 @@ describe('plugin sidebar placement', () => {
       within(devices)
         .getAllByRole('link')
         .map((link) => link.getAttribute('href')),
-    ).toEqual(['/devices/flows']);
+    ).toEqual(['/devices/flows', '/forms']);
+    expect(within(devices).getByRole('link', { name: 'Forms' })).toHaveAttribute('href', '/forms');
   });
 
-  it('includes Flows in the collapsed Devices menu', async () => {
+  it('includes Flows and Forms in the collapsed Devices menu', async () => {
     state.items = [];
     const user = userEvent.setup();
     renderSidebar(true);
@@ -162,7 +164,8 @@ describe('plugin sidebar placement', () => {
 
     const menu = screen.getByRole('menu', { name: 'Devices' });
     expect(within(menu).getByRole('menuitem', { name: 'Flows' })).toBeVisible();
-    expect(within(menu).getAllByRole('menuitem')).toHaveLength(1);
+    expect(within(menu).getByRole('menuitem', { name: 'Forms' })).toBeVisible();
+    expect(within(menu).getAllByRole('menuitem')).toHaveLength(2);
   });
 
   it('hides WAGO and the empty Devices group without the route permission', () => {

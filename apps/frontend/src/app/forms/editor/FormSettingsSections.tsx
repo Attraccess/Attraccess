@@ -31,6 +31,7 @@ export function FormSettingsSections({ form, setForm }: Readonly<FormSettingsSec
         <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
           {t('editor.sections.behavior')}
         </h3>
+        <p className="text-sm text-muted">{t('editor.defaultsHint')}</p>
         <div className="divide-y divide-default-200/60 rounded-lg border border-default-200">
           <div className="px-4 py-3">
             <LabeledSwitch

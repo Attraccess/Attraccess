@@ -31,13 +31,13 @@ describe('Fresh PostgreSQL install (e2e)', () => {
     await lifecycle.close();
   });
 
-  it('applies the baseline once and records exactly the PostgreSQL track in the track table', async () => {
+  it('applies the track once and records exactly the PostgreSQL track in the track table', async () => {
     const source = await lifecycle.open();
     expect(await source.runMigrations().then((applied) => applied.map((migration) => migration.name))).toEqual(
       trackNames,
     );
     expect(await recordedMigrations(source)).toEqual(trackNames);
-    expect(trackNames).toEqual(['PostgresBaseline1760000000000']);
+    expect(trackNames).toEqual(['PostgresBaseline1760000000000', 'PostgresGlobalForms1795700000000']);
     expect(postgresBackend.migrationTrack.tableName).toBe('migrations');
     const [{ count }] = await source.query(
       `SELECT COUNT(*)::int AS count FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'migrations'`,

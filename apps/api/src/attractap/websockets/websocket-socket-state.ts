@@ -248,6 +248,15 @@ export function queuedSendBytes(socket: Pick<AuthenticatedWebSocket, 'pendingSen
   return socket.pendingSendBytes?.() ?? socket.bufferedAmount ?? 0;
 }
 
+/**
+ * Forgets the reader's form answers and which forms it was shown, for every draft key. The two belong together: a
+ * fresh draft must start with nothing presented (ATT-796).
+ */
+export function forgetReaderFormState(socket: Pick<AuthenticatedWebSocket, 'state'>): void {
+  socket.state.formDrafts = undefined;
+  socket.state.formsPresented = undefined;
+}
+
 export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   messageCount: number;
   id: string;
@@ -356,6 +365,8 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       servedUntil?: number;
     } | null;
     formDrafts?: Record<string, Record<number, FormFieldAnswerValue>>;
+    /** Per draft key, the forms already sent to the reader; it shows at most four at a time (ATT-796). */
+    formsPresented?: Record<string, number[]>;
     /** Live card authentication (ATT-1187). Null once the reader reported sign-out or the server expired it. */
     cardSession?: CardSessionState | null;
     /** Open reader UI steps by stepId; discarded when the socket closes. */

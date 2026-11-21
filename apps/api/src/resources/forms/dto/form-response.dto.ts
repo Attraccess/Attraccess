@@ -1,4 +1,5 @@
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
+import { FORM_SCOPES, type FormScope } from '@attraccess/application-models';
 import { FormFieldResponseDto } from './form-field.dto';
 
 export class FormResponseDto {
@@ -14,17 +15,23 @@ export class FormResponseDto {
   @ApiProperty({ description: 'Form name', example: 'Machine safety checklist' })
   name!: string;
 
-  @ApiProperty({ description: 'Whether required before starting a usage session' })
+  @ApiProperty({ description: 'Where the form applies', enum: FORM_SCOPES, enumName: 'FormScope' })
+  scope!: FormScope;
+
+  @ApiProperty({ description: 'Default: whether required before starting a usage session' })
   isRequiredOnResourceUsageStart!: boolean;
 
-  @ApiProperty({ description: 'Whether required before taking over a usage session' })
+  @ApiProperty({ description: 'Default: whether required before taking over a usage session' })
   isRequiredOnResourceUsageTakeOver!: boolean;
 
-  @ApiProperty({ description: 'Whether required when ending a usage session' })
+  @ApiProperty({ description: 'Default: whether required when ending a usage session' })
   isRequiredOnResourceUsageEnd!: boolean;
 
-  @ApiProperty({ description: 'Owning resource identifier', example: 5 })
-  resourceId!: number;
+  @ApiProperty({ description: 'The resource of a resource form', example: 5, nullable: true, type: Number })
+  resourceId!: number | null;
+
+  @ApiProperty({ description: 'The resource group of a group form', nullable: true, type: Number })
+  groupId!: number | null;
 
   @ApiProperty({ type: () => FormFieldResponseDto, isArray: true })
   fields!: FormFieldResponseDto[];

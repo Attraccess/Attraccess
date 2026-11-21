@@ -52,6 +52,7 @@ describe('AttractapGateway card relay rules', () => {
       },
       massIntroductionFlow: { sessionId: 'mass-1' },
       formDrafts: { '1:START': { 1: 'x' } },
+      formsPresented: { '1:START': [7] },
     });
     fixture.websocketService.sockets.set(socket.id, socket);
     return socket;
@@ -142,6 +143,7 @@ describe('AttractapGateway card relay rules', () => {
       expect(socket.state.verifiedUserId).toBeNull();
       expect(socket.state.verifiedCardUid).toBeNull();
       expect(socket.state.formDrafts).toBeUndefined();
+      expect(socket.state.formsPresented).toBeUndefined();
       // Web-started supervision, mass introduction, enrollment and reset do not belong to the login.
       expect(socket.state.supervisionFlow).not.toBeNull();
       expect(socket.state.massIntroductionFlow).not.toBeNull();
@@ -221,6 +223,7 @@ describe('AttractapGateway card relay rules', () => {
       expect(abort).not.toHaveBeenCalled();
       expect(socket.state.verifiedUserId).toBe(5);
       expect(socket.state.formDrafts).toEqual({ '1:START': { 1: 'x' } });
+      expect(socket.state.formsPresented).toEqual({ '1:START': [7] });
     });
 
     it('a credential change ends the login and armed flows before the socket is gone', async () => {

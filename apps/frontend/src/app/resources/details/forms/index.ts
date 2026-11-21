@@ -1,3 +1,2 @@
-export { FormListPage } from './FormListPage';
-export { FormEditorPage } from './FormEditorPage';
-
+export { ResourceFormsTab } from './ResourceFormsTab';
+export { LegacyFormEditorRedirect } from './LegacyFormEditorRedirect';

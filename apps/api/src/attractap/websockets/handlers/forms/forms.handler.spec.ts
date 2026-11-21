@@ -172,6 +172,54 @@ describe('AttractapFormsHandler', () => {
       );
     });
 
+    it('sends at most four forms per request and the rest once those are answered', async () => {
+      const forms = [1, 2, 3, 4, 5, 6].map((id) => ({
+        id,
+        name: `Form ${id}`,
+        // Form 5 has no required field: it must still be shown once the reader is asked.
+        fields: id === 5 ? [{ id: 50, isRequired: false }] : [{ id: id * 10, isRequired: true }],
+      }));
+      fixture.mockResourceFormsService.getFormsForAction.mockResolvedValue(forms);
+      const socket = fixture.createMockSocket();
+      const key = `10:${ResourceFormAction.START}`;
+      const requestedIds = () =>
+        socket.sendMessage.mock.calls.at(-1)[0].data.payload.forms.map((form: { id: number }) => form.id);
+      const ask = () =>
+        fixture.handler.ensureFormsSatisfied({ socket, resourceId: 10, action: ResourceFormAction.START });
+
+      expect(await ask()).toBeNull();
+      expect(requestedIds()).toEqual([1, 2, 3, 4]);
+      // A retry before anything was answered asks for the same batch again.
+      expect(await ask()).toBeNull();
+      expect(requestedIds()).toEqual([1, 2, 3, 4]);
+
+      socket.state.formDrafts = { [key]: { 10: 'a', 20: 'b', 30: 'c', 40: 'd' } };
+      expect(await ask()).toBeNull();
+      expect(requestedIds()).toEqual([5, 6]);
+      expect(socket.sendMessage).toHaveBeenCalledTimes(3);
+
+      socket.state.formDrafts[key][60] = 'f';
+      const submissions = await ask();
+      expect(socket.sendMessage).toHaveBeenCalledTimes(3);
+      expect(submissions?.map((submission) => submission.formId)).toEqual([1, 2, 3, 4, 5, 6]);
+      expect(submissions?.[5]).toEqual({ formId: 6, answers: [{ fieldId: 60, value: 'f' }] });
+
+      fixture.handler.clearFormDraft(socket, 10, ResourceFormAction.START);
+      expect(socket.state.formsPresented).toEqual({});
+    });
+
+    it('starts right away when the answers already cover every required field, as before', async () => {
+      fixture.mockResourceFormsService.getFormsForAction.mockResolvedValue([
+        { id: 1, name: 'Optional only', fields: [{ id: 10, isRequired: false }] },
+      ]);
+      const socket = fixture.createMockSocket();
+
+      expect(
+        await fixture.handler.ensureFormsSatisfied({ socket, resourceId: 10, action: ResourceFormAction.START }),
+      ).toEqual([{ formId: 1, answers: [] }]);
+      expect(socket.sendMessage).not.toHaveBeenCalled();
+    });
+
     it('treats empty-string and null draft values as missing for required fields', async () => {
       fixture.mockResourceFormsService.getFormsForAction.mockResolvedValue([
         {
@@ -324,7 +372,13 @@ describe('AttractapFormsHandler', () => {
 
       await fixture.handler.handleResourceUsageFormGetFields(socket, eventData);
 
-      expect(fixture.mockResourceFormsService.getFieldsWindow).toHaveBeenCalledWith(10, 7, 0, 5);
+      expect(fixture.mockResourceFormsService.getFieldsWindow).toHaveBeenCalledWith(
+        10,
+        ResourceFormAction.START,
+        7,
+        0,
+        5,
+      );
       expect(socket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -393,7 +447,12 @@ describe('AttractapFormsHandler', () => {
 
       await fixture.handler.handleResourceUsageFormSubmitPage(socket, eventData);
 
-      expect(fixture.mockResourceFormsService.validatePageAnswers).toHaveBeenCalledWith(10, 7, answers);
+      expect(fixture.mockResourceFormsService.validatePageAnswers).toHaveBeenCalledWith(
+        10,
+        ResourceFormAction.START,
+        7,
+        answers,
+      );
       expect(socket.state.formDrafts).toEqual({
         [`10:${ResourceFormAction.START}`]: { 1: 'v1', 2: 'v2' },
       });
@@ -452,7 +511,12 @@ describe('AttractapFormsHandler', () => {
 
       await fixture.handler.handleResourceUsageFormSubmitPage(socket, eventData);
 
-      expect(fixture.mockResourceFormsService.validatePageAnswers).toHaveBeenCalledWith(10, 7, answers);
+      expect(fixture.mockResourceFormsService.validatePageAnswers).toHaveBeenCalledWith(
+        10,
+        ResourceFormAction.START,
+        7,
+        answers,
+      );
       expect(socket.state.formDrafts).toBeUndefined();
       expect(socket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({

@@ -34,6 +34,7 @@
       "label": "Devices",
       "items": {
         "globalFlows": "Flows",
+        "forms": "Forms",
         "attractapReaders": "Attractap Readers",
         "mqttServers": "MQTT Servers",
         "companion": "Companion App",

@@ -17,6 +17,7 @@ import {
   BookOpenIcon,
   BoxIcon,
   BugIcon,
+  ClipboardListIcon,
   GiftIcon,
   LightbulbIcon,
   PackageIcon,
@@ -241,6 +242,12 @@ export const SIDEBAR_ITEMS: (SidebarItem | SidebarItemGroup)[] = [
         path: '/devices/flows',
         translationKey: 'globalFlows',
         icon: WorkflowIcon,
+      },
+      {
+        // Forms that apply to one resource, a group or every resource; resources.update like the flows above.
+        path: '/forms',
+        translationKey: 'forms',
+        icon: ClipboardListIcon,
       },
       {
         path: '/devices/mqtt/servers',

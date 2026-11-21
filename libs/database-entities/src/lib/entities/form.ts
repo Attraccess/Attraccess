@@ -1,9 +1,11 @@
-import { FormFieldType, ResourceFormAction } from '@attraccess/application-models';
+import { FORM_SCOPES, FormFieldType, ResourceFormAction, type FormScope } from '@attraccess/application-models';
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -13,8 +15,21 @@ import {
 import { Resource } from './resource.entity';
 import { User } from './user.entity';
 import { ResourceUsage } from './resourceUsage.entity';
+import { ResourceGroup } from './resourceGroup.entity';
+
+/**
+ * Exactly the owner column the scope needs. A deleted group form may lose its group (the group was deleted), so its
+ * groupId may be NULL.
+ */
+const FORM_SCOPE_CHECK =
+  `("scope" = 'resource' AND "resourceId" IS NOT NULL AND "groupId" IS NULL) OR ` +
+  `("scope" = 'group' AND "resourceId" IS NULL AND ("groupId" IS NOT NULL OR "deletedAt" IS NOT NULL)) OR ` +
+  `("scope" = 'global' AND "resourceId" IS NULL AND "groupId" IS NULL)`;
 
 @Entity()
+@Check('CHK_form_scope', FORM_SCOPE_CHECK)
+@Index('IDX_form_scope_group', ['scope', 'groupId'])
+@Index('IDX_form_resource', ['resourceId'])
 export class Form {
   @PrimaryGeneratedColumn()
   @ApiProperty({ description: 'The ID of the form' })
@@ -55,17 +70,79 @@ export class Form {
   @ApiProperty({ description: 'The submissions of the form', type: () => FormSubmission, isArray: true })
   submissions!: FormSubmission[];
 
-  @Column({ type: 'integer' })
-  @ApiProperty({ description: 'The ID of the resource that the form belongs to' })
-  resourceId!: number;
+  @Column({ type: 'varchar', default: 'resource' })
+  @ApiProperty({ description: 'Where the form applies', enum: [...FORM_SCOPES] })
+  scope!: FormScope;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({ description: 'The resource of a resource form', nullable: true, type: Number })
+  resourceId!: number | null;
 
   @ManyToOne(() => Resource, (resource) => resource.forms)
   @JoinColumn({ name: 'resourceId' })
-  @ApiProperty({ description: 'The resource that the form belongs to', type: () => Resource })
+  @ApiProperty({ description: 'The resource of a resource form', type: () => Resource })
+  resource!: Resource | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({ description: 'The resource group of a group form', nullable: true, type: Number })
+  groupId!: number | null;
+
+  @ManyToOne(() => ResourceGroup, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'groupId' })
+  group!: ResourceGroup | null;
+
+  /** A plain column, not a TypeORM soft delete: submissions keep loading their deleted form for the history. */
+  @Column({ type: 'timestamptz', nullable: true })
+  @ApiProperty({ description: 'When the form was deleted', nullable: true, type: Date })
+  deletedAt!: Date | null;
+
+  @OneToMany(() => FormResourceOverride, (override) => override.form)
+  overrides!: FormResourceOverride[];
+}
+
+/** How one resource deviates from a form that applies to it: switched off, or other required flags. */
+@Entity()
+@Index('IDX_form_resource_override_form_resource', ['formId', 'resourceId'], { unique: true })
+@Index('IDX_form_resource_override_resource', ['resourceId'])
+export class FormResourceOverride {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: 'integer' })
+  formId!: number;
+
+  @ManyToOne(() => Form, (form) => form.overrides, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'formId' })
+  form!: Form;
+
+  @Column({ type: 'integer' })
+  resourceId!: number;
+
+  @ManyToOne(() => Resource, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'resourceId' })
   resource!: Resource;
+
+  @Column({ type: 'boolean', default: false })
+  disabled!: boolean;
+
+  @Column({ type: 'boolean', nullable: true })
+  isRequiredOnResourceUsageStart!: boolean | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  isRequiredOnResourceUsageTakeOver!: boolean | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  isRequiredOnResourceUsageEnd!: boolean | null;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  createdAt!: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  updatedAt!: Date;
 }
 
 @Entity()
+@Index('IDX_form_field_form', ['formId'])
 export class FormField {
   @PrimaryGeneratedColumn()
   @ApiProperty({ description: 'The ID of the form field' })
@@ -113,6 +190,8 @@ interface FormSubmissionFieldData {
 type FormSubmissionData = Record<string, FormSubmissionFieldData>;
 
 @Entity()
+@Index('IDX_form_submission_form_created', ['formId', 'createdAt'])
+@Index('IDX_form_submission_resource_usage', ['resourceUsageId'])
 export class FormSubmission {
   @PrimaryGeneratedColumn()
   @ApiProperty({ description: 'The ID of the form submission' })

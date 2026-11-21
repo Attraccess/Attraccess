@@ -5,6 +5,8 @@ import type { ResourceGroupRecord } from '@attraccess/application-models';
 import { MetricsService } from '../../metrics/metrics.service';
 import { ResourceGroupsService } from './resourceGroups.service';
 import { RESOURCE_GROUP_STORE } from './resource-group-store.port';
+import { RESOURCE_FORM_STORE } from '../forms/forms-store.port';
+import { UNIT_OF_WORK } from '../../database/unit-of-work';
 
 const record = (overrides: Partial<ResourceGroupRecord> = {}): ResourceGroupRecord => ({
   id: 5,
@@ -30,6 +32,9 @@ describe('ResourceGroupsService audit events', () => {
     removeResource: jest.fn(),
   };
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
+  const formStore = { softDeleteGroupForms: jest.fn().mockResolvedValue(0) };
+  const scope = { isOpen: true };
+  const unitOfWork = { run: jest.fn((work: (scope: unknown) => Promise<unknown>) => work(scope)) };
   let service: ResourceGroupsService;
 
   beforeEach(async () => {
@@ -42,6 +47,8 @@ describe('ResourceGroupsService audit events', () => {
           { provide: EventEmitter2, useValue: { emit: jest.fn() } },
           { provide: MetricsService, useValue: { resourceGroupsTotal: { inc: jest.fn(), dec: jest.fn() } } },
           { provide: AUDIT_RECORDER, useValue: audit },
+          { provide: RESOURCE_FORM_STORE, useValue: formStore },
+          { provide: UNIT_OF_WORK, useValue: unitOfWork },
         ],
       }).compile()
     ).get(ResourceGroupsService);
@@ -103,6 +110,9 @@ describe('ResourceGroupsService audit events', () => {
 
     store.delete.mockResolvedValue(1);
     await service.deleteOne(5, { id: 9 });
+    // The group's forms are deleted softly in the same unit of work as the group.
+    expect(formStore.softDeleteGroupForms).toHaveBeenCalledWith(5, scope);
+    expect(store.delete).toHaveBeenCalledWith(5, scope);
     expect(audit.record).toHaveBeenLastCalledWith(
       expect.objectContaining({
         domain: 'resource',

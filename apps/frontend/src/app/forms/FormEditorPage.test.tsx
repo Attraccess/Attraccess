@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
-import { TestWrapper } from '../../../../test-utils/wrappers';
+import { TestWrapper } from '../../test-utils/wrappers';
 import { FormEditorPage } from './FormEditorPage';
 
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
@@ -16,19 +16,17 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...((await importOriginal()) as object),
-  useGetOneResourceById: () => ({ data: { id: 7, name: 'Laser Cutter' } }),
-  useResourceFormsGetOne: () => ({ data: undefined, isLoading: false }),
-  useResourceFormsCreate: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useResourceFormsUpdate: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useResourceFormsDelete: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useFormsGetOne: () => ({ data: undefined, isLoading: false }),
+  useFormsListResources: () => ({ data: undefined }),
+  useFormsCreate: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useFormsUpdate: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useFormsDelete: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useResourceGroupsGetMany: () => ({ data: [], isLoading: false }),
 }));
 
 function renderEditor() {
   return render(
-    <TestWrapper
-      initialRoute="/resources/7/forms/new"
-      routes={<Route path="/resources/:id/forms/:formId" element={<FormEditorPage />} />}
-    />,
+    <TestWrapper initialRoute="/forms/new" routes={<Route path="/forms/:formId" element={<FormEditorPage />} />} />,
   );
 }
 

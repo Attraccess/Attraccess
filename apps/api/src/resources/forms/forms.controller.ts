@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Put, Query } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { ResourceFormsService } from './forms.service';
-import { CreateFormDto, FormRequirementsQueryDto, FormResponseDto, UpdateFormDto } from './dto';
+import { FormRequirementsQueryDto, FormResourceOverrideDto, FormResponseDto, ResourceApplicableFormDto } from './dto';
 
-@ApiTags('Resource Forms')
+/** The forms that apply to one resource and how the resource deviates from them. */
+@ApiTags('Forms')
 @Controller('resources/:resourceId/forms')
 export class ResourceFormsController {
   constructor(private readonly resourceFormsService: ResourceFormsService) {}
@@ -12,26 +13,13 @@ export class ResourceFormsController {
   @Get()
   @Auth('resources.update')
   @ApiOperation({
-    summary: 'List forms for a resource',
+    summary: 'List the forms that apply to a resource',
+    description: 'Its own forms and those it inherits from its groups and global forms, switched-off ones included.',
     operationId: 'resourceFormsList',
   })
-  @ApiResponse({ status: 200, type: FormResponseDto, isArray: true })
-  async list(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<FormResponseDto[]> {
-    return this.resourceFormsService.findAll(resourceId);
-  }
-
-  @Post()
-  @Auth('resources.update')
-  @ApiOperation({
-    summary: 'Create a form',
-    operationId: 'resourceFormsCreate',
-  })
-  @ApiResponse({ status: 201, type: FormResponseDto })
-  async create(
-    @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Body() dto: CreateFormDto,
-  ): Promise<FormResponseDto> {
-    return this.resourceFormsService.create(resourceId, dto);
+  @ApiResponse({ status: 200, type: ResourceApplicableFormDto, isArray: true })
+  async list(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<ResourceApplicableFormDto[]> {
+    return this.resourceFormsService.listForResource(resourceId);
   }
 
   @Get('requirements')
@@ -48,48 +36,35 @@ export class ResourceFormsController {
     return this.resourceFormsService.getFormsForAction(resourceId, query.action);
   }
 
-  @Get(':formId')
+  @Put(':formId/override')
   @Auth('resources.update')
   @ApiOperation({
-    summary: 'Get a form by id',
-    operationId: 'resourceFormsGetOne',
+    summary: 'Switch a form off for a resource or override its required flags',
+    operationId: 'resourceFormsSetOverride',
   })
   @ApiParam({ name: 'formId', type: Number })
-  @ApiResponse({ status: 200, type: FormResponseDto })
-  async getOne(
+  @ApiResponse({ status: 200, type: ResourceApplicableFormDto })
+  async setOverride(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('formId', ParseIntPipe) formId: number,
-  ): Promise<FormResponseDto> {
-    return this.resourceFormsService.findOne(resourceId, formId);
+    @Body() dto: FormResourceOverrideDto,
+  ): Promise<ResourceApplicableFormDto> {
+    return this.resourceFormsService.upsertOverride(resourceId, formId, dto);
   }
 
-  @Put(':formId')
-  @Auth('resources.update')
-  @ApiOperation({
-    summary: 'Update a form',
-    operationId: 'resourceFormsUpdate',
-  })
-  @ApiResponse({ status: 200, type: FormResponseDto })
-  async update(
-    @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Param('formId', ParseIntPipe) formId: number,
-    @Body() dto: UpdateFormDto,
-  ): Promise<FormResponseDto> {
-    return this.resourceFormsService.update(resourceId, formId, dto);
-  }
-
-  @Delete(':formId')
+  @Delete(':formId/override')
   @Auth('resources.update')
   @HttpCode(204)
   @ApiOperation({
-    summary: 'Delete a form',
-    operationId: 'resourceFormsDelete',
+    summary: "Remove a resource's override of a form, so the form's defaults apply again",
+    operationId: 'resourceFormsDeleteOverride',
   })
-  @ApiResponse({ status: 204, description: 'Form deleted' })
-  async delete(
+  @ApiParam({ name: 'formId', type: Number })
+  @ApiResponse({ status: 204, description: 'Override removed' })
+  async deleteOverride(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('formId', ParseIntPipe) formId: number,
   ): Promise<void> {
-    await this.resourceFormsService.delete(resourceId, formId);
+    await this.resourceFormsService.deleteOverride(resourceId, formId);
   }
 }

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { GroupsPersistenceModule } from '../../database/adapters/resources/groups-persistence.module';
+import { FormsPersistenceModule } from '../../database/adapters/resources/forms-persistence.module';
 import { ResourceGroupsService } from './resourceGroups.service';
 
 /**
@@ -7,7 +8,7 @@ import { ResourceGroupsService } from './resourceGroups.service';
  * retraining, so both import this module instead of each other.
  */
 @Module({
-  imports: [GroupsPersistenceModule],
+  imports: [GroupsPersistenceModule, FormsPersistenceModule],
   providers: [ResourceGroupsService],
   exports: [ResourceGroupsService],
 })

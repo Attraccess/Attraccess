@@ -1,6 +1,7 @@
 import type { DataSource } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../test-utils/test-database';
 import { postgresErrorClassifier } from './postgres-errors';
+import { postgresMigrations } from './migrations';
 
 describe('PostgreSQL baseline migration', () => {
   let source: DataSource;
@@ -36,9 +37,10 @@ describe('PostgreSQL baseline migration', () => {
     }
   };
 
-  it('records the baseline and seeds the defaults', async () => {
-    const migrations = await source.query('SELECT name FROM migrations');
-    expect(migrations.map((m: { name: string }) => m.name)).toEqual(['PostgresBaseline1760000000000']);
+  it('records the track from the baseline on and seeds the defaults', async () => {
+    const migrations = await source.query('SELECT name FROM migrations ORDER BY id');
+    expect(migrations.map((m: { name: string }) => m.name)).toEqual(postgresMigrations.map((m) => m.name));
+    expect(migrations[0].name).toBe('PostgresBaseline1760000000000');
     const [{ count }] = await source.query('SELECT COUNT(*)::int AS count FROM role');
     expect(count).toBeGreaterThanOrEqual(6);
     const [setting] = await source.query(
@@ -251,7 +253,7 @@ describe('PostgreSQL baseline migration', () => {
 
     it('applies the baseline although TypeORM prepared its metadata table first, and leaves no schema drift', async () => {
       await empty.runMigrations();
-      expect((await empty.query('SELECT name FROM migrations')).length).toBe(1);
+      expect((await empty.query('SELECT name FROM migrations')).length).toBe(postgresMigrations.length);
       const drift = await empty.driver.createSchemaBuilder().log();
       expect(drift.upQueries.map((q) => q.query)).toEqual([]);
     }, 120_000);

@@ -95,3 +95,19 @@ it('disables empty select lists and includes optional false boolean answers', as
   fireEvent.click(screen.getByRole('button', { name: 'modal.submit' }));
   expect(submit).toHaveBeenCalledWith([{ formId: 7, answers: [{ fieldId: 2, value: false }] }]);
 });
+it('flags every unanswered required field across several forms at once and scrolls to the first', async () => {
+  const submit = vi.fn();
+  const scrollIntoView = vi.fn();
+  Element.prototype.scrollIntoView = scrollIntoView;
+  const second = form([{ name: 'Second', isRequired: true }]);
+  const forms = [
+    { ...form([{ name: 'First', isRequired: true }]), id: 1 },
+    { ...second, id: 2, fields: [{ ...second.fields[0], id: 11 }] },
+  ];
+  render(<ResourceFormsModal isOpen action="start" forms={forms} onSubmit={submit} onCancel={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'modal.submit' }));
+  await waitFor(() => expect(screen.getAllByText('modal.fieldRequired')).toHaveLength(2));
+  expect(submit).not.toHaveBeenCalled();
+  await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+  expect((scrollIntoView.mock.contexts[0] as HTMLElement).dataset.formFieldId).toBe('1');
+});

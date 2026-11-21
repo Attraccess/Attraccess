@@ -43,7 +43,7 @@ import { readerWebSocketOptions } from './websocket-transport-options';
 import { WebsocketService } from './websocket.service';
 import { ReaderTimeZoneService } from './reader-time-zone.service';
 import { readerHeartbeat } from './websocket-reader-payloads';
-import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
+import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, forgetReaderFormState } from './websocket.types';
 import { SKIPS_ACTIVITY_WRITE } from './websocket-activity';
 import { randomBytes } from 'crypto';
 import type { IncomingMessage } from 'http';
@@ -174,7 +174,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     this.cardConversations.abort(socket, reason);
     this.cardHandler.clearVerifiedUser(socket);
     if (reason === 'READER_SESSION_ENDED') this.uiHandler.endCardSession(socket);
-    socket.state.formDrafts = undefined;
+    forgetReaderFormState(socket);
     if (socket.state.supervisionFlow && !socket.state.supervisionFlow.webInitiated) {
       this.supervisionHandler.cancelForSocket(socket);
     }

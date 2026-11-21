@@ -1,6 +1,6 @@
 import { LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Input, TextArea } from '@heroui/react';
-import { Select } from '../../../../../components/select';
+import { Select } from '../../../components/select';
 import { FormFieldType } from '@attraccess/react-query-client';
 import en from '../en.json';
 import de from '../de.json';

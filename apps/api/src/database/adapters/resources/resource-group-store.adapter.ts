@@ -99,8 +99,10 @@ export class TypeOrmResourceGroupStore implements ResourceGroupStore {
     return toGroupRecord(await this.groups.save(Object.assign(group, patch)));
   }
 
-  async delete(groupId: number): Promise<number> {
-    const result = await this.groups.delete(groupId);
+  async delete(groupId: number, context?: ResourcePersistenceContext): Promise<number> {
+    const result = await managerFor(context, this.dataSource.manager, this.unitOfWork)
+      .getRepository(ResourceGroup)
+      .delete(groupId);
     return result.affected ?? 0;
   }
 

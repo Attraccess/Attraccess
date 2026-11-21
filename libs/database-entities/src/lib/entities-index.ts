@@ -35,7 +35,7 @@ export { Conversation } from './entities/conversation.entity';
 export { EmailLayout } from './entities/email-layout.entity';
 export { EmailTemplateTranslation } from './entities/email-template-translation.entity';
 export { EmailTemplate } from './entities/email-template.entity';
-export { Form, FormField, FormSubmission } from './entities/form';
+export { Form, FormField, FormSubmission, FormResourceOverride } from './entities/form';
 export { Message } from './entities/message.entity';
 export { MqttServer } from './entities/mqttServer.entity';
 export { NotificationPreference } from './entities/notification-preference.entity';
@@ -158,7 +158,7 @@ import { ConversationParticipant } from './entities/conversation-participant.ent
 import { Conversation } from './entities/conversation.entity';
 import { EmailTemplateTranslation } from './entities/email-template-translation.entity';
 import { EmailTemplate } from './entities/email-template.entity';
-import { Form, FormField, FormSubmission } from './entities/form';
+import { Form, FormField, FormSubmission, FormResourceOverride } from './entities/form';
 import { Message } from './entities/message.entity';
 import { MqttServer } from './entities/mqttServer.entity';
 import { NotificationPreference } from './entities/notification-preference.entity';
@@ -260,6 +260,7 @@ export const entities = {
   Form,
   FormField,
   FormSubmission,
+  FormResourceOverride,
   ResourceHealthState,
   ResourceFlowVariable,
   PasswordPolicy,
