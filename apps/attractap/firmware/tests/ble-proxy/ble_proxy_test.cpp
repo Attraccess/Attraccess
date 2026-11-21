@@ -628,5 +628,6 @@ int main()
     runLinkTests();
     runWatchTests();
     runMemoryTests();
+    runLinkWatchdogTests();
     std::puts("PASS ble proxy");
 }

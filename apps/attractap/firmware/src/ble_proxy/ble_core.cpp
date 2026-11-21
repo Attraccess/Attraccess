@@ -107,6 +107,12 @@ namespace ble
         else logf(LogLevel::Warn, "ble shutdown failed detail=%s", error.detail);
     }
 
+    void BleProxyCore::superviseLink()
+    {
+        const char *action = radio.superviseLink();
+        if (action) logf(LogLevel::Warn, "ble link recovery action=%s", action);
+    }
+
     void BleProxyCore::startScan(Command &&command, uint32_t now)
     {
         // One BLE owner per reader: no queue, the API retries.
@@ -170,6 +176,8 @@ namespace ble
         notifications.clear();
         // NimBLE cannot scan while it initiates a connection: the watch resumes once the link is up or failed.
         stopWatchScan();
+        // A link whose end NimBLE never reported is recovered first, so the connect is not refused link-busy for it.
+        superviseLink();
         const Error error = radio.connect(command.address, command.connectTimeoutMs, session.allowlist);
         if (!error.ok())
         {

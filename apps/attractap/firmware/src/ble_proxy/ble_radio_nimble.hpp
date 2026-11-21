@@ -13,6 +13,7 @@
 
 #include "ble_core.hpp"
 #include "ble_link.hpp"
+#include "ble_link_watchdog.hpp"
 
 // NimBLE types (host/ble_gap.h, host/ble_gatt.h), declared here so only the .cpp includes NimBLE.
 struct ble_gap_event;
@@ -57,6 +58,7 @@ namespace ble
         Error connect(const Address &address, uint32_t timeoutMs, const PsVector<AllowEntry> &allowlist) override;
         void cancelConnect() override;
         void disconnect() override;
+        const char *superviseLink() override;
         Start read(uint32_t token, const Uuid &service, const Uuid &characteristic, Error &error) override;
         Start write(uint32_t token, const Uuid &service, const Uuid &characteristic, const Bytes &value,
                     bool withoutResponse, Error &error) override;
@@ -121,12 +123,16 @@ namespace ble
         uint32_t opToken = 0;
         Bytes opValue;
         std::atomic<uint32_t> epoch{0};
+        // Armed while the radio waits for NimBLE to end a connect or a link (proxy task and host task, under `mutex`).
+        LinkWatchdog watchdog;
 
         void terminate();
         void tuneLink();
         void reportLink(const char *what, int status);
         void abandonConnect();
         void failConnect(const Error &error);
+        // The tracked link is down (its disconnect event, or the watchdog found it gone): reports it once.
+        void linkGone(int reason);
         void startDiscovery();
         void discoverNextService();
         void discoverNextDescriptor();
