@@ -17,7 +17,7 @@ Ein neuer Leser (frisch geflasht oder zurückgesetzt) braucht eine PIN, sein Net
 
 - **Per USB** mit dem Web-Flasher: Öffnen Sie **Geräte** > **Attractap-Lesegeräte**, wählen Sie **Attractap einrichten** und klicken Sie auf **Per USB verbinden**. Er installiert die Firmware und stellt danach PIN, WLAN und Server ein (Serial Configurator).
 - **Am Leser selbst** (Attractap Touch): Ein Leser ohne Serveradresse zeigt seine Einstellungen auf dem Display. Geben Sie dort WLAN, Server und eine PIN ein.
-- **Per Bluetooth**, ohne Kabel (ab Firmware 2.8.0): siehe unten.
+- **Per Bluetooth**, ohne Kabel (ab Firmware 2.9.0): siehe unten.
 
 Ethernet-Varianten (Attractap Lite) erhalten ihre Adresse per DHCP, sobald das Kabel steckt; sie brauchen nur PIN und Server.
 

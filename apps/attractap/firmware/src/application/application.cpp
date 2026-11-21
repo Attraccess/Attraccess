@@ -320,7 +320,6 @@ void Application::pollUsageStats() {
 
 #endif
 
-
 #ifdef HAS_LVGL_DISPLAY
 void Application::beginEnrollment() {
   // Sign out whoever is signed in or checking a card: their rows leave the cache and the server ends the session.
