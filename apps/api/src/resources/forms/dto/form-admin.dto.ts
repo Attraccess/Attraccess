@@ -148,8 +148,14 @@ export class FormSubmissionUserDto {
   @ApiProperty()
   id!: number;
 
-  @ApiProperty({ description: 'The name shown for the user' })
+  @ApiProperty({ description: 'The username of the user' })
   username!: string;
+
+  @ApiProperty({ type: String, nullable: true, description: 'The first name of the user' })
+  firstName!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: 'The last name of the user' })
+  lastName!: string | null;
 }
 
 export class FormSubmissionResourceDto {

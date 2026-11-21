@@ -18,23 +18,28 @@ describe('ResourceIntroducersService', () => {
         userId,
         type,
         ...(group ? { resourceId: null, resourceGroupId: 5 } : { resourceId: 1 }),
-        user: { id: userId, username: `user${userId}` } as never,
+        user: {
+          id: userId,
+          username: `user${userId}`,
+          firstName: userId === 20 ? 'Ada' : null,
+          lastName: userId === 20 ? 'Lovelace' : null,
+        } as never,
       });
     const withGrants = (direct: ResourceIntroducerRecord[], group: ResourceIntroducerRecord[]) => {
       fixture.store.listDirect.mockResolvedValue(direct);
       fixture.store.listViaGroups.mockResolvedValue(group);
     };
 
-    it('lists direct and group introducers and maintainers with exactly id, username and role', async () => {
+    it('lists direct and group introducers and maintainers with exactly id, username, display name and role', async () => {
       withGrants(
         [grant(1, 10, ResourceIntroducerType.INTRODUCER), grant(2, 11, ResourceIntroducerType.MAINTAINER)],
         [grant(3, 20, ResourceIntroducerType.INTRODUCER, true)],
       );
       const names = await fixture.service.getNames(1);
       expect(names).toEqual([
-        { userId: 10, username: 'user10', role: ResourceIntroducerType.INTRODUCER },
-        { userId: 11, username: 'user11', role: ResourceIntroducerType.MAINTAINER },
-        { userId: 20, username: 'user20', role: ResourceIntroducerType.INTRODUCER },
+        { userId: 10, username: 'user10', displayName: 'user10', role: ResourceIntroducerType.INTRODUCER },
+        { userId: 11, username: 'user11', displayName: 'user11', role: ResourceIntroducerType.MAINTAINER },
+        { userId: 20, username: 'user20', displayName: 'Ada Lovelace', role: ResourceIntroducerType.INTRODUCER },
       ]);
       expect(JSON.stringify(names)).not.toContain('@example.test');
     });
@@ -45,7 +50,7 @@ describe('ResourceIntroducersService', () => {
         [grant(2, 10, ResourceIntroducerType.INTRODUCER, true)],
       );
       expect(await fixture.service.getNames(1)).toEqual([
-        { userId: 10, username: 'user10', role: ResourceIntroducerType.INTRODUCER },
+        { userId: 10, username: 'user10', displayName: 'user10', role: ResourceIntroducerType.INTRODUCER },
       ]);
     });
 

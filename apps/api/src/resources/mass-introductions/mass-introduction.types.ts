@@ -15,6 +15,9 @@ export interface MassIntroductionTarget {
 export interface MassIntroductionParticipant {
   userId: number;
   username: string;
+  firstName: string | null;
+  lastName: string | null;
+  displayName: string;
   method: MassIntroductionMethod;
   alreadyIntroduced: boolean;
   joinedAt: Date;
@@ -32,6 +35,7 @@ export interface ActiveMassIntroduction {
   introducer: {
     id: number;
     username: string;
+    displayName: string;
     authenticationMethod: AuthenticationMethod | null;
     apiTokenId: number | null;
     /**
@@ -69,6 +73,7 @@ export interface MassIntroductionReaderPort {
     sessionId: string;
     targetName: string;
     introducerUsername: string;
+    introducerDisplayName: string;
     expiresAt: Date;
   }): Promise<{ readerName: string }>;
 

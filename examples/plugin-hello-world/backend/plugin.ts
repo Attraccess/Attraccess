@@ -51,8 +51,8 @@ class HelloWorldService implements OnModuleInit {
   // Read host data through the neutral `hostData` lookups: no repository, no entity, no database engine in
   // sight. The call is gated behind the READ_USERS permission.
   async greetUsers(): Promise<string[]> {
-    const names = await this.context.hostData.users.getUsernames([1, 2, 3, 4, 5]);
-    return [...names.values()].map((username) => `Hello, ${username}!`);
+    const names = await this.context.hostData.users.getDisplayNames([1, 2, 3, 4, 5]);
+    return [...names.values()].map((name) => `Hello, ${name}!`);
   }
 }
 

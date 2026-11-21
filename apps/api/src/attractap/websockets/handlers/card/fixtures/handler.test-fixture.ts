@@ -28,7 +28,7 @@ export function createAttractapCardHandlerFixture() {
 
   let audit: { record: jest.Mock };
 
-  const mockUser = { id: 1, username: 'testuser' };
+  const mockUser = { id: 1, username: 'testuser', firstName: 'Ada', lastName: 'Lovelace' };
 
   const mockReaderWithEnrollment = {
     id: 42,

@@ -7,6 +7,7 @@ import {
   type UserContact,
 } from '@attraccess/application-models';
 
+import { formatUserDisplayName } from '@attraccess/shared';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 import { NotificationCategory } from '../../notifications/notification-types';
@@ -151,7 +152,7 @@ export class ProjectInvitations {
       recipients: [invitedUser as unknown as MailUser],
       actorId: invitation.inviterId,
       title: `You have been invited to ${project.name}`,
-      body: `${invitation.inviter?.username ?? 'A project owner'} invited you to join ${project.name}.`,
+      body: `${invitation.inviter ? formatUserDisplayName(invitation.inviter) : 'A project owner'} invited you to join ${project.name}.`,
       url: `/projects?invitation=${invitation.id}`,
       sendEmail: (recipient) =>
         this.emailService.sendProjectInvitationEmail(

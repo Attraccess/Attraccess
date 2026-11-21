@@ -16,6 +16,12 @@ export class SupervisionRequestDto {
   @ApiProperty({ description: 'The username of the requester', example: 'alice' })
   requesterUsername!: string;
 
+  @ApiProperty({
+    description: 'The display name of the requester (name, or the username without one)',
+    example: 'Alice Smith',
+  })
+  requesterDisplayName!: string;
+
   @ApiProperty({ description: 'The ID of the supervisor whose approval is required', example: 42 })
   supervisorUserId!: number;
 

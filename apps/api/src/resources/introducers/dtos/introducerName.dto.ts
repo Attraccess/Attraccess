@@ -9,6 +9,9 @@ export class ResourceIntroducerNameDto {
   @ApiProperty({ description: 'Username of the user' })
   username!: string;
 
+  @ApiProperty({ description: 'Display name of the user (first and last name, or the username without a name)' })
+  displayName!: string;
+
   @ApiProperty({
     description: 'Whether the user is an introducer or a maintainer. A user holding both is listed as introducer.',
     enum: ResourceIntroducerType,

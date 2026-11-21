@@ -5,6 +5,8 @@ import { StartUsageSessionDto } from '../usage/dtos/startUsageSession.dto';
 export interface SupervisionUser {
   id: number;
   username: string;
+  firstName?: string | null;
+  lastName?: string | null;
 }
 
 export interface PendingSupervisionRequest {
@@ -41,7 +43,7 @@ export interface PendingSupervisionRequest {
  * HTTP caller — resolution side effects (notifying the reader websocket) run through these instead.
  */
 export interface ReaderSupervisionCallbacks {
-  onResolved: (session: UsageSession, supervisor: { id: number; username: string }) => void;
+  onResolved: (session: UsageSession, supervisor: { id: number; username: string; displayName: string }) => void;
   onFailed: (error: Error) => void;
 }
 

@@ -52,6 +52,26 @@ describe('ResourceSessionNotificationListener', () => {
     expect(req.body(bob)).toBe('alice took over your active resource session.');
   });
 
+  it('names the user who took over by display name in the push text and the email', async () => {
+    await listener.handleTakenOver(
+      new ResourceUsageSessionTakenOverEvent(
+        { id: 4, name: 'Laser cutter' } as unknown as UsageSessionResource,
+        new Date('2026-01-01T12:00:00.000Z'),
+        { id: 1, username: 'alice', firstName: 'Alice', lastName: 'Liddell' } as UsageSessionUser,
+        { id: 2, username: 'bob', locale: 'en' } as UsageSessionUserRecord,
+      ),
+    );
+
+    const req = notifications.dispatch.mock.calls[0][0];
+    expect(req.body({ locale: 'en' })).toBe('Alice Liddell took over your active resource session.');
+    await req.sendEmail({ id: 2, email: 'bob@example.com' }, 'en');
+    expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(
+      expect.anything(),
+      NotificationCategory.RESOURCE_TAKEOVER,
+      expect.objectContaining({ takeover: { actorName: 'Alice Liddell' } }),
+    );
+  });
+
   it('sends resource takeover email through the notification dispatcher callback', async () => {
     await listener.handleTakenOver(
       new ResourceUsageSessionTakenOverEvent(

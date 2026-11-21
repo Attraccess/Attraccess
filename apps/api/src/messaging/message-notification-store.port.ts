@@ -14,7 +14,7 @@ export const MESSAGE_NOTIFICATION_STORE = Symbol.for('attraccess.messaging.notif
 
 export interface MessageNotificationStore {
   findParticipants(conversationId: number): Promise<NotifiableParticipant[]>;
-  findUsername(userId: number): Promise<string | null>;
+  findDisplayName(userId: number): Promise<string | null>;
   /** Remembers when the participant was last emailed, so one unread burst sends one email. */
   markNotified(participantId: number, notifiedAt: Date): Promise<void>;
 }

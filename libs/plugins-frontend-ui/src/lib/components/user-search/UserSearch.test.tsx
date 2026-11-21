@@ -189,7 +189,7 @@ describe('UserSearch', () => {
 
     render(<UserSearch />);
     await pointer.click(screen.getByRole('button', { name: /choose user/i }));
-    await pointer.type(screen.getByPlaceholderText(/search by username/i), 'ali');
+    await pointer.type(screen.getByPlaceholderText(/search by name, username or email/i), 'ali');
 
     // Debounce pending: still unfiltered right after typing
     expect(mocks.useFindManyInfinite).toHaveBeenLastCalledWith(
@@ -267,6 +267,14 @@ describe('groupUsersByLetter', () => {
     expect(groups).toEqual([
       { letter: 'A', users: [user(2, 'alan'), user(3, 'anna')] },
       { letter: 'Z', users: [user(1, 'Zoe'), user(4, 'zack')] },
+    ]);
+  });
+
+  it('groups by display name when a name is set', () => {
+    const named = { ...user(1, 'zed'), firstName: 'Ada', lastName: 'Lovelace' } as User;
+    expect(groupUsersByLetter([named, user(2, 'bob')])).toEqual([
+      { letter: 'A', users: [named] },
+      { letter: 'B', users: [user(2, 'bob')] },
     ]);
   });
 

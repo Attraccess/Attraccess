@@ -63,7 +63,7 @@ export const setup = () => {
         return Promise.resolve({
           type,
           subject: 'Username changed for {{user.username}}',
-          body: '<mjml><mj-body><mj-section><mj-column><mj-image src="{{host.logoUrl}}"/><mj-text>Hello {{user.username}},</mj-text><mj-text>Your username was changed from <strong>{{user.previousUsername}}</strong> to <strong>{{user.newUsername}}</strong>.</mj-text><mj-text>FE {{host.frontend}} BE {{host.backend}}</mj-text><mj-text>URL: {{url}}</mj-text></mj-column></mj-section></mj-body></mjml>',
+          body: '<mjml><mj-body><mj-section><mj-column><mj-image src="{{host.logoUrl}}"/><mj-text>Hello {{user.username}},</mj-text><mj-text>Name: {{user.displayName}}</mj-text><mj-text>Your username was changed from <strong>{{user.previousUsername}}</strong> to <strong>{{user.newUsername}}</strong>.</mj-text><mj-text>FE {{host.frontend}} BE {{host.backend}}</mj-text><mj-text>URL: {{url}}</mj-text></mj-column></mj-section></mj-body></mjml>',
         });
       }
       if (type === EmailTemplateType.VERIFY_EMAIL) {

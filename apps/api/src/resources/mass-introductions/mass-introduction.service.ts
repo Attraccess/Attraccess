@@ -1,3 +1,4 @@
+import { formatUserDisplayName } from '@attraccess/shared';
 import {
   BadRequestException,
   ForbiddenException,
@@ -49,6 +50,9 @@ import {
  * Sessions live in memory like supervision requests: they last 15 minutes and are worthless after
  * an API restart, so persisting them would only add cleanup work.
  */
+/** The user as the service needs it; the names are optional so callers with only a username keep working. */
+type MassIntroductionUser = { id: number; username: string; firstName?: string | null; lastName?: string | null };
+
 @Injectable()
 export class MassIntroductionService {
   public static readonly TTL_MS = 15 * 60_000;
@@ -104,6 +108,7 @@ export class MassIntroductionService {
       introducer: {
         id: user.id,
         username: user.username,
+        displayName: formatUserDisplayName(user),
         authenticationMethod: user.authenticationMethod ?? null,
         apiTokenId: user.apiTokenId ?? null,
         viaPermission,
@@ -132,6 +137,7 @@ export class MassIntroductionService {
           sessionId: session.id,
           targetName: target.name,
           introducerUsername: user.username,
+          introducerDisplayName: formatUserDisplayName(user),
           expiresAt: session.expiresAt,
         }));
       } catch (error) {
@@ -177,7 +183,7 @@ export class MassIntroductionService {
   public async redeem(
     publicId: string,
     code: string,
-    user: { id: number; username: string },
+    user: MassIntroductionUser,
     nowMs = Date.now(),
   ): Promise<RedeemMassIntroductionResponseDto> {
     const session = this.sessions.get(this.sessionIdsByPublicId.get(publicId) ?? '');
@@ -211,7 +217,7 @@ export class MassIntroductionService {
   public async redeemCard(
     sessionId: string,
     readerId: number,
-    user: { id: number; username: string },
+    user: MassIntroductionUser,
   ): Promise<{ participant: MassIntroductionParticipant; participantCount: number }> {
     const session = this.sessions.get(sessionId);
     if (!session || session.reader?.id !== readerId || session.reader.state !== MassIntroductionReaderState.ACTIVE) {
@@ -236,7 +242,7 @@ export class MassIntroductionService {
 
   protected async join(
     session: ActiveMassIntroduction,
-    user: { id: number; username: string },
+    user: MassIntroductionUser,
     method: MassIntroductionMethod,
   ): Promise<MassIntroductionParticipant> {
     if (session.expiresAt.getTime() <= Date.now()) {
@@ -270,7 +276,7 @@ export class MassIntroductionService {
 
   protected async grant(
     session: ActiveMassIntroduction,
-    user: { id: number; username: string },
+    user: MassIntroductionUser,
     method: MassIntroductionMethod,
   ): Promise<MassIntroductionParticipant> {
     const { target, introducer } = session;
@@ -299,7 +305,16 @@ export class MassIntroductionService {
       }
     }
 
-    return { userId: user.id, username: user.username, method, alreadyIntroduced, joinedAt: new Date() };
+    return {
+      userId: user.id,
+      username: user.username,
+      firstName: user.firstName ?? null,
+      lastName: user.lastName ?? null,
+      displayName: formatUserDisplayName(user),
+      method,
+      alreadyIntroduced,
+      joinedAt: new Date(),
+    };
   }
 
   protected async authorizeTarget(

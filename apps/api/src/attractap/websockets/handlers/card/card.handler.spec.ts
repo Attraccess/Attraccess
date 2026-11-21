@@ -129,7 +129,7 @@ describe('AttractapCardHandler', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO,
-            payload: { username: startEnrollOfNewNfcCardScope.mockUser.username },
+            payload: { username: startEnrollOfNewNfcCardScope.mockUser.username, displayName: 'Ada Lovelace' },
           }),
         }),
       );
@@ -463,7 +463,7 @@ describe('AttractapCardHandler', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.RESET_NFC_CARD,
-            payload: { username: startResetOfNfcCardScope.mockUser.username },
+            payload: { username: startResetOfNfcCardScope.mockUser.username, displayName: 'Ada Lovelace' },
           }),
         }),
       );

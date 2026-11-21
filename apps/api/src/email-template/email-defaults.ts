@@ -21,23 +21,56 @@ import { verifyEmailTranslations } from './defaults/accounts-translations';
 export const emailAccountDefaults = {
   [EmailTemplateType.VERIFY_EMAIL]: {
     subject: '{{t "subject" "Verify your email address"}}',
-    variables: ['user.username', 'user.email', 'user.id', 'host.frontend', 'host.backend', 'url'],
+    variables: [
+      'user.username',
+      'user.firstName',
+      'user.lastName',
+      'user.displayName',
+      'user.email',
+      'user.id',
+      'host.frontend',
+      'host.backend',
+      'url',
+    ],
   },
 
   [EmailTemplateType.RESET_PASSWORD]: {
     subject: '{{t "subject" "Reset your password"}}',
-    variables: ['user.username', 'user.email', 'user.id', 'host.frontend', 'host.backend', 'url'],
+    variables: [
+      'user.username',
+      'user.firstName',
+      'user.lastName',
+      'user.displayName',
+      'user.email',
+      'user.id',
+      'host.frontend',
+      'host.backend',
+      'url',
+    ],
   },
 
   [EmailTemplateType.USER_INVITATION]: {
     subject: '{{t "subject" "You have been invited to join Attraccess!"}}',
-    variables: ['user.username', 'user.email', 'user.id', 'host.frontend', 'host.backend', 'url'],
+    variables: [
+      'user.username',
+      'user.firstName',
+      'user.lastName',
+      'user.displayName',
+      'user.email',
+      'user.id',
+      'host.frontend',
+      'host.backend',
+      'url',
+    ],
   },
 
   [EmailTemplateType.USERNAME_CHANGED]: {
     subject: '{{t "subject" "Your username has been changed"}}',
     variables: [
       'user.username',
+      'user.firstName',
+      'user.lastName',
+      'user.displayName',
       'user.email',
       'user.id',
       'user.previousUsername',
@@ -50,20 +83,43 @@ export const emailAccountDefaults = {
 
   [EmailTemplateType.PASSWORD_CHANGED]: {
     subject: '{{t "subject" "Your password has been changed"}}',
-    variables: ['user.username', 'user.email', 'user.id', 'host.frontend', 'host.backend'],
+    variables: [
+      'user.username',
+      'user.firstName',
+      'user.lastName',
+      'user.displayName',
+      'user.email',
+      'user.id',
+      'host.frontend',
+      'host.backend',
+    ],
   },
 
   [EmailTemplateType.DELETE_ACCOUNT_CONFIRMATION]: {
     subject: '{{t "subject" "Confirm account deletion"}}',
-    variables: ['user.username', 'user.email', 'user.id', 'host.frontend', 'host.backend', 'url'],
+    variables: [
+      'user.username',
+      'user.firstName',
+      'user.lastName',
+      'user.displayName',
+      'user.email',
+      'user.id',
+      'host.frontend',
+      'host.backend',
+      'url',
+    ],
   },
 
   [EmailTemplateType.PROJECT_INVITATION]: {
     subject: '{{t "subject" "You have been invited to {project}" project=project.name}}',
     variables: [
       'user.username',
+      'user.firstName',
+      'user.lastName',
+      'user.displayName',
       'project.name',
       'inviter.username',
+      'inviter.displayName',
       'invitation.id',
       'invitation.role',
       'invitationUrl',
@@ -77,6 +133,9 @@ export const emailResourceDefaults = {
     subject: '{{t "subject" "Your usage receipt for {resource}" resource=resource.name}}',
     variables: [
       'user.username',
+      'user.firstName',
+      'user.lastName',
+      'user.displayName',
       'user.email',
       'host.frontend',
       'host.backend',
@@ -123,6 +182,9 @@ export const emailResourceDefaults = {
       '{{#if health.isDegraded}}{{t "subject_degraded" "Resource degraded: {resource}" resource=resource.name}}{{else}}{{t "subject_recovered" "Resource recovered: {resource}" resource=resource.name}}{{/if}}',
     variables: [
       'user.username',
+      'user.firstName',
+      'user.lastName',
+      'user.displayName',
       'user.email',
       'user.id',
       'host.frontend',
@@ -143,6 +205,9 @@ export const emailResourceDefaults = {
     subject: '{{t "subject" "Retraining required: {resource}" resource=resource.name}}',
     variables: [
       'user.username',
+      'user.firstName',
+      'user.lastName',
+      'user.displayName',
       'user.email',
       'user.id',
       'host.frontend',
@@ -160,6 +225,9 @@ export const emailResourceDefaults = {
     subject: '{{t "subject" "New message from {sender}" sender=message.senderName}}',
     variables: [
       'user.username',
+      'user.firstName',
+      'user.lastName',
+      'user.displayName',
       'user.email',
       'user.id',
       'host.frontend',
@@ -174,6 +242,9 @@ export const emailResourceDefaults = {
     subject: '{{t "subject" "New usage note: {resource}" resource=resource.name}}',
     variables: [
       'user.username',
+      'user.firstName',
+      'user.lastName',
+      'user.displayName',
       'user.email',
       'user.id',
       'host.frontend',
@@ -191,6 +262,9 @@ export const emailResourceDefaults = {
     subject: '{{t "subject" "{resource} was taken over" resource=resource.name}}',
     variables: [
       'user.username',
+      'user.firstName',
+      'user.lastName',
+      'user.displayName',
       'user.email',
       'user.id',
       'host.frontend',
@@ -206,6 +280,9 @@ export const emailResourceDefaults = {
     subject: '{{t "subject" "{resource} session ended" resource=resource.name}}',
     variables: [
       'user.username',
+      'user.firstName',
+      'user.lastName',
+      'user.displayName',
       'user.email',
       'user.id',
       'host.frontend',
@@ -223,6 +300,9 @@ export const emailResourceDefaults = {
     subject: '{{accessChange.title}}',
     variables: [
       'user.username',
+      'user.firstName',
+      'user.lastName',
+      'user.displayName',
       'user.email',
       'user.id',
       'host.frontend',
@@ -237,6 +317,9 @@ export const emailResourceDefaults = {
     subject: '{{t "subject" "Maintenance requested: {resource}" resource=resource.name}}',
     variables: [
       'user.username',
+      'user.firstName',
+      'user.lastName',
+      'user.displayName',
       'user.email',
       'user.id',
       'host.frontend',

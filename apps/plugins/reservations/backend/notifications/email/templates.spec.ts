@@ -67,7 +67,7 @@ describe('reservation email templates', () => {
     for (const template of EMAIL_TEMPLATES) {
       expect(template.id).toMatch(/^[a-z0-9][a-z0-9_-]*$/);
       expect(template.label.en && template.label.de).toBeTruthy();
-      expect(template.variables).toContain('user.username');
+      expect(template.variables).toContain('user.displayName');
       expect(template.subject.length).toBeLessThanOrEqual(255);
       expect(template.body).not.toMatch(/<mjml/);
     }

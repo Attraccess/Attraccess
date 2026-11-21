@@ -42,6 +42,6 @@ export class DirectoryService {
   }
 
   getUserNames(userIds: number[]): Promise<Map<number, string>> {
-    return this.context.hostData.users.getUsernames(userIds);
+    return this.context.hostData.users.getDisplayNames(userIds);
   }
 }

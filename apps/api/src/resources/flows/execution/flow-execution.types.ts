@@ -30,11 +30,17 @@ export interface UsageEventData {
   user: {
     id: number;
     username: string;
+    firstName: string | null;
+    lastName: string | null;
+    displayName: string;
     externalIdentifier: string;
   };
   previousUser?: {
     id: number;
     username: string;
+    firstName: string | null;
+    lastName: string | null;
+    displayName: string;
     externalIdentifier: string;
   };
 }

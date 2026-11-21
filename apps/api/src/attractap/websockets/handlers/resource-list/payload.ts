@@ -5,6 +5,7 @@ import {
   ResourceType,
   SupervisionMode,
 } from '@attraccess/application-models';
+import { formatUserDisplayName } from '@attraccess/shared';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
 import { getSessionCapacity } from '../../../../resources/usage/sessions/active-usage';
 import type { ResourceListService } from './resource-list.service';
@@ -29,8 +30,8 @@ interface ReaderSessionSource {
   userId: number;
   startTime: Date;
   /** Always loaded for the active sessions the reader lists. */
-  user?: { username: string } | null;
-  supervisorUser?: { username: string } | null;
+  user?: { username: string; firstName?: string | null; lastName?: string | null } | null;
+  supervisorUser?: { username: string; firstName?: string | null; lastName?: string | null } | null;
 }
 
 function toReaderSession(session: ReaderSessionSource, offsetMinutes: (at: Date) => number) {
@@ -38,13 +39,19 @@ function toReaderSession(session: ReaderSessionSource, offsetMinutes: (at: Date)
     id: session.id,
     user: {
       username: session.user.username,
+      displayName: formatUserDisplayName(session.user),
     },
     startTime: session.startTime.toISOString(),
     // Offset (minutes east of UTC) of the reader's time zone for this
     // specific instant, so the reader can render local wall-clock time without
     // a tz database. Computed per-timestamp, so it stays DST-correct.
     startTimeUtcOffsetMinutes: offsetMinutes(session.startTime),
-    ...(session.supervisorUser ? { supervisorUsername: session.supervisorUser.username } : {}),
+    ...(session.supervisorUser
+      ? {
+          supervisorUsername: session.supervisorUser.username,
+          supervisorDisplayName: formatUserDisplayName(session.supervisorUser),
+        }
+      : {}),
   };
 }
 
@@ -132,6 +139,9 @@ export async function sendResourceListToSockets(
         introducers: (introducersByResourceId.get(resource.id) ?? []).flatMap((introducer) =>
           introducer.user ? [introducer.user.username] : [],
         ),
+        introducerDisplayNames: (introducersByResourceId.get(resource.id) ?? []).flatMap((introducer) =>
+          introducer.user ? [formatUserDisplayName(introducer.user)] : [],
+        ),
         isUnderMaintenance: activeMaintenanceIds.has(resource.id),
         isHealthy: unhealthyEntries.length === 0,
         healthReason: context.buildHealthReason(unhealthyEntries),
@@ -148,10 +158,13 @@ export async function sendResourceListToSockets(
   };
   // Share the expensive list queries, but never share one user's access with
   // another socket. Reuse the existing authorization cache/retraining rules.
-  const payloadsByUser = new Map<number, Promise<typeof resourceListPayload & { authenticatedUsername: string }>>();
+  const payloadsByUser = new Map<
+    number,
+    Promise<typeof resourceListPayload & { authenticatedUsername: string; authenticatedDisplayName: string }>
+  >();
   const forUser = async (userId: number) => {
     const user = await context.usersService.findOne({ id: userId });
-    if (!user) return { ...resourceListPayload, authenticatedUsername: '' };
+    if (!user) return { ...resourceListPayload, authenticatedUsername: '', authenticatedDisplayName: '' };
     const permissions = await context.rbacService.getEffectivePermissions(userId);
     const maintenanceManagedResourceIds = await context.resourceMaintenanceService.getMaintenanceManagedResourceIds(
       user,
@@ -191,7 +204,12 @@ export async function sendResourceListToSockets(
         };
       }),
     );
-    return { ...resourceListPayload, authenticatedUsername: user.username, resources: personalized };
+    return {
+      ...resourceListPayload,
+      authenticatedUsername: user.username,
+      authenticatedDisplayName: formatUserDisplayName(user),
+      resources: personalized,
+    };
   };
   await Promise.all(
     sockets.map(async (socket) => {

@@ -65,7 +65,7 @@ describe('FlowEventTriggersService', () => {
       reason: 'Noisy',
       status: 'open',
       createdAt: new Date('2026-01-02T00:00:00Z'),
-      createdByUser: { id: 2, username: 'ann', email: 'secret@example.com' },
+      createdByUser: { id: 2, username: 'ann', firstName: 'Ann', lastName: null, email: 'secret@example.com' },
     });
 
     await service.onMaintenanceRequestCreated(new ResourceMaintenanceRequestCreatedEvent(4, 3));
@@ -79,7 +79,7 @@ describe('FlowEventTriggersService', () => {
           reason: 'Noisy',
           status: 'open',
           createdAt: '2026-01-02T00:00:00.000Z',
-          createdByUser: { id: 2, username: 'ann' },
+          createdByUser: { id: 2, username: 'ann', firstName: 'Ann', lastName: null, displayName: 'Ann' },
         },
       }),
     );

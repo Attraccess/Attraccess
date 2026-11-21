@@ -1,6 +1,7 @@
 // User avatar and name display component for Attraccess users
 // FEATURE: User identity display using HeroUI v3 Avatar compound
 import { User } from '@attraccess/react-query-client';
+import { formatUserDisplayName, hasUserName } from '@attraccess/shared';
 import { useTranslations } from '../../i18n';
 import { Avatar, AvatarFallback, AvatarImage, Button, Popover } from '@heroui/react';
 import { toSvg } from 'jdenticon';
@@ -10,7 +11,19 @@ import { useAttraccessUserActions } from './AttraccessUserActionsContext';
 import en from './en.json';
 import de from './de.json';
 
-export type UserIdentity = Pick<User, 'id' | 'username'>;
+export type UserIdentity = Pick<User, 'id' | 'username' | 'firstName' | 'lastName'>;
+
+/** Initials from the first and last name when set, otherwise the first two characters of the username. */
+export function getUserInitials(user: Pick<UserIdentity, 'username' | 'firstName' | 'lastName'>): string {
+  const parts = [user.firstName, user.lastName].map((part) => part?.trim() ?? '').filter(Boolean);
+  if (parts.length > 0) {
+    return parts
+      .map((part) => Array.from(part)[0])
+      .join('')
+      .toUpperCase();
+  }
+  return user.username.slice(0, 2).toUpperCase();
+}
 
 interface AttraccessUserProps {
   user?: UserIdentity & Partial<Pick<User, 'deletedAt'>>;
@@ -41,7 +54,8 @@ export function AttraccessUser({
     return `data:image/svg+xml;base64,${btoa(svg)}`;
   }, [isDeleted, user]);
 
-  const name = user?.username || t('unknown');
+  const name = user ? formatUserDisplayName(user) || t('unknown') : t('unknown');
+  const secondaryUsername = user && hasUserName(user) ? user.username : undefined;
 
   const startDirectMessage = useCallback(() => {
     if (onStartDirectMessage) {
@@ -56,7 +70,7 @@ export function AttraccessUser({
     <Avatar>
       {avatarIcon ? <AvatarImage src={avatarIcon} alt={name} /> : null}
       <AvatarFallback color={isDeleted ? 'warning' : undefined}>
-        {isDeleted ? <AlertTriangleIcon className="w-4 h-4" /> : name.slice(0, 2).toUpperCase()}
+        {isDeleted ? <AlertTriangleIcon className="w-4 h-4" /> : user ? getUserInitials(user) : ''}
       </AvatarFallback>
     </Avatar>
   );
@@ -71,6 +85,11 @@ export function AttraccessUser({
             <ChevronDownIcon className="h-3 w-3 text-muted-foreground shrink-0" aria-hidden="true" focusable="false" />
           )}
         </div>
+        {secondaryUsername && !description && (
+          <span className="text-xs text-muted-foreground">
+            {isDeleted ? <del>{secondaryUsername}</del> : secondaryUsername}
+          </span>
+        )}
         {description && (
           <span className="text-xs text-muted-foreground">{isDeleted ? <del>{description}</del> : description}</span>
         )}

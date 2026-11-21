@@ -37,6 +37,8 @@ export function toNfcCardOwnerDto(owner: AttractapCardOwner): NfcCardOwnerDto {
   return {
     id: owner.id,
     username: owner.username,
+    firstName: owner.firstName,
+    lastName: owner.lastName,
     locale: owner.locale,
     dateTimeLocale: owner.dateTimeLocale,
     isEmailVerified: owner.isEmailVerified,

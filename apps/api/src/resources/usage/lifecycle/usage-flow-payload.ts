@@ -1,3 +1,4 @@
+import { formatUserDisplayName } from '@attraccess/shared';
 import type { UsageFormSubmissionDraft, UsageSession, UsageSessionUser } from '@attraccess/application-models';
 
 /** The usage session as flows see it: answered forms by form id, a sanitized user and no resource documentation. */
@@ -22,10 +23,14 @@ export function usageFlowPayload(resourceUsage: UsageSession, formSubmissions?: 
   const usageUser: Partial<UsageSessionUser> | undefined =
     resourceUsage.user ?? (resourceUsage.userId != null ? { id: resourceUsage.userId } : undefined);
 
-  const sanitizedUser: (Partial<UsageSessionUser> & Pick<UsageSessionUser, 'id'>) | undefined = usageUser
+  const sanitizedUser:
+    (Partial<UsageSessionUser> & Pick<UsageSessionUser, 'id'> & { displayName?: string }) | undefined = usageUser
     ? {
         id: usageUser.id,
         username: usageUser.username,
+        firstName: usageUser.firstName ?? null,
+        lastName: usageUser.lastName ?? null,
+        displayName: formatUserDisplayName({ ...usageUser, username: usageUser.username ?? '' }),
         email: usageUser.email,
         createdAt: usageUser.createdAt,
         updatedAt: usageUser.updatedAt,

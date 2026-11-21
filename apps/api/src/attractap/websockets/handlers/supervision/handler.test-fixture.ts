@@ -27,7 +27,7 @@ export function registerAttractapSupervisionHandlerFixture() {
 
   let resourceReads: { findResource: jest.Mock };
 
-  const requester = { id: 1, username: 'requester' } as unknown as CoreUser;
+  const requester = { id: 1, username: 'requester', firstName: 'Rita', lastName: 'Requester' } as unknown as CoreUser;
 
   const READER_ID = 3;
 
@@ -79,13 +79,19 @@ export function registerAttractapSupervisionHandlerFixture() {
       getEligibleSupervisorIds: jest.fn().mockResolvedValue([2]),
       createReaderRequest: jest.fn().mockReturnValue({ requestId: 'req-1', expiresAt: new Date(0) }),
     };
-    usersService = { findOne: jest.fn().mockResolvedValue({ id: 2, username: 'supervisor' }) };
+    usersService = {
+      findOne: jest.fn().mockResolvedValue({ id: 2, username: 'supervisor', firstName: 'Sue', lastName: 'Pervisor' }),
+    };
     // The card proof is covered by card-relay.spec.ts and card-pending-records.spec.ts; here it either
     // passes or fails.
     cardOperations = {
       verifyCard: jest.fn().mockResolvedValue({
         ok: true,
-        card: { isActive: true, keyNo: 1, user: { id: 2, username: 'supervisor' } },
+        card: {
+          isActive: true,
+          keyNo: 1,
+          user: { id: 2, username: 'supervisor', firstName: 'Sue', lastName: 'Pervisor' },
+        },
       }),
     };
     resourceReads = {

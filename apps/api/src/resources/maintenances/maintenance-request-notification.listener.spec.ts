@@ -41,7 +41,12 @@ describe('MaintenanceRequestNotificationListener', () => {
   });
 
   it('dispatches a maintenance request notification to resource recipients', async () => {
-    store.findRequest.mockResolvedValue({ id: 9, reason: 'Broken lens', createdByUsername: 'alice' });
+    store.findRequest.mockResolvedValue({
+      id: 9,
+      reason: 'Broken lens',
+      createdByUsername: 'alice',
+      createdByDisplayName: 'alice',
+    });
     store.findResource.mockResolvedValue({ id: 4, name: 'Laser cutter', groupIds: [] });
 
     await listener.handleRequestCreated(new ResourceMaintenanceRequestCreatedEvent(4, 9));
@@ -63,7 +68,12 @@ describe('MaintenanceRequestNotificationListener', () => {
   });
 
   it('adds introducers of the resource and its groups once, skipping recipients without an address', async () => {
-    store.findRequest.mockResolvedValue({ id: 9, reason: 'Broken lens', createdByUsername: null });
+    store.findRequest.mockResolvedValue({
+      id: 9,
+      reason: 'Broken lens',
+      createdByUsername: null,
+      createdByDisplayName: null,
+    });
     store.findResource.mockResolvedValue({ id: 4, name: 'Laser cutter', groupIds: [8] });
     store.findUsersByIds.mockResolvedValue([recipient(2, 'admin@example.com'), recipient(3, null)]);
     store.findIntroducerUsers.mockResolvedValue([
@@ -82,7 +92,12 @@ describe('MaintenanceRequestNotificationListener', () => {
 
   it('does not look up users when nobody holds the maintenance permission and there are no introducers', async () => {
     rbacService.getUserIdsWithPermission.mockResolvedValue([]);
-    store.findRequest.mockResolvedValue({ id: 9, reason: 'x', createdByUsername: 'alice' });
+    store.findRequest.mockResolvedValue({
+      id: 9,
+      reason: 'x',
+      createdByUsername: 'alice',
+      createdByDisplayName: 'alice',
+    });
     store.findResource.mockResolvedValue({ id: 4, name: 'Laser cutter', groupIds: [] });
 
     await listener.handleRequestCreated(new ResourceMaintenanceRequestCreatedEvent(4, 9));
@@ -94,7 +109,7 @@ describe('MaintenanceRequestNotificationListener', () => {
   it('skips a missing request or resource and never throws', async () => {
     store.findRequest.mockResolvedValue(null);
     await listener.handleRequestCreated(new ResourceMaintenanceRequestCreatedEvent(4, 9));
-    store.findRequest.mockResolvedValue({ id: 9, reason: 'x', createdByUsername: null });
+    store.findRequest.mockResolvedValue({ id: 9, reason: 'x', createdByUsername: null, createdByDisplayName: null });
     store.findResource.mockResolvedValue(null);
     await listener.handleRequestCreated(new ResourceMaintenanceRequestCreatedEvent(4, 9));
     store.findResource.mockRejectedValue(new Error('db down'));

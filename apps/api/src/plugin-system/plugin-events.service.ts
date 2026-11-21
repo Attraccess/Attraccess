@@ -1,3 +1,4 @@
+import { formatUserDisplayName } from '@attraccess/shared';
 import {
   SystemEvent,
   SystemEventHandler,
@@ -14,7 +15,15 @@ const SYSTEM_EVENT_PREFIX = 'plugin.system.';
 /** Only the fields of the neutral model reach plugins: host records carry tokens and contact data. */
 function toUserModel(user: PluginUserModel | undefined): PluginUserModel | undefined {
   if (!user) return user;
-  return { id: user.id, username: user.username, locale: user.locale, isDisabled: user.isDisabled };
+  return {
+    id: user.id,
+    username: user.username,
+    firstName: user.firstName ?? null,
+    lastName: user.lastName ?? null,
+    displayName: formatUserDisplayName(user),
+    locale: user.locale,
+    isDisabled: user.isDisabled,
+  };
 }
 
 function toResourceModel(resource: PluginResourceModel | undefined): PluginResourceModel | undefined {
