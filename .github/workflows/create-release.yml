@@ -75,6 +75,11 @@ jobs:
           git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
           git config user.email "${{ steps.bot-user.outputs.id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
 
+      # Before anything is pushed: a package npm provenance rejects would otherwise fail only at "Publish libraries",
+      # after the tag, the GitHub release and release.yml (ATT-1384).
+      - name: Check repository metadata of the published packages
+        run: node scripts/check-release-package-metadata.mjs
+
       - name: Lint publishable libraries
         run: |
           exclude="$(node scripts/ci-nx-exclude.mjs lint)"
