@@ -300,7 +300,7 @@ changes nothing. Who opens it:
 - Touch / Touch V2: at every boot while unpaired (`Application::tickBtSetup`, first main-loop pass), and the **Bluetooth setup**
   button next to **Settings** on `InitScreen` (shown only while unpaired and no window is open; no PIN, the commands
   check it). If NimBLE cannot start, the button shows "Bluetooth unavailable". While the window is open,
-  `InitScreen` and the pairing-code screen show "Bluetooth setup open · mm:ss" over the name `Attractap Touch XXXX`, or
+  `InitScreen`, the pairing-code screen and the settings a fresh reader opens on (left of Save) show "Bluetooth setup open · mm:ss" over the name `Attractap Touch XXXX`, or
   "Bluetooth setup: browser connected" (`display/shared/btSetupStatus.hpp`, `messages.catalog.bt-setup.hpp`).
 - Lite: at every boot while unpaired. The ring shows `LED_STATE_BT_SETUP` (`led/led_bt_setup.hpp`): two short
   blue pulses every 1.5 s over a dim ring, steady blue with a browser connected. It replaces Configuration Required

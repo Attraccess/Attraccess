@@ -27,7 +27,7 @@ Ein Leser, der **noch nicht gekoppelt** ist, öffnet seine Bluetooth-Einrichtung
 
 | Leser | So öffnet sich die Einrichtung | Was er zeigt |
 |-------|--------------------------------|--------------|
-| **Attractap Touch** (und Touch V2) | 10 Minuten nach jedem Start. Später öffnet **Bluetooth-Einrichtung** neben **Einstellungen** auf dem Verbindungsbildschirm sie für weitere 10 Minuten. | Zwei Zeilen auf dem Display: „Bluetooth-Einrichtung offen · 09:41“ und sein Name, zum Beispiel „Attractap Touch 71C8“; und „Bluetooth-Einrichtung: Browser verbunden“, solange Ihr Browser verbunden ist. |
+| **Attractap Touch** (und Touch V2) | 10 Minuten nach jedem Start. Später öffnet **Bluetooth-Einrichtung** neben **Einstellungen** auf dem Verbindungsbildschirm sie für weitere 10 Minuten. | Auf dem Einstellungs- oder Verbindungsbildschirm: „Bluetooth-Einrichtung offen · 09:41“ und sein Name, zum Beispiel „Attractap Touch 71C8“; und „Bluetooth-Einrichtung: Browser verbunden“, solange Ihr Browser verbunden ist. |
 | **Attractap Lite** | 10 Minuten nach jedem Einschalten. Für weitere 10 Minuten trennen Sie ihn kurz vom Strom. | Der LED-Ring pulsiert alle 1,5 Sekunden zweimal blau; solange Ihr Browser verbunden ist, leuchtet er blau. Die Kopplungsfarben haben Vorrang. |
 | **BLE-Bridge** | Taster 3 Sekunden gedrückt halten. | Siehe [BLE-Bridge](attractap/ble-bridge.md). |
 
