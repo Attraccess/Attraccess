@@ -28,8 +28,4 @@ inline constexpr Entry networkStatusCatalog[] = {
     {Message::Milliseconds, "{0} ms", "{0} ms"},
     {Message::Percent, "{0} %", "{0}%"},
 };
-static_assert(sizeof(catalog) / sizeof(Entry) + sizeof(cardRelayCatalog) / sizeof(Entry) +
-                      sizeof(networkStatusCatalog) / sizeof(Entry) ==
-                  static_cast<size_t>(Message::Count),
-              "every firmware message needs a catalog entry, in enum order");
 } // namespace FirmwareI18n

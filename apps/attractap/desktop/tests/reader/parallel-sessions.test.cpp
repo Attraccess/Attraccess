@@ -53,11 +53,11 @@ void ReaderWorkflow::testParallelSessions()
         pump();
     };
 
-    // A free slot on a busy machine: "In use 2/3" with a plain Start, never a takeover.
+    // A free slot on a busy machine: the users and "2/3" with a plain Start, never a takeover.
     supervised = false; active = false;
     login(false);
     parallelList({3, false, true, {{7, "Robin"}, {8, "Sam"}}});
-    assert(label(lv_screen_active(), "In Verwendung 2/3"));
+    assert(label(lv_screen_active(), "Robin, Sam \xC2\xB7 2/3"));
     display.capture(output, "parallel-01-list-in-use-k-of-n");
     const auto starts = server.count("START_RESOURCE_USAGE_SESSION");
     click("Start");
@@ -66,10 +66,10 @@ void ReaderWorkflow::testParallelSessions()
     const auto start = startRequest["data"]["payload"];
     assert(start["resourceId"].as<int>() == 1 && !start["forceTakeOver"].as<bool>());
     // The server refuses when someone else took the last slot meanwhile: the refresh shows the
-    // resource full, so the failed Start button is gone and the row reads "Voll".
+    // resource full, so the failed Start button is gone and the row reads "<names> · Voll".
     actionReply("START_RESOURCE_USAGE_SESSION", R"("error":"ResourceFullError")");
     parallelList({3, false, false, {{7, "Robin"}, {8, "Sam"}, {10, "Kim"}}});
-    assert(label(lv_screen_active(), "Voll"));
+    assert(label(lv_screen_active(), "Robin, Sam, Kim \xC2\xB7 Voll"));
     assert(!label(lv_screen_active(), "Start"));
     display.capture(output, "parallel-02-list-full");
 
@@ -158,7 +158,7 @@ void ReaderWorkflow::testParallelSessions()
     click(LV_SYMBOL_LEFT);
     assert(label(lv_screen_active(), "In Verwendung: Sam"));
     parallelList({1, false, false, {{7, "Robin"}, {12, "Sam"}}});
-    assert(label(lv_screen_active(), "Voll"));
+    assert(label(lv_screen_active(), "Robin, Sam \xC2\xB7 Voll"));
     display.capture(output, "parallel-06-list-lowered-limit");
     click("Drucker");
     assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
