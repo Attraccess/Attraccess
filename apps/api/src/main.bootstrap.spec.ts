@@ -18,7 +18,7 @@ import { existsSync } from 'fs';
 import { readFile, writeFile } from 'fs/promises';
 import { createCert } from 'mkcert';
 import { initializeProcessLogging } from './logging/process-logging';
-import { prepareDatabaseAtStartup } from './database/transfer/startup-transfer';
+import { migrateDatabaseAtStartup } from './database/postgres/postgres-startup-migrations';
 
 jest.mock('./logging/process-logging', () => ({
   initializeProcessLogging: jest.fn(() => ({ log: jest.fn(), error: jest.fn(), warn: jest.fn() })),
@@ -48,7 +48,9 @@ jest.mock('fs', () => {
   const actual = jest.requireActual<typeof import('fs')>('fs');
   return { ...actual, existsSync: jest.fn(actual.existsSync) };
 });
-jest.mock('./database/transfer/startup-transfer', () => ({ prepareDatabaseAtStartup: jest.fn(async () => undefined) }));
+jest.mock('./database/postgres/postgres-startup-migrations', () => ({
+  migrateDatabaseAtStartup: jest.fn(async () => undefined),
+}));
 jest.mock('fs/promises', () => ({ readFile: jest.fn(async () => Buffer.from('certificate')), writeFile: jest.fn() }));
 jest.mock('mkcert', () => ({
   createCA: jest.fn(async () => ({ key: 'ca-key', cert: 'ca-cert' })),
@@ -302,11 +304,11 @@ describe('API bootstrap ordering and configuration', () => {
     // configure() resets the snapshot, and the boot guard must not record plugins the license keeps out.
     expect(jest.mocked(PluginService.configure).mock.invocationCallOrder[0]).toBeLessThan(snapshotOrder);
     expect(snapshotOrder).toBeLessThan(jest.mocked(PluginService.beginBootGuard).mock.invocationCallOrder[0]);
-    // PostgreSQL is prepared (reachable, baseline, SQLite data moved) before the license read and any plugin migration.
-    expect(prepareDatabaseAtStartup).toHaveBeenCalledTimes(1);
-    const prepareOrder = jest.mocked(prepareDatabaseAtStartup).mock.invocationCallOrder[0];
-    expect(prepareOrder).toBeLessThan(snapshotOrder);
-    expect(prepareOrder).toBeLessThan(migrationOrder);
+    // PostgreSQL is reachable and migrated (SQLite import included) before the license read and any plugin migration.
+    expect(migrateDatabaseAtStartup).toHaveBeenCalledTimes(1);
+    const migrateOrder = jest.mocked(migrateDatabaseAtStartup).mock.invocationCallOrder[0];
+    expect(migrateOrder).toBeLessThan(snapshotOrder);
+    expect(migrateOrder).toBeLessThan(migrationOrder);
     expect(early.close).toHaveBeenCalled();
     expect(initializeProcessLogging).toHaveBeenCalledTimes(1);
     expect(early.useLogger).toHaveBeenCalledWith(jest.mocked(initializeProcessLogging).mock.results[0].value);
@@ -327,7 +329,7 @@ describe('API bootstrap ordering and configuration', () => {
     expect(result.shouldGuardPluginLifecycle).toBe(false);
     expect(PluginService.beginBootGuard).not.toHaveBeenCalled();
     expect(PluginService.setLicenseSnapshot).not.toHaveBeenCalled();
-    expect(prepareDatabaseAtStartup).not.toHaveBeenCalled();
+    expect(migrateDatabaseAtStartup).not.toHaveBeenCalled();
     expect(PluginMigrationService.runPendingUpMigrationsForAllPlugins).not.toHaveBeenCalled();
     expect(datasource.initialize).not.toHaveBeenCalled();
     expect(datasource.runMigrations).not.toHaveBeenCalled();

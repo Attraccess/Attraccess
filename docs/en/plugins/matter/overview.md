@@ -15,8 +15,8 @@ control or list devices yet, so there is no device UI.
 - Attraccess 2.0 or newer and the `matter` plugin, installed as described in
   [Installing Plugins](plugins/installing-plugins.md). It needs the `PLUGIN_STORAGE` and `MANAGE_SECRETS`
   permissions.
-- Upgrading from 1.x: the plugin's 1.x tables and data are kept and adopted in place. Update to Attraccess 1.11
-  first (see [Upgrading to Attraccess 2.0](installation/updating.md#upgrading-to-attraccess-20)).
+- Upgrading a 1.x (SQLite) installation does not move the plugin's data: the plugin starts empty on PostgreSQL and
+  has to be set up again (see [Moving from SQLite to PostgreSQL](installation/updating.md#moving-from-sqlite-to-postgresql)).
 - The **Matter sidecar**, a separate Node.js process or container (Node.js `>=26.13.0 <27`) that you build, secure
   and run yourself. Attraccess talks to it with a service token. See the [Operator Guide](plugins/matter/operator.md).
 - Network access from the sidecar to your Matter devices (mDNS and UDP) once a fabric exists.

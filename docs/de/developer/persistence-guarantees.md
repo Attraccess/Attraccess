@@ -7,7 +7,7 @@ mehr als einer API-Instanz **nicht** zugesichert ist. Horizontale Skalierung wir
 
 ## PostgreSQL-Semantik
 
-PostgreSQL ist das einzige Laufzeit-Backend (SQLite wird nur von der einmaligen [Übernahme](installation/updating.md#umzug-von-sqlite-auf-postgresql) gelesen).
+PostgreSQL ist das einzige Laufzeit-Backend (SQLite wird nur von der einmaligen [Import-Migration](installation/updating.md#umzug-von-sqlite-auf-postgresql) gelesen).
 Es gibt keine prozessweite Schreibsperre: Unabhängige Transaktionen laufen parallel, und die Korrektheit stellt die
 Datenbank sicher.
 
@@ -35,9 +35,10 @@ Datenbank sicher.
   kollidierende Datenbank mit `503` und ungültige Eingaben mit `400`, nie mit der Treibermeldung.
 - **Typen.** Zeitpunkte sind `timestamptz` (UTC). Credits und Zählerwerte sind `bigint` oder exakte Dezimalzahlen, nie
   Gleitkomma.
-- **Migrationen.** Die PostgreSQL-Spur besteht aus einer Baseline-Migration (`apps/api/src/database/postgres/migrations`);
-  spätere Migrationen sind nur für PostgreSQL. Die veröffentlichten SQLite-Migrationen sind eingefroren und laufen nur
-  auf der temporären Kopie während der Übernahme.
+- **Migrationen.** Die PostgreSQL-Spur (`apps/api/src/database/postgres/migrations`) besteht aus einer Baseline, dem
+  SQLite-Import und späteren PostgreSQL-only-Migrationen. Sie laufen beim Start unter einem PostgreSQL-Advisory-Lock,
+  eine Transaktion je Migration. Die veröffentlichten SQLite-Migrationen sind eingefroren und laufen nur innerhalb des
+  Imports, an Ort und Stelle auf der SQLite-Datei.
 
 ## Unit of Work
 
@@ -105,8 +106,9 @@ Plugins haben keinen Datenbankzugriff; sie halten Daten in deklarierten Tabellen
   Konflikt wird als `PluginStorageConflict` gemeldet.
 - **Neutrale Fehler und Werte.** Unique-Verletzungen, Konflikte, fehlende Zeilen und ungültige Eingaben sind auf jeder
   Engine dieselben neutralen Fehler; Zeitstempel sind UTC-Zeitpunkte, Dezimalzahlen exakte Strings.
-- **Backup.** Plugin-Tabellen und der Schemastand jedes Plugins (angewendete Version) sind Teil des Transfer-Snapshots
-  und werden zusammen mit der Datenbank als eine Einheit wiederhergestellt.
+- **Backup.** Plugin-Tabellen und der Schemastand jedes Plugins (angewendete Version) liegen in der
+  PostgreSQL-Datenbank; ein Datenbank-Backup enthält sie also und stellt sie zusammen mit den Kerndaten als eine Einheit
+  wieder her.
 
 Das deckt die Plugin-Speicher-Conformance-Suite ab, die jeder Backend-Adapter bestehen muss.
 
