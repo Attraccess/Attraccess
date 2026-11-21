@@ -242,9 +242,10 @@ Alles, was hier steht, ist eine harte Anforderung. Der Host prüft die Lizenz **
 lädt. Ist die Anforderung nicht erfüllt, wird das Plugin gar nicht geladen: kein Backend, keine Migrationen, keine
 Flow-Knoten, Audit-Domänen, Reader-UI, Hooks oder Frontend. In **Einstellungen → Plugins** steht es als **Lizenz fehlt**,
 mit den fehlenden Modulen. Lässt sich die Lizenz nicht ermitteln (kein Schlüssel, ein Schlüssel, der sich nicht prüfen
-lässt, nicht lesbare Einstellungen), gilt ein geschütztes Plugin als nicht lizenziert. Bei einer Neuinstallation nutzt
-der Host die Umgebungsvariable `LICENSE_KEY`. Ein Plugin mit einer erforderlichen Abhängigkeit von einem nicht
-lizenzierten Plugin wird ebenfalls nicht geladen; es zeigt den üblichen Abhängigkeitsfehler.
+lässt, nicht lesbare Einstellungen), gilt ein geschütztes Plugin als nicht lizenziert. Eine Neuinstallation hat keinen
+Schlüssel, bis ein Administrator ihn in den Einstellungen einträgt; ihre geschützten Plugins laden nach dem nächsten
+Neustart. Ein Plugin mit einer erforderlichen Abhängigkeit von einem nicht lizenzierten Plugin wird ebenfalls nicht
+geladen; es zeigt den üblichen Abhängigkeitsfehler.
 
 Das Nichtladen aus Lizenzgründen ist kein Fehler: Das Plugin wird nicht unter Quarantäne gestellt und lädt nach dem
 nächsten Neustart, sobald die Lizenz es abdeckt. Ein ungültiger `license`-Block (falsche Typen, unbekannte Schlüssel) ist

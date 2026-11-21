@@ -22,7 +22,6 @@ All configuration options for Attraccess that can be set via environment variabl
 | `LOG_LEVELS`                     | `error,warn,log`         | Comma-separated log levels: `error`, `warn`, `log`, `debug`, `verbose`                                                                                                                                                                                                                 |
 | `LOG_DESTINATIONS`               | `console`                | Comma-separated registered API log drivers: initially `console`, `file`. Names are trimmed, lowercased and deduplicated.                                                                                                                                                               |
 | `LOG_FILE_PATH`                  | `<STORAGE_ROOT>/api.log` | Optional override when selecting `file`; defaults to `api.log` at the storage root (`./storage` when `STORAGE_ROOT` is unset). Explicit overrides must be non-blank; ignored otherwise. Relative paths resolve against the API process working directory; absolute paths are accepted. |
-| `LICENSE_KEY`                    | –                        | Seeds the license key when a new database is initialized. For existing installations, change the stored key under Settings → Application Settings.                                                                                                                                     |
 | `TZ`                             | –                        | Time zone, e.g. `Europe/Berlin`                                                                                                                                                                                                                                                        |
 | `TRUST_PROXY`                    | –                        | Trusted reverse-proxy hops so auth rate limiting uses the real client IP. `1` = single proxy (nginx/Traefik/Caddy), `2` = CDN + proxy, or a comma-separated list of trusted proxy IPs/CIDRs (or `loopback`, `linklocal`, `uniquelocal`). Unset = trust no proxy.                       |
 
@@ -112,20 +111,9 @@ The balena stack contains a `backup` service that backs up the database and the 
 | `MAX_FILE_SIZE_BYTES` | `10485760`     | Maximum file size for uploads (default: 10 MB) |
 | `CACHE_MAX_AGE_DAYS`  | `7`            | How long images stay in cache (days)           |
 
-## Email (SMTP)
+## License key and email
 
-| Variable       | Default     | Description                            |
-| -------------- | ----------- | -------------------------------------- |
-| `SMTP_SERVICE` | `SMTP`      | Email service: `SMTP` or `Outlook365`  |
-| `SMTP_HOST`    | `localhost` | SMTP server hostname                   |
-| `SMTP_PORT`    | `1025`      | SMTP port                              |
-| `SMTP_SECURE`  | `false`     | Enable TLS encryption (`true`/`false`) |
-| `SMTP_USER`    | –           | SMTP username                          |
-| `SMTP_PASS`    | –           | SMTP password                          |
-| `SMTP_FROM`    | –           | Sender email address                   |
-
-> [!NOTE]
-> When using `Outlook365`, host, port and secure are set automatically (`smtp.office365.com`, port `587`). You only need to provide username, password and sender address.
+The license key and the email (SMTP) server are not environment variables. Enter them in the [setup wizard](setup/first-time-setup.md) or under **Settings**; see [Email / SMTP Configuration](setup/smtp-email.md).
 
 ## SSL / TLS
 

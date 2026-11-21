@@ -22,7 +22,6 @@ Alle Konfigurationsoptionen für Attraccess, die über Umgebungsvariablen gesetz
 | `LOG_LEVELS`                     | `error,warn,log`         | Kommagetrennte Protokollebenen: `error`, `warn`, `log`, `debug`, `verbose`                                                                                                                                                                                                                                                         |
 | `LOG_DESTINATIONS`               | `console`                | Kommagetrennte registrierte Treiber für API-Logs: zunächst `console`, `file`. Namen werden getrimmt, kleingeschrieben und dedupliziert.                                                                                                                                                                                            |
 | `LOG_FILE_PATH`                  | `<STORAGE_ROOT>/api.log` | Optionale Pfadüberschreibung für `file`; standardmäßig `api.log` direkt im Speicherverzeichnis (`./storage`, wenn `STORAGE_ROOT` nicht gesetzt ist). Explizite Pfade dürfen nicht leer sein; andernfalls ignoriert. Relative Pfade beziehen sich auf das Arbeitsverzeichnis des API-Prozesses; absolute Pfade sind erlaubt.        |
-| `LICENSE_KEY`                    | –                        | Übernimmt den Lizenzschlüssel beim Initialisieren einer neuen Datenbank. Ändern Sie den gespeicherten Schlüssel bei bestehenden Installationen unter Einstellungen → Anwendungseinstellungen.                                                                                                                                      |
 | `TZ`                             | –                        | Zeitzone, z.B. `Europe/Berlin`                                                                                                                                                                                                                                                                                                     |
 | `TRUST_PROXY`                    | –                        | Anzahl vertrauenswürdiger Reverse-Proxy-Hops, damit das Auth-Rate-Limiting die echte Client-IP verwendet. `1` = einzelner Proxy (nginx/Traefik/Caddy), `2` = CDN + Proxy, oder eine kommagetrennte Liste vertrauenswürdiger Proxy-IPs/CIDRs (bzw. `loopback`, `linklocal`, `uniquelocal`). Nicht gesetzt = keinem Proxy vertrauen. |
 
@@ -112,20 +111,9 @@ Der balena-Stack enthält einen Dienst `backup`, der Datenbank und Volumes mit r
 | `MAX_FILE_SIZE_BYTES` | `10485760`     | Maximale Dateigröße für Uploads (Standard: 10 MB) |
 | `CACHE_MAX_AGE_DAYS`  | `7`            | Wie lange Bilder im Cache bleiben (Tage)          |
 
-## E-Mail (SMTP)
+## Lizenzschlüssel und E-Mail
 
-| Variable       | Standard    | Beschreibung                                    |
-| -------------- | ----------- | ----------------------------------------------- |
-| `SMTP_SERVICE` | `SMTP`      | E-Mail-Dienst: `SMTP` oder `Outlook365`         |
-| `SMTP_HOST`    | `localhost` | SMTP-Servername                                 |
-| `SMTP_PORT`    | `1025`      | SMTP-Port                                       |
-| `SMTP_SECURE`  | `false`     | TLS-Verschlüsselung aktivieren (`true`/`false`) |
-| `SMTP_USER`    | –           | SMTP-Benutzername                               |
-| `SMTP_PASS`    | –           | SMTP-Passwort                                   |
-| `SMTP_FROM`    | –           | Absender-E-Mail-Adresse                         |
-
-> [!NOTE]
-> Bei `Outlook365` werden Host, Port und Secure automatisch gesetzt (`smtp.office365.com`, Port `587`). Sie müssen nur Benutzer, Passwort und Absender angeben.
+Lizenzschlüssel und E-Mail-Server (SMTP) sind keine Umgebungsvariablen. Tragen Sie sie im [Einrichtungsassistenten](setup/first-time-setup.md) oder unter **Einstellungen** ein; siehe [E-Mail / SMTP-Konfiguration](setup/smtp-email.md).
 
 ## SSL / TLS
 

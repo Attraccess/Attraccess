@@ -25,18 +25,6 @@ AUTH_SESSION_SECRET=your-random-secure-key
 POSTGRES_PASSWORD=your-database-password
 ATTRACCESS_URL=https://attraccess.your-domain.com
 
-# Email (SMTP)
-SMTP_SERVICE=SMTP
-SMTP_HOST=smtp.your-domain.com
-SMTP_PORT=587
-SMTP_SECURE=true
-SMTP_USER=no-reply@your-domain.com
-SMTP_PASS=your-smtp-password
-SMTP_FROM=no-reply@your-domain.com
-
-# License
-LICENSE_KEY=your-license-key
-
 # Optional
 LOG_LEVELS=error,warn,log
 TZ=Europe/Berlin
