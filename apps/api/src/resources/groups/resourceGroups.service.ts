@@ -26,6 +26,8 @@ import {
 } from './resource-group-store.port';
 
 import type { ResourcePersistenceContext } from '../resource-persistence-context';
+import { RESOURCE_FORM_STORE, type ResourceFormStore } from '../forms/forms-store.port';
+import { UNIT_OF_WORK, type UnitOfWork } from '../../database/unit-of-work';
 import type { AuthenticationMethod } from '@attraccess/application-models';
 
 export interface GetOneSearchOptions {
@@ -43,6 +45,8 @@ export class ResourceGroupsService {
     protected readonly eventEmitter: EventEmitter2,
     protected readonly metricsService: MetricsService,
     @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
+    @Inject(RESOURCE_FORM_STORE) protected readonly formStore: ResourceFormStore,
+    @Inject(UNIT_OF_WORK) protected readonly unitOfWork: UnitOfWork,
   ) {}
 
   public async getMany(visibility?: GroupVisibilityContext): Promise<ResourceGroupRecord[]> {
@@ -181,7 +185,12 @@ export class ResourceGroupsService {
     actor?: { id: number; authenticationMethod?: AuthenticationMethod; apiTokenId?: number },
   ): Promise<void> {
     const resourceGroup = await this.getOne({ id: groupId }, ['resources']);
-    if ((await this.store.delete(groupId)) === 0) {
+    // The group's forms are deleted softly with it, so their submissions stay in the history (ATT-796).
+    const deleted = await this.unitOfWork.run(async (scope) => {
+      await this.formStore.softDeleteGroupForms(groupId, scope);
+      return this.store.delete(groupId, scope);
+    });
+    if (deleted === 0) {
       throw new ResourceGroupNotFoundException({ id: groupId });
     }
     this.eventEmitter.emit(

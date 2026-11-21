@@ -1,0 +1,201 @@
+{
+  "editor": {
+    "createTitle": "Formular erstellen",
+    "editTitle": "{{formName}}",
+    "sections": {
+      "identity": "Formularidentität",
+      "behavior": "Standardwerte: wann dieses Formular erforderlich ist",
+      "fields": "Felder",
+      "preview": "Live-Vorschau",
+      "scope": "Geltungsbereich"
+    },
+    "nameLabel": "Formularname",
+    "namePlaceholder": "Maschinen-Sicherheitscheckliste",
+    "resourceUsageStart": "Standardmäßig erforderlich bei Sitzungsstart",
+    "resourceUsageTakeover": "Standardmäßig erforderlich bei Übernahme",
+    "resourceUsageEnd": "Standardmäßig erforderlich bei Sitzungsende",
+    "addField": "Feld hinzufügen",
+    "reorderField": "Feld verschieben",
+    "emptyFieldsTitle": "Keine Felder",
+    "emptyFieldsDescription": "Füge mindestens ein Feld hinzu, damit Mitglieder etwas ausfüllen können.",
+    "save": "Formular speichern",
+    "delete": "Löschen",
+    "deleteField": "Feld löschen",
+    "unsaved": "Nicht gespeicherte Änderungen",
+    "createSuccess": "Formular erstellt",
+    "updateSuccess": "Formular aktualisiert",
+    "deleteSuccess": "Formular gelöscht",
+    "deleteConfirmTitle": "{{formName}} löschen?",
+    "deleteConfirmDescription": {
+      "one": "Das Formular wird von der Ressource entfernt, für die es gilt. Seine Einreichungen bleiben erhalten und in der Nutzungshistorie sichtbar.",
+      "many": "Das Formular wird von allen {{count}} Ressourcen entfernt, für die es gilt. Seine Einreichungen bleiben erhalten und in der Nutzungshistorie sichtbar."
+    },
+    "validation": {
+      "missingFieldName": "Bitte vergib für jedes Feld eine Beschriftung, bevor du speicherst."
+    },
+    "defaultsHint": "Jede Ressource kann diese Standardwerte unter Einstellungen → Formulare überschreiben.",
+    "deleteCancel": "Abbrechen",
+    "sharedNotice": "Änderungen gelten für alle {{count}} Ressourcen.",
+    "tabs": {
+      "form": "Formular",
+      "submissions": "Einreichungen"
+    },
+    "deleteConfirmDescriptionNone": "Das Formular gilt für keine Ressource. Seine Einreichungen bleiben erhalten und in der Nutzungshistorie sichtbar."
+  },
+  "fields": {
+    "label": "Beschriftung",
+    "type": "Typ",
+    "required": "Pflichtfeld",
+    "description": "Beschreibung",
+    "placeholder": {
+      "label": "-- Bitte Beschriftung eingeben --",
+      "description": "Wird unterhalb der Beschriftung angezeigt"
+    },
+    "optionsTitle": "Feldoptionen",
+    "options": {
+      "text": {
+        "placeholder": "Platzhaltertext",
+        "multiline": "Mehrzeilige Eingabe erlauben"
+      },
+      "number": {
+        "min": "Minimaler Wert",
+        "max": "Maximaler Wert",
+        "step": "Schrittweite"
+      },
+      "select": {
+        "description": "Definiere die Optionen, aus denen Nutzer wählen können.",
+        "optionPlaceholder": "Optionswert",
+        "addOption": "Option hinzufügen",
+        "maxOptions": "Maximale Anzahl von Optionen erreicht"
+      },
+      "boolean": {
+        "description": "Ja/Nein-Felder verwenden einen Schalter und benötigen keine weiteren Optionen."
+      }
+    },
+    "types": {
+      "text": "Text",
+      "number": "Zahl",
+      "select": "Einzelauswahl",
+      "boolean": "Ja / Nein"
+    }
+  },
+  "preview": {
+    "booleanYes": "Ja",
+    "booleanNo": "Nein",
+    "booleanLabel": "Ja/Nein-Feld Vorschau",
+    "selectPlaceholder": "Eine Option auswählen",
+    "empty": "Füge Felder hinzu, um die Vorschau zu sehen."
+  },
+  "globalList": {
+    "title": "Formulare",
+    "subtitle": "Formulare, die Mitglieder beim Starten, Übernehmen oder Beenden einer Sitzung ausfüllen. Ein Formular gilt für eine Ressource, eine Ressourcengruppe oder alle Ressourcen.",
+    "create": "Neues Formular",
+    "tableLabel": "Formulare",
+    "empty": "Noch keine Formulare",
+    "loadError": "Die Formulare konnten nicht geladen werden.",
+    "scopeFilter": "Geltungsbereich",
+    "allScopes": "Alle Geltungsbereiche",
+    "columns": {
+      "name": "Name",
+      "scope": "Geltungsbereich",
+      "fields": "Felder",
+      "appliesTo": "Gilt für"
+    },
+    "appliesToCount": {
+      "one": "{{count}} Ressource",
+      "many": "{{count}} Ressourcen"
+    },
+    "fieldCount": {
+      "one": "{{count}} Feld",
+      "many": "{{count}} Felder"
+    },
+    "emptyFiltered": "Keine Formulare passen zu diesem Filter.",
+    "editAction": "Formular bearbeiten"
+  },
+  "scope": {
+    "label": "Geltungsbereich",
+    "description": "Wo das Formular gilt.",
+    "resource": "Ressource",
+    "group": "Gruppe",
+    "global": "Global",
+    "groupWithName": "Gruppe: {{name}}",
+    "resourceWithName": "Ressource: {{name}}",
+    "groupPicker": "Gruppe",
+    "groupPlaceholder": "Gruppe auswählen",
+    "missingOwner": "Wähle für diesen Geltungsbereich eine Ressource oder Gruppe."
+  },
+  "appliesTo": {
+    "title": {
+      "one": "Gilt für {{count}} Ressource",
+      "many": "Gilt für {{count}} Ressourcen"
+    },
+    "empty": "Dieses Formular gilt noch für keine Ressource.",
+    "disabled": "Ausgeschaltet",
+    "overridden": "Überschrieben",
+    "inherited": "Standardwerte",
+    "tableLabel": "Ressourcen, für die das Formular gilt",
+    "resource": "Ressource",
+    "state": "Status",
+    "effective": "Erforderlich bei",
+    "badges": {
+      "start": "Beim Start",
+      "takeover": "Bei Übernahme",
+      "end": "Beim Beenden"
+    },
+    "switchedOff": "{{count}} ausgeschaltet"
+  },
+  "submissions": {
+    "tableLabel": "Einreichungen",
+    "empty": "Noch keine Einreichungen.",
+    "resourceFilter": "Ressource",
+    "allResources": "Alle Ressourcen",
+    "loadError": "Die Einreichungen konnten nicht geladen werden.",
+    "columns": {
+      "date": "Datum",
+      "user": "Benutzer",
+      "resource": "Ressource",
+      "action": "Aktion",
+      "answers": "Antworten"
+    },
+    "actions": {
+      "start": "Start",
+      "takeover": "Übernahme",
+      "end": "Ende"
+    },
+    "showAnswers": "Antworten anzeigen",
+    "hideAnswers": "Antworten ausblenden",
+    "noAnswers": "Keine Antworten",
+    "yes": "Ja",
+    "no": "Nein",
+    "unknown": "Unbekannt"
+  },
+  "resourceTab": {
+    "create": "Neues Formular",
+    "empty": "Für diese Ressource gelten noch keine Formulare.",
+    "tableLabel": "Formulare dieser Ressource",
+    "loadError": "Die Formulare konnten nicht geladen werden.",
+    "columns": {
+      "name": "Formular",
+      "source": "Herkunft",
+      "enabled": "Aktiv",
+      "start": "Start",
+      "takeover": "Übernahme",
+      "end": "Ende"
+    },
+    "toggle": "{{name}} für diese Ressource verwenden",
+    "override": {
+      "required": "Erforderlich",
+      "notRequired": "Nicht erforderlich",
+      "label": "{{action}} für {{name}}",
+      "inheritsRequired": "Erben (erforderlich)",
+      "inheritsNotRequired": "Erben (nicht erforderlich)"
+    },
+    "saved": "Gespeichert",
+    "editAction": "Formular bearbeiten",
+    "submissionsAction": "Einreichungen"
+  },
+  "deleted": {
+    "title": "Gelöschtes Formular #{{id}}",
+    "description": "Dieses Formular wurde gelöscht und gilt für keine Ressource mehr. Seine Einreichungen bleiben erhalten und sind unten aufgeführt."
+  }
+}

@@ -166,7 +166,12 @@ export function GroupDetailsForm(
             data-cy="group-details-form-delete-button"
             confirm={{
               title: t('deleteConfirm.title'),
-              message: t('deleteConfirm.message', { name: group.name }),
+              message: (
+                <>
+                  <p>{t('deleteConfirm.message', { name: group.name })}</p>
+                  <p className="mt-2">{t('deleteConfirm.forms')}</p>
+                </>
+              ),
               confirmLabel: t('deleteConfirm.confirm'),
               cancelLabel: t('deleteConfirm.cancel'),
             }}

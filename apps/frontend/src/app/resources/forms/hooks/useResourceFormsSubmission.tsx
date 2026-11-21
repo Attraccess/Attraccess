@@ -4,7 +4,7 @@ import {
   FormSubmissionRequestDto,
   resourceFormsGetRequirements,
 } from '@attraccess/react-query-client';
-import { ResourceFormAction } from '../../details/forms/types';
+import { ResourceFormAction } from '../../../forms/types';
 import { ResourceFormsModal } from '../components/ResourceFormsModal';
 
 interface PendingRequest {

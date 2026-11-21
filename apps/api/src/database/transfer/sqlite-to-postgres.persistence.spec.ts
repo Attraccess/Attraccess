@@ -103,6 +103,43 @@ describe('SQLite -> PostgreSQL transfer (persistence)', () => {
     expect(warnings).toEqual([expect.stringMatching(/^Integrity check: balance of user 1/)]);
   });
 
+  it('turns the forms of the SQLite data into resource forms with their fields and submissions (ATT-796)', async () => {
+    const sqlite = new Database(workspace.file);
+    try {
+      sqlite.exec(`INSERT INTO "resource" (id, name, type) VALUES (1, 'Laser', 'machine')`);
+      sqlite.exec(
+        `INSERT INTO "resource_usage" (id, usageAction, resourceId, userId, startTime, endTime) ` +
+          `VALUES (5, 'usage', 1, 1, '2030-01-01 10:00:00', '2030-01-01 11:00:00')`,
+      );
+      sqlite.exec(
+        `INSERT INTO "form" (id, name, resourceId, isRequiredOnResourceUsageStart) VALUES (7, 'Safety', 1, 1)`,
+      );
+      sqlite.exec(`INSERT INTO "form_field" (id, formId, name, type) VALUES (11, 7, 'Goggles?', 'boolean')`);
+      sqlite.exec(
+        `INSERT INTO "form_submission" (id, formId, data, userId, resourceUsageId) VALUES (21, 7, '{}', 1, 5)`,
+      );
+    } finally {
+      sqlite.close();
+    }
+
+    await run({ markMigrated: false });
+
+    expect(
+      await target.source.query(
+        `SELECT id, scope, "resourceId", "groupId", "deletedAt", "isRequiredOnResourceUsageStart" FROM "form"`,
+      ),
+    ).toEqual([
+      { id: 7, scope: 'resource', resourceId: 1, groupId: null, deletedAt: null, isRequiredOnResourceUsageStart: true },
+    ]);
+    expect(await target.source.query(`SELECT id, "formId" FROM "form_field"`)).toEqual([{ id: 11, formId: 7 }]);
+    expect(await target.source.query(`SELECT id, "formId" FROM "form_submission"`)).toEqual([{ id: 21, formId: 7 }]);
+    expect(await target.source.query(`SELECT * FROM "form_resource_override"`)).toEqual([]);
+    const [created] = await target.source.query(
+      `INSERT INTO "form" (name, scope) VALUES ('Everywhere', 'global') RETURNING id`,
+    );
+    expect(created.id).toBe(8);
+  });
+
   it('migrates the storage of an installed plugin on both sides and reports it', async () => {
     const summary = await run({
       plugins: [PLUGIN],

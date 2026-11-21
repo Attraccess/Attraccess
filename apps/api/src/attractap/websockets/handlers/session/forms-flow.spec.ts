@@ -2,6 +2,7 @@
 import { Test } from '@nestjs/testing';
 import {
   FormFieldType,
+  effectiveFormFlags,
   ResourceFormAction,
   type FormFieldRecord,
   type FormRecord,
@@ -70,6 +71,12 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
   let sessionHandler: AttractapSessionHandler;
   let startSession: jest.Mock;
   let endSession: jest.Mock;
+  let formStore: {
+    resourceExists: jest.Mock;
+    findRequiredForAction: jest.Mock;
+    findApplicableForResource: jest.Mock;
+    findForm: jest.Mock;
+  };
 
   beforeEach(async () => {
     startSession = jest.fn().mockResolvedValue({ id: 999 });
@@ -78,9 +85,19 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
       .mockResolvedValue({ id: 999, userId: 7, startTime: new Date(0), endTime: new Date(1426999) });
     form.isRequiredOnResourceUsageEnd = false;
 
-    const formStore = {
+    formStore = {
       resourceExists: jest.fn().mockResolvedValue(true),
       findRequiredForAction: jest.fn().mockResolvedValue([form]),
+      // The forms the test requires reach the resource with their own flags (no overrides).
+      findApplicableForResource: jest.fn(async () =>
+        ((await formStore.findRequiredForAction()) as FormRecord[]).map((item) => ({
+          form: item,
+          groupName: null,
+          override: null,
+          disabled: false,
+          effective: effectiveFormFlags(item, null),
+        })),
+      ),
       findForm: jest.fn().mockResolvedValue(form),
     };
 
@@ -215,5 +232,70 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
     } as AttractapEvent['data']);
 
     expect(sentTypes(socket)).toContain(AttractapEventType.RESOURCE_USAGE_FORM_REQUEST);
+  });
+
+  it('asks for five inherited forms in batches of four and starts only when all are answered (ATT-796)', async () => {
+    const inherited: FormRecord[] = [1, 2, 3, 4, 5].map(
+      (n) =>
+        ({
+          id: 100 + n,
+          name: `Inherited ${n}`,
+          scope: n === 5 ? 'group' : 'global',
+          resourceId: null,
+          groupId: n === 5 ? 3 : null,
+          deletedAt: null,
+          isRequiredOnResourceUsageStart: true,
+          isRequiredOnResourceUsageTakeOver: false,
+          isRequiredOnResourceUsageEnd: false,
+          fields: [makeField({ id: 1000 + n, formId: 100 + n, name: `Q${n}`, isRequired: true })],
+        }) as FormRecord,
+    );
+    formStore.findRequiredForAction.mockResolvedValue(inherited);
+    const socket = makeSocket();
+    const start = () =>
+      sessionHandler.handleStartResourceUsageSession(socket, {
+        payload: { resourceId: RESOURCE_ID },
+      } as AttractapEvent['data']);
+    const requested = () =>
+      socket.sendMessage.mock.calls
+        .map((call: any[]) => call[0].data)
+        .filter((data: any) => data.type === AttractapEventType.RESOURCE_USAGE_FORM_REQUEST)
+        .map((data: any) => data.payload.forms.map((form: { id: number }) => form.id));
+    const answer = async (n: number) => {
+      await formsHandler.handleResourceUsageFormGetFields(socket, {
+        payload: { resourceId: RESOURCE_ID, action: ACTION, formId: 100 + n, offset: 0, limit: 1 },
+      } as AttractapEvent['data']);
+      const fields = socket.sendMessage.mock.calls.at(-1)[0].data;
+      expect(fields.type).toBe(AttractapEventType.RESOURCE_USAGE_FORM_FIELDS);
+      expect(fields.payload.fields.map((field: { id: number }) => field.id)).toEqual([1000 + n]);
+      await formsHandler.handleResourceUsageFormSubmitPage(socket, {
+        payload: {
+          resourceId: RESOURCE_ID,
+          action: ACTION,
+          formId: 100 + n,
+          offset: 0,
+          answers: [{ fieldId: 1000 + n, value: `A${n}` }],
+        },
+      } as AttractapEvent['data']);
+      expect(socket.sendMessage.mock.calls.at(-1)[0].data.payload.valid).toBe(true);
+    };
+
+    await start();
+    expect(requested()).toEqual([[101, 102, 103, 104]]);
+    for (const n of [1, 2, 3, 4]) await answer(n);
+
+    await start();
+    expect(requested()).toEqual([[101, 102, 103, 104], [105]]);
+    expect(startSession).not.toHaveBeenCalled();
+
+    await answer(5);
+    await start();
+    expect(requested()).toHaveLength(2);
+    expect(startSession).toHaveBeenCalledTimes(1);
+    // Every batch's answers reach the session, not only the last batch's.
+    expect(startSession.mock.calls[0][2].formSubmissions).toEqual(
+      [1, 2, 3, 4, 5].map((n) => ({ formId: 100 + n, answers: [{ fieldId: 1000 + n, value: `A${n}` }] })),
+    );
+    expect(sentTypes(socket)).toContain(AttractapEventType.START_RESOURCE_USAGE_SESSION);
   });
 });

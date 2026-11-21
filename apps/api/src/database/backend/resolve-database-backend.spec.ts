@@ -1,3 +1,5 @@
+import { postgresMigrations } from '../postgres/migrations';
+import { PostgresBaseline1760000000000 } from '../postgres/migrations/1760000000000-baseline';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { UPGRADE_DOCS_URL as POSTGRES_CONFIG_DOCS_URL } from '../postgres/postgres-config';
@@ -19,7 +21,8 @@ describe('database backend selection', () => {
     expect(track.name).toBe('postgres');
     expect(track.tableName).toBe('migrations');
     expect(track.directory).toBe('apps/api/src/database/postgres/migrations');
-    expect(track.migrations.filter((candidate) => typeof candidate === 'function')).toHaveLength(1);
+    expect(track.migrations).toEqual(postgresMigrations);
+    expect(track.migrations[0]).toBe(PostgresBaseline1760000000000);
   });
 
   it('rejects sqlite before touching a database and points to the upgrade instructions', () => {

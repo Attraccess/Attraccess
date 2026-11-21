@@ -2,6 +2,7 @@ import type { DataSource } from 'typeorm';
 import {
   Form,
   FormField,
+  FormResourceOverride,
   FormSubmission,
   Project,
   ProjectInvitation,
@@ -48,6 +49,8 @@ export async function migrationMembershipFormSeeds(
 
   const formSubmissionRepo = dataSource.getRepository(FormSubmission);
 
+  const formOverrideRepo = dataSource.getRepository(FormResourceOverride);
+
   const introduction = await ensureEntity(introductionRepo, () => ({
     resourceId: resource.id,
     receiverUserId: primaryUser.id,
@@ -84,6 +87,7 @@ export async function migrationMembershipFormSeeds(
 
   const form = await ensureEntity(formRepo, () => ({
     name: `Seed Form ${seedTag}`,
+    scope: 'resource',
     resourceId: resource.id,
     isRequiredOnResourceUsageStart: true,
     isRequiredOnResourceUsageTakeOver: false,
@@ -114,5 +118,12 @@ export async function migrationMembershipFormSeeds(
         },
       },
     } as unknown as FormSubmission['data'],
+  }));
+
+  await ensureEntity(formOverrideRepo, () => ({
+    formId: form.id,
+    resourceId: resource.id,
+    disabled: false,
+    isRequiredOnResourceUsageEnd: true,
   }));
 }

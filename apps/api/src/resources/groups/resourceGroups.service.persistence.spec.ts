@@ -16,6 +16,8 @@ describe('ResourceGroupsService partial updates', () => {
       { emit: jest.fn() } as never,
       { resourceGroupsTotal: { inc: jest.fn(), dec: jest.fn() } } as never,
       audit as never,
+      {} as never,
+      {} as never,
     );
     audit.record.mockClear();
   });

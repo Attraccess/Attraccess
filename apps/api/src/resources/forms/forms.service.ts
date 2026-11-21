@@ -1,7 +1,11 @@
 import {
   ResourceFormAction,
+  effectiveFormFlags,
+  type ApplicableFormRecord,
   type FormFieldRecord,
   type FormRecord,
+  type FormRequiredFlags,
+  type FormResourceOverrideRecord,
   type UsageFormSubmissionDraft,
 } from '@attraccess/application-models';
 
@@ -14,6 +18,16 @@ import {
   FormSubmissionRequestDto,
   CreateFormDto,
   UpdateFormDto,
+  BaseFormDto,
+  FormAppliedResourceDto,
+  FormListItemDto,
+  FormListQueryDto,
+  FormRequiredFlagsDto,
+  FormResourceOverrideDto,
+  FormSubmissionsQueryDto,
+  PaginatedFormSubmissionsResponseDto,
+  PaginatedFormsResponseDto,
+  ResourceApplicableFormDto,
 } from './dto/index';
 
 import { FormResponseDto } from './dto/form-response.dto';
@@ -22,11 +36,17 @@ import { parseFieldOptions, parseFieldValue } from './forms.validation';
 
 import { MissingFormSubmissionException } from './errors/missingFormSubmission.exception';
 
-import { RESOURCE_FORM_STORE, type FormFieldInput, type ResourceFormStore } from './forms-store.port';
+import { RESOURCE_FORM_STORE, type FormFieldInput, type FormInput, type ResourceFormStore } from './forms-store.port';
 
 import type { TransactionScope } from '../../database/unit-of-work';
 
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
+
+const REQUIRED_FLAG = {
+  [ResourceFormAction.START]: 'isRequiredOnResourceUsageStart',
+  [ResourceFormAction.TAKEOVER]: 'isRequiredOnResourceUsageTakeOver',
+  [ResourceFormAction.END]: 'isRequiredOnResourceUsageEnd',
+} as const satisfies Record<ResourceFormAction, keyof FormRequiredFlags>;
 
 @Injectable()
 export class ResourceFormsService {
@@ -34,22 +54,149 @@ export class ResourceFormsService {
 
   protected readonly logger = new Logger(ResourceFormsService.name);
 
-  async findAll(resourceId: number): Promise<FormResponseDto[]> {
-    await this.ensureResourceExists(resourceId);
-    const forms = await this.store.listForResource(resourceId);
-    return forms.map((form) => this.mapFormResponse(form));
+  /** Forms, deleted ones left out, each with the number of resources it currently applies to. */
+  async list(query: FormListQueryDto): Promise<PaginatedFormsResponseDto> {
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(100, Math.max(1, query.limit ?? 10));
+    const { items, total } = await this.store.listForms({
+      scope: query.scope,
+      resourceId: query.resourceId,
+      groupId: query.groupId,
+      search: query.search,
+      page,
+      limit,
+    });
+    return {
+      total,
+      page,
+      limit,
+      data: items.map((item) => {
+        const dto = Object.assign(new FormListItemDto(), this.mapFormResponse(item.form));
+        dto.appliesToResourceCount = item.appliesToResourceCount;
+        dto.resourceName = item.resourceName;
+        dto.groupName = item.groupName;
+        return dto;
+      }),
+    };
   }
 
-  async findOne(resourceId: number, formId: number): Promise<FormResponseDto> {
-    await this.ensureResourceExists(resourceId);
-    const form = await this.getFormOrThrow(resourceId, formId);
-    return this.mapFormResponse(form);
+  async findOne(formId: number): Promise<FormResponseDto> {
+    return this.mapFormResponse(await this.getFormOrThrow(formId));
   }
 
+  /** The resources the form reaches by its scope, switched-off ones included, with the flags in effect for each. */
+  async listAppliedResources(formId: number): Promise<FormAppliedResourceDto[]> {
+    const form = await this.getFormOrThrow(formId);
+    const applied = await this.store.listAppliedResources(formId);
+    return applied.map(({ resource, override }) => ({
+      resourceId: resource.id,
+      resourceName: resource.name,
+      override: override ? this.mapOverride(override) : null,
+      disabled: override?.disabled ?? false,
+      effective: this.mapFlags(effectiveFormFlags(form, override)),
+    }));
+  }
+
+  /** Submissions of a form, deleted forms included, newest first. */
+  async listSubmissions(formId: number, query: FormSubmissionsQueryDto): Promise<PaginatedFormSubmissionsResponseDto> {
+    if (!(await this.store.findFormIncludingDeleted(formId))) {
+      throw new NotFoundException(`Form #${formId} not found`);
+    }
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(100, Math.max(1, query.limit ?? 10));
+    const { items, total } = await this.store.listSubmissions(formId, { resourceId: query.resourceId, page, limit });
+    return {
+      total,
+      page,
+      limit,
+      data: items.map((item) => ({
+        id: item.id,
+        createdAt: item.createdAt,
+        action: item.action,
+        user: item.user,
+        resource: item.resource,
+        data: item.data as unknown as Record<string, { value: string; fieldDefinition: Record<string, unknown> }>,
+      })),
+    };
+  }
+
+  /** The forms that reach a resource, its own and inherited ones, switched-off ones included. */
+  async listForResource(resourceId: number): Promise<ResourceApplicableFormDto[]> {
+    await this.ensureResourceExists(resourceId);
+    const applicable = await this.store.findApplicableForResource(resourceId);
+    return applicable.map((item) => this.mapApplicable(item));
+  }
+
+  async upsertOverride(
+    resourceId: number,
+    formId: number,
+    dto: FormResourceOverrideDto,
+  ): Promise<ResourceApplicableFormDto> {
+    await this.ensureResourceExists(resourceId);
+    await this.getFormOrThrow(formId);
+    const saved = await this.store.upsertOverride(formId, resourceId, {
+      disabled: dto.disabled,
+      isRequiredOnResourceUsageStart: dto.isRequiredOnResourceUsageStart ?? null,
+      isRequiredOnResourceUsageTakeOver: dto.isRequiredOnResourceUsageTakeOver ?? null,
+      isRequiredOnResourceUsageEnd: dto.isRequiredOnResourceUsageEnd ?? null,
+    });
+    const applicable = saved ? await this.findApplicable(resourceId, formId) : undefined;
+    if (!applicable) {
+      throw new BadRequestException(`Form #${formId} does not apply to resource #${resourceId}`);
+    }
+    return this.mapApplicable(applicable);
+  }
+
+  /** Removes the resource's override, so the resource inherits the form's defaults again. */
+  async deleteOverride(resourceId: number, formId: number): Promise<void> {
+    await this.ensureResourceExists(resourceId);
+    await this.getFormOrThrow(formId);
+    await this.store.deleteOverride(formId, resourceId);
+  }
+
+  private async findApplicable(resourceId: number, formId: number): Promise<ApplicableFormRecord | undefined> {
+    return (await this.store.findApplicableForResource(resourceId)).find((item) => item.form.id === formId);
+  }
+
+  protected mapApplicable(item: ApplicableFormRecord): ResourceApplicableFormDto {
+    return {
+      form: this.mapFormResponse(item.form),
+      source: item.form.scope,
+      groupName: item.groupName,
+      override: item.override ? this.mapOverride(item.override) : null,
+      disabled: item.disabled,
+      effective: this.mapFlags(item.effective),
+    };
+  }
+
+  protected mapOverride(override: FormResourceOverrideRecord): FormResourceOverrideDto {
+    const dto = new FormResourceOverrideDto();
+    dto.disabled = override.disabled;
+    dto.isRequiredOnResourceUsageStart = override.isRequiredOnResourceUsageStart;
+    dto.isRequiredOnResourceUsageTakeOver = override.isRequiredOnResourceUsageTakeOver;
+    dto.isRequiredOnResourceUsageEnd = override.isRequiredOnResourceUsageEnd;
+    return dto;
+  }
+
+  protected mapFlags(flags: FormRequiredFlags): FormRequiredFlagsDto {
+    const dto = new FormRequiredFlagsDto();
+    dto.isRequiredOnResourceUsageStart = flags.isRequiredOnResourceUsageStart;
+    dto.isRequiredOnResourceUsageTakeOver = flags.isRequiredOnResourceUsageTakeOver;
+    dto.isRequiredOnResourceUsageEnd = flags.isRequiredOnResourceUsageEnd;
+    return dto;
+  }
+
+  /**
+   * The forms the action requires on the resource. Each carries the flags in effect for this resource (an override
+   * wins over the form's default), so the requested action's flag is always true, as before forms were shared.
+   */
   async getFormsForAction(resourceId: number, action: ResourceFormAction): Promise<FormResponseDto[]> {
     await this.ensureResourceExists(resourceId);
-    const forms = await this.getFormsByAction(resourceId, action);
-    return forms.map((form) => this.mapFormResponse(form));
+    this.assertSupportedAction(action);
+    const flag = REQUIRED_FLAG[action];
+    return (await this.store.findApplicableForResource(resourceId))
+      .filter((item) => !item.disabled && item.effective[flag])
+      .map((item) => this.mapFormResponse({ ...item.form, ...item.effective }));
   }
 
   async getFormMetaForAction(
@@ -63,12 +210,13 @@ export class ResourceFormsService {
 
   async getFieldsWindow(
     resourceId: number,
+    action: ResourceFormAction,
     formId: number,
     offset: number,
     limit: number,
   ): Promise<{ totalFieldCount: number; fields: FormFieldResponseDto[] }> {
     await this.ensureResourceExists(resourceId);
-    const form = await this.getFormOrThrow(resourceId, formId);
+    const form = await this.getRequiredFormOrThrow(resourceId, action, formId);
     const fields = (form.fields ?? []).sort((a, b) => a.position - b.position);
     const safeOffset = Math.max(0, offset);
     const safeLimit = Math.max(1, limit);
@@ -120,10 +268,12 @@ export class ResourceFormsService {
     response.createdAt = form.createdAt;
     response.updatedAt = form.updatedAt;
     response.name = form.name;
+    response.scope = form.scope;
     response.isRequiredOnResourceUsageStart = form.isRequiredOnResourceUsageStart;
     response.isRequiredOnResourceUsageTakeOver = form.isRequiredOnResourceUsageTakeOver;
     response.isRequiredOnResourceUsageEnd = form.isRequiredOnResourceUsageEnd;
     response.resourceId = form.resourceId;
+    response.groupId = form.groupId;
     response.fields = (form.fields ?? [])
       .sort((a, b) => a.position - b.position)
       .map((field) => this.mapFieldResponse(field));
@@ -133,11 +283,12 @@ export class ResourceFormsService {
 
   async validatePageAnswers(
     resourceId: number,
+    action: ResourceFormAction,
     formId: number,
     answers: { fieldId: number; value: unknown }[],
   ): Promise<{ valid: boolean; errors: { fieldId: number; message: string; code: string }[] }> {
     await this.ensureResourceExists(resourceId);
-    const form = await this.getFormOrThrow(resourceId, formId);
+    const form = await this.getRequiredFormOrThrow(resourceId, action, formId);
     const errors: { fieldId: number; message: string; code: string }[] = [];
 
     for (const answer of answers) {
@@ -261,20 +412,17 @@ export class ResourceFormsService {
     return parseFieldValue(field.type, rawValue, field.options);
   }
 
-  async create(resourceId: number, dto: CreateFormDto): Promise<FormResponseDto> {
-    await this.ensureResourceExists(resourceId);
-
+  async create(dto: CreateFormDto): Promise<FormResponseDto> {
     const form = await this.store.createForm(
-      resourceId,
-      dto,
+      await this.formInput(dto),
       (dto.fields ?? []).map((field) => this.buildFieldPayload(field)),
     );
-
     return this.mapFormResponse(form);
   }
 
-  async update(resourceId: number, formId: number, dto: UpdateFormDto): Promise<FormResponseDto> {
-    await this.ensureResourceExists(resourceId);
+  /** Changes the form, a move to another scope included; ids of the form and its fields stay. */
+  async update(formId: number, dto: UpdateFormDto): Promise<FormResponseDto> {
+    const input = await this.formInput(dto);
 
     const incomingFieldIds = (dto.fields ?? []).map((field) => field.id).filter((id): id is number => !!id);
     if (incomingFieldIds.length) {
@@ -282,13 +430,12 @@ export class ResourceFormsService {
     }
 
     const result = await this.store.updateForm(
-      resourceId,
       formId,
-      dto,
+      input,
       (dto.fields ?? []).map((field) => ({ ...this.buildFieldPayload(field), id: field.id })),
     );
     if (result.status === 'form-missing') {
-      throw new NotFoundException(`Form #${formId} not found for resource #${resourceId}`);
+      throw new NotFoundException(`Form #${formId} not found`);
     }
     if (result.status === 'field-missing') {
       throw new NotFoundException(`Form field #${result.fieldId} not found on this form`);
@@ -297,12 +444,45 @@ export class ResourceFormsService {
     return this.mapFormResponse(result.form);
   }
 
-  async delete(resourceId: number, formId: number): Promise<void> {
-    await this.ensureResourceExists(resourceId);
-
-    if (!(await this.store.deleteForm(resourceId, formId))) {
-      throw new NotFoundException(`Form #${formId} not found for resource #${resourceId}`);
+  /** Deletes the form softly: it no longer applies anywhere, its fields and submissions stay for the history. */
+  async delete(formId: number): Promise<void> {
+    if (!(await this.store.deleteForm(formId))) {
+      throw new NotFoundException(`Form #${formId} not found`);
     }
+  }
+
+  /** Checks that the scope names exactly the owner it needs, and that the owner exists. */
+  protected async formInput(dto: BaseFormDto): Promise<FormInput> {
+    const resourceId = dto.resourceId ?? null;
+    const groupId = dto.groupId ?? null;
+    if (dto.scope === 'resource') {
+      if (resourceId === null || groupId !== null) {
+        throw new BadRequestException('A resource form needs a resourceId and no groupId.');
+      }
+      await this.ensureResourceExists(resourceId);
+    } else if (dto.scope === 'group') {
+      if (groupId === null || resourceId !== null) {
+        throw new BadRequestException('A group form needs a groupId and no resourceId.');
+      }
+      if (!(await this.store.groupExists(groupId))) {
+        throw new NotFoundException(`Resource group #${groupId} not found`);
+      }
+    } else if (dto.scope === 'global') {
+      if (resourceId !== null || groupId !== null) {
+        throw new BadRequestException('A global form has neither a resourceId nor a groupId.');
+      }
+    } else {
+      throw new BadRequestException(`Unsupported form scope: ${String(dto.scope)}`);
+    }
+    return {
+      name: dto.name,
+      scope: dto.scope,
+      resourceId,
+      groupId,
+      isRequiredOnResourceUsageStart: dto.isRequiredOnResourceUsageStart,
+      isRequiredOnResourceUsageTakeOver: dto.isRequiredOnResourceUsageTakeOver,
+      isRequiredOnResourceUsageEnd: dto.isRequiredOnResourceUsageEnd,
+    };
   }
 
   protected async ensureResourceExists(resourceId: number): Promise<void> {
@@ -311,11 +491,26 @@ export class ResourceFormsService {
     }
   }
 
-  protected async getFormOrThrow(resourceId: number, formId: number): Promise<FormRecord> {
-    const form = await this.store.findForm(resourceId, formId);
+  protected async getFormOrThrow(formId: number): Promise<FormRecord> {
+    const form = await this.store.findForm(formId);
 
     if (!form) {
-      throw new NotFoundException(`Form #${formId} not found for resource #${resourceId}`);
+      throw new NotFoundException(`Form #${formId} not found`);
+    }
+
+    return form;
+  }
+
+  /** A form the action requires on the resource: own or inherited, not switched off, required by its flags. */
+  protected async getRequiredFormOrThrow(
+    resourceId: number,
+    action: ResourceFormAction,
+    formId: number,
+  ): Promise<FormRecord> {
+    const form = (await this.getFormsByAction(resourceId, action)).find((item) => item.id === formId);
+
+    if (!form) {
+      throw new NotFoundException(`Form #${formId} is not required for ${action} on resource #${resourceId}`);
     }
 
     return form;

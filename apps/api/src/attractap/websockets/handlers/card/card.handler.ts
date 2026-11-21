@@ -32,7 +32,13 @@ import { CardOperationsService } from '../../card-operations.service';
 import { CardWriterPolicyService } from '../../card-writer-policy.service';
 import { WebsocketService } from '../../websocket.service';
 
-import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, CardDetection } from '../../websocket.types';
+import {
+  AttractapEvent,
+  AttractapEventType,
+  AuthenticatedWebSocket,
+  CardDetection,
+  forgetReaderFormState,
+} from '../../websocket.types';
 
 import { ResourceListService } from '../resource-list/resource-list.service';
 import { AttractapSupervisionHandler } from '../supervision/supervision.handler';
@@ -184,7 +190,7 @@ export class AttractapCardHandler {
    * keeps both. A web-started supervision belongs to the reader, not to a login, and stays.
    */
   private forgetLoginState(socket: AuthenticatedWebSocket, userId: number | null, previousUserId: number | null) {
-    if (userId === null || userId !== previousUserId) socket.state.formDrafts = undefined;
+    if (userId === null || userId !== previousUserId) forgetReaderFormState(socket);
     const flow = socket.state.supervisionFlow;
     if (flow && !flow.webInitiated && flow.requesterUserId !== userId) {
       this.supervisionHandler.cancelForSocket(socket);

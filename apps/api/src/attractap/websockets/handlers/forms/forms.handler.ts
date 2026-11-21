@@ -4,6 +4,7 @@ import { AttractapService } from '../../../attractap.service';
 import { ResourceFormsService } from '../../../../resources/forms/forms.service';
 import { FormSubmissionRequestDto } from '../../../../resources/forms/dto/form-submission-request.dto';
 import { ResourceActionGuard } from '../resource-action.guard';
+import type { FormResponseDto } from '../../../../resources/forms/dto/form-response.dto';
 import {
   AuthenticatedWebSocket,
   AttractapEvent,
@@ -16,6 +17,9 @@ import {
   ResourceUsageFormCancelPayload,
   ResourceUsageFormPageResultPayload,
 } from '../../websocket.types';
+
+/** The firmware shows at most this many forms per RESOURCE_USAGE_FORM_REQUEST and drops the rest. */
+export const MAX_FORMS_PER_READER_REQUEST = 4;
 
 @Injectable()
 export class AttractapFormsHandler {
@@ -43,8 +47,12 @@ export class AttractapFormsHandler {
   }
 
   public clearFormDraft(socket: AuthenticatedWebSocket, resourceId: number, action: ResourceFormAction): void {
+    const key = this.formDraftKey(resourceId, action);
     if (socket.state.formDrafts) {
-      delete socket.state.formDrafts[this.formDraftKey(resourceId, action)];
+      delete socket.state.formDrafts[key];
+    }
+    if (socket.state.formsPresented) {
+      delete socket.state.formsPresented[key];
     }
   }
 
@@ -69,15 +77,21 @@ export class AttractapFormsHandler {
       return [];
     }
 
+    const key = this.formDraftKey(resourceId, action);
     const draft = this.getFormDraft(socket, resourceId, action);
     const hasValue = (fieldId: number) => {
       const value = draft[fieldId];
       return value !== undefined && value !== null && value !== '';
     };
+    const answered = (form: FormResponseDto) =>
+      form.fields.filter((field) => field.isRequired).every((field) => hasValue(field.id));
+    const presented = new Set(socket.state.formsPresented?.[key] ?? []);
 
-    const complete = forms.every((form) =>
-      form.fields.filter((field) => field.isRequired).every((field) => hasValue(field.id)),
-    );
+    // Before the reader was asked for anything, answers that already cover every required field are enough, as they
+    // always were. Once it was asked, every form must have been shown and answered: the reader shows at most four
+    // forms per request, so the rest follow in further requests.
+    const pending = forms.filter((form) => !(presented.has(form.id) && answered(form)));
+    const complete = presented.size === 0 ? forms.every(answered) : pending.length === 0;
 
     if (complete) {
       return forms.map((form) => ({
@@ -87,6 +101,10 @@ export class AttractapFormsHandler {
           .map((field) => ({ fieldId: field.id, value: draft[field.id] })),
       }));
     }
+
+    const batch = pending.slice(0, MAX_FORMS_PER_READER_REQUEST);
+    socket.state.formsPresented ??= {};
+    socket.state.formsPresented[key] = [...presented, ...batch.map((form) => form.id)];
 
     let resourceName: string | undefined;
     try {
@@ -102,7 +120,7 @@ export class AttractapFormsHandler {
       resourceId,
       resourceName,
       action,
-      forms: forms.map((form) => ({ id: form.id, name: form.name, fieldCount: form.fields.length })),
+      forms: batch.map((form) => ({ id: form.id, name: form.name, fieldCount: form.fields.length })),
     };
 
     await socket.sendMessage(new AttractapEvent(AttractapEventType.RESOURCE_USAGE_FORM_REQUEST, payload));
@@ -124,6 +142,7 @@ export class AttractapFormsHandler {
 
     const { totalFieldCount, fields } = await this.resourceFormsService.getFieldsWindow(
       resourceId,
+      action,
       formId,
       offset,
       limit,
@@ -165,7 +184,7 @@ export class AttractapFormsHandler {
       return;
     }
 
-    const checked = await this.resourceFormsService.validatePageAnswers(resourceId, formId, answers);
+    const checked = await this.resourceFormsService.validatePageAnswers(resourceId, action, formId, answers);
     // Saved only for the user who answered; if the login changed meanwhile, the reader must not be
     // told the page was accepted (START would then miss the answers).
     const stillSameUser = userId != null && socket.state.verifiedUserId === userId;

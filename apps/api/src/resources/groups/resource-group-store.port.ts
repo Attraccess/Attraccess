@@ -50,8 +50,11 @@ export interface ResourceGroupStore {
 
   update(groupId: number, patch: ResourceGroupPatch): Promise<ResourceGroupRecord>;
 
-  /** The number of deleted groups (0 when it does not exist). */
-  delete(groupId: number): Promise<number>;
+  /**
+   * The number of deleted groups (0 when it does not exist). Live group forms must be deleted softly first, in the same
+   * unit of work (`ResourceFormStore.softDeleteGroupForms`): the group FK then sets their groupId to NULL.
+   */
+  delete(groupId: number, context?: ResourcePersistenceContext): Promise<number>;
 
   /** An introducer or maintainer grant on the group, or an introduction whose latest history item is a GRANT. */
   userIsPartOfGroup(groupId: number, userId: number): Promise<boolean>;

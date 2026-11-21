@@ -98,6 +98,8 @@ it('requires delete confirmation and navigates away after success', async () => 
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(state.remove).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Delete Group' }));
+  // Deleting a group deletes its forms too, but keeps their submissions (ATT-796).
+  expect(await screen.findByText(/Forms that apply to this group are deleted too/)).toBeInTheDocument();
   state.remove.mockRejectedValueOnce(new Error('In use'));
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   expect(state.remove).toHaveBeenCalledWith({ path: { groupId: 7 } });

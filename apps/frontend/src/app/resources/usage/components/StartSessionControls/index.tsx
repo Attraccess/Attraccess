@@ -20,7 +20,7 @@ import {
   SupervisionMode,
 } from '@attraccess/react-query-client';
 import { useStartSessionWithConfirmation } from '../../hooks/useStartSessionWithConfirmation';
-import { ResourceFormAction } from '../../../details/forms/types';
+import { ResourceFormAction } from '../../../../forms/types';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';

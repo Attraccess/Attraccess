@@ -1,6 +1,6 @@
 import { LabeledSwitch } from '@attraccess/plugins-frontend-ui';
 import { Button, TextField, Label, Input, TextArea } from '@heroui/react';
-import { Select } from '../../../../../components/select';
+import { Select } from '../../../components/select';
 import { Trash2 } from 'lucide-react';
 import { FormFieldType } from '@attraccess/react-query-client';
 import { EditableFormField, createDefaultFieldOptions } from '../types';

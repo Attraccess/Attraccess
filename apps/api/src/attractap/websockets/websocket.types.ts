@@ -22,7 +22,12 @@ export {
   ReaderCrashReportPayload,
   ResourceThumbnailDescriptorPayload,
 } from './websocket-reader-payloads';
-export { AuthenticatedWebSocket, CardDetection, queuedSendBytes } from './websocket-socket-state';
+export {
+  AuthenticatedWebSocket,
+  CardDetection,
+  forgetReaderFormState,
+  queuedSendBytes,
+} from './websocket-socket-state';
 
 export interface ResourceUsageStatsPayload {
   resourceId: number;

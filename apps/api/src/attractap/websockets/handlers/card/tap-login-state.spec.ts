@@ -116,11 +116,19 @@ describe('AttractapCardHandler login tap', () => {
     const drafts = () => ({ [`${RESOURCE_ID}:start`]: { 1: 'answer of the previous user' } });
 
     it('drops form answers and the reader-started supervision of another user', async () => {
-      const socket = scope.createMockSocket({ state: { formDrafts: drafts(), supervisionFlow: readerFlow(9) } });
+      const socket = scope.createMockSocket({
+        state: {
+          formDrafts: drafts(),
+          formsPresented: { [`${RESOURCE_ID}:start`]: [3] },
+          supervisionFlow: readerFlow(9),
+        },
+      });
 
       await scope.handler.handleCardTap(socket, CARD, RESOURCE_ID, 9);
 
       expect(socket.state.formDrafts).toBeUndefined();
+      // Which forms the previous user was shown goes with their answers (ATT-796).
+      expect(socket.state.formsPresented).toBeUndefined();
       expect((scope.handler as any).supervisionHandler.cancelForSocket).toHaveBeenCalledWith(socket);
       expect(socket.state.supervisionFlow).toBeNull();
       expect(socket.state.verifiedUserId).toBe(CARD_USER.id);

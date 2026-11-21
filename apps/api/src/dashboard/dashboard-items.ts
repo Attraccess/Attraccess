@@ -17,6 +17,7 @@ export const BUILT_IN_DASHBOARD_PAGE_PATHS: readonly string[] = [
   '/users',
   '/attractap/readers',
   '/devices/flows',
+  '/forms',
   '/devices/mqtt/servers',
   '/devices/companion',
   '/balena',

@@ -1,4 +1,4 @@
-import { FormFieldType, FormFieldResponseDto } from '@attraccess/react-query-client';
+import { FormFieldType, FormFieldResponseDto, FormScope } from '@attraccess/react-query-client';
 
 export interface BooleanFieldOptions {
   trueLabel?: string;
@@ -34,6 +34,10 @@ export interface EditableFormField {
 
 export interface EditableForm {
   name: string;
+  /** Where the form applies; `resourceId` / `groupId` name the owner the scope needs. */
+  scope: FormScope;
+  resourceId: number | null;
+  groupId: number | null;
   isRequiredOnResourceUsageStart: boolean;
   isRequiredOnResourceUsageTakeOver: boolean;
   isRequiredOnResourceUsageEnd: boolean;
