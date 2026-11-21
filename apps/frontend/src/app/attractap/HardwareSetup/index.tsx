@@ -40,7 +40,7 @@ export function AttractapHardwareSetup(props: Props) {
   const { kind, closedAfterPairing } = useConfiguratorConnection();
   const toast = useToastMessage();
 
-  // Approving a bridge closes this drawer for the reader editor, so the bridge's "set up" notice on the
+  // Approving a reader or bridge closes this drawer for the reader editor, so the "set up" notice on the
   // connect screen is never seen. Confirm it with a toast instead while the drawer is closed.
   const isOpenRef = useRef(isOpen);
   isOpenRef.current = isOpen;
