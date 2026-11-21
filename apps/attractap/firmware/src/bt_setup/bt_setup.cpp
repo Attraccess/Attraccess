@@ -224,8 +224,8 @@ namespace bt_setup
             vTaskDelete(nullptr);
         }
 
-        // NimBLE's host task, its stack in internal RAM: pairing (LE Secure Connections key generation) on a PSRAM
-        // stack stalled the host for the whole 30 s SMP timeout on the S3 (ATT-1371 lab run).
+        // NimBLE's host task, its 4 KB stack in internal RAM as on the bridge: pairing runs the P-256 key generation on
+        // it, and NimBLE's own port keeps its host stack internal too.
         bool startHostTask()
         {
             return xTaskCreatePinnedToCore(hostTask, "nimble_host", HOST_TASK_STACK, nullptr, configMAX_PRIORITIES - 4,

@@ -317,7 +317,8 @@ required) takes the bytes of Serial Configurator lines (`CMND <topic> <json>\n`,
 most 256 bytes; a longer one is dropped whole); TX `...a003` notifies the replies (`RESP <topic> <json>\n`, split
 into ATT MTU - 3 pieces). The lines run through `SerialCommandHandler` on the main loop with the serial PIN rules
 (`SerialCommandHandler::Channel`). Pairing is LE Secure Connections, Just Works, without stored bonds. The host task
-stack (4 KB) stays in internal RAM: with it in PSRAM the S3's host stalled through the whole 30 s pairing timeout.
+stack (4 KB) stays in internal RAM. macOS asks the user to accept the pairing (a system prompt): the web app keeps
+retrying the first write for about 30 s, the OS's pairing timeout.
 
 **NimBLE ownership.** While the window is open the BLE proxy refuses to start (`READER_OFFLINE` `bt-setup`,
 retryable). Closing drops the link, stops advertising, frees NimBLE and restores `ble_hs_cfg` as it was before the
