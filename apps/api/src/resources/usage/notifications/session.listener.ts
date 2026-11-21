@@ -1,4 +1,4 @@
-import { formatUserDisplayName } from '@attraccess/shared';
+import { optionalUserDisplayName } from '@attraccess/shared';
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ResourceUsageSessionEndedEvent, ResourceUsageSessionTakenOverEvent } from '../events/resource-usage.events';
@@ -16,8 +16,7 @@ export class ResourceSessionNotificationListener {
 
   @OnEvent(ResourceUsageSessionTakenOverEvent.EVENT_NAME)
   async handleTakenOver(event: ResourceUsageSessionTakenOverEvent): Promise<void> {
-    const newUserName =
-      formatUserDisplayName({ ...event.newUser, username: event.newUser.username ?? '' }) || undefined;
+    const newUserName = optionalUserDisplayName(event.newUser);
     await this.notifications.dispatch({
       category: NotificationCategory.RESOURCE_TAKEOVER,
       recipients: [event.previousUser],
@@ -50,9 +49,7 @@ export class ResourceSessionNotificationListener {
       return;
     }
 
-    const endedByName = event.endedBy
-      ? formatUserDisplayName({ ...event.endedBy, username: event.endedBy.username ?? '' }) || undefined
-      : undefined;
+    const endedByName = optionalUserDisplayName(event.endedBy);
 
     await this.notifications.dispatch({
       category: NotificationCategory.RESOURCE_SESSION_ENDED,

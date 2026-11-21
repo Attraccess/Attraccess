@@ -1,7 +1,7 @@
 import type { DataSource } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { PostgresBaseline1760000000000 } from './1760000000000-baseline';
-import { PREVIOUS_DEFAULT_BODIES } from './1796000000000-user-names-email-defaults';
+import { PREVIOUS_DEFAULT_BODIES } from './user-names-email-defaults';
 import { PostgresUserNames1796000000000 } from './1796000000000-user-names';
 
 const VARIABLES_BEFORE: Record<string, string> = {

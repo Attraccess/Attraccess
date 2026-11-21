@@ -22,8 +22,8 @@ export interface PluginNotificationCategory {
  * template: the host stores it per installation (key `plugin.<pluginName>.<id>`), lists it in the admin email
  * template editor under the plugin's name, renders it inside the global layout, and admins can edit subject,
  * body and translations. The declaration only seeds it, with its shipped translations: an installed template is
- * never overwritten ("reset to default" restores the declared version). A malformed declaration, including a
- * Handlebars syntax error, an unknown helper or a partial, quarantines the plugin.
+ * not overwritten ("reset to default" restores the declared version), except a body listed in `previousBodies`. A
+ * malformed declaration, including a Handlebars syntax error, an unknown helper or a partial, quarantines the plugin.
  *
  * Texts use the template translation helper, `{{t "key" "English default" name=user.username}}`; the English
  * default is inline and `translations.de` carries the German texts (every key used must be present).
@@ -39,6 +39,12 @@ export interface PluginEmailTemplate {
   subject: string;
   /** Body: an MJML fragment without an `<mjml>` root (the host wraps it in the global layout). */
   body: string;
+  /**
+   * Bodies earlier plugin versions shipped. The host replaces a stored body that still equals one of these exactly
+   * with `body`, so installations get an improved default while bodies an admin edited stay as they are. Subject,
+   * translations and variables are not affected by it.
+   */
+  previousBodies?: string[];
   /** Shipped translations per locale. `de` is required and must cover every `t` key of subject and body. */
   translations: { de: Record<string, string> } & Record<string, Record<string, string>>;
 }

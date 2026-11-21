@@ -4,6 +4,7 @@ import type { TransactionContext } from '../../../../database/transaction-contex
 import { UsersService } from '../../../users/users.service';
 import { AuthService } from '../../auth.service';
 import { AccountLinkingRequiredException } from '../oidc/exceptions/account-linking-required.exception';
+import { toStorableUserName } from '../../../users/accounts/normalize-name';
 
 /** Error message of the rejection raised when an IdP-unverified email collides with an existing account. */
 export const SSO_EMAIL_NOT_VERIFIED = 'SSO_EMAIL_NOT_VERIFIED';
@@ -21,6 +22,14 @@ export interface SsoAccountResolutionInput {
   /** Names the IdP released; an absent or blank claim is undefined and never clears a stored name. */
   firstName?: string;
   lastName?: string;
+}
+
+/**
+ * A released name as it will be stored, so comparing it with the stored one does not see a change at every login
+ * (e.g. trailing whitespace or a control character the store would drop). A blank name counts as not released.
+ */
+function storableName(name: string | undefined): string | undefined {
+  return name === undefined ? undefined : (toStorableUserName(name) ?? undefined);
 }
 
 /** Everything a provisioning hook may base its decision on when no account matches the identity. */
@@ -102,8 +111,9 @@ export class SsoAccountResolver {
     claims: Pick<SsoAccountResolutionInput, 'firstName' | 'lastName'>,
   ): Promise<UserAccount> {
     const changes: { firstName?: string; lastName?: string } = {};
-    if (claims.firstName && claims.firstName !== user.firstName) changes.firstName = claims.firstName;
-    if (claims.lastName && claims.lastName !== user.lastName) changes.lastName = claims.lastName;
+    const [firstName, lastName] = [storableName(claims.firstName), storableName(claims.lastName)];
+    if (firstName && firstName !== user.firstName) changes.firstName = firstName;
+    if (lastName && lastName !== user.lastName) changes.lastName = lastName;
     if (Object.keys(changes).length === 0) return user;
     return this.usersService.updateOne(user.id, changes);
   }
@@ -114,8 +124,8 @@ export class SsoAccountResolver {
     const user = await this.usersService.createOne(
       {
         username,
-        firstName: input.firstName,
-        lastName: input.lastName,
+        firstName: storableName(input.firstName),
+        lastName: storableName(input.lastName),
         email,
         externalIdentifier: null,
         isEmailVerified: input.emailVerified !== false,

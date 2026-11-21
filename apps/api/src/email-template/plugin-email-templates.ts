@@ -13,6 +13,8 @@ export interface RegisteredPluginEmailTemplate {
   variables: string[];
   subject: string;
   body: string;
+  /** Earlier shipped bodies: a stored body equal to one of them is replaced with `body`. */
+  previousBodies: string[];
   translations: Record<string, Record<string, string>>;
 }
 
@@ -57,6 +59,12 @@ function validate(pluginName: string, template: PluginEmailTemplate): void {
     throw new Error(`${where} needs a subject of 1 to ${MAX_SUBJECT_LENGTH} characters.`);
   }
   if (typeof template.body !== 'string' || !template.body.trim()) throw new Error(`${where} needs a body.`);
+  if (
+    template.previousBodies !== undefined &&
+    (!Array.isArray(template.previousBodies) || template.previousBodies.some((entry) => typeof entry !== 'string'))
+  ) {
+    throw new Error(`${where}: previousBodies must be a list of strings.`);
+  }
   if (isFullMjmlDocument(template.body)) {
     throw new Error(`${where}: the body must be an MJML fragment without an <mjml> root element.`);
   }
@@ -106,6 +114,7 @@ export function registerPluginEmailTemplates(pluginName: string, templates: read
       variables: [...template.variables],
       subject: template.subject,
       body: template.body,
+      previousBodies: [...(template.previousBodies ?? [])],
       translations: Object.fromEntries(
         Object.entries(template.translations).map(([locale, texts]) => [locale, { ...texts }]),
       ),

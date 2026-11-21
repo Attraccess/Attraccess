@@ -200,5 +200,20 @@ describe('SsoAccountResolver', () => {
       await resolver.resolveSsoUser({ ...input, firstName: undefined, lastName: undefined });
       expect(users.updateOne).not.toHaveBeenCalled();
     });
+
+    it('compares the name as it would be stored, so an untidy claim does not write at every login', async () => {
+      const { resolver, users } = setup({ bound: 5, boundNames: { firstName: 'Ada', lastName: 'x'.repeat(99) } });
+      await resolver.resolveSsoUser({ ...input, firstName: ' Ada\u0000 ', lastName: `${'x'.repeat(99)} tail` });
+      expect(users.updateOne).not.toHaveBeenCalled();
+    });
+
+    it('stores a released name without control characters when it creates the account', async () => {
+      const { resolver, users } = setup();
+      await resolver.resolveSsoUser({ ...input, firstName: 'A\u0000da', lastName: ' \u0000 ' });
+      expect(users.createOne).toHaveBeenCalledWith(
+        expect.objectContaining({ firstName: 'Ada', lastName: undefined }),
+        manager,
+      );
+    });
   });
 });

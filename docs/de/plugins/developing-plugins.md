@@ -1070,7 +1070,9 @@ await context.notifications.dispatch({
   mit ihr geladen wird, zusammen mit den mitgelieferten Übersetzungen. Danach gehört die gespeicherte Vorlage den
   Admins: Betreff, Text und Übersetzungen werden **nie überschrieben**, ihre Änderungen (auch gelöschte Übersetzungen)
   überstehen also Neustarts und Plugin-Upgrades, und neue Standardtexte eines Plugin-Updates ersetzen die gespeicherten
-  nicht. Nur die Variablenliste folgt der Deklaration. **Standard wiederherstellen** im Editor stellt die aktuell
+  nicht. Nur die Variablenliste folgt der Deklaration. Eine Ausnahme: Listen Sie die Texte früherer Plugin-Versionen in
+  `previousBodies` auf, dann ersetzt der Host einen gespeicherten Text, der einem davon noch genau gleicht, durch den
+  neuen `body`; ein von Admins geänderter Text bleibt. **Standard wiederherstellen** im Editor stellt die aktuell
   deklarierte Fassung mit ihren mitgelieferten Übersetzungen wieder her. Vorlagen eines deaktivierten oder
   deinstallierten Plugins bleiben gespeichert, werden aber weder gelistet noch gesendet.
 - **Admin-Oberfläche.** Plugin-Vorlagen stehen in derselben Vorlagenliste wie die Kernvorlagen, danach, nach Plugin
@@ -1154,7 +1156,7 @@ Entitäten oder Abfrage-Handles. Jede Gruppe prüft beim Aufruf einer Methode ih
 `PluginUserModel` (`id`, `username`, `firstName`, `lastName`, `displayName`, `locale`, `isDisabled`; `displayName` ist der berechnete Name „Vorname Nachname“ bzw. der Benutzername, zeigen Sie ihn Menschen an) und `PluginResourceModel` (`id`, `name`, `type`,
 `description`, `allowTakeOver`, `maxParallelSessions`, `supervisionMode`) stammen aus `@attraccess/application-models`
 und werden vom SDK-Root re-exportiert. Sie sind auch die Nutzlast der Events `RESOURCE_USAGE_STARTED` und
-`RESOURCE_USAGE_ENDED` sowie der Benutzer von `AuthenticatedRequest`: Tokens, Kontaktdaten und andere Kontofelder
+`RESOURCE_USAGE_ENDED` sowie der Benutzer von `AuthenticatedRequest` (`AuthenticatedUser`, mit denselben Namensfeldern): Tokens, Kontaktdaten und andere Kontofelder
 erreichen Plugin-Code nie.
 
 ### Transaktionen

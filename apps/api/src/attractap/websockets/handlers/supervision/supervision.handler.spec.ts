@@ -3,6 +3,10 @@ import type { SocketState } from './handler.test-fixture';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
 import { SupervisionMode } from '@attraccess/application-models';
+import type { ReaderSupervisionCallbacks } from '../../../../resources/supervision/supervision.types';
+
+// What SupervisionService hands to onResolved: no name parts, the display name already computed.
+const RESOLVED_SUPERVISOR = { id: 2, username: 'supervisor', displayName: 'Sue Pervisor' };
 
 describe('AttractapSupervisionHandler', () => {
   const fixture = registerAttractapSupervisionHandlerFixture();
@@ -46,9 +50,9 @@ describe('AttractapSupervisionHandler', () => {
     it('names the approving supervisor by username and display name when the request resolves', async () => {
       const socket = fixture.makeSocket();
       fixture.websocketService.sockets.set('a', socket);
-      const callbacks = (await fixture.arm()) as { onResolved: (session: unknown, supervisor: unknown) => void };
+      const callbacks = (await fixture.arm()) as ReaderSupervisionCallbacks;
 
-      callbacks.onResolved({}, { id: 2, username: 'supervisor', firstName: 'Sue', lastName: 'Pervisor' });
+      callbacks.onResolved({} as never, RESOLVED_SUPERVISOR);
 
       expect(lastPayload(socket)).toEqual({
         success: true,
@@ -226,6 +230,23 @@ describe('AttractapSupervisionHandler', () => {
 
       expect(fixture.supervisionService.createReaderRequest).toHaveBeenCalled();
       expect(socket.state.supervisionFlow).toMatchObject({ requestId: 'req-1', resourceId: fixture.RESOURCE_ID });
+    });
+
+    it('names the approving supervisor by display name when the reader request resolves', async () => {
+      const socket = tappedSocket();
+
+      await request(socket);
+      const { callbacks } = fixture.supervisionService.createReaderRequest.mock.calls[0][0] as {
+        callbacks: ReaderSupervisionCallbacks;
+      };
+      callbacks.onResolved({} as never, RESOLVED_SUPERVISOR);
+
+      expect(lastPayload(socket)).toEqual({
+        success: true,
+        resourceId: fixture.RESOURCE_ID,
+        supervisorUsername: 'supervisor',
+        supervisorDisplayName: 'Sue Pervisor',
+      });
     });
 
     it('lists the eligible supervisors by username and, in the same order, by display name', async () => {

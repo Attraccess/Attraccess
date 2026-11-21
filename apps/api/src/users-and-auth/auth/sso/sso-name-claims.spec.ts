@@ -28,6 +28,15 @@ describe('resolveOidcNameClaims', () => {
     });
     expect(resolveOidcNameClaims([{ given_name: 'x'.repeat(150) }], {}).firstName).toHaveLength(100);
   });
+
+  it('drops control characters (NUL breaks a PostgreSQL write) and cuts by character, ending without whitespace', () => {
+    expect(resolveOidcNameClaims([{ given_name: 'A\u0000da\n', family_name: '\u0000' }], {})).toEqual({
+      firstName: 'Ada',
+      lastName: undefined,
+    });
+    expect(resolveOidcNameClaims([{ given_name: '😀'.repeat(150) }], {}).firstName).toBe('😀'.repeat(100));
+    expect(resolveOidcNameClaims([{ given_name: `${'x'.repeat(99)} tail` }], {}).firstName).toBe('x'.repeat(99));
+  });
 });
 
 describe('resolveSamlNameClaims', () => {

@@ -158,7 +158,8 @@ export class EmailTemplateService implements OnApplicationBootstrap {
    * when the registry changed, or when storing a template failed last time. A template that is not stored yet is
    * inserted with its shipped texts and translations. From then on it belongs to the admins: subject, body and
    * translations stay as they are (also when a plugin update ships new defaults; "reset to default" restores them),
-   * only its variable list, which the editor cannot change, follows the declaration.
+   * only its variable list, which the editor cannot change, follows the declaration, and a body still equal to one
+   * the plugin lists in `previousBodies` (never edited) moves to the declared body.
    */
   private async syncPluginTemplates(): Promise<void> {
     for (;;) {
@@ -204,6 +205,7 @@ export class EmailTemplateService implements OnApplicationBootstrap {
         subject: declared.subject,
         body: declared.body,
         variables: declared.variables,
+        previousBodies: declared.previousBodies,
       },
       shippedPluginTranslations(declared),
     );

@@ -86,6 +86,19 @@ describe('UserInvitationService – parseCsvFile', () => {
     expect(tooLong.errors).toEqual([expect.objectContaining({ row: 1, field: 'firstName', message: 'TOO_LONG' })]);
   });
 
+  it('refuses a name with control characters (PostgreSQL cannot store NUL)', async () => {
+    const result = await service.parseCsvFile(
+      { buffer: Buffer.from('email,username,first,last\na@example.com,user1,A\u0000da,Love\tlace\n') } as FileUpload,
+      buildConfig({ firstNameKey: 'first', lastNameKey: 'last' }),
+    );
+
+    expect(result.errors).toEqual([
+      expect.objectContaining({ row: 1, field: 'firstName', message: 'INVALID' }),
+      expect.objectContaining({ row: 1, field: 'lastName', message: 'INVALID' }),
+    ]);
+    expect(result.candidates).toEqual([]);
+  });
+
   it('parses quoted values and honors ignored rows', async () => {
     const csv = 'email,username,perm\n"john@example.com","user1","tr,ue"\nsecond@example.com,user2,tr,ue\n';
     const file: FileUpload = { buffer: Buffer.from(csv) } as FileUpload;

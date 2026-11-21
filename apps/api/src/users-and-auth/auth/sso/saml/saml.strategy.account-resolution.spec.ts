@@ -90,4 +90,26 @@ describe('SSOSamlStrategy - account resolution', () => {
     );
     expect(metrics.authSsoLoginFailuresTotal.inc).toHaveBeenCalledTimes(1);
   });
+
+  describe('names', () => {
+    it('creates the account with givenName and surname from the default attributes', async () => {
+      const { strategy, users } = setup();
+      await strategy.validate(fixture.buildRequest(10, 'email'), {
+        ...profile,
+        attributes: { givenName: 'Ada', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname': 'Lovelace' },
+      } as SamlProfile);
+      expect(users.createOne).toHaveBeenCalledWith(
+        expect.objectContaining({ firstName: 'Ada', lastName: 'Lovelace' }),
+        expect.anything(),
+      );
+    });
+
+    it('reads the configured attribute keys and updates a bound user whose names changed', async () => {
+      const { strategy, users } = setup({ '10:shared-name-id': 5 });
+      const request = fixture.buildRequest(10, 'email');
+      Object.assign(request.ssoSamlOptions.samlConfiguration, { firstNameClaimPath: 'fn', lastNameClaimPath: 'ln' });
+      await strategy.validate(request, { ...profile, givenName: 'Ignored', fn: 'Ada', ln: 'Lovelace' } as SamlProfile);
+      expect(users.updateOne).toHaveBeenCalledWith(5, { firstName: 'Ada', lastName: 'Lovelace' });
+    });
+  });
 });

@@ -1,5 +1,5 @@
 import { get } from 'lodash-es';
-import { normalizeUserName, USER_NAME_MAX_LENGTH } from '../../users/accounts/normalize-name';
+import { toStorableUserName } from '../../users/accounts/normalize-name';
 
 /** The first and last name an identity provider released. A name the provider did not release is undefined. */
 export interface SsoNameClaims {
@@ -21,11 +21,14 @@ export const SAML_DEFAULT_FIRST_NAME_KEYS = [
 ];
 export const SAML_DEFAULT_LAST_NAME_KEYS = ['surname', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname'];
 
-/** A claim value as a stored name: a string (or the first string of a list), trimmed, never blank, at most 100 characters. */
+/**
+ * A claim value as a stored name: a string (or the first string of a list) made storable by `toStorableUserName`
+ * (no control characters, trimmed, at most 100 characters), never blank.
+ */
 function asName(value: unknown): string | undefined {
   const text = Array.isArray(value) ? value.find((entry) => typeof entry === 'string') : value;
   if (typeof text !== 'string') return undefined;
-  return normalizeUserName(text)?.slice(0, USER_NAME_MAX_LENGTH) ?? undefined;
+  return toStorableUserName(text) ?? undefined;
 }
 
 function configuredOr(configured: string | null | undefined, defaults: string[]): string[] {

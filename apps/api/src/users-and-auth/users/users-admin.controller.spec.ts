@@ -33,7 +33,10 @@ function expectNoPrivateFields(body: unknown) {
   const json = JSON.parse(JSON.stringify(body));
   for (const field of PRIVATE_FIELDS) expect(json).not.toHaveProperty(field);
 }
-import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, DualAuthGuard, EffectivePermissionsGuard } from '@attraccess/plugins-backend-sdk';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { Reflector } from '@nestjs/core';
+import { ExecutionContextHost } from '@nestjs/core/helpers/execution-context-host';
 
 describe('UsersAdminController', () => {
   let controller: UsersAdminController;
@@ -176,13 +179,16 @@ describe('UsersAdminController', () => {
       );
     });
 
-    it('should return only id and username without users.read', async () => {
+    it('returns only id, username and the names without users.read', async () => {
       jest.spyOn(usersService, 'findMany').mockResolvedValue({
         ...paginated(1, 10, 1),
         data: [
           {
             id: 1,
             username: 'member',
+            firstName: 'Ada',
+            lastName: 'Lovelace',
+            email: 'ada@example.com',
             creditBalance: 100,
             billingFactor: 2,
             isEmailVerified: false,
@@ -193,8 +199,8 @@ describe('UsersAdminController', () => {
 
       const result = await controller.findMany({ page: 1, limit: 10 }, makeRequest());
 
-      expect(result).toEqual({
-        data: [{ id: 1, username: 'member' }],
+      expect(result).toStrictEqual({
+        data: [{ id: 1, username: 'member', firstName: 'Ada', lastName: 'Lovelace' }],
         total: 1,
         page: 1,
         limit: 10,
@@ -284,6 +290,28 @@ describe('UsersAdminController', () => {
       const response = await controller.getOneById(user.id, mockRequest as AuthenticatedRequest);
       expect(response).toEqual(toUserAccountDto(user));
       expectNoPrivateFields(response);
+    });
+  });
+
+  describe('PATCH /users/:id/name permissions', () => {
+    it('requires users.update, like changing the username', () => {
+      for (const handler of [
+        UsersAdminController.prototype.changeUserName,
+        UsersAdminController.prototype.changeUserUsername,
+      ]) {
+        expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual(
+          expect.arrayContaining([DualAuthGuard, EffectivePermissionsGuard]),
+        );
+        const request = { user: { id: 1, effectivePermissions: new Set(['users.read']) } };
+        const check = () =>
+          new EffectivePermissionsGuard(new Reflector()).canActivate(
+            new ExecutionContextHost([request], UsersAdminController, handler),
+          );
+
+        expect(() => check()).toThrow('Insufficient permissions');
+        request.user.effectivePermissions.add('users.update');
+        expect(check()).toBe(true);
+      }
     });
   });
 });

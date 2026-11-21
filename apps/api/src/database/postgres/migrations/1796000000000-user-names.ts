@@ -1,28 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
-import { PREVIOUS_DEFAULT_BODIES } from './1796000000000-user-names-email-defaults';
+import { PREVIOUS_DEFAULT_BODIES, withDisplayNames, withNameVariables } from './user-names-email-defaults';
 
 const SSO_CONFIGURATION_TABLES = ['sso_provider_oidc_configuration', 'sso_provider_saml_configuration'];
-
-/** What the default templates change: they greet and name the inviter by display name instead of username. */
-function withDisplayNames(body: string): string {
-  return body
-    .replace('name=user.username', 'name=user.displayName')
-    .replace('inviter=inviter.username', 'inviter=inviter.displayName');
-}
-
-/** The variables the editor lists next to the username ones; the template context has always carried them from now on. */
-const NAME_VARIABLES: Record<string, string[]> = {
-  'user.username': ['user.firstName', 'user.lastName', 'user.displayName'],
-  'inviter.username': ['inviter.displayName'],
-};
-
-/** Adds the name variables after their username variable, or drops them again; a stored list is comma separated. */
-function withNameVariables(variables: string, direction: 'add' | 'remove'): string {
-  const added = new Set(Object.values(NAME_VARIABLES).flat());
-  const kept = variables.split(',').filter((variable) => variable && !added.has(variable));
-  if (direction === 'remove') return kept.join(',');
-  return kept.flatMap((variable) => [variable, ...(NAME_VARIABLES[variable] ?? [])]).join(',');
-}
 
 /**
  * Optional first and last name for users (ATT-1385). The display name is computed, never stored. Stored default email

@@ -1,4 +1,9 @@
-/** The default template bodies before ATT-1385, frozen: the migration refreshes a stored body only when it still equals one of these. */
+/**
+ * ATT-1385 email template refresh, shared by `PostgresUserNames1796000000000` and the SQLite→PostgreSQL transfer (which
+ * imports SQLite rows after the PostgreSQL migrations ran, so it applies the same change to the imported rows).
+ */
+
+/** The default template bodies before ATT-1385, frozen: a stored body is refreshed only when it still equals one of these. */
 export const PREVIOUS_DEFAULT_BODIES: Record<string, string> = {
   'access-change':
     '<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">\n  <mj-column>\n    <mj-text padding="0 0 12px 0">{{t \'greeting\' \'Hello {name},\' name=user.username}}</mj-text>\n    <mj-text padding="0 0 12px 0">{{accessChange.body}}</mj-text>\n    {{#if accessChange.url}}\n    <mj-button href="{{accessChange.url}}" align="center">{{t \'button\' \'View Details\'}}</mj-button>\n    <mj-text font-size="13px" color="#6B7280" padding="20px 0 0 0">\n      {{t \'copy_link\' \'Or copy this link into your browser:<br /><a href="{url}">{url}</a>\' url=accessChange.url}}\n    </mj-text>\n    {{/if}}\n    <mj-text font-size="12px" color="#9CA3AF" padding="16px 0 0 0">\n      {{t \'footer\' \'You received this email because access-change notifications are enabled for your account.\'}}\n    </mj-text>\n  </mj-column>\n</mj-section>',
@@ -33,3 +38,24 @@ export const PREVIOUS_DEFAULT_BODIES: Record<string, string> = {
   'verify-email':
     '<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">\n  <mj-column>\n    <mj-text padding="0 0 12px 0">{{t \'greeting\' \'Hello {name},\' name=user.username}}</mj-text>\n    <mj-text padding="0 0 24px 0">\n      {{t \'body\' \'Please verify your email address to activate your Attraccess account.\'}}\n    </mj-text>\n    <mj-button href="{{url}}" align="center">{{t \'button\' \'Verify Email\'}}</mj-button>\n    <mj-text font-size="13px" color="#6B7280" padding="20px 0 0 0">\n      {{t \'copy_link\' \'Or copy this link into your browser:<br /><a href="{url}">{url}</a>\' url=url}}\n    </mj-text>\n    <mj-text font-size="13px" color="#9CA3AF" padding="16px 0 0 0">\n      {{t \'footer\' \'If you did not create an account, you can safely ignore this email.\'}}\n    </mj-text>\n  </mj-column>\n</mj-section>',
 };
+
+/** What the default templates change: they greet and name the inviter by display name instead of username. */
+export function withDisplayNames(body: string): string {
+  return body
+    .replace('name=user.username', 'name=user.displayName')
+    .replace('inviter=inviter.username', 'inviter=inviter.displayName');
+}
+
+/** The variables the editor lists next to the username ones; the template context has always carried them from now on. */
+export const NAME_VARIABLES: Readonly<Record<string, readonly string[]>> = {
+  'user.username': ['user.firstName', 'user.lastName', 'user.displayName'],
+  'inviter.username': ['inviter.displayName'],
+};
+
+/** Adds the name variables after their username variable, or drops them again; a stored list is comma separated. */
+export function withNameVariables(variables: string, direction: 'add' | 'remove'): string {
+  const added = new Set(Object.values(NAME_VARIABLES).flat());
+  const kept = variables.split(',').filter((variable) => variable && !added.has(variable));
+  if (direction === 'remove') return kept.join(',');
+  return kept.flatMap((variable) => [variable, ...(NAME_VARIABLES[variable] ?? [])]).join(',');
+}

@@ -242,7 +242,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
               success: true,
               resourceId,
               supervisorUsername: supervisor.username,
-              supervisorDisplayName: formatUserDisplayName(supervisor),
+              supervisorDisplayName: supervisor.displayName,
             }),
           );
         },
@@ -406,7 +406,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
           success: true,
           resourceId,
           supervisorUsername: supervisor.username,
-          supervisorDisplayName: formatUserDisplayName(supervisor),
+          supervisorDisplayName: supervisor.displayName,
         }),
       onFailed: (error) => notifyReader({ success: false, resourceId, error: error?.message ?? 'SUPERVISION_FAILED' }),
     };

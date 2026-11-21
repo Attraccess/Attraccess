@@ -29,6 +29,19 @@ describe('ChangeNameDto', () => {
     expect((await check({ firstName: 'Ada' })).errors.map((error) => error.property)).toEqual(['lastName']);
   });
 
+  it('stores a blank name as null', async () => {
+    expect((await check({ firstName: '   ', lastName: null })).dto.firstName).toBeNull();
+  });
+
+  it('refuses control characters, NUL included', async () => {
+    const { errors } = await check({ firstName: 'a\u0000', lastName: 'Love\nlace' });
+    expect(errors.map((error) => error.property)).toEqual(['firstName', 'lastName']);
+  });
+
+  it('counts a character outside the BMP once', async () => {
+    expect((await check({ firstName: '😀'.repeat(100), lastName: null })).errors).toEqual([]);
+  });
+
   it('refuses non-string names', async () => {
     expect((await check({ firstName: 5, lastName: null })).errors).toHaveLength(1);
   });

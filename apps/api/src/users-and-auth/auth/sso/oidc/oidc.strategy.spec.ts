@@ -114,6 +114,48 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     );
   });
 
+  describe('names', () => {
+    const namedSetup = (config: Partial<SsoOidcConfigurationRecord>) => {
+      const usersService = {
+        findOne: jest.fn(async () => null),
+        updateOne: jest.fn(),
+        buildUsernameFromSSOClaim: jest.fn((raw: string) => raw),
+        createOne: jest.fn(async () => ({ id: 123, username: 'ada' }) as unknown as AuthenticatedSessionUser),
+      };
+      const authService = { findUserIdBySSO: jest.fn(async () => null), addAuthenticationDetails: jest.fn() };
+      return { usersService, strategy: fixture.createStrategy(config, usersService, authService) };
+    };
+
+    it('creates the account with given_name and family_name by default', async () => {
+      const { usersService, strategy } = namedSetup({});
+      await strategy.validateProfile('https://issuer', {
+        id: 'ext-1',
+        emails: [{ value: 'ada@example.com' }],
+        _json: { given_name: 'Ada', family_name: 'Lovelace' },
+      } as unknown as Profile);
+      expect(usersService.createOne).toHaveBeenCalledWith(
+        expect.objectContaining({ firstName: 'Ada', lastName: 'Lovelace' }),
+        expect.anything(),
+      );
+    });
+
+    it('reads the configured claim paths instead of the defaults', async () => {
+      const { usersService, strategy } = namedSetup({
+        firstNameClaimPath: 'person.first',
+        lastNameClaimPath: 'person.last',
+      });
+      await strategy.validateProfile('https://issuer', {
+        id: 'ext-1',
+        emails: [{ value: 'ada@example.com' }],
+        _json: { given_name: 'Default', person: { first: 'Ada', last: 'Lovelace' } },
+      } as unknown as Profile);
+      expect(usersService.createOne).toHaveBeenCalledWith(
+        expect.objectContaining({ firstName: 'Ada', lastName: 'Lovelace' }),
+        expect.anything(),
+      );
+    });
+  });
+
   it('resolves email using configured emailClaimPaths', async () => {
     const usersService = {
       findOne: jest.fn(async () => null),

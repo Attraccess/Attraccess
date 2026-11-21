@@ -30,6 +30,15 @@ describe('plugin email template registry', () => {
     expect(listPluginEmailTemplates().map((entry) => entry.key)).toContain('plugin.demo.confirmed');
   });
 
+  it('keeps the earlier shipped bodies of a declaration, and none when it lists none', () => {
+    registerPluginEmailTemplates('demo', [
+      template({ previousBodies: ['<mj-text>old</mj-text>'] }),
+      template({ id: 'b' }),
+    ]);
+    expect(getPluginEmailTemplate('plugin.demo.confirmed')?.previousBodies).toEqual(['<mj-text>old</mj-text>']);
+    expect(getPluginEmailTemplate('plugin.demo.b')?.previousBodies).toEqual([]);
+  });
+
   it('replaces an earlier registration of the same plugin and bumps the version', () => {
     registerPluginEmailTemplates('demo', [template()]);
     const before = pluginEmailTemplatesVersion();
@@ -56,6 +65,8 @@ describe('plugin email template registry', () => {
     ['a Handlebars syntax error in the subject', { subject: '{{#if x}}open' }, /The subject is not a valid template/],
     ['an unknown helper in the body', { body: '<mj-text>{{shout x}}</mj-text>' }, /The body is not a valid template/],
     ['a partial in the body', { body: '<mj-text>{{> footer}}</mj-text>' }, /partials and decorators/],
+    ['previousBodies that is not a list', { previousBodies: 'old' as never }, /previousBodies/],
+    ['previousBodies with a non-string entry', { previousBodies: [1] as never }, /previousBodies/],
   ])('rejects %s', (_name, patch, message) => {
     expect(() => registerPluginEmailTemplates('demo', [template(patch as Partial<PluginEmailTemplate>)])).toThrow(
       message,

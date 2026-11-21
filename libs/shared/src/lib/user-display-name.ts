@@ -17,6 +17,20 @@ export function formatUserDisplayName({ firstName, lastName, username }: UserDis
   return name.length > 0 ? name : username;
 }
 
+/**
+ * The display name of a user projection whose username may be missing (a partial or not loaded user): undefined when
+ * neither a name nor a username is known, so callers can fall back to their own text.
+ */
+export function optionalUserDisplayName(
+  user: { firstName?: string | null; lastName?: string | null; username?: string | null } | null | undefined,
+): string | undefined {
+  if (!user) return undefined;
+  return (
+    formatUserDisplayName({ firstName: user.firstName, lastName: user.lastName, username: user.username ?? '' }) ||
+    undefined
+  );
+}
+
 /** Whether the user has a name, so the username is worth showing as secondary text. */
 export function hasUserName({ firstName, lastName }: Pick<UserDisplayNameParts, 'firstName' | 'lastName'>): boolean {
   return Boolean(firstName?.trim() || lastName?.trim());

@@ -74,6 +74,16 @@ describe('reservation email templates', () => {
   });
 
   it.each(EMAIL_TEMPLATES.map((template) => [template.id, template] as const))(
+    '%s: names the body it replaces, which differs only in greeting by username',
+    (_id, template) => {
+      expect(template.previousBodies).toHaveLength(1);
+      const [previous] = template.previousBodies ?? [];
+      expect(previous).not.toBe(template.body);
+      expect(previous).toBe(template.body.replace('name=user.displayName}}', 'name=user.username}}'));
+    },
+  );
+
+  it.each(EMAIL_TEMPLATES.map((template) => [template.id, template] as const))(
     '%s: German covers exactly the English keys and uses the same placeholders',
     (_id, template) => {
       const source = `${template.subject}\n${template.body}`;

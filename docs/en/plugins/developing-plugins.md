@@ -665,7 +665,9 @@ await context.notifications.dispatch({
   it, together with the shipped translations. From then on the stored template belongs to the admins: subject, body
   and translations are **never overwritten**, so their edits (including deleted translations) survive restarts and
   plugin upgrades, and new defaults a plugin update ships do not replace the stored ones. Only the variable list
-  follows the declaration. **Reset to default** in the editor restores the currently declared version with its shipped
+  follows the declaration. One exception: list the bodies earlier plugin versions shipped in `previousBodies`, and the
+  host replaces a stored body that still equals one of them exactly with the new `body`; a body an admin edited stays.
+  **Reset to default** in the editor restores the currently declared version with its shipped
   translations. Templates of a plugin that is disabled or uninstalled stay stored but are neither listed nor sendable.
 - **Admin UI.** Plugin templates appear in the same template list as core templates, after them, grouped by plugin
   and marked with the plugin's name; the editor, the translations dialog and the reset action work the same way.

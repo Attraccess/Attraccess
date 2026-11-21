@@ -1,4 +1,4 @@
-import { formatUserDisplayName, hasUserName } from './user-display-name';
+import { formatUserDisplayName, hasUserName, optionalUserDisplayName } from './user-display-name';
 
 describe('formatUserDisplayName', () => {
   it('joins first and last name', () => {
@@ -30,5 +30,23 @@ describe('hasUserName', () => {
     expect(hasUserName({ firstName: 'Ada', lastName: null })).toBe(true);
     expect(hasUserName({ firstName: ' ', lastName: 'L' })).toBe(true);
     expect(hasUserName({ firstName: ' ', lastName: undefined })).toBe(false);
+  });
+});
+
+describe('optionalUserDisplayName', () => {
+  it('formats a user like formatUserDisplayName', () => {
+    expect(optionalUserDisplayName({ firstName: 'Ada', lastName: 'Lovelace', username: 'ada' })).toBe('Ada Lovelace');
+    expect(optionalUserDisplayName({ firstName: ' ', lastName: null, username: 'ada' })).toBe('ada');
+  });
+
+  it('shows the name when the username is not loaded', () => {
+    expect(optionalUserDisplayName({ firstName: 'Ada' })).toBe('Ada');
+  });
+
+  it('is undefined when neither a name nor a username is known', () => {
+    expect(optionalUserDisplayName({ username: undefined })).toBeUndefined();
+    expect(optionalUserDisplayName({ username: '', firstName: '  ' })).toBeUndefined();
+    expect(optionalUserDisplayName(null)).toBeUndefined();
+    expect(optionalUserDisplayName(undefined)).toBeUndefined();
   });
 });

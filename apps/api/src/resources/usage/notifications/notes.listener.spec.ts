@@ -8,7 +8,7 @@ type Recipient = ResourceNotificationRecipient;
 describe('ResourceUsageNoteNotificationListener', () => {
   let listener: ResourceUsageNoteNotificationListener;
   let recipients: { findResource: jest.Mock; findUsersByIds: jest.Mock; findIntroducerUsers: jest.Mock };
-  let notifications: { dispatch: jest.Mock };
+  let notifications: { dispatch: jest.Mock; sendEmailTemplate: jest.Mock };
   let rbacService: { getUserIdsWithPermission: jest.Mock };
 
   const RESOURCE_ID = 7;
@@ -29,7 +29,10 @@ describe('ResourceUsageNoteNotificationListener', () => {
       findIntroducerUsers: jest.fn().mockResolvedValue([]),
     };
     rbacService = { getUserIdsWithPermission: jest.fn().mockResolvedValue([]) };
-    notifications = { dispatch: jest.fn().mockResolvedValue(undefined) };
+    notifications = {
+      dispatch: jest.fn().mockResolvedValue(undefined),
+      sendEmailTemplate: jest.fn().mockResolvedValue(undefined),
+    };
     listener = new ResourceUsageNoteNotificationListener(recipients, notifications as never, rbacService as never);
   });
 
@@ -75,6 +78,14 @@ describe('ResourceUsageNoteNotificationListener', () => {
 
     const request = notifications.dispatch.mock.calls[0][0];
     expect(request.body({ locale: 'en' })).toBe('Alice: Bed needs leveling');
+
+    const recipient = { id: 3, email: 'intro@example.com' };
+    await request.sendEmail(recipient, 'en');
+    expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(
+      recipient,
+      NotificationCategory.RESOURCE_USAGE_NOTES,
+      expect.objectContaining({ note: expect.objectContaining({ authorName: 'Alice' }) }),
+    );
   });
 
   it('skips users without an email', async () => {

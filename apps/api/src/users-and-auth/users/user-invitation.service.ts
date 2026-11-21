@@ -15,7 +15,7 @@ import { mapEmailSendError } from './email-send-error.util';
 
 import { UsersService } from './users.service';
 import { normalizeEmail } from './accounts/normalize-email';
-import { normalizeUserName, USER_NAME_MAX_LENGTH } from './accounts/normalize-name';
+import { normalizeUserName, userNameProblem } from './accounts/normalize-name';
 
 import { plainToInstance } from 'class-transformer';
 
@@ -361,8 +361,9 @@ export class UserInvitationService {
     rowErrors: CsvInviteRowErrorDto[],
   ): string | null {
     const value = normalizeUserName(key ? rowData[key] : undefined);
-    if (value !== null && value.length > USER_NAME_MAX_LENGTH) {
-      rowErrors.push({ row: rowNumber, field, message: 'TOO_LONG', value });
+    const problem = value === null ? null : userNameProblem(value);
+    if (value !== null && problem) {
+      rowErrors.push({ row: rowNumber, field, message: problem, value });
       return null;
     }
     return value;

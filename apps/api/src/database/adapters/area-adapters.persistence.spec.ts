@@ -142,6 +142,25 @@ describe('area persistence adapters (real PostgreSQL)', () => {
       expect(await store().findTranslations(key)).toHaveLength(1);
     });
 
+    it('moves an unedited plugin body listed in previousBodies to the declared one, never an edited body', async () => {
+      const untouched = 'plugin.demo.untouched';
+      const edited = 'plugin.demo.edited';
+      for (const key of [untouched, edited]) {
+        await store().registerPluginTemplate({ type: key, subject: 'S', body: 'Old', variables: [] }, []);
+      }
+      await store().updateContent(edited, { body: 'Admin' });
+
+      for (const key of [untouched, edited]) {
+        await store().registerPluginTemplate(
+          { type: key, subject: 'S', body: 'New', variables: [], previousBodies: ['Older', 'Old'] },
+          [],
+        );
+      }
+
+      expect(await store().findTemplate(untouched)).toMatchObject({ body: 'New' });
+      expect(await store().findTemplate(edited)).toMatchObject({ body: 'Admin' });
+    });
+
     it('restores the defaults and the shipped translations together', async () => {
       await store().restoreDefaults(type, { subject: 'Default', body: '<mj-text>Default</mj-text>', variables: [] }, [
         { templateType: type, locale: 'de', key: 'greeting', value: 'Hallo {name},' },

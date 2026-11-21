@@ -1,5 +1,7 @@
-import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsIn, IsOptional, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { USER_NAME_MAX_LENGTH } from '../accounts/normalize-name';
+import { UserNameInput } from './user-name-input.decorator';
 import { AuthenticationType } from '@attraccess/application-models';
 
 export class CreateUserDto {
@@ -10,16 +12,24 @@ export class CreateUserDto {
   @IsString()
   username: string;
 
-  @ApiProperty({ required: false, type: String, nullable: true, maxLength: 100, description: 'Optional first name' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
+  @ApiProperty({
+    required: false,
+    type: String,
+    nullable: true,
+    maxLength: USER_NAME_MAX_LENGTH,
+    description: 'Optional first name',
+  })
+  @UserNameInput({ required: false })
   firstName?: string | null;
 
-  @ApiProperty({ required: false, type: String, nullable: true, maxLength: 100, description: 'Optional last name' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
+  @ApiProperty({
+    required: false,
+    type: String,
+    nullable: true,
+    maxLength: USER_NAME_MAX_LENGTH,
+    description: 'Optional last name',
+  })
+  @UserNameInput({ required: false })
   lastName?: string | null;
 
   @ApiProperty({

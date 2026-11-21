@@ -59,14 +59,19 @@ export class FakeEmailTemplateStore implements EmailTemplateStore {
   }
 
   async registerPluginTemplate(
-    template: { type: string; subject: string; body: string; variables: string[] },
+    template: { type: string; subject: string; body: string; variables: string[]; previousBodies?: readonly string[] },
     translations: EmailTemplateTranslationRecord[],
   ) {
     this.record('registerPluginTemplate', template, translations);
-    if (!this.templates.has(template.type)) {
-      this.put(template.type, template as Partial<EmailTemplateRecord>);
+    const existing = this.templates.get(template.type);
+    if (!existing) {
+      const { type, subject, body, variables } = template;
+      this.put(type, { subject, body, variables } as Partial<EmailTemplateRecord>);
       this.translations.push(...translations);
+      return;
     }
+    const body = template.previousBodies?.includes(existing.body) ? template.body : existing.body;
+    this.templates.set(template.type, { ...existing, body, variables: template.variables });
   }
 
   async findTranslations(type: string, locale?: string) {
