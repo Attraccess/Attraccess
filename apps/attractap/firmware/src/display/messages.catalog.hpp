@@ -281,11 +281,6 @@ enum class Message {
     EndNamedSession,
     EndOtherSessionsTitle,
     ErrorNoOwnActiveSession,
-    SessionYou,
-    SessionNameJoin,
-    SessionNamesMore,
-    SessionUsersLine,
-    SessionCountOf,
     ErrorCardAuthenticationFailed, ErrorCardNotSupported, ErrorServerBusy, ErrorCardRemoved, ErrorCardTimeout,
     ErrorEnrollNotConfirmed, ErrorNoFreeKeySlot, ErrorCardNotFactory, ErrorResetNotConfirmed, ErrorWrongCard,
     ErrorCardKeyUnavailable, ErrorFirmwareUpdateRequired, ErrorReaderNotAllowedToWriteCards,
@@ -294,6 +289,7 @@ enum class Message {
     LastMessageAge, LatestPing, AveragePing, PingTrend, ReconnectsLastMinute, SendQueueDepth, SendQueueFullLastMinute,
     SendFailuresLastMinute, ConnectionTimeoutsLastMinute, PingTimeoutsLastMinute, PingLossLastMinute,
     MissedHeartbeatsLastMinute, NotAvailable, Milliseconds, Percent,
+    SessionYou, SessionNameJoin, SessionNamesMore, SessionUsersLine, SessionCountOf,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
@@ -598,12 +594,6 @@ inline constexpr Entry catalog[] = {
     {Message::EndNamedSession, "Sitzung von {0} beenden", "End session of {0}"},
     {Message::EndOtherSessionsTitle, "Andere Sitzung beenden:", "End another session:"},
     {Message::ErrorNoOwnActiveSession, "Sie haben hier keine eigene Sitzung. Es wurde nichts beendet.", "You have no session of your own here. Nothing was ended."},
-    // Parallel-session rows: "Du, Sam +2 · 4/6" (own session first, then the rest, then the count).
-    {Message::SessionYou, "Du", "You"},
-    {Message::SessionNameJoin, "{0}, {1}", "{0}, {1}"},
-    {Message::SessionNamesMore, "{0} +{1}", "{0} +{1}"},
-    {Message::SessionUsersLine, "{0} \u00B7 {1}", "{0} \u00B7 {1}"},
-    {Message::SessionCountOf, "{0}/{1}", "{0}/{1}"},
 };
 
 } // namespace FirmwareI18n

@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include "../state/language.hpp"
-#include "messages.catalog.network-status.hpp"
+#include "messages.catalog.session-users.hpp"
 
 // Firmware-owned text is identified independently of its displayed wording.
 namespace FirmwareI18n {
@@ -17,9 +17,11 @@ inline const char *messageText(Message id, const std::string &locale) {
     }
     constexpr size_t mainEntries = sizeof(catalog) / sizeof(catalog[0]);
     constexpr size_t cardRelayEnd = mainEntries + sizeof(cardRelayCatalog) / sizeof(cardRelayCatalog[0]);
-    const auto &entry = index < mainEntries    ? catalog[index]
-                        : index < cardRelayEnd ? cardRelayCatalog[index - mainEntries]
-                                               : networkStatusCatalog[index - cardRelayEnd];
+    constexpr size_t networkStatusEnd = cardRelayEnd + sizeof(networkStatusCatalog) / sizeof(networkStatusCatalog[0]);
+    const auto &entry = index < mainEntries        ? catalog[index]
+                        : index < cardRelayEnd     ? cardRelayCatalog[index - mainEntries]
+                        : index < networkStatusEnd ? networkStatusCatalog[index - cardRelayEnd]
+                                                   : sessionUsersCatalog[index - networkStatusEnd];
     return Language::text(entry.en, entry.de, locale);
 }
 
