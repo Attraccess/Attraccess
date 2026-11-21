@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "esp_heap_caps.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
 #include "freertos/semphr.h"
@@ -50,6 +51,10 @@ namespace ble
         constexpr uint16_t WATCH_WINDOW = 48;
         constexpr uint16_t WATCH_INTERVAL = 160;
         constexpr uint16_t WATCH_INTERVAL_CONNECTED = 320;
+        // NimBLE's connect timeout when ble_gap_connect gets none (BLE_GAP_CONN_DUR_DFLT).
+        constexpr uint32_t NIMBLE_DEFAULT_CONNECT_MS = 30000;
+        // A cancelled connect reports its end within a few connection events.
+        constexpr uint32_t CANCEL_EVENT_MS = 0;
 
         NimbleRadio *instance = nullptr;
         SemaphoreHandle_t syncSemaphore = nullptr;
@@ -99,6 +104,11 @@ namespace ble
             char detail[sizeof(Error::detail)];
             snprintf(detail, sizeof detail, "esp:0x%x", static_cast<unsigned>(err));
             return Error(Code::ReaderOffline, detail);
+        }
+
+        uint32_t nowMs()
+        {
+            return static_cast<uint32_t>(esp_timer_get_time() / 1000);
         }
 
         void onSyncCallback()
@@ -213,6 +223,7 @@ namespace ble
         characteristics.clear();
         opToken = 0;
         opValue.clear();
+        watchdog.settled();
     }
 
     // ------------------------------------------------------------------------------------------- scan
@@ -269,8 +280,9 @@ namespace ble
     // ------------------------------------------------------------------------------------------- connection
 
     // The link is tracked until NimBLE confirms it is gone (its connect or disconnect event): `conn` and
-    // `connecting` are never cleared, and no event is made up, while a link may still be up. Otherwise the real
-    // event would arrive later and end the next session.
+    // `connecting` are never cleared, and no event is made up, while NimBLE may still report it. Otherwise the real
+    // event would arrive later and end the next session. An event that never comes is the watchdog's (superviseLink):
+    // it makes one up only once NimBLE no longer runs the connect or holds the link.
 
     Error NimbleRadio::connect(const Address &address, uint32_t timeoutMs, const PsVector<AllowEntry> &allow)
     {
@@ -301,6 +313,7 @@ namespace ble
                                        this);
         if (rc != 0) return mapConnectFailure(rc);
         connecting = true;
+        watchdog.expect(nowMs(), timeoutMs ? timeoutMs : NIMBLE_DEFAULT_CONNECT_MS);
         return Error();
     }
 
@@ -308,8 +321,11 @@ namespace ble
     {
         // 0, BLE_HS_EALREADY (a terminate is already pending) and BLE_HS_ENOTCONN (NimBLE dropped the link and
         // deletes it before it reports the disconnect) all end in a disconnect event. Any other failure leaves the
-        // link up: connect() asks again before it allows a new one.
+        // link up: connect() asks again before it allows a new one, and the watchdog resets the controller if it
+        // never goes down.
         (void)ble_gap_terminate(conn, BLE_ERR_REM_USER_CONN_TERM);
+        // The peripheral may have negotiated a longer supervision timeout than the reader asked for.
+        watchdog.expect(nowMs(), std::max<uint32_t>(link.timeout, link::SUPERVISION_TIMEOUT) * 10u);
     }
 
     void NimbleRadio::tuneLink()
@@ -369,11 +385,54 @@ namespace ble
 
     void NimbleRadio::abandonConnect()
     {
-        // Whatever ble_gap_conn_cancel returns, a connect event follows: BLE_HS_EALREADY means it is already on its
-        // way, any other failure ends with NimBLE's own connect timeout. A link that comes up anyway goes straight
-        // down again (onGapEvent).
+        // Whatever ble_gap_conn_cancel returns, a connect event should follow: BLE_HS_EALREADY means it is already on
+        // its way, any other failure ends with NimBLE's own connect timeout. A link that comes up anyway goes straight
+        // down again (onGapEvent). The classic ESP32's controller was seen to never send it: the watchdog's case.
         abandoned = true;
         (void)ble_gap_conn_cancel();
+        watchdog.expect(nowMs(), CANCEL_EVENT_MS);
+    }
+
+    const char *NimbleRadio::superviseLink()
+    {
+        std::lock_guard<std::recursive_mutex> lock(mutex);
+        if (!watchdog.armed()) return nullptr;
+        const bool linkTracked = conn != NO_CONN;
+        struct ble_gap_conn_desc desc;
+        // NimBLE's own view: the connect procedure it runs, or the link it holds.
+        const bool running = linkTracked ? ble_gap_conn_find(conn, &desc) == 0 : connecting && ble_gap_conn_active();
+        switch (watchdog.check(nowMs(), running))
+        {
+        case LinkWatchdog::Action::None:
+            return nullptr;
+        case LinkWatchdog::Action::Forget:
+            if (linkTracked)
+            {
+                linkGone(BLE_HS_ENOTCONN);
+                return "forget-link";
+            }
+            if (!connecting) return nullptr;
+            {
+                const Error error = abandoned ? Error(Code::Cancelled) : Error(Code::ConnectionFailed, "no-connect-event");
+                reset();
+                connectReported = true;
+                events.radioConnectFailed(error);
+            }
+            return "forget-connect";
+        case LinkWatchdog::Action::Retry:
+            if (linkTracked)
+            {
+                terminate();
+                return "terminate-again";
+            }
+            (void)ble_gap_conn_cancel();
+            return "cancel-again";
+        case LinkWatchdog::Action::Reset:
+            // Ends every procedure and link with its event (ble_gap_reset_state), then syncs again.
+            ble_hs_sched_reset(BLE_HS_ETIMEOUT);
+            return linkTracked ? "reset-controller link" : "reset-controller connect";
+        }
+        return nullptr;
     }
 
     void NimbleRadio::failConnect(const Error &error)
@@ -394,6 +453,27 @@ namespace ble
         terminate();
     }
 
+    void NimbleRadio::linkGone(int reason)
+    {
+        const bool reported = connectReported;
+        const uint32_t token = opToken;
+        const bool pending = hasPendingFailure;
+        const Error failure = pendingFailure;
+        reset();
+        if (pending)
+        {
+            events.radioConnectFailed(failure);
+            return;
+        }
+        if (!reported)
+        {
+            events.radioConnectFailed(mapConnectFailure(reason));
+            return;
+        }
+        if (token) events.radioOpDone(token, Error(Code::Disconnected, "link-lost"), Bytes());
+        events.radioDisconnected(reason);
+    }
+
     int NimbleRadio::onGapEvent(struct ble_gap_event *event)
     {
         std::lock_guard<std::recursive_mutex> lock(mutex);
@@ -409,7 +489,15 @@ namespace ble
             events.radioScanComplete();
             return 0;
         case BLE_GAP_EVENT_CONNECT:
+            if (!connecting)
+            {
+                // A connect the radio no longer tracks (the watchdog gave it up): it never becomes a session.
+                if (event->connect.status == 0)
+                    (void)ble_gap_terminate(event->connect.conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+                return 0;
+            }
             connecting = false;
+            watchdog.settled();
             if (event->connect.status != 0)
             {
                 connectReported = true;
@@ -435,24 +523,7 @@ namespace ble
         {
             // Only the tracked link ends the tracked link.
             if (event->disconnect.conn.conn_handle != conn) return 0;
-            const int reason = event->disconnect.reason;
-            const bool reported = connectReported;
-            const uint32_t token = opToken;
-            const bool pending = hasPendingFailure;
-            const Error failure = pendingFailure;
-            reset();
-            if (pending)
-            {
-                events.radioConnectFailed(failure);
-                return 0;
-            }
-            if (!reported)
-            {
-                events.radioConnectFailed(mapConnectFailure(reason));
-                return 0;
-            }
-            if (token) events.radioOpDone(token, Error(Code::Disconnected, "link-lost"), Bytes());
-            events.radioDisconnected(reason);
+            linkGone(event->disconnect.reason);
             return 0;
         }
         case BLE_GAP_EVENT_MTU:

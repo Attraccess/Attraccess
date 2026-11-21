@@ -283,6 +283,7 @@ namespace ble
     {
         // First, on the state the requests and radio events of this round left: whatever is still pending keeps it.
         shutdownIdleStack(now);
+        if (initialized) superviseLink();
         flushOutbox();
         if (currentOwner == Owner::Scan && due(now, scan.deadline))
         {
