@@ -491,6 +491,9 @@ void testParallelSessionUserEdges(Renderer &renderer)
     resources.items[3].activeSessionCount = 2;
     addSession(resources.items[3], 40, "", false);
     addSession(resources.items[3], 41, "Kim", false);
+    resources.items[3].activeSessionCount = 4;
+    addSession(resources.items[3], 42, " \t\n", false);          // only control characters and spaces: nameless
+    addSession(resources.items[3], 43, "Al\nex\t", false);       // a newline must not hide the rest of the line
     // The own session in the middle of many: shown once, as the you token.
     resources.items[4].activeSessionCount = 4;
     for (const char *user : {"Alex", "Robin", "Sam", "Kim"}) addSession(resources.items[4], 50 + resources.items[4].activeSessions.size(), user, std::string(user) == "Sam");
@@ -513,7 +516,8 @@ void testParallelSessionUserEdges(Renderer &renderer)
         ScreenGuard guard(signedOut.getScreen(), &signedOut);
         FirmwareI18n::refreshTree(guard.root, "de");
         expect(rowStatusLine(guard.root, "One") == "Alex \u00B7 1/6", "One name reads 'Alex · 1/6' without a stray separator");
-        expect(rowStatusLine(guard.root, "Empty name") == "Kim +1 \u00B7 2/6", "A nameless session is only counted");
+        expect(rowStatusLine(guard.root, "Empty name") == "Kim, Al ex +2 \u00B7 4/6",
+               "Nameless sessions are only counted, control characters become single spaces: " + rowStatusLine(guard.root, "Empty name"));
         expect(rowStatusLine(guard.root, "Only nameless") == "In Verwendung 2/6", "Only nameless sessions fall back to the count");
         expect(rowStatusLine(guard.root, "Own unlisted") == "Alex, Robin +1 \u00B7 3/6", "Signed out there is no you token");
         for (const char *row : {"One", "Long name", "Not Latin-1", "Empty name", "Own among many", "Own unlisted"})

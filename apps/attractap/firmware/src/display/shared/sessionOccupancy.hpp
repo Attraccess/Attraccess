@@ -64,12 +64,22 @@ namespace SessionOccupancy
             return true;
         }
 
-        // A user name as one line: control characters (a newline would hide the rest of the caption) become spaces.
+        // A user name as one line: control characters (a newline would hide the rest of the caption) become single
+        // spaces, without leading or trailing ones. Empty when the name has nothing else.
         inline std::string oneLine(const char *name)
         {
-            std::string result(name);
-            for (char &c : result)
-                if (static_cast<unsigned char>(c) < 0x20 || c == 0x7F) c = ' ';
+            std::string result;
+            bool gap = false;
+            for (const char *c = name; *c; ++c)
+            {
+                if (static_cast<unsigned char>(*c) < 0x20 || *c == 0x7F || *c == ' ') gap = !result.empty();
+                else
+                {
+                    if (gap) result += ' ';
+                    gap = false;
+                    result += *c;
+                }
+            }
             return result;
         }
     }
@@ -103,8 +113,11 @@ namespace SessionOccupancy
         names.reserve(sessions.size() + 1);
         if (ownSessionId != 0) names.push_back(Text(Message::SessionYou)); // shown even if the capped list misses it
         for (const auto &session : sessions)
-            if (session.id != ownSessionId && session.username[0] != '\0')
-                names.push_back(Text::literal(detail::oneLine(session.username)) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */);
+        {
+            if (ownSessionId != 0 && session.id == ownSessionId) continue;
+            std::string name = detail::oneLine(session.username);
+            if (!name.empty()) names.push_back(Text::literal(std::move(name)) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */);
+        }
         if (sessions.empty() || names.empty())
             return caption(activeCount, limit, ownSessionId != 0); // no names from the server: the plain count
         lv_obj_update_layout(label);
