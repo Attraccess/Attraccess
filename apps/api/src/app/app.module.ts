@@ -146,7 +146,7 @@ export class AppModule implements OnModuleInit {
     try {
       const licenseKey = await this.settingsService.getLicenseKey();
       if (!licenseKey) {
-        logger.warn('LICENSE_KEY not configured yet. Skipping initial license validation.');
+        logger.warn('No license key configured yet. Skipping initial license validation.');
         return;
       }
 

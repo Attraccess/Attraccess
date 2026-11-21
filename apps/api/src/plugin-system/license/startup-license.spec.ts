@@ -73,20 +73,15 @@ describe('evaluateStartupLicense', () => {
       process.env = { ...env };
     });
 
-    it('reports no license when LICENSE_KEY is not set', async () => {
-      delete process.env.LICENSE_KEY;
-      await expect(evaluate()).resolves.toEqual({ valid: false, modules: [] });
-    });
-
-    it('uses LICENSE_KEY from the environment, which the seed migration stores later', async () => {
-      process.env.LICENSE_KEY = '  licenso-key  ';
+    it('reports no license and never reads LICENSE_KEY from the environment', async () => {
+      process.env.LICENSE_KEY = 'licenso-key';
       process.env.ATTRACCESS_URL = 'https://attraccess.example';
       (verifyLicense as jest.Mock).mockResolvedValue({
         valid: true,
         payload: { cfg: { modules: { wago: true }, usageLimits: {} } },
       });
-      await expect(evaluate()).resolves.toEqual({ valid: true, modules: ['wago'] });
-      expect(verifyLicense).toHaveBeenCalledWith('licenso-key', 'public', 'attraccess.example');
+      await expect(evaluate()).resolves.toEqual({ valid: false, modules: [] });
+      expect(verifyLicense).not.toHaveBeenCalled();
     });
   });
 

@@ -21,19 +21,13 @@ const openBackendStartupSettings: OpenStartupSettings = () => resolveDatabaseBac
  */
 export const STARTUP_LICENSE_TIMEOUT_MS = 15_000;
 
-/** Trimmed like the seed migration (`1770236486649-seed-settings-from-env`) does before it stores these values. */
-function fromEnv(value: string | undefined): string | null {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
-}
-
 /**
  * Determines the license once at startup, before AppModule (and so PluginModule.forRoot()) is imported, because
  * forRoot() decides synchronously which plugins load. The container does not exist yet, so this reads the license key
  * through a short-lived connection the database backend opens (`openSettings`), the way plugin migrations do, and
  * reuses the core license resolution.
- * On a fresh install the database does not exist yet; the seed migration will store `LICENSE_KEY` from the
- * environment, so that is the key this startup uses.
+ * On a fresh install the database does not exist yet, so there is no license until an administrator enters the key
+ * (setup wizard or Settings → Application Settings); the environment is never read for it.
  *
  * Never throws: any failure (unreadable settings, a key that cannot be verified, the timeout) yields `null`, which
  * counts as "no valid license" for license-gated plugins. Ungated plugins are unaffected. Skips all work when no
@@ -86,12 +80,7 @@ async function resolveStartupLicense(
   const rows = await openSettings();
   // A fresh install has no database yet; the backend does not create an empty one for it here.
   if (!rows) {
-    return resolveLicenseData(
-      fromEnv(process.env.LICENSE_KEY),
-      async () => fromEnv(process.env.ATTRACCESS_URL ?? process.env.VITE_ATTRACCESS_URL),
-      appConfig.LICENSO_PUBLIC_KEY,
-      logger,
-    );
+    return resolveLicenseData(null, async () => null, appConfig.LICENSO_PUBLIC_KEY, logger);
   }
 
   onOpened(rows);
