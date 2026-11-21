@@ -4,6 +4,12 @@ import { PostgresBaseline1760000000000 } from './1760000000000-baseline';
 import { PREVIOUS_DEFAULT_BODIES } from './1796000000000-user-names-email-defaults';
 import { PostgresUserNames1796000000000 } from './1796000000000-user-names';
 
+const VARIABLES_BEFORE: Record<string, string> = {
+  'verify-email': 'user.username,user.email,user.id,url',
+  'project-invitation': 'user.username,project.name,inviter.username,invitation.id',
+  'password-changed': 'user.username,user.email,user.id',
+};
+
 describe('PostgreSQL user names migration', () => {
   let source: DataSource;
   const migration = new PostgresUserNames1796000000000();
@@ -17,6 +23,8 @@ describe('PostgreSQL user names migration', () => {
       await runner.release();
     }
   };
+  const variablesOf = async (type: string): Promise<string | undefined> =>
+    (await source.query(`SELECT "variables" FROM "email_templates" WHERE "type" = $1`, [type]))[0]?.variables;
   const bodyOf = async (type: string): Promise<string | undefined> =>
     (await source.query(`SELECT "body" FROM "email_templates" WHERE "type" = $1`, [type]))[0]?.body;
 
@@ -27,13 +35,13 @@ describe('PostgreSQL user names migration', () => {
     await source.query(`DELETE FROM "email_templates"`);
     for (const type of ['verify-email', 'project-invitation']) {
       await source.query(
-        `INSERT INTO "email_templates" ("type", "subject", "body", "variables") VALUES ($1, 's', $2, '[]')`,
-        [type, PREVIOUS_DEFAULT_BODIES[type]],
+        `INSERT INTO "email_templates" ("type", "subject", "body", "variables") VALUES ($1, 's', $2, $3)`,
+        [type, PREVIOUS_DEFAULT_BODIES[type], VARIABLES_BEFORE[type]],
       );
     }
     await source.query(
-      `INSERT INTO "email_templates" ("type", "subject", "body", "variables") VALUES ('password-changed', 's', $1, '[]')`,
-      [`${PREVIOUS_DEFAULT_BODIES['password-changed']}\n<!-- customised -->`],
+      `INSERT INTO "email_templates" ("type", "subject", "body", "variables") VALUES ('password-changed', 's', $1, $2)`,
+      [`${PREVIOUS_DEFAULT_BODIES['password-changed']}\n<!-- customised -->`, VARIABLES_BEFORE['password-changed']],
     );
   });
 
@@ -52,6 +60,20 @@ describe('PostgreSQL user names migration', () => {
     expect(await bodyOf('verify-email')).not.toContain('user.username');
     expect(await bodyOf('project-invitation')).toContain('inviter=inviter.displayName');
     expect(await bodyOf('password-changed')).toContain('name=user.username');
+  });
+
+  it('lists the name variables for every core template, customised ones included, and drops them again', async () => {
+    await run('up');
+    expect(await variablesOf('verify-email')).toBe(
+      'user.username,user.firstName,user.lastName,user.displayName,user.email,user.id,url',
+    );
+    expect(await variablesOf('project-invitation')).toBe(
+      'user.username,user.firstName,user.lastName,user.displayName,project.name,inviter.username,inviter.displayName,invitation.id',
+    );
+    expect(await variablesOf('password-changed')).toContain('user.displayName');
+    await run('down');
+    expect(await variablesOf('verify-email')).toBe(VARIABLES_BEFORE['verify-email']);
+    expect(await variablesOf('project-invitation')).toBe(VARIABLES_BEFORE['project-invitation']);
   });
 
   it('restores the previous defaults and drops the columns on the way down', async () => {

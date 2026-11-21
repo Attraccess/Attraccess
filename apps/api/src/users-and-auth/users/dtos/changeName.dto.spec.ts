@@ -24,6 +24,11 @@ describe('ChangeNameDto', () => {
     expect(errors.map((error) => error.property)).toEqual(['firstName']);
   });
 
+  it('refuses a missing key instead of clearing that name', async () => {
+    expect((await check({})).errors.map((error) => error.property)).toEqual(['firstName', 'lastName']);
+    expect((await check({ firstName: 'Ada' })).errors.map((error) => error.property)).toEqual(['lastName']);
+  });
+
   it('refuses non-string names', async () => {
     expect((await check({ firstName: 5, lastName: null })).errors).toHaveLength(1);
   });

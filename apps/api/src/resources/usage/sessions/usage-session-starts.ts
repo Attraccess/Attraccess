@@ -21,7 +21,7 @@ import { SessionChangeInterruptedError } from '../errors/session-change-interrup
 
 import { RESOURCE_USAGE_LOG_CONTEXT, StartSessionOptions, UsageLifecycle } from '../lifecycle/usage-lifecycle';
 
-import { usageFlowPayload } from '../lifecycle/usage-flow-payload';
+import { usageFlowPayload, withDisplayName } from '../lifecycle/usage-flow-payload';
 
 import { UsageSessionEnds } from './usage-session-ends';
 
@@ -105,8 +105,10 @@ export class UsageSessionStarts {
           ? {
               ...usageFlowPayload(existingActiveSession, formSubmissions),
               takeOverTime: attempt.transitionTime,
-              newUser: user,
-              oldUser: existingActiveSession.user,
+              newUser: withDisplayName(user),
+              oldUser: existingActiveSession.user
+                ? withDisplayName(existingActiveSession.user)
+                : existingActiveSession.user,
               activeSessions,
             }
           : { ...usageFlowPayload(createdSession, formSubmissions), activeSessions },

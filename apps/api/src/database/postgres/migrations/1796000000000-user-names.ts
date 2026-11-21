@@ -10,6 +10,20 @@ function withDisplayNames(body: string): string {
     .replace('inviter=inviter.username', 'inviter=inviter.displayName');
 }
 
+/** The variables the editor lists next to the username ones; the template context has always carried them from now on. */
+const NAME_VARIABLES: Record<string, string[]> = {
+  'user.username': ['user.firstName', 'user.lastName', 'user.displayName'],
+  'inviter.username': ['inviter.displayName'],
+};
+
+/** Adds the name variables after their username variable, or drops them again; a stored list is comma separated. */
+function withNameVariables(variables: string, direction: 'add' | 'remove'): string {
+  const added = new Set(Object.values(NAME_VARIABLES).flat());
+  const kept = variables.split(',').filter((variable) => variable && !added.has(variable));
+  if (direction === 'remove') return kept.join(',');
+  return kept.flatMap((variable) => [variable, ...(NAME_VARIABLES[variable] ?? [])]).join(',');
+}
+
 /**
  * Optional first and last name for users (ATT-1385). The display name is computed, never stored. Stored default email
  * templates move to the display name only where the stored body still equals the previous default; templates an
@@ -33,9 +47,32 @@ export class PostgresUserNames1796000000000 implements MigrationInterface {
         previous,
       ]);
     }
+    await this.rewriteVariables(queryRunner, 'add');
+  }
+
+  /**
+   * The editor lists the variables stored with a template, and an administrator cannot edit them, so every core
+   * template (customised ones too, they may use the display name) gets the new names.
+   */
+  private async rewriteVariables(queryRunner: QueryRunner, direction: 'add' | 'remove'): Promise<void> {
+    for (const type of Object.keys(PREVIOUS_DEFAULT_BODIES)) {
+      const [row]: { variables: string }[] = await queryRunner.query(
+        `SELECT "variables" FROM "email_templates" WHERE "type" = $1`,
+        [type],
+      );
+      if (!row || typeof row.variables !== 'string') continue;
+      const variables = withNameVariables(row.variables, direction);
+      if (variables === row.variables) continue;
+      await queryRunner.query(`UPDATE "email_templates" SET "variables" = $1 WHERE "type" = $2 AND "variables" = $3`, [
+        variables,
+        type,
+        row.variables,
+      ]);
+    }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await this.rewriteVariables(queryRunner, 'remove');
     for (const [type, previous] of Object.entries(PREVIOUS_DEFAULT_BODIES)) {
       await queryRunner.query(`UPDATE "email_templates" SET "body" = $1 WHERE "type" = $2 AND "body" = $3`, [
         previous,

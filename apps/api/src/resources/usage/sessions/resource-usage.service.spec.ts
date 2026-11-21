@@ -276,7 +276,10 @@ describe('ResourceUsageService', () => {
       const [resourceId, nodeType, payload] = scope.flows.runFlow.mock.calls[0];
       expect(resourceId).toBe(1);
       expect(nodeType).toBe(ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER);
-      expect(payload).toMatchObject({ newUser: { id: user.id }, oldUser: { id: previous.user.id } });
+      expect(payload).toMatchObject({
+        newUser: { id: user.id, displayName: expect.any(String) },
+        oldUser: { id: previous.user.id, displayName: expect.any(String) },
+      });
 
       // The new session is billed once, the outgoing one is charged once (and the new one never is).
       expect(scope.billing.handleResourceUsageStart).toHaveBeenCalledTimes(1);

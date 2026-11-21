@@ -1,6 +1,13 @@
 import { formatUserDisplayName } from '@attraccess/shared';
 import type { UsageFormSubmissionDraft, UsageSession, UsageSessionUser } from '@attraccess/application-models';
 
+/** A user as a flow payload carries it: the stored fields plus the computed display name, which templates cannot compute. */
+export function withDisplayName<
+  T extends { username?: string | null; firstName?: string | null; lastName?: string | null },
+>(user: T): T & { displayName: string } {
+  return { ...user, displayName: formatUserDisplayName({ ...user, username: user.username ?? '' }) };
+}
+
 /** The usage session as flows see it: answered forms by form id, a sanitized user and no resource documentation. */
 export function usageFlowPayload(resourceUsage: UsageSession, formSubmissions?: UsageFormSubmissionDraft[]) {
   const normalizedFormSubmissions = formSubmissions ?? [];
