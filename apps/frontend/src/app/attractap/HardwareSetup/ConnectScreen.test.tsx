@@ -53,6 +53,8 @@ it('reports a failed Bluetooth connection', async () => {
   const description = screen.getByText(/Bluetooth setup is still open/).textContent;
   expect(description).toMatch(/an Attractap Touch shows its name on its screen/);
   expect(description).not.toMatch(/the reader shows on its screen/);
+  // macOS asks the user to accept the Bluetooth pairing; unanswered, the connection fails.
+  expect(description).toMatch(/If your computer asks to pair over Bluetooth, accept the request/);
 });
 
 it('explains a Bluetooth link that dropped during setup', () => {
@@ -85,4 +87,5 @@ it('has the reader copy in German', async () => {
   expect(screen.getByText(/Schaltfläche „Bluetooth-Einrichtung“ auf seinem Display/)).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Per Bluetooth einrichten' }));
   expect(await screen.findByText('Bluetooth-Verbindung fehlgeschlagen')).toBeTruthy();
+  expect(screen.getByText(/Fragt dein Computer nach einer Bluetooth-Kopplung, bestätige sie/)).toBeTruthy();
 });

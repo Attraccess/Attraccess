@@ -27,12 +27,12 @@ Ein Leser, der **noch nicht gekoppelt** ist, öffnet seine Bluetooth-Einrichtung
 
 | Leser | So öffnet sich die Einrichtung | Was er zeigt |
 |-------|--------------------------------|--------------|
-| **Attractap Touch** (und Touch V2) | 10 Minuten nach jedem Start. Später öffnet **Bluetooth-Einrichtung** neben **Einstellungen** auf dem Verbindungsbildschirm sie für weitere 10 Minuten. | Auf dem Einstellungs- oder Verbindungsbildschirm: „Bluetooth-Einrichtung offen · 09:41“ und sein Name, zum Beispiel „Attractap Touch 71C8“; und „Bluetooth-Einrichtung: Browser verbunden“, solange Ihr Browser verbunden ist. |
+| **Attractap Touch** (und Touch V2) | 10 Minuten nach jedem Start. Später öffnet die Schaltfläche **Bluetooth-Einrichtung** unter **Einstellungen** auf dem Verbindungsbildschirm sie für weitere 10 Minuten. Der Einstellungsbildschirm eines Lesers ohne Server und der Bildschirm mit dem Kopplungscode haben diese Schaltfläche nicht: Starten Sie den Leser neu, um die Einrichtung wieder zu öffnen. | Auf dem Einstellungs-, Verbindungs- oder Kopplungscode-Bildschirm: „Bluetooth-Einrichtung offen · 09:41“ und sein Name, zum Beispiel „Attractap Touch 71C8“; und „Bluetooth-Einrichtung: Browser verbunden“, solange Ihr Browser verbunden ist. |
 | **Attractap Lite** | 10 Minuten nach jedem Einschalten. Für weitere 10 Minuten trennen Sie ihn kurz vom Strom. | Der LED-Ring pulsiert alle 1,5 Sekunden zweimal blau; solange Ihr Browser verbunden ist, leuchtet er blau. Die Kopplungsfarben haben Vorrang. |
-| **BLE-Bridge** | Taster 3 Sekunden gedrückt halten. | Siehe [BLE-Bridge](attractap/ble-bridge.md). |
+| **BLE-Bridge** | Taste 3 Sekunden gedrückt halten. | Siehe [BLE-Bridge](attractap/ble-bridge.md). |
 
 1. Öffnen Sie in Attraccess **Geräte** > **Attractap-Lesegeräte**, wählen Sie **Attractap einrichten** und klicken Sie auf **Per Bluetooth einrichten**.
-2. Wählen Sie den Leser in der Geräteliste des Browsers. Sein Name ist „Attractap Touch“, „Attractap Lite“ oder „Attractap Bridge“ und vier Zeichen; ein Touch zeigt seinen Namen auf dem Display. Bestätigen Sie die Kopplungsanfrage Ihres Computers oder Telefons, falls eine erscheint.
+2. Wählen Sie den Leser in der Geräteliste des Browsers. Sein Name ist „Attractap Touch“, „Attractap Lite“ oder „Attractap Bridge“ und vier Zeichen; ein Touch zeigt seinen Namen auf dem Display. Fragt Ihr Computer oder Telefon nach einer Bluetooth-Kopplung, bestätigen Sie sie innerhalb von etwa 30 Sekunden.
 3. Stellen Sie die PIN ein, dann das WLAN (nicht beim Lite) und den Server. Den Firmware-Tab gibt es per Bluetooth nicht: Firmware wird per USB installiert oder über das Netzwerk aktualisiert.
 4. Weiter mit Schritt 2: Der Leser bittet um die Kopplung.
 

@@ -76,7 +76,7 @@ CONFIG_BT_NIMBLE_TRANSPORT_ACL_FROM_LL_COUNT=10
 CONFIG_BT_NIMBLE_TRANSPORT_EVT_COUNT=16
 # Filter accept list: the proxy filters in software and the setup accepts anyone, so two entries suffice.
 CONFIG_BT_NIMBLE_WHITELIST_SIZE=2
-# Bluetooth setup (src/bridge/provisioning): a GATT server the web app writes the setup commands to. Peripheral
+# Bluetooth setup (src/bt_setup): a GATT server the web app writes the setup commands to. Peripheral
 # role and LE Secure Connections pairing (Just Works), so the Wi-Fi password never crosses the air in clear text.
 # No legacy pairing, no signed writes, no stored bonds: every setup window pairs anew under a new random address.
 CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y

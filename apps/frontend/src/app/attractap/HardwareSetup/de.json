@@ -16,15 +16,15 @@
       "label": "Per USB verbinden"
     },
     "bluetooth": {
-      "hint": "Schon geflasht und noch nicht gekoppelt? Richte das Gerät ohne Kabel ein, solange seine Bluetooth-Einrichtung offen ist. Ein Attractap Touch öffnet sie für 10 Minuten nach dem Start oder mit der Schaltfläche „Bluetooth-Einrichtung“ auf seinem Display. Ein Attractap Lite öffnet sie für 10 Minuten nach dem Einschalten (sein LED-Ring pulsiert blau). Eine BLE-Bridge öffnet sie, wenn du ihren Taster 3 Sekunden gedrückt hältst (die Bluetooth-LED blinkt doppelt; 10 Sekunden setzen die Bridge zurück).",
+      "hint": "Schon geflasht und noch nicht gekoppelt? Richte das Gerät ohne Kabel ein, solange seine Bluetooth-Einrichtung offen ist. Ein Attractap Touch öffnet sie für 10 Minuten nach dem Start oder mit der Schaltfläche „Bluetooth-Einrichtung“ auf seinem Display. Ein Attractap Lite öffnet sie für 10 Minuten nach dem Einschalten (sein LED-Ring pulsiert doppelt blau). Eine BLE-Bridge öffnet sie, wenn du ihre Taste 3 Sekunden gedrückt hältst (die Bluetooth-LED blinkt doppelt; 10 Sekunden setzen die Bridge zurück).",
       "button": "Per Bluetooth einrichten",
       "unavailable": {
         "title": "Bluetooth-Einrichtung ist in diesem Browser nicht verfügbar",
-        "description": "Die Einrichtung per Bluetooth braucht Web Bluetooth, das Chrome und Edge auf dem Desktop und unter Android (über HTTPS) bieten. Öffne die Seite dort oder verbinde das Gerät per USB; auch das braucht Chrome oder Edge auf einem Computer."
+        "description": "Die Einrichtung per Bluetooth braucht Web Bluetooth, das Chrome und Edge auf dem Computer und Chrome unter Android (über HTTPS) bieten. Öffne die Seite dort oder verbinde das Gerät per USB; auch das braucht Chrome oder Edge auf einem Computer."
       },
       "failed": {
         "title": "Bluetooth-Verbindung fehlgeschlagen",
-        "description": "Prüfe, ob die Bluetooth-Einrichtung des Geräts noch offen ist (sie schließt nach 10 Minuten), halte es nah an dieses Gerät und versuche es erneut. Wähle in der Liste des Browsers das richtige Gerät (ein Attractap Touch zeigt seinen Namen auf dem Display). Klappt es weiterhin nicht, richte es per USB ein."
+        "description": "Prüfe, ob die Bluetooth-Einrichtung des Geräts noch offen ist (sie schließt nach 10 Minuten), und halte es nah an diesen Computer oder dieses Telefon. Fragt dein Computer nach einer Bluetooth-Kopplung, bestätige sie. Wähle in der Liste des Browsers das richtige Gerät (ein Attractap Touch zeigt seinen Namen auf dem Display) und versuche es erneut. Klappt es weiterhin nicht, richte es per USB ein."
       },
       "lost": {
         "title": "Bluetooth-Verbindung getrennt",
