@@ -56,6 +56,14 @@ def reply(lines, topic):
     return json.loads(found[0]["reply"])
 
 
+def device_screenshot(hooks, artifacts, name):
+    """The panel's frame as evidence; a garbled transfer must not fail the test."""
+    try:
+        hooks.screenshot().save(artifacts / name)
+    except Exception as error:  # noqa: BLE001 - evidence only
+        print(f"device screenshot {name} failed: {error}")
+
+
 def save(artifacts, name, data):
     (artifacts / f"bt-setup-{name}.json").write_text(json.dumps(data, indent=1))
 
@@ -104,7 +112,7 @@ def test_bt_setup_sets_up_and_pairs_a_fresh_reader(fresh_console, target, api, a
     hooks = ReaderTestHooks(console.stream(), PIN)
     # The status ("Bluetooth setup open · mm:ss" over the name) is a plain label, which ui.widgets does not list:
     # the panel's frame is the evidence.
-    hooks.screenshot().save(artifacts / "bt-setup-open-device.png")
+    device_screenshot(hooks, artifacts, "bt-setup-open-device.png")
     screenshot("bt-setup-open")
     heap_open = read_heap(console)
 
@@ -169,7 +177,7 @@ def test_bt_setup_times_out_and_the_button_opens_a_new_window(fresh_console, art
     assert "error" not in console.command("api.configuration.set", {"authCode": PIN, **UNREACHABLE_SERVER}).lower()
     hooks = ReaderTestHooks(console.stream(), PIN)
     hooks.wait_for(screen="InitScreen", timeout=30)
-    hooks.screenshot().save(artifacts / "bt-setup-connecting-device.png")
+    device_screenshot(hooks, artifacts, "bt-setup-connecting-device.png")
     assert not hooks.find("Bluetooth-Einrichtung") and not hooks.find("Bluetooth setup"), "button while open"
 
     mark = console.mark()
@@ -179,7 +187,7 @@ def test_bt_setup_times_out_and_the_button_opens_a_new_window(fresh_console, art
     assert not any(device["name"] == name for device in central("scan", "10", name))
     caption = "Bluetooth-Einrichtung" if hooks.find("Bluetooth-Einrichtung") else "Bluetooth setup"
     hooks.wait_for(caption, timeout=10)
-    hooks.screenshot().save(artifacts / "bt-setup-button-device.png")
+    device_screenshot(hooks, artifacts, "bt-setup-button-device.png")
     screenshot("bt-setup-button")
 
     hooks.tap_text(caption)
@@ -187,6 +195,6 @@ def test_bt_setup_times_out_and_the_button_opens_a_new_window(fresh_console, art
     assert any(device["name"] == name for device in central("scan", "15", name))
     hooks.wait_for(screen="InitScreen", timeout=5)
     assert not hooks.find(caption)
-    hooks.screenshot().save(artifacts / "bt-setup-reopened-device.png")
+    device_screenshot(hooks, artifacts, "bt-setup-reopened-device.png")
     screenshot("bt-setup-reopened")
     save(artifacts, "timeout", {"name": name, "windowSeconds": round(lasted)})
