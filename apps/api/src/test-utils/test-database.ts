@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { Client } from 'pg';
 import type { DataSource, DataSourceOptions } from 'typeorm';
 import { resolveDatabaseBackend } from '../database/backend';
+import { POSTGRES_MIGRATIONS_TRANSACTION_MODE } from '../database/postgres/postgres-backend';
 import { postgresConnectionOptions } from '../database/postgres/postgres-connection';
 
 /**
@@ -89,10 +90,16 @@ function migratedTemplate(): Promise<string> {
         await admin.query(`DROP DATABASE IF EXISTS ${quoteIdent(building)}`);
         await admin.query(`CREATE DATABASE ${quoteIdent(building)}`);
         const source = backend.createDataSource({
-          ...postgresConnectionOptions({ url: databaseUrl(adminUrl, building), ssl: 'off', poolMax: 2, schema: 'public' }),
+          ...postgresConnectionOptions({
+            url: databaseUrl(adminUrl, building),
+            ssl: 'off',
+            poolMax: 2,
+            schema: 'public',
+          }),
           entities: [],
           migrations: [...backend.migrationTrack.migrations],
           migrationsTableName: backend.migrationTrack.tableName,
+          migrationsTransactionMode: POSTGRES_MIGRATIONS_TRANSACTION_MODE,
           migrationsRun: false,
         } as DataSourceOptions);
         await source.initialize();
@@ -143,6 +150,7 @@ export function createTestDataSourceOptions(options: TestDatabaseOptions = {}): 
     synchronize: options.synchronize ?? false,
     migrationsRun: options.migrationsRun ?? false,
     migrationsTableName: options.migrationsTableName ?? backend.migrationTrack.tableName,
+    migrationsTransactionMode: POSTGRES_MIGRATIONS_TRANSACTION_MODE,
   } as DataSourceOptions;
 }
 

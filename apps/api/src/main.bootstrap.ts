@@ -299,11 +299,12 @@ export async function bootstrap() {
   if (earlyConfig.PLUGIN_DIR) await NpmPluginService.recoverBackups();
   bootstrapLogger.log('PluginSystem configured.');
 
-  // PostgreSQL is the only database. Before anything reads it: wait for it to accept connections, apply the baseline
-  // and move the data of an existing SQLite installation (nothing is served, no plugin runs, until that is done).
+  // PostgreSQL is the only database. Before anything reads it: wait for it to accept connections and apply the core
+  // migrations under the migration lock, the import of an existing SQLite installation included (nothing is served,
+  // no plugin runs, until that is done).
   if (!skipDatabaseMigrations) {
-    const { prepareDatabaseAtStartup } = await import('./database/transfer/startup-transfer');
-    await prepareDatabaseAtStartup();
+    const { migrateDatabaseAtStartup } = await import('./database/postgres/postgres-startup-migrations');
+    await migrateDatabaseAtStartup();
   }
 
   const shouldGuardPluginLifecycle = !earlyConfig.DISABLE_PLUGINS && Boolean(earlyConfig.PLUGIN_DIR);

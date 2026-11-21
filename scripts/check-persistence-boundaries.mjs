@@ -13,12 +13,13 @@ import { excludedDirectory, generatedClients, git } from './lib/repo-files.mjs';
  * imports, re-exports, dynamic `import()`, `require()` and `import x = require()`.
  *
  * Adapter internals (apps/api/src/database/adapters, apps/api/src/database/postgres, libs/database-entities) may only
- * be imported by Nest composition files (`*.module.ts`) and tests. apps/api/src/database/transfer (the SQLite import
- * at startup) may also be imported by the two process entry points, main.ts and main.bootstrap.ts. The SDK's former
+ * be imported by Nest composition files (`*.module.ts`) and tests. The startup migration step
+ * (apps/api/src/database/postgres/postgres-startup-migrations.ts) may also be imported by the two process entry points,
+ * main.ts and main.bootstrap.ts. The SDK's former
  * engine subpath (`@attraccess/plugins-backend-sdk/sqlite`) no longer exists and is flagged everywhere.
  *
  * PostgreSQL is the only runtime database. SQLite code (apps/api/src/database/sqlite) exists for the one-way import
- * only: apps/api/src/database/transfer and tests (specs, test fixtures, e2e) may use it, nothing else, composition
+ * only: the PostgreSQL migration that imports a SQLite file and tests (specs, test fixtures, e2e) may use it, nothing else, composition
  * files included. The removed SQLite runtime (process-wide write queue and file lock, `runSerializedTransaction`,
  * the SQLite backend, unit of work and connection factory) may not come back in any file, tests included; those
  * findings are never baselined.
@@ -66,8 +67,8 @@ const isEngine = anyOf(forbiddenPluginModules.engines);
 const sdkSubpath = /^@attraccess\/plugins-backend-sdk\/(?!package\.json$).+/;
 const adapterInternals =
   /^apps\/api\/src\/database\/(?:adapters|postgres)(?:\/|$)|(?:^|\/)libs\/database-entities(?:\/|$)/;
-// The SQLite import at startup: the process entry points start it before anything else runs.
-const transferInternals = /^apps\/api\/src\/database\/transfer(?:\/|$)/;
+// The startup migration step (the SQLite import included): the process entry points run it before anything else.
+const startupMigrations = /^apps\/api\/src\/database\/postgres\/postgres-startup-migrations(?:\.ts)?$/;
 const entryPoint = /^apps\/api\/src\/main(?:\.bootstrap)?\.ts$/;
 // SQLite is the source of the one-way import, not a runtime database.
 const sqliteInternals = /^apps\/api\/src\/database\/sqlite(?:\/|$)/;
@@ -92,7 +93,7 @@ const removedRuntimeNames = new Set([
 // backend/database-backend.ts, ...) stays checked.
 const allowedPaths = [
   /^libs\/database-entities\//,
-  /^apps\/api\/src\/database\/(?:adapters|postgres|sqlite|transfer|conformance|migrations|migration-helpers)\//,
+  /^apps\/api\/src\/database\/(?:adapters|postgres|sqlite|conformance|migrations|migration-helpers)\//,
   // The backend registry: the one file that lists the engines and types the selected one for the composition root.
   /^apps\/api\/src\/database\/backend\/resolve-database-backend\.ts$/,
   // The import path released migration 1790100000000 uses for the usage recovery (a re-export of sqlite/, import only).
@@ -179,7 +180,7 @@ export function findViolations(file, content) {
     // SQLite code is for the import path only: not even composition files may use it.
     if (sqliteInternals.test(resolved)) return !(testFile.test(file) && !zone);
     if (mayWireAdapters) return false;
-    if (transferInternals.test(resolved)) return !entryPoint.test(file);
+    if (startupMigrations.test(resolved) && entryPoint.test(file)) return false;
     return adapterInternals.test(resolved);
   });
 }

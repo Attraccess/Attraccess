@@ -34,7 +34,7 @@ const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]{0,62}$/;
 const SSL_URL_PARAMETERS = ['ssl', 'sslmode', 'sslrootcert', 'sslcert', 'sslkey', 'sslpassword', 'sslcompat'];
 /**
  * Session query parameters pg merges over the API's own: `options` would drop the time zone, lock timeout and search
- * path the API sets, and `application_name` would hide a running API from `transfer-sqlite --force`.
+ * path the API sets, and `application_name` would hide which connections belong to the API.
  */
 const SESSION_URL_PARAMETERS = ['options', 'application_name'];
 

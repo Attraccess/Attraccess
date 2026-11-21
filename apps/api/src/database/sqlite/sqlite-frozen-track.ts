@@ -4,9 +4,9 @@ import * as migrations from '../migrations';
 import { createSqliteSource } from './sqlite-source';
 
 /**
- * The released SQLite migration track, frozen: its files are never changed (apps/api/src/database/migrations). It runs
- * on the private working copy of an old SQLite database during the SQLite -> PostgreSQL transfer, to bring a database
- * from any supported release to its final state before the data is exported. Nothing else uses it.
+ * The released SQLite migration track, frozen: its files are never changed (apps/api/src/database/migrations). The
+ * SQLite import (PostgresImportSqlite1760000000001) runs it on the SQLite file of an installation, to bring a database
+ * from any supported release to its final state before the data is copied. Nothing else uses it.
  */
 export const sqliteFrozenTrack: MigrationTrack = {
   name: 'sqlite',
@@ -21,7 +21,7 @@ export const sqliteFrozenTrack: MigrationTrack = {
  */
 const TYPEORM_METADATA = `CREATE TABLE IF NOT EXISTS "typeorm_metadata" ("type" varchar NOT NULL, "database" varchar, "schema" varchar, "table" varchar, "name" varchar, "value" text)`;
 
-/** Opens the SQLite file (a working copy) with the frozen track attached, without running anything. */
+/** Opens the SQLite file with the frozen track attached, without running anything. */
 export async function openFrozenSqlite(file: string): Promise<DataSource> {
   const source = createSqliteSource(file, {
     migrations: [...sqliteFrozenTrack.migrations],
@@ -31,7 +31,7 @@ export async function openFrozenSqlite(file: string): Promise<DataSource> {
   return source;
 }
 
-/** Applies every pending migration of the frozen track to the working copy. Returns the names that ran. */
+/** Applies every pending migration of the frozen track to the file. Returns the names that ran. */
 export async function migrateFrozenSqlite(source: DataSource): Promise<string[]> {
   await source.query(TYPEORM_METADATA);
   const applied = await source.runMigrations();

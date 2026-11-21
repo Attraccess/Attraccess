@@ -144,6 +144,10 @@ gibt keine `down`-Schritte: Der Host entfernt Ihre Tabellen beim Deinstallieren 
 
 ### Übernahme von 1.x-Installationen
 
+Das Upgrade von 1.x (SQLite) auf 2.0 (PostgreSQL) übernimmt keine Plugin-Daten: Plugins starten leer, und Version 1
+läuft wie bei einer Neuinstallation. Die Übernahme greift nur, wenn die PostgreSQL-Datenbank die Legacy-Tabellen des
+Plugins bereits enthält.
+
 Ein Plugin, das in 1.x Daten über TypeORM-Migrationen gespeichert hat, listet die Klassennamen **aller** seiner
 Legacy-Migrationen:
 

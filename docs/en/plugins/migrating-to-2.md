@@ -126,15 +126,19 @@ If a 1.x table name is forbidden, the table cannot be adopted; see
 
 ### The baseline and adoption rule
 
+The upgrade of a 1.x installation from SQLite to PostgreSQL copies only the core tables: plugin tables and their legacy
+migrations table are not moved (see [Plugin data is not moved](installation/updating.md#plugin-data-is-not-moved)).
+On an installation upgraded that way, your plugin finds no legacy history and version 1 runs as on a fresh
+installation; operators set the plugin up again. The rule below applies only when the PostgreSQL database already holds
+the plugin's legacy tables.
+
 On the first start of the 2.0 build the host looks at the plugin's legacy migrations table:
 
 - **All** `legacyMigrations` applied: the host records baseline version 1 **without running anything** and continues
   with later versions.
 - **None** applied (a fresh installation): version 1 runs as usual.
-- **Only some** applied: the plugin is **refused** and nothing is changed. A partial legacy history means the
-  database predates the plugin's last 1.x release. The message tells the operator: "Attraccess 2.0 adopts the data of
-  plugin "<name>" only from the last 1.x release (1.11). Restore the backup taken before this upgrade, update to
-  Attraccess 1.11 and start it once so the plugin's migrations finish, then update to 2.0."
+- **Only some** applied: the plugin is **refused** and nothing is changed. The message names the legacy migrations
+  that are missing.
 
 Version 1 must therefore match the legacy result exactly. A mismatch is not detected on adoption, it surfaces later as
 a failing query, so compare column by column.
@@ -227,7 +231,7 @@ with a link to this guide; the others describe the fix in their own words.
 | Forbidden or explicit name, foreign key         |       | A physical or index name is declared outside an adopting version 1, a name is a core table, uses a reserved prefix or lies in another installed plugin's namespace, or a foreign key points outside the plugin's own tables.                                                                                              |
 | Shared or overlapping namespace                 | guide | Another installed plugin with storage, loaded or not, has the same storage namespace (`foo-bar` and `foo_bar`) or an overlapping one (`wago` and `plugin-wago`, `demo` and `demo-extra`); rename the plugin. At startup a plugin that already keeps committed storage keeps loading and the newcomer is refused.          |
 | Invalid migration list                          |       | Versions are not strictly increasing from 1, a step or field is invalid, an adopted table declares `f.decimal`, or a step drops an index that backs a constraint, or a column that is part of an index or key or used by a UNIQUE, CHECK or foreign key constraint (refused when the migration runs; nothing is changed). |
-| Partial legacy history                          |       | Attraccess 2.0 adopts the data of the plugin only from the last 1.x release (1.11): restore the backup, update to 1.11, start it once, then update to 2.0. Nothing was changed.                                                                                                                                           |
+| Partial legacy history                          |       | Only some of the plugin's legacy migrations are applied; the message names the missing ones. Nothing was changed.                                                                                                                                                                                                         |
 | Unknown legacy history                          |       | Legacy migrations are applied that this release does not know; update the plugin. Nothing was changed.                                                                                                                                                                                                                    |
 
 The guide link reads `Migration guide: https://docs.attraccess.org/#/en/plugins/migrating-to-2`. Entity classes are not
@@ -235,10 +239,7 @@ a declaration of their own any more: they are caught because they import TypeORM
 
 A refused plugin stays in the plugin list with the error, and its data is left untouched. Deleting it removes its
 files without running its code; **its tables stay** in the database. A 2.0 build of the same plugin adopts them later,
-or the operator drops them by hand. An exception is the first start after 1.x: the SQLite data moves to PostgreSQL
-only when a loadable build of every plugin with data is installed, so operators need your 2.0 build before they
-upgrade (see [Plugins with data](installation/updating.md#plugins-with-data)). Publish it before or with Attraccess
-2.0.
+or the operator drops them by hand.
 
 ## Frontend SDK
 

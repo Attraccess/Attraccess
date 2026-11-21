@@ -1,6 +1,5 @@
 import type { DataSource } from 'typeorm';
-import { versionsTableName } from '../../../plugin-system/plugin-storage/storage-model';
-import { BOOKINGS_PLUGIN, BOOKINGS_TABLE } from './older-states-open-work.test-fixture';
+import { BOOKINGS_HISTORY, BOOKINGS_TABLE } from './older-states-open-work.test-fixture';
 
 const q = <T = Record<string, unknown>>(source: DataSource, sql: string, params: unknown[] = []): Promise<T[]> =>
   source.query(sql, params);
@@ -24,12 +23,12 @@ const nextUserId = async (source: DataSource): Promise<number> =>
   (
     await q<{ id: number }>(
       source,
-      `INSERT INTO "user" (username, email) VALUES ('after-the-transfer', 'after@example.com') RETURNING id`,
+      `INSERT INTO "user" (username, email) VALUES ('after-the-import', 'after@example.com') RETURNING id`,
     )
   )[0].id;
 
 /**
- * What each older release's data must look like in PostgreSQL after the transfer, by the name of the state: written
+ * What each older release's data must look like in PostgreSQL after the import, by the name of the state: written
  * for PostgreSQL (typed values, quoted camelCase columns), independent of how SQLite stored the same data.
  */
 export const postgresExpectations: Record<string, (pg: DataSource) => Promise<void>> = {
@@ -161,17 +160,13 @@ export const postgresExpectations: Record<string, (pg: DataSource) => Promise<vo
     expect(await q(pg, 'SELECT "usageId", reason FROM resource_usage_recovery')).toEqual([
       { usageId: 3, reason: 'cancelled_orphan_unfinalized_session' },
     ]);
-    // The plugin: its table with the row, and the storage version recorded in its own bookkeeping.
-    const [booking] = await q<{ slot: Date; confirmed: boolean; note: string }>(
-      pg,
-      `SELECT slot, confirmed, note FROM "${BOOKINGS_TABLE}"`,
-    );
-    expect(booking).toEqual({ slot: new Date('2026-03-02T09:00:00.000Z'), confirmed: true, note: 'Router' });
-    const versions = await q<{ version: number }>(
-      pg,
-      `SELECT version FROM "${versionsTableName(BOOKINGS_PLUGIN.id)}" ORDER BY version`,
-    );
-    expect(versions.map((row) => Number(row.version))).toEqual([1]);
+    // Plugin data is not moved: the plugin starts empty on PostgreSQL.
+    expect(
+      await q(pg, 'SELECT table_name FROM information_schema.tables WHERE table_name IN ($1, $2)', [
+        BOOKINGS_TABLE,
+        BOOKINGS_HISTORY,
+      ]),
+    ).toEqual([]);
   },
 
   'generic meter release (exact decimal readings)': async (pg) => {
@@ -226,5 +221,9 @@ export const postgresExpectations: Record<string, (pg: DataSource) => Promise<vo
       meterCreditsPerUnit: 15,
     });
     expect(await q(pg, 'SELECT "creditBalance" FROM "user" WHERE id = 1')).toEqual([{ creditBalance: -191 }]);
+    // The later migration ran on the imported data: the form of this release is a resource form.
+    expect(await q(pg, 'SELECT id, name, scope, "resourceId", "groupId", "deletedAt" FROM form')).toEqual([
+      { id: 1, name: 'Safety briefing', scope: 'resource', resourceId: 1, groupId: null, deletedAt: null },
+    ]);
   },
 };

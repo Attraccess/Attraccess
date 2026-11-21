@@ -67,15 +67,17 @@ test('adapter internals may only be imported by Nest composition files and tests
   assert.equal(find("import { parseDatabaseType } from '../database/backend';").length, 0);
 });
 
-test('the SQLite import at startup may be started by the process entry points and composition files', () => {
-  const transfer = "import { prepareDatabaseAtStartup } from './database/transfer/startup-transfer';";
-  assert.equal(find(transfer, 'apps/api/src/main.bootstrap.ts').length, 0);
-  assert.equal(find(transfer, 'apps/api/src/main.ts').length, 0);
-  assert.equal(find(transfer, 'apps/api/src/app/app.module.ts').length, 0);
+test('the startup migration step may be started by the process entry points and composition files', () => {
+  const startup = "import { migrateDatabaseAtStartup } from './database/postgres/postgres-startup-migrations';";
+  assert.equal(find(startup, 'apps/api/src/main.bootstrap.ts').length, 0);
+  assert.equal(find(startup, 'apps/api/src/main.ts').length, 0);
+  assert.equal(find(startup, 'apps/api/src/app/app.module.ts').length, 0);
   assert.equal(
-    find("import { x } from '../database/transfer/sqlite-to-postgres';", 'apps/api/src/a/a.service.ts').length,
+    find("import { x } from '../database/postgres/postgres-startup-migrations';", 'apps/api/src/a/a.service.ts').length,
     1,
   );
+  // Other adapter internals stay closed to the entry points.
+  assert.equal(find("import { x } from './database/postgres/postgres-backend';", 'apps/api/src/main.ts').length, 1);
 });
 
 test('SQLite code is for the one-way import only: tests and the import path may use it, composition files may not', () => {
@@ -241,7 +243,7 @@ test('ignores mentions in strings and comments', () => {
 test('persistence implementation code is allowed, application code is checked', () => {
   assert.equal(isChecked('apps/api/src/database/postgres/postgres-backend.ts'), false);
   assert.equal(isChecked('apps/api/src/database/sqlite/sqlite-source.ts'), false);
-  assert.equal(isChecked('apps/api/src/database/transfer/startup-transfer.ts'), false);
+  assert.equal(isChecked('apps/api/src/database/postgres/migrations/1760000000001-import-sqlite.ts'), false);
   assert.equal(isChecked('apps/api/src/database/migrations/1-x.ts'), false);
   assert.equal(isChecked('libs/database-entities/src/lib/entities/user.entity.ts'), false);
   assert.equal(isChecked('apps/api/src/billing/billing.integration.spec.ts'), false);
@@ -253,15 +255,7 @@ test('persistence implementation code is allowed, application code is checked', 
 });
 
 test('only the engine folders of the database code are allowed; its neutral seam is checked', () => {
-  for (const folder of [
-    'adapters/users',
-    'postgres',
-    'sqlite',
-    'transfer',
-    'conformance',
-    'migrations',
-    'migration-helpers',
-  ]) {
+  for (const folder of ['adapters/users', 'postgres', 'sqlite', 'conformance', 'migrations', 'migration-helpers']) {
     assert.equal(isChecked(`apps/api/src/database/${folder}/x.ts`), false, folder);
   }
   assert.equal(isChecked('apps/api/src/database/backend/resolve-database-backend.ts'), false);
@@ -269,7 +263,6 @@ test('only the engine folders of the database code are allowed; its neutral seam
     'unit-of-work.ts',
     'persistence-errors.ts',
     'transaction-context.ts',
-    'transfer-snapshot.ts',
     'datasource.ts',
     'resource-transactions.module.ts',
     'backend/database-backend.ts',

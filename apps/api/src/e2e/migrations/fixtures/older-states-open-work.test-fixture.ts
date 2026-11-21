@@ -1,15 +1,13 @@
-import type { DataSource } from 'typeorm';
-import { definePluginStorage, f, step, table } from '@attraccess/plugins-backend-sdk';
-import { postgresBackend } from '../../../database/postgres/postgres-backend';
-import { createSqlitePluginMigrationEngine } from '../../../database/sqlite/sqlite-plugin-migrations';
-import type { PluginDescriptor } from '../../../database/transfer-snapshot';
-import { compilePluginStorage } from '../../../plugin-system/plugin-storage/storage-schema';
 import type { OlderState } from './older-state.test-fixture';
+
+/** The plugin tables of this state. Plugin data is not moved to PostgreSQL. */
+export const BOOKINGS_TABLE = 'plugin_bookings_booking';
+export const BOOKINGS_HISTORY = 'plugin_migrations_bookings';
 
 /**
  * A deployment stopped in the middle of work, before parallel machine sessions: a running session (no end time), a
  * start that was reserved but not yet published (with its lifecycle attempt), a session that restart recovery had
- * cancelled (with its recovery journal row), and an installed plugin with its own migration table and data.
+ * cancelled (with its recovery journal row), and an installed plugin with its own tables and data (not moved).
  */
 export const openWorkRelease: OlderState = {
   name: 'release with open work (running session, pending start, recovery journal, plugin tables)',
@@ -37,32 +35,20 @@ export const openWorkRelease: OlderState = {
         originalAttributedOperatingDurationInMinutes, recoveredAt, reason) VALUES
         (3, 1, 2, '2026-02-28 07:00:00', NULL, 1.5, '2026-02-28 07:10:00', 'cancelled_orphan_unfinalized_session')`,
     );
+    // The tables a 1.x plugin kept in the same file: its data and its TypeORM migration history.
+    await source.query(
+      `CREATE TABLE "${BOOKINGS_TABLE}" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "slot" datetime NOT NULL,
+        "confirmed" boolean NOT NULL, "note" text)`,
+    );
+    await source.query(
+      `INSERT INTO "${BOOKINGS_TABLE}" (slot, confirmed, note) VALUES ('2026-03-02 09:00:00', 1, 'Router')`,
+    );
+    await source.query(
+      `CREATE TABLE "${BOOKINGS_HISTORY}" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "timestamp" bigint NOT NULL,
+        "name" varchar NOT NULL)`,
+    );
+    await source.query(
+      `INSERT INTO "${BOOKINGS_HISTORY}" (timestamp, name) VALUES (1700000000000, 'Bookings1700000000000')`,
+    );
   },
-  installPlugins: async (file, source) => [await installBookingsPlugin(file, source)],
 };
-
-const booking = table({
-  id: f.id(),
-  slot: f.timestamp(),
-  confirmed: f.boolean(),
-  note: f.text().optional(),
-});
-const BOOKINGS_STORAGE = definePluginStorage({
-  tables: { booking },
-  migrations: [{ version: 1, name: 'bookings', steps: [step.createTable('booking', booking)] }],
-});
-
-/** The 2.x plugin "bookings", installed in the SQLite file of this state: storage migrated, one booking written. */
-export const BOOKINGS_PLUGIN = { id: 'bookings', version: '1.4.0' } as const;
-export const BOOKINGS_TABLE = 'plugin_bookings_booking';
-
-export async function installBookingsPlugin(file: string, source: DataSource): Promise<PluginDescriptor> {
-  const storage = compilePluginStorage(BOOKINGS_PLUGIN.id, BOOKINGS_STORAGE, {
-    reservedTables: postgresBackend.plugins.coreTableNames(),
-  });
-  await createSqlitePluginMigrationEngine(file).migrate(storage);
-  await source.query(
-    `INSERT INTO "${BOOKINGS_TABLE}" ("slot", "confirmed", "note") VALUES ('2026-03-02 09:00:00.000', 1, 'Router')`,
-  );
-  return { ...BOOKINGS_PLUGIN, storage };
-}

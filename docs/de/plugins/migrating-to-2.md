@@ -133,16 +133,20 @@ Ist ein 1.x-Tabellenname verboten, lässt sich die Tabelle nicht übernehmen; si
 
 ### Die Baseline- und Übernahmeregel
 
+Der Umzug einer 1.x-Installation von SQLite auf PostgreSQL kopiert nur die Kerntabellen: Plugin-Tabellen und ihre
+Legacy-Migrationstabelle werden nicht übernommen (siehe
+[Plugin-Daten werden nicht übernommen](installation/updating.md#plugin-daten-werden-nicht-übernommen)). Auf einer so
+aktualisierten Installation findet Ihr Plugin keinen Legacy-Verlauf, und Version 1 läuft wie bei einer Neuinstallation;
+Betreiber richten das Plugin neu ein. Die folgende Regel gilt nur, wenn die PostgreSQL-Datenbank die Legacy-Tabellen
+des Plugins bereits enthält.
+
 Beim ersten Start des 2.0-Builds prüft der Host die Legacy-Migrationstabelle des Plugins:
 
 - **Alle** `legacyMigrations` angewendet: Der Host vermerkt die Baseline-Version 1 **ohne etwas auszuführen** und
   macht mit späteren Versionen weiter.
 - **Keine** angewendet (Neuinstallation): Version 1 läuft wie üblich.
-- **Nur einige** angewendet: Das Plugin wird **abgelehnt** und nichts wird geändert. Ein partieller Legacy-Verlauf
-  bedeutet, dass die Datenbank älter ist als das letzte 1.x-Release des Plugins. Die (englische) Meldung sagt, dass
-  Attraccess 2.0 die Daten des Plugins nur vom letzten 1.x-Release (1.11) übernimmt, und fordert den Betreiber auf, das
-  Backup von vor dem Upgrade zurückzuspielen, auf Attraccess 1.11 zu aktualisieren, es einmal zu starten, damit die
-  Migrationen des Plugins abschließen, und dann auf 2.0 zu aktualisieren.
+- **Nur einige** angewendet: Das Plugin wird **abgelehnt** und nichts wird geändert. Die (englische) Meldung nennt die
+  fehlenden Legacy-Migrationen.
 
 Version 1 muss das Legacy-Ergebnis daher exakt treffen. Eine Abweichung wird bei der Übernahme nicht erkannt, sie zeigt
 sich später als fehlschlagende Abfrage; vergleichen Sie deshalb Spalte für Spalte.
@@ -237,7 +241,7 @@ Ablehnungen enden zusätzlich mit einem Link auf diese Anleitung; die übrigen b
 | Verbotener oder eigener Name, Fremdschlüssel             |           | Ein physischer oder Indexname steht außerhalb einer übernehmenden Version 1, ein Name ist eine Kerntabelle, nutzt ein reserviertes Präfix oder liegt im Namensraum eines anderen installierten Plugins, oder ein Fremdschlüssel zeigt aus den eigenen Tabellen heraus.                                                                                                                          |
 | Gemeinsamer oder überschneidender Namensraum             | Anleitung | Ein anderes installiertes Plugin mit Speicher, ob geladen oder nicht, hat denselben Speicher-Namensraum (`foo-bar` und `foo_bar`) oder einen überschneidenden (`wago` und `plugin-wago`, `demo` und `demo-extra`); das Plugin umbenennen. Beim Start lädt ein Plugin mit bereits festgeschriebenem Speicher weiter und der Neuling wird abgelehnt.                                              |
 | Ungültige Migrationsliste                                |           | Versionen steigen nicht streng ab 1 an, ein Schritt oder Feld ist ungültig, eine übernommene Tabelle deklariert `f.decimal`, oder ein Schritt löscht einen Index, hinter dem ein Constraint steht, oder eine Spalte, die Teil eines Index oder Schlüssels ist oder die ein UNIQUE-, CHECK- oder Fremdschlüssel-Constraint nutzt (abgelehnt beim Ausführen der Migration; nichts wird geändert). |
-| Partieller Legacy-Verlauf                                |           | Attraccess 2.0 übernimmt die Daten des Plugins nur vom letzten 1.x-Release (1.11): Backup zurückspielen, auf 1.11 aktualisieren, einmal starten, dann auf 2.0 aktualisieren. Nichts wurde geändert.                                                                                                                                                                                             |
+| Partieller Legacy-Verlauf                                |           | Nur einige Legacy-Migrationen des Plugins sind angewendet; die Meldung nennt die fehlenden. Nichts wurde geändert.                                                                                                                                                                                                                                                                              |
 | Unbekannter Legacy-Verlauf                               |           | Es sind Legacy-Migrationen angewendet, die dieses Release nicht kennt; Plugin aktualisieren. Nichts wurde geändert.                                                                                                                                                                                                                                                                             |
 
 Der Link lautet `Migration guide: https://docs.attraccess.org/#/en/plugins/migrating-to-2`. Entitätsklassen sind keine
@@ -245,11 +249,7 @@ eigene Deklaration mehr: Sie fallen auf, weil sie TypeORM importieren.
 
 Ein abgelehntes Plugin bleibt mit dem Fehler in der Plugin-Liste, und seine Daten bleiben unverändert. Das Löschen
 entfernt seine Dateien, ohne seinen Code auszuführen; **seine Tabellen bleiben** in der Datenbank. Ein 2.0-Build
-desselben Plugins übernimmt sie später, oder der Betreiber löscht sie von Hand. Eine Ausnahme ist der erste Start nach
-1.x: Die SQLite-Daten wandern nur nach PostgreSQL, wenn von jedem Plugin mit Daten ein ladbarer Build installiert ist.
-Betreiber brauchen Ihren 2.0-Build also vor dem Upgrade (siehe
-[Plugins mit Daten](installation/updating.md#plugins-mit-daten)). Veröffentlichen Sie ihn vor oder mit Attraccess
-2.0.
+desselben Plugins übernimmt sie später, oder der Betreiber löscht sie von Hand.
 
 ## Frontend-SDK
 

@@ -1,7 +1,7 @@
 import type { DataSource } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../test-utils/test-database';
 import { PostgresBaseline1760000000000 } from './migrations/1760000000000-baseline';
-import { createSqliteWorkspace, migrateSqliteTo, type SqliteWorkspace } from '../transfer/sqlite-import.test-fixture';
+import { createSqliteWorkspace, migrateSqliteTo, type SqliteWorkspace } from '../sqlite/sqlite-import.test-fixture';
 
 /**
  * Compares the PostgreSQL baseline (without the migrations after it) with the schema the released SQLite migrations
@@ -18,7 +18,7 @@ const INTENDED_DIFFERENCES: { sqlite?: string; postgres?: string; why: string }[
   {
     sqlite: 'column resource_metering_session.meterId NULL',
     postgres: 'column resource_metering_session.meterId NOT NULL',
-    why: 'Every metering session belongs to a meter; the transfer reports a legacy session without one.',
+    why: 'Every metering session belongs to a meter; the SQLite import refuses a legacy session without one, naming its key.',
   },
   {
     sqlite: 'check audit_log: length cast details as blob <= 4096',

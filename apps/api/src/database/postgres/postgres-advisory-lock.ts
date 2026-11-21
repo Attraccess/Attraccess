@@ -1,11 +1,6 @@
 import { Client } from 'pg';
 import { sslOption, type PostgresConfig } from './postgres-config';
 
-/**
- * Advisory lock keys (one per kind of exclusive startup work). Whoever holds both takes the transfer lock first and
- * the migration lock second; the migration lock alone is never held while waiting for the transfer lock.
- */
-export const SQLITE_TRANSFER_LOCK_KEY = 584_584;
 /** Applying the core migrations: two instances that start together must not run the same migration twice. */
 export const POSTGRES_MIGRATION_LOCK_KEY = 584_585;
 
@@ -21,9 +16,8 @@ export interface AdvisoryLock {
 export async function acquireAdvisoryLock(
   config: Pick<PostgresConfig, 'url' | 'ssl'>,
   key: number,
-  connect: (client: Client) => Promise<void> = async (client) => {
-    await client.connect();
-  },
+  /** Called once when another session holds the lock and this one starts waiting. */
+  onWait: () => void = () => undefined,
 ): Promise<AdvisoryLock> {
   const client = new Client({
     connectionString: config.url,
@@ -33,9 +27,13 @@ export async function acquireAdvisoryLock(
   // An idle connection error must not become an unhandled event; the lock is lost with it, the caller's work fails on
   // its own connection in that case.
   client.on('error', () => undefined);
-  await connect(client);
+  await client.connect();
   try {
-    await client.query('SELECT pg_advisory_lock($1)', [key]);
+    const [{ locked }] = (await client.query('SELECT pg_try_advisory_lock($1) AS locked', [key])).rows;
+    if (!locked) {
+      onWait();
+      await client.query('SELECT pg_advisory_lock($1)', [key]);
+    }
   } catch (error) {
     await client.end().catch(() => undefined);
     throw error;

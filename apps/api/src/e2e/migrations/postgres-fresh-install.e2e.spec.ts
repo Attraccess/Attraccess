@@ -1,9 +1,7 @@
 import { execFile } from 'node:child_process';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { compareSnapshots, rowCounts } from '../../database/transfer/snapshot-compare.test-fixture';
 import { postgresBackend } from '../../database/postgres/postgres-backend';
-import { closeTestDataSource, createTestDataSource } from '../../test-utils/test-database';
 import { entitiesWithoutRows, seedAllEntities } from './fixtures/all-entities-seed.test-fixture';
 import {
   createLifecycleDatabase,
@@ -37,7 +35,11 @@ describe('Fresh PostgreSQL install (e2e)', () => {
       trackNames,
     );
     expect(await recordedMigrations(source)).toEqual(trackNames);
-    expect(trackNames).toEqual(['PostgresBaseline1760000000000', 'PostgresGlobalForms1795700000000']);
+    expect(trackNames).toEqual([
+      'PostgresBaseline1760000000000',
+      'PostgresImportSqlite1760000000001',
+      'PostgresGlobalForms1795700000000',
+    ]);
     expect(postgresBackend.migrationTrack.tableName).toBe('migrations');
     const [{ count }] = await source.query(
       `SELECT COUNT(*)::int AS count FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'migrations'`,
@@ -108,25 +110,32 @@ describe('Fresh PostgreSQL install (e2e)', () => {
     });
   });
 
-  describe('backup and restore of a fully populated database', () => {
-    it('restores every entity into a second fresh database: the export of the copy equals the export of the original', async () => {
+  describe('an existing database created before the SQLite import migration', () => {
+    it('runs the import once as a no-op (no SQLite file) and keeps every row', async () => {
       const source = await lifecycle.open();
       await source.runMigrations();
       await seedAllEntities(source);
       expect(await entitiesWithoutRows(source)).toEqual([]);
+      const tables = async () =>
+        (await source.query(
+          `SELECT table_name AS name FROM information_schema.tables
+            WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' ORDER BY table_name`,
+        )) as { name: string }[];
+      const rowsBefore: Record<string, number> = {};
+      for (const { name } of await tables()) {
+        rowsBefore[name] = (await source.query(`SELECT COUNT(*)::int AS n FROM "${name}"`))[0].n;
+      }
+      // TypeORM runs a pending migration even when a later one is recorded already.
+      await source.query(`DELETE FROM migrations WHERE name = 'PostgresImportSqlite1760000000001'`);
 
-      const snapshot = await postgresBackend.transfer.exportSnapshot(source);
-      const copy = await createTestDataSource();
-      try {
-        await postgresBackend.transfer.importSnapshot(copy, snapshot);
-        const restored = await postgresBackend.transfer.exportSnapshot(copy);
-        // Engine bookkeeping (the migrations table, TypeORM's own metadata with the database name) is not data.
-        expect(compareSnapshots(snapshot, restored)).toEqual([]);
-        expect(restored.sequences).toEqual(snapshot.sequences);
-        expect(rowCounts(restored)).toEqual(rowCounts(snapshot));
-        expect(await copy.query('SELECT conname FROM pg_constraint WHERE NOT convalidated')).toEqual([]);
-      } finally {
-        await closeTestDataSource(copy);
+      const restarted = await lifecycle.open();
+      expect((await restarted.runMigrations()).map((migration) => migration.name)).toEqual([
+        'PostgresImportSqlite1760000000001',
+      ]);
+      expect((await recordedMigrations(restarted)).sort()).toEqual([...trackNames].sort());
+      for (const [name, count] of Object.entries(rowsBefore)) {
+        const [{ n }] = await restarted.query(`SELECT COUNT(*)::int AS n FROM "${name}"`);
+        expect([name, n]).toEqual([name, count]);
       }
     });
   });

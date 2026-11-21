@@ -1,6 +1,6 @@
 # Aktualisierung
 
-<!-- llms-description: So prüfen Sie auf neue Attraccess-Versionen und aktualisieren mit Docker Compose, Docker oder Portainer, legen eine feste Version fest, gehen über 1.11 auf 2.0 und wechseln von SQLite auf PostgreSQL. -->
+<!-- llms-description: So prüfen und installieren Sie Attraccess-Updates mit Docker Compose, Docker oder Portainer, legen eine feste Version fest und ziehen eine 1.x-Installation von SQLite auf PostgreSQL um. -->
 
 So aktualisieren Sie Attraccess auf die neueste Version.
 
@@ -34,116 +34,59 @@ Attraccess läuft jetzt ausschließlich auf PostgreSQL. Das ist ein Breaking Cha
 
 ### Vor dem Upgrade
 
-1. **Seien Sie auf Attraccess 1.11 und starten Sie es einmal** (siehe [Upgrade auf Attraccess 2.0](#upgrade-auf-attraccess-20)). Kommen Sie von einem älteren Release, lehnt die Übernahme Plugin-Daten mit unvollständigem Verlauf ab, und die API startet nicht.
-2. Erstellen Sie ein [Backup](installation/backup-restore.md) des Storage-Volumes (es enthält `attraccess.sqlite`).
-3. **Fügen Sie einen PostgreSQL-Dienst hinzu** und lassen Sie `DATABASE_URL` auf eine leere Datenbank zeigen. Die mitgelieferten Compose-Dateien (Docker Compose, Portainer, Coolify, balena) enthalten bereits einen (`postgres:18.6-alpine`, nicht Teil des Attraccess-Images); siehe [Docker Compose](installation/docker-compose.md) und [Portainer](installation/portainer.md). Haben Sie Attraccess mit einem einfachen `docker run` gestartet, müssen Sie einen PostgreSQL-Container starten und `DATABASE_URL` setzen, **bevor** Sie das neue Image laden, denn die neue Version startet ohne beides nicht.
-4. **Legen Sie den 2.0-Build jedes Plugins mit Daten in den Plugin-Ordner** (`<STORAGE_ROOT>/plugins`), bevor Sie 2.0 zum ersten Mal starten. 2.0 lädt keine 1.x-Builds, und die Übernahme stoppt, wenn die Tabellen eines Plugins Zeilen enthalten, aber kein ladbarer Build davon installiert ist. Attraccess 1.11 kann keine 2.0-Builds installieren; folgen Sie deshalb [Plugins mit Daten](#plugins-mit-daten).
-5. Planen Sie Speicherplatz ein: Die alte SQLite-Datei bleibt nach der Übernahme auf dem Datenträger (siehe unten), neben den neuen PostgreSQL-Daten.
-6. **balena:** Der Stack enthält kein Duplicati mehr; seine Backup-Jobs entfallen. Erstellen Sie vor dem Upgrade ein letztes Duplicati-Backup und setzen Sie danach die `BACKUP_*`-Variablen des neuen [restic-Sidecars](installation/backup-restore.md#balena-restic-sidecar).
+1. **Stoppen Sie die alte Instanz** (jeden Container, der das Storage-Volume nutzt) und erstellen Sie ein [Backup](installation/backup-restore.md) des Storage-Volumes (es enthält `attraccess.sqlite`). Der erste Start migriert die SQLite-Datei an Ort und Stelle; dieses Backup ist deshalb die einzige unveränderte Kopie. Eine 1.x-Instanz, die weiterläuft, würde in eine Datei schreiben, die bereits kopiert wurde.
+2. **Fügen Sie einen PostgreSQL-Dienst hinzu** und lassen Sie `DATABASE_URL` auf eine **leere** Datenbank zeigen. Die mitgelieferten Compose-Dateien (Docker Compose, Portainer, Coolify, balena) enthalten bereits einen (`postgres:18.6-alpine`, nicht Teil des Attraccess-Images); siehe [Docker Compose](installation/docker-compose.md) und [Portainer](installation/portainer.md). Haben Sie Attraccess mit einem einfachen `docker run` gestartet, müssen Sie einen PostgreSQL-Container starten und `DATABASE_URL` setzen, **bevor** Sie das neue Image laden, denn die neue Version startet ohne beides nicht.
+3. Planen Sie Speicherplatz ein: Die alte SQLite-Datei bleibt nach dem Import auf dem Datenträger (siehe unten), neben den neuen PostgreSQL-Daten. Der Storage-Ordner und die SQLite-Datei müssen für den Attraccess-Container beschreibbar sein, denn die Datei wird an Ort und Stelle migriert und danach verschoben. Braucht die Datei noch SQLite-Migrationen, beendet eine schreibgeschützte Datei den Start, bevor etwas importiert wird (`attempt to write a readonly database`); andernfalls läuft der Import durch und nur das Verschieben schlägt fehl (siehe [Fehler und Wiederholung](#fehler-und-wiederholung)).
+4. Notieren Sie, wie Ihre Plugins eingerichtet sind. Plugin-Daten werden nicht übernommen (siehe [Plugin-Daten werden nicht übernommen](#plugin-daten-werden-nicht-übernommen)).
+5. **balena:** Der Stack enthält kein Duplicati mehr; seine Backup-Jobs entfallen. Erstellen Sie vor dem Upgrade ein letztes Duplicati-Backup und setzen Sie danach die `BACKUP_*`-Variablen des neuen [restic-Sidecars](installation/backup-restore.md#balena-restic-sidecar).
 
 Setzen Sie nicht `DATABASE_TYPE=sqlite`: Der Start schlägt dann mit einer Meldung fehl, die auf diese Seite verweist.
 
 ### Was beim ersten Start passiert
 
-Enthält das Storage-Verzeichnis `attraccess.sqlite` und ist die PostgreSQL-Datenbank leer, übernimmt Attraccess die Daten, **bevor** es HTTP-Anfragen annimmt, mit Geräten spricht oder Plugins startet:
+Bei jedem Start wartet Attraccess auf PostgreSQL und wendet die ausstehenden Datenbankmigrationen an, **bevor** es die Lizenz prüft, Plugins startet, HTTP-Anfragen annimmt oder mit Geräten spricht. Beim ersten Start von 2.0 sind das:
 
-1. Die SQLite-Datei (mit ihren `-wal`- und `-shm`-Dateien) wird in eine temporäre Arbeitskopie kopiert. **Das Original wird nie verändert.** Eine eingefrorene Kopie der alten SQLite-Migrationen bringt die Arbeitskopie zunächst auf das letzte SQLite-Schema. Plugin-Daten werden nur von 1.11 übernommen (siehe oben).
-2. Die Daten, einschließlich der Tabellen installierter Plugins und ihrer Storage-Versionen, werden in einen neutralen Snapshot gelesen.
-3. Der Snapshot wird in **einer Transaktion** in PostgreSQL importiert. Bezeichner und Sequenzen, UTC-Zeitpunkte und exakte Dezimalwerte bleiben erhalten, und Guthaben werden nicht doppelt angewendet. Fremdschlüssel werden innerhalb der Transaktion geprüft; eine Zeile, die auf eine fehlende Zeile verweist, rollt den gesamten Import zurück. Nach dem Commit vergleicht eine Guthabenprüfung die gespeicherten Guthaben mit den Abrechnungsbuchungen; sie protokolliert nur Warnungen (`Integrity check: …`) und macht die Übernahme nicht rückgängig.
-4. Bei Erfolg wird die Datei in `attraccess.sqlite.migrated-to-postgres-<Zeitstempel>` umbenannt, und das Log zeigt die Zeilenzahl je Tabelle. Die umbenannte Datei wird von Attraccess **aufbewahrt und nie gelöscht**; löschen Sie sie selbst, sobald Sie die Installation geprüft und ein PostgreSQL-Backup haben. Der nächste Start übernimmt nicht erneut.
+1. Die Baseline-Migration legt das PostgreSQL-Schema an, das dem letzten SQLite-Schema entspricht.
+2. Die Import-Migration sucht nach `<STORAGE_ROOT>/attraccess.sqlite`. Ohne die Datei tut sie nichts (eine neue Installation) und protokolliert `No SQLite file at <file>: nothing to import.` Prüfen Sie diese Zeile, wenn Sie einen Import erwartet haben: Der Import läuft nur einmal, ein erster Start ohne die Datei (Volume nicht eingebunden, anderes `STORAGE_ROOT`) hinterlässt also eine leere Installation. Mit der Datei wendet sie zuerst die veröffentlichten SQLite-Migrationen **auf die Datei selbst** an; die Datei wird also an Ort und Stelle verändert.
+3. Sie kopiert jede Kerntabelle in **einer Transaktion** nach PostgreSQL. IDs und Sequenzen bleiben erhalten (neue IDs schließen an die höchste an, die SQLite je vergeben hat), Zeitpunkte werden als UTC gespeichert (eine Zeit ohne Offset gilt als UTC), Dezimalwerte bleiben exakt, JSON bleibt erhalten, und Guthaben werden unverändert übernommen und nicht doppelt verbucht. Fremdschlüssel werden vor dem Commit geprüft.
+4. Nach dem Commit wird die SQLite-Datei beiseitegelegt (siehe unten). Spätere Migrationen, etwa die globalen Formulare, laufen danach wie bei jeder anderen Installation auf den importierten Daten.
 
-Schlägt das Umbenennen nach einer erfolgreichen Übernahme fehl (etwa auf einem schreibgeschützten Storage-Volume), protokolliert die API eine Warnung und startet trotzdem: Die Daten liegen bereits in PostgreSQL. Bei späteren Starts wird die Datei ignoriert, weil PostgreSQL nun Daten enthält. Benennen Sie `attraccess.sqlite` selbst um oder entfernen Sie sie.
+Die Import-Migration läuft nur einmal. Große Installationen brauchen beim ersten Start länger.
 
-Die Logzeilen stammen von `SqliteTransfer`; verfolgen Sie sie mit `docker compose logs -f attraccess`. Große Installationen brauchen beim ersten Start länger.
+### Wohin die SQLite-Datei kommt
+
+Nach einem erfolgreichen Import werden die SQLite-Datei und ihre `-wal`-, `-shm`- und `-journal`-Dateien nach `<STORAGE_ROOT>/sqlite-backup/` verschoben. Eine vorhandene Datei wird nie überschrieben: Existiert `sqlite-backup/attraccess.sqlite` bereits, erhält die neue Datei einen UTC-Zeitstempel im Namen, etwa `attraccess-20261121T093000123Z.sqlite`.
+
+Attraccess **bewahrt die Datei auf und löscht sie nie**. Löschen Sie sie selbst, sobald Sie die Installation geprüft und ein PostgreSQL-Backup haben. Die Datei in `sqlite-backup/` ist die migrierte Datei, nicht das Original: Um zu 1.x zurückzukehren, spielen Sie das Backup des Storage-Volumes ein, das Sie vor dem Upgrade erstellt haben.
+
+### Plugin-Daten werden nicht übernommen
+
+Der Import kopiert nur die Kerntabellen. Tabellen, für die PostgreSQL keine Tabelle hat, also die Tabellen der Plugins, ihre `plugin_migrations_*`-Tabellen und die Verwaltungsdaten des Plugin-Speichers, werden nicht kopiert. Ihre Namen werden einmal als Warnung protokolliert, die auch die Backup-Datei nennt.
+
+Plugins starten auf PostgreSQL deshalb mit leerem Speicher. Installieren Sie ihre 2.0-Builds wie gewohnt und richten Sie sie neu ein; für 1.x gebaute Plugins laden unter 2.0 nicht (siehe [Upgrade auf Attraccess 2.0](plugins/installing-plugins.md#upgrade-auf-attraccess-20)). Die alten Plugin-Daten liegen in der Backup-Datei (und in Ihrem Backup von vor dem Upgrade).
 
 ### Fehler und Wiederholung
 
-Schlägt etwas fehl, wird die PostgreSQL-Transaktion zurückgerollt, die SQLite-Datei bleibt unberührt, und die API beendet sich mit einer klaren Fehlermeldung und einem Link auf diese Seite. Beheben Sie die Ursache und starten Sie erneut: Der nächste Start wiederholt die Übernahme von vorn.
+Schlägt der Import vor dem Commit fehl, wird nichts importiert, die SQLite-Datei bleibt, wo sie ist, und die API beendet sich mit einer Fehlermeldung. Eine Zeile, die sich nicht speichern lässt (ein ungültiger Zeitpunkt, ein gebrochener Fremdschlüssel, eine verletzte Integritätsbedingung), lässt den gesamten Import scheitern; die Meldung nennt die Tabelle, die Zeile (über ihren Schlüssel) und die Spalte oder Integritätsbedingung; ein gebrochener Fremdschlüssel nennt die Bedingung und bis zu fünf betroffene Schlüssel. Andere Werte der Zeile werden nie angezeigt. Korrigieren oder löschen Sie die Zeile in `attraccess.sqlite` (etwa mit dem Werkzeug `sqlite3`, zuerst an einer Kopie) oder melden Sie die Meldung auf GitHub, und starten Sie dann erneut: Der nächste Start wiederholt den Import. Die Datei steht dann womöglich schon auf dem letzten SQLite-Schema; das ist unschädlich. Jede Migration läuft in ihrer eigenen Transaktion, die Baseline bleibt also angewendet; der Import leert die Ausgangsdaten (Seed-Daten) der Baseline, bevor er kopiert.
 
-- **Ein Plugin fehlt.** Enthalten Tabellen eines Plugins Zeilen, ist das Plugin aber nicht installiert oder nicht ladbar (etwa ein 1.x-Build), stoppt die Übernahme, und nichts wird importiert. Die Meldung listet jede solche Tabelle mit ihrer Zeilenzahl auf, gruppiert nach Plugin. Legen Sie den 2.0-Build jedes genannten Plugins in den Plugin-Ordner (siehe [Plugins mit Daten](#plugins-mit-daten)) und starten Sie erneut. Leere Tabellen eines nicht installierten Plugins werden mit einer Warnung übersprungen.
-- **Plugin-Daten von vor 1.11.** Die Übernahme lehnt Plugin-Daten ab, deren 1.x-Migrationen nur teilweise angewendet sind, und die API startet nicht. Die SQLite-Datei bleibt unberührt: Wechseln Sie zurück zum 1.11-Image, starten Sie es einmal und starten Sie dann erneut 2.0.
-- **Zwei Instanzen starten gleichzeitig.** Ein PostgreSQL-Advisory-Lock stellt sicher, dass nur eine übernimmt; die andere wartet.
-- **PostgreSQL enthält bereits Daten.** Ist die Datenbank nicht leer und die SQLite-Datei noch vorhanden, protokolliert Attraccess eine Warnung und übernimmt nichts. Nutzen Sie den manuellen Befehl unten, wenn Sie die Daten ersetzen wollen.
+- **PostgreSQL enthält bereits Benutzer und die SQLite-Datei ist vorhanden.** Der Start schlägt mit einer Fehlermeldung fehl, die die Datei nennt, und nichts wird verändert. Leeren Sie entweder die PostgreSQL-Datenbank (die Datenbank oder ihr Schema löschen und neu anlegen) und starten Sie erneut, oder verschieben Sie die SQLite-Datei aus dem Storage-Ordner, wenn PostgreSQL Ihre Daten bereits enthält. Das passiert auch, wenn ein früherer Start die Datei importiert, aber vor dem Verschieben angehalten hat (das Log zeigt dann `Copied <rows> rows into PostgreSQL (committed).`): PostgreSQL enthält Ihre Daten, verschieben Sie die Datei also nach `<STORAGE_ROOT>/sqlite-backup/`.
+- **Zwei Instanzen starten gleichzeitig.** Die Migrationen laufen unter einem PostgreSQL-Advisory-Lock: Eine Instanz führt sie aus, die andere protokolliert `Waiting for another instance to finish the database migrations...`, wartet und findet danach nichts mehr zu tun.
+- **Das Verschieben der Datei schlägt nach dem Commit fehl** (etwa weil eine Datei namens `sqlite-backup` im Weg ist). Attraccess protokolliert eine Warnung und startet trotzdem: Die Daten liegen bereits in PostgreSQL, und der Import gilt als erledigt, er läuft also nie wieder. Verschieben oder löschen Sie `attraccess.sqlite` (und ihre `-wal`-, `-shm`- und `-journal`-Dateien) selbst.
 
-### Plugins mit Daten
+### Logzeilen, auf die Sie achten sollten
 
-Jedes Plugin, dessen Tabellen Zeilen enthalten, braucht seinen 2.0-Build im Plugin-Ordner, bevor 2.0 zum ersten Mal startet. Installieren Sie ihn auf demselben Weg wie den 1.x-Build: Davon hängen sein Name und damit die Namen seiner Tabellen ab. Ein Plugin aus dem Marktplatz heißt wie sein npm-Paket (etwa `@attraccess/plugin-wago`), ein hochgeladenes Plugin wie der `name` in seiner `plugin.json` (etwa `wago`). Die Befehle unten nutzen Docker Compose; `docker volume ls` zeigt den Namen Ihres Storage-Volumes (etwa `attraccess_attraccess-storage`).
+Verfolgen Sie den Start mit `docker compose logs -f attraccess`. Der Import protokolliert unter `SqliteImport` (englische Meldungen):
 
-**Hochgeladene Plugins (ZIP-Datei).** Entpacken Sie die 2.0-ZIP-Datei in das Storage-Volume. Verschieben Sie vorher den 1.x-Build aus dem Plugin-Ordner. Jedes Plugin ist ein Ordner in `plugins/` mit seiner `plugin.json` auf oberster Ebene:
-
-```bash
-docker compose stop attraccess
-docker run --rm -v <Storage-Volume>:/data -v "$PWD":/zip:ro alpine sh -c '
-  ls /data/plugins
-  mv /data/plugins/<1.x-Ordner> /data/<1.x-Ordner>-1x
-  mkdir /data/plugins/<Name> && unzip /zip/<Plugin>.zip -d /data/plugins/<Name>
-  ls /data/plugins/<Name>/plugin.json'
+```text
+Importing the SQLite database <file> into PostgreSQL...
+Brought the SQLite file to the last SQLite migration (N migration(s) applied).
+Copied <rows> rows into PostgreSQL (committed).
+SQLite import complete: <rows> rows in <n> tables; the SQLite file is at <path>.
+  <table>: <rows>
+Not imported (plugin data and other tables PostgreSQL has no table for): ...
 ```
 
-**Plugins aus dem Marktplatz.** Eine Installation aus dem Marktplatz braucht ein laufendes 2.0. Starten Sie 2.0 einmal ohne die SQLite-Datei, installieren Sie die Plugins und führen Sie die Übernahme dann auf einer leeren Datenbank aus:
-
-1. Stoppen Sie Attraccess 1.11 und legen Sie die SQLite-Datei beiseite:
-
-   ```bash
-   docker compose stop attraccess
-   docker run --rm -v <Storage-Volume>:/data alpine sh -c 'cd /data &&
-     for f in attraccess.sqlite attraccess.sqlite-wal attraccess.sqlite-shm; do
-       if [ -e "$f" ]; then mv "$f" "$f.hold"; fi
-     done'
-   ```
-
-2. Starten Sie 2.0 mit der leeren PostgreSQL-Datenbank. Es startet als neue Installation: Legen Sie im Einrichtungsassistenten einen vorübergehenden Administrator an.
-3. Unter **Einstellungen → Plugins** stehen die 1.x-Plugins mit einem Fehler. Entfernen Sie jedes davon und installieren Sie dann seinen 2.0-Build aus dem Marktplatz.
-4. Stoppen Sie Attraccess (`postgres` läuft weiter), leeren Sie die Datenbank und legen Sie die SQLite-Datei zurück:
-
-   ```bash
-   docker compose stop attraccess
-   docker compose exec -T postgres sh -c 'dropdb -U "$POSTGRES_USER" attraccess && createdb -U "$POSTGRES_USER" attraccess'
-   docker run --rm -v <Storage-Volume>:/data alpine sh -c 'cd /data &&
-     for f in attraccess.sqlite attraccess.sqlite-wal attraccess.sqlite-shm; do
-       if [ -e "$f.hold" ]; then mv "$f.hold" "$f"; fi
-     done'
-   ```
-
-5. Starten Sie Attraccess. Die Übernahme läuft mit den 2.0-Builds. Der vorübergehende Administrator ist weg; Ihre 1.x-Konten sind wieder da.
-
-### Übernahme manuell ausführen
-
-Stoppen Sie zuerst die API (`docker compose stop attraccess`) und führen Sie den Befehl dann in einem einmaligen Container aus:
-
-```bash
-docker compose run --rm attraccess node dist/apps/api/main.js transfer-sqlite [--sqlite <Pfad>] [--force] [--keep]
-```
-
-| Option            | Bedeutung                                                                                                               |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `--sqlite <Pfad>` | Die SQLite-Datei; Standard `<STORAGE_ROOT>/attraccess.sqlite`                                                           |
-| `--force`         | Ersetzt Daten, die schon in der PostgreSQL-Datenbank liegen. Ohne sie wird ein nicht leeres Ziel abgelehnt. Siehe unten |
-| `--keep`          | Benennt die SQLite-Datei nach erfolgreicher Übernahme nicht um                                                          |
-
-`--force` leert vor dem Import **jede** Attraccess-Tabelle der Zieldatenbank, auch das Audit-Log und die Tabellen der Plugins; der Befehl listet die Tabellen auf, die er leert. **Stoppen Sie vorher jede API-Instanz.** Der Befehl verweigert die Ausführung nur, solange gerade eine API-Verbindung offen ist; eine untätige API hat womöglich keine offen, deshalb beweist diese Prüfung nicht, dass die API gestoppt ist. Erstellen Sie vorher ein PostgreSQL-Backup, wenn die Daten darin wichtig sind.
-
-In einem Entwicklungs-Checkout lautet das Gegenstück `pnpm nx run api:transfer-sqlite -- --sqlite <Pfad>`.
-
-## Upgrade auf Attraccess 2.0
-
-Attraccess 2.0 übernimmt die Daten von Plugins (WAGO, Matter, Shelly, Reservierungen und andere) nur vom letzten
-1.x-Release, **Attraccess 1.11**. Aktualisieren Sie in zwei Schritten:
-
-1. Erstellen Sie ein [Backup](installation/backup-restore.md).
-2. Aktualisieren Sie auf Attraccess 1.11 (fixieren Sie das neueste `v1.11.x`-Tag, siehe
-   [Eine feste Version festlegen](#eine-feste-version-festlegen)) und starten Sie es **einmal**, damit jedes Plugin seine
-   Migrationen abschließt. Prüfen Sie unter **Einstellungen → Plugins**, dass alle Plugins laden.
-3. Erstellen Sie ein weiteres Backup, legen Sie die 2.0-Builds Ihrer Plugins bereit (siehe
-   [Plugins mit Daten](#plugins-mit-daten)) und aktualisieren Sie dann auf 2.0.
-
-Überspringen Sie Schritt 2, etwa von 1.10 aus, lehnt die Übernahme die Daten jedes betroffenen Plugins mit einer
-(englischen) Meldung ab, etwa: "Attraccess 2.0 adopts the data of plugin "wago" only from the last 1.x release (1.11)".
-Die API startet nicht. Die SQLite-Datei bleibt unberührt: Wechseln Sie zurück zum 1.11-Image, starten Sie es einmal und
-aktualisieren Sie dann erneut auf 2.0.
-
-Für 1.x gebaute Plugins laden unter 2.0 gar nicht (siehe
-[Upgrade auf Attraccess 2.0](plugins/installing-plugins.md#upgrade-auf-attraccess-20) in der Plugin-Anleitung).
+Auf die Abschlusszeile folgt eine Zeile je Tabelle. Davor protokolliert `DatabaseStartup` die Zeile `Database: PostgreSQL <url> (schema ...)`, ohne das Passwort in der URL.
 
 ## Docker Compose
 
@@ -159,7 +102,7 @@ docker compose up -d
 
 Attraccess führt Datenbankmigrationen automatisch beim Start durch. Innerhalb einer Hauptversion sind keine manuellen
 Schritte nötig. Das Upgrade von 1.x braucht zusätzliche Schritte, siehe
-[Umzug von SQLite auf PostgreSQL](#umzug-von-sqlite-auf-postgresql) und [Upgrade auf Attraccess 2.0](#upgrade-auf-attraccess-20).
+[Umzug von SQLite auf PostgreSQL](#umzug-von-sqlite-auf-postgresql).
 
 ## Klassisches Docker
 

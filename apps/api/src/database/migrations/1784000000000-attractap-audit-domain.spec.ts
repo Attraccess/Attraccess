@@ -1,7 +1,7 @@
 import { DataSource } from 'typeorm';
 import { AttractapAuditDomain1784000000000 } from './1784000000000-attractap-audit-domain';
 
-// The released SQLite migration still runs on the working copy of a 1.x database during the transfer.
+// The released SQLite migration still runs on the SQLite file of an installation before its data moves to PostgreSQL.
 describe('Attractap audit domain rollout (frozen SQLite track)', () => {
   let source: DataSource;
   const migration = new AttractapAuditDomain1784000000000();

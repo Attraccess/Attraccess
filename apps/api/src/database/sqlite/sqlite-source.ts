@@ -1,12 +1,13 @@
 import 'better-sqlite3';
 import { DataSource, DataSourceOptions } from 'typeorm';
 
-/** How long a statement waits for the SQLite write lock. The import path works on a private copy: nobody else writes. */
-export const SQLITE_BUSY_TIMEOUT_MS = 5000;
+/** How long a statement waits for the SQLite write lock. The import runs while the API is not serving: nobody else writes. */
+const SQLITE_BUSY_TIMEOUT_MS = 5000;
 
 /**
- * A plain better-sqlite3 DataSource on one file, for the SQLite -> PostgreSQL transfer only: no entities (the entity
- * library describes the PostgreSQL schema) and no migrations of its own; the caller supplies the frozen track.
+ * A plain better-sqlite3 DataSource on one file, for the SQLite -> PostgreSQL import only
+ * (PostgresImportSqlite1760000000001): no entities (the entity library describes the PostgreSQL schema) and no
+ * migrations of its own; the caller supplies the frozen track.
  */
 export function createSqliteSource(file: string, extra: Partial<DataSourceOptions> = {}): DataSource {
   return new DataSource({
