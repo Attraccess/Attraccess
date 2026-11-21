@@ -1,3 +1,38 @@
+## 2.0.0-beta.1 (2026-11-21)
+
+### 🚀 Features
+
+- ⚠️  replace SQLite with PostgreSQL, automatic transfer on first boot (ATT-584) ([#2248](https://github.com/Attraccess/Attraccess/pull/2248))
+- warn before leaving the flow editor with unsaved changes (ATT-1356) ([#2268](https://github.com/Attraccess/Attraccess/pull/2268))
+- ⚠️  define forms once and apply them to a resource, a group or every resource (ATT-796) ([#2261](https://github.com/Attraccess/Attraccess/pull/2261))
+- **matter:** tabbed administration page under Devices (ATT-997) ([#2259](https://github.com/Attraccess/Attraccess/pull/2259))
+- **status-wall:** live big-screen status walls plugin ([#2278](https://github.com/Attraccess/Attraccess/pull/2278))
+
+### 🩹 Fixes
+
+- short flow node validation errors that stay inside the card (ATT-1352) ([#2267](https://github.com/Attraccess/Attraccess/pull/2267))
+- no console warnings on flow editor pages (React Flow #002, PressResponder) (ATT-1359) ([#2266](https://github.com/Attraccess/Attraccess/pull/2266), [#002](https://github.com/Attraccess/Attraccess/issues/002))
+- configure the license in Settings only, HIL stores it through the API (ATT-584) ([#2273](https://github.com/Attraccess/Attraccess/pull/2273))
+- **attractap:** renew the Wi-Fi association when the server stays unreachable on a live link (ATT-1366) ([#2264](https://github.com/Attraccess/Attraccess/pull/2264))
+- **attractap:** hide Unlatch when the door has no separate unlatch (ATT-1272) ([#2270](https://github.com/Attraccess/Attraccess/pull/2270))
+- **attractap:** answer a refused card once per presentation (ATT-882) ([#2271](https://github.com/Attraccess/Attraccess/pull/2271))
+- **release:** add repository to application-models so npm provenance accepts it (ATT-1384) ([#2276](https://github.com/Attraccess/Attraccess/pull/2276))
+
+### ⚠️  Breaking Changes
+
+- define forms once and apply them to a resource, a group or every resource (ATT-796)  ([#2261](https://github.com/Attraccess/Attraccess/pull/2261))
+  the per-resource form endpoints POST /api/resources/{resourceId}/forms and
+  GET/PUT/DELETE /api/resources/{resourceId}/forms/{formId} are replaced by POST /api/forms and
+  GET/PUT/DELETE /api/forms/{formId}; form bodies need a scope. GET
+  /api/resources/{resourceId}/forms returns ResourceApplicableFormDto[]. Deleting a form keeps
+  its submissions.
+- replace SQLite with PostgreSQL, automatic transfer on first boot (ATT-584)  ([#2248](https://github.com/Attraccess/Attraccess/pull/2248))
+  PostgreSQL is required; SQLite data is migrated automatically on first boot
+
+### ❤️ Thank You
+
+- Jan Jaap @jappyjan
+
 ## 2.0.0-beta.0 (2026-11-20)
 
 ### 🚀 Features
