@@ -37,5 +37,7 @@ export interface PluginReaderResource {
 export interface PluginReaderCardOwner {
   id: number;
   username: string;
+  /** "First Last", or the username when no name is set. */
+  displayName: string;
   isDisabled: boolean;
 }

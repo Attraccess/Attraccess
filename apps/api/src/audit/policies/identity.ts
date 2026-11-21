@@ -51,6 +51,7 @@ export const identityFields: Record<string, (value: unknown) => boolean> = {
   role: (value) => typeof value === 'string' && /^[a-z0-9][a-z0-9-]*$/.test(value),
   field: oneOf(
     'username',
+    'name',
     'email',
     'password',
     'billingFactor',

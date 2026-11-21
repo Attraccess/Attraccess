@@ -11,6 +11,16 @@ export class CsvInviteConfigDto {
   @IsString()
   usernameKey!: string;
 
+  @ApiProperty({ required: false, description: 'CSV column header containing the first name' })
+  @IsOptional()
+  @IsString()
+  firstNameKey?: string;
+
+  @ApiProperty({ required: false, description: 'CSV column header containing the last name' })
+  @IsOptional()
+  @IsString()
+  lastNameKey?: string;
+
   @ApiProperty({
     required: false,
     type: [Number],

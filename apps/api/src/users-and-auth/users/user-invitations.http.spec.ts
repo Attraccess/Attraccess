@@ -112,7 +112,7 @@ describe('user invitation endpoints (HTTP)', () => {
     // the response is the public user shape: the email address is never part of it
     expect(response.body).toEqual([{ id: 7, username: 'alex' }]);
     expect(users.createMany).toHaveBeenCalledWith(
-      [{ email: 'alex@example.com', username: 'alex', row: 1, locale: undefined }],
+      [{ email: 'alex@example.com', username: 'alex', firstName: null, lastName: null, row: 1, locale: undefined }],
       expect.objectContaining({ actor: expect.objectContaining({ id: 1 }) }),
     );
   });

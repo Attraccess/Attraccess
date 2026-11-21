@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
-import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
+import { AuthenticationType, SSOProviderType, type UserAccount } from '@attraccess/application-models';
 import type { TransactionContext } from '../../../../database/transaction-context';
 import { UsersService } from '../../../users/users.service';
 import { AuthService } from '../../auth.service';
@@ -18,6 +18,9 @@ export interface SsoAccountResolutionInput {
   emailVerified: boolean | undefined;
   /** Raw username candidate; passed through `UsersService.buildUsernameFromSSOClaim`. */
   usernameClaim?: string;
+  /** Names the IdP released; an absent or blank claim is undefined and never clears a stored name. */
+  firstName?: string;
+  lastName?: string;
 }
 
 /** Everything a provisioning hook may base its decision on when no account matches the identity. */
@@ -71,7 +74,7 @@ export class SsoAccountResolver {
 
     const boundUserId = await this.authService.findUserIdBySSO(providerType, providerId, subject);
     const boundUser = boundUserId ? await this.usersService.findOne({ id: boundUserId }) : null;
-    if (boundUser) return { user: boundUser, created: false };
+    if (boundUser) return { user: await this.syncNames(boundUser, input), created: false };
 
     const emailTrusted = input.emailVerified !== false;
     const emailOwner = await this.usersService.findOne({ email });
@@ -93,11 +96,30 @@ export class SsoAccountResolver {
     return { user, created: true };
   }
 
+  /** Applies the names the IdP released at this login. Writes only when one changed; a missing claim changes nothing. */
+  private async syncNames(
+    user: UserAccount,
+    claims: Pick<SsoAccountResolutionInput, 'firstName' | 'lastName'>,
+  ): Promise<UserAccount> {
+    const changes: { firstName?: string; lastName?: string } = {};
+    if (claims.firstName && claims.firstName !== user.firstName) changes.firstName = claims.firstName;
+    if (claims.lastName && claims.lastName !== user.lastName) changes.lastName = claims.lastName;
+    if (Object.keys(changes).length === 0) return user;
+    return this.usersService.updateOne(user.id, changes);
+  }
+
   private async createBoundUser(input: SsoAccountResolutionInput, transaction: TransactionContext) {
     const { providerType, providerId, subject, email } = input;
     const username = this.usersService.buildUsernameFromSSOClaim(input.usernameClaim || email, email);
     const user = await this.usersService.createOne(
-      { username, email, externalIdentifier: null, isEmailVerified: input.emailVerified !== false },
+      {
+        username,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        email,
+        externalIdentifier: null,
+        isEmailVerified: input.emailVerified !== false,
+      },
       transaction,
     );
     if (!user) throw new UnauthorizedException();

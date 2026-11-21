@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { formatUserDisplayName } from '@attraccess/shared';
 import { Resource, ResourceMaintenance, ResourceMaintenanceRequest, User } from '@attraccess/database-entities';
 import { MaintenanceRequestStatus, type ResourceMaintenanceRequestRecord } from '@attraccess/application-models';
 import type {
@@ -99,6 +100,7 @@ export class TypeOrmMaintenanceNotificationStore implements MaintenanceNotificat
       id: request.id,
       reason: request.reason,
       createdByUsername: request.createdByUser?.username ?? null,
+      createdByDisplayName: request.createdByUser ? formatUserDisplayName(request.createdByUser) : null,
     };
   }
 

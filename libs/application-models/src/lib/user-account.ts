@@ -21,6 +21,8 @@ export type UserPatch = Partial<
   Pick<
     UserRecord,
     | 'username'
+    | 'firstName'
+    | 'lastName'
     | 'email'
     | 'locale'
     | 'dateTimeLocale'
@@ -41,6 +43,8 @@ export type UserPatch = Partial<
 /** A user to create. The identity arrives normalized (trimmed, lower case). */
 export interface NewUser {
   username: string;
+  firstName?: string | null;
+  lastName?: string | null;
   email: string;
   externalIdentifier: string | null;
   isEmailVerified: boolean;

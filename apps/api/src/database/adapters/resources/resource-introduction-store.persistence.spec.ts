@@ -79,7 +79,14 @@ describe('introduction stores on real PostgreSQL', () => {
 
     const due = await store.listWithRetrainingRule();
     expect(due.map((item) => item.id)).toEqual([created.id]);
-    expect(due[0].receiver).toEqual({ id: userId, username: 'alice', email: 'alice@example.test', locale: 'en' });
+    expect(due[0].receiver).toEqual({
+      id: userId,
+      username: 'alice',
+      firstName: null,
+      lastName: null,
+      email: 'alice@example.test',
+      locale: 'en',
+    });
   });
 
   it('reads retraining targets, last use and the targets of a mass introduction', async () => {

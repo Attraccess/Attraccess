@@ -15,6 +15,7 @@ import { mapEmailSendError } from './email-send-error.util';
 
 import { UsersService } from './users.service';
 import { normalizeEmail } from './accounts/normalize-email';
+import { normalizeUserName, USER_NAME_MAX_LENGTH } from './accounts/normalize-name';
 
 import { plainToInstance } from 'class-transformer';
 
@@ -39,7 +40,14 @@ export class UserInvitationService {
   protected readonly logger = new Logger(UserInvitationService.name);
 
   protected async inviteUsersTransactional(
-    candidates: Array<{ username: string; email: string; locale?: string; roleKey?: string }>,
+    candidates: Array<{
+      username: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      email: string;
+      locale?: string;
+      roleKey?: string;
+    }>,
     options?: { grantAllPermissionsToFirst?: boolean; actor?: AuthenticatedUser },
   ): Promise<UserRecord[]> {
     try {
@@ -107,7 +115,15 @@ export class UserInvitationService {
 
     try {
       const [invited] = await this.inviteUsersTransactional(
-        [{ username: body.username, email: body.email, locale: adminLocale }],
+        [
+          {
+            username: body.username,
+            firstName: body.firstName,
+            lastName: body.lastName,
+            email: body.email,
+            locale: adminLocale,
+          },
+        ],
         { grantAllPermissionsToFirst: true },
       );
 
@@ -201,7 +217,13 @@ export class UserInvitationService {
     file: FileUpload | undefined,
     config: CsvInviteConfigDto,
   ): Promise<{
-    candidates: Array<{ username: string; email: string; row: number }>;
+    candidates: Array<{
+      username: string;
+      firstName: string | null;
+      lastName: string | null;
+      email: string;
+      row: number;
+    }>;
     errors: CsvInviteRowErrorDto[];
     emailRowMap: Map<string, number[]>;
     usernameRowMap: Map<string, number[]>;
@@ -226,6 +248,8 @@ export class UserInvitationService {
     let header: string[] | null = null;
     const candidates: Array<{
       username: string;
+      firstName: string | null;
+      lastName: string | null;
       email: string;
       row: number;
       roleKey?: string;
@@ -292,8 +316,17 @@ export class UserInvitationService {
         }
 
         const roleKey = config.roleKeyColumn ? (rowData[config.roleKeyColumn] ?? '').trim() || undefined : undefined;
+        const firstName = this.readCsvName(rowData, config.firstNameKey, 'firstName', rowNumber, rowErrors);
+        const lastName = this.readCsvName(rowData, config.lastNameKey, 'lastName', rowNumber, rowErrors);
+        if (rowErrors.length) {
+          errors.push(...rowErrors);
+          continue;
+        }
+
         candidates.push({
           username: normalizedUsername,
+          firstName,
+          lastName,
           email,
           row: rowNumber,
           roleKey,
@@ -308,7 +341,7 @@ export class UserInvitationService {
       throw new BadRequestException('MISSING_HEADER_ROW');
     }
 
-    const requiredColumns = new Set([config.emailKey, config.usernameKey]);
+    const requiredColumns = new Set([config.emailKey, config.usernameKey, config.firstNameKey, config.lastNameKey]);
 
     requiredColumns.forEach((column) => {
       if (column && !header?.includes(column)) {
@@ -317,6 +350,22 @@ export class UserInvitationService {
     });
 
     return { candidates, errors, emailRowMap, usernameRowMap };
+  }
+
+  /** An optional name column: trimmed, blank is null, and no longer than a stored name may be. */
+  private readCsvName(
+    rowData: Record<string, string>,
+    key: string | undefined,
+    field: 'firstName' | 'lastName',
+    rowNumber: number,
+    rowErrors: CsvInviteRowErrorDto[],
+  ): string | null {
+    const value = normalizeUserName(key ? rowData[key] : undefined);
+    if (value !== null && value.length > USER_NAME_MAX_LENGTH) {
+      rowErrors.push({ row: rowNumber, field, message: 'TOO_LONG', value });
+      return null;
+    }
+    return value;
   }
 
   protected validateCsvIdentity(

@@ -8,6 +8,12 @@ export class UserSummaryDto {
 
   @ApiProperty()
   username: string;
+
+  @ApiProperty({ type: String, nullable: true })
+  firstName: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  lastName: string | null;
 }
 
 export class PaginatedUserSummariesResponseDto extends PaginatedResponseWithNextPage<UserSummaryDto> {

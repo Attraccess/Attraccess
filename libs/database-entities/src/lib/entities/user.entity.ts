@@ -1,3 +1,4 @@
+import { formatUserDisplayName } from '@attraccess/shared';
 import { ApiProperty } from '@nestjs/swagger';
 
 import { Exclude } from 'class-transformer';
@@ -106,6 +107,19 @@ export class User {
     example: 'johndoe',
   })
   username!: string;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ type: String, nullable: true, description: 'The first name of the user', example: 'Ada' })
+  firstName!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ type: String, nullable: true, description: 'The last name of the user', example: 'Lovelace' })
+  lastName!: string | null;
+
+  /** Computed, never stored: "First Last", or the username. Not part of API responses (plugins read it). */
+  get displayName(): string {
+    return formatUserDisplayName(this);
+  }
 
   @Column({ unique: true, type: 'text' })
   @Exclude()

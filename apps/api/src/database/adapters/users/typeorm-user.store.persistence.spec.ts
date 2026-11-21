@@ -70,6 +70,9 @@ describe('user store on real PostgreSQL', () => {
       const saved = await store.insertUsers([aNewUser('first'), aNewUser('second', { locale: 'de' })]);
 
       expect(saved.map((user) => user.username)).toEqual(['first', 'second']);
+      expect(saved[0]).toMatchObject({ firstName: null, lastName: null });
+      const [named] = await store.insertUsers([aNewUser('named', { firstName: 'Ada', lastName: 'Lovelace' })]);
+      expect(named).toMatchObject({ firstName: 'Ada', lastName: 'Lovelace' });
       expect(saved[1]).toMatchObject({
         email: 'second@example.com',
         locale: 'de',
@@ -224,6 +227,29 @@ describe('user store on real PostgreSQL', () => {
       expect(await names({ roleId: ids['viewer'] })).toEqual(['alice', 'bob']);
       expect(await names({ roleId: ids['viewer'], search: 'ali' })).toEqual(['alice']);
       expect(await names({ search: 'ARO' })).toEqual(['carol']);
+    });
+
+    it('finds users by first name, last name and both on the plain and the filtered path', async () => {
+      await store.updateUser(ids['bob'], { firstName: 'Ada', lastName: 'Lovelace' });
+      await store.updateUser(ids['carol'], { firstName: 'Grace', lastName: null });
+      expect(await names({ search: 'ada' })).toEqual(['bob']);
+      expect(await names({ search: 'LOVE' })).toEqual(['bob']);
+      expect(await names({ search: 'ada lov' })).toEqual(['bob']);
+      expect(await names({ search: 'grace' })).toEqual(['carol']);
+      expect(await names({ search: 'bob' })).toEqual(['bob']);
+      // the filtered path (emailVerified makes the query use role and provider filters)
+      expect(await names({ search: 'ada lov', emailVerified: false })).toEqual(['bob']);
+      expect(await names({ search: 'lovelace', emailVerified: true })).toEqual([]);
+      expect(await names({ search: 'alice', emailVerified: true })).toEqual(['alice']);
+    });
+
+    it('sorts by display name, case-insensitively, then by id', async () => {
+      await store.updateUser(ids['alice'], { firstName: 'zed', lastName: 'Zimmer' });
+      await store.updateUser(ids['dave'], { firstName: 'Anna', lastName: null });
+      await store.updateUser(ids['carol'], { firstName: '  ', lastName: null });
+      // dave = "Anna", bob = "bob", carol (blank names) = "carol", alice = "zed Zimmer"
+      expect(await names()).toEqual(['dave', 'bob', 'carol', 'alice']);
+      expect(await names({ emailVerified: false })).toEqual(['dave', 'bob', 'carol']);
     });
 
     it('folds the email search term in JavaScript, including non-ASCII letters', async () => {
@@ -432,7 +458,12 @@ describe('user store on real PostgreSQL', () => {
         expiresAt: new Date(Date.now() + 60_000),
         requestedAt: new Date(),
       });
-      await store.updateUser(user.id, { emailVerificationToken: 'v', passwordResetToken: 'p' });
+      await store.updateUser(user.id, {
+        emailVerificationToken: 'v',
+        passwordResetToken: 'p',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+      });
 
       expect(await store.anonymizeUser(user.id, identity)).toEqual({ outcome: 'anonymized', locale: 'en' });
 
@@ -446,6 +477,8 @@ describe('user store on real PostgreSQL', () => {
         ...identity,
         isEmailVerified: false,
         externalIdentifier: null,
+        firstName: null,
+        lastName: null,
         emailVerificationToken: null,
         passwordResetToken: null,
         deleteAccountToken: 'hashed',

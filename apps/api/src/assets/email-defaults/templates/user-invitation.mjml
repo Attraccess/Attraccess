@@ -1,6 +1,6 @@
 <mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">
   <mj-column>
-    <mj-text padding="0 0 12px 0">{{t 'greeting' 'Hello {name},' name=user.username}}</mj-text>
+    <mj-text padding="0 0 12px 0">{{t 'greeting' 'Hello {name},' name=user.displayName}}</mj-text>
     <mj-text padding="0 0 24px 0">
       {{t 'body' 'You have been invited to join Attraccess. Accept your invitation to get started.'}}
     </mj-text>

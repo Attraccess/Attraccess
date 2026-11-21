@@ -24,13 +24,24 @@ export function applyUserListFilters(query: SelectQueryBuilder<User>, options: U
   if (options.search) {
     query.andWhere(
       new Brackets((where) =>
-        where.where('LOWER(user.username) LIKE LOWER(:search)').orWhere('LOWER(user.email) LIKE :emailSearch'),
+        where
+          .where('LOWER(user.username) LIKE LOWER(:search)')
+          .orWhere('LOWER(user.email) LIKE :emailSearch')
+          .orWhere('LOWER(user.firstName) LIKE LOWER(:search)')
+          .orWhere('LOWER(user.lastName) LIKE LOWER(:search)')
+          .orWhere(`LOWER(${FULL_NAME_SQL}) LIKE LOWER(:search)`),
       ),
       // Emails are stored lower-cased, so the email term is trimmed and lower-cased like the stored value.
       { search: `%${options.search}%`, emailSearch: `%${options.search.trim().toLowerCase()}%` },
     );
   }
 }
+
+/** "First Last" of the user, as the display name joins it (null names and blanks are skipped). */
+const FULL_NAME_SQL = `NULLIF(TRIM(CONCAT_WS(' ', user.firstName, user.lastName)), '')`;
+
+/** The sort key of a user: the display name, case-insensitively. */
+export const USER_DISPLAY_NAME_SORT_SQL = `LOWER(COALESCE(${FULL_NAME_SQL}, user.username))`;
 
 function applyRoleFilters(query: SelectQueryBuilder<User>, options: UserListQuery): void {
   const requestedRoleIds = options.roleIds ?? (options.roleId === undefined ? undefined : [options.roleId]);

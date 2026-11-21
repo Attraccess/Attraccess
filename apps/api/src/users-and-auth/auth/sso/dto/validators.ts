@@ -82,3 +82,20 @@ export function IsRolePathList(options?: ValidationOptions) {
     });
   };
 }
+
+/** A single claim path (OIDC) or attribute key (SAML) of a name: a safe, trimmed, non-empty string. */
+export function IsNameClaimPath(options?: ValidationOptions) {
+  return function (object: object, propertyName: string) {
+    registerDecorator({
+      name: 'isNameClaimPath',
+      target: object.constructor,
+      propertyName,
+      options: { message: `${propertyName} must be a trimmed, non-empty claim path`, ...options },
+      validator: {
+        validate(value: unknown) {
+          return value === null || value === undefined || isValidRolePath(value);
+        },
+      },
+    });
+  };
+}

@@ -6,6 +6,8 @@ import type { NotificationRecipient } from './notification-recipient';
 export interface ResourceActorUser {
   id: number;
   username: string;
+  firstName: string | null;
+  lastName: string | null;
   locale: string;
   dateTimeLocale: string | null;
   isEmailVerified: boolean;

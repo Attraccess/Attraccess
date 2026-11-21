@@ -259,6 +259,22 @@ describe('plugin host data adapter on a real database', () => {
       expect((await users.getUsernames([])).size).toBe(0);
     });
 
+    it('reads display names: the name when set, the username otherwise', async () => {
+      const users = hostData().users;
+      expect([...(await users.getDisplayNames([ids.active, ids.disabled, ids.deleted]))]).toEqual([
+        [ids.active, 'ada'],
+        [ids.disabled, 'off'],
+      ]);
+      await source.getRepository(User).update({ id: ids.active }, { firstName: ' Ada ', lastName: 'Lovelace' });
+      try {
+        expect([...(await users.getDisplayNames([ids.active]))]).toEqual([[ids.active, 'Ada Lovelace']]);
+        expect([...(await users.getUsernames([ids.active]))]).toEqual([[ids.active, 'ada']]);
+      } finally {
+        await source.getRepository(User).update({ id: ids.active }, { firstName: null, lastName: null });
+      }
+      expect((await users.getDisplayNames([])).size).toBe(0);
+    });
+
     it('treats deleted and disabled accounts as inactive', async () => {
       const users = hostData().users;
       expect(await users.isActive(ids.active)).toBe(true);

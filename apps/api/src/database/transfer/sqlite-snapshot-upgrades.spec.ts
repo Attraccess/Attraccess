@@ -44,7 +44,15 @@ describe('upgradeSqliteSnapshot', () => {
   });
 
   it('leaves other tables, a form table that already has the columns and an existing override table alone', () => {
-    const user = { name: 'user', columns: [{ name: 'id', kind: 'integer' as const }], rows: [[1]] };
+    const user = {
+      name: 'user',
+      columns: [
+        { name: 'id', kind: 'integer' as const },
+        { name: 'firstName', kind: 'text' as const },
+        { name: 'lastName', kind: 'text' as const },
+      ],
+      rows: [[1, null, null]],
+    };
     const form = {
       name: 'form',
       columns: [

@@ -54,6 +54,8 @@ export function toUserSummary(user: User): BillingUserSummary {
   return {
     id: user.id,
     username: user.username,
+    firstName: user.firstName,
+    lastName: user.lastName,
     locale: user.locale,
     dateTimeLocale: user.dateTimeLocale,
     isEmailVerified: user.isEmailVerified,
@@ -106,6 +108,8 @@ export function toUsageReceipt(row: BillingTransaction): UsageReceiptSource {
       ? {
           id: row.user.id,
           username: row.user.username,
+          firstName: row.user.firstName,
+          lastName: row.user.lastName,
           email: row.user.email,
           locale: row.user.locale,
           creditBalance: row.user.creditBalance,

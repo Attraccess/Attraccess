@@ -2,6 +2,8 @@
 export interface AttractapCardOwner {
   id: number;
   username: string;
+  firstName: string | null;
+  lastName: string | null;
   email: string;
   locale: string;
   dateTimeLocale: string | null;

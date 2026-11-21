@@ -41,6 +41,8 @@ import { ChangeEmailDto } from './dtos/changeEmail.dto';
 
 import { ChangeUsernameDto } from './dtos/changeUsername.dto';
 
+import { ChangeNameDto } from './dtos/changeName.dto';
+
 import { SetUserPasswordDto } from './dtos/setUserPassword.dto';
 
 import { mapEmailSendError } from './email-send-error.util';
@@ -173,7 +175,7 @@ export class UsersAdminController {
       ...result,
       data: canReadUsers
         ? result.data.map(toUserAccountDto)
-        : result.data.map(({ id, username }) => ({ id, username })),
+        : result.data.map(({ id, username, firstName, lastName }) => ({ id, username, firstName, lastName })),
       nextPage: computeNextPage(result.page, result.limit, result.total),
     };
   }
@@ -220,6 +222,19 @@ export class UsersAdminController {
     return toUserAccountDto(
       await this.administration.changeUsername(id, body.username, request.user, auditOriginOf(request)),
     );
+  }
+
+  @Patch(':id/name')
+  @Auth('users.update')
+  @ApiOperation({ summary: "Admin: Change a user's first and last name", operationId: 'changeUserName' })
+  @ApiResponse({ status: 200, description: 'Name changed.', type: UserDto })
+  @ApiResponse({ status: 403, description: 'The identity provider manages the name of SSO users.' })
+  async changeUserName(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: ChangeNameDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<UserDto> {
+    return toUserAccountDto(await this.administration.changeName(id, body, auditOriginOf(request)));
   }
 
   @Patch(':id/email')

@@ -12,6 +12,21 @@ interface AddedColumns {
  * gave existing rows, and added tables are empty.
  */
 const ADDED_COLUMNS: readonly AddedColumns[] = [
+  // PostgresUserNames1796000000000 (ATT-1385): SQLite users have no names.
+  {
+    table: 'user',
+    columns: [
+      { name: 'firstName', kind: 'text', value: null },
+      { name: 'lastName', kind: 'text', value: null },
+    ],
+  },
+  ...['sso_provider_oidc_configuration', 'sso_provider_saml_configuration'].map((table) => ({
+    table,
+    columns: [
+      { name: 'firstNameClaimPath', kind: 'text' as const, value: null },
+      { name: 'lastNameClaimPath', kind: 'text' as const, value: null },
+    ],
+  })),
   // PostgresGlobalForms1795700000000 (ATT-796): every SQLite form is a resource form, none is deleted.
   {
     table: 'form',

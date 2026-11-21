@@ -12,6 +12,8 @@ import type { UserContact, UserProfile } from './user-record';
 export interface UsageSessionUser {
   id: number;
   username?: string;
+  firstName?: string | null;
+  lastName?: string | null;
   email?: string | null;
   locale?: string | null;
   billingFactor?: number;

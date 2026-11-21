@@ -286,6 +286,8 @@ describe('area persistence adapters (real PostgreSQL)', () => {
       expect(participants.find((entry) => entry.userId === bob.id)?.recipient).toEqual({
         id: bob.id,
         username: 'msg-bob3',
+        firstName: null,
+        lastName: null,
         email: 'msg-bob3@example.test',
         locale: 'en',
       });
@@ -296,7 +298,10 @@ describe('area persistence adapters (real PostgreSQL)', () => {
       expect(
         (await notifications.findParticipants(id)).find((entry) => entry.userId === bob.id)?.lastNotifiedAt,
       ).toEqual(notifiedAt);
-      expect(await notifications.findUsername(alice.id)).toBe('msg-alice3');
+      expect(await notifications.findDisplayName(alice.id)).toBe('msg-alice3');
+      await source.getRepository(User).update({ id: alice.id }, { firstName: 'Alice', lastName: 'Liddell' });
+      expect(await notifications.findDisplayName(alice.id)).toBe('Alice Liddell');
+      expect(await notifications.findDisplayName(-1)).toBeNull();
     });
   });
 

@@ -13,6 +13,8 @@ export function toUserProfile(user: User): UserProfile {
   return {
     id: user.id,
     username: user.username,
+    firstName: user.firstName ?? null,
+    lastName: user.lastName ?? null,
     locale: user.locale,
     dateTimeLocale: user.dateTimeLocale ?? null,
     isEmailVerified: user.isEmailVerified,
