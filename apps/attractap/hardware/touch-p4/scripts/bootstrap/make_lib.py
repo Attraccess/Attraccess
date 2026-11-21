@@ -181,11 +181,43 @@ def paste_windows(tree, size, pitch):
                          [S('size'), size, size], [S('layers'), S('F.Paste')]])
 
 
+# VCNL4040 proximity sensor, as the converted footprint lies: body 4 x 2 mm, pins 1 to 4 along the bottom from the
+# left. From the datasheet's package drawing: emitter 0.85 mm from the end with pins 4 and 5, 1.2 mm wide; detector
+# 0.55 mm from the end with pins 1 and 8, 1.1 mm wide.
+PROX_BODY = (-2.0, -1.0, 2.0, 1.0)
+PROX_EMITTER, PROX_DETECTOR = (1.15, 0.0, 0.6), (-1.45, 0.0, 0.55)
+
+
+def proximity_sensor_outline(tree):
+    """The converted footprint draws its courtyard along the body and leaves the pads outside it, and has nothing
+    on the fabrication layer. Courtyard around the pads; body, emitter and detector on the fabrication layer."""
+    S = Sym
+    tree[:] = [i for i in tree if not (isinstance(i, list) and i and i[0] == 'fp_line'
+                                       and first(i, 'layer')[1] == 'F.CrtYd')]
+    pads = [(float(first(p, 'at')[1]), float(first(p, 'at')[2]), float(first(p, 'size')[1]) / 2,
+             float(first(p, 'size')[2]) / 2) for p in find(tree, 'pad')]
+    x1, y1, x2, y2 = PROX_BODY
+    cx, cy = max(x + w for x, _y, w, _h in pads) + 0.25, max(y + h for _x, y, _w, h in pads) + 0.25
+    cx, cy = round(max(cx, x2 + 0.25), 2), round(max(cy, y2 + 0.25), 2)
+
+    def box(a, b, c, d, layer, width):
+        for p, q in (((a, b), (c, b)), ((c, b), (c, d)), ((c, d), (a, d)), ((a, d), (a, b))):
+            tree.append([S('fp_line'), [S('start'), *p], [S('end'), *q], [S('layer'), S(layer)], [S('width'), width]])
+
+    box(-cx, -cy, cx, cy, 'F.CrtYd', 0.05)
+    box(x1, y1, x2, y2, 'F.Fab', 0.1)
+    for x, y, r in (PROX_EMITTER, PROX_DETECTOR):
+        tree.append([S('fp_circle'), [S('center'), x, y], [S('end'), x + r, y], [S('layer'), S('F.Fab')],
+                     [S('width'), 0.1]])
+
+
 def fix_footprint(name, text):
     """Repair two habits of the converter: mechanical holes as plated pads, thermal vias without a number."""
     tree = loads(text)
     if name == 'CONN-TH_4P-P3.5-2601-3102':
         fits_wago_250(tree)
+    if name == 'SENSORS-SMD_VCNL4040M3OE':
+        proximity_sensor_outline(tree)
     if name.startswith('QFN-104'):
         paste_windows(tree, P4_PASTE_WINDOW, P4_PASTE_PITCH)
     ep = None
@@ -240,6 +272,7 @@ def main(src):
             sub[:] = [item for item in sub if not (isinstance(item, list) and item and item[0] == 'arc')]
         out.append(s)
     text = dumps(out) + '\n'
+    text = text.replace('CATHODE(SENSOE)', 'CATHODE(SENSOR)')     # a typing error in the VCNL4040's symbol
     # the converted symbols carry no pin types; 'passive' keeps the electrical rule check quiet
     for kind in ('unspecified', 'power_in', 'power_out', 'input', 'output', 'bidirectional'):
         text = text.replace('(pin %s ' % kind, '(pin passive ')

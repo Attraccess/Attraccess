@@ -29,7 +29,7 @@ TEST_POINTS = {
     'TP805': ('GND', 'b'),
     'TP806': ('EN', 'r'), 'TP807': ('BOOT', 'r'), 'TP808': ('TX0', 'r'), 'TP809': ('RX0', 'r'),
     'TP810': ('EN', 'a'), 'TP811': ('BOOT', 'b'), 'TP812': ('TX', 'a'), 'TP813': ('RX', 'b'),
-    'TP814': ('INT', 'l'),
+    'TP814': ('INT', 'l'), 'TP815': ('INT', 'l'),
 }
 
 
@@ -222,6 +222,7 @@ def component_side(S):
     hx, hy = G.HALL
     S.text('DOCK', hx, hy + 2.75, 0.9)
     S.text('ACCEL', 6.0, 45.4, 0.9)
+    S.text('PROX', G.PROX[0], G.PROX[1] + 3.3, 0.9)
     # ---- connectors
     S.text('USB-C', 82.3, 9.2)
     S.text('SERVICE', 82.3, 10.9, 0.9)

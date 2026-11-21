@@ -138,6 +138,7 @@ The reader on the wall with its front, display and board left out. Ethernet is o
 - **Plug length.** The drawing assumes that plug and boot end 30 mm below the jack. A longer boot pushes the bend down and makes it tighter. Common moulded patch cables end 24 to 31 mm below the jack. A slim patch cable (28 AWG, under 4 mm thick) bends tighter and leaves the most room.
 - **Slack.** Leave about 10 cm of cable outside the wall for plugging in. All but about 2 cm of it slides back into the hole when the reader swings shut, so there has to be free space behind the hole: a conduit, a cavity or a box.
 - **Power.** If the board is powered over PoE, the Ethernet cable is the only cable. Otherwise bring two wires out of the same hole to the DC terminal beside the DC jack, or use a barrel plug as shown. A 3.5 mm lead fits through the hole beside the Ethernet cable.
+- **Free plate.** Keep cables, wire slack and labels off the dock's plate just below and left of the magnet's ring, as seen from the front. The reader measures the light that this patch reflects, to know that it is on its dock. A wire lying there changes the reading, and a wire that moves there looks like someone taking the reader off.
 - **Flush-mount box.** A box sits higher than this hole, level with the plug instead of below it. A cable from the box has to run down beside the plug and make a U-turn of at most 19 mm radius inside the reader. Only a thin, very flexible patch cable will do that, and this route is not modelled.
 
 ### Tie the cable down at the bottom exit
@@ -196,6 +197,7 @@ Nothing below has been checked on real parts. Each item can change a step or a p
 - [ ] **Inserts in the PCB bosses.** Their holes reach into the front wall and leave 1.5 mm of it. Check on the first print that the front shows no marks after the inserts are pressed in.
 - [ ] **Display distance and flex.** The frame holds the display 1.5 mm off the PCB; by the panel's drawing the flex allows 2 mm at most (see the case README). Check with the real panel that the stiff parts of the flex lie flat behind the PCB and that the flex reaches its connector.
 - [ ] **Dock magnet.** With the reader hung on the dock the board must report "on the dock", and "off" once it is lifted away. The figures do not show the magnet's ring yet.
+- [ ] **Dock plate and proximity sensor.** The board also measures the infrared light that the dock's plate reflects. What it reads on the dock, with every dock colour in use, and whether light on the case changes it, is not measured yet (see the board's bring-up notes).
 - [ ] **Figures.** The figures show the case before its depth changed: the cap was 1.2 mm deeper. The steps are the same.
 - [ ] **Jack pins behind the display.** Clipped to 1 mm they should clear the display's metal back by 0.5 mm or more. Measure how far the pins of a soldered jack stand out, and check the gap with the display fitted.
 - [ ] **PoE module height.** Assumed 10 mm.

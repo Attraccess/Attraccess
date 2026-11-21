@@ -284,6 +284,25 @@ def tamper_routes(B):
     B.track([p('U703', '1'), p('C713', '1')], '+3V3', w)
 
 
+def proximity_routes(B):
+    """Proximity sensor: the link between its two cathode pins, its supply pins with their capacitors and the
+    interrupt output. The bus pins (lower left) are left to finish_route.py, so nothing fixed runs past them."""
+    p = B.pad
+    u = lambda n: p('U704', str(n))
+    cx = G.PROX[0]
+    # emitter cathode (pin 5) to the driver's pin 2: along the middle of the part, between its two pad rows
+    B.track([u(5), (cx, u(5)[1]), (cx, u(2)[1]), u(2)], 'PROX_K', 0.25)
+    # supply: anode (pin 4) and VDD (pin 3) joined, 100 nF beside pin 3, 10 uF above pin 4
+    c1, c2 = p('C714', '1'), p('C715', '1')
+    B.track([u(4), u(3), c1], '+3V3', 0.25)
+    B.track(dog(u(4), c2), '+3V3', 0.25)
+    # interrupt: left out of pin 6, up to the test point, on to the pull-up
+    tp, r = p('TP815', '1'), p('R707', '2')
+    xi = round(u(6)[0] - 1.06, 3)
+    B.track([u(6), (xi, u(6)[1])] + dog((xi, u(6)[1]), tp)[1:], 'PROX_INT', 0.15)
+    B.track(dog(tp, r, first='d'), 'PROX_INT', 0.15)
+
+
 def buzzer_routes(B):
     """Buzzer and its driver. The coil is between pads 1 (+) and 2 (-), both on the side away from the
     sound port. Pad 1 is next to the series resistor. Pad 2 is on the far side of the part: its

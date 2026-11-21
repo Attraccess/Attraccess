@@ -171,6 +171,12 @@ written procedure for the 24-hour report. The reporting duty applies already.
 - PCB: FR-4 rated V-0 with a UL mark. Ask JLCPCB for it.
 - A supply sold with the reader becomes part of the tested product. Buy one
   with its own report.
+- The proximity sensor (U704) sends infrared light of 940 nm from an LED,
+  not from a laser: the laser standard EN 60825-1 does not apply and the
+  reader needs no laser label. The LED pulses with 200 mA at most, for a
+  millisecond at most and for no more than 1/40 of the time, inside the
+  closed case. Ask the lab whether its edition of the safety standard wants
+  anything on record for it. (Not checked against the standard.)
 - PoE isolation is asked for by the Ethernet standard (1500 V RMS for a
   minute), not by the safety standard, because both sides may be touched. A
   lab testing for CE may not test it; customers expect it. What the board does

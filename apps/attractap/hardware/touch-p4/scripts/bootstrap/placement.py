@@ -319,6 +319,11 @@ def place(B):
     put('C711', 8.3, 41.35, 0)             # 100 nF straight beside the supply pins
     put('C712', 6.9, 43.85, 180)           # 10 uF below, ground pad under the accelerometer's ground pins
     put('R706', 2.75, 41.85, 0)            # address pull-up, level with the accelerometer's SA0 pin
+    px, py = G.PROX
+    put('U704', px, py, 90)                # proximity sensor: emitter end up, bus pins lower left
+    put('C714', px + 2.9, py - 0.54, 0)    # 100 nF beside the supply pin
+    put('C715', px + 1.2, py - 3.5, 180)   # 10 uF above the emitter's anode pin, 3.3 V pad on the right
+    put('R707', px - 1.0, py - 5.65, 0)    # interrupt pull-up above the test point
 
     # ============================================================ test points
     tps = {
@@ -327,6 +332,7 @@ def place(B):
         'TP809': (14.6, 30.6), 'TP810': (3.0, 9.6), 'TP811': (3.0, 12.8), 'TP812': (7.6, 9.6),
         'TP813': (7.6, 12.8),               # 4.6 mm apart: the labels C6_BOOT and C6_RX need that much
         'TP814': (5.75, 38.6),              # accelerometer INT1, straight above its pin 12
+        'TP815': (G.PROX[0] - 1.7, G.PROX[1] - 3.8),   # proximity sensor INT, up and left of its pin 6
     }
     for ref, (x, y) in tps.items():
         put(ref, x, y, 0)

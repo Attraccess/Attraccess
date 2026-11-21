@@ -43,6 +43,7 @@ from routes_board import (
     poe_routes,
     small_links,
     tamper_routes,
+    proximity_routes,
 )
 from routes_mcu import (
     flash_routes,
@@ -89,6 +90,7 @@ def build():
     dc_route(B)
     small_links(B)
     tamper_routes(B)
+    proximity_routes(B)
     buzzer_routes(B)
     phy_fanout(B)
     mcu_escape(B)
@@ -112,6 +114,7 @@ def build():
 STALE_NETS = {'BUZ_P', 'BUZ_N', 'ETH_CT_RX', 'ETH_CT_TX', '+5V_POE'}
 STALE_PARTS = {'R104', 'R105', 'R705', 'L103', 'C117', 'D106', 'D103', 'FB102', 'FB103', 'C408', 'C409',
                'U702', 'U703', 'C711', 'C712', 'C713', 'R706', 'TP814',
+               'U704', 'C714', 'C715', 'R707', 'TP815',
                'D701', 'D702', 'D703', 'D704', 'D705', 'D706', 'D707', 'D708'}
 
 
@@ -127,8 +130,10 @@ def routes_of_session(path):
 
 
 def drop_stale(board):
-    """Remove the autorouter's tracks and vias for STALE_NETS and those in the way of STALE_PARTS."""
-    pads = []
+    """Remove the autorouter's tracks and vias for STALE_NETS and those in the way of STALE_PARTS: of
+    their pads, and of the fixed vias beside their pads (a new part's supply vias from plane_fanout go
+    through every layer, also where the autorouter laid a track on an inner layer)."""
+    pads = []                                     # (net, x1, y1, x2, y2, on every layer, radius)
     for fp in board.GetFootprints():
         if fp.GetReference() not in STALE_PARTS:
             continue
@@ -136,7 +141,14 @@ def drop_stale(board):
             bb = pad.GetBoundingBox()
             x1, y1 = unV(pcbnew.VECTOR2I(bb.GetLeft(), bb.GetTop()))
             x2, y2 = unV(pcbnew.VECTOR2I(bb.GetRight(), bb.GetBottom()))
-            pads.append((pad.GetNetname(), x1, y1, x2, y2, pad.GetAttribute() != pcbnew.PAD_ATTRIB_SMD))
+            pads.append((pad.GetNetname(), x1, y1, x2, y2, pad.GetAttribute() != pcbnew.PAD_ATTRIB_SMD, 0.0))
+    for t in board.GetTracks():
+        if not (t.IsLocked() and t.GetClass() == 'PCB_VIA'):
+            continue
+        x, y = unV(t.GetPosition())
+        if any(pnet == t.GetNetname() and math.hypot(max(x1 - x, 0, x - x2), max(y1 - y, 0, y - y2)) < 1.5
+               for pnet, x1, y1, x2, y2, _through, radius in pads if not radius):
+            pads.append((t.GetNetname(), x, y, x, y, True, pcbnew.ToMM(t.GetWidth(F)) / 2))
     gone = []
     for t in board.GetTracks():
         if t.IsLocked():
@@ -149,10 +161,10 @@ def drop_stale(board):
         (xa, ya), (xb, yb) = (unV(t.GetPosition()),) * 2 if via else (unV(t.GetStart()), unV(t.GetEnd()))
         half = pcbnew.ToMM(t.GetWidth(F) if via else t.GetWidth()) / 2
         n = int(math.hypot(xb - xa, yb - ya) / 0.02) + 1
-        for pnet, x1, y1, x2, y2, through in pads:
+        for pnet, x1, y1, x2, y2, through, radius in pads:
             if pnet == net or not (via or through or t.GetLayer() == F):
                 continue
-            need = max(class_of(net)[0], class_of(pnet)[0]) + half - 1e-3
+            need = max(class_of(net)[0], class_of(pnet)[0]) + half + radius - 1e-3
             if (min(xa, xb) - need > x2 or max(xa, xb) + need < x1 or min(ya, yb) - need > y2 or
                     max(ya, yb) + need < y1):
                 continue

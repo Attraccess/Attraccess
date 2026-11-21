@@ -23,7 +23,7 @@ plus PN532 module of the current readers with one board.
 | PoE (LAN version) | DP9900M-5V isolated module | 802.3af; footprint also takes a Silvertel Ag9905M |
 | Power | DC 12 to 24 V (barrel jack or WAGO push-button terminal), PoE, or USB-C 5 V | each source feeds the 5 V rail through its own diode; 3.3 V buck AP63203. The DC input has a filter towards the supply cable. USB-C is the service port for flashing and debugging |
 | Feedback | 8 RGB LEDs (SK6812MINI-E), buzzer | LEDs shine through the board above and below the NFC area |
-| Tamper detection | LIS2DH12 accelerometer, DRV5032 hall switch | knocks, tilting, and the reader leaving its dock (a magnet in the dock). Hardware only so far; the firmware does not read them yet |
+| Tamper detection | LIS2DH12 accelerometer, VCNL4040 proximity sensor, DRV5032 hall switch | knocks, tilting, and the reader leaving its dock: the proximity sensor measures the infrared light the dock's plate reflects inside the closed case, the hall switch senses a magnet in the dock. Hardware only so far; the firmware does not read them yet |
 
 Two assembly versions come from the same PCB:
 

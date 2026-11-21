@@ -16,7 +16,7 @@ Why the board looks the way it does, and what is still an assumption.
 | DC connectors | barrel jack (5.5 / 2.1 mm) and WAGO 250 push-button terminal in parallel | Plug-in supplies and bare wires from an existing installation both work. The terminal footprint also takes the WAGO 2601 lever terminal, which costs 13 times as much. |
 | Ethernet jack | behind the lower right corner of the display, 51 mm above the lower board edge | A plug with its boot and the cable's bend into the wall need 49 mm below the jack, inside the case. The price: the jack's pins stand out of the display side behind the display. The display sits 1.5 to 2 mm off the board and the pins are clipped (see "Display mounting and flex"). Below the display the jack would need a case 19 mm longer. |
 | USB-C | service port at the board edge next to the MCU | Only used for flashing and debugging, never offered to users. |
-| Tamper detection | an accelerometer and a hall switch facing a magnet in the dock | The accelerometer notices knocks, tilting and tearing off; the hall switch says for certain that the reader has left its dock. Both are read over I2C, because the MCU's four free pins are blocked by capacitors at the pad row. |
+| Tamper detection | an accelerometer, an infrared proximity sensor that looks at the dock's plate, and a hall switch facing a magnet in the dock | The accelerometer notices knocks, tilting and tearing off. The proximity sensor says that the reader has left its dock, and its light path lies inside the closed case, out of reach. The hall switch says the same in a second, simpler way, but a magnet held to the case fools it. All three are read over I2C, because the MCU's four free pins are blocked by capacitors at the pad row. |
 | Wi-Fi antenna | PCB antenna of the module, or external antenna | The ESP32-C6-MINI-1U (U.FL connector) fits the same pads. |
 | Assembly | all parts on one side | The display is taped to the other side; cheaper assembly. |
 
@@ -353,12 +353,13 @@ the Ethernet clock in the cold, look here first.
 
 ## Tamper detection
 
-Two sensors tell the firmware that someone is handling the reader. The firmware
+Three sensors tell the firmware that someone is handling the reader. The firmware
 does not read them yet; this is what it will find.
 
 | Sensor | Part | Detects | How it is read |
 |---|---|---|---|
 | Accelerometer U702 | LIS2DH12TR | knocks and drilling (shock), the reader being swung open or torn off (tilt against the direction it had when installed), falling | I2C0, address 0x19. Its event registers latch, so polling them is enough. INT1 is on test point TP814 (`INT`) |
+| Proximity sensor U704 | VCNL4040M3OE | the reader on or off its dock: it sends infrared pulses (940 nm) into the closed space behind the board and measures what the dock's plate, 13.9 mm away, reflects. It also measures the visible light in that space | I2C0, address 0x60. Proximity and ambient light as 16-bit values. It compares the proximity value with a lower and an upper threshold by itself and latches a flag when the value leaves that band. INT (open drain, 10 kΩ pull-up) is on test point TP815 (`INT`) |
 | Hall switch U703 | DRV5032FA | the reader on or off its dock: a magnet in the dock lies in front of the switch | `DOCK_N` on the IO expander's P6: low on the dock, high off it. The switch samples 20 times a second |
 
 - The magnet is a neodymium disc of 10 x 3 mm (N35 or stronger, magnetised
@@ -370,15 +371,46 @@ does not read them yet; this is what it will find.
   when the two lock screws come out: swinging the bottom out by 20 mm moves the
   switch only 5 mm away. The accelerometer covers that part: the same swing
   tilts the reader by 7 degrees.
-- A second magnet held to the case from outside can keep the switch on. The
-  accelerometer still sees the reader move.
+- A second magnet held to the case from outside can keep the hall switch on.
+  That is why the proximity sensor is there. Its light goes from the board to
+  the dock's plate and back, inside the closed case. To keep its reading where
+  it was while the reader comes off, something would have to stay in front of
+  it at the same distance and with the same brightness, and that needs a hole
+  in the case first.
+- The proximity sensor is at board point (21.6, 52.4), below the serial number
+  field, its emitter at the upper end. The emitter's light ends about 30° off
+  its axis, which is a spot of 7.4 mm radius on the plate. The plate is flat
+  for 9 mm around: the magnet's holder ends 9.4 mm from the middle of the
+  spot, the screw holes and the cables are further away. No cover is in front
+  of the sensor, so off the dock it reads close to zero.
+- How much it reads on the dock depends on the plate's colour and has to be
+  measured. The charts in Vishay's application note give, for a grey card
+  that reflects 18 % and 12.8 mm from the top of the part: about 50, 75 and
+  120 counts at 50, 100 and 200 mA with the shortest pulse (1T), and about
+  400 to 1100 with the longest (8T). By the same charts the reading falls by
+  about a fifth for every 2 mm the reader is lifted. A white plate reflects
+  several times more than the grey card, a plate coloured with carbon black
+  much less. The firmware should store the reading of the mounted reader and
+  report when the reading leaves a band around it.
+- The sensor measures its own pulses and subtracts steady light. The white
+  plastic lets some infrared through, so check on the first unit whether
+  sunlight or a strong lamp on the case moves the reading.
+- The same part measures visible light. The space behind the board is dark
+  while the reader is on its dock, apart from what the status LEDs and the
+  plastic let through. Light there is one more sign of an open case; how dark
+  the closed case is has to be measured too.
+- The hall switch and the magnet stay on revision A as a second, independent
+  way to see the dock. If the proximity sensor proves itself on the first
+  boards, U703 and C713 can be left off and the dock printed without the
+  magnet; nothing else changes.
 - What the hardware does not sense: a cut cable or lost supply (the server
   sees the reader go offline), and the board being taken out of the cap (that
   needs the reader off its dock first).
-- Both sensors are fitted on both versions. Their place, left of the MCU, is
-  15 mm from the middle of the buzzer and 22 mm from the nearest inductor, so that the
-  magnet does not disturb them. Do not move the magnet towards the PoE module,
-  the converter inductors or the NFC matching network.
+- All three sensors are fitted on both versions. The place of accelerometer and
+  hall switch, left of the MCU, is 15 mm from the middle of the buzzer and
+  22 mm from the nearest inductor, so that the magnet does not disturb them. Do
+  not move the magnet towards the PoE module, the converter inductors or the
+  NFC matching network.
 - The buzzer shakes the board at 2.7 kHz. The firmware should ignore the
   accelerometer while it beeps.
 - The MCU's free pins (GPIO27, 48, 53, 54) could not be used: capacitors sit
@@ -422,6 +454,8 @@ Routed by hand (script) and locked:
 - the antenna feeds,
 - the accelerometer's supply, ground and address links (its pads are 0.5 mm
   apart),
+- the proximity sensor's link between its two cathode pins (it runs under the
+  part, between the pad rows), its supply and its interrupt output,
 - the 5 V bus of the top LED row, in the strip between the flex slot and the
   LED windows,
 - the LED data link between the two LED rows, on the inner layer next to the
@@ -533,14 +567,15 @@ Parts at JLCPCB per board, in USD, prices of November 2026:
 The table is from before the design review. The review added parts worth about
 0.3 USD per board (input filter, three resistors, another level shifter) and
 one extended part line, the buzzer resistor. The tamper sensors add about
-1.1 USD per board (accelerometer 0.89, hall switch 0.17, three capacitors, a
-resistor) and two extended part lines; the dock needs a magnet of a few cents.
+2.7 USD per board (accelerometer 0.89, proximity sensor 1.57, hall switch
+0.17, five capacitors, two resistors) and three extended part lines; the dock
+needs a magnet of a few cents.
 
-Once per order JLCPCB adds 3 USD for every extended part line (33 lines on the
-Wi-Fi version, 38 on the Ethernet/PoE version), the setup and stencil fees, the
-bare boards and shipping. On five boards the extended-part fees alone are about
-20 USD per board, so a small prototype order costs far more per board than the
-table shows.
+Once per order JLCPCB adds 3 USD for every extended part line (36 lines on the
+Wi-Fi version, 41 on the Ethernet/PoE version, with the three tamper sensors),
+the setup and stencil fees, the bare boards and shipping. On five boards the
+extended-part fees alone are 22 to 25 USD per board, so a small prototype order
+costs far more per board than the table shows.
 
 The largest lines are the ESP32-P4 (6.15), the PN532 (5.89), the Wi-Fi module
 (4.09) and the flash (2.26); on the Ethernet/PoE version also the PoE module
@@ -640,9 +675,11 @@ display and the connectors. Nothing was built or measured.
   Ethernet plug and cable next to the loop on the lan version.
 - **Wi-Fi range** with the antenna 7 mm from the display's metal back.
 - **Isolation of the PoE side** under a 1500 V test (see "PoE isolation").
-- **Tamper sensors.** Whether the hall switch turns on and lets go at the
-  distances calculated, whether the dock's magnet changes the buzzer's sound,
-  and which accelerometer thresholds tell a knock from a door closing.
+- **Tamper sensors.** What the proximity sensor reads on the dock and off it,
+  with docks of the colours in use, and whether light on the case moves that
+  reading. Whether the hall switch turns on and lets go at the distances
+  calculated, whether the dock's magnet changes the buzzer's sound, and which
+  accelerometer thresholds tell a knock from a door closing.
 - **Hot-plugging a 24 V supply.** The TVS holds the peak below the converter's
   40 V limit by calculation. A 47 uF / 50 V electrolytic capacitor across C117
   would take the stress off the TVS; the board has no place for one.

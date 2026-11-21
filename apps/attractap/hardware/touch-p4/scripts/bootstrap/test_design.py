@@ -1,4 +1,5 @@
 """Checks of the circuit description that need no KiCad. Run: python3 -I scripts/bootstrap/test_design.py"""
+import math
 import os
 import sys
 import unittest
@@ -70,7 +71,14 @@ class DesignTest(unittest.TestCase):
         acc = self.d.parts['U702']
         self.assertEqual((acc.nets['1'], acc.nets['4'], acc.nets['2']), ('I2C0_SCL', 'I2C0_SDA', '+3V3'))
         self.assertEqual({ref for ref, _pin in self.nets[acc.nets['3']]}, {'U702', 'R706'})
-        self.assertEqual({hall.variant, acc.variant}, {''})
+        # proximity sensor: on the touch bus, the two cathode pins joined and on nothing else, emitter
+        # and receiver on 3.3 V, the open-drain interrupt with a pull-up and a test point
+        prox = self.d.parts['U704']
+        self.assertEqual((prox.nets['8'], prox.nets['7'], prox.nets['1']), ('I2C0_SCL', 'I2C0_SDA', 'GND'))
+        self.assertEqual((prox.nets['3'], prox.nets['4']), ('+3V3', '+3V3'))
+        self.assertEqual(sorted(self.nets[prox.nets['2']]), [('U704', '2'), ('U704', '5')])
+        self.assertEqual({ref for ref, _pin in self.nets[prox.nets['6']]}, {'U704', 'R707', 'TP815'})
+        self.assertEqual({hall.variant, acc.variant, prox.variant}, {''})
 
 
 class GeometryTest(unittest.TestCase):
@@ -96,6 +104,13 @@ class GeometryTest(unittest.TestCase):
         front = geometry.JACK_Y + 13.32
         self.assertGreaterEqual(front, geometry.NOTCH_Y)
         self.assertLess(front - geometry.NOTCH_Y, 0.5)
+
+    def test_proximity_sensor_sees_plain_dock_plate(self):
+        # the emitter's light on the dock's plate ends before the holder of the dock's magnet
+        ex, ey = geometry.PROX[0], geometry.PROX[1] + geometry.PROX_EMITTER_DY
+        spot = geometry.DOCK_PLATE * math.tan(math.radians(geometry.PROX_BEAM_DEG))
+        holder = math.hypot(ex - geometry.HALL[0], ey - geometry.HALL[1]) - geometry.MAGNET_RING_R
+        self.assertGreater(holder, spot)
 
     def test_room_for_the_plug(self):
         # plug with boot (30 mm) and the cable's bend into the wall (19 mm for a 5.5 mm cable)

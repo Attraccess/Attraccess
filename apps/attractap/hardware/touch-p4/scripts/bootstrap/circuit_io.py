@@ -223,7 +223,7 @@ def ui(d):
     # GPIO47 has no pull resistor while the MCU is in reset: without this the level shifter's input
     # floats and the LEDs can light up at random during power-up
     d.R('100k', 'LED_DATA', 'GND', desc='LED data low while the MCU is in reset')
-    # Two sensors that tell the firmware when someone handles the reader. (New parts go at the end of
+    # Three sensors that tell the firmware when someone handles the reader. (New parts go at the end of
     # the sheet: the reference designators of the parts above must not change.)
     d.group('Tamper detection')
     # Accelerometer: knocks, tilting, the reader being torn off. On the touch bus; SA0 high gives
@@ -242,6 +242,20 @@ def ui(d):
           {'1': '+3V3', '2': 'DOCK_N', '3': 'GND'},
           lcsc='C140921', mpn='DRV5032FADBZR', desc='Hall switch: output low with the dock magnet present')
     d.C('100n', '+3V3', desc='hall switch')
+    # Proximity sensor: sends infrared pulses across the closed cavity and measures what the dock's plate
+    # throws back (geometry.PROX). The reading drops to almost nothing when the reader leaves the dock,
+    # and nobody can reach into that light path from outside, unlike the hall switch, which a magnet
+    # held against the front keeps quiet. It also measures ambient light: the cavity is dark while it
+    # is closed. On the touch bus at address 0x60, read over I2C; INT (open drain) is on a test point.
+    # Emitter and receiver share the supply; the two cathode pins are joined as the datasheet asks.
+    d.add('U', 'VCNL4040M3OE', 'attractap:VCNL4040M3OE', 'attractap:SENSORS-SMD_VCNL4040M3OE', {
+        '1': 'GND', '2': 'PROX_K', '3': '+3V3', '4': '+3V3', '5': 'PROX_K', '6': 'PROX_INT',
+        '7': 'I2C0_SDA', '8': 'I2C0_SCL',
+    }, lcsc='C142526', mpn='VCNL4040M3OE', desc='Proximity and ambient light sensor, I2C address 0x60')
+    d.C('100n', '+3V3', desc='proximity sensor')
+    # the datasheet asks for 2.2 uF at the emitter's anode; 10 uF is on the parts list already
+    d.C('10u', '+3V3', size='0603', desc='proximity sensor: emitter pulses of up to 200 mA')
+    d.R('10k', '+3V3', 'PROX_INT', desc='proximity sensor interrupt: open drain')
 
 
 def mech(d):
@@ -254,7 +268,7 @@ def mech(d):
         ('UART0_RX', 'RX0', 'mcu'),
         ('C6_EN', 'C6_EN', 'wifi'), ('C6_IO9', 'C6_BOOT', 'wifi'), ('C6_TXD0', 'C6_TX', 'wifi'),
         ('C6_RXD0', 'C6_RX', 'wifi'),
-        ('ACC_INT', 'ACC_INT', 'ui'),
+        ('ACC_INT', 'ACC_INT', 'ui'), ('PROX_INT', 'PROX_INT', 'ui'),
     ):
         d.TP(net, label, sheet=sheet)
     d.group('Mounting holes')

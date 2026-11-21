@@ -89,6 +89,14 @@ MOUNT_HOLES = ((4.0, 3.5), (82.0, 3.5), (17.9, 139.4), (66.3, 117.0))
 # Hall switch U703 that senses the magnet in the dock: the magnet sits in front of this point, on the
 # component side. Free board area away from the buzzer (15 mm) and the inductors (22 mm and more).
 HALL = (12.5, 38.2)
+MAGNET_RING_R = 6.5                         # the dock's holder around the magnet, 3.2 mm high
+# Proximity sensor U704: centre of the part. It looks at the dock's plate, which is flat for 9 mm around this
+# point: past the magnet's holder, the screw holes and the cables. Emitter and detector lie on the part's long
+# axis, which runs up the board; the offsets are from the datasheet's package drawing.
+PROX = (21.6, 52.4)
+PROX_EMITTER_DY, PROX_DETECTOR_DY = -1.15, 1.45
+PROX_BEAM_DEG = 30                          # the emitter's light ends about 30 degrees off its axis
+DOCK_PLATE = 13.9                           # component side to the dock's plate, from the case design
 MOUNT_KEEPOUT_R = 3.3                       # screw head / standoff: no tracks on the outer layers
 
 # The 3.3 V plane (In2) covers the display area and reaches the NFC parts left of the antenna: (x, y) corner

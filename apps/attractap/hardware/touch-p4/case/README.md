@@ -11,7 +11,7 @@ A 3D-printable case for the [Attractap Touch P4 board](../README.md), revision A
 ## How it works
 
 - **Cap**: the front shell. It carries the display, flush with the front, and the board. Eight light windows for the status LEDs, the Attraccess wordmark and a tap ring over the NFC antenna.
-- **Dock**: the back plate. It is screwed to the wall (five holes; the lower pair matches the 60 mm spacing of a flush-mount box) or onto the stand. A ring on its inner face holds a 10 x 3 mm magnet: the board's hall switch senses it, so the reader knows when it is taken off the dock.
+- **Dock**: the back plate. It is screwed to the wall (five holes; the lower pair matches the 60 mm spacing of a flush-mount box) or onto the stand. The board senses the dock in two ways, so the reader knows when it is taken off: a proximity sensor measures the infrared light that the dock's plain inner face reflects, and a hall switch senses a 10 x 3 mm magnet held in a ring on that face.
 - **Stand**: a hollow wedge for the desk. The reader leans back 35°.
 - The cap hooks onto a 45° cleat at the top of the dock, swings shut and is locked by two M3 screws from below. Plugs and cables end up enclosed between cap and dock.
 - A cable either disappears into the wall behind the dock or leaves through a notch at the bottom, where a cable tie on a saddle inside the cap takes the pull off the jack.
@@ -107,6 +107,7 @@ The scripts are plain Python without dependencies; run them with `python3 -I`. T
   - The other way round does not work without a longer case: with the jack below the display its plug room shrinks from 51 to 32 mm, and a cable from the wall would need a plug that ends 12 mm below the jack.
 - **Inserts close to the front face.** With this display and distance only 2.3 mm lie between the board and the front wall. The insert holes of the four PCB bosses are 3.2 mm deep (`pcb_ins_depth`), so they reach 0.9 mm into the 2.4 mm front wall and leave 1.5 mm. Check on the first print that pressing the inserts in does not mark the front.
 - **Dock magnet.** The ring is at X 30.5, Y 10.95 (board point 12.5, 38.2), and the magnet's face is 10.3 mm from the hall switch. By calculation that gives 22 mT, four times what the switch needs. Check on the first board that the switch reads "on the dock" with the reader hung and "off" once it is lifted away. The pocket is 10.2 mm wide for a drop of glue; tune it for the magnets you buy.
+- **Dock plate in front of the proximity sensor.** The board's proximity sensor lights a patch of the dock's inner face around X 21.4, Y -2.1 (board point 21.6, 51.25), 9 mm left of and 13 mm below the magnet's ring as seen from the front. Keep the plate flat there for 9 mm around, 13.9 mm from the board's component side, and free of ribs, holes, cable clips and labels. The sensor's reading depends on the plate's colour: a reader has to store its reference again when it moves to a dock of another colour, and a black dock may reflect too little (not measured yet).
 - **PoE module height.** Assumed 10 mm.
 - **Outdoor use.** There are no seals, the buzzer holes and cable notches are open, and ABS+ ages in sunlight. Treat it as an indoor case.
 

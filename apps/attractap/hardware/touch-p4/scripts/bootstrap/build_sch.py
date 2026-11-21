@@ -88,6 +88,8 @@ NOTES = {
         'pads 3 and 4 only hold the part. R705 keeps the LED data line low while the MCU is in reset.',
         'Tamper: U702 accelerometer on I2C0 at 0x19, events read over I2C (INT1 on TP814). U703 hall switch:',
         'DOCK_N (IO expander P6) is low while the magnet in the dock is in front of it.',
+        'U704 proximity sensor on I2C0 at 0x60: infrared reflection from the dock plate 13.9 mm away, and ambient',
+        'light. Pins 2 and 5 are joined as the datasheet asks. INT is open drain, on TP815.',
     ],
     'mech': [],
 }

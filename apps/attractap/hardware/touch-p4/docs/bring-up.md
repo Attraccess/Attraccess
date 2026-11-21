@@ -139,6 +139,22 @@ when a step fails. Use a current-limited bench supply for the first power-up.
 4. Reader on its dock with the magnet fitted: P6 = 0. Lift it off: P6 = 1.
 5. Sound the buzzer with and without the magnet in front of the board: the
    tone must not change. Watch the accelerometer's output while it sounds.
+6. Proximity sensor (U704, marked `PROX`): it answers at 0x60 and its ID
+   register 0x0C reads 0x0186. Switch the proximity measurement on (16 bit,
+   8T, 100 mA to begin with) and read register 0x08:
+   - board on the bench, component side facing the open room: close to 0;
+   - a sheet of white paper 14 mm in front of it: note the value, then move
+     the sheet 2 mm further and note it again;
+   - reader on its dock, case closed: note the value for every dock colour in
+     use. Lift the reader off: the value must drop to near 0 at once.
+7. With the reader on its dock, shine a strong lamp and, if possible, sunlight
+   on the case from every side. The proximity value must stay where it was.
+   Note the ambient light value (register 0x09) in the closed case with the
+   status LEDs off and at full white, and with the reader off the dock.
+8. Set the two thresholds (registers 0x06 and 0x07) around the value on the
+   dock, interrupt for both directions: TP815 (`INT` next to `PROX`) is high
+   on the dock and goes low when the reader is lifted off. It stays low until
+   the flag register 0x0B is read.
 
 ## Before the test lab
 

@@ -82,7 +82,8 @@ autorouter run:
   import. `build_pcb.py ses` imports the routes only.
 - `build_pcb.py` has two lists, `STALE_NETS` and `STALE_PARTS`. The autorouter's tracks for the nets in
   the first are not taken over; they have fixed routes in `routes_board.py` now. Its tracks that come
-  too close to a pad of a part in the second are removed, and `finish_route.py` routes them again.
+  too close to a pad of a part in the second, or to a fixed via beside such a pad (the supply vias a
+  new part gets go through every layer), are removed, and `finish_route.py` routes them again.
 
 When the autorouter is run again, empty both lists.
 

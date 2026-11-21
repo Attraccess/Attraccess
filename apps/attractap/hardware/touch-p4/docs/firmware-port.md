@@ -70,6 +70,7 @@ All expander pins are inputs with weak pull-ups after power-up.
 | I2C0 (GPIO1/2) | GT911 touch | 0x5D or 0x14 (chosen by INT level at reset) |
 | I2C0 | TCA9554 | 0x20 |
 | I2C0 | LIS2DH12 accelerometer | 0x19 |
+| I2C0 | VCNL4040 proximity and light sensor | 0x60 |
 | I2C1 (GPIO51/52) | PN532 | 0x24 |
 
 The PN532 has a bus of its own. Its address is fixed at 0x24, and on the
@@ -94,7 +95,7 @@ address or when a device has no entry in its address table.
 
 ## Tamper detection
 
-The board has two sensors for this and the firmware does not use them yet.
+The board has three sensors for this and the firmware does not use them yet.
 
 - **Hall switch U703 (DRV5032FA)** on IO expander pin P6, net `DOCK_N`. Leave
   P6 an input. It reads 0 while the magnet in the dock is in front of the
@@ -108,12 +109,36 @@ The board has two sensors for this and the firmware does not use them yet.
   the click detection for knocks, and the 6D or activity function against the
   direction of gravity stored at installation, for the reader being swung open
   or pulled off.
+- **Proximity sensor U704 (VCNL4040)** on I2C0 at 0x60 (ID register 0x0C
+  reads 0x0186). All registers are 16 bits wide, low byte first. It measures
+  the infrared light that the dock's plate reflects and is the sensor to trust
+  for "on the dock": nothing outside the case reaches its light path, while a
+  magnet held to the case keeps `DOCK_N` at 0.
+  - Set-up: `PS_CONF1`/`PS_CONF2` (0x03) for pulse length, repetition and
+    16-bit output, `PS_CONF3`/`PS_MS` (0x04) for the emitter current (50 to
+    200 mA). Proximity value in 0x08. The part powers up with the measurement
+    switched off.
+  - Store the value of the mounted reader as its reference when the reader is
+    commissioned, and write a band around it to `PS_THDL` (0x06) and
+    `PS_THDH` (0x07) with the interrupt set to both directions. The part then
+    checks every measurement itself and latches a flag in `INT_Flag` (0x0B,
+    high byte) when the value leaves the band, so a lift between two polls is
+    not missed. Reading the flag register clears it. INT is on test point
+    TP815 only, not on a GPIO.
+  - The value depends on the dock's colour, so there is no fixed threshold
+    that fits every reader. Off the dock it is close to 0.
+  - Ambient light in 0x09 (`ALS_CONF`, 0x00, switches it on). The space behind
+    the board is dark while the reader is on its dock; treat light there as a
+    hint, not as proof, until it has been measured on real units.
 - The buzzer shakes the board at 2.7 kHz: ignore the accelerometer while it
   sounds and for a few milliseconds after.
 - A reader on the desk stand gets moved; the tilt alarm should be a setting.
 - A reader without a dock magnet reads `DOCK_N` = 1 all the time. The firmware
-  cannot tell that from a removed reader, so the dock state should only count
+  cannot tell that from a removed reader, so the hall switch should only count
   once it has been seen as 0.
+- Suggested rule: the proximity sensor decides whether the reader is on its
+  dock; the hall switch and the accelerometer add detail to the report
+  (lifted off, swung open, knocked).
 
 ## What changes compared with the ESP32-S3 firmware
 
