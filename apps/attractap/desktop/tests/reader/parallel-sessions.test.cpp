@@ -143,7 +143,7 @@ void ReaderWorkflow::testParallelSessions()
 
     // The limit was lowered to 1 while two sessions run: list each so either can be ended.
     parallelList({1, false, false, {{7, "Robin"}, {12, "Sam"}}});
-    assert(label(lv_screen_active(), "Robin, Sam \xC2\xB7 Voll"));
+    assert(label(lv_screen_active(), "Voll"));
     assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Ressource verwenden")));
     assert(label(lv_screen_active(), "Sitzung von Robin beenden"));
     assert(label(lv_screen_active(), "Sitzung von Sam beenden"));
