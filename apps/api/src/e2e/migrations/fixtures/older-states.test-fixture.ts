@@ -125,6 +125,10 @@ const meterRelease: OlderState = {
       `INSERT INTO billing_transaction_item (billingTransactionId, name, unitPrice, quantity, durationMs, meterQuantity,
         meterCreditsPerUnit) VALUES (1, 'Energy (kWh)', 186, 1, 7200000, '12.345678901', 15)`,
     );
+    // A form of this release: PostgresGlobalForms1795700000000 turns it into a resource form after the import.
+    await source.query(
+      `INSERT INTO form (id, name, isRequiredOnResourceUsageStart, resourceId) VALUES (1, 'Safety briefing', 1, 1)`,
+    );
   },
 };
 

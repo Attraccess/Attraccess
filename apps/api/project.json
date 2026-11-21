@@ -331,14 +331,6 @@
         "command": "node apps/api/scripts/reencrypt-card-keys.mjs"
       }
     },
-    "transfer-sqlite": {
-      "executor": "nx:run-commands",
-      "cache": false,
-      "dependsOn": ["build"],
-      "options": {
-        "command": "node --env-file-if-exists=.env dist/apps/api/main.js transfer-sqlite"
-      }
-    },
     "seed-dev": {
       "executor": "nx:run-commands",
       "cache": false,

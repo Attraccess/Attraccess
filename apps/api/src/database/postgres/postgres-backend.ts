@@ -8,7 +8,6 @@ import { parsePostgresConfig, type PostgresConfig } from './postgres-config';
 import { postgresConnectionOptions, createDataSource } from './postgres-connection';
 import { postgresErrorClassifier } from './postgres-errors';
 import { readPostgresPermissionOwners, openPostgresStartupSettings } from './postgres-startup-reads';
-import { createPostgresTransfer } from './postgres-transfer';
 import { createPostgresUnitOfWork } from './postgres-unit-of-work';
 import {
   createPostgresPluginMigrationEngine,
@@ -19,6 +18,11 @@ import {
 const entityList: unknown[] = Object.values(entities);
 
 export const POSTGRES_MIGRATIONS_TABLE = 'migrations';
+/**
+ * One transaction per migration. PostgresImportSqlite1760000000001 owns its transaction: it commits the imported data
+ * before it moves the SQLite file, so a later migration that fails must not roll that data back.
+ */
+export const POSTGRES_MIGRATIONS_TRANSACTION_MODE = 'each' as const;
 
 export const postgresMigrationTrack: MigrationTrack = {
   name: 'postgres',
@@ -64,6 +68,7 @@ function createDataSourceOptions(): DataSourceOptions {
     ...postgresConnectionOptions(configuration()),
     migrations: [...postgresMigrations],
     migrationsTableName: POSTGRES_MIGRATIONS_TABLE,
+    migrationsTransactionMode: POSTGRES_MIGRATIONS_TRANSACTION_MODE,
     // Providers access database-backed settings while Nest constructs AppModule.
     migrationsRun: true,
     entities: entityList,
@@ -86,7 +91,6 @@ export const postgresBackend: TypeOrmDatabaseBackend = {
     readPermissionOwners: () => readPostgresPermissionOwners(createDataSourceOptions()),
     openStartupSettings: () => openPostgresStartupSettings(createDataSourceOptions()),
   },
-  transfer: createPostgresTransfer(postgresMigrationTrack),
   // The pool serves every statement; there are no companion connections to instrument.
   onCompanionConnection: () => undefined,
   async shutdown(): Promise<void> {

@@ -19,9 +19,8 @@ import type { EntityManager } from 'typeorm';
  * - 584_501: plugin transactions and writes without scope, per plugin (`postgres/plugin-storage/postgres-storage-sessions.ts`,
  *   two keys, `hashtext(<plugin name>)` second)
  * - 584_601: MCP OAuth client registration (`adapters/mcp/typeorm-mcp-oauth.store.ts`, one key)
- * - 584_584: SQLite transfer (`postgres/postgres-advisory-lock.ts`, session-level, one key)
- * - 584_585: core migrations at startup and before a transfer (`postgres/postgres-advisory-lock.ts`, session-level,
- *   one key; taken after 584_584 when both are held)
+ * - 584_585: core migrations at startup, the SQLite import included (`postgres/postgres-advisory-lock.ts`,
+ *   session-level, one key)
  * - hashed keys: `hashtext('resource_usage_single_active')` + resource id in the usage integrity trigger
  *   (`postgres/migrations/baseline/triggers.ts`); `hashtextextended('attraccess:plugin-storage:<versions table>', 0)`
  *   in the plugin storage migrations (`postgres/plugin-storage/postgres-storage-migration-driver.ts`)
