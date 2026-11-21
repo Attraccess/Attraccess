@@ -68,9 +68,11 @@ export function UserNameFormView({
           {t(isAdminView ? 'ssoManagedAdmin' : 'ssoManaged')}
         </p>
       ) : (
-        <Button type="submit" variant="primary" isPending={isPending} isDisabled={isLoading}>
-          {t('save')}
-        </Button>
+        <div className={isAdminView ? 'flex w-full justify-end' : undefined}>
+          <Button type="submit" variant="primary" isPending={isPending} isDisabled={isLoading}>
+            {t('save')}
+          </Button>
+        </div>
       )}
     </form>
   );

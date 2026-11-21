@@ -11,7 +11,7 @@ Use the search box to find a setting, then open its row to make changes. Setting
 ### Change Your Name
 
 1. Navigate to **My Account**
-2. Open **Personal details** and find the **Name** form
+2. Open **Personal details** and find the **First name** and **Last name** fields
 3. Enter your first and last name (both optional, at most 100 characters each)
 4. Save the changes
 

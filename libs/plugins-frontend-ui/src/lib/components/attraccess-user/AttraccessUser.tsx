@@ -67,7 +67,7 @@ export function AttraccessUser({
   const isInteractive = interactive && !!user && !!startDirectMessage;
 
   const avatar = (
-    <Avatar>
+    <Avatar className="shrink-0">
       {avatarIcon ? <AvatarImage src={avatarIcon} alt={name} /> : null}
       <AvatarFallback color={isDeleted ? 'warning' : undefined}>
         {isDeleted ? <AlertTriangleIcon className="w-4 h-4" /> : user ? getUserInitials(user) : ''}
@@ -78,15 +78,16 @@ export function AttraccessUser({
   const userInfoAndAvatar = (
     <div className={`flex items-center gap-2 ${className ?? ''}`}>
       {avatar}
-      <div className="flex flex-col">
+      <div className="flex min-w-0 flex-col">
         <div className="flex flex-row items-center gap-1">
-          <span className="text-sm font-medium group-hover:underline">{isDeleted ? <del>{name}</del> : name}</span>
+          {/* A long name wraps, also inside a word, instead of pushing its table or list wider than the screen. */}
+          <span className="text-sm font-medium [overflow-wrap:anywhere] group-hover:underline">{isDeleted ? <del>{name}</del> : name}</span>
           {isInteractive && (
             <ChevronDownIcon className="h-3 w-3 text-muted-foreground shrink-0" aria-hidden="true" focusable="false" />
           )}
         </div>
         {secondaryUsername && !description && (
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
             {isDeleted ? <del>{secondaryUsername}</del> : secondaryUsername}
           </span>
         )}

@@ -22,6 +22,8 @@ export function oidcFormValues(
     clientId: config.clientId ?? '',
     // The API never returns the client secret; it is only sent when changed.
     clientSecret: '',
+    firstNameClaimPath: config.firstNameClaimPath ?? '',
+    lastNameClaimPath: config.lastNameClaimPath ?? '',
     permissionSyncTtlMinutes: config.permissionSyncTtlMinutes ?? null,
   };
 }
@@ -44,6 +46,8 @@ export function samlFormValues(
     wantAssertionsSigned: config.wantAssertionsSigned ?? false,
     wantAuthnResponseSigned: config.wantAuthnResponseSigned ?? true,
     forceAuthn: config.forceAuthn ?? false,
+    firstNameClaimPath: config.firstNameClaimPath ?? '',
+    lastNameClaimPath: config.lastNameClaimPath ?? '',
     provisioningSecret: '',
     spSigningCertificate: config.spSigningCertificate ?? '',
     spSigningPrivateKey: '',

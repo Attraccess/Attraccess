@@ -33,6 +33,10 @@
       "title": "Konfiguration fehlt",
       "description": "Bitte CSV-Datei auswählen und E-Mail- sowie Benutzername-Spalten zuordnen."
     },
+    "fields": {
+      "firstName": "Vorname",
+      "lastName": "Nachname"
+    },
     "reasons": {
       "DUPLICATE_IN_DB": "Wird bereits von einem bestehenden Konto verwendet",
       "DUPLICATE_IN_CSV": "Kommt mehrfach in der Datei vor",

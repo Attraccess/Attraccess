@@ -100,6 +100,8 @@ describe('CsvInvite', () => {
       getCsvRowErrorReasonKey(missingColumn),
       'inputs.fieldMapping.email',
       'inputs.fieldMapping.username',
+      'errors.fields.firstName',
+      'errors.fields.lastName',
     ];
 
     keys.forEach((key) => expect(translate(translations, key as string), key).toBeTruthy());

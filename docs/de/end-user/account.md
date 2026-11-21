@@ -11,7 +11,7 @@ Suchen Sie eine Einstellung über das Suchfeld und öffnen Sie dann den zugehör
 ### Namen ändern
 
 1. Navigieren Sie zu **Mein Konto**
-2. Öffnen Sie **Persönliche Daten** und finden Sie das Formular **Name**
+2. Öffnen Sie **Persönliche Daten** und finden Sie die Felder **Vorname** und **Nachname**
 3. Geben Sie Vor- und Nachname ein (beide optional, höchstens 100 Zeichen)
 4. Speichern Sie die Änderungen
 
