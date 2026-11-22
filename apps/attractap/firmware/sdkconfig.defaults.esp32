@@ -4,6 +4,7 @@
 
 # --- Board: ESP32-D0WD (WROOM-32U), 4 MB flash ---
 CONFIG_IDF_TARGET="esp32"
+# DIO at 40 MHz, the flash mode the bridge images are built and hardware-tested with (the S3 uses QIO/80 MHz).
 CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
 CONFIG_ESPTOOLPY_FLASHFREQ_40M=y
 CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
@@ -45,6 +46,7 @@ CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=5
 # Caps on the dynamic buffers (allocated per frame): limit the peak a burst can take from the heap.
 CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=12
 CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM=12
+# Management short buffers (scan results, association frames): 12 is enough for one STA and a setup scan.
 CONFIG_ESP_WIFI_MGMT_SBUF_NUM=12
 # TX aggregation holds frames for a block ack; the bridge never sends enough to gain from it.
 # CONFIG_ESP_WIFI_AMPDU_TX_ENABLED is not set
@@ -72,11 +74,13 @@ CONFIG_BT_NIMBLE_MSYS_2_BLOCK_COUNT=12
 # Controller-to-host ACL buffers 10x255 (was 24) and HCI event buffers 16x70 (was 30): -4 KB.
 CONFIG_BT_NIMBLE_TRANSPORT_ACL_FROM_LL_COUNT=10
 CONFIG_BT_NIMBLE_TRANSPORT_EVT_COUNT=16
+# Filter accept list: the proxy filters in software and the setup accepts anyone, so two entries suffice.
 CONFIG_BT_NIMBLE_WHITELIST_SIZE=2
 # Bluetooth setup (src/bridge/provisioning): a GATT server the web app writes the setup commands to. Peripheral
 # role and LE Secure Connections pairing (Just Works), so the Wi-Fi password never crosses the air in clear text.
 # No legacy pairing, no signed writes, no stored bonds: every setup window pairs anew under a new random address.
 CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
+# Broadcaster: the setup advertises its service and name so the browser can find it.
 CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
 CONFIG_BT_NIMBLE_SECURITY_ENABLE=y
 # CONFIG_BT_NIMBLE_SM_LEGACY is not set
