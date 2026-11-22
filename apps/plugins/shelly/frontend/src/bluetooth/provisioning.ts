@@ -1,8 +1,8 @@
 // The setup steps run over an RPC connection. Nothing here stores, logs or
 // returns the Wi-Fi or admin password beyond handing it to the device.
 import { computeHa1 } from './digest';
-import { SetupStepError, type SetupStep } from './errors';
-import type { RpcCaller, ShellyBleRpc } from './rpc';
+import { JoinTimeoutError, RpcError, SetupStepError, type SetupStep } from './errors';
+import type { AuthenticatingRpc, RpcCaller } from './rpc';
 
 export const ADMIN_USERNAME = 'admin';
 
@@ -52,7 +52,7 @@ export async function scanWifi(rpc: RpcCaller): Promise<WifiNetwork[]> {
 }
 
 /** Sets the admin password with the ha1 computed here; the plain password never leaves the browser. */
-export async function setAdminPassword(rpc: ShellyBleRpc, info: BleDeviceInfo, password: string): Promise<void> {
+export async function setAdminPassword(rpc: AuthenticatingRpc, info: BleDeviceInfo, password: string): Promise<void> {
   const ha1 = await computeHa1(ADMIN_USERNAME, info.id, password);
   await rpc.call('Shelly.SetAuth', { user: ADMIN_USERNAME, realm: info.id, ha1 });
   rpc.setCredentials(ADMIN_USERNAME, password);
@@ -74,13 +74,6 @@ export interface JoinOptions {
   now?: () => number;
 }
 
-export class JoinTimeoutError extends Error {
-  constructor(public readonly lastStatus: string) {
-    super(`The device did not get an IP address (last status: ${lastStatus})`);
-    this.name = 'JoinTimeoutError';
-  }
-}
-
 export async function waitForIp(rpc: RpcCaller, options: JoinOptions = {}): Promise<string> {
   const { timeoutMs = 60_000, pollIntervalMs = 2_000, sleep = defaultSleep, now = Date.now } = options;
   const deadline = now() + timeoutMs;
@@ -98,10 +91,12 @@ async function reboot(rpc: RpcCaller): Promise<void> {
   await rpc.call('Shelly.Reboot', undefined, { timeoutMs: 3_000 }).catch(() => undefined);
 }
 
-export type BluetoothOffResult = 'off' | 'refused';
-
-/** Switches the radio off. A refusal is reported, not thrown: the device is registered already. */
-export async function disableBluetooth(rpc: RpcCaller): Promise<BluetoothOffResult> {
+/**
+ * Switches the radio off. Failures are reported, not thrown: the device is
+ * registered already. `refused` means the device said no; `unknown` means the
+ * reply never came (link lost, timeout), so the change may or may not have applied.
+ */
+export async function disableBluetooth(rpc: RpcCaller): Promise<'off' | 'refused' | 'unknown'> {
   try {
     const result = await rpc.call<{ restart_required?: boolean }>('BLE.SetConfig', { config: { enable: false } });
     if (result?.restart_required) {
@@ -109,8 +104,8 @@ export async function disableBluetooth(rpc: RpcCaller): Promise<BluetoothOffResu
       await reboot(rpc);
     }
     return 'off';
-  } catch {
-    return 'refused';
+  } catch (err) {
+    return err instanceof RpcError ? 'refused' : 'unknown';
   }
 }
 
@@ -121,8 +116,11 @@ export interface SetupParams {
   wifi: WifiChoice;
   name: string;
   disableBluetooth: boolean;
-  /** Registers the device with Attraccess. Receives the address and name only. */
-  register: (input: { ipAddress: string; name: string }) => Promise<unknown>;
+  /**
+   * Registers the device with Attraccess. Receives the address and name only.
+   * Resolves `alreadyRegistered` when the address is in the registry already.
+   */
+  register: (input: { ipAddress: string; name: string }) => Promise<'added' | 'alreadyRegistered'>;
 }
 
 export interface SetupCallbacks {
@@ -136,31 +134,22 @@ export interface SetupOutcome {
   ipAddress?: string;
   /** The IP was already in the registry (HTTP 409). */
   alreadyRegistered: boolean;
-  bluetooth: 'off' | 'left-on' | 'refused';
+  bluetooth: 'off' | 'left-on' | 'refused' | 'unknown';
 }
 
-function isConflict(err: unknown): boolean {
-  return typeof err === 'object' && err !== null && (err as { status?: number }).status === 409;
-}
-
-async function step<T>(
-  name: SetupStep,
-  callbacks: SetupCallbacks,
-  action: () => Promise<T>,
-  detail?: (err: unknown) => Record<string, string | number>,
-): Promise<T> {
+async function step<T>(name: SetupStep, callbacks: SetupCallbacks, action: () => Promise<T>): Promise<T> {
   callbacks.onStep?.(name, 'running');
   try {
     const result = await action();
     callbacks.onStep?.(name, 'done');
     return result;
   } catch (err) {
-    throw new SetupStepError(name, err, detail?.(err));
+    throw new SetupStepError(name, err);
   }
 }
 
 export async function runSetup(
-  rpc: ShellyBleRpc,
+  rpc: AuthenticatingRpc,
   params: SetupParams,
   callbacks: SetupCallbacks = {},
 ): Promise<SetupOutcome> {
@@ -168,9 +157,9 @@ export async function runSetup(
 
   if (info.auth_en) {
     // The device is protected already: authenticate with its current password.
-    // A cheap protected call proves the password before anything is changed.
+    // A small protected call proves the password before anything is changed.
     rpc.setCredentials(ADMIN_USERNAME, params.adminPassword);
-    await step('password', callbacks, () => rpc.call('Sys.GetConfig'));
+    await step('password', callbacks, () => rpc.call('WiFi.GetStatus'));
   } else {
     // Before Wi-Fi, so the device is never on the network unprotected.
     await step('password', callbacks, () => setAdminPassword(rpc, info, params.adminPassword));
@@ -182,28 +171,14 @@ export async function runSetup(
     return { restartRequired: true, alreadyRegistered: false, bluetooth: 'left-on' };
   }
 
-  const ipAddress = await step(
-    'join',
-    callbacks,
-    () => waitForIp(rpc, callbacks.join),
-    (err): Record<string, string | number> => (err instanceof JoinTimeoutError ? { status: err.lastStatus } : {}),
-  );
+  const ipAddress = await step('join', callbacks, () => waitForIp(rpc, callbacks.join));
 
-  let alreadyRegistered = false;
-  await step('register', callbacks, async () => {
-    try {
-      await params.register({ ipAddress, name: params.name });
-    } catch (err) {
-      if (!isConflict(err)) throw err;
-      alreadyRegistered = true;
-    }
-  });
+  const registered = await step('register', callbacks, () => params.register({ ipAddress, name: params.name }));
+  const alreadyRegistered = registered === 'alreadyRegistered';
 
   let bluetooth: SetupOutcome['bluetooth'] = 'left-on';
   if (params.disableBluetooth) {
-    bluetooth = await step('bluetooth', callbacks, () => disableBluetooth(rpc)).then((r) =>
-      r === 'off' ? 'off' : 'refused',
-    );
+    bluetooth = await step('bluetooth', callbacks, () => disableBluetooth(rpc));
   } else {
     callbacks.onStep?.('bluetooth', 'skipped');
   }

@@ -1,21 +1,17 @@
 // Collects what the setup needs. The passwords live only in this component's
 // state: it unmounts when the run starts, so they are gone once the form closes.
+// Its submit button sits in the drawer footer (SetupFooter), tied by form id.
 import { Checkbox, Description, Form, Label } from '@heroui/react';
-import { BluetoothIcon } from 'lucide-react';
 import { useCallback, useState, type FormEvent } from 'react';
-import { Button, PasswordInput, StatusAlert } from '@attraccess/plugins-frontend-ui';
+import { PasswordInput, StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { useShellyTranslations } from '../../i18n';
-import { ADMIN_USERNAME, type BleDeviceInfo } from '../../bluetooth/provisioning';
-import type { ShellyBleRpc } from '../../bluetooth/rpc';
+import type { BleDeviceInfo } from '../../bluetooth/provisioning';
+import type { AuthenticatingRpc } from '../../bluetooth/rpc';
 import { TextFieldRow } from '../../shared/TextFieldRow';
+import type { SetupFormValues } from './useSetupSession';
 import { MANUAL, WifiNetworkPicker, type WifiSelection } from './WifiNetworkPicker';
 
-export interface SetupFormValues {
-  wifi: { ssid: string; password?: string };
-  adminPassword: string;
-  name: string;
-  disableBluetooth: boolean;
-}
+export const SETUP_FORM_ID = 'shelly-ble-form';
 
 export function SetupForm({
   rpc,
@@ -23,7 +19,7 @@ export function SetupForm({
   advertisedName,
   onSubmit,
 }: {
-  rpc: ShellyBleRpc;
+  rpc: AuthenticatingRpc;
   info: BleDeviceInfo;
   advertisedName: string;
   onSubmit: (values: SetupFormValues) => void;
@@ -37,18 +33,23 @@ export function SetupForm({
   const [name, setName] = useState(advertisedName);
   const [disableBluetooth, setDisableBluetooth] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mismatch, setMismatch] = useState(false);
 
   const manual = selection.choice === MANUAL;
-  const ssid = (manual ? selection.manualSsid : selection.choice).trim();
+  // Only a typed name is trimmed; a scanned SSID is used exactly as the device reported it.
+  const ssid = manual ? selection.manualSsid.trim() : selection.choice;
   const needsWifiPassword = manual || selection.secured;
+  // A new password is trimmed like in the admin password drawer; an existing one is used as typed.
+  const admin = protectedDevice ? adminPassword : adminPassword.trim();
 
   const submit = useCallback(() => {
-    const admin = adminPassword.trim();
+    const confirmMismatch = !protectedDevice && admin !== confirm.trim();
+    setMismatch(confirmMismatch && admin !== '');
     if (!ssid) return setError(t('ble.validation.ssid'));
     if (selection.secured && !manual && !wifiPassword) return setError(t('ble.validation.wifiPassword'));
-    if (!admin) return setError(t('ble.validation.adminPassword'));
-    if (!protectedDevice && admin !== confirm.trim()) return setError(t('ble.admin.mismatch'));
+    if (!admin.trim()) return setError(t('ble.validation.adminPassword'));
     setError(null);
+    if (confirmMismatch) return;
     onSubmit({
       wifi: { ssid, password: needsWifiPassword && wifiPassword ? wifiPassword : undefined },
       adminPassword: admin,
@@ -56,7 +57,7 @@ export function SetupForm({
       disableBluetooth,
     });
   }, [
-    adminPassword,
+    admin,
     advertisedName,
     confirm,
     disableBluetooth,
@@ -80,18 +81,18 @@ export function SetupForm({
   );
 
   return (
-    <Form onSubmit={handleSubmit} className="sh:flex sh:flex-col sh:gap-5" data-cy="shelly-ble-form">
+    <Form id={SETUP_FORM_ID} onSubmit={handleSubmit} className="sh:flex sh:flex-col sh:gap-5" data-cy="shelly-ble-form">
       <section className="sh:flex sh:w-full sh:flex-col sh:gap-3">
-        <h3 className="sh:text-sm sh:font-semibold">{t('ble.wifi.title')}</h3>
+        <div className="sh:flex sh:flex-col sh:gap-1">
+          <h3 className="sh:text-sm sh:font-semibold">{t('ble.wifi.title')}</h3>
+          <p className="sh:text-xs sh:text-muted">{t('ble.wifi.description')}</p>
+        </div>
         <WifiNetworkPicker
           rpc={rpc}
           selection={selection}
           onChange={setSelection}
           protectedDevice={protectedDevice}
-          beforeRescan={() => {
-            // A protected device refuses the first scan; retry with the password entered so far.
-            if (protectedDevice && adminPassword.trim()) rpc.setCredentials(ADMIN_USERNAME, adminPassword.trim());
-          }}
+          adminPassword={admin || undefined}
         />
         {needsWifiPassword && (
           <PasswordInput
@@ -99,7 +100,8 @@ export function SetupForm({
             value={wifiPassword}
             onChange={setWifiPassword}
             description={manual ? t('ble.wifi.passwordManualDescription') : undefined}
-            autoComplete="new-password"
+            // A Wi-Fi key, not a login for this site: keep the browser from saving or generating one.
+            autoComplete="off"
             data-cy="shelly-ble-wifi-password"
           />
         )}
@@ -130,9 +132,14 @@ export function SetupForm({
             <PasswordInput
               label={t('ble.admin.confirm')}
               value={confirm}
-              onChange={setConfirm}
+              onChange={(value) => {
+                setConfirm(value);
+                setMismatch(false);
+              }}
               autoComplete="new-password"
               isRequired
+              isInvalid={mismatch}
+              errorMessage={mismatch ? t('ble.admin.mismatch') : undefined}
               data-cy="shelly-ble-admin-confirm"
             />
           </>
@@ -159,12 +166,11 @@ export function SetupForm({
 
       <p className="sh:text-xs sh:text-muted">{t('ble.secretsNote')}</p>
 
-      {error && <StatusAlert status="danger" title={error} data-cy="shelly-ble-form-error" />}
-      <div className="sh:flex sh:justify-end">
-        <Button variant="primary" type="submit" data-cy="shelly-ble-start">
-          <BluetoothIcon className="sh:h-4 sh:w-4" /> {t('ble.begin')}
-        </Button>
-      </div>
+      {error && (
+        <StatusAlert status="danger" data-cy="shelly-ble-form-error">
+          {error}
+        </StatusAlert>
+      )}
     </Form>
   );
 }

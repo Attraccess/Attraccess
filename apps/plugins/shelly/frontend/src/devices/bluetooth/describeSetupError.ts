@@ -1,27 +1,39 @@
 // Turns a setup failure into translated text. Only secret-free data (step,
 // error kind, device message, last Wi-Fi status) ever reaches the message.
-import { SetupStepError, ShellyBleError } from '../../bluetooth/errors';
-import { JoinTimeoutError } from '../../bluetooth/provisioning';
+import type { TFunction } from '@attraccess/plugins-frontend-ui';
+import { JoinTimeoutError, SetupStepError, ShellyBleError } from '../../bluetooth/errors';
+import { isAdapterUnavailable } from '../../bluetooth/webBluetooth';
 
-type T = (key: string, data?: Record<string, string | number>) => string;
+/** A failed run: a short title naming the step, and what went wrong. */
+export interface SetupFailure {
+  title: string;
+  detail: string;
+}
 
-export function describeSetupError(err: unknown, t: T, options: { protectedDevice?: boolean } = {}): string {
-  if (!(err instanceof SetupStepError)) return describeCause(err, t);
+export function describeSetupError(
+  err: unknown,
+  t: TFunction,
+  options: { protectedDevice?: boolean } = {},
+): SetupFailure {
+  if (!(err instanceof SetupStepError)) return { title: t('ble.failure.titleGeneric'), detail: describeCause(err, t) };
   const step = t(`ble.steps.${err.step === 'password' && options.protectedDevice ? 'passwordCheck' : err.step}`);
-  const cause = err.cause;
   const title = t('ble.failure.title', { step });
+  const cause = err.cause;
   // Only a real timeout carries a Wi-Fi status; a lost link or a device error says what it is.
-  if (err.step === 'join' && cause instanceof JoinTimeoutError)
-    return `${title}. ${t('ble.failure.joinTimeout', { status: String(err.data.status ?? 'unknown') })}`;
+  if (cause instanceof JoinTimeoutError)
+    return { title, detail: t('ble.failure.joinTimeout', { status: cause.lastStatus }) };
   if (err.step === 'register') {
     // The server's message may or may not end in punctuation; the translation adds its own.
     const message = cause instanceof Error ? cause.message.trim().replace(/[.\s]+$/, '') : '';
-    return `${title}. ${t(message ? 'ble.failure.registerFailed' : 'ble.failure.registerFailedNoDetail', { message })}`;
+    return {
+      title,
+      detail: t(message ? 'ble.failure.registerFailed' : 'ble.failure.registerFailedNoDetail', { message }),
+    };
   }
-  return `${title}. ${describeCause(cause, t)}`;
+  return { title, detail: describeCause(cause, t) };
 }
 
-function describeCause(cause: unknown, t: T): string {
+function describeCause(cause: unknown, t: TFunction): string {
   if (cause instanceof ShellyBleError) {
     switch (cause.kind) {
       case 'wrongPassword':
@@ -41,7 +53,8 @@ function describeCause(cause: unknown, t: T): string {
 }
 
 /** Message for a failure before the setup starts (chooser, connect, device info). */
-export function describeConnectError(err: unknown, t: T): string {
+export function describeConnectError(err: unknown, t: TFunction): string {
+  if (isAdapterUnavailable(err)) return t('ble.connect.adapterOff');
   if (err instanceof ShellyBleError) {
     if (err.kind === 'noRpcService') return t('ble.connect.noRpcService');
     if (err.kind === 'linkLost' || err.kind === 'timeout') return t('ble.connect.linkLost');

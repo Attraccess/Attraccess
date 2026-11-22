@@ -24,11 +24,7 @@
     "deleteDescription": "{{name}} ({{address}}) aus der Registrierung entfernen? Das Gerät selbst wird nicht verändert.",
     "bluetooth": "Über Bluetooth einrichten"
   },
-  "auth": {
-    "none": "Keine Authentifizierung",
-    "required": "Authentifizierung erforderlich",
-    "unknown": "Unbekannt"
-  },
+  "auth": { "none": "Keine Authentifizierung", "required": "Authentifizierung erforderlich", "unknown": "Unbekannt" },
   "add": {
     "title": "Gerät hinzufügen",
     "description": "Gib die IP-Adresse des Geräts ein. Wir prüfen GET /shelly, um Generation und Modell zu erkennen.",
@@ -126,9 +122,8 @@
     "refresh": "Aktualisieren"
   },
   "ble": {
-    "open": "Über Bluetooth einrichten",
     "title": "Über Bluetooth einrichten",
-    "description": "Verbinde dich von diesem Browser aus mit einem zurückgesetzten Shelly, gib ihm WLAN und ein Admin-Passwort und füge ihn zu Attraccess hinzu.",
+    "description": "Verbinde dich von diesem Browser aus mit einem zurückgesetzten Shelly, richte WLAN und ein Admin-Passwort ein und füge ihn zu Attraccess hinzu.",
     "unsupported": {
       "title": "Bluetooth ist hier nicht verfügbar",
       "noApi": "Dieser Browser unterstützt kein Web Bluetooth. Öffne Attraccess in Chrome oder Edge auf einem Desktop- oder Android-Gerät.",
@@ -136,29 +131,29 @@
       "alternatives": "Du kannst das Gerät trotzdem über „Gerät hinzufügen“ hinzufügen, wenn du seine IP-Adresse kennst, oder „Suchen“ nutzen, sobald es im Netzwerk ist."
     },
     "start": {
-      "intro": "Stell dich neben den Shelly und stelle sicher, dass er mit Strom versorgt und zurückgesetzt ist. Funktioniert mit Shelly Gen2, Gen3 und Gen4. Gen1-Geräte lassen sich nicht über Bluetooth einrichten.",
+      "intro": "Geh zum Shelly und stell sicher, dass er Strom hat und auf Werkseinstellungen zurückgesetzt ist. Funktioniert mit Shelly Gen2, Gen3 und Gen4. Gen1-Geräte lassen sich nicht über Bluetooth einrichten.",
       "select": "Gerät auswählen",
-      "connecting": "Verbinde mit dem Gerät…",
+      "connecting": "Verbindung zum Gerät wird hergestellt…",
       "hint": "Dein Browser zeigt eine Liste von Bluetooth-Geräten in der Nähe. Wähle den Shelly aus (sein Name beginnt mit „Shelly“)."
     },
     "connect": {
       "title": "Verbindung fehlgeschlagen",
-      "noRpcService": "Dieses Gerät bietet Shellys Bluetooth-RPC-Dienst nicht an. Gen1-Geräte tun das nie. Aktiviere bei manchen Gen2-Firmwares „RPC über Bluetooth“ in der Weboberfläche des Geräts, oder nutze „Gerät hinzufügen“ oder „Suchen“.",
+      "noRpcService": "Dieses Gerät bietet Shellys Bluetooth-RPC-Dienst nicht an. Gen1-Geräte tun das nie. Aktiviere bei manchen Gen2-Firmwares „RPC über Bluetooth“ in der Weboberfläche des Geräts. Andernfalls verbinde es über seinen eigenen Access Point mit dem WLAN und nutze dann „Gerät hinzufügen“ oder „Suchen“.",
+      "adapterOff": "Bluetooth ist an diesem Computer ausgeschaltet oder nicht vorhanden. Schalte es ein und versuche es erneut.",
       "linkLost": "Die Bluetooth-Verbindung konnte nicht hergestellt werden. Gehe näher an das Gerät heran und versuche es erneut.",
       "generic": "Die Kommunikation mit dem Gerät über Bluetooth ist fehlgeschlagen."
     },
     "device": {
-      "title": "Verbundenes Gerät",
       "model": "Modell",
       "generation": "Generation",
       "id": "Geräte-ID",
-      "firmware": "Firmware",
-      "protected": "Dieses Gerät hat bereits ein Admin-Passwort."
+      "mac": "MAC-Adresse",
+      "firmware": "Firmware"
     },
     "wifi": {
       "title": "WLAN-Netzwerk",
       "description": "Wähle das 2,4-GHz-Netzwerk, dem das Gerät beitreten soll.",
-      "scanning": "Suche nach Netzwerken — das kann einige Sekunden dauern…",
+      "scanning": "Suche nach Netzwerken – das kann einige Sekunden dauern…",
       "scanFailed": "Das Gerät konnte nicht nach Netzwerken suchen. Gib den Netzwerknamen selbst ein.",
       "scanFailedProtected": "Das Gerät konnte nicht nach Netzwerken suchen. Falls es schon ein Admin-Passwort hat, gib es unten ein und wähle „Erneut suchen“, oder gib den Netzwerknamen selbst ein.",
       "rescan": "Erneut suchen",
@@ -203,11 +198,19 @@
       "register": "Zu Attraccess hinzufügen",
       "bluetooth": "Bluetooth ausschalten"
     },
+    "stepStatus": {
+      "pending": "Nicht begonnen",
+      "running": "Läuft",
+      "done": "Erledigt",
+      "skipped": "Übersprungen",
+      "failed": "Fehlgeschlagen"
+    },
     "failure": {
       "title": "Einrichtung bei „{{step}}“ fehlgeschlagen",
+      "titleGeneric": "Einrichtung fehlgeschlagen",
       "wrongPassword": "Das Gerät hat das Admin-Passwort abgelehnt. Prüfe es und versuche es erneut.",
-      "linkLost": "Die Bluetooth-Verbindung wurde unterbrochen. Gehe näher an das Gerät heran und starte erneut. Wenn das Gerät schon im WLAN ist, füge es über „Suchen“ hinzu.",
-      "joinTimeout": "Das Gerät hat innerhalb von 60 Sekunden keine IP-Adresse erhalten (letzter Status: {{status}}). Prüfe das Passwort und ob das Netzwerk 2,4 GHz nutzt — Shelly-Geräte können keinem 5-GHz-Netzwerk beitreten.",
+      "linkLost": "Die Bluetooth-Verbindung wurde unterbrochen. Gehe näher an das Gerät heran und beginne von vorn. Wenn das Gerät schon im WLAN ist, füge es über „Suchen“ hinzu.",
+      "joinTimeout": "Das Gerät hat innerhalb von 60 Sekunden keine IP-Adresse erhalten (letzter Status: {{status}}). Prüfe das Passwort und ob das Netzwerk 2,4 GHz nutzt – Shelly-Geräte können keinem 5-GHz-Netzwerk beitreten.",
       "timeout": "Das Gerät hat nicht rechtzeitig über Bluetooth geantwortet. Gehe näher heran und versuche es erneut.",
       "rpc": "Das Gerät hat die Anfrage abgelehnt: {{method}} lieferte „{{message}}“ (Code {{code}}).",
       "registerFailed": "Das Gerät ist im Netzwerk, aber Attraccess konnte es nicht hinzufügen ({{message}}). Füge es über „Suchen“ oder „Gerät hinzufügen“ hinzu.",
@@ -219,10 +222,11 @@
       "title": "Gerät eingerichtet",
       "name": "Name",
       "ip": "IP-Adresse",
-      "passwordSet": "Admin-Passwort gesetzt",
+      "passwordSet": "Admin-Passwort festgelegt",
       "bluetoothOff": "Bluetooth ausgeschaltet",
-      "bluetoothOn": "Bluetooth eingeschaltet gelassen",
+      "bluetoothOn": "Bluetooth bleibt eingeschaltet",
       "bluetoothRefused": "Das Gerät hat das Ausschalten von Bluetooth abgelehnt. Es ist eingerichtet und registriert; schalte Bluetooth bei Bedarf in der Weboberfläche des Geräts aus.",
+      "bluetoothUnknown": "Das Gerät hat nicht bestätigt, dass Bluetooth aus ist. Es ist eingerichtet und registriert; prüfe Bluetooth in der Weboberfläche des Geräts.",
       "alreadyRegistered": "Ein Gerät mit der IP {{ip}} ist in Attraccess bereits registriert, daher wurde nichts hinzugefügt.",
       "restartTitle": "Das Gerät startet neu",
       "restart": "Das WLAN ist eingestellt und das Gerät startet neu. Sobald es online ist, füge es über „Suchen“ (oder „Gerät hinzufügen“) hinzu. Bluetooth bleibt eingeschaltet."

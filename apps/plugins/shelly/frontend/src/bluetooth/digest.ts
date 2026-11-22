@@ -29,11 +29,16 @@ export function computeHa1(username: string, realm: string, password: string): P
   return sha256Hex(`${username}:${realm}:${password}`);
 }
 
+/** A fresh client nonce per auth object, from the platform CSPRNG. */
+function randomCnonce(): number {
+  return crypto.getRandomValues(new Uint32Array(1))[0] & 0x7fffffff;
+}
+
 export async function buildRpcAuth(
   challenge: DigestChallenge,
   username: string,
   password: string,
-  cnonce: number = Math.floor(Math.random() * 2 ** 31),
+  cnonce: number = randomCnonce(),
   nc = 1,
 ): Promise<RpcAuth> {
   const ha1 = await computeHa1(username, challenge.realm, password);

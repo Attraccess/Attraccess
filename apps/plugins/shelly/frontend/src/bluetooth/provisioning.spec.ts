@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
-import { SetupStepError } from './errors';
-import { createFakeDevice, FAKE_DEVICE_ID, type FakeDeviceOptions } from './fakeDevice';
+import { JoinTimeoutError, SetupStepError } from './errors';
+import { createFakeDevice, FAKE_DEVICE_ID, type FakeDeviceOptions } from './fakeDevice.test-utils';
 import { disableBluetooth, getDeviceInfo, runSetup, scanWifi, waitForIp, type SetupParams } from './provisioning';
 import { ShellyBleRpc } from './rpc';
 
@@ -28,7 +28,7 @@ async function params(rpc: ShellyBleRpc, over: Partial<SetupParams> = {}): Promi
     wifi: { ssid: 'Workshop', password: WIFI_PW },
     name: 'Pro 1PM',
     disableBluetooth: true,
-    register: vi.fn().mockResolvedValue({}),
+    register: vi.fn().mockResolvedValue('added'),
     ...over,
   };
 }
@@ -117,6 +117,15 @@ describe('runSetup', () => {
     const outcome = await runSetup(rpc, p, { join });
     expect(outcome.ipAddress).toBe('192.168.1.57');
     expect(fake.requests.some((r) => r.method === 'Shelly.SetAuth')).toBe(false);
+    // The password is proven with a small protected call before Wi-Fi is touched.
+    const methods = fake.requests.map((r) => r.method);
+    expect(methods.indexOf('WiFi.GetStatus')).toBeLessThan(methods.indexOf('WiFi.SetConfig'));
+  });
+
+  it('keeps the current password exactly as typed', async () => {
+    const { rpc, join } = setup({ authEn: true, ha1: sha(`admin:${FAKE_DEVICE_ID}: spaced pw `) });
+    const outcome = await runSetup(rpc, await params(rpc, { adminPassword: ' spaced pw ' }), { join });
+    expect(outcome.ipAddress).toBe('192.168.1.57');
   });
 
   it('fails with a wrong-password error before changing anything', async () => {
@@ -126,7 +135,7 @@ describe('runSetup', () => {
     expect(err.step).toBe('password');
     expect(err.cause).toMatchObject({ kind: 'wrongPassword' });
     expect(fake.requests.some((r) => r.method === 'WiFi.SetConfig')).toBe(false);
-    expect(JSON.stringify([err.message, err.data, err.cause.message])).not.toContain('wrong-pw-789');
+    expect(JSON.stringify([err.message, err.cause.message])).not.toContain('wrong-pw-789');
   });
 
   it('reboots and stops on restart_required, leaving Bluetooth on and registering nothing', async () => {
@@ -143,12 +152,13 @@ describe('runSetup', () => {
     const err = await runSetup(rpc, await params(rpc), { join }).catch((e) => e);
     expect(err).toBeInstanceOf(SetupStepError);
     expect(err.step).toBe('join');
-    expect(err.data).toEqual({ status: 'connecting' });
+    expect(err.cause).toBeInstanceOf(JoinTimeoutError);
+    expect(err.cause.lastStatus).toBe('connecting');
   });
 
-  it('treats a 409 as already registered and still switches Bluetooth off', async () => {
+  it('reports an already registered address and still switches Bluetooth off', async () => {
     const { fake, rpc, join } = setup();
-    const register = vi.fn().mockRejectedValue(Object.assign(new Error('exists'), { status: 409 }));
+    const register = vi.fn().mockResolvedValue('alreadyRegistered');
     const outcome = await runSetup(rpc, await params(rpc, { register }), { join });
     expect(outcome).toMatchObject({ alreadyRegistered: true, bluetooth: 'off' });
     expect(fake.state.bleEnabled).toBe(false);
@@ -165,9 +175,11 @@ describe('runSetup', () => {
     const { rpc, join } = setup();
     const p = await params(rpc);
     await runSetup(rpc, p, { join });
+    expect(vi.mocked(p.register).mock.calls).toEqual([[{ ipAddress: '192.168.1.57', name: 'Pro 1PM' }]]);
     const sent = JSON.stringify(vi.mocked(p.register).mock.calls);
     expect(sent).not.toContain(WIFI_PW);
     expect(sent).not.toContain(ADMIN_PW);
+    expect(sent).not.toContain(sha(`admin:${FAKE_DEVICE_ID}:${ADMIN_PW}`));
   });
 
   it('keeps the secrets out of a failing WiFi.SetConfig or Shelly.SetAuth', async () => {
@@ -175,9 +187,11 @@ describe('runSetup', () => {
       const { rpc, join } = setup({ failMethod: { method, message: 'Invalid argument' } });
       const err = await runSetup(rpc, await params(rpc), { join }).catch((e) => e);
       expect(err).toBeInstanceOf(SetupStepError);
-      const text = [err.message, JSON.stringify(err.data), err.cause.message, JSON.stringify(err.cause)].join('|');
+      const text = [err.message, err.cause.message, JSON.stringify(err.cause)].join('|');
       expect(text).not.toContain(WIFI_PW);
       expect(text).not.toContain(ADMIN_PW);
+      // The SetAuth params carry ha1, which is as good as the password for digest auth.
+      expect(text).not.toContain(sha(`admin:${FAKE_DEVICE_ID}:${ADMIN_PW}`));
       expect(text).toContain('Invalid argument');
     }
   });
@@ -207,5 +221,20 @@ describe('disableBluetooth', () => {
     const { fake, rpc } = setup({ bleSetConfig: 'refuse' });
     expect(await disableBluetooth(rpc)).toBe('refused');
     expect(fake.state.bleEnabled).toBe(true);
+  });
+
+  it('counts a link that drops as the device reboots as success', async () => {
+    const { fake, rpc } = setup({ bleSetConfig: 'restart' });
+    const readRx = fake.channel.rxControl.readValue;
+    fake.channel.rxControl.readValue = () =>
+      fake.state.rebooted ? Promise.reject(new Error('GATT Server is disconnected')) : readRx();
+    expect(await disableBluetooth(rpc)).toBe('off');
+    expect(fake.state.rebooted).toBe(true);
+  });
+
+  it('reports an unconfirmed switch-off when the reply never comes', async () => {
+    const { fake, rpc } = setup();
+    fake.channel.data.writeValue = () => Promise.reject(new Error('GATT Server is disconnected'));
+    expect(await disableBluetooth(rpc)).toBe('unknown');
   });
 });

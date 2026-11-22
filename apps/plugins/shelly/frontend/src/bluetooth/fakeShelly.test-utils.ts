@@ -11,7 +11,16 @@ export interface FakeRequest {
   auth?: Record<string, unknown>;
 }
 
-export type FakeReply = { result: unknown } | { error: { code: number; message: string } } | 'silence';
+/**
+ * `silence` never answers. `late` answers nothing now but queues its reply in
+ * front of the next request's, like a device whose reply arrives after the
+ * caller gave up.
+ */
+export type FakeReply =
+  | { result: unknown }
+  | { error: { code: number; message: string } }
+  | 'silence'
+  | { late: { result: unknown } | { error: { code: number; message: string } } };
 
 export interface FakeShelly {
   channel: RpcChannel;
@@ -33,9 +42,14 @@ export function createFakeShelly(
   const fake: FakeShelly = { channel: undefined as unknown as RpcChannel, requests: [], frames: [], writes: [] };
   let expected = 0;
   let received: number[] = [];
-  let response = new Uint8Array(0);
+  // Like mOS: a reply stays on RX control until it has been read out completely.
+  const outbox: Uint8Array[] = [];
+  let late: Uint8Array | undefined;
   let readOffset = 0;
   let pollsLeft = 0;
+
+  const encode = (id: number, reply: object) =>
+    new TextEncoder().encode(JSON.stringify({ id, src: 'shelly', ...reply }));
 
   const finishRequest = async () => {
     const frame = new TextDecoder().decode(new Uint8Array(received));
@@ -44,9 +58,14 @@ export function createFakeShelly(
     const request = JSON.parse(frame) as FakeRequest;
     fake.requests.push(request);
     const reply = await handler(request);
+    if (late) outbox.push(late);
+    late = undefined;
     if (reply === 'silence') return;
-    response = new TextEncoder().encode(JSON.stringify({ id: request.id, src: 'shelly', ...reply }));
-    readOffset = 0;
+    if ('late' in reply) {
+      late = encode(request.id, reply.late);
+      return;
+    }
+    outbox.push(encode(request.id, reply));
     pollsLeft = emptyPolls;
   };
 
@@ -55,7 +74,7 @@ export function createFakeShelly(
       async writeValue(value) {
         fake.writes.push({ target: 'tx', bytes: value.length });
         expected = view(value).getUint32(0, false);
-        response = new Uint8Array(0);
+        received = [];
       },
       readValue: () => Promise.reject(new Error('tx control is write-only')),
     },
@@ -63,11 +82,18 @@ export function createFakeShelly(
       async writeValue(value) {
         fake.writes.push({ target: 'data', bytes: value.length });
         received.push(...value);
-        if (received.length >= expected) await finishRequest();
+        // A real device takes exactly the announced length; more is a framing bug.
+        if (received.length > expected) throw new Error(`frame longer than announced (${expected} bytes)`);
+        if (received.length === expected) await finishRequest();
       },
       async readValue() {
-        const chunk = response.subarray(readOffset, readOffset + readChunk);
+        const current = outbox[0] ?? new Uint8Array(0);
+        const chunk = current.subarray(readOffset, readOffset + readChunk);
         readOffset += chunk.length;
+        if (current.length > 0 && readOffset >= current.length) {
+          outbox.shift();
+          readOffset = 0;
+        }
         return view(new Uint8Array(chunk));
       },
     },
@@ -78,7 +104,7 @@ export function createFakeShelly(
         if (pollsLeft > 0) {
           pollsLeft--;
         } else {
-          view(bytes).setUint32(0, response.length, false);
+          view(bytes).setUint32(0, outbox[0]?.length ?? 0, false);
         }
         return view(bytes);
       },

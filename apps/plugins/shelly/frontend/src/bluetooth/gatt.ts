@@ -10,7 +10,16 @@ export const SHELLY_RPC_RX_CONTROL = '5f6d4f53-5f52-5043-5f72-785f63746c5f';
 /** The slice of `BluetoothRemoteGATTCharacteristic` the RPC client needs. */
 export interface GattCharacteristic {
   readValue(): Promise<DataView>;
+  /** Deprecated in Chrome; the fallback when `writeValueWithResponse` is missing. */
   writeValue(value: Uint8Array): Promise<void>;
+  /** Waits for the device to acknowledge each chunk, so it is never overrun. */
+  writeValueWithResponse?(value: Uint8Array): Promise<void>;
+}
+
+export function writeChunk(characteristic: GattCharacteristic, value: Uint8Array): Promise<void> {
+  return characteristic.writeValueWithResponse
+    ? characteristic.writeValueWithResponse(value)
+    : characteristic.writeValue(value);
 }
 
 export interface RpcChannel {

@@ -53,18 +53,20 @@ connects to it from your browser, gives it an admin password and your Wi-Fi, and
 - Chrome or Edge on a desktop or Android device. Firefox and Safari do not support Web Bluetooth.
 - Attraccess opened over HTTPS or on `localhost`. Browsers only allow Bluetooth on secure pages.
 - A Shelly Gen2, Gen3 or Gen4 device, within Bluetooth range. Gen1 devices cannot be set up over Bluetooth. On some
-  Gen2 firmware, **RPC over Bluetooth** must be enabled in the device's web interface first.
+  Gen2 firmware, **RPC over Bluetooth** must be enabled in the device's web interface first. Without it, join the
+  device to your Wi-Fi through its own access point and use **Add device** or **Discover**.
 - A 2.4 GHz Wi-Fi network. Shelly devices cannot join 5 GHz networks.
 
 **Steps**
 
 1. On the **Shelly Devices** page, choose **Set up over Bluetooth** and then **Select device**. Pick the Shelly in the
-   browser's list (its name starts with `Shelly`). Attraccess shows its model, generation, ID and firmware.
+   browser's list (its name starts with `Shelly`). Attraccess shows its model, generation, device ID, MAC address and
+   firmware. If nothing happens and a message says Bluetooth is off, switch Bluetooth on on your computer.
 2. Pick your Wi-Fi network from the list the device scanned. For a hidden network, or if the scan fails, choose
-   **Other network** and type its name. Enter the Wi-Fi password; leave it empty for an open network.
-3. Enter the **new admin password** twice. It is required: it is set on the device before the Wi-Fi, so the device is
+   **Other network (enter name)** and type its name. Enter the Wi-Fi password; leave it empty for an open network.
+3. Enter the password in **New admin password** and **Confirm admin password**. It is required: it is set on the device before the Wi-Fi, so the device is
    never on your network unprotected. The username is `admin`. If the device already has an admin password, enter its
-   current password instead.
+   current password in **Current admin password** instead.
 4. Optionally change the name. It defaults to the device's Bluetooth name.
 5. Decide on **Switch off Bluetooth on the device after setup**, which is ticked by default. Leave it ticked unless you
    use the device as a BLU or BTHome gateway. While Bluetooth is on, anyone nearby can try to connect.
@@ -80,9 +82,9 @@ connects to it from your browser, gives it an admin password and your Wi-Fi, and
   **Discover** or **Add device** once it is online. Bluetooth stays on in that case.
 - If a device with that IP address is already in the registry, nothing is added. Bluetooth is still switched off if
   you asked for it.
-- If the Bluetooth link drops, start over. A device that already joined your Wi-Fi can be added with **Discover**.
+- If the Bluetooth link drops, choose **Start over**. A device that already joined your Wi-Fi can be added with **Discover**.
 - If the device refuses to switch Bluetooth off, it stays set up and registered. Switch Bluetooth off in the device's
-  web interface.
+  web interface. If the device does not confirm it, Attraccess says so; check Bluetooth there too.
 
 ## See also
 

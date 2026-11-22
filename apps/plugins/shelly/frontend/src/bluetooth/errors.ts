@@ -25,31 +25,47 @@ export class ShellyBleError extends Error {
   }
 }
 
+/** Device messages are shown to the operator; a misbehaving device could send anything. */
+const MAX_DEVICE_MESSAGE = 200;
+
+function clip(message: string): string {
+  return message.length > MAX_DEVICE_MESSAGE ? `${message.slice(0, MAX_DEVICE_MESSAGE)}…` : message;
+}
+
 /** The device answered an RPC call with an error object. */
 export class RpcError extends ShellyBleError {
+  public readonly deviceMessage: string;
+
   constructor(
     public readonly method: string,
     public readonly code: number | undefined,
-    public readonly deviceMessage: string,
+    deviceMessage: string,
   ) {
-    super('rpc', `${method} failed: ${deviceMessage} (code ${code ?? '?'})`, {
+    super('rpc', `${method} failed: ${clip(deviceMessage)} (code ${code ?? '?'})`, {
       method,
       code: code ?? 0,
-      message: deviceMessage,
+      message: clip(deviceMessage),
     });
     this.name = 'RpcError';
+    this.deviceMessage = clip(deviceMessage);
   }
 }
 
 export type SetupStep = 'password' | 'wifi' | 'join' | 'register' | 'bluetooth';
+
+/** The device did not report an IP address in time; `lastStatus` is its last Wi-Fi status. */
+export class JoinTimeoutError extends Error {
+  constructor(public readonly lastStatus: string) {
+    super(`The device did not get an IP address (last status: ${lastStatus})`);
+    this.name = 'JoinTimeoutError';
+  }
+}
 
 /** A setup step failed; `cause` is the underlying (secret-free) error. */
 export class SetupStepError extends Error {
   constructor(
     public readonly step: SetupStep,
     public readonly cause: unknown,
-    /** Extra non-secret detail, e.g. the last Wi-Fi status of a join timeout. */
-    public readonly data: Record<string, string | number> = {},
   ) {
     super(`Setup step "${step}" failed`);
     this.name = 'SetupStepError';

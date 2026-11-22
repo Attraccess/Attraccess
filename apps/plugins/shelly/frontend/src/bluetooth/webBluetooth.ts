@@ -47,9 +47,18 @@ export interface ShellyBleConnection {
   disconnect: () => void;
 }
 
-/** The browser chooser closed without a pick (a DOMException named NotFoundError). */
+/**
+ * The operator closed the browser chooser without a pick. Chrome uses
+ * `NotFoundError` both for that ("User cancelled the requestDevice() chooser")
+ * and for a missing or switched-off adapter, so the message tells them apart.
+ */
 export function isChooserCancelled(err: unknown): boolean {
-  return err instanceof Error && err.name === 'NotFoundError';
+  return err instanceof Error && err.name === 'NotFoundError' && /cancel/i.test(err.message);
+}
+
+/** `requestDevice` failed because this computer's Bluetooth is off or missing. */
+export function isAdapterUnavailable(err: unknown): boolean {
+  return err instanceof Error && err.name === 'NotFoundError' && !isChooserCancelled(err);
 }
 
 export async function connectShellyOverBle(bluetooth = getBluetooth()): Promise<ShellyBleConnection> {

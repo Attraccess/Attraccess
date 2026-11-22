@@ -97,7 +97,7 @@ export function DevicesPage() {
             icon: <BluetoothIcon className="sh:h-4 sh:w-4" />,
             variant: 'secondary',
             onPress: bluetoothDrawer.open,
-            dataCy: 'shelly-bluetooth-open',
+            dataCy: 'shelly-ble-open',
           },
           {
             key: 'discover',

@@ -7,7 +7,7 @@
 // credentials are set.
 import { buildRpcAuth, parseChallenge, type DigestChallenge } from './digest';
 import { RpcError, ShellyBleError } from './errors';
-import type { RpcChannel } from './gatt';
+import { writeChunk, type RpcChannel } from './gatt';
 
 const MAX_RESPONSE_BYTES = 1024 * 1024;
 
@@ -22,6 +22,11 @@ export interface RpcOptions {
 
 export interface RpcCaller {
   call<T>(method: string, params?: Record<string, unknown>, options?: { timeoutMs?: number }): Promise<T>;
+}
+
+/** An RPC connection that can authenticate its calls with the device's admin password. */
+export interface AuthenticatingRpc extends RpcCaller {
+  setCredentials(username: string, password: string): void;
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -48,7 +53,11 @@ async function transport<T>(action: () => Promise<T>): Promise<T> {
   }
 }
 
-export class ShellyBleRpc implements RpcCaller {
+function timeoutError(): ShellyBleError {
+  return new ShellyBleError('timeout', 'Timed out waiting for the device to answer over Bluetooth');
+}
+
+export class ShellyBleRpc implements AuthenticatingRpc {
   private nextId = 1;
   private credentials?: { username: string; password: string };
   private challenge?: DigestChallenge;
@@ -122,15 +131,17 @@ export class ShellyBleRpc implements RpcCaller {
     return buildRpcAuth(challenge, creds.username, creds.password, undefined, this.nc);
   }
 
+  /** One request and its reply. The deadline covers waiting for and reading the reply. */
   private async exchange(
     method: string,
     params: Record<string, unknown> | undefined,
     auth: unknown,
     timeoutMs: number,
   ): Promise<RpcEnvelope> {
+    const id = this.nextId++;
     const frame = new TextEncoder().encode(
       JSON.stringify({
-        id: this.nextId++,
+        id,
         src: 'attraccess',
         method,
         ...(params ? { params } : {}),
@@ -139,28 +150,36 @@ export class ShellyBleRpc implements RpcCaller {
     );
 
     await transport(async () => {
-      await this.channel.txControl.writeValue(uint32BE(frame.length));
+      await writeChunk(this.channel.txControl, uint32BE(frame.length));
       for (let offset = 0; offset < frame.length; offset += this.chunkSize) {
-        await this.channel.data.writeValue(frame.subarray(offset, offset + this.chunkSize));
+        await writeChunk(this.channel.data, frame.subarray(offset, offset + this.chunkSize));
       }
     });
 
-    const raw = new TextDecoder().decode(await this.readResponse(timeoutMs));
-    try {
-      return JSON.parse(raw) as RpcEnvelope;
-    } catch {
-      throw new ShellyBleError('malformedResponse', `${method}: the device sent a malformed response`);
+    const deadline = this.now() + timeoutMs;
+    for (;;) {
+      const raw = new TextDecoder().decode(await this.readResponse(deadline));
+      let envelope: RpcEnvelope;
+      try {
+        envelope = JSON.parse(raw) as RpcEnvelope;
+      } catch {
+        throw new ShellyBleError('malformedResponse', `${method}: the device sent a malformed response`);
+      }
+      // The device keeps an unread reply until it is read out, so a call that
+      // timed out leaves its late reply for the next one: skip it, wait for ours.
+      if (envelope.id === undefined || envelope.id === id) return envelope;
     }
   }
 
-  private async readResponse(timeoutMs: number): Promise<Uint8Array> {
-    const length = await this.awaitResponseLength(timeoutMs);
+  private async readResponse(deadline: number): Promise<Uint8Array> {
+    const length = await this.awaitResponseLength(deadline);
     if (length > MAX_RESPONSE_BYTES) {
       throw new ShellyBleError('responseTooLarge', `Bluetooth response is too large (${length} bytes)`);
     }
     const out = new Uint8Array(length);
     let filled = 0;
     while (filled < length) {
+      if (this.now() >= deadline) throw timeoutError();
       const view = await transport(() => this.channel.data.readValue());
       if (view.byteLength === 0) {
         throw new ShellyBleError('linkLost', 'The device stopped sending its response');
@@ -173,15 +192,12 @@ export class ShellyBleRpc implements RpcCaller {
     return out;
   }
 
-  private async awaitResponseLength(timeoutMs: number): Promise<number> {
-    const deadline = this.now() + timeoutMs;
+  private async awaitResponseLength(deadline: number): Promise<number> {
     for (;;) {
       const view = await transport(() => this.channel.rxControl.readValue());
       const length = view.byteLength >= 4 ? view.getUint32(0, false) : 0;
       if (length > 0) return length;
-      if (this.now() >= deadline) {
-        throw new ShellyBleError('timeout', 'Timed out waiting for the device to answer over Bluetooth');
-      }
+      if (this.now() >= deadline) throw timeoutError();
       await this.sleep(this.pollIntervalMs);
     }
   }

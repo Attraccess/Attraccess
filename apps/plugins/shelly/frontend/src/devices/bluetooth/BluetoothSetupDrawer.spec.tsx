@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { PluginApiError } from '@attraccess/plugins-frontend-sdk';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addDevice } from '../../api';
 import { computeHa1 } from '../../bluetooth/digest';
-import { createFakeDevice, type FakeDevice, type FakeDeviceOptions } from '../../bluetooth/fakeDevice';
+import { createFakeDevice, type FakeDevice, type FakeDeviceOptions } from '../../bluetooth/fakeDevice.test-utils';
 import { SHELLY_RPC_DATA, SHELLY_RPC_RX_CONTROL, SHELLY_RPC_TX_CONTROL } from '../../bluetooth/gatt';
 import { BluetoothSetupDrawer } from './BluetoothSetupDrawer';
 
@@ -22,9 +23,13 @@ afterEach(() => {
 const WIFI_PW = 'wifi-secret-123';
 const ADMIN_PW = 'admin-secret-456';
 
-function installBluetooth(fake: FakeDevice | Error) {
+function installBluetooth(
+  fake: FakeDevice | Error,
+  options: { noRpcService?: boolean; chooserClosed?: Promise<void> } = {},
+) {
   const disconnect = vi.fn();
   const requestDevice = vi.fn(async () => {
+    await options.chooserClosed;
     if (fake instanceof Error) throw fake;
     const byUuid = {
       [SHELLY_RPC_DATA]: fake.channel.data,
@@ -35,9 +40,10 @@ function installBluetooth(fake: FakeDevice | Error) {
       name: 'ShellyPro1PM-A0B1C2D3E4F5',
       gatt: {
         connect: async () => ({
-          getPrimaryService: async () => ({
-            getCharacteristic: async (uuid: keyof typeof byUuid) => byUuid[uuid],
-          }),
+          getPrimaryService: async () => {
+            if (options.noRpcService) throw Object.assign(new Error('No Services found'), { name: 'NotFoundError' });
+            return { getCharacteristic: async (uuid: keyof typeof byUuid) => byUuid[uuid] };
+          },
         }),
         disconnect,
       },
@@ -51,8 +57,15 @@ function installBluetooth(fake: FakeDevice | Error) {
 function renderDrawer() {
   const onRegistered = vi.fn();
   const onOpenChange = vi.fn();
-  render(<BluetoothSetupDrawer isOpen onOpenChange={onOpenChange} onRegistered={onRegistered} />);
-  return { onRegistered, onOpenChange };
+  const { unmount } = render(<BluetoothSetupDrawer isOpen onOpenChange={onOpenChange} onRegistered={onRegistered} />);
+  return { onRegistered, onOpenChange, unmount };
+}
+
+/** A promise the test settles by hand. */
+function deferred<T = void>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => (resolve = r));
+  return { promise, resolve };
 }
 
 const NETWORKS: FakeDeviceOptions['networks'] = [
@@ -112,6 +125,7 @@ describe('BluetoothSetupDrawer', () => {
     const fake = createFakeDevice({ networks: NETWORKS });
     const { disconnect } = installBluetooth(fake);
     vi.mocked(addDevice).mockResolvedValue({} as never);
+    const logged = (['log', 'info', 'warn', 'error', 'debug'] as const).map((level) => vi.spyOn(console, level));
     const user = userEvent.setup();
     const { onRegistered } = renderDrawer();
 
@@ -142,6 +156,10 @@ describe('BluetoothSetupDrawer', () => {
     expect(localStorage.length + sessionStorage.length).toBe(0);
     expect(document.body.innerHTML).not.toContain(WIFI_PW);
     expect(document.body.innerHTML).not.toContain(ADMIN_PW);
+    // Nothing is logged with a secret in it either.
+    const output = JSON.stringify(logged.flatMap((spy) => spy.mock.calls.map((args) => args.map(String))));
+    expect(output).not.toContain(WIFI_PW);
+    expect(output).not.toContain(ADMIN_PW);
   });
 
   it('leaves Bluetooth on when the box is unticked and says so', async () => {
@@ -175,7 +193,7 @@ describe('BluetoothSetupDrawer', () => {
   it('shows the already-registered notice on a 409 and still switches Bluetooth off', async () => {
     const fake = createFakeDevice({ networks: NETWORKS });
     installBluetooth(fake);
-    vi.mocked(addDevice).mockRejectedValue(Object.assign(new Error('exists'), { status: 409 }));
+    vi.mocked(addDevice).mockRejectedValue(new PluginApiError('exists', 409));
     const user = userEvent.setup();
     renderDrawer();
     await user.click(screen.getByRole('button', { name: /Select device/ }));
@@ -206,9 +224,12 @@ describe('BluetoothSetupDrawer', () => {
     await user.click(screen.getByRole('button', { name: /Select device/ }));
     await fillAndStart(user);
 
-    const alert = await screen.findByText(/Setup failed at “Set the admin password”/);
-    expect(alert.textContent).toContain('Invalid argument');
-    expect(alert.textContent).not.toContain(ADMIN_PW);
+    expect(await screen.findByText('Setup failed at “Set the admin password”')).toBeInTheDocument();
+    const detail = screen.getByText(/Invalid argument/);
+    expect(detail).toHaveAttribute('data-cy', 'shelly-ble-failure');
+    expect(detail.textContent).not.toContain(ADMIN_PW);
+    expect(document.querySelector('[data-cy="shelly-ble-step-password"]')).toHaveAttribute('data-status', 'failed');
+    expect(document.querySelector('[data-cy="shelly-ble-step-wifi"]')).toHaveAttribute('data-status', 'pending');
     expect(screen.getByRole('button', { name: 'Start over' })).toBeInTheDocument();
   });
 
@@ -243,7 +264,94 @@ describe('BluetoothSetupDrawer', () => {
     await user.click(screen.getByRole('button', { name: /Select device/ }));
     await fillAndStart(user);
 
-    expect(await screen.findByText('The device restarts')).toBeInTheDocument();
+    expect(await screen.findByText('The device is restarting')).toBeInTheDocument();
     expect(addDevice).not.toHaveBeenCalled();
+  });
+
+  it('shows progress per step and cannot be closed while the steps run', async () => {
+    installBluetooth(createFakeDevice({ networks: NETWORKS }));
+    const registering = deferred<never>();
+    vi.mocked(addDevice).mockReturnValue(registering.promise);
+    const user = userEvent.setup();
+    const { onOpenChange } = renderDrawer();
+    await user.click(screen.getByRole('button', { name: /Select device/ }));
+    await fillAndStart(user);
+
+    const step = (name: string) => document.querySelector(`[data-cy="shelly-ble-step-${name}"]`);
+    await waitFor(() => expect(step('register')).toHaveAttribute('data-status', 'running'));
+    expect(step('register')).toHaveAttribute('aria-current', 'step');
+    for (const done of ['password', 'wifi', 'join']) expect(step(done)).toHaveAttribute('data-status', 'done');
+    expect(step('bluetooth')).toHaveAttribute('data-status', 'pending');
+
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeDisabled();
+    await user.keyboard('{Escape}');
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it('drops the Bluetooth link when the drawer is closed or unmounted', async () => {
+    const first = installBluetooth(createFakeDevice({ networks: NETWORKS }));
+    const user = userEvent.setup();
+    const { onOpenChange, unmount } = renderDrawer();
+    await user.click(screen.getByRole('button', { name: /Select device/ }));
+    await screen.findByLabelText('New admin password');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(first.disconnect).toHaveBeenCalled();
+    unmount();
+
+    const second = installBluetooth(createFakeDevice({ networks: NETWORKS }));
+    const view = renderDrawer();
+    await user.click(screen.getByRole('button', { name: /Select device/ }));
+    await screen.findByLabelText('New admin password');
+    view.unmount();
+    expect(second.disconnect).toHaveBeenCalled();
+  });
+
+  it('drops a link that connects after the drawer is gone', async () => {
+    const chooser = deferred();
+    const { disconnect } = installBluetooth(createFakeDevice(), { chooserClosed: chooser.promise });
+    const user = userEvent.setup();
+    const { unmount } = renderDrawer();
+    await user.click(screen.getByRole('button', { name: /Select device/ }));
+    unmount();
+    await act(async () => chooser.resolve());
+    await waitFor(() => expect(disconnect).toHaveBeenCalled());
+  });
+
+  it('explains a device without the Shelly RPC service and drops the link', async () => {
+    const { disconnect } = installBluetooth(createFakeDevice(), { noRpcService: true });
+    const user = userEvent.setup();
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: /Select device/ }));
+
+    expect(await screen.findByText(/does not offer Shelly's Bluetooth RPC service/)).toBeInTheDocument();
+    expect(disconnect).toHaveBeenCalled();
+  });
+
+  it('says Bluetooth is off instead of treating it as a cancelled chooser', async () => {
+    installBluetooth(Object.assign(new Error('Bluetooth adapter not available.'), { name: 'NotFoundError' }));
+    const user = userEvent.setup();
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: /Select device/ }));
+
+    expect(await screen.findByText(/Bluetooth is switched off or missing on this computer/)).toBeInTheDocument();
+  });
+
+  it('names the step and offers a fresh start when the link drops mid-setup', async () => {
+    const fake = createFakeDevice({ networks: NETWORKS });
+    installBluetooth(fake);
+    const readRx = fake.channel.rxControl.readValue;
+    fake.channel.rxControl.readValue = () =>
+      fake.state.wifi ? Promise.reject(new Error('GATT Server is disconnected')) : readRx();
+    const user = userEvent.setup();
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: /Select device/ }));
+    await fillAndStart(user);
+
+    expect(await screen.findByText('Setup failed at “Configure Wi-Fi”')).toBeInTheDocument();
+    expect(screen.getByText(/The Bluetooth connection was lost/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Start over' }));
+    expect(await screen.findByRole('button', { name: /Select device/ })).toBeInTheDocument();
   });
 });

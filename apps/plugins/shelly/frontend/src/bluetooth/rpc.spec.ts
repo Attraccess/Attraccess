@@ -3,14 +3,45 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { buildRpcAuth, computeHa1, parseChallenge } from './digest';
 import { RpcError, ShellyBleError } from './errors';
-import { challengeError, createFakeShelly, verifyDigest } from './fakeShelly';
+import { challengeError, createFakeShelly, verifyDigest, type FakeRequest } from './fakeShelly.test-utils';
+import type { RpcChannel } from './gatt';
 import { ShellyBleRpc } from './rpc';
 
 const sha = (value: string) => createHash('sha256').update(value).digest('hex');
 
-function rpcFor(fake: ReturnType<typeof createFakeShelly>, extra: ConstructorParameters<typeof ShellyBleRpc>[1] = {}) {
-  return new ShellyBleRpc(fake.channel, { sleep: async () => undefined, ...extra });
+/** A fake clock that only moves when the client sleeps, so a silent device never spins in real time. */
+function rpcFor(fake: { channel: RpcChannel }, extra: ConstructorParameters<typeof ShellyBleRpc>[1] = {}) {
+  let clock = 0;
+  return new ShellyBleRpc(fake.channel, {
+    now: () => clock,
+    sleep: async (ms) => void (clock += ms),
+    ...extra,
+  });
 }
+
+/** A channel that answers every request with `length` on RX control and `chunks` from the data char. */
+function rawChannel(length: number, chunks: Array<Uint8Array | Error>): { channel: RpcChannel } {
+  const rx = new Uint8Array(4);
+  new DataView(rx.buffer).setUint32(0, length, false);
+  let next = 0;
+  const ok = async () => undefined;
+  return {
+    channel: {
+      txControl: { writeValue: ok, readValue: () => Promise.reject(new Error('write-only')) },
+      rxControl: { writeValue: ok, readValue: async () => new DataView(rx.buffer) },
+      data: {
+        writeValue: ok,
+        async readValue() {
+          const chunk = chunks[next++] ?? new Uint8Array(0);
+          if (chunk instanceof Error) throw chunk;
+          return new DataView(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+        },
+      },
+    },
+  };
+}
+
+const bytes = (text: string) => new TextEncoder().encode(text);
 
 describe('ShellyBleRpc framing', () => {
   it('writes the length to TX control, then the body in 20-byte chunks', async () => {
@@ -30,6 +61,28 @@ describe('ShellyBleRpc framing', () => {
     const fake = createFakeShelly(() => ({ result: { results } }), { readChunk: 7, emptyPolls: 3 });
     const reply = await rpcFor(fake).call<{ results: unknown[] }>('WiFi.Scan');
     expect(reply.results).toEqual(results);
+  });
+
+  it('announces the byte length, not the character length, for non-ASCII text', async () => {
+    const fake = createFakeShelly((req) => ({ result: req.params }));
+    const params = { config: { sta: { ssid: 'Büro-WLAN ☕', pass: 'äöü-ß' } } };
+    await expect(rpcFor(fake).call('WiFi.SetConfig', params)).resolves.toEqual(params);
+    expect(fake.requests[0].params).toEqual(params);
+  });
+
+  it('prefers writeValueWithResponse when the browser has it', async () => {
+    const fake = createFakeShelly(() => ({ result: null }));
+    const acked: string[] = [];
+    for (const key of ['txControl', 'data'] as const) {
+      const characteristic = fake.channel[key];
+      characteristic.writeValueWithResponse = (value) => {
+        acked.push(key);
+        return characteristic.writeValue(value);
+      };
+    }
+    await rpcFor(fake).call('X');
+    expect(acked[0]).toBe('txControl');
+    expect(acked.filter((k) => k === 'data').length).toBeGreaterThan(0);
   });
 
   it('increments the request id per call and identifies itself', async () => {
@@ -70,6 +123,54 @@ describe('ShellyBleRpc framing', () => {
     await expect(rpc.call('Shelly.GetDeviceInfo')).rejects.toMatchObject({ kind: 'timeout' });
   });
 
+  it('skips a late reply to a call that timed out and returns its own', async () => {
+    const fake = createFakeShelly((req) =>
+      req.method === 'WiFi.Scan' ? { late: { result: { results: ['late'] } } } : { result: { method: req.method } },
+    );
+    const rpc = rpcFor(fake, { timeoutMs: 1_000 });
+    await expect(rpc.call('WiFi.Scan')).rejects.toMatchObject({ kind: 'timeout' });
+    // The scan's reply now sits in front of SetAuth's: it must not count as SetAuth's answer.
+    await expect(rpc.call('Shelly.SetAuth')).resolves.toEqual({ method: 'Shelly.SetAuth' });
+    await expect(rpc.call('WiFi.SetConfig')).resolves.toEqual({ method: 'WiFi.SetConfig' });
+  });
+
+  it('rejects a reply that is not JSON', async () => {
+    const reply = bytes('not json');
+    await expect(rpcFor(rawChannel(reply.length, [reply])).call('X')).rejects.toMatchObject({
+      kind: 'malformedResponse',
+    });
+  });
+
+  it('refuses a reply larger than 1 MB before reading it', async () => {
+    await expect(rpcFor(rawChannel(2 * 1024 * 1024, [])).call('X')).rejects.toMatchObject({
+      kind: 'responseTooLarge',
+    });
+  });
+
+  it('reports a lost link when the device stops sending mid-reply', async () => {
+    const reply = bytes('{"id":1,"result":{"long":"' + 'x'.repeat(40) + '"}}');
+    const channel = rawChannel(reply.length, [reply.subarray(0, 20)]);
+    await expect(rpcFor(channel).call('X')).rejects.toMatchObject({ kind: 'linkLost' });
+  });
+
+  it('reports a lost link when a read fails mid-reply', async () => {
+    const reply = bytes('{"id":1,"result":{"long":"' + 'x'.repeat(40) + '"}}');
+    const channel = rawChannel(reply.length, [reply.subarray(0, 20), new Error('GATT Server is disconnected')]);
+    await expect(rpcFor(channel).call('X')).rejects.toMatchObject({ kind: 'linkLost' });
+  });
+
+  it('times out a reply that trickles in past the deadline', async () => {
+    const reply = bytes('{"id":1,"result":"' + 'x'.repeat(200) + '"}');
+    const chunks = Array.from({ length: reply.length }, (_, i) => reply.subarray(i, i + 1));
+    let clock = 0;
+    const rpc = new ShellyBleRpc(rawChannel(reply.length, chunks).channel, {
+      timeoutMs: 1_000,
+      now: () => (clock += 50),
+      sleep: async () => undefined,
+    });
+    await expect(rpc.call('X')).rejects.toMatchObject({ kind: 'timeout' });
+  });
+
   it('turns a failing characteristic into a link-lost error', async () => {
     const fake = createFakeShelly(() => ({ result: null }));
     fake.channel.data.writeValue = () => Promise.reject(new Error('GATT Server is disconnected'));
@@ -89,11 +190,13 @@ describe('ShellyBleRpc framing', () => {
 
 describe('digest auth', () => {
   it('matches a known SHA-256 vector', async () => {
+    // Literal values, computed outside this code base with sha256sum:
+    //   ha1      = sha256("admin:shellypro1pm-a0b1c2d3e4f5:secret")
+    //   ha2      = sha256("dummy_method:dummy_uri")
+    //   response = sha256("<ha1>:1700000000:1:12345:auth:<ha2>")
     const challenge = { realm: 'shellypro1pm-a0b1c2d3e4f5', nonce: 1700000000, nc: 1 };
     const auth = await buildRpcAuth(challenge, 'admin', 'secret', 12345, 1);
 
-    const ha1 = sha('admin:shellypro1pm-a0b1c2d3e4f5:secret');
-    const ha2 = sha('dummy_method:dummy_uri');
     expect(auth).toEqual({
       realm: 'shellypro1pm-a0b1c2d3e4f5',
       username: 'admin',
@@ -101,9 +204,19 @@ describe('digest auth', () => {
       cnonce: 12345,
       nc: 1,
       algorithm: 'SHA-256',
-      response: sha(`${ha1}:1700000000:1:12345:auth:${ha2}`),
+      response: '9422c1e883192fc888074fcd4822a51f6b48905356f8d1404a5688828ab3b2df',
     });
-    expect(await computeHa1('admin', 'shellypro1pm-a0b1c2d3e4f5', 'secret')).toBe(ha1);
+    expect(await computeHa1('admin', 'shellypro1pm-a0b1c2d3e4f5', 'secret')).toBe(
+      '9b39ccfc2f6ac34c6e7e449de05a0ac893ea043c2bb2587df3fbd942bae78c50',
+    );
+  });
+
+  it('uses a random cnonce per auth object', async () => {
+    const challenge = { realm: 'r', nonce: 1 };
+    const a = await buildRpcAuth(challenge, 'admin', 'pw');
+    const b = await buildRpcAuth(challenge, 'admin', 'pw');
+    expect(Number.isInteger(a.cnonce)).toBe(true);
+    expect(a.cnonce).not.toBe(b.cnonce);
   });
 
   it('parses a challenge and rejects other 401 messages', () => {
@@ -132,6 +245,30 @@ describe('digest auth', () => {
     await rpc.call('Sys.GetConfig');
     expect(fake.requests).toHaveLength(3);
     expect(fake.requests[2].auth?.nc).toBe(2);
+  });
+
+  it('retries once with a fresh challenge when the reused nonce went stale', async () => {
+    const ha1 = sha('admin:dev-1:pw');
+    let nonce = 100;
+    const valid = new Set<number>();
+    const fake = createFakeShelly(async (req: FakeRequest) => {
+      const auth = req.auth as { nonce?: number } | undefined;
+      if (auth && valid.has(Number(auth.nonce)) && (await verifyDigest(req.auth, ha1))) {
+        valid.delete(Number(auth.nonce)); // each nonce is good for one call, like one that expires
+        return { result: { ok: true } };
+      }
+      nonce += 1;
+      valid.add(nonce);
+      return challengeError('dev-1', nonce);
+    });
+    const rpc = rpcFor(fake);
+    rpc.setCredentials('admin', 'pw');
+
+    await expect(rpc.call('A')).resolves.toEqual({ ok: true });
+    await expect(rpc.call('B')).resolves.toEqual({ ok: true });
+    // B: the stale nonce is refused once, then the fresh challenge succeeds.
+    expect(fake.requests.map((r) => r.method)).toEqual(['A', 'A', 'B', 'B']);
+    expect(fake.requests[3].auth).toMatchObject({ nonce: 102, nc: 1 });
   });
 
   it('reports a wrong password without echoing it', async () => {

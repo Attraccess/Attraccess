@@ -4,7 +4,7 @@ import { Label, Radio, RadioGroup, Spinner } from '@heroui/react';
 import { RefreshCwIcon } from 'lucide-react';
 import { Button, StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { useShellyTranslations } from '../../i18n';
-import type { RpcCaller } from '../../bluetooth/rpc';
+import type { AuthenticatingRpc } from '../../bluetooth/rpc';
 import { TextFieldRow } from '../../shared/TextFieldRow';
 import { useWifiScan } from './useWifiScan';
 
@@ -23,15 +23,15 @@ export function WifiNetworkPicker({
   selection,
   onChange,
   protectedDevice = false,
-  beforeRescan,
+  adminPassword,
 }: {
-  rpc: RpcCaller;
+  rpc: AuthenticatingRpc;
   selection: WifiSelection;
   onChange: (selection: WifiSelection) => void;
   /** The device asks for its admin password, so a first scan may have been refused. */
   protectedDevice?: boolean;
-  /** Runs before a manual rescan, e.g. to hand the entered admin password to the connection. */
-  beforeRescan?: () => void;
+  /** The current admin password entered so far; a rescan of a protected device uses it. */
+  adminPassword?: string;
 }) {
   const { t } = useShellyTranslations();
   const { state, rescan } = useWifiScan(rpc);
@@ -64,7 +64,7 @@ export function WifiNetworkPicker({
           }}
           data-cy="shelly-ble-networks"
         >
-          <Label className="sr-only">{t('ble.wifi.networks')}</Label>
+          <Label className="sh:sr-only">{t('ble.wifi.networks')}</Label>
           {networks.map((network) => (
             <Radio key={network.ssid} value={network.ssid}>
               <Radio.Content>
@@ -105,10 +105,8 @@ export function WifiNetworkPicker({
           <Button
             variant="ghost"
             size="sm"
-            onPress={() => {
-              beforeRescan?.();
-              rescan();
-            }}
+            onPress={() => rescan(protectedDevice ? adminPassword : undefined)}
+            data-cy="shelly-ble-rescan"
           >
             <RefreshCwIcon className="sh:h-4 sh:w-4" /> {t('ble.wifi.rescan')}
           </Button>

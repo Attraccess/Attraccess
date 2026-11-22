@@ -1,14 +1,18 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { RpcError, SetupStepError, ShellyBleError } from '../../bluetooth/errors';
-import { JoinTimeoutError } from '../../bluetooth/provisioning';
-import { describeSetupError } from './describeSetupError';
+import { JoinTimeoutError, RpcError, SetupStepError, ShellyBleError } from '../../bluetooth/errors';
+import { describeConnectError, describeSetupError as describe_ } from './describeSetupError';
 
-const t = (key: string, data?: Record<string, string | number>) => `${key}${data ? JSON.stringify(data) : ''}`;
+const t = (key: string, data?: Record<string, unknown>) => `${key}${data ? JSON.stringify(data) : ''}`;
+/** Title and detail joined, so each assertion can look at the whole message. */
+const describeSetupError = (...args: Parameters<typeof describe_>) => {
+  const { title, detail } = describe_(...args);
+  return `${title} | ${detail}`;
+};
 
 describe('describeSetupError', () => {
   it('reports a join timeout with the last Wi-Fi status', () => {
-    const err = new SetupStepError('join', new JoinTimeoutError('connecting'), { status: 'connecting' });
+    const err = new SetupStepError('join', new JoinTimeoutError('connecting'));
     expect(describeSetupError(err, t)).toContain('ble.failure.joinTimeout{"status":"connecting"}');
   });
 
@@ -38,5 +42,32 @@ describe('describeSetupError', () => {
     const err = new SetupStepError('password', new ShellyBleError('wrongPassword', 'rejected'));
     expect(describeSetupError(err, t, { protectedDevice: true })).toContain('ble.steps.passwordCheck');
     expect(describeSetupError(err, t)).toContain('ble.steps.password');
+  });
+
+  it('puts the step in the title and the cause in the detail', () => {
+    const err = new SetupStepError('wifi', new ShellyBleError('linkLost', 'gone'));
+    expect(describe_(err, t)).toEqual({
+      title: 'ble.failure.title{"step":"ble.steps.wifi"}',
+      detail: 'ble.failure.linkLost',
+    });
+  });
+
+  it('clips a very long device message', () => {
+    const err = new SetupStepError('wifi', new RpcError('WiFi.SetConfig', -1, 'x'.repeat(5000)));
+    expect(describe_(err, t).detail.length).toBeLessThan(400);
+  });
+});
+
+describe('describeConnectError', () => {
+  const named = (name: string, message: string) => Object.assign(new Error(message), { name });
+
+  it('explains a switched-off Bluetooth adapter', () => {
+    expect(describeConnectError(named('NotFoundError', 'Bluetooth adapter not available.'), t)).toBe(
+      'ble.connect.adapterOff',
+    );
+  });
+
+  it('explains a device without the RPC service', () => {
+    expect(describeConnectError(new ShellyBleError('noRpcService', 'none'), t)).toBe('ble.connect.noRpcService');
   });
 });

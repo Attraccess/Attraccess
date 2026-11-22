@@ -6,7 +6,8 @@ export function DeviceSummary({ info, advertisedName }: { info: BleDeviceInfo; a
   const rows: Array<[string, string]> = [
     [t('ble.device.model'), info.model ?? advertisedName],
     [t('ble.device.generation'), info.gen ? t('devices.generation', { generation: info.gen }) : t('devices.unknown')],
-    [t('ble.device.id'), info.mac ?? info.id],
+    [t('ble.device.id'), info.id],
+    [t('ble.device.mac'), info.mac ?? t('devices.unknown')],
     [t('ble.device.firmware'), info.ver ?? t('devices.unknown')],
   ];
   return (

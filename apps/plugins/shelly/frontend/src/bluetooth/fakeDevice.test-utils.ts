@@ -1,7 +1,13 @@
 // A stateful fake Shelly Pro 1PM on top of the framing fake: it enforces
 // digest auth once an admin password is set (answering 401 with a challenge)
 // and implements the methods the setup uses. Test support only.
-import { challengeError, createFakeShelly, verifyDigest, type FakeReply, type FakeShelly } from './fakeShelly';
+import {
+  challengeError,
+  createFakeShelly,
+  verifyDigest,
+  type FakeReply,
+  type FakeShelly,
+} from './fakeShelly.test-utils';
 
 export interface FakeDeviceOptions {
   authEn?: boolean;
@@ -17,9 +23,9 @@ export interface FakeDeviceOptions {
   staIp?: string;
   restartRequiredOnWifi?: boolean;
   bleSetConfig?: 'ok' | 'restart' | 'refuse';
-  /** Fail an RPC with a device error. */
   /** Shelly.Reboot never answers, like a device that reboots first. */
   rebootSilent?: boolean;
+  /** Fail an RPC with a device error. */
   failMethod?: { method: string; message: string };
 }
 

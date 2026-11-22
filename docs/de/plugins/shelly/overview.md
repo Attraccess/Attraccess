@@ -58,20 +58,22 @@ WLAN ein und fügt das Gerät dem Register hinzu.
 - Attraccess wird über HTTPS oder auf `localhost` geöffnet. Browser erlauben Bluetooth nur auf sicheren Seiten.
 - Ein Shelly der Generation Gen2, Gen3 oder Gen4 in Bluetooth-Reichweite. Gen1-Geräte lassen sich nicht über
   Bluetooth einrichten. Bei manchen Gen2-Firmwares muss zuerst **RPC über Bluetooth** in der Weboberfläche des Geräts
-  aktiviert werden.
+  aktiviert werden. Ohne diese Option verbinden Sie das Gerät über seinen eigenen Access Point mit dem WLAN und
+  nutzen **Gerät hinzufügen** oder **Suchen**.
 - Ein 2,4-GHz-WLAN. Shelly-Geräte können keinem 5-GHz-Netzwerk beitreten.
 
 **Ablauf**
 
 1. Öffnen Sie die Seite **Shelly-Geräte**, wählen Sie **Über Bluetooth einrichten** und dann **Gerät auswählen**.
    Wählen Sie den Shelly in der Liste des Browsers aus (sein Name beginnt mit `Shelly`). Attraccess zeigt Modell,
-   Generation, ID und Firmware an.
+   Generation, Geräte-ID, MAC-Adresse und Firmware an. Meldet Attraccess, dass Bluetooth ausgeschaltet ist, schalten
+   Sie Bluetooth an Ihrem Computer ein.
 2. Wählen Sie Ihr WLAN aus der Liste, die das Gerät gefunden hat. Bei einem versteckten Netzwerk oder wenn die Suche
-   fehlschlägt, wählen Sie **Anderes Netzwerk** und geben den Namen ein. Geben Sie das WLAN-Passwort ein; lassen Sie es
+   fehlschlägt, wählen Sie **Anderes Netzwerk (Name eingeben)** und geben den Namen ein. Geben Sie das WLAN-Passwort ein; lassen Sie es
    bei einem offenen Netzwerk leer.
-3. Geben Sie das **neue Admin-Passwort** zweimal ein. Es ist erforderlich: Es wird vor dem WLAN auf dem Gerät gesetzt,
+3. Geben Sie das Passwort unter **Neues Admin-Passwort** und **Admin-Passwort bestätigen** ein. Es ist erforderlich: Es wird vor dem WLAN auf dem Gerät gesetzt,
    damit das Gerät nie ungeschützt in Ihrem Netzwerk ist. Der Benutzername ist `admin`. Hat das Gerät bereits ein
-   Admin-Passwort, geben Sie stattdessen dessen aktuelles Passwort ein.
+   Admin-Passwort, geben Sie stattdessen dessen aktuelles Passwort unter **Aktuelles Admin-Passwort** ein.
 4. Ändern Sie optional den Namen. Standard ist der Bluetooth-Name des Geräts.
 5. Entscheiden Sie über **Bluetooth am Gerät nach der Einrichtung ausschalten**, standardmäßig aktiviert. Lassen Sie
    es aktiviert, außer Sie nutzen das Gerät als BLU- oder BTHome-Gateway. Solange Bluetooth an ist, kann jeder in der
@@ -88,10 +90,11 @@ WLAN ein und fügt das Gerät dem Register hinzu.
   Fügen Sie es mit **Suchen** oder **Gerät hinzufügen** hinzu, sobald es online ist. Bluetooth bleibt in diesem Fall an.
 - Ist ein Gerät mit dieser IP-Adresse bereits im Register, wird nichts hinzugefügt. Bluetooth wird trotzdem
   ausgeschaltet, wenn Sie das gewünscht haben.
-- Bricht die Bluetooth-Verbindung ab, starten Sie neu. Ein Gerät, das bereits Ihrem WLAN beigetreten ist, fügen Sie
+- Bricht die Bluetooth-Verbindung ab, wählen Sie **Von vorn beginnen**. Ein Gerät, das bereits Ihrem WLAN beigetreten ist, fügen Sie
   mit **Suchen** hinzu.
 - Lehnt das Gerät das Ausschalten von Bluetooth ab, bleibt es eingerichtet und registriert. Schalten Sie Bluetooth in
-  der Weboberfläche des Geräts aus.
+  der Weboberfläche des Geräts aus. Bestätigt das Gerät das Ausschalten nicht, weist Attraccess darauf hin; prüfen Sie
+  Bluetooth auch dann dort.
 
 ## Siehe auch
 
