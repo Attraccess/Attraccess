@@ -141,7 +141,7 @@ export class FabricManager {
   async #exclusive<T>(work: () => Promise<T>): Promise<T> {
     if (this.#closed) throw new ApiError('sidecar_unavailable', 'The Matter sidecar is shutting down.');
     if (this.#running) {
-      throw new ApiError('busy', 'A snapshot or restore is in progress. Try again in a moment.');
+      throw new ApiError('busy', 'Another fabric operation is in progress. Try again in a moment.');
     }
     const running = work();
     this.#running = running;
@@ -150,6 +150,43 @@ export class FabricManager {
     } finally {
       this.#running = undefined;
     }
+  }
+
+  /** Runs `work` inside the single-flight gate (commissioning, removal and sharing use it). */
+  runExclusive<T>(work: () => Promise<T>): Promise<T> {
+    return this.#exclusive(work);
+  }
+
+  /**
+   * Takes the gate now, or throws `busy` / `sidecar_unavailable` at once, and holds it until `work` settles. For
+   * operations that outlive their request (commissioning). The returned promise settles with the work and never
+   * rejects unhandled: callers must handle the result themselves.
+   */
+  beginExclusive<T>(work: () => Promise<T>): Promise<T> {
+    if (this.#closed) throw new ApiError('sidecar_unavailable', 'The Matter sidecar is shutting down.');
+    if (this.#running) throw new ApiError('busy', 'Another fabric operation is in progress. Try again in a moment.');
+    return this.#exclusive(work);
+  }
+
+  /**
+   * Records a change of the fabric (a node joined or left): bumps `fabricGeneration`, persists it and publishes
+   * `fabric.changed`. Call it inside the gate. Returns the new generation.
+   */
+  commitFabricChange(): number {
+    const inspection = this.#inspection;
+    if (inspection.kind !== 'initialized') {
+      throw new ApiError('fabric_absent', 'There is no fabric.');
+    }
+    const metadata: StorageMetadata = {
+      ...inspection.metadata,
+      fabricGeneration: inspection.metadata.fabricGeneration + 1,
+      writtenBySidecar: this.options.versions.sidecar,
+      updatedAt: this.now(),
+    };
+    writeMetadata(this.layout, metadata);
+    this.#inspection = { ...inspection, metadata };
+    this.#announce();
+    return metadata.fabricGeneration;
   }
 
   /** Runs timer-driven clean-up through the single-flight gate, waiting while another operation holds it. */
