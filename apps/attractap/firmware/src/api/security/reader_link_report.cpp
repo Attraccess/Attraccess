@@ -3,6 +3,7 @@
 #include "build_profile.hpp"
 #include "efuse_report.hpp"
 #include "efuse_snapshot.hpp"
+#include "../../platform.hpp"
 
 // The eFuse report (ATT-1207): a secure-profile reader tells the server which eFuses it has, once per session,
 // as a CONTROL frame (`efuse.report`). Read-only: nothing in the firmware writes an eFuse.
