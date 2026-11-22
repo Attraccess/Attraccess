@@ -1,5 +1,6 @@
 import { MATTER_STORAGE } from '../plugin-storage/tables';
-import { PLUGIN_TABLES, tableColumns } from './tables';
+import { createHarness, nodeRow } from '../testing/devices-harness.test-utils';
+import { PLUGIN_TABLES, readTables, replaceTables, tableColumns } from './tables';
 
 /**
  * The plugin tables a backup deliberately leaves out: the backups themselves, the recovery keys (never in a backup),
@@ -23,5 +24,31 @@ describe('the tables a backup carries', () => {
     );
     expect(columns.get('plugin_matter_commands')).toContain('request_id');
     expect(columns.get('plugin_matter_fabrics')).toContain('fabric_generation');
+  });
+});
+
+describe('restoring nodes across the version 3 columns', () => {
+  it('restores a row from before version 3 (no administrators columns) with null, and a new one as it is', async () => {
+    const h = await createHarness();
+    await h.tables.nodes.insert(
+      nodeRow({ id: 'new', nodeId: '7', administrators: '[{"fabricIndex":1}]', attestationOverridden: true }),
+    );
+    const written = await readTables(h.tables);
+    expect(written['plugin_matter_nodes'][0]).toMatchObject({ attestation_overridden: true });
+    const old = { ...written['plugin_matter_nodes'][0], id: 'old', node_id: '8' };
+    delete (old as Record<string, unknown>)['administrators'];
+    delete (old as Record<string, unknown>)['attestation_overridden'];
+    await replaceTables(h.tables, { ...written, plugin_matter_nodes: [written['plugin_matter_nodes'][0], old] });
+    expect(await h.tables.nodes.get('old')).toMatchObject({ administrators: null, attestationOverridden: null });
+    expect(await h.tables.nodes.get('new')).toMatchObject({ attestationOverridden: true });
+  });
+
+  it('accepts the new removal reasons', async () => {
+    const h = await createHarness();
+    await h.tables.nodes.insert(
+      nodeRow({ id: 'gone', lifecycleState: 'removed', removalReason: 'forced_from_fabric', removedAt: 't' }),
+    );
+    const written = await readTables(h.tables);
+    await expect(replaceTables(h.tables, written)).resolves.toBeUndefined();
   });
 });

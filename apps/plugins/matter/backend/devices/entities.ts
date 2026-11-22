@@ -9,7 +9,8 @@ import type { MATTER_TABLES } from '../plugin-storage/tables';
 export type FabricStatus = 'active' | 'absent';
 export type LifecycleState = 'unclaimed' | 'claimed' | 'detached' | 'archived' | 'removed';
 export type DetachedReason = 'absent_from_sidecar' | 'fabric_mismatch' | 'fabric_absent';
-export type RemovalReason = 'force_removed' | 'merged' | 'replaced';
+/** `removed_from_fabric` / `forced_from_fabric` (ATT-1002): the sidecar removed or forgot the node. */
+export type RemovalReason = 'force_removed' | 'merged' | 'replaced' | 'removed_from_fabric' | 'forced_from_fabric';
 /** Why an endpoint row was retired. */
 export type EndpointRemovalReason = 'absent_from_sidecar' | 'replaced' | 'force_removed' | 'merged';
 export type AttestationStatus = 'verified' | 'unverified' | 'failed' | 'unknown';

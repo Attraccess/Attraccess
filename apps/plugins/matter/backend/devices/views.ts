@@ -102,6 +102,10 @@ export function nodeDetailView(detail: {
 }) {
   return {
     ...nodeView(detail.node),
+    /** Every fabric the device is joined to, Attraccess's own included. Read-only: other ecosystems manage theirs. */
+    administrators: parseAdministrators(detail.node.administrators),
+    /** True when the node was commissioned although attestation failed (development override). */
+    attestationOverridden: detail.node.attestationOverridden === true,
     fabric: detail.fabric && {
       id: detail.fabric.id,
       fabricId: detail.fabric.fabricId,
@@ -114,4 +118,21 @@ export function nodeDetailView(detail: {
       capabilities: capabilities.map(capabilityView).sort((a, b) => a.capability.localeCompare(b.capability)),
     })),
   };
+}
+
+export type AdministratorView = {
+  fabricIndex: number;
+  vendorId: number | null;
+  fabricLabel: string | null;
+  isOwn: boolean;
+};
+
+export function parseAdministrators(json: string | null): AdministratorView[] {
+  if (!json) return [];
+  try {
+    const parsed: unknown = JSON.parse(json);
+    return Array.isArray(parsed) ? (parsed as AdministratorView[]) : [];
+  } catch {
+    return [];
+  }
 }

@@ -9,6 +9,7 @@ import { MatterBackupController } from './backup/controller';
 import { MatterFabricController } from './fabric/controller';
 import { MatterRestoreService } from './backup/restore.service';
 import { MatterChangeBus } from './devices/change-bus';
+import { MatterCommissioningController } from './commissioning/controller';
 import { MatterDevicesController } from './devices/controller';
 import { MatterLifecycleService } from './devices/lifecycle.service';
 import { MatterLiveUpdatesService } from './devices/live-updates.service';
@@ -25,10 +26,11 @@ describe('matter plugin backend', () => {
     expect(module.controllers).toEqual([
       MatterConnectionController,
       MatterDevicesController,
+      MatterCommissioningController,
       MatterFabricController,
       MatterBackupController,
     ]);
-    expect(module.providers).toHaveLength(17);
+    expect(module.providers).toHaveLength(21);
     expect(plugin.storage).toBe(MATTER_STORAGE);
     expect(plugin.auditDomains).toEqual([MATTER_AUDIT_DOMAIN]);
   });
@@ -67,7 +69,7 @@ describe('matter plugin backend', () => {
       field.type === 'boolean' ||
       field.oneOf !== undefined ||
       (field.type === 'number' && field.integer === true) ||
-      (field.type === 'string' && /^\[(0-9a-f-|0-9)\]/.test(field.pattern ?? ''));
+      (field.type === 'string' && /^\[(0-9a-f-|0-9|A-Za-z0-9_,)\]/.test(field.pattern ?? ''));
     expect(details.every(bounded)).toBe(true);
   });
 
@@ -101,6 +103,19 @@ describe('matter plugin backend', () => {
         'matter.restore_rolled_back',
         'matter.fabric_recovery_required',
         'matter.recovery_action_chosen',
+        'matter.commissioning_started',
+        'matter.commissioning_failed',
+        'matter.commissioning_interrupted',
+        'matter.commissioning_cancelled',
+        'matter.commissioning_attestation_overridden',
+        'matter.node_commissioned',
+        'matter.commissioning_finished',
+        'matter.node_removed_from_fabric',
+        'matter.node_force_removed_from_fabric',
+        'matter.node_removal_failed',
+        'matter.node_shared',
+        'matter.node_share_revoked',
+        'matter.node_share_expired',
       ]),
     );
     const subjects = new Set(MATTER_AUDIT_DOMAIN.actions.flatMap((entry) => entry.subjectTypes));
@@ -112,6 +127,7 @@ describe('matter plugin backend', () => {
         'matter.fabric',
         'matter.backup',
         'matter.recovery_key',
+        'matter.commissioning_session',
       ]),
     );
   });

@@ -11,6 +11,11 @@ import { MatterBackupController } from './backup/controller';
 import { MatterBackupService } from './backup/backup.service';
 import { MatterRestoreService } from './backup/restore.service';
 import { MatterBackupSchedulerService } from './backup/scheduler.service';
+import { MatterCommissioningController } from './commissioning/controller';
+import { MatterCommissioningService } from './commissioning/commissioning.service';
+import { MatterOperationGate } from './commissioning/operation-gate';
+import { MatterNodeRemovalService } from './commissioning/removal.service';
+import { MatterNodeSharingService } from './commissioning/sharing.service';
 import { MATTER_AUDIT_DOMAIN } from './connection/audit';
 import { MatterConnectionController } from './connection/controller';
 import { MatterConnectionService } from './connection/connection.service';
@@ -47,6 +52,7 @@ const plugin: PluginBackendModule = {
       controllers: [
         MatterConnectionController,
         MatterDevicesController,
+        MatterCommissioningController,
         MatterFabricController,
         MatterBackupController,
       ],
@@ -69,6 +75,11 @@ const plugin: PluginBackendModule = {
         MatterFabricService,
         MatterRestoreService,
         MatterBackupSchedulerService,
+        // ATT-1002: commissioning, removal from the fabric and sharing.
+        MatterOperationGate,
+        MatterCommissioningService,
+        MatterNodeRemovalService,
+        MatterNodeSharingService,
       ],
     };
   },

@@ -10,7 +10,13 @@ import { randomUUID } from 'node:crypto';
 import { PLUGIN_CONTEXT } from '../plugin-context';
 
 export type DeviceAuditSubject = {
-  type: 'matter.node' | 'matter.endpoint' | 'matter.fabric' | 'matter.backup' | 'matter.recovery_key';
+  type:
+    | 'matter.node'
+    | 'matter.endpoint'
+    | 'matter.fabric'
+    | 'matter.backup'
+    | 'matter.recovery_key'
+    | 'matter.commissioning_session';
   ref: string;
 };
 export type AuditOutcome = 'succeeded' | 'failed';

@@ -3,10 +3,13 @@ import { MATTER_STORAGE } from '../plugin-storage/tables';
 import { schemaNameOf, storageSchemaName } from './migration-reader';
 
 describe('Matter storage schema identity (backup compatibility)', () => {
-  it('keeps the name of the last 1.x migration while later versions only add indexes', () => {
-    expect(MATTER_STORAGE.migrations.length).toBeGreaterThan(1);
-    // Backups made by 1.x and by earlier 2.x builds carry this name; an index changes no row they hold.
-    expect(storageSchemaName()).toBe('CreateMatterBackup1793900002000');
+  it('names version 3, the last migration that adds columns; version 2 only added indexes', () => {
+    expect(MATTER_STORAGE.migrations.length).toBe(3);
+    // Backups made by 1.x and by earlier 2.x builds carry the 1.x name; they restore onto this one (see format.spec).
+    expect(storageSchemaName()).toBe('v3:node-administrators');
+    expect(schemaNameOf({ ...MATTER_STORAGE, migrations: MATTER_STORAGE.migrations.slice(0, 2) })).toBe(
+      'CreateMatterBackup1793900002000',
+    );
   });
 
   it('names the last migration that changes rows: a column or a data step', () => {

@@ -10,6 +10,7 @@ import {
   MATTER_BASELINE_TABLES,
   MATTER_STORAGE,
   MATTER_TABLES,
+  NODE_V3_FIELDS,
 } from './tables';
 
 type Column = { type: string; notNull: boolean; default: string | null };
@@ -166,8 +167,7 @@ describe('Matter storage baseline', () => {
   });
 
   it('adds the lookup indexes of the legacy partial unique indexes in version 2, as plain indexes', () => {
-    const [, lookup, ...later] = MATTER_STORAGE.migrations;
-    expect(later).toEqual([]);
+    const [, lookup] = MATTER_STORAGE.migrations;
     expect(lookup.version).toBe(2);
     expect(lookup.data).toBeUndefined();
     const added = (lookup.steps ?? []).map((step) => (step.op === 'addIndex' ? [step.table, step.index] : step.op));
@@ -188,11 +188,26 @@ describe('Matter storage baseline', () => {
     }
   });
 
-  it('declares the head as the baseline plus the version 2 indexes', () => {
+  it('adds the two nullable node columns of ATT-1002 in version 3, without a data step', () => {
+    const v3 = MATTER_STORAGE.migrations[2];
+    expect(v3.version).toBe(3);
+    expect(v3.data).toBeUndefined();
+    expect((v3.steps ?? []).map((step) => (step.op === 'addColumn' ? [step.table, step.field] : step.op))).toEqual([
+      ['nodes', 'administrators'],
+      ['nodes', 'attestationOverridden'],
+    ]);
+    for (const [field, definition] of Object.entries(NODE_V3_FIELDS)) {
+      expect(definition.nullable).toBe(true);
+      expect(MATTER_TABLES.nodes.fields[field as keyof typeof NODE_V3_FIELDS]).toBe(definition);
+    }
+  });
+
+  it('declares the head as the baseline plus the version 2 indexes and the version 3 columns', () => {
     for (const [name, table] of Object.entries(MATTER_TABLES)) {
       const baseline = MATTER_BASELINE_TABLES[name as keyof typeof MATTER_BASELINE_TABLES];
       const extra = LOOKUP_INDEXES[name as keyof typeof LOOKUP_INDEXES] ?? [];
-      expect(table).toEqual({ ...baseline, indexes: [...baseline.indexes, ...extra] });
+      const fields = name === 'nodes' ? { ...baseline.fields, ...NODE_V3_FIELDS } : baseline.fields;
+      expect(table).toEqual({ ...baseline, fields, indexes: [...baseline.indexes, ...extra] });
     }
   });
 

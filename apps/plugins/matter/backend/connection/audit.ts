@@ -55,6 +55,125 @@ const MISMATCHES = [
   'storage_instance_changed',
   'sidecar_recovery_required',
 ] as const;
+// Commissioning (ATT-1002). Closed sets and bounded IDs only: never a setup code, a sharing code, a certificate or any
+// text the device or the sidecar sent. Finding types are the names of attestation findings (`PaaNotTrusted`, ...).
+const SESSION_REF = { sessionRef: UUID_FIELD } as const;
+const COMMISSIONING_STEPS = [
+  'discovering',
+  'pase',
+  'reading_device',
+  'attestation',
+  'adding_fabric',
+  'network_setup',
+  'case',
+  'interrogating',
+  'completed',
+] as const;
+const COMMISSIONING_FAILURES = [
+  'invalid_code',
+  'device_not_found',
+  'pase_failed',
+  'attestation_failed',
+  'already_commissioned',
+  'fabric_full',
+  'case_failed',
+  'timeout',
+  'cancelled',
+  'interrupted',
+  'internal',
+  'needs_reconciliation',
+  'registry_failed',
+] as const;
+const FINDINGS = { findings: { type: 'string', pattern: '[A-Za-z0-9_,]{0,512}', maxLength: 512 } } as const;
+const INTERRUPT_REASONS = ['sidecar_restart', 'connection_lost', 'timeout', 'plugin_restart'] as const;
+const REMOVAL_STATES = ['unclaimed', 'claimed', 'detached', 'archived'] as const;
+const COMMISSIONING_ACTIONS = [
+  {
+    action: 'matter.commissioning_started',
+    subjectTypes: ['matter.commissioning_session'],
+    details: { ...SESSION_REF, attestationOverride: { type: 'boolean' } },
+  },
+  {
+    action: 'matter.commissioning_failed',
+    subjectTypes: ['matter.commissioning_session'],
+    details: {
+      ...SESSION_REF,
+      failure: { type: 'string', oneOf: COMMISSIONING_FAILURES },
+      step: { type: 'string', oneOf: COMMISSIONING_STEPS },
+      ...FINDINGS,
+      existingNodeId: DECIMAL_ID_FIELD,
+    },
+  },
+  {
+    action: 'matter.commissioning_interrupted',
+    subjectTypes: ['matter.commissioning_session'],
+    details: { ...SESSION_REF, reason: { type: 'string', oneOf: INTERRUPT_REASONS } },
+  },
+  { action: 'matter.commissioning_cancelled', subjectTypes: ['matter.commissioning_session'], details: SESSION_REF },
+  {
+    // The dangerous development override: the attempt went on although attestation failed.
+    action: 'matter.commissioning_attestation_overridden',
+    subjectTypes: ['matter.commissioning_session'],
+    details: { ...SESSION_REF, ...FINDINGS },
+  },
+  {
+    action: 'matter.node_commissioned',
+    subjectTypes: ['matter.node'],
+    details: {
+      ...NODE_REF,
+      ...FABRIC_ID,
+      ...NODE_ID,
+      ...SESSION_REF,
+      attestation: { type: 'string', oneOf: ['verified', 'overridden'] },
+    },
+  },
+  {
+    action: 'matter.commissioning_finished',
+    subjectTypes: ['matter.node'],
+    details: {
+      ...NODE_REF,
+      ...SESSION_REF,
+      nameSet: { type: 'boolean' },
+      locationSet: { type: 'boolean' },
+      endpointNames: { type: 'number', integer: true, min: 0, max: 256 },
+    },
+  },
+  {
+    action: 'matter.node_removed_from_fabric',
+    subjectTypes: ['matter.node'],
+    details: { ...NODE_REF, previousState: { type: 'string', oneOf: REMOVAL_STATES }, ...GENERATION },
+  },
+  {
+    action: 'matter.node_force_removed_from_fabric',
+    subjectTypes: ['matter.node'],
+    details: { ...NODE_REF, previousState: { type: 'string', oneOf: REMOVAL_STATES }, ...GENERATION },
+  },
+  {
+    action: 'matter.node_removal_failed',
+    subjectTypes: ['matter.node'],
+    details: {
+      ...NODE_REF,
+      mode: { type: 'string', oneOf: ['normal', 'force'] },
+      reason: {
+        type: 'string',
+        oneOf: ['device_unreachable', 'timeout', 'busy', 'sidecar_unavailable', 'not_found', 'internal'],
+      },
+    },
+  },
+  {
+    // The sharing code itself is never recorded: only that a window was opened, and for how long.
+    action: 'matter.node_shared',
+    subjectTypes: ['matter.node'],
+    details: { ...NODE_REF, timeoutSec: { type: 'number', integer: true, min: 180, max: 900 } },
+  },
+  {
+    action: 'matter.node_share_revoked',
+    subjectTypes: ['matter.node'],
+    details: { ...NODE_REF, closed: { type: 'boolean' } },
+  },
+  { action: 'matter.node_share_expired', subjectTypes: ['matter.node'], details: NODE_REF },
+] as const satisfies PluginAuditDomainDeclaration['actions'];
+
 const METADATA_FLAGS = {
   displayNameChanged: { type: 'boolean' },
   descriptionChanged: { type: 'boolean' },
@@ -244,5 +363,6 @@ export const MATTER_AUDIT_DOMAIN: PluginAuditDomainDeclaration = {
       subjectTypes: ['matter.fabric'],
       details: { fabricRef: UUID_FIELD, choice: { type: 'string', oneOf: ['accept_sidecar', 'start_new', 'restore'] } },
     },
+    ...COMMISSIONING_ACTIONS,
   ],
 };

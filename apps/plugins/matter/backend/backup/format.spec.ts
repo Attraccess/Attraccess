@@ -247,6 +247,16 @@ describe('backup compatibility', () => {
     expect(reason(() => assertCompatible(header(), local))).toBeNull();
   });
 
+  it('restores a backup of the 1.x/2.0-beta layout onto version 3, which only added nullable columns', () => {
+    const v3 = { pluginMigration: 'v3:node-administrators' };
+    expect(reason(() => assertCompatible(header(), v3))).toBeNull();
+    expect(reason(() => assertCompatible(header({ pluginMigration: 'v3:node-administrators' }), v3))).toBeNull();
+    // The other direction (a version 3 file onto the older layout) stays refused.
+    expect(reason(() => assertCompatible(header({ pluginMigration: 'v3:node-administrators' }), local))).toBe(
+      'incompatible_migration',
+    );
+  });
+
   it('refuses another storage schema, plugin migration, or an unlisted release', () => {
     expect(reason(() => assertCompatible(header({ storageSchemaVersion: 2 }), local))).toBe('incompatible_schema');
     expect(reason(() => assertCompatible(header(), { pluginMigration: 'Newer1999999999999' }))).toBe(

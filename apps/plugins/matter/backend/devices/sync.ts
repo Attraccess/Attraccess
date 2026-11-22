@@ -59,6 +59,7 @@ export const NODE_IDENTITY_COLUMNS = [
   'attestationStatus',
   'attestationCheckedAt',
   'reachable',
+  'administrators',
   'lastSeenAt',
 ] as const satisfies readonly (keyof MatterNode)[];
 
@@ -110,6 +111,7 @@ export function identityOf(
     attestationStatus: view.attestation.status,
     attestationCheckedAt: view.attestation.checkedAt,
     reachable: view.reachable,
+    administrators: JSON.stringify(view.administrators),
     lastSeenAt: view.observedAt ?? fallbackLastSeen,
   };
 }

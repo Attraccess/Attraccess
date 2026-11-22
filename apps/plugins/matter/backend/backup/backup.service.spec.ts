@@ -56,7 +56,7 @@ describe('MatterBackupService', () => {
   it('records the plugin migration the installation ran last', async () => {
     const view = await h.backups.backup('manual', ADMIN);
     const row = await h.one('backups', { id: view.id });
-    expect(row.pluginMigration).toMatch(/^CreateMatterBackup1793900002000$/);
+    expect(row.pluginMigration).toBe('v3:node-administrators');
   });
 
   it('keeps the newest ten and prunes the rest', async () => {
