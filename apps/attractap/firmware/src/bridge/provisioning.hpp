@@ -28,7 +28,7 @@ namespace bridge::provisioning
     bool linked();
     // Drops a link that stays unencrypted or idle too long, or guessed the PIN too often (LinkGuard). Called
     // periodically from the bridge task.
-    void tick(uint32_t now);
+    void tick();
     // The command source SerialCommandHandler reads; empty while no setup runs.
     SerialCommandHandler::Channel &channel();
 }

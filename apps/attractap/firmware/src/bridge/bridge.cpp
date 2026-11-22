@@ -103,7 +103,7 @@ namespace bridge
 
                 if (setupWindow.update(State::getApiState().authenticated, now) == SetupWindow::Change::Close)
                     provisioning::close();
-                provisioning::tick(now);
+                provisioning::tick();
 
                 const State::NetworkState network = State::getNetworkState();
                 LedInputs in;

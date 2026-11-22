@@ -70,7 +70,6 @@ namespace bridge::provisioning
 
         // Counts links: a reply goes only to the link its command came from.
         std::atomic<uint32_t> linkGeneration{0};
-        std::atomic<bool> encrypted{false};
 
         std::mutex linesMutex;
         LineAssembler assembler(SerialCommandHandler::MAX_COMMAND_LENGTH);
@@ -151,12 +150,11 @@ namespace bridge::provisioning
                 {
                     forgetPartialInput();
                     linkGeneration++;
-                    encrypted = false;
                     {
                         std::lock_guard<std::mutex> lock(guardMutex);
                         guard.connected(millis());
+                        connHandle = event->connect.conn_handle;
                     }
-                    connHandle = event->connect.conn_handle;
                     connected = true;
                     logger.info("Web app connected");
                 }
@@ -167,11 +165,10 @@ namespace bridge::provisioning
                 return 0;
             case BLE_GAP_EVENT_DISCONNECT:
                 connected = false;
-                connHandle = BLE_HS_CONN_HANDLE_NONE;
-                encrypted = false;
                 linkGeneration++;
                 {
                     std::lock_guard<std::mutex> lock(guardMutex);
+                    connHandle = BLE_HS_CONN_HANDLE_NONE;
                     guard.disconnected();
                 }
                 forgetPartialInput();
@@ -187,7 +184,6 @@ namespace bridge::provisioning
                     logger.warnf("Pairing failed: %d", event->enc_change.status);
                     return 0;
                 }
-                encrypted = true;
                 {
                     std::lock_guard<std::mutex> lock(guardMutex);
                     guard.encryptedNow();
@@ -212,6 +208,8 @@ namespace bridge::provisioning
             {
                 std::lock_guard<std::mutex> lock(guardMutex);
                 if (guard.lockedOut()) return BLE_ATT_ERR_WRITE_NOT_PERMITTED;
+                // A write gets here only on an encrypted link (ENC_CHANGE may still be on its way: key exchange).
+                guard.encryptedNow();
                 guard.command(millis());
             }
             // Only the NimBLE host task calls this: one buffer, off its small stack.
@@ -276,6 +274,11 @@ namespace bridge::provisioning
         public:
             bool nextLine(std::string &line) override
             {
+                {
+                    // Lines queued before the lockout do not get more PIN guesses in.
+                    std::lock_guard<std::mutex> lock(guardMutex);
+                    if (guard.lockedOut()) return false;
+                }
                 std::lock_guard<std::mutex> lock(linesMutex);
                 if (lines.empty()) return false;
                 lineGeneration = lines.front().first;
@@ -289,8 +292,9 @@ namespace bridge::provisioning
                 std::lock_guard<std::mutex> lock(txMutex);
                 const uint16_t conn = connHandle;
                 if (!running || !connected || conn == BLE_HS_CONN_HANDLE_NONE) return;
-                // Only to the encrypted link the command came from: a reply can carry the enrolment code or SSIDs.
-                if (lineGeneration != linkGeneration || !encrypted) return;
+                // Only to the link the command came from (a reply can carry the enrolment code or SSIDs). Its lines
+                // got in only through the encrypted-write characteristic, so that link is encrypted.
+                if (lineGeneration != linkGeneration) return;
                 uint16_t mtu = ble_att_mtu(conn);
                 if (mtu < MIN_MTU) mtu = MIN_MTU;
                 if (!forEachChunk(line.size(), mtu - 3,
@@ -302,7 +306,10 @@ namespace bridge::provisioning
             {
                 std::lock_guard<std::mutex> lock(guardMutex);
                 guard.pinFailed();
-                if (guard.lockedOut()) logger.warn("Too many wrong PINs: Bluetooth setup refuses commands until reopened");
+                if (!guard.lockedOut()) return;
+                logger.warn("Too many wrong PINs: Bluetooth setup refuses commands until reopened");
+                std::lock_guard<std::mutex> linesLock(linesMutex);
+                lines.clear();
             }
         };
 
@@ -387,7 +394,6 @@ namespace bridge::provisioning
         ble_hs_cfg = savedHostConfig;
         connected = false;
         connHandle = BLE_HS_CONN_HANDLE_NONE;
-        encrypted = false;
         forgetPartialInput();
         owned = false;
         logger.info("Bluetooth setup closed");
@@ -395,21 +401,22 @@ namespace bridge::provisioning
 
     bool active() { return owned; }
 
-    void tick(uint32_t now)
+    void tick()
     {
         if (!running) return;
-        const uint16_t conn = connHandle;
-        if (!connected || conn == BLE_HS_CONN_HANDLE_NONE) return;
-        bool drop;
+        uint16_t conn;
         {
+            // The clock is read under the lock the host task writes the link's times under: never behind them.
             std::lock_guard<std::mutex> lock(guardMutex);
-            drop = guard.shouldDrop(now);
-            // Once per link: the disconnect event marks it gone.
-            if (drop) guard.disconnected();
+            conn = connHandle;
+            if (conn == BLE_HS_CONN_HANDLE_NONE || !guard.shouldDrop(millis())) return;
         }
-        if (!drop) return;
+        const int rc = ble_gap_terminate(conn, BLE_ERR_REM_USER_CONN_TERM);
+        if (rc != 0 && rc != BLE_HS_EALREADY) return; // try again next tick
+        std::lock_guard<std::mutex> lock(guardMutex);
+        // Once per link (unless a new one came meanwhile): the disconnect event marks it gone.
+        if (connHandle == conn) guard.dropping();
         logger.warn("Dropping the setup link (not encrypted, idle, or too many wrong PINs)");
-        ble_gap_terminate(conn, BLE_ERR_REM_USER_CONN_TERM);
     }
 
     bool linked() { return running && connected; }

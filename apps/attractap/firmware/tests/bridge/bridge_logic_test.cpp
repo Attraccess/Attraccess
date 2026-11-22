@@ -266,6 +266,16 @@ static void linkGuard()
     // millis() wrap.
     g.connected(0xFFFFFF00u);
     CHECK(!g.shouldDrop(0x10));
+    // A command stamped just after the caller read the clock: not 49 days of quiet.
+    g.command(5000);
+    CHECK(!g.shouldDrop(4990));
+    // Asked once per link: while the drop is under way it is not asked again, a new link is.
+    g.connected(0);
+    CHECK(g.shouldDrop(LinkGuard::UNENCRYPTED_MS));
+    g.dropping();
+    CHECK(!g.shouldDrop(LinkGuard::UNENCRYPTED_MS + 1));
+    g.connected(100);
+    CHECK(g.shouldDrop(100 + LinkGuard::UNENCRYPTED_MS));
     // Wrong PINs: locked out after the limit, across reconnects, until the next window.
     g.connected(0);
     g.encryptedNow();

@@ -82,9 +82,12 @@ namespace bridge
         {
             linked = true;
             encrypted = false;
+            terminating = false;
             lastActivity = now;
         }
         void disconnected() { linked = false; }
+        // The link is being dropped: do not ask again until its disconnect (or a new link) arrives.
+        void dropping() { terminating = true; }
         void encryptedNow() { encrypted = true; }
         void command(uint32_t now) { lastActivity = now; }
         void pinFailed()
@@ -97,15 +100,18 @@ namespace bridge
         // Whether the current link must be dropped now.
         bool shouldDrop(uint32_t now) const
         {
-            if (!linked) return false;
+            if (!linked || terminating) return false;
             if (lockedOut()) return true;
-            const uint32_t quiet = now - lastActivity;
-            return encrypted ? quiet >= IDLE_MS : quiet >= UNENCRYPTED_MS;
+            // A time stamped after `now` was read (another task) is no quiet time at all.
+            const int32_t quiet = static_cast<int32_t>(now - lastActivity);
+            if (quiet <= 0) return false;
+            return static_cast<uint32_t>(quiet) >= (encrypted ? IDLE_MS : UNENCRYPTED_MS);
         }
 
     private:
         bool linked = false;
         bool encrypted = false;
+        bool terminating = false;
         uint8_t pinFailures = 0;
         uint32_t lastActivity = 0;
     };
