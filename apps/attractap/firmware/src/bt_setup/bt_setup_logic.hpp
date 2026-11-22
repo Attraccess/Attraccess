@@ -112,6 +112,46 @@ namespace bt_setup
         uint8_t wrong = 0;
     };
 
+    // Who may hold the setup link. The window is open to anyone in radio range (Just Works pairing confirms nothing)
+    // and the controller takes one link at a time, so a link that is not encrypted within UNENCRYPTED_MS, or sends no
+    // command for IDLE_MS, is dropped: one idle connection cannot hold the setup for the whole window. (Wrong PINs
+    // are PinGuard's.)
+    class LinkGuard
+    {
+    public:
+        static constexpr uint32_t UNENCRYPTED_MS = 30000;
+        static constexpr uint32_t IDLE_MS = 5 * 60 * 1000;
+
+        void connected(uint32_t now)
+        {
+            linked = true;
+            encrypted = false;
+            terminating = false;
+            lastActivity = now;
+        }
+        void disconnected() { linked = false; }
+        // The link is being dropped: do not ask again until its disconnect (or a new link) arrives.
+        void dropping() { terminating = true; }
+        void encryptedNow() { encrypted = true; }
+        void command(uint32_t now) { lastActivity = now; }
+
+        // Whether the current link must be dropped now.
+        bool shouldDrop(uint32_t now) const
+        {
+            if (!linked || terminating) return false;
+            // A time stamped after `now` was read (another task) is no quiet time at all.
+            const int32_t quiet = static_cast<int32_t>(now - lastActivity);
+            if (quiet <= 0) return false;
+            return static_cast<uint32_t>(quiet) >= (encrypted ? IDLE_MS : UNENCRYPTED_MS);
+        }
+
+    private:
+        bool linked = false;
+        bool encrypted = false;
+        bool terminating = false;
+        uint32_t lastActivity = 0;
+    };
+
     // A remaining time in whole seconds, rounded up (the countdown never shows 00:00 while open).
     inline uint32_t countdownSeconds(uint32_t remainingMs) { return remainingMs / 1000 + (remainingMs % 1000 != 0); }
 

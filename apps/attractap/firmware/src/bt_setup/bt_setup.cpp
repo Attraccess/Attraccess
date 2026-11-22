@@ -17,6 +17,7 @@
 #include <string>
 
 #include "esp_attr.h"
+#include "esp_heap_caps.h"
 #include "esp_mac.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -48,7 +49,12 @@ namespace bt_setup
 {
     namespace
     {
-        constexpr uint32_t HOST_TASK_STACK = 4096;
+        // As the BLE proxy's host task (ble_radio_nimble.cpp, measured in QA); the setup adds LE Secure Connections
+        // pairing, whose key maths runs on this task too.
+        constexpr uint32_t HOST_TASK_STACK = 4864;
+        // Free DMA-capable internal RAM NimBLE needs to start: the controller asserts and the device restarts when it
+        // runs short (see STACK_MIN_FREE_INTERNAL in ble_radio_nimble.cpp).
+        constexpr size_t MIN_FREE_INTERNAL = 40 * 1024;
         // Complete lines waiting for the main loop; the web app sends one command and waits for its reply.
         constexpr size_t MAX_QUEUED_LINES = 4;
         // A notification refused for lack of buffers is retried this often, this many times.
@@ -93,6 +99,13 @@ namespace bt_setup
         // Counts links (changed under linesMutex): a reply goes only to the link its command came from, never to a
         // later one, also when that one connects while the reply is being sent.
         std::atomic<uint32_t> linkGeneration{0};
+        // Unencrypted and idle links (bt_setup_logic.hpp); touched by the host task and the task of update().
+        std::mutex guardMutex;
+        LinkGuard linkGuard;
+
+        // Held while sending a reply and while closing: close() must not free NimBLE under a notification.
+        std::mutex txMutex;
+
         // Wrong PINs (the main loop's). The count survives software restarts in RTC memory: an unpaired reader that
         // keeps restarting itself (an unreachable server, every 90 s) opens a window at every boot, which must not
         // hand out 5 new guesses each time. Only a power cycle or someone at the device (the Touch's button, the
@@ -171,7 +184,11 @@ namespace bt_setup
             case BLE_GAP_EVENT_CONNECT:
                 if (event->connect.status == 0)
                 {
-                    connHandle = event->connect.conn_handle;
+                    {
+                        std::lock_guard<std::mutex> lock(guardMutex);
+                        linkGuard.connected(millis());
+                        connHandle = event->connect.conn_handle;
+                    }
                     connected = true;
                     forgetPartialInput();
                     logger.info("Web app connected");
@@ -183,7 +200,11 @@ namespace bt_setup
                 return 0;
             case BLE_GAP_EVENT_DISCONNECT:
                 connected = false;
-                connHandle = BLE_HS_CONN_HANDLE_NONE;
+                {
+                    std::lock_guard<std::mutex> lock(guardMutex);
+                    connHandle = BLE_HS_CONN_HANDLE_NONE;
+                    linkGuard.disconnected();
+                }
                 forgetPartialInput();
                 logger.infof("Web app disconnected (%d)", event->disconnect.reason);
                 startAdvertising();
@@ -192,7 +213,15 @@ namespace bt_setup
                 startAdvertising();
                 return 0;
             case BLE_GAP_EVENT_ENC_CHANGE:
-                if (event->enc_change.status != 0) logger.warnf("Pairing failed: %d", event->enc_change.status);
+                if (event->enc_change.status != 0)
+                {
+                    logger.warnf("Pairing failed: %d", event->enc_change.status);
+                    return 0;
+                }
+                {
+                    std::lock_guard<std::mutex> lock(guardMutex);
+                    linkGuard.encryptedNow();
+                }
                 return 0;
             case BLE_GAP_EVENT_REPEAT_PAIRING:
             {
@@ -210,7 +239,14 @@ namespace bt_setup
         int access(uint16_t, uint16_t, struct ble_gatt_access_ctxt *ctxt, void *)
         {
             if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) return BLE_ATT_ERR_UNLIKELY;
-            uint8_t buffer[512];
+            {
+                std::lock_guard<std::mutex> lock(guardMutex);
+                // A write gets here only on an encrypted link (ENC_CHANGE may still be on its way: key exchange).
+                linkGuard.encryptedNow();
+                linkGuard.command(millis());
+            }
+            // Only the NimBLE host task calls this: one buffer, off its small stack.
+            static uint8_t buffer[512];
             uint16_t length = 0;
             if (ble_hs_mbuf_to_flat(ctxt->om, buffer, sizeof buffer, &length) != 0) return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
             std::lock_guard<std::mutex> lock(linesMutex);
@@ -249,8 +285,8 @@ namespace bt_setup
             vTaskDelete(nullptr);
         }
 
-        // NimBLE's host task, its 4 KB stack in internal RAM as on the bridge: pairing runs the P-256 key generation on
-        // it, and NimBLE's own port keeps its host stack internal too.
+        // NimBLE's host task, its stack in internal RAM: pairing runs the P-256 key generation on it, and NimBLE's own
+        // port keeps its host stack internal too.
         bool startHostTask()
         {
             return xTaskCreatePinnedToCore(hostTask, "nimble_host", HOST_TASK_STACK, nullptr, configMAX_PRIORITIES - 4,
@@ -295,8 +331,9 @@ namespace bt_setup
                     if (lineGeneration != linkGeneration) return;
                 }
                 const uint32_t generation = lineGeneration;
+                std::lock_guard<std::mutex> lock(txMutex);
                 const uint16_t conn = connHandle;
-                if (!connected || conn == BLE_HS_CONN_HANDLE_NONE) return;
+                if (!running || !connected || conn == BLE_HS_CONN_HANDLE_NONE) return;
                 uint16_t mtu = ble_att_mtu(conn);
                 if (mtu < MIN_MTU) mtu = MIN_MTU;
                 if (!forEachChunk(line.size(), mtu - 3,
@@ -344,6 +381,12 @@ namespace bt_setup
             forgetPartialInput();
             if (trigger == Trigger::User) pinGuardReset = true;
 
+            if (heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA) < MIN_FREE_INTERNAL)
+            {
+                logger.error("Bluetooth setup: not enough free memory");
+                owned = false;
+                return false;
+            }
             if (nimble_port_init() != ESP_OK)
             {
                 // Also when the BLE proxy already runs NimBLE (a device whose pairing was revoked): a reboot frees it.
@@ -388,6 +431,8 @@ namespace bt_setup
         void close()
         {
             if (!owned) return;
+            // Waits for a reply in progress; later replies see running == false.
+            std::lock_guard<std::mutex> lock(txMutex);
             running = false;
             const uint16_t conn = connHandle;
             if (conn != BLE_HS_CONN_HANDLE_NONE) ble_gap_terminate(conn, BLE_ERR_REM_USER_CONN_TERM);
@@ -402,6 +447,25 @@ namespace bt_setup
             forgetPartialInput();
             owned = false;
             logger.info("Bluetooth setup closed");
+        }
+
+        // Drops a link that stays unencrypted or idle too long (LinkGuard).
+        void dropStaleLink()
+        {
+            if (!running) return;
+            uint16_t conn;
+            {
+                // The clock is read under the lock the host task writes the link's times under: never behind them.
+                std::lock_guard<std::mutex> lock(guardMutex);
+                conn = connHandle;
+                if (conn == BLE_HS_CONN_HANDLE_NONE || !linkGuard.shouldDrop(millis())) return;
+            }
+            const int rc = ble_gap_terminate(conn, BLE_ERR_REM_USER_CONN_TERM);
+            if (rc != 0 && rc != BLE_HS_EALREADY) return; // try again next time
+            std::lock_guard<std::mutex> lock(guardMutex);
+            // Once per link (unless a new one came meanwhile): the disconnect event marks it gone.
+            if (connHandle == conn) linkGuard.dropping();
+            logger.warn("Dropping the setup link (not encrypted or idle)");
         }
     }
 
@@ -425,7 +489,11 @@ namespace bt_setup
     void update(bool authenticated, uint32_t now)
     {
         if (authenticated) paired = true;
-        if (window.update(authenticated, now) != SetupWindow::Change::Close) return;
+        if (window.update(authenticated, now) != SetupWindow::Change::Close)
+        {
+            dropStaleLink();
+            return;
+        }
         windowOpen = false;
         close();
     }

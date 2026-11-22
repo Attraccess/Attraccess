@@ -1,6 +1,6 @@
 // Host test: the Bluetooth setup shared by the BLE bridge and the readers (src/bt_setup/bt_setup_logic.hpp): the
-// setup window, the readers' triggers, the advertised name, line assembly and chunking; and the Lite ring while the
-// window is open (src/led/led_bt_setup.hpp).
+// setup window, the readers' triggers, the advertised name, line assembly, chunking and the link guard; and the Lite
+// ring while the window is open (src/led/led_bt_setup.hpp).
 #include "bt_setup_logic.hpp"
 #include "led_bt_setup.hpp"
 
@@ -216,6 +216,38 @@ static void liteRing()
     for (uint32_t t = 0; t < LedBtSetup::PERIOD_MS; t += 50) CHECK(LedBtSetup::level(t, true) == 255);
 }
 
+static void linkGuard()
+{
+    LinkGuard g;
+    CHECK(!g.shouldDrop(0));
+    // Not encrypted within 30 s: dropped.
+    g.connected(1000);
+    CHECK(!g.shouldDrop(1000 + LinkGuard::UNENCRYPTED_MS - 1));
+    CHECK(g.shouldDrop(1000 + LinkGuard::UNENCRYPTED_MS));
+    // Encrypted: the idle limit applies, every command restarts it.
+    g.connected(100000);
+    g.encryptedNow();
+    CHECK(!g.shouldDrop(100000 + LinkGuard::UNENCRYPTED_MS));
+    g.command(200000);
+    CHECK(!g.shouldDrop(200000 + LinkGuard::IDLE_MS - 1));
+    CHECK(g.shouldDrop(200000 + LinkGuard::IDLE_MS));
+    g.disconnected();
+    CHECK(!g.shouldDrop(200000 + LinkGuard::IDLE_MS));
+    // millis() wrap.
+    g.connected(0xFFFFFF00u);
+    CHECK(!g.shouldDrop(0x10));
+    // A command stamped just after the caller read the clock: not 49 days of quiet.
+    g.command(5000);
+    CHECK(!g.shouldDrop(4990));
+    // Asked once per link: while the drop is under way it is not asked again, a new link is.
+    g.connected(0);
+    CHECK(g.shouldDrop(LinkGuard::UNENCRYPTED_MS));
+    g.dropping();
+    CHECK(!g.shouldDrop(LinkGuard::UNENCRYPTED_MS + 1));
+    g.connected(100);
+    CHECK(g.shouldDrop(100 + LinkGuard::UNENCRYPTED_MS));
+}
+
 int main()
 {
     setupWindow();
@@ -226,6 +258,7 @@ int main()
     chunking();
     liteRing();
     pinGuard();
+    linkGuard();
     closeAfterPairedAcrossWrap();
     if (failures) return 1;
     std::puts("bt setup logic ok");

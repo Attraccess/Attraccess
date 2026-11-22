@@ -58,7 +58,8 @@ namespace bt_setup
     // Touch's button).
     Request request(uint32_t now, Trigger trigger);
     // Periodic, on the task that calls request(): closes the window when it times out or 10 s after the reader runs
-    // an authenticated session. Closing drops the link, stops advertising and frees NimBLE.
+    // an authenticated session. Closing drops the link, stops advertising and frees NimBLE. While open it drops a
+    // link that is not encrypted within 30 s or sends no command for 5 minutes (LinkGuard).
     void update(bool authenticated, uint32_t now);
 
     // Any task.
