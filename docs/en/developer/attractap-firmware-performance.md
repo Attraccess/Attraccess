@@ -25,11 +25,11 @@ Paths are relative to `apps/attractap/firmware`.
 | Images | Raw `.rgb565` / `.rgb565a8` files linked once into read-only data through `logos.S.in`. The C++ headers are about 0.5 KB each. The lockscreen is a 450 KB opaque RGB565 image; the two logos keep an alpha plane | `src/display/images/`, `main/CMakeLists.txt` |
 | FreeRTOS | 1 kHz tick. Main task: 18 KB stack, core 1. `LvglTask`: priority 4, core 1, 12 KB. WebSocket client task: priority 3. `ws_tx`: priority 3. `ws_conn` (connect and reconnect): priority 2. Beeper worker: priority 1 | `sdkconfig.defaults`, `src/display/display.cpp`, `src/websocket/` |
 | I2C | One shared bus for PN532, GT911 and the IO expander, 400 kHz, 50 ms transfer timeout | `src/utils.hpp` |
-| NFC polling | On the main loop. Detection poll 30 ms (`NFC::detectionPollTimeoutMs`), PN532 `waitready` in 2 ms steps, held card probed every 250 ms (`NFC::presenceCheckIntervalMs`) with one plain command | `src/rfid/rfid.hpp`, `src/rfid/rfid.cpp`, `src/rfid/pn532/driver.cpp` |
+| NFC polling | On the main loop. Detection poll timeout 30 ms (`NFC::detectionPollTimeoutMs`, applied to each of the two readiness waits of one poll, so a poll can hold the bus for up to about 60 ms), PN532 `waitready` in 2 ms steps, held card probed every 250 ms (`NFC::presenceCheckIntervalMs`) with one plain command | `src/rfid/rfid.hpp`, `src/rfid/rfid.cpp`, `src/rfid/pn532/driver.cpp` |
 | Card operations | Done on the server through the card relay. The reader no longer runs NTAG424 authentication or key changes itself | `src/application/card_relay.hpp` |
 | Wi-Fi | Modem sleep off (`WIFI_PS_NONE`) | `src/network/wifi/wifi.cpp` |
 | WebSocket | Client buffer 4096 bytes, `network_timeout_ms` 10 s, TCP keepalive 5 s / 5 s / 3, reconnect back-off from 10 s | `src/websocket/connection.cpp`, `websocket.hpp` |
-| mbedTLS | Record buffers 8192 in / 4096 out, allocated in PSRAM (`CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC`). TLS 1.3 is enabled for the paired-reader session, which runs on its own PSRAM-stack task | `sdkconfig.defaults`, `src/api/security/` |
+| mbedTLS | Record buffers 8192 in / 4096 out, allocated in PSRAM in standard builds (`CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC`). The secure profile uses a custom allocator that takes internal RAM (`sdkconfig.secure`, `src/api/security/tls_memory.c`). TLS 1.3 is enabled for the paired-reader session, which runs on its own PSRAM-stack task | `sdkconfig.defaults`, `src/api/security/` |
 | Optimization | `-O2` (`CONFIG_COMPILER_OPTIMIZATION_PERF`) for all production builds. No LTO option is set. No `IRAM_ATTR` in `src/` | `sdkconfig.defaults` |
 
 ### What changed since August and moves the baseline
@@ -41,12 +41,12 @@ Paths are relative to `apps/attractap/firmware`.
 
 ### Findings that still hold
 
-- NFC polling still runs on the main loop and holds the I2C bus for up to 30 ms per pass.
+- NFC polling still runs on the main loop and holds the I2C bus for up to about 60 ms per pass (two readiness waits of 30 ms each).
 - `Websocket::loop()` still copies strings and wakes the connect task on every pass (about once per millisecond).
 - The serial Wi-Fi scan command still blocks the main loop for up to 10 s.
-- WebSocket text frames above the 4096-byte client buffer are still handed on as fragments.
+- WebSocket text frames above the 4096-byte client buffer are still handed on as fragments ([ATT-1389](https://linear.app/attraccess/issue/ATT-1389)).
 - Some source comments are stale or point to the old report file, which never landed on `main`.
-- PSRAM free size is still not part of the periodic heap log, and `LOG_MEMORY_DEBUG` is still not defined anywhere. Both are tracked in ATT-1276.
+- PSRAM free size is still not part of the periodic heap log, and `LOG_MEMORY_DEBUG` is only defined for UI self-test lab builds (`main/CMakeLists.txt`). Both are tracked in ATT-1276.
 
 ## Recommendations
 
@@ -104,7 +104,7 @@ Do all of this on a bench reader, not a fielded one. Nothing here is done automa
 1. **Debug build.** Use the debug overlay: `idf.py -B build/dbg -DATTRACTAP_VARIANT=<variant> -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.debug" build`. It switches the compiler to `-Og` with assertions on, so absolute timings are not comparable with release builds.
 2. **LVGL performance monitor.** The code is compiled in when `ATTRACTAP_LV_PERF_MONITOR` is defined (`include/lv_conf.h`, `src/display/display.cpp`). It logs FPS and render and flush times to the serial console. No firmware CMake option sets the macro today; a ready-made variant is part of ATT-1276 (when merged).
 3. **Run-time stats and `debug.stats`.** FreeRTOS run-time statistics, the `debug.stats` serial command and PSRAM numbers in the heap log are tracked in ATT-1276 (when merged).
-4. **Heap log.** The WebSocket task logs internal free, largest block and minimum free heap every 30 seconds (`Websocket::logHeapStats`). Watch the minimum over 24 hours to see fragmentation.
+4. **Heap log.** The WebSocket task logs internal free, largest block and minimum free heap every 30 seconds (`Websocket::logHeapStats`). The largest free block shows fragmentation; the minimum free heap is the low-water mark since boot, so it only ever falls. Compare both over 24 hours.
 5. **What to compare before and after a change:** frame time with the performance monitor, touch latency while a card is polled and while one is held, tap-to-result latency, reconnect cycle time, and the internal heap minimum.
 
 ## History
