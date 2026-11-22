@@ -1,4 +1,4 @@
-import { EndpointNumber } from '@matter/main';
+import { Bytes, EndpointNumber } from '@matter/main';
 import { OperationalCredentials } from '@matter/main/clusters';
 import {
   CommissioningError,
@@ -91,7 +91,7 @@ export function createCommissioningFlow(hooks: FlowHooks): NonNullable<Commissio
         { fabricFilter: false },
         Read.Attribute({ endpoint: EndpointNumber(0), cluster: OperationalCredentials, attributes: ['fabrics'] }),
       );
-      const rootPublicKey = this.fabric.rootPublicKey;
+      const rootPublicKey = Bytes.of(this.fabric.rootPublicKey);
       for await (const chunk of this.interaction.read(request)) {
         for await (const entry of chunk) {
           if (entry.kind !== 'attr-value' || !Array.isArray(entry.value)) continue;

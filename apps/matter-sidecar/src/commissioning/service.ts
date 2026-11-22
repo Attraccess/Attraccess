@@ -102,11 +102,28 @@ export class CommissioningService {
       this.#fail(session, { code: 'invalid_code' });
       return session.view;
     }
-    // Throws `busy` at once when a snapshot, restore, removal, share or commissioning holds the gate.
-    this.options.manager
-      .beginExclusive(() => this.#run(session, decoded))
-      .catch(() => this.#fail(session, { code: 'internal' }));
+    try {
+      // Throws `busy` at once when a snapshot, restore, removal, share or commissioning holds the gate.
+      this.options.manager
+        .beginExclusive(() => this.#run(session, decoded))
+        .catch(() => this.#fail(session, { code: 'internal' }));
+    } catch (error) {
+      this.#sessions.delete(session.view.sessionId);
+      throw this.#busyWithSession(error);
+    }
     return session.view;
+  }
+
+  /**
+   * A `busy` refusal names the session that holds the gate, when it is a commissioning one. The plugin may have
+   * restarted and lost it: it can then cancel that session by its ID (a non-secret) and start again.
+   */
+  #busyWithSession(error: unknown): unknown {
+    if (!(error instanceof ApiError) || error.code !== 'busy') return error;
+    const active = [...this.#sessions.values()].find(
+      (entry) => entry.view.state === 'pending' || entry.view.state === 'running',
+    );
+    return active ? new ApiError('busy', error.message, { sessionId: active.view.sessionId }) : error;
   }
 
   #find(sessionId: string): Running {

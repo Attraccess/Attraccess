@@ -257,6 +257,48 @@ describe('commissioning sessions', () => {
       expect(h.gate.busy).toBe(false);
     });
 
+    it('cancels a session of the sidecar it lost with a plugin restart, audits it once and starts again', async () => {
+      const orphan = randomUUID();
+      const starts: unknown[] = [];
+      h.connection.handlers['commissioning.start'] = () => {
+        starts.push(1);
+        if (starts.length === 1) {
+          throw new SidecarRequestError('busy', { code: 'busy', details: { sessionId: orphan } });
+        }
+        return sidecar;
+      };
+      const cancelled: unknown[] = [];
+      h.connection.handlers['commissioning.cancel'] = ({ params }) => {
+        cancelled.push(params);
+        return { ...sidecar, sessionId: orphan, state: 'failed', failure: { code: 'cancelled' } };
+      };
+      h.connection.handlers['commissioning.get'] = () => ({
+        ...sidecar,
+        state: 'failed',
+        failure: { code: 'cancelled' },
+      });
+
+      const view = await h.commissioning.start({ setupCode: CODE }, USER);
+
+      expect(view).toMatchObject({ state: expect.stringMatching(/pending|running/) });
+      expect(starts).toHaveLength(2);
+      expect(cancelled).toEqual([{ sessionId: orphan }]);
+      const interrupted = h.audit.mock.calls
+        .map((c) => (c as unknown as [{ action: string; principal: unknown; details: { reason?: string } }])[0])
+        .filter((entry) => entry.action === 'matter.commissioning_interrupted');
+      expect(interrupted).toHaveLength(1);
+      expect(interrupted[0].details.reason).toBe('plugin_restart');
+    });
+
+    it('does not cancel anything when the sidecar is busy for another reason', async () => {
+      h.connection.handlers['commissioning.start'] = () => {
+        throw new SidecarRequestError('busy', { code: 'busy' });
+      };
+      await expect(h.commissioning.start({ setupCode: CODE }, USER)).rejects.toBeInstanceOf(ConflictException);
+      expect(h.connection.sent.some((entry) => entry.operation === 'commissioning.cancel')).toBe(false);
+      expect(h.gate.busy).toBe(false);
+    });
+
     it('a new stream instance means the sidecar restarted', async () => {
       h.connection.emitLifecycle(h.connection.streamInstanceId);
       const view = await h.commissioning.start({ setupCode: CODE }, USER);

@@ -70,7 +70,7 @@ function loadPlugin(source: PluginSource) {
 }
 
 export async function bootHost(
-  options: { hostVersion?: string | undefined; source?: PluginSource } = {},
+  options: { hostVersion?: string | undefined; source?: PluginSource; storage?: InMemoryPluginStorage } = {},
 ): Promise<Host> {
   const plugin = loadPlugin(options.source ?? 'source');
   resetPluginAuditRegistry(); // the registry is process-wide: a second boot in one test starts clean
@@ -78,7 +78,8 @@ export async function bootHost(
     { name: '@attraccess/plugin-matter', id: PLUGIN_ID },
     plugin.auditDomains as PluginAuditDomainDeclaration[],
   );
-  const storage = createInMemoryPluginStorage(plugin.storage as NonNullable<typeof plugin.storage>);
+  // A restart of the plugin keeps its database: pass the previous host's storage.
+  const storage = options.storage ?? createInMemoryPluginStorage(plugin.storage as NonNullable<typeof plugin.storage>);
   // The host's audit recorder drops an event its plugin projection rejects (outside the declared domain policy); this
   // stand-in records the ones that pass, and answers like the recorder does.
   const audit: AuditEvent[] = [];

@@ -77,14 +77,19 @@ export type VirtualDevice = Credentials & {
 };
 
 /** Starts a commissionable OnOff light with its own storage and Matter port. */
-export async function startVirtualDevice(storageDir: string, port: number): Promise<VirtualDevice> {
+export async function startVirtualDevice(
+  storageDir: string,
+  port: number,
+  /** Fixed credentials, for a test that must know the code before the device is on the network. */
+  fixed?: Credentials,
+): Promise<VirtualDevice> {
   Logger.level = LogLevel.ERROR;
   const environment = NodeJsEnvironment();
   environment.vars.set('path.root', storageDir);
   environment.vars.set('storage.path', storageDir);
   environment.vars.set('runtime.signals', false);
   environment.vars.set('runtime.unhandlederrors', false);
-  const credentials = randomCommissioningCredentials();
+  const credentials = fixed ?? randomCommissioningCredentials();
   const node = await ServerNode.create({
     environment,
     id: 'virtual-device',

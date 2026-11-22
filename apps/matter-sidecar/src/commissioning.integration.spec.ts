@@ -233,6 +233,8 @@ describe('commissioning through the sidecar', () => {
       const second = await running.call('POST', '/v1/commissioning/sessions', { setupCode: absent.qr });
       expect(second.status).toBe(409);
       expect(second.body.error.code).toBe('busy');
+      // The refusal names the running session, so a plugin that lost it in a restart can cancel it.
+      expect(second.body.error.details).toEqual({ sessionId: started.body.sessionId });
       const snapshot = await running.call('POST', '/v1/backup/snapshot', {});
       expect(snapshot.status).toBe(409);
       expect(snapshot.body.error.code).toBe('busy');

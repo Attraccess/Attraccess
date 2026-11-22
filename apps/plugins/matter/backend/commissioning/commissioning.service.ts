@@ -71,6 +71,9 @@ export class MatterCommissioningService implements OnModuleInit, OnModuleDestroy
   private polling = false;
   private streamInstanceId: string | null = null;
   private releaseGate: (() => void) | null = null;
+  /** Sidecar sessions this plugin did not start (it restarted since), already handled. */
+  private readonly orphans = new Set<string>();
+  private startsInFlight = 0;
 
   constructor(
     @Inject(PLUGIN_CONTEXT) private readonly context: PluginContext,
@@ -121,12 +124,7 @@ export class MatterCommissioningService implements OnModuleInit, OnModuleDestroy
       if (this.connection.status().state !== 'connected') {
         throw conflict('sidecar_unavailable', 'The Matter sidecar is not connected.');
       }
-      sidecar = await this.connection.request('commissioning.start', {
-        body: {
-          setupCode: input.setupCode,
-          ...(input.attestationOverride ? { attestationOverride: input.attestationOverride } : {}),
-        },
-      });
+      sidecar = await this.requestStart(input);
     } catch (error) {
       release();
       throw error instanceof SidecarClientError ? startFailure(error) : error;
@@ -162,6 +160,60 @@ export class MatterCommissioningService implements OnModuleInit, OnModuleDestroy
     this.startPolling();
     await this.apply(session, sidecar);
     return sessionView(session);
+  }
+
+  /**
+   * Asks the sidecar to start. A session this plugin does not know may hold the sidecar's gate: the plugin restarted
+   * while it ran. It is cancelled (nothing resumes), audited as interrupted, and the start is tried once more.
+   */
+  private async requestStart(input: StartInput): Promise<CommissioningSession> {
+    const body = {
+      setupCode: input.setupCode,
+      ...(input.attestationOverride ? { attestationOverride: input.attestationOverride } : {}),
+    };
+    this.startsInFlight += 1;
+    try {
+      try {
+        return await this.connection.request('commissioning.start', { body });
+      } catch (error) {
+        const orphan = this.orphanOf(error);
+        if (orphan === null) throw error;
+        await this.cancelOrphan(orphan);
+        return await this.connection.request('commissioning.start', { body });
+      }
+    } finally {
+      this.startsInFlight -= 1;
+    }
+  }
+
+  /** The sidecar session an unknown `busy` refusal points at, or null when the refusal has another cause. */
+  private orphanOf(error: unknown): string | null {
+    if (!(error instanceof SidecarClientError) || error.code !== 'busy') return null;
+    const id = error.details?.sessionId;
+    if (typeof id !== 'string' || this.activeSessions().length > 0) return null;
+    return [...this.sessions.values()].some((entry) => entry.sidecarSessionId === id) ? null : id;
+  }
+
+  private async cancelOrphan(sidecarSessionId: string): Promise<void> {
+    await this.noteOrphan(sidecarSessionId);
+    await this.connection.request('commissioning.cancel', { params: { sessionId: sidecarSessionId } });
+    const deadline = Date.now() + 15_000;
+    for (;;) {
+      const state = await this.connection
+        .request('commissioning.get', { params: { sessionId: sidecarSessionId } })
+        .then((view) => view.state)
+        .catch(() => 'failed');
+      if (state !== 'pending' && state !== 'running') return;
+      if (Date.now() > deadline) return;
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  }
+
+  /** A session of the sidecar this plugin has no record of: it was lost with a restart. Audited once. */
+  private async noteOrphan(sidecarSessionId: string): Promise<void> {
+    if (this.orphans.has(sidecarSessionId)) return;
+    this.orphans.add(sidecarSessionId);
+    await this.record('matter.commissioning_interrupted', null, { reason: 'plugin_restart' }, randomUUID());
   }
 
   get(id: string, userId: number): SessionView {
@@ -266,10 +318,11 @@ export class MatterCommissioningService implements OnModuleInit, OnModuleDestroy
     const session = [...this.sessions.values()].find((entry) => entry.sidecarSessionId === payload.sessionId);
     if (session) {
       if (isActive(session) && !session.settling) void this.refresh(session);
-    } else if (payload.state === 'succeeded') {
-      // A session this plugin does not know (it restarted meanwhile) finished: its node surfaces as unclaimed.
-      void this.record('matter.commissioning_interrupted', null, { reason: 'plugin_restart' }, randomUUID());
-      void this.reconciliation.request().catch(() => undefined);
+    } else if (payload.sessionId && this.startsInFlight === 0) {
+      // A session this plugin does not know (it restarted meanwhile): nothing resumes, and a node it completed
+      // surfaces as unclaimed.
+      void this.noteOrphan(payload.sessionId);
+      if (payload.state === 'succeeded') void this.reconciliation.request().catch(() => undefined);
     }
   }
 
