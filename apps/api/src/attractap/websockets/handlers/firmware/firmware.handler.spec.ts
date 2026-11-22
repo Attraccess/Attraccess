@@ -298,14 +298,14 @@ describe('AttractapFirmwareHandler', () => {
 
     it.each([
       ['the BLE Bridge', { capabilities: { nfc: false } }, false],
-      ['2.9.0 with NFC', { capabilities: { nfc: true } }, true],
+      ['2.10.0 with NFC', { capabilities: { nfc: true } }, true],
       ['firmware that does not report nfc', { capabilities: {} }, true],
     ])('stores the nfc capability from FIRMWARE_INFO: %s', async (_name, info, expected) => {
       fixture.mockFirmwareService.getFirmwareDefinition.mockResolvedValue(null);
       fixture.socket.state.nfc = !expected;
 
       await fixture.handler.handleFirmwareInfo(fixture.socket, {
-        payload: { name: 'attractap', variant: 'touch', version: '2.9.0', ...info },
+        payload: { name: 'attractap', variant: 'touch', version: '2.10.0', ...info },
       } as AttractapEvent['data']);
 
       expect(fixture.socket.state.nfc).toBe(expected);

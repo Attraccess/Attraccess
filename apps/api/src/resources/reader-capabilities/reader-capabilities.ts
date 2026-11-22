@@ -29,7 +29,7 @@ export const BLE_BRIDGE_READER_CAPABILITIES: ReaderCapabilities = { resourceType
 
 export const BLE_BRIDGE_MESSAGE = 'This reader is a Bluetooth bridge and cannot serve resources';
 
-/** Whether an Attractap is a BLE Bridge. Firmware before 2.9.0 does not report `nfc`; those readers have NFC. */
+/** Whether an Attractap is a BLE Bridge. Firmware before 2.10.0 does not report `nfc`; those readers have NFC. */
 export function isBleBridge(reader: { firmware?: { capabilities?: { nfc?: boolean } | null } | null }): boolean {
   return reader.firmware?.capabilities?.nfc === false;
 }
