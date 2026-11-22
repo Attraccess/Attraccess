@@ -124,7 +124,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Overview](https://docs.attraccess.org/en/plugins/rabbitmq/overview.md): The RabbitMQ plugin adds status, user, connection and statistics panels for RabbitMQ brokers to an MQTT server's detail page; prerequisites and permissions.
 
 ## English: Shelly
-- [Overview](https://docs.attraccess.org/en/plugins/shelly/overview.md): The Shelly plugin keeps a registry of Shelly devices on your network, with discovery, device info, admin password management and firmware updates.
+- [Overview](https://docs.attraccess.org/en/plugins/shelly/overview.md): The Shelly plugin keeps a registry of Shelly devices on your network, with discovery, Bluetooth setup of new devices, device info, admin password management and firmware updates.
 
 ## English: Status Wall
 - [Overview](https://docs.attraccess.org/en/plugins/status-wall/overview.md): The Status Wall plugin shows on a big screen which machines are ready, in use or under maintenance, live and without signing in.
@@ -284,7 +284,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Überblick](https://docs.attraccess.org/de/plugins/rabbitmq/overview.md): Das Plugin RabbitMQ ergänzt die Detailseite eines MQTT-Servers um Status-, Benutzer-, Verbindungs- und Statistik-Bereiche für RabbitMQ-Broker; Voraussetzungen und Berechtigungen.
 
 ## Deutsch: Shelly
-- [Überblick](https://docs.attraccess.org/de/plugins/shelly/overview.md): Das Plugin Shelly führt ein Register der Shelly-Geräte in Ihrem Netzwerk mit Suche, Geräteinformationen, Admin-Passwort-Verwaltung und Firmware-Updates.
+- [Überblick](https://docs.attraccess.org/de/plugins/shelly/overview.md): Das Plugin Shelly führt ein Register der Shelly-Geräte in Ihrem Netzwerk mit Suche, Einrichtung neuer Geräte über Bluetooth, Geräteinformationen, Admin-Passwort-Verwaltung und Firmware-Updates.
 
 ## Deutsch: Status Wall
 - [Überblick](https://docs.attraccess.org/de/plugins/status-wall/overview.md): Das Statuswand-Plugin zeigt auf einem großen Bildschirm live und ohne Anmeldung, welche Maschinen frei, in Benutzung oder in Wartung sind.
