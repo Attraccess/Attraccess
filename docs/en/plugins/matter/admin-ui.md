@@ -117,9 +117,9 @@ Each says so, based on what the sidecar reports (feature families `thread`, `com
   Zigbee and Wi-Fi. Sections for the dataset, Border Routers, radio co-processors and SMLIGHT diagnostics are
   placeholders.
 - **Commissioning** is a guided flow on its own page: prepare the device, enter or scan the code, watch the progress, name
-  the device. It also shows, on a device's page, sharing, removal and the device's other administrators. See
-  [Commissioning, Sharing and Removal](plugins/matter/commissioning.md). When the sidecar does not report the
-  `commissioning` family, the tab says so and offers no input.
+  the device. When the sidecar does not report the `commissioning` family, the tab says so and offers no input. Sharing,
+  removal from the fabric and the device's other administrators are not on this tab: a device's own page shows them. See
+  [Commissioning, Sharing and Removal](plugins/matter/commissioning.md).
 - **Software Updates** lists the software each device runs now. Finding, approving and applying updates comes with OTA
   support.
 

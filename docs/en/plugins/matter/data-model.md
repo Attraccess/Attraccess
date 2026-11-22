@@ -118,7 +118,7 @@ If the Attraccess database is **older** than the sidecar, the nodes it does not 
 
 Commissioning (see [Commissioning](plugins/matter/commissioning.md)) creates the node directly as `claimed` by the commissioning user, with its endpoints, in one transaction. Removing a node from the fabric, or forcing the removal, sets `lifecycleState` to `removed` with `removalReason` `removed_from_fabric` or `forced_from_fabric`; the record-only force-remove keeps its own reason. Endpoints are retired and history stays. A `removed` node is never claimed again; commissioning the device again creates a new record.
 
-A node carries its other administrators (fabric index, vendor ID, fabric label and whether the fabric is Attraccess's own) as a JSON text column `administrators`, added by plugin storage migration 3. It is shown read-only. Actions of an external fabric are never attributed to an Attraccess user: such audit and history entries carry no `userId`.
+A node carries its other administrators (fabric index, vendor ID, fabric label and whether the fabric is Attraccess's own) as a JSON text column `administrators`. Plugin storage migration 3 adds it together with the boolean column `attestation_overridden`, which marks a node commissioned with the development attestation override (see [Commissioning](plugins/matter/commissioning.md#development-override)). Both columns are nullable; rows written before the migration carry null. It is shown read-only. Actions of an external fabric are never attributed to an Attraccess user: such audit and history entries carry no `userId`.
 
 ## Actions
 
@@ -210,6 +210,26 @@ All endpoints are under `/api/matter/…`. Reading needs `matter.devices.read`, 
 
 ## Audit
 
-The audit domain `matter` records `matter.node_quarantined`, `matter.node_detached`, `matter.node_reattached`, `matter.node_claimed`, `matter.node_relinked`, `matter.node_repaired`, `matter.node_archived`, `matter.node_restored`, `matter.node_force_removed`, `matter.node_commissioned`, `matter.commissioning_attestation_overridden`, `matter.node_removed_from_fabric`, `matter.node_force_removed_from_fabric`, `matter.node_shared`, `matter.node_share_revoked`, `matter.node_metadata_updated`, `matter.endpoint_metadata_updated` and `matter.fabric_mismatch_detected`. They appear in the audit log UI with readable names, for example "Matter node quarantined". An entry's subject shows a number derived from the plugin UUID; the full UUID is in the entry's details (`nodeRef`, `endpointRef`, `fabricRef`). Entries carry only IDs, enums and flags, never device free text or secrets. The details of `matter.node_detached` and `matter.node_reattached` include `fabricId` and `nodeId`. Telemetry is never audited.
+The audit domain `matter` records `matter.node_quarantined`, `matter.node_detached`, `matter.node_reattached`, `matter.node_claimed`, `matter.node_relinked`, `matter.node_repaired`, `matter.node_archived`, `matter.node_restored`, `matter.node_force_removed`, `matter.node_metadata_updated`, `matter.endpoint_metadata_updated` and `matter.fabric_mismatch_detected`. They appear in the audit log UI with readable names, for example "Matter node quarantined". An entry's subject shows a number derived from the plugin UUID; the full UUID is in the entry's details (`nodeRef`, `endpointRef`, `fabricRef`). Entries carry only IDs, enums and flags, never device free text or secrets. The details of `matter.node_detached` and `matter.node_reattached` include `fabricId` and `nodeId`. Telemetry is never audited.
+
+Commissioning, sharing and removal from the fabric (see [Commissioning](plugins/matter/commissioning.md)) record:
+
+| Action                                        | When                                                                                                            |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `matter.commissioning_started`                | A commissioning attempt started; `attestationOverride` says whether it carries the development override         |
+| `matter.commissioning_failed`                 | The attempt failed: failure code, step, attestation finding types and, for `already_commissioned`, the node ID  |
+| `matter.commissioning_interrupted`            | The attempt was interrupted: sidecar or plugin restart, lost connection or timeout                              |
+| `matter.commissioning_cancelled`              | The user cancelled the attempt                                                                                  |
+| `matter.commissioning_attestation_overridden` | The attempt went on although attestation failed (development override), with the finding types                  |
+| `matter.node_commissioned`                    | The node was registered as claimed; `attestation` is `verified` or `overridden`, with any warning finding types |
+| `matter.commissioning_finished`               | The naming step saved a name, a location or endpoint names                                                      |
+| `matter.node_removed_from_fabric`             | The device left the Attraccess fabric, with the previous state and the new fabric generation                    |
+| `matter.node_force_removed_from_fabric`       | The sidecar forgot the node without contacting the device, with the previous state and the new generation       |
+| `matter.node_removal_failed`                  | A removal failed: mode (`normal` or `force`) and reason                                                         |
+| `matter.node_shared`                          | A sharing window was opened, with its length in seconds                                                         |
+| `matter.node_share_revoked`                   | A user closed the sharing window; `closed` says whether the device still had it open                            |
+| `matter.node_share_expired`                   | The sharing window ran out                                                                                      |
+
+The subject of `matter.commissioning_started`, `matter.commissioning_failed`, `matter.commissioning_interrupted`, `matter.commissioning_cancelled` and `matter.commissioning_attestation_overridden` is the commissioning session (`sessionRef` in the details); the subject of the others is the node. No entry ever contains a setup code or a sharing code.
 
 Reconciliation entries (`matter.node_quarantined`, `matter.node_detached`, `matter.node_reattached`, `matter.fabric_mismatch_detected`) carry `initiator`: `system` when an automatic trigger ran the reconciliation, `administrator` for a manual `POST /matter/reconciliation`. Automatic entries show **System or anonymous** as the actor; manual ones name the user who started them.

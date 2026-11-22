@@ -1,5 +1,5 @@
 // Removal from the fabric: normal (RemoveFabric for the Attraccess fabric only), unreachable device, and force removal
-// with the device stopped. Needs mDNS over loopback.
+// with the device stopped and with the device running (proof that force never contacts it). Needs mDNS over loopback.
 import { openSharingWindow, commissionVirtualDevice } from '../../../matter-sidecar/src/testing/virtual-device';
 import { matterStorage } from '../backend/plugin-storage/access';
 import {
@@ -24,6 +24,13 @@ const remove = (stack: Stack, id: string, mode: 'normal' | 'force', headers = CO
   stack.api().post(`/api/matter/nodes/${id}/remove`).set(headers).send({ mode, confirm: true });
 const generation = async (stack: Stack): Promise<number> =>
   (await stack.api().get('/api/matter/fabric').set(ADMIN_ONLY).expect(200)).body.sidecar.fabricGeneration;
+/** Node IDs the sidecar's controller lists now, read from the sidecar itself rather than the plugin's records. */
+const sidecarNodeIds = async (stack: Stack): Promise<string[]> => {
+  const listed = await stack.rig.call('GET', '/v1/nodes');
+  expect(listed.status).toBe(200);
+  return (listed.body.nodes as { nodeId: string }[]).map((node) => node.nodeId);
+};
+const reconcile = (stack: Stack) => stack.api().post('/api/matter/reconciliation').set(OPERATOR).expect(200);
 
 describe('removal from the fabric', () => {
   const mdns = loopbackMdns();
@@ -66,9 +73,11 @@ describe('removal from the fabric', () => {
     expect(await nodeList(stack, '?lifecycleState=removed')).toHaveLength(1);
     expect(
       (await stack.api().post(`/api/matter/nodes/${session.nodeRecordId}/claim`).set(OPERATOR).send({})).status,
-    ).toBeGreaterThanOrEqual(400);
+    ).toBe(409);
     // A second removal has nothing left to remove.
-    expect((await remove(stack, session.nodeRecordId, 'normal')).status).toBeGreaterThanOrEqual(400);
+    const removedAgain = await remove(stack, session.nodeRecordId, 'normal');
+    expect(removedAgain.status).toBe(409);
+    expect(removedAgain.body.code).toBe('not_removable');
 
     // The change is backed up on its own.
     const backup = await until(
@@ -96,7 +105,7 @@ describe('removal from the fabric', () => {
     const session = await commission(stack, light.codes.qr);
     expect(session.state).toBe('succeeded');
     const before = await generation(stack);
-    const fabricIds = light.fabricIds();
+    const { nodeId } = await nodeDetail(stack, session.nodeRecordId);
     await light.stop();
 
     const refused = await remove(stack, session.nodeRecordId, 'normal');
@@ -119,9 +128,35 @@ describe('removal from the fabric', () => {
       (await tables.endpoints.find({ where: { nodeRef: session.nodeRecordId } })).every((e) => e.removedAt !== null),
     ).toBe(true);
     // The sidecar forgot the node, so a reconciliation does not bring it back.
-    await stack.api().post('/api/matter/reconciliation').set(OPERATOR);
+    expect(await sidecarNodeIds(stack)).not.toContain(nodeId);
+    await reconcile(stack);
     expect(await nodeList(stack)).toHaveLength(1);
-    expect(fabricIds).toContain(stack.fabricId);
+  }, 300_000);
+
+  it('force-removes a running device without contacting it: the device still lists the Attraccess fabric', async () => {
+    const light = await cleanup.device();
+    const stack = await cleanup.stack({ tuning: TEST_PAA });
+    const session = await commission(stack, light.codes.qr);
+    expect(session.state).toBe('succeeded');
+    const { nodeId } = await nodeDetail(stack, session.nodeRecordId);
+    expect(await sidecarNodeIds(stack)).toContain(nodeId);
+    expect(light.fabricIds()).toEqual([stack.fabricId]);
+    const before = await generation(stack);
+
+    const forced = await remove(stack, session.nodeRecordId, 'force');
+
+    expect(forced.status).toBe(200);
+    expect(forced.body).toMatchObject({ lifecycleState: 'removed', removalReason: 'forced_from_fabric' });
+    expect(await generation(stack)).toBe(before + 1);
+    expect(await sidecarNodeIds(stack)).not.toContain(nodeId);
+    expect(auditActions(stack)).toContain('matter.node_force_removed_from_fabric');
+    expect(auditActions(stack)).not.toContain('matter.node_removed_from_fabric');
+    // Read from the running device now: no RemoveFabric reached it, so it still holds the Attraccess credentials.
+    expect(light.fabricIds()).toEqual([stack.fabricId]);
+    // A reconciliation afterwards neither brings the node back nor changes the device.
+    await reconcile(stack);
+    expect(await nodeList(stack)).toHaveLength(1);
+    expect(light.fabricIds()).toEqual([stack.fabricId]);
   }, 300_000);
 
   it('requires the explicit confirmation and the commission permission', async () => {

@@ -119,9 +119,10 @@ Jeder sagt das, ausgehend von dem, was der Sidecar meldet (Funktionsfamilien `th
 - **Thread-Netzwerk** erklärt, dass Thread nicht eingerichtet ist, und gibt Hinweise, wie sich Thread, Zigbee und WLAN das
   2,4-GHz-Band teilen. Bereiche für Dataset, Border Router, Radio-Co-Prozessoren und SMLIGHT-Diagnose sind Platzhalter.
 - **Inbetriebnahme** ist ein geführter Ablauf auf einer eigenen Seite: Gerät vorbereiten, Code eingeben oder scannen,
-  Fortschritt verfolgen, Gerät benennen. Auf der Geräteseite kommen Teilen, Entfernen und die weiteren Administratoren
-  des Geräts hinzu. Siehe [Inbetriebnahme, Teilen und Entfernen](plugins/matter/commissioning.md). Meldet der Sidecar die
-  Familie `commissioning` nicht, sagt der Tab das und bietet keine Eingabe an.
+  Fortschritt verfolgen, Gerät benennen. Meldet der Sidecar die Familie `commissioning` nicht, sagt der Tab das und bietet
+  keine Eingabe an. Teilen, das Entfernen aus der Fabric und die weiteren Administratoren eines Geräts stehen nicht in
+  diesem Tab, sondern auf der Seite des Geräts selbst. Siehe
+  [Inbetriebnahme, Teilen und Entfernen](plugins/matter/commissioning.md).
 - **Software-Updates** listet die Software, die jedes Gerät gerade nutzt. Updates finden, freigeben und einspielen kommt
   mit der OTA-Unterstützung.
 

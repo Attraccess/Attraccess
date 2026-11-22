@@ -119,7 +119,8 @@ describe('attestation and registry agreement', () => {
     // Nothing half-written: the transaction rolled back.
     expect((await nodeList(stack)).filter((node) => node.lifecycleState === 'claimed')).toHaveLength(0);
 
-    await stack.api().post('/api/matter/reconciliation').set(OPERATOR);
+    const reconcile = () => stack.api().post('/api/matter/reconciliation').set(OPERATOR).expect(200);
+    await reconcile();
     const listed = await until(
       async () => {
         const nodes = await nodeList(stack);
@@ -130,5 +131,11 @@ describe('attestation and registry agreement', () => {
     );
     expect(listed).toHaveLength(1);
     expect(listed[0]).toMatchObject({ lifecycleState: 'unclaimed', claimedBy: null });
+
+    // A further reconciliation finds the same node and adds no duplicate.
+    await reconcile();
+    const again = await nodeList(stack);
+    expect(again).toHaveLength(1);
+    expect(again[0]).toMatchObject({ id: listed[0].id, lifecycleState: 'unclaimed', claimedBy: null });
   }, 240_000);
 });
