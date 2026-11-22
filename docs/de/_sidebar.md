@@ -106,6 +106,7 @@
     - [Matter: Verwaltungsseite](plugins/matter/admin-ui.md)
     - [Matter: Betriebsanleitung](plugins/matter/operator.md)
     - [Matter: Datenmodell und Lebenszyklus](plugins/matter/data-model.md)
+    - [Matter: Inbetriebnahme, Teilen und Entfernen](plugins/matter/commissioning.md)
     - [Matter: Backup und Wiederherstellung](plugins/matter/backup-restore.md)
     - [Matter: Berechtigungen](plugins/matter/permissions.md)
   - **RabbitMQ**

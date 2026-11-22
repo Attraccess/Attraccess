@@ -110,14 +110,16 @@ can be undone until you save. The token is never shown again after saving. Every
 
 ## Thread Network, Commissioning and Software Updates
 
-These tabs exist so that the address and the permission are in place, but the functions come with later plugin versions.
+Thread and Software Updates exist so that the address and the permission are in place, but the functions come with later plugin versions.
 Each says so, based on what the sidecar reports (feature families `thread`, `commissioning` and `ota`):
 
 - **Thread Network** explains that Thread is not set up and gives guidance for sharing the 2.4 GHz band between Thread,
   Zigbee and Wi-Fi. Sections for the dataset, Border Routers, radio co-processors and SMLIGHT diagnostics are
   placeholders.
-- **Commissioning** will be a guided flow on its own page (prepare the device, enter or scan the code, watch the progress,
-  name and claim). Until then it only explains the steps and collects no setup code.
+- **Commissioning** is a guided flow on its own page: prepare the device, enter or scan the code, watch the progress, name
+  the device. It also shows, on a device's page, sharing, removal and the device's other administrators. See
+  [Commissioning, Sharing and Removal](plugins/matter/commissioning.md). When the sidecar does not report the
+  `commissioning` family, the tab says so and offers no input.
 - **Software Updates** lists the software each device runs now. Finding, approving and applying updates comes with OTA
   support.
 
