@@ -94,6 +94,8 @@ export class AttractapFirmwareHandler {
     socket.state.cardRelay = data.payload?.capabilities?.cardRelay === true;
     // Firmware before 2.10.0 does not report nfc; only the BLE Bridge reports false.
     socket.state.nfc = data.payload?.capabilities?.nfc !== false;
+    // Image form fields (ATT-879): only firmware that announces it can render the QR code of the phone handoff.
+    socket.state.formImages = data.payload?.capabilities?.formImages === true;
     // Plugin BLE (protocol v1): older or incompatible firmware makes plugins see READER_UNSUPPORTED.
     socket.state.ble = parseBleCapability(data.payload?.capabilities?.ble);
     // The eFuse report on the control channel waits for the build: hand it over before the database writes,

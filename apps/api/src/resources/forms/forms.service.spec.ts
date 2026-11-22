@@ -23,6 +23,7 @@ const makeField = (overrides: Partial<FormFieldRecord>): FormFieldRecord => ({
 
 const makeStore = (): { [K in keyof ResourceFormStore]: jest.Mock } => ({
   resourceExists: jest.fn().mockResolvedValue(true),
+  findResourceName: jest.fn().mockResolvedValue('Laser'),
   groupExists: jest.fn().mockResolvedValue(true),
   listForms: jest.fn().mockResolvedValue({ items: [], total: 0 }),
   findForm: jest.fn().mockResolvedValue(null),
@@ -73,7 +74,7 @@ describe('ResourceFormsService pagination + per-field validation', () => {
     store = makeStore();
     store.findForm.mockResolvedValue(form);
     store.findRequiredForAction.mockResolvedValue([form]);
-    service = new ResourceFormsService(store as never);
+    service = new ResourceFormsService(store as never, {} as never);
   });
 
   it('returns form metadata with field counts', async () => {
@@ -242,7 +243,7 @@ describe('ResourceFormsService form writes', () => {
 
   beforeEach(() => {
     store = makeStore();
-    service = new ResourceFormsService(store as never);
+    service = new ResourceFormsService(store as never, {} as never);
   });
 
   it('hands the form and its validated fields to the store as one create and sorts the response fields', async () => {
@@ -372,7 +373,7 @@ describe('ResourceFormsService forms of a resource', () => {
 
   beforeEach(() => {
     store = makeStore();
-    service = new ResourceFormsService(store as never);
+    service = new ResourceFormsService(store as never, {} as never);
   });
 
   it('lists own and inherited forms with their source, override and effective flags', async () => {

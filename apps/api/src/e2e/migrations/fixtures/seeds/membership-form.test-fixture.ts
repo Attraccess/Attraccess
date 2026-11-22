@@ -1,7 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import type { DataSource } from 'typeorm';
 import {
+  Attractap,
   Form,
   FormField,
+  FormImage,
+  FormImageHandoff,
   FormResourceOverride,
   FormSubmission,
   Project,
@@ -103,7 +107,7 @@ export async function migrationMembershipFormSeeds(
     options: null,
   }));
 
-  await ensureEntity(formSubmissionRepo, () => ({
+  const submission = await ensureEntity(formSubmissionRepo, () => ({
     formId: form.id,
     userId: primaryUser.id,
     resourceUsageId: usage.id,
@@ -125,5 +129,34 @@ export async function migrationMembershipFormSeeds(
     resourceId: resource.id,
     disabled: false,
     isRequiredOnResourceUsageEnd: true,
+  }));
+
+  const reader = await dataSource.getRepository(Attractap).findOneByOrFail({});
+  const handoff = await ensureEntity(dataSource.getRepository(FormImageHandoff), () => ({
+    id: randomUUID(),
+    tokenHash: `seed-${seedTag}`.padEnd(64, '0'),
+    readerId: reader.id,
+    userId: primaryUser.id,
+    resourceId: resource.id,
+    action: ResourceFormAction.START,
+    formId: form.id,
+    fieldId: formField.id,
+    maxImages: 3,
+    expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+  }));
+
+  await ensureEntity(dataSource.getRepository(FormImage), () => ({
+    id: randomUUID(),
+    userId: primaryUser.id,
+    uploadedByUserId: null,
+    handoffId: handoff.id,
+    formId: form.id,
+    fieldId: formField.id,
+    submissionId: submission.id,
+    mimeType: 'image/jpeg',
+    size: 1234,
+    width: 640,
+    height: 480,
+    filename: `seed-${seedTag}.jpg`,
   }));
 }

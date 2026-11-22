@@ -175,6 +175,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     this.cardHandler.clearVerifiedUser(socket);
     if (reason === 'READER_SESSION_ENDED') this.uiHandler.endCardSession(socket);
     forgetReaderFormState(socket);
+    this.formsHandler.endReaderAttempts(socket);
     if (socket.state.supervisionFlow && !socket.state.supervisionFlow.webInitiated) {
       this.supervisionHandler.cancelForSocket(socket);
     }

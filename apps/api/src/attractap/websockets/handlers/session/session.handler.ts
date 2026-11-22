@@ -348,6 +348,7 @@ export class AttractapSessionHandler {
       resourceId,
       action: formAction,
       requestId: data.payload?.requestId,
+      reject: (payload) => this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, payload),
     });
     if (formSubmissions === null) {
       return;
@@ -476,6 +477,7 @@ export class AttractapSessionHandler {
       resourceId,
       action: ResourceFormAction.END,
       requestId: data.payload?.requestId,
+      reject: (payload) => this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, payload),
     });
     if (formSubmissions === null) {
       return;

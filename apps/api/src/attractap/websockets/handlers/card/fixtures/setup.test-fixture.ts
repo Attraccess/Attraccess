@@ -67,6 +67,7 @@ export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
       data.payload.resourceId,
     );
   (scope.handler as any).cardSessions = new CardSessionService();
+  (scope.handler as any).formsHandler = { endReaderAttempts: jest.fn() };
   (scope.handler as any).supervisionHandler = {
     cancelForSocket: jest.fn((socket: any) => {
       socket.state.supervisionFlow = null;

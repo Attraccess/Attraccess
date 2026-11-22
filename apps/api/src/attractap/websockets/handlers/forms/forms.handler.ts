@@ -1,9 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ResourceFormAction } from '@attraccess/application-models';
+import { FormFieldType, ResourceFormAction } from '@attraccess/application-models';
 import { AttractapService } from '../../../attractap.service';
 import { ResourceFormsService } from '../../../../resources/forms/forms.service';
 import { FormSubmissionRequestDto } from '../../../../resources/forms/dto/form-submission-request.dto';
 import { ResourceActionGuard } from '../resource-action.guard';
+import { FORM_PHOTO_UNSUPPORTED_REASON, ReaderFormImages } from './reader-form-images.service';
 import type { FormResponseDto } from '../../../../resources/forms/dto/form-response.dto';
 import {
   AuthenticatedWebSocket,
@@ -34,6 +35,9 @@ export class AttractapFormsHandler {
   @Inject(ResourceActionGuard)
   private resourceActionGuard: ResourceActionGuard;
 
+  @Inject(ReaderFormImages)
+  private readerImages: ReaderFormImages;
+
   private formDraftKey(resourceId: number, action: ResourceFormAction): string {
     return `${resourceId}:${action}`;
   }
@@ -54,6 +58,13 @@ export class AttractapFormsHandler {
     if (socket.state.formsPresented) {
       delete socket.state.formsPresented[key];
     }
+    // The attempt is over, submitted or not: the phone links of its image fields stop working.
+    this.readerImages.endAttempt(socket, resourceId, action);
+  }
+
+  /** The reader's login ended or changed: the phone links of its image fields stop working (ATT-879). */
+  public endReaderAttempts(socket: AuthenticatedWebSocket): void {
+    this.readerImages.endAllForReader(socket);
   }
 
   public handleResourceUsageFormCancel(socket: AuthenticatedWebSocket, data: AttractapEvent['data']): void {
@@ -66,19 +77,32 @@ export class AttractapFormsHandler {
     resourceId,
     action,
     requestId,
+    reject,
   }: {
     socket: AuthenticatedWebSocket;
     resourceId: number;
     action: ResourceFormAction;
     requestId?: number;
+    /** Answers the pending action with an error, for a form this reader can never complete. */
+    reject?: (payload: { error: string; reason: unknown }) => Promise<unknown>;
   }): Promise<FormSubmissionRequestDto[] | null> {
-    const forms = await this.resourceFormsService.getFormsForAction(resourceId, action);
-    if (!forms.length) {
+    const allForms = await this.resourceFormsService.getFormsForAction(resourceId, action);
+    if (!allForms.length) {
       return [];
     }
 
+    // Readers that cannot show image fields never get them (ATT-879): optional ones are left out, a required one
+    // makes the action fail with a pointer to the web app.
+    const adapted = await this.readerImages.adapt(socket, allForms);
+    if (adapted.blocked) {
+      await reject?.({ error: 'START_BLOCKED', reason: FORM_PHOTO_UNSUPPORTED_REASON });
+      return null;
+    }
+    const forms = adapted.forms;
+
     const key = this.formDraftKey(resourceId, action);
     const draft = this.getFormDraft(socket, resourceId, action);
+    await this.readerImages.refreshDraft(socket, { resourceId, action }, forms, draft);
     const hasValue = (fieldId: number) => {
       const value = draft[fieldId];
       return value !== undefined && value !== null && value !== '';
@@ -94,7 +118,7 @@ export class AttractapFormsHandler {
     const complete = presented.size === 0 ? forms.every(answered) : pending.length === 0;
 
     if (complete) {
-      return forms.map((form) => ({
+      return allForms.map((form) => ({
         formId: form.id,
         answers: form.fields
           .filter((field) => draft[field.id] !== undefined)
@@ -140,30 +164,37 @@ export class AttractapFormsHandler {
       return;
     }
 
+    const imageFields = await this.readerImages.supports(socket);
     const { totalFieldCount, fields } = await this.resourceFormsService.getFieldsWindow(
       resourceId,
       action,
       formId,
       offset,
       limit,
+      { imageFields },
     );
 
     const draft = this.getFormDraft(socket, resourceId, action);
+    const where = { resourceId, action, formId };
     const payload: ResourceUsageFormFieldsPayload = {
       resourceId,
       action,
       formId,
       offset,
       totalFieldCount,
-      fields: fields.map((field) => ({
-        id: field.id,
-        name: field.name,
-        description: field.description ?? null,
-        type: field.type,
-        isRequired: field.isRequired,
-        options: field.options ?? null,
-        value: draft[field.id] ?? null,
-      })),
+      fields: await Promise.all(
+        fields.map(async (field) => ({
+          id: field.id,
+          name: field.name,
+          description: field.description ?? null,
+          type: field.type,
+          isRequired: field.isRequired,
+          options: field.options ?? null,
+          // The ids of an image answer stay on the server: the reader shows a link and a count instead.
+          value: field.type === FormFieldType.IMAGE ? null : (draft[field.id] ?? null),
+          ...(field.type === FormFieldType.IMAGE ? await this.readerImages.describeField(socket, where, field) : {}),
+        })),
+      ),
     };
 
     await socket.sendMessage(new AttractapEvent(AttractapEventType.RESOURCE_USAGE_FORM_FIELDS, payload));
@@ -184,7 +215,13 @@ export class AttractapFormsHandler {
       return;
     }
 
-    const checked = await this.resourceFormsService.validatePageAnswers(resourceId, action, formId, answers);
+    const where = { resourceId, action, formId };
+    const form = (await this.resourceFormsService.getFormsForAction(resourceId, action)).find(
+      (item) => item.id === formId,
+    );
+    // The reader sends no image ids: the answer of an image field is what the phone handoff holds.
+    const filled = await this.readerImages.fillAnswers(socket, where, form, answers);
+    const checked = await this.resourceFormsService.validatePageAnswers(resourceId, action, formId, filled, userId);
     // Saved only for the user who answered; if the login changed meanwhile, the reader must not be
     // told the page was accepted (START would then miss the answers).
     const stillSameUser = userId != null && socket.state.verifiedUserId === userId;
@@ -195,7 +232,14 @@ export class AttractapFormsHandler {
       const key = this.formDraftKey(resourceId, action);
       socket.state.formDrafts ??= {};
       socket.state.formDrafts[key] ??= {};
-      for (const answer of answers) {
+      for (const answer of filled) {
+        if (
+          answer.value === '' &&
+          form?.fields.some((f) => f.id === answer.fieldId && f.type === FormFieldType.IMAGE)
+        ) {
+          delete socket.state.formDrafts[key][answer.fieldId];
+          continue;
+        }
         socket.state.formDrafts[key][answer.fieldId] = answer.value;
       }
     }

@@ -9,11 +9,11 @@ export class FormSubmissionFieldAnswerDto {
   fieldId!: number;
 
   @ApiProperty({
-    description: 'Submitted value',
-    oneOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }],
+    description: 'Submitted value. An image field takes the list of the ids of its uploaded images.',
+    oneOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { type: 'array', items: { type: 'string' } }],
   })
   @IsDefined()
-  value!: string | number | boolean;
+  value!: string | number | boolean | string[];
 }
 
 export class FormSubmissionRequestDto {

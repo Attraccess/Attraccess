@@ -84,6 +84,7 @@ describe('persisted web UI locale at card authentication', () => {
         }),
       },
       cardSessions: new CardSessionService(),
+      formsHandler: { endReaderAttempts: jest.fn() },
     });
     const sendMessage = jest.fn().mockResolvedValue(true);
     const socket = { readerId: 42, readyState: 1, state: {}, sendMessage } as unknown as AuthenticatedWebSocket;
