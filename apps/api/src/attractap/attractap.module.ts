@@ -75,9 +75,11 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
 
 import { ReaderBleDriver } from './websockets/handlers/ble/reader-ble.driver';
 import { BLE_TRANSPORT_DRIVER } from '../plugin-system/ble/ble-transport-driver';
+import { ResourceListVisibilityModule } from '../resources/visibility/resource-list-visibility.module';
 
 @Module({
   imports: [
+    ResourceListVisibilityModule,
     EventEmitterModule.forRoot(),
     AttractapPersistenceModule,
     UsersAndAuthModule,

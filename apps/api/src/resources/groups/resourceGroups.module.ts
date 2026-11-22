@@ -9,9 +9,16 @@ import { NotificationsModule } from '../../notifications/notifications.module';
 import { ResourceRetrainingModule } from '../retraining/resourceRetraining.module';
 import { ResourceGroupsCoreModule } from './resourceGroupsCore.module';
 import { GroupsPersistenceModule } from '../../database/adapters/resources/groups-persistence.module';
+import { ResourceListVisibilityModule } from '../visibility/resource-list-visibility.module';
 
 @Module({
-  imports: [GroupsPersistenceModule, NotificationsModule, ResourceGroupsCoreModule, ResourceRetrainingModule],
+  imports: [
+    ResourceListVisibilityModule,
+    GroupsPersistenceModule,
+    NotificationsModule,
+    ResourceGroupsCoreModule,
+    ResourceRetrainingModule,
+  ],
   controllers: [ResourceGroupsController, ResourceGroupsIntroductionsController, ResourceGroupsIntroducersController],
   providers: [ResourceGroupsIntroductionsService, ResourceGroupsIntroducersService, IsResourceGroupIntroducerGuard],
   exports: [

@@ -10,9 +10,11 @@ import { CreateMaintenanceScheduleDto } from './dtos/create-maintenance-schedule
 import { UpdateMaintenanceScheduleDto } from './dtos/update-maintenance-schedule.dto';
 import { LicenseModuleType } from '../../license/license.service';
 import { RequiresLicense } from '../../license/require-license.decorator';
+import { ResourceListVisible } from '../visibility/resource-list-visible.interceptor';
 
 @RequiresLicense(LicenseModuleType.MAINTENANCE)
 @ApiTags('Resource Maintenance Schedules')
+@ResourceListVisible()
 @Controller('resources/:resourceId/maintenance-schedules')
 @Auth()
 export class MaintenanceScheduleController {

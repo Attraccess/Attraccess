@@ -1,5 +1,6 @@
 # Systemeinstellungen
-<!-- llms-description: Administratorübersicht der Systemeinstellungen: Anwendung, Sichtbarkeit der Ressourcennutzung, E-Mail und weitere Einstellungen. -->
+
+<!-- llms-description: Administratorübersicht der Systemeinstellungen: Anwendung, Sichtbarkeit der Maschinenliste, Sichtbarkeit der Ressourcennutzung, E-Mail und weitere Einstellungen. -->
 
 Auf der Seite Systemeinstellungen koennen Administratoren das grundlegende Verhalten der Anwendung konfigurieren. Oeffnen Sie diese ueber **Einstellungen** in der Seitenleiste.
 
@@ -19,13 +20,46 @@ Allgemeine Einstellungen fuer die Attraccess-Instanz:
 
 | Einstellung                     | Beschreibung                                                                                                                                                                                                                                                                                                            |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Anwendungs-URL**              | Die URL, unter der Benutzer auf Attraccess zugreifen. E-Mail-Links werden daraus gebildet.                                                                                                                                                                                                                                     |
+| **Anwendungs-URL**              | Die URL, unter der Benutzer auf Attraccess zugreifen. E-Mail-Links werden daraus gebildet.                                                                                                                                                                                                                              |
 | **Oeffentliche Internet-URL**   | Oeffentliche URL fuer externe Callbacks, z.B. Zahlungsanbieter. Nur erforderlich, wenn sie sich von der Anwendungs-URL unterscheidet.                                                                                                                                                                                   |
 | **Lizenzschluessel**            | Ihr Attraccess-Lizenzschluessel.                                                                                                                                                                                                                                                                                        |
 | **Standardsprache des Systems** | Deutsch oder Englisch als Ersatzsprache für übersetzte Inhalte. Eine unterstützte Benutzer- oder Browsersprache hat Vorrang. Attractap verwendet während einer Sitzung die unterstützte Sprache des Karteninhabers, sonst die Standardsprache. Auswahl bei der Ersteinrichtung; Administratoren können sie hier ändern. |
 
 > [!TIP]
 > Die meisten Einstellungen koennen auch ueber [Umgebungsvariablen](installation/environment-variables.md) konfiguriert werden. In der Oberflaeche geaenderte Einstellungen ueberschreiben die Standardwerte der Umgebungsvariablen.
+
+## Sichtbarkeit der Maschinenliste
+
+Unter **Allgemein** legt **Wer die Maschinenliste sehen darf** fest, wer sieht, welche Maschinen es gibt. Zum Ändern ist die Berechtigung **Systemeinstellungen verwalten** (`system.settings.manage`) nötig; jede Änderung wird im [Audit-Log](settings/audit-log.md) protokolliert.
+
+| Option                                         | Wer eine Maschine sieht                                                                                                                                                                                                                          |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Alle mit „Ressourcen lesen“**                | Alle mit der Berechtigung **Ressourcen lesen** (`resources.read`) sehen alle Maschinen.                                                                                                                                                          |
+| **Nur in eine Maschine eingewiesene Personen** | Personen sehen nur Maschinen, in die sie eingewiesen sind (direkt oder über eine Gruppe), die sie einweisen oder warten (direkt oder über eine Gruppe) oder die sie gerade nutzen. Niemand sonst erfährt, dass die anderen Maschinen existieren. |
+
+Standardwerte:
+
+- **Neue Installationen** starten mit **Nur in eine Maschine eingewiesene Personen**. Ein neu registriertes Konto sieht eine leere Maschinenübersicht, bis es in eine Maschine eingewiesen wird.
+- **Aktualisierte Instanzen**, die schon Konten haben, behalten **Alle mit „Ressourcen lesen“**, bis ein Administrator es ändert. Das Update speichert diesen Wert einmalig und überschreibt nie einen Wert, den Sie gesetzt haben.
+
+In beiden Modi gilt:
+
+- Man muss angemeldet sein. Es gibt keinen öffentlichen Modus: Abgemeldete Anfragen erhalten `401` und keine Daten.
+- Alle mit **Ressourcen bearbeiten** (`resources.update`) oder **Ressourcen-Zugriff verwalten** (`resources.access.manage`) sehen alle Maschinen.
+- Eine Einweisung, die bis zur Nachschulung blockiert ist, zählt weiter, damit man die Maschine sieht, auf der man nachgeschult werden muss. Eine widerrufene Einweisung verbirgt die Maschine wieder. Solange man eine Maschine nutzt, sieht man sie.
+- Konten ohne **Ressourcen lesen**, zum Beispiel mit eigenen Rollen, erhalten die Ansicht **Nur in eine Maschine eingewiesene Personen** auch im Modus **Alle mit „Ressourcen lesen“**.
+
+Eine für jemanden verborgene Maschine antwortet mit `404 Not found`, genau wie eine Maschine, die es nicht gibt, und zwar auf jeder Adresse der Maschine: Seite, Status, Nutzung, Einweisungen, Wartung, Abläufe, Formulare und Live-Aktualisierungen. Listen, die Liste der Maschinen in Benutzung, Ressourcengruppen, das Dashboard und Live-Aktualisierungen lassen sie aus, und Seitenzahlen zählen nur die Maschinen, die man sehen darf. Ressourcengruppen erscheinen nur, wenn sie eine sichtbare Maschine enthalten oder man die Gruppe einweist oder wartet.
+
+Die Sichtbarkeit der Nutzung (unten) gilt zusätzlich: Eine Maschine, die man nicht sehen darf, erscheint nie in der Liste der Maschinen in Benutzung oder in Live-Aktualisierungen, egal wie die Einstellung zur Nutzung lautet.
+
+> [!WARNING]
+> Seiten und Feeds von Plugins, zum Beispiel des Reservierungs-Plugins, sind noch nicht abgedeckt und können Maschinen weiterhin namentlich auflisten. Prüfen Sie die eingesetzten Plugins, bevor Sie sich darauf verlassen, dass diese Einstellung Ihre Geräteliste verbirgt.
+
+> [!NOTE]
+> Kiosk-Konten und gedruckte QR-Etiketten öffnen Maschinenseiten wie ein normales Konto. Bei **Nur in eine Maschine eingewiesene Personen** braucht ein Kiosk-Konto Einweisungen oder die Berechtigung **Ressourcen bearbeiten** bzw. **Ressourcen-Zugriff verwalten**, und wer ein Etikett einer Maschine scannt, in die er nicht eingewiesen ist, sieht die Seite „nicht gefunden“.
+
+Die Einstellung wird pro API-Instanz bis zu eine Minute zwischengespeichert; bei mehreren Instanzen kann eine Änderung dort eine Minute später greifen.
 
 ## Sichtbarkeit der Ressourcennutzung
 

@@ -5,9 +5,16 @@ import { ResourceIntroducersModule } from '../introducers/resourceIntroducers.mo
 import { NotificationsModule } from '../../notifications/notifications.module';
 import { ResourceRetrainingModule } from '../retraining/resourceRetraining.module';
 import { IntroductionsPersistenceModule } from '../../database/adapters/resources/introductions-persistence.module';
+import { ResourceListVisibilityModule } from '../visibility/resource-list-visibility.module';
 
 @Module({
-  imports: [IntroductionsPersistenceModule, ResourceIntroducersModule, NotificationsModule, ResourceRetrainingModule],
+  imports: [
+    ResourceListVisibilityModule,
+    IntroductionsPersistenceModule,
+    ResourceIntroducersModule,
+    NotificationsModule,
+    ResourceRetrainingModule,
+  ],
   controllers: [ResourceIntroductionsController],
   providers: [ResourceIntroductionsService],
   exports: [ResourceIntroductionsService],

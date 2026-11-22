@@ -4,6 +4,10 @@
     "description": "Adjust your search or the filter-options to find resources",
     "clear": "Clear filter and search"
   },
+  "restricted": {
+    "title": "No machines yet",
+    "description": "Machines appear here once you are introduced to them. Ask an introducer of the machine you want to use."
+  },
   "firstResource": {
     "title": "No resources yet",
     "description": "Add your first machine or door to start managing access and usage.",

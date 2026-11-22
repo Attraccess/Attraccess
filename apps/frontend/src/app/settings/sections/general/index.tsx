@@ -6,6 +6,7 @@ import { PasswordInput, useTranslations } from '@attraccess/plugins-frontend-ui'
 import {
   ApiError,
   ResourceActivityVisibility,
+  ResourceListVisibility,
   useGetResourceVisibilitySettings,
   UseGetResourceVisibilitySettingsKeyFn,
   useGetSystemSettings,
@@ -35,6 +36,7 @@ const isAbsoluteUrl = (value: string) => {
 };
 
 const ACTIVITY_VISIBILITY_MODES = [ResourceActivityVisibility.ALL, ResourceActivityVisibility.INTRODUCED];
+const LIST_VISIBILITY_MODES = [ResourceListVisibility.AUTHENTICATED, ResourceListVisibility.PERMITTED_ONLY];
 
 type Draft = Partial<{
   url: string;
@@ -42,6 +44,7 @@ type Draft = Partial<{
   licenseKey: string;
   defaultLanguage: 'en' | 'de';
   activityVisibility: ResourceActivityVisibility;
+  listVisibility: ResourceListVisibility;
 }>;
 
 /** Drops the given keys from the draft, so those fields follow the server again. */
@@ -86,6 +89,8 @@ export function GeneralSection() {
   const defaultLanguage = draft.defaultLanguage ?? savedLanguage;
   const savedActivityVisibility = visibilitySettings?.activityVisibility;
   const activityVisibility = draft.activityVisibility ?? savedActivityVisibility;
+  const savedListVisibility = visibilitySettings?.listVisibility;
+  const listVisibility = draft.listVisibility ?? savedListVisibility;
 
   const { mutateAsync: saveSettings, isPending: isSavingSettings } = useUpdateSystemSettings(undefined, {
     onSuccess(data) {
@@ -104,7 +109,7 @@ export function GeneralSection() {
     {
       onSuccess(data) {
         queryClient.setQueryData(UseGetResourceVisibilitySettingsKeyFn(), data);
-        setDraft(withoutKeys(['activityVisibility']));
+        setDraft(withoutKeys(['activityVisibility', 'listVisibility']));
       },
     },
   );
@@ -115,7 +120,7 @@ export function GeneralSection() {
     publicInternetUrl !== savedPublicUrl ||
     licenseKey.trim() !== '' ||
     defaultLanguage !== savedLanguage;
-  const isVisibilityDirty = activityVisibility !== savedActivityVisibility;
+  const isVisibilityDirty = activityVisibility !== savedActivityVisibility || listVisibility !== savedListVisibility;
   const isDirty = isSystemSettingsDirty || isVisibilityDirty;
 
   const trimmedUrl = url.trim();
@@ -161,8 +166,16 @@ export function GeneralSection() {
         }),
       );
     }
-    if (isVisibilityDirty && activityVisibility) {
-      saves.push(saveVisibility({ body: { activityVisibility } }));
+    if (isVisibilityDirty) {
+      // Only the fields that changed: the API accepts either one on its own.
+      saves.push(
+        saveVisibility({
+          body: {
+            ...(activityVisibility && activityVisibility !== savedActivityVisibility ? { activityVisibility } : {}),
+            ...(listVisibility && listVisibility !== savedListVisibility ? { listVisibility } : {}),
+          },
+        }),
+      );
     }
     if (saves.length === 0) return;
 
@@ -270,6 +283,32 @@ export function GeneralSection() {
           </div>
         </SettingsRow>
 
+        <SettingsRow
+          stacked
+          label={t('inputs.listVisibility.label')}
+          hint={
+            isVisibilityError
+              ? t('inputs.listVisibility.loadFailed')
+              : listVisibility === ResourceListVisibility.PERMITTED_ONLY
+                ? t('inputs.listVisibility.permittedOnlyHint')
+                : t('inputs.listVisibility.authenticatedHint')
+          }
+        >
+          <Select
+            aria-label={t('inputs.listVisibility.label')}
+            value={listVisibility}
+            onChange={(next) => {
+              const mode = LIST_VISIBILITY_MODES.find((candidate) => candidate === next);
+              if (mode) setDraft((current) => ({ ...current, listVisibility: mode }));
+            }}
+            items={LIST_VISIBILITY_MODES.map((mode) => ({
+              key: mode,
+              label: t(`inputs.listVisibility.${mode}`),
+            }))}
+            isDisabled={isSaving || isVisibilityLoading || isVisibilityError}
+            fullWidth
+          />
+        </SettingsRow>
         <SettingsRow
           stacked
           label={t('inputs.activityVisibility.label')}

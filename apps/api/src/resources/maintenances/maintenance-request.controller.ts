@@ -13,9 +13,11 @@ import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { CanManageMaintenance } from './canManageMaintenance.decorator';
 import { LicenseModuleType } from '../../license/license.service';
 import { RequiresLicense } from '../../license/require-license.decorator';
+import { ResourceListVisible } from '../visibility/resource-list-visible.interceptor';
 
 @RequiresLicense(LicenseModuleType.MAINTENANCE)
 @ApiTags('Resource Maintenances')
+@ResourceListVisible()
 @Controller('resources/:resourceId/maintenance-requests')
 @Auth()
 export class MaintenanceRequestController {

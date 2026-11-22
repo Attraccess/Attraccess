@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Req } from '@nestjs/common';
-import { ResourceGroupsService, GroupVisibilityContext } from './resourceGroups.service';
+import { ResourceGroupsService } from './resourceGroups.service';
+import { ResourceListVisibilityService } from '../visibility/resource-list-visibility.service';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResourceGroup, toResourceGroupDto } from './dto/resource-group.dto';
 import { CreateResourceGroupDto } from './dto/createGroup.dto';
@@ -10,14 +11,10 @@ import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 @ApiTags('Resources')
 @Controller('resource-groups')
 export class ResourceGroupsController {
-  constructor(private readonly resourceGroupsService: ResourceGroupsService) {}
-
-  private getVisibilityContext(req: AuthenticatedRequest): GroupVisibilityContext {
-    return {
-      userId: req.user.id,
-      canUpdateResources: req.user.effectivePermissions?.has('resources.update') === true,
-    };
-  }
+  constructor(
+    private readonly resourceGroupsService: ResourceGroupsService,
+    private readonly listVisibility: ResourceListVisibilityService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new resource group', operationId: 'resourceGroupsCreateOne' })
@@ -40,7 +37,9 @@ export class ResourceGroupsController {
     type: [ResourceGroup],
   })
   async getAll(@Req() req: AuthenticatedRequest): Promise<ResourceGroup[]> {
-    return (await this.resourceGroupsService.getMany(this.getVisibilityContext(req))).map(toResourceGroupDto);
+    return (await this.resourceGroupsService.getMany(await this.listVisibility.groupContext(req.user))).map(
+      toResourceGroupDto,
+    );
   }
 
   @Get('resources-exist')
@@ -51,7 +50,11 @@ export class ResourceGroupsController {
   })
   @ApiResponse({ status: 200, type: VisibleResourcesExistDto })
   async resourcesExist(@Req() req: AuthenticatedRequest): Promise<VisibleResourcesExistDto> {
-    return { hasResources: await this.resourceGroupsService.hasVisibleResources(this.getVisibilityContext(req)) };
+    return {
+      hasResources: await this.resourceGroupsService.hasVisibleResources(
+        await this.listVisibility.groupContext(req.user),
+      ),
+    };
   }
 
   @Get(':id')
@@ -69,7 +72,7 @@ export class ResourceGroupsController {
   })
   async getOne(@Param('id', ParseIntPipe) id: number, @Req() req: AuthenticatedRequest): Promise<ResourceGroup> {
     return toResourceGroupDto(
-      await this.resourceGroupsService.getOne({ id }, undefined, this.getVisibilityContext(req)),
+      await this.resourceGroupsService.getOne({ id }, undefined, await this.listVisibility.groupContext(req.user)),
     );
   }
 

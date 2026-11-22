@@ -14,6 +14,7 @@ import { ResourceActivityVisibilityService } from './usage/authorization/resourc
 import { ResourceIntroducersService } from './introducers/resourceIntroducers.service';
 import { AuthenticatedRequest, DualAuthGuard } from '@attraccess/plugins-backend-sdk';
 import supertest from 'supertest';
+import { ResourceListVisibilityService } from './visibility/resource-list-visibility.service';
 
 // Only the documented columns and the relations a read loaded leave the controller, never a whole entity.
 type Resource = ReturnType<typeof createMockResource>;
@@ -43,6 +44,10 @@ describe('ResourcesController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ResourcesController],
       providers: [
+        {
+          provide: ResourceListVisibilityService,
+          useValue: { canSee: jest.fn(async () => true), permittedForUserId: jest.fn(async () => undefined) },
+        },
         {
           provide: ResourcesService,
           useValue: mockResourcesService,
@@ -98,6 +103,7 @@ describe('ResourcesController', () => {
 
       expect(result).toEqual({
         ...paginatedResponse,
+        visibilityScope: 'all',
         data: [dto(resources[0], 'public/path/1/test.jpg')],
       });
       expect(service.listResources).toHaveBeenCalledWith({ page: 1, limit: 10 });
@@ -206,6 +212,10 @@ describe('ResourcesController', () => {
       const module = await Test.createTestingModule({
         controllers: [ResourcesController],
         providers: [
+          {
+            provide: ResourceListVisibilityService,
+            useValue: { canSee: jest.fn(async () => true), permittedForUserId: jest.fn(async () => undefined) },
+          },
           { provide: ResourcesService, useValue: service },
           { provide: ResourceImageService, useValue: {} },
           {

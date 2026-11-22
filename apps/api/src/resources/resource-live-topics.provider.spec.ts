@@ -6,8 +6,9 @@ import { LiveTopicsService } from '../live-updates/live-topics.service';
 import { ResourceEventsService } from './sse/resource-events.service';
 import { FlowLogRecorderService } from './flows/logs/flow-log-recorder.service';
 import { ResourceActivityVisibilityService } from './usage/authorization/resource-activity-visibility.service';
+import { ResourceListVisibilityService } from './visibility/resource-list-visibility.service';
 
-function setup() {
+function setup(hiddenIds: number[] = []) {
   const registry = new LiveTopicsService();
   const resources = { existingIds: jest.fn(async () => [1]) };
   const events = { subscribeResource: jest.fn(async () => new Subject<{ data: object }>()) };
@@ -18,15 +19,22 @@ function setup() {
     canFollowLive: jest.fn(async () => true),
     viewLiveStream: jest.fn((stream: unknown) => stream),
   };
+  const listVisibility = {
+    filterVisible: jest.fn(async (_user: AuthenticatedUser, ids: number[]) =>
+      ids.filter((id) => !hiddenIds.includes(id)),
+    ),
+    followVisible: jest.fn((stream: unknown) => stream),
+  };
   const provider = new ResourceLiveTopicsProvider(
     registry,
     resources as never,
     events as unknown as ResourceEventsService,
     logs as unknown as FlowLogRecorderService,
     visibility as unknown as ResourceActivityVisibilityService,
+    listVisibility as unknown as ResourceListVisibilityService,
   );
   provider.onModuleInit();
-  return { registry, resources, events, logs };
+  return { registry, resources, events, logs, listVisibility };
 }
 
 describe('resource live topic provider', () => {
@@ -81,5 +89,34 @@ describe('resource live topic provider', () => {
     expect(logs.subjectFor).toHaveBeenCalledWith(1);
     observer.unsubscribe();
     expect(logs.releaseSubject).toHaveBeenCalledWith(1);
+  });
+
+  it('refuses a subscription to a machine the viewer may not see, like a machine that does not exist', async () => {
+    const { registry, listVisibility } = setup([1]);
+    const user = { id: 1, effectivePermissions: new Set(['resources.update']) } as AuthenticatedUser;
+    await expect(
+      registry.authorize(
+        [
+          { topic: 'resource', resourceId: 1 },
+          { topic: 'flow-logs', resourceId: 1 },
+          { topic: 'resource', resourceId: 2 },
+        ],
+        user,
+      ),
+    ).resolves.toEqual(
+      new Map([
+        ['resource:1', 'Resource not found'],
+        ['flow-logs:1', 'Resource not found'],
+        ['resource:2', 'Resource not found'],
+      ]),
+    );
+    expect(listVisibility.filterVisible).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the events of a hidden machine from an open resource stream', async () => {
+    const { registry, listVisibility } = setup();
+    const user = { id: 1 } as AuthenticatedUser;
+    await registry.source({ topic: 'resource', resourceId: 1 }, user);
+    expect(listVisibility.followVisible).toHaveBeenCalledWith(expect.anything(), user, 1);
   });
 });

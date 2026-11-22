@@ -21,9 +21,11 @@ import {
 
 import { ResourceMaintenanceService } from './maintenance.service';
 import { CanManageMaintenance } from './canManageMaintenance.decorator';
+import { ResourceListVisible } from '../visibility/resource-list-visible.interceptor';
 
 @RequiresLicense(LicenseModuleType.MAINTENANCE)
 @ApiTags('Resource Maintenances')
+@ResourceListVisible()
 @Controller('resources/:resourceId/maintenances')
 @Auth()
 export class ResourceMaintenanceController {

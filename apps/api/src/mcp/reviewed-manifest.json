@@ -567,12 +567,12 @@
   "getResourceVisibilitySettings": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "5db619ae"
+    "shape": "85d5cace"
   },
   "updateResourceVisibilitySettings": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "f8bb300a"
+    "shape": "ae491a47"
   },
   "getLicenseInformation": {
     "decision": "allow",
@@ -682,7 +682,7 @@
   "getAllResources": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "b0ae2943"
+    "shape": "2f62064b"
   },
   "getAllResourcesInUse": {
     "decision": "allow",

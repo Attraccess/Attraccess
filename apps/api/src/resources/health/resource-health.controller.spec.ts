@@ -3,6 +3,7 @@ import { ResourceHealthController } from './resource-health.controller';
 import { ResourceHealthService } from './resource-health.service';
 import { ResourceHealthSource, ResourceHealthStatus } from '@attraccess/application-models';
 import { CanManageMaintenanceGuard } from '../maintenances/canManageMaintenance.guard';
+import { ResourceListVisibilityService } from '../visibility/resource-list-visibility.service';
 
 describe('ResourceHealthController', () => {
   let controller: ResourceHealthController;
@@ -12,6 +13,7 @@ describe('ResourceHealthController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ResourceHealthController],
       providers: [
+        { provide: ResourceListVisibilityService, useValue: { canSee: jest.fn(async () => true) } },
         {
           provide: ResourceHealthService,
           useValue: {

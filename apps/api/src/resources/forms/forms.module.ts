@@ -3,9 +3,10 @@ import { FormsPersistenceModule } from '../../database/adapters/resources/forms-
 import { FormsController } from './global-forms.controller';
 import { ResourceFormsController } from './forms.controller';
 import { ResourceFormsService } from './forms.service';
+import { ResourceListVisibilityModule } from '../visibility/resource-list-visibility.module';
 
 @Module({
-  imports: [FormsPersistenceModule],
+  imports: [ResourceListVisibilityModule, FormsPersistenceModule],
   controllers: [FormsController, ResourceFormsController],
   providers: [ResourceFormsService],
   exports: [ResourceFormsService],

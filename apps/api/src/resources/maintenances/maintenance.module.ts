@@ -19,9 +19,11 @@ import { NotificationsModule } from '../../notifications/notifications.module';
 import { LicenseModule } from '../../license/license.module';
 import { RbacModule } from '../../users-and-auth/rbac/rbac.module';
 import { ResourceOperatingAttributionModule } from '../operating-intervals/resource-operating-attribution.module';
+import { ResourceListVisibilityModule } from '../visibility/resource-list-visibility.module';
 
 @Module({
   imports: [
+    ResourceListVisibilityModule,
     MaintenancePersistenceModule,
     ResourceOperatingAttributionModule,
     NotificationsModule,

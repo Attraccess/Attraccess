@@ -15,6 +15,7 @@ import { ResourceUsageService } from './resource-usage.service';
 import { ResourceActivityVisibilityService } from '../authorization/resource-activity-visibility.service';
 import { SessionEndNotifier } from '../pre-start/session-end-notifier.service';
 import { PreStartService } from '../pre-start/pre-start.service';
+import { ResourceListVisibilityService } from '../../visibility/resource-list-visibility.service';
 
 class FakeAuth implements CanActivate {
   canActivate(context: ExecutionContext) {
@@ -91,6 +92,7 @@ describe('usage session responses', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [ResourceUsageController],
       providers: [
+        { provide: ResourceListVisibilityService, useValue: { canSee: jest.fn(async () => true) } },
         { provide: ResourceUsageService, useValue: service },
         {
           provide: ResourceActivityVisibilityService,

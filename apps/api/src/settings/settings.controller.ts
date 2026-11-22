@@ -196,7 +196,7 @@ export class SettingsController {
 
   @Get('resources/visibility')
   @Auth('system.settings.manage')
-  @ApiOperation({ summary: 'Get resource activity visibility settings', operationId: 'getResourceVisibilitySettings' })
+  @ApiOperation({ summary: 'Get resource visibility settings', operationId: 'getResourceVisibilitySettings' })
   @ApiResponse({ status: 200, description: 'Current visibility settings.', type: ResourceVisibilitySettingsDto })
   async getResourceVisibilitySettings(): Promise<ResourceVisibilitySettingsDto> {
     return this.settingsService.getResourceVisibilitySettings();
@@ -205,7 +205,7 @@ export class SettingsController {
   @Patch('resources/visibility')
   @Auth('system.settings.manage')
   @ApiOperation({
-    summary: 'Update resource activity visibility settings',
+    summary: 'Update resource visibility settings',
     operationId: 'updateResourceVisibilitySettings',
   })
   @ApiResponse({ status: 200, description: 'Visibility settings updated.', type: ResourceVisibilitySettingsDto })

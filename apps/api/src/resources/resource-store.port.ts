@@ -17,6 +17,8 @@ export interface ListResourcesQuery {
   ids?: number[];
   onlyInUseByUserId?: number;
   onlyWithPermissionForUserId?: number;
+  /** Narrows the page, and its total, to the machines this user may see under "permitted-only" (ATT-843). */
+  permittedForUserId?: number;
   onlyInUse?: boolean;
   /** Embeds the running sessions with their users. */
   returnUsingUser?: boolean;
@@ -50,6 +52,9 @@ export interface ResourceStore {
 
   /** One page of resources by name, with their groups, and the total count. */
   list(query: ListResourcesQuery): Promise<{ data: ResourceRecord[]; total: number }>;
+
+  /** Which of the ids are machines the user may see under "permitted-only" (ATT-843). Deleted machines are never. */
+  permittedIds(userId: number, ids: number[]): Promise<number[]>;
 
   count(): Promise<number>;
 

@@ -3,8 +3,10 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceRetrainingService } from './resourceRetraining.service';
 import { RetrainingStatusResponseDto } from './dtos/retrainingStatus.response.dto';
+import { ResourceListVisible } from '../visibility/resource-list-visible.interceptor';
 
 @ApiTags('Resources')
+@ResourceListVisible()
 @Controller('resources/:resourceId/retraining')
 export class ResourceRetrainingController {
   constructor(private readonly resourceRetrainingService: ResourceRetrainingService) {}
