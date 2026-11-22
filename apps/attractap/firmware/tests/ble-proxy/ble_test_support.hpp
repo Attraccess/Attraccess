@@ -73,12 +73,28 @@ namespace bletest
             return watchError;
         }
         void stopScan() override { calls.push_back("stopScan"); }
-        Error connect(const Address &, uint32_t, const PsVector<AllowEntry> &) override
+        // A test's own radio behaviour (ble_link_watchdog_test.cpp): what connect returns, what a cancel does and what
+        // the link supervision finds.
+        std::function<Error(uint32_t timeoutMs)> onConnect;
+        std::function<void()> onCancelConnect;
+        std::function<const char *()> onSupervise;
+        int superviseCalls = 0;
+
+        Error connect(const Address &, uint32_t timeoutMs, const PsVector<AllowEntry> &) override
         {
             calls.push_back("connect");
-            return connectError;
+            return onConnect ? onConnect(timeoutMs) : connectError;
         }
-        void cancelConnect() override { calls.push_back("cancelConnect"); }
+        void cancelConnect() override
+        {
+            calls.push_back("cancelConnect");
+            if (onCancelConnect) onCancelConnect();
+        }
+        const char *superviseLink() override
+        {
+            superviseCalls++;
+            return onSupervise ? onSupervise() : nullptr;
+        }
         void disconnect() override { calls.push_back("disconnect"); }
         Start op(const char *name, uint32_t token, Error &error)
         {
@@ -254,4 +270,8 @@ namespace bletest
     void runLinkTests();
     // ble_watch_test.cpp: the advertisement watch.
     void runWatchTests();
+    // ble_memory_test.cpp: a short heap refuses or drops work instead of aborting.
+    void runMemoryTests();
+    // ble_link_watchdog_test.cpp: a connect or link whose NimBLE event never comes is recovered.
+    void runLinkWatchdogTests();
 }

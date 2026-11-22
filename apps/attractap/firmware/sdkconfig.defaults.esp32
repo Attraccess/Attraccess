@@ -1,0 +1,102 @@
+# Classic ESP32 overlay: the BLE bridge (variants/attractap-bridge-gl-s10.cmake, GL.iNet GL-S10).
+# ESP-IDF applies it after sdkconfig.defaults only when IDF_TARGET is esp32, so the S3 variants never see it.
+# Everything below overrides an S3 default of sdkconfig.defaults or adds what the bridge needs.
+
+# --- Board: ESP32-D0WD (WROOM-32U), 4 MB flash ---
+CONFIG_IDF_TARGET="esp32"
+# DIO at 40 MHz, the flash mode the bridge images are built and hardware-tested with (the S3 uses QIO/80 MHz).
+CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_40M=y
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+
+# --- PSRAM: none. The S10 drives the 50 MHz RMII clock out on GPIO17, which the ESP32's external PSRAM needs
+# as its clock pin, so PSRAM and Ethernet cannot both run. NimBLE, mbedTLS and the proxy use internal RAM; the
+# proxy reports smaller bounds (BLE_PROXY_INTERNAL_RAM in the variant).
+# CONFIG_SPIRAM is not set
+CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC=y
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_INTERNAL=y
+
+# --- Partition table: 4 MB dual-OTA layout ---
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions-4mb.csv"
+
+# --- Main task: no display or plugin UI on this board, so less stack than the S3 readers ---
+# QA (ATT-1315) measured 11.1 KB in use after an Ethernet boot: the high-water mark plus about 2 KB.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=13312
+
+# --- BLE: BLE-only controller with one connection (the NimBLE host settings come from sdkconfig.defaults) ---
+CONFIG_BTDM_CTRL_MODE_BLE_ONLY=y
+CONFIG_BTDM_CTRL_BLE_MAX_CONN=1
+# Wi-Fi and BLE share the radio; software coexistence arbitrates while the Wi-Fi fallback is in use.
+CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y
+
+# --- Console: UART0 (GPIO1/3, the serial pads). The classic ESP32 has no USB-Serial-JTAG; the Serial
+# Configurator talks to the bridge through a 3.3 V USB-TTL adapter.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+CONFIG_ESP_CONSOLE_UART_BAUDRATE=115200
+
+# --- Ethernet: internal EMAC (RMII) ---
+CONFIG_ETH_USE_ESP32_EMAC=y
+
+# --- Internal RAM budget (ATT-1315). No PSRAM: Wi-Fi, lwIP, two TLS contexts (wss + the reader session), the
+# websocket and NimBLE share about 160 KB of heap. Without the trimming below the first plugin BLE scan could not
+# even create the 4 KB NimBLE host task. Each value: what it costs, why the bridge can do with less.
+# Wi-Fi: the bridge moves a few KB/s (websocket frames, OTA chunks), so the throughput defaults buy nothing here.
+# 5 static RX buffers (1.6 KB each, allocated at Wi-Fi init even on Ethernet): -8 KB, enough for one TCP flow.
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=5
+# Caps on the dynamic buffers (allocated per frame): limit the peak a burst can take from the heap.
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=12
+CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM=12
+# Management short buffers (scan results, association frames): 12 is enough for one STA and a setup scan.
+CONFIG_ESP_WIFI_MGMT_SBUF_NUM=12
+# TX aggregation holds frames for a block ack; the bridge never sends enough to gain from it.
+# CONFIG_ESP_WIFI_AMPDU_TX_ENABLED is not set
+# RX aggregation stays (some APs misbehave without it), with a window of 4 buffers instead of 6.
+CONFIG_ESP_WIFI_RX_BA_WIN=4
+# Station only: no soft-AP code.
+# CONFIG_ESP_WIFI_SOFTAP_SUPPORT is not set
+# The IRAM placement options (ESP_WIFI_IRAM_OPT, ESP_WIFI_RX_IRAM_OPT) stay on: on the ESP32, IRAM freed by them
+# only becomes 32-bit-only heap, which neither task stacks nor the buffers above can use.
+
+# mbedTLS: buffers allocated per record and freed when it is done, instead of 8 KB + 4 KB held per context for
+# the whole connection (the bridge keeps two contexts open). The incoming limit stays 8192 (sdkconfig.defaults):
+# reverse proxies in front of the API do not negotiate a smaller record size. Key and CA data are not freed after
+# the handshake (MBEDTLS_DYNAMIC_FREE_*): the reader session reuses its key and the wss CA on every reconnect.
+CONFIG_MBEDTLS_DYNAMIC_BUFFER=y
+# Outgoing records of 2 KB: the bridge sends small frames; a larger write is split into more records.
+CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=2048
+# The wss connection checks the server against the firmware's own CA list (src/certs), never the IDF bundle.
+# CONFIG_MBEDTLS_CERTIFICATE_BUNDLE is not set
+
+# NimBLE: one link at a time (a plugin connection, or the Bluetooth setup), so fewer and smaller pools.
+# Mbuf pools: 8x256 + 12x320 B (was 12x256 + 24x320): -5 KB, still a 517 B notification in flight both ways.
+CONFIG_BT_NIMBLE_MSYS_1_BLOCK_COUNT=8
+CONFIG_BT_NIMBLE_MSYS_2_BLOCK_COUNT=12
+# Controller-to-host ACL buffers 10x255 (was 24) and HCI event buffers 16x70 (was 30): -4 KB.
+CONFIG_BT_NIMBLE_TRANSPORT_ACL_FROM_LL_COUNT=10
+CONFIG_BT_NIMBLE_TRANSPORT_EVT_COUNT=16
+# Filter accept list: the proxy filters in software and the setup accepts anyone, so two entries suffice.
+CONFIG_BT_NIMBLE_WHITELIST_SIZE=2
+# Bluetooth setup (src/bt_setup): a GATT server the web app writes the setup commands to. Peripheral
+# role and LE Secure Connections pairing (Just Works), so the Wi-Fi password never crosses the air in clear text.
+# No legacy pairing, no signed writes, no stored bonds: every setup window pairs anew under a new random address.
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
+# Broadcaster: the setup advertises its service and name so the browser can find it.
+CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
+CONFIG_BT_NIMBLE_SECURITY_ENABLE=y
+# CONFIG_BT_NIMBLE_SM_LEGACY is not set
+CONFIG_BT_NIMBLE_SM_SC=y
+# CONFIG_BT_NIMBLE_SM_SIGN_CNT is not set
+# CONFIG_BT_NIMBLE_NVS_PERSIST is not set
+# Only the GAP and GATT services the setup needs: none of NimBLE's example profiles. (SPS stays: ESP-IDF's
+# ble_gatts_reset() calls into it.)
+# CONFIG_BT_NIMBLE_PROX_SERVICE is not set
+# CONFIG_BT_NIMBLE_ANS_SERVICE is not set
+# CONFIG_BT_NIMBLE_CTS_SERVICE is not set
+# CONFIG_BT_NIMBLE_HTP_SERVICE is not set
+# CONFIG_BT_NIMBLE_IPSS_SERVICE is not set
+# CONFIG_BT_NIMBLE_TPS_SERVICE is not set
+# CONFIG_BT_NIMBLE_IAS_SERVICE is not set
+# CONFIG_BT_NIMBLE_LLS_SERVICE is not set
+# CONFIG_BT_NIMBLE_HR_SERVICE is not set
+# CONFIG_BT_NIMBLE_BAS_SERVICE is not set
+# CONFIG_BT_NIMBLE_DIS_SERVICE is not set

@@ -39,17 +39,52 @@ namespace
 
 // --- session channel -------------------------------------------------------------------------
 
-bool ReaderLink::flushOutbox()
+bool ReaderLink::flushOutboxLocked()
 {
-    // All records of one operation leave in one binary frame, in order.
-    if (outbox.empty())
+    // All waiting records leave in one binary frame, in order. A refused frame stays in the outbox for the next
+    // flush (SessionOutbox): only a backlog the websocket never takes ends the session.
+    const SessionOutbox::Result result =
+        outbox.flush(millis(), [this](const uint8_t *data, size_t length) {
+            // No free slot: refuse without the websocket's copy, its error log and its quality event (loop() retries
+            // every millisecond while records wait).
+            return socket.sendQueueHasRoom(0) && socket.sendBinary(data, length);
+        });
+    if (result != SessionOutbox::Result::Broken)
     {
         return true;
     }
-    std::vector<uint8_t> records;
-    records.swap(outbox);
-    // A lost record breaks the TLS stream: the caller starts over.
-    return socket.sendBinary(records.data(), records.size());
+    logger.errorf("Session records not taken by the websocket (%u bytes), reconnecting",
+                  static_cast<unsigned>(outbox.size()));
+    endSessionLocked("session send failed");
+    return false;
+}
+
+void ReaderLink::endSessionLocked(const char *reason)
+{
+    closeSessionLocked();
+    outbox.clear();
+    socket.forceReconnect(reason);
+}
+
+bool ReaderLink::sendSessionFrameLocked(SessionFraming::FrameType type, const uint8_t *payload, size_t length)
+{
+    // Records refused earlier go first, and nothing new is encrypted behind them or without a free send slot: a
+    // message refused here never reached TLS, so the stream loses nothing and the caller may try again.
+    if (!flushOutboxLocked() || !outbox.accepting() || !socket.sendQueueHasRoom(0))
+    {
+        return false;
+    }
+    if (!tls.sendFrame(type, payload, length))
+    {
+        if (tls.status() != SessionTls::Status::Open)
+        {
+            logger.errorf("Secure session ended while sending (%d)", tls.lastError());
+            endSessionLocked("session send failed");
+        }
+        return false;
+    }
+    // Refused records wait in the outbox: the message is on its way.
+    return flushOutboxLocked();
 }
 
 void ReaderLink::onSessionConnected()
@@ -149,10 +184,8 @@ void ReaderLink::runSessionWork(const SessionWork &item)
                 return;
             }
             sessionReady = false;
-            tls.begin(config, [this](const uint8_t *data, size_t length) {
-                outbox.insert(outbox.end(), data, data + length);
-                return true;
-            });
+            outbox.clear();
+            tls.begin(config, [this](const uint8_t *data, size_t length) { return outbox.append(data, length); });
         }
         else
         {
@@ -163,11 +196,16 @@ void ReaderLink::runSessionWork(const SessionWork &item)
                      });
             status.opened = wasHandshaking && tls.status() == SessionTls::Status::Open;
         }
-        status.sendFailed = !flushOutbox();
+        // Records the websocket refuses wait in the outbox (retried from loop()); only a backlog it never takes
+        // ends the session.
+        status.sendFailed = outbox.flush(millis(), [this](const uint8_t *data, size_t length) {
+            return socket.sendBinary(data, length);
+        }) == SessionOutbox::Result::Broken;
         status.code = static_cast<int>(tls.status());
         if (status.sendFailed)
         {
             closeSessionLocked();
+            outbox.clear();
         }
         sessionReady = tls.open();
     }

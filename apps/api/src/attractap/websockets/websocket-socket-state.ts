@@ -292,6 +292,8 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
     signingIn?: { readerId: number; attempt: symbol };
     /** The reader runs firmware that relays card APDUs (capabilities.cardRelay, 2.0.0+). Older readers get no card functions. */
     cardRelay?: boolean;
+    /** False for the BLE Bridge (capabilities.nfc): it gets no resource list. Undefined until READER_FIRMWARE_INFO. */
+    nfc?: boolean;
     /**
      * Plugin BLE support negotiated from capabilities.ble; undefined until READER_FIRMWARE_INFO arrived. Used only
      * on the paired reader link (the session; pairing connections get no socket state).

@@ -138,7 +138,13 @@ void Websocket::connectWebSocketLocked()
     // WebSocket event callbacks parse API payloads and invoke application
     // callbacks on this task. The 9.8 KB stack overflowed on the initial
     // resource-list payload after adding network-quality reporting.
+#ifdef ATTRACTAP_BLE_BRIDGE
+    // The bridge gets no resource list and parses only small payloads here: QA measured about 1.5 KB of
+    // stack in use (ATT-1315), and the 8 KB it saves goes to the heap that Wi-Fi, TLS and BLE share.
+    websocket_cfg.task_stack = 8192;
+#else
     websocket_cfg.task_stack = 16384;
+#endif
     websocket_cfg.buffer_size = 4096; // Increase buffer size (default is typically 1024)
     // Below the LVGL render task (prio 4): TLS work must not preempt UI refresh
     // (default was 5, unpinned) - ATT-554 item 7.

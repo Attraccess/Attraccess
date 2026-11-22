@@ -36,6 +36,14 @@ public:
         std::function<bool()> otaActive;
     };
 
+    // What the radio does for plugins (the bridge's BT LED). Any task.
+    enum class Activity : uint8_t
+    {
+        Idle,
+        Scanning, // a scan or the advertisement watch
+        Connected, // a session holds (or opens) a connection
+    };
+
     static constexpr bool supported() { return ATTRACTAP_BLE_PROXY; }
 
     void setup(Hooks hooks);
@@ -52,6 +60,7 @@ public:
     // Adds `capabilities.ble` to READER_FIRMWARE_INFO (nothing on builds without the proxy). `scratch` must
     // outlive the serialization (ble::CAPABILITY_SCRATCH bytes).
     void fillCapability(JsonObject capabilities, char *scratch, size_t size);
+    Activity activity() const;
 
     struct Impl;
 

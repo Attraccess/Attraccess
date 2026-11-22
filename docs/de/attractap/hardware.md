@@ -14,6 +14,10 @@ Attractap-Leser sind in mehreren Hardwarevarianten verfuegbar. Diese Seite besch
 > [!TIP]
 > Waehlen Sie eine Ethernet-Variante, wenn Sie maximale Zuverlaessigkeit benoetigen. Waehlen Sie WiFi, wenn das Verlegen eines Netzwerkkabels zum Montageort unpraktisch ist.
 
+### Attractap BLE Bridge
+
+Die **Attractap BLE Bridge** ist eine Firmware für das BLE-Gateway GL.iNet GL-S10 (klassischer ESP32, Ethernet mit PoE, WLAN). Sie hat keinen RFID-Leser, kein Display und keinen Buzzer und leitet nur Bluetooth Low Energy für Plugins weiter, zum Beispiel für Bluetooth-Türschlösser. Die folgenden Komponenten gelten für sie nicht. Flashen, LEDs und Montage beschreibt [Attractap BLE Bridge](attractap/ble-bridge.md).
+
 ## Kernkomponenten
 
 Jeder Attractap-Leser enthaelt die folgenden Komponenten:
@@ -31,7 +35,7 @@ Jeder Attractap-Leser enthaelt die folgenden Komponenten:
 
 ### WiFi
 
-WiFi-Varianten verbinden sich mit Ihrem lokalen drahtlosen Netzwerk. Bei der Ersteinrichtung erstellt der Leser einen temporaeren Zugangspunkt zur Konfiguration.
+WiFi-Varianten verbinden sich mit Ihrem lokalen drahtlosen Netzwerk. Das Netzwerk geben Sie per USB, am Display des Lesers oder per Bluetooth ein; siehe [Attractap Einrichtung](attractap/setup.md). Der Leser öffnet keinen eigenen Zugangspunkt.
 
 | Einstellung | Beschreibung |
 |-------------|-------------|
@@ -72,4 +76,5 @@ Attractap-Leser sind fuer die Montage neben einer Maschine oder Tuer konzipiert.
 
 - [Ueberblick](attractap/overview.md) -- Was ist Attractap?
 - [Einrichtung](attractap/setup.md) -- Leser registrieren und konfigurieren
+- [BLE Bridge](attractap/ble-bridge.md) -- Reine Bluetooth-Bridge für Plugins auf einem GL.iNet GL-S10
 - [Firmware-Updates](attractap/firmware-updates.md) -- Leser-Firmware aktualisieren

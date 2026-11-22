@@ -120,6 +120,19 @@ describe('ReadersToPair', () => {
     ).toEqual(['toPair.pair', 'toPair.delete', 'toPair.pair', 'toPair.delete', 'toPair.pair']);
   });
 
+  it('calls a BLE bridge a Bluetooth bridge, whether it is a reader record or a waiting device', () => {
+    mocks.pairings.current = [
+      pairing('dev', { kind: 'lite', firmware: { name: 'attractap_bridge', variant: 'gl_s10', version: '2.8.0' } }),
+    ];
+    render(<ReadersToPair onPaired={mocks.onPaired} readers={[reader(1, 'revoked', 'attractap_bridge')]} />);
+    const card = document.querySelector('[data-cy="attractap-readers-to-pair"]') as HTMLElement;
+    expect(
+      within(card)
+        .getAllByText(/^kind\./)
+        .map((chip) => chip.textContent),
+    ).toEqual(['kind.bridge', 'kind.bridge']);
+  });
+
   it('shows which resources a record without pairing was linked to', () => {
     const withResources = {
       ...reader(1, 'revoked'),

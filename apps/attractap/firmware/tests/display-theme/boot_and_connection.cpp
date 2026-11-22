@@ -66,4 +66,29 @@ void testInit(Renderer &renderer)
     init.setOnOpenSettingsCallback([&] { opened = true; });
     lv_obj_send_event(lv_obj_get_parent(requireObject(screen.root, &lv_label_class, "Einstellungen")), LV_EVENT_CLICKED, nullptr);
     expect(opened, "Production settings event callback");
+
+    // An unpaired reader without a window shows "Bluetooth setup" next to Settings (ATT-1371). The host build has no
+    // Bluetooth, so the button is unhidden by hand. Both buttons stay on the screen, also with the longer German
+    // captions.
+    auto *settingsButton = lv_obj_get_parent(requireObject(screen.root, &lv_label_class, "Einstellungen"));
+    auto *bluetoothButton = lv_obj_get_parent(requireObject(screen.root, &lv_label_class, "Bluetooth-Einrichtung"));
+    expect(lv_obj_has_flag(bluetoothButton, LV_OBJ_FLAG_HIDDEN), "Bluetooth setup button hidden without Bluetooth");
+    lv_obj_remove_flag(bluetoothButton, LV_OBJ_FLAG_HIDDEN);
+    for (const char *language : {"de", "en"}) {
+        FirmwareI18n::refreshTree(screen.root, language);
+        lv_obj_update_layout(screen.root);
+        for (auto *button : {settingsButton, bluetoothButton}) {
+            lv_area_t area;
+            lv_obj_get_coords(button, &area);
+            expect(area.x1 >= 0 && area.x2 < Renderer::width && area.y2 < Renderer::height,
+                   std::string("Init screen button fits the screen (") + language + ")");
+            lv_obj_t *caption = lv_obj_get_child(button, 0);
+            lv_area_t text;
+            lv_obj_get_coords(caption, &text);
+            expect(text.x1 >= area.x1 && text.x2 <= area.x2,
+                   std::string("Init screen button caption fits its button (") + language + ")");
+        }
+        renderer.capture(std::string("init-bluetooth-setup-button-") + language);
+    }
+    FirmwareI18n::refreshTree(screen.root, "de");
 }

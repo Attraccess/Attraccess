@@ -15,6 +15,14 @@ import {
 @ApiSchema({ name: 'AttractapCapabilities' })
 export class AttractapCapabilitiesDto {
   @ApiProperty({
+    description:
+      'Whether the reader has an NFC card reader. False for the Attractap BLE Bridge, which serves no resources or cards and only carries plugin Bluetooth traffic.',
+    example: true,
+    default: true,
+  })
+  nfc!: boolean;
+
+  @ApiProperty({
     description: 'Whether the reader can choose from many linked resources or can only handle one',
     example: true,
     default: true,

@@ -14,6 +14,7 @@
   "ledBrightness": "LED Brightness",
   "allowPluginBle": "Allow plugins to use Bluetooth",
   "allowPluginBleDescription": "When this is on, plugins with the BLE_TRANSPORT permission can scan for nearby Bluetooth devices of the kinds they support and connect to the devices they have set up. Turning it off immediately ends their Bluetooth connections through this reader.",
+  "bleBridgeDescription": "This reader is an Attractap BLE Bridge. It has no card reader, display or LED settings and serves no resources; it only connects plugins to Bluetooth devices nearby.",
   "tabs": {
     "general": "General",
     "resources": "Resources",

@@ -62,6 +62,8 @@ public:
     static WifiScanResult getKnownWifiNetworks() { return {}; }
     static bool isConnected() { return true; }
     static bool reassociate() { return false; }
+    static void setStandby(bool) {}
+    static bool hasSavedCredentials() { return true; }
     #else
     static void setup();
     static void connectToNetwork(const std::string &ssid, const std::string &password);
@@ -74,6 +76,9 @@ public:
     // Drops and re-establishes the association with the saved network. False when Wi-Fi is not the
     // active link or nothing is saved. For a link that is up but carries no traffic (ATT-1366).
     static bool reassociate();
+    // BLE bridge: Wi-Fi stays disconnected while Ethernet is up (Network::loop decides). Off elsewhere.
+    static void setStandby(bool standby);
+    static bool hasSavedCredentials();
     #endif
 
 private:
@@ -87,7 +92,7 @@ private:
     static const uint32_t RECONNECT_INTERVAL_MS;
     static const uint32_t WAITING_FOR_IP_TIMEOUT_MS;
     static void tryAutoConnect();
-    static bool hasSavedCredentials();
+    static bool standby;
     static WifiNetwork knownWifiNetworks[MAX_KNOWN_WIFI_NETWORKS];
     static uint8_t knownWifiNetworksCount;
     static void handleScanComplete();

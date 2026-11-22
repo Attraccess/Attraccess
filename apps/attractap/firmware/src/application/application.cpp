@@ -131,6 +131,7 @@ void Application::loop() {
   this->snapshotBootDiagnostics();
 
   SerialCommandHandler::loop();
+  this->tickBtSetup();
 
 #ifdef HAS_LVGL_DISPLAY
   Display::loop();
@@ -318,7 +319,6 @@ void Application::pollUsageStats() {
 }
 
 #endif
-
 
 #ifdef HAS_LVGL_DISPLAY
 void Application::beginEnrollment() {

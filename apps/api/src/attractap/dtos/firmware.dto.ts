@@ -111,6 +111,14 @@ export class AttractapFirmware {
   secureImage?: AttractapSecureImage;
 
   @ApiProperty({
+    description:
+      'Whether this is the Attractap BLE Bridge (no NFC, flashed through a USB-TTL adapter in manual download mode). Missing means false.',
+    example: false,
+    required: false,
+  })
+  bleBridge?: boolean;
+
+  @ApiProperty({
     description: 'The flash mode for programming (qio, qout, dio, dout)',
     example: 'dio',
   })

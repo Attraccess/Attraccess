@@ -18,6 +18,9 @@ void Network::initSharedComponents() {}
 #include "esp_log.h"
 #include "esp_sntp.h"
 #include "../clock/wall_clock.hpp"
+#ifdef ATTRACTAP_BLE_BRIDGE
+#include "../bridge/bridge_logic.hpp"
+#endif
 #include <string>
 #include <time.h>
 
@@ -94,6 +97,11 @@ void Network::initSharedComponents()
 
 void Network::loop()
 {
+#ifdef ATTRACTAP_BLE_BRIDGE
+    // Ethernet first; Wi-Fi only after 30 s without an Ethernet link or IP address (bridge_logic.hpp).
+    static bridge::NetworkFallback fallback;
+    Wifi::setStandby(!fallback.update(Ethernet::isConnected(), Wifi::hasSavedCredentials(), millis()));
+#endif
     Wifi::loop();
     Ethernet::loop();
 }

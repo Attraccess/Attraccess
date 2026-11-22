@@ -75,11 +75,14 @@ void ReaderLink::setup()
     if (!sessionWorker)
     {
         // Key exchange and signature checks need ~10 KB of stack; keep them off the main loop's
-        // internal stack. A PSRAM stack costs no internal heap; the task never touches flash.
+        // internal stack. A PSRAM stack costs no internal heap; the task never touches flash. Boards
+        // without PSRAM (the BLE bridge) take it from internal RAM.
         TaskHandle_t handle = nullptr;
         if (xTaskCreatePinnedToCoreWithCaps(sessionWorkerEntry, "rl_tls", SESSION_WORKER_STACK, this,
                                             SESSION_WORKER_PRIORITY, &handle, tskNO_AFFINITY,
-                                            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) == pdPASS)
+                                            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) == pdPASS ||
+            xTaskCreatePinnedToCore(sessionWorkerEntry, "rl_tls", SESSION_WORKER_STACK, this, SESSION_WORKER_PRIORITY,
+                                    &handle, tskNO_AFFINITY) == pdPASS)
         {
             sessionWorker = handle;
         }
@@ -161,6 +164,22 @@ void ReaderLink::loop()
         }
     }
 
+    if (channel == Channel::Session)
+    {
+        // Records the websocket refused (a full send queue, no heap for the copy) go out once it has room again.
+        std::unique_lock<std::mutex> lock(sessionMutex, std::try_to_lock);
+        if (lock.owns_lock() && !outbox.empty())
+        {
+            flushOutboxLocked();
+        }
+        lock = {};
+        if (efuseReportDue && !efuseReportSent && sessionReady.load() &&
+            static_cast<int32_t>(millis() - efuseRetryAt) >= 0)
+        {
+            sendEfuseReport();
+        }
+    }
+
     if (channel == Channel::Session && connected && handshakeStartedMs != 0 &&
         millis() - handshakeStartedMs > HANDSHAKE_TIMEOUT_MS)
     {
@@ -216,6 +235,7 @@ void ReaderLink::handle(Event &event)
             closeSessionLocked();
             outbox.clear();
             efuseReportSent = false;
+            efuseReportDue = false;
             // The sign-in belonged to that session; the next one authenticates again.
             State::setApiState(false, "");
         }
@@ -283,6 +303,7 @@ void ReaderLink::useChannel(Channel next, const char *reason)
         outbox.clear();
     }
     efuseReportSent = false;
+    efuseReportDue = false;
     pairing.reset();
     connected = false;
     handshakeStartedMs = 0;
@@ -335,17 +356,8 @@ bool ReaderLink::sendMessage(const char *message, size_t length)
             return false;
         }
         std::lock_guard<std::mutex> lock(sessionMutex);
-        if (!tls.sendFrame(SessionFraming::FrameType::JSON, reinterpret_cast<const uint8_t *>(message), length))
-        {
-            return false;
-        }
-        if (flushOutbox())
-        {
-            return true;
-        }
-        closeSessionLocked();
-        socket.forceReconnect("session send failed");
-        return false;
+        return sendSessionFrameLocked(SessionFraming::FrameType::JSON, reinterpret_cast<const uint8_t *>(message),
+                                      length);
     }
     case Channel::Pairing:
     default:
@@ -366,17 +378,7 @@ bool ReaderLink::sendHeartbeat(const char *message, size_t length)
             return false;
         }
         std::unique_lock<std::mutex> lock(sessionMutex, std::try_to_lock);
-        if (!lock.owns_lock() || !tls.sendFrame(SessionFraming::FrameType::HEARTBEAT, nullptr, 0))
-        {
-            return false;
-        }
-        if (flushOutbox())
-        {
-            return true;
-        }
-        closeSessionLocked();
-        socket.forceReconnect("session send failed");
-        return false;
+        return lock.owns_lock() && sendSessionFrameLocked(SessionFraming::FrameType::HEARTBEAT, nullptr, 0);
     }
     case Channel::Pairing:
     default:

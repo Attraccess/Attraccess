@@ -6,7 +6,6 @@
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/usb_serial_jtag.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -22,48 +21,34 @@
 #include "../testhooks/test_hooks.hpp"
 #endif
 
-std::string SerialCommandHandler::inputBuffer = "";
 Logger SerialCommandHandler::logger("SerialCmd");
+SerialCommandHandler::Channel *SerialCommandHandler::extraChannel = nullptr;
+SerialCommandHandler::Channel *SerialCommandHandler::replyChannel = nullptr;
 
 void SerialCommandHandler::setup()
 {
     logger.info("Serial command handler ready");
+#ifndef ATTRACTAP_SECURE_PROFILE
     inputBuffer.reserve(MAX_COMMAND_LENGTH);
+#endif
 }
 #endif
 
 void SerialCommandHandler::loop()
 {
-    // Non-blocking drain of the USB-Serial-JTAG RX buffer (driver installed in
-    // main.cpp during startup; 0-tick timeout = don't wait for more bytes).
-    uint8_t byte;
-    while (usb_serial_jtag_read_bytes(&byte, 1, 0) == 1)
+#ifndef ATTRACTAP_SECURE_PROFILE
+    readConsole();
+#endif
+
+    if (extraChannel)
     {
-        char c = static_cast<char>(byte);
-
-        if (c == '\r')
+        std::string line;
+        while (extraChannel->nextLine(line))
         {
-            continue;
+            replyChannel = extraChannel;
+            processLine(line);
+            replyChannel = nullptr;
         }
-
-        if (c == '\n')
-        {
-            if (inputBuffer.length() > 0)
-            {
-                processLine(inputBuffer);
-            }
-            inputBuffer = "";
-            continue;
-        }
-
-        if (inputBuffer.length() >= MAX_COMMAND_LENGTH)
-        {
-            logger.error("Serial command too long, clearing buffer");
-            inputBuffer = "";
-            continue;
-        }
-
-        inputBuffer += c;
     }
 }
 
@@ -115,7 +100,14 @@ void SerialCommandHandler::processLine(const std::string &line)
 void SerialCommandHandler::sendJsonResponse(const std::string &topic, const std::string &payload)
 {
     // Exact wire format "RESP <topic> <payload>\n" — the provisioning tooling parses it.
+    if (replyChannel)
+    {
+        replyChannel->reply("RESP " + topic + " " + payload + "\n");
+        return;
+    }
+#ifndef ATTRACTAP_SECURE_PROFILE
     printf("RESP %s %s\n", topic.c_str(), payload.c_str());
+#endif
 }
 
 void SerialCommandHandler::sendErrorResponse(const std::string &topic, const char *error)
@@ -133,7 +125,6 @@ void SerialCommandHandler::sendErrorResponse(const std::string &topic, const cha
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/usb_serial_jtag.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -185,8 +176,15 @@ bool SerialCommandHandler::ensureAuthorized(const char *codeFromPayload, std::st
         return false;
     }
 
+    if (replyChannel && !replyChannel->pinAttemptAllowed())
+    {
+        errorOut = "TOO_MANY_PIN_ATTEMPTS";
+        return false;
+    }
+
     if (Settings::getDeviceConfig().passCode != std::string(codeFromPayload))
     {
+        if (replyChannel) replyChannel->pinRejected();
         errorOut = "INVALID_AUTH_CODE";
         return false;
     }
@@ -234,7 +232,6 @@ const char *SerialCommandHandler::encryptionTypeToString(wifi_auth_mode_t mode)
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/usb_serial_jtag.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -332,6 +329,10 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
     }
 #endif
 
+#ifdef ATTRACTAP_BLE_BRIDGE
+    if (topic == "heap") return sendHeapStatus(topic); // read-only, no PIN: release logs no heap (ATT-1315)
+#endif
+
     if (topic == "auth.status.get")
     {
         DynamicJsonDocument resp(64);
@@ -399,7 +400,6 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/usb_serial_jtag.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>

@@ -5,7 +5,9 @@ With a release build directory, fails (exit 1) when:
   - a source was compiled with a lab-only define (ATTRACTAP_CRASH_TRIGGER,
     ATTRACTAP_TEST_HOOKS, ATTRACTAP_UI_SELFTEST, ATTRACTAP_LAB_CA), read from compile_commands.json,
   - the app image contains a lab-only serial topic (the `debug.crash` trigger) or
-    trusts the device-lab TLS CA (its certificate list entry).
+    trusts the device-lab TLS CA (its certificate list entry),
+  - the app image leaves less than 10 % of the smallest app (OTA) partition free, so later
+    updates still fit (the 4 MB BLE bridge layout has ~1.9 MB per slot, ATT-1315).
 
 Usage: check_release_build.py <build-dir>
 """
@@ -19,6 +21,8 @@ LAB_ONLY_DEFINES = ("ATTRACTAP_CRASH_TRIGGER=1", "ATTRACTAP_TEST_HOOKS=1", "ATTR
                     "ATTRACTAP_LAB_CA=1")
 LAB_ONLY_MARKERS = (b"debug.crash", b"Attractap Device Lab CA")
 APP_IMAGE = "attractap.bin"
+PARTITION_TABLE = os.path.join("partition_table", "partition-table.bin")
+MIN_APP_HEADROOM = 0.10
 
 
 class GateError(Exception):
@@ -42,6 +46,31 @@ def check_app_image(image):
             for marker in LAB_ONLY_MARKERS if marker in image]
 
 
+def app_partition_sizes(table):
+    """Sizes of the app partitions in a binary ESP-IDF partition table (32-byte entries)."""
+    sizes = []
+    for start in range(0, len(table) - 31, 32):
+        entry = table[start:start + 32]
+        if entry[:2] in (b"\xff\xff", b"\xeb\xeb"):  # end of table, MD5 entry
+            break
+        if entry[:2] != b"\xaa\x50":
+            raise GateError(f"partition table entry at {start} has no magic")
+        if entry[2] == 0x00:  # type app
+            sizes.append(int.from_bytes(entry[8:12], "little"))
+    if not sizes:
+        raise GateError("the partition table has no app partition")
+    return sizes
+
+
+def check_app_headroom(image_size, table):
+    slot = min(app_partition_sizes(table))
+    free = slot - image_size
+    if free < slot * MIN_APP_HEADROOM:
+        return [f"the app image ({image_size} B) leaves {max(free, 0)} B of the {slot} B app partition free, "
+                f"less than {MIN_APP_HEADROOM:.0%}"]
+    return []
+
+
 def read(path, mode="r"):
     try:
         with open(path, mode) as f:
@@ -56,7 +85,9 @@ def run_checks(build_dir):
     except json.JSONDecodeError as error:
         raise GateError(f"{build_dir}/compile_commands.json is not valid JSON") from error
     errors = check_compile_commands(compile_commands)
-    errors += check_app_image(read(os.path.join(build_dir, APP_IMAGE), "rb"))
+    image = read(os.path.join(build_dir, APP_IMAGE), "rb")
+    errors += check_app_image(image)
+    errors += check_app_headroom(len(image), read(os.path.join(build_dir, PARTITION_TABLE), "rb"))
     return errors
 
 

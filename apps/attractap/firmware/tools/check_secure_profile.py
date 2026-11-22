@@ -6,8 +6,11 @@ With a secure build directory, fails (exit 1) when:
   - the signed bootloader would not fit below the partition table (0x8000),
   - the built partition table differs from partitions.csv,
   - CONFIG_BOOTLOADER_APP_SECURE_VERSION differs from secure-version-floor.txt,
-  - the USB serial config handler (src/serial/) was compiled in, or the
-    ATTRACTAP_SECURE_PROFILE define that compiles it out is missing,
+  - the console is on, or console command input (src/serial/serialConsoleInput.cpp) was
+    compiled in: the command handler must be reachable only through the Bluetooth setup
+    channel (src/bt_setup, ATT-1371), and every source needs the ATTRACTAP_SECURE_PROFILE
+    define that compiles the console out,
+  - the lab crash trigger or the ui.* test hooks were compiled in,
   - the mbedTLS allocator that keeps key material in internal RAM
     (src/api/security/tls_memory.c) was not compiled in or not linked.
 With --base-ref (no build needed), fails when the secure version or the floor
@@ -203,19 +206,48 @@ def check_against_base(ref):
     return errors
 
 
-def check_serial_handler_compiled_out(compile_commands):
-    """The secure profile has no serial config path: CMake must drop src/serial/
-    and define ATTRACTAP_SECURE_PROFILE (read from compile_commands.json)."""
+CONSOLE_INPUT = "/src/serial/serialConsoleInput.cpp"
+BLUETOOTH_CHANNEL = "/src/bt_setup/bt_setup.cpp"
+APP_COMPONENT = "__idf_main.dir"
+LAB_ONLY_DEFINES = ("ATTRACTAP_CRASH_TRIGGER=1", "ATTRACTAP_TEST_HOOKS=1")
+
+
+def check_console_off(resolved):
+    """No console at all: the sdkconfig gate pins it too, this names the reason."""
+    if resolved.get("ESP_CONSOLE_NONE", "n") != "y":
+        return ["the console is enabled (CONFIG_ESP_CONSOLE_NONE is not set)"]
+    return []
+
+
+def check_command_paths(compile_commands):
+    """The secure profile reads commands only from the Bluetooth setup (read from compile_commands.json):
+    no console command input, the ATTRACTAP_SECURE_PROFILE define on every app source (it drops the console
+    driver and the console reads), the Bluetooth channel compiled in, and no lab crash trigger or test hooks."""
     if not isinstance(compile_commands, list) or not all(isinstance(e, dict) and "file" in e for e in compile_commands):
         raise GateError("compile_commands.json is not a list of compile entries")
-    errors = []
-    serial = sorted({e["file"] for e in compile_commands if "/src/serial/" in e["file"].replace(os.sep, "/")})
-    if serial:
-        errors.append(f"the USB serial config handler is compiled in: {', '.join(serial)}")
+
+    def path(entry):
+        return entry["file"].replace(os.sep, "/")
+
     def command(entry):
         return entry.get("command") or " ".join(entry.get("arguments", []))
-    if not any("ATTRACTAP_SECURE_PROFILE=1" in command(e) for e in compile_commands):
-        errors.append("no source is compiled with -DATTRACTAP_SECURE_PROFILE=1 (main.cpp keeps the USB console driver)")
+
+    # The reader app is ESP-IDF's `main` component (main/CMakeLists.txt); other components have src/ trees too.
+    app = [e for e in compile_commands if APP_COMPONENT in command(e)]
+    errors = []
+    console = sorted(path(e) for e in app if path(e).endswith(CONSOLE_INPUT))
+    if console:
+        errors.append(f"console command input is compiled in: {', '.join(console)}")
+    if not app or not all("ATTRACTAP_SECURE_PROFILE=1" in command(e) for e in app):
+        missing = sorted(path(e) for e in app if "ATTRACTAP_SECURE_PROFILE=1" not in command(e))
+        errors.append("app sources without -DATTRACTAP_SECURE_PROFILE=1 (they keep the console driver and console "
+                      f"reads): {', '.join(missing) or 'no app sources found'}")
+    if not any(path(e).endswith(BLUETOOTH_CHANNEL) for e in app):
+        errors.append(f"the Bluetooth setup channel ({BLUETOOTH_CHANNEL[1:]}) is not compiled in")
+    hooks = sorted({d for e in app for d in LAB_ONLY_DEFINES if d in command(e)})
+    hooks += sorted(path(e) for e in app if "/src/testhooks/" in path(e))
+    if hooks:
+        errors.append(f"lab-only crash trigger or test hooks are compiled in: {', '.join(hooks)}")
     return errors
 
 
@@ -266,7 +298,8 @@ def run_checks(build_dir):
         compile_commands = json.loads(read(os.path.join(build_dir, "compile_commands.json")))
     except ValueError as error:
         raise GateError(f"{build_dir}/compile_commands.json is not valid JSON") from error
-    errors += check_serial_handler_compiled_out(compile_commands)
+    errors += check_console_off(resolved)
+    errors += check_command_paths(compile_commands)
     errors += check_tls_allocator_compiled_in(compile_commands)
     errors += check_tls_allocator_linked(read(os.path.join(build_dir, "attractap.map")))
     return errors

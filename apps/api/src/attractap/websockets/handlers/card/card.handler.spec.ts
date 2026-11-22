@@ -162,6 +162,19 @@ describe('AttractapCardHandler', () => {
       expect(socket.state.enrollment).toBeFalsy();
     });
 
+    it('refuses card enrollment and reset on a BLE Bridge, which has no NFC', async () => {
+      const socket = scope.createMockSocket({ state: { cardRelay: false, nfc: false } });
+      scope.websocketService.sockets.set(socket.id, socket);
+
+      await expect(scope.handler.startEnrollOfNewNfcCard({ readerId: 42, userId: 1 })).rejects.toThrow(
+        'READER_CARD_ENROLLMENT_NOT_SUPPORTED',
+      );
+      await expect(scope.handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 })).rejects.toThrow(
+        'READER_CARD_ENROLLMENT_NOT_SUPPORTED',
+      );
+      expect(socket.sendMessage).not.toHaveBeenCalled();
+    });
+
     it('refuses to arm a reset when any connection of the reader lacks relay firmware', async () => {
       const relaying = scope.createMockSocket();
       const legacy = scope.createMockSocket({ id: 'socket-2', state: { cardRelay: false } });

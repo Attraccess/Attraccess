@@ -273,6 +273,63 @@ describe('AttractapService reader maintenance and crash reports', () => {
     );
     expect(readers.edits).toEqual([]);
   });
+  it('drops the resource links of a reader once, when it first reports itself as a BLE Bridge', async () => {
+    const { service, readers, reader, events } = setup();
+    const firmware = (nfc: boolean) => ({ ...reader.firmware, capabilities: { ...reader.firmware.capabilities, nfc } });
+    reader.allowPluginBle = true;
+    reader.resources = [makeResource(1)];
+
+    await service.updateReaderFirmware(4, firmware(true));
+    expect(reader.resources.map((r) => r.id)).toEqual([1]);
+    expect(readers.edits.at(-1)?.edit).not.toHaveProperty('resourceIds');
+
+    await service.updateReaderFirmware(4, firmware(false));
+    expect(reader.resources).toEqual([]);
+    expect(readers.edits.at(-1)?.edit).toMatchObject({ resourceIds: [] });
+    expect(events.emit).toHaveBeenCalledTimes(1);
+
+    // A bridge that already said nfc:false is left alone on reconnect.
+    await service.updateReaderFirmware(4, firmware(false));
+    expect(readers.edits.at(-1)?.edit).not.toHaveProperty('resourceIds');
+    expect(events.emit).toHaveBeenCalledTimes(1);
+  });
+  it('opens a reader for plugin BLE once, when it first reports itself as a BLE Bridge', async () => {
+    const { service, readers, reader, events } = setup();
+    const firmware = (nfc: boolean) => ({ ...reader.firmware, capabilities: { ...reader.firmware.capabilities, nfc } });
+    await service.updateReaderFirmware(4, firmware(true));
+    expect(reader.allowPluginBle).toBe(false);
+    expect(events.emit).not.toHaveBeenCalled();
+
+    await service.updateReaderFirmware(4, firmware(false));
+    expect(reader.allowPluginBle).toBe(true);
+    expect(readers.edits.at(-1)?.edit).toMatchObject({ allowPluginBle: true });
+    // Running advertisement watches learn about the newly opened reader from the event.
+    expect(events.emit).toHaveBeenCalledTimes(1);
+    expect(events.emit).toHaveBeenLastCalledWith(
+      ReaderUpdatedEvent.EVENT_NAME,
+      expect.objectContaining({ reader: expect.objectContaining({ allowPluginBle: true }) }),
+    );
+
+    // The administrator turns it off; reconnects of the same bridge keep it off.
+    await service.updateReader(4, { allowPluginBle: false }, false);
+    await service.updateReaderFirmware(4, firmware(false));
+    await service.updateReaderFirmware(4, firmware(false));
+    expect(reader.allowPluginBle).toBe(false);
+    expect(events.emit).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses to assign any resource to a BLE Bridge', async () => {
+    const { service, reader, readers } = setup();
+    reader.firmware.capabilities.nfc = false;
+
+    await expect(service.updateReader(4, { connectedResourceIds: [1] }, false)).rejects.toThrow(
+      'This reader is a Bluetooth bridge and cannot serve resources',
+    );
+    expect(readers.edits).toEqual([]);
+    await service.updateReader(4, { connectedResourceIds: [] }, false);
+    expect(readers.edits).toEqual([{ id: 4, edit: { resourceIds: [] } }]);
+  });
+
   it('normalizes crash report metrics and avoids symbolication when no dump is provided', async () => {
     const { service, reports, symbolication } = setup();
     const report = await service.createCrashReport(4, {

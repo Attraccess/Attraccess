@@ -200,9 +200,9 @@ test('ESP-IDF repairs tagged partial installations and verifies readiness', (t) 
   const result = run();
   assert.equal(result.status, 0, result.stderr);
   assert.equal(existsSync(stale), false);
-  assert.match(readFileSync(log, 'utf8'), /install esp32s3\nready/);
+  assert.match(readFileSync(log, 'utf8'), /install esp32s3,esp32\nready/);
   assert.equal(run().status, 0);
-  assert.match(readFileSync(log, 'utf8'), /install esp32s3/);
+  assert.match(readFileSync(log, 'utf8'), /install esp32s3,esp32/);
   assert.equal(run({ IDF_TEST_TAG: 'v5.0.0' }).status, 0);
   assert.match(readFileSync(log, 'utf8'), /checkout --detach v6\.0\.2/);
   assert.equal(run({ IDF_TEST_FAIL_INSTALL: '1' }).status, 5);

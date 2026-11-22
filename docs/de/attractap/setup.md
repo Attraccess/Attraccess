@@ -8,27 +8,44 @@ Diese Anleitung fuehrt Sie durch die Kopplung eines neuen Attractap-Lesers in At
 Stellen Sie vor Beginn sicher, dass:
 
 - Ihr Attraccess-Server laeuft und erreichbar ist
-- Der Attractap-Leser eingeschaltet und mit demselben Netzwerk wie Ihr Server verbunden ist
+- Der Attractap-Leser eingeschaltet ist und Ihren Server über das Netzwerk (WLAN oder Ethernet) erreicht
 - Sie Administratorberechtigungen in Attraccess haben
 
-## Schritt 1: Leser mit dem Netzwerk verbinden
+## Schritt 1: PIN, Netzwerk und Server einstellen
 
-### WiFi-Variante
+Ein neuer Leser (frisch geflasht oder zurückgesetzt) braucht eine PIN, sein Netzwerk und die Adresse Ihres Attraccess-Servers. Es gibt drei Wege, sie einzustellen:
 
-1. Schalten Sie den Attractap-Leser ein
-2. Der Leser erstellt einen temporaeren WiFi-Zugangspunkt (z.B. `Attractap-Setup`)
-3. Verbinden Sie sich von Ihrem Telefon oder Laptop mit diesem Zugangspunkt
-4. Geben Sie Ihren WiFi-Netzwerknamen (SSID) und Ihr Passwort ein
-5. Der Leser startet neu und verbindet sich mit Ihrem Netzwerk
+- **Per USB** mit dem Web-Flasher: Öffnen Sie **Geräte** > **Attractap-Lesegeräte**, wählen Sie **Attractap einrichten** und klicken Sie auf **Per USB verbinden**. Er installiert die Firmware und stellt danach PIN, WLAN und Server ein (Serial Configurator).
+- **Am Leser selbst** (Attractap Touch): Ein Leser ohne Serveradresse zeigt seine Einstellungen auf dem Display. Geben Sie dort WLAN, Server und eine PIN ein.
+- **Per Bluetooth**, ohne Kabel (ab Firmware 2.11.0): siehe unten.
 
-### Ethernet-Variante
+Ethernet-Varianten (Attractap Lite) erhalten ihre Adresse per DHCP, sobald das Kabel steckt; sie brauchen nur PIN und Server.
 
-1. Verbinden Sie den Attractap-Leser ueber ein Ethernet-Kabel mit Ihrem Netzwerk
-2. Schalten Sie den Leser ein
-3. Der Leser erhaelt automatisch eine IP-Adresse ueber DHCP
+### Per Bluetooth einrichten
+
+Ein Leser, der **noch nicht gekoppelt** ist, öffnet seine Bluetooth-Einrichtung von selbst:
+
+| Leser | So öffnet sich die Einrichtung | Was er zeigt |
+|-------|--------------------------------|--------------|
+| **Attractap Touch** (und Touch V2) | 10 Minuten nach jedem Start. Später öffnet die Schaltfläche **Bluetooth-Einrichtung** unter **Einstellungen** auf dem Verbindungsbildschirm sie für weitere 10 Minuten. Der Einstellungsbildschirm eines Lesers ohne Server und der Bildschirm mit dem Kopplungscode haben diese Schaltfläche nicht: Starten Sie den Leser neu, um die Einrichtung wieder zu öffnen. | Auf dem Einstellungs-, Verbindungs- oder Kopplungscode-Bildschirm: „Bluetooth-Einrichtung offen · 09:41“ und sein Name, zum Beispiel „Attractap Touch 71C8“; und „Bluetooth-Einrichtung: Browser verbunden“, solange Ihr Browser verbunden ist. |
+| **Attractap Lite** | 10 Minuten nach jedem Einschalten. Für weitere 10 Minuten trennen Sie ihn kurz vom Strom. | Der LED-Ring pulsiert alle 1,5 Sekunden zweimal blau; solange Ihr Browser verbunden ist, leuchtet er blau. Die Kopplungsfarben haben Vorrang. |
+| **BLE-Bridge** | Taste 3 Sekunden gedrückt halten. | Siehe [BLE-Bridge](attractap/ble-bridge.md). |
+
+1. Öffnen Sie in Attraccess **Geräte** > **Attractap-Lesegeräte**, wählen Sie **Attractap einrichten** und klicken Sie auf **Per Bluetooth einrichten**.
+2. Wählen Sie den Leser in der Geräteliste des Browsers. Sein Name ist „Attractap Touch“, „Attractap Lite“ oder „Attractap Bridge“ und vier Zeichen; ein Touch zeigt seinen Namen auf dem Display. Fragt Ihr Computer oder Telefon nach einer Bluetooth-Kopplung, bestätigen Sie sie innerhalb von etwa 30 Sekunden.
+3. Stellen Sie die PIN ein, dann das WLAN (nicht beim Lite) und den Server. Den Firmware-Tab gibt es per Bluetooth nicht: Firmware wird per USB installiert oder über das Netzwerk aktualisiert.
+4. Weiter mit Schritt 2: Der Leser bittet um die Kopplung.
+
+Die Einrichtung schließt nach 10 Minuten, etwa 10 Sekunden nachdem der Leser gekoppelt ist (Ihr Browser zeigt dann **Einrichtung abgeschlossen**), oder wenn der Leser neu startet. Ein gekoppelter Leser öffnet sie nie und zeigt keine Schaltfläche **Bluetooth-Einrichtung**. Die Verbindung ist verschlüsselt (Bluetooth LE Secure Connections), das WLAN-Passwort wird also nie im Klartext gesendet, und es gelten dieselben PIN-Regeln wie per USB. Siehe [Leser-Sicherheit](attractap/reader-security.md#einrichtung-per-bluetooth).
+
+| Browser | Bluetooth-Einrichtung |
+|---------|-----------------------|
+| Chrome oder Edge unter Windows, macOS, Linux | Unterstützt |
+| Chrome unter Android | Unterstützt |
+| Firefox, Safari, jeder Browser unter iOS | Nicht unterstützt: USB mit Chrome oder Edge auf einem Computer verwenden |
 
 > [!NOTE]
-> Das Display des Lesers zeigt seinen Verbindungsstatus und seine IP-Adresse an, sobald er verbunden ist.
+> Die Seite muss über HTTPS (oder `localhost`) geöffnet sein; Browser bieten Bluetooth nur sicheren Seiten an. Solange die Einrichtung offen ist, können Plugins das Bluetooth des Lesers noch nicht nutzen; danach schon.
 
 ## Schritt 2: Leser mit Attraccess koppeln
 

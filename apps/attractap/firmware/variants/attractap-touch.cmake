@@ -4,6 +4,8 @@ set(ATTRACTAP_FIRMWARE_NAME "attractap_touch")
 set(ATTRACTAP_FIRMWARE_FRIENDLY_NAME "Attractap Touch")
 set(ATTRACTAP_FIRMWARE_VARIANT "wifi")
 set(ATTRACTAP_FIRMWARE_VARIANT_FRIENDLY_NAME "WiFi")
+# Bluetooth setup (src/bt_setup): advertised as "Attractap Touch XXXX" (last two bytes of the Bluetooth MAC).
+set(ATTRACTAP_BT_SETUP_NAME_PREFIX "Attractap Touch")
 # Flip to "true" only after the secure profile passed its hardware run (ATT-1166).
 set(ATTRACTAP_SECURE_PROFILE_HARDWARE_TESTED "false")
 set(ATTRACTAP_SECURE_PROFILE_BUILD "false")
@@ -15,6 +17,8 @@ set(ATTRACTAP_DEFINES
     FIRMWARE_VARIANT_FRIENDLY_NAME="${ATTRACTAP_FIRMWARE_VARIANT_FRIENDLY_NAME}"
 
     LOGGER_LEVEL_NUM=3
+
+    BT_SETUP_NAME_PREFIX="${ATTRACTAP_BT_SETUP_NAME_PREFIX}"
 
     PIN_NFC_I2C_SDA=15
     PIN_NFC_I2C_SCL=7

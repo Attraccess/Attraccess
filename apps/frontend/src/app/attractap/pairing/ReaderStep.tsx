@@ -7,6 +7,7 @@ import de from './de.json';
 import en from './en.json';
 import { ModeStep } from './ModeStep';
 import { ProofStep } from './ProofStep';
+import { readerTypeOf } from './PairingRow';
 
 export function ReaderStep(props: Readonly<{ flow: PairingFlow; current: PairingDto; insecure: boolean }>) {
   const { flow, current } = props;
@@ -26,7 +27,7 @@ export function ReaderStep(props: Readonly<{ flow: PairingFlow; current: Pairing
         </Button>
       )}
       <p className="text-sm text-default-500">
-        {t(`kind.${current.kind}`)}
+        {t(`kind.${readerTypeOf(current.firmware, current.kind)}`)}
         {current.firmware?.version ? ` · v${current.firmware.version}` : ''}
       </p>
       {flow.needsChoice && <ModeStep flow={flow} />}

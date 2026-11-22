@@ -75,6 +75,7 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/screens/confirm/confirmScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/topUp/topUpScreen.cpp"
     "${FIRMWARE_DIR}/src/display/shared/buttonError.cpp"
+    "${FIRMWARE_DIR}/src/bt_setup/bt_setup.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsActionFeedback.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/layout.cpp"
     "${FIRMWARE_DIR}/src/display/screens/forms/fields.cpp"

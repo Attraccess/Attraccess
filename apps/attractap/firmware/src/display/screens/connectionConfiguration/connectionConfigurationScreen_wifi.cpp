@@ -13,6 +13,8 @@ static const uint32_t WIFI_SCAN_TIMEOUT_MS = 10000;
 
 void ConnectionConfigurationScreen::loop()
 {
+   for (uint8_t i = 0; i < this->bluetoothSetupStatusCount; i++)
+      this->bluetoothSetupStatus[i].update();
    if (!this->wifiSelectNetwork || !this->wifiScanRequested || this->wifiScanCompleted)
    {
       return;

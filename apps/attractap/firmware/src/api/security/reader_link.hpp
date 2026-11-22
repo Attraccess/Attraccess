@@ -16,6 +16,7 @@
 #include "pairing_client.hpp"
 #include "reader_identity.hpp"
 #include "reader_key_store.hpp"
+#include "session_outbox.hpp"
 #include "session_tls.hpp"
 
 // The reader's connection to the server, as the API sees it. It picks one of two channels on
@@ -46,6 +47,8 @@ public:
 
     // A TLS handshake that takes longer than this is abandoned.
     static constexpr uint32_t HANDSHAKE_TIMEOUT_MS = 20000;
+    // A refused eFuse report (full send queue) is tried again after this long.
+    static constexpr uint32_t EFUSE_RETRY_MS = 500;
     // After the pinned server could not be verified: wait before trying again.
     static constexpr uint32_t UNTRUSTED_RETRY_MS = 30000;
     // A reader whose first (bootstrap) session never came up: after this many consecutive
@@ -55,7 +58,13 @@ public:
     // Consecutive failed handshakes (timeouts, errors, text frames) before the screen shows an error.
     static constexpr int HANDSHAKE_FAILURES_BEFORE_ERROR = 2;
     // Session worker (device only): stack in PSRAM, below the LVGL and WebSocket tasks.
+#ifdef ATTRACTAP_BLE_BRIDGE
+    // The bridge has no PSRAM, so this stack is internal RAM: QA (ATT-1315) measured 5.3 KB in use with the
+    // session up (P-256 handshake included). The high-water mark plus about 4 KB.
+    static constexpr uint32_t SESSION_WORKER_STACK = 9216;
+#else
     static constexpr uint32_t SESSION_WORKER_STACK = 16384;
+#endif
     static constexpr unsigned SESSION_WORKER_PRIORITY = 2;
 
     ReaderLink(IReaderTransport &socket, Options options);
@@ -156,8 +165,14 @@ private:
     void onSessionFrame(SessionFraming::FrameType type, std::string payload);
     void onControl(const std::string &payload);
     void onPairingRemoved(const char *reason);
-    // Sends the queued TLS records as one binary frame. Caller holds sessionMutex.
-    bool flushOutbox();
+    // Hands the waiting TLS records to the websocket as one binary frame. False when the websocket never took them
+    // (the session is closed and the reader reconnects). Caller holds sessionMutex.
+    bool flushOutboxLocked();
+    // Encrypts and sends one session frame. False when it was not sent: nothing reached TLS, so the caller may try
+    // again (or the session ended). Caller holds sessionMutex.
+    bool sendSessionFrameLocked(SessionFraming::FrameType type, const uint8_t *payload, size_t length);
+    // Closes the session and reconnects. Caller holds sessionMutex.
+    void endSessionLocked(const char *reason);
 
     void onPairingConnected();
     void onPairingText(const std::string &text);
@@ -199,9 +214,12 @@ private:
     // (frames it already decrypted are still delivered).
     std::atomic<uint32_t> sessionEpoch{0};
     SessionTls tls;
-    std::vector<uint8_t> outbox;
+    SessionOutbox outbox;
     // tls.open(), readable without sessionMutex: senders on the main loop must not wait for a
     // handshake step on the worker (LVGL, LEDs and NFC would stall).
     std::atomic<bool> sessionReady{false};
     bool efuseReportSent = false;
+    // The firmware info went out, so the eFuse report is due; a refused one is retried from loop() (main task).
+    bool efuseReportDue = false;
+    uint32_t efuseRetryAt = 0;
 };

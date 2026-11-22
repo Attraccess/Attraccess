@@ -85,6 +85,28 @@ restored as a signing key backup.
 **Regenerate keys** replaces both keys, so recovery files and backups of the old keys stop being useful.
 It is only possible while no reader has this installation's keys burned in.
 
+## Setup over Bluetooth
+
+Readers accept their PIN, Wi-Fi and server address over Bluetooth ([Attractap Setup](attractap/setup.md#set-up-over-bluetooth)),
+and secured readers do too, as secured readers have no USB setup:
+
+- Only while the reader is **not paired**: a paired reader never opens the Bluetooth setup.
+- Only over an **encrypted** link (Bluetooth LE Secure Connections). Every setup window uses a new Bluetooth
+  address and stores no pairing: a computer pairs anew for every window.
+- With the **same PIN rules** as over USB: once a PIN is set, every change needs it.
+- After **5 wrong PINs** the reader refuses every command that needs the PIN, also the right one, until someone
+  at the device resets it: unplug it briefly, or, on a Touch, press **Bluetooth setup** once the window has closed.
+  The reader's own restarts keep the count.
+- A secured reader still has **no USB configurator**: its USB console stays off.
+
+Because an unpaired reader opens the setup by itself for 10 minutes after it starts, anyone in Bluetooth range
+during that time can configure it as long as no PIN is set, and nobody can without the PIN once it is set. On a
+Touch that is no more than its on-screen settings already allow; a Lite or a secured reader, which needed a cable
+or had no setup at all before, can now be configured from nearby. Set the PIN first. It never applies to a paired
+reader. A reader that someone set up this way still cannot do anything
+until an admin approves its pairing in Attraccess: approve only the reader you expect (compare its code or
+colour pattern).
+
 ## Limits
 
 - Key revocation and rotation for already-secured readers are not supported yet.

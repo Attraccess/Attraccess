@@ -3,7 +3,7 @@
     "title": "Attractaps",
     "actions": {
       "menu": "Hardware Setup",
-      "openHardwareSetup": "Setup RFID-Reader",
+      "openHardwareSetup": "Set up Attractap",
       "openSerialConsole": "Serial Console"
     }
   },
@@ -40,5 +40,6 @@
   },
   "connected": "Connected",
   "disconnected": "Disconnected",
-  "pairFirst": "Pair the new reader in the Not paired list before you set it up."
+  "pairFirst": "Pair the new reader in the Not paired list before you set it up.",
+  "bleBridge": "Bluetooth bridge"
 }

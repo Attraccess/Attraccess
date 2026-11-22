@@ -16,6 +16,9 @@ namespace
     // option, so the white card is padded by hand to at least 4 modules (QR spec) around the symbol.
     // With the quiet zone the card is about 220 px (190..225 px depending on the symbol size).
     constexpr int32_t QR_CANVAS_PX = 184;
+    // While the Bluetooth setup status (two lines) shows below the hint, the full-size card pushes the column into the
+    // network badge and the device footer, more so with the two-line German title: the card shrinks to 150..165 px.
+    constexpr int32_t QR_CANVAS_COMPACT_PX = 144;
     constexpr int32_t QR_QUIET_MODULES = 4;
     constexpr size_t QR_MAX_URL_BYTES = 200;
     constexpr char PLACEHOLDER_CODE[] = "- - -";
@@ -56,7 +59,8 @@ void PendingApprovalScreen::init()
    lv_obj_set_style_pad_all(this->qrCard, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    // The one QR object: updated in place on every rotation, never recreated.
    this->qrCode = lv_qrcode_create(this->qrCard);
-   lv_qrcode_set_size(this->qrCode, QR_CANVAS_PX);
+   this->qrCanvasPx = QR_CANVAS_PX;
+   lv_qrcode_set_size(this->qrCode, this->qrCanvasPx);
    lv_qrcode_set_dark_color(this->qrCode, lv_color_black());
    lv_qrcode_set_light_color(this->qrCode, lv_color_white());
    lv_obj_add_flag(this->qrCard, LV_OBJ_FLAG_HIDDEN);
@@ -77,6 +81,8 @@ void PendingApprovalScreen::init()
    lv_obj_set_style_text_align(this->hintLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(this->hintLabel, &attractap_font_montserrat_latin1_20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->hintLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->bluetoothSetupStatus.create(this->screen);
 
    this->resetShown();
    this->loop();
@@ -119,6 +125,8 @@ void PendingApprovalScreen::loop()
    {
       return;
    }
+   this->bluetoothSetupStatus.update();
+   this->fitQrCanvas(this->bluetoothSetupStatus.visible() ? QR_CANVAS_COMPACT_PX : QR_CANVAS_PX);
    const State::EnrollmentState enrollment = State::getEnrollmentState();
    View view = View::Code;
    if (enrollment.pairingRemoved)
@@ -163,6 +171,19 @@ void PendingApprovalScreen::loop()
                                                                  : FirmwareI18n::Message::PairingWaitingForServer);
 }
 
+// A new canvas size clears the symbol: encode the current link again on this pass.
+void PendingApprovalScreen::fitQrCanvas(int32_t px)
+{
+   if (px == this->qrCanvasPx)
+   {
+      return;
+   }
+   this->qrCanvasPx = px;
+   lv_qrcode_set_size(this->qrCode, px);
+   this->qrUrl.clear();
+   this->hasShown = false;
+}
+
 bool PendingApprovalScreen::isQrVisible() const
 {
    return this->qrCard && !lv_obj_has_flag(this->qrCard, LV_OBJ_FLAG_HIDDEN);
@@ -202,8 +223,8 @@ void PendingApprovalScreen::updateQrCode(const std::string &url)
    }
    // LVGL scales by whole pixels and centres the symbol on the canvas: pad the white card up to 4 modules.
    const int32_t modules = qrcodegen_version2size(version);
-   const int32_t moduleSize = QR_CANVAS_PX / modules;
-   const int32_t margin = (QR_CANVAS_PX - modules * moduleSize) / 2;
+   const int32_t moduleSize = this->qrCanvasPx / modules;
+   const int32_t margin = (this->qrCanvasPx - modules * moduleSize) / 2;
    const int32_t pad = QR_QUIET_MODULES * moduleSize > margin ? QR_QUIET_MODULES * moduleSize - margin : 0;
    lv_obj_set_style_pad_all(this->qrCard, pad, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_invalidate(this->qrCode);
@@ -238,6 +259,7 @@ void PendingApprovalScreen::destroy()
    this->codeLabel = nullptr;
    this->instructionLabel = nullptr;
    this->hintLabel = nullptr;
+   this->bluetoothSetupStatus.forget();
    this->qrUrl.clear();
    this->resetShown();
 }

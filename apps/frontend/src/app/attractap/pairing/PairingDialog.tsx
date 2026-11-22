@@ -106,7 +106,9 @@ function PairingDialogContent(props: Readonly<PairingDialogProps>) {
           )}
           {flow.error && (
             <StatusAlert status="danger" data-cy="attractap-pairing-error">
-              {errorText(t, flow.error)}
+              {flow.bleBridge && flow.error.kind === 'wrongCode'
+                ? t('dialog.error.wrongBridgeCode')
+                : errorText(t, flow.error)}
             </StatusAlert>
           )}
           {flow.finished && current && <PairingResult current={current} />}

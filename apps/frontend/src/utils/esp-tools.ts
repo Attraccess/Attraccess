@@ -7,6 +7,9 @@ import {
   FlashSizeValues,
 } from 'esptool-js';
 import { Mutex } from 'async-mutex';
+import type { Command, ConfiguratorTransport, ConnectionStateEvent } from './configurator-transport';
+
+export type { Command, ConnectionStateEvent } from './configurator-transport';
 
 export enum ESPToolsErrorType {
   NO_PORT_SELECTED = 'NO_PORT_SELECTED',
@@ -16,18 +19,9 @@ export enum ESPToolsErrorType {
   DEVICE_NOT_FOUND = 'DEVICE_NOT_FOUND',
   FIRMWARE_READ_FAILED = 'FIRMWARE_READ_FAILED',
   RESET_FAILED = 'RESET_FAILED',
+  CHIP_MISMATCH = 'CHIP_MISMATCH',
   UNKNOWN_ERROR = 'UNKNOWN_ERROR',
   NO_TRANSPORT_AVAILABLE = 'NO_TRANSPORT_AVAILABLE',
-}
-
-export interface Command {
-  topic: string;
-  payload?: string;
-}
-
-export interface ConnectionStateEvent {
-  connected: boolean;
-  timestamp: number;
 }
 
 export type ESPToolsEventData = {
@@ -35,6 +29,19 @@ export type ESPToolsEventData = {
 };
 
 export type ESPToolsEvent = 'connectionState';
+
+/**
+ * Baud rate the ROM bootloader talks at. A USB-TTL adapter (manual download mode) flashes faster and falls back to it
+ * when the faster rate fails; native USB serial ignores the rate.
+ */
+const ROM_BAUD_RATE = 115200;
+const FAST_BAUD_RATE = 460800;
+
+/** `esp32s3` (firmwares.json) and `ESP32-S3` (esptool-js chip name) name the same chip. */
+export function sameChip(a: string, b: string): boolean {
+  const normalize = (chip: string) => chip.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return normalize(a) === normalize(b);
+}
 
 export interface ESPToolsResult<T = unknown> {
   success: boolean;
@@ -54,7 +61,9 @@ export interface UseTransportOptionsNonBlocking<TResult = unknown> {
   fn: (transport: Transport) => Promise<TResult>;
 }
 
-export class ESPTools {
+export class ESPTools implements ConfiguratorTransport {
+  public readonly kind = 'serial' as const;
+
   private constructor() {
     // Private constructor to prevent instantiation
   }
@@ -97,14 +106,20 @@ export class ESPTools {
         let continueReading = true;
         let buffer = '';
 
-        const timeoutId = setTimeout(() => {
-          continueReading = false;
-        }, timeout);
-
         let resolveResult: ((v: string | null) => void) | null = null;
         const resultPromise = new Promise<string | null>((resolve) => {
           resolveResult = resolve;
         });
+
+        // A silent device (for example a chip waiting in ROM download mode) never sends a line, so rawRead would
+        // keep the port locked and this command would hold the transport forever: give up and cancel the read.
+        const timeoutId = setTimeout(() => {
+          continueReading = false;
+          resolveResult?.(null);
+          (transport as unknown as { reader?: ReadableStreamDefaultReader }).reader?.cancel().catch((err) => {
+            console.error('Failed to cancel the serial read', err);
+          });
+        }, timeout);
 
         transport.rawRead(
           (value) => {
@@ -229,8 +244,16 @@ export class ESPTools {
     flashMode?: FlashModeValues;
     flashFreq?: FlashFreqValues;
     flashSize?: FlashSizeValues;
+    /** The chip the image is built for (e.g. `esp32`, `esp32s3`); another detected chip is refused. */
+    chip?: string;
+    /**
+     * The user put the chip into download mode by hand (GPIO0 held at power-up), e.g. through a generic USB-TTL
+     * adapter without DTR/RTS wiring: connect without a reset and do not reset afterwards.
+     */
+    manualDownloadMode?: boolean;
   }): Promise<ESPToolsResult<void>> {
-    const { firmware, terminal, onProgress, flashMode, flashFreq, flashSize } = options;
+    const { firmware, terminal, onProgress, flashMode, flashFreq, flashSize, chip, manualDownloadMode } = options;
+    const resetMode = manualDownloadMode ? 'no_reset' : 'default_reset';
 
     let firmwareData: Uint8Array;
     try {
@@ -259,14 +282,40 @@ export class ESPTools {
             console.error(err);
           }
 
-          const esploader = new ESPLoader({
-            transport,
-            baudrate: 115200,
-            enableTracing: false,
-            terminal,
-          });
+          const connect = async (baudrate: number) => {
+            const loader = new ESPLoader({
+              transport,
+              baudrate,
+              romBaudrate: ROM_BAUD_RATE,
+              enableTracing: false,
+              terminal,
+            });
+            await loader.main(resetMode);
+            return loader;
+          };
+          let esploader: ESPLoader;
+          try {
+            esploader = await connect(manualDownloadMode ? FAST_BAUD_RATE : ROM_BAUD_RATE);
+          } catch (err) {
+            if (!manualDownloadMode) throw err;
+            console.warn(`Connecting at ${FAST_BAUD_RATE} baud failed, retrying at ${ROM_BAUD_RATE}`, err);
+            try {
+              await transport.disconnect();
+            } catch (disconnectError) {
+              console.error(disconnectError);
+            }
+            esploader = await connect(ROM_BAUD_RATE);
+          }
 
-          await esploader.main();
+          const detectedChip = esploader.chip.CHIP_NAME;
+          if (chip && !sameChip(chip, detectedChip)) {
+            return {
+              success: false,
+              error: { type: ESPToolsErrorType.CHIP_MISMATCH, details: { expected: chip, detected: detectedChip } },
+              data: null,
+            };
+          }
+
           await esploader.flashId();
 
           const ERASE_FIRST = false;
@@ -323,6 +372,23 @@ export class ESPTools {
         error: { type: ESPToolsErrorType.FLASH_FAILED, details: error.message },
         data: null,
       };
+    }
+
+    // Without reset wiring the user power-cycles the reader instead. The flash may have left the port at the fast
+    // baud rate, but the firmware's Serial Configurator answers on the same port at the ROM baud rate.
+    if (manualDownloadMode) {
+      try {
+        await this.useTransport({
+          blocking: true,
+          fn: async (transport) => {
+            await transport.disconnect();
+            await transport.connect(ROM_BAUD_RATE);
+          },
+        });
+      } catch (err) {
+        console.error('Failed to reopen the serial port at the ROM baud rate', err);
+      }
+      return result;
     }
 
     return await this.useTransport({

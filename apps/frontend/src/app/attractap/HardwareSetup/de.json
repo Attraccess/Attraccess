@@ -2,14 +2,38 @@
   "title": "Attractap Einrichtung",
   "subtitle": "Firmware installieren und Leser konfigurieren",
   "connection": {
-    "connected": "Verbunden",
+    "connected": {
+      "serial": "Per USB verbunden",
+      "bluetooth": "Per Bluetooth verbunden"
+    },
     "disconnected": "Nicht verbunden"
   },
   "connect": {
     "title": "Attractap verbinden",
     "description": "Schließe deinen Attractap an einen USB-Port an, klicke auf Verbinden und wähle im Browser-Dialog den richtigen seriellen Port aus.",
+    "bleBridgeHint": "Du installierst Firmware auf einer Attractap BLE-Bridge (GL.iNet GL-S10)? Schließe stattdessen deinen 3,3-V-USB-TTL-Adapter an und versetze die Bridge zuerst in den Download-Modus.",
     "button": {
       "label": "Per USB verbinden"
+    },
+    "bluetooth": {
+      "hint": "Schon geflasht und noch nicht gekoppelt? Richte das Gerät ohne Kabel ein, solange seine Bluetooth-Einrichtung offen ist. Ein Attractap Touch öffnet sie für 10 Minuten nach dem Start oder mit der Schaltfläche „Bluetooth-Einrichtung“ auf seinem Display. Ein Attractap Lite öffnet sie für 10 Minuten nach dem Einschalten (sein LED-Ring pulsiert doppelt blau). Eine BLE-Bridge öffnet sie, wenn du ihre Taste 3 Sekunden gedrückt hältst (die Bluetooth-LED blinkt doppelt; 10 Sekunden setzen die Bridge zurück).",
+      "button": "Per Bluetooth einrichten",
+      "unavailable": {
+        "title": "Bluetooth-Einrichtung ist in diesem Browser nicht verfügbar",
+        "description": "Die Einrichtung per Bluetooth braucht Web Bluetooth, das Chrome und Edge auf dem Computer und Chrome unter Android (über HTTPS) bieten. Öffne die Seite dort oder verbinde das Gerät per USB; auch das braucht Chrome oder Edge auf einem Computer."
+      },
+      "failed": {
+        "title": "Bluetooth-Verbindung fehlgeschlagen",
+        "description": "Prüfe, ob die Bluetooth-Einrichtung des Geräts noch offen ist (sie schließt nach 10 Minuten), und halte es nah an diesen Computer oder dieses Telefon. Fragt dein Computer nach einer Bluetooth-Kopplung, bestätige sie. Wähle in der Liste des Browsers das richtige Gerät (ein Attractap Touch zeigt seinen Namen auf dem Display) und versuche es erneut. Klappt es weiterhin nicht, richte es per USB ein."
+      },
+      "lost": {
+        "title": "Bluetooth-Verbindung getrennt",
+        "description": "Das Gerät hat die Verbindung getrennt: Es war außer Reichweite, wurde neu gestartet oder sein 10-minütiges Einrichtungsfenster ist abgelaufen. Noch nicht gespeicherte Einstellungen sind verloren. Ist es noch nicht gekoppelt, öffne seine Bluetooth-Einrichtung erneut (siehe oben) und verbinde dich noch einmal."
+      },
+      "closedAfterPairing": {
+        "title": "Einrichtung abgeschlossen",
+        "description": "Das Gerät ist mit Attraccess verbunden und hat seine Bluetooth-Verbindung wie erwartet getrennt."
+      }
     }
   },
   "tabs": {

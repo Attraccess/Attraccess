@@ -43,6 +43,16 @@ if(NOT EXISTS "${ATTRACTAP_VARIANT_FILE}")
 endif()
 include("${ATTRACTAP_VARIANT_FILE}")
 
+# IDF target of the variant (esp32s3 unless the variant sets ATTRACTAP_IDF_TARGET). ESP-IDF then also applies
+# sdkconfig.defaults.<target> when it exists (sdkconfig.defaults.esp32 for the BLE bridge).
+if(NOT DEFINED ATTRACTAP_IDF_TARGET)
+    set(ATTRACTAP_IDF_TARGET "esp32s3")
+endif()
+if(DEFINED ENV{IDF_TARGET} AND NOT "$ENV{IDF_TARGET}" STREQUAL "${ATTRACTAP_IDF_TARGET}")
+    message(FATAL_ERROR "IDF_TARGET=$ENV{IDF_TARGET} in the environment, but variant '${ATTRACTAP_VARIANT}' is built for ${ATTRACTAP_IDF_TARGET}")
+endif()
+set(IDF_TARGET "${ATTRACTAP_IDF_TARGET}")
+
 # Secure profile (ATT-1166): Secure Boot v2 + flash encryption + locked debug paths.
 # Never for demo builds; images stay unsigned, the API signs them per installation.
 option(ATTRACTAP_SECURE_PROFILE "Build the secure firmware profile (sdkconfig.secure overlay)" OFF)
@@ -65,6 +75,10 @@ if(NOT "${ATTRACTAP_LAB_CA}" STREQUAL "")
     endif()
 endif()
 if(ATTRACTAP_SECURE_PROFILE)
+    # sdkconfig.secure and the secure bootloader budget are ESP32-S3 only; the bridge has a plan, no build (README).
+    if(NOT ATTRACTAP_IDF_TARGET STREQUAL "esp32s3")
+        message(FATAL_ERROR "The secure profile is not available for ${ATTRACTAP_IDF_TARGET} variant '${ATTRACTAP_VARIANT}'")
+    endif()
     if(ATTRACTAP_FIRMWARE_VARIANT STREQUAL "demo")
         message(FATAL_ERROR "The secure profile is not available for demo variant '${ATTRACTAP_VARIANT}'")
     endif()
@@ -83,12 +97,13 @@ if(ATTRACTAP_SECURE_PROFILE)
         list(APPEND SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.secure-lab")
         list(APPEND ATTRACTAP_DEFINES ATTRACTAP_SECURE_LAB=1)
     else()
-        # Compiles out the USB serial config handler and console driver.
+        # Compiles out the console: its driver (main.cpp) and the console command input (serialConsoleInput.cpp).
+        # The command handler stays for the Bluetooth setup channel (ATT-1371), the only way commands arrive.
         list(APPEND ATTRACTAP_DEFINES ATTRACTAP_SECURE_PROFILE=1)
         if(DEFINED ATTRACTAP_EXCLUDE_REGEX AND NOT "${ATTRACTAP_EXCLUDE_REGEX}" STREQUAL "")
-            set(ATTRACTAP_EXCLUDE_REGEX "${ATTRACTAP_EXCLUDE_REGEX}|src/serial/")
+            set(ATTRACTAP_EXCLUDE_REGEX "${ATTRACTAP_EXCLUDE_REGEX}|src/serial/serialConsoleInput\\.cpp$")
         else()
-            set(ATTRACTAP_EXCLUDE_REGEX "src/serial/")
+            set(ATTRACTAP_EXCLUDE_REGEX "src/serial/serialConsoleInput\\.cpp$")
         endif()
     endif()
 endif()

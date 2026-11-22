@@ -96,6 +96,28 @@ wird ein neuer erzeugt, der die Prüfung bestehen muss.
 Schlüssel sind danach nutzlos. Es ist nur möglich, solange bei keinem Reader die Schlüssel dieser
 Installation eingebrannt sind.
 
+## Einrichtung per Bluetooth
+
+Reader nehmen PIN, WLAN und Serveradresse per Bluetooth an ([Attractap Einrichtung](attractap/setup.md#per-bluetooth-einrichten)),
+gesicherte Reader ebenfalls, denn sie haben keine USB-Einrichtung:
+
+- Nur solange der Reader **nicht gekoppelt** ist: Ein gekoppelter Reader öffnet die Bluetooth-Einrichtung nie.
+- Nur über eine **verschlüsselte** Verbindung (Bluetooth LE Secure Connections). Jedes Einrichtungsfenster nutzt
+  eine neue Bluetooth-Adresse und speichert keine Kopplung: Ein Computer koppelt sich für jedes Fenster neu.
+- Mit **denselben PIN-Regeln** wie per USB: Sobald eine PIN gesetzt ist, braucht jede Änderung sie.
+- Nach **5 falschen PINs** lehnt der Reader jeden Befehl ab, der die PIN braucht, auch die richtige, bis jemand am
+  Gerät ihn zurücksetzt: kurz vom Strom trennen oder beim Touch **Bluetooth-Einrichtung** drücken, sobald das
+  Fenster geschlossen ist. Eigene Neustarts des Readers behalten den Zähler.
+- Ein gesicherter Reader hat weiterhin **keinen USB-Konfigurator**: Seine USB-Konsole bleibt aus.
+
+Da ein ungekoppelter Reader die Einrichtung nach dem Start 10 Minuten lang von selbst öffnet, kann ihn in dieser
+Zeit jeder in Bluetooth-Reichweite einrichten, solange keine PIN gesetzt ist; ist sie gesetzt, geht es nur mit
+ihr. Beim Touch ist das nicht mehr, als seine Einstellungen auf dem Display ohnehin erlauben; ein Lite oder ein
+gesicherter Reader, die bisher ein Kabel brauchten oder gar keine Einrichtung hatten, lassen sich jetzt aus der
+Nähe einrichten. Setzen Sie die PIN zuerst. Für einen gekoppelten Reader gilt das nie. Ein so eingerichteter Reader
+kann trotzdem nichts tun, bis ein Admin seine Kopplung in Attraccess freigibt: Geben Sie nur den Reader frei, den
+Sie erwarten (vergleichen Sie Code oder Farbmuster).
+
 ## Grenzen
 
 - Widerruf und Rotation der Schlüssel bereits gesicherter Reader werden noch nicht unterstützt.

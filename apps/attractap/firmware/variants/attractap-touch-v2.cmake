@@ -5,6 +5,8 @@ set(ATTRACTAP_FIRMWARE_NAME "attractap_touch_v2")
 set(ATTRACTAP_FIRMWARE_FRIENDLY_NAME "Attractap Touch V2")
 set(ATTRACTAP_FIRMWARE_VARIANT "wifi")
 set(ATTRACTAP_FIRMWARE_VARIANT_FRIENDLY_NAME "WiFi")
+# Bluetooth setup (src/bt_setup): advertised as "Attractap Touch XXXX" (last two bytes of the Bluetooth MAC).
+set(ATTRACTAP_BT_SETUP_NAME_PREFIX "Attractap Touch")
 # Flip to "true" only after the secure profile passed its hardware run (ATT-1166).
 set(ATTRACTAP_SECURE_PROFILE_HARDWARE_TESTED "false")
 # Build the secure profile and run its gates for this variant in every CI stage.
@@ -17,6 +19,8 @@ set(ATTRACTAP_DEFINES
     FIRMWARE_VARIANT_FRIENDLY_NAME="${ATTRACTAP_FIRMWARE_VARIANT_FRIENDLY_NAME}"
 
     LOGGER_LEVEL_NUM=3
+
+    BT_SETUP_NAME_PREFIX="${ATTRACTAP_BT_SETUP_NAME_PREFIX}"
 
     # Show the "power off" button in settings — drives SYS_EN low to cut
     # battery power. V4 hardware with SYS_EN latch only.

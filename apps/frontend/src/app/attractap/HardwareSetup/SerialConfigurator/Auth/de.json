@@ -2,6 +2,7 @@
   "title": "Geräte-PIN",
   "loading": "Geräte-PIN wird geprüft...",
   "waitingForDevice": "Warte auf Antwort des Geräts. Wenn du gerade Firmware installiert hast, gib ihm ein paar Sekunden zum Starten.",
+  "waitingForBluetooth": "Warte auf Antwort der Bridge. Bestätige die Bluetooth-Kopplungsanfrage deines Systems, falls eine erscheint, und prüfe dann erneut.",
   "retry": "Erneut prüfen",
   "enterPin": {
     "submit": "Entsperren"
@@ -27,6 +28,7 @@
   "errors": {
     "invalid": "PIN muss 4-stellig sein.",
     "mismatch": "PINs stimmen nicht überein.",
-    "auth": "Ungültige PIN. Bitte versuche es erneut."
+    "auth": "Ungültige PIN. Bitte versuche es erneut.",
+    "tooManyAttempts": "Zu viele falsche PINs per Bluetooth. Trenne das Gerät kurz vom Strom oder drücke seine Bluetooth-Taste bzw. -Schaltfläche, um es erneut zu versuchen."
   }
 }

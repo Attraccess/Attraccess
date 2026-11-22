@@ -13,8 +13,4 @@ inline constexpr Entry sessionUsersCatalog[] = {
     {Message::SessionUsersLine, "{0} · {1}", "{0} · {1}"},
     {Message::SessionCountOf, "{0}/{1}", "{0}/{1}"},
 };
-static_assert(sizeof(catalog) / sizeof(Entry) + sizeof(cardRelayCatalog) / sizeof(Entry) +
-                      sizeof(networkStatusCatalog) / sizeof(Entry) + sizeof(sessionUsersCatalog) / sizeof(Entry) ==
-                  static_cast<size_t>(Message::Count),
-              "every firmware message needs a catalog entry, in enum order");
 } // namespace FirmwareI18n

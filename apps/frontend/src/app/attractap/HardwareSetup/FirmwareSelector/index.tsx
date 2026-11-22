@@ -34,6 +34,7 @@ function FirmwareCard({ firmware, onSelect }: { firmware: AttractapFirmware; onS
           <PageHeader title={firmware.friendlyName} noMargin />
         </Card.Header>
         <Card.Content className="flex flex-wrap gap-2 flex-row">
+          <Chip variant="soft">{firmware.boardFamily}</Chip>
           {firmware.variantFriendlyName.split(',').map((variantFeature) => (
             <Chip color="accent" key={`${firmware.name}-${firmware.variant}-${variantFeature}`}>
               {variantFeature}

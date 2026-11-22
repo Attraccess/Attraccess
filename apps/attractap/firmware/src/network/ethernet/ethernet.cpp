@@ -2,8 +2,10 @@
 #include "../../platform.hpp"
 #include "esp_system.h"
 #include "esp_mac.h"
+#ifndef ETH_RMII_EMAC
 #include "esp_eth_mac_w5500.h"
 #include "esp_eth_phy_w5500.h"
+#endif
 #include <string>
 
 // Static member definitions
@@ -25,7 +27,7 @@ const uint32_t Ethernet::DHCP_TIMEOUT_MS = 30000; // 30 second DHCP timeout
 
 void Ethernet::setup()
 {
-    if (PIN_ETH_SPI_CS < 0)
+    if (!configured())
     {
         logger.info("Ethernet SPI CS pin not configured, skipping Ethernet setup");
         return;
@@ -36,7 +38,7 @@ void Ethernet::setup()
 
 void Ethernet::loop()
 {
-    if (PIN_ETH_SPI_CS < 0)
+    if (!configured())
     {
         return;
     }
@@ -156,6 +158,7 @@ void Ethernet::deinit()
     setState(ETHERNET_STATE_INIT);
 }
 
+#ifndef ETH_RMII_EMAC
 esp_err_t Ethernet::w5500_read_version_register(spi_device_handle_t spi_device, uint8_t *version)
 {
     // W5500 Version Register (VERSIONR) is at address 0x0039
@@ -187,6 +190,8 @@ esp_err_t Ethernet::w5500_read_version_register(spi_device_handle_t spi_device, 
     return ESP_OK;
 }
 
+#endif
+
 void Ethernet::cleanupPartialInit()
 {
     logger.info("Cleaning up partial initialization");
@@ -195,6 +200,9 @@ void Ethernet::cleanupPartialInit()
     esp_event_handler_unregister(IP_EVENT, IP_EVENT_ETH_GOT_IP, got_ip_event_handler);
     esp_event_handler_unregister(ETH_EVENT, ESP_EVENT_ANY_ID, eth_event_handler);
 
+#ifdef ETH_RMII_EMAC
+    emac_release();
+#else
     // Stop and clean up Ethernet driver
     if (eth_handle != nullptr)
     {
@@ -215,6 +223,7 @@ void Ethernet::cleanupPartialInit()
         esp_netif_destroy(eth_netif);
         eth_netif = nullptr;
     }
+#endif
 
     // The W5500 driver owns its SPI device and removed it during uninstall;
     // the SPI bus itself stays up for other users.
@@ -304,6 +313,9 @@ esp_err_t Ethernet::initializeNetwork()
 {
     logger.info("Initializing Ethernet network stack");
 
+#ifdef ETH_RMII_EMAC
+    esp_err_t ret = emac_init(&eth_handle);
+#else
     // Initialize SPI first
     esp_err_t ret = initSPI();
     if (ret != ESP_OK)
@@ -315,6 +327,7 @@ esp_err_t Ethernet::initializeNetwork()
     // Initialize Ethernet driver
     uint8_t eth_port_cnt = 0;
     ret = ethernet_init(&eth_handle, &eth_port_cnt);
+#endif
     if (ret != ESP_OK)
     {
         logger.error((std::string("Failed to initialize Ethernet driver: ") + esp_err_to_name(ret)).c_str());
@@ -382,6 +395,7 @@ esp_err_t Ethernet::initializeNetwork()
     return ESP_OK;
 }
 
+#ifndef ETH_RMII_EMAC
 esp_err_t Ethernet::initSPI()
 {
     logger.info("Initializing SPI for W5500");
@@ -580,3 +594,4 @@ esp_err_t Ethernet::ethernet_init(esp_eth_handle_t *eth_handles, uint8_t *eth_po
     logger.info("W5500 Ethernet driver initialized successfully");
     return ESP_OK;
 }
+#endif

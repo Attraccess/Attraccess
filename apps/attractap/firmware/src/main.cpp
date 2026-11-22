@@ -1,12 +1,19 @@
 #include <cstdio>
 #include "esp_err.h"
 #include "nvs_flash.h"
-#include "driver/usb_serial_jtag.h"
+#ifndef ATTRACTAP_SECURE_PROFILE
+#include "serial/console_io.hpp"
+#endif
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
 #include "application/application.hpp"
+#ifdef ATTRACTAP_BLE_BRIDGE
+#include "bridge/bridge.hpp"
+#include "bridge/no_nfc.hpp"
+#else
 #include "rfid/rfid.hpp"
+#endif
 #include "websocket/websocket.hpp"
 #ifdef DEMO_MODE
 #include "api/demo/websocket.hpp"
@@ -27,6 +34,9 @@
 #endif
 #endif
 
+#ifdef ATTRACTAP_BLE_BRIDGE
+NoNfc nfc;
+#else
 // Default I2C pins when a variant does not set PIN_NFC_I2C_* explicitly
 // (was Wire.begin(SDA, SCL) with the board's Arduino defaults).
 #ifndef PIN_NFC_I2C_SDA
@@ -34,6 +44,7 @@
 #endif
 
 NFC nfc;
+#endif
 #ifdef DEMO_MODE
 DemoWebsocket websocket;
 API api(websocket);
@@ -102,14 +113,10 @@ extern "C" void app_main(void)
 
 #ifndef ATTRACTAP_SECURE_PROFILE
     // Console input (serialCommandHandler) reads from the USB-Serial-JTAG
-    // driver; log output goes through stdout, which the VFS console routes to
-    // the same port (CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG). The secure profile
-    // has no console and no serial config handler.
-    usb_serial_jtag_driver_config_t usbConfig = {
-        .tx_buffer_size = 1024,
-        .rx_buffer_size = 512,
-    };
-    usb_serial_jtag_driver_install(&usbConfig);
+    // driver (UART0 on the BLE bridge); log output goes through stdout, which
+    // the VFS console routes to the same port. The secure profile has no
+    // console: its commands arrive only over the Bluetooth setup (src/bt_setup).
+    console_io::install();
 
     // Give the host time to enumerate USB before the first log lines
     // (parity with the old `Serial.begin(); delay(2000);` boot).
@@ -128,6 +135,17 @@ extern "C" void app_main(void)
 
     mainLogger.info("Console initialized");
 
+#ifdef ATTRACTAP_BLE_BRIDGE
+    // LEDs and button first, so the power LED shows the firmware runs.
+    bridge::start([] {
+        switch (api.bleActivity())
+        {
+        case BleProxy::Activity::Connected: return bridge::BleActivity::Connected;
+        case BleProxy::Activity::Scanning: return bridge::BleActivity::Scanning;
+        default: return bridge::BleActivity::Idle;
+        }
+    });
+#else
     mainLogger.infof("I2C init: SDA=%d, SCL=%d", PIN_NFC_I2C_SDA, PIN_NFC_I2C_SCL);
     if (!recoverI2CBus(PIN_NFC_I2C_SDA, PIN_NFC_I2C_SCL))
     {
@@ -141,6 +159,7 @@ extern "C" void app_main(void)
     // Serialize all shared-bus I2C traffic (PN532 / GT911 / IO expander) across
     // tasks — must exist before application.setup() spawns any task (ATT-554).
     I2CBusLock::init();
+#endif
 
     mainLogger.info("Attractap starting...");
     application.setup();

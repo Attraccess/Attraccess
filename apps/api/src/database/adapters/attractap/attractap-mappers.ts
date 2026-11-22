@@ -57,6 +57,7 @@ export function toFirmwareInfo(firmware: Attractap['firmware']): AttractapFirmwa
     variant: firmware?.variant ?? null,
     version: firmware?.version ?? null,
     capabilities: {
+      nfc: capabilities?.nfc,
       resourceSelection: capabilities?.resourceSelection,
       resourceActionSelection: capabilities?.resourceActionSelection,
       cardEnrollment: capabilities?.cardEnrollment,

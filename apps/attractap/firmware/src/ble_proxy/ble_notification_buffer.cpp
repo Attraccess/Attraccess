@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "../heap_guard.hpp"
+
 namespace ble
 {
     bool NotificationBuffer::overflowed(const Uuid &service, const Uuid &characteristic) const
@@ -17,10 +19,15 @@ namespace ble
         if (overflowed(service, characteristic)) return false;
         const bool oversized = length > MAX_PAYLOAD_BYTES;
         const size_t cost = oversized ? 0 : length;
-        if (dataEntries >= maxEntries || bytes + cost > maxBytes)
+        // With the heap short, the stream overflows like a full buffer: the API ends it instead of the reader
+        // aborting on an allocation.
+        if (dataEntries >= maxEntries || bytes + cost > maxBytes || !heap_guard::fits(cost + ENTRY_HEADROOM_BYTES))
         {
-            // One marker per characteristic; at most one per allowlist entry, so markers stay bounded too.
-            if (overflowedKeys.size() >= MAX_ALLOWLIST_ENTRIES) return false;
+            // One marker per characteristic; at most one per allowlist entry, so markers stay bounded too. The marker
+            // list is reserved up front; the marker entry itself may need a new deque block.
+            if (overflowedKeys.size() >= MAX_ALLOWLIST_ENTRIES ||
+                !heap_guard::fits(ENTRY_HEADROOM_BYTES, heap_guard::CRITICAL_RESERVE_BYTES))
+                return false;
             overflowedKeys.push_back({service, characteristic});
             Entry marker;
             marker.service = service;

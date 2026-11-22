@@ -89,6 +89,7 @@ std::string InitScreen::getName()
 
 void InitScreen::onScreenLeave()
 {
+   this->bluetoothSetupError.clear();
    this->resetState(this->wifiSpinner, this->wifiLabel);
    this->resetState(this->ethernetSpinner, this->ethernetLabel);
    this->resetState(this->apiConnectionSpinner, this->apiConnectionLabel);
@@ -118,6 +119,9 @@ void InitScreen::destroy()
    this->serverTargetLabel = nullptr;
    this->certLabel = nullptr;
    this->connectionStateLabel = nullptr;
+   this->bluetoothSetupError.clear();
+   this->bluetoothSetupButton = nullptr;
+   this->bluetoothSetupStatus.forget();
 }
 
 void InitScreen::createApiRows(lv_obj_t *statesContainer)
@@ -219,25 +223,79 @@ void InitScreen::createConnectionDetails(lv_obj_t *statesContainer)
    lv_obj_set_style_text_color(this->connectionStateLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
 
-   lv_obj_t *openSettingsButton = lv_btn_create(statesContainer);
-   DisplayTheme::button(openSettingsButton);
-   lv_obj_set_width(openSettingsButton, LV_SIZE_CONTENT);
-   lv_obj_set_height(openSettingsButton, LV_SIZE_CONTENT);
-   lv_obj_set_align(openSettingsButton, LV_ALIGN_CENTER);
-   lv_obj_add_flag(openSettingsButton, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_add_flag(openSettingsButton, LV_OBJ_FLAG_SCROLLABLE);
+   this->bluetoothSetupStatus.create(statesContainer);
+   this->createButtons(statesContainer);
+}
 
-   lv_obj_t *openSettingsButtonLabel = lv_label_create(openSettingsButton);
-   lv_obj_set_width(openSettingsButtonLabel, LV_SIZE_CONTENT);
-   lv_obj_set_height(openSettingsButtonLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(openSettingsButtonLabel, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(openSettingsButtonLabel, FirmwareI18n::Message::Settings);
-   lv_obj_set_style_text_color(openSettingsButtonLabel, DisplayTheme::onPrimary(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(openSettingsButtonLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+// Settings, and next to it "Bluetooth setup" while a reader that is not paired has no window open (ATT-1371).
+void InitScreen::createButtons(lv_obj_t *statesContainer)
+{
+   lv_obj_t *row = lv_obj_create(statesContainer);
+   lv_obj_remove_style_all(row);
+   lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
+   // Side by side when they fit; at this font size both languages need two lines.
+   lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW_WRAP);
+   lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+   lv_obj_set_style_pad_column(row, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_row(row, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_remove_flag(row, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
 
+   const struct
+   {
+      FirmwareI18n::Message caption;
+      lv_event_cb_t onClick;
+      lv_obj_t **button;
+   } buttons[] = {
+      {FirmwareI18n::Message::Settings, &InitScreen::onOpenSettingsButtonEvent, nullptr},
+      {FirmwareI18n::Message::BluetoothSetup, &InitScreen::onBluetoothSetupButtonEvent, &this->bluetoothSetupButton},
+   };
+   for (const auto &spec : buttons)
+   {
+      lv_obj_t *button = lv_btn_create(row);
+      DisplayTheme::button(button);
+      lv_obj_set_size(button, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+      lv_obj_add_flag(button, LV_OBJ_FLAG_CLICKABLE);
 
-   lv_obj_add_event_cb(openSettingsButton, &InitScreen::onOpenSettingsButtonEvent, LV_EVENT_CLICKED, this);
+      lv_obj_t *label = lv_label_create(button);
+      lv_obj_set_align(label, LV_ALIGN_CENTER);
+      FirmwareI18n::setLabel(label, spec.caption);
+      lv_obj_set_style_text_color(label, DisplayTheme::onPrimary(), LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_style_text_font(label, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
+      lv_obj_add_event_cb(button, spec.onClick, LV_EVENT_CLICKED, this);
+      if (spec.button) *spec.button = button;
+   }
+   this->updateBluetoothSetup();
+}
+
+void InitScreen::onBluetoothSetupButtonEvent(lv_event_t *e)
+{
+   InitScreen *self = static_cast<InitScreen *>(lv_event_get_user_data(e));
+   if (self && self->onBluetoothSetupCallback)
+      self->onBluetoothSetupCallback();
+}
+
+void InitScreen::setOnBluetoothSetupCallback(std::function<void()> callback)
+{
+   this->onBluetoothSetupCallback = std::move(callback);
+}
+
+void InitScreen::showBluetoothSetupError()
+{
+   if (this->bluetoothSetupButton)
+      this->bluetoothSetupError.show(this->bluetoothSetupButton, FirmwareI18n::Message::BluetoothSetupUnavailable);
+}
+
+void InitScreen::updateBluetoothSetup()
+{
+   this->bluetoothSetupStatus.update();
+   // An error stays on the button while it shows, even though the reader still offers a window.
+   if (!this->bluetoothSetupButton)
+      return;
+   const bool offer = bt_setup::offerButton() || this->bluetoothSetupError.target() == this->bluetoothSetupButton;
+   if (lv_obj_has_flag(this->bluetoothSetupButton, LV_OBJ_FLAG_HIDDEN) == offer)
+      lv_obj_set_flag(this->bluetoothSetupButton, LV_OBJ_FLAG_HIDDEN, !offer);
 }
 
 void InitScreen::createNetworkRows(lv_obj_t *statesContainer)
@@ -339,6 +397,8 @@ void InitScreen::loop()
       return;
    }
    this->lastLoopRefreshMs = now;
+
+   this->updateBluetoothSetup();
 
    State::NetworkState networkState = State::getNetworkState();
    // TODO: extend network state and network interface classes to be more descriptive (in progress, success, error and maybe error reason)

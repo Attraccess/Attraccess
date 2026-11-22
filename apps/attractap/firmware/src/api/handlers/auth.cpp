@@ -36,6 +36,10 @@ void API::sendFirmwareInfo()
 #if defined(BEEPER_PIN) || defined(HAS_IO_EXPANDER) // touch readers drive the beeper through the IO expander
     traits.hasBeeper = true;
 #endif
+#ifdef ATTRACTAP_BLE_BRIDGE
+    // BLE bridge: no card reader, so no card functions (and no cardRelay below); BLE only.
+    traits.hasNfc = false;
+#endif
 #ifdef ESP_PLATFORM
     const char *resetReason = crashResetReasonToString((uint8_t)esp_reset_reason());
 #else
@@ -50,7 +54,7 @@ void API::sendFirmwareInfo()
                            BuildProfile::name(), BuildProfile::release(), BuildProfile::secureVersion()},
                           traits, uiCaps, sizeof uiCaps);
     // This reader relays card APDUs to the server and holds no card keys (firmware 2.0.0+).
-    event["data"]["payload"]["capabilities"]["cardRelay"] = true;
+    if (traits.hasNfc) event["data"]["payload"]["capabilities"]["cardRelay"] = true;
     // Plugin BLE proxy, protocol v1 (ATT-1033). Builds without it send no `ble`: the API answers READER_UNSUPPORTED.
     char bleCaps[ble::CAPABILITY_SCRATCH];
     if (BleProxy::supported())
@@ -64,11 +68,16 @@ void API::sendFirmwareInfo()
         this->logger.error("Failed to serialize firmware info");
         return;
     }
-    if (this->transport.sendMessage(json, n))
+    // Sent once per authentication: a refusal under back-pressure is retried from loop(), or the server would see
+    // no capabilities (no BLE) for the whole session.
+    this->firmwareInfoPending = !this->transport.sendMessage(json, n);
+    if (this->firmwareInfoPending)
     {
-        // Explicit, not a scan of outgoing bytes: the session's eFuse report follows this message.
-        this->transport.onFirmwareInfoSent();
+        this->firmwareInfoRetryAt = millis() + FIRMWARE_INFO_RETRY_MS;
+        return;
     }
+    // Explicit, not a scan of outgoing bytes: the session's eFuse report follows this message.
+    this->transport.onFirmwareInfoSent();
 }
 
 void API::onReaderAuthenticated(JsonObject data)

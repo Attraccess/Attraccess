@@ -1,0 +1,28 @@
+{
+  "name": "caps-bridge",
+  "kind": "capabilities",
+  "verdict": "accept",
+  "note": "BLE bridge (GL.iNet GL-S10): no screen, no LED ring, no beeper, no card reader.",
+  "payload": {
+    "schemaVersion": 1,
+    "components": [],
+    "slots": [],
+    "steps": [],
+    "maxPayloadBytes": 0,
+    "maxNodes": 0,
+    "maxDepth": 0,
+    "maxLiveNodes": 0,
+    "display": null,
+    "input": {
+      "touch": false,
+      "buttons": 0,
+      "cardHold": false
+    },
+    "feedback": {
+      "leds": false,
+      "beeper": false
+    },
+    "charset": "latin1",
+    "images": false
+  }
+}

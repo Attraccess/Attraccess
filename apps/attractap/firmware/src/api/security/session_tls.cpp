@@ -1,6 +1,8 @@
 #include "session_tls.hpp"
 #include "session_certificates.hpp"
 
+#include "../../heap_guard.hpp"
+
 #include <cstdint>
 #include <cstring>
 
@@ -19,6 +21,8 @@ namespace
     const uint16_t SIGNATURE_ALGORITHMS[] = {MBEDTLS_TLS1_3_SIG_ECDSA_SECP256R1_SHA256, MBEDTLS_TLS1_3_SIG_NONE};
     // Small on purpose: the caller's stack also carries the handshake.
     constexpr size_t READ_CHUNK_BYTES = 1024;
+    // Received bytes keep a buffer up to this size between messages; a larger one is freed once it is read.
+    constexpr size_t INBOUND_KEEP_BYTES = 4096;
 
     int verifyCallback(void *context, mbedtls_x509_crt *crt, int depth, uint32_t *flags)
     {
@@ -191,8 +195,28 @@ SessionTls::Status SessionTls::feed(const uint8_t *data, size_t length,
     {
         return state;
     }
-    impl->inbound.insert(impl->inbound.end(), data, data + length);
-    return advance(onFrame);
+    std::vector<uint8_t> &inbound = impl->inbound;
+    // Only the bytes TLS has not read yet stay: without this, a stream that always ends in a partial record
+    // would keep every byte it ever received.
+    if (impl->inboundOffset > 0)
+    {
+        inbound.erase(inbound.begin(), inbound.begin() + static_cast<std::ptrdiff_t>(impl->inboundOffset));
+        impl->inboundOffset = 0;
+    }
+    // Exceptions are off: a failed allocation would abort the reader. Without the heap for these bytes the session
+    // fails instead and the reader opens a new one (ATT-1315).
+    const size_t needed = inbound.size() + length;
+    if (needed > inbound.capacity() && !heap_guard::fits(needed, heap_guard::CRITICAL_RESERVE_BYTES))
+    {
+        fail(MBEDTLS_ERR_SSL_ALLOC_FAILED);
+        return state;
+    }
+    inbound.insert(inbound.end(), data, data + length);
+    const Status status = advance(onFrame);
+    // A large message (an OTA chunk) must not keep its buffer once TLS read it all.
+    if (impl && impl->inbound.empty() && impl->inbound.capacity() > INBOUND_KEEP_BYTES)
+        std::vector<uint8_t>().swap(impl->inbound);
+    return status;
 }
 
 SessionTls::Status SessionTls::advance(const SessionFraming::Decoder::FrameCallback &onFrame)

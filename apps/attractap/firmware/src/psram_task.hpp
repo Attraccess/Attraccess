@@ -14,14 +14,18 @@
 #include "freertos/task.h"
 #include "sdkconfig.h"
 
-#if !(CONFIG_SPIRAM_FETCH_INSTRUCTIONS && CONFIG_SPIRAM_RODATA)
+#if CONFIG_SPIRAM && !(CONFIG_SPIRAM_FETCH_INSTRUCTIONS && CONFIG_SPIRAM_RODATA)
 #error "PSRAM task stacks need CONFIG_SPIRAM_XIP_FROM_PSRAM"
 #endif
 
-// For tasks that never end: one that returns must delete itself with vTaskDeleteWithCaps().
+// For tasks that never end. Boards without PSRAM (the BLE bridge, ATT-1315) take the stack from internal RAM.
 inline bool createPsramTask(TaskFunction_t entry, const char *name, uint32_t stackBytes, void *argument,
                             UBaseType_t priority, TaskHandle_t *handle = nullptr)
 {
+#if CONFIG_SPIRAM
     return xTaskCreatePinnedToCoreWithCaps(entry, name, stackBytes, argument, priority, handle, tskNO_AFFINITY,
                                            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) == pdPASS;
+#else
+    return xTaskCreatePinnedToCore(entry, name, stackBytes, argument, priority, handle, tskNO_AFFINITY) == pdPASS;
+#endif
 }

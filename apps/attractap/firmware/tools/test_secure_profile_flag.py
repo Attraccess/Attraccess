@@ -124,7 +124,8 @@ class ReleaseBuildRunsTheSecureGate(unittest.TestCase):
                 with open(os.path.join(build_dir, "flasher_args.json"), "w") as f:
                     json.dump({"app": {"file": "app.bin"}, "bootloader": {"file": "bootloader.bin"},
                                "partition-table": {"file": "partition-table.bin"}}, f)
-            return build_dir, [], {"app": {"file": "app.bin"}}
+            return build_dir, [], {"app": {"file": "app.bin"},
+                                   "flash_settings": {"flash_mode": "dio", "flash_freq": "40m", "flash_size": "4MB"}}
 
         gate_runs = []
 

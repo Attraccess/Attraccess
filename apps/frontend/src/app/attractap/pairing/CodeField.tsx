@@ -17,7 +17,7 @@ export function CodeField({ flow, insecure }: Readonly<{ flow: PairingFlow; inse
   return (
     <div className="flex items-end gap-2">
       <TextField className="min-w-0 grow" value={flow.codeInput} onChange={flow.setCodeInput} isDisabled={!flow.idle}>
-        <Label>{t('dialog.codeLabel')}</Label>
+        <Label>{t(flow.bleBridge ? 'dialog.bridgeCodeLabel' : 'dialog.codeLabel')}</Label>
         <Input
           autoComplete="off"
           autoCapitalize="characters"
@@ -28,7 +28,8 @@ export function CodeField({ flow, insecure }: Readonly<{ flow: PairingFlow; inse
           data-cy="attractap-pairing-code-input"
         />
       </TextField>
-      {!insecure && (
+      {/* A bridge's code is only on its setup page, never as a QR code. */}
+      {!insecure && !flow.bleBridge && (
         <ResourceScanner title={t('dialog.scanTitle')} onDetected={scan} cameraFallbackHint={t('dialog.scanFallback')}>
           {(open) => (
             <Button variant="secondary" className="shrink-0" onPress={open} data-cy="attractap-pairing-scan">

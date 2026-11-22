@@ -22,6 +22,7 @@ vi.mock('@attraccess/react-query-client', () => ({
 }));
 vi.mock('../../../utils/esp-tools', () => ({
   ESPTools: { getInstance: () => ({ connectToDevice: state.connect, flashFirmware: state.flash }) },
+  ESPToolsErrorType: { CHIP_MISMATCH: 'CHIP_MISMATCH' },
 }));
 vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ success: state.success }) }));
 vi.mock('../../../components/Terminal', () => ({
@@ -110,7 +111,7 @@ it('passes flash settings and terminal callbacks, reporting completion at 100 pe
   );
   expect(state.success).toHaveBeenCalledWith({
     title: 'Installation successful',
-    description: 'You can now set up and use the RFID reader.',
+    description: 'You can now set up and use the reader.',
   });
   fireEvent.click(screen.getByRole('button', { name: 'Terminal Output' }));
   expect(await screen.findByText('Writing image Verified')).toBeTruthy();
@@ -169,4 +170,74 @@ it('flashes only the plain image of a firmware that also ships unsigned secure-p
   }
   expect(state.flash).toHaveBeenCalledWith(expect.objectContaining({ firmware: state.binary }));
   expect(JSON.stringify([state.query.mock.calls, state.flash.mock.calls])).not.toMatch(/secure-(app|bootloader)/);
+});
+const bridge: AttractapFirmware = {
+  ...firmware,
+  name: 'attractap_bridge',
+  friendlyName: 'Attractap BLE Bridge',
+  variant: 'gl_s10',
+  variantFriendlyName: 'GL.iNet GL-S10',
+  boardFamily: 'ESP32',
+  chip: 'esp32',
+  bleBridge: true,
+};
+it('lists the BLE Bridge with its board', () => {
+  state.firmwares = [{ ...firmware, boardFamily: 'ESP32-S3', chip: 'esp32s3' }, bridge];
+  render(
+    <MemoryRouter>
+      <FirmwareSelector onSelect={vi.fn()} />
+    </MemoryRouter>,
+  );
+  const card = screen.getByRole('button', { name: /Attractap BLE Bridge/ });
+  expect(card).toHaveTextContent('ESP32');
+  expect(card).toHaveTextContent('GL.iNet GL-S10');
+});
+it('warns before flashing the BLE Bridge and flashes it in manual download mode', async () => {
+  const completed = vi.fn();
+  state.flash.mockImplementation(async ({ onProgress }: { onProgress: (value: number) => void }) => {
+    onProgress(100);
+    return { success: true };
+  });
+  render(<FirmwareFlasher firmware={bridge} onCompleted={completed} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Install Now' }));
+  expect(await screen.findByText('Never power the GL-S10 through USB and PoE at the same time.')).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'Step-by-step guide to the pads and wiring' })).toHaveProperty(
+    'href',
+    'https://docs.attraccess.org/#/en/attractap/ble-bridge',
+  );
+  expect(state.connect).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Install now' }));
+  await waitFor(() => expect(state.flash).toHaveBeenCalledOnce());
+  expect(state.flash).toHaveBeenCalledWith(
+    expect.objectContaining({ chip: 'esp32', manualDownloadMode: true, flashFreq: '40m', flashSize: '4MB' }),
+  );
+  // No automatic reset: the user power-cycles the bridge before the configurator continues.
+  expect(await screen.findByText('Restart the bridge')).toBeTruthy();
+  expect(completed).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Continue setup' }));
+  expect(completed).toHaveBeenCalledOnce();
+});
+it('flashes other readers without the bridge warning, with auto-reset', async () => {
+  render(<FirmwareFlasher firmware={{ ...firmware, chip: 'esp32s3' }} onCompleted={vi.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Install Now' }));
+  await waitFor(() => expect(state.flash).toHaveBeenCalledOnce());
+  expect(state.flash).toHaveBeenCalledWith(expect.objectContaining({ chip: 'esp32s3', manualDownloadMode: false }));
+  expect(screen.queryByText('Prepare the GL.iNet GL-S10')).toBeNull();
+});
+it('refuses an image built for another chip', async () => {
+  const completed = vi.fn();
+  state.flash.mockResolvedValue({
+    success: false,
+    error: { type: 'CHIP_MISMATCH', details: { expected: 'esp32s3', detected: 'ESP32' } },
+  });
+  render(
+    <FirmwareFlasher firmware={{ ...firmware, boardFamily: 'ESP32-S3', chip: 'esp32s3' }} onCompleted={completed} />,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Install Now' }));
+  const dialog = await screen.findByRole('alertdialog');
+  expect(dialog).toHaveTextContent('Wrong chip for this firmware');
+  expect(dialog).toHaveTextContent('This firmware is built for ESP32-S3, but the connected device is an ESP32.');
+  expect(completed).not.toHaveBeenCalled();
+  expect(state.success).not.toHaveBeenCalled();
 });

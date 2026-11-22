@@ -117,6 +117,8 @@ export class ResourceListService {
     sockets: AuthenticatedWebSocket[],
     onlyIfResourceMatches?: { resourceIds?: Set<number>; requestId?: number },
   ) {
+    // A BLE Bridge has no NFC and serves no resource.
+    sockets = sockets.filter((socket) => socket.state?.nfc !== false);
     if (sockets.length === 0) return;
     const getContextOwner = () => this;
     return sendResourceListToSocketsImplementation(

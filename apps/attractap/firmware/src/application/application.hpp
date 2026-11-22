@@ -59,6 +59,15 @@ private:
     void updateLedState();
 #endif
 
+    // Bluetooth setup (ATT-1371, src/bt_setup), every main-loop pass: the first opens the window on an unpaired reader
+    // (after setup(), so NimBLE starts once the display, Wi-Fi and the tasks have their memory) and wires the Touch's
+    // "Bluetooth setup" button; later ones close the window on time.
+    void tickBtSetup();
+    bool btSetupStarted = false;
+    // The user opened the settings: they stay until saved or cancelled. A configuration missing at boot that arrives
+    // over USB or the Bluetooth setup instead leaves the "not configured" state by itself.
+    bool settingsOpenedByUser = false;
+
 #ifdef HAS_LVGL_DISPLAY
 
     void beginEnrollment();

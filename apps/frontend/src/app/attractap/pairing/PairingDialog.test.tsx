@@ -308,6 +308,19 @@ describe('PairingDialog', () => {
     });
   });
 
+  it('asks for the code of a BLE bridge, which has no colour ring', () => {
+    mocks.pairing.current = { ...lite(3), firmware: { name: 'attractap_bridge', variant: 'gl_s10', version: '2.8.0' } };
+    open({ pairingId: 'p1' });
+    expect(document.querySelector('[data-cy="attractap-pairing-pattern"]')).toBeNull();
+    expect(document.querySelector('[data-cy="attractap-pairing-code-input"]')).not.toBeNull();
+    expect(
+      screen.getByText("Enter the code the bridge's setup page shows on its Server tab right now."),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Code on the setup page')).toBeInTheDocument();
+    // The setup page shows the code as text only: no QR code to scan.
+    expect(document.querySelector('[data-cy="attractap-pairing-scan"]')).toBeNull();
+  });
+
   describe('Lite pattern step', () => {
     beforeEach(() => {
       mocks.pairing.current = lite(3);
