@@ -3,7 +3,8 @@
 import type { CommissioningSession, EventEnvelope } from '@attraccess/matter-contract';
 import type { SidecarConfig } from '../config';
 import { loadMatterPlatform, type FabricTuning, type MatterPlatform } from '../matter-platform';
-import { http, startSidecar, validHeaders, type JsonBody, type Running } from './harness';
+import { expectOk } from './expect-ok';
+import { http, startSidecar, validHeaders, type Running } from './harness';
 
 export type CommissioningRig = Running & {
   platform(): MatterPlatform;
@@ -51,8 +52,7 @@ export async function startCommissioningRig(options: RigOptions = {}): Promise<C
     }
   };
   if (options.createFabric !== false) {
-    const created: JsonBody = await call('POST', '/v1/fabric', { label: 'Attraccess' });
-    if (created.status !== 200) throw new Error(`the fabric was not created: ${created.raw}`);
+    expectOk(running, 'POST /v1/fabric', await call('POST', '/v1/fabric', { label: 'Attraccess' }));
   }
   return {
     ...running,

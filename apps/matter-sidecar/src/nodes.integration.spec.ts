@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadMatterPlatform, type MatterPlatform } from './matter-platform';
+import { expectOk } from './testing/expect-ok';
 import { http, startSidecar, validHeaders, type JsonBody, type Running } from './testing/harness';
 import { freeUdpPort } from './testing/ports';
 import { startSecondController, type SecondController } from './testing/second-controller';
@@ -66,7 +67,11 @@ describe('inventory, removal and sharing (real matter.js controller and virtual 
     stoppers.push(() => sidecar.stop());
     const device: VirtualDevice = await startVirtualDevice(tmp(), await freeUdpPort());
     stoppers.push(() => device.stop());
-    const fabric = (await call(sidecar, 'POST', '/v1/fabric', { label: 'Attraccess' })).body;
+    const fabric = expectOk(
+      sidecar,
+      'POST /v1/fabric',
+      await call(sidecar, 'POST', '/v1/fabric', { label: 'Attraccess' }),
+    );
     const controller = platform?.fabric?.controller;
     if (!controller) throw new Error('the controller is not running');
     const nodeId = await commissionVirtualDevice(controller, device);
