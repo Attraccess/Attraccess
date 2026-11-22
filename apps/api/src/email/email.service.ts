@@ -4,7 +4,7 @@ import {
   NotificationRecipient,
   ResourceHealthStatus,
 } from '@attraccess/application-models';
-import { formatCredits, toExactCredits, getSupportedDeviceLanguage } from '@attraccess/shared';
+import { formatCredits, formatUserDisplayName, toExactCredits, getSupportedDeviceLanguage } from '@attraccess/shared';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EmailLayoutService } from '../email-layout/email-layout.service';
 import { EmailTemplateKey, EmailTemplateService } from '../email-template/email-template.service';
@@ -68,6 +68,9 @@ export class EmailService {
       },
       inviter: {
         username: invitation.inviter?.username,
+        firstName: invitation.inviter?.firstName ?? null,
+        lastName: invitation.inviter?.lastName ?? null,
+        displayName: invitation.inviter ? formatUserDisplayName(invitation.inviter) : undefined,
         email: invitation.inviter?.email,
       },
       invitation: {
@@ -563,6 +566,9 @@ export class EmailService {
     return {
       user: {
         username: user.username,
+        firstName: user.firstName ?? null,
+        lastName: user.lastName ?? null,
+        displayName: formatUserDisplayName(user),
         email: user.email,
         id: user.id,
       },

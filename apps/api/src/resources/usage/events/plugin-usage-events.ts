@@ -1,3 +1,4 @@
+import { formatUserDisplayName } from '@attraccess/shared';
 import type {
   PluginResourceModel,
   PluginUserModel,
@@ -42,7 +43,15 @@ export function pluginUsageParties(
       maxParallelSessions: resource.maxParallelSessions,
       supervisionMode: resource.supervisionMode,
     },
-    user: { id: user.id, username: user.username, locale: user.locale, isDisabled: user.isDisabled },
+    user: {
+      id: user.id,
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      displayName: formatUserDisplayName(user),
+      locale: user.locale,
+      isDisabled: user.isDisabled,
+    },
   };
 }
 

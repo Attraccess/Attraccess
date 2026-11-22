@@ -10,6 +10,7 @@
       "isEmailVerified": "Email bestätigt",
       "id": "ID",
       "username": "Benutzername",
+      "name": "Name",
       "externalIdentifier": "Externe ID",
       "ssoLinked": "SSO",
       "roles": "Rollen"

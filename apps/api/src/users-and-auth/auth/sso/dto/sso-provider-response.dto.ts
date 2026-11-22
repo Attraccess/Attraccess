@@ -81,6 +81,24 @@ export class SsoOidcConfigurationResponseDto {
   emailClaimPaths!: string[] | null;
 
   @ApiProperty({
+    description: 'Claim path to read the first name from; defaults to given_name',
+    example: 'given_name',
+    required: false,
+    nullable: true,
+    type: String,
+  })
+  firstNameClaimPath?: string | null;
+
+  @ApiProperty({
+    description: 'Claim path to read the last name from; defaults to family_name',
+    example: 'family_name',
+    required: false,
+    nullable: true,
+    type: String,
+  })
+  lastNameClaimPath?: string | null;
+
+  @ApiProperty({
     description:
       'Ordered list of claim paths to read roles/groups/permissions from. When unset, the built-in defaults are read. When set, only these paths are read.',
     example: ['realm_access.roles', 'groups'],
@@ -208,6 +226,24 @@ export class SsoSamlConfigurationResponseDto {
     example: ['email', 'urn:oid:1.2.840.113549.1.9.1'],
   })
   emailAttributeKeys?: string[] | null;
+
+  @ApiProperty({
+    description: 'Attribute key to read the first name from; defaults to givenName',
+    example: 'givenName',
+    required: false,
+    nullable: true,
+    type: String,
+  })
+  firstNameClaimPath?: string | null;
+
+  @ApiProperty({
+    description: 'Attribute key to read the last name from; defaults to surname',
+    example: 'surname',
+    required: false,
+    nullable: true,
+    type: String,
+  })
+  lastNameClaimPath?: string | null;
 
   @ApiProperty({
     description:
@@ -346,6 +382,8 @@ function toOidcResponse(config: SsoOidcConfigurationRecord): SsoOidcConfiguratio
     scopes: config.scopes,
     usernameClaimPaths: config.usernameClaimPaths,
     emailClaimPaths: config.emailClaimPaths,
+    firstNameClaimPath: config.firstNameClaimPath ?? null,
+    lastNameClaimPath: config.lastNameClaimPath ?? null,
     roleClaimPaths: config.roleClaimPaths,
     roleMappings: config.roleMappings,
     endSessionURL: config.endSessionURL,
@@ -371,6 +409,8 @@ function toSamlResponse(config: SsoSamlConfigurationRecord): SsoSamlConfiguratio
     wantAuthnResponseSigned: config.wantAuthnResponseSigned,
     forceAuthn: config.forceAuthn,
     emailAttributeKeys: config.emailAttributeKeys,
+    firstNameClaimPath: config.firstNameClaimPath ?? null,
+    lastNameClaimPath: config.lastNameClaimPath ?? null,
     roleAttributeKeys: config.roleAttributeKeys,
     roleMappings: config.roleMappings,
     spSigningCertificate: config.spSigningCertificate,

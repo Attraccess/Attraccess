@@ -6,7 +6,26 @@ import { PluginSandboxService } from './plugin-sandbox.service';
 import { PluginEventsService } from './plugin-events.service';
 
 function buildPayload(): { resource: PluginResourceModel; user: PluginUserModel } {
-  return { resource: { id: 1, name: 'CNC' } as PluginResourceModel, user: { id: 7 } as PluginUserModel };
+  return {
+    resource: {
+      id: 1,
+      name: 'CNC',
+      type: 'machine',
+      description: null,
+      allowTakeOver: false,
+      maxParallelSessions: 1,
+      supervisionMode: 'introduction_required',
+    } as PluginResourceModel,
+    user: {
+      id: 7,
+      username: 'ada',
+      firstName: null,
+      lastName: null,
+      displayName: 'ada',
+      locale: 'en',
+      isDisabled: false,
+    },
+  };
 }
 
 describe('PluginEventsService', () => {
@@ -59,6 +78,8 @@ describe('PluginEventsService', () => {
       user: {
         id: 7,
         username: 'ada',
+        firstName: ' Ada ',
+        lastName: 'Lovelace',
         locale: 'de',
         isDisabled: false,
         email: 'ada@example.test',
@@ -67,7 +88,15 @@ describe('PluginEventsService', () => {
     } as never);
 
     const [payload] = handler.mock.calls[0];
-    expect(payload.user).toEqual({ id: 7, username: 'ada', locale: 'de', isDisabled: false });
+    expect(payload.user).toEqual({
+      id: 7,
+      username: 'ada',
+      firstName: ' Ada ',
+      lastName: 'Lovelace',
+      displayName: 'Ada Lovelace',
+      locale: 'de',
+      isDisabled: false,
+    });
     expect(Object.keys(payload.resource).sort()).toEqual(
       ['allowTakeOver', 'description', 'id', 'maxParallelSessions', 'name', 'supervisionMode', 'type'].sort(),
     );

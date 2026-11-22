@@ -50,4 +50,5 @@ export interface AuditEntryFilter {
 }
 
 /** Kinds of subjects whose current display name the audit listing can look up. */
-export type AuditSubjectNameKind = 'user' | 'resource' | 'resource-group' | 'project';
+/** `user` resolves to the display name, `username` to the plain username. */
+export type AuditSubjectNameKind = 'user' | 'username' | 'resource' | 'resource-group' | 'project';

@@ -20,6 +20,10 @@ import { UserNotFoundException } from '../../../exceptions/user.notFound.excepti
 
 import { SSOUsernameChangeForbiddenException } from '../errors/ssoUsernameChangeForbidden.exception';
 
+import { SSONameChangeForbiddenException } from '../errors/ssoNameChangeForbidden.exception';
+
+import { normalizeUserName } from '../accounts/normalize-name';
+
 import { UserAccounts } from '../accounts/user-accounts';
 import { normalizeEmail } from '../accounts/normalize-email';
 
@@ -71,6 +75,8 @@ export class UserDirectory {
     // An explicit null clears the column; undefined leaves it unchanged.
     const trimOrNull = (value: string | null | undefined) => (value === null ? null : value?.trim());
     const updates: UpdateUserData = {
+      firstName: updateData.firstName === undefined ? undefined : normalizeUserName(updateData.firstName),
+      lastName: updateData.lastName === undefined ? undefined : normalizeUserName(updateData.lastName),
       externalIdentifier: trimOrNull(updateData.externalIdentifier),
       emailVerificationToken: trimOrNull(updateData.emailVerificationToken),
       emailVerificationTokenExpiresAt:
@@ -149,6 +155,31 @@ export class UserDirectory {
       await this.emailService.sendUsernameChangedEmail(updated, oldUsername);
     } catch (e) {
       this.logger.error('Failed to send username changed email', (e as Error).stack);
+    }
+    return updated;
+  }
+
+  /** Sets or clears the first and last name. The identity provider manages the names of SSO users. */
+  async changeName(
+    targetUserId: number,
+    name: { firstName?: string | null; lastName?: string | null },
+  ): Promise<UserAccount> {
+    const targetUser = await this.accounts.findOne({ id: targetUserId });
+    if (!targetUser) {
+      throw new UserNotFoundException(targetUserId);
+    }
+    if (await this.accounts.isSSOUser(targetUserId)) {
+      throw new SSONameChangeForbiddenException();
+    }
+
+    await this.store.updateUser(targetUserId, {
+      firstName: normalizeUserName(name.firstName),
+      lastName: normalizeUserName(name.lastName),
+    });
+
+    const updated = await this.accounts.findOne({ id: targetUserId });
+    if (!updated) {
+      throw new UserNotFoundException(targetUserId);
     }
     return updated;
   }

@@ -14,6 +14,6 @@
   },
   "success": {
     "title": "Invitation sent",
-    "description": "{{username}} will receive an email."
+    "description": "{{name}} will receive an email."
   }
 }

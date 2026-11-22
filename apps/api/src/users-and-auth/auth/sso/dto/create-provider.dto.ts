@@ -12,7 +12,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { IsRolePathList, IsStoredStringList, IsStringArrayRecord } from './validators';
+import { IsNameClaimPath, IsRolePathList, IsStoredStringList, IsStringArrayRecord } from './validators';
 
 export class CreateOIDCConfigurationDto {
   @ApiProperty({
@@ -137,6 +137,28 @@ export class CreateOIDCConfigurationDto {
   emailClaimPaths?: string[] | null;
 
   @ApiProperty({
+    description: 'Claim path to read the first name from; defaults to given_name',
+    example: 'given_name',
+    required: false,
+    nullable: true,
+    type: String,
+  })
+  @IsOptional()
+  @IsNameClaimPath()
+  firstNameClaimPath?: string | null;
+
+  @ApiProperty({
+    description: 'Claim path to read the last name from; defaults to family_name',
+    example: 'family_name',
+    required: false,
+    nullable: true,
+    type: String,
+  })
+  @IsOptional()
+  @IsNameClaimPath()
+  lastNameClaimPath?: string | null;
+
+  @ApiProperty({
     description:
       'Ordered list of claim paths (lodash-style, e.g. `realm_access.roles`) to read roles/groups/permissions from. When unset, the defaults are read: permissions, roles, groups, realm_access.roles and resource_access.<clientId>.roles. When set, ONLY these paths are read.',
     required: false,
@@ -250,6 +272,28 @@ export class CreateSAMLConfigurationDto {
   @IsOptional()
   @IsStoredStringList()
   emailAttributeKeys?: string[] | null;
+
+  @ApiProperty({
+    description: 'Attribute key to read the first name from; defaults to givenName and the givenname claim URI',
+    example: 'givenName',
+    required: false,
+    nullable: true,
+    type: String,
+  })
+  @IsOptional()
+  @IsNameClaimPath()
+  firstNameClaimPath?: string | null;
+
+  @ApiProperty({
+    description: 'Attribute key to read the last name from; defaults to surname and the surname claim URI',
+    example: 'surname',
+    required: false,
+    nullable: true,
+    type: String,
+  })
+  @IsOptional()
+  @IsNameClaimPath()
+  lastNameClaimPath?: string | null;
 
   @ApiProperty({
     description: 'Shared secret used to authorize SAML provisioning requests',

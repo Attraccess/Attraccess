@@ -13,6 +13,7 @@ import en from './en.json';
 import de from './de.json';
 import { UserAccountPluginSlot } from '../plugins/PluginSettingsSlots';
 import { UsernameForm } from './username';
+import { NameForm } from './name';
 import { EmailForm } from './email';
 import { SetPasswordForm } from '../user-management/details/components/setPasswordForm';
 import { useAuth } from '../../hooks/useAuth';
@@ -66,10 +67,11 @@ export default function AccountPage() {
           title: t('topics.profile.title'),
           description: t('topics.profile.description'),
           icon: <UserIcon size={19} />,
-          searchTerms: [t('searchTerms.email'), t('searchTerms.username')],
+          searchTerms: [t('searchTerms.email'), t('searchTerms.username'), t('searchTerms.name')],
           content: (
             <div className="flex max-w-xl flex-col gap-6">
               <EmailForm />
+              <NameForm />
               <UsernameForm />
             </div>
           ),

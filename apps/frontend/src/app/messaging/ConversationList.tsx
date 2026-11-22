@@ -1,6 +1,7 @@
 // Inbox list of conversations showing the other participant and last message
 // FEATURE: Messaging inbox conversation list
 import { ConversationListItemDto } from '@attraccess/react-query-client';
+import { formatUserDisplayName } from '@attraccess/shared';
 import { Chip, Skeleton, cn } from '@heroui/react';
 import { EmptyState, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
@@ -36,7 +37,9 @@ export function ConversationList(props: Props) {
   return (
     <div className="flex flex-col">
       {conversations.map((conversation) => {
-        const username = conversation.otherParticipant?.username ?? t('conversations.unknownUser');
+        const username = conversation.otherParticipant
+          ? formatUserDisplayName(conversation.otherParticipant)
+          : t('conversations.unknownUser');
         const preview = conversation.lastMessage?.content ?? t('conversations.noMessages');
         const unreadCount = conversation.unreadCount ?? 0;
         const hasUnread = unreadCount > 0;
@@ -83,8 +86,9 @@ export function ConversationList(props: Props) {
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-2">
-                <p className="truncate font-medium">{username}</p>
+              {/* The date wraps below a long display name instead of squeezing the name down to "Ad...". */}
+              <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+                <p className="min-w-0 max-w-full truncate font-medium">{username}</p>
                 {conversation.lastMessage && (
                   <span className="shrink-0 text-tiny text-zinc-400">
                     {formatDateTime(conversation.lastMessage.createdAt)}

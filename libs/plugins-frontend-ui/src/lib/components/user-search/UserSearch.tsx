@@ -20,6 +20,7 @@ import { SearchIcon, UserPlusIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslations } from '../../i18n';
 import { StandardModal } from '../StandardModal';
+import { formatUserDisplayName } from '@attraccess/shared';
 import { AttraccessUser } from '../attraccess-user/AttraccessUser';
 
 import { PaginatedUsersResponseDto, useFindManyInfinite } from '@attraccess/react-query-client';
@@ -356,7 +357,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
                           <ListBoxItem
                             key={user.id}
                             id={String(user.id)}
-                            textValue={user.username}
+                            textValue={`${formatUserDisplayName(user)} ${user.username}`}
                             onAction={() => handleSelect(user)}
                             data-cy={`user-picker-item-${user.id}`}
                           >

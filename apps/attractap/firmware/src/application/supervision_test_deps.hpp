@@ -32,11 +32,13 @@ class API {
 public:
     static constexpr size_t MAX_INTRODUCERS = 8;
     static constexpr size_t MAX_USERNAME_LEN = 33;
+    static constexpr size_t MAX_DISPLAY_NAME_LEN = 80;
     struct SupervisionRequestResult {
         bool success = false;
         std::string error;
         uint8_t supervisorCount = 0;
         std::string supervisorNames[MAX_INTRODUCERS];
+        std::string supervisorDisplayNames[MAX_INTRODUCERS];
     };
     struct SupervisorCardAuthenticationResponse {
         std::string error;
@@ -49,6 +51,7 @@ public:
         uint32_t resourceId = 0;
         uint32_t timeoutMs = 0;
         std::string requesterUsername;
+        std::string requesterDisplayName;
     };
 
     uint32_t requests = 0;

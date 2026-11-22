@@ -7,6 +7,8 @@ import type { SsoSessionContext } from './sso-session-context';
 export interface AuthenticatedSessionUser {
   id: number;
   username: string;
+  firstName: string | null;
+  lastName: string | null;
   email: string;
   locale: string;
   dateTimeLocale: string | null;

@@ -118,6 +118,34 @@ describe('EmailTemplateService with plugin templates (real SQLite)', () => {
     await first;
   });
 
+  describe('previousBodies', () => {
+    const OLD_BODY = declared().body;
+    const NEW_BODY = OLD_BODY.replace('Booked', 'Reserved');
+    const upgrade = () =>
+      registerPluginEmailTemplates('demo', [declared({ body: NEW_BODY, previousBodies: [OLD_BODY] })]);
+
+    it('moves a stored body that still equals an earlier shipped one to the declared body', async () => {
+      await service.onApplicationBootstrap();
+
+      upgrade();
+      await service.findOne(KEY);
+
+      expect((await stored())?.body).toBe(NEW_BODY);
+      expect(await translations()).toEqual({ 'de:subject': 'Bestätigt: {resource}', 'de:body': 'Gebucht {when}' });
+    });
+
+    it('keeps a body an admin edited', async () => {
+      await service.onApplicationBootstrap();
+      const edited = '<mj-section><mj-column><mj-text>Mine</mj-text></mj-column></mj-section>';
+      await service.update(KEY, { body: edited }, ACTOR);
+
+      upgrade();
+      await service.findOne(KEY);
+
+      expect((await stored())?.body).toBe(edited);
+    });
+  });
+
   it('follows a changed variable list of the declaration', async () => {
     await service.onApplicationBootstrap();
     registerPluginEmailTemplates('demo', [declared({ variables: ['reservation.when', 'resource.name'] })]);

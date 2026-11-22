@@ -31,10 +31,11 @@ export interface EmailTemplateStore {
   ): Promise<void>;
   /**
    * Stores a plugin template and its shipped translations in one transaction when it is not stored yet; an existing
-   * template only gets its variable list updated. A concurrent seeding is a no-op instead of a conflict.
+   * template gets its variable list updated, and its body replaced when it still equals one of `previousBodies`.
+   * A concurrent seeding is a no-op instead of a conflict.
    */
   registerPluginTemplate(
-    template: { type: string } & EmailTemplateDefaults,
+    template: { type: string; previousBodies?: readonly string[] } & EmailTemplateDefaults,
     translations: EmailTemplateTranslationRecord[],
   ): Promise<void>;
   /** Translations of a template, of one locale when given. */

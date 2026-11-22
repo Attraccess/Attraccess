@@ -46,6 +46,15 @@ export class MassIntroductionParticipantDto {
   @ApiProperty({ example: 'alice' })
   username!: string;
 
+  @ApiProperty({ type: String, nullable: true, example: 'Alice' })
+  firstName!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, example: 'Smith' })
+  lastName!: string | null;
+
+  @ApiProperty({ example: 'Alice Smith', description: 'First and last name, or the username without a name' })
+  displayName!: string;
+
   @ApiProperty({ enum: MassIntroductionMethod, enumName: 'MassIntroductionMethod' })
   method!: MassIntroductionMethod;
 

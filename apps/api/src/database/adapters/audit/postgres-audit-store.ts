@@ -1,3 +1,4 @@
+import { formatUserDisplayName } from '@attraccess/shared';
 import { AuditLog, Project, Resource, ResourceGroup, User } from '@attraccess/database-entities';
 import type {
   AuditEntry,
@@ -40,6 +41,7 @@ const AUDIT_SAVEPOINT = 'attraccess_audit_record';
 
 const NAME_SOURCES = {
   user: { entity: User, field: 'username' },
+  username: { entity: User, field: 'username' },
   resource: { entity: Resource, field: 'name' },
   'resource-group': { entity: ResourceGroup, field: 'name' },
   project: { entity: Project, field: 'name' },
@@ -314,14 +316,28 @@ export class PostgresAuditStore implements AuditStore {
     const { entity, field } = NAME_SOURCES[kind];
     if (!ids.length || !this.source.hasMetadata(entity)) return new Map();
     // At most one bounded query per entity kind, selecting no credentials, relations, or configuration.
-    const rows = await this.source
+    const builder = this.source
       .createQueryBuilder()
       .select('subject.id', 'id')
       .addSelect(`subject.${field}`, 'label')
       .from(entity, 'subject')
-      .where('subject.id IN (:...ids)', { ids })
-      .getRawMany<{ id: number; label: string }>();
-    return new Map(rows.map((row) => [row.id, row.label]));
+      .where('subject.id IN (:...ids)', { ids });
+    // A user is labelled by its display name, which needs the optional names next to the username.
+    if (kind === 'user') builder.addSelect('subject.firstName', 'firstName').addSelect('subject.lastName', 'lastName');
+    const rows = await builder.getRawMany<{
+      id: number;
+      label: string;
+      firstName?: string | null;
+      lastName?: string | null;
+    }>();
+    return new Map(
+      rows.map((row) => [
+        row.id,
+        kind === 'user'
+          ? formatUserDisplayName({ firstName: row.firstName, lastName: row.lastName, username: row.label })
+          : row.label,
+      ]),
+    );
   }
 
   /** Serializes every write on the audit storage connection, including cleanup transactions. */

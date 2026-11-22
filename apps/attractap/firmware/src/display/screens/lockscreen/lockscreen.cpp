@@ -10,6 +10,7 @@
 #include "../../ui/ui_builder.hpp"
 #include "../../ui/ui_slots.hpp"
 #include "../../../platform.hpp"
+#include "../../../text/utf8_copy.hpp"
 #include <string>
 
 #include <cstring>
@@ -228,8 +229,7 @@ void Lockscreen::storeUsage(bool hasActiveUsage, const char *username, bool isUn
 {
     if (hasActiveUsage)
     {
-        strlcpy(this->username, username, API::MAX_USERNAME_LEN);
-        this->username[API::MAX_USERNAME_LEN - 1] = '\0';
+        copyUtf8(this->username, username, sizeof(this->username));
     }
     this->hasActiveUsage = hasActiveUsage;
     this->isUnderMaintenance = isUnderMaintenance;
@@ -251,7 +251,9 @@ void Lockscreen::setUsageInfo(const API::ResourceBrief &resource)
 {
     if (resource.id != this->resourceId) this->pluginStamp = 0;
     this->resourceId = resource.id;
-    this->storeUsage(resource.hasActiveUsage, resource.activeUser, resource.isUnderMaintenance, resource.isHealthy);
+    this->storeUsage(resource.hasActiveUsage,
+                    resource.activeUserDisplayName[0] != '\0' ? resource.activeUserDisplayName : resource.activeUser,
+                    resource.isUnderMaintenance, resource.isHealthy);
     this->multiSession = resource.isMultiSession();
     if (this->multiSession)
     {

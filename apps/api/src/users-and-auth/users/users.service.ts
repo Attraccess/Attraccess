@@ -27,6 +27,7 @@ import { UNIT_OF_WORK, type TransactionScope, type UnitOfWork } from '../../data
 import { UserDirectory } from './directory/user-directory';
 
 import { UserAccounts } from './accounts/user-accounts';
+import { normalizeUserName } from './accounts/normalize-name';
 import { normalizeEmail } from './accounts/normalize-email';
 
 import {
@@ -148,6 +149,13 @@ export class UsersService {
     return this.directory.changeUsername(targetUserId, newUsername, executingUser);
   }
 
+  async changeName(
+    targetUserId: number,
+    name: { firstName?: string | null; lastName?: string | null },
+  ): Promise<UserAccount> {
+    return this.directory.changeName(targetUserId, name);
+  }
+
   async changeEmail(targetUserId: number, newEmail: string, executingUser: { id: number }): Promise<UserAccount> {
     return this.directory.changeEmail(targetUserId, newEmail, executingUser);
   }
@@ -224,7 +232,14 @@ export class UsersService {
   }
 
   async createMany(
-    users: Array<{ username: string; email: string; locale?: string; roleKey?: string }>,
+    users: Array<{
+      username: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      email: string;
+      locale?: string;
+      roleKey?: string;
+    }>,
     options?: { grantAllPermissionsToFirst?: boolean; context?: TransactionContext; actor?: AuthenticatedUser },
   ): Promise<UserRecord[]> {
     if (users.length === 0) {
@@ -233,6 +248,8 @@ export class UsersService {
 
     const normalized = users.map((userData) => ({
       username: this.accounts.cleanupUsername(userData.username),
+      firstName: normalizeUserName(userData.firstName),
+      lastName: normalizeUserName(userData.lastName),
       email: normalizeEmail(userData.email),
       locale: userData.locale,
       roleKey: userData.roleKey,
@@ -251,6 +268,8 @@ export class UsersService {
 
         return {
           username: data.username,
+          firstName: data.firstName,
+          lastName: data.lastName,
           email: data.email,
           externalIdentifier: null,
           isEmailVerified: false,

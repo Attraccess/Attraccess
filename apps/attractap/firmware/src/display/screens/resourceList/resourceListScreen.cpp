@@ -43,7 +43,7 @@ void ResourceListScreen::init() {
     loginContainer = sessionHeader.create(screen, [this] {
         if (!busy && logoutCallback) logoutCallback();
     });
-    sessionHeader.setUser(username);
+    sessionHeader.setUser(displayName.empty() ? username : displayName);
     resourceContainer = lv_obj_create(screen);
     lv_obj_remove_style_all(resourceContainer);
     lv_obj_set_size(resourceContainer, lv_pct(100), 0);
@@ -70,10 +70,11 @@ void ResourceListScreen::setResourceList(const API::ResourceList &resources) {
     renderRows();
 }
 
-void ResourceListScreen::setAuthenticatedUser(const std::string &value) {
-    if (username == value) return;
+void ResourceListScreen::setAuthenticatedUser(const std::string &value, const std::string &shownName) {
+    if (username == value && displayName == shownName) return;
     username = value;
-    sessionHeader.setUser(username);
+    displayName = shownName;
+    sessionHeader.setUser(displayName.empty() ? username : displayName);
     renderRows();
     loop();
 }

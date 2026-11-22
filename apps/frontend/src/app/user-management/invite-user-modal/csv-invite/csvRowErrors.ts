@@ -8,6 +8,7 @@ export type CsvRowError = {
 export const CSV_ROW_ERROR_REASON_KEYS: Record<string, string> = {
   DUPLICATE_IN_DB: 'DUPLICATE_IN_DB',
   DUPLICATE_IN_CSV: 'DUPLICATE_IN_CSV',
+  TOO_LONG: 'TOO_LONG',
   REQUIRED: 'REQUIRED',
   INVALID: 'INVALID',
   'Row is empty': 'ROW_IS_EMPTY',
@@ -30,5 +31,8 @@ export function getCsvRowErrorReasonKey(error: CsvRowError): string | undefined 
 /** Translation key for a row error field, or undefined to show the field (a CSV column name) unchanged. */
 export function getCsvRowErrorFieldKey(error: CsvRowError): string | undefined {
   if (isMissingColumnError(error)) return undefined;
-  return error.field === 'email' || error.field === 'username' ? `inputs.fieldMapping.${error.field}` : undefined;
+  if (error.field === 'email' || error.field === 'username') return `inputs.fieldMapping.${error.field}`;
+  // A name is reported under the stored field, not under the CSV column it was read from.
+  if (error.field === 'firstName' || error.field === 'lastName') return `errors.fields.${error.field}`;
+  return undefined;
 }

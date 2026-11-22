@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react';
+import { formatUserDisplayName } from '@attraccess/shared';
 import { HistoryIcon, ShieldCheckIcon, ShieldOffIcon, UserMinusIcon } from 'lucide-react';
 import { ResourceIntroducerType, User } from '@attraccess/react-query-client';
 import { TableRowAction, TableRowActions, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -44,7 +45,7 @@ export function PeopleRowActions(props: Readonly<PeopleRowActionsProps>) {
   const setComment = useCallback((comment: string) => {
     commentRef.current = comment;
   }, []);
-  const name = row.user.username;
+  const name = formatUserDisplayName(row.user);
   const isIntroductionPending = pendingIntroductionUserId === row.user.id;
   const revokeIntroductionLabel = t(
     target.type === 'resource' ? 'rowActions.revokeDirectIntroduction' : 'rowActions.revokeIntroduction',

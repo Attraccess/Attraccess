@@ -10,6 +10,7 @@ export class AuditEntryDto {
   @ApiProperty() operationId!: string;
   @ApiProperty({ type: Number, nullable: true }) actorId!: number | null;
   @ApiPropertyOptional({ type: String, nullable: true }) actorUsername?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) actorDisplayName?: string | null;
   @ApiPropertyOptional({ enum: ['recorded', 'current'] }) actorUsernameSource?: 'recorded' | 'current';
   @ApiProperty({ type: String, nullable: true }) authenticationMethod!: string | null;
   @ApiProperty({ type: Number, nullable: true }) apiTokenId!: number | null;

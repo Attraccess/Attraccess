@@ -13,6 +13,12 @@
         "format": "Only letters, numbers, underscores, hyphens, and dots are allowed."
       }
     },
+    "firstName": {
+      "label": "First name (optional)"
+    },
+    "lastName": {
+      "label": "Last name (optional)"
+    },
     "email": {
       "label": "Email"
     }

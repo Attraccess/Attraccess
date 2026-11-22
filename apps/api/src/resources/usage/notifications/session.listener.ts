@@ -1,3 +1,4 @@
+import { optionalUserDisplayName } from '@attraccess/shared';
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ResourceUsageSessionEndedEvent, ResourceUsageSessionTakenOverEvent } from '../events/resource-usage.events';
@@ -15,14 +16,14 @@ export class ResourceSessionNotificationListener {
 
   @OnEvent(ResourceUsageSessionTakenOverEvent.EVENT_NAME)
   async handleTakenOver(event: ResourceUsageSessionTakenOverEvent): Promise<void> {
-    const newUserUsername = event.newUser.username;
+    const newUserName = optionalUserDisplayName(event.newUser);
     await this.notifications.dispatch({
       category: NotificationCategory.RESOURCE_TAKEOVER,
       recipients: [event.previousUser],
       actorId: event.newUser.id,
       title: (recipient) => t(recipient.locale, 'takeoverTitle', { resourceName: event.resource.name }),
       body: (recipient) => {
-        const userName = newUserUsername ?? t(recipient.locale, 'fallbackUser');
+        const userName = newUserName ?? t(recipient.locale, 'fallbackUser');
         return t(recipient.locale, 'takeoverBody', { userName });
       },
       url: `/resources/${event.resource.id}`,
@@ -30,7 +31,7 @@ export class ResourceSessionNotificationListener {
       sendEmail: (recipient, language) =>
         this.notifications.sendEmailTemplate(recipient, NotificationCategory.RESOURCE_TAKEOVER, {
           resource: { id: event.resource.id, name: event.resource.name },
-          takeover: { actorName: newUserUsername ?? t(language, 'fallbackUser') },
+          takeover: { actorName: newUserName ?? t(language, 'fallbackUser') },
         }),
     });
   }
@@ -48,7 +49,7 @@ export class ResourceSessionNotificationListener {
       return;
     }
 
-    const endedByUsername = event.endedBy?.username;
+    const endedByName = optionalUserDisplayName(event.endedBy);
 
     await this.notifications.dispatch({
       category: NotificationCategory.RESOURCE_SESSION_ENDED,
@@ -56,7 +57,7 @@ export class ResourceSessionNotificationListener {
       actorId: event.endedBy?.id,
       title: (r) => t(r.locale, 'sessionEndedTitle', { resourceName: resource.name }),
       body: (r) => {
-        const endedBy = endedByUsername ?? t(r.locale, 'fallbackSystem');
+        const endedBy = endedByName ?? t(r.locale, 'fallbackSystem');
         return t(r.locale, 'sessionEndedBody', { endedBy });
       },
       url: `/resources/${resource.id}`,
@@ -68,7 +69,7 @@ export class ResourceSessionNotificationListener {
           session: {
             id: event.usage.id,
             endedAt: event.usage.endTime,
-            endedBy: endedByUsername ?? t(language, 'fallbackSystem'),
+            endedBy: endedByName ?? t(language, 'fallbackSystem'),
           },
         }),
     });

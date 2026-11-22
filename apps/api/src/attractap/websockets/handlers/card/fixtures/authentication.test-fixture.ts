@@ -9,6 +9,8 @@ export function createHandleCardAuthenticationRequestFixture(parentScope: Attrac
     user: {
       id: 5,
       username: 'carduser',
+      firstName: 'Grace',
+      lastName: 'Hopper',
     },
   };
 

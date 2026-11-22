@@ -8,6 +8,7 @@ import { PASSKEY_STORE, type PasskeyStore } from './passkey.port';
 import { PasskeyService } from './passkey.service';
 import { SettingsService } from '../../../settings/settings.service';
 import { UserEmailNotVerifiedException } from '../errors/userEmailNotVerified.exception';
+import { generateRegistrationOptions } from '@simplewebauthn/server';
 
 const verifyAuthenticationResponse = jest.fn();
 jest.mock('@simplewebauthn/server', () => ({
@@ -107,6 +108,19 @@ describe('PasskeyService', () => {
       getUrl.mockResolvedValue(null);
 
       await expect(service.resolveRelyingParty(undefined)).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('createRegistrationOptions', () => {
+    it.each([
+      ['the display name for a named user', { firstName: 'Ada', lastName: 'Lovelace' }, 'Ada Lovelace'],
+      ['the username for a user without a name', { firstName: null, lastName: null }, 'ada'],
+    ])('passes %s as the WebAuthn userDisplayName', async (_name, names, expected) => {
+      await service.createRegistrationOptions({ id: 42, username: 'ada', ...names });
+
+      expect(generateRegistrationOptions).toHaveBeenLastCalledWith(
+        expect.objectContaining({ userName: 'ada', userDisplayName: expected }),
+      );
     });
   });
 

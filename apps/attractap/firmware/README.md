@@ -96,13 +96,13 @@ arms any reader that reports `capabilities.cardEnrollment`. Firmware older than
 1.7.0 acknowledges and ignores these events, so readers must be updated before
 they can take part in mass introductions.
 
-| Direction       | Event                      | Payload                                                                                     |
-| --------------- | -------------------------- | ------------------------------------------------------------------------------------------- |
-| Server → reader | `MASS_INTRODUCTION_START`  | `sessionId`, `targetName`, `introducerUsername`, `remainingMs`                              |
-| Reader → server | `CARD_DETECTED`            | `purpose: "mass-introduction"`, `sessionId`, `uid`, `detectionId` (card relay, below)       |
-| Server → reader | `MASS_INTRODUCTION_RESULT` | `sessionId`, `success` plus `username`, `alreadyIntroduced`, `participantCount`, or `error` |
-| Reader → server | `MASS_INTRODUCTION_CANCEL` | `sessionId`                                                                                 |
-| Server → reader | `MASS_INTRODUCTION_END`    | `sessionId`, `reason` (`expired`, `cancelled`, `revoked`)                                   |
+| Direction       | Event                      | Payload                                                                                                    |
+| --------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Server → reader | `MASS_INTRODUCTION_START`  | `sessionId`, `targetName`, `introducerUsername`, `introducerDisplayName`, `remainingMs`                    |
+| Reader → server | `CARD_DETECTED`            | `purpose: "mass-introduction"`, `sessionId`, `uid`, `detectionId` (card relay, below)                      |
+| Server → reader | `MASS_INTRODUCTION_RESULT` | `sessionId`, `success` plus `username`, `displayName`, `alreadyIntroduced`, `participantCount`, or `error` |
+| Reader → server | `MASS_INTRODUCTION_CANCEL` | `sessionId`                                                                                                |
+| Server → reader | `MASS_INTRODUCTION_END`    | `sessionId`, `reason` (`expired`, `cancelled`, `revoked`)                                                  |
 
 Since 2.0.0 the server checks each tapped card through the card relay (like a
 supervisor card) before it introduces the user; the reader never sees a card key.
@@ -311,16 +311,16 @@ certificate starts pairing; a paired reader only uses the session. The server no
 readers that signed in with a token or that paired with an older server: after the upgrade every
 reader pairs again, from the pairing screen, like a new reader.
 
-| Protocol                       | Subprotocol            | Behaviour                                                                                                                                                                                                                                                                    |
-| ------------------------------ | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `attractap-pairing.v1`         | `attractap-pairing.v1` | Plain-text JSON frames of at most 4 KiB: `hello`, `round`, `nonce`, `reveal`, `accepted`, `failed`, `cancel`. Used only while pairing.                                                                                                                                       |
-| `attractap-session.v1`         | `attractap-session.v1` | TLS 1.3 only, mutual authentication, AEAD (AES-128-GCM preferred), no resumption, 0-RTT or renegotiation. Binary WebSocket frames with inner length-prefixed framing, 64 KiB messages. The server is identified by the installation ID in the certificate, not by host name. |
+| Protocol               | Subprotocol            | Behaviour                                                                                                                                                                                                                                                                    |
+| ---------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `attractap-pairing.v1` | `attractap-pairing.v1` | Plain-text JSON frames of at most 4 KiB: `hello`, `round`, `nonce`, `reveal`, `accepted`, `failed`, `cancel`. Used only while pairing.                                                                                                                                       |
+| `attractap-session.v1` | `attractap-session.v1` | TLS 1.3 only, mutual authentication, AEAD (AES-128-GCM preferred), no resumption, 0-RTT or renegotiation. Binary WebSocket frames with inner length-prefixed framing, 64 KiB messages. The server is identified by the installation ID in the certificate, not by host name. |
 
-| Reader firmware                       | Server (2.6.0 generation)                                       |
-| ------------------------------------- | --------------------------------------------------------------- |
-| 2.6.0 and newer, no credentials       | Pairing, then the TLS session.                                  |
-| 2.6.0 and newer, paired               | TLS session. Never falls back to another channel.               |
-| Older than 2.6.0, token registered    | Cannot connect. It cannot update over the air either (the update runs over the authenticated connection): flash 2.6.0 over USB (web flasher), then pair it. |
+| Reader firmware                            | Server (2.6.0 generation)                                                                                                                                                           |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2.6.0 and newer, no credentials            | Pairing, then the TLS session.                                                                                                                                                      |
+| 2.6.0 and newer, paired                    | TLS session. Never falls back to another channel.                                                                                                                                   |
+| Older than 2.6.0, token registered         | Cannot connect. It cannot update over the air either (the update runs over the authenticated connection): flash 2.6.0 over USB (web flasher), then pair it.                         |
 | 1.8.0 to 2.5.x, paired with the old server | The server no longer knows its certificate and ends the session (`session.rejected`); the reader shows "Pairing removed" and pairs again. It keeps updating over the air as before. |
 
 A reader moved to another server pairs there with its existing key; clear it on the old server
@@ -436,14 +436,14 @@ python3 tools/check_secure_profile.py build/attractap-touch-v2-secure
 
 ### eFuse key block layout (fixed)
 
-| Block | Content |
-| ----- | ------- |
-| KEY0 | Secure Boot digest: per-installation signing key |
-| KEY1 | Secure Boot digest: recovery key |
-| KEY2 | Flash encryption key (XTS-AES-128) |
-| KEY3 | Spare (no Digital Signature key: the reader identity is a P-256 key) |
-| KEY4 | NVS encryption (HMAC key, read-protected) |
-| KEY5 | Spare |
+| Block | Content                                                              |
+| ----- | -------------------------------------------------------------------- |
+| KEY0  | Secure Boot digest: per-installation signing key                     |
+| KEY1  | Secure Boot digest: recovery key                                     |
+| KEY2  | Flash encryption key (XTS-AES-128)                                   |
+| KEY3  | Spare (no Digital Signature key: the reader identity is a P-256 key) |
+| KEY4  | NVS encryption (HMAC key, read-protected)                            |
+| KEY5  | Spare                                                                |
 
 ### eFuse read protection (RD_DIS)
 
@@ -463,7 +463,7 @@ no report. `READER_FIRMWARE_INFO` adds the build's claims `profile` (`plain`, `s
 `secure-lab`), `release` and, on secure builds, `secureVersion`. The server treats all of it as a
 claim; only a release secure build whose report passes and whose session uses the paired
 certificate counts as secured. The lab reader (`secure-lab`, development-mode flash encryption)
-is expected to report *not secured*. `tests/efuse-report` checks the message format on the host.
+is expected to report _not secured_. `tests/efuse-report` checks the message format on the host.
 
 Lab secure readers use public keys and development-mode flash encryption; see
 `lab/secure-boot/README.md`.
@@ -568,7 +568,9 @@ asset shared by those screens, embedded once with four-byte alignment through
 ## Host Tests
 
 From the repository root, run `pnpm nx run attractap-firmware:test`. It runs
-SupervisionFlow logic tests and the [real LVGL host-rendering harness](tests/display-theme/README.md).
+SupervisionFlow logic tests, the UTF-8-safe text copy used for server-supplied names (`tests/text`:
+display names are cut to 79 bytes in whole characters) and the
+[real LVGL host-rendering harness](tests/display-theme/README.md).
 The latter checks theme states, both logo assets, selected production screens
 and deterministic 480 x 480 rendering. The dedicated firmware CI runs both.
 

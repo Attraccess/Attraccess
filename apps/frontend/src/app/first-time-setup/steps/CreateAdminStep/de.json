@@ -8,6 +8,8 @@
     "format": "Nur Buchstaben, Zahlen, Unterstriche, Bindestriche und Punkte sind erlaubt."
   },
   "email": "E-Mail-Adresse",
+  "firstName": "Vorname (optional)",
+  "lastName": "Nachname (optional)",
   "password": "Passwort",
   "passwordConfirmation": "Passwort bestätigen",
   "actions": {

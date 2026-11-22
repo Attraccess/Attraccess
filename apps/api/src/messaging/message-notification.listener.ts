@@ -39,7 +39,7 @@ export class MessageNotificationListener {
         return;
       }
 
-      const senderName = (await this.store.findUsername(message.senderId)) ?? 'Someone';
+      const senderName = (await this.store.findDisplayName(message.senderId)) ?? 'Someone';
 
       await this.dispatchToast(recipients, message, senderName);
 

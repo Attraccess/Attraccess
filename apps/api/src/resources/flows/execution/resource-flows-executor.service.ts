@@ -1,3 +1,4 @@
+import { optionalUserDisplayName } from '@attraccess/shared';
 import { Inject, Injectable, OnModuleInit, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 
 import {
@@ -297,6 +298,9 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
         user: {
           id: usage.user.id,
           username: usage.user.username,
+          firstName: usage.user.firstName ?? null,
+          lastName: usage.user.lastName ?? null,
+          displayName: optionalUserDisplayName(usage.user) ?? '',
           externalIdentifier: usage.user.externalIdentifier,
         },
         resource: {

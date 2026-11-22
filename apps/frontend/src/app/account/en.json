@@ -10,7 +10,7 @@
     "advanced": "Advanced"
   },
   "topics": {
-    "profile": { "title": "Personal details", "description": "Email address and username" },
+    "profile": { "title": "Personal details", "description": "Name, email address and username" },
     "password": { "title": "Password", "description": "Change your sign-in password" },
     "twoFactor": { "title": "Two-factor authentication", "description": "Add an authenticator app" },
     "passkeys": { "title": "Passkeys", "description": "Manage passwordless sign-in" },
@@ -26,6 +26,7 @@
   "searchTerms": {
     "email": "email",
     "username": "username",
+    "name": "name",
     "authenticator": "authenticator 2FA",
     "push": "push",
     "mcp": "MCP AI assistant"

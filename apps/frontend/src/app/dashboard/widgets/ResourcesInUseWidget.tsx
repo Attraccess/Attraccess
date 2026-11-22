@@ -1,4 +1,5 @@
 import { Link } from '@heroui/react';
+import { formatUserDisplayName } from '@attraccess/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import type { DashboardWidgetRenderProps } from '@attraccess/plugins-frontend-sdk';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -39,7 +40,7 @@ function InUseRow({ resource }: Readonly<{ resource: Resource }>) {
     },
   });
   const usage = activeSession?.usages?.[0] ?? activeSession?.usage;
-  const userName = usage?.user?.username;
+  const userName = usage?.user ? formatUserDisplayName(usage.user) : undefined;
 
   return (
     <li className="flex min-w-0 items-center justify-between gap-2" data-cy="dashboard-in-use-row">

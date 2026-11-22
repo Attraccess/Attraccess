@@ -57,8 +57,8 @@ private:
         uint32_t participantCount;
         uint32_t receivedAtMs;
         char sessionId[SESSION_ID_LEN];
-        char name[NAME_LEN];                       // target name (start) or participant username
-        char introducer[API::MAX_USERNAME_LEN];
+        char name[NAME_LEN];                       // target name (start) or participant display name
+        char introducer[API::MAX_DISPLAY_NAME_LEN];  // display name
         char code[CODE_LEN];                       // error code, or end reason
     };
 
@@ -79,7 +79,7 @@ private:
     bool pendingStart = false;
     char pendingSessionId[SESSION_ID_LEN] = {0};
     char pendingTargetName[NAME_LEN] = {0};
-    char pendingIntroducer[API::MAX_USERNAME_LEN] = {0};
+    char pendingIntroducer[API::MAX_DISPLAY_NAME_LEN] = {0};
     uint32_t pendingReceivedAtMs = 0;
     uint32_t pendingRemainingMs = 0;
 
@@ -87,7 +87,7 @@ private:
     bool leftFlow = false;
     char sessionId[SESSION_ID_LEN] = {0};
     char targetName[NAME_LEN] = {0};
-    char introducerName[API::MAX_USERNAME_LEN] = {0};
+    char introducerName[API::MAX_DISPLAY_NAME_LEN] = {0};
     char participantName[NAME_LEN] = {0};
     uint32_t deadlineMs = 0;
     uint32_t durationMs = 0;

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatUserDisplayName } from '@attraccess/shared';
 import { useNavigate } from 'react-router-dom';
 import { Button, Chip, Link } from '@heroui/react';
 import { UserPlusIcon } from 'lucide-react';
@@ -54,7 +55,7 @@ function Results({ term, limit }: Readonly<{ term: string; limit: number }>) {
             className="block min-w-0 truncate text-sm leading-tight"
             data-cy="dashboard-users-result"
           >
-            {user.username}
+            {formatUserDisplayName(user)}
           </Link>
         </li>
       ))}

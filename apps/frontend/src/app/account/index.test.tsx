@@ -45,6 +45,7 @@ vi.mock('@attraccess/react-query-client', () => ({
 }));
 vi.mock('./email', () => ({ EmailForm: () => <div>Email form</div> }));
 vi.mock('./username', () => ({ UsernameForm: () => <div>Username form</div> }));
+vi.mock('./name', () => ({ NameForm: () => <div>Name form</div> }));
 vi.mock('./notifications', () => ({ NotificationPreferencesForm: () => <div>Notification form</div> }));
 vi.mock('./two-factor', () => ({ TwoFactorCard: () => <div>Two-factor settings</div> }));
 vi.mock('./passkeys', () => ({ PasskeysCard: () => <div>Passkey settings</div> }));

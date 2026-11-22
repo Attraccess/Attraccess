@@ -19,19 +19,10 @@ import { useNavigate } from 'react-router-dom';
 import { PaginatedUsersResponseDto, SsoProvider, useListRoles, User, UserRole } from '@attraccess/react-query-client';
 import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
 import { useSsoProviders } from '../useSsoProviders';
+import { getSsoAuthenticationDetails } from '../../../components/userNameForm/getSsoAuthenticationDetails';
 import en from '../en.json';
 import de from '../de.json';
 
-export type AuthenticationDetailSummary = {
-  providerId?: number | null;
-  providerType?: string | null;
-  ssoSubject?: string | null;
-  type?: string | null;
-};
-
-export type UserWithAuthDetails = Omit<User, 'authenticationDetails'> & {
-  authenticationDetails?: AuthenticationDetailSummary[];
-};
 // Role keys that are considered "default" and not worth showing in the list
 export const DEFAULT_ROLE_KEYS = new Set(['user']);
 
@@ -61,7 +52,7 @@ export function UserTable({ searchResult, roleIds, assignRoleId }: UserTableProp
               {t('table.columns.isEmailVerified')}
             </TableColumn>
             <TableColumn width="0">{t('table.columns.id')}</TableColumn>
-            <TableColumn isRowHeader>{t('table.columns.username')}</TableColumn>
+            <TableColumn isRowHeader>{t('table.columns.name')}</TableColumn>
             <TableColumn className="hidden md:table-cell">{t('table.columns.externalIdentifier')}</TableColumn>
             <TableColumn className="hidden lg:table-cell">{t('table.columns.roles')}</TableColumn>
             <TableColumn width="0" className="text-center">
@@ -84,10 +75,7 @@ export function UserTable({ searchResult, roleIds, assignRoleId }: UserTableProp
             }
           >
             {(user) => {
-              const ssoDetails =
-                (user as UserWithAuthDetails).authenticationDetails?.filter(
-                  (detail) => detail.ssoSubject || detail.providerId || detail.providerType,
-                ) ?? [];
+              const ssoDetails = getSsoAuthenticationDetails(user);
               const ssoProviderNames = ssoDetails
                 .map((detail) => {
                   if (detail.providerId) {

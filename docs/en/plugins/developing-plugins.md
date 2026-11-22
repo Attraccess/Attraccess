@@ -235,8 +235,8 @@ class HelloWorldService implements OnModuleInit {
   async greetUsers(): Promise<string[]> {
     // Host data is read through context.hostData as neutral values, never as
     // entities. The users group is gated behind READ_USERS.
-    const names = await this.context.hostData.users.getUsernames([1, 2, 3, 4, 5]);
-    return [...names.values()].map((username) => `Hello, ${username}!`);
+    const names = await this.context.hostData.users.getDisplayNames([1, 2, 3, 4, 5]);
+    return [...names.values()].map((name) => `Hello, ${name}!`);
   }
 }
 
@@ -625,7 +625,7 @@ const plugin: PluginBackendModule = {
       variables: ['booking.id', 'booking.start'], // offered in the editor ("Variables")
       subject: '{{t "subject" "Reminder: booking {id}" id=booking.id}}',
       body: `<mj-section><mj-column>
-  <mj-text>{{t "greeting" "Hello {name}," name=user.username}}</mj-text>
+  <mj-text>{{t "greeting" "Hello {name}," name=user.displayName}}</mj-text>
   <mj-text>{{t "body" "Your booking starts at {start}." start=booking.start}}</mj-text>
   <mj-button href="{{host.frontend}}/reservations/{{booking.id}}">{{t "open" "Open booking"}}</mj-button>
 </mj-column></mj-section>`,
@@ -665,7 +665,9 @@ await context.notifications.dispatch({
   it, together with the shipped translations. From then on the stored template belongs to the admins: subject, body
   and translations are **never overwritten**, so their edits (including deleted translations) survive restarts and
   plugin upgrades, and new defaults a plugin update ships do not replace the stored ones. Only the variable list
-  follows the declaration. **Reset to default** in the editor restores the currently declared version with its shipped
+  follows the declaration. One exception: list the bodies earlier plugin versions shipped in `previousBodies`, and the
+  host replaces a stored body that still equals one of them exactly with the new `body`; a body an admin edited stays.
+  **Reset to default** in the editor restores the currently declared version with its shipped
   translations. Templates of a plugin that is disabled or uninstalled stay stored but are neither listed nor sendable.
 - **Admin UI.** Plugin templates appear in the same template list as core templates, after them, grouped by plugin
   and marked with the plugin's name; the editor, the translations dialog and the reset action work the same way.
@@ -742,14 +744,14 @@ query handles. Each group checks its own permission when a method is called.
 | Group                | Permission         | Methods                                                                                                                                                                                                                                                                                                 |
 | -------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `hostData.resources` | `ACCESS_RESOURCES` | `get(id, scope?)` (a `PluginResourceModel` or `null`; with a transaction scope it reads inside that transaction), `getNames(ids)`, `filterVisible(userId, ids, { seeAll? })`, `filterRequiringSupervision(ids)`, `listIdsInGroups(groupIds)`, `countUnhealthyEntries(id)`, `listIntroducerUserIds(id)`. |
-| `hostData.users`     | `READ_USERS`       | `getUsernames(ids)`, `getLocales(ids)`, `isActive(id)` (exists, not deleted, not disabled), `listIdsWithAnyPermission(keys)`.                                                                                                                                                                           |
+| `hostData.users`     | `READ_USERS`       | `getUsernames(ids)` (kept for compatibility), `getDisplayNames(ids)` (a map of user id to display name: "First Last", or the username), `getLocales(ids)`, `isActive(id)` (exists, not deleted, not disabled), `listIdsWithAnyPermission(keys)`.                                                                                                                                                                           |
 | `hostData.settings`  | `READ_SETTINGS`    | `getApp(key)`: the trimmed value of an application setting, or `null`.                                                                                                                                                                                                                                  |
 | `hostData.flows`     | `TRIGGER_FLOWS`    | `findNodes(query)`: flow nodes by `type`, `typePrefix`, `dataEquals`, `dataIn`, `resourceId`, `excludeResourceId`, `excludeFlowId`, `orderById` and `limit`, as `{ id, type, resourceId, resourceName, flowId, flowName, data }`.                                                                       |
 
-`PluginUserModel` (`id`, `username`, `locale`, `isDisabled`) and `PluginResourceModel` (`id`, `name`, `type`,
+`PluginUserModel` (`id`, `username`, `firstName`, `lastName`, `displayName`, `locale`, `isDisabled`; `displayName` is the computed "First Last" or the username, show it to people) and `PluginResourceModel` (`id`, `name`, `type`,
 `description`, `allowTakeOver`, `maxParallelSessions`, `supervisionMode`) come from `@attraccess/application-models` and
 are re-exported by the SDK root. They are also the payload of the `RESOURCE_USAGE_STARTED` and `RESOURCE_USAGE_ENDED`
-events and the user of `AuthenticatedRequest`: tokens, contact data and other account fields never reach plugin code.
+events and the user of `AuthenticatedRequest` (`AuthenticatedUser`, with the same name fields): tokens, contact data and other account fields never reach plugin code.
 
 ### Transactions
 

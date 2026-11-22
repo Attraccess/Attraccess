@@ -18,6 +18,8 @@ export function toActorUser(user: User | null | undefined): ResourceActorUser | 
   return {
     id: user.id,
     username: user.username,
+    firstName: user.firstName,
+    lastName: user.lastName,
     locale: user.locale,
     dateTimeLocale: user.dateTimeLocale,
     isEmailVerified: user.isEmailVerified,
@@ -33,7 +35,14 @@ export function toActorUser(user: User | null | undefined): ResourceActorUser | 
 }
 
 export function toNotificationRecipient(user: User): ResourceNotificationRecipient {
-  return { id: user.id, username: user.username, email: user.email, locale: user.locale };
+  return {
+    id: user.id,
+    username: user.username,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    locale: user.locale,
+  };
 }
 
 export function toMaintenanceRecord(entity: ResourceMaintenance): ResourceMaintenanceRecord {

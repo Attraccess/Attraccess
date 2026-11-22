@@ -102,6 +102,8 @@ type CardOwnerSource = Pick<
   User,
   | 'id'
   | 'username'
+  | 'firstName'
+  | 'lastName'
   | 'email'
   | 'locale'
   | 'dateTimeLocale'
@@ -116,6 +118,8 @@ export function toCardOwner(user: CardOwnerSource): AttractapCardOwner {
   return {
     id: user.id,
     username: user.username,
+    firstName: user.firstName,
+    lastName: user.lastName,
     email: user.email,
     locale: user.locale,
     dateTimeLocale: user.dateTimeLocale,

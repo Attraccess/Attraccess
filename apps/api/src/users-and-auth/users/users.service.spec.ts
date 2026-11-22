@@ -9,6 +9,7 @@ import { aUserRecord } from './fakes/in-memory-user-store.test-fixture';
 import { ForbiddenException, BadRequestException } from '@nestjs/common';
 import { UserNotFoundException } from './../../exceptions/user.notFound.exception';
 import { SSOUsernameChangeForbiddenException } from './errors/ssoUsernameChangeForbidden.exception';
+import { SSONameChangeForbiddenException } from './errors/ssoNameChangeForbidden.exception';
 import { UserHasActiveUsageSessionsException } from './accounts/user-accounts';
 import { randomBytes } from 'crypto';
 import { fakeTransactionScope } from '../../database/fake-transaction-scope.test-fixture';
@@ -314,6 +315,33 @@ describe('UsersService', () => {
 
       await expect(fixture.service.changeUsername(me.id, 'newuser', me)).rejects.toThrow(
         SSOUsernameChangeForbiddenException,
+      );
+    });
+  });
+
+  describe('changeName', () => {
+    it('stores trimmed names and turns blanks into null', async () => {
+      const [me] = fixture.store.seed({ id: 12 });
+
+      const named = await fixture.service.changeName(me.id, { firstName: '  Ada ', lastName: ' Lovelace' });
+      expect(named).toMatchObject({ firstName: 'Ada', lastName: 'Lovelace' });
+
+      const cleared = await fixture.service.changeName(me.id, { firstName: '   ', lastName: null });
+      expect(cleared).toMatchObject({ firstName: null, lastName: null });
+    });
+
+    it('forbids changing the name of SSO users', async () => {
+      const [me] = fixture.store.seed({ id: 13 });
+      jest.spyOn(fixture.accounts, 'isSSOUser').mockResolvedValueOnce(true);
+
+      await expect(fixture.service.changeName(me.id, { firstName: 'Ada', lastName: null })).rejects.toThrow(
+        SSONameChangeForbiddenException,
+      );
+    });
+
+    it('rejects an unknown user', async () => {
+      await expect(fixture.service.changeName(404, { firstName: 'Ada', lastName: null })).rejects.toThrow(
+        UserNotFoundException,
       );
     });
   });

@@ -52,6 +52,53 @@ describe('UserInvitationService – parseCsvFile', () => {
     ...overrides,
   });
 
+  it('reads the mapped first and last name columns, trimmed and blank as null', async () => {
+    const csv = 'email,username,first,last\na@example.com,user1, Ada ,Lovelace\nb@example.com,user2,,  \n';
+    const result = await service.parseCsvFile(
+      { buffer: Buffer.from(csv) } as FileUpload,
+      buildConfig({ firstNameKey: 'first', lastNameKey: 'last' }),
+    );
+
+    expect(result.errors).toEqual([]);
+    expect(result.candidates.map(({ firstName, lastName }) => ({ firstName, lastName }))).toEqual([
+      { firstName: 'Ada', lastName: 'Lovelace' },
+      { firstName: null, lastName: null },
+    ]);
+  });
+
+  it('leaves names out without a mapping, requires a mapped column and refuses names that are too long', async () => {
+    const withoutMapping = await service.parseCsvFile(
+      { buffer: Buffer.from('email,username,first\na@example.com,user1,Ada\n') } as FileUpload,
+      buildConfig(),
+    );
+    expect(withoutMapping.candidates[0]).toMatchObject({ firstName: null, lastName: null });
+
+    const missingColumn = await service.parseCsvFile(
+      { buffer: Buffer.from('email,username\na@example.com,user1\n') } as FileUpload,
+      buildConfig({ lastNameKey: 'surname' }),
+    );
+    expect(missingColumn.errors).toContainEqual({ row: 0, field: 'surname', message: 'REQUIRED' });
+
+    const tooLong = await service.parseCsvFile(
+      { buffer: Buffer.from(`email,username,first\na@example.com,user1,${'x'.repeat(101)}\n`) } as FileUpload,
+      buildConfig({ firstNameKey: 'first' }),
+    );
+    expect(tooLong.errors).toEqual([expect.objectContaining({ row: 1, field: 'firstName', message: 'TOO_LONG' })]);
+  });
+
+  it('refuses a name with control characters (PostgreSQL cannot store NUL)', async () => {
+    const result = await service.parseCsvFile(
+      { buffer: Buffer.from('email,username,first,last\na@example.com,user1,A\u0000da,Love\tlace\n') } as FileUpload,
+      buildConfig({ firstNameKey: 'first', lastNameKey: 'last' }),
+    );
+
+    expect(result.errors).toEqual([
+      expect.objectContaining({ row: 1, field: 'firstName', message: 'INVALID' }),
+      expect.objectContaining({ row: 1, field: 'lastName', message: 'INVALID' }),
+    ]);
+    expect(result.candidates).toEqual([]);
+  });
+
   it('parses quoted values and honors ignored rows', async () => {
     const csv = 'email,username,perm\n"john@example.com","user1","tr,ue"\nsecond@example.com,user2,tr,ue\n';
     const file: FileUpload = { buffer: Buffer.from(csv) } as FileUpload;
@@ -66,6 +113,8 @@ describe('UserInvitationService – parseCsvFile', () => {
       {
         email: 'john@example.com',
         username: 'user1',
+        firstName: null,
+        lastName: null,
         row: 1,
       },
     ]);
@@ -125,7 +174,17 @@ describe('CSV invitations', () => {
     expect(result).toEqual([{ id: 7, username: 'alex', email: 'alex@example.com' }]);
     expect(users.ensureLicenseForNewUsers).toHaveBeenCalledWith(1);
     expect(users.createMany).toHaveBeenCalledWith(
-      [{ email: 'alex@example.com', username: 'alex', row: 1, roleKey: 'operator', locale: 'de' }],
+      [
+        {
+          email: 'alex@example.com',
+          username: 'alex',
+          firstName: null,
+          lastName: null,
+          row: 1,
+          roleKey: 'operator',
+          locale: 'de',
+        },
+      ],
       { grantAllPermissionsToFirst: true, context: manager, actor },
     );
     expect(auth.generateEmailVerificationToken).toHaveBeenCalledWith(result[0], manager);

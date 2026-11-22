@@ -1,9 +1,10 @@
 import { Inject, Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
-import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
+import { AuthenticationType, SSOProviderType, type UserAccount } from '@attraccess/application-models';
 import type { TransactionContext } from '../../../../database/transaction-context';
 import { UsersService } from '../../../users/users.service';
 import { AuthService } from '../../auth.service';
 import { AccountLinkingRequiredException } from '../oidc/exceptions/account-linking-required.exception';
+import { toStorableUserName } from '../../../users/accounts/normalize-name';
 
 /** Error message of the rejection raised when an IdP-unverified email collides with an existing account. */
 export const SSO_EMAIL_NOT_VERIFIED = 'SSO_EMAIL_NOT_VERIFIED';
@@ -18,6 +19,17 @@ export interface SsoAccountResolutionInput {
   emailVerified: boolean | undefined;
   /** Raw username candidate; passed through `UsersService.buildUsernameFromSSOClaim`. */
   usernameClaim?: string;
+  /** Names the IdP released; an absent or blank claim is undefined and never clears a stored name. */
+  firstName?: string;
+  lastName?: string;
+}
+
+/**
+ * A released name as it will be stored, so comparing it with the stored one does not see a change at every login
+ * (e.g. trailing whitespace or a control character the store would drop). A blank name counts as not released.
+ */
+function storableName(name: string | undefined): string | undefined {
+  return name === undefined ? undefined : (toStorableUserName(name) ?? undefined);
 }
 
 /** Everything a provisioning hook may base its decision on when no account matches the identity. */
@@ -71,7 +83,7 @@ export class SsoAccountResolver {
 
     const boundUserId = await this.authService.findUserIdBySSO(providerType, providerId, subject);
     const boundUser = boundUserId ? await this.usersService.findOne({ id: boundUserId }) : null;
-    if (boundUser) return { user: boundUser, created: false };
+    if (boundUser) return { user: await this.syncNames(boundUser, input), created: false };
 
     const emailTrusted = input.emailVerified !== false;
     const emailOwner = await this.usersService.findOne({ email });
@@ -93,11 +105,31 @@ export class SsoAccountResolver {
     return { user, created: true };
   }
 
+  /** Applies the names the IdP released at this login. Writes only when one changed; a missing claim changes nothing. */
+  private async syncNames(
+    user: UserAccount,
+    claims: Pick<SsoAccountResolutionInput, 'firstName' | 'lastName'>,
+  ): Promise<UserAccount> {
+    const changes: { firstName?: string; lastName?: string } = {};
+    const [firstName, lastName] = [storableName(claims.firstName), storableName(claims.lastName)];
+    if (firstName && firstName !== user.firstName) changes.firstName = firstName;
+    if (lastName && lastName !== user.lastName) changes.lastName = lastName;
+    if (Object.keys(changes).length === 0) return user;
+    return this.usersService.updateOne(user.id, changes);
+  }
+
   private async createBoundUser(input: SsoAccountResolutionInput, transaction: TransactionContext) {
     const { providerType, providerId, subject, email } = input;
     const username = this.usersService.buildUsernameFromSSOClaim(input.usernameClaim || email, email);
     const user = await this.usersService.createOne(
-      { username, email, externalIdentifier: null, isEmailVerified: input.emailVerified !== false },
+      {
+        username,
+        firstName: storableName(input.firstName),
+        lastName: storableName(input.lastName),
+        email,
+        externalIdentifier: null,
+        isEmailVerified: input.emailVerified !== false,
+      },
       transaction,
     );
     if (!user) throw new UnauthorizedException();

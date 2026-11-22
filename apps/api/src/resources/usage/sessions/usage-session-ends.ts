@@ -1,6 +1,7 @@
 import { ResourceFlowNodeType, ResourceFormAction, ResourceType } from '@attraccess/application-models';
 import type { UsageFormSubmissionDraft, UsageSession, UsageSessionUser } from '@attraccess/application-models';
 
+import { optionalUserDisplayName } from '@attraccess/shared';
 import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 
 import { randomUUID } from 'node:crypto';
@@ -120,7 +121,7 @@ export class UsageSessionEnds {
       const endTime = new Date();
       let endNotes = dto.notes;
       if (!isSessionOwner) {
-        endNotes = `[By #${user.id} - ${user.username}] ${endNotes ?? ''}`;
+        endNotes = `[By #${user.id} - ${optionalUserDisplayName(user) ?? ''}] ${endNotes ?? ''}`;
       }
 
       this.logger.debug(`Ending session ${activeSession.id} at ${endTime.toISOString()}`);

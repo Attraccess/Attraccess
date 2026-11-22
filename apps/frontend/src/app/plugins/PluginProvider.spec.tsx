@@ -275,7 +275,28 @@ describe('PluginProvider', () => {
     const instance = usePluginState.getState().plugins[0].plugin;
     await waitFor(() => expect(instance.onApiEndpointChange).toHaveBeenCalledWith('http://test.local'));
     expect(instance.onApiAuthStateChange).toHaveBeenCalledWith(
-      expect.objectContaining({ authToken: '', user: hoisted.user, effectivePermissions: [] }),
+      expect.objectContaining({
+        authToken: '',
+        user: { id: 1, username: 'admin', displayName: 'admin' },
+        effectivePermissions: [],
+      }),
+    );
+  });
+
+  it('gives plugins the display name of a user with a name', async () => {
+    hoisted.user = { id: 1, username: 'ada', firstName: 'Ada', lastName: 'Lovelace' };
+    primeManifest();
+
+    render(<PluginProvider />);
+
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
+    const instance = usePluginState.getState().plugins[0].plugin;
+    await waitFor(() =>
+      expect(instance.onApiAuthStateChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user: { id: 1, username: 'ada', firstName: 'Ada', lastName: 'Lovelace', displayName: 'Ada Lovelace' },
+        }),
+      ),
     );
   });
 

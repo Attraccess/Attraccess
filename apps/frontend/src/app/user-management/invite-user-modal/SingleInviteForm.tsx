@@ -15,13 +15,29 @@ interface SingleInviteFormProps {
   onUsernameChange: (username: string) => void;
   email: string;
   onEmailChange: (email: string) => void;
+  firstName: string;
+  onFirstNameChange: (firstName: string) => void;
+  lastName: string;
+  onLastNameChange: (lastName: string) => void;
   usernameValidationMessages: UsernameValidationMessages;
   onSubmit: () => void;
 }
 
-/** Username and email fields of the single-user invite; the drawer footer submits it. */
+/** Username, email and optional name fields of the single-user invite; the drawer footer submits it. */
 export function SingleInviteForm(props: Readonly<SingleInviteFormProps>) {
-  const { formRef, username, onUsernameChange, email, onEmailChange, usernameValidationMessages, onSubmit } = props;
+  const {
+    formRef,
+    username,
+    onUsernameChange,
+    email,
+    onEmailChange,
+    firstName,
+    onFirstNameChange,
+    lastName,
+    onLastNameChange,
+    usernameValidationMessages,
+    onSubmit,
+  } = props;
   const { t } = useTranslations({ en, de });
 
   return (
@@ -48,6 +64,14 @@ export function SingleInviteForm(props: Readonly<SingleInviteFormProps>) {
       <TextField isRequired value={email} onChange={onEmailChange}>
         <Label>{t('inputs.email.label')}</Label>
         <Input name="email" type="email" required />
+      </TextField>
+      <TextField value={firstName} onChange={onFirstNameChange} maxLength={100}>
+        <Label>{t('inputs.firstName.label')}</Label>
+        <Input name="firstName" />
+      </TextField>
+      <TextField value={lastName} onChange={onLastNameChange} maxLength={100}>
+        <Label>{t('inputs.lastName.label')}</Label>
+        <Input name="lastName" />
       </TextField>
     </Form>
   );

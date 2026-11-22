@@ -42,7 +42,10 @@ export interface PluginResourceDirectory {
 
 /** User lookups. Requires READ_USERS. Soft-deleted users are skipped, unless stated otherwise. */
 export interface PluginUserDirectory {
+  /** Login names. Kept for compatibility: show people `getDisplayNames` instead. */
   getUsernames(userIds: number[]): Promise<Map<number, string>>;
+  /** The name to show for each existing user: "First Last", or the username when no name is set. */
+  getDisplayNames(userIds: number[]): Promise<Map<number, string>>;
   /** The preferred language tag of each existing user (null when the user stored none). */
   getLocales(userIds: number[]): Promise<Map<number, string | null>>;
   /** Whether the account exists, is not soft-deleted and not disabled. */

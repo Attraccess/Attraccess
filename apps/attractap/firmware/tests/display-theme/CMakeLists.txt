@@ -56,6 +56,7 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/screens/boot/bootscreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/init/initscreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/lockscreen/lockscreen.cpp"
+    "${FIRMWARE_DIR}/src/text/utf8_copy.cpp"
     "${FIRMWARE_DIR}/src/display/screens/noResources/noResourcesScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceList/resourceListScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/enrollment/enrollmentScreen.cpp"
@@ -117,7 +118,7 @@ FetchContent_Declare(arduinojson
     URL https://codeload.github.com/bblanchon/ArduinoJson/tar.gz/e868711b56df8c9db2967fed989bd795e81866a3
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 FetchContent_MakeAvailable(arduinojson)
-add_executable(resource-introducers-parser resource_introducers_test.cpp)
+add_executable(resource-introducers-parser resource_introducers_test.cpp "${FIRMWARE_DIR}/src/text/utf8_copy.cpp")
 target_include_directories(resource-introducers-parser PRIVATE "${FIRMWARE_DIR}/src")
 target_link_libraries(resource-introducers-parser PRIVATE ArduinoJson)
 add_test(NAME resource-introducers-parser COMMAND resource-introducers-parser)

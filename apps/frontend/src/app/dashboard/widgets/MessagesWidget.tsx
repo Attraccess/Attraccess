@@ -1,4 +1,5 @@
 import { Chip, Link } from '@heroui/react';
+import { formatUserDisplayName } from '@attraccess/shared';
 import type { DashboardWidgetRenderProps } from '@attraccess/plugins-frontend-sdk';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -38,7 +39,9 @@ export function MessagesUnreadChip({ size }: Readonly<Partial<DashboardWidgetRen
 function ConversationRow({ conversation }: Readonly<{ conversation: ConversationListItemDto }>) {
   const { t } = useTranslations({ en, de });
   const formatDateTime = useDateTimeFormatter();
-  const name = conversation.otherParticipant?.username ?? t('messages.unknownUser');
+  const name = conversation.otherParticipant
+    ? formatUserDisplayName(conversation.otherParticipant)
+    : t('messages.unknownUser');
 
   return (
     <li>
@@ -82,12 +85,15 @@ function UnreadSummary({ conversations }: Readonly<{ conversations: Conversation
   // Skips conversations where the user's own reply is the latest message.
   const latest = conversations.find(
     (conversation) => conversation.lastMessage && conversation.lastMessage.senderId !== user?.id,
-  )?.otherParticipant?.username;
+  )?.otherParticipant;
+  const latestName = latest ? formatUserDisplayName(latest) : undefined;
 
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <BigNumber value={unread?.total ?? 0} label={t('messages.unreadLabel')} data-cy="dashboard-messages-unread" />
-      {latest && <span className="truncate text-xs text-muted">{t('messages.latestFrom', { name: latest })}</span>}
+      {latestName && (
+        <span className="truncate text-xs text-muted">{t('messages.latestFrom', { name: latestName })}</span>
+      )}
     </div>
   );
 }

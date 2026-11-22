@@ -78,7 +78,7 @@ export class TypeOrmEmailTemplateStore implements EmailTemplateStore {
   }
 
   async registerPluginTemplate(
-    template: { type: string } & EmailTemplateDefaults,
+    template: { type: string; previousBodies?: readonly string[] } & EmailTemplateDefaults,
     translations: EmailTemplateTranslationRecord[],
   ): Promise<void> {
     await this.templates.manager.transaction(async (manager) => {
@@ -88,6 +88,11 @@ export class TypeOrmEmailTemplateStore implements EmailTemplateStore {
       if (existing) {
         if (existing.variables.join(',') !== template.variables.join(',')) {
           await templates.update({ type }, { variables: template.variables });
+        }
+        // A body the plugin shipped earlier and nobody edited moves to the current one; the condition on the stored
+        // body keeps an admin edit made in the meantime.
+        if (existing.body !== template.body && template.previousBodies?.includes(existing.body)) {
+          await templates.update({ type, body: existing.body }, { body: template.body });
         }
         return;
       }

@@ -373,9 +373,11 @@ export class TypeOrmResourceFormStore implements ResourceFormStore {
             .find({ where: { id: In(resourceIds) }, select: { id: true, name: true }, withDeleted: true })
         : Promise.resolve<Resource[]>([]),
       userIds.length
-        ? this.dataSource
-            .getRepository(User)
-            .find({ where: { id: In(userIds) }, select: { id: true, username: true }, withDeleted: true })
+        ? this.dataSource.getRepository(User).find({
+            where: { id: In(userIds) },
+            select: { id: true, username: true, firstName: true, lastName: true },
+            withDeleted: true,
+          })
         : Promise.resolve<User[]>([]),
     ]);
     const resourceById = new Map(resources.map((resource) => [resource.id, resource]));
@@ -391,7 +393,9 @@ export class TypeOrmResourceFormStore implements ResourceFormStore {
           createdAt: submission.createdAt,
           formId: submission.formId,
           action: submission.action,
-          user: user ? { id: user.id, username: user.username } : null,
+          user: user
+            ? { id: user.id, username: user.username, firstName: user.firstName, lastName: user.lastName }
+            : null,
           resource: resource ? { id: resource.id, name: resource.name } : null,
           data: submission.data as unknown as FormSubmissionListRecord['data'],
         };

@@ -127,6 +127,8 @@ export class UsageSessionNotifications {
         new ResourceUsageNoteAddedEvent(resourceId, dto.notes.trim(), 'start', {
           id: user.id,
           username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
         }),
       );
     }
@@ -155,7 +157,9 @@ export class UsageSessionNotifications {
           ResourceUsageSessionEndedEvent.EVENT_NAME,
           new ResourceUsageSessionEndedEvent(
             updatedUsage,
-            skipNoteNotification ? null : { id: user.id, username: user.username },
+            skipNoteNotification
+              ? null
+              : { id: user.id, username: user.username, firstName: user.firstName, lastName: user.lastName },
           ),
         );
       } catch (error) {
@@ -190,6 +194,8 @@ export class UsageSessionNotifications {
         new ResourceUsageNoteAddedEvent(resourceId, dto.notes.trim(), 'end', {
           id: user.id,
           username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
         }),
       );
     }

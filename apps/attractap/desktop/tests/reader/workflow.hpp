@@ -34,6 +34,8 @@ struct ReaderWorkflow
     Framebuffer display;
     unsigned listVersion = 0;
     std::string username = "Alex";
+    // The signed-in user's display name; empty: an older server that sends only the username.
+    std::string displayName;
     std::string userLocale = "de";
     std::string cardSessionId; // sent with CARD_AUTHENTICATION_DATA when set
     bool userLanguageFallback = false;
@@ -46,6 +48,9 @@ struct ReaderWorkflow
     // Who holds the Lasercutter's active session (empty: the signed-in user), whether others may
     // take it over, and its flow buttons ({id, label}).
     std::string activeUser;
+    std::string activeUserDisplayName; // sent with activeUser when not empty
+    // The CNC Fräse's introducers and their display names (each sent when not empty).
+    std::vector<std::string> introducers, introducerDisplayNames;
     bool allowTakeOver = false;
     std::vector<std::pair<std::string, std::string>> flowButtons;
     std::string longDescription;
@@ -120,6 +125,7 @@ struct ReaderWorkflow
         if (correlate && server.count("REQUEST_RESOURCE_LIST"))
             doc["requestId"] = server.last("REQUEST_RESOURCE_LIST")["data"]["payload"]["requestId"].as<uint32_t>();
         doc["authenticatedUsername"] = signedIn ? username : "";
+        if (signedIn && !displayName.empty()) doc["authenticatedDisplayName"] = displayName;
         auto resources = doc["resources"].to<JsonArray>();
         for (int id = 1; id <= (onlyOne ? 1 : 3); ++id) {
             auto r = resources.add<JsonObject>();
@@ -131,9 +137,14 @@ struct ReaderWorkflow
             if (id == 1 && parallelLimit > 1) { r["maxParallelSessions"] = parallelLimit; r["activeSessionCount"] = parallelActive; }
             if (signedIn) { r["hasIntroduction"] = id != 2; r["requiresSupervisor"] = id == 1 && supervised; }
             if (id == 1) r["allowTakeOver"] = allowTakeOver;
+            if (id == 2 && !introducers.empty()) for (const auto &name : introducers) r["introducers"].add(name);
+            if (id == 2 && !introducerDisplayNames.empty())
+                for (const auto &name : introducerDisplayNames) r["introducerDisplayNames"].add(name);
             if (id == 1 && active) {
                 r["activeUsageSession"]["id"] = activeUsageId;
                 r["activeUsageSession"]["user"]["username"] = activeUser.empty() ? username : activeUser;
+                const std::string &shownUser = activeUser.empty() ? displayName : activeUserDisplayName;
+                if (!shownUser.empty()) r["activeUsageSession"]["user"]["displayName"] = shownUser;
                 auto buttons = r["flowButtons"].to<JsonArray>();
                 for (const auto &flow : flowButtons) {
                     auto button = buttons.add<JsonObject>();
@@ -168,7 +179,7 @@ struct ReaderWorkflow
             assert(lv_screen_active() == Display::resourceListScreen.getScreen());
             drawerSettingsBeforeLogin = nullptr;
         }
-        server.push("CARD_AUTHENTICATION_DATA", "{\"username\":\"" + username + "\",\"language\":\"" + userLocale + "\",\"languageFallback\":" + (userLanguageFallback ? "true" : "false") + (cardSessionId.empty() ? "" : ",\"cardSessionId\":\"" + cardSessionId + "\"") + R"(,"hasIntroduction":true,"requiresSupervisor":)" + (supervised ? "true}" : "false}"));
+        server.push("CARD_AUTHENTICATION_DATA", "{\"username\":\"" + username + "\"" + (displayName.empty() ? "" : ",\"displayName\":\"" + displayName + "\"") + ",\"language\":\"" + userLocale + "\",\"languageFallback\":" + (userLanguageFallback ? "true" : "false") + (cardSessionId.empty() ? "" : ",\"cardSessionId\":\"" + cardSessionId + "\"") + R"(,"hasIntroduction":true,"requiresSupervisor":)" + (supervised ? "true}" : "false}"));
         pump(250); nfc.setPresent(0, false);
         if (refresh) list();
         server.push("PROJECTS_OF_USER", R"({"page":1,"limit":10,"total":1,"projects":[{"id":42,"name":"Werkstattprojekt"}]})");
@@ -220,4 +231,8 @@ struct ReaderWorkflow
     void testUiPlugins();
     void testFooterClockAndLockscreenStatus();
     void testFirmwareUpdate(bool reset);
+    void testDisplayNames();
 };
+
+// Parses each display-name field with the production API (ATT-1385): display-names.test.cpp.
+void testDisplayNameParsing();

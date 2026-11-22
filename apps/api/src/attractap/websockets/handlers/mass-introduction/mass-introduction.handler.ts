@@ -1,3 +1,4 @@
+import { formatUserDisplayName } from '@attraccess/shared';
 import {
   BadRequestException,
   ConflictException,
@@ -84,6 +85,7 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
       await reply({
         success: true,
         username: participant.username,
+        displayName: formatUserDisplayName(verified.card.user),
         alreadyIntroduced: participant.alreadyIntroduced,
         participantCount,
       });
@@ -133,6 +135,7 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
     sessionId: string;
     targetName: string;
     introducerUsername: string;
+    introducerDisplayName?: string;
     expiresAt: Date;
   }): Promise<{ readerName: string }> {
     const { readerId, sessionId } = params;
@@ -188,6 +191,7 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
       sessionId,
       targetName: params.targetName,
       introducerUsername: params.introducerUsername,
+      introducerDisplayName: params.introducerDisplayName ?? params.introducerUsername,
       remainingMs: Math.max(0, params.expiresAt.getTime() - Date.now()),
     });
     const acknowledged = await Promise.all(

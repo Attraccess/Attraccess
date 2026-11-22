@@ -1,4 +1,5 @@
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { formatUserDisplayName } from '@attraccess/shared';
 import { ExportProps as ExporterProps } from '../export-props';
 import de from './de.json';
 import en from './en.json';
@@ -61,6 +62,11 @@ export function BillingTransactionsExport(props: ExporterProps) {
       { label: t('columns.id'), key: 'id', getter: (item) => item.id.toString(), selectedByDefault: true },
       { label: t('columns.user'), key: 'user', getter: (item) => item.user.username, selectedByDefault: true },
       {
+        label: t('columns.userDisplayName'),
+        key: 'userDisplayName',
+        getter: (item) => formatUserDisplayName(item.user),
+      },
+      {
         label: t('columns.createdAt'),
         key: 'createdAt',
         getter: (item) => formatDateTimeFull(item.createdAt),
@@ -73,6 +79,11 @@ export function BillingTransactionsExport(props: ExporterProps) {
         selectedByDefault: true,
       },
       { label: t('columns.initiator'), key: 'initiator', getter: (item) => item.initiator?.username },
+      {
+        label: t('columns.initiatorDisplayName'),
+        key: 'initiatorDisplayName',
+        getter: (item) => (item.initiator ? formatUserDisplayName(item.initiator) : ''),
+      },
       {
         label: t('columns.resourceUsage'),
         key: 'resourceUsage',

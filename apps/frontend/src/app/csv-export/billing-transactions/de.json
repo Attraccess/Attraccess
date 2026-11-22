@@ -1,9 +1,11 @@
 {
   "columns": {
     "id": "ID",
+    "userDisplayName": "Benutzer-Anzeigename",
     "user": "Benutzer",
     "createdAt": "Erstellt am",
     "amount": "Betrag",
+    "initiatorDisplayName": "Ausgelöst von (Anzeigename)",
     "initiator": "Ausgelöst von",
     "resourceUsage": "Ressource / Nutzung",
     "refundOf": "Erstattung von",

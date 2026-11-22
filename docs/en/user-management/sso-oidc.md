@@ -62,8 +62,16 @@ Attraccess needs to know which fields in the OIDC token contain the username and
 |-------|---------|-------------|
 | **Username Claim Paths** | `preferred_username, email, sub` | Ordered list of token fields for username |
 | **Email Claim Paths** | `email, emails[0].value, upn` | Ordered list of token fields for email |
+| **First Name Claim Path** (optional) | `given_name` | Token field for the first name |
+| **Last Name Claim Path** (optional) | `family_name` | Token field for the last name |
 
 Attraccess checks the paths in the specified order and uses the first match.
+
+### Names
+
+<a id="names"></a>
+
+Attraccess reads the first and last name from `given_name` and `family_name` (profile, UserInfo and ID token claims) unless you set a **First Name Claim Path** or **Last Name Claim Path**. Names are set when the account is created and synchronised on every login: a changed claim updates the stored name, a missing or empty claim leaves it unchanged, and nothing is written when the names did not change. Because the identity provider manages them, the name fields of SSO users are read-only in Attraccess (the user and administrators cannot change them). If your provider releases no name claims, these users have no names and are shown by username; release `given_name`/`family_name` or configure the claim paths.
 
 ### Role Claim Paths
 

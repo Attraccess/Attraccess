@@ -42,8 +42,9 @@ function wrap(condition: Condition | undefined, inner: string): string {
 const paragraph = ([key, en, , condition]: Paragraph): string =>
   wrap(condition, `<mj-text padding="0 0 12px 0">${tCall(key, en)}</mj-text>`);
 
-function body(spec: TemplateSpec): string {
-  const greeting = `<mj-text padding="0 0 12px 0">{{t "greeting" "${GREETING.en}" name=user.username}}</mj-text>`;
+/** The greeting names the user by display name; before ATT-1385 it used the username. */
+function body(spec: TemplateSpec, greetingName = 'user.displayName'): string {
+  const greeting = `<mj-text padding="0 0 12px 0">{{t "greeting" "${GREETING.en}" name=${greetingName}}}</mj-text>`;
   const buttons = (spec.buttons ?? []).map((b) =>
     wrap(
       b.condition,
@@ -79,6 +80,8 @@ function toTemplate(spec: TemplateSpec): PluginEmailTemplate {
     variables: variablesOf(subject, html),
     subject,
     body: html,
+    // Installed templates still greeting by username move to the display name unless an admin edited them.
+    previousBodies: [body(spec, 'user.username')],
     translations: { de },
   };
 }

@@ -3,6 +3,7 @@
 
 #include "../api.hpp"
 #include "resource-introducers.hpp"
+#include "../../text/utf8_copy.hpp"
 #include <functional>
 #include <string.h>
 #include <string>
@@ -224,6 +225,8 @@ void API::onResourceList(JsonObject data)
     result.requestId = data["payload"]["requestId"] | 0u;
     const char *authenticatedUsername = data["payload"]["authenticatedUsername"].as<const char *>();
     strlcpy(result.authenticatedUsername, authenticatedUsername ? authenticatedUsername : "", sizeof(result.authenticatedUsername));
+    const char *authenticatedDisplayName = data["payload"]["authenticatedDisplayName"].as<const char *>();
+    copyUtf8(result.authenticatedDisplayName, authenticatedDisplayName && authenticatedDisplayName[0] ? authenticatedDisplayName : result.authenticatedUsername, sizeof(result.authenticatedDisplayName));
 
     JsonArray arr = data["payload"]["resources"].as<JsonArray>();
     if (arr.isNull())
@@ -287,6 +290,8 @@ void API::onResourceList(JsonObject data)
             dst.activeUsageId = aus["id"] | 0u;
             const char *username = aus["user"]["username"].as<const char *>();
             strlcpy(dst.activeUser, username ? username : "", sizeof(dst.activeUser));
+            const char *displayName = aus["user"]["displayName"].as<const char *>();
+            copyUtf8(dst.activeUserDisplayName, displayName && displayName[0] ? displayName : dst.activeUser, sizeof(dst.activeUserDisplayName));
             const char *startIso = aus["startTime"].as<const char *>();
             dst.activeStartEpoch = parseIso8601ToTimeT(startIso);
             // Offset is optional for backwards compatibility; absent -> 0 (render UTC as before)
@@ -297,6 +302,7 @@ void API::onResourceList(JsonObject data)
             dst.hasActiveUsage = false;
             dst.activeUsageId = 0;
             dst.activeUser[0] = '\0';
+            dst.activeUserDisplayName[0] = '\0';
             dst.activeStartEpoch = 0;
             dst.activeStartUtcOffsetMinutes = 0;
         }
@@ -318,11 +324,15 @@ void API::onResourceList(JsonObject data)
             ActiveSession entry;
             entry.id = session["id"].as<uint32_t>();
             strlcpy(entry.username, sessionUser, sizeof(entry.username));
+            const char *sessionDisplayName = session["user"]["displayName"].as<const char *>();
+            copyUtf8(entry.displayName, sessionDisplayName && sessionDisplayName[0] ? sessionDisplayName : entry.username, sizeof(entry.displayName));
             dst.activeSessions.push_back(entry);
         }
 
         // Parse introducers: array of strings (usernames)
         dst.introducers = parseResourceIntroducers(resource["introducers"].as<JsonArrayConst>());
+        dst.introducerDisplayNames = parseIntroducerDisplayNames(resource["introducers"].as<JsonArrayConst>(),
+                                                                 resource["introducerDisplayNames"].as<JsonArrayConst>());
 
         // Parse flowButtons: array of { id, label }
         dst.flowButtonCount = 0;

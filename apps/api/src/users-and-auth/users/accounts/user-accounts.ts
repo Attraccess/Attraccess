@@ -22,6 +22,7 @@ import { PaginationOptions } from '../../../types/request';
 import type { TransactionContext } from '../../../database/transaction-context';
 import { UNIT_OF_WORK, type UnitOfWork } from '../../../database/unit-of-work';
 import { normalizeEmail } from './normalize-email';
+import { normalizeUserName } from './normalize-name';
 import { USER_STORE, UserIdentityTakenError, type UserIdentityField, type UserStore } from '../user-store.port';
 
 export type UserListOptions = PaginationOptions & {
@@ -64,6 +65,8 @@ export class UserHasActiveUsageSessionsException extends BadRequestException {
 
 export type UpdateUserData = Pick<
   UserPatch,
+  | 'firstName'
+  | 'lastName'
   | 'externalIdentifier'
   | 'emailVerificationToken'
   | 'emailVerificationTokenExpiresAt'
@@ -148,6 +151,8 @@ export class UserAccounts {
   async createOne(
     userData: {
       username: string;
+      firstName?: string | null;
+      lastName?: string | null;
       email: string;
       externalIdentifier: string | null;
       isEmailVerified?: boolean;
@@ -160,6 +165,8 @@ export class UserAccounts {
   ): Promise<UserRecord> {
     const data = {
       username: this.cleanupUsername(userData.username),
+      firstName: normalizeUserName(userData.firstName),
+      lastName: normalizeUserName(userData.lastName),
       email: normalizeEmail(userData.email),
       externalIdentifier: userData.externalIdentifier?.trim() ?? null,
       isEmailVerified: userData.isEmailVerified ?? false,

@@ -166,4 +166,20 @@ describe('identity audit policy', () => {
       }),
     ).toMatchObject({ actorId: 7, authenticationMethod: 'api-token', apiTokenId: 19 });
   });
+
+  it('accepts a name change as user_updated with field name, and no other unknown field', () => {
+    const nameUpdate = (field: string) =>
+      projectIdentityAuditEvent({
+        action: 'user_updated',
+        operationId: randomUUID(),
+        outcome: 'succeeded',
+        actorId: 7,
+        authenticationMethod: 'session',
+        subjectId: 4,
+        details: { field },
+      });
+
+    expect(nameUpdate('name')).toMatchObject({ action: 'identity.user_updated', details: { field: 'name' } });
+    expect(nameUpdate('firstName')).toBeNull();
+  });
 });

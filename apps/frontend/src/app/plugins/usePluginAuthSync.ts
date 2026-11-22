@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
-import { AttraccessFrontendPluginAuthData } from '@attraccess/plugins-frontend-sdk';
 import { getBaseUrl } from '../../api/index';
 import { useAuth } from '../../hooks/useAuth';
 import usePluginState from './plugin.state';
+import { toPluginAuthUser } from './toPluginAuthUser';
 
 /** Tells every loaded plugin the API endpoint and the signed-in user whenever either the plugin set or the user changes. */
 export function usePluginAuthSync() {
@@ -10,11 +10,12 @@ export function usePluginAuthSync() {
   const { user } = useAuth();
 
   useEffect(() => {
+    const pluginUser = toPluginAuthUser(user);
     plugins.forEach((plugin) => {
       plugin.plugin.onApiEndpointChange(getBaseUrl());
       plugin.plugin.onApiAuthStateChange({
         authToken: '', // No longer using tokens - authentication is handled by cookies
-        user: user as unknown as AttraccessFrontendPluginAuthData['user'],
+        user: pluginUser,
         effectivePermissions: user?.effectivePermissions ?? [],
       });
     });

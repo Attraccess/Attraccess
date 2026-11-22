@@ -1,5 +1,6 @@
 // Emails introducers, maintainers and admins when a user attaches a note to a usage session.
 // FEATURE: inform introducers/maintainers about usage notes (ATT-174)
+import { optionalUserDisplayName } from '@attraccess/shared';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { ResourceNotificationRecipient } from '@attraccess/application-models';
@@ -38,14 +39,14 @@ export class ResourceUsageNoteNotificationListener {
         return;
       }
 
-      const authorUsername = event.author.username;
+      const authorDisplayName = optionalUserDisplayName(event.author);
       await this.notifications.dispatch({
         category: NotificationCategory.RESOURCE_USAGE_NOTES,
         recipients,
         actorId: event.author.id,
         title: (recipient) => t(recipient.locale, 'title', { resourceName: resource.name }),
         body: (recipient) => {
-          const authorName = authorUsername ?? t(recipient.locale, 'fallbackUser');
+          const authorName = authorDisplayName ?? t(recipient.locale, 'fallbackUser');
           return t(recipient.locale, 'body', { authorName, note: event.note });
         },
         url: `/resources/${resource.id}/usage`,
@@ -55,7 +56,7 @@ export class ResourceUsageNoteNotificationListener {
             note: {
               content: event.note,
               phase: event.phase,
-              authorName: authorUsername ?? t(language, 'fallbackUser'),
+              authorName: authorDisplayName ?? t(language, 'fallbackUser'),
             },
           }),
       });

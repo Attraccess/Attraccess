@@ -39,10 +39,16 @@ Templates support placeholders that are automatically replaced when sending:
 
 | Placeholder | Description |
 |-------------|-------------|
-| `{{username}}` | Recipient's username |
+| `{{user.displayName}}` | Recipient's name: "First Last", or the username when no name is set |
+| `{{user.firstName}}`, `{{user.lastName}}` | Recipient's first and last name (may be empty) |
+| `{{user.username}}` | Recipient's username |
+| `{{inviter.displayName}}` | Display name of the inviter (project invitation) |
 | `{{email}}` | Recipient's email address |
 | `{{link}}` | Action link (confirmation, reset, etc.) |
 | `{{appName}}` | Application name |
+
+> [!NOTE]
+> The default templates greet the recipient with `user.displayName`. Templates you changed before this was introduced keep greeting by `user.username`; they are not refreshed. To use the new greeting, use **Reset to Default** or replace `user.username` with `user.displayName` in your template.
 
 ## See Also
 

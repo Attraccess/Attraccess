@@ -35,7 +35,7 @@ void ResourceDetailsScreen::init()
       if (!this->actionInProgress && this->buttonClickCallback)
          this->buttonClickCallback({this, BUTTON_CLICK_TYPE_BACK, {}});
    });
-   sessionHeader.setUser(this->loginUsernameCache);
+   sessionHeader.setUser(this->loginDisplayNameCache.empty() ? this->loginUsernameCache : this->loginDisplayNameCache);
 
    // Detail panels can exceed the display height, especially with many tutors: they scroll in the body.
    this->body = lv_obj_create(this->screen);
@@ -132,10 +132,11 @@ void ResourceDetailsScreen::setUserDetails(UserDetails userDetails)
 {
    this->logger.debugf("Setting signed in username: %s", userDetails.username.c_str());
    this->loginUsernameCache = userDetails.username;
+   this->loginDisplayNameCache = userDetails.displayName;
    this->userDetailsCache = userDetails;
    this->userDetailsInitialized = true;
 
-   sessionHeader.setUser(userDetails.username);
+   sessionHeader.setUser(userDetails.displayName.empty() ? userDetails.username : userDetails.displayName);
 
    this->refreshAccessState();
    this->updateUsageStatsDisplay();
@@ -206,7 +207,7 @@ void ResourceDetailsScreen::applyCachedState()
       return;
    }
 
-   sessionHeader.setUser(this->loginUsernameCache);
+   sessionHeader.setUser(this->loginDisplayNameCache.empty() ? this->loginUsernameCache : this->loginDisplayNameCache);
 
    if (this->resourceCacheValid)
    {
@@ -342,13 +343,16 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
 std::string ResourceDetailsScreen::buildIntroducersText(const API::ResourceBrief &resource)
 {
    std::string list;
-   for (size_t i = 0; i < resource.introducers.size(); ++i)
+   // Display names come in the same order; an older server sends none, then the usernames are shown.
+   const bool hasDisplayNames = resource.introducerDisplayNames.size() == resource.introducers.size();
+   const auto &shown = hasDisplayNames ? resource.introducerDisplayNames : resource.introducers;
+   for (size_t i = 0; i < shown.size(); ++i)
    {
       if (i > 0)
       {
          list += "\n";
       }
-      list += resource.introducers[i];
+      list += shown[i];
    }
    if (list.length() == 0)
    {
@@ -579,6 +583,6 @@ void ResourceDetailsScreen::rebuildOtherSessions(bool visible)
       lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_align(label, LV_ALIGN_CENTER);
       lv_obj_set_style_text_font(label, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-      FirmwareI18n::setLabel(label, FirmwareI18n::Text::format(FirmwareI18n::Message::EndNamedSession, {FirmwareI18n::Text::literal(session->username) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */}));
+      FirmwareI18n::setLabel(label, FirmwareI18n::Text::format(FirmwareI18n::Message::EndNamedSession, {FirmwareI18n::Text::literal(session->displayName[0] != '\0' ? session->displayName : session->username) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */}));
    }
 }

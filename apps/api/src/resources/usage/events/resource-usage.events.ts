@@ -31,7 +31,7 @@ export class ResourceUsageSessionEndedEvent {
 
   constructor(
     public readonly usage: UsageSession,
-    public readonly endedBy: Pick<UsageSessionUser, 'id' | 'username'> | null,
+    public readonly endedBy: Pick<UsageSessionUser, 'id' | 'username' | 'firstName' | 'lastName'> | null,
   ) {}
 }
 
@@ -46,7 +46,7 @@ export class ResourceUsageNoteAddedEvent {
     public readonly resourceId: number,
     public readonly note: string,
     public readonly phase: 'start' | 'end',
-    public readonly author: Pick<UsageSessionUser, 'id' | 'username'>,
+    public readonly author: Pick<UsageSessionUser, 'id' | 'username' | 'firstName' | 'lastName'>,
   ) {}
 }
 

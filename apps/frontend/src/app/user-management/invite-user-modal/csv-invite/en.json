@@ -4,6 +4,8 @@
     "fieldMapping": {
       "email": "Email",
       "username": "Username",
+      "firstName": "First name (optional)",
+      "lastName": "Last name (optional)",
       "roleKeyColumn": "Role column (optional)"
     }
   },
@@ -11,6 +13,7 @@
     "columns": {
       "index": "Index",
       "username": "Username",
+      "name": "Name",
       "email": "Email"
     }
   },
@@ -30,9 +33,14 @@
       "title": "Missing configuration",
       "description": "Select a CSV file and map email and username columns."
     },
+    "fields": {
+      "firstName": "First name",
+      "lastName": "Last name"
+    },
     "reasons": {
       "DUPLICATE_IN_DB": "Already used by an existing account",
       "DUPLICATE_IN_CSV": "Appears more than once in the file",
+      "TOO_LONG": "Longer than 100 characters",
       "REQUIRED": "Required value missing",
       "INVALID": "Invalid value",
       "ROW_IS_EMPTY": "Row is empty",

@@ -21,6 +21,7 @@ const baseRequest = {
   resourceId: 7,
   requesterUserId: 5,
   requesterUsername: 'bob',
+  requesterDisplayName: 'Bob Builder',
   supervisorUserId: 1,
   notes: 'please',
   createdAt: new Date().toISOString(),

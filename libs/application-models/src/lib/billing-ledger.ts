@@ -59,6 +59,8 @@ export interface BillingTransactionRecord {
 export interface BillingUserSummary {
   id: number;
   username: string;
+  firstName: string | null;
+  lastName: string | null;
   locale: string;
   dateTimeLocale: string | null;
   isEmailVerified: boolean;
@@ -107,6 +109,8 @@ export interface UsageReceiptSource {
   recipient: {
     id: number;
     username: string;
+    firstName: string | null;
+    lastName: string | null;
     email: string;
     locale: string;
     creditBalance: number;

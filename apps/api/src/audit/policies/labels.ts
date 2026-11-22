@@ -59,19 +59,26 @@ export async function auditEntriesWithLabels(
     entries
       .filter((entry) => entry.domain === domain && entry.subjectType === type && !recordedSubjectLabel(entry))
       .map((entry) => entry.subjectId);
-  const [users, resources, groups, projects] = await Promise.all([
+  const [users, usernames, resources, groups, projects] = await Promise.all([
     currentNames(reader, 'user', [
-      ...entries.filter((entry) => !name(entry.details.actorUsername)).map((entry) => entry.actorId),
+      ...entries.map((entry) => entry.actorId),
       ...subjects('identity', 'identity.user'),
       ...subjects('sso', 'user'),
     ]),
+    currentNames(
+      reader,
+      'username',
+      entries.filter((entry) => !name(entry.details.actorUsername)).map((entry) => entry.actorId),
+    ),
     currentNames(reader, 'resource', subjects('resource', 'resource')),
     currentNames(reader, 'resource-group', subjects('resource', 'resource_group')),
     currentNames(reader, 'project', subjects('project', 'project')),
   ]);
   return entries.map((entry) => {
     const recordedActor = name(entry.details.actorUsername);
-    const actorUsername = recordedActor ?? users.get(entry.actorId);
+    const actorUsername = recordedActor ?? usernames.get(entry.actorId);
+    // The account's current display name; a deleted account only has the username that was recorded.
+    const actorDisplayName = users.get(entry.actorId) ?? actorUsername;
     const recordedSubject = recordedSubjectLabel(entry);
     const subjectNames =
       entry.domain === 'resource' && entry.subjectType === 'resource'
@@ -87,6 +94,7 @@ export async function auditEntriesWithLabels(
     const subjectLabel = recordedSubject ?? subjectNames?.get(entry.subjectId);
     return {
       ...entry,
+      ...(actorDisplayName ? { actorDisplayName } : {}),
       ...(actorUsername
         ? { actorUsername, actorUsernameSource: recordedActor ? ('recorded' as const) : ('current' as const) }
         : {}),

@@ -34,7 +34,7 @@ describe('createHostDataContext', () => {
     expect(hostData.resources.source).toBeUndefined();
     expect(hostData.users.internalHelper).toBeUndefined();
     expect(Object.keys(hostData.users).sort()).toEqual(
-      ['getLocales', 'getUsernames', 'isActive', 'listIdsWithAnyPermission'].sort(),
+      ['getDisplayNames', 'getLocales', 'getUsernames', 'isActive', 'listIdsWithAnyPermission'].sort(),
     );
     expect(Object.isFrozen(hostData.users)).toBe(true);
   });

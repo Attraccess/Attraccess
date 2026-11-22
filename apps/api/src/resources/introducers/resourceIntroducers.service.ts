@@ -1,5 +1,6 @@
 import { ResourceIntroducerType, type ResourceIntroducerRecord } from '@attraccess/application-models';
 
+import { formatUserDisplayName } from '@attraccess/shared';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
@@ -68,6 +69,7 @@ export class ResourceIntroducersService {
       byUser.set(introducer.userId, {
         userId: introducer.userId,
         username: introducer.user.username,
+        displayName: formatUserDisplayName(introducer.user),
         role: introducer.type,
       });
     }

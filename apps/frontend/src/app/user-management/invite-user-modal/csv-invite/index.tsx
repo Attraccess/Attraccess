@@ -58,7 +58,7 @@ export function CsvInvite({ onSuccess, onError }: Readonly<Props>) {
 
   const submit = useCallback(
     (options?: { ignoreFailed?: boolean }) => {
-      const { emailKey, usernameKey, roleKeyColumn } = mapping;
+      const { emailKey, usernameKey, firstNameKey, lastNameKey, roleKeyColumn } = mapping;
       if (!selectedFile || !emailKey || !usernameKey) {
         toast.error({
           title: t('errors.missingConfig.title'),
@@ -81,6 +81,8 @@ export function CsvInvite({ onSuccess, onError }: Readonly<Props>) {
           emailKey,
           usernameKey,
           ignoredRows: rowsToIgnore,
+          ...(firstNameKey ? { firstNameKey } : {}),
+          ...(lastNameKey ? { lastNameKey } : {}),
           ...(roleKeyColumn ? { roleKeyColumn } : {}),
         },
       };
@@ -107,6 +109,8 @@ export function CsvInvite({ onSuccess, onError }: Readonly<Props>) {
         previewRows={previewRows}
         usernameKey={mapping.usernameKey}
         emailKey={mapping.emailKey}
+        firstNameKey={mapping.firstNameKey}
+        lastNameKey={mapping.lastNameKey}
       />
 
       {rowErrors.length > 0 && <CsvRowErrorsTable rowErrors={rowErrors} />}

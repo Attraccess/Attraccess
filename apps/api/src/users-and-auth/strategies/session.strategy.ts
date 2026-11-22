@@ -15,6 +15,7 @@ import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { databaseBusyException, isDatabaseBusyError } from '../../database/persistence-errors';
 import { isValkeyUnavailableError, valkeyUnavailableException } from '../../valkey/valkey-unavailable';
 import { getMcpDelegation, McpDelegation } from './mcp-delegation';
+import { formatUserDisplayName } from '@attraccess/shared';
 
 const TWO_FACTOR_SETUP_ALLOWED_PREFIXES = ['/auth/two-factor', '/auth/session', '/users/me'];
 
@@ -22,6 +23,17 @@ const TWO_FACTOR_SETUP_ALLOWED_PREFIXES = ['/auth/two-factor', '/auth/session', 
 class SerializablePermissionSet extends Set<string> {
   toJSON() {
     return [...this];
+  }
+}
+
+/**
+ * Gives the principal the plugin SDK's `displayName`. A plain account object gets it as a field (recomputed, so a
+ * reused object never keeps a stale name); a `User` entity already has it as a getter, which must not be assigned.
+ */
+function attachDisplayName(user: AuthenticatedSessionUser): void {
+  const target = user as AuthenticatedSessionUser & { displayName?: string };
+  if (Object.prototype.hasOwnProperty.call(target, 'displayName') || !('displayName' in target)) {
+    target.displayName = formatUserDisplayName(user);
   }
 }
 
@@ -42,7 +54,9 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
 
   async validate(req: Request & { authSession?: LogoutSession }): Promise<AuthenticatedSessionUser> {
     try {
-      return await this.resolveUser(req);
+      const user = await this.resolveUser(req);
+      attachDisplayName(user);
+      return user;
     } catch (error) {
       // An unreachable Valkey is not a failed sign-in: answer 503 (the auth guard passes 5xx through) instead of 401.
       if (isValkeyUnavailableError(error)) throw valkeyUnavailableException(error as Error);

@@ -1,3 +1,4 @@
+import { maintenanceUserName } from '../maintenance-hub/maintenanceUserName';
 import {
   Button,
   Card,
@@ -166,12 +167,8 @@ export function MaintenanceManagement(props: Props) {
                 <TableCell className="overflow-hidden text-ellipsis">
                   <MaintenanceReasonDisplay reason={maintenance.reason} />
                 </TableCell>
-                <TableCell>
-                  {(maintenance.createdByUser as { username?: string } | undefined)?.username ?? '—'}
-                </TableCell>
-                <TableCell>
-                  {(maintenance.completedByUser as { username?: string } | undefined)?.username ?? '—'}
-                </TableCell>
+                <TableCell>{maintenanceUserName(maintenance.createdByUser) ?? '—'}</TableCell>
+                <TableCell>{maintenanceUserName(maintenance.completedByUser) ?? '—'}</TableCell>
                 <TableCell>
                   {maintenance.completedAt ? <DateTimeDisplay date={maintenance.completedAt} /> : '—'}
                 </TableCell>

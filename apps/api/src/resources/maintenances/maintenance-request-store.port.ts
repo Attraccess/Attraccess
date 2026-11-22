@@ -39,6 +39,7 @@ export interface RequestForNotification {
   id: number;
   reason: string;
   createdByUsername: string | null;
+  createdByDisplayName: string | null;
 }
 
 /** What the maintenance request notification needs to know about the request, the resource and the recipients. */

@@ -9,6 +9,12 @@ export class ResourceActorUserDto implements ResourceActorUser {
   @ApiProperty({ description: 'The username of the user', example: 'johndoe' })
   username!: string;
 
+  @ApiProperty({ type: String, nullable: true, description: 'The first name of the user', example: 'Ada' })
+  firstName!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: 'The last name of the user', example: 'Lovelace' })
+  lastName!: string | null;
+
   @ApiProperty({ description: 'The preferred language of the user', example: 'en' })
   locale!: string;
 

@@ -10,6 +10,8 @@
     "format": "Nur Buchstaben, Zahlen, Unterstrich, Bindestrich und Punkt sind erlaubt."
   },
   "email": "E-Mail-Adresse",
+  "firstName": "Vorname (optional)",
+  "lastName": "Nachname (optional)",
   "password": "Passwort",
   "passwordConfirmation": "Bestätige dein Passwort",
   "createAccountButton": "Konto erstellen",

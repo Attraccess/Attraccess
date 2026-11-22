@@ -96,7 +96,12 @@ export function renderEmail(email: EmailRequest, lang: 'en' | 'de', frontend = '
       ),
     );
   };
-  const context = { ...email.variables, user: { username: 'tester' }, host: { frontend }, url: frontend };
+  const context = {
+    ...email.variables,
+    user: { username: 'tester', displayName: 'Tester' },
+    host: { frontend },
+    url: frontend,
+  };
   const options = { helpers: { t } };
   const subject = Handlebars.compile(template.subject)(context, options);
   const document = Handlebars.compile(mjmlBodies()[template.id])(context, options);

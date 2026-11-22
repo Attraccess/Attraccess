@@ -17,6 +17,8 @@ export function toActorUserDto(user: ResourceActorUser | null | undefined): Reso
   return {
     id: user.id,
     username: user.username,
+    firstName: user.firstName,
+    lastName: user.lastName,
     locale: user.locale,
     dateTimeLocale: user.dateTimeLocale,
     isEmailVerified: user.isEmailVerified,

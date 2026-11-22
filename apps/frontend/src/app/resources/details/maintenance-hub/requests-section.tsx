@@ -1,4 +1,5 @@
 import { Button } from '@heroui/react';
+import { maintenanceUserName } from './maintenanceUserName';
 import { useTranslations, DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
 import { CheckCircleIcon, XCircleIcon, MessageSquareWarningIcon } from 'lucide-react';
 import { useCallback } from 'react';
@@ -60,9 +61,7 @@ export function RequestsSection(props: Props) {
               <div className="text-xs text-default-600">
                 <span>
                   {t('activity.requests.reportedBy', {
-                    name:
-                      (request.createdByUser as { username?: string } | null)?.username ??
-                      t('activity.requests.someone'),
+                    name: maintenanceUserName(request.createdByUser) ?? t('activity.requests.someone'),
                   })}
                 </span>{' '}
                 · <DateTimeDisplay date={request.createdAt} />

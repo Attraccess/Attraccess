@@ -96,6 +96,24 @@ export class SSOProviderOIDCConfiguration {
   })
   emailClaimPaths!: string[] | null;
 
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'Claim path to read the first name from (default given_name)',
+    required: false,
+    nullable: true,
+    type: String,
+  })
+  firstNameClaimPath?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'Claim path to read the last name from (default family_name)',
+    required: false,
+    nullable: true,
+    type: String,
+  })
+  lastNameClaimPath?: string | null;
+
   @Column({ type: 'simple-array', nullable: true })
   @ApiProperty({
     description:

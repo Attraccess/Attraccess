@@ -26,6 +26,9 @@ import de from '../de.json';
 
 const USERNAME_CLAIM_PATHS_DEFAULT = 'preferred_username · email · sub';
 const EMAIL_CLAIM_PATHS_DEFAULT = 'email · emails[0].value · upn';
+// The server's defaults (apps/api sso-name-claims.ts), in the order it reads them.
+const FIRST_NAME_CLAIM_PATHS_DEFAULT = 'given_name · name.givenName';
+const LAST_NAME_CLAIM_PATHS_DEFAULT = 'family_name · name.familyName';
 const ROLE_CLAIM_PATHS_DEFAULT = [...DEFAULT_OIDC_ROLE_CLAIM_PATHS, 'resource_access.<clientId>.roles'].join(' · ');
 
 export interface OIDCConfigFormProps {
@@ -232,6 +235,22 @@ export function OIDCConfigForm({ form }: OIDCConfigFormProps) {
           emptyHint={t('defaultsUsed', { defaults: EMAIL_CLAIM_PATHS_DEFAULT })}
           data-cy="sso-provider-form-oidc-email-claims-input"
         />
+        <TextField
+          value={formValues.oidcConfiguration?.firstNameClaimPath ?? ''}
+          onChange={(v) => setOidc('firstNameClaimPath', v)}
+        >
+          <Label>{t('firstNameClaimPath')}</Label>
+          <Input placeholder="given_name" data-cy="sso-provider-form-oidc-first-name-claim-input" />
+          <Description>{t('nameClaimPathHint', { defaults: FIRST_NAME_CLAIM_PATHS_DEFAULT })}</Description>
+        </TextField>
+        <TextField
+          value={formValues.oidcConfiguration?.lastNameClaimPath ?? ''}
+          onChange={(v) => setOidc('lastNameClaimPath', v)}
+        >
+          <Label>{t('lastNameClaimPath')}</Label>
+          <Input placeholder="family_name" data-cy="sso-provider-form-oidc-last-name-claim-input" />
+          <Description>{t('nameClaimPathHint', { defaults: LAST_NAME_CLAIM_PATHS_DEFAULT })}</Description>
+        </TextField>
         <StringListField
           label={t('roleClaimPaths')}
           description={t('roleClaimPathsHint')}

@@ -11,7 +11,7 @@ import {
   type UserRecord,
 } from '@attraccess/application-models';
 import { AuthenticationDetail, DashboardPin, ResourceUsage, Session, User } from '@attraccess/database-entities';
-import { DataSource, EntityManager, FindOptionsWhere, ILike, In, IsNull, Not } from 'typeorm';
+import { DataSource, EntityManager, FindOptionsWhere, In, IsNull, Not } from 'typeorm';
 import {
   UserIdentityTakenError,
   type DeleteAccountRequest,
@@ -25,11 +25,8 @@ import { isUniqueViolation } from '../../persistence-errors';
 import type { TransactionContext } from '../../transaction-context';
 import { TransactionContextResolver } from '../transaction-context';
 import { toUserAccount, toUserRecord } from './user-mapping';
-import { applyUserListFilters } from './user-list-query';
+import { applyUserListFilters, USER_DISPLAY_NAME_SORT_SQL } from './user-list-query';
 import { findRelations } from '../find-options';
-
-/** Emails are stored trimmed and lower-cased, so the email search term is folded the same way. */
-const foldEmail = (value: string) => value.trim().toLowerCase();
 
 /**
  * Advisory lock key (one key, transaction-scoped) that serialises account creation and the first-time-setup claim
@@ -120,35 +117,15 @@ export class TypeOrmUserStore implements UserStore {
     const skip = (query.page - 1) * query.limit;
     const repository = this.source.getRepository(User);
 
-    if (hasAdvancedFilters(query)) {
-      const builder = repository.createQueryBuilder('user');
-      applyUserListFilters(builder, query);
-      const [users, total] = await builder
-        .orderBy('user.username', 'ASC')
-        .skip(skip)
-        .take(query.limit)
-        .getManyAndCount();
-      return { users: users.map(toUserAccount), total };
-    }
-
-    let where: FindOptionsWhere<User>[] | FindOptionsWhere<User> = {};
-    if (Array.isArray(query.ids)) where = { id: In(query.ids) };
-    if (query.roleId !== undefined) where = { ...where, userRoles: { roleId: query.roleId } };
-    if (query.search) {
-      where = [
-        { ...where, username: ILike(`%${query.search}%`) },
-        { ...where, email: ILike(`%${foldEmail(query.search)}%`) },
-      ];
-    }
-    const [users, total] = await repository.findAndCount({
-      skip,
-      take: query.limit,
-      where,
-      relations: findRelations(
-        query.includeRoles ? ['authenticationDetails', 'userRoles', 'userRoles.role'] : ['authenticationDetails'],
-      ),
-      order: { username: 'ASC' },
-    });
+    const builder = repository.createQueryBuilder('user');
+    applyUserListFilters(builder, query);
+    const [users, total] = await builder
+      .addSelect(USER_DISPLAY_NAME_SORT_SQL, 'user_display_name_sort')
+      .orderBy('user_display_name_sort', 'ASC')
+      .addOrderBy('user.id', 'ASC')
+      .skip(skip)
+      .take(query.limit)
+      .getManyAndCount();
     return { users: users.map(toUserAccount), total };
   }
 
@@ -168,6 +145,8 @@ export class TypeOrmUserStore implements UserStore {
       const entities = users.map((data) => {
         const entity = repository.create();
         entity.username = data.username;
+        entity.firstName = data.firstName ?? null;
+        entity.lastName = data.lastName ?? null;
         entity.email = data.email;
         entity.externalIdentifier = data.externalIdentifier;
         entity.isEmailVerified = data.isEmailVerified;
@@ -322,6 +301,8 @@ export class TypeOrmUserStore implements UserStore {
         passwordResetToken: null,
         passwordResetTokenExpiresAt: null,
         externalIdentifier: null,
+        firstName: null,
+        lastName: null,
         nfcKeySeedToken: null,
         lastUsernameChangeAt: null,
       });
@@ -329,16 +310,4 @@ export class TypeOrmUserStore implements UserStore {
       return { outcome: 'anonymized', locale: user.locale };
     });
   }
-}
-
-function hasAdvancedFilters(query: UserListQuery): boolean {
-  return (
-    query.roleIds !== undefined ||
-    query.excludeRoleIds !== undefined ||
-    query.emailVerified !== undefined ||
-    query.ssoProviderIds !== undefined ||
-    query.excludeSsoProviderIds !== undefined ||
-    query.ssoProviderNone !== undefined ||
-    query.hasSsoProvider !== undefined
-  );
 }

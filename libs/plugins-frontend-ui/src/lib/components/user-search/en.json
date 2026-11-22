@@ -2,7 +2,7 @@
   "label": "User",
   "chooseUser": "Choose user",
   "modalTitle": "Choose a user",
-  "searchPlaceholder": "Search by username or email",
+  "searchPlaceholder": "Search by name, username or email",
   "usersListLabel": "Users",
   "clear": "Clear selection",
   "resultCount": {

@@ -15,7 +15,7 @@ Navigate to **Users** in the sidebar. You need the **Manage Users** permission.
 
 The user list shows all registered users with:
 
-- Username and email
+- Name (first and last name, or the username when none is set) with the username below it, and email
 - Login method (password or SSO provider)
 - System permissions
 
@@ -25,7 +25,7 @@ The list can be searched and paginated.
 
 Click on a user to see and edit their details:
 
-- Account information (username, email)
+- Account information (username, optional first and last name, email). Administrators with the **Update Users** permission can change the name; it is shown instead of the username throughout Attraccess, and the username is the fallback when no name is set. Names of users who sign in via SSO are read-only, because the identity provider manages them.
 - Login methods (local password, SSO links)
 - System permissions
 - Linked RFID cards

@@ -42,7 +42,7 @@
     },
     "success": {
       "title": "Benutzer gelöscht",
-      "description": "{{username}} wurde gelöscht."
+      "description": "{{name}} wurde gelöscht."
     }
   },
   "rfidCards": {

@@ -57,6 +57,8 @@ public:
         lv_obj_set_flex_grow(userLabel, 1);
         lv_label_set_long_mode(userLabel, LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_font(userLabel, &attractap_font_montserrat_latin1_16, 0);
+        // One line: a long display name ends with dots instead of wrapping out of the header.
+        lv_obj_set_height(userLabel, lv_font_get_line_height(&attractap_font_montserrat_latin1_16));
         timeLabel = lv_label_create(identity);
         lv_obj_set_style_text_font(timeLabel, &attractap_font_montserrat_latin1_14, 0);
         lv_obj_set_style_text_color(timeLabel, DisplayTheme::muted(), 0);

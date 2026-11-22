@@ -7,6 +7,10 @@ import { DEFAULT_SAML_ROLE_ATTRIBUTE_KEYS, ROLE_PATH_LIST_MAX_ENTRIES, ROLE_PATH
 import en from '../en.json';
 import de from '../de.json';
 
+// The server's defaults (apps/api sso-name-claims.ts), in the order it reads them.
+const FIRST_NAME_ATTRIBUTE_KEYS_DEFAULT = 'givenName · http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname';
+const LAST_NAME_ATTRIBUTE_KEYS_DEFAULT = 'surname · http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname';
+
 const EMAIL_ATTRIBUTE_KEYS_DEFAULT =
   'email · mail · Email · http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress · urn:oid:1.2.840.113549.1.9.1';
 
@@ -102,6 +106,22 @@ export function SAMLConfigForm({ form }: SAMLConfigFormProps) {
           emptyHint={t('emailAttributeKeysEmptyHint', { defaults: EMAIL_ATTRIBUTE_KEYS_DEFAULT })}
           data-cy="sso-provider-form-saml-email-attribute-keys-input"
         />
+        <TextField
+          value={formValues.samlConfiguration?.firstNameClaimPath ?? ''}
+          onChange={(v) => setSaml('firstNameClaimPath', v)}
+        >
+          <Label>{t('firstNameAttributeKey')}</Label>
+          <Input placeholder="givenName" data-cy="sso-provider-form-saml-first-name-attribute-input" />
+          <Description>{t('nameAttributeKeyHint', { defaults: FIRST_NAME_ATTRIBUTE_KEYS_DEFAULT })}</Description>
+        </TextField>
+        <TextField
+          value={formValues.samlConfiguration?.lastNameClaimPath ?? ''}
+          onChange={(v) => setSaml('lastNameClaimPath', v)}
+        >
+          <Label>{t('lastNameAttributeKey')}</Label>
+          <Input placeholder="surname" data-cy="sso-provider-form-saml-last-name-attribute-input" />
+          <Description>{t('nameAttributeKeyHint', { defaults: LAST_NAME_ATTRIBUTE_KEYS_DEFAULT })}</Description>
+        </TextField>
         <StringListField
           label={t('roleAttributeKeys')}
           description={t('roleAttributeKeysHint')}

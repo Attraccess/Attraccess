@@ -37,6 +37,16 @@ export class UserAdministrationService {
     return user;
   }
 
+  async changeName(
+    id: number,
+    name: { firstName?: string | null; lastName?: string | null },
+    origin: AuditOrigin,
+  ): Promise<UserAccount> {
+    const user = await this.usersService.changeName(id, name);
+    await this.record('user_updated', id, origin, 'name');
+    return user;
+  }
+
   async changeEmail(id: number, email: string, actor: AuthenticatedUser, origin: AuditOrigin): Promise<UserAccount> {
     const user = await this.usersService.changeEmail(id, email, actor);
     await this.record('user_updated', id, origin, 'email');
@@ -53,7 +63,7 @@ export class UserAdministrationService {
     action: 'user_deleted' | 'user_updated',
     userId: number,
     origin: AuditOrigin,
-    field?: 'username' | 'email' | 'password' | 'billingFactor',
+    field?: 'username' | 'name' | 'email' | 'password' | 'billingFactor',
   ): Promise<void> {
     await this.audit.record(identityAuditEvent(action, origin, { id: userId }, field ? { field } : {}));
   }

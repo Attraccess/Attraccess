@@ -44,7 +44,7 @@ export class MaintenanceRequestNotificationListener {
         return;
       }
 
-      const requestedByUsername = request.createdByUsername ?? undefined;
+      const requestedByUsername = request.createdByDisplayName ?? undefined;
 
       await this.notifications.dispatch({
         category: NotificationCategory.MAINTENANCE_REQUESTS,

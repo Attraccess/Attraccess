@@ -16,6 +16,8 @@ Sie benötigen eine RFID-Karte, die mit Ihrem Attraccess-Konto verknüpft ist. W
 
 _Oben sehen Sie Ihren Namen und die verbleibende Zeit bis zur automatischen Abmeldung._
 
+Der Leser zeigt Ihren Anzeigenamen: Vor- und Nachname, sofern Ihr Konto sie hat, sonst Ihren Benutzernamen. Das gilt für die Kopfzeile, den Sperrbildschirm, Einrichtungs- und Zurücksetzen-Ansichten, Gruppeneinweisungen, Aufsicht und die Sitzungszusammenfassung. Leser mit älterer Firmware oder älterem Server zeigen weiterhin den Benutzernamen. Zeichen außerhalb der Leserschrift (Latin-1) werden ersetzt, sehr lange Namen werden auf dem Bildschirm gekürzt.
+
 Sie können eine Ressource auch **vor der Anmeldung** auswählen. Tippen Sie auf ihren Namen und halten Sie Ihre Karte an den Leser, wenn Sie dazu aufgefordert werden. Nach der Anmeldung öffnen sich die Details. Mit dem Pfeil ganz links in der Kopfzeile gelangen Sie zurück zur Liste.
 
 ![Kartenaufforderung für eine ausgewählte Ressource mit Zurück-Pfeil oben links](../../_media/attractap/card-prompt.png)
@@ -92,7 +94,7 @@ _Mit dem Zurück-Pfeil gelangen Sie wieder zur Ressourcenliste. Beim Wechsel zwi
 
 ### Zusammenfassung zum Nutzungsende
 
-Nach dem erfolgreichen Beenden Ihrer eigenen Maschinennutzung zeigt der Leser **Danke, {name}!** mit Ihrem Benutzernamen. **Dauer** ist die vergangene Sitzungszeit in Stunden, Minuten und Sekunden, nicht die Betriebszeit oder die abgerechneten Minuten. Die Stunden können 24 überschreiten. **Abgerechnet** zeigt den formatierten Endbetrag bei einer Gebühr ungleich null. Ohne Gebühr steht nur die Dauer mittig.
+Nach dem erfolgreichen Beenden Ihrer eigenen Maschinennutzung zeigt der Leser **Danke, {name}!** mit Ihrem Anzeigenamen (Ihr Name oder, ohne Namen, Ihr Benutzername). **Dauer** ist die vergangene Sitzungszeit in Stunden, Minuten und Sekunden, nicht die Betriebszeit oder die abgerechneten Minuten. Die Stunden können 24 überschreiten. **Abgerechnet** zeigt den formatierten Endbetrag bei einer Gebühr ungleich null. Ohne Gebühr steht nur die Dauer mittig.
 
 ![Vollbild-Zusammenfassung mit Dauer und Endbetrag](../../_media/attractap/session-summary-billed.png)
 

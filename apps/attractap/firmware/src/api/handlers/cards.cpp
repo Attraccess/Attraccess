@@ -3,6 +3,7 @@
 
 #include "../api.hpp"
 #include "../../rfid/rfid_contract.hpp"
+#include "display-name.hpp"
 #include <functional>
 #include <cstring>
 #include <string>
@@ -144,6 +145,7 @@ void API::onCardAuthenticationDetailsResponse(JsonObject data)
     CardAuthenticationDetailsResponse response;
     response.error = error;
     response.username = username;
+    response.displayName = displayNameOr(payload["displayName"], username);
     response.cardSessionId = payload["cardSessionId"].is<const char *>() ? payload["cardSessionId"].as<std::string>() : std::string("");
     if (error.empty() && !response.cardSessionId.empty())
     {
@@ -169,7 +171,7 @@ void API::setCardAuthenticationDetailsResponseCallback(std::function<void(CardAu
     this->cardAuthenticationDetailsResponseCallback = callback;
 }
 
-void API::setEnrollNewCardGetAvailableKeyNoCallback(std::function<void(std::string username)> callback)
+void API::setEnrollNewCardGetAvailableKeyNoCallback(std::function<void(std::string username, std::string displayName)> callback)
 {
     this->enrollNewCardGetAvailableKeyNoCallback = callback;
 }
@@ -191,7 +193,7 @@ void API::setEnrollNewCardErrorCallback(std::function<void(std::string error)> c
     this->enrollNewCardErrorCallback = callback;
 }
 
-void API::setResetNfcCardCallback(std::function<void(std::string username)> callback)
+void API::setResetNfcCardCallback(std::function<void(std::string username, std::string displayName)> callback)
 {
     this->resetNfcCardCallback = callback;
 }
@@ -234,7 +236,7 @@ void API::onResetNfcCard(JsonObject data)
         return;
     }
     std::string username = payload["username"].is<const char *>() ? payload["username"].as<std::string>() : std::string("");
-    this->resetNfcCardCallback(username);
+    this->resetNfcCardCallback(username, displayNameOr(payload["displayName"], username));
 }
 
 void API::onEnrollNewCardGetAvailableKeyNo(JsonObject data)
@@ -247,8 +249,7 @@ void API::onEnrollNewCardGetAvailableKeyNo(JsonObject data)
     }
 
     std::string username = data["payload"]["username"].as<std::string>();
-
-    this->enrollNewCardGetAvailableKeyNoCallback(username);
+    this->enrollNewCardGetAvailableKeyNoCallback(username, displayNameOr(data["payload"]["displayName"], username));
 }
 
 void API::onEnrollNewCard(JsonObject data)

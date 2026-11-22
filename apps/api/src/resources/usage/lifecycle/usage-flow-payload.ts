@@ -1,4 +1,12 @@
+import { optionalUserDisplayName } from '@attraccess/shared';
 import type { UsageFormSubmissionDraft, UsageSession, UsageSessionUser } from '@attraccess/application-models';
+
+/** A user as a flow payload carries it: the stored fields plus the computed display name, which templates cannot compute. */
+export function withDisplayName<
+  T extends { username?: string | null; firstName?: string | null; lastName?: string | null },
+>(user: T): T & { displayName: string } {
+  return { ...user, displayName: optionalUserDisplayName(user) ?? '' };
+}
 
 /** The usage session as flows see it: answered forms by form id, a sanitized user and no resource documentation. */
 export function usageFlowPayload(resourceUsage: UsageSession, formSubmissions?: UsageFormSubmissionDraft[]) {
@@ -22,10 +30,14 @@ export function usageFlowPayload(resourceUsage: UsageSession, formSubmissions?: 
   const usageUser: Partial<UsageSessionUser> | undefined =
     resourceUsage.user ?? (resourceUsage.userId != null ? { id: resourceUsage.userId } : undefined);
 
-  const sanitizedUser: (Partial<UsageSessionUser> & Pick<UsageSessionUser, 'id'>) | undefined = usageUser
+  const sanitizedUser:
+    (Partial<UsageSessionUser> & Pick<UsageSessionUser, 'id'> & { displayName?: string }) | undefined = usageUser
     ? {
         id: usageUser.id,
         username: usageUser.username,
+        firstName: usageUser.firstName ?? null,
+        lastName: usageUser.lastName ?? null,
+        displayName: optionalUserDisplayName(usageUser) ?? '',
         email: usageUser.email,
         createdAt: usageUser.createdAt,
         updatedAt: usageUser.updatedAt,

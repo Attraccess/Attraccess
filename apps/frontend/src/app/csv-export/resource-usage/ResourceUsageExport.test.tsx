@@ -76,11 +76,12 @@ it('offers email, external identifier, notes and resource metadata fields', asyn
     'Resource metadata: costCenter',
   );
   // existing keys stay stable because templates reference them
-  expect(state.fields.slice(0, 17).map((c) => c.key)).toEqual([
+  expect(state.fields.slice(0, 19).map((c) => c.key)).toEqual([
     'resourceId',
     'resourceName',
     'userId',
     'username',
+    'userDisplayName',
     'startTimeISO',
     'startTime',
     'endTimeISO',
@@ -94,5 +95,6 @@ it('offers email, external identifier, notes and resource metadata fields', asyn
     'endNotes',
     'supervisorId',
     'supervisorUsername',
+    'supervisorDisplayName',
   ]);
 });

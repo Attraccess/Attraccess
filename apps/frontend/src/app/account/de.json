@@ -10,7 +10,7 @@
     "advanced": "Erweitert"
   },
   "topics": {
-    "profile": { "title": "Persönliche Daten", "description": "E-Mail-Adresse und Benutzername" },
+    "profile": { "title": "Persönliche Daten", "description": "Name, E-Mail-Adresse und Benutzername" },
     "password": { "title": "Passwort", "description": "Anmeldepasswort ändern" },
     "twoFactor": { "title": "Zwei-Faktor-Authentifizierung", "description": "Authenticator-App hinzufügen" },
     "passkeys": { "title": "Passkeys", "description": "Passwortlose Anmeldung verwalten" },
@@ -26,6 +26,7 @@
   "searchTerms": {
     "email": "E-Mail",
     "username": "Benutzername",
+    "name": "Name",
     "authenticator": "Authenticator 2FA",
     "push": "Push",
     "mcp": "MCP KI Assistent"

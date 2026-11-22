@@ -252,6 +252,7 @@ add_test(NAME attractap-reader-workflow-tests COMMAND attractap-reader-workflow-
 add_test(NAME attractap-reader-ui-tests COMMAND attractap-reader-workflow-tests --ui)
 add_test(NAME attractap-reader-clock-journey-tests COMMAND attractap-reader-workflow-tests --with-clock)
 add_test(NAME attractap-reader-refused-card-tests COMMAND attractap-reader-workflow-tests --refused-card)
+add_test(NAME attractap-reader-display-name-tests COMMAND attractap-reader-workflow-tests --display-names)
 # The ATT-882 journeys run on the test clock: seconds, no real waits.
 set_tests_properties(attractap-reader-refused-card-tests PROPERTIES TIMEOUT 120)
 add_test(NAME attractap-ota-interrupt-enrollment COMMAND attractap-reader-workflow-tests --ota-enrollment)
@@ -280,6 +281,7 @@ set_property(TEST
     attractap-reader-clock-journey-tests
     attractap-reader-ui-tests
     attractap-reader-refused-card-tests
+    attractap-reader-display-name-tests
     attractap-ota-interrupt-enrollment
     attractap-ota-interrupt-reset
     attractap-reader-timeout-tests

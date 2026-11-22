@@ -48,6 +48,20 @@ describe('EmailService', () => {
     expect(callArg.html).toContain('cid:attraccess-logo');
   });
 
+  it('puts first name, last name and display name into the template context', async () => {
+    const { service, sendMail } = scope.setup();
+
+    await service.sendUsernameChangedEmail(
+      scope.makeUser({ username: 'ada', firstName: ' Ada ', lastName: 'Lovelace' }),
+      'old_ada',
+    );
+    await service.sendUsernameChangedEmail(scope.makeUser({ username: 'bob' }), 'old_bob');
+
+    const [named, unnamed] = (sendMail as jest.Mock).mock.calls.map(([mail]) => mail.html as string);
+    expect(named).toContain('Name: Ada Lovelace');
+    expect(unnamed).toContain('Name: bob');
+  });
+
   it('sends verification email with correct URL', async () => {
     const { service, sendMail } = scope.setup();
     const user = scope.makeUser({ email: 'bob@example.com' });

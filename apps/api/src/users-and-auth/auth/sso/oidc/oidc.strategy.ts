@@ -28,6 +28,8 @@ import { SSOService } from '../sso.service';
 
 import { get } from 'lodash-es';
 
+import { resolveOidcNameClaims } from '../sso-name-claims';
+
 import { PassportStrategy } from '@nestjs/passport';
 
 /** Request key set by SSOOIDCGuard so the strategy uses the per-request callback URL (current settings, no restart needed). */
@@ -231,6 +233,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 10) 
           userinfoClaims,
         ),
         usernameClaim: resolvedUsername || profile.username || email,
+        ...resolveOidcNameClaims(claimSources, this.config),
       })
       .catch((error: unknown) => {
         if (error instanceof UnauthorizedException) this.recordFailure(error);

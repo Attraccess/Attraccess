@@ -142,6 +142,25 @@ describe('area persistence adapters (real PostgreSQL)', () => {
       expect(await store().findTranslations(key)).toHaveLength(1);
     });
 
+    it('moves an unedited plugin body listed in previousBodies to the declared one, never an edited body', async () => {
+      const untouched = 'plugin.demo.untouched';
+      const edited = 'plugin.demo.edited';
+      for (const key of [untouched, edited]) {
+        await store().registerPluginTemplate({ type: key, subject: 'S', body: 'Old', variables: [] }, []);
+      }
+      await store().updateContent(edited, { body: 'Admin' });
+
+      for (const key of [untouched, edited]) {
+        await store().registerPluginTemplate(
+          { type: key, subject: 'S', body: 'New', variables: [], previousBodies: ['Older', 'Old'] },
+          [],
+        );
+      }
+
+      expect(await store().findTemplate(untouched)).toMatchObject({ body: 'New' });
+      expect(await store().findTemplate(edited)).toMatchObject({ body: 'Admin' });
+    });
+
     it('restores the defaults and the shipped translations together', async () => {
       await store().restoreDefaults(type, { subject: 'Default', body: '<mj-text>Default</mj-text>', variables: [] }, [
         { templateType: type, locale: 'de', key: 'greeting', value: 'Hallo {name},' },
@@ -286,6 +305,8 @@ describe('area persistence adapters (real PostgreSQL)', () => {
       expect(participants.find((entry) => entry.userId === bob.id)?.recipient).toEqual({
         id: bob.id,
         username: 'msg-bob3',
+        firstName: null,
+        lastName: null,
         email: 'msg-bob3@example.test',
         locale: 'en',
       });
@@ -296,7 +317,10 @@ describe('area persistence adapters (real PostgreSQL)', () => {
       expect(
         (await notifications.findParticipants(id)).find((entry) => entry.userId === bob.id)?.lastNotifiedAt,
       ).toEqual(notifiedAt);
-      expect(await notifications.findUsername(alice.id)).toBe('msg-alice3');
+      expect(await notifications.findDisplayName(alice.id)).toBe('msg-alice3');
+      await source.getRepository(User).update({ id: alice.id }, { firstName: 'Alice', lastName: 'Liddell' });
+      expect(await notifications.findDisplayName(alice.id)).toBe('Alice Liddell');
+      expect(await notifications.findDisplayName(-1)).toBeNull();
     });
   });
 

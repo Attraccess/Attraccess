@@ -1,4 +1,5 @@
 #include "../api.hpp"
+#include "display-name.hpp"
 #include <functional>
 #include <cstring>
 #include <string>
@@ -37,6 +38,7 @@ void API::onSupervisionStart(JsonObject data)
     command.requesterUsername = payload["requesterUsername"].is<const char *>()
                                     ? payload["requesterUsername"].as<std::string>()
                                     : std::string("");
+    command.requesterDisplayName = displayNameOr(payload["requesterDisplayName"], command.requesterUsername);
     this->supervisionStartCallback(command);
 }
 
@@ -78,6 +80,11 @@ void API::onSupervisionRequestResult(JsonObject data)
             result.supervisorNames[result.supervisorCount++] = name.as<std::string>();
         }
     }
+    // Display names come in the same order; an older server sends none, then the usernames are shown.
+    for (uint8_t i = 0; i < result.supervisorCount; ++i)
+    {
+        result.supervisorDisplayNames[i] = displayNameOr(payload["supervisorDisplayNames"][i], result.supervisorNames[i]);
+    }
     this->supervisionRequestResultCallback(result);
 }
 
@@ -91,6 +98,7 @@ void API::onSupervisorCardAuthenticationData(JsonObject data)
     SupervisorCardAuthenticationResponse response;
     response.error = payload["error"].is<const char *>() ? payload["error"].as<std::string>() : std::string("");
     response.username = payload["username"].is<const char *>() ? payload["username"].as<std::string>() : std::string("");
+    response.displayName = displayNameOr(payload["displayName"], response.username);
 
     this->supervisorCardAuthenticationResponseCallback(response);
 }
@@ -106,5 +114,6 @@ void API::onSupervisionResolved(JsonObject data)
     result.success = payload["success"].is<bool>() ? payload["success"].as<bool>() : false;
     result.error = payload["error"].is<const char *>() ? payload["error"].as<std::string>() : std::string("");
     result.supervisorUsername = payload["supervisorUsername"].is<const char *>() ? payload["supervisorUsername"].as<std::string>() : std::string("");
+    result.supervisorDisplayName = displayNameOr(payload["supervisorDisplayName"], result.supervisorUsername);
     this->supervisionResolvedCallback(result);
 }

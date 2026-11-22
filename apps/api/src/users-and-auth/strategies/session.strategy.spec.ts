@@ -101,6 +101,82 @@ describe('SessionStrategy', () => {
       expect(twoFactorService.getStatus).not.toHaveBeenCalled();
     });
 
+    describe('display name on the principal', () => {
+      const namedUser = (): AuthenticatedSessionUser =>
+        ({ id: 7, username: 'ada', firstName: ' Ada ', lastName: 'Lovelace', email: 'ada@example.com' }) as never;
+
+      it('gives a session principal the display name', async () => {
+        sessionService.authenticateSession.mockResolvedValue({
+          user: namedUser(),
+          session: { id: 'stable-session', ssoContext: null },
+        });
+
+        const result = (await strategy.validate({
+          headers: { authorization: 'Bearer session-token' },
+          cookies: {},
+          path: '/api/users/me',
+        } as Request)) as AuthenticatedUser;
+
+        expect(result.displayName).toBe('Ada Lovelace');
+      });
+
+      it('gives an API token principal the display name', async () => {
+        apiTokenService.authenticate.mockResolvedValue({
+          user: namedUser(),
+          apiToken: { id: 4, permissionKeys: ['resources.read'] },
+        } as never);
+        rbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.read', 'users.api-tokens.manage']));
+
+        const result = (await strategy.validate({
+          headers: { authorization: 'Bearer api-token' },
+          cookies: {},
+          path: '/api/resources',
+        } as Request)) as AuthenticatedUser;
+
+        expect(result.displayName).toBe('Ada Lovelace');
+      });
+
+      it('falls back to the username and recomputes a stale display name on a reused object', async () => {
+        const user = { ...namedUser(), firstName: null, lastName: null, displayName: 'Old Name' };
+        sessionService.authenticateSession.mockResolvedValue({
+          user,
+          session: { id: 'stable-session', ssoContext: null },
+        });
+
+        const result = (await strategy.validate({
+          headers: { authorization: 'Bearer session-token' },
+          cookies: {},
+          path: '/api/users/me',
+        } as Request)) as AuthenticatedUser;
+
+        expect(result.displayName).toBe('ada');
+      });
+
+      it('leaves an entity getter alone instead of assigning to it', async () => {
+        class EntityLike {
+          id = 7;
+          username = 'ada';
+          firstName = 'Ada';
+          lastName = null;
+          get displayName() {
+            return 'from getter';
+          }
+        }
+        sessionService.authenticateSession.mockResolvedValue({
+          user: new EntityLike() as never,
+          session: { id: 'stable-session', ssoContext: null },
+        });
+
+        const result = (await strategy.validate({
+          headers: { authorization: 'Bearer session-token' },
+          cookies: {},
+          path: '/api/users/me',
+        } as Request)) as AuthenticatedUser;
+
+        expect(result.displayName).toBe('from getter');
+      });
+    });
+
     it('rejects API tokens when the owner loses API token management permission', async () => {
       const mockRequest = {
         headers: { authorization: 'Bearer api-token' },
@@ -367,6 +443,16 @@ describe('SessionStrategy', () => {
       expect(rbacService.getEffectivePermissions).toHaveBeenCalledWith(mockUser.id, true);
       expect(sessionService.authenticateSession).not.toHaveBeenCalled();
       expect(apiTokenService.authenticate).not.toHaveBeenCalled();
+    });
+
+    it('gives the delegated principal the display name', async () => {
+      const request = { headers: {}, cookies: {}, path: '/api/resources' } as Request;
+      const user = { ...mockUser, firstName: 'Ada', lastName: 'Lovelace' } as AuthenticatedSessionUser;
+      setMcpDelegation(request, { user, permissionKeys: [], grantId: 'grant-1', clientId: 'client-1' });
+
+      const result = (await strategy.validate(request)) as AuthenticatedUser;
+
+      expect(result.displayName).toBe('Ada Lovelace');
     });
 
     it('still blocks a user whose required two-factor setup is missing', async () => {

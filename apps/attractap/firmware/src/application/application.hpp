@@ -105,6 +105,7 @@ private:
 
     void handleResourceListAction(const API::ResourceBrief &resource, ResourceListAction action);
     void updateSelectedResourceDetails();
+    void showCardHolderDetails();
     void showReaderActionProgress(const FirmwareI18n::Text &title);
     void finishReaderAction(bool success);
     void logoutReader();

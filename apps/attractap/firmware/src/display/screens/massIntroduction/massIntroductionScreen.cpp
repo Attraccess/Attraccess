@@ -97,7 +97,7 @@ void MassIntroductionScreen::render(const View &view)
    {
       hint = FirmwareI18n::Text::format(FirmwareI18n::Message::Breadcrumb, {
          hint, FirmwareI18n::Text::format(FirmwareI18n::Message::MassIntroductionIntroducer,
-                                          {FirmwareI18n::Text::literal(this->view.introducerName) /* i18n-data: Server-supplied introducer username; preserve exact contents. */})});
+                                          {FirmwareI18n::Text::literal(this->view.introducerName) /* i18n-data: Server-supplied introducer display name; preserve exact contents. */})});
    }
    FirmwareI18n::setLabel(this->hintLabel, hint);
    const uint32_t durationSeconds = this->view.durationMs / 1000;
@@ -215,7 +215,7 @@ void MassIntroductionScreen::applyStatus()
       return;
    }
 
-   const FirmwareI18n::Text participant = FirmwareI18n::Text::literal(this->view.participantName) /* i18n-data: Server-supplied participant username; preserve exact contents. */;
+   const FirmwareI18n::Text participant = FirmwareI18n::Text::literal(this->view.participantName) /* i18n-data: Server-supplied participant display name; preserve exact contents. */;
    FirmwareI18n::Text text;
    lv_color_t color = DisplayTheme::text();
    switch (this->view.status)

@@ -3,9 +3,16 @@ import type { SocketState } from './handler.test-fixture';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
 import { SupervisionMode } from '@attraccess/application-models';
+import type { ReaderSupervisionCallbacks } from '../../../../resources/supervision/supervision.types';
+
+// What SupervisionService hands to onResolved: no name parts, the display name already computed.
+const RESOLVED_SUPERVISOR = { id: 2, username: 'supervisor', displayName: 'Sue Pervisor' };
 
 describe('AttractapSupervisionHandler', () => {
   const fixture = registerAttractapSupervisionHandlerFixture();
+
+  const lastPayload = (socket: AuthenticatedWebSocket) =>
+    (socket.sendMessage as jest.Mock).mock.calls.at(-1)?.[0].data.payload;
 
   describe('armReader', () => {
     it('arms every socket of the reader and tells it to wait for a card', async () => {
@@ -26,6 +33,33 @@ describe('AttractapSupervisionHandler', () => {
           data: expect.objectContaining({ type: AttractapEventType.SUPERVISION_START }),
         }),
       );
+    });
+
+    it('names the requester by username and display name', async () => {
+      const socket = fixture.makeSocket();
+      fixture.websocketService.sockets.set('a', socket);
+
+      await fixture.arm();
+
+      expect(lastPayload(socket)).toMatchObject({
+        requesterUsername: 'requester',
+        requesterDisplayName: 'Rita Requester',
+      });
+    });
+
+    it('names the approving supervisor by username and display name when the request resolves', async () => {
+      const socket = fixture.makeSocket();
+      fixture.websocketService.sockets.set('a', socket);
+      const callbacks = (await fixture.arm()) as ReaderSupervisionCallbacks;
+
+      callbacks.onResolved({} as never, RESOLVED_SUPERVISOR);
+
+      expect(lastPayload(socket)).toEqual({
+        success: true,
+        resourceId: fixture.RESOURCE_ID,
+        supervisorUsername: 'supervisor',
+        supervisorDisplayName: 'Sue Pervisor',
+      });
     });
 
     // Regression: verifiedUserId is a sticky record of the last card ever tapped, cleared
@@ -198,6 +232,41 @@ describe('AttractapSupervisionHandler', () => {
       expect(socket.state.supervisionFlow).toMatchObject({ requestId: 'req-1', resourceId: fixture.RESOURCE_ID });
     });
 
+    it('names the approving supervisor by display name when the reader request resolves', async () => {
+      const socket = tappedSocket();
+
+      await request(socket);
+      const { callbacks } = fixture.supervisionService.createReaderRequest.mock.calls[0][0] as {
+        callbacks: ReaderSupervisionCallbacks;
+      };
+      callbacks.onResolved({} as never, RESOLVED_SUPERVISOR);
+
+      expect(lastPayload(socket)).toEqual({
+        success: true,
+        resourceId: fixture.RESOURCE_ID,
+        supervisorUsername: 'supervisor',
+        supervisorDisplayName: 'Sue Pervisor',
+      });
+    });
+
+    it('lists the eligible supervisors by username and, in the same order, by display name', async () => {
+      const socket = tappedSocket();
+      fixture.supervisionService.getEligibleSupervisorIds.mockResolvedValue([2]);
+      fixture.usersService.findOne.mockResolvedValueOnce(fixture.requester).mockResolvedValueOnce({
+        id: 2,
+        username: 'supervisor',
+        firstName: 'Sue',
+        lastName: 'Pervisor',
+      });
+
+      await request(socket);
+
+      expect(lastPayload(socket)).toMatchObject({
+        supervisorNames: ['supervisor'],
+        supervisorDisplayNames: ['Sue Pervisor'],
+      });
+    });
+
     it('refuses the request when no introducer can supervise', async () => {
       const socket = tappedSocket();
       fixture.supervisionService.getEligibleSupervisorIds.mockResolvedValue([]);
@@ -254,9 +323,6 @@ describe('AttractapSupervisionHandler', () => {
         },
       });
 
-    const lastPayload = (socket: AuthenticatedWebSocket) =>
-      (socket.sendMessage as jest.Mock).mock.calls.at(-1)?.[0].data.payload;
-
     beforeEach(() => {
       fixture.usersService.findOne.mockResolvedValue(fixture.requester);
     });
@@ -276,7 +342,7 @@ describe('AttractapSupervisionHandler', () => {
         2,
       );
       expect(socket.state.supervisionFlow).toMatchObject({ approvedSupervisorUserId: 2 });
-      expect(lastPayload(socket)).toEqual({ username: 'supervisor' });
+      expect(lastPayload(socket)).toEqual({ username: 'supervisor', displayName: 'Sue Pervisor' });
     });
 
     it('never hands a key to the reader', async () => {

@@ -187,6 +187,8 @@ export class TypeOrmResourceIntroductionStore implements ResourceIntroductionSto
         ? {
             id: row.receiverUser.id,
             username: row.receiverUser.username,
+            firstName: row.receiverUser.firstName,
+            lastName: row.receiverUser.lastName,
             email: row.receiverUser.email,
             locale: row.receiverUser.locale,
           }

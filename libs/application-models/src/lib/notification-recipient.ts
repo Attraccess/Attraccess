@@ -2,6 +2,8 @@
 export interface NotificationRecipient {
   id: number;
   username: string;
+  firstName?: string | null;
+  lastName?: string | null;
   email: string;
   locale: string;
 }

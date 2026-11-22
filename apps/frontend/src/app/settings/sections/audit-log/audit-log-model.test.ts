@@ -70,6 +70,21 @@ describe('audit export and filtering', () => {
     expect(csv).toContain('new');
     expect(csv).toContain('"api-token","19","demo-fixture","2001:db8::1","\'=diagnostic"');
   });
+  it('exports the actor display name as "Actor" and the username in its own column', () => {
+    const lines = auditCsv([
+      { ...entry, actorId: 7, actorDisplayName: 'Ada Lovelace', actorUsername: 'ada', actorUsernameSource: 'current' },
+      { ...entry, actorId: 8, actorUsername: 'bob' },
+    ]).split('\r\n');
+    const columns = lines[0].split(',');
+    const column = (line: string, name: string) => line.split(',')[columns.indexOf(`"${name}"`)];
+    expect(columns.slice(5, 9)).toEqual(['"Actor ID"', '"Actor"', '"Actor username"', '"Actor username source"']);
+    expect(column(lines[1], 'Actor')).toBe('"Ada Lovelace"');
+    expect(column(lines[1], 'Actor username')).toBe('"ada"');
+    expect(column(lines[1], 'Actor username source')).toBe('"current"');
+    // Without a display name the username stands in for it.
+    expect(column(lines[2], 'Actor')).toBe('"bob"');
+    expect(column(lines[2], 'Actor username')).toBe('"bob"');
+  });
   it('rejects reversed dates and unsafe IDs without throwing', () => {
     expect(filterRequest({ ...emptyFilters, from: '2026-09-13T12:00', to: '2026-09-12T12:00' })).toEqual({
       error: 'invalidRange',

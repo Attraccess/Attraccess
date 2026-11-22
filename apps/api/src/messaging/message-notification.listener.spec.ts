@@ -9,7 +9,7 @@ import { NotificationCategory, NotificationChannel } from '../notifications/noti
 
 describe('MessageNotificationListener', () => {
   let listener: MessageNotificationListener;
-  let store: { findParticipants: jest.Mock; findUsername: jest.Mock; markNotified: jest.Mock };
+  let store: { findParticipants: jest.Mock; findDisplayName: jest.Mock; markNotified: jest.Mock };
   let liveService: { isOnline: jest.Mock };
   let notifications: { dispatch: jest.Mock; sendEmailTemplate: jest.Mock };
 
@@ -49,7 +49,7 @@ describe('MessageNotificationListener', () => {
   beforeEach(async () => {
     store = {
       findParticipants: jest.fn(),
-      findUsername: jest.fn().mockResolvedValue('alice'),
+      findDisplayName: jest.fn().mockResolvedValue('alice'),
       markNotified: jest.fn().mockResolvedValue(undefined),
     };
     liveService = { isOnline: jest.fn().mockReturnValue(false) };
@@ -241,7 +241,7 @@ describe('MessageNotificationListener', () => {
   });
 
   it('falls back to a generic sender name when the sender is missing', async () => {
-    store.findUsername.mockResolvedValue(null);
+    store.findDisplayName.mockResolvedValue(null);
     store.findParticipants.mockResolvedValue([buildParticipant()]);
 
     await listener.handleMessageCreated(new MessageCreatedEvent(buildMessage()));
