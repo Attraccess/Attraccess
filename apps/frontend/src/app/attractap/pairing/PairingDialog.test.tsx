@@ -316,6 +316,9 @@ describe('PairingDialog', () => {
     expect(
       screen.getByText("Enter the code the bridge's setup page shows on its Server tab right now."),
     ).toBeInTheDocument();
+    expect(screen.getByText('Code on the setup page')).toBeInTheDocument();
+    // The setup page shows the code as text only: no QR code to scan.
+    expect(document.querySelector('[data-cy="attractap-pairing-scan"]')).toBeNull();
   });
 
   describe('Lite pattern step', () => {

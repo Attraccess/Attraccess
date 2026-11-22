@@ -86,7 +86,7 @@ The connection is encrypted (Bluetooth LE Secure Connections), so the Wi-Fi pass
 
 ## Setup and Pairing
 
-The bridge pairs like any other reader: it waits with a code, and an admin approves it once. See [Reader Pairing](attractap/pairing.md).
+The bridge pairs like any other reader: it waits with a code, and an admin approves it once. See [Reader Pairing](attractap/pairing.md). The bridge has no screen: its code is on the setup page, on the **Server** tab. If you approve it from the reader list instead, enter that code there.
 
 In the reader list, the bridge appears as **Bluetooth bridge**. The switch **Allow plugins to use Bluetooth** is already on. This default applies once: if an admin turns it off, it stays off. The bridge settings have no resources, NFC, display or LED options.
 

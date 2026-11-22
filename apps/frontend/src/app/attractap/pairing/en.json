@@ -39,6 +39,7 @@
     },
     "findHint": "Enter the code shown on the reader.",
     "codeLabel": "Code on the reader",
+    "bridgeCodeLabel": "Code on the setup page",
     "typeCode": "Enter the code the reader shows right now.",
     "typeBridgeCode": "Enter the code the bridge's setup page shows on its Server tab right now.",
     "scan": "Scan",
@@ -57,6 +58,7 @@
     "segmentStart": "1 (start)",
     "error": {
       "wrongCode": "This code does not match the reader. Check the code on the reader and try again.",
+      "wrongBridgeCode": "This code does not match the bridge. Check the code on its setup page (Server tab) and try again.",
       "codeNotFound": "No waiting reader shows this code. Check the code on the reader; it changes about every 30 seconds.",
       "ambiguous": "Two readers show this code right now. Wait for the next code on the reader and try again.",
       "stale": "The colours changed. Compare the new colours and approve again.",

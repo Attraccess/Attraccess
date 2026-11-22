@@ -86,7 +86,7 @@ Die Verbindung ist verschlüsselt (Bluetooth LE Secure Connections); das WLAN-Pa
 
 ## Einrichtung und Kopplung
 
-Die Bridge wird wie jeder andere Leser gekoppelt: Sie wartet mit einem Code, und ein Admin gibt sie einmal frei. Siehe [Reader koppeln](attractap/pairing.md).
+Die Bridge wird wie jeder andere Leser gekoppelt: Sie wartet mit einem Code, und ein Admin gibt sie einmal frei. Siehe [Reader koppeln](attractap/pairing.md). Die Bridge hat kein Display: Ihr Code steht auf der Einrichtungsseite im Tab **Server**. Geben Sie ihn dort ein, wenn Sie die Bridge stattdessen aus der Leser-Liste freigeben.
 
 In der Leser-Liste erscheint die Bridge als **Bluetooth-Bridge**. Der Schalter **Bluetooth-Nutzung durch Plugins erlauben** ist bereits eingeschaltet. Diese Voreinstellung gilt einmal: Schaltet ein Admin ihn aus, bleibt er aus. Die Einstellungen der Bridge haben keine Optionen für Ressourcen, NFC, Display oder LEDs.
 
