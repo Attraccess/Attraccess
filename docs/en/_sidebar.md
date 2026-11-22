@@ -130,6 +130,7 @@
 - **Developer Guide**
   - [Overview](developer/overview.md)
   - [Architecture](developer/architecture.md)
+  - [Attractap Firmware Performance](developer/attractap-firmware-performance.md)
   - [Persistence Architecture](developer/persistence-architecture.md)
   - [Persistence Guarantees](developer/persistence-guarantees.md)
   - [Adding a Database Backend](developer/adding-a-database-backend.md)
