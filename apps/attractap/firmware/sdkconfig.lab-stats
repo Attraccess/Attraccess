@@ -6,5 +6,7 @@
 # tools/check_release_build.py fails an image that contains the `debug.stats` topic.
 CONFIG_FREERTOS_USE_TRACE_FACILITY=y
 CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS=y
+# 64-bit counters: the default 32-bit ones wrap after 71 minutes and the CPU shares turn to nonsense.
+CONFIG_FREERTOS_RUN_TIME_COUNTER_TYPE_U64=y
 CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS=y
 CONFIG_FREERTOS_VTASKLIST_INCLUDE_COREID=y

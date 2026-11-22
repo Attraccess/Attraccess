@@ -19,13 +19,17 @@ constexpr UBaseType_t SNAPSHOT_ATTEMPTS = 3;
 // Tasks created between counting and snapshotting still fit.
 constexpr UBaseType_t SNAPSHOT_SLACK = 4;
 constexpr size_t ROW_BYTES = 96;
+// The USB-Serial-JTAG console drops lines written back to back (the table is also larger than the 1 KB TX ring
+// buffer in main.cpp). A short pause before every line lets the host drain it; measured on a Touch V2.
+constexpr TickType_t LINE_PAUSE_TICKS = pdMS_TO_TICKS(20);
 } // namespace
 
 void TaskStats::log()
 {
     TaskStatus_t *status = nullptr;
     UBaseType_t reported = 0;
-    uint32_t totalRunTime = 0;
+    // 64-bit with sdkconfig.lab-stats/.debug (CONFIG_FREERTOS_RUN_TIME_COUNTER_TYPE_U64): a 32-bit counter wraps after 71 minutes.
+    configRUN_TIME_COUNTER_TYPE totalRunTime = 0;
 
     // uxTaskGetSystemState returns 0 when the array is too small, so retry with a fresh
     // count if tasks were created meanwhile. The array is bounded: it never overruns.
@@ -51,9 +55,13 @@ void TaskStats::log()
     // The run-time counter ticks once for the whole chip; each core can use all of it.
     const uint64_t cpuTime = static_cast<uint64_t>(totalRunTime) * portNUM_PROCESSORS;
 
-    logger.infof("--- FreeRTOS run-time stats (%u tasks, total %u ticks) ---", (unsigned)reported,
-                 (unsigned)totalRunTime);
+    // Also before the header: it follows the "Handling command" line back to back and was dropped about a third of the time.
+    vTaskDelay(LINE_PAUSE_TICKS);
+    logger.infof("--- FreeRTOS run-time stats (%u tasks, total %llu ticks) ---", (unsigned)reported,
+                 (unsigned long long)totalRunTime);
+    vTaskDelay(LINE_PAUSE_TICKS);
     logger.info("Task                 Runtime       CPU  StackHWM  Core");
+    vTaskDelay(LINE_PAUSE_TICKS);
     for (UBaseType_t i = 0; i < reported; i++)
     {
         const TaskStatus_t &task = status[i];
@@ -69,14 +77,15 @@ void TaskStats::log()
         {
             snprintf(core, sizeof(core), "%d", (int)task.xCoreID);
         }
-        const int written = snprintf(row, sizeof(row), "%-16.16s %10u %4u.%u%% %9u  %s", task.pcTaskName,
-                                     (unsigned)task.ulRunTimeCounter, percentTenths / 10, percentTenths % 10,
+        const int written = snprintf(row, sizeof(row), "%-16.16s %10llu %4u.%u%% %9u  %s", task.pcTaskName,
+                                     (unsigned long long)task.ulRunTimeCounter, percentTenths / 10, percentTenths % 10,
                                      (unsigned)task.usStackHighWaterMark, core);
         if (written < 0 || static_cast<size_t>(written) >= sizeof(row))
         {
             logger.warn("debug.stats: row truncated");
         }
         logger.info(row);
+        vTaskDelay(LINE_PAUSE_TICKS);
     }
     logger.info("--- end of run-time stats ---");
     free(status);
