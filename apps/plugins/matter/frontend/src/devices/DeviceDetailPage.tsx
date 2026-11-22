@@ -7,6 +7,7 @@ import { useMatterTranslations } from '../i18n';
 import { matterTabPath } from '../matterPaths';
 import { useMatterPermissions } from '../permissions';
 import { updateEndpoint, updateNode } from './api';
+import { AdministratorsSection } from './AdministratorsSection';
 import { DiagnosticsSection } from './DiagnosticsSection';
 import { EndpointTree } from './EndpointTree';
 import { IdentityCard } from './IdentityCard';
@@ -15,9 +16,12 @@ import { LifecycleChip } from './LifecycleChip';
 import { MetadataForm } from './MetadataForm';
 import { needsResolution } from './lifecycle';
 import { nodeLabel } from './nodeLabel';
+import { RemoveFromFabric } from './RemoveFromFabric';
+import { RemovedNotice } from './RemovedNotice';
 import { RetryButton } from './RetryButton';
 import { ReachabilityChip } from './ReachabilityChip';
 import { ResolutionCallout } from './ResolutionCallout';
+import { ShareSection } from './ShareSection';
 import { useNodeDetail } from './useNodeDetail';
 
 /**
@@ -29,7 +33,7 @@ import { useNodeDetail } from './useNodeDetail';
 export function DeviceDetailPage({ nodeId }: Readonly<{ nodeId: string }>) {
   const { t } = useMatterTranslations();
   const navigate = useNavigate();
-  const { canRead, canManage } = useMatterPermissions();
+  const { canRead, canManage, canCommission } = useMatterPermissions();
   const detail = useNodeDetail(nodeId, canRead);
   const node = detail.data;
 
@@ -93,6 +97,7 @@ export function DeviceDetailPage({ nodeId }: Readonly<{ nodeId: string }>) {
         </StatusAlert>
       )}
       <ResolutionCallout node={node} />
+      <RemovedNotice node={node} />
       {canManage && (
         <LifecycleActions
           node={node}
@@ -102,7 +107,18 @@ export function DeviceDetailPage({ nodeId }: Readonly<{ nodeId: string }>) {
           }}
         />
       )}
+      {canCommission && node.lifecycleState !== 'removed' && (
+        <RemoveFromFabric
+          nodeRecordId={node.id}
+          name={name}
+          onChanged={() => {
+            void detail.refetch();
+          }}
+        />
+      )}
       <IdentityCard node={node} />
+      {canCommission && node.lifecycleState === 'claimed' && <ShareSection nodeRecordId={node.id} name={name} />}
+      <AdministratorsSection administrators={node.administrators ?? []} />
       {/* Not a Card: form fields share the Card's fill and would be invisible (ATT-294 / ATT-834). */}
       <section
         className="mt:flex mt:flex-col mt:gap-3 mt:rounded-xl mt:border mt:border-separator mt:p-4"

@@ -91,7 +91,19 @@ export interface MatterEndpointDetail extends MatterEndpointView {
   capabilities: { capability: string; sourceClusterId: number; details: unknown }[];
 }
 
+/** Another administrator of the device: a fabric it is joined to. Read-only; Attraccess does not act for it. */
+export interface NodeAdministrator {
+  fabricIndex: number;
+  vendorId: number | null;
+  fabricLabel: string | null;
+  isOwn: boolean;
+}
+
 export interface MatterNodeDetail extends MatterNodeSummary {
+  /** Absent from an older backend. */
+  administrators?: NodeAdministrator[];
+  /** The device was commissioned although its attestation failed (a development override). */
+  attestationOverridden?: boolean;
   fabric: { id: string; fabricId: string; status: string; label: string | null } | null;
   endpoints: MatterEndpointDetail[];
 }

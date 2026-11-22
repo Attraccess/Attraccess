@@ -1,43 +1,54 @@
 import { Card } from '@heroui/react';
 import { PlusCircleIcon } from 'lucide-react';
+import { familyAvailability } from '../capabilities';
+import { CommissioningFlow } from '../commissioning/CommissioningFlow';
 import { useMatterTranslations } from '../i18n';
+import { useMatterConnection } from '../MatterConnectionContext';
 import { FamilyNotice } from './FamilyNotice';
 import { NotAvailableYet } from './NotAvailableYet';
 
 const STEPS = ['prepare', 'code', 'progress', 'claim'] as const;
 
 /**
- * The full-page commissioning flow (ATT-1002 fills it; never a modal). Today it only explains the steps: no setup code
- * is collected or sent, and nothing here renders an input that pretends to work. Visible with
- * `matter.devices.commission`.
+ * The full-page commissioning flow (never a modal). Visible with `matter.devices.commission`. While the connected
+ * sidecar does not report `commissioning` as available, the page says why and renders no input. A user who may not read
+ * the connection status gets the flow: the API refuses what the sidecar cannot do.
  */
 export function CommissioningTab() {
   const { t } = useMatterTranslations();
+  const { status } = useMatterConnection();
+  const unavailable = status !== null && familyAvailability(status, 'commissioning') !== 'available';
   return (
     <div className="mt:flex mt:flex-col mt:gap-4" data-cy="matter-commissioning-tab">
-      <NotAvailableYet
-        title={t('commissioning.emptyTitle')}
-        icon={<PlusCircleIcon className="mt:h-8 mt:w-8" />}
-        dataCy="matter-commissioning-empty"
-      >
-        <FamilyNotice family="commissioning" />
-        <p>{t('commissioning.emptyText')}</p>
-      </NotAvailableYet>
-      <Card data-cy="matter-commissioning-steps">
-        <Card.Header>
-          <Card.Title>{t('commissioning.stepsTitle')}</Card.Title>
-        </Card.Header>
-        <Card.Content>
-          <ol className="mt:flex mt:list-decimal mt:flex-col mt:gap-3 mt:pl-5">
-            {STEPS.map((step) => (
-              <li key={step}>
-                <span className="mt:font-medium">{t(`commissioning.steps.${step}.title`)}</span>
-                <span className="mt:block mt:text-sm mt:text-muted">{t(`commissioning.steps.${step}.text`)}</span>
-              </li>
-            ))}
-          </ol>
-        </Card.Content>
-      </Card>
+      {unavailable ? (
+        <>
+          <NotAvailableYet
+            title={t('commissioning.emptyTitle')}
+            icon={<PlusCircleIcon className="mt:h-8 mt:w-8" />}
+            dataCy="matter-commissioning-empty"
+          >
+            <FamilyNotice family="commissioning" />
+            <p>{t('commissioning.emptyText')}</p>
+          </NotAvailableYet>
+          <Card data-cy="matter-commissioning-steps">
+            <Card.Header>
+              <Card.Title>{t('commissioning.stepsTitle')}</Card.Title>
+            </Card.Header>
+            <Card.Content>
+              <ol className="mt:flex mt:list-decimal mt:flex-col mt:gap-3 mt:pl-5">
+                {STEPS.map((step) => (
+                  <li key={step}>
+                    <span className="mt:font-medium">{t(`commissioning.steps.${step}.title`)}</span>
+                    <span className="mt:block mt:text-sm mt:text-muted">{t(`commissioning.steps.${step}.text`)}</span>
+                  </li>
+                ))}
+              </ol>
+            </Card.Content>
+          </Card>
+        </>
+      ) : (
+        <CommissioningFlow />
+      )}
     </div>
   );
 }

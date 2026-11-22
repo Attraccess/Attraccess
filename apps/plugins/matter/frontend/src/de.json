@@ -377,8 +377,8 @@
   },
   "commissioning": {
     "emptyTitle": "Inbetriebnahme ist noch nicht verfügbar",
-    "emptyText": "Geräte hinzufügen läuft auf dieser Seite als geführter Ablauf in mehreren Schritten. Er ist noch nicht verfügbar: Hier wird kein Setup-Code erfasst oder gesendet.",
-    "stepsTitle": "So läuft das Hinzufügen eines Geräts ab",
+    "emptyText": "Zum Hinzufügen von Geräten braucht es einen Sidecar mit Commissioning-Unterstützung. Bis dahin sammelt und sendet diese Seite keinen Einrichtungscode.",
+    "stepsTitle": "So funktioniert das Hinzufügen",
     "steps": {
       "prepare": {
         "title": "Gerät vorbereiten",
@@ -396,6 +396,173 @@
         "title": "Benennen und übernehmen",
         "text": "Gib dem neuen Gerät einen Namen und übernimm es, damit es in Flows genutzt werden kann."
       }
+    },
+    "flow": {
+      "prepare": "Gerät vorbereiten",
+      "code": "Code eingeben oder scannen",
+      "progress": "Fortschritt",
+      "finish": "Benennen und abschließen"
+    },
+    "prepare": {
+      "title": "Gerät vorbereiten",
+      "network": "Das Gerät muss bereits im Netzwerk (Ethernet oder WLAN) und vom Matter-Sidecar erreichbar sein.",
+      "window": "Ein neues Gerät ist ab Werk oder nach einem Werksreset bereit. Ein Gerät, das schon zu einem anderen Ökosystem gehört, braucht einen Freigabecode aus diesem Ökosystem („Teilen“ oder „Kopplungsmodus aktivieren“).",
+      "code": "Halte den Einrichtungscode bereit: den QR-Code oder die 11- oder 21-stellige Nummer auf dem Gerät oder der Verpackung.",
+      "sharing": "Ein Freigabecode aus Apple Home, Google Home, SmartThings oder Home Assistant funktioniert wie ein Einrichtungscode und wird genauso eingegeben.",
+      "continue": "Weiter"
+    },
+    "code": {
+      "sources": "Woher der Code kommt",
+      "source": {
+        "camera": "Mit Kamera scannen",
+        "image": "Bild hochladen",
+        "type": "Eingeben oder einfügen"
+      },
+      "label": "Einrichtungs- oder Freigabecode",
+      "hint": "Füge den QR-Text (MT:…) ein oder tippe die 11- oder 21-stellige Nummer. Leerzeichen und Bindestriche werden ignoriert. Der Code wird hier geprüft und nie gespeichert.",
+      "start": "Commissioning starten",
+      "problem": {
+        "empty": "Gib einen Einrichtungscode ein.",
+        "format": "Das ist kein Matter-Einrichtungscode. Verwende den QR-Text mit MT: am Anfang oder die 11- oder 21-stellige Nummer.",
+        "checksum": "Die Prüfziffer stimmt nicht. Prüfe die Nummer auf einen Tippfehler."
+      }
+    },
+    "camera": {
+      "label": "Kameravorschau",
+      "insecure": {
+        "title": "Die Kamera ist nicht verfügbar",
+        "text": "Browser erlauben die Kamera nur über HTTPS oder localhost. Lade stattdessen ein Bild des QR-Codes hoch oder tippe den Code ein."
+      },
+      "denied": {
+        "title": "Die Kamera konnte nicht geöffnet werden",
+        "text": "Erlaube den Kamerazugriff für diese Seite, oder lade ein Bild des QR-Codes hoch oder tippe den Code ein."
+      }
+    },
+    "image": {
+      "label": "Bild des QR-Codes",
+      "pick": "Bild auswählen",
+      "hint": "Das Bild wird in diesem Browser gelesen. Es wird weder hochgeladen noch gespeichert.",
+      "failed": "Kein QR-Code gefunden",
+      "failedText": "Das Bild konnte nicht als QR-Code gelesen werden. Versuche ein schärferes, näheres Bild oder tippe den Code ein."
+    },
+    "progress": {
+      "title": "Commissioning läuft",
+      "hint": "Das kann einige Minuten dauern. Lass das Gerät eingeschaltet und nah am Netzwerk.",
+      "cancel": "Abbrechen",
+      "cancelTitle": "Commissioning abbrechen?",
+      "cancelText": "Das Gerät wird nicht hinzugefügt. Du kannst mit dem Code neu starten.",
+      "pollError": "Der Fortschritt konnte nicht gelesen werden",
+      "step": {
+        "discovering": "Gerät finden",
+        "pase": "Sichere Kopplung mit dem Einrichtungscode",
+        "reading_device": "Gerät auslesen",
+        "attestation": "Gerätezertifikat prüfen",
+        "adding_fabric": "Gerät zum Attraccess-Fabric hinzufügen",
+        "case": "Sicher verbinden",
+        "interrogating": "Endpunkte des Geräts auslesen"
+      },
+      "state": {
+        "done": "erledigt",
+        "running": "läuft",
+        "waiting": "wartet"
+      }
+    },
+    "failure": {
+      "again": "Neu starten",
+      "openDevices": "Geräte öffnen",
+      "openAction": {
+        "open": "Gerät öffnen",
+        "repair": "Gerät öffnen und reparieren",
+        "restore": "Gerät öffnen und wiederherstellen",
+        "reconcile": "Geräte öffnen"
+      },
+      "unknown": {
+        "title": "Commissioning fehlgeschlagen",
+        "text": "Das Gerät wurde nicht hinzugefügt. Starte mit dem Code neu."
+      },
+      "invalid_code": {
+        "title": "Der Einrichtungscode ist ungültig",
+        "text": "Der Sidecar konnte diesen Code nicht lesen. Prüfe ihn und gib ihn erneut ein."
+      },
+      "device_not_found": {
+        "title": "Das Gerät wurde nicht gefunden",
+        "text": "Bringe das Gerät näher oder ins gleiche Netzwerk wie den Matter-Sidecar, stelle sicher, dass sein Kopplungsfenster offen ist, und starte neu."
+      },
+      "pase_failed": {
+        "title": "Der Code wurde nicht akzeptiert",
+        "text": "Das Gerät hat den Passcode nicht akzeptiert. Prüfe den Code auf Tippfehler oder öffne am Gerät ein neues Kopplungsfenster und starte neu."
+      },
+      "attestation_failed": {
+        "title": "Das Gerät konnte nicht verifiziert werden",
+        "text": "Das Gerätezertifikat wird nicht als vertrauenswürdig anerkannt, deshalb wurde das Gerät nicht hinzugefügt. Am Gerät wurde nichts geändert.",
+        "findings": "Befunde: {{findings}}"
+      },
+      "already_commissioned": {
+        "title": "Dieses Gerät ist schon im Attraccess-Fabric",
+        "text": "Es wurde kein neuer Eintrag angelegt.",
+        "open": "Es ist hier schon bekannt. Öffne es.",
+        "repair": "Es ist bekannt, aber getrennt. Öffne es und repariere es.",
+        "restore": "Es ist bekannt, aber archiviert. Öffne es und stelle es wieder her.",
+        "reconcile": "Starte auf dem Tab „Geräte“ einen Abgleich, um es zu finden, oder setze das Gerät auf Werkseinstellungen zurück und füge es neu hinzu."
+      },
+      "fabric_full": {
+        "title": "Das Gerät hat keinen Platz für einen weiteren Administrator",
+        "text": "Das Gerät kann keinem weiteren Fabric beitreten. Entferne es von einem seiner anderen Controller oder setze es auf Werkseinstellungen zurück und starte neu."
+      },
+      "case_failed": {
+        "title": "Die sichere Verbindung ist fehlgeschlagen",
+        "text": "Das Gerät ist beigetreten, aber die Verbindung konnte nicht abgeschlossen werden. Prüfe, ob das Gerät im Netzwerk ist, und starte neu."
+      },
+      "timeout": {
+        "title": "Das Commissioning hat zu lange gedauert",
+        "text": "Das Gerät wurde nicht rechtzeitig fertig. Es blieb nichts halb registriert. Starte neu."
+      },
+      "cancelled": {
+        "title": "Das Commissioning wurde abgebrochen",
+        "text": "Das Gerät wurde nicht hinzugefügt."
+      },
+      "interrupted": {
+        "title": "Das Commissioning wurde unterbrochen",
+        "text": "Der Matter-Sidecar oder das Plugin wurde neu gestartet, oder die Verbindung ist abgebrochen. Eine Sitzung wird nie fortgesetzt. Falls das Gerät schon beigetreten war, prüfe „Geräte“: Dort erscheint es als nicht zugeordnetes Gerät. Sonst starte mit dem Code neu."
+      },
+      "internal": {
+        "title": "Commissioning fehlgeschlagen",
+        "text": "Ein unerwarteter Fehler hat das Commissioning gestoppt. Starte neu."
+      },
+      "needs_reconciliation": {
+        "title": "Das Gerät ist beigetreten, aber noch nicht eingetragen",
+        "text": "Das Gerät ist im Fabric, aber Attraccess konnte es nicht erfassen. Öffne „Geräte“: Nach dem nächsten Abgleich erscheint es als nicht zugeordnetes Gerät."
+      },
+      "registry_failed": {
+        "title": "Das Gerät ist beigetreten, konnte aber nicht erfasst werden",
+        "text": "Das Gerät ist im Fabric, aber Attraccess konnte es nicht speichern. Öffne „Geräte“: Nach dem nächsten Abgleich erscheint es als nicht zugeordnetes Gerät."
+      }
+    },
+    "override": {
+      "start": "Trotzdem hinzufügen (Entwicklungs-Override)",
+      "title": "Gerät ohne Verifizierung hinzufügen?",
+      "risk": "Dieses Gerät hat die Attestierung nicht bestanden: Sein Zertifikat wird nicht als vertrauenswürdig anerkannt. Wenn du es trotzdem hinzufügst, gelangt ein nicht verifiziertes oder gefälschtes Gerät in dein Fabric. Tu das nur für ein Gerät, das du selbst gebaut hast oder dem du vertraust, auf einem Entwicklungssystem. Der Versuch wird im Audit-Log festgehalten.",
+      "findings": "Befunde:",
+      "acknowledge": "Ich verstehe das Risiko und möchte dieses Gerät ohne Verifizierung hinzufügen.",
+      "confirm": "Ohne Verifizierung hinzufügen"
+    },
+    "finish": {
+      "addedTitle": "Das Gerät wurde hinzugefügt",
+      "addedText": "Es ist im Attraccess-Fabric und schon von dir übernommen.",
+      "overridden": "Die Attestierung wurde übergangen: Das Gerät wird als nicht verifiziert angezeigt.",
+      "title": "Gerät benennen",
+      "name": "Gerätename",
+      "location": "Ort",
+      "endpoints": "Namen der Endpunkte",
+      "endpoint": "Endpunkt {{endpointId}}",
+      "endpointsHint": "Optional. Leere Namen bleiben unverändert.",
+      "save": "Speichern und abschließen",
+      "skip": "Benennen überspringen",
+      "openDevice": "Gerät öffnen",
+      "failed": "Die Namen konnten nicht gespeichert werden",
+      "doneTitle": "Fertig",
+      "doneText": "Das Gerät erscheint unter „Geräte“.",
+      "another": "Weiteres Gerät hinzufügen"
     }
   },
   "updates": {
@@ -574,7 +741,8 @@
       "verified": "Verifiziert",
       "unverified": "Nicht verifiziert",
       "failed": "Fehlgeschlagen",
-      "unknown": "Unbekannt"
+      "unknown": "Unbekannt",
+      "overriddenNote": "Die Attestierung wurde beim Hinzufügen des Geräts übergangen."
     },
     "state": {
       "none": "Noch kein Zustand gemeldet.",
@@ -659,6 +827,55 @@
     "diagnostics": {
       "title": "Diagnose",
       "text": "Rohe Gerätetypen, Cluster-, Attribut- und Befehls-IDs sowie Fähigkeiten, für den Support. Du brauchst sie nicht, um ein Gerät zu nutzen."
+    },
+    "removed": {
+      "removed_from_fabric": {
+        "title": "Aus dem Attraccess-Fabric entfernt",
+        "text": "Das Gerät hat das Attraccess-Fabric verlassen. Der Verlauf bleibt erhalten. Andere Controller sind nicht betroffen. Das Gerät wurde nicht auf Werkseinstellungen zurückgesetzt."
+      },
+      "forced_from_fabric": {
+        "title": "Von Attraccess vergessen",
+        "text": "Attraccess hat dieses Gerät vergessen, ohne es zu kontaktieren. Das Gerät kann noch Attraccess-Zugangsdaten tragen: Setze es auf Werkseinstellungen zurück oder entferne es bei seinem anderen Controller. Der Verlauf bleibt erhalten."
+      },
+      "generic": {
+        "title": "Entfernt",
+        "text": "Dieses Gerät gehört nicht mehr zum Fabric. Der Verlauf bleibt erhalten."
+      }
+    },
+    "remove": {
+      "action": "Aus Fabric entfernen",
+      "confirmTitle": "{{name}} aus dem Attraccess-Fabric entfernen?",
+      "confirmText": "Attraccess bittet das Gerät, das Attraccess-Fabric zu verlassen, und vergisst es dann. Andere Controller behalten das Gerät. Das ist kein Werksreset. Der Verlauf bleibt erhalten.",
+      "force": "Entfernen erzwingen",
+      "forceTitle": "{{name}} zwangsweise entfernen?",
+      "forceText": "Attraccess vergisst das Gerät, ohne es zu kontaktieren. Das Gerät kann noch Attraccess-Zugangsdaten tragen. Setze es auf Werkseinstellungen zurück oder entferne es bei seinem anderen Controller, damit es nicht Mitglied des Attraccess-Fabrics bleibt. Der Verlauf bleibt erhalten.",
+      "failed": "Das Gerät konnte nicht entfernt werden",
+      "unreachableTitle": "Das Gerät war nicht erreichbar",
+      "unreachableText": "Es wurde nichts geändert. Ist das Gerät weg oder defekt, kannst du das Entfernen erzwingen."
+    },
+    "share": {
+      "title": "Mit einem anderen Controller teilen",
+      "text": "Öffnet ein Kopplungsfenster, damit Apple Home, Google Home, Home Assistant oder ein anderer Controller dieses Gerät ebenfalls hinzufügen kann. Attraccess behält seinen eigenen Zugriff.",
+      "open": "Mit anderem Controller teilen",
+      "confirmTitle": "{{name}} teilen?",
+      "confirmText": "Ein einmaliger Code öffnet für einige Minuten ein Kopplungsfenster. Wer den Code in dieser Zeit hat, kann das Gerät einem anderen Ökosystem hinzufügen.",
+      "manualCode": "Manueller Kopplungscode",
+      "qrText": "QR-Text",
+      "qrLabel": "QR-Code zum Teilen von {{name}}",
+      "countdown": "Das Fenster schließt in {{minutes}}:{{seconds}}.",
+      "once": "Dieser Code wird nur einmal angezeigt und nicht gespeichert.",
+      "close": "Fenster schließen",
+      "failed": "Teilen fehlgeschlagen",
+      "expired": "Das Fenster wurde geschlossen",
+      "expiredText": "Das Kopplungsfenster ist abgelaufen. Teile erneut, um einen neuen Code zu erhalten."
+    },
+    "administrators": {
+      "title": "Außerhalb von Attraccess verwaltet",
+      "text": "Weitere Controller, bei denen dieses Gerät angemeldet ist. Attraccess listet sie nur auf. Nichts, was sie tun, wird als Aktion eines Attraccess-Benutzers angezeigt.",
+      "none": "Keine weiteren Administratoren.",
+      "fabric": "Fabric {{index}}",
+      "unlabeled": "Ohne Bezeichnung",
+      "vendor": "Hersteller {{vendorId}}"
     }
   },
   "profile": {
