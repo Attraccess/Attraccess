@@ -56,6 +56,7 @@ export function node(nodeId: string, extra: Partial<NodeView> = {}): NodeView {
     attestation: { status: 'verified', checkedAt: '2026-10-29T10:00:00.000Z' },
     observedAt: '2026-10-29T10:00:00.000Z',
     endpoints: [endpoint(0, [0x0028]), endpoint(1, [0x0006, 0x0008])],
+    administrators: [],
     ...extra,
   };
 }
@@ -72,6 +73,7 @@ export class ScriptedSidecar {
   inventoryAvailable: boolean | null = true;
   list: NodeListView | Error = inventory(null, []);
   fabricId: string | null = null;
+  fabricGeneration = 1;
   requests: string[] = [];
   /** Delay before `inventory.list` answers, to hold a run open. */
   listDelayMs = 0;
@@ -87,16 +89,41 @@ export class ScriptedSidecar {
     } as unknown as ConnectionStatus;
   }
 
-  async request(operation: string, options?: { params?: { nodeId: string } }): Promise<unknown> {
+  /** Answers for operations beyond inventory (`commissioning.*`, `nodes.*`): a thrown error is the sidecar's refusal. */
+  handlers: Record<string, (options: { params?: Record<string, string>; body?: unknown }) => unknown> = {};
+  /** The bodies of the requests, by operation, for assertions (a test must not need to log them). */
+  bodies: { operation: string; body: unknown }[] = [];
+  private readonly eventListeners = new Set<(event: { cursor: string; event: unknown }) => void>();
+  private readonly stateListeners = new Set<(status: ConnectionStatus) => void>();
+
+  /** Delivers an event to the subscribers, like the connection's event stream. */
+  emit(event: unknown): void {
+    for (const listener of this.eventListeners) listener({ cursor: 'c', event });
+  }
+
+  /** Changes the connection state and tells the subscribers. */
+  setState(state: ConnectionStatus['state']): void {
+    this.state = state;
+    for (const listener of this.stateListeners) listener(this.status());
+  }
+
+  async request(operation: string, options?: { params?: { nodeId: string }; body?: unknown }): Promise<unknown> {
     this.requests.push(operation);
+    this.bodies.push({ operation, body: options?.body });
     if (this.state !== 'connected') throw new SidecarUnavailableError('The Matter sidecar is not connected.');
+    const custom = this.handlers[operation];
+    if (custom) return custom(options ?? {});
     if (operation === 'inventory.list') {
       if (this.listDelayMs) await new Promise((resolve) => setTimeout(resolve, this.listDelayMs));
       if (this.list instanceof Error) throw this.list;
       return this.list;
     }
     if (operation === 'fabric.get') {
-      return { state: this.fabricId === null ? 'uninitialized' : 'initialized', fabricId: this.fabricId };
+      return {
+        state: this.fabricId === null ? 'uninitialized' : 'initialized',
+        fabricId: this.fabricId,
+        fabricGeneration: this.fabricGeneration,
+      };
     }
     if (operation === 'inventory.get') {
       if (this.list instanceof Error) throw this.list;
@@ -107,9 +134,15 @@ export class ScriptedSidecar {
     throw new Error(`unexpected operation ${operation}`);
   }
 
-  onStateChange = () => () => undefined;
+  onStateChange = (listener: (status: ConnectionStatus) => void) => {
+    this.stateListeners.add(listener);
+    return () => this.stateListeners.delete(listener);
+  };
   onReconciliationRequired = () => () => undefined;
-  onEvent = () => () => undefined;
+  onEvent = (listener: (event: { cursor: string; event: unknown }) => void) => {
+    this.eventListeners.add(listener);
+    return () => this.eventListeners.delete(listener);
+  };
 }
 
 export const unsupportedCapability = () =>
@@ -151,6 +184,8 @@ export const nodeRow = (overrides: Partial<MatterNode> = {}): MatterNode => ({
   mergedInto: null,
   createdAt: 't',
   updatedAt: 't',
+  administrators: null,
+  attestationOverridden: null,
   ...overrides,
 });
 

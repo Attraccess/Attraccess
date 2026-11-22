@@ -302,8 +302,8 @@ export class FakeFabricConnection {
   readonly requests: string[] = [];
   /** The last body of each operation, for assertions on what was sent. */
   readonly bodies: Record<string, unknown> = {};
-  private readonly stateHandlers = new Set<Handler<unknown>>();
-  private readonly eventHandlers = new Set<Handler<{ event: { type: string; payload: unknown } }>>();
+  protected readonly stateHandlers = new Set<Handler<unknown>>();
+  protected readonly eventHandlers = new Set<Handler<{ event: { type: string; payload: unknown } }>>();
 
   constructor(readonly backend: FakeFabricBackend) {
     backend.emit = (type, payload) => this.emitEvent(type, payload);

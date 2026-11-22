@@ -262,6 +262,15 @@ export class BackupIncompatibleError extends Error {
 export type LocalSchema = { pluginMigration: string | null };
 
 /**
+ * Older layouts whose backups restore onto a newer one, because everything that changed since adds only nullable
+ * columns: a row the old file lacks the column for restores with null. Keyed by the installed layout's name.
+ */
+const RESTORABLE_OLDER_LAYOUTS: Readonly<Record<string, readonly string[]>> = {
+  // ATT-1002: `administrators` and `attestation_overridden` on nodes.
+  'v3:node-administrators': ['CreateMatterBackup1793900002000'],
+};
+
+/**
  * Whether a backup can be restored onto this installation: the same sidecar storage schema, the same plugin
  * migration, and a release combination the compatibility table lists.
  */
@@ -272,7 +281,11 @@ export function assertCompatible(header: FileHeader, local: LocalSchema): void {
       'The backup uses a different Matter storage layout than this installation.',
     );
   }
-  if (local.pluginMigration === null || header.pluginMigration !== local.pluginMigration) {
+  const accepted =
+    local.pluginMigration === null
+      ? []
+      : [local.pluginMigration, ...(RESTORABLE_OLDER_LAYOUTS[local.pluginMigration] ?? [])];
+  if (!accepted.includes(header.pluginMigration)) {
     throw new BackupIncompatibleError(
       'incompatible_migration',
       'The backup was made with a different database layout of the Matter plugin than the installed one.',

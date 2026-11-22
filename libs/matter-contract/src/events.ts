@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { EVENT_SCHEMA_VERSION } from './constants';
 import { capabilityReportSchema } from './capabilities';
-import { commandResultSchema } from './families';
+import { commandResultSchema, commissioningProgressPayloadSchema } from './families';
 import {
   clusterIdSchema,
   correlationSchema,
@@ -75,6 +75,7 @@ export type CommandOutcomePayload = z.infer<typeof commandOutcomePayloadSchema>;
 
 /** Payload schemas by event type, for the types that are implemented. The others keep the opaque slot. */
 const TYPED_PAYLOADS: Partial<Record<(typeof EVENT_TYPES)[number], z.ZodType>> = {
+  'commissioning.progress': commissioningProgressPayloadSchema,
   'device.state': deviceStatePayloadSchema,
   'command.outcome': commandOutcomePayloadSchema,
 };
@@ -91,6 +92,7 @@ export const eventEnvelopeSchema = z
     payload: z.union([
       lifecyclePayloadSchema,
       capabilityReportSchema,
+      commissioningProgressPayloadSchema,
       deviceStatePayloadSchema,
       commandOutcomePayloadSchema,
       opaquePayloadSchema,

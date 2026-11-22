@@ -114,6 +114,12 @@ Hat der Sidecar gar keine Fabric, werden die übernommenen und nicht übernommen
 
 Ist die Attraccess-Datenbank **älter** als der Sidecar, werden die ihr unbekannten Nodes als **Nicht übernommen** (`unclaimed`) in Quarantäne genommen. Ist sie **neuer**, werden die Nodes getrennt, die der Sidecar nicht mehr listet.
 
+## Inbetriebnahme, Entfernen und weitere Administratoren
+
+Die Inbetriebnahme (siehe [Inbetriebnahme](plugins/matter/commissioning.md)) legt den Node direkt als `claimed` durch den ausführenden Benutzer an, samt Endpunkten, in einer Transaktion. Wird ein Node aus der Fabric entfernt oder das Entfernen erzwungen, steht `lifecycleState` auf `removed` mit `removalReason` `removed_from_fabric` oder `forced_from_fabric`; das Nur-Datensatz-„Entfernen erzwingen“ behält seinen eigenen Grund. Endpunkte werden stillgelegt, die Historie bleibt. Ein `removed`-Node wird nie wieder übernommen; eine erneute Inbetriebnahme legt einen neuen Datensatz an.
+
+Ein Node trägt seine weiteren Administratoren (Fabric-Index, Hersteller-ID, Fabric-Label und ob die Fabric die von Attraccess ist) als JSON-Textspalte `administrators`. Die Plugin-Speichermigration 3 ergänzt sie zusammen mit der booleschen Spalte `attestation_overridden`, die einen mit dem Entwicklungs-Override der Attestierung in Betrieb genommenen Node kennzeichnet (siehe [Inbetriebnahme](plugins/matter/commissioning.md#entwicklungs-override)). Beide Spalten sind nullbar; Zeilen von vor der Migration tragen null. Sie wird schreibgeschützt angezeigt. Aktionen einer externen Fabric werden nie einem Attraccess-Benutzer zugeordnet: Solche Audit- und Verlaufseinträge tragen keine `userId`.
+
 ## Aktionen
 
 Alle Aktionen brauchen `matter.devices.manage`, validieren ihre Eingabe, werden im Audit-Log festgehalten und antworten mit `409` bei einem nicht erlaubten Übergang und mit `404` bei einer unbekannten ID.
@@ -184,7 +190,7 @@ Die Ereignisse `device.state` und `command.outcome` des Sidecars aktualisieren d
 | Ereignis                                                                                                          | Was mit den Matter-Daten passiert                                                                                                                                                                                                             |
 | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Plugin deaktiviert oder nicht geladen (Plugins global deaktiviert, fehlgeschlagenes Laden, Boot-Guard-Quarantäne) | Nichts wird verändert oder gelöscht. Es läuft kein Abgleich, und der gespeicherte Zustand gilt anhand seiner Zeitstempel einfach als veraltet. Beim nächsten Laden läuft nach dem Verbindungsaufbau ein Abgleich.                             |
-| Plugin-Aktualisierung                                                                                             | Es laufen nur additive neutrale Migrationen. Alle Daten bleiben erhalten.                                                                                                                                                                              |
+| Plugin-Aktualisierung                                                                                             | Es laufen nur additive neutrale Migrationen. Alle Daten bleiben erhalten.                                                                                                                                                                     |
 | **Plugin-Deinstallation**                                                                                         | **Alle Matter-Tabellen und -Zeilen werden gelöscht**, auch die Verbindungseinstellungen. Die Fabric im Sidecar bleibt unberührt. Nach einer Neuinstallation erscheinen die Nodes als nicht übernommen; Namen und Flow-Verweise sind verloren. |
 
 Sichern Sie vor dem Deinstallieren, was Sie brauchen, und planen Sie ein, die Nodes danach erneut zu übernehmen.
@@ -205,5 +211,25 @@ Alle Endpunkte liegen unter `/api/matter/…`. Lesen braucht `matter.devices.rea
 ## Audit
 
 Die Audit-Domäne `matter` erfasst `matter.node_quarantined`, `matter.node_detached`, `matter.node_reattached`, `matter.node_claimed`, `matter.node_relinked`, `matter.node_repaired`, `matter.node_archived`, `matter.node_restored`, `matter.node_force_removed`, `matter.node_metadata_updated`, `matter.endpoint_metadata_updated` und `matter.fabric_mismatch_detected`. In der Oberfläche des Audit-Logs erscheinen sie mit lesbaren Namen, etwa „Matter node quarantined“. Der Gegenstand eines Eintrags zeigt eine aus der Plugin-UUID abgeleitete Zahl; die vollständige UUID steht in den Details des Eintrags (`nodeRef`, `endpointRef`, `fabricRef`). Die Einträge enthalten nur IDs, Aufzählungswerte und Kennzeichen, nie freien Text von Geräten oder Geheimnisse. Die Details von `matter.node_detached` und `matter.node_reattached` enthalten `fabricId` und `nodeId`. Telemetrie wird nie auditiert.
+
+Inbetriebnahme, Teilen und Entfernen aus der Fabric (siehe [Inbetriebnahme](plugins/matter/commissioning.md)) erfassen:
+
+| Aktion                                        | Wann                                                                                                                              |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `matter.commissioning_started`                | Ein Inbetriebnahme-Versuch hat begonnen; `attestationOverride` sagt, ob er den Entwicklungs-Override trägt                        |
+| `matter.commissioning_failed`                 | Der Versuch ist gescheitert: Fehlercode, Schritt, Befundtypen der Attestierung und bei `already_commissioned` die Node-ID         |
+| `matter.commissioning_interrupted`            | Der Versuch wurde unterbrochen: Neustart von Sidecar oder Plugin, Verbindungsabbruch oder Zeitüberschreitung                      |
+| `matter.commissioning_cancelled`              | Der Benutzer hat den Versuch abgebrochen                                                                                          |
+| `matter.commissioning_attestation_overridden` | Der Versuch lief trotz gescheiterter Attestierung weiter (Entwicklungs-Override), mit den Befundtypen                             |
+| `matter.node_commissioned`                    | Der Node wurde als übernommen registriert; `attestation` ist `verified` oder `overridden`, mit etwaigen Befundtypen auf Warnstufe |
+| `matter.commissioning_finished`               | Der Benennungsschritt hat einen Namen, einen Ort oder Endpunktnamen gespeichert                                                   |
+| `matter.node_removed_from_fabric`             | Das Gerät hat die Attraccess-Fabric verlassen, mit dem vorherigen Zustand und der neuen Fabric-Generation                         |
+| `matter.node_force_removed_from_fabric`       | Der Sidecar hat den Node vergessen, ohne das Gerät zu kontaktieren, mit dem vorherigen Zustand und der neuen Generation           |
+| `matter.node_removal_failed`                  | Ein Entfernen ist gescheitert: Modus (`normal` oder `force`) und Grund                                                            |
+| `matter.node_shared`                          | Ein Freigabefenster wurde geöffnet, mit seiner Dauer in Sekunden                                                                  |
+| `matter.node_share_revoked`                   | Ein Benutzer hat das Freigabefenster geschlossen; `closed` sagt, ob das Gerät es noch offen hatte                                 |
+| `matter.node_share_expired`                   | Das Freigabefenster ist abgelaufen                                                                                                |
+
+Gegenstand von `matter.commissioning_started`, `matter.commissioning_failed`, `matter.commissioning_interrupted`, `matter.commissioning_cancelled` und `matter.commissioning_attestation_overridden` ist die Inbetriebnahme-Sitzung (`sessionRef` in den Details), bei den übrigen der Node. Kein Eintrag enthält je einen Setup- oder Freigabecode.
 
 Einträge des Abgleichs (`matter.node_quarantined`, `matter.node_detached`, `matter.node_reattached`, `matter.fabric_mismatch_detected`) tragen `initiator`: `system`, wenn ein automatischer Auslöser den Abgleich gestartet hat, `administrator` bei einem manuellen `POST /matter/reconciliation`. Automatische Einträge zeigen **System oder anonym** als Akteur, manuelle nennen den Benutzer, der sie gestartet hat.

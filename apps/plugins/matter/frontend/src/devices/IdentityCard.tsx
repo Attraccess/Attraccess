@@ -2,11 +2,13 @@ import { DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
 import { Card } from '@heroui/react';
 import { Fact } from '../Fact';
 import { useMatterTranslations } from '../i18n';
-import type { MatterNodeSummary } from './api';
+import type { MatterNodeDetail, MatterNodeSummary } from './api';
 import { softwareLabel } from './nodeLabel';
 
 /** What the device reports about itself: vendor, product, serial, versions and attestation. Read-only. */
-export function IdentityCard({ node }: Readonly<{ node: MatterNodeSummary }>) {
+export function IdentityCard({
+  node,
+}: Readonly<{ node: MatterNodeSummary & Pick<MatterNodeDetail, 'attestationOverridden'> }>) {
   const { t, tExists } = useMatterTranslations();
   const { identity } = node;
   const unknown = t('devices.unknown');
@@ -29,6 +31,11 @@ export function IdentityCard({ node }: Readonly<{ node: MatterNodeSummary }>) {
               : tExists(`devices.attestation.${attestation}`)
                 ? t(`devices.attestation.${attestation}`)
                 : attestation}
+            {node.attestationOverridden && (
+              <span className="mt:block mt:text-warning" data-cy="matter-attestation-overridden">
+                {t('devices.attestation.overriddenNote')}
+              </span>
+            )}
           </Fact>
           <Fact label={t('devices.lastSeen')}>
             <DateTimeDisplay date={node.lastSeenAt} />

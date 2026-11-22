@@ -42,7 +42,7 @@ const ALLOWED_VALUES: Partial<Record<BackedUp, Record<string, readonly string[]>
   nodes: {
     lifecycleState: ['unclaimed', 'claimed', 'detached', 'archived', 'removed'],
     detachedReason: ['absent_from_sidecar', 'fabric_mismatch', 'fabric_absent'],
-    removalReason: ['force_removed', 'merged', 'replaced'],
+    removalReason: ['force_removed', 'merged', 'replaced', 'removed_from_fabric', 'forced_from_fabric'],
     attestationStatus: ['verified', 'unverified', 'failed', 'unknown'],
   },
   endpoints: { removalReason: ['absent_from_sidecar', 'replaced', 'force_removed', 'merged'] },

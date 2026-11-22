@@ -113,13 +113,16 @@ Das Token wird nach dem Speichern nie wieder angezeigt. Alles Weitere zur Verbin
 
 ## Thread-Netzwerk, Inbetriebnahme und Software-Updates
 
-Diese Tabs gibt es, damit Adresse und Berechtigung bereitstehen; die Funktionen kommen mit späteren Plugin-Versionen.
+Thread und Software-Updates gibt es, damit Adresse und Berechtigung bereitstehen; die Funktionen kommen mit späteren Plugin-Versionen.
 Jeder sagt das, ausgehend von dem, was der Sidecar meldet (Funktionsfamilien `thread`, `commissioning` und `ota`):
 
 - **Thread-Netzwerk** erklärt, dass Thread nicht eingerichtet ist, und gibt Hinweise, wie sich Thread, Zigbee und WLAN das
   2,4-GHz-Band teilen. Bereiche für Dataset, Border Router, Radio-Co-Prozessoren und SMLIGHT-Diagnose sind Platzhalter.
-- **Inbetriebnahme** wird ein geführter Ablauf auf einer eigenen Seite (Gerät vorbereiten, Code eingeben oder scannen,
-  Fortschritt verfolgen, benennen und übernehmen). Bis dahin erklärt sie nur die Schritte und erfasst keinen Setup-Code.
+- **Inbetriebnahme** ist ein geführter Ablauf auf einer eigenen Seite: Gerät vorbereiten, Code eingeben oder scannen,
+  Fortschritt verfolgen, Gerät benennen. Meldet der Sidecar die Familie `commissioning` nicht, sagt der Tab das und bietet
+  keine Eingabe an. Teilen, das Entfernen aus der Fabric und die weiteren Administratoren eines Geräts stehen nicht in
+  diesem Tab, sondern auf der Seite des Geräts selbst. Siehe
+  [Inbetriebnahme, Teilen und Entfernen](plugins/matter/commissioning.md).
 - **Software-Updates** listet die Software, die jedes Gerät gerade nutzt. Updates finden, freigeben und einspielen kommt
   mit der OTA-Unterstützung.
 

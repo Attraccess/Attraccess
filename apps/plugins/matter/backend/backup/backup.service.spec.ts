@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { decodeBlob } from '../plugin-storage/blob';
 import { ADMIN, createFabricHarness, nodeRow, type FabricHarness } from '../testing/fabric-harness.test-utils';
@@ -56,7 +57,7 @@ describe('MatterBackupService', () => {
   it('records the plugin migration the installation ran last', async () => {
     const view = await h.backups.backup('manual', ADMIN);
     const row = await h.one('backups', { id: view.id });
-    expect(row.pluginMigration).toMatch(/^CreateMatterBackup1793900002000$/);
+    expect(row.pluginMigration).toBe('v3:node-administrators');
   });
 
   it('keeps the newest ten and prunes the rest', async () => {
@@ -359,6 +360,35 @@ describe('MatterBackupSchedulerService', () => {
     const list = await h.backups.list();
     expect(list.filter((entry) => entry.trigger === 'fabric_changed')).toHaveLength(1);
     expect(list[0].fabricGeneration).toBe(3);
+  });
+
+  it('tries a change backup the sidecar refused as busy again, a bounded number of times', async () => {
+    await make();
+    await h.fabric.create(undefined, ADMIN);
+    h.backend.generationCounter = 2;
+    await h.fabric.detect('event');
+    const backup = h.backups.backup.bind(h.backups);
+    let refusals = 2;
+    const spy = jest.spyOn(h.backups, 'backup').mockImplementation(async (...args) => {
+      if (refusals > 0) {
+        refusals -= 1;
+        throw new ConflictException({ code: 'busy', message: 'The sidecar is busy.' });
+      }
+      return backup(...args);
+    });
+    await h.scheduler.backupAfterChange();
+    await until(async () => (await h.backups.list()).some((entry) => entry.trigger === 'fabric_changed'));
+    expect(spy).toHaveBeenCalledTimes(3);
+
+    // A sidecar that stays busy is not tried forever.
+    h.backend.generationCounter = 3;
+    await h.fabric.detect('event');
+    spy.mockClear();
+    spy.mockRejectedValue(new ConflictException({ code: 'busy', message: 'The sidecar is busy.' }));
+    await h.scheduler.backupAfterChange();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(spy).toHaveBeenCalledTimes(6);
+    h.scheduler.onModuleDestroy();
   });
 
   it('does not bring the next run back when the connection dropped during a check', async () => {

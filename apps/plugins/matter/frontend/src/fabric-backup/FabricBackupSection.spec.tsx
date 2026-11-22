@@ -5,7 +5,8 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import en from '../en.json';
 import de from '../de.json';
-import { FabricApiError, type BackupView, type FabricBackupStatus, type RestoreValidation } from './api';
+import { MatterApiError } from '../matterApi';
+import type { BackupView, FabricBackupStatus, RestoreValidation } from './api';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { FabricBackupSection } from './FabricBackupSection';
 import { FABRIC_POLL_MS, pollBackoffMs, useFabricBackup } from './useFabricBackup';
@@ -294,12 +295,15 @@ describe('FabricBackupSection status', () => {
   });
 
   it.each([
-    ['busy', 'The Matter sidecar is busy with another backup or restore. Try again shortly.'],
+    [
+      'busy',
+      'The Matter sidecar is busy with another operation (a backup, restore, commissioning, removal or share). Try again shortly.',
+    ],
     ['inconsistent', /disagree about the fabric/],
     ['recovery_key_mismatch', 'That is no longer the current recovery key. Reload the page.'],
   ])('translates the backend code %s of a failed backup', async (code, text) => {
     const user = userEvent.setup();
-    api.backUpNow.mockRejectedValue(new FabricApiError('Raw backend text.', 409, code));
+    api.backUpNow.mockRejectedValue(new MatterApiError('Raw backend text.', 409, code));
     renderSection(healthy);
     await user.click(await screen.findByRole('button', { name: 'Back up now' }));
     expect(await screen.findByText(text)).toBeInTheDocument();
@@ -444,7 +448,7 @@ describe('restore wizard', () => {
 
   it('asks for the recovery key when the backup needs one, then proceeds', async () => {
     const user = await openWizard();
-    api.validateRestore.mockRejectedValueOnce(new FabricApiError('key', 422, 'key_required'));
+    api.validateRestore.mockRejectedValueOnce(new MatterApiError('key', 422, 'key_required'));
     await user.click(screen.getByRole('button', { name: 'Validate' }));
     expect(await screen.findByText(/encrypted with a different recovery key/)).toBeInTheDocument();
     api.validateRestore.mockResolvedValueOnce(validation());
@@ -464,10 +468,10 @@ describe('restore wizard', () => {
     ['stage_failed', /could not prepare the backup/],
     ['insecure_transport', /plain HTTP to another machine/],
     ['sidecar_unavailable', /cannot be reached/],
-    ['busy', /busy with another backup or restore/],
+    ['busy', /busy with another operation/],
   ])('shows a specific message for %s', async (code, text) => {
     const user = await openWizard();
-    api.validateRestore.mockRejectedValue(new FabricApiError('raw', 422, code));
+    api.validateRestore.mockRejectedValue(new MatterApiError('raw', 422, code));
     await user.click(screen.getByRole('button', { name: 'Validate' }));
     expect(await screen.findByText(text)).toBeInTheDocument();
     expect(screen.queryByText('raw')).not.toBeInTheDocument();
@@ -484,7 +488,7 @@ describe('restore wizard', () => {
 
   it('says when the chosen file cannot be read', async () => {
     const user = await openWizard();
-    api.readFileAsBase64.mockRejectedValue(new FabricApiError('', 0, 'file_unreadable'));
+    api.readFileAsBase64.mockRejectedValue(new MatterApiError('', 0, 'file_unreadable'));
     await uploadFile(user);
     await user.click(screen.getByRole('button', { name: 'Validate' }));
     expect(await screen.findByText('The file could not be read. Choose it again.')).toBeInTheDocument();
@@ -492,7 +496,7 @@ describe('restore wizard', () => {
 
   it('falls back to the HTTP status when an error carries neither a known code nor a message', async () => {
     const user = await openWizard();
-    api.validateRestore.mockRejectedValue(new FabricApiError('', 502, null));
+    api.validateRestore.mockRejectedValue(new MatterApiError('', 502, null));
     await user.click(screen.getByRole('button', { name: 'Validate' }));
     expect(await screen.findByText('The request failed (HTTP 502).')).toBeInTheDocument();
   });
@@ -575,7 +579,7 @@ describe('restore wizard', () => {
   ])('says once that the installation was left unchanged after %s', async (code, text) => {
     const user = await openWizard();
     api.validateRestore.mockResolvedValue(validation());
-    api.confirmRestore.mockRejectedValue(new FabricApiError('Raw backend text.', 409, code));
+    api.confirmRestore.mockRejectedValue(new MatterApiError('Raw backend text.', 409, code));
     await user.click(screen.getByRole('button', { name: 'Validate' }));
     await user.click(await screen.findByRole('button', { name: 'Restore now' }));
     expect(await screen.findByText('The restore failed')).toBeInTheDocument();
@@ -587,7 +591,7 @@ describe('restore wizard', () => {
   it('does not claim an unchanged installation when the sidecar could not be rolled back', async () => {
     const user = await openWizard();
     api.validateRestore.mockResolvedValue(validation());
-    api.confirmRestore.mockRejectedValue(new FabricApiError('raw', 500, 'rollback_failed'));
+    api.confirmRestore.mockRejectedValue(new MatterApiError('raw', 500, 'rollback_failed'));
     await user.click(screen.getByRole('button', { name: 'Validate' }));
     await user.click(await screen.findByRole('button', { name: 'Restore now' }));
     expect(await screen.findByText('The restore failed and could not be rolled back')).toBeInTheDocument();
@@ -617,7 +621,7 @@ describe('restore wizard', () => {
     api.validateRestore.mockResolvedValue(
       validation({ kind: 'replacement', requiresTypedConfirmation: true, confirmationFabricId: 'FAB-9' }),
     );
-    api.confirmRestore.mockRejectedValue(new FabricApiError('raw', 409, 'confirmation_required'));
+    api.confirmRestore.mockRejectedValue(new MatterApiError('raw', 409, 'confirmation_required'));
     await user.click(screen.getByRole('button', { name: 'Validate' }));
     await user.type(await screen.findByLabelText(/Type the current fabric ID FAB-9/), 'FAB-9');
     await user.click(screen.getByRole('button', { name: 'Restore now' }));
@@ -629,15 +633,18 @@ describe('restore wizard', () => {
   it.each([
     ['validation_expired', 'This check has expired. Validate the backup again.'],
     ['preflight_changed', 'The sidecar changed since the backup was checked. Validate the backup again.'],
-    ['busy', 'The Matter sidecar is busy with another backup or restore. Try again shortly.'],
+    [
+      'busy',
+      'The Matter sidecar is busy with another operation (a backup, restore, commissioning, removal or share). Try again shortly.',
+    ],
   ])('goes back to validating, keeping the source and key, after %s', async (code, text) => {
     const user = await openWizard();
-    api.validateRestore.mockRejectedValueOnce(new FabricApiError('key', 422, 'key_required'));
+    api.validateRestore.mockRejectedValueOnce(new MatterApiError('key', 422, 'key_required'));
     await user.click(screen.getByRole('button', { name: 'Validate' }));
     await user.type(await screen.findByLabelText(/Recovery key/), 'ABCD');
     api.validateRestore.mockResolvedValue(validation());
     await user.click(screen.getByRole('button', { name: 'Validate' }));
-    api.confirmRestore.mockRejectedValueOnce(new FabricApiError('raw', 409, code));
+    api.confirmRestore.mockRejectedValueOnce(new MatterApiError('raw', 409, code));
     await user.click(await screen.findByRole('button', { name: 'Restore now' }));
     expect(await screen.findByText(text)).toBeInTheDocument();
     expect(screen.getByText('Validate the backup again')).toBeInTheDocument();
@@ -718,7 +725,7 @@ describe('recovery panel failures and sidecar recovery', () => {
 
   it('reports a failed accept in an error dialog with the translated reason', async () => {
     const user = userEvent.setup();
-    api.acceptSidecarFabric.mockRejectedValue(new FabricApiError('Raw.', 409, 'sidecar_not_initialized'));
+    api.acceptSidecarFabric.mockRejectedValue(new MatterApiError('Raw.', 409, 'sidecar_not_initialized'));
     renderSection({ ...recovery('fabric_changed'), actions: { ...healthy.actions, canAcceptSidecar: true } });
     await user.click(await screen.findByRole('button', { name: "Accept sidecar's fabric" }));
     await user.click(await screen.findByRole('button', { name: 'Accept' }));
@@ -728,7 +735,7 @@ describe('recovery panel failures and sidecar recovery', () => {
 
   it('reports a failed start of a new fabric in an error dialog with the translated reason', async () => {
     const user = userEvent.setup();
-    api.startNewFabric.mockRejectedValue(new FabricApiError('Raw.', 409, 'sidecar_not_empty'));
+    api.startNewFabric.mockRejectedValue(new MatterApiError('Raw.', 409, 'sidecar_not_empty'));
     renderSection({
       ...recovery('sidecar_uninitialized', { state: 'uninitialized', ...noFacts }),
       actions: { ...healthy.actions, canStartNew: true },

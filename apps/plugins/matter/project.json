@@ -87,7 +87,8 @@
         {
           "externalDependencies": ["jest"]
         },
-        "{workspaceRoot}/apps/matter-sidecar/src/**/*"
+        "{workspaceRoot}/apps/matter-sidecar/src/**/*",
+        "{workspaceRoot}/apps/matter-sidecar/trust/**/*"
       ],
       "outputs": [],
       "dependsOn": ["build-backend", "matter-sidecar:build"],

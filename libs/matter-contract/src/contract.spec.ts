@@ -74,6 +74,9 @@ describe('errors', () => {
       unsupported_capability: 501,
       sidecar_unavailable: 503,
       timeout: 504,
+      already_commissioned: 409,
+      device_unreachable: 409,
+      attestation_override_disabled: 403,
     });
   });
 
@@ -116,14 +119,9 @@ describe('families', () => {
   it('validates the commissioning request and accepts secrets only in requests', () => {
     expect(commissioningRequestSchema.safeParse({ setupCode: '34970112332' }).success).toBe(true);
     expect(commissioningRequestSchema.safeParse({ setupCode: 'abc' }).success).toBe(false);
-    expect(
-      families.commissioningSessionSchema.safeParse({
-        sessionId: id,
-        state: 'pending',
-        nodeId: null,
-        outcome: 'requested',
-      }).success,
-    ).toBe(true);
+    // The QR payload is capped like the plugin caps it: 512 characters after `MT:`.
+    expect(commissioningRequestSchema.safeParse({ setupCode: `MT:${'A'.repeat(512)}` }).success).toBe(true);
+    expect(commissioningRequestSchema.safeParse({ setupCode: `MT:${'A'.repeat(513)}` }).success).toBe(false);
     expect(Object.keys(families.commissioningSessionSchema.shape)).not.toContain('setupCode');
     expect(Object.keys(families.threadNetworkSchema.shape)).not.toContain('activeDataset');
     expect(threadDatasetRequestSchema.safeParse({ activeDataset: '0e08' }).success).toBe(true);
@@ -410,5 +408,78 @@ describe('client helpers', () => {
     expect(SERVICE_TOKEN_PATTERN.test('a'.repeat(513))).toBe(false);
     expect(SERVICE_TOKEN_PATTERN.test(`${'a'.repeat(31)} `)).toBe(false);
     expect(SERVICE_TOKEN_PATTERN.test(`${'a'.repeat(31)}é`)).toBe(false);
+  });
+});
+
+describe('commissioning, removal and sharing', () => {
+  const session = {
+    sessionId: id,
+    state: 'failed',
+    step: 'attestation',
+    nodeId: null,
+    outcome: 'failed',
+    failure: { code: 'attestation_failed', attestationFindings: ['PaaNotTrusted'] },
+    attestation: { status: 'failed', findings: ['PaaNotTrusted'] },
+    attestationOverrideAllowed: false,
+    startedAt: '2026-11-20T10:00:00.000Z',
+    updatedAt: '2026-11-20T10:00:01.000Z',
+    finishedAt: '2026-11-20T10:00:01.000Z',
+  };
+
+  it('accepts the override only as an explicit confirmation', () => {
+    const base = { setupCode: '34970112332' };
+    expect(commissioningRequestSchema.safeParse({ ...base, attestationOverride: { confirmed: true } }).success).toBe(
+      true,
+    );
+    expect(commissioningRequestSchema.safeParse({ ...base, attestationOverride: { confirmed: false } }).success).toBe(
+      false,
+    );
+    expect(commissioningRequestSchema.safeParse({ ...base, attestationOverride: true }).success).toBe(false);
+  });
+
+  it('validates sessions and keeps every secret out of them', () => {
+    expect(families.commissioningSessionSchema.safeParse(session).success).toBe(true);
+    expect(families.commissioningSessionSchema.safeParse({ ...session, setupCode: '1' }).success).toBe(false);
+    expect(families.commissioningSessionSchema.safeParse({ ...session, step: 'bogus' }).success).toBe(false);
+    for (const schema of [families.commissioningSessionSchema, families.commissioningProgressPayloadSchema]) {
+      for (const key of Object.keys(schema.shape))
+        expect(['setupCode', 'manualCode', 'qrCode', 'passcode']).not.toContain(key);
+    }
+  });
+
+  it('types the commissioning.progress payload', () => {
+    const envelope = {
+      eventId: id,
+      schemaVersion: 1,
+      type: 'commissioning.progress',
+      timestamp: '2026-11-20T10:00:00.000Z',
+      correlation: { correlationId: id, causationId: null, initiator: { userId: null, requestId: null } },
+      streamInstanceId: id,
+      sequence: 1,
+      payload: { sessionId: id, step: 'pase', state: 'running', nodeId: null, failure: null },
+    };
+    expect(eventEnvelopeSchema.safeParse(envelope).success).toBe(true);
+    expect(
+      eventEnvelopeSchema.safeParse({ ...envelope, payload: { ...envelope.payload, setupCode: '34970112332' } })
+        .success,
+    ).toBe(false);
+  });
+
+  it('marks the mutating operations and the ones that carry codes', () => {
+    const byId = (operationId: string) => OPERATIONS.find((operation) => operation.id === operationId);
+    for (const operationId of ['commissioning.start', 'nodes.remove', 'nodes.share.open', 'nodes.share.revoke']) {
+      expect(byId(operationId)?.fabricMutating).toBe(true);
+    }
+    expect(byId('commissioning.start')?.secretsOnWire).toBe(true);
+    expect(byId('nodes.share.open')?.secretsOnWire).toBe(true);
+    expect(findOperation('DELETE', '/v1/nodes/42')).toMatchObject({ kind: 'match' });
+    expect(findOperation('DELETE', `/v1/commissioning/sessions/${id}`)).toMatchObject({ kind: 'match' });
+  });
+
+  it('bounds the sharing window to 180-900 seconds', () => {
+    expect(families.shareOpenRequestSchema.parse({}).timeoutSec).toBe(180);
+    expect(families.shareOpenRequestSchema.safeParse({ timeoutSec: 179 }).success).toBe(false);
+    expect(families.shareOpenRequestSchema.safeParse({ timeoutSec: 901 }).success).toBe(false);
+    expect(Object.keys(families.nodeRemoveResultSchema.shape)).not.toContain('manualCode');
   });
 });

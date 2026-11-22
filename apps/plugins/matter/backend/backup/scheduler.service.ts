@@ -17,6 +17,14 @@ export type SchedulerTiming = {
 export const DEFAULT_TIMING: SchedulerTiming = { intervalMs: 24 * 3_600_000, checkMs: 15 * 60_000, debounceMs: 30_000 };
 export const SCHEDULER_TIMING = Symbol.for('attraccess.matter.backup-timing');
 
+/** How often a `fabric_changed` backup refused as busy is tried again, each after the debounce. */
+const BUSY_RETRIES = 5;
+
+const isBusy = (error: unknown): boolean => {
+  const response = (error as { getResponse?: () => unknown } | null)?.getResponse?.();
+  return typeof response === 'object' && response !== null && (response as { code?: unknown }).code === 'busy';
+};
+
 /**
  * The plugin's own backup schedule: no host job. Runs only while the sidecar is connected and a fabric exists, and
  * never in recovery. Backups also follow a fabric generation that moved on (debounced).
@@ -26,6 +34,9 @@ export class MatterBackupSchedulerService implements OnModuleInit, OnModuleDestr
   private readonly unsubscribe: (() => void)[] = [];
   private checkTimer: NodeJS.Timeout | undefined;
   private debounceTimer: NodeJS.Timeout | undefined;
+  /** Retries left for a `fabric_changed` backup the sidecar refused as busy (its own gate can outlive the plugin's). */
+  private busyRetries = BUSY_RETRIES;
+  private destroyed = false;
   private readonly timing: SchedulerTiming;
 
   constructor(
@@ -58,6 +69,7 @@ export class MatterBackupSchedulerService implements OnModuleInit, OnModuleDestr
   }
 
   onModuleDestroy(): void {
+    this.destroyed = true;
     for (const stop of this.unsubscribe.splice(0)) stop();
     this.stop();
     clearTimeout(this.debounceTimer);
@@ -117,6 +129,7 @@ export class MatterBackupSchedulerService implements OnModuleInit, OnModuleDestr
   }
 
   private scheduleAfterChange(): void {
+    if (this.destroyed) return;
     clearTimeout(this.debounceTimer);
     this.debounceTimer = setTimeout(() => this.safely(() => this.backupAfterChange()), this.timing.debounceMs);
     this.debounceTimer.unref();
@@ -130,6 +143,18 @@ export class MatterBackupSchedulerService implements OnModuleInit, OnModuleDestr
     if (generation === undefined || !status.recoveryKey.present) return;
     const latest = status.backups.stored[0]?.fabricGeneration ?? -1;
     if (generation <= latest) return;
-    await this.backups.backup('fabric_changed').catch(() => undefined);
+    // The change belongs to a commissioning session, removal or share that has not written its rows yet: wait for it.
+    if (this.guard.operation !== null) return this.scheduleAfterChange();
+    try {
+      await this.backups.backup('fabric_changed');
+      this.busyRetries = BUSY_RETRIES;
+    } catch (error) {
+      if (!isBusy(error) || this.busyRetries <= 0) {
+        this.busyRetries = BUSY_RETRIES;
+        return;
+      }
+      this.busyRetries -= 1;
+      this.scheduleAfterChange();
+    }
   }
 }

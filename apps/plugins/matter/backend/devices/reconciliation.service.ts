@@ -351,6 +351,7 @@ export class MatterReconciliationService {
           removedBy: null,
           removalReason: null,
           mergedInto: null,
+          attestationOverridden: null,
           createdAt: now,
           updatedAt: now,
           ...identityOf(view, now),

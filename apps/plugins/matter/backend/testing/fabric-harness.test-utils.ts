@@ -20,11 +20,17 @@ export { ADMIN, nodeRow };
 export const TEST_ROLLBACK_TIMING: RollbackTiming = { windowMs: 300, firstRetryMs: 5, maxRetryMs: 40 };
 
 export async function createFabricHarness(
-  options: { timing?: Partial<SchedulerTiming>; validationTtlMs?: number; rollbackTiming?: RollbackTiming } = {},
+  options: {
+    timing?: Partial<SchedulerTiming>;
+    validationTtlMs?: number;
+    rollbackTiming?: RollbackTiming;
+    /** A connection built on the fake fabric backend, for tests that need more than the fabric operations. */
+    connection?: (backend: FakeFabricBackend) => FakeFabricConnection;
+  } = {},
 ) {
   const h = await createHarness();
   const backend = new FakeFabricBackend();
-  const connection = new FakeFabricConnection(backend);
+  const connection = options.connection?.(backend) ?? new FakeFabricConnection(backend);
   const connectionService = { connection } as unknown as MatterConnectionService;
   const guard = new MatterFabricGuard();
   const audit = new DeviceAuditService(h.context);

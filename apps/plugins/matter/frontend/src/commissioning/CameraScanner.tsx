@@ -1,0 +1,118 @@
+import { StatusAlert } from '@attraccess/plugins-frontend-ui';
+import { useEffect, useRef, useState } from 'react';
+import { useMatterTranslations } from '../i18n';
+import { decodeQrFromPixels } from './qrDecode';
+
+const SCAN_INTERVAL_MS = 250;
+/** Longest edge of a frame handed to jsQR: enough for a QR code held in front of the camera, and cheap to decode. */
+const FRAME_EDGE = 640;
+
+type Detector = { detect: (source: CanvasImageSource) => Promise<{ rawValue: string }[]> };
+type DetectorConstructor = new (options: { formats: string[] }) => Detector;
+
+/**
+ * Scans a QR code with the camera. The native `BarcodeDetector` is used where the browser has it, otherwise frames are
+ * decoded in memory with jsQR, scaled down to FRAME_EDGE. A tick is skipped while the previous frame is still being
+ * scanned. Nothing is recorded or uploaded; the stream stops when the code is found or the component unmounts. A camera needs a secure context (HTTPS or localhost): without one the person is told to use an
+ * image or to type the code.
+ */
+export function CameraScanner({ onScan }: Readonly<{ onScan: (text: string) => void }>) {
+  const { t } = useMatterTranslations();
+  const video = useRef<HTMLVideoElement>(null);
+  const [problem, setProblem] = useState<'insecure' | 'denied' | null>(null);
+  const latest = useRef(onScan);
+  latest.current = onScan;
+
+  useEffect(() => {
+    if (!globalThis.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      setProblem('insecure');
+      return;
+    }
+    let stopped = false;
+    let stream: MediaStream | null = null;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const Native = (globalThis as { BarcodeDetector?: DetectorConstructor }).BarcodeDetector;
+    const detector = Native ? new Native({ formats: ['qr_code'] }) : null;
+    const canvas = document.createElement('canvas');
+    let context: CanvasRenderingContext2D | null = null;
+    let scanning = false;
+
+    const finish = (text: string) => {
+      stopped = true;
+      clearInterval(timer);
+      stream?.getTracks().forEach((track) => track.stop());
+      latest.current(text);
+    };
+
+    /** One frame: with the native detector, or drawn small and decoded with jsQR. */
+    const scanFrame = async (element: HTMLVideoElement): Promise<string | null> => {
+      if (detector) {
+        const found = await detector.detect(element).catch(() => []);
+        return found[0]?.rawValue ?? null;
+      }
+      const scale = Math.min(1, FRAME_EDGE / Math.max(element.videoWidth, element.videoHeight || 1));
+      const width = Math.max(1, Math.round(element.videoWidth * scale));
+      const height = Math.max(1, Math.round((element.videoHeight || element.videoWidth) * scale));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      context ??= canvas.getContext('2d', { willReadFrequently: true });
+      if (!context) return null;
+      context.drawImage(element, 0, 0, width, height);
+      return decodeQrFromPixels(context.getImageData(0, 0, width, height), 'normal');
+    };
+
+    const scan = async () => {
+      const element = video.current;
+      if (stopped || scanning || !element || element.readyState < 2 || !element.videoWidth) return;
+      scanning = true;
+      try {
+        const text = await scanFrame(element);
+        if (!stopped && text) finish(text);
+      } finally {
+        scanning = false;
+      }
+    };
+
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+      .then((opened) => {
+        if (stopped) {
+          opened.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        stream = opened;
+        if (video.current) {
+          video.current.srcObject = opened;
+          void video.current.play?.().catch(() => undefined);
+        }
+        timer = setInterval(() => void scan(), SCAN_INTERVAL_MS);
+      })
+      .catch(() => !stopped && setProblem('denied'));
+
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      stream?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  if (problem) {
+    return (
+      <StatusAlert status="warning" title={t(`commissioning.camera.${problem}.title`)} data-cy="matter-camera-problem">
+        {t(`commissioning.camera.${problem}.text`)}
+      </StatusAlert>
+    );
+  }
+  return (
+    <video
+      ref={video}
+      muted
+      playsInline
+      aria-label={t('commissioning.camera.label')}
+      className="mt:aspect-video mt:w-full mt:max-w-md mt:rounded-xl mt:bg-black"
+      data-cy="matter-camera-video"
+    />
+  );
+}

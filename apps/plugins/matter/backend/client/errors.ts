@@ -134,9 +134,57 @@ export function classifyNetworkError(
   });
 }
 
+const SECRET_FIELDS = new Set(['setupCode', 'manualCode', 'qrCode', 'passcode', 'attestationOverride']);
+/**
+ * Identifiers the plugin acts on (a session to cancel, a node to look up). Never a code, and a node ID can be 11 digits
+ * long: their values are kept as they are.
+ */
+const ID_FIELDS = new Set([
+  'sessionId',
+  'nodeId',
+  'existingNodeId',
+  'fabricId',
+  'correlationId',
+  'stageId',
+  'backupId',
+  'streamInstanceId',
+  'storageInstanceId',
+]);
+/**
+ * A QR payload (`MT:...`) or a manual pairing code (11 or 21 digits) standing on its own, as the sidecar's logger
+ * matches it: not a digit run inside a UUID or a longer word. Setup and sharing codes never leave memory.
+ */
+const SECRET_TEXT = /MT:[A-Z0-9.-]{6,}|(?<![0-9A-Za-z-])(?:[0-9]{21}|[0-9]{11})(?![0-9A-Za-z-])/g;
+
+/** `text` without anything that looks like a setup or sharing code. */
+export function redactSecrets(text: string): string {
+  return text.replace(SECRET_TEXT, '[redacted]');
+}
+
+function redactValue(value: unknown): unknown {
+  if (typeof value === 'string') return redactSecrets(value);
+  if (Array.isArray(value)) return value.map(redactValue);
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        SECRET_FIELDS.has(key)
+          ? '[redacted]'
+          : ID_FIELDS.has(key) && typeof entry === 'string'
+            ? entry
+            : redactValue(entry),
+      ]),
+    );
+  }
+  return value;
+}
+
 /** A contract error the sidecar sent, as an HTTP envelope or as an event-stream `error` message. */
 export function fromErrorEnvelope(error: ErrorEnvelope['error'], status?: number): SidecarClientError {
-  const { code, message, correlationId, retryable, outcome, details } = error;
+  const { code, correlationId, retryable, outcome } = error;
+  // The sidecar redacts codes itself; a code that still slipped into a message or detail is scrubbed here too.
+  const message = redactSecrets(error.message);
+  const details = error.details === undefined ? undefined : (redactValue(error.details) as Record<string, unknown>);
   const init: ClientErrorInit = { code, correlationId, retryable, outcome, details, status };
   if (code === 'unauthorized') return new SidecarUnauthorizedError(message, init);
   if (code === 'incompatible_release' || code === 'unsupported_wire_version') {

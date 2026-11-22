@@ -18,6 +18,7 @@ import {
   f,
   step,
   table,
+  type PluginStorageField,
   type PluginStorageIndex,
   type PluginStorageTable,
 } from '@attraccess/plugins-backend-sdk';
@@ -302,6 +303,21 @@ export const LOOKUP_INDEXES = {
   endpointClusters: [{ fields: ['endpointRef', 'clusterId', 'role'] }],
 } as const satisfies Partial<Record<keyof typeof MATTER_BASELINE_TABLES, readonly PluginStorageIndex[]>>;
 
+/**
+ * Version 3 (ATT-1002): the device's other administrators (JSON text) and whether the node was commissioned with an
+ * attestation override. Both nullable: rows written before carry null.
+ */
+export const NODE_V3_FIELDS = {
+  administrators: f.text().optional(),
+  attestationOverridden: f.boolean({ column: 'attestation_overridden' }).optional(),
+};
+
+const withFields = <T extends PluginStorageTable, F extends Record<string, PluginStorageField>>(
+  definition: T,
+  fields: F,
+): PluginStorageTable<T['fields'] & F> =>
+  ({ ...definition, fields: { ...definition.fields, ...fields } }) as unknown as PluginStorageTable<T['fields'] & F>;
+
 const withIndexes = <T extends PluginStorageTable>(definition: T, indexes: readonly PluginStorageIndex[]): T => ({
   ...definition,
   indexes: [...definition.indexes, ...indexes],
@@ -311,7 +327,7 @@ const withIndexes = <T extends PluginStorageTable>(definition: T, indexes: reado
 export const MATTER_TABLES = {
   ...MATTER_BASELINE_TABLES,
   fabrics: withIndexes(fabrics, LOOKUP_INDEXES.fabrics),
-  nodes: withIndexes(nodes, LOOKUP_INDEXES.nodes),
+  nodes: withIndexes(withFields(nodes, NODE_V3_FIELDS), LOOKUP_INDEXES.nodes),
   endpoints: withIndexes(endpoints, LOOKUP_INDEXES.endpoints),
   endpointClusters: withIndexes(endpointClusters, LOOKUP_INDEXES.endpointClusters),
 };
@@ -341,6 +357,9 @@ export const LEGACY_ONLY_CONSTRAINTS = {
     'CHK_plugin_matter_fabrics_status',
     'CHK_plugin_matter_nodes_lifecycle',
     'CHK_plugin_matter_nodes_detached_reason',
+    // Allows only force_removed|merged|replaced. It never reaches a 2.0 install: the 1.x Matter migrations shipped
+    // only in the 1.11 betas on SQLite, and the PostgreSQL import does not copy plugin tables, so the 2.0 reasons
+    // removed_from_fabric and forced_from_fabric are never refused in practice.
     'CHK_plugin_matter_nodes_removal_reason',
     'CHK_plugin_matter_nodes_attestation',
     'CHK_plugin_matter_endpoints_range',
@@ -372,6 +391,11 @@ export const MATTER_STORAGE = definePluginStorage({
       steps: Object.entries(LOOKUP_INDEXES).flatMap(([name, indexes]) =>
         indexes.map((index) => step.addIndex(name, index)),
       ),
+    },
+    {
+      version: 3,
+      name: 'node-administrators',
+      steps: Object.entries(NODE_V3_FIELDS).map(([field, definition]) => step.addColumn('nodes', field, definition)),
     },
   ],
   adoption: { legacyMigrations: LEGACY_MIGRATIONS },

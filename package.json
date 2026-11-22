@@ -125,6 +125,8 @@
     "react-intersection-observer": "^11.0.1",
     "react-markdown": "^10.1.0",
     "react-pluggable": "^0.4.3",
+    "jsqr": "1.4.0",
+    "qrcode-generator": "2.0.4",
     "react-qrcode-logo": "^4.1.0",
     "react-router-dom": "7.18.5",
     "react-toastify": "^11.2.0",

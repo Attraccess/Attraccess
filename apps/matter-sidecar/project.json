@@ -21,6 +21,7 @@
       "inputs": [
         "{projectRoot}/src/**/!(*.spec).ts",
         "{projectRoot}/scripts/**/*",
+        "{projectRoot}/trust/**/*",
         "{projectRoot}/package.json",
         "{projectRoot}/tsconfig*.json",
         "{workspaceRoot}/tsconfig.base.json",

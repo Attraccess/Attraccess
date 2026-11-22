@@ -13,6 +13,7 @@ import type { SidecarConfig } from './config';
 import { EventStream } from './event-stream';
 import { correlationIdFrom, sendError } from './http-utils';
 import { createLogger, type Logger } from './logger';
+import { commissioningHandlers } from './commissioning/handlers';
 import { fabricHandlers } from './fabric/handlers';
 import { loadMatterPlatform, type MatterPlatform, type PlatformContext } from './matter-platform';
 import { handleRequest, type FeatureHandlers, type PipelineDeps } from './request-pipeline';
@@ -130,6 +131,7 @@ export function createSidecar(options: SidecarOptions): Sidecar {
       config,
       logger,
       onFabricChanged: (payload) => stream.publish('fabric.changed', payload),
+      onCommissioningProgress: (payload) => stream.publish('commissioning.progress', payload),
     });
     if (state.draining) {
       // stop() ran while this platform was loading and never saw it; it waits for this start, so close it here.
@@ -140,6 +142,11 @@ export function createSidecar(options: SidecarOptions): Sidecar {
     // Explicit handlers win, so tests can still simulate features. Families without a handler stay unavailable.
     if (loaded.fabric) {
       for (const [id, handler] of Object.entries(fabricHandlers(loaded.fabric))) {
+        (features as Record<string, unknown>)[id] ??= handler;
+      }
+    }
+    if (loaded.commissioning) {
+      for (const [id, handler] of Object.entries(commissioningHandlers(loaded.commissioning))) {
         (features as Record<string, unknown>)[id] ??= handler;
       }
     }
@@ -174,6 +181,12 @@ export function createSidecar(options: SidecarOptions): Sidecar {
     pruneTimer.unref();
     stream.publish('sidecar.lifecycle', { phase: 'started' });
     stream.publish('sidecar.capabilities', capabilityReport(features));
+    if (config.allowAttestationOverride) {
+      logger(
+        'warn',
+        'the attestation override is enabled (MATTER_SIDECAR_ALLOW_ATTESTATION_OVERRIDE=true); never use this in production',
+      );
+    }
     logger('info', 'listening', { host: config.host, port, tls: config.tls !== null });
     if (config.insecureRemote) {
       logger('warn', 'serving plain HTTP on a non-loopback address (MATTER_SIDECAR_ALLOW_INSECURE_REMOTE=true)', {

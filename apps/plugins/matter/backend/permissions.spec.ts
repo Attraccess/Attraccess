@@ -13,6 +13,10 @@ import { MatterRestoreService } from './backup/restore.service';
 import { MatterConnectionService } from './connection/connection.service';
 import { MatterConnectionController } from './connection/controller';
 import { MatterSettingsService } from './connection/settings.service';
+import { MatterCommissioningController } from './commissioning/controller';
+import { MatterCommissioningService } from './commissioning/commissioning.service';
+import { MatterNodeRemovalService } from './commissioning/removal.service';
+import { MatterNodeSharingService } from './commissioning/sharing.service';
 import { MatterDevicesController } from './devices/controller';
 import { MatterLifecycleService } from './devices/lifecycle.service';
 import { MatterReconciliationService } from './devices/reconciliation.service';
@@ -80,6 +84,20 @@ const ROUTES: Route[] = [
   [MatterDevicesController, 'endpointState', 'endpointState', 'get', `/matter/endpoints/${ID}/state`],
   [MatterDevicesController, 'reconciliationStatus', 'reconciliationStatus', 'get', '/matter/reconciliation'],
   [MatterDevicesController, 'trigger', 'reconciliationRun', 'post', '/matter/reconciliation'],
+  [MatterCommissioningController, 'start', 'commissioningStart', 'post', '/matter/commissioning/sessions'],
+  [MatterCommissioningController, 'current', 'commissioningStatus', 'get', '/matter/commissioning/sessions/current'],
+  [MatterCommissioningController, 'get', 'commissioningStatus', 'get', `/matter/commissioning/sessions/${ID}`],
+  [MatterCommissioningController, 'cancel', 'commissioningStart', 'delete', `/matter/commissioning/sessions/${ID}`],
+  [
+    MatterCommissioningController,
+    'finish',
+    'commissioningStart',
+    'post',
+    `/matter/commissioning/sessions/${ID}/finish`,
+  ],
+  [MatterCommissioningController, 'remove', 'commissioningRemoveFromFabric', 'post', `/matter/nodes/${ID}/remove`],
+  [MatterCommissioningController, 'share', 'commissioningShare', 'post', `/matter/nodes/${ID}/share`],
+  [MatterCommissioningController, 'revokeShare', 'commissioningShare', 'delete', `/matter/nodes/${ID}/share`],
 ];
 
 function guardAllows(controller: Type, handler: string, granted: string[]): boolean {
@@ -140,7 +158,7 @@ describe('Matter route permissions', () => {
   it('lists every registered controller and route handler', () => {
     const covered = new Set(ROUTES.map(([controller, handler]) => `${controller.name}.${handler}`));
     const listed = new Set(ROUTES.map(([controller]) => controller));
-    expect(REGISTERED.length).toBe(4);
+    expect(REGISTERED.length).toBe(5);
     for (const controller of REGISTERED) {
       expect(listed).toContain(controller);
       const handlers = Object.getOwnPropertyNames(controller.prototype).filter(
@@ -177,11 +195,20 @@ describe('Matter route permissions', () => {
         'reconciliationStatus',
       ].sort(),
     );
-    for (const [, , operation] of ROUTES) {
+    for (const [controller, , operation] of ROUTES) {
       expect(MATTER_OPERATIONS[operation]).toHaveLength(1);
+      if (controller === MatterCommissioningController) continue;
       if (!read.some(([, , readOperation]) => readOperation === operation)) {
         expect(MATTER_OPERATIONS[operation]).toEqual(['matter.devices.manage']);
       }
+    }
+  });
+
+  it('keeps commissioning, sharing and removal from the fabric on the commission key alone', () => {
+    const commissioning = ROUTES.filter(([controller]) => controller === MatterCommissioningController);
+    expect(commissioning.length).toBe(8);
+    for (const [, , operation] of commissioning) {
+      expect(MATTER_OPERATIONS[operation]).toEqual(['matter.devices.commission']);
     }
   });
 });
@@ -256,6 +283,9 @@ describe('Matter routes over HTTP', () => {
       MatterLifecycleService,
       MatterReconciliationService,
       MatterStateService,
+      MatterCommissioningService,
+      MatterNodeRemovalService,
+      MatterNodeSharingService,
     ];
     const moduleRef = await Test.createTestingModule({
       controllers: REGISTERED,

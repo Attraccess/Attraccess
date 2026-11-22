@@ -25,6 +25,18 @@ const post = (running: Running, path: string, body: unknown) =>
     body: JSON.stringify(body),
   });
 const get = (running: Running, path: string) => http(running.port, 'GET', path, { headers: validHeaders() });
+/** DELETE carries a body here, and Node frames one only when `content-length` says so. */
+const del = (running: Running, path: string, body: unknown) => {
+  const payload = JSON.stringify(body);
+  return http(running.port, 'DELETE', path, {
+    headers: {
+      ...validHeaders(),
+      'content-type': 'application/json',
+      'content-length': String(Buffer.byteLength(payload)),
+    },
+    body: payload,
+  });
+};
 
 /** Hash of every file below `directory`, to prove that a recovery state left the storage untouched. */
 function fingerprint(directory: string): string {
@@ -276,6 +288,15 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
       expect(refused.status).toBe(409);
       expect(refused.body.error.code).toBe('recovery_required');
       expect((await post(second, '/v1/backup/snapshot', {})).body.error.code).toBe('recovery_required');
+      // Commissioning, removal and the commissioning window are refused the same way, before touching anything.
+      const refusals = [
+        await post(second, '/v1/commissioning/sessions', { setupCode: '34970112332' }),
+        await del(second, '/v1/nodes/1', { force: false }),
+        await del(second, '/v1/nodes/1', { force: true }),
+        await post(second, '/v1/nodes/1/commissioning-window', { timeoutSec: 180 }),
+        await del(second, '/v1/nodes/1/commissioning-window', {}),
+      ];
+      for (const answer of refusals) expect(answer.body.error?.code).toBe('recovery_required');
       await stop(second);
       expect(fingerprint(storage)).toBe(before);
     });
