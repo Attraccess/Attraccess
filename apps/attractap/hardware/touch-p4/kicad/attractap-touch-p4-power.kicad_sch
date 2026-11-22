@@ -3875,17 +3875,18 @@
 		(dnp no)
 		(uuid "8dcf1923-8f27-5bef-8bb5-502654115ac8")
 		(property "Reference" "C117" (at 242.57 144.72 90) (effects (font (size 1 1))))
-		(property "Value" "10u/50V" (at 242.57 150.22 90) (effects (font (size 1 1))))
+		(property "Value" "2.2u/100V" (at 242.57 150.22 90) (effects (font (size 1 1))))
 		(property "Footprint" "Capacitor_SMD:C_1206_3216Metric"
 			(at 242.57 147.32 90)
 			(effects (font (size 1 1)) (hide yes))
 		)
 		(property "Datasheet" "" (at 242.57 147.32 90) (effects (font (size 1 1)) (hide yes)))
-		(property "Description" "DC input filter, connector side"
+		(property "Description" "DC input filter, connector side. 100 V X7R: keeps 1.5 uF at 24 V"
 			(at 242.57 147.32 90)
 			(effects (font (size 1 1)) (hide yes))
 		)
-		(property "LCSC" "C13585" (at 242.57 147.32 90) (effects (font (size 1 1)) (hide yes)))
+		(property "LCSC" "C170101" (at 242.57 147.32 90) (effects (font (size 1 1)) (hide yes)))
+		(property "MPN" "CL31B225KCHSNNE" (at 242.57 147.32 90) (effects (font (size 1 1)) (hide yes)))
 		(pin "1" (uuid "bd895ec9-deaa-58b1-b0b4-080ba33e77d8"))
 		(pin "2" (uuid "3ae5d8b5-f930-56f9-b51a-c3accaaf09d4"))
 		(instances
@@ -4039,14 +4040,18 @@
 		(dnp no)
 		(uuid "c82168cb-d30a-5703-9856-960f36bad051")
 		(property "Reference" "C112" (at 303.53 144.72 90) (effects (font (size 1 1))))
-		(property "Value" "10u/50V" (at 303.53 150.22 90) (effects (font (size 1 1))))
+		(property "Value" "2.2u/100V" (at 303.53 150.22 90) (effects (font (size 1 1))))
 		(property "Footprint" "Capacitor_SMD:C_1206_3216Metric"
 			(at 303.53 147.32 90)
 			(effects (font (size 1 1)) (hide yes))
 		)
 		(property "Datasheet" "" (at 303.53 147.32 90) (effects (font (size 1 1)) (hide yes)))
-		(property "Description" "" (at 303.53 147.32 90) (effects (font (size 1 1)) (hide yes)))
-		(property "LCSC" "C13585" (at 303.53 147.32 90) (effects (font (size 1 1)) (hide yes)))
+		(property "Description" "converter input. 100 V X7R: keeps 1.5 uF at 24 V"
+			(at 303.53 147.32 90)
+			(effects (font (size 1 1)) (hide yes))
+		)
+		(property "LCSC" "C170101" (at 303.53 147.32 90) (effects (font (size 1 1)) (hide yes)))
+		(property "MPN" "CL31B225KCHSNNE" (at 303.53 147.32 90) (effects (font (size 1 1)) (hide yes)))
 		(pin "1" (uuid "08d62efd-1ed0-522a-9cdf-8ffa74067f2e"))
 		(pin "2" (uuid "2c721f63-e552-5089-8d8f-6e6836dbafd0"))
 		(instances
@@ -4096,14 +4101,18 @@
 		(dnp no)
 		(uuid "301ca92f-fd99-5a2b-bf0d-7dd8fd88aabd")
 		(property "Reference" "C113" (at 327.66 144.72 90) (effects (font (size 1 1))))
-		(property "Value" "10u/50V" (at 327.66 150.22 90) (effects (font (size 1 1))))
+		(property "Value" "2.2u/100V" (at 327.66 150.22 90) (effects (font (size 1 1))))
 		(property "Footprint" "Capacitor_SMD:C_1206_3216Metric"
 			(at 327.66 147.32 90)
 			(effects (font (size 1 1)) (hide yes))
 		)
 		(property "Datasheet" "" (at 327.66 147.32 90) (effects (font (size 1 1)) (hide yes)))
-		(property "Description" "" (at 327.66 147.32 90) (effects (font (size 1 1)) (hide yes)))
-		(property "LCSC" "C13585" (at 327.66 147.32 90) (effects (font (size 1 1)) (hide yes)))
+		(property "Description" "converter input. 100 V X7R: keeps 1.5 uF at 24 V"
+			(at 327.66 147.32 90)
+			(effects (font (size 1 1)) (hide yes))
+		)
+		(property "LCSC" "C170101" (at 327.66 147.32 90) (effects (font (size 1 1)) (hide yes)))
+		(property "MPN" "CL31B225KCHSNNE" (at 327.66 147.32 90) (effects (font (size 1 1)) (hide yes)))
 		(pin "1" (uuid "e544f0d6-0d8c-5e2b-9370-993f3657e000"))
 		(pin "2" (uuid "ef675a09-fd40-5f70-ad7c-aedbc1e173a1"))
 		(instances

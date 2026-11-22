@@ -152,10 +152,23 @@ The board has three sensors for this and the firmware does not use them yet.
    LVGL 9 can use it as a draw unit.
 3. **Backlight**: a real PWM pin instead of the expander. Use LEDC at 25 to
    40 kHz on GPIO26. Below about 2.5 kHz the driver restarts its soft start on
-   every cycle.
+   every cycle. GPIO26 is one of the chip's four USB pads (24 to 27), which
+   come out of reset in their USB function. Espressif's own board has its
+   backlight PWM on the same pin, so nothing special is expected; it is one
+   more thing to look at on the first board.
 4. **Wi-Fi**: the P4 has no radio. Add `esp_wifi_remote` + `esp_hosted`
    (SDIO, 4-bit). Board-specific settings: SDMMC slot 0, the pins above,
-   reset GPIO 45. The ESP32-C6 needs the esp-hosted co-processor firmware:
+   reset GPIO 45. In esp-hosted's configuration that is three choices, and the
+   first is easy to miss: for a P4 with a C6 it selects the board
+   "ESP32-P4-Function-EV-Board" by itself, which fixes the reset to GPIO54 and
+   the bus to slot 1 on GPIO14 to 19. Set the board to "No specific PCB board"
+   (`ESP_HOSTED_P4_DEV_BOARD_NONE`), the slot to "Slot 0 (IOMUX-fixed pins)"
+   (`ESP_HOSTED_SDIO_SLOT_0`) and the reset GPIO to 45
+   (`ESP_HOSTED_HOST_RESET_GPIO`). The names are those of esp-hosted's main
+   branch in November 2026. The slot's pins are supplied with 3.3 V straight
+   from the board, so the SD card supply setting of Espressif's board (one of
+   the chip's regulators) is not needed. The ESP32-C6 needs the esp-hosted
+   co-processor firmware:
    first flash through the C6 test points (C6_TX, C6_RX, C6_EN, C6_BOOT),
    later updates over the SDIO link from the P4. The C6 firmware version has to
    be tracked together with the reader firmware. Boards built with the

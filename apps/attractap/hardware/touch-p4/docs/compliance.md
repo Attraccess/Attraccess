@@ -205,7 +205,7 @@ A terminal for wires "from an existing installation" means cables longer than
 | Wi-Fi antenna | Module at the board edge above the display. No copper on any layer for 44 mm along the edge; the board is cut away under the antenna. |
 | Return paths | Solid ground plane on layer 2 under all signals. Layer 3 is a 3.3 V pour that also carries signal tracks; it is kept free of tracks under the MCU. |
 | Switching regulators | AP63203 and AP63205 with spread spectrum; small loops, input and output capacitors next to the ICs. |
-| DC input | Self-resetting fuse, reverse-polarity diode, pi filter (10 uF, 2.2 uH, 2 x 10 uF) and TVS before the converter. The converter sits away from the NFC antenna, and the DC run does not go around the NFC loop. |
+| DC input | Self-resetting fuse, reverse-polarity diode, pi filter (2.2 uF, 2.2 uH, 2 x 2.2 uF; 100 V capacitors that keep 1.5 uF each at 24 V) and TVS before the converter. The converter sits away from the NFC antenna, and the DC run does not go around the NFC loop. |
 | Display bus | 33 ohm series resistors on all RGB and sync lines; reduce GPIO drive strength in firmware if needed. |
 | Clocks | Series resistors on the 50 MHz RMII clock, the SDIO clock and the flash clock. |
 | USB | TVS and ESD array at the connector, fuse, ferrite bead in the supply. |

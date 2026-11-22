@@ -55,6 +55,14 @@ class DesignTest(unittest.TestCase):
         for ref, source in (('D102', '+5V_USB'), ('D104', '+5V_POE'), ('D107', '+5V_DC')):
             self.assertEqual(self.d.parts[ref].nets, {'1': '+5V', '2': source})
 
+    def test_dc_input_capacitors_keep_their_capacitance_at_24_v(self):
+        # The 10 uF / 50 V X5R part of this size (a basic part, so tempting) keeps 1.35 uF at 24 V. Large at
+        # low voltage and small at high voltage, it lets the input swing to 45 V when a live 24 V supply is
+        # plugged in; the converter stands 40 V. The 100 V X7R part keeps 1.53 uF and swings to 37.5 V.
+        for ref in ('C112', 'C113', 'C117'):
+            part = self.d.parts[ref]
+            self.assertEqual((part.value, part.lcsc, part.fp), ('2.2u/100V', 'C170101', design.STD_FP['C1206']))
+
     def test_unpowered_sources_have_a_bleed_resistor(self):
         for net in ('+5V_USB', '+5V_DC'):
             to_ground = [ref for ref, _pin in self.nets[net] if ref.startswith('R') and
@@ -139,6 +147,51 @@ class GeometryTest(unittest.TestCase):
     def test_room_for_the_plug(self):
         # plug with boot (30 mm) and the cable's bend into the wall (19 mm for a 5.5 mm cable)
         self.assertGreaterEqual(geometry.BOARD_H - geometry.NOTCH_Y, 49.0)
+
+
+class FootprintLibraryTest(unittest.TestCase):
+    """The project's footprints: what the converter delivered, after the repairs in make_lib.py."""
+
+    FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'kicad', 'lib', 'attractap.pretty')
+
+    @staticmethod
+    def pads(path):
+        """[(x1, y1, x2, y2)] of the solder paste openings and [(x, y, radius)] of the plated holes."""
+        from sexpr import find, first, loads
+        paste, holes = [], []
+        with open(path, encoding='utf-8') as file:
+            tree = loads(file.read())
+        for pad in find(tree, 'pad'):
+            at, size = first(pad, 'at'), first(pad, 'size')
+            x, y, w, h = float(at[1]), float(at[2]), float(size[1]), float(size[2])
+            if len(at) > 3 and float(at[3]) % 180 == 90:
+                w, h = h, w
+            if any(str(v).endswith('.Paste') for v in first(pad, 'layers')[1:]):
+                paste.append((x - w / 2, y - h / 2, x + w / 2, y + h / 2))
+            if pad[2] == 'thru_hole':
+                drill = [float(v) for v in first(pad, 'drill')[1:] if str(v).replace('.', '').isdigit()]
+                holes.append((x, y, max(drill) / 2))
+        return paste, holes
+
+    def test_no_solder_paste_on_a_plated_hole(self):
+        # Paste printed over a hole runs into it. The converted PN532 footprint had one opening over its
+        # whole exposed pad and one more on each of the four thermal vias in it, on both sides of the board.
+        found = []
+        for file in sorted(os.listdir(self.FOLDER)):
+            paste, holes = self.pads(os.path.join(self.FOLDER, file))
+            for x, y, r in holes:
+                for x1, y1, x2, y2 in paste:
+                    if math.hypot(x - min(max(x, x1), x2), y - min(max(y, y1), y2)) < r:
+                        found.append((file, x, y))
+        self.assertEqual(found, [])
+
+    def test_nfc_chip_has_paste_on_half_of_its_exposed_pad(self):
+        paste, holes = self.pads(os.path.join(self.FOLDER, 'QFN-40_L6.0-W6.0-P0.50-BL-EP.kicad_mod'))
+        self.assertEqual(len(holes), 4)
+        windows = [p for p in paste if p[2] - p[0] > 1.0]        # the pins' openings are 0.28 mm wide
+        covered = sum((x2 - x1) * (y2 - y1) for x1, y1, x2, y2 in windows) / 4.42 ** 2
+        self.assertEqual(len(windows), 8)
+        self.assertTrue(0.45 < covered < 0.75, covered)
 
 
 class I2cBusTest(unittest.TestCase):

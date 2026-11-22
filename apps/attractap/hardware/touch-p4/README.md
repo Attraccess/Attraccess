@@ -138,9 +138,10 @@ What the parts cost, what JLCPCB charges once per order, and which cheaper parts
 
 Check before paying:
 
-- Stock. JLCPCB's parts list shows what it does not have. On 20 November 2026 it had no ESP32-P4
+- Stock. JLCPCB's parts list shows what it does not have. On 22 November 2026 it had no ESP32-P4
   (U201) and two pieces of the 3.3 V converter AP63203WU-7 (U103); both have to be ordered in
-  through JLCPCB's parts sourcing before the assembly order. See the sourcing risks in
+  through JLCPCB's parts sourcing before the assembly order. Of the PoE module (U102, Ethernet
+  version) it had 38, ten fewer than two days before. See the sourcing risks in
   [docs/design-notes.md](docs/design-notes.md).
 - DC terminal J103. The WAGO 250-202 has two pins and the footprint four holes (it also takes the
   WAGO 2601-3102 lever terminal). Write in the order remark: pins in the upper left and the lower
@@ -148,7 +149,8 @@ Check before paying:
   drawing shows the body outline.
 - Rotation. The placement files already carry JLCPCB's angle for the four parts where it differs
   from KiCad's (the PN532 U501, the level shifter U701, the transistor Q701 and the resistor arrays);
-  `check-footprints` compares every part with JLCPCB's library. Still look at every polarised part
+  `check-footprints` compares every part with JLCPCB's library, except the inductor L102, for whose
+  part number the library has no footprint (two pads, no polarity). Still look at every polarised part
   in JLCPCB's placement preview, in particular the PoE module U102 (its pads are the same when it is
   turned by 180 degrees), the diodes D101 to D107 (D106, the TVS of the DC input, has its cathode on
   the left, towards the board edge), C103, the LEDs and the ICs.

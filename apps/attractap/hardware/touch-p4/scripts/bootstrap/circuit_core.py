@@ -3,6 +3,9 @@
 Each function adds the parts of one schematic sheet to the design (see design.py)."""
 
 
+DC_INPUT_CAP = '2.2u/100V'      # C112, C113, C117; why this value: see power()
+
+
 def power(d):
     """Power input: USB-C, PoE, supply OR-ing, 3.3 V buck."""
     d.begin('power', 100)
@@ -84,7 +87,13 @@ def power(d):
     # cable (conducted emission). C117 - L103 - C112/C113 form a pi filter; the TVS sits behind the
     # inductor, at the converter, and so also clamps what the filter rings up to when a live supply
     # is plugged in.
-    d.C('10u/50V', 'VDC_R', size='1206', ref='C117', desc='DC input filter, connector side')
+    # The three input capacitors are 2.2 uF / 100 V X7R, not the 10 uF / 50 V X5R of the same size. By
+    # the maker's curves the 10 uF part keeps 1.35 uF at 24 V and the 2.2 uF part 1.53 uF, so nothing is
+    # lost where it counts. But a capacitor that is large at 5 V and small at 24 V makes the input swing
+    # far above the supply when a live supply is plugged in: 45 V at the converter with 5 m of 1.5 mm2
+    # wire, against its limit of 40 V. With these it is 37.5 V (docs/design-notes.md, "Power").
+    d.C(DC_INPUT_CAP, 'VDC_R', size='1206', ref='C117', mpn='CL31B225KCHSNNE',
+        desc='DC input filter, connector side. 100 V X7R: keeps 1.5 uF at 24 V')
     d.add('L', '2.2uH 2.3A', 'Device:L', 'attractap:IND-SMD_L2.5-W2.0_CKCSA252012', {'1': 'VDC_R', '2': 'VDC'},
           ref='L103', lcsc='C354540', mpn='CKCSA252012-2.2uH/M', desc='DC input filter')
     # 600 W part with 26 V stand-off: it starts to conduct at 28.9 to 31.9 V and holds the input below
@@ -92,8 +101,9 @@ def power(d):
     # SMAJ28A fitted before crossed 40 V at 4.5 A.
     d.add('D', 'SMBJ26A', 'Device:D_Zener', 'Diode_SMD:D_SMB', {'1': 'VDC', '2': 'GND'},
           lcsc='C315992', mpn='SMBJ26A', desc='TVS, DC input (stand-off 26 V, conducts from 28.9 V; U104 stands 40 V for 0.4 s)')
-    d.C('10u/50V', 'VDC', size='1206')
-    d.C('10u/50V', 'VDC', size='1206')
+    for _ in range(2):
+        d.C(DC_INPUT_CAP, 'VDC', size='1206', mpn='CL31B225KCHSNNE',
+            desc='converter input. 100 V X7R: keeps 1.5 uF at 24 V')
     d.add('U', 'AP63205WU-7', 'attractap:AP63203WU-7', 'attractap:TSOT-26_L2.9-W1.6-P0.95-LS2.8-BL', {
         '3': 'VDC', '2': 'DC_EN', '4': 'GND', '5': 'DC_SW', '6': 'DC_BST', '1': '+5V_DC',
     }, lcsc='C2071056', mpn='AP63205WU-7', desc='5 V 2 A buck for the DC input (same family as U103)')

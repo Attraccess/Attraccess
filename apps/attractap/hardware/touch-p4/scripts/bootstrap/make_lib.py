@@ -170,8 +170,15 @@ P4_PASTE_WINDOW, P4_PASTE_PITCH = 2.1, 2.5
 PHY_PASTE_WINDOW, PHY_PASTE_PITCH = 1.0, 1.5
 
 
+# The PN532's 4.42 mm pad. Its footprint brings four thermal vias with it, as plated pads 0.5 mm from the
+# centre: eight windows in a ring around them (a 3 x 3 grid without its centre), 54 % of the pad.
+NFC_PASTE_WINDOW, NFC_PASTE_PITCH = 1.15, 1.5
+
+
 def paste_windows(tree, size, pitch, n=3):
-    """Take the paste off the largest pad and add an n x n grid of paste-only openings in its place."""
+    """Take the paste off the largest pad and add an n x n grid of paste-only openings in its place. A
+    window that would lie on a plated hole of the footprint (a thermal via) is left out: solder paste
+    over a hole runs into it."""
     S = Sym
     ep = max((p for p in find(tree, 'pad') if p[2] == 'smd'), key=lambda p: float(first(p, 'size')[1]))
     layers = first(ep, 'layers')
@@ -179,11 +186,25 @@ def paste_windows(tree, size, pitch, n=3):
         return                                            # done before
     layers[:] = [layers[0]] + [v for v in layers[1:] if str(v) != 'F.Paste']
     x0, y0 = float(first(ep, 'at')[1]), float(first(ep, 'at')[2])
+    holes = [(float(first(p, 'at')[1]), float(first(p, 'at')[2]), float(first(p, 'size')[1]) / 2)
+             for p in find(tree, 'pad') if p[2] == 'thru_hole']
     steps = [(k - (n - 1) / 2) * pitch for k in range(n)]
     for dx in steps:
         for dy in steps:
-            tree.append([S('pad'), '', S('smd'), S('rect'), [S('at'), x0 + dx, y0 + dy],
+            x, y = x0 + dx, y0 + dy
+            if any(abs(x - hx) < size / 2 + r and abs(y - hy) < size / 2 + r for hx, hy, r in holes):
+                continue
+            tree.append([S('pad'), '', S('smd'), S('rect'), [S('at'), x, y],
                          [S('size'), size, size], [S('layers'), S('F.Paste')]])
+
+
+def no_paste_on_plated_holes(tree):
+    """The converter gives a thermal via inside an exposed pad the layers `*.Cu *.Paste *.Mask`: a paste
+    opening on the hole, on both sides of the board. Parts with wire leads have none on their pads."""
+    for pad in find(tree, 'pad'):
+        layers = first(pad, 'layers')
+        if pad[2] == 'thru_hole' and layers:
+            layers[:] = [v for v in layers if not str(v).endswith('.Paste')]
 
 
 # VCNL4040 proximity sensor, as the converted footprint lies: body 4 x 2 mm, pins 1 to 4 along the bottom from the
@@ -228,6 +249,10 @@ def fix_footprint(name, text, fresh=True):
         paste_windows(tree, P4_PASTE_WINDOW, P4_PASTE_PITCH)
     if name.startswith('QFN-32'):
         paste_windows(tree, PHY_PASTE_WINDOW, PHY_PASTE_PITCH, n=2)
+    if name.startswith('QFN-40'):
+        paste_windows(tree, NFC_PASTE_WINDOW, NFC_PASTE_PITCH)
+    if name.startswith('QFN'):
+        no_paste_on_plated_holes(tree)
     # The converter marks the inductors as through-hole parts. With that flag a placement export that
     # takes surface-mount parts only would leave them out.
     attr = first(tree, 'attr')

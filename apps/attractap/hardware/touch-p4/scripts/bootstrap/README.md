@@ -12,7 +12,7 @@ edited by hand, treat the KiCad files as the source of truth and do not run
 | `design.py` | The circuit description: part model, part numbers of the passives, and `build()`. |
 | `circuit_core.py`, `circuit_io.py` | Every part, sheet by sheet, with value, footprint, LCSC number, variant, group and the net on each pin. |
 | `libs.py` | Reads symbol and footprint libraries, checks every part against both. |
-| `make_lib.py` | Builds `kicad/lib/` from LCSC/EasyEDA conversions, generates the NFC antenna footprint and the three-unit ESP32-P4 symbol, and windows the solder paste on the ESP32-P4's exposed pad. |
+| `make_lib.py` | Builds `kicad/lib/` from LCSC/EasyEDA conversions, generates the NFC antenna footprint and the three-unit ESP32-P4 symbol, and windows the solder paste on the exposed pads of the ESP32-P4, the Ethernet PHY and the PN532. `--refit` applies its repairs again to the footprints already in `kicad/lib/`. |
 | `build_sch.py` | Writes the hierarchical schematic (root + one sheet per block). |
 | `geometry.py` | Board outline, display position, slot, antenna and LED positions. |
 | `placement.py` | Position and rotation of every part. |
@@ -104,6 +104,11 @@ Lessons from revision A, in case the generator is used again:
 - A footprint's angle in KiCad is not always the angle JLCPCB wants: it counts from its own library
   footprint of the part number. `tools/pcb.sh check-footprints` compares the two for every part; the
   corrections are in `scripts/export_fab.py`.
+- A ceramic capacitor's value on the parts list is its value at 0 V. Take the value at the working
+  voltage from the maker's curve: the 10 uF / 50 V parts first fitted at the 24 V input had 1.35 uF
+  there, and their large value at low voltage made the input overshoot when a supply was plugged in.
+- A thermal via that comes with a converted footprint is a plated pad, not a via: checks that look at
+  vias do not see it. The PN532's four had solder paste on them (`test_design.py` looks for that now).
 - Through-hole parts stand out of the display side of the board. Keep them from behind the display
   where the mechanics allow. Where they do not (the Ethernet jack), keep 48 V pins beside the
   display's metal back and set the display distance for clipped pins (`test_design.py` checks both).

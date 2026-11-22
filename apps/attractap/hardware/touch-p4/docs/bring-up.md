@@ -16,7 +16,10 @@ when a step fails. Use a current-limited bench supply for the first power-up.
 2. Have an electronics engineer look at the open points listed under "Design
    review" in the design notes.
 3. Check that JLCPCB (or the chosen assembler) can supply every BOM line, in
-   particular the ESP32-P4NRW32X and the AP63203WU-7.
+   particular the ESP32-P4NRW32X and the AP63203WU-7 (none and two in stock on
+   22 November 2026), and for the Ethernet version the PoE module DP9900M-5V
+   (38 in stock, falling). The list of short lines is under "Sourcing risks"
+   in the design notes.
 4. Run the `check` and `check-footprints` targets (README) and look at the
    Gerbers in a viewer.
 5. When the bare boards arrive before assembly: drop an LED into one of its
@@ -43,10 +46,35 @@ when a step fails. Use a current-limited bench supply for the first power-up.
    the terminal before the first use. Then feed 12 V through a plug.
 7. DC input with reversed polarity: no current flows and nothing gets warm.
 8. Plug a 24 V supply in live a few times with an oscilloscope at the cathode
-   of D106 (the TVS): the peak must stay below 40 V.
+   of D106 (the TVS): the peak must stay below 40 V. It lasts about 10
+   microseconds, so trigger on the edge at 30 V. Expected by simulation: 29 to
+   34 V with a plug-in supply, up to 38 V with a few metres of thick wire to a
+   bench or DIN rail supply. Do it once that way (5 m of 1.5 mm2 wire in the
+   terminal), which is the worst case: thick wire has little resistance to
+   damp the swing, and very short wire too little inductance to make one. If
+   the peak is above 40 V, check that C112, C113 and C117 are the 100 V parts
+   (2.2 uF); with 10 uF / 50 V parts in their place it reaches 45 V.
 9. With the board running from the DC input, measure the unplugged USB-C
    connector's VBUS (at F101): below 0.5 V. Then plug it into a USB-C port of a
-   computer: the port must come up.
+   computer: the port must come up. Repeat both after the reader has run for
+   half an hour in its case: the leakage of D102 that lifts VBUS grows about
+   tenfold from 50 to 75 °C. Above 0.8 V a USB-C port stays off; fit 1 k for
+   R104 then.
+
+Rails without a test point of their own, and where to measure them:
+
+| Rail | Expected | Measure at |
+|---|---|---|
+| USB input behind fuse and ferrite | 5 V | anode of D102 |
+| DC input at the converter | the supply's voltage less 0.5 V | cathode of D106 |
+| DC converter output | 5.0 V | L102, on the side of C115 |
+| PoE module output | 5.0 V | the `+` pad of C103 |
+| Flash supply (from the MCU) | 3.3 V | pin 8 of the flash U203 |
+| PSRAM supply (from the MCU) | 0 V without firmware, 1.9 V with | C226 (0402, next to the MCU) |
+| PN532 supply | about 4.6 V | C501 |
+| PN532 regulator output | 3.0 V once NFC_RST is high | C503 |
+| PHY supply and its 1.1 V regulator | 3.3 V and 1.1 V | C401 and C404 |
+| Backlight anode | 11 to 13 V when lit, about the voltage of the 5 V rail when off | C606 |
 
 ## MCU
 
@@ -83,9 +111,15 @@ when a step fails. Use a current-limited bench supply for the first power-up.
 2. Before the field is switched on for the first time, measure the loop: with
    the display fitted, an LCR meter or network analyser across R504/R505 on the
    antenna side (remove both resistors for that). The fitted matching values
-   are safe for 1.0 to 1.3 uH. Outside that range change them first.
+   are safe for 1.12 to 1.22 uH whatever the tolerance of the parts on this
+   board. From 1.0 to 1.3 uH they are safe for parts of exact value, and about
+   one board in seven can draw more than 100 mA at either end: there, switch
+   the field on for a second at most the first time and read the current
+   (next step) before leaving it on. Outside 1.0 to 1.3 uH change the values
+   first.
 3. Switch the field on and measure the transmitter current: the voltage across
-   FB503 (0.15 ohm) or the rise of the 5 V current. It must stay below 100 mA.
+   FB503 (0.15 ohm) or the rise of the 5 V current. It must stay below 100 mA
+   (expected 35 to 50 mA when the loop is near 1.2 uH).
 4. Tune the antenna with a network analyser between the EMC filter and the
    matching network (see design notes). Record the final values of C513 to
    C519, R504, R505 in the circuit description. Tune the Ethernet version on
