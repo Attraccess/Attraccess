@@ -30,9 +30,9 @@ export function SetupResult({
       </div>
       <dl className="sh:grid sh:grid-cols-[auto_1fr] sh:gap-x-4 sh:gap-y-1 sh:text-sm">
         <dt className="sh:text-muted">{t('ble.result.name')}</dt>
-        <dd>{name}</dd>
+        <dd className="sh:break-all">{name}</dd>
         <dt className="sh:text-muted">{t('ble.result.ip')}</dt>
-        <dd>{outcome.ipAddress}</dd>
+        <dd className="sh:break-all">{outcome.ipAddress}</dd>
       </dl>
       <ul className="sh:flex sh:list-inside sh:list-disc sh:flex-col sh:gap-1 sh:text-sm">
         {passwordSet && <li>{t('ble.result.passwordSet')}</li>}

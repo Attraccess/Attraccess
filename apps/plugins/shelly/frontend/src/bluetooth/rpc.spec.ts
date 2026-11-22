@@ -41,6 +41,28 @@ describe('ShellyBleRpc framing', () => {
     expect(fake.requests[1]).toMatchObject({ method: 'B', params: { x: 1 }, src: 'attraccess' });
   });
 
+  it('runs concurrent calls one after another so their frames never interleave', async () => {
+    const fake = createFakeShelly((req) => ({ result: { method: req.method } }));
+    const rpc = rpcFor(fake);
+    const replies = await Promise.all([
+      rpc.call('WiFi.Scan', { pad: 'x'.repeat(60) }),
+      rpc.call('WiFi.Scan', { pad: 'y'.repeat(60) }),
+      rpc.call('Shelly.GetDeviceInfo'),
+    ]);
+    expect(replies).toEqual([{ method: 'WiFi.Scan' }, { method: 'WiFi.Scan' }, { method: 'Shelly.GetDeviceInfo' }]);
+    expect(fake.requests.map((r) => r.id)).toEqual([1, 2, 3]);
+  });
+
+  it('keeps serving calls after one fails', async () => {
+    const fake = createFakeShelly((req) =>
+      req.method === 'Bad' ? { error: { code: -1, message: 'no' } } : { result: 1 },
+    );
+    const rpc = rpcFor(fake);
+    const [bad, good] = await Promise.allSettled([rpc.call('Bad'), rpc.call('Good')]);
+    expect(bad.status).toBe('rejected');
+    expect(good).toEqual({ status: 'fulfilled', value: 1 });
+  });
+
   it('times out when the device never answers', async () => {
     const fake = createFakeShelly(() => 'silence');
     let clock = 0;

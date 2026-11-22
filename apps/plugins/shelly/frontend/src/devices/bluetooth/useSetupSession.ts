@@ -92,7 +92,12 @@ export function useSetupSession(onRegistered: () => void) {
         setPhase({ kind: 'done', info, outcome, name: values.name });
       } catch (err) {
         if (err instanceof SetupStepError) statuses[err.step] = 'failed';
-        setPhase({ kind: 'failed', ...base, statuses: { ...statuses }, message: describeSetupError(err, t) });
+        setPhase({
+          kind: 'failed',
+          ...base,
+          statuses: { ...statuses },
+          message: describeSetupError(err, t, { protectedDevice: Boolean(info.auth_en) }),
+        });
       } finally {
         disconnect();
         if (registered) onRegistered();

@@ -22,10 +22,16 @@ export function WifiNetworkPicker({
   rpc,
   selection,
   onChange,
+  protectedDevice = false,
+  beforeRescan,
 }: {
   rpc: RpcCaller;
   selection: WifiSelection;
   onChange: (selection: WifiSelection) => void;
+  /** The device asks for its admin password, so a first scan may have been refused. */
+  protectedDevice?: boolean;
+  /** Runs before a manual rescan, e.g. to hand the entered admin password to the connection. */
+  beforeRescan?: () => void;
 }) {
   const { t } = useShellyTranslations();
   const { state, rescan } = useWifiScan(rpc);
@@ -40,7 +46,12 @@ export function WifiNetworkPicker({
           {t('ble.wifi.scanning')}
         </div>
       )}
-      {state.status === 'failed' && <StatusAlert status="warning" title={t('ble.wifi.scanFailed')} />}
+      {state.status === 'failed' && (
+        <StatusAlert
+          status="warning"
+          title={t(protectedDevice ? 'ble.wifi.scanFailedProtected' : 'ble.wifi.scanFailed')}
+        />
+      )}
       {state.status === 'done' && networks.length === 0 && (
         <p className="sh:text-sm sh:text-muted">{t('ble.wifi.none')}</p>
       )}
@@ -61,7 +72,7 @@ export function WifiNetworkPicker({
                   <Radio.Indicator />
                 </Radio.Control>
                 <Label>
-                  {network.ssid}{' '}
+                  <span className="sh:break-all">{network.ssid}</span>{' '}
                   <span className="sh:text-xs sh:text-muted">
                     {t(network.secured ? 'ble.wifi.secured' : 'ble.wifi.open')} ·{' '}
                     {t('ble.wifi.signal', { rssi: network.rssi })}
@@ -91,7 +102,14 @@ export function WifiNetworkPicker({
       )}
       {state.status !== 'scanning' && (
         <div>
-          <Button variant="ghost" size="sm" onPress={rescan}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onPress={() => {
+              beforeRescan?.();
+              rescan();
+            }}
+          >
             <RefreshCwIcon className="sh:h-4 sh:w-4" /> {t('ble.wifi.rescan')}
           </Button>
         </div>

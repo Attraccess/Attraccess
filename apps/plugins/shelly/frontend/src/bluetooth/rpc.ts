@@ -53,6 +53,8 @@ export class ShellyBleRpc implements RpcCaller {
   private credentials?: { username: string; password: string };
   private challenge?: DigestChallenge;
   private nc = 0;
+  /** The GATT channel carries one request at a time; concurrent calls would interleave their frames. */
+  private queue: Promise<unknown> = Promise.resolve();
   private readonly chunkSize: number;
   private readonly pollIntervalMs: number;
   private readonly timeoutMs: number;
@@ -76,7 +78,18 @@ export class ShellyBleRpc implements RpcCaller {
     this.challenge = undefined;
   }
 
-  async call<T>(method: string, params?: Record<string, unknown>, options: { timeoutMs?: number } = {}): Promise<T> {
+  /** Calls run one after another, in the order they were made. */
+  call<T>(method: string, params?: Record<string, unknown>, options: { timeoutMs?: number } = {}): Promise<T> {
+    const result = this.queue.then(() => this.callNow<T>(method, params, options));
+    this.queue = result.catch(() => undefined);
+    return result;
+  }
+
+  private async callNow<T>(
+    method: string,
+    params: Record<string, unknown> | undefined,
+    options: { timeoutMs?: number },
+  ): Promise<T> {
     const timeoutMs = options.timeoutMs ?? this.timeoutMs;
     const creds = this.credentials;
     // Reuse the last challenge so authenticated calls need one round trip; a

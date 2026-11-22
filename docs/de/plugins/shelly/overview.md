@@ -63,9 +63,9 @@ WLAN ein und fügt das Gerät dem Register hinzu.
 
 **Ablauf**
 
-1. Wählen Sie auf der Seite **Shelly-Geräte** **Über Bluetooth einrichten** und dann **Gerät auswählen**. Wählen Sie
-   den Shelly in der Liste des Browsers aus (sein Name beginnt mit `Shelly`). Attraccess zeigt Modell, Generation,
-   ID und Firmware an.
+1. Öffnen Sie die Seite **Shelly-Geräte**, wählen Sie **Über Bluetooth einrichten** und dann **Gerät auswählen**.
+   Wählen Sie den Shelly in der Liste des Browsers aus (sein Name beginnt mit `Shelly`). Attraccess zeigt Modell,
+   Generation, ID und Firmware an.
 2. Wählen Sie Ihr WLAN aus der Liste, die das Gerät gefunden hat. Bei einem versteckten Netzwerk oder wenn die Suche
    fehlschlägt, wählen Sie **Anderes Netzwerk** und geben den Namen ein. Geben Sie das WLAN-Passwort ein; lassen Sie es
    bei einem offenen Netzwerk leer.

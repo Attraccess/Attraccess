@@ -160,6 +160,7 @@
       "description": "Wähle das 2,4-GHz-Netzwerk, dem das Gerät beitreten soll.",
       "scanning": "Suche nach Netzwerken — das kann einige Sekunden dauern…",
       "scanFailed": "Das Gerät konnte nicht nach Netzwerken suchen. Gib den Netzwerknamen selbst ein.",
+      "scanFailedProtected": "Das Gerät konnte nicht nach Netzwerken suchen. Falls es schon ein Admin-Passwort hat, gib es unten ein und wähle „Erneut suchen“, oder gib den Netzwerknamen selbst ein.",
       "rescan": "Erneut suchen",
       "networks": "Vom Gerät gefundene Netzwerke",
       "other": "Anderes Netzwerk (Name eingeben)",
@@ -209,9 +210,10 @@
       "joinTimeout": "Das Gerät hat innerhalb von 60 Sekunden keine IP-Adresse erhalten (letzter Status: {{status}}). Prüfe das Passwort und ob das Netzwerk 2,4 GHz nutzt — Shelly-Geräte können keinem 5-GHz-Netzwerk beitreten.",
       "timeout": "Das Gerät hat nicht rechtzeitig über Bluetooth geantwortet. Gehe näher heran und versuche es erneut.",
       "rpc": "Das Gerät hat die Anfrage abgelehnt: {{method}} lieferte „{{message}}“ (Code {{code}}).",
-      "registerFailed": "Das Gerät ist im Netzwerk, aber Attraccess konnte es nicht hinzufügen: {{message}} Füge es über „Suchen“ oder „Gerät hinzufügen“ hinzu.",
+      "registerFailed": "Das Gerät ist im Netzwerk, aber Attraccess konnte es nicht hinzufügen ({{message}}). Füge es über „Suchen“ oder „Gerät hinzufügen“ hinzu.",
+      "registerFailedNoDetail": "Das Gerät ist im Netzwerk, aber Attraccess konnte es nicht hinzufügen. Füge es über „Suchen“ oder „Gerät hinzufügen“ hinzu.",
       "generic": "Bei der Kommunikation mit dem Gerät ist etwas schiefgelaufen.",
-      "retry": "Neu starten"
+      "retry": "Von vorn beginnen"
     },
     "result": {
       "title": "Gerät eingerichtet",

@@ -5,8 +5,8 @@ import { BluetoothIcon } from 'lucide-react';
 import { useCallback, useState, type FormEvent } from 'react';
 import { Button, PasswordInput, StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { useShellyTranslations } from '../../i18n';
-import type { BleDeviceInfo } from '../../bluetooth/provisioning';
-import type { RpcCaller } from '../../bluetooth/rpc';
+import { ADMIN_USERNAME, type BleDeviceInfo } from '../../bluetooth/provisioning';
+import type { ShellyBleRpc } from '../../bluetooth/rpc';
 import { TextFieldRow } from '../../shared/TextFieldRow';
 import { MANUAL, WifiNetworkPicker, type WifiSelection } from './WifiNetworkPicker';
 
@@ -23,7 +23,7 @@ export function SetupForm({
   advertisedName,
   onSubmit,
 }: {
-  rpc: RpcCaller;
+  rpc: ShellyBleRpc;
   info: BleDeviceInfo;
   advertisedName: string;
   onSubmit: (values: SetupFormValues) => void;
@@ -83,7 +83,16 @@ export function SetupForm({
     <Form onSubmit={handleSubmit} className="sh:flex sh:flex-col sh:gap-5" data-cy="shelly-ble-form">
       <section className="sh:flex sh:w-full sh:flex-col sh:gap-3">
         <h3 className="sh:text-sm sh:font-semibold">{t('ble.wifi.title')}</h3>
-        <WifiNetworkPicker rpc={rpc} selection={selection} onChange={setSelection} />
+        <WifiNetworkPicker
+          rpc={rpc}
+          selection={selection}
+          onChange={setSelection}
+          protectedDevice={protectedDevice}
+          beforeRescan={() => {
+            // A protected device refuses the first scan; retry with the password entered so far.
+            if (protectedDevice && adminPassword.trim()) rpc.setCredentials(ADMIN_USERNAME, adminPassword.trim());
+          }}
+        />
         {needsWifiPassword && (
           <PasswordInput
             label={t('ble.wifi.password')}

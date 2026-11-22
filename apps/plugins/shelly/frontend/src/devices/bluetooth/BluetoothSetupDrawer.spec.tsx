@@ -4,6 +4,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addDevice } from '../../api';
+import { computeHa1 } from '../../bluetooth/digest';
 import { createFakeDevice, type FakeDevice, type FakeDeviceOptions } from '../../bluetooth/fakeDevice';
 import { SHELLY_RPC_DATA, SHELLY_RPC_RX_CONTROL, SHELLY_RPC_TX_CONTROL } from '../../bluetooth/gatt';
 import { BluetoothSetupDrawer } from './BluetoothSetupDrawer';
@@ -219,6 +220,20 @@ describe('BluetoothSetupDrawer', () => {
 
     expect(await screen.findByLabelText('Current admin password')).toBeInTheDocument();
     expect(screen.queryByLabelText('Confirm admin password')).not.toBeInTheDocument();
+  });
+
+  it('scans again with the entered password when a protected device refused the first scan', async () => {
+    const ha1 = await computeHa1('admin', 'shellypro1pm-a0b1c2d3e4f5', ADMIN_PW);
+    installBluetooth(createFakeDevice({ networks: NETWORKS, authEn: true, ha1 }));
+    const user = userEvent.setup();
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: /Select device/ }));
+
+    expect(await screen.findByText(/enter it below and press “Scan again”/)).toBeInTheDocument();
+    await enter(user, await screen.findByLabelText('Current admin password'), ADMIN_PW);
+    await user.click(screen.getByRole('button', { name: /Scan again/ }));
+
+    expect(await screen.findByLabelText(/Workshop/)).toBeInTheDocument();
   });
 
   it('tells the operator to restart when Wi-Fi needs a reboot, and registers nothing', async () => {

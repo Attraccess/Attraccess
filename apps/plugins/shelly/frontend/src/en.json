@@ -160,6 +160,7 @@
       "description": "Pick the 2.4 GHz network the device should join.",
       "scanning": "Scanning for networks — this can take several seconds…",
       "scanFailed": "The device could not scan for networks. Enter the network name yourself.",
+      "scanFailedProtected": "The device could not scan for networks. If it already has an admin password, enter it below and press “Scan again”, or enter the network name yourself.",
       "rescan": "Scan again",
       "networks": "Networks seen by the device",
       "other": "Other network (enter name)",
@@ -209,7 +210,8 @@
       "joinTimeout": "The device did not get an IP address within 60 seconds (last status: {{status}}). Check the password, and that the network is 2.4 GHz — Shelly devices cannot join 5 GHz networks.",
       "timeout": "The device did not answer over Bluetooth in time. Move closer and try again.",
       "rpc": "The device refused the request: {{method}} returned “{{message}}” (code {{code}}).",
-      "registerFailed": "The device is on the network, but Attraccess could not add it: {{message}} Use Discover or Add device to add it.",
+      "registerFailed": "The device is on the network, but Attraccess could not add it ({{message}}). Use Discover or Add device to add it.",
+      "registerFailedNoDetail": "The device is on the network, but Attraccess could not add it. Use Discover or Add device to add it.",
       "generic": "Something went wrong while talking to the device.",
       "retry": "Start over"
     },
