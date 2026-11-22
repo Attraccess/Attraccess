@@ -705,6 +705,9 @@ idf.py -B build/dbg -DATTRACTAP_VARIANT=attractap-touch \
        -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.debug" build
 ```
 
+The debug overlay also turns on the FreeRTOS run-time stats (trace facility, run-time counters; the same
+options as `sdkconfig.lab-stats`), which add the `debug.stats` serial topic (see "Task stats" below).
+
 Note: `tools/build_individual_ca_certs.py` needs network access on the first
 run (it downloads Mozilla's CA bundle, cached for 7 days). Run it once before
 `idf.py` when building without `build_firmwares.py`.
@@ -1003,6 +1006,33 @@ coredump grows by about that much. Without `stackBytes` it panics right away. Th
 `-DATTRACTAP_CRASH_TRIGGER=OFF`, and `tools/check_release_build.py` fails a
 release build whose sources were compiled with a lab-only define or whose app
 image contains the `debug.crash` topic.
+
+### Task stats (debug and lab builds only)
+
+`CMND debug.stats` on the serial console (no PIN, like `debug.crash`) logs one row per FreeRTOS task at
+INFO: name, run time (counter ticks), CPU share of the chip's two cores (one decimal), stack high-water mark
+(free words at the lowest point) and core (`any` for unpinned tasks), between a header and an end line. The
+shares of all tasks, including `IDLE0`/`IDLE1`, add up to about 100 % (rounding aside). The counters run
+since boot, so a short sample needs two calls. The reply is `{}`.
+
+The topic exists only where `CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS` is on: builds with `sdkconfig.debug`
+and every build with `-DATTRACTAP_TEST_HOOKS=ON` (CMake layers `sdkconfig.lab-stats` after the defaults;
+also with `ATTRACTAP_SECURE_LAB`, never with a release secure profile). Other builds answer
+`UNKNOWN_TOPIC`, and `tools/check_release_build.py` fails a release image that contains the `debug.stats`
+topic. Run-time stats cost a little CPU and RAM, so lab and debug images differ slightly from release.
+
+### LVGL perf monitor (development builds only)
+
+`-DATTRACTAP_LV_PERF_MONITOR=ON` (display variants such as `attractap-touch-v2`; other variants fail the
+configure step) turns on LVGL's sysmon perf monitor in log mode: FPS, render and flush time go to the serial
+log instead of the panel. The option is `OFF` by default, `build_firmwares.py` never sets it, and
+`tools/check_release_build.py` fails a release image compiled with it.
+
+### Wi-Fi and lwIP buffers in PSRAM
+
+`sdkconfig.defaults` sets `CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y`: the Wi-Fi and lwIP buffers are taken from
+PSRAM first, so internal RAM stays free for DMA buffers, task stacks, LVGL and TLS. The periodic heap log
+shows both: `Heap internal: free= largest= min=` and `Heap PSRAM: free= largest=`.
 
 ### Device-lab TLS CA (lab builds only)
 

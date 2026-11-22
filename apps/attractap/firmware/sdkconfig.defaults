@@ -19,6 +19,10 @@ CONFIG_SPIRAM_USE_MALLOC=y
 # stacks, FreeRTOS objects, mbedTLS on the secure profile), all of which ask for
 # MALLOC_CAP_INTERNAL or MALLOC_CAP_DMA explicitly.
 CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=1024
+# Wi-Fi and lwIP buffers are allocated from PSRAM first (internal RAM only as the
+# fallback), so internal RAM stays free for DMA buffers, task stacks, LVGL and TLS
+# (ATT-1276). Compare the heap log lines (internal and PSRAM) when changing it.
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
 # Run code and read-only data from PSRAM (copied there at boot) instead of
 # flash, so the cache stays enabled while NVS or OTA write the flash and the
 # RGB panel's bounce buffers keep refilling (rgb_gt911_driver.cpp).

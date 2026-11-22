@@ -17,6 +17,7 @@
 #include "../state/state.hpp"
 #include "../utils.hpp"
 #include "../platform.hpp"
+#include "task_stats.hpp"
 #ifdef ATTRACTAP_TEST_HOOKS
 #include "../testhooks/test_hooks.hpp"
 #endif
@@ -331,6 +332,16 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
 
 #ifdef ATTRACTAP_BLE_BRIDGE
     if (topic == "heap") return sendHeapStatus(topic); // read-only, no PIN: release logs no heap (ATT-1315)
+#endif
+
+#ifdef ATTRACTAP_TASK_STATS
+    // Debug and lab images only (run-time stats compiled in): per-task CPU table, no PIN like debug.crash.
+    if (topic == "debug.stats")
+    {
+        TaskStats::log();
+        sendJsonResponse(topic, "{}");
+        return;
+    }
 #endif
 
     if (topic == "auth.status.get")

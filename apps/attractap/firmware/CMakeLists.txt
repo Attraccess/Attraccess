@@ -20,6 +20,11 @@ option(ATTRACTAP_TEST_HOOKS "Compile the ui.* serial test hooks (display variant
 # Lab/test-only `debug.crash` serial topic that panics on purpose (crash report and
 # coredump upload tests, ATT-1144). Never ship it: build_firmwares.py forces this OFF
 # and tools/check_release_build.py fails a release image that contains it.
+# LVGL FPS/render/flush timing logged to serial (sysmon perf monitor, ATT-554/ATT-1276). Display
+# variants only; a developer option that build_firmwares.py never sets (tools/check_release_build.py
+# fails a release image compiled with it).
+option(ATTRACTAP_LV_PERF_MONITOR "Log LVGL perf monitor FPS/render timing to serial (display variants, dev builds only)" OFF)
+
 option(ATTRACTAP_CRASH_TRIGGER "Compile the debug.crash serial crash trigger (lab builds only)" OFF)
 
 # Beeper state of a reader that has no saved beeper setting yet (fresh or
@@ -73,6 +78,20 @@ if(NOT "${ATTRACTAP_LAB_CA}" STREQUAL "")
     if(NOT EXISTS "${ATTRACTAP_LAB_CA}")
         message(FATAL_ERROR "ATTRACTAP_LAB_CA: ${ATTRACTAP_LAB_CA} does not exist")
     endif()
+endif()
+if(ATTRACTAP_LV_PERF_MONITOR AND NOT "HAS_LVGL_DISPLAY=1" IN_LIST ATTRACTAP_DEFINES)
+    message(FATAL_ERROR "ATTRACTAP_LV_PERF_MONITOR=ON needs a variant with an LVGL display, '${ATTRACTAP_VARIANT}' has none")
+endif()
+# Run-time stats (the debug.stats serial topic) for every lab image, not for a release secure profile.
+# Goes before the secure overlays so they stay last.
+if(ATTRACTAP_TEST_HOOKS AND NOT (ATTRACTAP_SECURE_PROFILE AND NOT ATTRACTAP_SECURE_LAB))
+    if(NOT SDKCONFIG_DEFAULTS AND DEFINED ENV{SDKCONFIG_DEFAULTS})
+        set(SDKCONFIG_DEFAULTS "$ENV{SDKCONFIG_DEFAULTS}")
+    endif()
+    if(NOT SDKCONFIG_DEFAULTS)
+        set(SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults")
+    endif()
+    list(APPEND SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.lab-stats")
 endif()
 if(ATTRACTAP_SECURE_PROFILE)
     # sdkconfig.secure and the secure bootloader budget are ESP32-S3 only; the bridge has a plan, no build (README).
@@ -131,6 +150,10 @@ endif()
 # the value must be a quoted string — lv_conf_internal.h does `#include LV_CONF_PATH`).
 # Directory-scoped so it propagates to every component added below this scope.
 add_compile_definitions(LV_CONF_PATH="${CMAKE_CURRENT_LIST_DIR}/include/lv_conf.h")
+# The perf monitor is configured in lv_conf.h, so LVGL's own sources need the macro too.
+if(ATTRACTAP_LV_PERF_MONITOR)
+    add_compile_definitions(ATTRACTAP_LV_PERF_MONITOR=1)
+endif()
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(attractap)

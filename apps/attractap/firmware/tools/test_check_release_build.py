@@ -57,6 +57,9 @@ class AppImage(unittest.TestCase):
     def test_trigger_topic_fails(self):
         self.assertEqual(len(c.check_app_image(b"\x00prefix debug.crash suffix")), 1)
 
+    def test_stats_topic_fails(self):
+        self.assertEqual(len(c.check_app_image(b"\x00prefix debug.stats suffix")), 1)
+
     def test_lab_ca_fails(self):
         self.assertEqual(len(c.check_app_image(b"\x00Attractap Device Lab CA (lab builds only)\x00")), 1)
 

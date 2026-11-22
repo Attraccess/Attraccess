@@ -1,5 +1,14 @@
 # Development overlay (successor of the attractap-touch-debug PlatformIO env):
 #   idf.py -B build/dbg -DATTRACTAP_VARIANT=attractap-touch \
 #          -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.debug" build
+#
+# Also enables the run-time stats behind the `debug.stats` serial topic (same
+# options as sdkconfig.lab-stats, ATT-1276).
 CONFIG_COMPILER_OPTIMIZATION_DEBUG=y
 CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_ENABLE=y
+
+# FreeRTOS run-time stats for the `debug.stats` serial topic (ATT-1276)
+CONFIG_FREERTOS_USE_TRACE_FACILITY=y
+CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS=y
+CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS=y
+CONFIG_FREERTOS_VTASKLIST_INCLUDE_COREID=y
