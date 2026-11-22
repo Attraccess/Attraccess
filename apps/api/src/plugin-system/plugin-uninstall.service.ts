@@ -18,7 +18,7 @@ import { PluginService } from './plugin.service';
 
 import { ResourceHealthService } from '../resources/health/resource-health.service';
 
-import { clearAllPluginResourceHealth } from './runtime/plugin-resource-health';
+import { clearAllPluginResourceHealth, retirePluginResourceHealth } from './runtime/plugin-resource-health';
 
 import { releaseStorageNames } from './plugin-storage/storage-registry';
 
@@ -43,6 +43,8 @@ export class PluginUninstallService {
    * logged, never blocking.
    */
   async clearHealthEntries(pluginName: string): Promise<void> {
+    // Its runtime runs until the restart: a report after the clear must not leave an entry behind.
+    retirePluginResourceHealth(pluginName);
     try {
       const health = this.moduleRef?.get(ResourceHealthService, { strict: false });
       if (health) await clearAllPluginResourceHealth(pluginName, health);
