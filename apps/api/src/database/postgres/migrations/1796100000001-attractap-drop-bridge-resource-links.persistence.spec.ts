@@ -1,17 +1,17 @@
 import type { DataSource } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { PostgresBaseline1760000000000 } from './1760000000000-baseline';
-import { AttractapNfcCapability1795800000000 } from './1795800000000-attractap-nfc-capability';
-import { AttractapDropBridgeResourceLinks1795800000001 } from './1795800000001-attractap-drop-bridge-resource-links';
+import { AttractapNfcCapability1796100000000 } from './1796100000000-attractap-nfc-capability';
+import { AttractapDropBridgeResourceLinks1796100000001 } from './1796100000001-attractap-drop-bridge-resource-links';
 
 jest.setTimeout(120_000);
 
-describe('AttractapDropBridgeResourceLinks1795800000001 (persistence)', () => {
+describe('AttractapDropBridgeResourceLinks1796100000001 (persistence)', () => {
   let source: DataSource;
 
   beforeEach(async () => {
     source = await createTestDataSource({
-      migrations: [PostgresBaseline1760000000000, AttractapNfcCapability1795800000000],
+      migrations: [PostgresBaseline1760000000000, AttractapNfcCapability1796100000000],
       migrationsRun: true,
     });
   });
@@ -28,7 +28,7 @@ describe('AttractapDropBridgeResourceLinks1795800000001 (persistence)', () => {
 
     const runner = source.createQueryRunner();
     try {
-      await new AttractapDropBridgeResourceLinks1795800000001().up(runner);
+      await new AttractapDropBridgeResourceLinks1796100000001().up(runner);
     } finally {
       await runner.release();
     }

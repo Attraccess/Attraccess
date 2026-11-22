@@ -5,8 +5,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * when it first reports that it has no NFC; a bridge that reported it before that rule (development and QA databases)
  * kept its links. An installation upgraded from a release has no such reader yet: its readers all have NFC.
  */
-export class AttractapDropBridgeResourceLinks1795800000001 implements MigrationInterface {
-  name = 'AttractapDropBridgeResourceLinks1795800000001';
+export class AttractapDropBridgeResourceLinks1796100000001 implements MigrationInterface {
+  name = 'AttractapDropBridgeResourceLinks1796100000001';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

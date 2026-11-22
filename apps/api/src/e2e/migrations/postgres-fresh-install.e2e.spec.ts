@@ -40,8 +40,8 @@ describe('Fresh PostgreSQL install (e2e)', () => {
       'PostgresImportSqlite1760000000001',
       'PostgresGlobalForms1795700000000',
       'PostgresUserNames1796000000000',
-      'AttractapNfcCapability1795800000000',
-      'AttractapDropBridgeResourceLinks1795800000001',
+      'AttractapNfcCapability1796100000000',
+      'AttractapDropBridgeResourceLinks1796100000001',
     ]);
     expect(postgresBackend.migrationTrack.tableName).toBe('migrations');
     const [{ count }] = await source.query(
