@@ -121,6 +121,7 @@ export class PluginAdministrationService {
   async removePackageGraph(packageName: string, approvedDependants: string[], actor?: AuditActor) {
     const removing = this.npmPluginService.removalPlan(packageName);
     await this.npmPluginService.removeInstalled(packageName, Boolean(actor), approvedDependants);
+    await this.clearHealthEntries(removing);
     for (const plugin of removing) await this.recordPackage(actor, 'plugin.removed', plugin);
     if (actor) this.pluginService.requestRestart();
   }
@@ -128,8 +129,18 @@ export class PluginAdministrationService {
   async removeInstalled(packageName: string, actor?: AuditActor) {
     const installed = this.npmPluginService.listInstalled().find((plugin) => plugin.name === packageName);
     await this.npmPluginService.removeInstalled(packageName, Boolean(actor));
-    if (installed) await this.recordPackage(actor, 'plugin.removed', installed);
+    if (installed) {
+      await this.clearHealthEntries([installed]);
+      await this.recordPackage(actor, 'plugin.removed', installed);
+    }
     if (actor) this.pluginService.requestRestart();
+  }
+
+  /** The removed packages' health entries, by the plugin name their manifest declares (not the package name). */
+  private async clearHealthEntries(removed: Array<Pick<InstalledNpmPlugin, 'installPath'>>) {
+    const directories = new Set(removed.map((plugin) => plugin.installPath));
+    for (const manifest of PluginService.getDiscoveredPlugins())
+      if (directories.has(manifest.pluginDirectory)) await this.pluginUninstall.clearHealthEntries(manifest.name);
   }
 
   async addRegistry(body: AddPluginRegistryDto, actor: AuditActor) {
@@ -194,6 +205,7 @@ export class PluginAdministrationService {
         : undefined);
     if (installed) {
       await this.npmPluginService.removeInstalled(installed.name, Boolean(actor));
+      await this.clearHealthEntries([installed]);
       await this.recordPackage(actor, 'plugin.removed', installed);
       if (actor) this.pluginService.requestRestart();
       return;

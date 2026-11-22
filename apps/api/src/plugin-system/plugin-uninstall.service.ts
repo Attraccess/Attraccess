@@ -37,6 +37,20 @@ export class PluginUninstallService {
     @Optional() private readonly moduleRef?: ModuleRef,
   ) {}
 
+  /**
+   * Removes the health entries of an uninstalled plugin, so no door stays blocked by a plugin that is gone (disabling
+   * keeps them, an admin can clear those by hand). Used for uploaded and npm-installed plugins alike. A failure is
+   * logged, never blocking.
+   */
+  async clearHealthEntries(pluginName: string): Promise<void> {
+    try {
+      const health = this.moduleRef?.get(ResourceHealthService, { strict: false });
+      if (health) await clearAllPluginResourceHealth(pluginName, health);
+    } catch (error) {
+      PluginUninstallService.logger.error(`Failed to clear the health entries of plugin ${pluginName}`, error as Error);
+    }
+  }
+
   async deletePlugin(pluginId: string, deferRestart = false) {
     // Refused plugins (SDK 1.x, unsupported engine) are listed too, so an admin can remove them.
     const plugin = PluginService.getManifestById(pluginId);
@@ -83,17 +97,7 @@ export class PluginUninstallService {
       PluginUninstallService.logger.error(`Failed to delete the readers of plugin ${plugin.name}`, error as Error);
     }
 
-    // The plugin's health entries go too, so no door stays blocked by a plugin that is gone (disabling keeps them,
-    // an admin can clear those by hand). A failure is logged, never blocking.
-    try {
-      const health = this.moduleRef?.get(ResourceHealthService, { strict: false });
-      if (health) await clearAllPluginResourceHealth(plugin.name, health);
-    } catch (error) {
-      PluginUninstallService.logger.error(
-        `Failed to clear the health entries of plugin ${plugin.name}`,
-        error as Error,
-      );
-    }
+    await this.clearHealthEntries(plugin.name);
 
     // delete folder. The plugin's RBAC permission rows stay: deleting them would cascade to every role and
     // API-token grant. The next boot marks them unavailable, and a reinstall brings them back with their grants.
