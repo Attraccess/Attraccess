@@ -357,6 +357,9 @@ export const LEGACY_ONLY_CONSTRAINTS = {
     'CHK_plugin_matter_fabrics_status',
     'CHK_plugin_matter_nodes_lifecycle',
     'CHK_plugin_matter_nodes_detached_reason',
+    // Allows only force_removed|merged|replaced. It never reaches a 2.0 install: the 1.x Matter migrations shipped
+    // only in the 1.11 betas on SQLite, and the PostgreSQL import does not copy plugin tables, so the 2.0 reasons
+    // removed_from_fabric and forced_from_fabric are never refused in practice.
     'CHK_plugin_matter_nodes_removal_reason',
     'CHK_plugin_matter_nodes_attestation',
     'CHK_plugin_matter_endpoints_range',
