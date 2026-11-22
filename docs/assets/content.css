@@ -56,6 +56,16 @@
 .markdown-section table tr:nth-child(odd) td {
   background: var(--table-row-odd-background);
 }
+/* Long paths and CONFIG_ names in table cells must wrap, otherwise the table outgrows the content column
+   and is clipped (the theme sets white-space: nowrap on inline code). */
+.markdown-section table :not(pre) > code {
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+}
+/* Keep short file names in one piece: only a long path or name breaks. */
+.markdown-section table td:has(code) {
+  min-width: 22ch;
+}
 .markdown-section img {
   border-radius: 6px;
 }
