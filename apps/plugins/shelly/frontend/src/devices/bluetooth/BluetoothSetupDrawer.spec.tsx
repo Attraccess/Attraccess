@@ -188,6 +188,11 @@ describe('BluetoothSetupDrawer', () => {
 
     expect(await screen.findByText('The passwords do not match.')).toBeInTheDocument();
     expect(addDevice).not.toHaveBeenCalled();
+
+    // Fixing the first field (not the confirm field) clears the message too.
+    await user.clear(screen.getByLabelText('New admin password'));
+    await enter(user, screen.getByLabelText('New admin password'), 'something-else');
+    await waitFor(() => expect(screen.queryByText('The passwords do not match.')).not.toBeInTheDocument());
   });
 
   it('shows the already-registered notice on a 409 and still switches Bluetooth off', async () => {

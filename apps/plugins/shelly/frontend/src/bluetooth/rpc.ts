@@ -62,6 +62,8 @@ export class ShellyBleRpc implements AuthenticatingRpc {
   private credentials?: { username: string; password: string };
   private challenge?: DigestChallenge;
   private nc = 0;
+  /** A reply was abandoned half-read; its rest would corrupt every later reply on this link. */
+  private outOfStep = false;
   /** The GATT channel carries one request at a time; concurrent calls would interleave their frames. */
   private queue: Promise<unknown> = Promise.resolve();
   private readonly chunkSize: number;
@@ -99,6 +101,9 @@ export class ShellyBleRpc implements AuthenticatingRpc {
     params: Record<string, unknown> | undefined,
     options: { timeoutMs?: number },
   ): Promise<T> {
+    if (this.outOfStep) {
+      throw new ShellyBleError('linkLost', 'The Bluetooth link is out of step; reconnect to the device');
+    }
     const timeoutMs = options.timeoutMs ?? this.timeoutMs;
     const creds = this.credentials;
     // Reuse the last challenge so authenticated calls need one round trip; a
@@ -131,7 +136,11 @@ export class ShellyBleRpc implements AuthenticatingRpc {
     return buildRpcAuth(challenge, creds.username, creds.password, undefined, this.nc);
   }
 
-  /** One request and its reply. The deadline covers waiting for and reading the reply. */
+  /**
+   * One request and its reply. The deadline covers waiting for the reply; once
+   * its length is known, reading it out gets the same time again, because a
+   * half-read reply would stay on the device and garble the next one.
+   */
   private async exchange(
     method: string,
     params: Record<string, unknown> | undefined,
@@ -158,7 +167,7 @@ export class ShellyBleRpc implements AuthenticatingRpc {
 
     const deadline = this.now() + timeoutMs;
     for (;;) {
-      const raw = new TextDecoder().decode(await this.readResponse(deadline));
+      const raw = new TextDecoder().decode(await this.readResponse(deadline, timeoutMs));
       let envelope: RpcEnvelope;
       try {
         envelope = JSON.parse(raw) as RpcEnvelope;
@@ -167,19 +176,23 @@ export class ShellyBleRpc implements AuthenticatingRpc {
       }
       // The device keeps an unread reply until it is read out, so a call that
       // timed out leaves its late reply for the next one: skip it, wait for ours.
-      if (envelope.id === undefined || envelope.id === id) return envelope;
+      if (envelope.id == null || envelope.id === id) return envelope;
     }
   }
 
-  private async readResponse(deadline: number): Promise<Uint8Array> {
+  private async readResponse(deadline: number, timeoutMs: number): Promise<Uint8Array> {
     const length = await this.awaitResponseLength(deadline);
+    const readDeadline = Math.max(deadline, this.now()) + timeoutMs;
     if (length > MAX_RESPONSE_BYTES) {
       throw new ShellyBleError('responseTooLarge', `Bluetooth response is too large (${length} bytes)`);
     }
     const out = new Uint8Array(length);
     let filled = 0;
     while (filled < length) {
-      if (this.now() >= deadline) throw timeoutError();
+      if (this.now() >= readDeadline) {
+        this.outOfStep = true;
+        throw timeoutError();
+      }
       const view = await transport(() => this.channel.data.readValue());
       if (view.byteLength === 0) {
         throw new ShellyBleError('linkLost', 'The device stopped sending its response');

@@ -159,16 +159,26 @@ describe('ShellyBleRpc framing', () => {
     await expect(rpcFor(channel).call('X')).rejects.toMatchObject({ kind: 'linkLost' });
   });
 
-  it('times out a reply that trickles in past the deadline', async () => {
-    const reply = bytes('{"id":1,"result":"' + 'x'.repeat(200) + '"}');
+  /** Every clock read advances 50 ms, so each 1-byte read costs time. */
+  function tricklingRpc(reply: Uint8Array) {
     const chunks = Array.from({ length: reply.length }, (_, i) => reply.subarray(i, i + 1));
     let clock = 0;
-    const rpc = new ShellyBleRpc(rawChannel(reply.length, chunks).channel, {
+    return new ShellyBleRpc(rawChannel(reply.length, chunks).channel, {
       timeoutMs: 1_000,
       now: () => (clock += 50),
       sleep: async () => undefined,
     });
+  }
+
+  it('still returns a reply whose reading runs a little past the deadline', async () => {
+    await expect(tricklingRpc(bytes('{"id":1,"result":"ok"}')).call('X')).resolves.toBe('ok');
+  });
+
+  it('times out a reply that trickles in far too slowly, then refuses to use the garbled link', async () => {
+    const rpc = tricklingRpc(bytes('{"id":1,"result":"' + 'x'.repeat(200) + '"}'));
     await expect(rpc.call('X')).rejects.toMatchObject({ kind: 'timeout' });
+    // The rest of that reply is still on the device: later calls must not read it as theirs.
+    await expect(rpc.call('Y')).rejects.toMatchObject({ kind: 'linkLost' });
   });
 
   it('turns a failing characteristic into a link-lost error', async () => {

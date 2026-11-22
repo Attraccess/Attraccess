@@ -33,7 +33,7 @@ export function SetupForm({
   const [name, setName] = useState(advertisedName);
   const [disableBluetooth, setDisableBluetooth] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mismatch, setMismatch] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   const manual = selection.choice === MANUAL;
   // Only a typed name is trimmed; a scanned SSID is used exactly as the device reported it.
@@ -41,10 +41,12 @@ export function SetupForm({
   const needsWifiPassword = manual || selection.secured;
   // A new password is trimmed like in the admin password drawer; an existing one is used as typed.
   const admin = protectedDevice ? adminPassword : adminPassword.trim();
+  const confirmMismatch = !protectedDevice && admin !== confirm.trim();
+  // Shown after the first submit and worked out from the current values, so fixing either field clears it.
+  const showMismatch = submitted && confirmMismatch && admin !== '';
 
   const submit = useCallback(() => {
-    const confirmMismatch = !protectedDevice && admin !== confirm.trim();
-    setMismatch(confirmMismatch && admin !== '');
+    setSubmitted(true);
     if (!ssid) return setError(t('ble.validation.ssid'));
     if (selection.secured && !manual && !wifiPassword) return setError(t('ble.validation.wifiPassword'));
     if (!admin.trim()) return setError(t('ble.validation.adminPassword'));
@@ -59,13 +61,12 @@ export function SetupForm({
   }, [
     admin,
     advertisedName,
-    confirm,
+    confirmMismatch,
     disableBluetooth,
     manual,
     name,
     needsWifiPassword,
     onSubmit,
-    protectedDevice,
     selection.secured,
     ssid,
     t,
@@ -132,14 +133,11 @@ export function SetupForm({
             <PasswordInput
               label={t('ble.admin.confirm')}
               value={confirm}
-              onChange={(value) => {
-                setConfirm(value);
-                setMismatch(false);
-              }}
+              onChange={setConfirm}
               autoComplete="new-password"
               isRequired
-              isInvalid={mismatch}
-              errorMessage={mismatch ? t('ble.admin.mismatch') : undefined}
+              isInvalid={showMismatch}
+              errorMessage={showMismatch ? t('ble.admin.mismatch') : undefined}
               data-cy="shelly-ble-admin-confirm"
             />
           </>
