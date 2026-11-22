@@ -56,6 +56,11 @@
 .markdown-section table tr:nth-child(odd) td {
   background: var(--table-row-odd-background);
 }
+/* app.js wraps every table in this container: a table wider than the column scrolls here instead of being
+   clipped (main hides horizontal overflow). */
+.markdown-section .table-scroll {
+  overflow-x: auto;
+}
 .markdown-section img {
   border-radius: 6px;
 }

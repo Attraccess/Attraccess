@@ -75,12 +75,22 @@ window.$docsify = {
   routerMode: 'hash',
   plugins: [
     function (hook, vm) {
+      hook.afterEach(wrapTables);
       hook.doneEach(function () {
         updateLangSwitcher();
       });
     },
   ],
 };
+
+// content.css keeps tables at display: table so they span the content column, which turns off the theme's
+// own table scrolling. Each rendered table gets a scroll container instead, so a wide table scrolls rather
+// than being clipped by the column.
+function wrapTables(html) {
+  return html.replace(/<table\b[^>]*>[\s\S]*?<\/table>/g, function (table) {
+    return '<div class="table-scroll">' + table + '</div>';
+  });
+}
 
 // ===== Language Switching =====
 // Returns true when the language changes (the page then reloads after delayMs).

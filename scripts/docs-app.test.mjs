@@ -152,7 +152,7 @@ test('the language switcher, its highlight and the theme toggle work', () => {
   );
   const plugin = app.window.$docsify.plugins[0];
   let doneEach;
-  plugin({ doneEach: (callback) => (doneEach = callback) });
+  plugin({ afterEach: () => {}, doneEach: (callback) => (doneEach = callback) });
   doneEach();
 
   let prevented = 0;
@@ -174,4 +174,21 @@ test('the language switcher, its highlight and the theme toggle work', () => {
   assert.equal(app.toggle.attributes['aria-pressed'], 'false');
   app.toggle.listeners.click();
   assert.equal(app.root.attributes['data-theme'], 'dark');
+});
+
+test('every rendered table gets a scroll container so wide tables scroll instead of being clipped', () => {
+  const plugin = loadApp().window.$docsify.plugins[0];
+  let afterEach;
+  plugin({ afterEach: (callback) => (afterEach = callback), doneEach: () => {} });
+  const table = (body) =>
+    `<table>\n<thead><tr><th>A</th></tr></thead>\n<tbody><tr><td>${body}</td></tr></tbody>\n</table>`;
+  assert.equal(
+    afterEach(`<p>x</p>${table('1')}<p>y</p>${table('2')}`),
+    `<p>x</p><div class="table-scroll">${table('1')}</div><p>y</p><div class="table-scroll">${table('2')}</div>`,
+  );
+  assert.equal(
+    afterEach('<table class="x"><tr><td>1</td></tr></table>'),
+    '<div class="table-scroll"><table class="x"><tr><td>1</td></tr></table></div>',
+  );
+  assert.equal(afterEach('<p>no table, <code>&lt;table&gt;</code></p>'), '<p>no table, <code>&lt;table&gt;</code></p>');
 });
