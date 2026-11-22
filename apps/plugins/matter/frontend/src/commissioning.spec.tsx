@@ -101,6 +101,16 @@ describe('the code step: every input form leads to the same request', () => {
     await waitFor(() => expect(commissioning.startCommissioning).toHaveBeenCalledWith({ setupCode: MANUAL_21 }));
   });
 
+  it('submits with the Enter key and does not send an invalid code', async () => {
+    const user = await openCodeStep();
+    await user.type(screen.getByTestId('matter-code-input'), 'hello{Enter}');
+    expect(commissioning.startCommissioning).not.toHaveBeenCalled();
+    await user.clear(screen.getByTestId('matter-code-input'));
+    await user.type(screen.getByTestId('matter-code-input'), `${MANUAL_11}{Enter}`);
+    await waitFor(() => expect(commissioning.startCommissioning).toHaveBeenCalledTimes(1));
+    expect(commissioning.startCommissioning).toHaveBeenCalledWith({ setupCode: MANUAL_11 });
+  });
+
   it('sends a pasted QR payload', async () => {
     const user = await openCodeStep();
     await user.click(screen.getByTestId('matter-code-input'));
@@ -242,6 +252,10 @@ describe('progress', () => {
     renderMatter('/matter/commissioning');
     expect(await screen.findByTestId('matter-progress-case')).toHaveAttribute('data-state', 'running');
     await user.click(screen.getByTestId('matter-progress-cancel'));
+    // The dialog's two buttons must not both read "Cancel": one keeps going, the other confirms.
+    const dialog = await screen.findByTestId('matter-progress-cancel-dialog');
+    expect(within(dialog).getByRole('button', { name: 'Keep going' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
     await user.click(await screen.findByTestId('matter-progress-cancel-confirm'));
     expect(await screen.findByTestId('matter-failure-cancelled')).toBeInTheDocument();
     expect(commissioning.cancelSession).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111');

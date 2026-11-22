@@ -39,7 +39,16 @@ export function CodeEntryStep({
   };
 
   return (
-    <div className="mt:flex mt:flex-col mt:gap-4" data-cy="matter-code-step">
+    <form
+      className="mt:flex mt:flex-col mt:gap-4"
+      noValidate
+      onSubmit={(event) => {
+        // Enter in the field submits like the button; the page itself never reloads.
+        event.preventDefault();
+        submit();
+      }}
+      data-cy="matter-code-step"
+    >
       <div className="mt:flex mt:flex-wrap mt:gap-2" role="group" aria-label={t('commissioning.code.sources')}>
         {SOURCES.map((entry) => (
           <Button
@@ -80,7 +89,7 @@ export function CodeEntryStep({
         </FieldError>
       </TextField>
       <div>
-        <Button variant="primary" isPending={starting} onPress={submit} data-cy="matter-code-start">
+        <Button variant="primary" type="submit" isPending={starting} data-cy="matter-code-start">
           {t('commissioning.code.start')}
         </Button>
       </div>
@@ -89,6 +98,6 @@ export function CodeEntryStep({
           {error}
         </p>
       )}
-    </div>
+    </form>
   );
 }

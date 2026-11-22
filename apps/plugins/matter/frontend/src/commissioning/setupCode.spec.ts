@@ -25,6 +25,12 @@ describe('setup code validation', () => {
     expect(parseSetupCode('MT:Y.K9042C00KA064_G00')).toEqual({ ok: false, problem: 'format' });
   });
 
+  it('rejects a pasted payload that is far longer than any QR code', () => {
+    expect(parseSetupCode(`MT:${'A'.repeat(10_000)}`)).toEqual({ ok: false, problem: 'format' });
+    expect(parseSetupCode(`MT:${'A'.repeat(512)}`).ok).toBe(true);
+    expect(parseSetupCode(`MT:${'A'.repeat(513)}`).ok).toBe(false);
+  });
+
   it('computes Verhoeff for known vectors', () => {
     expect(verhoeffValid('2363')).toBe(true);
     expect(verhoeffValid('2364')).toBe(false);

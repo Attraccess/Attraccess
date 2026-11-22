@@ -43,7 +43,8 @@ const FAILURE_TEXT: Record<BackupFailureReason, string> = {
   inconsistent:
     'The sidecar and the plugin disagree about the fabric (identity or generation), so no consistent backup can be made.',
   sidecar_unavailable: 'The Matter sidecar could not be reached.',
-  sidecar_busy: 'The Matter sidecar is busy with another backup or restore. Try again shortly.',
+  sidecar_busy:
+    'The Matter sidecar is busy with another operation (a backup, restore, commissioning, removal or share). Try again shortly.',
   insecure_transport: INSECURE_MESSAGE,
   no_recovery_key: 'There is no recovery key yet. Generate one first.',
   recovery_key_unreadable: 'The stored recovery key cannot be read by this installation.',

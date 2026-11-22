@@ -39,7 +39,8 @@ export type SetupCodeProblem = 'empty' | 'format' | 'checksum';
 export type SetupCodeResult =
   { ok: true; code: string; problem?: undefined } | { ok: false; problem: SetupCodeProblem };
 
-const QR_PAYLOAD = /^MT:[A-Z0-9.-]{10,}$/;
+/** A real payload is a few dozen characters; the upper bound keeps pasted junk off the network. */
+const QR_PAYLOAD = /^MT:[A-Z0-9.-]{10,512}$/;
 
 /**
  * Normalizes what a person typed, pasted or scanned: spaces and hyphens inside a manual code are dropped, a QR payload

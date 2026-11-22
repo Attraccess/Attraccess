@@ -44,6 +44,13 @@ describe('the commissioning controller', () => {
     expect(JSON.stringify((odd as BadRequestException).getResponse())).not.toContain(CODE);
   });
 
+  it('refuses a QR payload far longer than any real one, without echoing it', async () => {
+    const junk = `MT:${'A'.repeat(513)}`;
+    const error = await controller.start({ setupCode: junk }, as(KEYS)).catch((failure: unknown) => failure);
+    expect(error).toBeInstanceOf(BadRequestException);
+    expect(JSON.stringify((error as BadRequestException).getResponse())).not.toContain('AAAA');
+  });
+
   it('starts a session for the commission key, and answers the caller’s own current session', async () => {
     const view = await controller.start({ setupCode: CODE }, as(['matter.devices.commission']));
     expect(view).toMatchObject({ state: 'pending', overrideAvailable: true });

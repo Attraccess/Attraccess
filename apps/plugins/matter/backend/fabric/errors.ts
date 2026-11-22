@@ -31,7 +31,10 @@ export function sidecarFailure(error: unknown): HttpException {
     case 'recovery_required':
       return conflict('recovery_required', 'The sidecar needs recovery before it can create a fabric.');
     case 'busy':
-      return conflict('busy', 'The Matter sidecar is busy with another backup or restore. Try again shortly.');
+      return conflict(
+        'busy',
+        'The Matter sidecar is busy with another operation (a backup, restore, commissioning, removal or share). Try again shortly.',
+      );
     case 'sidecar_unavailable':
     case 'timeout':
     case 'network':

@@ -111,7 +111,7 @@
       "fabric_exists": "Der Sidecar hat bereits eine Fabric.",
       "recovery_required": "Die Fabric muss zuerst wiederhergestellt werden. Stelle ein Backup wieder her, übernimm die Fabric des Sidecars oder starte eine neue Fabric.",
       "recovery_not_required": "Die Fabric muss nicht mehr wiederhergestellt werden.",
-      "busy": "Der Matter-Sidecar ist mit einem anderen Backup oder einer Wiederherstellung beschäftigt. Versuche es gleich noch einmal.",
+      "busy": "Der Matter-Sidecar ist mit einem anderen Vorgang beschäftigt (Backup, Wiederherstellung, Commissioning, Entfernen oder Teilen). Versuche es gleich noch einmal.",
       "sidecar_unavailable": "Der Sidecar ist nicht erreichbar. Versuche es erneut, sobald er verbunden ist.",
       "sidecar_error": "Der Matter-Sidecar hat die Anfrage abgelehnt.",
       "sidecar_not_empty": "Eine neue Fabric kann nur gestartet werden, solange der Sidecar keine Fabric hat.",
@@ -229,7 +229,7 @@
       "reason": {
         "inconsistent": "Sidecar und Plugin sind sich über die Fabric nicht einig, daher ist kein konsistentes Backup möglich.",
         "sidecar_unavailable": "Der Matter-Sidecar ist nicht erreichbar.",
-        "sidecar_busy": "Der Matter-Sidecar ist mit einem anderen Backup oder einer Wiederherstellung beschäftigt. Versuche es gleich noch einmal.",
+        "sidecar_busy": "Der Matter-Sidecar ist mit einem anderen Vorgang beschäftigt (Backup, Wiederherstellung, Commissioning, Entfernen oder Teilen). Versuche es gleich noch einmal.",
         "insecure_transport": "Backups werden über eine unverschlüsselte HTTP-Verbindung zu einem entfernten Sidecar abgelehnt. Nutze https oder eine lokale Verbindung.",
         "no_recovery_key": "Es gibt noch keinen Wiederherstellungsschlüssel.",
         "recovery_key_unreadable": "Der gespeicherte Wiederherstellungsschlüssel kann von dieser Installation nicht gelesen werden.",
@@ -449,6 +449,8 @@
       "title": "Commissioning läuft",
       "hint": "Das kann einige Minuten dauern. Lass das Gerät eingeschaltet und nah am Netzwerk.",
       "cancel": "Abbrechen",
+      "cancelConfirm": "Commissioning abbrechen",
+      "cancelKeep": "Weitermachen",
       "cancelTitle": "Commissioning abbrechen?",
       "cancelText": "Das Gerät wird nicht hinzugefügt. Du kannst mit dem Code neu starten.",
       "pollError": "Der Fortschritt konnte nicht gelesen werden",
@@ -544,7 +546,7 @@
       "risk": "Dieses Gerät hat die Attestierung nicht bestanden: Sein Zertifikat wird nicht als vertrauenswürdig anerkannt. Wenn du es trotzdem hinzufügst, gelangt ein nicht verifiziertes oder gefälschtes Gerät in dein Fabric. Tu das nur für ein Gerät, das du selbst gebaut hast oder dem du vertraust, auf einem Entwicklungssystem. Der Versuch wird im Audit-Log festgehalten.",
       "findings": "Befunde:",
       "acknowledge": "Ich verstehe das Risiko und möchte dieses Gerät ohne Verifizierung hinzufügen.",
-      "confirm": "Ohne Verifizierung hinzufügen"
+      "confirm": "Trotzdem hinzufügen"
     },
     "finish": {
       "addedTitle": "Das Gerät wurde hinzugefügt",

@@ -294,7 +294,10 @@ describe('FabricBackupSection status', () => {
   });
 
   it.each([
-    ['busy', 'The Matter sidecar is busy with another backup or restore. Try again shortly.'],
+    [
+      'busy',
+      'The Matter sidecar is busy with another operation (a backup, restore, commissioning, removal or share). Try again shortly.',
+    ],
     ['inconsistent', /disagree about the fabric/],
     ['recovery_key_mismatch', 'That is no longer the current recovery key. Reload the page.'],
   ])('translates the backend code %s of a failed backup', async (code, text) => {
@@ -464,7 +467,7 @@ describe('restore wizard', () => {
     ['stage_failed', /could not prepare the backup/],
     ['insecure_transport', /plain HTTP to another machine/],
     ['sidecar_unavailable', /cannot be reached/],
-    ['busy', /busy with another backup or restore/],
+    ['busy', /busy with another operation/],
   ])('shows a specific message for %s', async (code, text) => {
     const user = await openWizard();
     api.validateRestore.mockRejectedValue(new FabricApiError('raw', 422, code));
@@ -629,7 +632,10 @@ describe('restore wizard', () => {
   it.each([
     ['validation_expired', 'This check has expired. Validate the backup again.'],
     ['preflight_changed', 'The sidecar changed since the backup was checked. Validate the backup again.'],
-    ['busy', 'The Matter sidecar is busy with another backup or restore. Try again shortly.'],
+    [
+      'busy',
+      'The Matter sidecar is busy with another operation (a backup, restore, commissioning, removal or share). Try again shortly.',
+    ],
   ])('goes back to validating, keeping the source and key, after %s', async (code, text) => {
     const user = await openWizard();
     api.validateRestore.mockRejectedValueOnce(new FabricApiError('key', 422, 'key_required'));

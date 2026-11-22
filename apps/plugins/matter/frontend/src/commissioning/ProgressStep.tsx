@@ -45,7 +45,8 @@ export function ProgressStep({
           confirm={{
             title: t('commissioning.progress.cancelTitle'),
             message: t('commissioning.progress.cancelText'),
-            confirmLabel: t('commissioning.progress.cancel'),
+            confirmLabel: t('commissioning.progress.cancelConfirm'),
+            cancelLabel: t('commissioning.progress.cancelKeep'),
             'data-cy': 'matter-progress-cancel-dialog',
             confirmDataCy: 'matter-progress-cancel-confirm',
           }}

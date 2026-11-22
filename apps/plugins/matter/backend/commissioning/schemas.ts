@@ -15,7 +15,7 @@ const optionalText = (max: number) =>
  * from a manual code; a value that does not match is refused without being echoed.
  */
 export const startSchema = z.strictObject({
-  setupCode: z.string().regex(/^[0-9]{11}$|^[0-9]{21}$|^MT:[A-Z0-9.-]{10,}$/, 'must be a Matter setup code'),
+  setupCode: z.string().regex(/^[0-9]{11}$|^[0-9]{21}$|^MT:[A-Z0-9.-]{10,512}$/, 'must be a Matter setup code'),
   attestationOverride: z.strictObject({ confirmed: z.literal(true) }).optional(),
 });
 export type StartInput = z.infer<typeof startSchema>;

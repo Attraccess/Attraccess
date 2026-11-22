@@ -74,8 +74,10 @@ export function RemoveFromFabric({
           title={t(failure.unreachable ? 'devices.remove.unreachableTitle' : 'devices.remove.failed')}
           data-cy="matter-remove-error"
         >
-          <span className="mt:block">{failure.message}</span>
-          {failure.unreachable && <span className="mt:block">{t('devices.remove.unreachableText')}</span>}
+          {/* The unreachable hint already says nothing was changed; the server's sentence would repeat it. */}
+          <span className="mt:block">
+            {failure.unreachable ? t('devices.remove.unreachableText') : failure.message}
+          </span>
         </StatusAlert>
       )}
     </div>
