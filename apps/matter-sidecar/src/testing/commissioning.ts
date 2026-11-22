@@ -29,11 +29,18 @@ export async function startCommissioningRig(options: RigOptions = {}): Promise<C
   });
   const events: EventEnvelope[] = [];
   running.sidecar.stream.subscribe((event) => events.push(event));
-  const call = (method: string, path: string, body?: unknown) =>
-    http(running.port, method, path, {
-      headers: { ...validHeaders(), 'content-type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
+  const call = (method: string, path: string, body?: unknown) => {
+    // A DELETE carries its body only when `content-length` frames it.
+    const payload = body === undefined ? undefined : JSON.stringify(body);
+    return http(running.port, method, path, {
+      headers: {
+        ...validHeaders(),
+        'content-type': 'application/json',
+        ...(payload === undefined ? {} : { 'content-length': String(Buffer.byteLength(payload)) }),
+      },
+      body: payload,
     });
+  };
   const waitFor = async (sessionId: string, timeoutMs = 90_000) => {
     const deadline = Date.now() + timeoutMs;
     for (;;) {

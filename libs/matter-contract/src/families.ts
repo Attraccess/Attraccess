@@ -153,7 +153,8 @@ export type CommissioningFailure = z.infer<typeof commissioningFailureSchema>;
 
 /** The setup code is a secret. It appears only in requests, never in responses, events or logs. */
 export const commissioningRequestSchema = z.strictObject({
-  setupCode: z.string().regex(/^[0-9]{11}$|^[0-9]{21}$|^MT:[A-Z0-9.-]{10,}$/),
+  /** An 11- or 21-digit manual code, or a QR payload (`MT:` and at most 512 base38 characters, as the plugin caps it). */
+  setupCode: z.string().regex(/^[0-9]{11}$|^[0-9]{21}$|^MT:[A-Z0-9.-]{10,512}$/),
   /**
    * A new session that proceeds although attestation fails. Refused with `attestation_override_disabled` unless the
    * sidecar runs with `MATTER_SIDECAR_ALLOW_ATTESTATION_OVERRIDE=true`.

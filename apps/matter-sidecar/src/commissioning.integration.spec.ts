@@ -1,3 +1,4 @@
+import { OPERATIONS, type OperationId } from '@attraccess/matter-contract';
 import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,6 +16,8 @@ import {
 } from './testing/virtual-device';
 
 const TEST_PAA = { commissioning: { trustTestPaa: true } };
+/** The production policy without the network: the bundled seed (and its cache) only, never the live CSA DCL. */
+const OFFLINE = { dclRefresh: false };
 
 describe('commissioning through the sidecar', () => {
   let restoreMdns: () => void;
@@ -133,21 +136,23 @@ describe('commissioning through the sidecar', () => {
   }, 60_000);
 
   describe('attestation', () => {
-    it('fails strictly under the production policy and names the findings by type only', async () => {
+    it('fails strictly under the production policy, offline from the seed, and names the findings by type only', async () => {
       const light = await device();
-      const running = await rig();
+      // No tuning: the production tolerance (none) and the bundled seed, which holds no test PAA.
+      const running = await rig({ config: OFFLINE });
       const session = await running.commission(light.codes.qr);
+      // The seed is usable, so the trust store is not reported unavailable: the test PAA is simply not trusted.
       expect(session).toMatchObject({
         state: 'failed',
-        failure: { code: 'attestation_failed', attestationFindings: expect.arrayContaining(['PaaNotTrusted']) },
-        attestation: { status: 'failed', findings: expect.arrayContaining(['PaaNotTrusted']) },
+        failure: { code: 'attestation_failed', attestationFindings: ['PaaNotTrusted'] },
+        attestation: { status: 'failed', findings: ['PaaNotTrusted'] },
       });
       expect(light.fabricIds()).toEqual([]);
       expect(await generation(running)).toBe(1);
     }, 120_000);
 
     it('refuses the override while the sidecar flag is off', async () => {
-      const running = await rig();
+      const running = await rig({ config: OFFLINE });
       const refused = await running.call('POST', '/v1/commissioning/sessions', {
         setupCode: '34970112332',
         attestationOverride: { confirmed: true },
@@ -159,7 +164,7 @@ describe('commissioning through the sidecar', () => {
 
     it('accepts a confirmed override only on a sidecar that enables it, and records it as unverified', async () => {
       const light = await device();
-      const running = await rig({ config: { allowAttestationOverride: true } });
+      const running = await rig({ config: { ...OFFLINE, allowAttestationOverride: true } });
       expect(running.logs.join('\n')).toContain('the attestation override is enabled');
 
       const withoutOverride = await running.commission(light.codes.qr);
@@ -246,6 +251,59 @@ describe('commissioning through the sidecar', () => {
       // The gate is free again.
       expect((await running.call('POST', '/v1/backup/snapshot', {})).status).toBe(200);
     }, 120_000);
+
+    it('answers busy to every fabric-mutating operation of the contract while the gate is held', async () => {
+      const running = await rig();
+      const manager = running.platform().fabric;
+      if (!manager) throw new Error('no fabric manager');
+      const stageId = '3b241101-e2bb-4255-8caf-4136c566a962';
+      const bodies: Partial<Record<OperationId, unknown>> = {
+        'fabric.create': { label: 'Attraccess' },
+        'commissioning.start': { setupCode: setupCodesFor({ passcode: 34970112, discriminator: 3004 }).manual11 },
+        'nodes.remove': { force: true },
+        'nodes.share.open': { timeoutSec: 180 },
+        'nodes.share.revoke': {},
+        'backup.restore.commit': { stageId },
+        'backup.restore.rollback': { stageId },
+      };
+      const mutating = OPERATIONS.filter((operation) => operation.fabricMutating);
+      // A new fabric-mutating operation must be added here, so its enforcement is checked too.
+      expect(mutating.map((operation) => operation.id).sort()).toEqual(Object.keys(bodies).sort());
+      let release: () => void = () => undefined;
+      const held = manager.runExclusive(() => new Promise<void>((resolve) => (release = resolve)));
+      try {
+        for (const operation of mutating) {
+          const answer = await running.call(
+            operation.method,
+            operation.path.replace('{nodeId}', '1'),
+            bodies[operation.id],
+          );
+          expect({ id: operation.id, status: answer.status, code: answer.body.error?.code }).toEqual({
+            id: operation.id,
+            status: 409,
+            code: 'busy',
+          });
+        }
+      } finally {
+        release();
+        await held;
+      }
+    });
+
+    it('ends a running session as interrupted when the sidecar stops, without waiting it out', async () => {
+      const running = await rig({ tuning: { commissioning: { trustTestPaa: true, discoveryTimeoutMs: 120_000 } } });
+      const service = running.platform().commissioning;
+      if (!service) throw new Error('no commissioning service');
+      const absent = setupCodesFor({ passcode: 34970112, discriminator: 3005 });
+      const started = await running.call('POST', '/v1/commissioning/sessions', { setupCode: absent.qr });
+      expect(started.status).toBe(200);
+
+      const stopping = Date.now();
+      await running.stop();
+
+      expect(Date.now() - stopping).toBeLessThan(20_000);
+      expect(service.get(started.body.sessionId)).toMatchObject({ state: 'failed', failure: { code: 'interrupted' } });
+    }, 60_000);
 
     it('ends a session at its overall deadline with timeout', async () => {
       const running = await rig({

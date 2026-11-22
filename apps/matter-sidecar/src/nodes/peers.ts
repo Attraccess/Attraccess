@@ -38,11 +38,61 @@ export function findPeer(controller: MatterController, nodeId: string): ClientNo
 }
 
 class StepTimeout extends Error {}
+
+/**
+ * Runs `work` inside the fabric gate. The request is answered when `work` settles, or earlier when it calls
+ * `replyEarly` with an error. The gate stays held until `work` settles either way, so a device step that outlived its
+ * reply (it cannot be cancelled) is never overlapped by the next fabric operation.
+ */
+export function runExclusiveWithEarlyReply<T>(
+  manager: FabricManager,
+  work: (replyEarly: (error: unknown) => void) => Promise<T>,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    // After the early reply, the late resolve or reject is a no-op: the caller has its answer.
+    manager.runExclusive(() => work(reject)).then(resolve, reject);
+  });
+}
+
+/** How long a removal or share keeps the gate after its reply, waiting for a step it could not cancel to settle. */
+export const LATE_SETTLE_MS = 30_000;
+
+/**
+ * Waits up to `ms` for `work` to settle. `fulfilled` carries its value; `pending` means it is still running (its
+ * outcome is unknown); `rejected` means it failed.
+ */
+export async function settleWithin<T>(
+  work: Promise<T>,
+  ms: number,
+): Promise<{ state: 'fulfilled'; value: T } | { state: 'rejected' | 'pending' }> {
+  let timer: NodeJS.Timeout | undefined;
+  const pending = new Promise<{ state: 'pending' }>((resolve) => {
+    timer = setTimeout(() => resolve({ state: 'pending' }), ms);
+    timer.unref();
+  });
+  try {
+    return await Promise.race([
+      work.then(
+        (value) => ({ state: 'fulfilled' as const, value }),
+        () => ({ state: 'rejected' as const }),
+      ),
+      pending,
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 export const isStepTimeout = (error: unknown) => error instanceof StepTimeout;
 
-/** Rejects with a `StepTimeout` after `ms`, or with the abort reason when `signal` aborts first. The work is not cancelled. */
+/**
+ * Rejects with a `StepTimeout` after `ms`, or when `signal` aborts (at once if it already has). The work is not
+ * cancelled: a caller that started a change on the device must still wait for `work` to learn its outcome.
+ */
 export function withTimeout<T>(work: Promise<T>, ms: number, signal?: AbortSignal): Promise<T> {
   return new Promise<T>((resolve, reject) => {
+    // The work may fail after the race is over; nobody is listening then.
+    work.catch(() => undefined);
+    if (signal?.aborted) return reject(new StepTimeout());
     const timer = setTimeout(() => reject(new StepTimeout()), ms);
     const onAbort = () => reject(new StepTimeout());
     signal?.addEventListener('abort', onAbort, { once: true });
@@ -50,8 +100,6 @@ export function withTimeout<T>(work: Promise<T>, ms: number, signal?: AbortSigna
       clearTimeout(timer);
       signal?.removeEventListener('abort', onAbort);
     });
-    // The work may fail after the race is over; nobody is listening then.
-    work.catch(() => undefined);
   });
 }
 

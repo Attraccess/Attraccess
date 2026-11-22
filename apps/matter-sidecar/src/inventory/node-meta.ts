@@ -62,6 +62,12 @@ export function readAttestation(layout: StorageLayout, nodeId: string): Attestat
   return load(layout).attestation[nodeId] ?? EMPTY;
 }
 
+/** Reads the file once, for a whole list: the lookup answers every node from that one read. */
+export function readAttestations(layout: StorageLayout): (nodeId: string) => AttestationRecord {
+  const { attestation } = load(layout);
+  return (nodeId) => (Object.hasOwn(attestation, nodeId) ? attestation[nodeId] : EMPTY);
+}
+
 /** Drops what is recorded about a node that left the fabric, so a reused node ID never inherits it. */
 export function forgetNodeMeta(layout: StorageLayout, nodeId: string): void {
   const store = load(layout);

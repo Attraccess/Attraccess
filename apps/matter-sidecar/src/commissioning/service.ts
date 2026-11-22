@@ -11,6 +11,7 @@ import { ApiError } from '../api-error';
 import type { FabricManager } from '../fabric/manager';
 import type { Logger } from '../logger';
 import { recordAttestation } from '../inventory/node-meta';
+import { judgeAttestation } from './attestation-policy';
 import { decodeSetupCode, type DecodedSetupCode } from './code';
 import { classifyFailure, errorNames } from './failure';
 import { CommissioningCancelledError, createCommissioningFlow, type ProgressStep } from './flow';
@@ -26,13 +27,18 @@ const INTERROGATION_WAIT_MS = 30_000;
 /** Discovery and PASE: a device that does not answer within this long is not on the network (or the code is wrong). */
 const DISCOVERY_TIMEOUT_MS = 60_000;
 const KEPT_SESSIONS = 20;
+/** How long `close()` waits for aborted sessions to wind down before the fabric manager takes over the wait. */
+const CLOSE_WAIT_MS = 10_000;
 
 /** Seams for tests. Not reachable from the environment or HTTP. */
 export type CommissioningTuning = {
   deadlineMs?: number;
   /** Budget for discovery and PASE (matter.js defaults to 30 s). */
   discoveryTimeoutMs?: number;
-  /** Finding types a test accepts as `verified` (the virtual device chains to a matter.js test PAA). */
+  /**
+   * Finding types a test accepts as `verified` (the virtual device chains to a matter.js test PAA). Production passes
+   * none; see `toleratedFindings` in `attestation-policy`.
+   */
   tolerateFindings?: readonly string[];
 };
 
@@ -53,10 +59,15 @@ type Running = {
   cancelRequested: boolean;
   deadlineExpired: boolean;
   attestationFailed: boolean;
+  /** The sidecar is shutting down; the session ends `interrupted`. */
+  interrupted: boolean;
   findings: string[];
+  /** The background run, while it holds the gate. */
+  run?: Promise<void>;
 };
 
-const uniqueTypes = (findings: readonly AttestationFinding[]) => [...new Set(findings.map((finding) => finding.type))];
+/** The trust store could not be opened (seed or cache unusable). Reported as a failed attestation. */
+class TrustStoreUnavailableError extends Error {}
 
 /**
  * Commissions IP-reachable devices into the Attraccess fabric. One attempt at a time, through the fabric manager's
@@ -64,8 +75,32 @@ const uniqueTypes = (findings: readonly AttestationFinding[]) => [...new Set(fin
  */
 export class CommissioningService {
   readonly #sessions = new Map<string, Running>();
+  #closed = false;
 
   constructor(private readonly options: CommissioningServiceOptions) {}
+
+  /**
+   * Shutdown: refuses new sessions and aborts the running ones, which end `interrupted`. Waits a bounded time for them
+   * to release the gate; the fabric manager's own close waits for whatever is left.
+   */
+  async close(): Promise<void> {
+    this.#closed = true;
+    const runs: Promise<void>[] = [];
+    for (const session of this.#sessions.values()) {
+      if (session.view.state !== 'pending' && session.view.state !== 'running') continue;
+      session.interrupted = true;
+      session.abort.abort();
+      if (session.run) runs.push(session.run);
+    }
+    if (runs.length === 0) return;
+    let timer: NodeJS.Timeout | undefined;
+    const bound = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, CLOSE_WAIT_MS);
+      timer.unref();
+    });
+    await Promise.race([Promise.allSettled(runs), bound]);
+    clearTimeout(timer);
+  }
 
   get(sessionId: string): CommissioningSession {
     return this.#find(sessionId).view;
@@ -82,6 +117,7 @@ export class CommissioningService {
 
   /** Starts a session and returns it at once; the run continues in the background and reports by events. */
   start(request: { setupCode: string; attestationOverride?: { confirmed: true } }): CommissioningSession {
+    if (this.#closed) throw new ApiError('sidecar_unavailable', 'The Matter sidecar is shutting down.');
     const override = request.attestationOverride?.confirmed === true;
     if (override && !this.options.allowAttestationOverride) {
       throw new ApiError(
@@ -104,7 +140,7 @@ export class CommissioningService {
     }
     try {
       // Throws `busy` at once when a snapshot, restore, removal, share or commissioning holds the gate.
-      this.options.manager
+      session.run = this.options.manager
         .beginExclusive(() => this.#run(session, decoded))
         .catch(() => this.#fail(session, { code: 'internal' }));
     } catch (error) {
@@ -153,6 +189,7 @@ export class CommissioningService {
       cancelRequested: false,
       deadlineExpired: false,
       attestationFailed: false,
+      interrupted: false,
       findings: [],
     };
     this.#sessions.set(session.view.sessionId, session);
@@ -213,7 +250,7 @@ export class CommissioningService {
       const controller = manager.controller;
       if (!controller) throw new ApiError('sidecar_unavailable', 'The Matter controller is not running.');
       this.#update(session, { state: 'running', step: 'discovering', outcome: 'accepted' });
-      const trust = await this.options.trust.service();
+      const trust = await this.#trustService(session);
       const node = controller.serverNode;
       node.env.set(DclCertificateService, trust);
       const caseSeconds = Math.max(
@@ -255,6 +292,7 @@ export class CommissioningService {
           cancelRequested: session.cancelRequested,
           deadlineExpired: session.deadlineExpired,
           attestationFailed: session.attestationFailed,
+          interrupted: session.interrupted,
           attestationFindings: session.findings,
         }),
       );
@@ -264,26 +302,38 @@ export class CommissioningService {
     }
   }
 
-  /** Strict policy: any error-level finding fails, unless this session carries the confirmed override. */
-  #judgeAttestation(session: Running, findings: AttestationFinding[]): boolean {
-    const tolerated = new Set(this.options.tuning?.tolerateFindings ?? []);
-    const types = uniqueTypes(findings);
-    const blocking = findings.filter((finding) => finding.level === 'error' && !tolerated.has(finding.type));
-    session.findings = types;
-    if (blocking.length === 0) {
-      this.#update(session, { attestation: { status: 'verified', findings: types } });
-      return true;
+  /**
+   * The trust store. When it cannot be opened (the bundled seed or the cache is unusable) attestation cannot be
+   * checked, so the attempt fails as a failed attestation, never as `internal`.
+   */
+  async #trustService(session: Running): Promise<DclCertificateService> {
+    try {
+      return await this.options.trust.service();
+    } catch {
+      this.options.logger('error', 'the attestation trust store is unavailable', { sessionId: session.view.sessionId });
+      session.attestationFailed = true;
+      session.findings = ['DclServiceUnavailable'];
+      this.#update(session, { attestation: { status: 'failed', findings: session.findings } });
+      throw new TrustStoreUnavailableError();
     }
-    if (session.override) {
+  }
+
+  /** Strict policy (see `attestation-policy`): blocking findings fail unless this session carries the confirmed override. */
+  #judgeAttestation(session: Running, findings: AttestationFinding[]): boolean {
+    const judgment = judgeAttestation(findings, {
+      override: session.override,
+      tolerated: this.options.tuning?.tolerateFindings,
+    });
+    session.findings = judgment.findings;
+    this.#update(session, { attestation: { status: judgment.status, findings: judgment.findings } });
+    if (judgment.status === 'overridden') {
       this.options.logger('warn', 'attestation failed; continuing because the override was confirmed', {
         sessionId: session.view.sessionId,
-        findings: uniqueTypes(blocking),
+        findings: judgment.blocking,
       });
-      this.#update(session, { attestation: { status: 'overridden', findings: types } });
-      return true;
     }
+    if (judgment.status !== 'failed') return true;
     session.attestationFailed = true;
-    this.#update(session, { attestation: { status: 'failed', findings: types } });
     return false;
   }
 

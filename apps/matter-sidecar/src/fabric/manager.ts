@@ -80,6 +80,7 @@ export class FabricManager {
   #closed = false;
   #staged: Staged | undefined;
   #pending: PendingFinalize | undefined;
+  readonly #changeListeners = new Set<(status: FabricStatus) => void>();
 
   constructor(private readonly options: FabricManagerOptions) {
     this.layout = layoutFor(options.storageDir);
@@ -89,6 +90,16 @@ export class FabricManager {
       sidecarVersion: options.versions.sidecar,
       now: () => this.now(),
     });
+  }
+
+  /** Calls `listener` after every announced change of the fabric (commission, removal, create, restore). */
+  onFabricChange(listener: (status: FabricStatus) => void): void {
+    this.#changeListeners.add(listener);
+  }
+
+  /** The sidecar logger, for the node operations served next to this manager. */
+  get logger(): Logger {
+    return this.options.logger;
   }
 
   /** The running controller, for the test-only commissioning harness. */
@@ -242,6 +253,13 @@ export class FabricManager {
       fabricId: status.fabricId,
       state: status.state,
     });
+    for (const listener of this.#changeListeners) {
+      try {
+        listener(status);
+      } catch {
+        // A listener keeps caches; it never fails the change itself.
+      }
+    }
   }
 
   // --- fabric.create ---------------------------------------------------------------------------

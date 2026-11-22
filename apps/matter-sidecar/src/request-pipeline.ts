@@ -64,6 +64,15 @@ function parseDeadline(req: IncomingMessage, body: unknown, fallback: number): n
   return Math.min(...candidates);
 }
 
+/**
+ * Operations whose own steps outlast the default deadline: backup stops and restarts the controller and a commit cannot
+ * be cancelled halfway; node removal probes the device and then waits for RemoveFabric, and opening a commissioning
+ * window waits for the device. The caller's deadline governs them, up to the contract maximum, instead of the shorter
+ * default.
+ */
+const callerGovernsDeadline = (operation: OperationDefinition) =>
+  operation.family === 'backup' || operation.id.startsWith('nodes.');
+
 async function withDeadline<T>(work: Promise<T> | T, ms: number, controller: AbortController): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
   const deadline = new Promise<never>((_resolve, reject) => {
@@ -122,9 +131,7 @@ async function runFeature(
   deps: PipelineDeps,
 ): Promise<{ status: number; body: unknown } | { error: ErrorReply }> {
   const controller = new AbortController();
-  // Backup operations stop and restart the controller, and a commit cannot be cancelled halfway: the caller's deadline
-  // header governs them, up to the contract maximum, instead of the shorter default.
-  const base = operation.family === 'backup' ? MAX_REQUEST_DEADLINE_MS : deps.config.requestDeadlineMs;
+  const base = callerGovernsDeadline(operation) ? MAX_REQUEST_DEADLINE_MS : deps.config.requestDeadlineMs;
   const deadlineMs = parseDeadline(req, input.body, base);
   try {
     const value = await withDeadline(

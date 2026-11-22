@@ -6,6 +6,7 @@ const context = (overrides: Partial<FailureContext> = {}): FailureContext => ({
   cancelRequested: false,
   deadlineExpired: false,
   attestationFailed: false,
+  interrupted: false,
   attestationFindings: [],
   ...overrides,
 });
@@ -67,6 +68,8 @@ describe('classifyFailure', () => {
     });
     expect(classifyFailure(errorOf('AbortedError'), context({ cancelRequested: true }))).toEqual({ code: 'cancelled' });
     expect(classifyFailure(errorOf('AbortedError'), context({ deadlineExpired: true }))).toEqual({ code: 'timeout' });
+    // A sidecar shutdown aborts the attempt: it is interrupted, not timed out.
+    expect(classifyFailure(errorOf('AbortedError'), context({ interrupted: true }))).toEqual({ code: 'interrupted' });
     expect(classifyFailure(errorOf('TimeoutError'), context({ step: 'discovering' }))).toEqual({
       code: 'device_not_found',
     });

@@ -9,6 +9,8 @@ export type FailureContext = {
   deadlineExpired: boolean;
   /** The attestation callback rejected the device. */
   attestationFailed: boolean;
+  /** The sidecar is shutting down and aborted the attempt. */
+  interrupted: boolean;
   attestationFindings: string[];
 };
 
@@ -56,6 +58,7 @@ export function classifyFailure(error: unknown, context: FailureContext): Commis
   if (context.cancelRequested && has(names, 'CommissioningCancelledError', 'AbortedError', 'CanceledError')) {
     return { code: 'cancelled' };
   }
+  if (context.interrupted) return { code: 'interrupted' };
   if (context.attestationFailed || has(names, 'DeviceAttestationError')) {
     return { code: 'attestation_failed', attestationFindings: context.attestationFindings };
   }

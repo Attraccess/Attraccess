@@ -119,6 +119,9 @@ describe('families', () => {
   it('validates the commissioning request and accepts secrets only in requests', () => {
     expect(commissioningRequestSchema.safeParse({ setupCode: '34970112332' }).success).toBe(true);
     expect(commissioningRequestSchema.safeParse({ setupCode: 'abc' }).success).toBe(false);
+    // The QR payload is capped like the plugin caps it: 512 characters after `MT:`.
+    expect(commissioningRequestSchema.safeParse({ setupCode: `MT:${'A'.repeat(512)}` }).success).toBe(true);
+    expect(commissioningRequestSchema.safeParse({ setupCode: `MT:${'A'.repeat(513)}` }).success).toBe(false);
     expect(Object.keys(families.commissioningSessionSchema.shape)).not.toContain('setupCode');
     expect(Object.keys(families.threadNetworkSchema.shape)).not.toContain('activeDataset');
     expect(threadDatasetRequestSchema.safeParse({ activeDataset: '0e08' }).success).toBe(true);

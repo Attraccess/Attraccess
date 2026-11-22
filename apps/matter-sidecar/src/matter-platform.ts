@@ -1,5 +1,6 @@
 import type { CommissioningProgressPayload } from '@attraccess/matter-contract';
 import type { SidecarConfig } from './config';
+import { toleratedFindings } from './commissioning/attestation-policy';
 import type { CommissioningService, CommissioningTuning } from './commissioning/service';
 import { FabricManager, type FabricManagerOptions } from './fabric/manager';
 import type { Logger } from './logger';
@@ -73,18 +74,16 @@ export async function loadMatterPlatform(
     logger: context.logger,
     allowAttestationOverride: context.config.allowAttestationOverride,
     publish: (payload) => context.onCommissioningProgress?.(payload),
-    tuning: {
-      ...commissioningTuning,
-      tolerateFindings: commissioningTuning?.trustTestPaa
-        ? ['TrustedAsTestCertificate', 'CertificationTypeTest', ...(commissioningTuning.tolerateFindings ?? [])]
-        : commissioningTuning?.tolerateFindings,
-    },
+    // Production passes no tuning and so tolerates no finding.
+    tuning: { ...commissioningTuning, tolerateFindings: toleratedFindings(commissioningTuning) },
   });
   return {
     version,
     fabric,
     commissioning,
     close: async () => {
+      // A commissioning holds the fabric gate for minutes; abort it first so the fabric close does not wait it out.
+      await commissioning.close();
       await fabric.close();
       await trust.close();
     },
