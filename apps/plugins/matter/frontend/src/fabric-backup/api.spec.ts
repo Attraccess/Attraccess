@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FabricApiError, backUpNow, confirmRestore, downloadBackup, getFabricStatus, readFileAsBase64 } from './api';
+import { MatterApiError } from '../matterApi';
+import { backUpNow, confirmRestore, downloadBackup, getFabricStatus, readFileAsBase64 } from './api';
 
 const respond = (body: string | null, status = 200) => Promise.resolve(new Response(body, { status }));
 
@@ -25,7 +26,7 @@ describe('fabric & backup API', () => {
   it('keeps the backend code and message of an error response', async () => {
     fetchMock.mockReturnValueOnce(respond('{"code":"busy","message":"Busy."}', 409));
     const error = await backUpNow().catch((caught: unknown) => caught);
-    expect(error).toBeInstanceOf(FabricApiError);
+    expect(error).toBeInstanceOf(MatterApiError);
     expect(error).toMatchObject({ code: 'busy', message: 'Busy.', status: 409 });
   });
 
@@ -36,6 +37,11 @@ describe('fabric & backup API', () => {
     await expect(backUpNow()).rejects.toMatchObject({ code: null, message: '', status: 500 });
     fetchMock.mockReturnValueOnce(respond('<html>', 502));
     await expect(backUpNow()).rejects.toMatchObject({ code: null, message: '', status: 502 });
+  });
+
+  it('fails with the code network when no response arrives', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(getFabricStatus()).rejects.toMatchObject({ code: 'network', status: 0, message: 'Failed to fetch' });
   });
 
   it('downloads a stored backup under the name the server gives, or a fallback name', async () => {

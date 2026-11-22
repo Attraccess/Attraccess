@@ -4,7 +4,9 @@ import { act, cleanup, configure, screen, waitFor, within } from '@testing-libra
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CommissioningSessionView } from './commissioning/api';
+import { ImageTooLargeError } from './commissioning/imageLimits';
 import { SESSION_POLL_MS } from './commissioning/useCommissioningState';
+import { MatterApiError } from './matterApi';
 import { node, status } from './test-utils/fixtures';
 import { MANUAL_11, MANUAL_21, QR_PAYLOAD, qrPixels } from './test-utils/qrPixels';
 import { ALL_KEYS, renderMatter, signIn } from './test-utils/renderMatter';
@@ -119,14 +121,29 @@ describe('the code step: every input form leads to the same request', () => {
     await waitFor(() => expect(commissioning.startCommissioning).toHaveBeenCalledWith({ setupCode: QR_PAYLOAD }));
   });
 
-  it('decodes an uploaded QR image in the browser and sends the same request', async () => {
+  it('decodes an uploaded QR image in the browser, uploads nothing, and sends the same request', async () => {
     image.loadImagePixels.mockResolvedValue(qrPixels(QR_PAYLOAD));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const user = await openCodeStep();
+    await user.click(screen.getByTestId('matter-code-source-image'));
+    const file = new File(['x'], 'qr.png', { type: 'image/png' });
+    await user.upload(screen.getByTestId('matter-image-input'), file);
+    await waitFor(() => expect(screen.getByTestId('matter-code-input')).toHaveValue(QR_PAYLOAD));
+    // The picture went to the in-browser decoder only: no request of any kind left the page.
+    expect(image.loadImagePixels).toHaveBeenCalledWith(file);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId('matter-code-start'));
+    await waitFor(() => expect(commissioning.startCommissioning).toHaveBeenCalledWith({ setupCode: QR_PAYLOAD }));
+  });
+
+  it('refuses a picture that is too large to read, and sends nothing', async () => {
+    image.loadImagePixels.mockRejectedValue(new ImageTooLargeError());
     const user = await openCodeStep();
     await user.click(screen.getByTestId('matter-code-source-image'));
     await user.upload(screen.getByTestId('matter-image-input'), new File(['x'], 'qr.png', { type: 'image/png' }));
-    await waitFor(() => expect(screen.getByTestId('matter-code-input')).toHaveValue(QR_PAYLOAD));
-    await user.click(screen.getByTestId('matter-code-start'));
-    await waitFor(() => expect(commissioning.startCommissioning).toHaveBeenCalledWith({ setupCode: QR_PAYLOAD }));
+    expect(await screen.findByTestId('matter-image-too-large')).toHaveTextContent('up to 20 MB and 40 megapixels');
+    expect(screen.queryByTestId('matter-image-failed')).not.toBeInTheDocument();
+    expect(commissioning.startCommissioning).not.toHaveBeenCalled();
   });
 
   it('says when an image holds no QR code', async () => {
@@ -203,15 +220,31 @@ describe('the code step: every input form leads to the same request', () => {
     expect(commissioning.startCommissioning).not.toHaveBeenCalled();
   });
 
-  it('shows a refused start (busy) without losing the entered code', async () => {
-    commissioning.startCommissioning.mockRejectedValue(new Error('Another commissioning session is running.'));
+  it('shows a refused start (409 busy) translated, without losing the entered code', async () => {
+    commissioning.startCommissioning.mockRejectedValue(
+      new MatterApiError('A commissioning session is already running.', 409, 'busy'),
+    );
     const user = await openCodeStep();
     await user.type(screen.getByTestId('matter-code-input'), MANUAL_11);
     await user.click(screen.getByTestId('matter-code-start'));
-    expect(await screen.findByTestId('matter-code-request-error')).toHaveTextContent(
-      'already running'.slice(0, 0) + 'Another',
-    );
+    const error = await screen.findByTestId('matter-code-request-error');
+    expect(error).toHaveTextContent('The Matter sidecar is busy with another operation');
+    expect(error).not.toHaveTextContent('already running');
     expect(screen.getByTestId('matter-code-input')).toHaveValue(MANUAL_11);
+  });
+
+  it.each([
+    ['recovery_required', /needs recovery first/],
+    ['sidecar_unavailable', /cannot be reached/],
+    ['fabric_absent', /has no fabric yet/],
+    ['insecure_transport', /Setup and sharing codes are secrets/],
+  ])('translates the refused start %s', async (code, text) => {
+    commissioning.startCommissioning.mockRejectedValue(new MatterApiError('Raw backend text.', 409, code));
+    const user = await openCodeStep();
+    await user.type(screen.getByTestId('matter-code-input'), `${MANUAL_11}{Enter}`);
+    const error = await screen.findByTestId('matter-code-request-error');
+    expect(error).toHaveTextContent(text);
+    expect(error).not.toHaveTextContent('Raw backend text.');
   });
 });
 
@@ -272,6 +305,8 @@ describe('failure screens', () => {
     ['timeout', /Nothing was left half-registered/],
     ['cancelled', /was not added/],
     ['internal', /unexpected error/],
+    ['needs_reconciliation', /could not record it/],
+    ['registry_failed', /could not store it/],
     ['mystery', /Start again with the code/],
   ];
   it.each(cases)('%s explains what happened and offers to start again with a re-entered code', async (code, text) => {
@@ -313,6 +348,17 @@ describe('failure screens', () => {
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`/matter/devices/${id}`));
   });
 
+  it('already_commissioned of an unclaimed record says it still has to be claimed', async () => {
+    commissioning.getCurrentSession.mockResolvedValue(
+      failed('already_commissioned', {
+        existing: { nodeRecordId: 'node-5', lifecycleState: 'unclaimed', action: 'open' },
+      }),
+    );
+    renderMatter('/matter/commissioning');
+    expect(await screen.findByTestId('matter-failure-existing')).toHaveTextContent('not claimed yet');
+    expect(screen.getByTestId('matter-failure-open-device')).toHaveTextContent('Open the device to claim it');
+  });
+
   it('already_commissioned without a record points to a reconciliation or a factory reset', async () => {
     commissioning.getCurrentSession.mockResolvedValue(
       failed('already_commissioned', { existing: { nodeRecordId: null, lifecycleState: null, action: 'reconcile' } }),
@@ -329,7 +375,7 @@ describe('the attestation override', () => {
     failed('attestation_failed', { attestationFindings: ['PaaNotTrusted'] }, { step: 'attestation', ...overrides });
 
   async function failAttestation(overrideAvailable: boolean) {
-    commissioning.startCommissioning.mockResolvedValue(session({ state: 'pending', step: null }));
+    commissioning.startCommissioning.mockResolvedValue(session({ state: 'pending', step: null, overrideAvailable }));
     commissioning.getSession.mockResolvedValue(attestation({ overrideAvailable }));
     const user = await openCodeStep();
     await user.type(screen.getByTestId('matter-code-input'), MANUAL_11);
@@ -415,6 +461,26 @@ describe('naming and finishing', () => {
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/matter/devices/node-9'));
   });
 
+  it('marks a name that is too long on its own field and does not save', async () => {
+    commissioning.getCurrentSession.mockResolvedValue(done);
+    const user = userEvent.setup();
+    renderMatter('/matter/commissioning');
+    await user.type(await screen.findByTestId('matter-finish-endpoint-1'), 'x'.repeat(101));
+    expect(await screen.findByTestId('matter-finish-endpoint-1-error')).toHaveTextContent('At most 100 characters.');
+    expect(screen.queryByTestId('matter-finish-name-error')).not.toBeInTheDocument();
+    expect(screen.getByTestId('matter-finish-save')).toBeDisabled();
+    expect(screen.getByText('Endpoint 1')).toBeInTheDocument();
+  });
+
+  it('shows a refused naming translated', async () => {
+    commissioning.getCurrentSession.mockResolvedValue(done);
+    commissioning.finishSession.mockRejectedValue(new MatterApiError('Raw.', 409, 'already_finished'));
+    const user = userEvent.setup();
+    renderMatter('/matter/commissioning');
+    await user.click(await screen.findByTestId('matter-finish-save'));
+    expect(await screen.findByTestId('matter-finish-error')).toHaveTextContent('was already named');
+  });
+
   it('can be skipped and then starts over for another device', async () => {
     commissioning.getCurrentSession.mockResolvedValue(done);
     commissioning.finishSession.mockResolvedValue({ node: node('node-9') });
@@ -424,6 +490,149 @@ describe('naming and finishing', () => {
     await waitFor(() => expect(commissioning.finishSession).toHaveBeenCalledWith(done.id, {}));
     await user.click(await screen.findByTestId('matter-finish-another'));
     expect(await screen.findByTestId('matter-prepare-step')).toBeInTheDocument();
+  });
+});
+
+describe('a session the backend no longer knows, and failed requests', () => {
+  const gone = () => new MatterApiError('Unknown commissioning session.', 404, null);
+
+  it('ends a running session as interrupted when polling gets 404 (the plugin or the API restarted)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    commissioning.getCurrentSession.mockResolvedValue(session({ step: 'case' }));
+    commissioning.getSession.mockRejectedValue(gone());
+    renderMatter('/matter/commissioning');
+    await screen.findByTestId('matter-progress-step');
+    await act(async () => void (await vi.advanceTimersByTimeAsync(SESSION_POLL_MS)));
+    const failure = await screen.findByTestId('matter-failure-screen');
+    expect(failure).toHaveAttribute('data-code', 'interrupted');
+    expect(screen.getByTestId('matter-failure-open-devices')).toBeInTheDocument();
+    expect(screen.queryByTestId('matter-progress-error')).not.toBeInTheDocument();
+    // Nothing is read any more once the session ended here.
+    await act(async () => void (await vi.advanceTimersByTimeAsync(SESSION_POLL_MS * 3)));
+    expect(commissioning.getSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a failed read translated, keeps reading, and never sends two reads at once', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    commissioning.getCurrentSession.mockResolvedValue(session({ step: 'pase' }));
+    commissioning.getSession.mockRejectedValueOnce(new MatterApiError('', 503, 'sidecar_unavailable'));
+    renderMatter('/matter/commissioning');
+    await screen.findByTestId('matter-progress-step');
+    await act(async () => void (await vi.advanceTimersByTimeAsync(SESSION_POLL_MS)));
+    expect(await screen.findByTestId('matter-progress-error')).toHaveTextContent('cannot be reached');
+    // The next read answers late: no second request is sent while it is outstanding.
+    let answer: (value: CommissioningSessionView) => void = () => undefined;
+    commissioning.getSession.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    await act(async () => void (await vi.advanceTimersByTimeAsync(SESSION_POLL_MS * 5)));
+    expect(commissioning.getSession).toHaveBeenCalledTimes(2);
+    await act(async () => answer(session({ step: 'attestation' })));
+    await waitFor(() => expect(screen.queryByTestId('matter-progress-error')).not.toBeInTheDocument());
+    expect(screen.getByTestId('matter-progress-attestation')).toHaveAttribute('data-state', 'running');
+  });
+
+  it('drops an answer for a session that was replaced in the meantime', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    commissioning.getCurrentSession.mockResolvedValue(session({ step: 'pase' }));
+    let answer: (value: CommissioningSessionView) => void = () => undefined;
+    commissioning.getSession.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    commissioning.cancelSession.mockResolvedValue(failed('cancelled'));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderMatter('/matter/commissioning');
+    await screen.findByTestId('matter-progress-step');
+    await act(async () => void (await vi.advanceTimersByTimeAsync(SESSION_POLL_MS)));
+    await user.click(screen.getByTestId('matter-progress-cancel'));
+    await user.click(await screen.findByTestId('matter-progress-cancel-confirm'));
+    await screen.findByTestId('matter-failure-cancelled');
+    // The read sent before the cancellation answers "running": it must not bring the progress back.
+    await act(async () => answer(session({ step: 'case' })));
+    expect(screen.getByTestId('matter-failure-cancelled')).toBeInTheDocument();
+    expect(screen.queryByTestId('matter-progress-step')).not.toBeInTheDocument();
+  });
+
+  it('reports a failed cancellation, and a cancellation of a session the backend lost ends it as interrupted', async () => {
+    commissioning.getCurrentSession.mockResolvedValue(session({ step: 'case' }));
+    commissioning.cancelSession.mockRejectedValueOnce(new MatterApiError('', 0, 'network'));
+    const user = userEvent.setup();
+    renderMatter('/matter/commissioning');
+    await user.click(await screen.findByTestId('matter-progress-cancel'));
+    await user.click(await screen.findByTestId('matter-progress-cancel-confirm'));
+    const error = await screen.findByTestId('matter-progress-cancel-error');
+    expect(error).toHaveTextContent('The server could not be reached');
+    expect(screen.getByTestId('matter-progress-step')).toBeInTheDocument();
+    commissioning.cancelSession.mockRejectedValueOnce(gone());
+    await user.click(screen.getByTestId('matter-progress-cancel'));
+    await user.click(await screen.findByTestId('matter-progress-cancel-confirm'));
+    expect(await screen.findByTestId('matter-failure-screen')).toHaveAttribute('data-code', 'interrupted');
+  });
+});
+
+describe('the override retry and the kept code', () => {
+  const attestation = (overrideAvailable: boolean) =>
+    failed(
+      'attestation_failed',
+      { attestationFindings: ['PaaNotTrusted'] },
+      { step: 'attestation', overrideAvailable },
+    );
+
+  it('shows a refused retry (409 busy) on the failure screen and keeps the code for another try', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    commissioning.startCommissioning
+      .mockResolvedValueOnce(session({ state: 'pending', step: null, overrideAvailable: true }))
+      .mockRejectedValueOnce(new MatterApiError('Raw.', 409, 'busy'));
+    commissioning.getSession.mockResolvedValue(attestation(true));
+    const user = await openCodeStep();
+    await user.type(screen.getByTestId('matter-code-input'), `${MANUAL_11}{Enter}`);
+    await act(async () => void (await vi.advanceTimersByTimeAsync(SESSION_POLL_MS)));
+    await user.click(await screen.findByTestId('matter-failure-override'));
+    await user.click(within(screen.getByTestId('matter-override-dialog')).getByRole('checkbox'));
+    await user.click(screen.getByTestId('matter-override-confirm'));
+    const error = await screen.findByTestId('matter-override-error');
+    expect(error).toHaveTextContent('busy with another operation');
+    expect(error).not.toHaveTextContent('Raw.');
+    expect(commissioning.startCommissioning).toHaveBeenLastCalledWith({
+      setupCode: MANUAL_11,
+      attestationOverride: { confirmed: true },
+    });
+    expect(screen.getByTestId('matter-failure-override')).toBeInTheDocument();
+  });
+
+  it('drops the code at once when the sidecar does not allow the override', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    commissioning.startCommissioning.mockResolvedValue(session({ state: 'pending', step: null }));
+    commissioning.getSession.mockResolvedValue(attestation(false));
+    const user = await openCodeStep();
+    await user.type(screen.getByTestId('matter-code-input'), `${MANUAL_11}{Enter}`);
+    await screen.findByTestId('matter-progress-step');
+    // The sidecar later claims to allow it: the code is gone already, so nothing can be retried with it.
+    commissioning.getSession.mockResolvedValue(attestation(true));
+    await act(async () => void (await vi.advanceTimersByTimeAsync(SESSION_POLL_MS)));
+    await screen.findByTestId('matter-failure-attestation_failed');
+    expect(screen.queryByTestId('matter-failure-override')).not.toBeInTheDocument();
+  });
+});
+
+describe('accessibility of the flow', () => {
+  it('moves the focus to the heading of each new step, and announces the current step in one status line', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = await openCodeStep();
+    expect(screen.getByRole('heading', { name: 'Enter or scan the setup code' })).toHaveFocus();
+    await user.type(screen.getByTestId('matter-code-input'), `${MANUAL_11}{Enter}`);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Commissioning in progress' })).toHaveFocus());
+    const current = screen.getByTestId('matter-progress-current');
+    expect(current).toHaveAttribute('role', 'status');
+    expect(current).toHaveTextContent('Current step: Finding the device');
+    expect(screen.getByTestId('matter-progress-step').querySelector('[aria-live]')).toBeNull();
+    commissioning.getSession.mockResolvedValue(failed('pase_failed'));
+    await act(async () => void (await vi.advanceTimersByTimeAsync(SESSION_POLL_MS)));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'The code was not accepted' })).toHaveFocus());
+  });
+
+  it('leaves the focus alone when the page opens on a resumed session', async () => {
+    commissioning.getCurrentSession.mockResolvedValue(session({ step: 'case' }));
+    renderMatter('/matter/commissioning');
+    const heading = await screen.findByRole('heading', { name: 'Commissioning in progress' });
+    expect(heading).not.toHaveFocus();
+    expect(screen.getByTestId('matter-progress-current')).toHaveTextContent('Current step: Connecting securely');
   });
 });
 

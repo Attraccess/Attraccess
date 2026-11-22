@@ -109,11 +109,7 @@
       "incompatible_version": "The plugin version must match the version that created the backup. Install that version first.",
       "stage_failed": "The sidecar could not prepare the backup. Your installation was left unchanged.",
       "fabric_exists": "The sidecar already has a fabric.",
-      "recovery_required": "The fabric needs recovery first. Restore a backup, accept the sidecar's fabric or start a new fabric.",
       "recovery_not_required": "The fabric does not need recovery any more.",
-      "busy": "The Matter sidecar is busy with another operation (a backup, restore, commissioning, removal or share). Try again shortly.",
-      "sidecar_unavailable": "The sidecar cannot be reached. Try again when it is connected.",
-      "sidecar_error": "The Matter sidecar refused the request.",
       "sidecar_not_empty": "A new fabric can only be started while the sidecar has no fabric.",
       "sidecar_not_initialized": "The sidecar has no healthy fabric to accept.",
       "insecure_transport": "The connection to the sidecar is plain HTTP to another machine. Backups and restores carry fabric secrets, so they need https or a sidecar on this machine.",
@@ -128,8 +124,7 @@
       "pre_restore_backup_failed": "The backup of the current fabric failed, so nothing was restored. Your installation was left unchanged.",
       "restore_failed": "The Matter sidecar could not apply or verify the backup. Your installation was left unchanged.",
       "rolled_back": "The restore failed and was rolled back. Your installation was left unchanged.",
-      "rollback_failed": "The restore failed and the Matter sidecar could not be rolled back automatically, so its state is unknown. Check the sidecar, then restore the backup again.",
-      "http": "The request failed (HTTP {{status}})."
+      "rollback_failed": "The restore failed and the Matter sidecar could not be rolled back automatically, so its state is unknown. Check the sidecar, then restore the backup again."
     },
     "blocked": {
       "unreachable": "The sidecar is not reachable.",
@@ -315,6 +310,30 @@
       "error": "The recovery action failed"
     }
   },
+  "error": {
+    "busy": "The Matter sidecar is busy with another operation (a backup, restore, commissioning, removal or share). Try again shortly.",
+    "sidecar_unavailable": "The sidecar cannot be reached. Try again when it is connected.",
+    "sidecar_error": "The Matter sidecar refused the request.",
+    "recovery_required": "The fabric needs recovery first. Restore a backup, accept the sidecar's fabric or start a new fabric.",
+    "http": "The request failed (HTTP {{status}}).",
+    "network": "The server could not be reached. Check the connection and try again.",
+    "not_found": "This no longer exists. Reload the page.",
+    "invalid_code": "The setup code is not valid. Check it and enter it again.",
+    "fabric_absent": "The Matter sidecar has no fabric yet. Create the fabric on the Infrastructure tab first.",
+    "fabric_mismatch": "The device does not belong to the sidecar's current fabric. Nothing was changed.",
+    "node_not_on_sidecar": "The Matter sidecar does not know this device. Nothing was changed. Run a reconciliation on the Devices tab.",
+    "not_shareable": "Only a claimed device in the fabric can be shared.",
+    "not_removable": "This device cannot be removed from the fabric in its current state. Reload the page.",
+    "not_succeeded": "Only a device that was added can be named.",
+    "already_finished": "This device was already named. Open it to change its names.",
+    "node_removed": "The device was removed in the meantime.",
+    "insecure_transport": "The connection to the Matter sidecar is plain HTTP to another machine. Setup and sharing codes are secrets, so this needs https or a sidecar on this machine.",
+    "device_unreachable": "The device could not be reached. Nothing was changed.",
+    "timeout": "The device did not answer in time.",
+    "registry_failed": "The device left the fabric, but its Attraccess record could not be updated. A reconciliation runs now; check the device again in a moment.",
+    "attestation_override_disabled": "The Matter sidecar does not allow the attestation override. An operator enables it on a development install only.",
+    "unsupported_capability": "This Matter sidecar release cannot do this yet. Update the sidecar."
+  },
   "tabs": {
     "label": "Matter sections",
     "devices": "Devices",
@@ -381,20 +400,16 @@
     "stepsTitle": "How adding a device works",
     "steps": {
       "prepare": {
-        "title": "Prepare the device",
-        "text": "Reset the device or open its pairing window, and keep it close to the Matter sidecar."
+        "text": "Make sure the device is on the network (Ethernet or Wi-Fi) and ready to pair: new, factory-reset, or with a pairing window opened by its other controller."
       },
       "code": {
-        "title": "Enter or scan the code",
         "text": "Enter the setup code or scan the QR code printed on the device or its packaging."
       },
       "progress": {
-        "title": "Watch the progress",
         "text": "Attraccess shows each commissioning step and tells you what to do if one fails."
       },
-      "claim": {
-        "title": "Name and claim",
-        "text": "Give the new device a name and claim it, so it can be used in flows."
+      "finish": {
+        "text": "Give the new device a name and a location. It is already claimed by you and can be used in flows."
       }
     },
     "flow": {
@@ -425,7 +440,9 @@
         "empty": "Enter a setup code.",
         "format": "This is not a Matter setup code. Use the QR text starting with MT: or the 11 or 21 digit number.",
         "checksum": "The check digit does not match. Check the number for a typo."
-      }
+      },
+      "title": "Enter or scan the setup code",
+      "failed": "Commissioning could not start"
     },
     "camera": {
       "label": "Camera preview",
@@ -443,7 +460,9 @@
       "pick": "Choose an image",
       "hint": "The picture is read in this browser. It is not uploaded and not stored.",
       "failed": "No QR code found",
-      "failedText": "The picture could not be read as a QR code. Try a sharper, closer picture, or type the code."
+      "failedText": "The picture could not be read as a QR code. Try a sharper, closer picture, or type the code.",
+      "tooLarge": "The picture is too large",
+      "tooLargeText": "Pictures up to 20 MB and 40 megapixels are read here. Use a smaller or cropped picture of the QR code, or type the code."
     },
     "progress": {
       "title": "Commissioning in progress",
@@ -467,7 +486,9 @@
         "done": "done",
         "running": "in progress",
         "waiting": "waiting"
-      }
+      },
+      "cancelFailed": "Cancelling failed",
+      "current": "Current step: {{step}}"
     },
     "failure": {
       "again": "Start again",
@@ -476,7 +497,8 @@
         "open": "Open the device",
         "repair": "Open the device to repair it",
         "restore": "Open the device to restore it",
-        "reconcile": "Open Devices"
+        "reconcile": "Open Devices",
+        "claim": "Open the device to claim it"
       },
       "unknown": {
         "title": "Commissioning failed",
@@ -505,7 +527,8 @@
         "open": "It is already known here. Open it.",
         "repair": "It is known but detached. Open it and repair it.",
         "restore": "It is known but archived. Open it and restore it.",
-        "reconcile": "Run a reconciliation on the Devices tab to find it, or factory-reset the device and add it again."
+        "reconcile": "Run a reconciliation on the Devices tab to find it, or factory-reset the device and add it again.",
+        "claim": "It is known here but not claimed yet. Open it and claim it."
       },
       "fabric_full": {
         "title": "The device has no room for another administrator",
@@ -546,7 +569,8 @@
       "risk": "This device failed attestation: its certificate is not trusted. Adding it anyway lets an unverified or counterfeit device into your fabric. Only do this for a device you built or trust, on a development system. The attempt is recorded in the audit log.",
       "findings": "Findings:",
       "acknowledge": "I understand the risk and want to add this device without verification.",
-      "confirm": "Add without verification"
+      "confirm": "Add without verification",
+      "failed": "The new attempt could not start"
     },
     "finish": {
       "addedTitle": "The device was added",
@@ -556,7 +580,6 @@
       "name": "Device name",
       "location": "Location",
       "endpoints": "Endpoint names",
-      "endpoint": "Endpoint {{endpointId}}",
       "endpointsHint": "Optional. Empty names stay as they are.",
       "save": "Save and finish",
       "skip": "Skip naming",
@@ -839,21 +862,39 @@
         "title": "Forgotten by Attraccess",
         "text": "Attraccess forgot this device without contacting it. The device may still hold Attraccess credentials: factory-reset it or remove it from its other controller. Its history is kept."
       },
+      "force_removed": {
+        "title": "Removed from Attraccess only",
+        "text": "This record was removed from Attraccess without contacting the device. The device is still in the Matter fabric: if the sidecar still lists it, it comes back as a new unclaimed device. Its history is kept."
+      },
+      "merged": {
+        "title": "Merged into another device",
+        "text": "This record was relinked into a detached device, which now carries its identity and endpoints. Its history is kept."
+      },
+      "replaced": {
+        "title": "Replaced",
+        "text": "This record was replaced by a newer record of the same device. Its history is kept."
+      },
       "generic": {
         "title": "Removed",
-        "text": "This device is no longer part of the fabric. Its history is kept."
+        "text": "This device is no longer used in Attraccess. Its history is kept."
       }
     },
     "remove": {
       "action": "Remove from fabric",
       "confirmTitle": "Remove {{name}} from the Attraccess fabric?",
       "confirmText": "Attraccess asks the device to leave the Attraccess fabric and then forgets it. Other controllers keep the device. This is not a factory reset. History is kept.",
-      "force": "Force remove",
-      "forceTitle": "Force remove {{name}}?",
+      "force": "Force remove from fabric",
+      "forceTitle": "Force remove {{name}} from the fabric?",
       "forceText": "Attraccess forgets the device without contacting it. The device may still hold Attraccess credentials. Factory-reset it, or remove it from its other controller, so it does not stay a member of the Attraccess fabric. History is kept.",
       "failed": "The device could not be removed",
       "unreachableTitle": "The device could not be reached",
-      "unreachableText": "Nothing was changed. If the device is gone or broken, you can force remove it."
+      "unreachableText": "Nothing was changed. If the device is gone or broken, you can force remove it.",
+      "timeoutTitle": "The device did not confirm the removal in time",
+      "timeoutText": "The outcome is uncertain: the device may still leave the fabric. A reconciliation runs now. Check this page again before you force remove the device.",
+      "detachedHint": "The Matter sidecar does not know this detached device. Repair or relink it first; then it can be removed from the fabric.",
+      "error": {
+        "node_not_on_sidecar": "The Matter sidecar does not know this device, so it cannot be removed from the fabric. Nothing was changed. Run a reconciliation, or use “Force remove” among the device actions to remove only its record from Attraccess."
+      }
     },
     "share": {
       "title": "Share with another controller",

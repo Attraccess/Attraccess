@@ -28,7 +28,7 @@ import { useNodeDetail } from './useNodeDetail';
  * `/matter/devices/:nodeId`: one device as a full page with a way back to the list. Identity, editable metadata
  * (manage, and only for a claimed device), the endpoint tree, lifecycle actions and a collapsed Diagnostics section.
  * An unclaimed or detached device shows its callout and only the actions that resolve it; it is not editable, and its
- * endpoints are shown read-only.
+ * endpoints are shown read-only. A removed device shows how it left and its history only.
  */
 export function DeviceDetailPage({ nodeId }: Readonly<{ nodeId: string }>) {
   const { t } = useMatterTranslations();
@@ -74,6 +74,8 @@ export function DeviceDetailPage({ nodeId }: Readonly<{ nodeId: string }>) {
   const name = nodeLabel(node, (id) => t('devices.nodeFallback', { nodeId: id }));
   const editable = canManage && node.lifecycleState === 'claimed';
   const usable = !needsResolution(node.lifecycleState);
+  // A removed device is history: no other administrators to show and no endpoints to list.
+  const removed = node.lifecycleState === 'removed';
   const refreshed = <T,>(action: Promise<T>) => action.then(async (result) => (await detail.refetch(), result));
 
   return (
@@ -84,7 +86,7 @@ export function DeviceDetailPage({ nodeId }: Readonly<{ nodeId: string }>) {
           {name}
         </h2>
         <LifecycleChip state={node.lifecycleState} />
-        {node.lifecycleState !== 'removed' && <ReachabilityChip reachable={node.reachable} />}
+        {!removed && <ReachabilityChip reachable={node.reachable} />}
       </div>
       {detail.error && (
         <StatusAlert status="warning" title={t('devices.refreshError')} data-cy="matter-device-refresh-error">
@@ -107,7 +109,13 @@ export function DeviceDetailPage({ nodeId }: Readonly<{ nodeId: string }>) {
           }}
         />
       )}
-      {canCommission && node.lifecycleState !== 'removed' && (
+      {/* A detached device is not known to the sidecar: it is repaired or relinked before it can leave the fabric. */}
+      {canCommission && node.lifecycleState === 'detached' && (
+        <p className="mt:text-sm mt:text-muted" data-cy="matter-remove-detached">
+          {t('devices.remove.detachedHint')}
+        </p>
+      )}
+      {canCommission && node.lifecycleState !== 'removed' && node.lifecycleState !== 'detached' && (
         <RemoveFromFabric
           nodeRecordId={node.id}
           name={name}
@@ -118,7 +126,7 @@ export function DeviceDetailPage({ nodeId }: Readonly<{ nodeId: string }>) {
       )}
       <IdentityCard node={node} />
       {canCommission && node.lifecycleState === 'claimed' && <ShareSection nodeRecordId={node.id} name={name} />}
-      <AdministratorsSection administrators={node.administrators ?? []} />
+      {!removed && <AdministratorsSection administrators={node.administrators ?? []} />}
       {/* Not a Card: form fields share the Card's fill and would be invisible (ATT-294 / ATT-834). */}
       <section
         className="mt:flex mt:flex-col mt:gap-3 mt:rounded-xl mt:border mt:border-separator mt:p-4"
@@ -153,17 +161,19 @@ export function DeviceDetailPage({ nodeId }: Readonly<{ nodeId: string }>) {
         </div>
       </section>
       {/* Read-only for an unclaimed or detached device: it helps decide how to resolve it, but nothing is editable. */}
-      <section className="mt:flex mt:flex-col mt:gap-3" data-cy="matter-endpoints">
-        <h3 className="mt:text-lg mt:font-semibold">{t('devices.endpoint.title')}</h3>
-        <EndpointTree
-          endpoints={node.endpoints}
-          bridgeName={name}
-          canEdit={editable}
-          canRead={canRead}
-          showFlowUsage={usable}
-          onRename={(endpointRef, changes) => refreshed(updateEndpoint(endpointRef, changes))}
-        />
-      </section>
+      {!(removed && node.endpoints.length === 0) && (
+        <section className="mt:flex mt:flex-col mt:gap-3" data-cy="matter-endpoints">
+          <h3 className="mt:text-lg mt:font-semibold">{t('devices.endpoint.title')}</h3>
+          <EndpointTree
+            endpoints={node.endpoints}
+            bridgeName={name}
+            canEdit={editable}
+            canRead={canRead}
+            showFlowUsage={usable}
+            onRename={(endpointRef, changes) => refreshed(updateEndpoint(endpointRef, changes))}
+          />
+        </section>
+      )}
       <DiagnosticsSection node={node} />
     </div>
   );

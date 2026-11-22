@@ -12,7 +12,9 @@ import {
   type RestoreSource,
   type RestoreValidation,
 } from './api';
-import { codeOf, useErrorText } from './errors';
+import { codeOf } from '../matterApi';
+import { useMatterErrorText } from '../useMatterErrorText';
+import { fabricErrorKey } from './errors';
 import { Field } from './Field';
 import { RETRY_CODES, RestoreSourceStep, type Mode, type WizardError } from './RestoreSourceStep';
 
@@ -175,7 +177,7 @@ function WizardFooter({ step, busy, canValidate, canConfirm, danger, onClose, on
  */
 export function RestoreWizard({ stored, onClose, onRestored }: Props) {
   const { t } = useMatterTranslations();
-  const errorText = useErrorText();
+  const errorText = useMatterErrorText();
   const [step, setStep] = useState<Step>('select');
   const [mode, setMode] = useState<Mode>(stored.length > 0 ? 'stored' : 'upload');
   const [backupId, setBackupId] = useState<string | null>(stored[0]?.id ?? null);
@@ -188,7 +190,7 @@ export function RestoreWizard({ stored, onClose, onRestored }: Props) {
 
   const preflight = validation?.preflight;
   const confirmed = !preflight?.requiresTypedConfirmation || typed.trim() === preflight.confirmationFabricId;
-  const fail = (caught: unknown) => setError({ code: codeOf(caught), text: errorText(caught) });
+  const fail = (caught: unknown) => setError({ code: codeOf(caught), text: errorText(caught, fabricErrorKey) });
 
   const validate = async () => {
     setError(null);

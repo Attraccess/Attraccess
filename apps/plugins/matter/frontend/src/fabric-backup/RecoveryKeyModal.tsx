@@ -3,7 +3,8 @@ import { Checkbox, ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@he
 import { useState } from 'react';
 import { useMatterTranslations } from '../i18n';
 import { saveBlob, type RecoveryKeyReveal } from './api';
-import { useErrorText } from './errors';
+import { useMatterErrorText } from '../useMatterErrorText';
+import { fabricErrorKey } from './errors';
 
 type Props = Readonly<{
   reveal: RecoveryKeyReveal;
@@ -19,7 +20,7 @@ type Props = Readonly<{
  */
 export function RecoveryKeyModal({ reveal, onAcknowledge, onDone }: Props) {
   const { t } = useMatterTranslations();
-  const errorText = useErrorText();
+  const errorText = useMatterErrorText();
   const [confirmed, setConfirmed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -47,7 +48,7 @@ export function RecoveryKeyModal({ reveal, onAcknowledge, onDone }: Props) {
       await onAcknowledge(reveal.keyId);
       onDone();
     } catch (caught) {
-      setError(errorText(caught));
+      setError(errorText(caught, fabricErrorKey));
     } finally {
       setBusy(false);
     }

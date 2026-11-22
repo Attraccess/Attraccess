@@ -139,11 +139,14 @@ describe('Commissioning', () => {
         .getAllByRole('listitem')
         .map((step) => step.textContent),
     ).toEqual([
-      expect.stringContaining('Prepare the device'),
-      expect.stringContaining('Enter or scan the code'),
-      expect.stringContaining('Watch the progress'),
-      expect.stringContaining('Name and claim'),
+      expect.stringContaining('Prepare device'),
+      expect.stringContaining('Enter or scan code'),
+      expect.stringContaining('Progress'),
+      expect.stringContaining('Name and finish'),
     ]);
+    // The same steps as the flow: no separate claim step (a commissioned device is claimed already), nothing about
+    // keeping the device close to the sidecar (it is on the network).
+    expect(steps).not.toHaveTextContent(/claim it|close to the Matter sidecar/);
     expect(within(tab).queryAllByRole('textbox')).toHaveLength(0);
     expect(within(tab).queryAllByRole('button')).toHaveLength(0);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

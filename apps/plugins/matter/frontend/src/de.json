@@ -109,11 +109,7 @@
       "incompatible_version": "Die Plugin-Version muss mit der Version übereinstimmen, die das Backup erstellt hat. Installiere zuerst diese Version.",
       "stage_failed": "Der Sidecar konnte das Backup nicht vorbereiten. Deine Installation blieb unverändert.",
       "fabric_exists": "Der Sidecar hat bereits eine Fabric.",
-      "recovery_required": "Die Fabric muss zuerst wiederhergestellt werden. Stelle ein Backup wieder her, übernimm die Fabric des Sidecars oder starte eine neue Fabric.",
       "recovery_not_required": "Die Fabric muss nicht mehr wiederhergestellt werden.",
-      "busy": "Der Matter-Sidecar ist mit einem anderen Vorgang beschäftigt (Backup, Wiederherstellung, Commissioning, Entfernen oder Teilen). Versuche es gleich noch einmal.",
-      "sidecar_unavailable": "Der Sidecar ist nicht erreichbar. Versuche es erneut, sobald er verbunden ist.",
-      "sidecar_error": "Der Matter-Sidecar hat die Anfrage abgelehnt.",
       "sidecar_not_empty": "Eine neue Fabric kann nur gestartet werden, solange der Sidecar keine Fabric hat.",
       "sidecar_not_initialized": "Der Sidecar hat keine gesunde Fabric, die übernommen werden könnte.",
       "insecure_transport": "Die Verbindung zum Sidecar ist unverschlüsseltes HTTP zu einem anderen Rechner. Backups und Wiederherstellungen enthalten Fabric-Geheimnisse und brauchen daher https oder einen Sidecar auf diesem Rechner.",
@@ -128,8 +124,7 @@
       "pre_restore_backup_failed": "Das Backup der aktuellen Fabric ist fehlgeschlagen, daher wurde nichts wiederhergestellt. Deine Installation blieb unverändert.",
       "restore_failed": "Der Matter-Sidecar konnte das Backup nicht anwenden oder prüfen. Deine Installation blieb unverändert.",
       "rolled_back": "Die Wiederherstellung ist fehlgeschlagen und wurde zurückgerollt. Deine Installation blieb unverändert.",
-      "rollback_failed": "Die Wiederherstellung ist fehlgeschlagen und der Matter-Sidecar konnte nicht automatisch zurückgerollt werden, sein Zustand ist daher unbekannt. Prüfe den Sidecar und stelle das Backup dann erneut wieder her.",
-      "http": "Die Anfrage ist fehlgeschlagen (HTTP {{status}})."
+      "rollback_failed": "Die Wiederherstellung ist fehlgeschlagen und der Matter-Sidecar konnte nicht automatisch zurückgerollt werden, sein Zustand ist daher unbekannt. Prüfe den Sidecar und stelle das Backup dann erneut wieder her."
     },
     "blocked": {
       "unreachable": "Der Sidecar ist nicht erreichbar.",
@@ -229,7 +224,7 @@
       "reason": {
         "inconsistent": "Sidecar und Plugin sind sich über die Fabric nicht einig, daher ist kein konsistentes Backup möglich.",
         "sidecar_unavailable": "Der Matter-Sidecar ist nicht erreichbar.",
-        "sidecar_busy": "Der Matter-Sidecar ist mit einem anderen Vorgang beschäftigt (Backup, Wiederherstellung, Commissioning, Entfernen oder Teilen). Versuche es gleich noch einmal.",
+        "sidecar_busy": "Der Matter-Sidecar ist mit einem anderen Vorgang beschäftigt (Backup, Wiederherstellung, Inbetriebnahme, Entfernen oder Teilen). Versuche es gleich noch einmal.",
         "insecure_transport": "Backups werden über eine unverschlüsselte HTTP-Verbindung zu einem entfernten Sidecar abgelehnt. Nutze https oder eine lokale Verbindung.",
         "no_recovery_key": "Es gibt noch keinen Wiederherstellungsschlüssel.",
         "recovery_key_unreadable": "Der gespeicherte Wiederherstellungsschlüssel kann von dieser Installation nicht gelesen werden.",
@@ -315,6 +310,30 @@
       "error": "Die Wiederherstellungsaktion ist fehlgeschlagen"
     }
   },
+  "error": {
+    "busy": "Der Matter-Sidecar ist mit einem anderen Vorgang beschäftigt (Backup, Wiederherstellung, Inbetriebnahme, Entfernen oder Teilen). Versuche es gleich noch einmal.",
+    "sidecar_unavailable": "Der Sidecar ist nicht erreichbar. Versuche es erneut, sobald er verbunden ist.",
+    "sidecar_error": "Der Matter-Sidecar hat die Anfrage abgelehnt.",
+    "recovery_required": "Die Fabric muss zuerst wiederhergestellt werden. Stelle ein Backup wieder her, übernimm die Fabric des Sidecars oder starte eine neue Fabric.",
+    "http": "Die Anfrage ist fehlgeschlagen (HTTP {{status}}).",
+    "network": "Der Server war nicht erreichbar. Prüfe die Verbindung und versuche es erneut.",
+    "not_found": "Das gibt es nicht mehr. Lade die Seite neu.",
+    "invalid_code": "Der Einrichtungscode ist ungültig. Prüfe ihn und gib ihn erneut ein.",
+    "fabric_absent": "Der Matter-Sidecar hat noch keine Fabric. Lege die Fabric zuerst auf dem Tab „Infrastruktur“ an.",
+    "fabric_mismatch": "Das Gerät gehört nicht zur aktuellen Fabric des Sidecars. Es wurde nichts geändert.",
+    "node_not_on_sidecar": "Der Matter-Sidecar kennt dieses Gerät nicht. Es wurde nichts geändert. Starte auf dem Tab „Geräte“ einen Abgleich.",
+    "not_shareable": "Nur ein übernommenes Gerät in der Fabric kann geteilt werden.",
+    "not_removable": "Dieses Gerät kann in seinem aktuellen Zustand nicht aus der Fabric entfernt werden. Lade die Seite neu.",
+    "not_succeeded": "Nur ein hinzugefügtes Gerät kann benannt werden.",
+    "already_finished": "Dieses Gerät wurde schon benannt. Öffne es, um die Namen zu ändern.",
+    "node_removed": "Das Gerät wurde inzwischen entfernt.",
+    "insecure_transport": "Die Verbindung zum Matter-Sidecar ist unverschlüsseltes HTTP zu einem anderen Rechner. Einrichtungs- und Freigabecodes sind geheim und brauchen daher https oder einen Sidecar auf diesem Rechner.",
+    "device_unreachable": "Das Gerät war nicht erreichbar. Es wurde nichts geändert.",
+    "timeout": "Das Gerät hat nicht rechtzeitig geantwortet.",
+    "registry_failed": "Das Gerät hat die Fabric verlassen, aber sein Attraccess-Eintrag konnte nicht aktualisiert werden. Ein Abgleich läuft jetzt; sieh gleich noch einmal nach dem Gerät.",
+    "attestation_override_disabled": "Der Matter-Sidecar erlaubt den Attestierungs-Override nicht. Ein Betreiber aktiviert ihn nur auf einer Entwicklungsinstallation.",
+    "unsupported_capability": "Diese Version des Matter-Sidecars kann das noch nicht. Aktualisiere den Sidecar."
+  },
   "tabs": {
     "label": "Matter-Bereiche",
     "devices": "Geräte",
@@ -377,24 +396,20 @@
   },
   "commissioning": {
     "emptyTitle": "Inbetriebnahme ist noch nicht verfügbar",
-    "emptyText": "Zum Hinzufügen von Geräten braucht es einen Sidecar mit Commissioning-Unterstützung. Bis dahin sammelt und sendet diese Seite keinen Einrichtungscode.",
+    "emptyText": "Zum Hinzufügen von Geräten braucht es einen Sidecar, der die Inbetriebnahme unterstützt. Bis dahin sammelt und sendet diese Seite keinen Einrichtungscode.",
     "stepsTitle": "So funktioniert das Hinzufügen",
     "steps": {
       "prepare": {
-        "title": "Gerät vorbereiten",
-        "text": "Setze das Gerät zurück oder öffne sein Pairing-Fenster und halte es nah am Matter-Sidecar."
+        "text": "Stelle sicher, dass das Gerät im Netzwerk ist (Ethernet oder WLAN) und gekoppelt werden kann: neu, auf Werkseinstellungen zurückgesetzt oder mit einem Kopplungsfenster, das sein anderer Controller geöffnet hat."
       },
       "code": {
-        "title": "Code eingeben oder scannen",
-        "text": "Gib den Setup-Code ein oder scanne den QR-Code auf dem Gerät oder seiner Verpackung."
+        "text": "Gib den Einrichtungscode ein oder scanne den QR-Code auf dem Gerät oder seiner Verpackung."
       },
       "progress": {
-        "title": "Fortschritt verfolgen",
         "text": "Attraccess zeigt jeden Schritt der Inbetriebnahme und sagt dir, was du bei einem Fehler tun kannst."
       },
-      "claim": {
-        "title": "Benennen und übernehmen",
-        "text": "Gib dem neuen Gerät einen Namen und übernimm es, damit es in Flows genutzt werden kann."
+      "finish": {
+        "text": "Gib dem neuen Gerät einen Namen und einen Ort. Es ist schon von dir übernommen und kann in Flows genutzt werden."
       }
     },
     "flow": {
@@ -420,12 +435,14 @@
       },
       "label": "Einrichtungs- oder Freigabecode",
       "hint": "Füge den QR-Text (MT:…) ein oder tippe die 11- oder 21-stellige Nummer. Leerzeichen und Bindestriche werden ignoriert. Der Code wird hier geprüft und nie gespeichert.",
-      "start": "Commissioning starten",
+      "start": "Inbetriebnahme starten",
       "problem": {
         "empty": "Gib einen Einrichtungscode ein.",
         "format": "Das ist kein Matter-Einrichtungscode. Verwende den QR-Text mit MT: am Anfang oder die 11- oder 21-stellige Nummer.",
         "checksum": "Die Prüfziffer stimmt nicht. Prüfe die Nummer auf einen Tippfehler."
-      }
+      },
+      "title": "Einrichtungscode eingeben oder scannen",
+      "failed": "Die Inbetriebnahme konnte nicht starten"
     },
     "camera": {
       "label": "Kameravorschau",
@@ -443,15 +460,17 @@
       "pick": "Bild auswählen",
       "hint": "Das Bild wird in diesem Browser gelesen. Es wird weder hochgeladen noch gespeichert.",
       "failed": "Kein QR-Code gefunden",
-      "failedText": "Das Bild konnte nicht als QR-Code gelesen werden. Versuche ein schärferes, näheres Bild oder tippe den Code ein."
+      "failedText": "Das Bild konnte nicht als QR-Code gelesen werden. Versuche ein schärferes, näheres Bild oder tippe den Code ein.",
+      "tooLarge": "Das Bild ist zu groß",
+      "tooLargeText": "Hier werden Bilder bis 20 MB und 40 Megapixel gelesen. Verwende ein kleineres oder zugeschnittenes Bild des QR-Codes oder tippe den Code ein."
     },
     "progress": {
-      "title": "Commissioning läuft",
+      "title": "Inbetriebnahme läuft",
       "hint": "Das kann einige Minuten dauern. Lass das Gerät eingeschaltet und nah am Netzwerk.",
       "cancel": "Abbrechen",
-      "cancelConfirm": "Commissioning abbrechen",
+      "cancelConfirm": "Inbetriebnahme abbrechen",
       "cancelKeep": "Weitermachen",
-      "cancelTitle": "Commissioning abbrechen?",
+      "cancelTitle": "Inbetriebnahme abbrechen?",
       "cancelText": "Das Gerät wird nicht hinzugefügt. Du kannst mit dem Code neu starten.",
       "pollError": "Der Fortschritt konnte nicht gelesen werden",
       "step": {
@@ -459,7 +478,7 @@
         "pase": "Sichere Kopplung mit dem Einrichtungscode",
         "reading_device": "Gerät auslesen",
         "attestation": "Gerätezertifikat prüfen",
-        "adding_fabric": "Gerät zum Attraccess-Fabric hinzufügen",
+        "adding_fabric": "Gerät zur Attraccess-Fabric hinzufügen",
         "case": "Sicher verbinden",
         "interrogating": "Endpunkte des Geräts auslesen"
       },
@@ -467,7 +486,9 @@
         "done": "erledigt",
         "running": "läuft",
         "waiting": "wartet"
-      }
+      },
+      "cancelFailed": "Abbrechen fehlgeschlagen",
+      "current": "Aktueller Schritt: {{step}}"
     },
     "failure": {
       "again": "Neu starten",
@@ -476,10 +497,11 @@
         "open": "Gerät öffnen",
         "repair": "Gerät öffnen und reparieren",
         "restore": "Gerät öffnen und wiederherstellen",
-        "reconcile": "Geräte öffnen"
+        "reconcile": "Geräte öffnen",
+        "claim": "Gerät öffnen und übernehmen"
       },
       "unknown": {
-        "title": "Commissioning fehlgeschlagen",
+        "title": "Inbetriebnahme fehlgeschlagen",
         "text": "Das Gerät wurde nicht hinzugefügt. Starte mit dem Code neu."
       },
       "invalid_code": {
@@ -500,63 +522,64 @@
         "findings": "Befunde: {{findings}}"
       },
       "already_commissioned": {
-        "title": "Dieses Gerät ist schon im Attraccess-Fabric",
+        "title": "Dieses Gerät ist schon in der Attraccess-Fabric",
         "text": "Es wurde kein neuer Eintrag angelegt.",
         "open": "Es ist hier schon bekannt. Öffne es.",
         "repair": "Es ist bekannt, aber getrennt. Öffne es und repariere es.",
         "restore": "Es ist bekannt, aber archiviert. Öffne es und stelle es wieder her.",
-        "reconcile": "Starte auf dem Tab „Geräte“ einen Abgleich, um es zu finden, oder setze das Gerät auf Werkseinstellungen zurück und füge es neu hinzu."
+        "reconcile": "Starte auf dem Tab „Geräte“ einen Abgleich, um es zu finden, oder setze das Gerät auf Werkseinstellungen zurück und füge es neu hinzu.",
+        "claim": "Es ist hier bekannt, aber noch nicht übernommen. Öffne es und übernimm es."
       },
       "fabric_full": {
         "title": "Das Gerät hat keinen Platz für einen weiteren Administrator",
-        "text": "Das Gerät kann keinem weiteren Fabric beitreten. Entferne es von einem seiner anderen Controller oder setze es auf Werkseinstellungen zurück und starte neu."
+        "text": "Das Gerät kann keiner weiteren Fabric beitreten. Entferne es von einem seiner anderen Controller oder setze es auf Werkseinstellungen zurück und starte neu."
       },
       "case_failed": {
         "title": "Die sichere Verbindung ist fehlgeschlagen",
         "text": "Das Gerät ist beigetreten, aber die Verbindung konnte nicht abgeschlossen werden. Prüfe, ob das Gerät im Netzwerk ist, und starte neu."
       },
       "timeout": {
-        "title": "Das Commissioning hat zu lange gedauert",
+        "title": "Die Inbetriebnahme hat zu lange gedauert",
         "text": "Das Gerät wurde nicht rechtzeitig fertig. Es blieb nichts halb registriert. Starte neu."
       },
       "cancelled": {
-        "title": "Das Commissioning wurde abgebrochen",
+        "title": "Die Inbetriebnahme wurde abgebrochen",
         "text": "Das Gerät wurde nicht hinzugefügt."
       },
       "interrupted": {
-        "title": "Das Commissioning wurde unterbrochen",
-        "text": "Der Matter-Sidecar oder das Plugin wurde neu gestartet, oder die Verbindung ist abgebrochen. Eine Sitzung wird nie fortgesetzt. Falls das Gerät schon beigetreten war, prüfe „Geräte“: Dort erscheint es als nicht zugeordnetes Gerät. Sonst starte mit dem Code neu."
+        "title": "Die Inbetriebnahme wurde unterbrochen",
+        "text": "Der Matter-Sidecar oder das Plugin wurde neu gestartet, oder die Verbindung ist abgebrochen. Eine Sitzung wird nie fortgesetzt. Falls das Gerät schon beigetreten war, prüfe „Geräte“: Dort erscheint es als nicht übernommenes Gerät. Sonst starte mit dem Code neu."
       },
       "internal": {
-        "title": "Commissioning fehlgeschlagen",
-        "text": "Ein unerwarteter Fehler hat das Commissioning gestoppt. Starte neu."
+        "title": "Inbetriebnahme fehlgeschlagen",
+        "text": "Ein unerwarteter Fehler hat die Inbetriebnahme gestoppt. Starte neu."
       },
       "needs_reconciliation": {
         "title": "Das Gerät ist beigetreten, aber noch nicht eingetragen",
-        "text": "Das Gerät ist im Fabric, aber Attraccess konnte es nicht erfassen. Öffne „Geräte“: Nach dem nächsten Abgleich erscheint es als nicht zugeordnetes Gerät."
+        "text": "Das Gerät ist in der Fabric, aber Attraccess konnte es nicht erfassen. Öffne „Geräte“: Nach dem nächsten Abgleich erscheint es als nicht übernommenes Gerät."
       },
       "registry_failed": {
         "title": "Das Gerät ist beigetreten, konnte aber nicht erfasst werden",
-        "text": "Das Gerät ist im Fabric, aber Attraccess konnte es nicht speichern. Öffne „Geräte“: Nach dem nächsten Abgleich erscheint es als nicht zugeordnetes Gerät."
+        "text": "Das Gerät ist in der Fabric, aber Attraccess konnte es nicht speichern. Öffne „Geräte“: Nach dem nächsten Abgleich erscheint es als nicht übernommenes Gerät."
       }
     },
     "override": {
       "start": "Trotzdem hinzufügen (Entwicklungs-Override)",
       "title": "Gerät ohne Verifizierung hinzufügen?",
-      "risk": "Dieses Gerät hat die Attestierung nicht bestanden: Sein Zertifikat wird nicht als vertrauenswürdig anerkannt. Wenn du es trotzdem hinzufügst, gelangt ein nicht verifiziertes oder gefälschtes Gerät in dein Fabric. Tu das nur für ein Gerät, das du selbst gebaut hast oder dem du vertraust, auf einem Entwicklungssystem. Der Versuch wird im Audit-Log festgehalten.",
+      "risk": "Dieses Gerät hat die Attestierung nicht bestanden: Sein Zertifikat wird nicht als vertrauenswürdig anerkannt. Wenn du es trotzdem hinzufügst, gelangt ein nicht verifiziertes oder gefälschtes Gerät in deine Fabric. Tu das nur für ein Gerät, das du selbst gebaut hast oder dem du vertraust, auf einem Entwicklungssystem. Der Versuch wird im Audit-Log festgehalten.",
       "findings": "Befunde:",
       "acknowledge": "Ich verstehe das Risiko und möchte dieses Gerät ohne Verifizierung hinzufügen.",
-      "confirm": "Trotzdem hinzufügen"
+      "confirm": "Trotzdem hinzufügen",
+      "failed": "Der neue Versuch konnte nicht starten"
     },
     "finish": {
       "addedTitle": "Das Gerät wurde hinzugefügt",
-      "addedText": "Es ist im Attraccess-Fabric und schon von dir übernommen.",
+      "addedText": "Es ist in der Attraccess-Fabric und schon von dir übernommen.",
       "overridden": "Die Attestierung wurde übergangen: Das Gerät wird als nicht verifiziert angezeigt.",
       "title": "Gerät benennen",
       "name": "Gerätename",
       "location": "Ort",
       "endpoints": "Namen der Endpunkte",
-      "endpoint": "Endpunkt {{endpointId}}",
       "endpointsHint": "Optional. Leere Namen bleiben unverändert.",
       "save": "Speichern und abschließen",
       "skip": "Benennen überspringen",
@@ -832,28 +855,46 @@
     },
     "removed": {
       "removed_from_fabric": {
-        "title": "Aus dem Attraccess-Fabric entfernt",
-        "text": "Das Gerät hat das Attraccess-Fabric verlassen. Der Verlauf bleibt erhalten. Andere Controller sind nicht betroffen. Das Gerät wurde nicht auf Werkseinstellungen zurückgesetzt."
+        "title": "Aus der Attraccess-Fabric entfernt",
+        "text": "Das Gerät hat die Attraccess-Fabric verlassen. Der Verlauf bleibt erhalten. Andere Controller sind nicht betroffen. Das Gerät wurde nicht auf Werkseinstellungen zurückgesetzt."
       },
       "forced_from_fabric": {
         "title": "Von Attraccess vergessen",
         "text": "Attraccess hat dieses Gerät vergessen, ohne es zu kontaktieren. Das Gerät kann noch Attraccess-Zugangsdaten tragen: Setze es auf Werkseinstellungen zurück oder entferne es bei seinem anderen Controller. Der Verlauf bleibt erhalten."
       },
+      "force_removed": {
+        "title": "Nur aus Attraccess entfernt",
+        "text": "Dieser Eintrag wurde aus Attraccess entfernt, ohne das Gerät zu kontaktieren. Das Gerät ist weiterhin in der Matter-Fabric: Listet der Sidecar es noch, kommt es als neues, nicht übernommenes Gerät zurück. Der Verlauf bleibt erhalten."
+      },
+      "merged": {
+        "title": "Mit einem anderen Gerät zusammengeführt",
+        "text": "Dieser Eintrag wurde beim Neu verknüpfen in ein getrenntes Gerät übertragen, das jetzt seine Identität und Endpunkte trägt. Der Verlauf bleibt erhalten."
+      },
+      "replaced": {
+        "title": "Ersetzt",
+        "text": "Dieser Eintrag wurde durch einen neueren Eintrag desselben Geräts ersetzt. Der Verlauf bleibt erhalten."
+      },
       "generic": {
         "title": "Entfernt",
-        "text": "Dieses Gerät gehört nicht mehr zum Fabric. Der Verlauf bleibt erhalten."
+        "text": "Dieses Gerät wird in Attraccess nicht mehr verwendet. Der Verlauf bleibt erhalten."
       }
     },
     "remove": {
-      "action": "Aus Fabric entfernen",
-      "confirmTitle": "{{name}} aus dem Attraccess-Fabric entfernen?",
-      "confirmText": "Attraccess bittet das Gerät, das Attraccess-Fabric zu verlassen, und vergisst es dann. Andere Controller behalten das Gerät. Das ist kein Werksreset. Der Verlauf bleibt erhalten.",
-      "force": "Entfernen erzwingen",
-      "forceTitle": "{{name}} zwangsweise entfernen?",
-      "forceText": "Attraccess vergisst das Gerät, ohne es zu kontaktieren. Das Gerät kann noch Attraccess-Zugangsdaten tragen. Setze es auf Werkseinstellungen zurück oder entferne es bei seinem anderen Controller, damit es nicht Mitglied des Attraccess-Fabrics bleibt. Der Verlauf bleibt erhalten.",
+      "action": "Aus der Fabric entfernen",
+      "confirmTitle": "{{name}} aus der Attraccess-Fabric entfernen?",
+      "confirmText": "Attraccess bittet das Gerät, die Attraccess-Fabric zu verlassen, und vergisst es dann. Andere Controller behalten das Gerät. Das ist kein Werksreset. Der Verlauf bleibt erhalten.",
+      "force": "Entfernen aus der Fabric erzwingen",
+      "forceTitle": "Entfernen von {{name}} aus der Fabric erzwingen?",
+      "forceText": "Attraccess vergisst das Gerät, ohne es zu kontaktieren. Das Gerät kann noch Attraccess-Zugangsdaten tragen. Setze es auf Werkseinstellungen zurück oder entferne es bei seinem anderen Controller, damit es nicht Mitglied der Attraccess-Fabric bleibt. Der Verlauf bleibt erhalten.",
       "failed": "Das Gerät konnte nicht entfernt werden",
       "unreachableTitle": "Das Gerät war nicht erreichbar",
-      "unreachableText": "Es wurde nichts geändert. Ist das Gerät weg oder defekt, kannst du das Entfernen erzwingen."
+      "unreachableText": "Es wurde nichts geändert. Ist das Gerät weg oder defekt, kannst du das Entfernen erzwingen.",
+      "timeoutTitle": "Das Gerät hat das Entfernen nicht rechtzeitig bestätigt",
+      "timeoutText": "Der Ausgang ist ungewiss: Das Gerät kann die Fabric noch verlassen. Ein Abgleich läuft jetzt. Sieh auf dieser Seite noch einmal nach, bevor du das Entfernen erzwingst.",
+      "detachedHint": "Der Matter-Sidecar kennt dieses getrennte Gerät nicht. Repariere es oder verknüpfe es neu; danach kann es aus der Fabric entfernt werden.",
+      "error": {
+        "node_not_on_sidecar": "Der Matter-Sidecar kennt dieses Gerät nicht, daher kann es nicht aus der Fabric entfernt werden. Es wurde nichts geändert. Starte einen Abgleich oder nutze bei den Geräteaktionen „Entfernen erzwingen“, um nur den Eintrag in Attraccess zu entfernen."
+      }
     },
     "share": {
       "title": "Mit einem anderen Controller teilen",

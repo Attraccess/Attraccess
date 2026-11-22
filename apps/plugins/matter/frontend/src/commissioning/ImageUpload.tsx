@@ -2,24 +2,28 @@ import { StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { Button } from '@heroui/react';
 import { useRef, useState } from 'react';
 import { useMatterTranslations } from '../i18n';
+import { ImageTooLargeError } from './imageLimits';
 import { loadImagePixels } from './loadImagePixels';
 import { decodeQrFromPixels } from './qrDecode';
 
-/** Picks a picture of the QR code and decodes it in the browser. The picture is never uploaded or kept. */
+/**
+ * Picks a picture of the QR code and decodes it in the browser. The picture is never uploaded or kept. A picture that is
+ * too large to read safely is refused before it is decoded.
+ */
 export function ImageUpload({ onScan }: Readonly<{ onScan: (text: string) => void }>) {
   const { t } = useMatterTranslations();
   const input = useRef<HTMLInputElement>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<'unreadable' | 'tooLarge' | null>(null);
 
   const read = async (file: File | undefined) => {
     if (!file) return;
-    setFailed(false);
+    setFailed(null);
     try {
-      const text = decodeQrFromPixels(await loadImagePixels(file));
+      const text = await decodeQrFromPixels(await loadImagePixels(file));
       if (text) onScan(text);
-      else setFailed(true);
-    } catch {
-      setFailed(true);
+      else setFailed('unreadable');
+    } catch (error) {
+      setFailed(error instanceof ImageTooLargeError ? 'tooLarge' : 'unreadable');
     }
   };
 
@@ -43,9 +47,14 @@ export function ImageUpload({ onScan }: Readonly<{ onScan: (text: string) => voi
         </Button>
       </div>
       <p className="mt:text-sm mt:text-muted">{t('commissioning.image.hint')}</p>
-      {failed && (
+      {failed === 'unreadable' && (
         <StatusAlert status="warning" title={t('commissioning.image.failed')} data-cy="matter-image-failed">
           {t('commissioning.image.failedText')}
+        </StatusAlert>
+      )}
+      {failed === 'tooLarge' && (
+        <StatusAlert status="warning" title={t('commissioning.image.tooLarge')} data-cy="matter-image-too-large">
+          {t('commissioning.image.tooLargeText')}
         </StatusAlert>
       )}
     </div>

@@ -1,8 +1,8 @@
 import { Button, ConfirmableButton, StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { useEffect, useState } from 'react';
-import { closeShareWindow, openShareWindow, type ShareWindow } from '../commissioning/api';
-import { errorMessage } from '../errorMessage';
 import { useMatterTranslations } from '../i18n';
+import { useMatterErrorText } from '../useMatterErrorText';
+import { closeShareWindow, openShareWindow, type ShareWindow } from './api';
 import { QrImage } from './QrImage';
 
 /** Seconds left until `expiresAt`, never below 0. */
@@ -15,9 +15,10 @@ const secondsLeft = (expiresAt: string) => Math.max(0, Math.ceil((new Date(expir
  */
 export function ShareSection({ nodeRecordId, name }: Readonly<{ nodeRecordId: string; name: string }>) {
   const { t } = useMatterTranslations();
+  const errorText = useMatterErrorText();
   const [window, setWindow] = useState<ShareWindow | null>(null);
   const [left, setLeft] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [expired, setExpired] = useState(false);
   const [closing, setClosing] = useState(false);
 
@@ -43,7 +44,7 @@ export function ShareSection({ nodeRecordId, name }: Readonly<{ nodeRecordId: st
     try {
       setWindow(await openShareWindow(nodeRecordId));
     } catch (failure) {
-      setError(errorMessage(failure));
+      setError(failure);
     }
   };
 
@@ -53,7 +54,7 @@ export function ShareSection({ nodeRecordId, name }: Readonly<{ nodeRecordId: st
       await closeShareWindow(nodeRecordId);
       setWindow(null);
     } catch (failure) {
-      setError(errorMessage(failure));
+      setError(failure);
     } finally {
       setClosing(false);
     }
@@ -66,9 +67,9 @@ export function ShareSection({ nodeRecordId, name }: Readonly<{ nodeRecordId: st
     >
       <h3 className="mt:font-semibold">{t('devices.share.title')}</h3>
       <p className="mt:text-sm mt:text-muted">{t('devices.share.text')}</p>
-      {error && (
+      {error !== null && (
         <StatusAlert status="danger" title={t('devices.share.failed')} data-cy="matter-share-error">
-          {error}
+          {errorText(error)}
         </StatusAlert>
       )}
       {expired && (

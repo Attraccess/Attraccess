@@ -16,7 +16,8 @@ import {
   type RecoveryKeyReveal,
 } from './api';
 import { BackupsCard, downloadAction } from './BackupsCard';
-import { backupReasonKey, useErrorText, type ErrorKeyOf } from './errors';
+import { useMatterErrorText, type ErrorKeyOf } from '../useMatterErrorText';
+import { backupReasonKey, fabricErrorKey } from './errors';
 import { FabricStatusCard } from './FabricStatusCard';
 import { KeyCard } from './KeyCard';
 import { RecoveryKeyModal } from './RecoveryKeyModal';
@@ -38,7 +39,7 @@ type Notice = { title: string; message: string } | null;
  */
 export function FabricBackupSection({ canManage }: Readonly<{ canManage: boolean }>) {
   const { t } = useMatterTranslations();
-  const errorText = useErrorText();
+  const errorText = useMatterErrorText();
   const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const { status, error, loading, refresh, setStatus } = useFabricBackup();
   const [reveal, setReveal] = useState<RecoveryKeyReveal | null>(null);
@@ -52,7 +53,7 @@ export function FabricBackupSection({ canManage }: Readonly<{ canManage: boolean
     try {
       await action();
     } catch (caught) {
-      setNotice({ title, message: errorText(caught, keyOf) });
+      setNotice({ title, message: errorText(caught, keyOf, fabricErrorKey) });
       void refresh();
     } finally {
       setPending(null);

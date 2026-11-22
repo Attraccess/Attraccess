@@ -2,21 +2,30 @@ import { ConfirmableButton } from '@attraccess/plugins-frontend-ui';
 import { CheckIcon, CircleDotIcon, CircleIcon } from 'lucide-react';
 import { useMatterTranslations } from '../i18n';
 import { SESSION_STEPS, type CommissioningSessionView, type SessionStep } from './api';
+import { StepHeading } from './StepHeading';
 
 /** `network_setup` does not apply to a device that is already on the network. */
 const SHOWN: readonly SessionStep[] = SESSION_STEPS.filter((step) => step !== 'network_setup' && step !== 'completed');
 
-/** Step 3: each protocol step with its live state, and a way to cancel. */
+/**
+ * Step 3: each protocol step with its live state, and a way to cancel. One status line announces the current step to
+ * screen readers; the list itself is not live, so a change is read once instead of the whole list.
+ */
 export function ProgressStep({
   session,
   onCancel,
 }: Readonly<{ session: CommissioningSessionView; onCancel: () => Promise<void> }>) {
   const { t } = useMatterTranslations();
   const position = session.step ? SESSION_STEPS.indexOf(session.step) : -1;
+  // The shown step the session is at (a hidden one counts as the shown step before it).
+  const current = [...SHOWN].reverse().find((step) => SESSION_STEPS.indexOf(step) <= position) ?? SHOWN[0];
   return (
     <div className="mt:flex mt:flex-col mt:gap-3" data-cy="matter-progress-step">
-      <h3 className="mt:text-lg mt:font-semibold">{t('commissioning.progress.title')}</h3>
-      <ol className="mt:flex mt:flex-col mt:gap-2" aria-live="polite">
+      <StepHeading>{t('commissioning.progress.title')}</StepHeading>
+      <p role="status" className="mt:sr-only" data-cy="matter-progress-current">
+        {t('commissioning.progress.current', { step: t(`commissioning.progress.step.${current}`) })}
+      </p>
+      <ol className="mt:flex mt:flex-col mt:gap-2">
         {SHOWN.map((step) => {
           const at = SESSION_STEPS.indexOf(step);
           const state =

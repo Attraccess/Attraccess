@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { errorMessage } from '../errorMessage';
+import { statusOf } from '../matterApi';
 import {
   cancelSession,
   getCurrentSession,
@@ -10,32 +10,52 @@ import {
   type StartRequest,
 } from './api';
 
-/** How often a running session is read again. */
+/** How long after an answer a running session is read again. */
 export const SESSION_POLL_MS = 1_000;
+
+/** A failed request of the flow and which one it was, so each step shows only its own. */
+export interface CommissioningRequestFailure {
+  kind: 'load' | 'start' | 'poll' | 'cancel';
+  error: unknown;
+}
 
 export interface CommissioningState {
   session: CommissioningSessionView | null;
   /** True until the first answer of `current`. */
   loading: boolean;
-  error: string | null;
+  /** The last failed request; a successful read clears a failed read, a new start or cancel clears the rest. */
+  failure: CommissioningRequestFailure | null;
   /** True while a start request is in flight. */
   starting: boolean;
+  /** Rejects when the start failed (the failure is also in `failure`). */
   start: (request: StartRequest) => Promise<void>;
+  /** Never rejects: a failed cancellation is reported in `failure`. */
   cancel: () => Promise<void>;
   /** Forgets the finished session on this page (nothing is sent): back to entering a code. */
   reset: () => void;
-  setSession: (session: CommissioningSessionView) => void;
 }
+
+/**
+ * The backend no longer knows the session (404: the plugin or the API restarted and sessions live in memory only).
+ * The page ends it as interrupted: never resumed, the person starts again and checks Devices.
+ */
+const interruptedHere = (session: CommissioningSessionView): CommissioningSessionView => ({
+  ...session,
+  state: 'interrupted',
+  failure: { code: 'interrupted' },
+  finishedAt: new Date().toISOString(),
+});
 
 /**
  * The session of the signed-in user, shared by the commissioning flow's steps (CommissioningFlow, ProgressStep,
  * FailureScreen, FinishStep). Loads the caller's current session once, so returning to the page resumes it, and reads an
- * active session every second. It holds sessions only, never a setup code.
+ * active session again one second after each answer (never two reads at once). It holds sessions only, never a setup
+ * code.
  */
-export function useCommissioningState(enabled: boolean): CommissioningState {
+export function useCommissioningState(): CommissioningState {
   const [session, setSession] = useState<CommissioningSessionView | null>(null);
-  const [loading, setLoading] = useState(enabled);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [failure, setFailure] = useState<CommissioningRequestFailure | null>(null);
   const [starting, setStarting] = useState(false);
   const mounted = useRef(true);
   /** A session the person dismissed must not come back from `current`. */
@@ -49,47 +69,63 @@ export function useCommissioningState(enabled: boolean): CommissioningState {
   }, []);
 
   useEffect(() => {
-    if (!enabled) {
-      setLoading(false);
-      return;
-    }
     let cancelled = false;
     getCurrentSession()
       .then((current) => {
         if (!cancelled && current && current.id !== dismissed.current) setSession(current);
       })
-      .catch((failure: unknown) => !cancelled && setError(errorMessage(failure)))
+      .catch((error: unknown) => !cancelled && setFailure({ kind: 'load', error }))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, []);
+
+  /** Replaces the session only if it is still the one the answer is about. */
+  const update = useCallback((id: string, next: (previous: CommissioningSessionView) => CommissioningSessionView) => {
+    setSession((previous) => (previous?.id === id ? next(previous) : previous));
+  }, []);
 
   const id = session?.id;
   const active = session ? isActive(session) : false;
   useEffect(() => {
     if (!id || !active) return;
-    const timer = setInterval(() => {
-      getSession(id)
-        .then((next) => {
-          if (!mounted.current) return;
-          setSession((previous) => (previous?.id === id ? next : previous));
-          setError(null);
-        })
-        .catch((failure: unknown) => mounted.current && setError(errorMessage(failure)));
-    }, SESSION_POLL_MS);
-    return () => clearInterval(timer);
-  }, [id, active]);
+    // Set when the session changed, ended or the page was left: an answer that arrives later is dropped.
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const read = async () => {
+      try {
+        const next = await getSession(id);
+        if (stopped) return;
+        update(id, () => next);
+        setFailure((previous) => (previous?.kind === 'poll' ? null : previous));
+      } catch (error) {
+        if (stopped) return;
+        if (statusOf(error) === 404) {
+          update(id, interruptedHere);
+          setFailure(null);
+          return;
+        }
+        setFailure({ kind: 'poll', error });
+      }
+      if (!stopped) timer = setTimeout(() => void read(), SESSION_POLL_MS);
+    };
+    timer = setTimeout(() => void read(), SESSION_POLL_MS);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
+  }, [id, active, update]);
 
   const start = useCallback(async (request: StartRequest) => {
     setStarting(true);
-    setError(null);
+    setFailure(null);
     try {
       const created = await startCommissioning(request);
       if (mounted.current) setSession(created);
-    } catch (failure) {
-      if (mounted.current) setError(errorMessage(failure));
-      throw failure;
+    } catch (error) {
+      if (mounted.current) setFailure({ kind: 'start', error });
+      throw error;
     } finally {
       if (mounted.current) setStarting(false);
     }
@@ -97,15 +133,22 @@ export function useCommissioningState(enabled: boolean): CommissioningState {
 
   const cancel = useCallback(async () => {
     if (!id) return;
-    const next = await cancelSession(id);
-    if (mounted.current) setSession(next);
-  }, [id]);
+    setFailure(null);
+    try {
+      const next = await cancelSession(id);
+      if (mounted.current) update(id, () => next);
+    } catch (error) {
+      if (!mounted.current) return;
+      if (statusOf(error) === 404) update(id, interruptedHere);
+      else setFailure({ kind: 'cancel', error });
+    }
+  }, [id, update]);
 
   const reset = useCallback(() => {
     dismissed.current = id ?? null;
     setSession(null);
-    setError(null);
+    setFailure(null);
   }, [id]);
 
-  return { session, loading, error, starting, start, cancel, reset, setSession };
+  return { session, loading, failure, starting, start, cancel, reset };
 }

@@ -1,5 +1,5 @@
 // REST access for the fabric & backup section (`/api/matter/*`, guarded by the Matter keys, see backend/permissions.ts).
-import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
+import { MatterApiError, matterApiClient, matterRequest, toMatterApiError } from '../matterApi';
 
 export type SidecarFabricState = 'uninitialized' | 'initialized' | 'recovery_required' | 'unknown';
 export type RecoveryMismatch =
@@ -91,43 +91,7 @@ export interface RestoreResult {
   status: FabricBackupStatus;
 }
 
-/**
- * An error response with the machine-readable `code` the backend sends next to its (English) message. The UI shows
- * the translation of the code; the message is only a fallback and is empty when the response had none.
- */
-export class FabricApiError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly code: string | null,
-  ) {
-    super(message);
-    this.name = 'FabricApiError';
-  }
-}
-
-const client = createPluginApiClient('/api/matter');
-
-async function toError(response: Response): Promise<FabricApiError> {
-  try {
-    const body = (await response.json()) as { code?: string; message?: string | string[] };
-    const message = Array.isArray(body.message) ? body.message.join(', ') : body.message;
-    return new FabricApiError(message ?? '', response.status, body.code ?? null);
-  } catch {
-    return new FabricApiError('', response.status, null);
-  }
-}
-
-async function call<T>(path: string, method: 'GET' | 'POST' = 'GET', body?: unknown): Promise<T> {
-  const response = await client.fetch(path, {
-    method,
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  if (!response.ok) throw await toError(response);
-  const text = await response.text();
-  return (text.length > 0 ? JSON.parse(text) : null) as T;
-}
+const call = <T>(path: string, method: 'GET' | 'POST' = 'GET', body?: unknown) => matterRequest<T>(method, path, body);
 
 export const getFabricStatus = () => call<FabricBackupStatus>('/fabric');
 export const createFabric = () =>
@@ -153,8 +117,8 @@ export const startNewFabric = () =>
 
 /** Downloads the encrypted backup file through the authenticated session and hands it to the browser. */
 export async function downloadBackup(id: string): Promise<void> {
-  const response = await client.fetch(`/backups/${encodeURIComponent(id)}/download`);
-  if (!response.ok) throw await toError(response);
+  const response = await matterApiClient.fetch(`/backups/${encodeURIComponent(id)}/download`);
+  if (!response.ok) throw await toMatterApiError(response);
   const disposition = response.headers.get('Content-Disposition') ?? '';
   const filename = /filename="?([^";]+)"?/.exec(disposition)?.[1] ?? `attraccess-matter-${id}.attraccess-matter-backup`;
   saveBlob(await response.blob(), filename);
@@ -175,7 +139,7 @@ export function saveBlob(blob: Blob, filename: string): void {
 export function readFileAsBase64(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new FabricApiError('', 0, 'file_unreadable'));
+    reader.onerror = () => reject(new MatterApiError('', 0, 'file_unreadable'));
     reader.onload = () => {
       const result = String(reader.result ?? '');
       resolve(result.slice(result.indexOf(',') + 1));

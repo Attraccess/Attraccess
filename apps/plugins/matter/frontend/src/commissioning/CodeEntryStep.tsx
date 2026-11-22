@@ -1,4 +1,4 @@
-import { Button } from '@attraccess/plugins-frontend-ui';
+import { Button, StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { Description, FieldError, Input, Label, TextField } from '@heroui/react';
 import { useState } from 'react';
 import { useMatterTranslations } from '../i18n';
@@ -6,6 +6,7 @@ import { CameraScanner } from './CameraScanner';
 import { ImageUpload } from './ImageUpload';
 import { setupCodeFromScan } from './qrDecode';
 import { parseSetupCode } from './setupCode';
+import { StepHeading } from './StepHeading';
 
 const SOURCES = ['camera', 'image', 'type'] as const;
 type Source = (typeof SOURCES)[number];
@@ -13,7 +14,8 @@ type Source = (typeof SOURCES)[number];
 /**
  * Step 2: the setup code from the camera, a picture or the keyboard. Every source ends in the same field, so every form
  * leads to the same request. The code is checked locally first (check digit, `MT:` format) and an invalid code never
- * leaves the browser. It lives in this component's state only: no storage, no URL, no cache.
+ * leaves the browser. It lives in this component's state only: no storage, no URL, no cache. `error` is the translated
+ * text of a refused start.
  */
 export function CodeEntryStep({
   starting,
@@ -49,6 +51,7 @@ export function CodeEntryStep({
       }}
       data-cy="matter-code-step"
     >
+      <StepHeading>{t('commissioning.code.title')}</StepHeading>
       <div className="mt:flex mt:flex-wrap mt:gap-2" role="group" aria-label={t('commissioning.code.sources')}>
         {SOURCES.map((entry) => (
           <Button
@@ -94,9 +97,9 @@ export function CodeEntryStep({
         </Button>
       </div>
       {error && (
-        <p className="mt:text-sm mt:text-danger" role="alert" data-cy="matter-code-request-error">
+        <StatusAlert status="danger" title={t('commissioning.code.failed')} data-cy="matter-code-request-error">
           {error}
-        </p>
+        </StatusAlert>
       )}
     </form>
   );

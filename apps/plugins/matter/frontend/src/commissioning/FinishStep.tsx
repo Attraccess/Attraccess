@@ -1,12 +1,16 @@
 import { Button, StatusAlert } from '@attraccess/plugins-frontend-ui';
-import { Description, Input, Label, TextField } from '@heroui/react';
+import { Description, FieldError, Input, Label, TextField } from '@heroui/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MAX_NAME_LENGTH } from '../devices/ClaimDialog';
-import { errorMessage } from '../errorMessage';
 import { useMatterTranslations } from '../i18n';
 import { matterDevicePath } from '../matterPaths';
+import { useMatterErrorText } from '../useMatterErrorText';
 import { finishSession, type CommissioningSessionView } from './api';
+import { StepHeading } from './StepHeading';
+import { useFocusOnChange } from './useFocusOnChange';
+
+const tooLong = (value: string) => value.trim().length > MAX_NAME_LENGTH;
 
 /**
  * Step 4: the device is in the fabric and already claimed by you. Name it (device, location, endpoints), or skip: the
@@ -14,16 +18,17 @@ import { finishSession, type CommissioningSessionView } from './api';
  */
 export function FinishStep({ session, onDone }: Readonly<{ session: CommissioningSessionView; onDone: () => void }>) {
   const { t } = useMatterTranslations();
+  const errorText = useMatterErrorText();
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [location, setLocation] = useState('');
   const [endpointNames, setEndpointNames] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [saved, setSaved] = useState(false);
-  const tooLong = [name, location, ...Object.values(endpointNames)].some(
-    (value) => value.trim().length > MAX_NAME_LENGTH,
-  );
+  const invalid = [name, location, ...Object.values(endpointNames)].some(tooLong);
+  const done = saved || session.finished;
+  const container = useFocusOnChange<HTMLDivElement>(done ? 'done' : 'naming');
 
   const finish = async (withNames: boolean) => {
     setBusy(true);
@@ -44,7 +49,7 @@ export function FinishStep({ session, onDone }: Readonly<{ session: Commissionin
       );
       setSaved(true);
     } catch (failure) {
-      setError(errorMessage(failure));
+      setError(failure);
     } finally {
       setBusy(false);
     }
@@ -60,12 +65,11 @@ export function FinishStep({ session, onDone }: Readonly<{ session: Commissionin
     </Button>
   ) : null;
 
-  if (saved || session.finished) {
+  if (done) {
     return (
-      <div className="mt:flex mt:flex-col mt:gap-3" data-cy="matter-finish-done">
-        <StatusAlert status="success" title={t('commissioning.finish.doneTitle')}>
-          {t('commissioning.finish.doneText')}
-        </StatusAlert>
+      <div ref={container} className="mt:flex mt:flex-col mt:gap-3" data-cy="matter-finish-done">
+        <StepHeading>{t('commissioning.finish.doneTitle')}</StepHeading>
+        <StatusAlert status="success">{t('commissioning.finish.doneText')}</StatusAlert>
         <div className="mt:flex mt:flex-wrap mt:gap-2">
           {deviceLink}
           <Button variant="secondary" onPress={onDone} data-cy="matter-finish-another">
@@ -77,7 +81,8 @@ export function FinishStep({ session, onDone }: Readonly<{ session: Commissionin
   }
 
   return (
-    <div className="mt:flex mt:flex-col mt:gap-4" data-cy="matter-finish-step">
+    <div ref={container} className="mt:flex mt:flex-col mt:gap-4" data-cy="matter-finish-step">
+      <StepHeading>{t('commissioning.finish.title')}</StepHeading>
       <StatusAlert status="success" title={t('commissioning.finish.addedTitle')}>
         {t('commissioning.finish.addedText')}
         {session.attestation?.status === 'overridden' && (
@@ -86,42 +91,49 @@ export function FinishStep({ session, onDone }: Readonly<{ session: Commissionin
           </span>
         )}
       </StatusAlert>
-      <h3 className="mt:text-lg mt:font-semibold">{t('commissioning.finish.title')}</h3>
-      <TextField value={name} onChange={setName}>
+      <TextField value={name} onChange={setName} isInvalid={tooLong(name)}>
         <Label>{t('commissioning.finish.name')}</Label>
         <Input autoComplete="off" data-cy="matter-finish-name" />
+        <FieldError data-cy="matter-finish-name-error">{t('devices.validation.nameLength')}</FieldError>
       </TextField>
-      <TextField value={location} onChange={setLocation}>
+      <TextField value={location} onChange={setLocation} isInvalid={tooLong(location)}>
         <Label>{t('commissioning.finish.location')}</Label>
         <Input autoComplete="off" data-cy="matter-finish-location" />
+        <FieldError data-cy="matter-finish-location-error">{t('devices.validation.nameLength')}</FieldError>
       </TextField>
       {session.endpoints.length > 0 && (
         <fieldset className="mt:flex mt:flex-col mt:gap-3" data-cy="matter-finish-endpoints">
           <legend className="mt:font-medium">{t('commissioning.finish.endpoints')}</legend>
-          {session.endpoints.map((endpoint) => (
-            <TextField
-              key={endpoint.id}
-              value={endpointNames[endpoint.id] ?? endpoint.displayName ?? ''}
-              onChange={(value) => setEndpointNames((previous) => ({ ...previous, [endpoint.id]: value }))}
-            >
-              <Label>{t('commissioning.finish.endpoint', { endpointId: endpoint.endpointId })}</Label>
-              <Input autoComplete="off" data-cy={`matter-finish-endpoint-${endpoint.endpointId}`} />
-            </TextField>
-          ))}
+          {session.endpoints.map((endpoint) => {
+            const value = endpointNames[endpoint.id] ?? endpoint.displayName ?? '';
+            return (
+              <TextField
+                key={endpoint.id}
+                value={value}
+                onChange={(next) => setEndpointNames((previous) => ({ ...previous, [endpoint.id]: next }))}
+                isInvalid={tooLong(value)}
+              >
+                <Label>{t('devices.endpoint.number', { number: endpoint.endpointId })}</Label>
+                <Input autoComplete="off" data-cy={`matter-finish-endpoint-${endpoint.endpointId}`} />
+                <FieldError data-cy={`matter-finish-endpoint-${endpoint.endpointId}-error`}>
+                  {t('devices.validation.nameLength')}
+                </FieldError>
+              </TextField>
+            );
+          })}
           <Description>{t('commissioning.finish.endpointsHint')}</Description>
         </fieldset>
       )}
-      {tooLong && <p className="mt:text-sm mt:text-danger">{t('devices.validation.nameLength')}</p>}
-      {error && (
+      {error !== null && (
         <StatusAlert status="danger" title={t('commissioning.finish.failed')} data-cy="matter-finish-error">
-          {error}
+          {errorText(error)}
         </StatusAlert>
       )}
       <div className="mt:flex mt:flex-wrap mt:gap-2">
         <Button
           variant="primary"
           isPending={busy}
-          isDisabled={tooLong}
+          isDisabled={invalid}
           onPress={() => void finish(true)}
           data-cy="matter-finish-save"
         >

@@ -38,19 +38,22 @@ describe('setup code validation', () => {
 });
 
 describe('QR decoding', () => {
-  it('decodes a real QR image of a known payload, also scaled and inverted', () => {
-    expect(decodeQrFromPixels(qrPixels(QR_PAYLOAD))).toBe(QR_PAYLOAD);
-    expect(decodeQrFromPixels(qrPixels(QR_PAYLOAD, 3, 6))).toBe(QR_PAYLOAD);
+  it('decodes a real QR image of a known payload, also scaled and inverted', async () => {
+    await expect(decodeQrFromPixels(qrPixels(QR_PAYLOAD))).resolves.toBe(QR_PAYLOAD);
+    await expect(decodeQrFromPixels(qrPixels(QR_PAYLOAD, 3, 6))).resolves.toBe(QR_PAYLOAD);
     const inverted = qrPixels(QR_PAYLOAD);
     for (let at = 0; at < inverted.data.length; at += 4) {
       inverted.data[at] = inverted.data[at + 1] = inverted.data[at + 2] = 255 - inverted.data[at];
     }
-    expect(decodeQrFromPixels(inverted)).toBe(QR_PAYLOAD);
+    await expect(decodeQrFromPixels(inverted)).resolves.toBe(QR_PAYLOAD);
+    // Camera frames are tried the normal way only, which is cheaper: an inverted code is not found there.
+    await expect(decodeQrFromPixels(qrPixels(QR_PAYLOAD), 'normal')).resolves.toBe(QR_PAYLOAD);
+    await expect(decodeQrFromPixels(inverted, 'normal')).resolves.toBeNull();
   });
 
-  it('finds nothing in a blank picture and keeps only the payload of a longer text', () => {
+  it('finds nothing in a blank picture and keeps only the payload of a longer text', async () => {
     const blank = { data: new Uint8ClampedArray(40 * 40 * 4).fill(255), width: 40, height: 40 };
-    expect(decodeQrFromPixels(blank)).toBeNull();
+    await expect(decodeQrFromPixels(blank)).resolves.toBeNull();
     expect(setupCodeFromScan(`see ${QR_PAYLOAD} now`)).toBe(QR_PAYLOAD);
     expect(setupCodeFromScan(' 3497 ')).toBe('3497');
   });
