@@ -16,10 +16,30 @@ describe('ResourceHealthService', () => {
         source: ResourceHealthSource.MANUAL,
       });
 
-      expect(result.identifier).toBe('ir-bridge');
-      expect(result.status).toBe(ResourceHealthStatus.HEALTHY);
-      expect(result.reason).toBeNull();
+      expect(result?.identifier).toBe('ir-bridge');
+      expect(result?.status).toBe(ResourceHealthStatus.HEALTHY);
+      expect(result?.reason).toBeNull();
       expect(fixture.records).toHaveLength(1);
+    });
+
+    it('keeps the plugin namespace to plugins: other sources cannot write plugin: identifiers', async () => {
+      await expect(
+        fixture.service.reportHealth({
+          resourceId: 1,
+          identifier: 'plugin:acme:lock-1-motor',
+          status: ResourceHealthStatus.HEALTHY,
+          source: ResourceHealthSource.PAYLOAD,
+        }),
+      ).resolves.toBeNull();
+      await expect(
+        fixture.service.reportHealth({
+          resourceId: 1,
+          identifier: 'door',
+          status: ResourceHealthStatus.UNHEALTHY,
+          source: ResourceHealthSource.PLUGIN,
+        }),
+      ).resolves.toBeNull();
+      expect(fixture.records).toEqual([]);
     });
 
     it('normalises empty/undefined identifiers to empty string', async () => {
@@ -61,7 +81,7 @@ describe('ResourceHealthService', () => {
         source: ResourceHealthSource.MANUAL,
       });
 
-      expect(result.reason).toBeNull();
+      expect(result?.reason).toBeNull();
     });
 
     it('falls back to null reason when unhealthy with empty reason', async () => {
@@ -72,7 +92,7 @@ describe('ResourceHealthService', () => {
         reason: '   ',
         source: ResourceHealthSource.MANUAL,
       });
-      expect(result.reason).toBeNull();
+      expect(result?.reason).toBeNull();
     });
 
     it('emits ResourceHealthChangedEvent only when status changes', async () => {

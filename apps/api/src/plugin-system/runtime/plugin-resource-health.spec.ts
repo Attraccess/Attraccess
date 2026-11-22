@@ -2,7 +2,12 @@ import { ResourceHealthSource, ResourceHealthStatus } from '@attraccess/applicat
 import type { PluginResourceHealthContext } from '@attraccess/plugins-backend-sdk';
 import { ResourceHealthChangedEvent } from '../../resources/health/events/resource-health-changed.event';
 import { registerResourceHealthServiceFixture } from '../../resources/health/resource-health.service.resource-health-service.test-fixture';
-import { clearAllPluginResourceHealth, createPluginResourceHealthContext } from './plugin-resource-health';
+import {
+  clearAllPluginResourceHealth,
+  createPluginResourceHealthContext,
+  retirePluginResourceHealth,
+  unretirePluginResourceHealth,
+} from './plugin-resource-health';
 
 describe('plugin resource health', () => {
   const fixture = registerResourceHealthServiceFixture();
@@ -96,6 +101,22 @@ describe('plugin resource health', () => {
     expect(fixture.records.map((record) => record.identifier)).toEqual(['plugin:acme:sub:a']);
   });
 
+  it('rejects a status other than healthy or unhealthy', async () => {
+    await acme.report(unhealthy('a', 'x'));
+    await expect(acme.report({ resourceId: 1, key: 'a', status: 'ok' as never })).rejects.toThrow(/invalid/);
+    expect(fixture.records[0].status).toBe(ResourceHealthStatus.UNHEALTHY);
+  });
+
+  it('ignores the reports of an uninstalled plugin until the restart', async () => {
+    retirePluginResourceHealth('acme');
+    try {
+      await acme.report(unhealthy('a', 'x'));
+      expect(fixture.records).toEqual([]);
+    } finally {
+      unretirePluginResourceHealth('acme');
+    }
+  });
+
   it('skips an unknown resource', async () => {
     await expect(acme.report(unhealthy('a', 'x', 999))).resolves.toBeUndefined();
     await expect(acme.clear(999, 'a')).resolves.toBeUndefined();
@@ -113,6 +134,19 @@ describe('plugin resource health', () => {
     expect(events.map((event) => event.status)).toEqual([ResourceHealthStatus.UNHEALTHY, ResourceHealthStatus.HEALTHY]);
   });
 
+  it('cannot be taken over by a flow or payload report of the same identifier', async () => {
+    await acme.report(unhealthy('a', 'ours'));
+    await fixture.service.reportHealth({
+      resourceId: 1,
+      identifier: 'plugin:acme:a',
+      status: ResourceHealthStatus.HEALTHY,
+      source: ResourceHealthSource.PAYLOAD,
+    });
+    expect(fixture.records.map((record) => [record.source, record.status])).toEqual([['plugin', 'unhealthy']]);
+    await acme.clear(1, 'a');
+    expect(fixture.records).toEqual([]);
+  });
+
   it('never touches manual, other-plugin or look-alike entries, and a manual unhealthy entry survives', async () => {
     await fixture.service.reportHealth({
       resourceId: 1,
@@ -121,12 +155,14 @@ describe('plugin resource health', () => {
       reason: 'broken by admin',
       source: ResourceHealthSource.MANUAL,
     });
-    await fixture.service.reportHealth({
+    // Written before core reserved the plugin namespace (a flow node): stored directly.
+    await fixture.store.upsertReport({
       resourceId: 1,
       identifier: 'plugin:acme:fake',
       status: ResourceHealthStatus.UNHEALTHY,
       reason: 'flow node',
       source: ResourceHealthSource.MANUAL,
+      lastReportedAt: new Date(),
     });
     await other.report(unhealthy('a', 'theirs'));
     await acme.report(unhealthy('a', 'ours'));
@@ -150,11 +186,13 @@ describe('plugin resource health', () => {
     await acme.report(unhealthy('a', 'x', 1));
     await acme.report(unhealthy('b', 'y', 2));
     await other.report(unhealthy('a', 'theirs', 1));
-    await fixture.service.reportHealth({
+    await fixture.store.upsertReport({
       resourceId: 1,
       identifier: 'plugin:acme:manual',
       status: ResourceHealthStatus.UNHEALTHY,
+      reason: null,
       source: ResourceHealthSource.MANUAL,
+      lastReportedAt: new Date(),
     });
 
     expect((await acme.list()).map((entry) => [entry.resourceId, entry.key, entry.status, entry.reason])).toEqual([

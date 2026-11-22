@@ -31,6 +31,12 @@ function keyOf(key: unknown): string {
  * The plugin's own entry: source `plugin`, its prefix, and a valid key after it. The key check keeps plugin `a` off
  * the entries of a plugin named `a:b` (`plugin:a:b:<key>`), since keys never hold a colon.
  */
+/**
+ * Plugins whose entries were cleared because they were uninstalled. Their runtime keeps running until the restart that
+ * follows; its reports are ignored meanwhile, so no entry outlives the plugin. In memory: the restart forgets them.
+ */
+const retiredPlugins = new Set<string>();
+
 const isOwn = (entry: ResourceHealthRecord, prefix: string): boolean =>
   entry.source === ResourceHealthSource.PLUGIN &&
   entry.identifier.startsWith(prefix) &&
@@ -62,6 +68,10 @@ export function createPluginResourceHealthContext(
   return {
     async report(input) {
       const key = keyOf(input.key);
+      if (input.status !== 'healthy' && input.status !== 'unhealthy') {
+        throw new Error(`Health status ${JSON.stringify(input.status)} is invalid: use "healthy" or "unhealthy".`);
+      }
+      if (retiredPlugins.has(pluginName)) return;
       const health = getHealth();
       if (!(await health.resourceExists(input.resourceId))) return;
       const identifier = `${prefix}${key}`;
@@ -109,6 +119,16 @@ export function createPluginResourceHealthContext(
         }));
     },
   };
+}
+
+/** From now until the restart, the plugin's reports are ignored: it was uninstalled. */
+export function retirePluginResourceHealth(pluginName: string): void {
+  retiredPlugins.add(pluginName);
+}
+
+/** Lets a plugin report again (tests; a real host restarts after an uninstall). */
+export function unretirePluginResourceHealth(pluginName: string): void {
+  retiredPlugins.delete(pluginName);
 }
 
 /**

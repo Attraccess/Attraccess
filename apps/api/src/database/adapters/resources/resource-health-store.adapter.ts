@@ -76,7 +76,7 @@ export class TypeOrmResourceHealthStore implements ResourceHealthStore {
       },
       order: { resourceId: 'ASC', identifier: 'ASC' },
     });
-    return rows.filter((row) => row.identifier.startsWith(identifierPrefix)).map(toRecord);
+    return rows.map(toRecord);
   }
 
   async hasUnhealthyEntry(resourceId: number, context?: ResourcePersistenceContext): Promise<boolean> {

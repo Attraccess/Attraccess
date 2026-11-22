@@ -20,6 +20,9 @@ import { RESOURCE_HEALTH_STORE, type ResourceHealthStore } from './resource-heal
 
 import type { ResourcePersistenceContext } from '../resource-persistence-context';
 
+/** Identifiers under this prefix (`plugin:<name>:<key>`) belong to plugins: only reports of source `plugin` write them. */
+export const PLUGIN_HEALTH_IDENTIFIER_PREFIX = 'plugin:';
+
 export interface ReportInput {
   resourceId: number;
   identifier?: string | null;
@@ -53,8 +56,19 @@ export class ResourceHealthService {
     return trimmed.length > 0 ? trimmed : null;
   }
 
-  async reportHealth(input: ReportInput): Promise<ResourceHealthRecord> {
+  /**
+   * Upserts the entry. Returns null for a report refused because it crosses the plugin namespace: a plugin writes only
+   * `plugin:` identifiers, and nothing else writes them, so a flow or payload never takes over a plugin's entry.
+   */
+  async reportHealth(input: ReportInput): Promise<ResourceHealthRecord | null> {
     const identifier = this.normalizeIdentifier(input.identifier);
+    if ((input.source === ResourceHealthSource.PLUGIN) !== identifier.startsWith(PLUGIN_HEALTH_IDENTIFIER_PREFIX)) {
+      this.logger.warn(
+        `Ignored a ${input.source} health report for "${identifier}" on resource ${input.resourceId}: identifiers ` +
+          `starting with "${PLUGIN_HEALTH_IDENTIFIER_PREFIX}" belong to plugins.`,
+      );
+      return null;
+    }
     const reason = this.normalizeReason(input.status, input.reason);
     const reportedAt = input.reportedAt ?? new Date();
 

@@ -385,7 +385,7 @@ Typ: `output.resource.health.set`
 | **Status**  | Fest `healthy` oder `unhealthy`; `health.status` kann ihn überschreiben |
 | **Grund**   | Optionale Vorlage; `health.reason` kann ihn überschreiben               |
 
-Overrides müssen nicht leere Zeichenketten sein; ungültiger Status führt zum Fehler. Bei gesunden Meldungen wird der Grund gelöscht. Gibt die unveränderte Payload über **Ausgang** weiter. Beispiel: **Payload setzen** mit Schlüssel `health.status`, Wert `unhealthy`, und Schlüssel `health.reason`, Wert `Gerät meldet {{payload.error}}`, dann hier verbinden.
+Overrides müssen nicht leere Zeichenketten sein; ungültiger Status führt zum Fehler. Kennungen, die mit `plugin:` beginnen, gehören Plugins: eine Meldung dafür wird ignoriert und protokolliert. Bei gesunden Meldungen wird der Grund gelöscht. Gibt die unveränderte Payload über **Ausgang** weiter. Beispiel: **Payload setzen** mit Schlüssel `health.status`, Wert `unhealthy`, und Schlüssel `health.reason`, Wert `Gerät meldet {{payload.error}}`, dann hier verbinden.
 
 ### PC sperren
 

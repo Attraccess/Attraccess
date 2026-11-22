@@ -446,6 +446,7 @@ const mine = await context.resourceHealth.list(); // nach einem Neustart abgleic
 - Ein Plugin sieht und ändert nur eigene Einträge. Manuelle Einträge, Flow-Einträge und Einträge anderer Plugins bleiben unberührt; ein manueller Eintrag „ungesund“ hält die Ressource also ungesund.
 - Eine unbekannte Ressource wird übersprungen. Administratoren können einen Plugin-Eintrag von Hand entfernen; besteht der Zustand weiter, melden Sie ihn erneut.
 - Beim Deinstallieren des Plugins werden seine Einträge entfernt, beim Deaktivieren bleiben sie.
+- Nur Plugins schreiben Kennungen, die mit `plugin:` beginnen: eine Flow- oder Gerätemeldung für eine solche Kennung wird ignoriert und kann den Eintrag eines Plugins nicht übernehmen. Nach dem Deinstallieren werden die Meldungen des Plugins bis zum Neustart des Hosts ignoriert.
 - Auf dem Kontext optional: ältere Hosts bieten `context.resourceHealth` nicht an; vor der Nutzung prüfen. Ein Host, der `REPORT_RESOURCE_HEALTH` nicht kennt, lehnt ein Manifest mit dieser Berechtigung ab; legen Sie `attraccessVersion.min` entsprechend fest.
 
 ### Plugin-eigene RBAC-Berechtigungen
