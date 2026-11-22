@@ -26,6 +26,9 @@ namespace bridge::provisioning
     bool active();
     // The web app is connected.
     bool linked();
+    // Drops a link that stays unencrypted or idle too long, or guessed the PIN too often (LinkGuard). Called
+    // periodically from the bridge task.
+    void tick(uint32_t now);
     // The command source SerialCommandHandler reads; empty while no setup runs.
     SerialCommandHandler::Channel &channel();
 }

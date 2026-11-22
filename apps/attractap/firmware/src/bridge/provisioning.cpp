@@ -9,6 +9,7 @@
 #include <cstring>
 #include <string>
 
+#include "esp_heap_caps.h"
 #include "esp_mac.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -31,7 +32,12 @@ namespace bridge::provisioning
 {
     namespace
     {
-        constexpr uint32_t HOST_TASK_STACK = 4096;
+        // As the BLE proxy's host task (ble_radio_nimble.cpp, measured in QA); the setup adds LE Secure Connections
+        // pairing, whose key maths runs on this task too.
+        constexpr uint32_t HOST_TASK_STACK = 4864;
+        // Free DMA-capable internal RAM NimBLE needs to start: the controller asserts and the bridge restarts when it
+        // runs short (see STACK_MIN_FREE_INTERNAL in ble_radio_nimble.cpp).
+        constexpr size_t MIN_FREE_INTERNAL = 40 * 1024;
         // Complete lines waiting for the main loop; the web app sends one command and waits for its reply.
         constexpr size_t MAX_QUEUED_LINES = 4;
         // A notification refused for lack of buffers is retried this often, this many times.
@@ -62,9 +68,26 @@ namespace bridge::provisioning
         char deviceName[24] = "Attractap Bridge";
         TaskHandle_t hostTaskHandle = nullptr;
 
+        // Counts links: a reply goes only to the link its command came from.
+        std::atomic<uint32_t> linkGeneration{0};
+        std::atomic<bool> encrypted{false};
+
         std::mutex linesMutex;
         LineAssembler assembler(SerialCommandHandler::MAX_COMMAND_LENGTH);
-        std::deque<std::string> lines;
+        // Complete lines and the link they came from.
+        std::deque<std::pair<uint32_t, std::string>> lines;
+        // The link of the line the main loop is handling now.
+        uint32_t lineGeneration = 0;
+
+        // Wrong PINs and idle links (provisioning_logic.hpp); touched by the host, main and bridge tasks.
+        std::mutex guardMutex;
+        LinkGuard guard;
+
+        // Held while sending a reply and while closing: close() must not free NimBLE under a notification.
+        std::mutex txMutex;
+
+        // ble_hs_cfg as the BLE proxy expects it: the setup's pairing settings must not outlive the setup.
+        struct ble_hs_cfg savedHostConfig;
 
         int gapEvent(struct ble_gap_event *event, void *arg);
 
@@ -126,9 +149,15 @@ namespace bridge::provisioning
             case BLE_GAP_EVENT_CONNECT:
                 if (event->connect.status == 0)
                 {
+                    forgetPartialInput();
+                    linkGeneration++;
+                    encrypted = false;
+                    {
+                        std::lock_guard<std::mutex> lock(guardMutex);
+                        guard.connected(millis());
+                    }
                     connHandle = event->connect.conn_handle;
                     connected = true;
-                    forgetPartialInput();
                     logger.info("Web app connected");
                 }
                 else
@@ -139,6 +168,12 @@ namespace bridge::provisioning
             case BLE_GAP_EVENT_DISCONNECT:
                 connected = false;
                 connHandle = BLE_HS_CONN_HANDLE_NONE;
+                encrypted = false;
+                linkGeneration++;
+                {
+                    std::lock_guard<std::mutex> lock(guardMutex);
+                    guard.disconnected();
+                }
                 forgetPartialInput();
                 logger.infof("Web app disconnected (%d)", event->disconnect.reason);
                 startAdvertising();
@@ -147,7 +182,16 @@ namespace bridge::provisioning
                 startAdvertising();
                 return 0;
             case BLE_GAP_EVENT_ENC_CHANGE:
-                if (event->enc_change.status != 0) logger.warnf("Pairing failed: %d", event->enc_change.status);
+                if (event->enc_change.status != 0)
+                {
+                    logger.warnf("Pairing failed: %d", event->enc_change.status);
+                    return 0;
+                }
+                encrypted = true;
+                {
+                    std::lock_guard<std::mutex> lock(guardMutex);
+                    guard.encryptedNow();
+                }
                 return 0;
             case BLE_GAP_EVENT_REPEAT_PAIRING:
             {
@@ -165,13 +209,20 @@ namespace bridge::provisioning
         int access(uint16_t, uint16_t, struct ble_gatt_access_ctxt *ctxt, void *)
         {
             if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) return BLE_ATT_ERR_UNLIKELY;
-            uint8_t buffer[512];
+            {
+                std::lock_guard<std::mutex> lock(guardMutex);
+                if (guard.lockedOut()) return BLE_ATT_ERR_WRITE_NOT_PERMITTED;
+                guard.command(millis());
+            }
+            // Only the NimBLE host task calls this: one buffer, off its small stack.
+            static uint8_t buffer[512];
             uint16_t length = 0;
             if (ble_hs_mbuf_to_flat(ctxt->om, buffer, sizeof buffer, &length) != 0) return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+            const uint32_t generation = linkGeneration;
             std::lock_guard<std::mutex> lock(linesMutex);
             bool full = false;
             assembler.feed(buffer, length, [&](const std::string &line) {
-                if (lines.size() < MAX_QUEUED_LINES) lines.push_back(line);
+                if (lines.size() < MAX_QUEUED_LINES) lines.emplace_back(generation, line);
                 else full = true;
             });
             if (full) logger.error("Setup command dropped: the previous ones are still running");
@@ -227,20 +278,31 @@ namespace bridge::provisioning
             {
                 std::lock_guard<std::mutex> lock(linesMutex);
                 if (lines.empty()) return false;
-                line = std::move(lines.front());
+                lineGeneration = lines.front().first;
+                line = std::move(lines.front().second);
                 lines.pop_front();
                 return true;
             }
 
             void reply(const std::string &line) override
             {
+                std::lock_guard<std::mutex> lock(txMutex);
                 const uint16_t conn = connHandle;
-                if (!connected || conn == BLE_HS_CONN_HANDLE_NONE) return;
+                if (!running || !connected || conn == BLE_HS_CONN_HANDLE_NONE) return;
+                // Only to the encrypted link the command came from: a reply can carry the enrolment code or SSIDs.
+                if (lineGeneration != linkGeneration || !encrypted) return;
                 uint16_t mtu = ble_att_mtu(conn);
                 if (mtu < MIN_MTU) mtu = MIN_MTU;
                 if (!forEachChunk(line.size(), mtu - 3,
                                   [&](size_t offset, size_t size) { return notify(conn, line.data() + offset, size); }))
                     logger.error("Setup reply lost");
+            }
+
+            void authFailed() override
+            {
+                std::lock_guard<std::mutex> lock(guardMutex);
+                guard.pinFailed();
+                if (guard.lockedOut()) logger.warn("Too many wrong PINs: Bluetooth setup refuses commands until reopened");
             }
         };
 
@@ -255,7 +317,18 @@ namespace bridge::provisioning
         esp_read_mac(mac, ESP_MAC_BT);
         snprintf(deviceName, sizeof deviceName, "Attractap Bridge %02X%02X", mac[4], mac[5]);
         forgetPartialInput();
+        {
+            std::lock_guard<std::mutex> lock(guardMutex);
+            guard.reset();
+        }
 
+        if (heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA) < MIN_FREE_INTERNAL)
+        {
+            logger.error("Bluetooth setup: not enough free memory");
+            owned = false;
+            return false;
+        }
+        savedHostConfig = ble_hs_cfg;
         if (nimble_port_init() != ESP_OK)
         {
             // Also when the BLE proxy already runs NimBLE (a bridge whose pairing was revoked): a reboot frees it.
@@ -290,6 +363,7 @@ namespace bridge::provisioning
             running = false;
             logger.errorf("Bluetooth setup: not enough memory (%d)", rc);
             nimble_port_deinit();
+            ble_hs_cfg = savedHostConfig;
             owned = false;
             return false;
         }
@@ -299,6 +373,8 @@ namespace bridge::provisioning
     void close()
     {
         if (!owned) return;
+        // Waits for a reply in progress; later replies see running == false.
+        std::lock_guard<std::mutex> lock(txMutex);
         running = false;
         const uint16_t conn = connHandle;
         if (conn != BLE_HS_CONN_HANDLE_NONE) ble_gap_terminate(conn, BLE_ERR_REM_USER_CONN_TERM);
@@ -307,14 +383,34 @@ namespace bridge::provisioning
         delay(200);
         nimble_port_stop();
         nimble_port_deinit();
+        // The BLE proxy starts NimBLE with its own settings: no bonding, no key store.
+        ble_hs_cfg = savedHostConfig;
         connected = false;
         connHandle = BLE_HS_CONN_HANDLE_NONE;
+        encrypted = false;
         forgetPartialInput();
         owned = false;
         logger.info("Bluetooth setup closed");
     }
 
     bool active() { return owned; }
+
+    void tick(uint32_t now)
+    {
+        if (!running) return;
+        const uint16_t conn = connHandle;
+        if (!connected || conn == BLE_HS_CONN_HANDLE_NONE) return;
+        bool drop;
+        {
+            std::lock_guard<std::mutex> lock(guardMutex);
+            drop = guard.shouldDrop(now);
+            // Once per link: the disconnect event marks it gone.
+            if (drop) guard.disconnected();
+        }
+        if (!drop) return;
+        logger.warn("Dropping the setup link (not encrypted, idle, or too many wrong PINs)");
+        ble_gap_terminate(conn, BLE_ERR_REM_USER_CONN_TERM);
+    }
 
     bool linked() { return running && connected; }
 

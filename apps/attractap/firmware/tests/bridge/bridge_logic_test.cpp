@@ -143,6 +143,11 @@ static void button()
     // A new press after that works again.
     CHECK(b.update(true, 40000) == A::None);
     CHECK(b.update(false, 40100) == A::Reboot);
+
+    // The last sample while held came just before 10 s, the release is seen just after: still a factory reset.
+    CHECK(b.update(true, 50000) == A::None);
+    CHECK(b.update(true, 50000 + Button::FACTORY_RESET_HOLD_MS - 10) == A::None);
+    CHECK(b.update(false, 50000 + Button::FACTORY_RESET_HOLD_MS + 40) == A::FactoryReset);
 }
 
 static void phy()
@@ -241,9 +246,45 @@ static void chunking()
     CHECK(calls == 2);
 }
 
+static void linkGuard()
+{
+    LinkGuard g;
+    CHECK(!g.shouldDrop(0));
+    // Not encrypted within 30 s: dropped.
+    g.connected(1000);
+    CHECK(!g.shouldDrop(1000 + LinkGuard::UNENCRYPTED_MS - 1));
+    CHECK(g.shouldDrop(1000 + LinkGuard::UNENCRYPTED_MS));
+    // Encrypted: the idle limit applies, every command restarts it.
+    g.connected(100000);
+    g.encryptedNow();
+    CHECK(!g.shouldDrop(100000 + LinkGuard::UNENCRYPTED_MS));
+    g.command(200000);
+    CHECK(!g.shouldDrop(200000 + LinkGuard::IDLE_MS - 1));
+    CHECK(g.shouldDrop(200000 + LinkGuard::IDLE_MS));
+    g.disconnected();
+    CHECK(!g.shouldDrop(200000 + LinkGuard::IDLE_MS));
+    // millis() wrap.
+    g.connected(0xFFFFFF00u);
+    CHECK(!g.shouldDrop(0x10));
+    // Wrong PINs: locked out after the limit, across reconnects, until the next window.
+    g.connected(0);
+    g.encryptedNow();
+    for (int i = 0; i < LinkGuard::MAX_PIN_FAILURES - 1; i++) g.pinFailed();
+    CHECK(!g.lockedOut() && !g.shouldDrop(1));
+    g.pinFailed();
+    CHECK(g.lockedOut() && g.shouldDrop(1));
+    g.disconnected();
+    g.connected(10);
+    g.encryptedNow();
+    CHECK(g.lockedOut() && g.shouldDrop(10));
+    g.reset();
+    CHECK(!g.lockedOut() && !g.shouldDrop(10));
+}
+
 int main()
 {
     setupWindow();
+    linkGuard();
     lineAssembly();
     chunking();
     networkFallback();

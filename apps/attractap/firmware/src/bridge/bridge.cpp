@@ -7,6 +7,10 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "nvs_flash.h"
+#include "sdkconfig.h"
+#if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
+#include "esp_core_dump.h"
+#endif
 
 #include "../logger/logger.hpp"
 #include "../platform.hpp"
@@ -56,8 +60,8 @@ namespace bridge
             setLed(PIN_LED_BT, levels.bt);
         }
 
-        // Clears Wi-Fi, the API address, the pairing credentials and the PIN (all of NVS), then reboots
-        // unconfigured. Setup starts again over Bluetooth (hold 3 s) or the serial pads.
+        // Clears Wi-Fi, the API address, the pairing credentials and the PIN (all of NVS) and any crash dump, then
+        // reboots unconfigured. Setup starts again over Bluetooth (hold 3 s) or the serial pads.
         [[noreturn]] void factoryReset()
         {
             logger.warn("Button held 10 s: factory reset");
@@ -67,6 +71,10 @@ namespace bridge
             nvs_flash_deinit();
             const esp_err_t err = nvs_flash_erase();
             if (err != ESP_OK) logger.errorf("NVS erase failed: %s", esp_err_to_name(err));
+#if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
+            // A crash dump holds copies of task stacks, which may include the Wi-Fi password or the PIN.
+            esp_core_dump_image_erase();
+#endif
             delay(RESET_SHOW_MS);
             esp_restart();
         }
@@ -95,6 +103,7 @@ namespace bridge
 
                 if (setupWindow.update(State::getApiState().authenticated, now) == SetupWindow::Change::Close)
                     provisioning::close();
+                provisioning::tick(now);
 
                 const State::NetworkState network = State::getNetworkState();
                 LedInputs in;

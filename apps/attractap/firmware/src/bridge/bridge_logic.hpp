@@ -133,6 +133,8 @@ namespace bridge
             down = false;
             const uint32_t held = now - pressedAt;
             if (fired || held < DEBOUNCE_MS) return Action::None;
+            // The task samples the button every few tens of ms: a release seen after the reset time still resets.
+            if (held >= FACTORY_RESET_HOLD_MS) return Action::FactoryReset;
             if (held < SHORT_PRESS_MAX_MS) return Action::Reboot;
             return held >= SETUP_HOLD_MS ? Action::Setup : Action::None;
         }

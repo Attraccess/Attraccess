@@ -73,7 +73,7 @@ Eine noch nicht gekoppelte Bridge (frisch geflasht oder nach einem Werksreset) l
 
 Die Einrichtung schließt nach 10 Minuten, etwa 10 Sekunden nachdem die Bridge gekoppelt ist, oder bei einem Neustart der Bridge. Von selbst öffnet sie nicht wieder. Bei einer bereits gekoppelten Bridge bewirkt das 3-Sekunden-Halten nichts.
 
-Die Verbindung ist verschlüsselt (Bluetooth LE Secure Connections); das WLAN-Passwort wird also nie im Klartext übertragen. Es gelten dieselben PIN-Regeln wie über die serielle Schnittstelle.
+Die Verbindung ist verschlüsselt (Bluetooth LE Secure Connections); das WLAN-Passwort wird also nie im Klartext übertragen. Es gelten dieselben PIN-Regeln wie über die serielle Schnittstelle, mit zwei Ergänzungen für die Funkverbindung: Nach 5 falschen PINs lehnt die Einrichtung jeden weiteren Befehl ab, bis sie erneut geöffnet wird (Bridge neu starten und die Taste halten), und die Bridge trennt eine Verbindung, die nicht innerhalb von 30 Sekunden verschlüsselt ist oder 5 Minuten lang nichts sendet, damit niemand in der Nähe die Einrichtung blockieren kann.
 
 | Browser                                      | Einrichtung über Bluetooth                                                                  |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------- |
@@ -124,7 +124,7 @@ Die Taste ist die Reset-Taste am Gehäuse, nicht GPIO0.
 | ---------------------- | --------------------------------------------------------------------------------------------- |
 | **Kurz drücken**       | Die Bridge startet neu                                                                        |
 | **3 Sekunden halten**  | Öffnet die Bluetooth-Einrichtung für 10 Minuten (nur bei einer noch nicht gekoppelten Bridge) |
-| **10 Sekunden halten** | Werksreset: löscht WLAN, API-URL und Kopplungsdaten                                           |
+| **10 Sekunden halten** | Werksreset: löscht WLAN, API-URL, Kopplungsdaten und PIN                                      |
 
 Nach 3 Sekunden blinken alle drei LEDs schnell. Lassen Sie die Taste zwischen 3 und 10 Sekunden los, öffnet sich die Bluetooth-Einrichtung. Nach 10 Sekunden läuft der Werksreset: Alle LEDs leuchten, und die Bridge startet unkonfiguriert neu.
 

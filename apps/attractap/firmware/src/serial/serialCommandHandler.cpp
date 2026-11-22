@@ -206,6 +206,7 @@ bool SerialCommandHandler::ensureAuthorized(const char *codeFromPayload, std::st
     if (Settings::getDeviceConfig().passCode != std::string(codeFromPayload))
     {
         errorOut = "INVALID_AUTH_CODE";
+        if (replyChannel) replyChannel->authFailed();
         return false;
     }
 
@@ -597,4 +598,3 @@ void SerialCommandHandler::handleAuthorizedCommand(const std::string &topic, Jso
 }
 
 #endif
-

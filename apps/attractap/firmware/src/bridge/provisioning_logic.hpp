@@ -62,6 +62,54 @@ namespace bridge
         uint32_t pairedSince = 0;
     };
 
+    // Who may use the setup link. The window is open to anyone in radio range (Just Works pairing confirms nothing)
+    // and the controller takes one link at a time, so:
+    // - a link that is not encrypted within UNENCRYPTED_MS, or sends no command for IDLE_MS, is dropped, so one
+    //   idle connection cannot hold the setup for the whole window;
+    // - after MAX_PIN_FAILURES wrong PINs in one window the setup refuses every further command until the window is
+    //   opened again (reboot, then hold the button), so the 4-digit PIN cannot be guessed over the air.
+    class LinkGuard
+    {
+    public:
+        static constexpr uint32_t UNENCRYPTED_MS = 30000;
+        static constexpr uint32_t IDLE_MS = 5 * 60 * 1000;
+        static constexpr uint8_t MAX_PIN_FAILURES = 5;
+
+        // A new window: forgets the failures of the last one.
+        void reset() { *this = LinkGuard(); }
+
+        void connected(uint32_t now)
+        {
+            linked = true;
+            encrypted = false;
+            lastActivity = now;
+        }
+        void disconnected() { linked = false; }
+        void encryptedNow() { encrypted = true; }
+        void command(uint32_t now) { lastActivity = now; }
+        void pinFailed()
+        {
+            if (pinFailures < MAX_PIN_FAILURES) pinFailures++;
+        }
+
+        bool lockedOut() const { return pinFailures >= MAX_PIN_FAILURES; }
+
+        // Whether the current link must be dropped now.
+        bool shouldDrop(uint32_t now) const
+        {
+            if (!linked) return false;
+            if (lockedOut()) return true;
+            const uint32_t quiet = now - lastActivity;
+            return encrypted ? quiet >= IDLE_MS : quiet >= UNENCRYPTED_MS;
+        }
+
+    private:
+        bool linked = false;
+        bool encrypted = false;
+        uint8_t pinFailures = 0;
+        uint32_t lastActivity = 0;
+    };
+
     // Splits the bytes the web app writes into command lines, like the serial console does: `\n` ends a line, `\r`
     // is ignored. A line longer than maxLength is dropped whole (up to its newline) instead of being cut.
     class LineAssembler
