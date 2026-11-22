@@ -16,6 +16,7 @@
 #include "pairing_client.hpp"
 #include "reader_identity.hpp"
 #include "reader_key_store.hpp"
+#include "session_outbox.hpp"
 #include "session_tls.hpp"
 
 // The reader's connection to the server, as the API sees it. It picks one of two channels on
@@ -162,8 +163,14 @@ private:
     void onSessionFrame(SessionFraming::FrameType type, std::string payload);
     void onControl(const std::string &payload);
     void onPairingRemoved(const char *reason);
-    // Sends the queued TLS records as one binary frame. Caller holds sessionMutex.
-    bool flushOutbox();
+    // Hands the waiting TLS records to the websocket as one binary frame. False when the websocket never took them
+    // (the session is closed and the reader reconnects). Caller holds sessionMutex.
+    bool flushOutboxLocked();
+    // Encrypts and sends one session frame. False when it was not sent: nothing reached TLS, so the caller may try
+    // again (or the session ended). Caller holds sessionMutex.
+    bool sendSessionFrameLocked(SessionFraming::FrameType type, const uint8_t *payload, size_t length);
+    // Closes the session and reconnects. Caller holds sessionMutex.
+    void endSessionLocked(const char *reason);
 
     void onPairingConnected();
     void onPairingText(const std::string &text);
@@ -205,7 +212,7 @@ private:
     // (frames it already decrypted are still delivered).
     std::atomic<uint32_t> sessionEpoch{0};
     SessionTls tls;
-    std::vector<uint8_t> outbox;
+    SessionOutbox outbox;
     // tls.open(), readable without sessionMutex: senders on the main loop must not wait for a
     // handshake step on the worker (LVGL, LEDs and NFC would stall).
     std::atomic<bool> sessionReady{false};

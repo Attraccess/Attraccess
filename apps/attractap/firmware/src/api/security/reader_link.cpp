@@ -164,6 +164,16 @@ void ReaderLink::loop()
         }
     }
 
+    if (channel == Channel::Session)
+    {
+        // Records the websocket refused (a full send queue, no heap for the copy) go out once it has room again.
+        std::unique_lock<std::mutex> lock(sessionMutex, std::try_to_lock);
+        if (lock.owns_lock() && !outbox.empty())
+        {
+            flushOutboxLocked();
+        }
+    }
+
     if (channel == Channel::Session && connected && handshakeStartedMs != 0 &&
         millis() - handshakeStartedMs > HANDSHAKE_TIMEOUT_MS)
     {
@@ -338,17 +348,8 @@ bool ReaderLink::sendMessage(const char *message, size_t length)
             return false;
         }
         std::lock_guard<std::mutex> lock(sessionMutex);
-        if (!tls.sendFrame(SessionFraming::FrameType::JSON, reinterpret_cast<const uint8_t *>(message), length))
-        {
-            return false;
-        }
-        if (flushOutbox())
-        {
-            return true;
-        }
-        closeSessionLocked();
-        socket.forceReconnect("session send failed");
-        return false;
+        return sendSessionFrameLocked(SessionFraming::FrameType::JSON, reinterpret_cast<const uint8_t *>(message),
+                                      length);
     }
     case Channel::Pairing:
     default:
@@ -369,17 +370,7 @@ bool ReaderLink::sendHeartbeat(const char *message, size_t length)
             return false;
         }
         std::unique_lock<std::mutex> lock(sessionMutex, std::try_to_lock);
-        if (!lock.owns_lock() || !tls.sendFrame(SessionFraming::FrameType::HEARTBEAT, nullptr, 0))
-        {
-            return false;
-        }
-        if (flushOutbox())
-        {
-            return true;
-        }
-        closeSessionLocked();
-        socket.forceReconnect("session send failed");
-        return false;
+        return lock.owns_lock() && sendSessionFrameLocked(SessionFraming::FrameType::HEARTBEAT, nullptr, 0);
     }
     case Channel::Pairing:
     default:

@@ -16,18 +16,8 @@ bool ReaderLink::sendControl(const std::string &json)
         return false;
     }
     std::lock_guard<std::mutex> lock(sessionMutex);
-    if (!tls.sendFrame(SessionFraming::FrameType::CONTROL, reinterpret_cast<const uint8_t *>(json.data()),
-                       json.size()))
-    {
-        return false;
-    }
-    if (flushOutbox())
-    {
-        return true;
-    }
-    closeSessionLocked();
-    socket.forceReconnect("session send failed");
-    return false;
+    return sendSessionFrameLocked(SessionFraming::FrameType::CONTROL, reinterpret_cast<const uint8_t *>(json.data()),
+                                  json.size());
 }
 
 void ReaderLink::onFirmwareInfoSent()

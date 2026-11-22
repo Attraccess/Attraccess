@@ -32,3 +32,10 @@ target_link_libraries(pairing-host-tests PRIVATE ArduinoJson ${ATTRACTAP_MBEDTLS
 enable_testing()
 add_test(NAME pairing-host-tests COMMAND pairing-host-tests)
 set_tests_properties(pairing-host-tests PROPERTIES TIMEOUT 60)
+
+# The secure session's outbox: TLS records the websocket refuses wait instead of ending the session (ATT-1315).
+add_executable(session-outbox-tests session_outbox_test.cpp)
+target_include_directories(session-outbox-tests PRIVATE "${FIRMWARE_DIR}/src")
+target_compile_options(session-outbox-tests PRIVATE -Wall -Wextra -UNDEBUG)
+add_test(NAME session-outbox-tests COMMAND session-outbox-tests)
+set_tests_properties(session-outbox-tests PROPERTIES TIMEOUT 10)
