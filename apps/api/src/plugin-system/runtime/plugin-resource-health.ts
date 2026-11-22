@@ -16,7 +16,7 @@ export type PluginResourceHealthHost = Pick<
 >;
 
 /** The identifier prefix of every entry of one plugin. */
-export const pluginHealthPrefix = (pluginName: string): string => `plugin:${pluginName}:`;
+const pluginHealthPrefix = (pluginName: string): string => `plugin:${pluginName}:`;
 
 function keyOf(key: unknown): string {
   if (typeof key !== 'string' || !PLUGIN_RESOURCE_HEALTH_KEY_PATTERN.test(key)) {
@@ -27,8 +27,14 @@ function keyOf(key: unknown): string {
   return key;
 }
 
+/**
+ * The plugin's own entry: source `plugin`, its prefix, and a valid key after it. The key check keeps plugin `a` off
+ * the entries of a plugin named `a:b` (`plugin:a:b:<key>`), since keys never hold a colon.
+ */
 const isOwn = (entry: ResourceHealthRecord, prefix: string): boolean =>
-  entry.source === ResourceHealthSource.PLUGIN && entry.identifier.startsWith(prefix);
+  entry.source === ResourceHealthSource.PLUGIN &&
+  entry.identifier.startsWith(prefix) &&
+  PLUGIN_RESOURCE_HEALTH_KEY_PATTERN.test(entry.identifier.slice(prefix.length));
 
 async function removeEntry(health: PluginResourceHealthHost, entry: ResourceHealthRecord): Promise<void> {
   try {
@@ -67,14 +73,20 @@ export function createPluginResourceHealthContext(
         return;
       }
       const unhealthy = input.status === 'unhealthy';
-      await health.reportHealth({
-        resourceId: input.resourceId,
-        identifier,
-        status: unhealthy ? ResourceHealthStatus.UNHEALTHY : ResourceHealthStatus.HEALTHY,
-        reason: unhealthy ? (input.reason ?? '').trim().slice(0, PLUGIN_RESOURCE_HEALTH_MAX_REASON_LENGTH) : null,
-        source: ResourceHealthSource.PLUGIN,
-        auditOrigin: SYSTEM_AUDIT_ACTOR,
-      });
+      const reason = unhealthy ? (input.reason ?? '').trim().slice(0, PLUGIN_RESOURCE_HEALTH_MAX_REASON_LENGTH) : null;
+      try {
+        await health.reportHealth({
+          resourceId: input.resourceId,
+          identifier,
+          status: unhealthy ? ResourceHealthStatus.UNHEALTHY : ResourceHealthStatus.HEALTHY,
+          reason,
+          source: ResourceHealthSource.PLUGIN,
+          auditOrigin: SYSTEM_AUDIT_ACTOR,
+        });
+      } catch (error) {
+        // Deleted since the check above (the entry's foreign key fails): skipped like an unknown resource.
+        if (await health.resourceExists(input.resourceId)) throw error;
+      }
     },
 
     async clear(resourceId, key) {

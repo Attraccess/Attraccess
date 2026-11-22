@@ -70,6 +70,32 @@ describe('plugin resource health', () => {
     expect(fixture.records).toEqual([]);
   });
 
+  it.each(['0', 'a.b_c-d', 'a'.repeat(64)])('accepts the key %p', async (key) => {
+    await acme.report(unhealthy(key, 'x'));
+    expect(fixture.records.map((record) => record.identifier)).toEqual([`plugin:acme:${key}`]);
+  });
+
+  it('skips a resource deleted between the check and the write', async () => {
+    const exists = jest.spyOn(fixture.service, 'resourceExists').mockResolvedValueOnce(true).mockResolvedValue(false);
+    jest.spyOn(fixture.service, 'reportHealth').mockRejectedValueOnce(new Error('foreign key violation'));
+    await expect(acme.report(unhealthy('a', 'x'))).resolves.toBeUndefined();
+    expect(exists).toHaveBeenCalledTimes(2);
+  });
+
+  it('still fails when the write fails for a resource that exists', async () => {
+    jest.spyOn(fixture.service, 'reportHealth').mockRejectedValueOnce(new Error('database down'));
+    await expect(acme.report(unhealthy('a', 'x'))).rejects.toThrow('database down');
+  });
+
+  it('keeps a plugin off the entries of a plugin whose name extends its own with a colon', async () => {
+    const nested = createPluginResourceHealthContext('acme:sub', () => fixture.service);
+    await nested.report(unhealthy('a', 'nested'));
+
+    expect(await acme.list()).toEqual([]);
+    await expect(clearAllPluginResourceHealth('acme', fixture.service)).resolves.toBe(0);
+    expect(fixture.records.map((record) => record.identifier)).toEqual(['plugin:acme:sub:a']);
+  });
+
   it('skips an unknown resource', async () => {
     await expect(acme.report(unhealthy('a', 'x', 999))).resolves.toBeUndefined();
     await expect(acme.clear(999, 'a')).resolves.toBeUndefined();

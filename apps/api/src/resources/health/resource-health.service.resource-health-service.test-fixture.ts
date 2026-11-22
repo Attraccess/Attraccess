@@ -18,7 +18,7 @@ function createInMemoryHealthStore(
         Object.assign(existing, report);
         return { record: existing, previousStatus };
       }
-      const record = { id: records.length + 1, ...report };
+      const record = { id: Math.max(0, ...records.map((r) => r.id)) + 1, ...report };
       records.push(record);
       return { record, previousStatus: null };
     },
