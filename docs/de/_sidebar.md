@@ -130,6 +130,7 @@
 - **Für Entwickler**
   - [Überblick](developer/overview.md)
   - [Architektur](developer/architecture.md)
+  - [Attractap-Firmware-Performance](developer/attractap-firmware-performance.md)
   - [Persistenz-Architektur](developer/persistence-architecture.md)
   - [Persistenz-Garantien](developer/persistence-guarantees.md)
   - [Datenbank-Backend hinzufügen](developer/adding-a-database-backend.md)
