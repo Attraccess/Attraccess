@@ -387,7 +387,7 @@ Type: `output.resource.health.set`
 | **Status**     | Literal `healthy` or `unhealthy`; `health.status` can override it |
 | **Reason**     | Optional template; `health.reason` can override it                |
 
-Overrides must be nonempty strings; an invalid status fails. For healthy reports the reason is cleared. Forwards unchanged payload through **Output**. Example: **Set Payload** with key `health.status`, value `unhealthy`, and key `health.reason`, value `Device reported {{payload.error}}`, then connect here.
+Overrides must be nonempty strings; an invalid status fails. Identifiers starting with `plugin:` belong to plugins: a report for one is ignored and logged. For healthy reports the reason is cleared. Forwards unchanged payload through **Output**. Example: **Set Payload** with key `health.status`, value `unhealthy`, and key `health.reason`, value `Device reported {{payload.error}}`, then connect here.
 
 ### Lock PC
 

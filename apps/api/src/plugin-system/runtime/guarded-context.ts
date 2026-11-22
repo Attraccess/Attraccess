@@ -10,6 +10,7 @@ import {
   PluginStorageContext,
   PluginNotificationsContext,
   PluginResourceAccessContext,
+  PluginResourceHealthContext,
   PluginPermission,
   PluginPermissionError,
   PluginReaderUiApi,
@@ -147,6 +148,11 @@ export function createGuardedContext(
       require(PluginPermission.READER_DEVICES, 'readers');
       if (!base.readers) throw new Error('Plugin readers are unavailable in this host');
       return base.readers;
+    },
+    get resourceHealth(): PluginResourceHealthContext {
+      require(PluginPermission.REPORT_RESOURCE_HEALTH, 'resourceHealth');
+      if (!base.resourceHealth) throw new Error('Resource health is unavailable in this host');
+      return base.resourceHealth;
     },
     get secrets(): PluginSecretsContext {
       require(PluginPermission.MANAGE_SECRETS, 'secrets');

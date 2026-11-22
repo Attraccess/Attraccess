@@ -1247,7 +1247,7 @@
   "getResourceHealth": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "ab67e217"
+    "shape": "4065f3b0"
   },
   "clearResourceHealthEntry": {
     "decision": "allow",
@@ -1687,7 +1687,7 @@
   "getPlugins": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "b9cba5a4"
+    "shape": "7f1aaf60"
   },
   "uploadPlugin": {
     "decision": "deny",

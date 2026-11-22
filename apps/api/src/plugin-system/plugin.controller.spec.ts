@@ -30,7 +30,12 @@ const req = { user: { id: 42, authenticationMethod: 'session' } } as Authenticat
 
 describe('PluginController', () => {
   let root: string;
-  let service: { uploadPlugin: jest.Mock; deletePlugin: jest.Mock; requestRestart: jest.Mock };
+  let service: {
+    uploadPlugin: jest.Mock;
+    deletePlugin: jest.Mock;
+    requestRestart: jest.Mock;
+    clearHealthEntries: jest.Mock;
+  };
   let npmService: {
     findInstalledByPluginId: jest.Mock;
     listInstalled: jest.Mock;
@@ -45,7 +50,12 @@ describe('PluginController', () => {
     root = mkdtempSync(join(tmpdir(), 'plugin-controller-'));
     PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
     PluginModule.configure({ DISABLE_PLUGINS: false });
-    service = { uploadPlugin: jest.fn(), deletePlugin: jest.fn(), requestRestart: jest.fn() };
+    service = {
+      uploadPlugin: jest.fn(),
+      deletePlugin: jest.fn(),
+      requestRestart: jest.fn(),
+      clearHealthEntries: jest.fn(),
+    };
     npmService = {
       findInstalledByPluginId: jest.fn(),
       listInstalled: jest.fn().mockReturnValue([]),
@@ -373,8 +383,21 @@ describe('PluginController', () => {
     await controller.deletePlugin(plugin.id, req);
 
     expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin', true);
+    // Its health entries go like an uploaded plugin's, by the manifest's plugin name.
+    expect(service.clearHealthEntries).toHaveBeenCalledWith(plugin.name);
     expect(service.requestRestart).toHaveBeenCalledTimes(1);
     expect(service.deletePlugin).not.toHaveBeenCalled();
+  });
+
+  it('clears the health entries of an npm package removed by its package name', async () => {
+    const plugin = frontendPlugin('npm-runtime-name');
+    jest.spyOn(PluginService, 'getDiscoveredPlugins').mockReturnValue([plugin]);
+    npmService.listInstalled.mockReturnValue([{ name: '@attraccess/plugin', installPath: plugin.pluginDirectory }]);
+
+    await controller.removeInstalledPackage('@attraccess/plugin', req);
+
+    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin', true);
+    expect(service.clearHealthEntries).toHaveBeenCalledWith('npm-runtime-name');
   });
 
   it('uses the data-preserving npm removal flow when npm manifest discovery fails', async () => {

@@ -428,6 +428,21 @@ describe('PluginSandboxService', () => {
       expect(() => withoutHostSupport.cards).toThrow(/unavailable in this host/);
     });
 
+    it('gates resourceHealth behind REPORT_RESOURCE_HEALTH', () => {
+      const resourceHealth = { report: jest.fn(), clear: jest.fn(), list: jest.fn() };
+      const base = { ...buildBaseContext(events), resourceHealth } as never as PluginContext;
+      const denied = PluginSandboxService.createGuardedContext(base, [PluginPermission.ACCESS_RESOURCES]);
+      expect(() => denied.resourceHealth).toThrow(PluginPermissionError);
+      expect(() => denied.resourceHealth).toThrow(/REPORT_RESOURCE_HEALTH/);
+
+      const granted = PluginSandboxService.createGuardedContext(base, [PluginPermission.REPORT_RESOURCE_HEALTH]);
+      expect(granted.resourceHealth).toBe(resourceHealth);
+      const withoutHostSupport = PluginSandboxService.createGuardedContext(buildBaseContext(events), [
+        PluginPermission.REPORT_RESOURCE_HEALTH,
+      ]);
+      expect(() => withoutHostSupport.resourceHealth).toThrow(/unavailable in this host/);
+    });
+
     it('gates readers behind READER_DEVICES', () => {
       const readers = { tap: jest.fn() };
       const base = { ...buildBaseContext(events), readers } as never as PluginContext;

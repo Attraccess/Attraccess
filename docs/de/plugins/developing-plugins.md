@@ -399,6 +399,7 @@ nennt.
 | `BLE_TRANSPORT`          | `context.ble` -- die Bluetooth-Funkverbindung von Attractap-Readern nutzen, die ein Administrator für Plugins freigegeben hat, begrenzt auf die BLE-Profile, die das Plugin registriert. Siehe [Bluetooth-Transport für Plugins](plugins/ble-transport.md).                                            |
 | `CARD_AUTHENTICATION`    | `context.cards` -- NFC-Karten an eigenen Geräten des Plugins mit den Attraccess-Kartenschlüsseln authentifizieren; das Plugin erhält die Karte und ihren Besitzer, nie die Schlüssel. Siehe [Kartenauthentifizierung für Plugins](plugins/card-authentication.md).                                     |
 | `READER_DEVICES`         | `context.readers` -- eigene Kartenleser des Plugins registrieren; eine daran authentifizierte Karte führt die Aktion des Readers auf seiner zugewiesenen Ressource für den Karteninhaber aus, mit denselben Prüfungen wie an einem Attractap-Reader. Siehe [Plugin-Reader](plugins/plugin-readers.md). |
+| `REPORT_RESOURCE_HEALTH` | `context.resourceHealth` -- eigene Gesundheitseinträge des Plugins an Ressourcen setzen und entfernen. Siehe [Ressourcen-Gesundheit](#ressourcen-gesundheit).                                                                                                                                          |
 
 `context.manifest` und `context.logger` sind immer verfügbar und benötigen
 keine Berechtigung. Dasselbe gilt für `context.hostVersion`: die Version des
@@ -423,6 +424,30 @@ Einige Hinweise zur Grenze:
 > Fordern Sie nur die minimal nötigen Berechtigungen an. Administratoren sehen
 > auf der Plugins-Seite jede angeforderte Berechtigung, bevor sie einem Plugin
 > vertrauen.
+
+### Ressourcen-Gesundheit
+
+Eine Ressource ist ungesund, solange einer ihrer Gesundheitseinträge ungesund ist, und eine ungesunde Ressource sperrt die Nutzung für Personen ohne Wartungsrecht. Mit `REPORT_RESOURCE_HEALTH` kann ein Plugin über `context.resourceHealth` eigene Einträge führen:
+
+```ts
+await context.resourceHealth.report({
+  resourceId,
+  key: 'device-7-offline',
+  status: 'unhealthy',
+  reason: 'Gerät 7 ist nicht erreichbar',
+});
+await context.resourceHealth.clear(resourceId, 'device-7-offline');
+const mine = await context.resourceHealth.list(); // nach einem Neustart abgleichen
+```
+
+- Der Host speichert den Eintrag als `plugin:<Plugin-Name>:<key>` mit der Quelle `plugin`. Ein Schlüssel hat 1 bis 64 Zeichen aus `a-z`, `0-9`, `.`, `_` und `-` und beginnt mit einem Buchstaben oder einer Ziffer. Ein ungültiger Schlüssel löst einen Fehler aus.
+- Ein Statuswechsel benachrichtigt Wartende und Einweiser wie eine manuelle Änderung. Wird der bestehende Status erneut gemeldet, wird niemand benachrichtigt. `clear` eines ungesunden Eintrags gilt als Erholung.
+- Der Grund wird getrimmt, auf 500 Zeichen gekürzt und bei `healthy` verworfen.
+- Ein Plugin sieht und ändert nur eigene Einträge. Manuelle Einträge, Flow-Einträge und Einträge anderer Plugins bleiben unberührt; ein manueller Eintrag „ungesund“ hält die Ressource also ungesund.
+- Eine unbekannte Ressource wird übersprungen. Administratoren können einen Plugin-Eintrag von Hand entfernen; besteht der Zustand weiter, melden Sie ihn erneut.
+- Beim Deinstallieren des Plugins werden seine Einträge entfernt, beim Deaktivieren bleiben sie.
+- Nur Plugins schreiben Kennungen, die mit `plugin:` beginnen: eine Flow- oder Gerätemeldung für eine solche Kennung wird ignoriert und kann den Eintrag eines Plugins nicht übernehmen. Nach dem Deinstallieren werden die Meldungen des Plugins bis zum Neustart des Hosts ignoriert.
+- Auf dem Kontext optional: ältere Hosts bieten `context.resourceHealth` nicht an; vor der Nutzung prüfen. Ein Host, der `REPORT_RESOURCE_HEALTH` nicht kennt, lehnt ein Manifest mit dieser Berechtigung ab; legen Sie `attraccessVersion.min` entsprechend fest.
 
 ### Plugin-eigene RBAC-Berechtigungen
 
@@ -1149,7 +1174,7 @@ Entitäten oder Abfrage-Handles. Jede Gruppe prüft beim Aufruf einer Methode ih
 | Gruppe               | Berechtigung       | Methoden                                                                                                                                                                                                                                                                                                             |
 | -------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `hostData.resources` | `ACCESS_RESOURCES` | `get(id, scope?)` (ein `PluginResourceModel` oder `null`; mit einem Transaktions-Scope liest es innerhalb dieser Transaktion), `getNames(ids)`, `filterVisible(userId, ids, { seeAll? })`, `filterRequiringSupervision(ids)`, `listIdsInGroups(groupIds)`, `countUnhealthyEntries(id)`, `listIntroducerUserIds(id)`. |
-| `hostData.users`     | `READ_USERS`       | `getUsernames(ids)` (aus Kompatibilitätsgründen beibehalten), `getDisplayNames(ids)` (Map von Benutzer-ID auf Anzeigenamen: „Vorname Nachname“, ersatzweise der Benutzername), `getLocales(ids)`, `isActive(id)` (existiert, nicht gelöscht, nicht deaktiviert), `listIdsWithAnyPermission(keys)`.                                                                                                                                                                             |
+| `hostData.users`     | `READ_USERS`       | `getUsernames(ids)` (aus Kompatibilitätsgründen beibehalten), `getDisplayNames(ids)` (Map von Benutzer-ID auf Anzeigenamen: „Vorname Nachname“, ersatzweise der Benutzername), `getLocales(ids)`, `isActive(id)` (existiert, nicht gelöscht, nicht deaktiviert), `listIdsWithAnyPermission(keys)`.                   |
 | `hostData.settings`  | `READ_SETTINGS`    | `getApp(key)`: der getrimmte Wert einer Anwendungseinstellung oder `null`.                                                                                                                                                                                                                                           |
 | `hostData.flows`     | `TRIGGER_FLOWS`    | `findNodes(query)`: Flow-Knoten nach `type`, `typePrefix`, `dataEquals`, `dataIn`, `resourceId`, `excludeResourceId`, `excludeFlowId`, `orderById` und `limit`, als `{ id, type, resourceId, resourceName, flowId, flowName, data }`.                                                                                |
 
@@ -1329,18 +1354,18 @@ und diese Hosts teilen die Bibliothek.
 `@attraccess/plugins-frontend-ui` enthält auch die UI-Bausteine des Hosts, damit
 Plugins wie der Kern aussehen und sich verhalten, statt eigene Kopien mitzubringen:
 
-| Komponente                                              | Verwendung                                                                       |
-| ------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `StatusDialog`                                          | Hinweise (`info`, `success`, `warning`, `error`)                                 |
-| `ConfirmableButton`                                     | Button, der vor seiner Aktion in einem `StatusDialog` um Bestätigung bittet      |
-| `TableRowActions`, `TableActionsColumnHeader`           | Aktionen einer Tabellenzeile: ⋮-Menü in der letzten Spalte „Aktionen“            |
-| `DeleteConfirmationModal`                               | **Veraltet**: nutze `ConfirmableButton`                                          |
-| `StandardModal`, `StandardDrawer`                       | Umfangreichere Modals und Drawer (Formulare, Listen)                             |
-| `Button`                                                | Buttons mit Ladeanzeige                                                          |
-| `AlertStatusIcon`, `StatusAlert`                        | Hinweise mit Statussymbol                                                        |
-| `LabeledSwitch`, `PasswordInput`                        | Schalter mit Beschriftung, Passwortfeld mit Anzeigen/Verbergen                   |
-| `EmptyState`, `TableDataLoadingIndicator`, `PageHeader` | Leere Listen, zentrierte Ladeanzeige, Seitenkopf mit Aktionen                    |
-| `DateTimeDisplay`, `useDateTimeFormatter`               | Datum und Uhrzeit nach den Einstellungen des Benutzers                           |
+| Komponente                                              | Verwendung                                                                  |
+| ------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `StatusDialog`                                          | Hinweise (`info`, `success`, `warning`, `error`)                            |
+| `ConfirmableButton`                                     | Button, der vor seiner Aktion in einem `StatusDialog` um Bestätigung bittet |
+| `TableRowActions`, `TableActionsColumnHeader`           | Aktionen einer Tabellenzeile: ⋮-Menü in der letzten Spalte „Aktionen“       |
+| `DeleteConfirmationModal`                               | **Veraltet**: nutze `ConfirmableButton`                                     |
+| `StandardModal`, `StandardDrawer`                       | Umfangreichere Modals und Drawer (Formulare, Listen)                        |
+| `Button`                                                | Buttons mit Ladeanzeige                                                     |
+| `AlertStatusIcon`, `StatusAlert`                        | Hinweise mit Statussymbol                                                   |
+| `LabeledSwitch`, `PasswordInput`                        | Schalter mit Beschriftung, Passwortfeld mit Anzeigen/Verbergen              |
+| `EmptyState`, `TableDataLoadingIndicator`, `PageHeader` | Leere Listen, zentrierte Ladeanzeige, Seitenkopf mit Aktionen               |
+| `DateTimeDisplay`, `useDateTimeFormatter`               | Datum und Uhrzeit nach den Einstellungen des Benutzers                      |
 
 Verwende `StatusDialog` für kurze Hinweise und Bestätigungen. Nur `error` zeigt
 eine rote (Danger-)Aktionsschaltfläche, alle anderen Status eine primäre. Escape
