@@ -1012,14 +1012,15 @@ image contains the `debug.crash` topic.
 `CMND debug.stats` on the serial console (no PIN, like `debug.crash`) logs one row per FreeRTOS task at
 INFO: name, run time (counter ticks), CPU share of the chip's two cores (one decimal), stack high-water mark
 (free bytes at the lowest point) and core (`any` for unpinned tasks), between a header and an end line. The
-shares of all tasks, including `IDLE0`/`IDLE1`, add up to about 100 % (rounding aside). The counters run
+shares of all tasks, including `IDLE0`/`IDLE1`, add up to roughly 97-100 % (each share is cut to one decimal, and
+interrupt time and the slices still running are not counted). The counters run
 since boot (64-bit, so they do not wrap), so a short sample needs two calls. The rows are paced (20 ms apart)
 because the console's 1 KB TX buffer drops lines of a burst. The reply is `{}`.
 
 The topic exists only where `CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS` is on: builds with `sdkconfig.debug`
 and every build with `-DATTRACTAP_TEST_HOOKS=ON` (CMake layers `sdkconfig.lab-stats` after the defaults;
 also with `ATTRACTAP_SECURE_LAB`, never with a release secure profile). Other builds answer
-`UNKNOWN_TOPIC`, and `tools/check_release_build.py` fails a release image that contains the `debug.stats`
+`UNKNOWN_TOPIC` (after the PIN check, like any unknown topic; `PIN_NOT_SET` on a reader without PIN), and `tools/check_release_build.py` fails a release image that contains the `debug.stats`
 topic. Run-time stats cost a little CPU and RAM, so lab and debug images differ slightly from release.
 
 ### LVGL perf monitor (development builds only)
