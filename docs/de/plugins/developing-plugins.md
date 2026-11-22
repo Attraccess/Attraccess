@@ -441,12 +441,12 @@ const mine = await context.resourceHealth.list(); // nach einem Neustart abgleic
 ```
 
 - Der Host speichert den Eintrag als `plugin:<Plugin-Name>:<key>` mit der Quelle `plugin`. Ein Schlüssel hat 1 bis 64 Zeichen aus `a-z`, `0-9`, `.`, `_` und `-` und beginnt mit einem Buchstaben oder einer Ziffer. Ein ungültiger Schlüssel löst einen Fehler aus.
-- Ein Statuswechsel benachrichtigt Wartende und Einweisende wie eine manuelle Änderung. Wird der bestehende Status erneut gemeldet, wird niemand benachrichtigt. `clear` eines ungesunden Eintrags gilt als Erholung.
+- Ein Statuswechsel benachrichtigt Wartende und Einweiser wie eine manuelle Änderung. Wird der bestehende Status erneut gemeldet, wird niemand benachrichtigt. `clear` eines ungesunden Eintrags gilt als Erholung.
 - Der Grund wird getrimmt, auf 500 Zeichen gekürzt und bei `healthy` verworfen.
 - Ein Plugin sieht und ändert nur eigene Einträge. Manuelle Einträge, Flow-Einträge und Einträge anderer Plugins bleiben unberührt; ein manueller Eintrag „ungesund“ hält die Ressource also ungesund.
-- Eine unbekannte Ressource wird übersprungen. Administratoren können einen Plugin-Eintrag von Hand entfernen; besteht der Zustand weiter, melde ihn erneut.
+- Eine unbekannte Ressource wird übersprungen. Administratoren können einen Plugin-Eintrag von Hand entfernen; besteht der Zustand weiter, melden Sie ihn erneut.
 - Beim Deinstallieren des Plugins werden seine Einträge entfernt, beim Deaktivieren bleiben sie.
-- Auf dem Kontext optional: ältere Hosts bieten `context.resourceHealth` nicht an; vor der Nutzung prüfen.
+- Auf dem Kontext optional: ältere Hosts bieten `context.resourceHealth` nicht an; vor der Nutzung prüfen. Ein Host, der `REPORT_RESOURCE_HEALTH` nicht kennt, lehnt ein Manifest mit dieser Berechtigung ab; legen Sie `attraccessVersion.min` entsprechend fest.
 
 ### Plugin-eigene RBAC-Berechtigungen
 

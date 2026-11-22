@@ -347,7 +347,7 @@ const mine = await context.resourceHealth.list(); // reconcile after a restart
 - A plugin only ever sees and changes its own entries. Manual entries, flow entries and the entries of other plugins are untouched, so a manual unhealthy entry keeps the resource unhealthy.
 - An unknown resource is skipped. Administrators can clear a plugin entry by hand; report it again if the state persists.
 - Uninstalling the plugin clears its entries. Disabling it keeps them.
-- Optional on the context: older hosts do not provide `context.resourceHealth`; check before use.
+- Optional on the context: older hosts do not provide `context.resourceHealth`; check before use. A host that does not know `REPORT_RESOURCE_HEALTH` refuses a manifest that requests it, so set `attraccessVersion.min` to match.
 
 ### Plugin-declared RBAC permissions
 
