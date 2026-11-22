@@ -1,6 +1,6 @@
 {
   "name": "@attraccess/plugin-shelly",
-  "version": "0.2.0-alpha.0",
+  "version": "0.3.0-alpha.0",
   "description": "Official Attraccess integration for Shelly devices.",
   "license": "SEE LICENSE IN LICENSE.md",
   "repository": {
