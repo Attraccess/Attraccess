@@ -21,9 +21,14 @@
     "password": "Set admin password",
     "reprobe": "Re-probe device",
     "delete": "Delete device",
-    "deleteDescription": "Remove {{name}} ({{address}}) from the registry? The device itself is not changed."
+    "deleteDescription": "Remove {{name}} ({{address}}) from the registry? The device itself is not changed.",
+    "bluetooth": "Set up over Bluetooth"
   },
-  "auth": { "none": "No auth", "required": "Auth required", "unknown": "Unknown" },
+  "auth": {
+    "none": "No auth",
+    "required": "Auth required",
+    "unknown": "Unknown"
+  },
   "add": {
     "title": "Add a device",
     "description": "Enter the device's IP address. We probe GET /shelly to detect its generation and model.",
@@ -113,5 +118,112 @@
     "betaStage": "beta",
     "timeout": "The device did not report the expected firmware version within 5 minutes. Check it and re-check the firmware manually."
   },
-  "common": { "cancel": "Cancel", "close": "Close", "delete": "Delete", "done": "Done", "refresh": "Refresh" }
+  "common": {
+    "cancel": "Cancel",
+    "close": "Close",
+    "delete": "Delete",
+    "done": "Done",
+    "refresh": "Refresh"
+  },
+  "ble": {
+    "open": "Set up over Bluetooth",
+    "title": "Set up over Bluetooth",
+    "description": "Connect to a factory-reset Shelly from this browser, give it Wi-Fi and an admin password, and add it to Attraccess.",
+    "unsupported": {
+      "title": "Bluetooth is not available here",
+      "noApi": "This browser cannot use Web Bluetooth. Open Attraccess in Chrome or Edge on a desktop or Android device.",
+      "insecure": "Web Bluetooth only works on HTTPS pages or on localhost. Open Attraccess over HTTPS.",
+      "alternatives": "You can still add the device with “Add device” if you know its IP address, or use “Discover” once it is on your network."
+    },
+    "start": {
+      "intro": "Stand next to the Shelly and make sure it is powered and factory reset. Works with Shelly Gen2, Gen3 and Gen4 devices. Gen1 devices cannot be set up over Bluetooth.",
+      "select": "Select device",
+      "connecting": "Connecting to the device…",
+      "hint": "Your browser opens a list of nearby Bluetooth devices. Pick the Shelly (its name starts with “Shelly”)."
+    },
+    "connect": {
+      "title": "Could not connect",
+      "noRpcService": "This device does not offer Shelly's Bluetooth RPC service. Gen1 devices never do. On some Gen2 firmware, enable “RPC over Bluetooth” in the device's web interface, or use Add device or Discover instead.",
+      "linkLost": "The Bluetooth connection could not be established. Move closer to the device and try again.",
+      "generic": "Could not talk to the device over Bluetooth."
+    },
+    "device": {
+      "title": "Connected device",
+      "model": "Model",
+      "generation": "Generation",
+      "id": "Device ID",
+      "firmware": "Firmware",
+      "protected": "This device already has an admin password."
+    },
+    "wifi": {
+      "title": "Wi-Fi network",
+      "description": "Pick the 2.4 GHz network the device should join.",
+      "scanning": "Scanning for networks — this can take several seconds…",
+      "scanFailed": "The device could not scan for networks. Enter the network name yourself.",
+      "rescan": "Scan again",
+      "networks": "Networks seen by the device",
+      "other": "Other network (enter name)",
+      "ssid": "Network name (SSID)",
+      "password": "Wi-Fi password",
+      "passwordManualDescription": "Leave empty for an open network.",
+      "secured": "secured",
+      "open": "open",
+      "signal": "{{rssi}} dBm",
+      "none": "The device did not see any networks."
+    },
+    "admin": {
+      "new": "New admin password",
+      "newDescription": "Required. It protects the device before it joins the network. The username is “admin”.",
+      "current": "Current admin password",
+      "currentDescription": "This device already has an admin password. It is used to authenticate over Bluetooth and is not changed.",
+      "confirm": "Confirm admin password",
+      "mismatch": "The passwords do not match."
+    },
+    "name": {
+      "label": "Name (optional)",
+      "description": "Shown in Attraccess. Defaults to the Bluetooth name of the device."
+    },
+    "disable": {
+      "label": "Switch off Bluetooth on the device after setup",
+      "description": "Keep it on only if you use the device as a BLU or BTHome gateway. While Bluetooth is on, anyone nearby can try to connect."
+    },
+    "begin": "Start setup",
+    "validation": {
+      "ssid": "Choose or enter a Wi-Fi network.",
+      "wifiPassword": "Enter the Wi-Fi password.",
+      "adminPassword": "An admin password is required."
+    },
+    "secretsNote": "Wi-Fi and admin passwords go from this browser straight to the device over Bluetooth. They are not sent to Attraccess and not stored.",
+    "steps": {
+      "password": "Set the admin password",
+      "passwordCheck": "Check the admin password",
+      "wifi": "Configure Wi-Fi",
+      "join": "Wait for the device to join the network",
+      "register": "Add to Attraccess",
+      "bluetooth": "Switch off Bluetooth"
+    },
+    "failure": {
+      "title": "Setup failed at “{{step}}”",
+      "wrongPassword": "The device rejected the admin password. Check it and try again.",
+      "linkLost": "The Bluetooth connection was lost. Move closer to the device and start again. If the device already joined Wi-Fi, use Discover to add it.",
+      "joinTimeout": "The device did not get an IP address within 60 seconds (last status: {{status}}). Check the password, and that the network is 2.4 GHz — Shelly devices cannot join 5 GHz networks.",
+      "timeout": "The device did not answer over Bluetooth in time. Move closer and try again.",
+      "rpc": "The device refused the request: {{method}} returned “{{message}}” (code {{code}}).",
+      "registerFailed": "The device is on the network, but Attraccess could not add it: {{message}} Use Discover or Add device to add it.",
+      "generic": "Something went wrong while talking to the device.",
+      "retry": "Start over"
+    },
+    "result": {
+      "title": "Device set up",
+      "name": "Name",
+      "ip": "IP address",
+      "passwordSet": "Admin password set",
+      "bluetoothOff": "Bluetooth switched off",
+      "bluetoothOn": "Bluetooth left on",
+      "bluetoothRefused": "The device refused to switch Bluetooth off. It is set up and registered; switch Bluetooth off in the device's web interface if you want to.",
+      "alreadyRegistered": "A device with the IP {{ip}} is already registered in Attraccess, so nothing was added.",
+      "restartTitle": "The device restarts",
+      "restart": "Wi-Fi is set and the device restarts. Once it is online, use Discover (or Add device) to add it. Bluetooth is left on."
+    }
+  }
 }

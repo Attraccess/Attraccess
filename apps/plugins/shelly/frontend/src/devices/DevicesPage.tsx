@@ -1,10 +1,11 @@
 import { PageHeader, StatusAlert, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
 import { useOverlayState } from '@heroui/react';
-import { PlusIcon, SearchIcon, WifiIcon } from 'lucide-react';
+import { BluetoothIcon, PlusIcon, SearchIcon, WifiIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { deleteDevice, listDevices, listFirmware, type FirmwareOverviewEntry, type ShellyDevice } from '../api';
 import { AddDeviceDrawer } from './AddDeviceDrawer';
 import { AdminPasswordDrawer } from '../AdminPasswordDrawer';
+import { BluetoothSetupDrawer } from './bluetooth/BluetoothSetupDrawer';
 import { DeviceInfoDrawer } from './info/DeviceInfoDrawer';
 import { DiscoverDrawer } from '../DiscoverDrawer';
 import { FirmwareDrawer } from './firmware/FirmwareDrawer';
@@ -23,6 +24,7 @@ export function DevicesPage() {
   const [firmware, setFirmware] = useState<Record<number, FirmwareOverviewEntry>>({});
   const addDrawer = useOverlayState();
   const discoverDrawer = useOverlayState();
+  const bluetoothDrawer = useOverlayState();
 
   // Firmware checks talk to every device (and, on Gen2+, to the Shelly update
   // server), so they run after the list rather than holding the table hostage.
@@ -90,6 +92,14 @@ export function DevicesPage() {
         subtitle={t('devices.description')}
         actions={[
           {
+            key: 'bluetooth',
+            label: t('devices.bluetooth'),
+            icon: <BluetoothIcon className="sh:h-4 sh:w-4" />,
+            variant: 'secondary',
+            onPress: bluetoothDrawer.open,
+            dataCy: 'shelly-bluetooth-open',
+          },
+          {
             key: 'discover',
             label: t('devices.discover'),
             icon: <SearchIcon className="sh:h-4 sh:w-4" />,
@@ -131,6 +141,11 @@ export function DevicesPage() {
       )}
 
       <AddDeviceDrawer isOpen={addDrawer.isOpen} onOpenChange={addDrawer.setOpen} onAdded={refresh} />
+      <BluetoothSetupDrawer
+        isOpen={bluetoothDrawer.isOpen}
+        onOpenChange={bluetoothDrawer.setOpen}
+        onRegistered={refresh}
+      />
       <DiscoverDrawer isOpen={discoverDrawer.isOpen} onOpenChange={discoverDrawer.setOpen} onDiscovered={refresh} />
       <DeviceInfoDrawer device={infoDevice} onOpenChange={(open) => !open && setInfoDevice(null)} />
       <AdminPasswordDrawer
