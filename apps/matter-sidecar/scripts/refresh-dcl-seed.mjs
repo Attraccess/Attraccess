@@ -83,6 +83,14 @@ function issuedByOneOf(record, roots) {
   return cert.checkIssued(root) && cert.verify(root.publicKey);
 }
 
+/** True for a CSA (vid 0xC5A0) Certification Declaration signing certificate issued by one of the approved `roots`. */
+function isCdSigner(record, roots) {
+  const subject = record.subjectAsText ?? '';
+  return (
+    !record.isRoot && [CD_SIGNER, CSA_VID].every((pattern) => pattern.test(subject)) && issuedByOneOf(record, roots)
+  );
+}
+
 function entryOf(record) {
   const der = new X509Certificate(record.pemCert);
   return {
@@ -113,15 +121,7 @@ const rootCerts = new Map(
   roots.map((record) => [normalizedKeyId(record.subjectKeyId), new X509Certificate(record.pemCert)]),
 );
 const paaRoots = roots.map(entryOf);
-const cdSigners = attestation
-  .filter(
-    (record) =>
-      !record.isRoot &&
-      CD_SIGNER.test(record.subjectAsText ?? '') &&
-      CSA_VID.test(record.subjectAsText ?? '') &&
-      issuedByOneOf(record, rootCerts),
-  )
-  .map(entryOf);
+const cdSigners = attestation.filter((record) => isCdSigner(record, rootCerts)).map(entryOf);
 const byKey = (a, b) => a.subjectKeyId.localeCompare(b.subjectKeyId);
 if (paaRoots.length === 0 || cdSigners.length === 0) {
   throw new Error(`Refusing to write an empty seed (PAA ${paaRoots.length}, CD signers ${cdSigners.length}).`);
