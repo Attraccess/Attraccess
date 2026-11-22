@@ -142,10 +142,18 @@ namespace bletest
             WatchFixture broken;
             broken.radio.initError = Error(Code::ReaderOffline, "no-sync");
             broken.request("BLE_WATCH_SET", watchSet(5, MANUFACTURER_FILTER));
-            JsonObjectConst refused = broken.states().back();
-            expect(refused["ok"] == false && std::strcmp(refused["error"]["detail"] | "", "ble-init-failed") == 0,
-                   "an init failure is answered READER_OFFLINE");
-            expect(!broken.core.watching() && broken.core.idle(), "and leaves no watch behind");
+            JsonObjectConst inactive = broken.states().back();
+            expect(inactive["ok"] == true && inactive["active"] == false &&
+                       std::strcmp(inactive["detail"] | "", "ble-init-failed") == 0,
+                   "an init failure is answered inactive, with the reason");
+            expect(!broken.core.watching() && !broken.core.idle(), "the watch stays and the proxy keeps trying");
+            broken.radio.initError = Error();
+            broken.tickAt(broken.now + WATCH_RETRY_MS - 1);
+            expect(!broken.core.watching(), "not before the retry time");
+            broken.tickAt(broken.now + 1);
+            expect(broken.core.watching() && broken.radio.count("watch") == 1, "the radio came up: the watch scans");
+            expect(broken.states().back()["active"] == true && !broken.states().back()["requestId"].is<int>(),
+                   "and says so unsolicited");
         }
 
         void reportsChangesAndKeepalives()

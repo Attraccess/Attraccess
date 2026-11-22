@@ -21,13 +21,9 @@ namespace ble
             send(watchStateMessage(command.requestId, Error(), false));
             return;
         }
-        // NimBLE comes up with the first filter set (never for an empty one). During an OTA it waits for the OTA.
-        if (!ota() && !ensureRadio(command))
-        {
-            watch.clear();
-            stopWatchScan();
-            return;
-        }
+        // NimBLE comes up with the first filter set (never for an empty one), in updateWatchScan(). During an OTA it
+        // waits for the OTA. A stack that cannot start now (low memory, the BLE bridge's Bluetooth setup still open)
+        // keeps the filters and retries every WATCH_RETRY_MS: the API pushes a filter set only once per connection.
         const size_t filters = command.watchFilters.size();
         watch.set(std::move(command.watchFilters), command.keepaliveMs, now);
         watchRetry = false;
