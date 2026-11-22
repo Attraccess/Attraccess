@@ -1028,11 +1028,12 @@ configure step) turns on LVGL's sysmon perf monitor in log mode: FPS, render and
 log instead of the panel. The option is `OFF` by default, `build_firmwares.py` never sets it, and
 `tools/check_release_build.py` fails a release image compiled with it.
 
-### Wi-Fi and lwIP buffers in PSRAM
+### Heap log
 
-`sdkconfig.defaults` sets `CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y`: the Wi-Fi and lwIP buffers are taken from
-PSRAM first, so internal RAM stays free for DMA buffers, task stacks, LVGL and TLS. The periodic heap log
-shows both: `Heap internal: free= largest= min=` and `Heap PSRAM: free= largest=`.
+The periodic heap log shows internal and PSRAM RAM: `Heap internal: free= largest= min=` and
+`Heap PSRAM: free= largest=`. `CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP` stays off: an HIL A/B run on a Touch V2
+(ATT-1276) showed no internal RAM gain with it (1 KB lower minimum free) and about 60 KB less free PSRAM,
+because `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=1024` already sends larger blocks to PSRAM.
 
 ### Device-lab TLS CA (lab builds only)
 
