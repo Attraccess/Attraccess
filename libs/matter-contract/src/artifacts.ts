@@ -4,6 +4,7 @@ import { capabilityReportSchema } from './capabilities';
 import { COMPATIBILITY_TABLE, supportedCombinationSchema } from './compatibility';
 import { errorEnvelopeSchema } from './errors';
 import { commandOutcomePayloadSchema, deviceStatePayloadSchema, eventEnvelopeSchema } from './events';
+import { commissioningProgressPayloadSchema } from './families';
 import { clientMessageSchema, serverMessageSchema } from './messages';
 import { EVENTS_PATH, OPERATIONS, OperationDefinition } from './operations';
 
@@ -16,6 +17,7 @@ const NAMED_SCHEMAS: Record<string, z.ZodType> = {
   EventEnvelope: eventEnvelopeSchema,
   DeviceStatePayload: deviceStatePayloadSchema,
   CommandOutcomePayload: commandOutcomePayloadSchema,
+  CommissioningProgressPayload: commissioningProgressPayloadSchema,
   ClientMessage: clientMessageSchema,
   ServerMessage: serverMessageSchema,
 };

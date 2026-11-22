@@ -114,17 +114,115 @@ export const backupRestoreResultSchema = z.strictObject({
 
 // --- commissioning ----------------------------------------------------------------------------
 
+export const commissioningStepSchema = z.enum([
+  'discovering',
+  'pase',
+  'reading_device',
+  'attestation',
+  'adding_fabric',
+  /** Not used for devices already on an IP network; reserved for Thread. */
+  'network_setup',
+  'case',
+  'interrogating',
+  'completed',
+]);
+export const commissioningFailureCodeSchema = z.enum([
+  'invalid_code',
+  'device_not_found',
+  /** The passcode was wrong, or the device refused the pairing. */
+  'pase_failed',
+  'attestation_failed',
+  'already_commissioned',
+  'fabric_full',
+  'case_failed',
+  'timeout',
+  'cancelled',
+  'interrupted',
+  'internal',
+]);
+/** The name of an attestation finding (for example `PaaNotTrusted`). A type only: never certificate content. */
+export const attestationFindingTypeSchema = z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,63}$/);
+export const commissioningFailureSchema = z.strictObject({
+  code: commissioningFailureCodeSchema,
+  /** Present for `attestation_failed`. */
+  attestationFindings: z.array(attestationFindingTypeSchema).max(32).optional(),
+  /** Present for `already_commissioned`: the node the device already is in this fabric. */
+  existingNodeId: matterId64Schema.optional(),
+});
+export type CommissioningFailure = z.infer<typeof commissioningFailureSchema>;
+
 /** The setup code is a secret. It appears only in requests, never in responses, events or logs. */
 export const commissioningRequestSchema = z.strictObject({
   setupCode: z.string().regex(/^[0-9]{11}$|^[0-9]{21}$|^MT:[A-Z0-9.-]{10,}$/),
+  /**
+   * A new session that proceeds although attestation fails. Refused with `attestation_override_disabled` unless the
+   * sidecar runs with `MATTER_SIDECAR_ALLOW_ATTESTATION_OVERRIDE=true`.
+   */
+  attestationOverride: z.strictObject({ confirmed: z.literal(true) }).optional(),
   deadlineMs: deadlineSchema.optional(),
 });
 export const commissioningSessionSchema = z.strictObject({
   sessionId: uuidSchema,
   state: z.enum(['pending', 'running', 'succeeded', 'failed']),
+  step: commissioningStepSchema.nullable(),
   nodeId: matterId64Schema.nullable(),
   outcome: outcomeSchema,
+  /** Set when `state` is `failed`. */
+  failure: commissioningFailureSchema.nullable(),
+  /** The attestation result so far: finding types only. `overridden` means a failure was accepted by an override. */
+  attestation: z
+    .strictObject({
+      status: z.enum(['verified', 'failed', 'overridden']),
+      findings: z.array(attestationFindingTypeSchema).max(32),
+    })
+    .nullable(),
+  /** Whether this sidecar offers the attestation override at all. */
+  attestationOverrideAllowed: z.boolean(),
+  startedAt: timestampSchema,
+  updatedAt: timestampSchema,
+  finishedAt: timestampSchema.nullable(),
 });
+export type CommissioningSession = z.infer<typeof commissioningSessionSchema>;
+
+/** Payload of the `commissioning.progress` event. Carries no setup code and no certificate content. */
+export const commissioningProgressPayloadSchema = z.strictObject({
+  sessionId: uuidSchema,
+  step: commissioningStepSchema.nullable(),
+  state: z.enum(['pending', 'running', 'succeeded', 'failed']),
+  nodeId: matterId64Schema.nullable(),
+  failure: commissioningFailureSchema.nullable(),
+});
+export type CommissioningProgressPayload = z.infer<typeof commissioningProgressPayloadSchema>;
+
+// --- removal and sharing ----------------------------------------------------------------------
+
+/**
+ * `force: false` sends RemoveFabric for the Attraccess fabric to the reachable device, then forgets the node.
+ * `force: true` only forgets the node on the sidecar and never contacts the device.
+ */
+export const nodeRemoveRequestSchema = z.strictObject({ force: z.boolean(), deadlineMs: deadlineSchema.optional() });
+export const nodeRemoveResultSchema = z.strictObject({
+  nodeId: matterId64Schema,
+  /** `removed_from_fabric`: the device confirmed. `forgotten`: forced, the device was not contacted. */
+  result: z.enum(['removed_from_fabric', 'forgotten']),
+  fabricGeneration: z.int().min(0),
+});
+
+export const SHARE_WINDOW_MIN_SEC = 180;
+export const SHARE_WINDOW_MAX_SEC = 900;
+export const shareOpenRequestSchema = z.strictObject({
+  timeoutSec: z.int().min(SHARE_WINDOW_MIN_SEC).max(SHARE_WINDOW_MAX_SEC).default(SHARE_WINDOW_MIN_SEC),
+  deadlineMs: deadlineSchema.optional(),
+});
+/** The codes are secrets that open the window for anyone who has them: returned once, never stored or logged. */
+export const shareWindowSchema = z.strictObject({
+  nodeId: matterId64Schema,
+  manualCode: z.string().regex(/^[0-9]{11}$|^[0-9]{21}$/),
+  qrCode: z.string().regex(/^MT:[A-Z0-9.-]{10,}$/),
+  expiresAt: timestampSchema,
+});
+export const shareCloseRequestSchema = z.strictObject({ deadlineMs: deadlineSchema.optional() });
+export const shareCloseResultSchema = z.strictObject({ nodeId: matterId64Schema, closed: z.boolean() });
 
 // --- inventory --------------------------------------------------------------------------------
 
@@ -163,6 +261,14 @@ export const endpointSchema = z.strictObject({
   bridged: bridgedInfoSchema.nullable(),
 });
 export const attestationStatusSchema = z.enum(['verified', 'unverified', 'failed', 'unknown']);
+/** Another administrator of the device: a fabric the device is joined to. */
+export const administratorSchema = z.strictObject({
+  fabricIndex: z.int().min(1).max(254),
+  vendorId: z.int().min(0).max(0xffff).nullable(),
+  fabricLabel: z.string().max(32).nullable(),
+  /** True for the Attraccess fabric itself. */
+  isOwn: z.boolean(),
+});
 export const nodeSchema = z.strictObject({
   nodeId: matterId64Schema,
   reachable: z.boolean(),
@@ -177,6 +283,8 @@ export const nodeSchema = z.strictObject({
   softwareVersionString: z.string().max(64).nullable(),
   attestation: z.strictObject({ status: attestationStatusSchema, checkedAt: timestampSchema.nullable() }),
   endpoints: z.array(endpointSchema).max(256),
+  /** Every fabric the device is joined to, Attraccess's own included. */
+  administrators: z.array(administratorSchema).max(254).default([]),
   /** When this inventory view was last confirmed by the device. */
   observedAt: timestampSchema.nullable(),
 });
