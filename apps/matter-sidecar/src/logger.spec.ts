@@ -73,4 +73,26 @@ describe('createLogger masking', () => {
     log('info', 'plain message');
     expect(JSON.parse(lines[0]).message).toBe('plain message');
   });
+
+  it('masks QR payloads and 11- or 21-digit manual codes, and leaves other numbers alone', () => {
+    const { lines, log } = capture([]);
+    log('warn', 'code MT:Y.K90AFN00KA0648G00 and 34970112332', {
+      a: '749701123365521327694',
+      b: 'x34970112332y',
+      timestamp: 1_764_000_000_000,
+      uuid: 'a285de68-12345678901-968f',
+      short: '1234567890',
+      long: '1234567890123',
+    });
+    const line = JSON.parse(lines[0]);
+    expect(line.message).toBe('code [redacted] and [redacted]');
+    expect(line.a).toBe('[redacted]');
+    expect(line.b).toBe('x34970112332y');
+    expect(line).toMatchObject({
+      uuid: 'a285de68-12345678901-968f',
+      timestamp: 1_764_000_000_000,
+      short: '1234567890',
+      long: '1234567890123',
+    });
+  });
 });

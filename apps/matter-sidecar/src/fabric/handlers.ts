@@ -1,5 +1,7 @@
 import type { BackupHeader } from '@attraccess/matter-contract';
 import type { FeatureHandlers } from '../request-pipeline';
+import type { inventoryHandlers as InventoryHandlers } from '../inventory/handlers';
+import type { nodeHandlers as NodeHandlers } from '../nodes/handlers';
 import type { FabricManager } from './manager';
 
 type StageBody = { header: BackupHeader; payload: string };
@@ -7,7 +9,13 @@ type StageIdBody = { stageId: string };
 
 /** The `fabric` and `backup` operations, served from the sidecar's persistent state. */
 export function fabricHandlers(manager: FabricManager): FeatureHandlers {
+  // These modules load matter.js; they are required here, after the platform is loaded, so that importing the
+  // sidecar alone (the unit tests) opens no matter.js.
+  const { inventoryHandlers } = require('../inventory/handlers') as { inventoryHandlers: typeof InventoryHandlers };
+  const { nodeHandlers } = require('../nodes/handlers') as { nodeHandlers: typeof NodeHandlers };
   return {
+    ...inventoryHandlers(manager),
+    ...nodeHandlers(manager),
     'fabric.get': () => manager.status(),
     'fabric.create': ({ body }) => manager.create((body as { label: string }).label),
     'backup.snapshot': () => manager.snapshot(),

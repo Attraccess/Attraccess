@@ -30,6 +30,8 @@ describe('loadConfig', () => {
       tls: null,
       insecureRemote: false,
       storageDir: resolve('./matter-storage'),
+      allowAttestationOverride: false,
+      dclRefresh: true,
       matterPort: 0,
       maxMessageBytes: 1024 * 1024,
       requestDeadlineMs: 10_000,
@@ -40,6 +42,17 @@ describe('loadConfig', () => {
       maxClients: 64,
       firstMessageTimeoutMs: 30_000,
     });
+  });
+
+  it('keeps the attestation override off unless it is switched on explicitly, and DCL refresh on unless switched off', () => {
+    expect(loadConfig({ ...base, MATTER_SIDECAR_ALLOW_ATTESTATION_OVERRIDE: '' })).toMatchObject({
+      allowAttestationOverride: false,
+    });
+    expect(loadConfig({ ...base, MATTER_SIDECAR_ALLOW_ATTESTATION_OVERRIDE: ' TRUE ' }).allowAttestationOverride).toBe(
+      true,
+    );
+    expect(loadConfig({ ...base, MATTER_SIDECAR_DCL_REFRESH: 'false' }).dclRefresh).toBe(false);
+    expect(() => loadConfig({ ...base, MATTER_SIDECAR_ALLOW_ATTESTATION_OVERRIDE: 'yes' })).toThrow(ConfigError);
   });
 
   it('resolves MATTER_SIDECAR_STORAGE_DIR and reads the Matter port', () => {

@@ -3,6 +3,7 @@
 // through no HTTP route and no environment flag. Public commissioning and commands belong to later tickets.
 import { Endpoint, Logger, LogLevel, Seconds, ServerNode, VendorId } from '@matter/main';
 import { OnOffClient } from '@matter/main/behaviors';
+import { DiscoveryCapabilitiesSchema, ManualPairingCodeCodec, QrPairingCodeCodec } from '@matter/main/types';
 import { OnOffLightDevice } from '@matter/main/devices';
 import { NodeJsEnvironment } from '@matter/nodejs';
 import { randomInt } from 'node:crypto';
@@ -28,7 +29,45 @@ type Credentials = ReturnType<typeof randomCommissioningCredentials>;
 /** The device `commissionVirtualDevice` uses when the caller names none. */
 let lastStarted: Credentials | undefined;
 
+/** The setup codes of a virtual device, in every form a person can enter. */
+export type SetupCodes = {
+  /** The `MT:` QR payload. */
+  qr: string;
+  /** The 11-digit manual code (short discriminator, no vendor or product). */
+  manual11: string;
+  /** The 21-digit manual code (long form with vendor and product ID). */
+  manual21: string;
+};
+
+const TEST_VENDOR_ID = 0xfff1;
+const TEST_PRODUCT_ID = 0x8000;
+
+export function setupCodesFor({ passcode, discriminator }: Credentials): SetupCodes {
+  return {
+    qr: QrPairingCodeCodec.encode([
+      {
+        version: 0,
+        vendorId: VendorId(TEST_VENDOR_ID),
+        productId: TEST_PRODUCT_ID,
+        flowType: 0,
+        discoveryCapabilities: DiscoveryCapabilitiesSchema.encode({ onIpNetwork: true }),
+        discriminator,
+        passcode,
+      },
+    ]),
+    manual11: ManualPairingCodeCodec.encode({ discriminator, passcode }),
+    manual21: ManualPairingCodeCodec.encode({
+      discriminator,
+      passcode,
+      vendorId: VendorId(TEST_VENDOR_ID),
+      productId: TEST_PRODUCT_ID,
+    }),
+  };
+}
+
 export type VirtualDevice = Credentials & {
+  /** Every form of the device's setup code. */
+  codes: SetupCodes;
   node: ServerNode;
   light: Endpoint<typeof OnOffLightDevice>;
   /** Fabric IDs the device lists, as decimal strings. */
@@ -73,6 +112,7 @@ export async function startVirtualDevice(storageDir: string, port: number): Prom
   lastStarted = credentials;
   return {
     ...credentials,
+    codes: setupCodesFor(credentials),
     node,
     light,
     fabricIds: () => Object.values(node.state.operationalCredentials.fabrics).map((fabric) => String(fabric.fabricId)),
@@ -140,4 +180,18 @@ async function onlinePeer(controller: MatterController, nodeId: string, timeoutM
 export async function toggleDevice(controller: MatterController, nodeId: string, timeoutMs = 60_000): Promise<void> {
   const peer = await onlinePeer(controller, nodeId, timeoutMs);
   await peer.endpoints.for(1).commandsOf(OnOffClient).toggle();
+}
+
+/**
+ * Opens an Enhanced Commissioning Window on a node the controller has commissioned, as another ecosystem's "share"
+ * button does, and returns the codes a person would type or scan. `nodeId` is the node ID in that controller's fabric.
+ */
+export async function openSharingWindow(
+  controller: MatterController,
+  nodeId: string,
+  seconds = 180,
+): Promise<{ manual: string; qr: string }> {
+  const peer = await onlinePeer(controller, nodeId, 60_000);
+  const window = await peer.openEnhancedCommissioningWindow(Seconds(seconds));
+  return { manual: window.manualPairingCode, qr: window.qrPairingCode };
 }

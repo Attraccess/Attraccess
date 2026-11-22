@@ -76,6 +76,8 @@ const configSchema = z.object({
   MATTER_SIDECAR_TLS_KEY_FILE: optionalString,
   MATTER_SIDECAR_ALLOW_INSECURE_REMOTE: optionalBoolean,
   MATTER_SIDECAR_STORAGE_DIR: optionalString,
+  MATTER_SIDECAR_ALLOW_ATTESTATION_OVERRIDE: optionalBoolean,
+  MATTER_SIDECAR_DCL_REFRESH: optionalBoolean,
   MATTER_SIDECAR_MATTER_PORT: integer(0, 65_535, 0),
   MATTER_SIDECAR_PORT: integer(0, 65_535, 8581),
   MATTER_SIDECAR_MAX_MESSAGE_BYTES: positiveInt(MAX_MESSAGE_BYTES, 16 * 1024 * 1024),
@@ -99,6 +101,13 @@ export type SidecarConfig = {
   insecureRemote: boolean;
   /** Where the fabric and the controller state are persisted. Needs its own persistent volume. */
   storageDir: string;
+  /**
+   * Offers the development override for device attestation failures (`MATTER_SIDECAR_ALLOW_ATTESTATION_OVERRIDE`).
+   * Off by default; never enable it in production.
+   */
+  allowAttestationOverride: boolean;
+  /** Refreshes the attestation trust store from the CSA production DCL (`MATTER_SIDECAR_DCL_REFRESH`, default on). */
+  dclRefresh: boolean;
   /** UDP port of the controller's Matter endpoint; 0 picks a free port. */
   matterPort: number;
   maxMessageBytes: number;
@@ -225,6 +234,8 @@ export function loadConfig(
     tls,
     insecureRemote: remote && !tls,
     storageDir: resolve(values.MATTER_SIDECAR_STORAGE_DIR ?? './matter-storage'),
+    allowAttestationOverride: values.MATTER_SIDECAR_ALLOW_ATTESTATION_OVERRIDE === 'true',
+    dclRefresh: values.MATTER_SIDECAR_DCL_REFRESH !== 'false',
     matterPort: values.MATTER_SIDECAR_MATTER_PORT,
     maxMessageBytes: values.MATTER_SIDECAR_MAX_MESSAGE_BYTES,
     requestDeadlineMs: values.MATTER_SIDECAR_REQUEST_DEADLINE_MS,
