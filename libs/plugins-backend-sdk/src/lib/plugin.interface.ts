@@ -156,6 +156,8 @@ export enum PluginPermission {
   CARD_AUTHENTICATION = 'CARD_AUTHENTICATION',
   /** Register the plugin's own card readers through context.readers; a card held to one runs its action on its resource. */
   READER_DEVICES = 'READER_DEVICES',
+  /** Set and clear the plugin's own health entries on resources through context.resourceHealth. */
+  REPORT_RESOURCE_HEALTH = 'REPORT_RESOURCE_HEALTH',
 }
 
 /**
@@ -186,6 +188,7 @@ export const PLUGIN_PERMISSION_DESCRIPTIONS: Record<PluginPermission, string> = 
     "Authenticate NFC cards held to the plugin's own devices with the Attraccess card keys. The plugin receives the card and its owner, never the keys.",
   [PluginPermission.READER_DEVICES]:
     "Register the plugin's own card readers and assign each one a resource its capabilities allow (today an access-only door); a card authenticated on a reader runs its action on that resource for the card owner, with the same checks as an Attractap reader.",
+  [PluginPermission.REPORT_RESOURCE_HEALTH]: "Set and clear the plugin's own health entries on resources.",
 };
 
 /**

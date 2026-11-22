@@ -53,6 +53,55 @@ describe('PluginUninstallService', () => {
     expect(existsSync(join(fixture.root, 'delete-me'))).toBe(false);
   });
 
+  describe('health entries', () => {
+    const entry = (id: number, identifier: string, source = 'plugin') => ({
+      id,
+      resourceId: 5,
+      identifier,
+      source,
+      status: 'unhealthy',
+    });
+    const healthWith = (entries: ReturnType<typeof entry>[]) => ({
+      listBySourceAndPrefix: jest.fn().mockResolvedValue(entries),
+      clearEntry: jest.fn().mockResolvedValue(undefined),
+    });
+    const uninstallerWith = (health: unknown) =>
+      new PluginUninstallService(
+        new PluginService(),
+        bleEndpoints as never,
+        readers as never,
+        {
+          get: () => health,
+        } as never,
+      );
+
+    it('clears the health entries of the plugin through the clear path', async () => {
+      const plugin = writeDeletablePlugin();
+      const health = healthWith([
+        entry(1, 'plugin:delete-me:lock-1-motor'),
+        // a manual entry that merely looks like one of the plugin's is left alone
+        entry(2, 'plugin:delete-me:lock-2-motor', 'manual'),
+      ]);
+
+      await uninstallerWith(health).deletePlugin(plugin.id, true);
+
+      expect(health.listBySourceAndPrefix).toHaveBeenCalledWith('plugin', 'plugin:delete-me:');
+      expect(health.clearEntry).toHaveBeenCalledTimes(1);
+      expect(health.clearEntry).toHaveBeenCalledWith(5, 1, expect.anything());
+      expect(existsSync(join(fixture.root, 'delete-me'))).toBe(false);
+    });
+
+    it('still uninstalls when clearing the health entries fails', async () => {
+      const plugin = writeDeletablePlugin();
+      const health = healthWith([entry(1, 'plugin:delete-me:a')]);
+      health.clearEntry.mockRejectedValue(new Error('db locked'));
+
+      await uninstallerWith(health).deletePlugin(plugin.id, true);
+
+      expect(existsSync(join(fixture.root, 'delete-me'))).toBe(false);
+    });
+  });
+
   it('removes the plugin folder and schedules a restart', async () => {
     const plugin = writeDeletablePlugin();
     PluginService.quarantinePlugin(plugin, new Error('prior crash'));

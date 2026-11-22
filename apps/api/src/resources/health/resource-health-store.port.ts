@@ -31,6 +31,13 @@ export interface ResourceHealthStore {
 
   listForResources(resourceIds: number[]): Promise<ResourceHealthRecord[]>;
 
+  /** Entries of one source whose identifier starts with the prefix, of one resource or of all; ordered by resource, identifier. */
+  listBySourceAndPrefix(
+    source: ResourceHealthSource,
+    identifierPrefix: string,
+    resourceId?: number,
+  ): Promise<ResourceHealthRecord[]>;
+
   /** Whether any entry of the resource is unhealthy, inside the caller's transaction when one is given. */
   hasUnhealthyEntry(resourceId: number, context?: ResourcePersistenceContext): Promise<boolean>;
 

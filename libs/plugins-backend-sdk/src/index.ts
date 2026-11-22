@@ -20,6 +20,7 @@ export * from './lib/plugin-ble-fake';
 export * from './lib/plugin-storage-memory';
 export * from './lib/plugin-cards';
 export * from './lib/plugin-readers';
+export * from './lib/plugin-resource-health';
 
 export * from './lib/auth-decorator';
 export * from '@attraccess/application-models';

@@ -102,6 +102,7 @@ import {
   createHostDataContext,
   createHostNotificationsContext,
   createHostResourceAccessContext,
+  createHostResourceHealthContext,
   PluginHostRefs,
 } from './runtime/host-contexts';
 import { LicenseService } from '../license/license.service';
@@ -487,6 +488,7 @@ export class PluginModule {
       license: createPluginLicenseContext(() => getImplementationClass().hostRefs().get(LicenseService)),
       notifications: createHostNotificationsContext(manifest.name, getImplementationClass().hostRefs()),
       resourceAccess: createHostResourceAccessContext(getImplementationClass().hostRefs()),
+      resourceHealth: createHostResourceHealthContext(manifest.name, getImplementationClass().hostRefs()),
       hostData: createHostDataContext(getImplementationClass().hostRefs()),
       persistence: contexts.persistence,
       storage: contexts.storage,

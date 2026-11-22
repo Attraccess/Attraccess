@@ -1,4 +1,6 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+
+import { ModuleRef } from '@nestjs/core';
 
 import { existsSync } from 'fs';
 
@@ -14,6 +16,10 @@ import { PluginReadersService } from './readers/plugin-readers.service';
 
 import { PluginService } from './plugin.service';
 
+import { ResourceHealthService } from '../resources/health/resource-health.service';
+
+import { clearAllPluginResourceHealth } from './runtime/plugin-resource-health';
+
 import { releaseStorageNames } from './plugin-storage/storage-registry';
 
 /**
@@ -28,6 +34,7 @@ export class PluginUninstallService {
     private readonly pluginService: PluginService,
     private readonly ble: PluginBleService,
     private readonly readers: PluginReadersService,
+    @Optional() private readonly moduleRef?: ModuleRef,
   ) {}
 
   async deletePlugin(pluginId: string, deferRestart = false) {
@@ -74,6 +81,18 @@ export class PluginUninstallService {
       await this.readers.deleteAllForPlugin(plugin.id);
     } catch (error) {
       PluginUninstallService.logger.error(`Failed to delete the readers of plugin ${plugin.name}`, error as Error);
+    }
+
+    // The plugin's health entries go too, so no door stays blocked by a plugin that is gone (disabling keeps them,
+    // an admin can clear those by hand). A failure is logged, never blocking.
+    try {
+      const health = this.moduleRef?.get(ResourceHealthService, { strict: false });
+      if (health) await clearAllPluginResourceHealth(plugin.name, health);
+    } catch (error) {
+      PluginUninstallService.logger.error(
+        `Failed to clear the health entries of plugin ${plugin.name}`,
+        error as Error,
+      );
     }
 
     // delete folder. The plugin's RBAC permission rows stay: deleting them would cascade to every role and

@@ -290,6 +290,7 @@ export default plugin;
 | `context.license`                                         | Query the license (`getLicense`, `hasModule`, `verify`). Optional: older hosts do not provide it. See [License requirements](#license-requirements).              | none                     |
 | `context.ble`                                             | Bluetooth transport through Attractap readers: profiles, endpoints, sessions. See [Bluetooth Transport for Plugins](plugins/ble-transport.md).                    | `BLE_TRANSPORT`          |
 | `context.cards`                                           | Authenticate NFC cards held to your plugin's own devices. See [Card Authentication for Plugins](plugins/card-authentication.md).                                  | `CARD_AUTHENTICATION`    |
+| `context.resourceHealth`                                  | Set, clear and list your plugin's own health entries on resources. Optional: older hosts do not provide it. See [Resource health](#resource-health).              | `REPORT_RESOURCE_HEALTH` |
 | `context.readers`                                         | Register your plugin's own card readers and run their action on their resource for a card authenticated on them. See [Plugin Readers](plugins/plugin-readers.md). | `READER_DEVICES`         |
 
 > [!IMPORTANT]
@@ -323,6 +324,30 @@ naming the missing permission.
 | `BLE_TRANSPORT`          | `context.ble` — use the Bluetooth radio of Attractap readers an administrator opened for plugins, limited to the BLE profiles your plugin registers. See [Bluetooth Transport for Plugins](plugins/ble-transport.md).                               |
 | `CARD_AUTHENTICATION`    | `context.cards` — authenticate NFC cards held to your plugin's own devices with the Attraccess card keys; your plugin gets the card and its owner, never the keys. See [Card Authentication for Plugins](plugins/card-authentication.md).           |
 | `READER_DEVICES`         | `context.readers` — register your plugin's own card readers; a card authenticated on one runs its action on its assigned resource for the card owner, with the same checks as an Attractap reader. See [Plugin Readers](plugins/plugin-readers.md). |
+| `REPORT_RESOURCE_HEALTH` | `context.resourceHealth` — set and clear your plugin's own health entries on resources. See [Resource health](#resource-health).                                                                                                                    |
+
+### Resource health
+
+A resource is unhealthy while any of its health entries is unhealthy, and an unhealthy resource blocks usage for users without maintenance permission. With `REPORT_RESOURCE_HEALTH`, `context.resourceHealth` lets a plugin keep entries of its own:
+
+```ts
+await context.resourceHealth.report({
+  resourceId,
+  key: 'device-7-offline',
+  status: 'unhealthy',
+  reason: 'Device 7 cannot be reached',
+});
+await context.resourceHealth.clear(resourceId, 'device-7-offline');
+const mine = await context.resourceHealth.list(); // reconcile after a restart
+```
+
+- The host stores the entry as `plugin:<pluginName>:<key>` with the source `plugin`. A key has 1 to 64 characters of `a-z`, `0-9`, `.`, `_` and `-`, and starts with a letter or digit. An invalid key throws.
+- A change of status notifies maintainers and introducers like a manual change does. Reporting the status an entry already has notifies nobody. `clear` of an unhealthy entry counts as recovered.
+- The reason is trimmed, cut to 500 characters and dropped for `healthy`.
+- A plugin only ever sees and changes its own entries. Manual entries, flow entries and the entries of other plugins are untouched, so a manual unhealthy entry keeps the resource unhealthy.
+- An unknown resource is skipped. Administrators can clear a plugin entry by hand; report it again if the state persists.
+- Uninstalling the plugin clears its entries. Disabling it keeps them.
+- Optional on the context: older hosts do not provide `context.resourceHealth`; check before use.
 
 ### Plugin-declared RBAC permissions
 
@@ -744,7 +769,7 @@ query handles. Each group checks its own permission when a method is called.
 | Group                | Permission         | Methods                                                                                                                                                                                                                                                                                                 |
 | -------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `hostData.resources` | `ACCESS_RESOURCES` | `get(id, scope?)` (a `PluginResourceModel` or `null`; with a transaction scope it reads inside that transaction), `getNames(ids)`, `filterVisible(userId, ids, { seeAll? })`, `filterRequiringSupervision(ids)`, `listIdsInGroups(groupIds)`, `countUnhealthyEntries(id)`, `listIntroducerUserIds(id)`. |
-| `hostData.users`     | `READ_USERS`       | `getUsernames(ids)` (kept for compatibility), `getDisplayNames(ids)` (a map of user id to display name: "First Last", or the username), `getLocales(ids)`, `isActive(id)` (exists, not deleted, not disabled), `listIdsWithAnyPermission(keys)`.                                                                                                                                                                           |
+| `hostData.users`     | `READ_USERS`       | `getUsernames(ids)` (kept for compatibility), `getDisplayNames(ids)` (a map of user id to display name: "First Last", or the username), `getLocales(ids)`, `isActive(id)` (exists, not deleted, not disabled), `listIdsWithAnyPermission(keys)`.                                                        |
 | `hostData.settings`  | `READ_SETTINGS`    | `getApp(key)`: the trimmed value of an application setting, or `null`.                                                                                                                                                                                                                                  |
 | `hostData.flows`     | `TRIGGER_FLOWS`    | `findNodes(query)`: flow nodes by `type`, `typePrefix`, `dataEquals`, `dataIn`, `resourceId`, `excludeResourceId`, `excludeFlowId`, `orderById` and `limit`, as `{ id, type, resourceId, resourceName, flowId, flowName, data }`.                                                                       |
 
@@ -1609,18 +1634,18 @@ and `attraccessVersion.min`, and those hosts share this module.
 `@attraccess/plugins-frontend-ui` also ships the host's UI building blocks, so
 plugins look and behave like core instead of carrying their own copies:
 
-| Component                                               | Use it for                                                                         |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `StatusDialog`                                          | Notices (`info`, `success`, `warning`, `error`)                                    |
-| `ConfirmableButton`                                     | A button that asks for confirmation in a `StatusDialog` before it runs its action  |
-| `TableRowActions`, `TableActionsColumnHeader`           | A table row's actions: ⋮ menu in the last column, headed "Actions"                 |
-| `DeleteConfirmationModal`                               | **Deprecated**: use `ConfirmableButton`                                            |
-| `StandardModal`, `StandardDrawer`                       | Richer modals and drawers (forms, lists)                                           |
-| `Button`                                                | Buttons with a pending spinner                                                     |
-| `AlertStatusIcon`, `StatusAlert`                        | Alerts with a status icon                                                          |
-| `LabeledSwitch`, `PasswordInput`                        | Switch with label, password field with show/hide                                   |
-| `EmptyState`, `TableDataLoadingIndicator`, `PageHeader` | Empty lists, centred loading indicator, page title with actions                    |
-| `DateTimeDisplay`, `useDateTimeFormatter`               | Dates and times that follow the user's date/time preferences                       |
+| Component                                               | Use it for                                                                        |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `StatusDialog`                                          | Notices (`info`, `success`, `warning`, `error`)                                   |
+| `ConfirmableButton`                                     | A button that asks for confirmation in a `StatusDialog` before it runs its action |
+| `TableRowActions`, `TableActionsColumnHeader`           | A table row's actions: ⋮ menu in the last column, headed "Actions"                |
+| `DeleteConfirmationModal`                               | **Deprecated**: use `ConfirmableButton`                                           |
+| `StandardModal`, `StandardDrawer`                       | Richer modals and drawers (forms, lists)                                          |
+| `Button`                                                | Buttons with a pending spinner                                                    |
+| `AlertStatusIcon`, `StatusAlert`                        | Alerts with a status icon                                                         |
+| `LabeledSwitch`, `PasswordInput`                        | Switch with label, password field with show/hide                                  |
+| `EmptyState`, `TableDataLoadingIndicator`, `PageHeader` | Empty lists, centred loading indicator, page title with actions                   |
+| `DateTimeDisplay`, `useDateTimeFormatter`               | Dates and times that follow the user's date/time preferences                      |
 
 Use `StatusDialog` for short notices and confirmations. Only `error` renders a
 red (danger) action button; every other status renders a primary one. Escape

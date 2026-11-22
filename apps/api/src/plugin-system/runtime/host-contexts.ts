@@ -1,5 +1,6 @@
 import type {
   PluginHostDataContext,
+  PluginResourceHealthContext,
   PluginNotificationsContext,
   PluginResourceAccessContext,
 } from '@attraccess/plugins-backend-sdk';
@@ -9,6 +10,7 @@ import { NotificationDispatchService } from '../../notifications/notification-di
 import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
 import { ResourceUsageService } from '../../resources/usage/sessions/resource-usage.service';
 import { ResourceActivityVisibilityService } from '../../resources/usage/authorization/resource-activity-visibility.service';
+import { ResourceHealthService } from '../../resources/health/resource-health.service';
 import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import {
   PLUGIN_CORE_LOOKUP,
@@ -18,6 +20,7 @@ import {
 } from '../persistence/plugin-host-data.port';
 import { createPluginNotificationsContext } from './plugin-notifications';
 import { createResourceAccessContext } from './resource-access';
+import { createPluginResourceHealthContext } from './plugin-resource-health';
 
 /** Lazy accessors to host singletons; each call throws until the host finished bootstrapping. */
 export interface PluginHostRefs {
@@ -31,6 +34,11 @@ export function createHostNotificationsContext(pluginName: string, host: PluginH
     email: host.get(PluginEmailService),
     findUsers: (userIds) => host.get<PluginCoreLookupPort>(PLUGIN_CORE_LOOKUP).findRecipients(userIds),
   }));
+}
+
+/** `context.resourceHealth` wired to the host's resource health service. */
+export function createHostResourceHealthContext(pluginName: string, host: PluginHostRefs): PluginResourceHealthContext {
+  return createPluginResourceHealthContext(pluginName, () => host.get(ResourceHealthService));
 }
 
 /** `context.resourceAccess` wired to the host's authorization and maintenance services. */

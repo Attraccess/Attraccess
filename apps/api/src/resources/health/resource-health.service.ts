@@ -97,6 +97,19 @@ export class ResourceHealthService {
     return await this.store.listForResource(resourceId);
   }
 
+  async resourceExists(resourceId: number): Promise<boolean> {
+    return this.store.resourceExists(resourceId);
+  }
+
+  /** Entries of one source whose identifier starts with the prefix. */
+  async listBySourceAndPrefix(
+    source: ResourceHealthSource,
+    identifierPrefix: string,
+    resourceId?: number,
+  ): Promise<ResourceHealthRecord[]> {
+    return this.store.listBySourceAndPrefix(source, identifierPrefix, resourceId);
+  }
+
   async listForResources(resourceIds: number[]): Promise<Map<number, ResourceHealthRecord[]>> {
     const map = new Map<number, ResourceHealthRecord[]>(resourceIds.map((id) => [id, []]));
     if (resourceIds.length === 0) return map;

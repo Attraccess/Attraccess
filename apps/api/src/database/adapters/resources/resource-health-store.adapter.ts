@@ -1,8 +1,12 @@
 import { Injectable, Optional, Inject } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In } from 'typeorm';
+import { DataSource, EntityManager, In, Like } from 'typeorm';
 import { Resource, ResourceHealthState } from '@attraccess/database-entities';
-import { ResourceHealthStatus, type ResourceHealthRecord } from '@attraccess/application-models';
+import {
+  ResourceHealthStatus,
+  type ResourceHealthRecord,
+  type ResourceHealthSource,
+} from '@attraccess/application-models';
 import type { ResourcePersistenceContext } from '../../../resources/resource-persistence-context';
 import type { HealthReport, ResourceHealthStore } from '../../../resources/health/resource-health-store.port';
 import { ScopedUnitOfWork, UNIT_OF_WORK } from '../../unit-of-work';
@@ -57,6 +61,22 @@ export class TypeOrmResourceHealthStore implements ResourceHealthStore {
       order: { identifier: 'ASC' },
     });
     return rows.map(toRecord);
+  }
+
+  async listBySourceAndPrefix(
+    source: ResourceHealthSource,
+    identifierPrefix: string,
+    resourceId?: number,
+  ): Promise<ResourceHealthRecord[]> {
+    const rows = await this.repository.find({
+      where: {
+        source,
+        identifier: Like(`${identifierPrefix.replace(/[\\%_]/g, '\\$&')}%`),
+        ...(resourceId === undefined ? {} : { resourceId }),
+      },
+      order: { resourceId: 'ASC', identifier: 'ASC' },
+    });
+    return rows.filter((row) => row.identifier.startsWith(identifierPrefix)).map(toRecord);
   }
 
   async hasUnhealthyEntry(resourceId: number, context?: ResourcePersistenceContext): Promise<boolean> {

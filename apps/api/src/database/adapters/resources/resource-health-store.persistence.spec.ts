@@ -70,4 +70,21 @@ describe('TypeOrmResourceHealthStore on real PostgreSQL', () => {
     await store.removeEntry(record.id);
     expect(await store.listForResource(resourceId)).toEqual([]);
   });
+
+  it('lists the entries of one source by identifier prefix, treating LIKE wildcards literally', async () => {
+    const plugin = (identifier: string, source = ResourceHealthSource.PLUGIN) => ({
+      ...report(identifier, ResourceHealthStatus.UNHEALTHY, 'x'),
+      source,
+    });
+    await store.upsertReport(plugin('plugin:my_app:a'));
+    await store.upsertReport(plugin('plugin:myXapp:a'));
+    await store.upsertReport(plugin('plugin:my_app:b', ResourceHealthSource.MANUAL));
+    await store.upsertReport(plugin('other'));
+
+    const found = await store.listBySourceAndPrefix(ResourceHealthSource.PLUGIN, 'plugin:my_app:');
+    expect(found.map((entry) => entry.identifier)).toEqual(['plugin:my_app:a']);
+    expect(await store.listBySourceAndPrefix(ResourceHealthSource.PLUGIN, 'plugin:my_app:', resourceId + 1)).toEqual(
+      [],
+    );
+  });
 });

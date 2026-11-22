@@ -24,6 +24,13 @@ function createInMemoryHealthStore(
     },
     listForResource: async (resourceId) => records.filter((r) => r.resourceId === resourceId),
     listForResources: async (resourceIds) => records.filter((r) => resourceIds.includes(r.resourceId)),
+    listBySourceAndPrefix: async (source, prefix, resourceId) =>
+      records.filter(
+        (r) =>
+          r.source === source &&
+          r.identifier.startsWith(prefix) &&
+          (resourceId === undefined || r.resourceId === resourceId),
+      ),
     hasUnhealthyEntry: jest.fn(async (resourceId: number) =>
       records.some((r) => r.resourceId === resourceId && r.status === 'unhealthy'),
     ),
