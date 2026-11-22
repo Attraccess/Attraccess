@@ -165,6 +165,12 @@ it('reports a drop after the reader was authenticated as expected, other drops p
   expect(events.at(-1)).toMatchObject({ connected: true });
   device.drop();
   expect(events.at(-1)?.closedAfterPairing).toBeUndefined();
+  expect(events.at(-1)?.lost).toBe(true);
+
+  await expect(ble.connect()).resolves.toBe(true);
+  await ble.disconnect();
+  expect(events.at(-1)).toMatchObject({ connected: false });
+  expect(events.at(-1)?.lost).toBeUndefined();
 });
 
 it('answers a pending command with null when the link drops', async () => {

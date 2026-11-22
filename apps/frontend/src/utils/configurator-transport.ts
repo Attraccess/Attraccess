@@ -12,6 +12,8 @@ export interface ConnectionStateEvent {
    * `authenticated`. Not an error.
    */
   closedAfterPairing?: boolean;
+  /** The link dropped unexpectedly (out of range, setup window closed, bridge restarted), not on our request. */
+  lost?: boolean;
 }
 
 export type ConfiguratorTransportKind = 'serial' | 'bluetooth';

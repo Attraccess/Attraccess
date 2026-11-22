@@ -47,6 +47,12 @@ it('reports a failed Bluetooth connection', async () => {
   expect(await screen.findByText('Could not connect to the bridge')).toBeTruthy();
 });
 
+it('explains a Bluetooth link that dropped during setup', () => {
+  render(<ConnectScreen bluetoothLost />);
+  expect(screen.getByText('Bluetooth connection lost')).toBeTruthy();
+  expect(screen.getByText(/10-minute setup window closed/)).toBeTruthy();
+});
+
 it('confirms a bridge that closed Bluetooth after pairing', () => {
   render(<ConnectScreen closedAfterPairing />);
   expect(screen.getByText('Bridge set up')).toBeTruthy();

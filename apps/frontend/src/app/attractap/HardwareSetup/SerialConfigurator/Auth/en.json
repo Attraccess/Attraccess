@@ -2,6 +2,7 @@
   "title": "Device PIN",
   "loading": "Checking device PIN...",
   "waitingForDevice": "Waiting for the device to respond. If you just installed firmware, give it a few seconds to boot.",
+  "waitingForBluetooth": "Waiting for the bridge to respond. Accept the Bluetooth pairing request of your system if one appears, then check again.",
   "retry": "Check again",
   "enterPin": {
     "submit": "Unlock"

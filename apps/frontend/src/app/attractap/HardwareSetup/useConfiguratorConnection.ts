@@ -8,6 +8,8 @@ export interface ConfiguratorConnection {
   kind: ConfiguratorTransportKind | null;
   /** The bridge closed Bluetooth on purpose after its reader was authenticated (not an error). */
   closedAfterPairing: boolean;
+  /** The Bluetooth link dropped unexpectedly; the unsaved form is gone, so say why. */
+  bluetoothLost: boolean;
 }
 
 function currentKind(): ConfiguratorTransportKind | null {
@@ -21,14 +23,19 @@ export function useConfiguratorConnection(): ConfiguratorConnection {
   const [connection, setConnection] = useState<ConfiguratorConnection>(() => ({
     kind: currentKind(),
     closedAfterPairing: false,
+    bluetoothLost: false,
   }));
 
   useEffect(() => {
     const serial = ESPTools.getInstance();
     const bluetooth = BleConfigurator.getInstance();
-    const onSerialState = () => setConnection({ kind: currentKind(), closedAfterPairing: false });
+    const onSerialState = () => setConnection({ kind: currentKind(), closedAfterPairing: false, bluetoothLost: false });
     const onBluetoothState = (event: ConnectionStateEvent) =>
-      setConnection({ kind: currentKind(), closedAfterPairing: !event.connected && !!event.closedAfterPairing });
+      setConnection({
+        kind: currentKind(),
+        closedAfterPairing: !event.connected && !!event.closedAfterPairing,
+        bluetoothLost: !event.connected && !!event.lost,
+      });
     serial.on('connectionState', onSerialState);
     bluetooth.on('connectionState', onBluetoothState);
     return () => {

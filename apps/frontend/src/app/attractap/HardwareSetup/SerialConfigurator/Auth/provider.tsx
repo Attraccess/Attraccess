@@ -70,7 +70,9 @@ export function AttractapSerialCommGate({ children }: PropsWithChildren) {
             <ProgressCircleFillCircle />
           </ProgressCircleTrack>
         </ProgressCircle>
-        <p className="text-sm text-muted text-center">{t('waitingForDevice')}</p>
+        <p className="text-sm text-muted text-center">
+          {t(getActiveConfiguratorTransport().kind === 'bluetooth' ? 'waitingForBluetooth' : 'waitingForDevice')}
+        </p>
         <Button
           variant="secondary"
           onPress={() => refreshPinStatus().catch((err) => console.error('Failed to refresh PIN status', err))}

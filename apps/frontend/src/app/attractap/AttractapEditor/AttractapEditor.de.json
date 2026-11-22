@@ -14,7 +14,7 @@
   "ledBrightness": "LED Helligkeit",
   "allowPluginBle": "Bluetooth-Nutzung durch Plugins erlauben",
   "allowPluginBleDescription": "Wenn aktiviert, können Plugins mit der Berechtigung BLE_TRANSPORT in der Nähe dieses Readers nach Bluetooth-Geräten der von ihnen unterstützten Art suchen und sich mit den für sie eingerichteten Geräten verbinden. Beim Ausschalten werden ihre Bluetooth-Verbindungen über diesen Reader sofort beendet.",
-  "bleBridgeDescription": "Dieser Reader ist eine Attractap BLE-Bridge. Er hat keinen Kartenleser, kein Display und keine LEDs und steuert keine Ressourcen; er verbindet nur Plugins mit Bluetooth-Geräten in seiner Nähe.",
+  "bleBridgeDescription": "Dieser Reader ist eine Attractap BLE-Bridge. Er hat keinen Kartenleser, kein Display und keine LED-Einstellungen und steuert keine Ressourcen; er verbindet nur Plugins mit Bluetooth-Geräten in seiner Nähe.",
   "tabs": {
     "general": "Allgemein",
     "resources": "Ressourcen",

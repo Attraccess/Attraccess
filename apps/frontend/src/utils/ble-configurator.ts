@@ -232,17 +232,23 @@ export class BleConfigurator implements ConfiguratorTransport {
     // During connect() the failure path cleans up; only a link that was up reports a disconnect.
     if (!this.rx) return;
     this.device?.removeEventListener('gattserverdisconnected', this.handleDisconnected);
-    this.teardown(this.lastApiStatus === 'authenticated');
+    const closedAfterPairing = this.lastApiStatus === 'authenticated';
+    this.teardown(closedAfterPairing, !closedAfterPairing);
   };
 
-  private teardown(closedAfterPairing: boolean) {
+  private teardown(closedAfterPairing: boolean, lost = false) {
     this.tx?.removeEventListener('characteristicvaluechanged', this.handleNotification);
     this.device = null;
     this.rx = null;
     this.tx = null;
     this.pendingAborts.forEach((abort) => abort());
     this.resetStream();
-    this.emit({ connected: false, timestamp: Date.now(), ...(closedAfterPairing ? { closedAfterPairing } : {}) });
+    this.emit({
+      connected: false,
+      timestamp: Date.now(),
+      ...(closedAfterPairing ? { closedAfterPairing } : {}),
+      ...(lost ? { lost } : {}),
+    });
   }
 
   private resetStream() {

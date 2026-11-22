@@ -16,10 +16,10 @@ interface SetupContentProps {
 }
 
 function SetupContent({ openDeviceSettings, onClose }: SetupContentProps) {
-  const { kind, closedAfterPairing } = useConfiguratorConnection();
+  const { kind, closedAfterPairing, bluetoothLost } = useConfiguratorConnection();
 
   if (!kind) {
-    return <ConnectScreen closedAfterPairing={closedAfterPairing} />;
+    return <ConnectScreen closedAfterPairing={closedAfterPairing} bluetoothLost={bluetoothLost} />;
   }
 
   // Keyed so switching between USB and Bluetooth starts a fresh session (PIN, tabs).

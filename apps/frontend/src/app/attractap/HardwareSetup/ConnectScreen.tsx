@@ -13,9 +13,11 @@ type BluetoothNotice = 'unavailable' | 'failed' | null;
 interface Props {
   /** The bridge closed Bluetooth after its reader was approved; say so instead of starting blank. */
   closedAfterPairing?: boolean;
+  /** The Bluetooth link dropped during setup; explain instead of starting blank. */
+  bluetoothLost?: boolean;
 }
 
-export function ConnectScreen({ closedAfterPairing = false }: Props) {
+export function ConnectScreen({ closedAfterPairing = false, bluetoothLost = false }: Props) {
   const { t } = useTranslations({ de, en });
   const [isConnectingUsb, setIsConnectingUsb] = useState(false);
   const [isConnectingBluetooth, setIsConnectingBluetooth] = useState(false);
@@ -57,6 +59,15 @@ export function ConnectScreen({ closedAfterPairing = false }: Props) {
           <AlertContent>
             <AlertTitle>{t('connect.bluetooth.closedAfterPairing.title')}</AlertTitle>
             <AlertDescription>{t('connect.bluetooth.closedAfterPairing.description')}</AlertDescription>
+          </AlertContent>
+        </Alert>
+      )}
+      {bluetoothLost && (
+        <Alert status="warning" className="text-left">
+          <AlertStatusIcon status="warning" />
+          <AlertContent>
+            <AlertTitle>{t('connect.bluetooth.lost.title')}</AlertTitle>
+            <AlertDescription>{t('connect.bluetooth.lost.description')}</AlertDescription>
           </AlertContent>
         </Alert>
       )}

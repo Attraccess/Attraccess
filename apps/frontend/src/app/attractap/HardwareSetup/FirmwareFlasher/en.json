@@ -37,7 +37,7 @@
   },
   "powerCycle": {
     "title": "Restart the bridge",
-    "description": "The firmware is installed. The bridge cannot be restarted automatically: unplug its micro-USB power and plug it in again without holding GPIO0, and keep the USB-TTL adapter connected. Then continue with the PIN, network and server settings over the same connection. Later changes can also be made over Bluetooth: hold the bridge's button for 3 seconds and choose \"Set up over Bluetooth\".",
+    "description": "The firmware is installed. The bridge cannot be restarted automatically: unplug its micro-USB power and plug it in again without holding GPIO0, and keep the USB-TTL adapter connected. Then continue with the PIN, network and server settings over the same connection.",
     "continue": "Continue setup"
   },
   "chipMismatch": {
