@@ -71,6 +71,45 @@ describe('sharing a node with another controller', () => {
     expect(h.gate.busy).toBe(false);
   });
 
+  it('gives the device 30 s to open or close the window', async () => {
+    const deadlines: unknown[] = [];
+    for (const name of ['nodes.share.open', 'nodes.share.revoke']) {
+      const answer = h.connection.handlers[name];
+      h.connection.handlers[name] = (options) => {
+        deadlines.push((options as { timeoutMs?: number }).timeoutMs);
+        return answer(options);
+      };
+    }
+    await h.sharing.open(nodeRef, {}, USER);
+    await h.sharing.revoke(nodeRef, USER);
+    expect(deadlines).toEqual([30_000, 30_000]);
+  });
+
+  it('never receives sharing codes over plain HTTP, and maps the sidecar refusing it', async () => {
+    h.connection.insecureTransport = true;
+    await expect(h.sharing.open(nodeRef, {}, USER)).rejects.toMatchObject({
+      status: 403,
+      response: { code: 'insecure_transport', message: expect.stringContaining('HTTPS') },
+    });
+    expect(h.connection.sent.some((entry) => entry.operation === 'nodes.share.open')).toBe(false);
+    h.connection.insecureTransport = false;
+    h.connection.handlers['nodes.share.open'] = () => {
+      throw new SidecarRequestError('plain HTTP', { code: 'insecure_transport' });
+    };
+    await expect(h.sharing.open(nodeRef, {}, USER)).rejects.toMatchObject({
+      status: 403,
+      response: { code: 'insecure_transport' },
+    });
+    expect(h.gate.busy).toBe(false);
+  });
+
+  it('refuses a node of another fabric than the sidecar’s', async () => {
+    h.backend.storage = { ...(h.backend.storage as object), fabricId: '999' } as never;
+    await expect(h.sharing.open(nodeRef, {}, USER)).rejects.toMatchObject({ response: { code: 'fabric_mismatch' } });
+    await expect(h.sharing.revoke(nodeRef, USER)).rejects.toMatchObject({ response: { code: 'fabric_mismatch' } });
+    expect(h.connection.sent.some((entry) => entry.operation.startsWith('nodes.share'))).toBe(false);
+  });
+
   it('only shares a node that is in the fabric', async () => {
     await h.lifecycle.forceRemove(nodeRef, USER);
     await expect(h.sharing.open(nodeRef, {}, USER)).rejects.toMatchObject({ response: { code: 'not_shareable' } });

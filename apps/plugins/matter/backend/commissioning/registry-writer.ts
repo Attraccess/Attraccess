@@ -42,7 +42,8 @@ export async function registerCommissionedNode(
     attestationStatus: overridden ? ('unverified' as const) : view.attestation.status,
     attestationOverridden: overridden,
   };
-  const live = (await findLive(tables.nodes, 'fabricRef', fabric.id)).find((entry) => entry.nodeId === view.nodeId);
+  // At most one live row per node ID and fabric (live uniqueness): looked up directly, not among every node.
+  const live = await tables.nodes.findOne({ where: { fabricRef: fabric.id, nodeId: view.nodeId, removedAt: null } });
   let node: MatterNode;
   if (live) {
     if (live.lifecycleState !== 'unclaimed') throw new RegistryConflictError('The node already has a record.');

@@ -1,9 +1,10 @@
 // The Matter and Thread permissions (ATT-1003): the keys this plugin declares, and the minimum key(s) of every
 // operation. Every route, the frontend page and the tests read the map below, so a route never names a key itself.
 //
-// Each operation lists the keys it requires; a user needs ALL of them. Operations without a route yet (commissioning,
-// direct commands, Thread, OTA, development overrides, live topics) are listed so the tickets that add them
-// (ATT-1002, ATT-1011, ATT-1012, ATT-1015, ATT-997) apply these keys instead of choosing new ones.
+// Each operation lists the keys it requires; a user needs ALL of them. Operations without a route yet (direct
+// commands, Thread, OTA, development overrides, live topics) are listed so the tickets that add them (ATT-1011,
+// ATT-1012, ATT-1015, ATT-997) apply these keys instead of choosing new ones. Commissioning, sharing and removal from
+// the fabric (ATT-1002) have their routes in ./commissioning/controller.
 //
 // Flow-executed device commands are not listed: they stay under the normal flow and resource authorization. Only
 // direct commands from the admin UI or API need `matter.devices.command-direct`.
@@ -130,11 +131,13 @@ export const MATTER_OPERATIONS = {
   endpointUpdate: [MATTER_MANAGE],
   reconciliationRun: [MATTER_MANAGE],
 
-  // Future: commissioning (ATT-1002).
+  // Commissioning (ATT-1002): start, cancel and name a session; read it; share and remove a node.
+  /** Start, cancel and finish (name) a commissioning session. */
   commissioningStart: [MATTER_COMMISSION],
   commissioningStatus: [MATTER_COMMISSION],
-  /** Opens a commissioning window so another controller can join. */
+  /** Opens (and closes) a commissioning window so another controller can join. */
   commissioningShare: [MATTER_COMMISSION],
+  /** Normal and forced removal from the fabric through the sidecar. */
   commissioningRemoveFromFabric: [MATTER_COMMISSION],
   attestationOverride: [MATTER_COMMISSION, MATTER_MANAGE],
 

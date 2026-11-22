@@ -12,7 +12,7 @@ import { MatterConnectionService } from '../connection/connection.service';
 import { DeviceAuditService, auditUserId, isSystemAudit, type AuditBy } from '../devices/audit.service';
 import { INSECURE_MESSAGE, conflict, sidecarCode } from '../fabric/errors';
 import { factsOfRow, recordedFabricRow, type FabricFacts } from '../fabric/facts';
-import { MatterFabricGuard } from '../fabric/guard';
+import { MatterFabricGuard, operationBusy } from '../fabric/guard';
 import { RecoveryKeyService, RecoveryKeyUnreadableError } from '../fabric/recovery-key.service';
 import { PLUGIN_MIGRATION_READER, type PluginMigrationReader } from '../fabric/tokens';
 import { PLUGIN_CONTEXT } from '../plugin-context';
@@ -165,6 +165,8 @@ export class MatterBackupService {
    */
   async backup(trigger: BackupTrigger, by: AuditBy = null, options: BackupOptions = {}): Promise<BackupView> {
     if (this.guard.busy) throw conflict('busy', 'A restore is in progress.');
+    // A commissioning session, removal or share is changing the fabric; the plugin's rows may not follow it yet.
+    if (this.guard.operation !== null) throw operationBusy(this.guard.operation);
     const own = options.fresh === true || trigger === 'pre_restore' || trigger === 'restore';
     while (this.inFlight) {
       if (!own) return this.inFlight;

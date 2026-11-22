@@ -1,5 +1,17 @@
 import { Auth, type AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Inject, Param, Post, Req } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Header,
+  HttpCode,
+  Inject,
+  Param,
+  Post,
+  Req,
+} from '@nestjs/common';
 import type { z } from 'zod';
 import { principalOf } from '../connection/controller';
 import { validationMessages } from '../connection/validation';
@@ -89,6 +101,8 @@ export class MatterCommissioningController {
   @Auth(...MATTER_OPERATIONS.commissioningShare)
   @Post('nodes/:id/share')
   @HttpCode(200)
+  // The answer carries the sharing codes: no cache, proxy or browser may keep it.
+  @Header('Cache-Control', 'no-store')
   async share(@Param('id') id: string, @Body() body: unknown, @Req() request: AuthenticatedRequest) {
     return this.sharing.open(parseId(id), parse(shareSchema, body ?? {}), principalOf(request));
   }

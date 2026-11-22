@@ -7,6 +7,7 @@ import { matterStorage, type MatterTables } from '../plugin-storage/access';
 import { DeviceAuditService } from './audit.service';
 import { MatterChangeBus } from './change-bus';
 import type { LifecycleState, MatterEndpoint, MatterFabric, MatterNode } from './entities';
+import { markNodeRemoved } from './mark-removed';
 import type { MetadataInput } from './schemas';
 import type { NodeView } from './sidecar-types';
 import {
@@ -285,17 +286,11 @@ export class MatterLifecycleService {
       this.expect(node, ['unclaimed', 'claimed', 'detached', 'archived'], 'force-removed');
       previousState = node.lifecycleState as typeof previousState;
       const now = new Date().toISOString();
-      await this.transition(tables, node, ['unclaimed', 'claimed', 'detached', 'archived'], {
-        lifecycleState: 'removed',
-        removedAt: now,
-        removedBy: actor.userId,
-        removalReason: 'force_removed',
-        updatedAt: now,
-      });
-      for (const endpoint of await findLive(tables.endpoints, 'nodeRef', node.id)) {
-        await retireEndpoint(tables, endpoint, 'force_removed', now);
+      const removal = { removedBy: actor.userId, removalReason: 'force_removed' as const };
+      if (!(await markNodeRemoved(tables, node.id, ['unclaimed', 'claimed', 'detached', 'archived'], removal, now))) {
+        throw new ConflictException('The node changed in the meantime. Nothing was changed.');
       }
-      return node;
+      return Object.assign(node, removal, { lifecycleState: 'removed' as const, removedAt: now, updatedAt: now });
     });
     this.changes.inventoryChanged();
     await this.audit.record('matter.node_force_removed', actor, nodeSubject(node), { nodeRef: node.id, previousState });

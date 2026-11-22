@@ -91,7 +91,7 @@ export async function createCommissioningHarness(timing: Partial<CommissioningTi
   await h.fabric.create(undefined, ADMIN);
   const connection = created;
   const connectionService = { connection } as unknown as MatterConnectionService;
-  const gate = new MatterOperationGate();
+  const gate = new MatterOperationGate(h.guard);
   const audit = new DeviceAuditService(h.context);
   const commissioning = new MatterCommissioningService(
     h.context,
@@ -105,7 +105,16 @@ export async function createCommissioningHarness(timing: Partial<CommissioningTi
     { ...FAST_TIMING, ...timing },
   );
   commissioning.onModuleInit();
-  const removal = new MatterNodeRemovalService(h.context, connectionService, h.guard, audit, h.bus, gate, h.fabric);
+  const removal = new MatterNodeRemovalService(
+    h.context,
+    connectionService,
+    h.guard,
+    audit,
+    h.bus,
+    gate,
+    h.fabric,
+    h.reconciliation,
+  );
   const sharing = new MatterNodeSharingService(h.context, connectionService, h.guard, audit, gate);
   const fabricId = h.backend.storage?.fabricId as string;
   /** The sidecar commissions a node: the fabric generation moves on and `fabric.changed` is published. */
@@ -145,7 +154,7 @@ export async function createCommissioningHarness(timing: Partial<CommissioningTi
     sidecarCommissions,
     waitFor,
     close: async () => {
-      commissioning.onModuleDestroy();
+      await commissioning.onModuleDestroy();
       sharing.onModuleDestroy();
     },
   };

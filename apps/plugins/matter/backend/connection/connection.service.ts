@@ -10,6 +10,9 @@ import { SidecarConnection } from '../client/connection';
 import { PLUGIN_CONTEXT } from '../plugin-context';
 import { CredentialUnreadableError, MatterSettingsService } from './settings.service';
 
+/** The longest the plugin's stop waits for work that still needs the sidecar (cancelling a commissioning session). */
+export const STOP_GRACE_MS = 3_000;
+
 /**
  * Owns the sidecar connection for the lifetime of the plugin. Starting it never waits for the sidecar, and neither
  * a missing sidecar nor a bad credential can stop the plugin from loading.
@@ -32,6 +35,16 @@ export class MatterConnectionService implements OnModuleInit, OnModuleDestroy, O
   }
 
   private readonly logger: PluginContext['logger'];
+  private readonly beforeStop = new Set<() => Promise<void>>();
+
+  /**
+   * Work that still needs the sidecar when the plugin stops, such as cancelling a running commissioning session. It
+   * runs before the connection closes, for at most STOP_GRACE_MS. Returns the function that withdraws it.
+   */
+  beforeStopping(task: () => Promise<void>): () => void {
+    this.beforeStop.add(task);
+    return () => this.beforeStop.delete(task);
+  }
 
   async onModuleInit(): Promise<void> {
     try {
@@ -54,7 +67,18 @@ export class MatterConnectionService implements OnModuleInit, OnModuleDestroy, O
     }
   }
 
-  onModuleDestroy(): void {
+  async onModuleDestroy(): Promise<void> {
+    const tasks = [...this.beforeStop];
+    this.beforeStop.clear();
+    if (tasks.length > 0) {
+      let timer: NodeJS.Timeout | undefined;
+      const grace = new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, STOP_GRACE_MS);
+        timer.unref();
+      });
+      await Promise.race([Promise.allSettled(tasks.map((task) => Promise.resolve().then(task))), grace]);
+      clearTimeout(timer);
+    }
     this.connection.stop();
   }
 

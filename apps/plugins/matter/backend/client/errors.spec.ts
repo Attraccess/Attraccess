@@ -9,6 +9,7 @@ import {
   closedUnexpectedly,
   fromErrorEnvelope,
   protocolError,
+  redactSecrets,
 } from './errors';
 
 const failure = (code: string | undefined, message: string) => Object.assign(new Error(message), { code });
@@ -109,5 +110,43 @@ describe('classifyHttpFailure', () => {
     const error = classifyHttpFailure(426, body);
     expect(error).toBeInstanceOf(SidecarIncompatibleError);
     expect(error).toMatchObject({ status: 426, details: { supportedWireVersion: 1 }, correlationId: CORRELATION_ID });
+  });
+});
+
+describe('code redaction', () => {
+  // The last group of this UUID is a letter and eleven digits: no setup code, and needed to cancel the session.
+  const SESSION_ID = '0b6f3c1e-2a4d-4c8e-9f1a-a12345678901';
+  const MANUAL = '34970112332';
+  const LONG = '123456789012345678901';
+  const QR = 'MT:Y.K9042C00KA0648G00';
+
+  it('keeps digit runs inside a UUID or a word, and redacts free-standing codes', () => {
+    expect(redactSecrets(`session ${SESSION_ID} busy`)).toBe(`session ${SESSION_ID} busy`);
+    expect(redactSecrets(`x${MANUAL} ${MANUAL}y ${MANUAL}-a`)).toBe(`x${MANUAL} ${MANUAL}y ${MANUAL}-a`);
+    expect(redactSecrets(`code ${MANUAL}, long ${LONG}. qr ${QR}`)).toBe(
+      'code [redacted], long [redacted]. qr [redacted]',
+    );
+  });
+
+  it('never redacts the values of ID fields, always those of secret fields', () => {
+    const error = fromErrorEnvelope({
+      code: 'busy',
+      message: `Busy with ${SESSION_ID} (code ${MANUAL})`,
+      correlationId: CORRELATION_ID,
+      retryable: false,
+      details: {
+        sessionId: SESSION_ID,
+        nodeId: '12345678901',
+        setupCode: MANUAL,
+        note: `entered ${MANUAL} and ${QR}`,
+      },
+    });
+    expect(error.message).toBe(`Busy with ${SESSION_ID} (code [redacted])`);
+    expect(error.details).toEqual({
+      sessionId: SESSION_ID,
+      nodeId: '12345678901',
+      setupCode: '[redacted]',
+      note: 'entered [redacted] and [redacted]',
+    });
   });
 });

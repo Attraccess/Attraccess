@@ -1,3 +1,4 @@
+import { commissioningFailureCodeSchema, commissioningStepSchema } from '@attraccess/matter-contract';
 import type { PluginAuditDomainDeclaration } from '@attraccess/plugins-backend-sdk';
 
 const UUID_FIELD = { type: 'string', pattern: '[0-9a-f-]{36}' } as const;
@@ -58,35 +59,22 @@ const MISMATCHES = [
 // Commissioning (ATT-1002). Closed sets and bounded IDs only: never a setup code, a sharing code, a certificate or any
 // text the device or the sidecar sent. Finding types are the names of attestation findings (`PaaNotTrusted`, ...).
 const SESSION_REF = { sessionRef: UUID_FIELD } as const;
-const COMMISSIONING_STEPS = [
-  'discovering',
-  'pase',
-  'reading_device',
-  'attestation',
-  'adding_fabric',
-  'network_setup',
-  'case',
-  'interrogating',
-  'completed',
-] as const;
-const COMMISSIONING_FAILURES = [
-  'invalid_code',
-  'device_not_found',
-  'pase_failed',
-  'attestation_failed',
-  'already_commissioned',
-  'fabric_full',
-  'case_failed',
-  'timeout',
-  'cancelled',
-  'interrupted',
-  'internal',
-  'needs_reconciliation',
-  'registry_failed',
-] as const;
+const COMMISSIONING_STEPS = commissioningStepSchema.options;
+/** The sidecar's failure codes, plus the two the plugin adds when it cannot agree with a successful sidecar. */
+export const PLUGIN_FAILURE_CODES = ['needs_reconciliation', 'registry_failed'] as const;
+const COMMISSIONING_FAILURES = [...commissioningFailureCodeSchema.options, ...PLUGIN_FAILURE_CODES];
 const FINDINGS = { findings: { type: 'string', pattern: '[A-Za-z0-9_,]{0,512}', maxLength: 512 } } as const;
-const INTERRUPT_REASONS = ['sidecar_restart', 'connection_lost', 'timeout', 'plugin_restart'] as const;
+/** Why the plugin ended a session as `interrupted`. */
+export const INTERRUPT_REASONS = ['sidecar_restart', 'connection_lost', 'timeout', 'plugin_restart'] as const;
+export type InterruptReason = (typeof INTERRUPT_REASONS)[number];
 const REMOVAL_STATES = ['unclaimed', 'claimed', 'detached', 'archived'] as const;
+/** `registryUpdated: false`: the sidecar removed the node, but the plugin could not mark its record removed. */
+const REMOVED_FROM_FABRIC = {
+  ...NODE_REF,
+  previousState: { type: 'string', oneOf: REMOVAL_STATES },
+  ...GENERATION,
+  registryUpdated: { type: 'boolean' },
+} as const;
 const COMMISSIONING_ACTIONS = [
   {
     action: 'matter.commissioning_started',
@@ -125,6 +113,8 @@ const COMMISSIONING_ACTIONS = [
       ...NODE_ID,
       ...SESSION_REF,
       attestation: { type: 'string', oneOf: ['verified', 'overridden'] },
+      // The warning- and info-level finding types a verified attestation still reported.
+      ...FINDINGS,
     },
   },
   {
@@ -141,12 +131,12 @@ const COMMISSIONING_ACTIONS = [
   {
     action: 'matter.node_removed_from_fabric',
     subjectTypes: ['matter.node'],
-    details: { ...NODE_REF, previousState: { type: 'string', oneOf: REMOVAL_STATES }, ...GENERATION },
+    details: REMOVED_FROM_FABRIC,
   },
   {
     action: 'matter.node_force_removed_from_fabric',
     subjectTypes: ['matter.node'],
-    details: { ...NODE_REF, previousState: { type: 'string', oneOf: REMOVAL_STATES }, ...GENERATION },
+    details: REMOVED_FROM_FABRIC,
   },
   {
     action: 'matter.node_removal_failed',

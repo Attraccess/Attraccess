@@ -135,8 +135,26 @@ export function classifyNetworkError(
 }
 
 const SECRET_FIELDS = new Set(['setupCode', 'manualCode', 'qrCode', 'passcode', 'attestationOverride']);
-/** A QR payload (`MT:...`) or a manual pairing code (11 or 21 digits): setup and sharing codes never leave memory. */
-const SECRET_TEXT = /MT:[A-Z0-9.-]{6,}|(?<![0-9])(?:[0-9]{21}|[0-9]{11})(?![0-9])/g;
+/**
+ * Identifiers the plugin acts on (a session to cancel, a node to look up). Never a code, and a node ID can be 11 digits
+ * long: their values are kept as they are.
+ */
+const ID_FIELDS = new Set([
+  'sessionId',
+  'nodeId',
+  'existingNodeId',
+  'fabricId',
+  'correlationId',
+  'stageId',
+  'backupId',
+  'streamInstanceId',
+  'storageInstanceId',
+]);
+/**
+ * A QR payload (`MT:...`) or a manual pairing code (11 or 21 digits) standing on its own, as the sidecar's logger
+ * matches it: not a digit run inside a UUID or a longer word. Setup and sharing codes never leave memory.
+ */
+const SECRET_TEXT = /MT:[A-Z0-9.-]{6,}|(?<![0-9A-Za-z-])(?:[0-9]{21}|[0-9]{11})(?![0-9A-Za-z-])/g;
 
 /** `text` without anything that looks like a setup or sharing code. */
 export function redactSecrets(text: string): string {
@@ -148,7 +166,14 @@ function redactValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(redactValue);
   if (value !== null && typeof value === 'object') {
     return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, SECRET_FIELDS.has(key) ? '[redacted]' : redactValue(entry)]),
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        SECRET_FIELDS.has(key)
+          ? '[redacted]'
+          : ID_FIELDS.has(key) && typeof entry === 'string'
+            ? entry
+            : redactValue(entry),
+      ]),
     );
   }
   return value;

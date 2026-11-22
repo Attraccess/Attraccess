@@ -15,7 +15,7 @@ import { MatterReconciliationService } from '../devices/reconciliation.service';
 import { conflict, sidecarCode, unprocessable } from '../fabric/errors';
 import type { SidecarFabric } from '../fabric/facts';
 import { MatterFabricService } from '../fabric/fabric.service';
-import { MatterFabricGuard } from '../fabric/guard';
+import { MatterFabricGuard, operationBusy } from '../fabric/guard';
 import { RecoveryKeyService } from '../fabric/recovery-key.service';
 import { PLUGIN_MIGRATION_READER, type PluginMigrationReader } from '../fabric/tokens';
 import { PLUGIN_CONTEXT } from '../plugin-context';
@@ -122,7 +122,7 @@ export class MatterRestoreService implements OnModuleDestroy {
     // The validation ID doubles as the operation ID: the check, the confirmation, the outcome and a cancel share it.
     const actor = this.audit.actorFor(principal);
     const refuse: Refuse = (code) => this.refused(code, audited.ref, actor, unprocessable(code, MESSAGES[code]));
-    if (this.running) await this.refuseBusy(audited.ref, actor);
+    if (this.running || this.guard.operation !== null) await this.refuseBusy(audited.ref, actor);
 
     const status = this.connection.status();
     if (status.state !== 'connected') return refuse('sidecar_unavailable');
@@ -135,7 +135,7 @@ export class MatterRestoreService implements OnModuleDestroy {
 
     const preflight = await this.preflight(opened.header.fabricId);
     // Checked again right before staging: a restore may have started while the file was being read.
-    if (this.running) await this.refuseBusy(audited.ref, actor);
+    if (this.running || this.guard.operation !== null) await this.refuseBusy(audited.ref, actor);
     this.running = true;
     let validation: RestoreValidation;
     try {
@@ -183,12 +183,16 @@ export class MatterRestoreService implements OnModuleDestroy {
     throw error;
   }
 
+  /** A restore is running, or a commissioning session, removal or share is changing the fabric. */
   private refuseBusy(ref: string, actor: AuditActor): Promise<never> {
+    const operation = this.guard.operation;
     return this.refused(
       'busy',
       ref,
       actor,
-      conflict('busy', 'A restore is in progress. Check the backup again once it has finished.'),
+      !this.running && operation !== null
+        ? operationBusy(operation)
+        : conflict('busy', 'A restore is in progress. Check the backup again once it has finished.'),
     );
   }
 
@@ -321,6 +325,8 @@ export class MatterRestoreService implements OnModuleDestroy {
       throw conflict('validation_expired', 'This restore check has expired. Check the backup again.');
     }
     if (this.running) throw conflict('busy', 'A restore is already in progress.');
+    // The validation stays: the administrator confirms again once the commissioning, removal or share has ended.
+    if (this.guard.operation !== null) throw operationBusy(this.guard.operation);
     const ref = pending.header.backupId;
     const actor = this.audit.actorFor(principal, validationId);
     const refuse = async (code: ConfirmRefusal, message: string) => {
@@ -335,6 +341,7 @@ export class MatterRestoreService implements OnModuleDestroy {
     };
 
     this.running = true;
+    this.guard.restoreConfirming = true;
     try {
       const now = await this.preflight(pending.header.fabricId).catch(() => null);
       if (
@@ -369,6 +376,7 @@ export class MatterRestoreService implements OnModuleDestroy {
       }
     } finally {
       this.running = false;
+      this.guard.restoreConfirming = false;
     }
   }
 

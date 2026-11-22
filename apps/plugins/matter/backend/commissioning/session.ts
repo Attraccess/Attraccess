@@ -2,13 +2,13 @@
 // the sidecar in the request that starts the session and is never kept (ATT-1002 decisions 7 and 17).
 import type { CommissioningSession } from '@attraccess/matter-contract';
 import type { PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
+import type { PLUGIN_FAILURE_CODES } from '../connection/audit';
 import type { LifecycleState } from '../devices/entities';
 
 export type SessionState = 'pending' | 'running' | 'succeeded' | 'failed' | 'interrupted';
 export type SidecarStep = NonNullable<CommissioningSession['step']>;
 /** The sidecar's failure codes, plus the two the plugin adds when it cannot agree with a successful sidecar. */
-export type FailureCode =
-  NonNullable<CommissioningSession['failure']>['code'] | 'needs_reconciliation' | 'registry_failed';
+export type FailureCode = NonNullable<CommissioningSession['failure']>['code'] | (typeof PLUGIN_FAILURE_CODES)[number];
 /** What an administrator can do about a device that already is in the fabric. */
 export type ExistingAction = 'open' | 'repair' | 'restore' | 'reconcile';
 
@@ -33,6 +33,8 @@ export type Session = {
   nodeRecordId: string | null;
   endpoints: SessionEndpoint[];
   finished: boolean;
+  /** Set while the naming step writes, so a second request cannot write and audit it again. */
+  finishing: boolean;
   startedAt: string;
   updatedAt: string;
   finishedAt: string | null;

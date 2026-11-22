@@ -1,5 +1,6 @@
 import type { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { HEADERS_METADATA } from '@nestjs/common/constants';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -32,6 +33,13 @@ describe('the commissioning controller', () => {
       source.match(/@(Get|Post|Patch|Delete)\(/g)?.length ?? -1,
     );
     expect(source).toContain("@Controller('matter')");
+  });
+
+  it('keeps the share answer, which carries the sharing codes, out of every cache', () => {
+    expect(Reflect.getMetadata(HEADERS_METADATA, MatterCommissioningController.prototype.share)).toContainEqual({
+      name: 'Cache-Control',
+      value: 'no-store',
+    });
   });
 
   it('validates strictly and never echoes the submitted code', async () => {
