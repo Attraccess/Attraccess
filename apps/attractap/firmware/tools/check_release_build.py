@@ -7,6 +7,8 @@ With a release build directory, fails (exit 1) when:
     compile_commands.json,
   - the app image contains a lab-only serial topic (the `debug.crash` trigger, the `debug.stats`
     run-time stats table) or trusts the device-lab TLS CA (its certificate list entry),
+  - the generated sdkconfig turns on a lab-only option (FreeRTOS run-time stats, which a release secure
+    profile would carry without the `debug.stats` marker because it has no serial console),
   - the app image leaves less than 10 % of the smallest app (OTA) partition free, so later
     updates still fit (the 4 MB BLE bridge layout has ~1.9 MB per slot, ATT-1315).
 
@@ -21,7 +23,10 @@ import sys
 LAB_ONLY_DEFINES = ("ATTRACTAP_CRASH_TRIGGER=1", "ATTRACTAP_TEST_HOOKS=1", "ATTRACTAP_UI_SELFTEST=1",
                     "ATTRACTAP_LAB_CA=1", "ATTRACTAP_LV_PERF_MONITOR=1")
 LAB_ONLY_MARKERS = (b"debug.crash", b"debug.stats", b"Attractap Device Lab CA")
+# sdkconfig.lab-stats / sdkconfig.debug only; read from the generated config/sdkconfig.h.
+LAB_ONLY_SDKCONFIG = ("CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS",)
 APP_IMAGE = "attractap.bin"
+SDKCONFIG_HEADER = os.path.join("config", "sdkconfig.h")
 PARTITION_TABLE = os.path.join("partition_table", "partition-table.bin")
 MIN_APP_HEADROOM = 0.10
 
@@ -45,6 +50,13 @@ def check_compile_commands(compile_commands):
 def check_app_image(image):
     return [f"the app image contains the lab-only marker {marker.decode()!r}"
             for marker in LAB_ONLY_MARKERS if marker in image]
+
+
+def check_sdkconfig_header(header):
+    enabled = {line.split()[1] for line in header.splitlines()
+               if line.startswith("#define ") and len(line.split()) >= 3 and line.split()[2] == "1"}
+    return [f"the generated sdkconfig enables the lab-only option {option}"
+            for option in LAB_ONLY_SDKCONFIG if option in enabled]
 
 
 def app_partition_sizes(table):
@@ -89,6 +101,7 @@ def run_checks(build_dir):
     image = read(os.path.join(build_dir, APP_IMAGE), "rb")
     errors += check_app_image(image)
     errors += check_app_headroom(len(image), read(os.path.join(build_dir, PARTITION_TABLE), "rb"))
+    errors += check_sdkconfig_header(read(os.path.join(build_dir, SDKCONFIG_HEADER)))
     return errors
 
 

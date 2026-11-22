@@ -20,20 +20,20 @@ option(ATTRACTAP_TEST_HOOKS "Compile the ui.* serial test hooks (display variant
 # Lab/test-only `debug.crash` serial topic that panics on purpose (crash report and
 # coredump upload tests, ATT-1144). Never ship it: build_firmwares.py forces this OFF
 # and tools/check_release_build.py fails a release image that contains it.
-# LVGL FPS/render/flush timing logged to serial (sysmon perf monitor, ATT-554/ATT-1276). Display
-# variants only; a developer option that build_firmwares.py never sets (tools/check_release_build.py
-# fails a release image compiled with it).
-option(ATTRACTAP_LV_PERF_MONITOR "Log LVGL perf monitor FPS/render timing to serial (display variants, dev builds only)" OFF)
-
 option(ATTRACTAP_CRASH_TRIGGER "Compile the debug.crash serial crash trigger (lab builds only)" OFF)
 
-# Beeper state of a reader that has no saved beeper setting yet (fresh or
-# erased). Lab builds set it OFF; the setting itself still works.
+# LVGL FPS/render/flush timing logged to serial (sysmon perf monitor, ATT-554/ATT-1276). Display
+# variants only, a developer option: build_firmwares.py forces it OFF and tools/check_release_build.py
+# fails a release image compiled with it.
+option(ATTRACTAP_LV_PERF_MONITOR "Log LVGL perf monitor FPS/render timing to serial (display variants, dev builds only)" OFF)
+
 # Reader UI self-test (ATT-1187): fills every plugin slot, opens a step and the keyboard, runs the hostile
 # fixtures and prints UI_MEM/UI_STACK/UI_HEAP/UI_BUILD lines for `attractap-lab --check-ui-selftest`.
 # Real display variants only (not the demo variants), lab builds only; build_firmwares.py never sets it.
 option(ATTRACTAP_UI_SELFTEST "Compile the reader UI self-test scenario (lab builds only)" OFF)
 
+# Beeper state of a reader that has no saved beeper setting yet (fresh or
+# erased). Lab builds set it OFF; the setting itself still works.
 option(ATTRACTAP_BEEPER_DEFAULT "Enable the beeper on readers without a saved beeper setting" ON)
 
 # Device-lab TLS CA (PEM path) that a lab image also trusts for wss://, so HIL runs can measure the
@@ -128,10 +128,10 @@ if(ATTRACTAP_SECURE_PROFILE)
 endif()
 
 # A release build reports `release: true` in READER_FIRMWARE_INFO (ATT-1207): not a lab-only variant
-# (ATTRACTAP_RELEASE OFF), no secure lab overlay, no test hooks or crash trigger. The server still
-# treats it as a claim.
+# (ATTRACTAP_RELEASE OFF), no secure lab overlay, no test hooks, crash trigger, UI self-test or LVGL perf
+# monitor. The server still treats it as a claim.
 if((NOT DEFINED ATTRACTAP_RELEASE OR ATTRACTAP_RELEASE) AND NOT ATTRACTAP_SECURE_LAB AND NOT ATTRACTAP_TEST_HOOKS
-   AND NOT ATTRACTAP_CRASH_TRIGGER AND NOT ATTRACTAP_UI_SELFTEST)
+   AND NOT ATTRACTAP_CRASH_TRIGGER AND NOT ATTRACTAP_UI_SELFTEST AND NOT ATTRACTAP_LV_PERF_MONITOR)
     list(APPEND ATTRACTAP_DEFINES ATTRACTAP_RELEASE=1)
 endif()
 
