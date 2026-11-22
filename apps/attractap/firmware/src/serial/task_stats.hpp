@@ -10,8 +10,9 @@
 
 namespace TaskStats
 {
-// Logs one table row per task (name, run time, CPU %, stack high-water mark, core) at INFO.
-void log();
+// Logs one table row per task (name, run time, CPU %, stack high-water mark, core) at INFO. Returns false (after
+// logging why) when it could not take or format the snapshot.
+bool log();
 } // namespace TaskStats
 #endif
 #endif

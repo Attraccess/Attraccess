@@ -338,8 +338,8 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
     // Debug and lab images only (run-time stats compiled in): per-task CPU table, no PIN like debug.crash.
     if (topic == "debug.stats")
     {
-        TaskStats::log();
-        sendJsonResponse(topic, "{}");
+        if (TaskStats::log()) sendJsonResponse(topic, "{\"success\":true}");
+        else sendErrorResponse(topic, "STATS_UNAVAILABLE");
         return;
     }
 #endif
