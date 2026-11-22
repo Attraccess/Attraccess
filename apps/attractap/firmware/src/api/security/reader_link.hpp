@@ -47,6 +47,8 @@ public:
 
     // A TLS handshake that takes longer than this is abandoned.
     static constexpr uint32_t HANDSHAKE_TIMEOUT_MS = 20000;
+    // A refused eFuse report (full send queue) is tried again after this long.
+    static constexpr uint32_t EFUSE_RETRY_MS = 500;
     // After the pinned server could not be verified: wait before trying again.
     static constexpr uint32_t UNTRUSTED_RETRY_MS = 30000;
     // A reader whose first (bootstrap) session never came up: after this many consecutive
@@ -217,4 +219,7 @@ private:
     // handshake step on the worker (LVGL, LEDs and NFC would stall).
     std::atomic<bool> sessionReady{false};
     bool efuseReportSent = false;
+    // The firmware info went out, so the eFuse report is due; a refused one is retried from loop() (main task).
+    bool efuseReportDue = false;
+    uint32_t efuseRetryAt = 0;
 };

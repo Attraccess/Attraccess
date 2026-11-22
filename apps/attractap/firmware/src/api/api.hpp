@@ -20,6 +20,9 @@ struct ApiState : public ApiCards, public ApiMassIntroduction, public ApiUiState
 {
 protected:
     bool loopIsEnabled = false;
+    // READER_FIRMWARE_INFO the transport refused (a full send queue): sent again from loop() while authenticated.
+    bool firmwareInfoPending = false;
+    uint32_t firmwareInfoRetryAt = 0;
     unsigned long heartbeat_sent_at = 0;
     std::function<void(const ResourceList &)> resourceListUpdateCallback;
     std::function<void(CardAuthenticationDetailsResponse)> cardAuthenticationDetailsResponseCallback;
@@ -42,6 +45,7 @@ protected:
     static constexpr size_t JSON_INBUF = 4608;
     static constexpr size_t JSON_OUTBUF_SMALL = 256;
     static constexpr size_t JSON_OUTBUF_AUTH = 1536;
+    static constexpr uint32_t FIRMWARE_INFO_RETRY_MS = 500;
     uint32_t resourceListMessageCounter = 0;
     uint32_t resourceListRevision = 0;
     uint32_t nextRequestId = 0;

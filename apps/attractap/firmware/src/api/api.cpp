@@ -112,6 +112,9 @@ void API::loop()
     {
         this->sendHeartbeat();
         this->crashUploader.tick(millis());
+        if (this->firmwareInfoPending && static_cast<int32_t>(millis() - this->firmwareInfoRetryAt) >= 0 &&
+            State::getApiState().authenticated)
+            this->sendFirmwareInfo();
     }
 
     this->firmware.tick();

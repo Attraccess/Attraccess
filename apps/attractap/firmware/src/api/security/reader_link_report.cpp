@@ -26,6 +26,7 @@ void ReaderLink::onFirmwareInfoSent()
     {
         return;
     }
+    efuseReportDue = true;
     sendEfuseReport();
 }
 
@@ -35,14 +36,16 @@ void ReaderLink::sendEfuseReport()
     {
         return;
     }
-    efuseReportSent = true;
     std::string json;
     if (!EfuseReport::toJson(EfuseSnapshot::read(), json))
     {
+        efuseReportSent = true;
         logger.error("eFuse report too large");
         return;
     }
-    sendControl(json);
+    // Refused under back-pressure: loop() tries again.
+    efuseReportSent = sendControl(json);
+    if (!efuseReportSent) efuseRetryAt = millis() + EFUSE_RETRY_MS;
 }
 
 #else // plain builds and host tests: nothing to report

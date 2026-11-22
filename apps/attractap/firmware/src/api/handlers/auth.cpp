@@ -68,11 +68,16 @@ void API::sendFirmwareInfo()
         this->logger.error("Failed to serialize firmware info");
         return;
     }
-    if (this->transport.sendMessage(json, n))
+    // Sent once per authentication: a refusal under back-pressure is retried from loop(), or the server would see
+    // no capabilities (no BLE) for the whole session.
+    this->firmwareInfoPending = !this->transport.sendMessage(json, n);
+    if (this->firmwareInfoPending)
     {
-        // Explicit, not a scan of outgoing bytes: the session's eFuse report follows this message.
-        this->transport.onFirmwareInfoSent();
+        this->firmwareInfoRetryAt = millis() + FIRMWARE_INFO_RETRY_MS;
+        return;
     }
+    // Explicit, not a scan of outgoing bytes: the session's eFuse report follows this message.
+    this->transport.onFirmwareInfoSent();
 }
 
 void API::onReaderAuthenticated(JsonObject data)

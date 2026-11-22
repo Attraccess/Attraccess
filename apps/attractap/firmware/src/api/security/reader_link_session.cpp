@@ -44,7 +44,11 @@ bool ReaderLink::flushOutboxLocked()
     // All waiting records leave in one binary frame, in order. A refused frame stays in the outbox for the next
     // flush (SessionOutbox): only a backlog the websocket never takes ends the session.
     const SessionOutbox::Result result =
-        outbox.flush(millis(), [this](const uint8_t *data, size_t length) { return socket.sendBinary(data, length); });
+        outbox.flush(millis(), [this](const uint8_t *data, size_t length) {
+            // No free slot: refuse without the websocket's copy, its error log and its quality event (loop() retries
+            // every millisecond while records wait).
+            return socket.sendQueueHasRoom(0) && socket.sendBinary(data, length);
+        });
     if (result != SessionOutbox::Result::Broken)
     {
         return true;

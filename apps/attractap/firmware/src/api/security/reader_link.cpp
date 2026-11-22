@@ -172,6 +172,12 @@ void ReaderLink::loop()
         {
             flushOutboxLocked();
         }
+        lock = {};
+        if (efuseReportDue && !efuseReportSent && sessionReady.load() &&
+            static_cast<int32_t>(millis() - efuseRetryAt) >= 0)
+        {
+            sendEfuseReport();
+        }
     }
 
     if (channel == Channel::Session && connected && handshakeStartedMs != 0 &&
@@ -229,6 +235,7 @@ void ReaderLink::handle(Event &event)
             closeSessionLocked();
             outbox.clear();
             efuseReportSent = false;
+            efuseReportDue = false;
             // The sign-in belonged to that session; the next one authenticates again.
             State::setApiState(false, "");
         }
@@ -296,6 +303,7 @@ void ReaderLink::useChannel(Channel next, const char *reason)
         outbox.clear();
     }
     efuseReportSent = false;
+    efuseReportDue = false;
     pairing.reset();
     connected = false;
     handshakeStartedMs = 0;

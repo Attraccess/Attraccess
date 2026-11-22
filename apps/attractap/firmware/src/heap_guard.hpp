@@ -44,9 +44,27 @@ namespace heap_guard
 #endif
     }
 
+    // Free bytes in total. Cheap (no heap walk), unlike largestBlock(), which walks every block with interrupts
+    // masked: on readers with PSRAM that is thousands of blocks, on the hot paths (every advertisement report).
+    inline size_t freeBytes()
+    {
+#ifdef ESP_PLATFORM
+        return heap_caps_get_free_size(MALLOC_CAP_8BIT);
+#else
+        return testBudget();
+#endif
+    }
+
+    // Free memory above which a request is granted without walking the heap: fragmentation never splits it so
+    // finely that no block of the (at most a few KB) requests fits.
+    constexpr size_t PLENTY_FREE_BYTES = 128 * 1024;
+
     // Whether `bytes` can be allocated in one block and still leave `reserve` bytes for the rest of the reader.
     inline bool fits(size_t bytes, size_t reserve = BULK_RESERVE_BYTES)
     {
+        const size_t free = freeBytes();
+        if (free < reserve || free - reserve < bytes) return false;
+        if (free - reserve - bytes >= PLENTY_FREE_BYTES) return true;
         const size_t largest = largestBlock();
         return largest >= reserve && largest - reserve >= bytes;
     }
