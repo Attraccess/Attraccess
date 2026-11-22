@@ -64,7 +64,18 @@ export function classifyFailure(error: unknown, context: FailureContext): Commis
   if (context.deadlineExpired || has(names, 'CommissioningTimeoutError')) return { code: 'timeout' };
   if (has(names, 'AbortedError', 'CanceledError')) return { code: context.cancelRequested ? 'cancelled' : 'timeout' };
   if (context.step === null || context.step === 'discovering') {
-    if (has(names, 'DiscoveryError', 'TimeoutError', 'PairRetransmissionLimitReachedError', 'NoResponseTimeoutError')) {
+    // A device seen on mDNS that went away before the first message ends as an aggregate of PeerCommunicationErrors.
+    if (
+      has(
+        names,
+        'DiscoveryError',
+        'DiscoveryAggregateError',
+        'PeerCommunicationError',
+        'TimeoutError',
+        'PairRetransmissionLimitReachedError',
+        'NoResponseTimeoutError',
+      )
+    ) {
       return { code: 'device_not_found' };
     }
   }

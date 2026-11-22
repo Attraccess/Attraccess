@@ -72,6 +72,15 @@ describe('classifyFailure', () => {
     });
   });
 
+  it('reports a device that was seen on mDNS and then went silent as not found, not as an internal error', () => {
+    const aggregate = errorOf('DiscoveryAggregateError', { errors: [errorOf('PeerCommunicationError')] });
+    expect(classifyFailure(aggregate, context({ step: 'discovering' }))).toEqual({ code: 'device_not_found' });
+    // After the pairing started the same errors are not a discovery problem.
+    expect(classifyFailure(errorOf('PeerCommunicationError'), context({ step: 'adding_fabric' }))).toEqual({
+      code: 'internal',
+    });
+  });
+
   it('falls back by step and never carries a message', () => {
     expect(classifyFailure(errorOf('Whatever'), context({ step: 'case' }))).toEqual({ code: 'case_failed' });
     expect(classifyFailure(errorOf('Whatever'), context({ step: 'pase' }))).toEqual({ code: 'pase_failed' });

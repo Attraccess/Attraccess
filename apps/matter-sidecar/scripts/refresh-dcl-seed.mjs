@@ -10,6 +10,13 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
+const USAGE = 'Usage: node apps/matter-sidecar/scripts/refresh-dcl-seed.mjs [--url <dcl base url>] [--out <file>]';
+// An unknown flag (--help included) must never fall through to a run: the default output is the committed seed.
+if (args.some((arg) => arg.startsWith('-') && arg !== '--url' && arg !== '--out')) {
+  const asked = args.includes('--help') || args.includes('-h');
+  process.stdout.write(`${USAGE}\n`);
+  process.exit(asked ? 0 : 2);
+}
 const option = (name, fallback) => {
   const index = args.indexOf(name);
   return index >= 0 && args[index + 1] ? args[index + 1] : fallback;
