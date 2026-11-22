@@ -87,8 +87,11 @@ def power(d):
     d.C('10u/50V', 'VDC_R', size='1206', ref='C117', desc='DC input filter, connector side')
     d.add('L', '2.2uH 2.3A', 'Device:L', 'attractap:IND-SMD_L2.5-W2.0_CKCSA252012', {'1': 'VDC_R', '2': 'VDC'},
           ref='L103', lcsc='C354540', mpn='CKCSA252012-2.2uH/M', desc='DC input filter')
-    d.add('D', 'SMAJ28A', 'Device:D_Zener', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': 'VDC', '2': 'GND'},
-          lcsc='C19077545', mpn='SMAJ28A', desc='TVS, DC input (starts to conduct at 31 V; U104 stands 40 V for 0.4 s)')
+    # 600 W part with 26 V stand-off: it starts to conduct at 28.9 to 31.9 V and holds the input below
+    # the converter's 40 V limit up to a peak current of 11 A (42.1 V at its rated 14.3 A). The smaller
+    # SMAJ28A fitted before crossed 40 V at 4.5 A.
+    d.add('D', 'SMBJ26A', 'Device:D_Zener', 'Diode_SMD:D_SMB', {'1': 'VDC', '2': 'GND'},
+          lcsc='C315992', mpn='SMBJ26A', desc='TVS, DC input (stand-off 26 V, conducts from 28.9 V; U104 stands 40 V for 0.4 s)')
     d.C('10u/50V', 'VDC', size='1206')
     d.C('10u/50V', 'VDC', size='1206')
     d.add('U', 'AP63205WU-7', 'attractap:AP63203WU-7', 'attractap:TSOT-26_L2.9-W1.6-P0.95-LS2.8-BL', {

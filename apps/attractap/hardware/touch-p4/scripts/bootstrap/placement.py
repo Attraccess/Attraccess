@@ -192,11 +192,11 @@ def place(B):
     # fuse, reverse-polarity diode, input filter and TVS next to the converter, in the left column behind
     # the display. From the bottom up: fuse, diode, filter (inductor on the left, its capacitor on the
     # right), TVS, converter.
-    put('F102', 5.5, 85.5, 0)
-    put('D105', 5.5, 81.4, 0)
-    put('L103', 3.3, 78.5, 90)     # VDC_R below (at the diode's cathode), VDC on top
-    put('C117', 7.0, 78.5, 0)      # VDC_R on the left
-    put('D106', 5.5, 75.6, 0)
+    put('F102', 5.5, 86.7, 0)
+    put('D105', 5.5, 83.0, 0)
+    put('L103', 3.3, 79.8, 90)     # VDC_R below (at the diode's cathode), VDC on top
+    put('C117', 7.0, 79.8, 0)      # VDC_R on the left
+    put('D106', 5.5, 76.0, 0)      # SMB package: its outline ends right below the converter's enable pull-up
 
     # ===================================================== Ethernet and PoE (right)
     put('J401', G.JACK_X, G.JACK_Y, 90)  # opens downwards into the cut-away
@@ -269,7 +269,9 @@ def place(B):
     # left strip, top to bottom: AVDD supply, receive path
     n('FB502', -5.4, -12.6, 0)
     n('C505', -5.4, -11.4, 180)
-    n('C506', -5.4, -10.3, 180)
+    # AVDD 100 nF: at the foot of the strip, 4 mm from the chip's AVDD pin (pin 8). The band right above
+    # that pin is taken by the transmitter's vias and the VMID and TVDD tracks.
+    n('C506', -5.4, -4.8, 180)
     n('C521', -5.4, -9.2, 180)
     n('R507', -5.4, -8.1, 0)
     n('C520', -5.4, -7.0, 0)

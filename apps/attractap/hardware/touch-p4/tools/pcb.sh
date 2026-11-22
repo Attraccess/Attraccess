@@ -81,6 +81,12 @@ finish_routing() {
     bootstrap build_pcb.py finish
     bootstrap finish_route.py --pours
     bootstrap build_pcb.py finish
+    # wider supply tracks, larger via pads, ground vias beside the fast signals' vias, stitching vias;
+    # then KiCad's design rule check decides what of that stays
+    bootstrap post_route.py
+    bootstrap build_pcb.py finish
+    bootstrap post_route.py --fix
+    bootstrap build_pcb.py finish
     drc
 }
 

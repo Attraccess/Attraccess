@@ -37,7 +37,15 @@ CLI = os.environ.get('KICAD_CLI') or (
     os.path.join(os.environ['KICAD'], 'bin', 'kicad-cli') if os.environ.get('KICAD') else 'kicad-cli')
 VARIANTS = {'wifi': {''}, 'lan': {'', 'lan'}}
 NOT_ASSEMBLED = ('TP', 'H', 'FID', 'ANT')          # bare copper / holes, nothing to place
-COPPER = 'F.Cu,In1.Cu,In2.Cu,B.Cu'
+
+
+def copper_layers(pcb):
+    """The board's copper layers, top to bottom, as the board file lists them (four or six)."""
+    text = open(pcb, encoding='utf-8').read()
+    inner = sorted(set(re.findall(r'^\t\t\(\d+ "(In\d+\.Cu)"', text, re.M)), key=lambda name: int(name[2:-3]))
+    return ','.join(['F.Cu'] + inner + ['B.Cu'])
+
+
 # JLCPCB counts a part's angle from the orientation of its own library footprint for that part number
 # (the JLCEDA/EasyEDA library, https://easyeda.com). Most footprints of this board were converted from
 # that library, so KiCad's angle is JLCPCB's. For these it is not: (footprint, LCSC number) -> degrees
@@ -89,7 +97,7 @@ def main():
     # Settings as in JLCPCB's KiCad guide: Protel file extensions, Excellon drill files in millimetres with
     # absolute origin, oval holes in "alternate" mode (KiCad's default), plated and unplated holes apart.
     run('pcb', 'export', 'gerbers', '--layers',
-        COPPER + ',F.Paste,B.Paste,F.SilkS,B.SilkS,F.Mask,B.Mask,Edge.Cuts',
+        copper_layers(pcb) + ',F.Paste,B.Paste,F.SilkS,B.SilkS,F.Mask,B.Mask,Edge.Cuts',
         '--subtract-soldermask', '--check-zones', '-o', gerbers + os.sep, pcb)
     run('pcb', 'export', 'drill', '--format', 'excellon', '--excellon-units', 'mm', '--excellon-oval-format',
         'alternate', '--excellon-separate-th', '-o', gerbers + os.sep, pcb)

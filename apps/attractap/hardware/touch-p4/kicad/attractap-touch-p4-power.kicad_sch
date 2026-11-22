@@ -3978,18 +3978,18 @@
 		(dnp no)
 		(uuid "09770ed1-dd12-5179-9f8c-60e5211e9980")
 		(property "Reference" "D106" (at 287.02 152.34 90) (effects (font (size 1 1))))
-		(property "Value" "SMAJ28A" (at 287.02 157.84 90) (effects (font (size 1 1))))
-		(property "Footprint" "attractap:SMA_L4.3-W2.6-LS5.2-RD"
+		(property "Value" "SMBJ26A" (at 287.02 157.84 90) (effects (font (size 1 1))))
+		(property "Footprint" "Diode_SMD:D_SMB"
 			(at 287.02 154.94 90)
 			(effects (font (size 1 1)) (hide yes))
 		)
 		(property "Datasheet" "" (at 287.02 154.94 90) (effects (font (size 1 1)) (hide yes)))
-		(property "Description" "TVS, DC input (starts to conduct at 31 V; U104 stands 40 V for 0.4 s)"
+		(property "Description" "TVS, DC input (stand-off 26 V, conducts from 28.9 V; U104 stands 40 V for 0.4 s)"
 			(at 287.02 154.94 90)
 			(effects (font (size 1 1)) (hide yes))
 		)
-		(property "LCSC" "C19077545" (at 287.02 154.94 90) (effects (font (size 1 1)) (hide yes)))
-		(property "MPN" "SMAJ28A" (at 287.02 154.94 90) (effects (font (size 1 1)) (hide yes)))
+		(property "LCSC" "C315992" (at 287.02 154.94 90) (effects (font (size 1 1)) (hide yes)))
+		(property "MPN" "SMBJ26A" (at 287.02 154.94 90) (effects (font (size 1 1)) (hide yes)))
 		(pin "1" (uuid "6d47d354-ca0d-5b64-a19b-8f89e9ad3fe1"))
 		(pin "2" (uuid "82d38ac5-d48e-5e96-bc5d-172a131cc42b"))
 		(instances

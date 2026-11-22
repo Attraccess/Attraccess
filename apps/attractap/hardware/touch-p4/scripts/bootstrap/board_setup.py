@@ -3,11 +3,12 @@
 import json
 import math
 import os
+import re
 
 import pcbnew
 
 import geometry as G
-from board import B_, F, IN1, IN2, NAME, PROJECT, V, mm, rect, unV
+from board import ALL_CU, B_, F, IN1, IN2, IN3, IN4, NAME, PLANE_3V3, PROJECT, SIX, V, mm, rect, unV
 
 
 def outline(B):
@@ -95,7 +96,7 @@ def zones(B):
     ax, ay = G.ANT_C
     hw, hh = G.ANT_W / 2 + 1.5, G.ANT_H / 2 + 1.5
     full = rect(0.3, 0.3, W - 0.3, H - 0.3)
-    all_cu = (F, IN1, IN2, B_)
+    all_cu = ALL_CU
     # copper-free areas
     B.keepout(rect(ax - hw, ay - hh, ax + hw, ay + hh), all_cu, 'NFC antenna: no copper pour', pours=True)
     # nothing else may be routed across the loop; the notch lets the inner feed trace out on the left
@@ -131,24 +132,91 @@ def zones(B):
     B.zone('GND', IN1, full, priority=0, thermal=None, name='GND plane')
     B.zone('GND', F, full, priority=0, thermal=None, name='GND top fill')
     B.zone('GND', B_, full, priority=0, thermal=None, name='GND bottom fill')
-    # 3.3 V plane on In2, display area only (nothing below the slot needs it as a plane)
+    # 3.3 V plane, display area only (nothing below the slot needs it as a plane)
     x3, y3 = G.PLANE_3V3_TONGUE
-    B.zone('+3V3', IN2, [(0.3, 0.3), (W - 0.3, 0.3), (W - 0.3, 89.0), (x3, 89.0), (x3, y3), (0.3, y3)],
+    B.zone('+3V3', PLANE_3V3, [(0.3, 0.3), (W - 0.3, 0.3), (W - 0.3, 89.0), (x3, 89.0), (x3, y3), (0.3, y3)],
            priority=0, thermal=None, name='3V3 plane')
+    if SIX:
+        # Six layers: the 3.3 V plane has a layer of its own (In3) and stays whole. In2 keeps the signal
+        # tracks, with ground filled in between them; a second ground plane (In4) is the reference of
+        # the back layer.
+        B.zone('GND', IN2, full, priority=0, thermal=None, name='GND fill between the inner tracks')
+        B.zone('GND', IN4, full, priority=0, thermal=None, name='GND plane 2')
     # core rail under the MCU on the bottom layer, reaching the DC-DC output capacitors
     cx, cy = unV(B.fp['U201'].GetPosition())
-    B.zone('VDD_HP', B_, [(cx - 6.2, cy - 6.2), (cx + 6.2, cy - 6.2), (cx + 6.2, cy + 6.2), (cx - 6.2, cy + 6.2),
-                           (cx - 6.2, cy - 6.2), (cx - 4.0, cy - 6.2), (cx - 4.0, cy - 14.4), (cx - 11.4, cy - 14.4),
-                           (cx - 11.4, cy - 10.4), (cx - 6.2, cy - 10.4)], priority=2, thermal=False,
-           name='VDD_HP core rail')
+    # One outline without a point visited twice: the square under the MCU, a neck up its left side and
+    # the area under the converter's output capacitors. (Drawn as a square plus a second loop from one of
+    # its corners, KiCad filled the square only, and the rail hung on one thin track.)
+    B.zone('VDD_HP', B_, [(cx + 6.2, cy - 6.2), (cx + 6.2, cy + 6.2), (cx - 6.2, cy + 6.2), (cx - 6.2, cy - 10.4),
+                           (cx - 11.4, cy - 10.4), (cx - 11.4, cy - 14.9), (cx - 4.0, cy - 14.9), (cx - 4.0, cy - 6.2)],
+           priority=2, thermal=False, name='VDD_HP core rail')
+
+
+def relieve_small_parts(B):
+    """Thermal relief for the pads of the 0402 and 0603 two-pad parts that lie in a copper pour. With one
+    pad solid in the ground fill and the other on a thin track, the two ends do not melt at the same
+    moment in the oven and the part can stand up. Larger parts, ICs and vias stay solid in the pours."""
+    n = 0
+    for ref, fp in B.fp.items():
+        name = str(fp.GetFPID().GetLibItemName())
+        if fp.GetPadCount() != 2 or not any(size in name for size in ('0402', '0603')):
+            continue
+        for pad in fp.Pads():
+            pad.SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_THERMAL)
+            pad.SetLocalThermalSpokeWidthOverride(mm(0.25))
+            pad.SetThermalGap(mm(0.2))
+            n += 1
+    return n
+
+
+def stackup_text(layers=None):
+    """The (stackup ...) block of the board file for geometry.STACKUP, in KiCad's own layout."""
+    layers = layers or G.COPPER_LAYERS
+    _name, dielectrics = G.STACKUP[layers]
+    copper = ['F.Cu'] + ['In%d.Cu' % k for k in range(1, layers - 1)] + ['B.Cu']
+    t = '\t\t\t'
+    out = ['\t\t(stackup',
+           t + '(layer "F.SilkS"\n' + t + '\t(type "Top Silk Screen")\n' + t + ')',
+           t + '(layer "F.Paste"\n' + t + '\t(type "Top Solder Paste")\n' + t + ')',
+           t + '(layer "F.Mask"\n' + t + '\t(type "Top Solder Mask")\n' + t + '\t(thickness 0.01)\n' + t + ')']
+    for k, name in enumerate(copper):
+        thick = G.COPPER_OUTER if k in (0, len(copper) - 1) else G.COPPER_INNER
+        out.append(t + '(layer "%s"\n%s\t(type "copper")\n%s\t(thickness %s)\n%s)' % (name, t, t, thick, t))
+        if k < len(dielectrics):
+            kind, thick, material, er = dielectrics[k]
+            out.append(t + '(layer "dielectric %d"\n%s\t(type "%s")\n%s\t(thickness %s)\n%s\t(material "%s")\n'
+                       '%s\t(epsilon_r %s)\n%s\t(loss_tangent 0.02)\n%s)' % (k + 1, t, kind, t, thick, t, material, t, er, t, t))
+    out += [t + '(layer "B.Mask"\n' + t + '\t(type "Bottom Solder Mask")\n' + t + '\t(thickness 0.01)\n' + t + ')',
+            t + '(layer "B.Paste"\n' + t + '\t(type "Bottom Solder Paste")\n' + t + ')',
+            t + '(layer "B.SilkS"\n' + t + '\t(type "Bottom Silk Screen")\n' + t + ')',
+            t + '(copper_finish "ENIG")', t + '(dielectric_constraints no)', '\t\t)']
+    return '\n'.join(out) + '\n'
+
+
+def write_stackup(path):
+    """Put the stack-up into a saved board file. pcbnew's Python interface cannot set it, so the block is
+    written into the file's setup section; KiCad reads it back and keeps it from then on."""
+    text = open(path, encoding='utf-8').read()
+    block = stackup_text()
+    old = re.search(r'\t\t\(stackup\n.*?\n\t\t\)\n', text, re.S)
+    if old:
+        text = text[:old.start()] + block + text[old.end():]
+    else:
+        at = text.index('\t(setup\n') + len('\t(setup\n')
+        text = text[:at] + block + text[at:]
+    open(path, 'w', encoding='utf-8').write(text)
 
 
 def setup(board):
-    board.SetCopperLayerCount(4)
-    # In1 is the ground plane and stays free of tracks. In2 carries the 3.3 V pour, but the autorouter
-    # may use it as a third routing layer: two layers are not enough around the MCU.
+    board.SetCopperLayerCount(G.COPPER_LAYERS)
+    # In1 is the ground plane and stays free of tracks. In2 is the third routing layer: two layers are not
+    # enough around the MCU. On four layers it also carries the 3.3 V pour; on six that pour has In3 to
+    # itself and In4 is a second ground plane.
     board.SetLayerType(IN1, pcbnew.LT_POWER)
-    board.SetLayerType(IN2, pcbnew.LT_MIXED)
+    board.SetLayerType(IN2, pcbnew.LT_SIGNAL if SIX else pcbnew.LT_MIXED)
+    if SIX:
+        board.SetLayerType(IN3, pcbnew.LT_POWER)
+        board.SetLayerType(IN4, pcbnew.LT_POWER)
     ds = board.GetDesignSettings()
     ds.SetBoardThickness(mm(1.6))
     ds.m_TrackMinWidth = mm(0.11)        # the autorouter necks tracks down to 0.112 mm at fine-pitch pins
@@ -211,8 +279,6 @@ def write_project(names):
     json.dump(pro, open(path, 'w'), indent=2)
     open(os.path.join(PROJECT, NAME + '.kicad_dru'), 'w').write(
         '(version 1)\n'
-        '# The reverse-mount LEDs sit in windows cut into the board: their pads are closer to that edge\n'
-        '# than the general copper-to-edge rule allows.\n'
         '(rule "PoE isolation"\n'
         '  (condition "A.NetClass == \'PoE\' && B.NetClass != \'PoE\' && B.NetName != \'\''
         ' && B.NetName != \'unconnected-*\' && !B.memberOfFootprint(\'C102\')")\n'
@@ -220,7 +286,4 @@ def write_project(names):
         '# the USB-C receptacle has 0.1 mm between its own VBUS and GND pads\n'
         '(rule "USB-C pad spacing"\n'
         '  (condition "A.memberOfFootprint(\'J101\') && B.memberOfFootprint(\'J101\')")\n'
-        '  (constraint clearance (min 0.09mm)))\n'
-        '(rule "LED window"\n'
-        '  (condition "A.memberOfFootprint(\'D70?\')")\n'
-        '  (constraint edge_clearance (min 0.12mm)))\n')
+        '  (constraint clearance (min 0.09mm)))\n')

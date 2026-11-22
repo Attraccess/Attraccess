@@ -16,7 +16,7 @@ from board_setup import NETCLASSES
 CELL = 0.05
 MARGIN = 0.006                      # raster safety margin on top of the clearance (a 0.05 mm step past a
 LAYERS = [pcbnew.F_Cu, pcbnew.In2_Cu, pcbnew.B_Cu]
-ALL_CU = [pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.B_Cu]
+ALL_CU = list(BD.ALL_CU)
 VIA_D, VIA_DRILL = 0.45, 0.2
 VIA_COST = 40                       # in grid steps
 SOFT_COST = 400                     # crossing a track that could be ripped up (per cell, times the net's weight)

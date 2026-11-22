@@ -24,6 +24,7 @@ edited by hand, treat the KiCad files as the source of truth and do not run
 | `routes_board.py` | Fixed routes elsewhere: 48 V nets, Ethernet pairs, antenna feeds, DC input with its filter, buzzer, LED link, ground vias, and the via fan-out of the supply pads. |
 | `finish_route.py` | Grid router that closes the connections the autorouter leaves open, including the ground and 3.3 V pads that are cut off from their pours. |
 | `route_grid.py` | Its engine: obstacle raster, net connectivity, path search, conversion to tracks and vias. |
+| `post_route.py` | After the routing: widens supply tracks and neck-downs, enlarges via pads, adds a ground via beside the via of every fast signal and stitching vias. With `--fix` it reads KiCad's design rule check and takes back whatever is part of a violation. |
 | `check_overlap.py` | Reports overlapping part bodies. |
 | `check_netlist.py` | Compares a netlist exported by KiCad with `design.py`. Lists the devices and addresses on each I2C bus and fails on an address clash. |
 | `sexpr.py` | Small reader/writer for KiCad's file format. |
@@ -58,7 +59,11 @@ pnpm nx run attractap-touch-p4-pcb:route
 ```
 
 `route` runs these steps (`tools/pcb.sh`): `build_pcb.py dsn`, Freerouting, `build_pcb.py ses`,
-`finish_route.py`, `build_pcb.py finish`, `finish_route.py --pours`, `build_pcb.py finish`, DRC.
+`finish_route.py`, `build_pcb.py finish`, `finish_route.py --pours`, `build_pcb.py finish`,
+`post_route.py`, `build_pcb.py finish`, `post_route.py --fix`, `build_pcb.py finish`, DRC.
+
+The number of copper layers is `COPPER_LAYERS` in `geometry.py`: 6, or 4 for the first layout. Tracks run
+on F.Cu, In2 and B.Cu in both; only the planes differ (see `board_setup.zones`).
 
 The autorouter does not give the same result twice, so its result is kept in git:
 `kicad/attractap-touch-p4.ses`. Everything after it is repeatable. To rebuild the committed board
@@ -84,6 +89,13 @@ autorouter run:
   the first are not taken over; they have fixed routes in `routes_board.py` now. Its tracks that come
   too close to a pad of a part in the second, or to a fixed via beside such a pad (the supply vias a
   new part gets go through every layer), are removed, and `finish_route.py` routes them again.
+
+- Beyond those two lists, `build_pcb.py ses` removes every track and via of the autorouter that comes too
+  close to a pad, a fixed via or a fixed track of another net (`drop_collisions`), measured against the real
+  pad outlines. So a part can be moved or a fixed route changed without touching the lists. On a board that
+  has not changed since the autorouter ran this removes nothing.
+- The session calls its vias after the four layers the autorouter saw. On the six-layer board KiCad takes
+  them for buried vias; the import makes them through vias again.
 
 When the autorouter is run again, empty both lists.
 

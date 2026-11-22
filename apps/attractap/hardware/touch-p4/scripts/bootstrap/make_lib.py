@@ -22,7 +22,7 @@ import geometry
 ANT_W, ANT_H, ANT_TURNS, ANT_TRACK, ANT_PITCH = geometry.ANT_W, geometry.ANT_H, 4, 0.5, 0.9
 # Symbols whose footprint is not the converted one. The LED uses KiCad's footprint: it has the board
 # cut-out with relieved corners and pads that keep their distance from it.
-FOOTPRINT_OVERRIDE = {'SK6812MINI-E_C5149201': 'LED_SMD:LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount'}
+FOOTPRINT_OVERRIDE = {'SK6812MINI-E_C5149201': 'attractap:LED_SK6812MINI-E_ReverseMount_Clear'}
 ANT_FEED_Y = -12.0   # where the outer end starts on the left side, relative to the loop centre
 
 
@@ -166,8 +166,12 @@ def fits_wago_250(tree):
 P4_PASTE_WINDOW, P4_PASTE_PITCH = 2.1, 2.5
 
 
-def paste_windows(tree, size, pitch):
-    """Take the paste off the largest pad and add a 3 x 3 grid of paste-only openings in its place."""
+# The same for the Ethernet PHY's 2.7 mm pad: four windows, with lanes between them for the ground vias.
+PHY_PASTE_WINDOW, PHY_PASTE_PITCH = 1.0, 1.5
+
+
+def paste_windows(tree, size, pitch, n=3):
+    """Take the paste off the largest pad and add an n x n grid of paste-only openings in its place."""
     S = Sym
     ep = max((p for p in find(tree, 'pad') if p[2] == 'smd'), key=lambda p: float(first(p, 'size')[1]))
     layers = first(ep, 'layers')
@@ -175,9 +179,10 @@ def paste_windows(tree, size, pitch):
         return                                            # done before
     layers[:] = [layers[0]] + [v for v in layers[1:] if str(v) != 'F.Paste']
     x0, y0 = float(first(ep, 'at')[1]), float(first(ep, 'at')[2])
-    for i in (-1, 0, 1):
-        for j in (-1, 0, 1):
-            tree.append([S('pad'), '', S('smd'), S('rect'), [S('at'), x0 + i * pitch, y0 + j * pitch],
+    steps = [(k - (n - 1) / 2) * pitch for k in range(n)]
+    for dx in steps:
+        for dy in steps:
+            tree.append([S('pad'), '', S('smd'), S('rect'), [S('at'), x0 + dx, y0 + dy],
                          [S('size'), size, size], [S('layers'), S('F.Paste')]])
 
 
@@ -211,15 +216,23 @@ def proximity_sensor_outline(tree):
                      [S('width'), 0.1]])
 
 
-def fix_footprint(name, text):
-    """Repair two habits of the converter: mechanical holes as plated pads, thermal vias without a number."""
+def fix_footprint(name, text, fresh=True):
+    """Repair two habits of the converter: mechanical holes as plated pads, thermal vias without a number.
+    fresh=False: the footprint comes from the project library and has the outline fixes already."""
     tree = loads(text)
-    if name == 'CONN-TH_4P-P3.5-2601-3102':
+    if fresh and name == 'CONN-TH_4P-P3.5-2601-3102':
         fits_wago_250(tree)
-    if name == 'SENSORS-SMD_VCNL4040M3OE':
+    if fresh and name == 'SENSORS-SMD_VCNL4040M3OE':
         proximity_sensor_outline(tree)
     if name.startswith('QFN-104'):
         paste_windows(tree, P4_PASTE_WINDOW, P4_PASTE_PITCH)
+    if name.startswith('QFN-32'):
+        paste_windows(tree, PHY_PASTE_WINDOW, PHY_PASTE_PITCH, n=2)
+    # The converter marks the inductors as through-hole parts. With that flag a placement export that
+    # takes surface-mount parts only would leave them out.
+    attr = first(tree, 'attr')
+    if attr and name.startswith('IND-SMD') and all(p[2] == 'smd' for p in find(tree, 'pad')):
+        attr[1:] = [Sym('smd')]
     ep = None
     for pad in find(tree, 'pad'):
         if str(pad[1]) and first(pad, 'size') and float(first(pad, 'size')[1]) > 2.5 and pad[2] == 'smd':
@@ -241,6 +254,47 @@ def fix_footprint(name, text):
     return dumps(tree) + '\n'
 
 
+# The LED is KiCad's footprint with its pads 0.1 mm shorter on the side of the cut-out. KiCad's pads end
+# 0.25 mm from the relieved corners of the cut-out, and a milled outline may lie 0.2 mm off.
+LED_SOURCE = ('LED_SMD', 'LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount')
+LED_NAME, LED_PAD_TRIM = 'LED_SK6812MINI-E_ReverseMount_Clear', 0.1
+
+
+def led_footprint():
+    lib = os.environ.get('KICAD10_FOOTPRINT_DIR')
+    if not lib:
+        raise SystemExit('KICAD10_FOOTPRINT_DIR is not set (source tools/kicad-env.sh)')
+    text = open(os.path.join(lib, LED_SOURCE[0] + '.pretty', LED_SOURCE[1] + '.kicad_mod'), encoding='utf-8').read()
+    tree = loads(text)
+    tree[1] = LED_NAME
+    for pad in find(tree, 'pad'):
+        at, size = first(pad, 'at'), first(pad, 'size')
+        x = float(at[1])
+        size[1] = round(float(size[1]) - LED_PAD_TRIM, 3)
+        at[1] = round(x + (LED_PAD_TRIM / 2 if x > 0 else -LED_PAD_TRIM / 2), 3)
+    return dumps(tree) + '\n'
+
+
+def refit():
+    """Apply fix_footprint() and the generated footprints again to the library that is in the project,
+    without the converter's output. Every fix leaves a footprint alone that already has it."""
+    folder = os.path.join(LIB, NICK + '.pretty')
+    for file in sorted(os.listdir(folder)):
+        name = file[:-len('.kicad_mod')]
+        path = os.path.join(folder, file)
+        if name == 'NFC_Antenna_4T':
+            new = antenna_footprint()
+        elif name == LED_NAME:
+            continue
+        else:
+            new = fix_footprint(name, open(path, encoding='utf-8').read(), fresh=False)
+        if new != open(path, encoding='utf-8').read():
+            open(path, 'w', encoding='utf-8').write(new)
+            print('updated', file)
+    open(os.path.join(folder, LED_NAME + '.kicad_mod'), 'w', encoding='utf-8').write(led_footprint())
+    print('wrote', LED_NAME)
+
+
 def main(src):
     d = design_mod.build()
     os.makedirs(os.path.join(LIB, NICK + '.pretty'), exist_ok=True)
@@ -250,6 +304,9 @@ def main(src):
         dst = os.path.join(LIB, NICK + '.pretty', name + '.kicad_mod')
         if name == 'NFC_Antenna_4T':
             open(dst, 'w', encoding='utf-8').write(antenna_footprint())
+            continue
+        if name == LED_NAME:
+            open(dst, 'w', encoding='utf-8').write(led_footprint())
             continue
         text = open(os.path.join(src, 'lcsc.pretty', name + '.kicad_mod'), encoding='utf-8').read()
         # 3D models are not shipped in the repository
@@ -288,4 +345,7 @@ def main(src):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1])
+    if sys.argv[1:] == ['--refit']:
+        refit()
+    else:
+        main(sys.argv[1])

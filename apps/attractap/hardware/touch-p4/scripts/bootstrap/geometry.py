@@ -70,8 +70,10 @@ C6_KEEPOUT = (0.0, 0.0, 44.0, 6.0)
 # antenna cannot stand out over the board edge: x1, x2 and depth of the cut in the top edge.
 C6_NOTCH = (14.9, 29.1, 5.65)
 
-# PoE primary side (48 V, isolated from everything else): no secondary copper in here
-POE_PRIMARY = [(77.9, 35.0, 86.0, 78.0), (79.0, 30.6, 86.0, 35.0)]
+# PoE primary side (48 V, isolated from everything else): no secondary copper in here, on any layer. The
+# second rectangle ends 2.1 mm above the 48 V pad of C102: the pours of the other layers lie above and
+# below that pad, and the clearance rule only looks at copper against copper on one layer.
+POE_PRIMARY = [(77.9, 35.0, 86.0, 78.0), (79.0, 29.4, 86.0, 35.0)]
 # Under the PoE module the isolation barrier does not run at the pin row but under the module body:
 # 2.3 mm from the output pin row at the pin 1/2 end, 5.3 mm at the pin 3/4 end (Silvertel Ag9900
 # datasheet, figure 23). No copper from that line to the 48 V pins. Corner points, clockwise.
@@ -99,5 +101,22 @@ PROX_BEAM_DEG = 30                          # the emitter's light ends about 30 
 DOCK_PLATE = 13.9                           # component side to the dock's plate, from the case design
 MOUNT_KEEPOUT_R = 3.3                       # screw head / standoff: no tracks on the outer layers
 
-# The 3.3 V plane (In2) covers the display area and reaches the NFC parts left of the antenna: (x, y) corner
+# The 3.3 V plane covers the display area and reaches the NFC parts left of the antenna: (x, y) corner
 PLANE_3V3_TONGUE = (25.3, 136.6)
+
+# Copper layers. With 6 every signal layer lies next to an unbroken plane:
+#   F.Cu signals and parts / In1 ground / In2 signals / In3 3.3 V / In4 ground / B.Cu signals, core rail, antenna
+# With 4 (the first layout) the 3.3 V pour shares In2 with the signal tracks, which cut it apart, and
+# B.Cu has that cut pour as its reference:
+#   F.Cu / In1 ground / In2 signals and 3.3 V / B.Cu
+# The routing is the same in both: tracks only on F.Cu, In2 and B.Cu.
+COPPER_LAYERS = 6
+# Stack-ups to order, top to bottom: (kind, thickness mm, material, relative permittivity). The
+# thicknesses of the six-layer stack-up are the ones JLCPCB's order form shows for it (November 2026);
+# those of the four-layer stack-up are nominal values, not compared with the form.
+STACKUP = {
+    4: ('JLC04161H-7628', [('prepreg', 0.2104, '7628', 4.4), ('core', 1.065, 'FR4', 4.6), ('prepreg', 0.2104, '7628', 4.4)]),
+    6: ('JLC06161H-3313', [('prepreg', 0.0994, '3313', 4.1), ('core', 0.55, 'FR4', 4.6), ('prepreg', 0.1088, '2116', 4.16),
+                           ('core', 0.55, 'FR4', 4.6), ('prepreg', 0.0994, '3313', 4.1)]),
+}
+COPPER_OUTER, COPPER_INNER = 0.035, 0.0152

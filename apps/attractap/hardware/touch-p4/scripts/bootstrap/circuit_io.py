@@ -202,7 +202,7 @@ def ui(d):
         if i + 1 < n_led:
             nets['4'] = 'LED_D%d' % (i + 1)
         d.add('D', 'SK6812MINI-E', 'attractap:SK6812MINI-E_C5149201',
-              'LED_SMD:LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount', nets, nc=() if i + 1 < n_led else ('4',),
+              'attractap:LED_SK6812MINI-E_ReverseMount_Clear', nets, nc=() if i + 1 < n_led else ('4',),
               lcsc='C5149201', mpn='SK6812MINI-E', desc='RGB LED, reverse mount')
         d.C('100n', '+5V', desc='LED %d' % (i + 1))
     d.group('Buzzer')

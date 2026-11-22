@@ -112,6 +112,30 @@ class GeometryTest(unittest.TestCase):
         holder = math.hypot(ex - geometry.HALL[0], ey - geometry.HALL[1]) - geometry.MAGNET_RING_R
         self.assertGreater(holder, spot)
 
+    def test_stack_up_matches_the_layer_count(self):
+        # one dielectric between every two copper layers, and a board of 1.6 mm (JLCPCB: +-10 %)
+        layers = geometry.COPPER_LAYERS
+        self.assertIn(layers, geometry.STACKUP)
+        for count, (_name, dielectrics) in geometry.STACKUP.items():
+            self.assertEqual(len(dielectrics), count - 1)
+            total = (sum(d[1] for d in dielectrics) + 2 * geometry.COPPER_OUTER + (count - 2) * geometry.COPPER_INNER)
+            self.assertAlmostEqual(total, 1.6, delta=0.16)
+
+    def test_no_pour_within_2_mm_of_the_48_v_pad_of_the_barrier_capacitor(self):
+        # C102 bridges the PoE barrier. Its 48 V pad is the right one (the part is turned by 180 degrees);
+        # the pours of the other layers must end 2 mm from it, which only the keep-out can see to.
+        import placement
+        placed = {}
+        placement.place(type('B', (), {'put': lambda self, ref, x, y, rot=0: placed.__setitem__(ref, (x, y, rot)),
+                                       'row': lambda *a: None})())
+        x, y, rot = placed['C102']
+        self.assertEqual(rot, 180)
+        pad = (x + 1.475 - 0.575, y - 0.9, x + 1.475 + 0.575, y + 0.9)        # 1206 pad: 1.15 x 1.8 mm
+        x1, y1, x2, y2 = geometry.POE_PRIMARY[1]
+        self.assertLessEqual(y1, pad[1] - 2.0)
+        self.assertLessEqual(x1, pad[0] - 2.0)
+        self.assertGreaterEqual(x2, geometry.BOARD_W)
+
     def test_room_for_the_plug(self):
         # plug with boot (30 mm) and the cable's bend into the wall (19 mm for a 5.5 mm cable)
         self.assertGreaterEqual(geometry.BOARD_H - geometry.NOTCH_Y, 49.0)

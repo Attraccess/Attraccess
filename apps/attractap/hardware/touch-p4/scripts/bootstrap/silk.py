@@ -5,7 +5,7 @@ grouped test point labels, connector labels with their limits, the GPIO map and 
 are. The display side is hidden in the finished reader; it carries the assembly hints for the display
 (ground pads, the jack's pins) and a note for whoever takes the display off.
 
-Texts are at least 0.9 mm high with 0.15 mm lines, which JLCPCB prints. Everything is placed by hand on
+Texts are 1.0 mm high or more with 0.15 mm lines (JLCPCB's capability table asks for 1 mm). Everything is placed by hand on
 free board area; check() names any text that lies on a pad, on another text or off the board.
 """
 import os
@@ -21,6 +21,7 @@ FRONT, BACK = pcbnew.F_SilkS, pcbnew.B_SilkS
 LOGO = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'case', 'logo')
 URL = 'github.com/Attraccess/Attraccess'
 LINE = 0.15
+SERIAL_FIELD = (16.0, 41.0, 26.0, 43.0)     # x1, y1, x2, y2: 10 x 2 mm, the size JLCPCB asks for
 ALIGN = {'l': pcbnew.GR_TEXT_H_ALIGN_LEFT, 'c': pcbnew.GR_TEXT_H_ALIGN_CENTER, 'r': pcbnew.GR_TEXT_H_ALIGN_RIGHT}
 
 # Test points: label and where it goes ('r': right of the pad, 'l': left of it, 'b': below it, 'a': above it).
@@ -204,50 +205,52 @@ def component_side(S):
         if where in 'rl':
             S.text(label, x + (1.7 if where == 'r' else -1.7), y, align='l' if where == 'r' else 'r')
         else:
-            S.text(label, x, y + (1.8 if where == 'b' else -1.8), 0.9)
-    S.text('C6', 10.4, 11.2, 0.9, tag=True)
-    S.text('P4 UART0', 13.4, 18.55, 0.9, align='l', tag=True)
-    S.text('115200 8N1', 16.3, 32.5, 0.9, align='l')
-    S.text('POWER', 24.75, 22.1, 0.9, align='l', tag=True)
+            S.text(label, x, y + (1.8 if where == 'b' else -1.8))
+    S.text('C6', 10.4, 11.2, 1.0, tag=True)
+    S.text('P4 UART0', 13.4, 18.55, 1.0, align='l', tag=True)
+    S.text('115200 8N1', 15.4, 32.3, 1.0, align='l')
+    S.text('POWER', 24.75, 22.1, 1.0, align='l', tag=True)
     # ---- buttons
     for ref, label in (('SW201', 'RST'), ('SW202', 'BOOT')):
         x, y = unV(B.fp[ref].GetPosition())
         S.text(label, x + 5.6, y)
-    S.text('HOLD BOOT, TAP RST:', 1.3, 34.2, 0.9, align='l')
-    S.text('DOWNLOAD MODE', 1.3, 35.8, 0.9, align='l')
-    # ---- a field for a serial number or a note
-    S.text('S/N', 16.0, 40.0, 0.9, align='l')
-    S.field(16.0, 41.0, 28.0, 46.0)
+    S.text('HOLD BOOT, TAP RST:', 1.3, 34.1, 1.0, align='l')
+    S.text('DOWNLOAD MODE', 1.3, 35.9, 1.0, align='l')
+    # ---- serial number: JLCPCB prints a number that is different on every board into a solid silkscreen
+    # rectangle of 10 x 2 mm (order option "Mark on PCB": number only, position specified). Without that
+    # option the field stays white, to write on.
+    S.text('S/N', 16.0, 40.0, 1.0, align='l')
+    S.field(*SERIAL_FIELD)
     # ---- tamper sensors
     hx, hy = G.HALL
-    S.text('DOCK', hx, hy + 2.75, 0.9)
-    S.text('ACCEL', 6.0, 45.4, 0.9)
-    S.text('PROX', G.PROX[0], G.PROX[1] + 3.3, 0.9)
+    S.text('DOCK', hx, hy + 2.75)
+    S.text('ACCEL', 6.0, 45.4)
+    S.text('PROX', G.PROX[0], G.PROX[1] + 3.3)
     # ---- connectors
     S.text('USB-C', 82.3, 9.2)
-    S.text('SERVICE', 82.3, 10.9, 0.9)
+    S.text('SERVICE', 82.3, 10.9)
     S.text('12-24V DC', 6.1, 90.7)
     for num, mark in (('1', '+'), ('2', '-')):
         x, y = min(B.pads_num('J103', num), key=lambda p: p[1])
         S.text(mark, x, y - 3.6)
     S.text('DISPLAY FLEX', 43.85, 74.0)
     S.text('FLEX FOLDS OVER THIS AREA', 36.75, 82.5)
-    S.text('ANTENNA ZONE', 36.6, 2.2, 0.9)
-    S.text('NO METAL HERE', 36.6, 3.9, 0.9)
+    S.text('ANTENNA ZONE', 36.6, 2.2)
+    S.text('NO METAL HERE', 36.6, 3.9)
     # ---- 48 V side: its border beside the Ethernet pair, and its name
     x48 = G.POE_PRIMARY[0][0]
     S.line([(x48, 57.4), (x48, G.JACK_REAR_CLEAR_Y + 0.4)], dash=(1.0, 0.7))
-    S.text('PoE 48V', x48 + 1.4, 64.4, 0.9, rot=90)
+    S.text('PoE 48V', x48 + 1.4, 64.4, 1.0, rot=90)
     # ---- LED numbers as the firmware counts them
     for i, x in enumerate(G.LED_X):
-        S.text(str(i), x, G.LED_Y_TOP + 3.15, 0.9)
-        S.text(str(7 - i), x, G.LED_Y_BOT - 3.0, 0.9)
+        S.text(str(i), x, G.LED_Y_TOP + 3.15)
+        S.text(str(7 - i), x, G.LED_Y_BOT - 3.0)
     # ---- the free area behind the NFC loop: name, GPIO map, where to read more
     left, mid = 28.5, G.ANT_C[0]
     S.logo('attraccess-keyhole.svg', left, 100.9, 7.0)
     S.logo('attraccess-wordmark.svg', 33.8, 101.2, 3.4)
     S.text('ATTRACTAP TOUCH P4', 33.8, 106.9, 1.2, align='l')
-    S.text('REV A', 60.6, 106.9, 0.9, align='r', tag=True)
+    S.text('REV A', 60.6, 106.9, 1.0, align='r', tag=True)
     S.line([(left, 109.3), (60.6, 109.3)])
     bottom = gpio_map(S, left, 111.2)
     S.line([(left, bottom + 0.1), (60.6, bottom + 0.1)])
@@ -263,19 +266,17 @@ def display_side(S):
     S.text('MIND THE FLEX.', 43.0, 68.8, layer=BACK)
     # ---- assembly hints
     for x, y in G.LCD_GROUND_PADS:
-        S.text('GND PAD', x, y - 3.5, 0.9, BACK)
-    S.text('GND PADS: CONDUCTIVE TAPE TO THE LCD BACK', 43.0, 28.0, 0.9, BACK)
-    S.text('CLIP PINS TO 1 MM', G.JACK_X - 0.8, G.JACK_Y - 9.9, 0.9, BACK)
-    S.text('48V', G.JACK_X + 7.5, G.JACK_Y - 6.9, 0.9, BACK)
-    # ---- JLCPCB prints its order number in place of this text (order option "Specify a location")
-    S.text('JLCJLCJLCJLC', 20.0, 86.0, layer=BACK)
+        S.text('GND PAD', x, y - 3.5, 1.0, BACK)
+    S.text('GND PADS: CONDUCTIVE TAPE TO THE LCD BACK', 43.0, 28.0, 1.0, BACK)
+    S.text('CLIP PINS TO 1 MM', G.JACK_X - 0.8, G.JACK_Y - 9.9, 1.0, BACK)
+    S.text('48V', G.JACK_X + 7.1, G.JACK_Y - 6.9, 1.0, BACK)
     # ---- LED numbers, and the tap point in the middle of the loop
     for i, x in enumerate(G.LED_X):
-        S.text(str(i), x + 3.0, G.LED_Y_TOP, 0.9, BACK)
-        S.text(str(7 - i), x + 3.0, G.LED_Y_BOT, 0.9, BACK)
+        S.text(str(i), x + 3.0, G.LED_Y_TOP, 1.0, BACK)
+        S.text(str(7 - i), x + 3.0, G.LED_Y_BOT, 1.0, BACK)
     ax, ay = G.ANT_C
     S.logo('attraccess-keyhole.svg', ax - 2.25, ay - 7.5, 9.0, BACK)
-    S.text('NFC 13.56 MHZ', ax, ay + 4.2, 0.9, BACK)
+    S.text('NFC 13.56 MHZ', ax, ay + 4.2, 1.0, BACK)
 
 
 def silkscreen(B):

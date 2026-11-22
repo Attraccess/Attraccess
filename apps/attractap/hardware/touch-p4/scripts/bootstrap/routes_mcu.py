@@ -36,10 +36,28 @@ def mcu_power_vias(B):
                 vx -= math.copysign(0.12, dx)
         B.track([(x, y), (vx, vy)], net, 0.15)
         B.via(vx, vy, net)
-    # ground vias in the exposed pad
-    for i in range(-2, 3):
-        for j in range(-2, 3):
-            B.via(cx + i * 1.4, cy + j * 1.4, 'GND', size=0.6, drill=0.3)
+    # Ground vias in the exposed pad, in the lanes between its nine solder paste windows (2.1 mm at a
+    # pitch of 2.5 mm, see make_lib.py). A via under a paste window draws the solder into its hole.
+    lane = 1.25
+    along = (-2.8, -lane, 0.0, lane, 2.8)
+    spots = {(s * lane, t) for s in (-1, 1) for t in along} | {(t, s * lane) for s in (-1, 1) for t in along}
+    for dx, dy in sorted(spots):
+        B.via(cx + dx, cy + dy, 'GND', size=0.6, drill=0.3)
+
+
+def core_rail_feed(B):
+    """The core rail's way from the converter to the MCU: the pour on the back layer, which reaches up to
+    the converter's second output capacitor (C235). Three vias in a row beside that capacitor's supply pad
+    take the current down, two of them under the capacitor between its pads. One via alone would carry
+    the whole core current, and a single bad via would leave the MCU without its core supply."""
+    x, y = B.pad('C235', '1')
+    xv = x + 0.8
+    ys = (y - 0.35, y + 0.5, y + 1.2)
+    B.track([(x, y), (xv - 0.3, ys[1]), (xv, ys[1])], 'VDD_HP', 0.5)
+    B.track([(xv, ys[0]), (xv, ys[1])], 'VDD_HP', 0.5)
+    B.track([(xv, ys[1]), (xv, ys[2])], 'VDD_HP', 0.5)
+    for yv in ys:
+        B.via(xv, yv, 'VDD_HP', size=0.6, drill=0.3)
 
 
 def psram_ring(board):

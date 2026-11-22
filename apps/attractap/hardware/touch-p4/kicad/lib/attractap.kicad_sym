@@ -3713,7 +3713,7 @@
 		(on_board yes)
 		(property "Reference" "LED" (id 0) (at 0 6.35 0) (effects (font (size 1.27 1.27))))
 		(property "Value" "SK6812MINI-E_C5149201" (id 1) (at 0 -6.35 0) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "LED_SMD:LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount"
+		(property "Footprint" "attractap:LED_SK6812MINI-E_ReverseMount_Clear"
 			(id 2)
 			(at 0 -8.89 0)
 			(effects (font (size 1.27 1.27)) hide)

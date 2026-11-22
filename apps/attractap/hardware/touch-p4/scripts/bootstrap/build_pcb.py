@@ -18,14 +18,16 @@ import design
 import geometry as G
 import libs
 import placement
-from board import B_, Board, F, IN1, IN2, NAME, PCB, PROJECT, mm, rect, schematic_net_names, unV
+from board import ALL_CU, B_, Board, F, NAME, PCB, PROJECT, V, mm, rect, schematic_net_names, unV
 from board_setup import (
     check_display_ground_pads,
     display_ground_pads,
     documentation,
     outline,
+    relieve_small_parts,
     setup,
     write_project,
+    write_stackup,
     zones,
 )
 from route_grid import class_of, short
@@ -50,6 +52,7 @@ from routes_mcu import (
     lcd_fanout,
     mcu_escape,
     mcu_left,
+    core_rail_feed,
     mcu_power_vias,
     mcu_top,
     nfc_host,
@@ -79,7 +82,9 @@ def build():
         raise SystemExit('silkscreen: ' + '; '.join('"%s" %s' % item for item in bad))
     display_ground_pads(board)
     zones(B)
+    relieve_small_parts(B)
     mcu_power_vias(B)
+    core_rail_feed(B)
     module_ground(B)
     psram_ring(board)
     ep_vias(board)
@@ -103,6 +108,7 @@ def build():
     mcu_left(B)
     plane_fanout(B)                 # last: its vias go where the fixed routes leave room
     pcbnew.SaveBoard(PCB, board)
+    write_stackup(PCB)
     write_project(names)
     print('wrote', PCB, len(B.fp), 'footprints', len(B.nets), 'nets')
 
@@ -178,6 +184,131 @@ def drop_stale(board):
     return len(gone)
 
 
+def drop_collisions(board):
+    """Remove the autorouter's tracks and vias that no longer fit the board they are laid on: those that come
+    too close to a pad, a fixed via or a fixed track of another net. That happens wherever the placement or
+    a fixed route has changed since the autorouter ran; finish_route.py routes what is cut off again. On an
+    unchanged board this removes nothing."""
+    def seg_seg(a, b, c, d):
+        def cross(p, q, r):
+            return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+
+        def point_seg(p, s, e):
+            dx, dy = e[0] - s[0], e[1] - s[1]
+            L2 = dx * dx + dy * dy
+            u = 0.0 if L2 == 0 else max(0.0, min(1.0, ((p[0] - s[0]) * dx + (p[1] - s[1]) * dy) / L2))
+            return math.hypot(p[0] - s[0] - u * dx, p[1] - s[1] - u * dy)
+        d1, d2, d3, d4 = cross(c, d, a), cross(c, d, b), cross(a, b, c), cross(a, b, d)
+        if ((d1 > 0) != (d2 > 0)) and ((d3 > 0) != (d4 > 0)) and d1 * d2 != 0 and d3 * d4 != 0:
+            return 0.0
+        return min(point_seg(a, c, d), point_seg(b, c, d), point_seg(c, a, b), point_seg(d, a, b))
+
+    assert seg_seg((0, 0), (2, 2), (0, 2), (2, 0)) == 0.0                 # crossing
+    assert abs(seg_seg((0, 0), (2, 0), (0, 1), (2, 1)) - 1.0) < 1e-9      # parallel, 1 apart
+    assert abs(seg_seg((0, 0), (1, 0), (3, 0), (3, 5)) - 2.0) < 1e-9      # end to line
+
+    def seg_pad(a, b, poly):
+        """Distance in mm from the segment a-b to a pad's real copper outline (rounded corners, round
+        pads and turned pads included), measured by KiCad."""
+        seg = pcbnew.SEG(V(*a), V(*b))
+        if poly.Contains(seg.A) or poly.Contains(seg.B):
+            return 0.0
+        return pcbnew.ToMM(int(math.sqrt(poly.SquaredDistanceToSeg(seg))))
+
+    solid = []           # (net, layer or None for every layer, kind, geometry): what the autorouter's copper must clear
+    for fp in board.GetFootprints():
+        for pad in fp.Pads():
+            bb = pad.GetBoundingBox()
+            x1, y1 = unV(pcbnew.VECTOR2I(bb.GetLeft(), bb.GetTop()))
+            x2, y2 = unV(pcbnew.VECTOR2I(bb.GetRight(), bb.GetBottom()))
+            through = pad.GetAttribute() != pcbnew.PAD_ATTRIB_SMD
+            if not through and not pad.IsOnLayer(F):
+                continue                           # paste-only openings and the like
+            poly = pad.GetEffectivePolygon(F, pcbnew.ERROR_INSIDE)
+            solid.append((pad.GetNetname(), None if through else F, 'pad', ((x1, y1), (x2, y2), poly), 0.0))
+    for t in board.GetTracks():
+        if not t.IsLocked():
+            continue
+        if t.GetClass() == 'PCB_VIA':
+            x, y = unV(t.GetPosition())
+            solid.append((t.GetNetname(), None, 'seg', ((x, y), (x, y)), pcbnew.ToMM(t.GetWidth(F)) / 2))
+        else:
+            solid.append((t.GetNetname(), t.GetLayer(), 'seg', (unV(t.GetStart()), unV(t.GetEnd())),
+                          pcbnew.ToMM(t.GetWidth()) / 2))
+    cell = 2.0
+    grid = {}
+    for item in solid:
+        _net, _layer, kind, geo, r = item
+        xs, ys = (geo[0][0], geo[1][0]), (geo[0][1], geo[1][1])
+        for i in range(int((min(xs) - r - 1) // cell), int((max(xs) + r + 1) // cell) + 1):
+            for j in range(int((min(ys) - r - 1) // cell), int((max(ys) + r + 1) // cell) + 1):
+                grid.setdefault((i, j), []).append(item)
+    gone = []
+    for t in board.GetTracks():
+        if t.IsLocked():
+            continue
+        net = t.GetNetname()
+        via = t.GetClass() == 'PCB_VIA'
+        a, b = (unV(t.GetPosition()),) * 2 if via else (unV(t.GetStart()), unV(t.GetEnd()))
+        half = pcbnew.ToMM(t.GetWidth(F) if via else t.GetWidth()) / 2
+        layer = None if via else t.GetLayer()
+        seen = set()
+        hit = False
+        for i in range(int(min(a[0], b[0]) // cell), int(max(a[0], b[0]) // cell) + 1):
+            for j in range(int(min(a[1], b[1]) // cell), int(max(a[1], b[1]) // cell) + 1):
+                for item in grid.get((i, j), ()):
+                    if id(item) in seen:
+                        continue
+                    seen.add(id(item))
+                    onet, olayer, kind, geo, r = item
+                    if onet == net or not (layer is None or olayer is None or layer == olayer):
+                        continue
+                    # (a pad without a net is a bare hole: the hole clearance applies)
+                    need = max(class_of(net)[0], class_of(onet)[0] if onet else 0.2) + half + r - 1e-3
+                    if kind == 'pad':
+                        (px1, py1), (px2, py2), poly = geo
+                        if (min(a[0], b[0]) - need > px2 or max(a[0], b[0]) + need < px1 or
+                                min(a[1], b[1]) - need > py2 or max(a[1], b[1]) + need < py1):
+                            continue
+                        d = seg_pad(a, b, poly)
+                    else:
+                        d = seg_seg(a, b, geo[0], geo[1])
+                    if d < need:
+                        hit = True
+                        if os.environ.get('PCB_DEBUG'):
+                            print('  collision: %s %s at %s  vs  %s %s %s  (%.3f < %.3f)' % (
+                                short(net), 'via' if via else board.GetLayerName(t.GetLayer()),
+                                tuple(round(v, 2) for v in a), short(onet), kind, [tuple(round(v, 2) for v in g) for g in geo[:2]], d, need))
+                        break
+                if hit:
+                    break
+            if hit:
+                break
+        if hit:
+            gone.append(t)
+    for t in gone:
+        board.Remove(t)
+    _KEEP.extend(gone)
+    return len(gone)
+
+
+def drop_vias_in_pads(board):
+    """Remove the autorouter's vias that sit in a pad of a two-pad part. In the oven the solder runs into
+    such a hole and the part gets too little of it. The pad keeps its other connection, or
+    finish_route.py gives it a new one beside the pad."""
+    gone = []
+    pads = [pad for fp in board.GetFootprints() if fp.GetPadCount() == 2 for pad in fp.Pads()
+            if pad.GetAttribute() == pcbnew.PAD_ATTRIB_SMD and pad.IsOnLayer(F)]
+    for t in board.GetTracks():
+        if t.GetClass() == 'PCB_VIA' and not t.IsLocked():
+            if any(pad.GetNetCode() == t.GetNetCode() and pad.HitTest(t.GetPosition()) for pad in pads):
+                gone.append(t)
+    for t in gone:
+        board.Remove(t)
+    _KEEP.extend(gone)
+    return len(gone)
+
+
 def drop_edge_violations(board, clearance=0.3):
     """Remove the autorouter's tracks and vias that come closer than the edge clearance to the board edge
     or a cut-out (it keeps a slightly smaller distance of its own). finish_route.py routes them again."""
@@ -232,7 +363,7 @@ if __name__ == '__main__':
         boxes.append((G.NOTCH_X - 0.35, G.NOTCH_Y - 0.35, G.BOARD_W + 1, G.BOARD_H + 1))      # Ethernet cut-away
         boxes.append((-1, G.POCKET_Y - 0.35, G.POCKET_X + 0.35, G.BOARD_H + 1))               # DC plug cut-away
         for x1, y1, x2, y2 in boxes:
-            helper.keepout(rect(x1, y1, x2, y2), (F, IN1, IN2, B_), 'router only', tracks=True, vias=True,
+            helper.keepout(rect(x1, y1, x2, y2), ALL_CU, 'router only', tracks=True, vias=True,
                            pours=False)
         print('dsn', pcbnew.ExportSpecctraDSN(b, os.path.join(PROJECT, NAME + '.dsn')))
     elif cmd == 'ses':
@@ -241,11 +372,22 @@ if __name__ == '__main__':
         routes = routes_of_session(os.path.join(PROJECT, NAME + '.ses'))
         print('ses', pcbnew.ImportSpecctraSES(b, routes))
         os.remove(routes)
+        # The session names its vias after the four layers the autorouter saw ("Via[0-3]"). On a board with
+        # more layers KiCad takes that for a buried via. All vias of this board go through.
+        through = 0
+        for t in b.GetTracks():
+            if t.GetClass() == 'PCB_VIA' and t.GetViaType() != pcbnew.VIATYPE_THROUGH:
+                t.SetViaType(pcbnew.VIATYPE_THROUGH)
+                t.SetLayerPair(F, B_)
+                through += 1
+        print('made %d imported vias through vias' % through)
         thin = [t for t in b.GetTracks() if t.GetClass() == 'PCB_TRACK' and t.GetWidth() < mm(0.11)]
         for t in thin:                            # the autorouter's neck-downs go below the board minimum
             t.SetWidth(mm(0.11))
         print('widened %d tracks to 0.11 mm' % len(thin))
         print('removed %d tracks and vias that later changes made obsolete' % drop_stale(b))
+        print('removed %d tracks and vias in the way of a moved pad or fixed route' % drop_collisions(b))
+        print('removed %d vias in pads of two-pad parts' % drop_vias_in_pads(b))
         print('removed %d tracks and vias too close to the board edge' % drop_edge_violations(b))
         pcbnew.SaveBoard(PCB, b)
     elif cmd == 'finish':

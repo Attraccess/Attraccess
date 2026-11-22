@@ -19,6 +19,7 @@ Why the board looks the way it does, and what is still an assumption.
 | Tamper detection | an accelerometer, an infrared proximity sensor that looks at the dock's plate, and a hall switch facing a magnet in the dock | The accelerometer notices knocks, tilting and tearing off. The proximity sensor says that the reader has left its dock, and its light path lies inside the closed case, out of reach. The hall switch says the same in a second, simpler way, but a magnet held to the case fools it. All three are read over I2C, because the MCU's four free pins are blocked by capacitors at the pad row. |
 | Wi-Fi antenna | PCB antenna of the module, or external antenna | The ESP32-C6-MINI-1U (U.FL connector) fits the same pads. |
 | Assembly | all parts on one side | The display is taped to the other side; cheaper assembly. |
+| Layers | six: signals on both outer layers and one inner layer, each next to a plane of its own | Two signal layers are not enough around the MCU. On four layers the third one shared its layer with the 3.3 V pour and cut it apart, so the fast buses had no unbroken plane to return on (see [Review against layout rules](#review-against-layout-rules)). |
 
 Alternatives that were looked at (November 2026): ESP32-S31-WROOM-1 (one module
 with Wi-Fi 6 and Ethernet MAC, but not yet in stock and only preview support in
@@ -209,13 +210,17 @@ Notes:
 - The PoE module needs a minimum load (100 mA DP9900M, 200 mA Ag9905M). With the
   backlight on the board draws more than that. A deep-sleep mode would need a
   dummy load.
-- DC input: meant for 12 V or 24 V supplies. The jack is rated 24 V. The
-  converter (AP63205) works up to 32 V, stands 35 V continuously and 40 V for
-  0.4 s. The TVS is an SMAJ28A: it starts to conduct between 31 and 34 V and
-  holds short peaks below 40 V, as when a live 24 V supply is plugged in. It
-  cannot hold a lasting overvoltage. Reversed polarity does no harm (series
-  diode D105). The inductor L102 is rated for 25 V across it, which is reached
-  at 30 V input.
+- DC input: meant for 12 V or 24 V supplies; 28 V is the most it stands
+  continuously. The jack is rated 24 V. The converter (AP63205) works up to
+  32 V, stands 35 V continuously and 40 V for 0.4 s. The TVS is an SMBJ26A
+  (600 W): it starts to conduct between 28.9 and 31.9 V and, by its
+  datasheet's figures, keeps the input below 40 V up to a peak current of
+  11 A (42.1 V at its rated 14.3 A). That covers a live 24 V supply being
+  plugged in. The smaller SMAJ28A fitted first reached 40 V at 4.5 A. The TVS
+  cannot hold a lasting overvoltage, and a surge from a long supply line can
+  still exceed 40 V: holding that needs a converter rated for 60 V. Reversed
+  polarity does no harm (series diode D105). The inductor L102 is rated for
+  25 V across it, which is reached at 30 V input.
 - DC input filter: C117 (10 uF), L103 (2.2 uH) and the converter's own input
   capacitors C112/C113 form a pi filter. Without it the converter's 1.1 MHz
   ripple current would run straight out on the supply cable; conducted
@@ -250,7 +255,10 @@ Notes:
 
 The 48 V side consists of jack pins 9 and 10, FB102, FB103, D103 and module
 pins 5 to 8. It lives in the right-hand strip of the board. No ground or supply
-copper is poured there, and the PoE net class keeps 2 mm from every other net.
+copper is poured there on any layer, and the PoE net class keeps 2 mm from every
+other net. That rule compares copper on one layer only; from layer to layer the
+keep-out areas do its job: no pour on any layer comes closer than 2 mm to 48 V
+copper (below C102's 48 V pad the inner pours used to end 0.9 mm from it).
 C102 (1 nF, 2 kV) bridges the barrier for EMC, C410/R413 tie the jack shield to
 ground.
 
@@ -269,7 +277,8 @@ copper on one layer:
   module edge, pin 10 with 1.8 mm. Air alone does not hold 1500 V over 0.5 mm.
   The polyimide tape on that corner of the LCD, wrapped round its edge, is the
   insulation (see "Display mounting and flex"). No 48 V track runs on the back
-  layer, which faces the display.
+  layer, which faces the display: the two lines from the jack and the filtered
+  negative line beside the module (19 mm) run on the inner layer In2.
 
 The 2 mm figure is a design choice, not a certified creepage distance.
 Silvertel asks for 3 mm between the two sides of the barrier; the board has
@@ -430,8 +439,18 @@ does not read them yet; this is what it will find.
 | USB | 0.25 | 0.127 | USB data |
 | MDI | 0.2 | 0.127 | Ethernet pairs |
 
-Minimum via 0.45 mm pad, 0.2 mm drill. The ESP32-P4 has 0.35 mm pin pitch with
-0.15 mm pads.
+The widths are the ones tracks are laid with. After the routing,
+`scripts/bootstrap/post_route.py` widens every supply track as far as the copper
+beside it allows (towards 0.6 mm for the core rail, 0.5 mm for 3.3 V, 0.8 mm for
+the 5 V nets, 0.4 mm for the other supply nets) and the autorouter's 0.112 mm
+neck-downs to 0.127 mm. A track that ends on a pad stays as narrow as the pad.
+Of the 527 track segments of the Power class 88 are narrower than 0.25 mm after
+that, all of them at fine-pitch pins or between pads; two signal segments are
+still 0.112 mm wide.
+
+Minimum via 0.45 mm pad, 0.2 mm drill. Of the 753 vias with a 0.2 mm hole 620
+have a 0.5 mm pad (ring 0.15 mm); the 133 others have no room for it. The
+ESP32-P4 has 0.35 mm pin pitch with 0.15 mm pads.
 
 Every P4 supply pin has a via just inside the pad row, straight down to the
 3.3 V plane or to the core-rail copper on the back layer. Decoupling capacitors
@@ -441,9 +460,29 @@ Ground does not depend on the copper fill of the outer layers, which the
 routing cuts into pieces. Every ground pad has a via into the ground plane or a
 track to a pad that has one: the converters, the USB protection diodes, the
 flash, the IO expander, the LED buffer and the connectors each have a via at
-their ground pin, the Wi-Fi module has nine under it, the PoE module two at its
-output ground pad, and the ground pins of the three QFN parts run straight into
-their exposed pads.
+their ground pin, the Wi-Fi module has four between its nine ground pads, the PoE
+module two at its output ground pad, and the ground pins of the three QFN parts
+run straight into their exposed pads.
+
+No via hole lies under solder paste, where the solder would run into it: the
+vias of the MCU's and the PHY's exposed pads sit in the lanes between the paste
+windows, the Wi-Fi module's where four of its ground pads meet, and the fan-out
+vias of the small parts beside their pads (between two pads of one net where
+capacitors stand 1.1 mm apart).
+
+The pads of the 0402 and 0603 two-pad parts connect to the ground fill through
+thermal spokes (0.25 mm wide, 0.2 mm gap). Solid in the fill on one side and on
+a thin track on the other, such a part can stand up in the oven. Larger parts,
+ICs and vias are solid in the fills.
+
+Ground vias tie the fills and planes together (`post_route.py`): one next to
+the via of every fast signal (RMII, SDIO, USB, Ethernet pairs), so the return
+current can change planes where the signal does, and stitching vias every 5 mm,
+every 2.5 mm along the top edge and around the Wi-Fi module. A piece of fill
+without vias beside the antenna would resonate near 2.4 GHz; the strip right of
+the antenna had none over 40 mm. Of the 42 vias of fast signals 25 have a ground
+via within 1.5 mm and 6 none within 3 mm (3.8 mm at most): the Ethernet vias
+above the MCU and those at the PHY stand too close together for more.
 
 Routed by hand (script) and locked:
 
@@ -487,15 +526,18 @@ routers did not need were removed again at the end.
 Everything else was routed by the autorouter (Freerouting) and, where it gave
 up, by the grid router in `scripts/bootstrap/finish_route.py`.
 
-Two layers are not enough to get all signals away from the MCU, so layer 3
-(the 3.3 V pour) also carries signal tracks. Under the MCU it has none: the
-supply pins there reach the pour through vias inside the pad ring.
+Two layers are not enough to get all signals away from the MCU, so the inner
+layer In2 carries signal tracks as well: 1130 mm of them, 28 % of all tracks.
+Ground is filled in between them. The 3.3 V plane (In3) lies right below, the
+ground plane In1 above; the back layer has the second ground plane (In4) as its
+reference. No track runs on In1, In3 or In4, and each of the three is one piece.
+The 3.3 V plane has a strip that runs down to the NFC parts left of the antenna.
 
-The pour has a strip that runs down to the NFC parts left of the antenna, but
-signal tracks on that layer cut it off from the rest. The NFC block therefore
-gets its 3.3 V through a routed track (0.2 mm wide, about 60 mm long). It only
-feeds the PN532's interface supply pin and the two I2C pull-ups, a few
-milliamps.
+The core rail's pour on the back layer reaches from under the MCU up to the
+converter's second output capacitor (C235). Three vias of 0.3 mm beside that
+capacitor's pad take the current down to it, and the tracks from the inductor
+to the capacitors are 0.6 mm wide. The fourth core pin (54, behind the 0 ohm
+link R203) is fed by a track of 0.2 to 0.3 mm on the back layer, 11 mm long.
 
 Placement around the MCU follows from the routing. The signals on its left
 side need a free strip, so only two capacitors sit next to those pins (in the
@@ -505,26 +547,36 @@ MCU sit 2.4 mm from the pad row for the same reason.
 
 Track width: 0.15 mm for signals. The autorouter narrows tracks to 0.112 mm
 next to fine-pitch pins, so the board's minimum is set to 0.11 mm (the
-manufacturer's limit is 0.09 mm).
+manufacturer's limit is 0.09 mm). All but two of those neck-downs are widened to
+0.127 mm afterwards.
 
 Not done in revision A: controlled-impedance routing. USB runs at full speed
-(12 Mbit/s) and the Ethernet pairs are about 10 mm long and run side by side,
+(12 Mbit/s) and the Ethernet pairs are 11 to 18 mm long and run side by side,
 so this is uncritical. Their width and gap (0.2 / 0.2 mm) are not calculated
-for 100 ohm.
+for 100 ohm; over the 0.1 mm of this stack-up they come out lower (roughly
+85 ohm, estimated, not from the manufacturer's calculator), and a 0.15 mm
+signal track near 50 ohm.
 
 Lengths of the fast buses on the routed board: the six SDIO lines to the Wi-Fi
-module are 39 to 47 mm, the RMII lines to the PHY 35 to 51 mm with two to four
-vias each. Both are well inside what these interfaces tolerate. The Ethernet
-pairs from the PHY to the jack are 11 to 18 mm.
+module are 38 to 46 mm, the RMII lines to the PHY 40 to 48 mm and its 50 MHz
+clock 59 mm, with two to four vias each. Both are well inside what these
+interfaces tolerate. The Ethernet pairs from the PHY to the jack are 11 to
+18 mm. The RMII transmit lines have no series resistors (there is no room for
+them at the MCU); the firmware sets their drive strength instead (see
+[firmware-port.md](firmware-port.md)).
 
 Solder paste on the MCU's exposed pad is printed as nine windows of 2.1 mm
 (70 % of the pad), not as one opening of 7.5 mm: with paste over the whole pad
 the package can float on it and lift off its 0.35 mm pitch pins. The pad has
-25 ground vias of 0.3 mm, open on the component side.
+16 ground vias of 0.3 mm in the lanes between the windows. The PHY's pad has
+four windows and five vias in the same way.
 
-The LEDs use KiCad's footprint for this part. Its cut-out is 3.4 x 3.0 mm with
-relieved corners: a milled opening has round inside corners, and the LED body
-(3.2 x 2.8 mm) has square ones.
+The LEDs use KiCad's footprint for this part with pads 0.1 mm shorter. Its
+cut-out is 3.4 x 3.0 mm with relieved corners: a milled opening has round
+inside corners, and the LED body (3.2 x 2.8 mm) has square ones. KiCad's pads
+end 0.25 mm from those corners, and a milled outline may lie 0.2 mm off; the
+shorter pads keep 0.3 mm, like all other copper (0.31 mm is the least on the
+board).
 
 RMII_TXD1 is GPIO35, which is also the boot-mode pin. The BOOT button and its
 test point are about 70 mm away. They hang behind a 1 kohm resistor (R217) that
@@ -539,7 +591,10 @@ dense they would overlap. They are on the assembly drawing layer
 - Component side, the side one sees with the reader off its dock: test points
   in named groups (C6, P4 UART0, power), how to get into download mode, the
   limits of the connectors, the border of the 48 V side, the LED numbers as the
-  firmware counts them, and a field for a serial number. The free area behind
+  firmware counts them, and a white field of 10 x 2 mm beside `S/N`: JLCPCB
+  prints a number that differs from board to board into a field of that size
+  if the order asks for it (see the README). A reader that comes back can then
+  be told apart even when it no longer starts. The free area behind
   the NFC loop holds the logo, the board's name and revision, a short GPIO map
   and where the documents are. The numbers of the GPIO map are taken from the
   circuit description (`circuit_core.P4_GPIO`), so they cannot drift from the
@@ -547,9 +602,8 @@ dense they would overlap. They are on the assembly drawing layer
 - Display side, hidden in the finished reader: the assembly hints for the
   display (the four ground pads, the jack's pins to clip, which of them carry
   48 V), the LED numbers, the keyhole at the tap point, and a note for whoever
-  takes the display off. The text `JLCJLCJLCJLC` there is where JLCPCB prints
-  its order number, if the order asks for that (see the README).
-- Texts are 0.9 or 1.0 mm high with 0.15 mm lines. The build stops if a text
+  takes the display off.
+- Texts are 1.0 mm high with 0.15 mm lines. The build stops if a text
   lies on a pad, on another text or within 0.3 mm of the board edge.
 - The logo is drawn from the vector files in `case/logo/`. The mascot is not
   used: by the brand rules it keeps its natural colours, and a silkscreen has
@@ -570,6 +624,48 @@ one extended part line, the buzzer resistor. The tamper sensors add about
 2.7 USD per board (accelerometer 0.89, proximity sensor 1.57, hall switch
 0.17, five capacitors, two resistors) and three extended part lines; the dock
 needs a magnet of a few cents.
+
+The table is for the parts only. The bare boards, from JLCPCB's order form on
+21 November 2026 (86 x 143.5 mm, 1.6 mm, green, slowest build time, without
+shipping and tax), in USD per order:
+
+| Boards | Four layers, ENIG | Six layers, ENIG | Six layers, OSP | Six layers with ENIG, per board |
+|---|---|---|---|---|
+| 5 | 50.70 | 59.00 | 41.00 | 11.80 |
+| 10 | 59.70 | 68.40 | 49.00 | 6.84 |
+| 30 | 95.90 | 106.00 | 80.80 | 3.53 |
+| 50 | 132.00 | 143.60 | 112.70 | 2.87 |
+| 100 | 208.50 | 253.50 | 208.30 | 2.54 |
+
+The prices are from the form filled in by hand, without the Gerber files, so
+JLCPCB's review of the files can still change them. Six layers cost 8 to 12 USD
+more per order up to 50 boards and 45 USD more on 100 (0.45 USD per board).
+They take 7 to 9 working days to build, four layers 3 to 6.
+
+The vias cost nothing extra. The form's option "Min via hole size/diameter"
+charges for holes below 0.3 mm, but its note says that on boards with inner
+layers a 0.2 mm hole is free when the via is 0.45 mm wide or more, and that is
+the board's smallest via. The option stays at "0.3mm/(0.4/0.45mm)". Choosing
+"0.2mm/(0.3/0.35mm)" there adds 39 USD on 5 boards and 91 USD on 100 (the
+option itself, TG155 material and a four-wire test).
+
+ENIG is 18 USD of the price on 5 boards and 45 USD on 100. OSP, which JLCPCB
+offers at no charge and selects for six layers unless told otherwise, is as
+flat as ENIG and takes the 0.35 mm pitch MCU as well. But it protects copper
+only until it is soldered, and JLCPCB excludes it for contact areas. The board
+has them: the four bare ground pads for the display's metal back, on the side
+without parts, where assembly cannot tin them, and the 15 test points, four of
+which carry the first flash of the Wi-Fi module. Bare boards with OSP also keep
+for three months only, and about a week once unpacked. The board stays with
+ENIG.
+
+Splitting the board into a small six-layer board for the MCU (45 x 45 mm:
+48.80 USD for 5, 97.10 USD for 100) and a carrier with fewer layers (four
+layers: 50.70 and 208.50 USD; two layers: 28.00 and 148.70 USD) does not pay.
+With a four-layer carrier the two boards cost more than the one six-layer board
+at every quantity. With a two-layer carrier they cost more on 5 boards and
+0.08 USD less per reader on 100, before the connector pair between the boards
+and the second assembly order.
 
 Once per order JLCPCB adds 3 USD for every extended part line (36 lines on the
 Wi-Fi version, 41 on the Ethernet/PoE version, with the three tamper sensors),
@@ -651,7 +747,45 @@ display and the connectors. Nothing was built or measured.
   design means.
 - Electrical and design rule checks, schematic against board, and the board
   against JLCPCB's limits (tracks 0.11 mm against 0.09, vias 0.45 / 0.2 mm
-  without surcharge, copper to milled edges 0.23 mm against 0.2).
+  without surcharge, copper to milled edges 0.31 mm against 0.2).
+
+### Review against layout rules
+
+Later in November 2026 the routed board was measured against a collection of
+layout rules (reference planes and return paths, supply routing, decoupling,
+stitching, soldering and ordering). The design rule check was clean before and
+after; it does not look at any of this.
+
+| Finding on the four-layer board | Change |
+|---|---|
+| The 3.3 V pour shared the inner layer In2 with 1150 mm of signal tracks, which cut it into five pieces. The back layer had that pour as its reference: 23 % of the length of the fast signals on the back layer, and 28 % on In2, had no copper of a plane next to them (the 50 MHz Ethernet clock over 18 of its 47 mm). | Six layers. The routing is the same; the 3.3 V plane has a layer of its own and the back layer a ground plane. 7 % of the fast signals' length on those two layers is still without a plane next to it, at vias and where the planes end. |
+| 17 of the 42 vias of fast signals had no ground via within 3 mm, the six SDIO vias at the Wi-Fi module none within 6 to 12 mm. | A ground via beside each, where there is room: 6 are left without one within 3 mm (3.8 mm at most). |
+| About 1000 mm2 of each outer ground fill lay more than 10 mm from a ground via; the strip right of the Wi-Fi antenna had none at all. | 342 stitching vias. No fill is more than 5.6 mm from a ground via. |
+| Core rail: the pour on the back layer did not reach the converter, because its outline visited one corner twice and KiCad filled only the square under the MCU. The rail hung on one track of 0.2 mm and one via with a 0.2 mm hole. | One outline; three 0.3 mm vias at the output capacitor into the pour; supply tracks widened. |
+| A 48 V track on the back layer (19 mm beside the PoE module), where these notes said there was none. Inner pours 0.9 mm from the 48 V pad of C102. | The track is on the inner layer. Pours end 2 mm from 48 V copper on every layer. |
+| PN532: the capacitors of its analog supply were 8.3 mm from the pin. | The 100 nF is 4.1 mm from it. Nearer is not possible: the transmitter's vias and tracks take the space above the pin. |
+| 104 small parts stood with one pad solid in the ground fill and the other on a thin track (tombstoning). | Thermal spokes at the pads of all 0402 and 0603 parts. |
+| Vias under solder paste: 9 of 25 in the MCU's exposed pad, all in the PHY's and the Wi-Fi module's ground pads, one in a capacitor pad. | None now. |
+| The four inductor footprints were marked as through-hole parts. A placement export for surface-mount parts only would have left them out (this project's export did not). | Marked as surface-mount. |
+| LED pads 0.25 mm from the milled windows, with an outline tolerance of 0.2 mm. | Pads 0.1 mm shorter: 0.3 mm and more. |
+| TVS of the DC input: 45 V at its rated current against the converter's 40 V. | SMBJ26A, see "Power". |
+| Silkscreen text of 0.9 mm; the marker `JLCJLCJLCJLC` for an order number that JLCPCB stopped printing in May 2026. | Text 1.0 mm; a field for JLCPCB's serial number. |
+| No stack-up in the board file. Part counts and bus lengths in these documents were out of date. | Added and corrected. |
+
+Looked at and left as it is:
+
+- The flash's supply pin has its 100 nF 5.3 mm away. Below the pin run the
+  data-out and chip-select tracks, beside it lies the flash's body; there is no
+  nearer place on this side of the board.
+- The seven RMII vias above the MCU cut one slot of 4 x 1.6 mm into the planes.
+  Spreading them would take the fan-out of the MCU's upper edge apart.
+- Teardrops. KiCad makes them only in its board editor, not from a script. The
+  larger via pads do part of their job.
+- 3D models. KiCad's library has one for the display connector only; those of
+  the other connectors and the modules would have to be downloaded and kept
+  in the repository.
+- The fourth core supply pin and the supply tracks at fine-pitch pins stay
+  narrow (see "Layout rules used").
 
 ### Open: cannot be settled on paper
 
@@ -665,10 +799,11 @@ display and the connectors. Nothing was built or measured.
   bring-up plan), and measure how far the pins of a real jack stand out. If the
   flex does not reach at 1.5 mm, the fallback is the jack below the display
   (commit 74add084d has that board) with a case 19 mm longer.
-- **Decoupling at the MCU.** The capacitors of several supply pins are 4 to
-  9 mm from their pin; Espressif asks for one at each pin. They connect through
-  vias into the planes. The space next to the pins is taken by the signals
-  that leave the 0.35 mm pitch pad row, and the back of the board is under the
+- **Decoupling at the MCU.** Of its 21 supply pins 7 have their nearest
+  capacitor more than 5 mm away (6.7 mm at most) and 5 within 3 mm; Espressif
+  asks for one at each pin. They connect through vias into the planes, which
+  are unbroken now. The space next to the pins is taken by the signals that
+  leave the 0.35 mm pitch pad row, and the back of the board is under the
   display. If the MCU proves unstable at full clock speed, this is the first
   suspect, and it needs a new layout to change.
 - **NFC range and tuning**, the second-source PN532, and the effect of the

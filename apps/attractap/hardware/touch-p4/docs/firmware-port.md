@@ -164,7 +164,9 @@ The board has three sensors for this and the firmware does not use them yet.
    `ip101`, address 1, external 50 MHz clock on GPIO32
    (`EMAC_CLK_EXT_IN`), MDC 31, MDIO 36, data pins as in the table. Set the
    drive strength of the transmit pins (GPIO33 to 35) to the lowest value
-   that works; that keeps the emissions down. On the wifi
+   that works; that keeps the emissions down, and it stands in for series
+   resistors, which these three lines do not have (the receive lines and the
+   clock have 33 ohm at the PHY). On the wifi
    version the PHY is not fitted: probe it and fall back to Wi-Fi.
 
    **Reset the PHY before the driver starts.** The board has no reset circuit

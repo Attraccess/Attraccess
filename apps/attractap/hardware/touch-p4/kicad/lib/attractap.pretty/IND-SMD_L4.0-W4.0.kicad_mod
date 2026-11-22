@@ -1,7 +1,7 @@
 (module easyeda2kicad:IND-SMD_L4.0-W4.0
 	(layer F.Cu)
 	(tedit 5DC5F6A4)
-	(attr through_hole)
+	(attr smd)
 	(fp_text reference REF**
 		(at 0.000 -4.000)
 		(layer F.SilkS)

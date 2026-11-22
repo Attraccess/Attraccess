@@ -20,7 +20,10 @@ NAME = 'attractap-touch-p4'
 PCB = os.path.join(PROJECT, NAME + '.kicad_pcb')
 mm = pcbnew.FromMM
 OX, OY = G.ORIGIN
-F, B_, IN1, IN2 = pcbnew.F_Cu, pcbnew.B_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu
+F, B_, IN1, IN2, IN3, IN4 = pcbnew.F_Cu, pcbnew.B_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.In3_Cu, pcbnew.In4_Cu
+SIX = G.COPPER_LAYERS == 6
+ALL_CU = (F, IN1, IN2, IN3, IN4, B_) if SIX else (F, IN1, IN2, B_)
+PLANE_3V3 = IN3 if SIX else IN2          # the layer that carries the 3.3 V plane
 
 
 def V(x, y):

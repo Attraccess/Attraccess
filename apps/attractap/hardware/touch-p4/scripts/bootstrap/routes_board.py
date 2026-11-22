@@ -10,12 +10,16 @@ from board import B_, F, IN2, V, dog, mm, unV
 
 
 def module_ground(B):
-    """Ground vias that plane_fanout() cannot place: one in each of the nine ground pads under the Wi-Fi
+    """Ground vias that plane_fanout() cannot place: four between the nine ground pads under the Wi-Fi
     module, two beside the output ground pad of the PoE module (under the module, on the secondary
     side) and one for the backlight driver."""
-    for pad in B.fp['U301'].Pads():
-        if pad.GetNumber() == '49':
-            B.via(*unV(pad.GetPosition()), 'GND', size=0.6, drill=0.3)
+    # The module's nine ground pads carry solder paste. The vias sit where four pads meet, on the ground
+    # fill between them and under the solder mask, so no paste runs into a hole.
+    pads = [unV(pad.GetPosition()) for pad in B.fp['U301'].Pads() if pad.GetNumber() == '49']
+    xs, ys = sorted({round(x, 3) for x, _y in pads}), sorted({round(y, 3) for _x, y in pads})
+    for xa, xb in zip(xs, xs[1:]):
+        for ya, yb in zip(ys, ys[1:]):
+            B.via((xa + xb) / 2, (ya + yb) / 2, 'GND', size=0.6, drill=0.3)
     x, y = B.pad('U102', 3)
     for dy in (-0.4, 0.4):
         B.track([(x, y + dy), (x + 2.7, y + dy)], 'GND', 0.5)
@@ -40,7 +44,8 @@ def module_ground(B):
 
 
 def ep_vias(board):
-    """Ground vias in the exposed pad of the Ethernet PHY (its footprint has none)."""
+    """Ground vias in the exposed pad of the Ethernet PHY (its footprint has none): a cross of five, in
+    the lanes between the four solder paste windows (make_lib.py), so no paste runs into a hole."""
     fp = board.FindFootprintByReference('U401')
     if fp is None:
         return
@@ -50,12 +55,11 @@ def ep_vias(board):
             math.hypot(unV(t.GetPosition())[0] - cx, unV(t.GetPosition())[1] - cy) < 1.3]
     if have:
         return
-    for dx in (-0.7, 0.7):
-        for dy in (-0.7, 0.7):
-            v = pcbnew.PCB_VIA(board)
-            v.SetPosition(V(cx + dx, cy + dy)); v.SetWidth(pcbnew.F_Cu, mm(0.6)); v.SetDrill(mm(0.3))
-            v.SetNet(pad.GetNet()); v.SetLocked(True); v.SetLayerPair(F, B_)
-            board.Add(v)
+    for dx, dy in ((0.0, 0.0), (-0.95, 0.0), (0.95, 0.0), (0.0, -0.95), (0.0, 0.95)):
+        v = pcbnew.PCB_VIA(board)
+        v.SetPosition(V(cx + dx, cy + dy)); v.SetWidth(pcbnew.F_Cu, mm(0.6)); v.SetDrill(mm(0.3))
+        v.SetNet(pad.GetNet()); v.SetLocked(True); v.SetLayerPair(F, B_)
+        board.Add(v)
 
 
 def poe_routes(B):
@@ -85,8 +89,8 @@ def poe_routes(B):
     B.track([f2b, (dk[0] - 0.7, dk[1] + 0.5)], 'POE_VPF', w)
     B.track([(dk[0] - 0.7, dk[1]), (xl, dk[1] - 1.2), (xl, m5[1] + 1.0), (xl + 1.0, m5[1]), m5], 'POE_VPF', w)
     B.track([m5, m6], 'POE_VPF', w)
-    # filtered - : bead -> right of the TVS cathode -> TVS anode -> under the + pads on the back layer
-    #              -> module pins 7 and 8 -> C102
+    # filtered - : bead -> right of the TVS cathode -> TVS anode -> under the + pads on the inner layer
+    #              -> module pins 7 and 8 -> C102. (Not on the back layer: that one faces the display.)
     xr = da[0] + 2.15
     B.track([f3b, (xr, f3b[1] - 0.85), (xr, da[1]), da], 'POE_VNF', w)
     vx = 85.1
@@ -94,7 +98,7 @@ def poe_routes(B):
     v2 = (vx, (m7[1] + m8[1]) / 2)
     B.track([(xr, da[1]), (xr, v1[1] + 0.6), v1], 'POE_VNF', w)
     B.via(v1[0], v1[1], 'POE_VNF', size=0.8, drill=0.4)
-    B.track([v1, v2], 'POE_VNF', w, layer=B_)
+    B.track([v1, v2], 'POE_VNF', w, layer=IN2)
     B.via(v2[0], v2[1], 'POE_VNF', size=0.8, drill=0.4)
     B.track([m7, (m7[0], v2[1]), m8], 'POE_VNF', w)
     B.track([v2, (m7[0], v2[1])], 'POE_VNF', w)
@@ -336,7 +340,7 @@ def plane_fanout(B):
 
     Returns the pads for which no free spot was found (the autorouter has to deal with those).
     """
-    VIA_R, CLR, W = 0.225, 0.14, 0.25
+    VIA_R, HOLE_R, CLR, W = 0.225, 0.1, 0.14, 0.25
     x3, y3 = G.PLANE_3V3_TONGUE
     gnd, p3v3 = B.names.get('GND', 'GND'), B.names.get('+3V3', '+3V3')
 
@@ -376,13 +380,15 @@ def plane_fanout(B):
         for x1, y1, x2, y2 in keep:
             if x1 - 0.5 < x < x2 + 0.5 and y1 - 0.5 < y < y2 + 0.5:
                 return False
-        for pnet, x1, y1, x2, y2, _, _ in pads:
+        for pnet, x1, y1, x2, y2, pref, _ in pads:
             dx = max(x1 - x, 0, x - x2)
             dy = max(y1 - y, 0, y - y2)
             d = math.hypot(dx, dy)
             if pnet != net and d < VIA_R + CLR:
                 return False
-            if pnet == net and d < 0.05 and False:
+            # Its hole not in or at a pad of its own net: the solder would run into it. (A test point has
+            # no solder paste; a via in its pad does no harm.)
+            if pnet == net and d < HOLE_R + 0.1 and not pref.startswith('TP'):
                 return False
         for (vx, vy), vnet in vias:
             if vnet != net and math.hypot(vx - x, vy - y) < 2 * VIA_R + CLR + 0.2:
@@ -400,7 +406,7 @@ def plane_fanout(B):
     # diode's ground pin would depend on what the routing leaves of the copper fill around it.
     # (MCU, PHY, PN532 and Wi-Fi module have vias in their exposed pads.)
     ics = ('U101', 'U103', 'U104', 'U202', 'U203', 'U601', 'U602', 'U701', 'J101', 'J601')
-    failed, made = [], 0
+    failed, made, served = [], 0, set()
     for net, x1, y1, x2, y2, ref, pad in list(pads):
         if net not in (gnd, p3v3):
             continue
@@ -426,7 +432,9 @@ def plane_fanout(B):
                 done = True
                 break
         if not done:
-            for dist_extra in (0.12, 0.3, 0.55):
+            # (the last step is for capacitors that stand in a row 1.1 mm apart: the via fits exactly
+            # between two pads of the same net)
+            for dist_extra in (0.12, 0.3, 0.55, 0.02):
                 for ang in (0, 45, -45, 90, -90, 135, -135):
                     r = math.radians(ang)
                     dx = ox * math.cos(r) - oy * math.sin(r)
@@ -446,6 +454,24 @@ def plane_fanout(B):
                 if done:
                     break
         if not done:
+            # No room for a via of its own: share the one of a pad of the same net right beside it (two
+            # capacitors side by side), if the short track between the two pads is clear.
+            for qnet, qx1, qy1, qx2, qy2, qref, qpad in pads:
+                qx, qy = (qx1 + qx2) / 2, (qy1 + qy2) / 2
+                if qnet != net or qpad is pad or (qref, qpad.GetNumber()) not in served or math.hypot(qx - px, qy - py) > 1.3:
+                    continue
+                clear = all(snet == net or min(seg_dist(px + (qx - px) * k / 8, py + (qy - py) * k / 8, a, c) for k in range(9)) > W / 2 + w / 2 + 0.14
+                            for a, c, w, snet in segs)
+                clear = clear and all(onet == net or math.hypot(max(ox1 - (px + qx) / 2, 0, (px + qx) / 2 - ox2),
+                                                               max(oy1 - (py + qy) / 2, 0, (py + qy) / 2 - oy2)) > W / 2 + CLR
+                                      for onet, ox1, oy1, ox2, oy2, _r, _p in pads)
+                if clear:
+                    B.track([(px, py), (qx, qy)], net, W)
+                    done = True
+                    break
+        if done:
+            served.add((ref, pad.GetNumber()))
+        else:
             failed.append('%s.%s' % (ref, pad.GetNumber()))
     print('plane fan-out: %d vias, %d pads left to the router%s' % (
         made, len(failed), (': ' + ' '.join(failed[:40])) if failed else ''))

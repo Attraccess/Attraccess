@@ -241,7 +241,7 @@
 			(on_board yes)
 			(property "Reference" "LED" (id 0) (at 0 6.35 0) (effects (font (size 1.27 1.27))))
 			(property "Value" "SK6812MINI-E_C5149201" (id 1) (at 0 -6.35 0) (effects (font (size 1.27 1.27))))
-			(property "Footprint" "LED_SMD:LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount"
+			(property "Footprint" "attractap:LED_SK6812MINI-E_ReverseMount_Clear"
 				(id 2)
 				(at 0 -8.89 0)
 				(effects (font (size 1.27 1.27)) hide)
@@ -1539,7 +1539,7 @@
 		(uuid "2a53f23c-8e13-5879-972e-74654dd8a61b")
 		(property "Reference" "D701" (at 177.8 63.21 0) (effects (font (size 1.27 1.27))))
 		(property "Value" "SK6812MINI-E" (at 177.8 65.11 0) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "LED_SMD:LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount"
+		(property "Footprint" "attractap:LED_SK6812MINI-E_ReverseMount_Clear"
 			(at 177.8 68.58 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -1705,7 +1705,7 @@
 		(uuid "96d72e26-3142-50a4-92ea-f0c79a3ef8ef")
 		(property "Reference" "D702" (at 246.38 63.21 0) (effects (font (size 1.27 1.27))))
 		(property "Value" "SK6812MINI-E" (at 246.38 65.11 0) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "LED_SMD:LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount"
+		(property "Footprint" "attractap:LED_SK6812MINI-E_ReverseMount_Clear"
 			(at 246.38 68.58 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -1871,7 +1871,7 @@
 		(uuid "1ffb0b53-c33d-5f1f-9460-3c2909b75546")
 		(property "Reference" "D703" (at 177.8 75.91 0) (effects (font (size 1.27 1.27))))
 		(property "Value" "SK6812MINI-E" (at 177.8 77.81 0) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "LED_SMD:LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount"
+		(property "Footprint" "attractap:LED_SK6812MINI-E_ReverseMount_Clear"
 			(at 177.8 81.28 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -2037,7 +2037,7 @@
 		(uuid "66d812fb-29f7-5a07-83e1-94f4c0c547bb")
 		(property "Reference" "D704" (at 246.38 75.91 0) (effects (font (size 1.27 1.27))))
 		(property "Value" "SK6812MINI-E" (at 246.38 77.81 0) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "LED_SMD:LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount"
+		(property "Footprint" "attractap:LED_SK6812MINI-E_ReverseMount_Clear"
 			(at 246.38 81.28 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -2203,7 +2203,7 @@
 		(uuid "e9e53f15-091f-53f2-873f-bf3161d5aa15")
 		(property "Reference" "D705" (at 177.8 88.61 0) (effects (font (size 1.27 1.27))))
 		(property "Value" "SK6812MINI-E" (at 177.8 90.51 0) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "LED_SMD:LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount"
+		(property "Footprint" "attractap:LED_SK6812MINI-E_ReverseMount_Clear"
 			(at 177.8 93.98 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -2369,7 +2369,7 @@
 		(uuid "bff3c6a9-7a99-5f17-a750-3aeac4edc58b")
 		(property "Reference" "D706" (at 246.38 88.61 0) (effects (font (size 1.27 1.27))))
 		(property "Value" "SK6812MINI-E" (at 246.38 90.51 0) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "LED_SMD:LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount"
+		(property "Footprint" "attractap:LED_SK6812MINI-E_ReverseMount_Clear"
 			(at 246.38 93.98 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -2535,7 +2535,7 @@
 		(uuid "e3d4e984-18d0-5df9-974a-7693477d00c5")
 		(property "Reference" "D707" (at 177.8 101.31 0) (effects (font (size 1.27 1.27))))
 		(property "Value" "SK6812MINI-E" (at 177.8 103.21 0) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "LED_SMD:LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount"
+		(property "Footprint" "attractap:LED_SK6812MINI-E_ReverseMount_Clear"
 			(at 177.8 106.68 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -2701,7 +2701,7 @@
 		(uuid "9a2d3939-ee8d-57e1-92f1-da319d1fdab4")
 		(property "Reference" "D708" (at 246.38 101.31 0) (effects (font (size 1.27 1.27))))
 		(property "Value" "SK6812MINI-E" (at 246.38 103.21 0) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "LED_SMD:LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount"
+		(property "Footprint" "attractap:LED_SK6812MINI-E_ReverseMount_Clear"
 			(at 246.38 106.68 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
