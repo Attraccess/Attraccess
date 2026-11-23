@@ -130,23 +130,19 @@ void DemoWebsocket::processOutbound(const char *data, size_t len)
     }
 
     if (strcmp(type, "START_RESOURCE_USAGE_SESSION") == 0 || strcmp(type, "STOP_RESOURCE_USAGE_SESSION") == 0 ||
-        strcmp(type, "LOCK_DOOR") == 0 || strcmp(type, "UNLOCK_DOOR") == 0 ||
+        strcmp(type, "EXTEND_RESOURCE_USAGE_SESSION") == 0 || strcmp(type, "LOCK_DOOR") == 0 || strcmp(type, "UNLOCK_DOOR") == 0 ||
         strcmp(type, "UNLATCH_DOOR") == 0 || strcmp(type, "TRIGGER_FLOW_BUTTON") == 0)
         _actionRequestId = doc["data"]["payload"]["requestId"] | 0u;
 
     if (strcmp(type, "START_RESOURCE_USAGE_SESSION") == 0)
     {
-        handleStartSession(doc["data"]["payload"]["resourceId"] | 0u,
-                           doc["data"]["payload"]["projectId"] | 0u,
-                           doc["data"]["payload"]["forceTakeOver"] | false);
+        handleStartSession(doc["data"]["payload"]);
         return;
     }
 
-    if (strcmp(type, "STOP_RESOURCE_USAGE_SESSION") == 0)
-    {
-        handleStopSession(doc["data"]["payload"]["resourceId"] | 0u, doc["data"]["payload"]["usageId"] | 0u);
-        return;
-    }
+    if (strcmp(type, "EXTEND_RESOURCE_USAGE_SESSION") == 0) { handleExtendSession(doc["data"]["payload"]); return; }
+
+    if (strcmp(type, "STOP_RESOURCE_USAGE_SESSION") == 0) { handleStopSession(doc["data"]["payload"]["resourceId"] | 0u, doc["data"]["payload"]["usageId"] | 0u); return; }
 
     if (strcmp(type, "RESOURCE_USAGE_FORM_GET_FIELDS") == 0)
     {
@@ -264,6 +260,7 @@ void DemoWebsocket::respondResourceList(uint32_t requestId, const char *language
         // Takeover stays disabled: another user's session blocks non-managers,
         // while admins (canManageResource) can still force-stop it.
         obj["allowTakeOver"] = false;
+        addDurationSettings(obj, r.id);
         JsonArray intro = obj["introducers"].to<JsonArray>();
         for (const std::string &name : introducers)
             intro.add(name);

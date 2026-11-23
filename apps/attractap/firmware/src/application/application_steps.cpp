@@ -128,6 +128,7 @@ void Application::clearPendingStartLocally()
   this->pendingActionResourceId = 0;
   this->pendingActionProjectId = 0;
   this->pendingActionIsTakeover = false;
+  this->pendingActionEstimateMinutes = 0;
   this->hasPendingServerFormFlow = false;
   if (!this->waitingForResourceRefresh) Display::resourceDetailsScreen.hideActionProgress();
   this->finishReaderAction(false);
@@ -156,7 +157,8 @@ void Application::handleUiStepAction(const std::string &stepId, const std::strin
   this->showReaderActionProgress(this->pendingActionIsTakeover ? FirmwareI18n::Message::TakingOverSession
                                                                : FirmwareI18n::Message::StartingSession);
   this->api.startResourceUsageSession(this->pendingActionResourceId, this->pendingActionProjectId,
-                                      this->pendingActionIsTakeover, id.c_str(), isChoice ? action.c_str() : nullptr);
+                                      this->pendingActionIsTakeover, id.c_str(), isChoice ? action.c_str() : nullptr,
+                                      this->pendingActionEstimateMinutes);
 }
 
 void Application::handleUiStepCancel(const std::string &stepId)

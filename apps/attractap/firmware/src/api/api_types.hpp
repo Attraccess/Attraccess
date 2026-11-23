@@ -81,6 +81,19 @@ struct ResourceBrief
         // The authenticated user's own session; activeUser/activeUsageId point at it when present.
         bool hasOwnUsage = false;
         uint32_t ownUsageId = 0;
+        // Session duration (ATT-43, machines only). The reader asks for an estimate before a start when required.
+        bool requireSessionDurationEstimate = false;
+        // Longest session in minutes; 0 means the machine has no maximum.
+        uint32_t maxSessionDurationMinutes = 0;
+        // The own session's automatic end. The seconds are relative to `autoEndReceivedMs` (millis() when the list
+        // arrived), so the countdown needs no wall clock; `autoEndEpoch` (0 when unknown) gives the stop time.
+        bool hasAutoEnd = false;
+        bool hasMaxSessionTime = false;
+        uint32_t autoEndInSeconds = 0;
+        uint32_t extendLimitInSeconds = 0;
+        uint32_t autoEndReceivedMs = 0;
+        uint32_t autoEndEpoch = 0;
+        int16_t autoEndUtcOffsetMinutes = 0;
         // Every active session (bounded) so managers can end a chosen one.
         std::vector<ActiveSession> activeSessions;
         // Parallel UI: a limit lowered to 1 while several sessions run still lists them so each can be stopped.

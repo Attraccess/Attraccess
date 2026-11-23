@@ -197,6 +197,7 @@ void Application::resetSessionOnDisconnect() {
   this->pendingActionResourceId = 0;
   this->pendingActionProjectId = 0;
   this->pendingActionIsTakeover = false;
+  this->pendingActionEstimateMinutes = 0;
   this->pendingActionUsageId = 0;
   this->hasPendingFormRequest = false;
   this->hasPendingServerFormFlow = false;
@@ -238,6 +239,11 @@ void Application::updateSelectedResourceDetails() {
     Display::lockscreen.setResourceName(resource.name);
     Display::lockscreen.setUsageInfo(resource);
     Display::resourceDetailsScreen.setResourceAndUsageDetails(resource);
+    if (Display::isActive(&Display::extendSessionScreen)) {
+      // Live update (an extension from the web or another reader); the screen closes when there is nothing to extend.
+      if (resource.hasOwnUsage && resource.hasAutoEnd) Display::extendSessionScreen.update(resource);
+      else Display::returnFromTransient();
+    }
     const bool personalized = resource.accessKnown && this->cardAuthenticationData.username == this->resourceList.authenticatedUsername;
     const bool legacy = !resource.accessKnown && this->authenticationResourceId == resource.id;
     Display::resourceDetailsScreen.setUserDetails({
@@ -324,6 +330,21 @@ void Application::handleResourceDetailsButtonClick(
       }
     }
 
+    // A machine that requires an estimate asks first (also for a takeover or a supervised start); the answer
+    // re-enters this case and the estimate travels with the start request, and with its retries after forms.
+    uint32_t maxMinutes = 0;
+    if (this->needsDurationEstimate(this->selectedResourceId, maxMinutes)) {
+      if (!this->durationEstimateChosen) {
+        this->pendingUiAction.clear();
+        this->durationStartPending = true;
+        this->openDurationInput(maxMinutes);
+        break;
+      }
+    } else {
+      this->pendingActionEstimateMinutes = 0;
+    }
+    this->durationEstimateChosen = false;
+
     // Resource-first authentication can finish before its personalized list.
     // Match the same verified-card fallback used by the details screen.
     bool requiresSupervisor = this->authenticationResourceId == this->selectedResourceId &&
@@ -352,7 +373,7 @@ void Application::handleResourceDetailsButtonClick(
     this->formFlowSubmitted = false;
     this->api.startResourceUsageSession(this->selectedResourceId,
                                         isTakeover ? 0 : this->selectedProjectId,
-                                        isTakeover);
+                                        isTakeover, nullptr, nullptr, this->pendingActionEstimateMinutes);
     break;
   }
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
@@ -485,6 +506,65 @@ void Application::leaveForms() {
   Display::resourceListScreen.setAuthenticatedUser(this->unlocked ? this->cardAuthenticationData.username : "",
                                                          this->unlocked ? this->cardAuthenticationData.displayName : "");
   Display::transitionToScreen(&Display::resourceListScreen);
+}
+
+bool Application::needsDurationEstimate(uint32_t resourceId, uint32_t &maxMinutes) const {
+  for (uint16_t i = 0; i < this->resourceList.count; ++i) {
+    const auto &resource = this->resourceList.items[i];
+    if (resource.id != resourceId) continue;
+    maxMinutes = resource.maxSessionDurationMinutes;
+    return resource.type == 0 && resource.requireSessionDurationEstimate;
+  }
+  return false;
+}
+
+void Application::openDurationInput(uint32_t maxMinutes) {
+  Display::durationInputScreen.configure(
+      this->resourceNameOf(this->selectedResourceId), maxMinutes,
+      [this](uint32_t minutes) {
+        // Back to the screen the start came from, then the interrupted start runs with the estimate.
+        Display::returnFromTransient();
+        if (!this->durationStartPending) return;
+        this->durationStartPending = false;
+        this->pendingActionEstimateMinutes = minutes;
+        this->durationEstimateChosen = true;
+        this->handleResourceDetailsButtonClick({&Display::resourceDetailsScreen, ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION, {}});
+      },
+      [this]() {
+        this->durationStartPending = false;
+        this->durationEstimateChosen = false;
+        this->pendingActionEstimateMinutes = 0;
+        this->returnToListAfterAction = false;
+        Display::returnFromTransient();
+      });
+  Display::transitionToScreen(&Display::durationInputScreen);
+}
+
+void Application::openExtendScreen() {
+  for (uint16_t i = 0; i < this->resourceList.count; ++i) {
+    const auto &resource = this->resourceList.items[i];
+    if (resource.id != this->selectedResourceId || !resource.hasOwnUsage || !resource.hasAutoEnd) continue;
+    Display::extendSessionScreen.configure(
+        resource, [this](uint32_t minutes, bool toMax) { this->handleExtend(minutes, toMax); },
+        []() { Display::returnFromTransient(); });
+    Display::transitionToScreen(&Display::extendSessionScreen);
+    return;
+  }
+}
+
+void Application::handleExtend(uint32_t minutes, bool toMax) {
+  if (!this->unlocked || !this->pendingUiAction.empty() || this->waitingForResourceRefresh) return;
+  // The request is answered on the details, where the progress shows and the refreshed deadline appears.
+  Display::returnFromTransient();
+  this->pendingUiAction = "EXTEND_RESOURCE_USAGE_SESSION";
+  this->pendingUiResourceId = this->selectedResourceId;
+  this->pendingUiStartedAt = millis();
+  Display::resourceDetailsScreen.forgetLastAction();
+  this->showReaderActionProgress(FirmwareI18n::Message::ExtendingSession);
+  this->beginActionPause();
+  this->hasPendingFormRequest = false;
+  this->formFlowSubmitted = false;
+  this->api.extendResourceUsageSession(this->selectedResourceId, 0, minutes, toMax);
 }
 
 void Application::openProjects() {

@@ -36,11 +36,13 @@ int main(int argc, char **argv)
     JsonDocument resourceList;
     JsonDocument startReply;
     JsonDocument stopReply;
+    JsonDocument extendReply;
     transport.setMessageCallbackRaw([&](const char *message, size_t length) {
         assert(deserializeJson(received, message, length) == DeserializationError::Ok);
         if (received["data"]["type"] == "RESOURCE_LIST") resourceList.set(received);
         if (received["data"]["type"] == "START_RESOURCE_USAGE_SESSION") startReply.set(received);
         if (received["data"]["type"] == "STOP_RESOURCE_USAGE_SESSION") stopReply.set(received);
+        if (received["data"]["type"] == "EXTEND_RESOURCE_USAGE_SESSION") extendReply.set(received);
         if (received["data"]["type"] == "READER_AUTHENTICATED") {
             authenticated.set(received);
             State::setDefaultLanguage(received["data"]["payload"]["language"].as<std::string>());
@@ -160,6 +162,21 @@ int main(int argc, char **argv)
     assert(printer()["activeSessionCount"] == 1 && printer()["canStart"] == false);
     assert(printer()["ownUsageSession"]["user"]["username"] == "Ann");
     assert(printer()["canEndOtherSessions"] == false);
+    // ATT-43: the printer requires an estimate and has a maximum of 8 h. A start without an estimate (a reader that
+    // cannot ask) gets the maximum as its deadline, so there is nothing left to extend.
+    assert(printer()["requireSessionDurationEstimate"] == true && printer()["maxSessionDurationMinutes"] == 480);
+    assert(resourceList["data"]["payload"]["resources"][0]["requireSessionDurationEstimate"] == false);
+    const auto ownEnd = printer()["ownUsageSession"];
+    assert(ownEnd["hasMaxSessionTime"] == true && ownEnd["autoEndInSeconds"].as<uint32_t>() > 28000);
+    assert(ownEnd["extendLimitInSeconds"].as<uint32_t>() == ownEnd["autoEndInSeconds"].as<uint32_t>());
+    const auto extend = [&](const char *body) {
+        extendReply.clear();
+        exchange((std::string(R"({"data":{"type":"EXTEND_RESOURCE_USAGE_SESSION","payload":{"resourceId":2,"requestId":7,)") + body + "}}}").c_str());
+    };
+    extend(R"("extendByMinutes":60)");
+    assert(extendReply["data"]["payload"]["error"] == "SESSION_EXTENSION_EXCEEDS_MAXIMUM");
+    extend(R"("extendByMinutes":45)");
+    assert(extendReply["data"]["payload"]["error"] == "SESSION_EXTENSION_INVALID");
     startPrinter(); // already has one
     assert(startError() == "AlreadyHasActiveSessionError");
     assert(printer()["activeSessionCount"] == 1);

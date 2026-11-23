@@ -4,6 +4,7 @@
 #include "../api.hpp"
 #include "resource-introducers.hpp"
 #include "../../text/utf8_copy.hpp"
+#include "../../platform.hpp"
 #include <functional>
 #include <string.h>
 #include <string>
@@ -50,7 +51,7 @@ void API::setResourceListUpdateCallback(std::function<void(const ResourceList &)
 }
 
 void API::startResourceUsageSession(uint32_t resourceId, uint32_t projectId, bool forceTakeOver,
-                                    const char *stepId, const char *choice)
+                                    const char *stepId, const char *choice, uint32_t estimatedDurationMinutes)
 {
     this->logger.info("Starting resource usage session");
     JsonDocument doc;
@@ -64,6 +65,7 @@ void API::startResourceUsageSession(uint32_t resourceId, uint32_t projectId, boo
     {
         payload["forceTakeOver"] = true;
     }
+    if (estimatedDurationMinutes != 0) payload["estimatedDurationMinutes"] = estimatedDurationMinutes;
     if (stepId && *stepId)
     {
         payload["stepId"] = stepId;
@@ -72,6 +74,20 @@ void API::startResourceUsageSession(uint32_t resourceId, uint32_t projectId, boo
     CardSessionIdBuf cardSession;
     if (copyCardSessionId(cardSession)) payload["cardSessionId"] = cardSession;
     this->sendResourceAction("START_RESOURCE_USAGE_SESSION", payload);
+}
+
+void API::extendResourceUsageSession(uint32_t resourceId, uint32_t usageId, uint32_t extendByMinutes, bool toMax)
+{
+    this->logger.info("Extending resource usage session");
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["resourceId"] = resourceId;
+    if (usageId != 0) payload["usageId"] = usageId;
+    if (toMax) payload["toMax"] = true;
+    else payload["extendByMinutes"] = extendByMinutes;
+    CardSessionIdBuf cardSession;
+    if (copyCardSessionId(cardSession)) payload["cardSessionId"] = cardSession;
+    this->sendResourceAction("EXTEND_RESOURCE_USAGE_SESSION", payload);
 }
 
 void API::stopResourceUsageSession(uint32_t resourceId, uint32_t usageId)
@@ -314,6 +330,20 @@ void API::onResourceList(JsonObject data)
         dst.activeSessionCount = activeCount < 0 ? 0 : (activeCount > 1000 ? 1000 : activeCount);
         dst.canStart = resource["canStart"] | !dst.isFull();
         dst.hasOwnUsage = hasOwn;
+        dst.requireSessionDurationEstimate = dst.type == 0 && (resource["requireSessionDurationEstimate"] | false);
+        dst.maxSessionDurationMinutes = dst.type == 0 ? (resource["maxSessionDurationMinutes"] | 0u) : 0u;
+        // Only the card holder's own session is extendable here; another person's deadline is not shown.
+        if (hasOwn && own["autoEndInSeconds"].is<uint32_t>())
+        {
+            dst.hasAutoEnd = true;
+            dst.hasMaxSessionTime = own["hasMaxSessionTime"] | false;
+            dst.autoEndInSeconds = own["autoEndInSeconds"].as<uint32_t>();
+            dst.extendLimitInSeconds = own["extendLimitInSeconds"] | 0u;
+            dst.autoEndReceivedMs = millis();
+            const char *endIso = own["autoEndAt"].as<const char *>();
+            dst.autoEndEpoch = endIso ? parseIso8601ToTimeT(endIso) : 0;
+            dst.autoEndUtcOffsetMinutes = own["autoEndUtcOffsetMinutes"].is<int>() ? (int16_t)own["autoEndUtcOffsetMinutes"].as<int>() : 0;
+        }
         dst.ownUsageId = dst.hasOwnUsage ? own["id"].as<uint32_t>() : 0;
         dst.activeSessions.clear();
         for (JsonObject session : resource["activeUsageSessions"].as<JsonArray>())

@@ -79,6 +79,7 @@ void ResourceDetailsScreen::loop()
    this->updateUsageStatsDisplay();
    this->updateElapsedTimeDisplay();
    this->updateSessionTimeoutIndicator();
+   this->updateAutoEnd();
 }
 lv_obj_t *ResourceDetailsScreen::getScreen()
 {
@@ -338,6 +339,8 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    this->updateElapsedTimeDisplay();
    this->updateUsageStatsDisplay();
    this->refreshAccessState();
+   this->autoEndShownSeconds = UINT32_MAX;
+   this->updateAutoEnd();
 }
 
 std::string ResourceDetailsScreen::buildIntroducersText(const API::ResourceBrief &resource)

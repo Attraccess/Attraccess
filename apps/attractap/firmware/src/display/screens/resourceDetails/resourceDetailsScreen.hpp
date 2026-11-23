@@ -44,6 +44,10 @@ public:
     // The project button opens the project picker, which the application routes.
     void setOpenProjectsCallback(std::function<void()> callback);
     void setSelectedProject(uint32_t projectId, const char *projectName);
+    // The Extend button of a running own session with an automatic end opens the extension screen (ATT-43).
+    void setOpenExtendCallback(std::function<void()> callback) { this->openExtendCallback = std::move(callback); }
+    // A failure of an action that has no button here (the extension) must not appear on the last button used.
+    void forgetLastAction() { this->lastActionType = BUTTON_CLICK_TYPE_BACK; this->dropActionError(); }
 
     // UI helpers for async actions
     void showActionProgress(const FirmwareI18n::Text &text);
@@ -122,6 +126,13 @@ private:
     // Limit 1 force-stop: the usageId of the foreign session shown; 0 while the button stops one's own.
     uint32_t stopSessionUsageId = 0;
     bool ownsActiveUsage() const;
+    // Remaining time and the Extend button of the own session (resourceDetailsAutoEnd.cpp).
+    lv_obj_t *autoEndLabel = nullptr;
+    lv_obj_t *extendButton = nullptr;
+    uint32_t autoEndShownSeconds = UINT32_MAX;
+    std::function<void()> openExtendCallback;
+    void createAutoEnd();
+    void updateAutoEnd();
     void updateOccupancy();
     lv_obj_t *doorControls = nullptr;
 

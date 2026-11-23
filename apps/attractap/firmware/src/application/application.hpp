@@ -149,6 +149,11 @@ private:
     void leaveTopUp();
     void leaveForms();
     void openProjects();
+    // Duration estimate and extension (ATT-43)
+    bool needsDurationEstimate(uint32_t resourceId, uint32_t &maxMinutes) const;
+    void openDurationInput(uint32_t maxMinutes);
+    void openExtendScreen();
+    void handleExtend(uint32_t minutes, bool toMax);
     void finishCardAuthentication(bool success);
 
 #else

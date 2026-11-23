@@ -1,5 +1,4 @@
 #pragma once
-
 namespace FirmwareI18n {
 enum class Message {
     Maintenance,
@@ -283,14 +282,16 @@ enum class Message {
     ErrorNoOwnActiveSession,
     ErrorCardAuthenticationFailed, ErrorCardNotSupported, ErrorServerBusy, ErrorCardRemoved, ErrorCardTimeout,
     ErrorEnrollNotConfirmed, ErrorNoFreeKeySlot, ErrorCardNotFactory, ErrorResetNotConfirmed, ErrorWrongCard,
-    ErrorCardKeyUnavailable, ErrorFirmwareUpdateRequired, ErrorReaderNotAllowedToWriteCards,
-    ErrorCardOperationExpired,
+    ErrorCardKeyUnavailable, ErrorFirmwareUpdateRequired, ErrorReaderNotAllowedToWriteCards, ErrorCardOperationExpired,
     NetworkStatus, NetworkStatusShort, ConnectionQuality, ConnectionQualityGood, ConnectionQualityDegraded, ConnectionQualityOffline,
     LastMessageAge, LatestPing, AveragePing, PingTrend, ReconnectsLastMinute, SendQueueDepth, SendQueueFullLastMinute,
     SendFailuresLastMinute, ConnectionTimeoutsLastMinute, PingTimeoutsLastMinute, PingLossLastMinute,
-    MissedHeartbeatsLastMinute, NotAvailable, Milliseconds, Percent,
-    SessionYou, SessionNameJoin, SessionNamesMore, SessionUsersLine, SessionCountOf,
-    BluetoothSetup, BluetoothSetupOpen, BluetoothSetupLinked, BluetoothSetupUnavailable,
+    MissedHeartbeatsLastMinute, NotAvailable, Milliseconds, Percent, SessionYou, SessionNameJoin, SessionNamesMore,
+    SessionUsersLine, SessionCountOf, BluetoothSetup, BluetoothSetupOpen, BluetoothSetupLinked, BluetoothSetupUnavailable,
+    DurationTitle, DurationHint, DurationMaxLine, DurationHours, DurationMinutes, DurationHoursMinutes, DurationHoursLabel,
+    DurationMinutesLabel, ExtendSession, ExtendStopsAt, ExtendToMax, ExtendMaxReached, ExtendStep, ExtendingSession,
+    AutoEndLine, AutoEndLineAt, ErrorExtensionExceedsMaximum, ErrorExtensionNotPossible, ErrorEstimateExceedsMaximum,
+    ErrorEstimateRequired,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
@@ -596,5 +597,4 @@ inline constexpr Entry catalog[] = {
     {Message::EndOtherSessionsTitle, "Andere Sitzung beenden:", "End another session:"},
     {Message::ErrorNoOwnActiveSession, "Sie haben hier keine eigene Sitzung. Es wurde nichts beendet.", "You have no session of your own here. Nothing was ended."},
 };
-
 } // namespace FirmwareI18n

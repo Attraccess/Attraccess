@@ -292,6 +292,52 @@ secure profile; development units stay unfused. A later secure bridge build need
 Installations that rely on the reader secure profile get bridges without it; physical access to a
 bridge exposes its flash, including its pairing credentials.
 
+## Session duration protocol (2.12.0)
+
+Machines can limit how long a session runs (ATT-43): a **maximum session time**, and an option that **requires the
+user to say how long they will use the machine**. The server ends a session automatically at its deadline. The
+Touch and Touch V2 readers (also their demo variants) ask for the estimate and extend running sessions; the
+reader announces this with `capabilities.sessionDuration: true` in its firmware info. Lite, the BLE bridge, plugin
+readers and Touch readers on older firmware are never refused for a missing estimate: the server starts them with
+the machine's maximum as the deadline, or with its default estimate (60 minutes unless set) when there is no maximum.
+
+| Direction       | Event                           | Payload                                                                                                                                                             |
+| --------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reader → server | `READER_FIRMWARE_INFO`          | `capabilities.sessionDuration: true`                                                                                                                                |
+| Server → reader | `RESOURCE_LIST`                 | per machine `requireSessionDurationEstimate` (bool), `maxSessionDurationMinutes` (int or `null`)                                                                    |
+| Server → reader | `RESOURCE_LIST` (session)       | on `ownUsageSession` (and the other listed sessions): `autoEndAt` (ISO), `autoEndUtcOffsetMinutes`, `autoEndInSeconds`, `hasMaxSessionTime`, `extendLimitInSeconds` |
+| Reader → server | `START_RESOURCE_USAGE_SESSION`  | optional `estimatedDurationMinutes` (1 to 43200); the server refuses a value above the maximum                                                                      |
+| Reader → server | `EXTEND_RESOURCE_USAGE_SESSION` | `resourceId`, optional `usageId`, `extendByMinutes` (60, 120, 240, 360, 720 or 1440) or `toMax: true`, `cardSessionId`                                              |
+| Server → reader | `EXTEND_RESOURCE_USAGE_SESSION` | `success: true` with `usageId`, or `error` (`SESSION_EXTENSION_EXCEEDS_MAXIMUM`, `SESSION_EXTENSION_NOT_POSSIBLE`, `SESSION_EXTENSION_INVALID`)                     |
+
+The seconds in the list (`autoEndInSeconds`, `extendLimitInSeconds`) are relative to the moment the server built the
+list. The reader stores `millis()` when the list arrives and counts down from it, so the remaining time is right on a
+reader without a wall clock; the stop time ("Stops at 17:30") comes from `autoEndAt` and the zone offset, never from
+the reader's clock. `extendLimitInSeconds` is how far the end can still be pushed: the machine's maximum, or 30 days
+when it has none (`hasMaxSessionTime` tells which). The reader only enables a step that fits, and "To maximum" only for
+a machine with a maximum and room below it; the server decides anyway and refuses with a code (nothing is clipped).
+
+Start: when `requireSessionDurationEstimate` is set the reader opens the **duration input** (hours and minutes
+steppers, quick picks 30 min / 1 h / 2 h / 4 h / 8 h, the maximum and the hint that the machine stops automatically)
+before it sends the start request, for a start, a takeover and a supervised start. Quick picks and values above the
+maximum cannot be chosen; Cancel aborts the start. The chosen minutes travel with the start request and with its
+retries after a usage form or a plugin confirmation. The input comes before the forms because the server asks for
+forms in answer to the first start request, which must already carry the estimate.
+
+Running session: the session area of the details screen shows "Stops automatically in 1:23:45 (at 17:30)" and an
+**Extend** button for the card holder's own session. It opens a screen with +1 h, +2 h, +4 h, +6 h, +12 h, +24 h and
+"To maximum". The server resends the list after an extension, and also after one made on the web, so the screen
+updates live and closes when the session no longer has a deadline. Extending needs the same identity as stopping: the
+card holder is the session's owner (the reader only offers it for the own session; the server checks the rule of
+ending a session).
+
+Memory: the list adds about 40 bytes to each of the (at most 10) listed resources; the two screens are built on entry and
+destroyed on leaving, like the project picker.
+
+Compatibility: an older reader ignores the new list fields and never sends `estimatedDurationMinutes`; an older
+server sends none of the fields, so the reader shows nothing new. `EXTEND_RESOURCE_USAGE_SESSION` is only sent to a
+server that put `autoEndInSeconds` in the list.
+
 ## Bluetooth setup (2.11.0)
 
 `src/bt_setup/` (ATT-1315 for the bridge, ATT-1371 for the readers): the web app's **Set up over Bluetooth**
