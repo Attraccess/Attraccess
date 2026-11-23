@@ -22,11 +22,18 @@ Kartenschlüssel und Sitzungsschlüssel verlassen die API nie. Das Plugin sieht 
 die Antworten der Karte; beide sind durch das Secure Messaging der Karte geschützt. Das Ergebnis enthält `id`, `uid` und
 `userId` der Karte, sonst nichts; für ein Plugin mit `READER_DEVICES` zusätzlich `authentication` (siehe unten).
 
+> [!WARNING]
+> Solange ein Administrator [UID-only-Karten](attractap/rfid-cards.md#uid-only-karten-unsicher) erlaubt, wird eine UID, die
+> zu einer UID-only-Karte gehört, allein anhand der UID akzeptiert: Attraccess sendet kein APDU, und `exchange` wird nie
+> aufgerufen. Solche Karten lassen sich kopieren; werten Sie dieses Ergebnis daher schwächer als das einer sicheren Karte.
+> Sichere Karten weisen immer ihren Schlüssel nach.
+
 ## Berechtigung
 
 Deklarieren Sie `CARD_AUTHENTICATION` im Manifest. Administratoren sehen die Berechtigung bei der Installation auf der
 Plugins-Seite. Das SDK beschreibt sie so: _„Authenticate NFC cards held to the plugin's own devices with the Attraccess
-card keys. The plugin receives the card and its owner, never the keys.“_
+card keys (UID-only cards, while an administrator allows them, by their UID alone). The plugin receives the card and
+its owner, never the keys.“_
 
 ```json
 {
@@ -93,7 +100,7 @@ interface PluginCardChannel {
 
 | Feld      | Bedeutung                                                                                                                                                                               |
 | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `uid`     | Die UID der Karte, hexadezimal, 4 bis 32 Zeichen; alles andere ergibt `INVALID_UID`. Sie wird exakt verglichen: Senden Sie sie in Kleinbuchstaben, wie Attractap-Reader.                |
+| `uid`     | Die UID der Karte, hexadezimal, 4 bis 32 Zeichen; alles andere ergibt `INVALID_UID`. Groß- und Kleinschreibung werden gleich behandelt.                                                 |
 | `device`  | Ihre eigene Kennung des Geräts, an dem die Karte liegt (1 bis 200 Zeichen), zum Beispiel eine BLE-Endpunkt-ID.                                                                          |
 | `channel` | Der Kartenkanal von oben.                                                                                                                                                               |
 | `signal`  | Optional. Brechen Sie es ab, wenn die Karte das Feld verlassen hat oder Sie aufgeben; das Gespräch endet mit `CARD_REMOVED`. Ein bereits abgebrochenes Signal beendet es vor dem Start. |
@@ -144,7 +151,7 @@ Plugin-Gespräche zählen zum selben serverweiten Limit wie Reader-Gespräche. I
 | `INVALID_UID`                | Die UID besteht nicht aus 4 bis 32 Hex-Zeichen.                                                                         |
 | `CARD_NOT_FOUND`             | Für diese UID ist keine Karte registriert.                                                                              |
 | `CARD_NOT_ACTIVE`            | Die Karte ist registriert, aber nicht die aktive Karte des Benutzers.                                                   |
-| `CARD_NOT_SUPPORTED`         | Der Kartentyp wird nicht unterstützt (zum Beispiel eine DESFire EV1).                                                   |
+| `CARD_NOT_SUPPORTED`         | Der Kartentyp wird nicht unterstützt, oder es ist eine UID-only-Karte, solange UID-only-Karten nicht erlaubt sind.      |
 | `CARD_AUTHENTICATION_FAILED` | Die Karte hat den gespeicherten Schlüssel nicht nachgewiesen: kopierte UID, fremde Karte oder manipulierte Antwort.     |
 
 Anders als bei Attractap-Readern werden `TIMEOUT` und `TOO_MANY_EXCHANGES` getrennt gemeldet.
