@@ -83,7 +83,7 @@ Antwort ohne Gebühr (einschließlich Nullbeträgen):
 
 ## Sitzungsdauer und Verlängerung
 
-Maschinen können eine **maximale Sitzungsdauer** haben und eine **Zeitschätzung verlangen** (Ressourcenfelder `maxSessionDurationMinutes`, `requireSessionDurationEstimate` und `defaultSessionDurationEstimateMinutes`; nur Maschinen, Türen ignorieren sie). Eine Sitzung speichert ihr Ende beim Start: `autoEndAt` (wann der Server sie beendet), `maxAutoEndAt` (das späteste Ende, auf das verlängert werden kann; `null` ohne maximale Sitzungsdauer, dann gilt die Grenze von 30 Tagen) und `estimatedDurationMinutes`. Spätere Änderungen der Ressourceneinstellungen ändern laufende Sitzungen nicht.
+Maschinen können eine **maximale Sitzungsdauer** haben und eine **Dauerschätzung verlangen** (Ressourcenfelder `maxSessionDurationMinutes`, `requireSessionDurationEstimate` und `defaultSessionDurationEstimateMinutes`; nur Maschinen, Türen ignorieren sie). Eine Sitzung speichert ihr Ende beim Start: `autoEndAt` (wann der Server sie beendet), `maxAutoEndAt` (das späteste Ende, auf das verlängert werden kann; `null` ohne maximale Sitzungsdauer, dann gilt die Grenze von 30 Tagen) und `estimatedDurationMinutes`. Spätere Änderungen der Ressourceneinstellungen ändern laufende Sitzungen nicht.
 
 **Starten.** `POST /api/resources/{resourceId}/usage/start` akzeptiert das optionale `estimatedDurationMinutes` (1–43200). Bei Ressourcen ohne verlangte Schätzung wird es ignoriert. Fehler sind `400` mit einem maschinenlesbaren `code`:
 
@@ -93,17 +93,23 @@ Maschinen können eine **maximale Sitzungsdauer** haben und eine **Zeitschätzun
 | `SESSION_DURATION_ESTIMATE_EXCEEDS_MAXIMUM` | Die Schätzung liegt über der maximalen Sitzungsdauer. |
 
 > [!WARNING]
-> API-Token- und MCP-Clients, die Sitzungen starten, scheitern mit `SESSION_DURATION_ESTIMATE_REQUIRED` bei jeder Ressource, bei der ein Admin **Zeitschätzung verlangen** einschaltet. Senden Sie dort `estimatedDurationMinutes`.
+> API-Token- und MCP-Clients, die Sitzungen starten, scheitern mit `SESSION_DURATION_ESTIMATE_REQUIRED` bei jeder Ressource, bei der ein Admin **Dauerschätzung verlangen** einschaltet. Senden Sie dort `estimatedDurationMinutes`.
 
-**Verlängern.** `POST /api/resources/{resourceId}/usage/extend` mit `{ "usageId"?: number, "extendByMinutes"?: 60 | 120 | 240 | 360 | 720 | 1440, "toMax"?: boolean }` verschiebt `autoEndAt` nach hinten. Ohne `usageId` wird die eigene Sitzung verlängert. Der Sitzungsinhaber und alle, die die Sitzung beenden dürfen, können sie verlängern. `toMax: true` setzt exakt Start plus maximale Sitzungsdauer. Die Antwort ist die Sitzung mit neuem `autoEndAt`; die Änderung wird im Audit-Log festgehalten (`usage_session.extended`) und an die Web-App und die Leser gesendet. Fehler sind `400` mit einem `code`; es wird nichts gekürzt:
+**Verlängern.** `POST /api/resources/{resourceId}/usage/extend` verschiebt `autoEndAt` nach hinten. Der Body enthält `usageId`, `extendByMinutes` oder `toMax`:
+
+```json
+{ "usageId": 123, "extendByMinutes": 60 }
+```
+
+`usageId` ist optional; `extendByMinutes` ist 60, 120, 240, 360, 720 oder 1440; `toMax` (Boolean) ersetzt es. Ohne `usageId` wird die eigene Sitzung verlängert. Der Sitzungsbesitzer und alle, die die Sitzung beenden dürfen, können sie verlängern. `toMax: true` setzt exakt Start plus maximale Sitzungsdauer. Die Antwort ist die Sitzung mit neuem `autoEndAt`; die Änderung wird im Audit-Log festgehalten (`usage_session.extended`) und an die Web-App und die Leser gesendet. Fehler sind `400` mit einem `code` (oder `403`, wenn Sie die Sitzung nicht beenden dürfen); es wird nichts gekürzt:
 
 | Code | Bedeutung |
 |------|-----------|
 | `SESSION_EXTENSION_EXCEEDS_MAXIMUM` | Das neue Ende läge nach `maxAutoEndAt` (oder der Grenze von 30 Tagen). Der Body enthält `maxAutoEndAt`. |
-| `SESSION_EXTENSION_NOT_POSSIBLE` | Die Sitzung hat kein automatisches Ende, es ist schon erreicht, die Sitzung wird gerade beendet, oder `toMax` bei einer Maschine ohne maximale Sitzungsdauer. |
+| `SESSION_EXTENSION_NOT_POSSIBLE` | Die Sitzung hat kein automatisches Ende, ihr Ende ist schon erreicht, die Sitzung wird gerade beendet, oder `toMax` bei einer Maschine ohne maximale Sitzungsdauer. |
 | `SESSION_EXTENSION_INVALID` | Weder ein erlaubtes `extendByMinutes` noch `toMax` wurde gesendet. |
 
-**Automatisches Ende.** Ein Job beendet Sitzungen, die `autoEndAt` erreicht haben, als System, normalerweise innerhalb einer Minute: Abschlussformulare werden übersprungen, Stopp-Flows laufen, die Abrechnung bleibt unverändert, und die Endnotiz lautet „Automatically ended: maximum session time reached“ oder „Automatically ended: estimated duration elapsed“. Der Audit-Eintrag enthält den Endgrund (`auto_maximum` oder `auto_estimate`).
+**Automatisches Ende.** Ein Job beendet Sitzungen, die `autoEndAt` erreicht haben, als System, normalerweise innerhalb einer Minute: Endformulare werden übersprungen, Stopp-Flows laufen, die Abrechnung bleibt unverändert, und die Endnotiz lautet „Automatically ended: maximum session time reached“ oder „Automatically ended: estimated duration elapsed“. Der Audit-Eintrag enthält den Endgrund (`auto_maximum` oder `auto_estimate`).
 
 ## Attractap-WebSocket: Sitzungsdauer
 

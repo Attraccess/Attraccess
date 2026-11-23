@@ -63,7 +63,7 @@ Chronologische Liste aller Nutzungssitzungen mit:
 
 ## Automatisches Stoppen
 
-Hat die Maschine eine maximale Sitzungsdauer oder verlangt eine Zeitschätzung, zeigt der Nutzungsbereich **Stoppt automatisch um HH:MM** mit Live-Countdown und die Verlängern-Schaltflächen (**+1 h** bis **+24 h**, **Auf Maximum verlängern**). Siehe [Automatisches Stoppen und Sitzung verlängern](resources/usage-tracking.md#automatisches-stoppen-und-sitzung-verlangern).
+Hat die Maschine eine maximale Sitzungsdauer oder verlangt eine Dauerschätzung, zeigt der Nutzungsbereich **Stoppt automatisch um HH:MM** mit Live-Countdown und die Verlängern-Schaltflächen (**+1 Std.** bis **+24 Std.**, **Auf Maximum verlängern**). Siehe [Automatisches Stoppen und Sitzung verlängern](resources/usage-tracking.md#automatisches-stoppen-und-sitzung-verlängern).
 
 ## Siehe auch
 

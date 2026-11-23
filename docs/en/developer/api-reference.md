@@ -97,7 +97,13 @@ Machines can have a **max session time** and can **require a duration estimate**
 > [!WARNING]
 > API-token and MCP clients that start sessions fail with `SESSION_DURATION_ESTIMATE_REQUIRED` on every resource where an admin turns on **Require duration estimate**. Send `estimatedDurationMinutes` there.
 
-**Extending.** `POST /api/resources/{resourceId}/usage/extend` with `{ "usageId"?: number, "extendByMinutes"?: 60 | 120 | 240 | 360 | 720 | 1440, "toMax"?: boolean }` moves `autoEndAt` later. Without `usageId` your own session is extended. The session owner and everybody allowed to end the session may extend it. `toMax: true` sets exactly the start plus the max session time. The response is the session with its new `autoEndAt`; the change is audited (`usage_session.extended`) and pushed to the web app and to readers. Errors are `400` with a `code`; nothing is clipped:
+**Extending.** `POST /api/resources/{resourceId}/usage/extend` moves `autoEndAt` later. The body takes `usageId`, `extendByMinutes` or `toMax`:
+
+```json
+{ "usageId": 123, "extendByMinutes": 60 }
+```
+
+`usageId` is optional; `extendByMinutes` is one of 60, 120, 240, 360, 720 or 1440; `toMax` (boolean) replaces it. Without `usageId` your own session is extended. The session owner and everybody allowed to end the session may extend it. `toMax: true` sets exactly the start plus the max session time. The response is the session with its new `autoEndAt`; the change is audited (`usage_session.extended`) and pushed to the web app and to readers. Errors are `400` with a `code` (or `403` if you may not end the session); nothing is clipped:
 
 | Code | Meaning |
 |------|---------|

@@ -110,12 +110,12 @@ The device currently uses German labels, including **Bis bald!**. Future English
 
 On a machine that [requires a duration estimate](resources/creating-resources.md#max-session-time-and-duration-estimate), touch readers with firmware that supports it (the capability **sessionDuration**) open a full-screen input after the forms and project selection and before the session starts. Set hours and minutes with the steppers or use a quick pick. The screen shows the max session time, if the machine has one, and does not accept more. It also says that the machine stops automatically after this time at the latest. **Cancel** aborts the start. The same applies to takeover and to a supervised start.
 
-While you use the machine, the details show the remaining time and the time it stops automatically, with **+1h**, **+2h**, **+4h**, **+6h**, **+12h**, **+24h** and **To maximum**. Buttons that would pass the max session time are disabled. You need the same card identity as for stopping: the session owner or somebody who may end that session. Extensions made in the web app update the reader live.
+While you use the machine, the details show the remaining time and the time it stops automatically, with **+1 h**, **+2 h**, **+4 h**, **+6 h**, **+12 h**, **+24 h** and **To maximum**. Buttons that would pass the max session time are disabled. You need the same card identity as for stopping: the session owner or somebody who may end that session. Extensions made in the web app update the reader live.
 
 Readers that cannot ask never refuse a start for a missing estimate: Attractap Lite Ethernet, the GL-S10 bridge, plugin readers and touch readers with older firmware. Your session starts normally and ends at the max session time. Without a max, it ends at the machine's default estimate (60 minutes if the admin did not set one). Extend it in the web app.
 
-> [!NOTE]
-> At the end time the server stops the machine itself, even without a reader. Flows run, so power may be cut. You get a warning 15 and 5 minutes before.
+> [!WARNING]
+> At the end time the server stops the machine itself, even without a reader and even in the middle of a job such as a 3D print. Flows run, so power may be cut. You get a warning 15 and 5 minutes before (in the app, as push or by email, not on the reader).
 
 ## Shared machines
 

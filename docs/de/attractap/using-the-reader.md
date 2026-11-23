@@ -108,14 +108,14 @@ Die Gerätebeschriftungen bleiben vorerst deutsch, einschließlich **Bis bald!**
 
 ## Sitzungsdauer und Verlängern
 
-Bei einer Maschine, die [eine Zeitschätzung verlangt](resources/creating-resources.md#maximale-sitzungsdauer-und-zeitschatzung), öffnen Touch-Leser mit Firmware, die das unterstützt (Fähigkeit **sessionDuration**), nach den Formularen und der Projektauswahl und vor dem Sitzungsstart eine Vollbild-Eingabe. Stellen Sie Stunden und Minuten mit den Schaltflächen ein oder nutzen Sie eine Schnellauswahl. Der Bildschirm zeigt die maximale Sitzungsdauer an, falls die Maschine eine hat, und lässt keine längere Zeit zu. Er weist außerdem darauf hin, dass die Maschine spätestens nach dieser Zeit automatisch stoppt. **Abbrechen** bricht den Start ab. Das gilt auch für die Übernahme und für einen beaufsichtigten Start.
+Bei einer Maschine, die [eine Dauerschätzung verlangt](resources/creating-resources.md#maximale-sitzungsdauer-und-dauerschätzung), öffnen Touch-Leser mit Firmware, die das unterstützt (Fähigkeit **sessionDuration**), nach den Formularen und der Projektauswahl und vor dem Sitzungsstart eine Vollbild-Eingabe. Stellen Sie Stunden und Minuten mit den Schaltflächen ein oder nutzen Sie eine Schnellauswahl. Der Bildschirm zeigt die maximale Sitzungsdauer an, falls die Maschine eine hat, und lässt keine längere Zeit zu. Er weist außerdem darauf hin, dass die Maschine spätestens nach dieser Zeit automatisch stoppt. **Abbrechen** bricht den Start ab. Das gilt auch für die Übernahme und für einen beaufsichtigten Start.
 
-Während Sie die Maschine nutzen, zeigen die Details die verbleibende Zeit und die Uhrzeit des automatischen Stopps, mit **+1 h**, **+2 h**, **+4 h**, **+6 h**, **+12 h**, **+24 h** und **Bis Maximum**. Schaltflächen, die über die maximale Sitzungsdauer hinausgehen würden, sind deaktiviert. Es gelten dieselben Kartenregeln wie beim Beenden: der Sitzungsinhaber oder jemand, der die Sitzung beenden darf. Verlängerungen aus der Web-App erscheinen live am Leser.
+Während Sie die Maschine nutzen, zeigen die Details die verbleibende Zeit und die Uhrzeit des automatischen Stopps, mit **+1 h**, **+2 h**, **+4 h**, **+6 h**, **+12 h**, **+24 h** und **Bis zum Maximum**. Schaltflächen, die über die maximale Sitzungsdauer hinausgehen würden, sind deaktiviert. Es gelten dieselben Kartenregeln wie beim Beenden: der Sitzungsbesitzer oder jemand, der die Sitzung beenden darf. Verlängerungen aus der Web-App erscheinen live am Leser.
 
 Leser, die nicht fragen können, lehnen einen Start nie wegen einer fehlenden Schätzung ab: Attractap Lite Ethernet, die GL-S10-Bridge, Plugin-Leser und Touch-Leser mit älterer Firmware. Ihre Sitzung startet normal und endet bei der maximalen Sitzungsdauer. Ohne Maximum endet sie bei der Standardschätzung der Maschine (60 Minuten, wenn der Admin keine gesetzt hat). Verlängern Sie sie in der Web-App.
 
-> [!NOTE]
-> Zum Endzeitpunkt stoppt der Server die Maschine selbst, auch ohne Leser. Flows laufen, der Strom kann also abgeschaltet werden. 15 und 5 Minuten vorher erhalten Sie eine Warnung.
+> [!WARNING]
+> Zum Endzeitpunkt stoppt der Server die Maschine selbst, auch ohne Leser und auch mitten in einem Auftrag wie einem 3D-Druck. Flows laufen, der Strom kann also abgeschaltet werden. 15 und 5 Minuten vorher erhalten Sie eine Warnung (in der App, als Push oder per E-Mail, nicht am Leser).
 
 ## Gemeinsam genutzte Maschinen
 

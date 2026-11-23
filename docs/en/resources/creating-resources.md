@@ -19,7 +19,7 @@ You need the **Manage Resources** permission to create new resources.
 | **Max parallel sessions** | No | Machines only: how many people may use the machine at the same time (1–1000, default 1). Doors ignore this setting |
 | **Max session time** | No | Machines only: the longest a session may run (1 minute to 30 days, as hours and minutes). Empty means no limit. Doors ignore this setting |
 | **Require duration estimate** | No | Machines only: users must say how long they will use the machine at most when they start. Doors ignore this setting |
-| **Default estimate for readers without a screen** | No | Machines only: shown when an estimate is required and no max session time is set. Default 60 minutes |
+| **Default estimate for readers without a screen** | No | Machines only: used when an estimate is required and no max session time is set. Default 60 minutes |
 
 4. Click **Save**
 
