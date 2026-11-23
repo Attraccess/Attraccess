@@ -18,7 +18,7 @@ export function ReaderSecurityChips({ reader, conversionState }: Readonly<Props>
   const running = conversionState && isRunning(conversionState) ? conversionState : null;
   if (!reader.secured && reader.firmwareProfile !== 'secure-lab' && !running) return null;
   return (
-    <span className="inline-flex flex-wrap gap-1">
+    <span className="ms-2 inline-flex flex-wrap gap-1 whitespace-nowrap">
       {reader.secured && (
         <Chip size="sm" variant="soft" color="success" data-cy={`attractap-secured-chip-${reader.id}`}>
           {t('secured')}
