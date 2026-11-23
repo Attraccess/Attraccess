@@ -156,6 +156,56 @@ export class UpdateResourceDto extends UpdateResourceDtoDocumentation {
   maxParallelSessions?: number;
 
   @ApiProperty({
+    description:
+      'Longest a session on this machine may run, in minutes (1-43200). The server ends a session that reaches it. Null or omitted means no limit. Machines only: doors ignore it. Applies to sessions started afterwards.',
+    required: false,
+    nullable: true,
+    example: 480,
+    minimum: 1,
+    maximum: 43200,
+    type: Number,
+  })
+  @ToNumber()
+  @ValidateIf((o) => o.maxSessionDurationMinutes !== null && o.maxSessionDurationMinutes !== undefined)
+  @IsInt()
+  @Min(1)
+  @Max(43200)
+  @IsOptional()
+  maxSessionDurationMinutes?: number | null;
+
+  @ApiProperty({
+    description:
+      'Whether starting a session requires an estimate of how long the machine will be used. The machine stops automatically when that time is up. Machines only: doors ignore it.',
+    required: false,
+    example: false,
+    type: Boolean,
+  })
+  @IsBoolean()
+  @ToBoolean()
+  @IsOptional()
+  requireSessionDurationEstimate?: boolean;
+
+  @ApiProperty({
+    description:
+      'The estimate used for a start from a reader that cannot ask for one, when an estimate is required and there is no maximum (1-43200, at most the maximum). Null means 60 minutes.',
+    required: false,
+    nullable: true,
+    example: 60,
+    minimum: 1,
+    maximum: 43200,
+    type: Number,
+  })
+  @ToNumber()
+  @ValidateIf(
+    (o) => o.defaultSessionDurationEstimateMinutes !== null && o.defaultSessionDurationEstimateMinutes !== undefined,
+  )
+  @IsInt()
+  @Min(1)
+  @Max(43200)
+  @IsOptional()
+  defaultSessionDurationEstimateMinutes?: number | null;
+
+  @ApiProperty({
     description: 'Days after a user was trained before retraining is required. Null disables the age-based trigger.',
     required: false,
     nullable: true,

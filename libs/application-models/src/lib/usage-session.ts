@@ -28,6 +28,9 @@ export interface UsageSessionResource {
   name?: string;
   type: ResourceType;
   maxParallelSessions?: number | null;
+  maxSessionDurationMinutes?: number | null;
+  requireSessionDurationEstimate?: boolean;
+  defaultSessionDurationEstimateMinutes?: number | null;
   allowTakeOver?: boolean;
   supervisionMode?: SupervisionMode;
   separateUnlockAndUnlatch?: boolean | null;
@@ -95,6 +98,14 @@ export interface UsageSession {
   billingFactor: number | null;
   meterRates: UsageMeterRate[] | null;
   attributedOperatingDurationInMinutes: number | null;
+  /** When the server ends the session automatically; null means never. Fixed at the start, only raised by extensions. */
+  autoEndAt: Date | null;
+  /** Start plus the machine's maximum at the start; the cap of extensions. Null when the machine had no maximum. */
+  maxAutoEndAt: Date | null;
+  /** The estimate the user gave at the start, in minutes. */
+  estimatedDurationMinutes: number | null;
+  /** The smallest "ending soon" offset already sent for the current deadline. */
+  autoEndWarnedOffsetMinutes: number | null;
   resource?: ResourceRecord;
   user?: UsageSessionUserRecord | null;
   project?: ProjectRecord | null;

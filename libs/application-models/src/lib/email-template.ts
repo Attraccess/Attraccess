@@ -15,4 +15,5 @@ export enum EmailTemplateType {
   RESOURCE_TAKEOVER = 'resource-takeover',
   ACCESS_CHANGE = 'access-change',
   RESOURCE_SESSION_ENDED = 'resource-session-ended',
+  RESOURCE_SESSION_ENDING_SOON = 'resource-session-ending-soon',
 }

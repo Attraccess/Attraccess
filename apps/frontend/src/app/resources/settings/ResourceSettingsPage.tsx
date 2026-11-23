@@ -20,6 +20,7 @@ import { RetrainingTab } from '../editModal/tabs/retraining';
 import { SupervisionTab } from '../editModal/tabs/supervision';
 import { ResourceReaderUiSettings } from '../../readerUi/ResourceReaderUiSettings';
 import { ResourceMetadataEditor } from '../editModal/resourceMetadataEditor';
+import { sessionDurationSettingsError } from '../editModal/tabs/sessionDurationSettingsError';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -38,6 +39,9 @@ export function fromResource(resource: Resource): FormData {
     description: resource.description ?? '',
     allowTakeOver: resource.allowTakeOver ?? false,
     maxParallelSessions: resource.maxParallelSessions ?? 1,
+    maxSessionDurationMinutes: resource.maxSessionDurationMinutes ?? null,
+    requireSessionDurationEstimate: resource.requireSessionDurationEstimate ?? false,
+    defaultSessionDurationEstimateMinutes: resource.defaultSessionDurationEstimateMinutes ?? null,
     type: resource.type ?? ResourceType.MACHINE,
     separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch ?? false,
     accessOnly: resource.accessOnly ?? false,
@@ -108,6 +112,11 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
     if (updateResource.isPending) return;
     if (!formData || !formData.name?.trim()) {
       toast.error({ title: t('inputs.name.required') });
+      return;
+    }
+    const durationError = sessionDurationSettingsError(formData);
+    if (durationError) {
+      toast.error({ title: t(durationError) });
       return;
     }
     submittedRevision.current = editRevision.current;

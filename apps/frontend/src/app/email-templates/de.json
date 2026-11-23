@@ -29,7 +29,8 @@
     "resource-usage-note-added": "Ressourcen-Nutzungsnotiz hinzugefügt",
     "resource-takeover": "Ressourcenübernahme",
     "access-change": "Zugriffsänderung",
-    "resource-session-ended": "Ressourcen-Sitzung beendet"
+    "resource-session-ended": "Ressourcen-Sitzung beendet",
+    "resource-session-ending-soon": "Ressourcen-Sitzung endet bald"
   },
   "pluginChip": "Plugin: {{plugin}}"
 }

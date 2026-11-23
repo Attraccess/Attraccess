@@ -397,6 +397,12 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     };
     if (draft.supervisorUserId !== undefined) usageData.supervisorUserId = draft.supervisorUserId;
     if (draft.projectId !== undefined) usageData.projectId = draft.projectId;
+    if (draft.autoEndAt) {
+      usageData.autoEndAt = draft.autoEndAt;
+      usageData.maxAutoEndAt = draft.maxAutoEndAt ?? null;
+      usageData.estimatedDurationMinutes = draft.estimatedDurationMinutes ?? null;
+      usageData.autoEndWarnedOffsetMinutes = draft.autoEndWarnedOffsetMinutes ?? null;
+    }
 
     const { identifiers } = await manager.createQueryBuilder().insert().into(ResourceUsage).values(usageData).execute();
 

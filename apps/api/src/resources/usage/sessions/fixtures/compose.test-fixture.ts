@@ -10,6 +10,7 @@ import { UsageSessionNotifications } from '../usage-session-notifications';
 import { UsageSessionRecords } from '../usage-session-records';
 import { UsageSessionStartPreparation } from '../usage-session-start-preparation';
 import { UsageSessionStarts } from '../usage-session-starts';
+import { UsageSessionExtensions } from '../../session-duration/usage-session-extensions';
 import { usagePersistenceFor } from '../../../../database/adapters/usage/usage-persistence.test-fixture';
 
 /**
@@ -40,7 +41,7 @@ export function composeResourceUsageService(
   valkeyClient: unknown,
   metering?: unknown,
 ): ResourceUsageService {
-  const { unitOfWork, store } = usagePersistenceFor({ usage: resourceUsageRepository });
+  const { unitOfWork, store, deadlines } = usagePersistenceFor({ usage: resourceUsageRepository });
   const turns = new SessionChangeTurns(store, valkeyClient as never);
   const rules = new UsageAccessRules(
     resourceIntroductionService as never,
@@ -103,6 +104,7 @@ export function composeResourceUsageService(
     resourceFormsService as never,
     audit as never,
     notifications,
+    deadlines,
   );
   const starts = new UsageSessionStarts(
     lifecycle,
@@ -113,7 +115,15 @@ export function composeResourceUsageService(
     audit as never,
     notifications,
   );
-  return new ResourceUsageService(lifecycle, access, gate, records, doors, preparation, starts, ends);
+  const extensions = new UsageSessionExtensions(
+    lifecycle,
+    gate,
+    ends,
+    eventEmitter as never,
+    deadlines,
+    audit as never,
+  );
+  return new ResourceUsageService(lifecycle, access, gate, records, doors, preparation, starts, ends, extensions);
 }
 
 /** The collaborators behind a ResourceUsageService, for tests that reach into the one owning some state. */
@@ -126,6 +136,7 @@ export function usageInternals(service: ResourceUsageService) {
     records: Reflect.get(service, 'records') as UsageSessionRecords,
     preparation: Reflect.get(service, 'preparation') as UsageSessionStartPreparation,
     starts: Reflect.get(service, 'starts') as UsageSessionStarts,
+    extensions: Reflect.get(service, 'extensions') as UsageSessionExtensions,
     ends,
     turns: Reflect.get(ends, 'turns') as SessionChangeTurns,
   };
@@ -145,5 +156,6 @@ export function forkUsageInstance(service: ResourceUsageService, setUp: (turns: 
   const ends = fork(parts.ends, { turns, lifecycle });
   const preparation = fork(parts.preparation, { lifecycle });
   const starts = fork(parts.starts, { lifecycle, preparation, ends });
-  return fork(service, { lifecycle, preparation, starts, ends });
+  const extensions = fork(parts.extensions, { lifecycle, ends });
+  return fork(service, { lifecycle, preparation, starts, ends, extensions });
 }

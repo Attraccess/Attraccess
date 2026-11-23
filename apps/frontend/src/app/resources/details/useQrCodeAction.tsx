@@ -10,6 +10,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useStartSessionWithConfirmation } from '../usage/hooks/useStartSessionWithConfirmation';
+import { useSessionDurationEstimate } from '../usage/hooks/useSessionDurationEstimate';
 import de from './useQrCodeAction.de.json';
 import en from './useQrCodeAction.en.json';
 import { useNavigate } from 'react-router-dom';
@@ -76,6 +77,8 @@ export function useQrCodeAction(props: Props) {
     },
   });
 
+  const { ask: askDuration, dialog: durationDialog } = useSessionDurationEstimate(resourceId);
+
   const { mutate: endResourceMutate } = useResourceUsageEndSession(undefined, {
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -109,13 +112,17 @@ export function useQrCodeAction(props: Props) {
   });
 
   const startResource = useCallback(
-    (forceTakeOver: boolean) => {
+    async (forceTakeOver: boolean) => {
+      // A machine that requires an estimate asks first, also for QR starts.
+      const estimate = await askDuration();
+      if (estimate === null) return;
       startResourceMutate({
         notes: '-- by QR-Code --',
         forceTakeOver,
+        ...(estimate === undefined ? {} : { estimatedDurationMinutes: estimate }),
       });
     },
-    [startResourceMutate],
+    [askDuration, startResourceMutate],
   );
 
   const stopResource = useCallback(() => {
@@ -142,10 +149,10 @@ export function useQrCodeAction(props: Props) {
 
     switch (action) {
       case QrCodeAction.Start:
-        startResource(false);
+        void startResource(false);
         break;
       case QrCodeAction.StartAndTakeover:
-        startResource(true);
+        void startResource(true);
         break;
       case QrCodeAction.Stop:
         stopResource();
@@ -155,5 +162,12 @@ export function useQrCodeAction(props: Props) {
     }
   }, [urlSearchParams, startResource, stopResource, navigate, resourceId]);
 
-  return { confirmationDialog };
+  return {
+    confirmationDialog: (
+      <>
+        {confirmationDialog}
+        {durationDialog}
+      </>
+    ),
+  };
 }

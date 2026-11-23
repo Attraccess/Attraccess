@@ -1,0 +1,15 @@
+{
+  "stopsAt": "Stops automatically {{deadline}} (in {{remaining}})",
+  "stopsAtReadOnly": "Stops automatically {{deadline}}",
+  "deadline": {
+    "today": "at {{time}}",
+    "otherDay": "on {{date}} at {{time}}"
+  },
+  "stoppingNow": "Stops automatically any moment now",
+  "extend": "Extend",
+  "extendBy": "+{{hours}} h",
+  "extendToMax": "Extend to maximum",
+  "maxReached": "The maximum session time is reached, the session cannot be extended any further.",
+  "extended": "Session extended",
+  "extendedDescription": "The machine now stops automatically {{deadline}}."
+}

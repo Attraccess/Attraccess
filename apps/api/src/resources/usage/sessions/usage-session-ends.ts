@@ -20,6 +20,11 @@ import { UsageResourceGate } from '../authorization/usage-resource-gate';
 
 import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
 
+import { AUTO_END_NOTES, autoEndReason } from '../session-duration/session-duration.rules';
+
+import { SessionNoLongerDueError } from '../session-duration/session-no-longer-due.error';
+import { SESSION_DEADLINE_STORE, SessionDeadlineStore } from '../session-duration/session-deadline-store.port';
+
 import { TentativeSessionCancelledError } from '../errors/tentative-session-cancelled.error';
 
 import { MachineBusyError } from '../errors/machine-busy.error';
@@ -66,6 +71,7 @@ export class UsageSessionEnds {
     private readonly resourceFormsService: ResourceFormsService,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly notifications: UsageSessionNotifications,
+    @Inject(SESSION_DEADLINE_STORE) private readonly deadlines: SessionDeadlineStore,
   ) {}
 
   async endSession(
@@ -117,6 +123,12 @@ export class UsageSessionEnds {
       }
 
       const isSessionOwner = await this.gate.assertMayEndSession(activeSession, user);
+      if (options.autoEndReason) {
+        // The row lock orders this end with an extension on another instance; the deadline is read after it.
+        const locked = await this.deadlines.lockDeadline(activeSession.id, scope);
+        // Extended (or ended and replaced) since the job found it: nothing to end any more.
+        if (!locked?.autoEndAt || locked.autoEndAt.getTime() > Date.now()) throw new SessionNoLongerDueError();
+      }
 
       const endTime = new Date();
       let endNotes = dto.notes;
@@ -205,6 +217,7 @@ export class UsageSessionEnds {
               usageId: endedSession.id,
               usageUserId: endedSession.userId,
               ...(options.triggeredByUserId === undefined ? {} : { triggeredByUserId: options.triggeredByUserId }),
+              ...(options.autoEndReason ? { endReason: `auto_${options.autoEndReason}` } : {}),
             },
           },
           scope,
@@ -225,9 +238,39 @@ export class UsageSessionEnds {
       activeSession,
       skipNoteNotification,
       chargeTransactionId,
+      options.autoEndReason,
     );
 
     return updatedUsage;
+  }
+
+  /**
+   * Ends a session whose automatic end has passed, as the system: the end form is skipped, the stop flows run and
+   * the bill settles as for any end. Returns `null` when there was nothing to end: another instance or a manual stop
+   * got there first, or the session was extended meanwhile.
+   */
+  async endSessionAutomatically(resourceId: number, usageId: number): Promise<UsageSession | null> {
+    const session = await this.findEndableSession(resourceId, usageId);
+    if (!session?.autoEndAt) return null;
+    const reason = autoEndReason(session);
+    try {
+      return await this.endSession(
+        resourceId,
+        session.user as UsageSessionUser,
+        { usageId, notes: AUTO_END_NOTES[reason] },
+        {
+          skipFormSubmissions: true,
+          skipNoteNotification: true,
+          auditOrigin: SYSTEM_AUDIT_ACTOR,
+          autoEndReason: reason,
+        },
+      );
+    } catch (error) {
+      if (error instanceof SessionNoLongerDueError) return null;
+      // A manual stop that won the race leaves nothing to report.
+      if (!(await this.findEndableSession(resourceId, usageId))) return null;
+      throw error;
+    }
   }
 
   /**

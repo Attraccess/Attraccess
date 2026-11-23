@@ -26,6 +26,7 @@ import { CardOperationsService } from '../../card-operations.service';
 import { assertReaderRelaysCards } from '../card/card-write-errors';
 import { WebsocketService } from '../../websocket.service';
 import { getSessionCapacity } from '../../../../resources/usage/sessions/active-usage';
+import { computeStartDeadline, validReaderEstimate } from '../../../../resources/usage/session-duration/session-duration.rules';
 
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, CardDetection } from '../../websocket.types';
 
@@ -177,7 +178,11 @@ export class AttractapSupervisionHandler implements OnModuleInit {
    * to eligible supervisors and records the flow on the socket.
    */
   public async handleSupervisionRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    const { resourceId } = data.payload as { resourceId: number };
+    const { resourceId, estimatedDurationMinutes } = data.payload as {
+      resourceId: number;
+      /** Minutes the requester will use the machine at most (capabilities.sessionDuration readers). */
+      estimatedDurationMinutes?: unknown;
+    };
 
     const requesterUserId = socket.state.verifiedUserId;
     if (!requesterUserId) {
@@ -209,6 +214,19 @@ export class AttractapSupervisionHandler implements OnModuleInit {
       return;
     }
 
+    // The estimate is checked now like a web request's, not only once a supervisor approved.
+    const dto = validReaderEstimate(estimatedDurationMinutes);
+    const canAskDuration = socket.state.sessionDuration === true;
+    try {
+      computeStartDeadline(resource, new Date(), dto.estimatedDurationMinutes, canAskDuration);
+    } catch (error) {
+      const code = (error as { getResponse?: () => { code?: string } }).getResponse?.()?.code;
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.SUPERVISION_REQUEST, { error: code ?? 'SUPERVISION_FAILED' }),
+      );
+      return;
+    }
+
     // Only introducers may supervise, so an empty list means the reader must not start a request.
     const eligibleSupervisorIds = await this.supervisionService.getEligibleSupervisorIds(resourceId, requester.id);
     if (eligibleSupervisorIds.length === 0) {
@@ -228,8 +246,9 @@ export class AttractapSupervisionHandler implements OnModuleInit {
     const { requestId, expiresAt } = this.supervisionService.createReaderRequest({
       resourceId,
       requester,
-      // No notes/project from the reader's two-card flow.
-      dto: {},
+      // No notes/project from the reader's two-card flow; the estimate survives an approval on the web.
+      dto,
+      canAskDuration,
       eligibleSupervisorIds,
       callbacks: {
         onResolved: (_session, supervisor) => {

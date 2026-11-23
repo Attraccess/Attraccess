@@ -310,6 +310,7 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
     else if (
         strcmp(eventType, "START_RESOURCE_USAGE_SESSION") == 0 ||
         strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 ||
+        strcmp(eventType, "EXTEND_RESOURCE_USAGE_SESSION") == 0 ||
         strcmp(eventType, "LOCK_DOOR") == 0 ||
         strcmp(eventType, "UNLOCK_DOOR") == 0 ||
         strcmp(eventType, "UNLATCH_DOOR") == 0 ||
@@ -460,7 +461,8 @@ void API::processIncomingMessage(const char *buf, size_t len)
     }
 
     const bool isActionResponse = strcmp(eventType, "START_RESOURCE_USAGE_SESSION") == 0 ||
-        strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 || strcmp(eventType, "LOCK_DOOR") == 0 ||
+        strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 || strcmp(eventType, "EXTEND_RESOURCE_USAGE_SESSION") == 0 ||
+        strcmp(eventType, "LOCK_DOOR") == 0 ||
         strcmp(eventType, "UNLOCK_DOOR") == 0 || strcmp(eventType, "UNLATCH_DOOR") == 0 ||
         strcmp(eventType, "TRIGGER_FLOW_BUTTON") == 0;
     // UI_* types carry the server's messageId back in their ACK; every path below that acks uses it.
