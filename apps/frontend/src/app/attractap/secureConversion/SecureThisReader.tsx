@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Spinner } from '@heroui/react';
 import { StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  useGetFirmwares,
   useGetSecureConversionEligibility,
   useGetSecureConversionStatus,
   type Attractap,
@@ -35,29 +34,22 @@ export function SecureThisReader(props: Readonly<{ reader: Attractap }>) {
   const [step, setStep] = useState<'idle' | 'risk' | 'start'>('idle');
 
   const path = { path: { id: reader.id } };
-  const eligibility = useGetSecureConversionEligibility(path, undefined, {
-    enabled: canManage,
-    refetchInterval: IDLE_POLL_MS,
-  });
+  // Without the permission the server answers only whether the action exists, with `missing-permission`.
+  const eligibility = useGetSecureConversionEligibility(path, undefined, { refetchInterval: IDLE_POLL_MS });
   const status = useGetSecureConversionStatus(path, undefined, {
     enabled: canManage,
     refetchInterval: (query) =>
       runningIn(query.state.data as SecureConversionStatusDto | undefined) ? POLL_INTERVAL_MS : IDLE_POLL_MS,
   });
-  // Without the permission the gates cannot be asked; the catalog still tells whether the action exists at all.
-  const { data: firmwares } = useGetFirmwares(undefined, undefined, { enabled: !canManage });
 
   if (!canManage) {
-    const tested = firmwares?.some(
-      (firmware) =>
-        firmware.name === reader.firmware.name &&
-        firmware.variant === reader.firmware.variant &&
-        firmware.secureProfileHardwareTested === true,
-    );
-    if (!tested) return null;
+    if (!eligibility.data || eligibility.data.hidden) return null;
     return (
       <SecureConversionSection>
-        <SecureReaderButton blockers={['missing-permission']} onPress={() => undefined} />
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-sm text-default-500">{t('description')}</p>
+          <SecureReaderButton blockers={eligibility.data.blockers} onPress={() => undefined} />
+        </div>
       </SecureConversionSection>
     );
   }
@@ -74,16 +66,21 @@ export function SecureThisReader(props: Readonly<{ reader: Attractap }>) {
     void eligibility.refetch();
   };
   const blockers = eligibility.data?.blockers ?? [];
+  const noSigningKey = status.data?.signingKeyAvailable === false;
+  const showButton = !eligibility.data?.hidden && !runningIn(status.data) && !reader.secured;
+  const showProgress = !!conversion && (conversion.state as string) !== 'cancelled';
+  // A secured reader without a conversion to show has nothing here: no empty heading.
+  if (!noSigningKey && !showButton && !showProgress) return null;
 
   return (
     <SecureConversionSection>
-      {status.data?.signingKeyAvailable === false && (
+      {noSigningKey && (
         <StatusAlert status="danger" title={t('noSigningKey')} data-cy="secure-conversion-no-signing-key">
           {t('noSigningKeyHint')}
         </StatusAlert>
       )}
       {status.data && <ConversionProgress readerId={reader.id} status={status.data} onChanged={refresh} />}
-      {!eligibility.data?.hidden && !runningIn(status.data) && !reader.secured && (
+      {showButton && (
         <div className="flex items-center justify-between gap-4">
           <p className="text-sm text-default-500">{t('description')}</p>
           <SecureReaderButton blockers={blockers} onPress={() => setStep('risk')} />

@@ -106,6 +106,12 @@ export class SecureConversionService {
     return { hidden: blockers.includes('not-hardware-tested'), blockers };
   }
 
+  /** Without the permission to secure readers the caller sees only whether the action exists at all. */
+  public async eligibilityFor(readerId: number, canSecure: boolean): Promise<ConversionEligibility> {
+    const eligibility = await this.eligibility(readerId);
+    return canSecure ? eligibility : { hidden: eligibility.hidden, blockers: ['missing-permission'] };
+  }
+
   private async assertEligible(readerId: number): Promise<void> {
     const { blockers } = await this.eligibility(readerId);
     if (blockers.includes('recovery-check-missing')) {

@@ -13,6 +13,23 @@ describe('secure conversion gates (server side)', () => {
     await expect(h.service.eligibility(1)).resolves.toEqual({ hidden: false, blockers: [] });
   });
 
+  it('tells a reader manager without the permission only whether the action exists', async () => {
+    const h = await online({ keysStatus: 'recovery-check-pending' });
+    await expect(h.service.eligibilityFor(1, false)).resolves.toEqual({
+      hidden: false,
+      blockers: ['missing-permission'],
+    });
+    await expect(h.service.eligibilityFor(1, true)).resolves.toEqual({
+      hidden: false,
+      blockers: ['recovery-check-missing'],
+    });
+    const hidden = await online({ hardwareTested: false });
+    await expect(hidden.service.eligibilityFor(1, false)).resolves.toEqual({
+      hidden: true,
+      blockers: ['missing-permission'],
+    });
+  });
+
   it('rejects preflight and start without a passed recovery check', async () => {
     const h = await online({ keysStatus: 'recovery-check-pending' });
     expect((await h.service.eligibility(1)).blockers).toEqual(['recovery-check-missing']);

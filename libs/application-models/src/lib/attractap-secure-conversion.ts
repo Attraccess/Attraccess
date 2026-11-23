@@ -61,6 +61,8 @@ export const ATTRACTAP_CONVERSION_BLOCKERS = [
   'already-secured',
   'digests-differ',
   'conversion-running',
+  // The caller may edit the reader but not secure it; no other gate is revealed then.
+  'missing-permission',
 ] as const;
 export type AttractapConversionBlocker = (typeof ATTRACTAP_CONVERSION_BLOCKERS)[number];
 

@@ -16,7 +16,6 @@ const mocks = vi.hoisted(() => ({
     canRetry: false,
     signingKeyAvailable: null as boolean | null,
   },
-  firmwares: [] as unknown[],
   preflight: vi.fn(),
   preflightData: undefined as unknown,
   start: vi.fn(),
@@ -29,7 +28,6 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useGetSecureConversionEligibility: () => ({ data: mocks.eligibility, isLoading: false, refetch: vi.fn() }),
   useGetSecureConversionStatus: () => ({ data: mocks.status, isLoading: false, refetch: vi.fn() }),
-  useGetFirmwares: () => ({ data: mocks.firmwares }),
   useRunSecureConversionPreflight: () => ({ mutate: mocks.preflight, data: mocks.preflightData, isPending: false }),
   useStartSecureConversion: () => ({ mutate: mocks.start, isPending: false }),
   useRetrySecureConversion: () => ({ mutate: mocks.retry, isPending: false }),
@@ -92,7 +90,6 @@ beforeEach(() => {
   mocks.canManage = true;
   mocks.eligibility = { hidden: false, blockers: [] };
   mocks.status = { conversion: null, online: true, canCancel: false, canRetry: false, signingKeyAvailable: null };
-  mocks.firmwares = [];
   mocks.preflightData = undefined;
 });
 
@@ -120,11 +117,19 @@ describe('SecureThisReader', () => {
     expect(screen.getByText(`blocker.${blocker}`)).toBeInTheDocument();
   });
 
+  it('shows nothing for a secured reader without a conversion, not an empty heading', () => {
+    mocks.eligibility = { hidden: false, blockers: ['already-secured'] };
+    mocks.status = { ...mocks.status, signingKeyAvailable: true };
+    const { container } = render(<SecureThisReader reader={{ ...reader, secured: true } as Attractap} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('names the missing permission when the variant is tested, and stays hidden otherwise', () => {
     mocks.canManage = false;
+    mocks.eligibility = { hidden: true, blockers: ['missing-permission'] };
     const { container, rerender } = render(<SecureThisReader reader={reader} />);
     expect(container).toBeEmptyDOMElement();
-    mocks.firmwares = [{ name: 'attractap', variant: 'touch-v2', secureProfileHardwareTested: true }];
+    mocks.eligibility = { hidden: false, blockers: ['missing-permission'] };
     rerender(<SecureThisReader reader={reader} />);
     expect(button()).toBeDisabled();
     expect(screen.getByText('blocker.missing-permission')).toBeInTheDocument();

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, Inject, Param, ParseIntPipe, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { AttractapSecureConversionRecord } from '@attraccess/application-models';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthAny, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { auditActorOf } from '../../audit/recorder/audit-event';
 import { LicenseModuleType } from '../../license/license.service';
 import { RequiresLicense } from '../../license/require-license.decorator';
@@ -34,15 +34,23 @@ const toStatusDto = (status: ConversionStatus): SecureConversionStatusDto => ({
 export class SecureConversionController {
   constructor(@Inject(SecureConversionService) private readonly conversions: SecureConversionService) {}
 
+  /**
+   * Reader managers without `system.settings.manage` may ask too, so the editor can show the action disabled with
+   * the missing permission; they learn only whether the action exists, never the other gates.
+   */
   @Get('readers/:id/secure-conversion/eligibility')
-  @Auth('system.settings.manage')
+  @AuthAny('system.settings.manage', 'resources.update')
   @ApiOperation({
     summary: 'Whether a reader can be secured now, with reasons',
     operationId: 'getSecureConversionEligibility',
   })
   @ApiResponse({ status: 200, type: SecureConversionEligibilityDto })
-  async eligibility(@Param('id', ParseIntPipe) id: number): Promise<SecureConversionEligibilityDto> {
-    return await this.conversions.eligibility(id);
+  async eligibility(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<SecureConversionEligibilityDto> {
+    const canSecure = req.user.effectivePermissions?.has('system.settings.manage') === true;
+    return await this.conversions.eligibilityFor(id, canSecure);
   }
 
   @Post('readers/:id/secure-conversion/preflight')
