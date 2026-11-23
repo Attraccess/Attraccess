@@ -727,6 +727,15 @@ idf.py -B build/dbg -DATTRACTAP_VARIANT=attractap-touch \
        -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.debug" build
 ```
 
+The debug overlay also turns on the FreeRTOS run-time stats (the same options as
+`sdkconfig.lab-stats`), which add the `debug.stats` serial topic (see "Task stats").
+
+LVGL perf monitor (development builds only): `-DATTRACTAP_LV_PERF_MONITOR=ON` on a display variant
+such as `attractap-touch-v2` turns on LVGL's sysmon perf monitor in log mode. FPS, render and flush
+time go to the serial log, not to the panel. Other variants fail the configure step. The option is
+`OFF` by default, `build_firmwares.py` passes `OFF`, such an image does not claim `release: true`,
+and `tools/check_release_build.py` fails a release image compiled with it.
+
 Note: `tools/build_individual_ca_certs.py` needs network access on the first
 run (it downloads Mozilla's CA bundle, cached for 7 days). Run it once before
 `idf.py` when building without `build_firmwares.py`.
@@ -752,6 +761,13 @@ partition such as `otadata` on the secure profile): ESP-IDF asserts that the sta
 RAM while the cache is frozen for the mapping. The main task, `LvglTask`, `LedTask`, `Beeper` and
 the `esp_websocket_client` task (`websocket_task`, 16 KB, created by the component with plain
 `xTaskCreate`; no released component version can put it in PSRAM) keep internal stacks.
+
+`CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP` stays off: an HIL A/B run on a Touch V2 (ATT-1276) showed
+no internal RAM gain with it (1 KB lower minimum free) and about 60 KB less free PSRAM, because
+`ALWAYSINTERNAL=1024` already sends the larger blocks to PSRAM.
+
+The heap log (every 30 s, INFO) shows both kinds: `Heap internal: free= largest= min=` and
+`Heap PSRAM: free= largest=`.
 
 ## Display Theme
 
@@ -838,7 +854,8 @@ shows over the same console. These topics exist only in firmware built with
 `-DATTRACTAP_TEST_HOOKS=ON` (display variants; configuring a headless variant
 with it fails). Release builds never contain them: the option defaults to
 `OFF` and `build_firmwares.py` passes `-DATTRACTAP_TEST_HOOKS=OFF`. Like all
-topics except `auth.*`, each command needs the serial PIN in `authCode`.
+topics except `auth.*` and the lab-only `debug.*` topics, each command needs
+the serial PIN in `authCode`.
 
 `-DATTRACTAP_BEEPER_DEFAULT=OFF` turns the beeper off on readers without a
 saved beeper setting (new or erased readers). The setting itself still works;
@@ -951,6 +968,39 @@ Errors: `INVALID_PAYLOAD` (missing or out-of-range value), `WIDGET_NOT_FOUND`,
 The lookup reads LVGL objects only: text drawn without a label (images, canvas
 content, button-matrix keys without text) cannot be matched, and keys are
 reported without separate hit-testing of overlapping keys.
+
+### Task stats (debug and lab builds only)
+
+`CMND debug.stats` (no PIN, like `debug.crash`) logs one row per FreeRTOS task at INFO, between
+`=== FreeRTOS run-time stats (...) ===` and `=== End run-time stats ===`:
+
+```
+[TaskStats] INFO: Task               Runtime us    CPU  StackHWM  Core
+[TaskStats] INFO: IDLE1             12345678901  48.3%      1234  1
+```
+
+- Runtime: microseconds the task ran since boot (64-bit counters, so they do not wrap). A short
+  sample needs two calls.
+- CPU: share of both cores, cut to one decimal. All rows, including `IDLE0` and `IDLE1`, add up to
+  about 97-100 %: interrupt time and the slices still running are not counted.
+- StackHWM: free stack bytes at the lowest point. Core: `0`, `1` or `any` (unpinned).
+
+The rows go out 20 ms apart, because the console's 1 KB TX buffer drops lines of a burst, so a call
+takes about half a second. The reply `RESP debug.stats {"success":true}` comes after the end line;
+`{"error":"STATS_UNAVAILABLE"}` means the snapshot could not be taken (the log says why). Taking
+the snapshot briefly masks interrupts on the calling core, which can disturb one display frame: do
+not call it during timing or display measurements.
+
+The topic exists where `CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS` is on: builds with
+`sdkconfig.debug`, and every build with `-DATTRACTAP_TEST_HOOKS=ON` (CMake layers
+`sdkconfig.lab-stats` after the defaults, also with `ATTRACTAP_SECURE_LAB`, never for a release
+secure profile). sdkconfig defaults only reach a new `sdkconfig`: delete the build directory after
+switching the test hooks on or off, and once for a directory created before firmware 2.11.1 (such
+as an old `build/hil-*` of `apps/attractap-lab/hil/run.sh`). Other builds answer `UNKNOWN_TOPIC`
+after the PIN check, like any unknown topic (`PIN_NOT_SET` on a reader without a PIN).
+`tools/check_release_build.py` fails a release build whose sdkconfig enables the stats or whose
+image contains the `debug.stats` topic. The stats cost a little CPU and RAM, so lab and debug
+images differ slightly from release.
 
 ## Crash reports and coredump upload (ATT-474, ATT-1144)
 
