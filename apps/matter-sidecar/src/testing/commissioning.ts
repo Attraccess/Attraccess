@@ -4,7 +4,7 @@ import type { CommissioningSession, EventEnvelope } from '@attraccess/matter-con
 import type { SidecarConfig } from '../config';
 import { loadMatterPlatform, type FabricTuning, type MatterPlatform } from '../matter-platform';
 import { expectOk } from './expect-ok';
-import { http, startSidecar, validHeaders, type Running } from './harness';
+import { http, REAL_CONTROLLER_DEADLINE_MS, startSidecar, validHeaders, type Running } from './harness';
 
 export type CommissioningRig = Running & {
   platform(): MatterPlatform;
@@ -25,9 +25,12 @@ export type RigOptions = {
 
 export async function startCommissioningRig(options: RigOptions = {}): Promise<CommissioningRig> {
   let platform: MatterPlatform | undefined;
-  const running = await startSidecar(options.config ?? {}, {
-    loadPlatform: async (context) => (platform = await loadMatterPlatform(context, options.tuning)),
-  });
+  const running = await startSidecar(
+    { requestDeadlineMs: REAL_CONTROLLER_DEADLINE_MS, ...options.config },
+    {
+      loadPlatform: async (context) => (platform = await loadMatterPlatform(context, options.tuning)),
+    },
+  );
   const events: EventEnvelope[] = [];
   running.sidecar.stream.subscribe((event) => events.push(event));
   const call = (method: string, path: string, body?: unknown) => {
@@ -52,7 +55,13 @@ export async function startCommissioningRig(options: RigOptions = {}): Promise<C
     }
   };
   if (options.createFabric !== false) {
-    expectOk(running, 'POST /v1/fabric', await call('POST', '/v1/fabric', { label: 'Attraccess' }));
+    // The caller only learns of the rig once it is returned, so stop it here when its setup fails.
+    try {
+      expect(expectOk(running, await call('POST', '/v1/fabric', { label: 'Attraccess' })).state).toBe('initialized');
+    } catch (error) {
+      await running.stop().catch(() => undefined);
+      throw error;
+    }
   }
   return {
     ...running,
@@ -61,9 +70,8 @@ export async function startCommissioningRig(options: RigOptions = {}): Promise<C
     call,
     waitFor,
     async commission(setupCode, extra = {}) {
-      const started = await call('POST', '/v1/commissioning/sessions', { setupCode, ...extra });
-      if (started.status !== 200) throw new Error(`start refused: ${started.raw}`);
-      return waitFor(started.body.sessionId);
+      const started = expectOk(running, await call('POST', '/v1/commissioning/sessions', { setupCode, ...extra }));
+      return waitFor(started.sessionId);
     },
   };
 }

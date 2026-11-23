@@ -18,7 +18,19 @@ import { gunzipSync } from 'node:zlib';
 import { MatterController, type ControllerOptions } from './fabric/controller';
 import { loadMatterPlatform, type FabricTuning, type MatterPlatform } from './matter-platform';
 import { expectOk } from './testing/expect-ok';
-import { http, startSidecar, validHeaders, type JsonBody, type Running } from './testing/harness';
+import {
+  http,
+  REAL_CONTROLLER_DEADLINE_MS,
+  startSidecar,
+  validHeaders,
+  type JsonBody,
+  type Running,
+} from './testing/harness';
+
+// A test here runs up to two real controllers in a row, and under load each fabric create may take up to the request
+// deadline. The budget leaves room for both, so a hung create fails in `expectOk` with its logs, not as a bare jest
+// timeout. Backup calls are capped separately (60 s); they have not been slow so far.
+jest.setTimeout(4 * REAL_CONTROLLER_DEADLINE_MS);
 
 const post = (running: Running, path: string, body: unknown) =>
   http(running.port, 'POST', path, {
@@ -138,10 +150,7 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
     const changes: JsonBody[] = [];
     let platform: MatterPlatform | undefined;
     const sidecar = await startSidecar(
-      // Under load the real controller can need longer than the 10 s default deadline for a create or a stop. A request
-      // that hits the deadline answers 504 while its work keeps the single-flight gate, and the next call then sees a
-      // misleading 409 `busy`. Keep the deadline below the 30 s test timeout, so a real hang still fails in `expectOk`.
-      { storageDir, requestDeadlineMs: 25_000, ...overrides },
+      { storageDir, requestDeadlineMs: REAL_CONTROLLER_DEADLINE_MS, ...overrides },
       {
         loadPlatform: async (context) => {
           const onFabricChanged: typeof context.onFabricChanged = (payload) => {
@@ -161,16 +170,16 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
     running.splice(running.indexOf(sidecar), 1);
   };
 
-  /** Setup steps assert their own success, so a failed one is reported where it happened, with its sidecar logs. */
+  // Setup steps assert their own success, so a failed one is reported where it happened, with its sidecar logs.
   const createFabric = async (sidecar: Running, label: string) => {
-    const body = expectOk(sidecar, 'POST /v1/fabric', await post(sidecar, '/v1/fabric', { label }));
+    const body = expectOk(sidecar, await post(sidecar, '/v1/fabric', { label }));
     expect(body.state).toBe('initialized');
     return body;
   };
   const stage = async (sidecar: Running, snapshot: unknown) =>
-    expectOk(sidecar, 'POST /v1/backup/restore/stage', await post(sidecar, '/v1/backup/restore/stage', snapshot));
+    expectOk(sidecar, await post(sidecar, '/v1/backup/restore/stage', snapshot));
   const commit = async (sidecar: Running, stageId: string) =>
-    expectOk(sidecar, 'POST /v1/backup/restore/commit', await post(sidecar, '/v1/backup/restore/commit', { stageId }));
+    expectOk(sidecar, await post(sidecar, '/v1/backup/restore/commit', { stageId }));
 
   afterEach(async () => {
     for (const sidecar of running.splice(0)) await sidecar.stop().catch(() => undefined);
@@ -235,18 +244,21 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
     const dir = newDir();
     const sidecar = await start(dir);
     const responses: string[] = [];
-    const call = async (path: string, body: unknown) => {
+    // Each step must answer as expected, or the scan below would only see error bodies.
+    const call = async (path: string, body: unknown, expectedStatus = 200) => {
       const result = await post(sidecar, path, body);
       responses.push(result.raw);
-      return result.body;
+      return expectOk(sidecar, result, expectedStatus);
     };
-    responses.push(JSON.stringify(await createFabric(sidecar, 'Attraccess')));
+    expect((await call('/v1/fabric', { label: 'Attraccess' })).state).toBe('initialized');
     const snapshot = await snapshotOf(sidecar);
     const { stageId } = await call('/v1/backup/restore/stage', snapshot);
     await call('/v1/backup/restore/commit', { stageId });
     await call('/v1/backup/restore/rollback', { stageId });
-    await call('/v1/backup/restore/commit', { stageId });
-    responses.push((await get(sidecar, '/v1/fabric')).raw);
+    await call('/v1/backup/restore/commit', { stageId }, 404);
+    const current = await get(sidecar, '/v1/fabric');
+    expectOk(sidecar, current);
+    responses.push(current.raw);
 
     const secrets = storedSecrets(dir);
     // Root CA key, operational key and IPK, each in three forms.
@@ -318,7 +330,7 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
   });
 
   const snapshotOf = async (sidecar: Running) => {
-    const body = expectOk(sidecar, 'POST /v1/backup/snapshot', await post(sidecar, '/v1/backup/snapshot', {}));
+    const body = expectOk(sidecar, await post(sidecar, '/v1/backup/snapshot', {}));
     return body as { header: JsonBody; payload: string };
   };
 
@@ -379,10 +391,7 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
     });
 
     it('keeps the previous fabric as a rollback copy and swaps it back on request', async () => {
-      const donor = await start(newDir());
-      await createFabric(donor, 'Donor');
-      const snapshot = await snapshotOf(donor);
-      await stop(donor);
+      const snapshot = await donorSnapshot();
 
       const dir = newDir();
       const live = await start(dir);
@@ -418,10 +427,7 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
     });
 
     it('puts the previous fabric back and resumes it when the restored one fails verification', async () => {
-      const donor = await start(newDir());
-      await createFabric(donor, 'Donor');
-      const snapshot = await snapshotOf(donor);
-      await stop(donor);
+      const snapshot = await donorSnapshot();
 
       const { hooks, createController } = controllerHooks();
       const dir = newDir();
@@ -596,16 +602,13 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
     });
 
     it('quarantines the rollback copy when neither finalize nor rollback arrives in time', async () => {
-      const donor = await start(newDir());
-      await createFabric(donor, 'Donor');
-      const snapshot = await snapshotOf(donor);
-      await stop(donor);
+      const snapshot = await donorSnapshot();
 
       const dir = newDir();
       const live = await start(dir, {}, { pendingTtlMs: 300 });
       await createFabric(live, 'Live');
       const staged = await stage(live, snapshot);
-      expect((await post(live, '/v1/backup/restore/commit', { stageId: staged.stageId })).status).toBe(200);
+      await commit(live, staged.stageId);
       await until(() => !existsSync(join(dir, 'restore-rollback')));
       const [quarantine] = quarantinesIn(dir);
       expect(existsSync(join(dir, quarantine, 'matter', 'controller'))).toBe(true);
@@ -615,10 +618,7 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
     });
 
     it('removes an expired stage from disk without waiting for its next use', async () => {
-      const donor = await start(newDir());
-      await createFabric(donor, 'Donor');
-      const snapshot = await snapshotOf(donor);
-      await stop(donor);
+      const snapshot = await donorSnapshot();
 
       const dir = newDir();
       const target = await start(dir, {}, { stageTtlMs: 300 });
@@ -629,10 +629,7 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
     });
 
     it('rejects a corrupt, incomplete or incompatible snapshot before touching live storage', async () => {
-      const donor = await start(newDir());
-      await createFabric(donor, 'Donor');
-      const snapshot = await snapshotOf(donor);
-      await stop(donor);
+      const snapshot = await donorSnapshot();
 
       const dir = newDir();
       const live = await start(dir);
@@ -661,9 +658,7 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
     });
 
     it('discards staged data on abort', async () => {
-      const donor = await start(newDir());
-      await createFabric(donor, 'Donor');
-      const snapshot = await snapshotOf(donor);
+      const snapshot = await donorSnapshot();
       const dir = newDir();
       const target = await start(dir);
       const staged = await stage(target, snapshot);
@@ -674,9 +669,7 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
     });
 
     it('removes a stage that an earlier process left behind', async () => {
-      const donor = await start(newDir());
-      await createFabric(donor, 'Donor');
-      const snapshot = await snapshotOf(donor);
+      const snapshot = await donorSnapshot();
       const dir = newDir();
       const first = await start(dir);
       await stage(first, snapshot);

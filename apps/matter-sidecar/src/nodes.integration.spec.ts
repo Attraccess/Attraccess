@@ -3,7 +3,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadMatterPlatform, type MatterPlatform } from './matter-platform';
 import { expectOk } from './testing/expect-ok';
-import { http, startSidecar, validHeaders, type JsonBody, type Running } from './testing/harness';
+import {
+  http,
+  REAL_CONTROLLER_DEADLINE_MS,
+  startSidecar,
+  validHeaders,
+  type JsonBody,
+  type Running,
+} from './testing/harness';
 import { freeUdpPort } from './testing/ports';
 import { startSecondController, type SecondController } from './testing/second-controller';
 import {
@@ -52,7 +59,7 @@ describe('inventory, removal and sharing (real matter.js controller and virtual 
     const changes: JsonBody[] = [];
     let platform: MatterPlatform | undefined;
     const sidecar = await startSidecar(
-      { storageDir: tmp() },
+      { storageDir: tmp(), requestDeadlineMs: REAL_CONTROLLER_DEADLINE_MS },
       {
         loadPlatform: async (context) =>
           (platform = await loadMatterPlatform({
@@ -67,11 +74,8 @@ describe('inventory, removal and sharing (real matter.js controller and virtual 
     stoppers.push(() => sidecar.stop());
     const device: VirtualDevice = await startVirtualDevice(tmp(), await freeUdpPort());
     stoppers.push(() => device.stop());
-    const fabric = expectOk(
-      sidecar,
-      'POST /v1/fabric',
-      await call(sidecar, 'POST', '/v1/fabric', { label: 'Attraccess' }),
-    );
+    const fabric = expectOk(sidecar, await call(sidecar, 'POST', '/v1/fabric', { label: 'Attraccess' }));
+    expect(fabric.state).toBe('initialized');
     const controller = platform?.fabric?.controller;
     if (!controller) throw new Error('the controller is not running');
     const nodeId = await commissionVirtualDevice(controller, device);
