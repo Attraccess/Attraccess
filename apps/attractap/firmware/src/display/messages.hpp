@@ -20,12 +20,14 @@ inline const char *messageText(Message id, const std::string &locale) {
     constexpr size_t networkStatusEnd = cardRelayEnd + sizeof(networkStatusCatalog) / sizeof(networkStatusCatalog[0]);
     constexpr size_t sessionUsersEnd = networkStatusEnd + sizeof(sessionUsersCatalog) / sizeof(sessionUsersCatalog[0]);
     constexpr size_t btSetupEnd = sessionUsersEnd + sizeof(btSetupCatalog) / sizeof(btSetupCatalog[0]);
+    constexpr size_t sessionDurationEnd = btSetupEnd + sizeof(sessionDurationCatalog) / sizeof(sessionDurationCatalog[0]);
     const auto &entry = index < mainEntries        ? catalog[index]
                         : index < cardRelayEnd     ? cardRelayCatalog[index - mainEntries]
                         : index < networkStatusEnd ? networkStatusCatalog[index - cardRelayEnd]
                         : index < sessionUsersEnd  ? sessionUsersCatalog[index - networkStatusEnd]
                         : index < btSetupEnd       ? btSetupCatalog[index - sessionUsersEnd]
-                                                   : formImagesCatalog[index - btSetupEnd];
+                        : index < sessionDurationEnd ? sessionDurationCatalog[index - btSetupEnd]
+                                                   : formImagesCatalog[index - sessionDurationEnd];
     return Language::text(entry.en, entry.de, locale);
 }
 
@@ -115,6 +117,10 @@ inline Text knownReaderError(const std::string &code) {
     if (code == "CARD_MASTER_KEY_UNKNOWN") return Message::ErrorCardKeyUnavailable;
     if (code == "FIRMWARE_UPDATE_REQUIRED") return Message::ErrorFirmwareUpdateRequired;
     if (code == "READER_NOT_ALLOWED_TO_WRITE_CARDS") return Message::ErrorReaderNotAllowedToWriteCards;
+    if (code == "SESSION_EXTENSION_EXCEEDS_MAXIMUM") return Message::ErrorExtensionExceedsMaximum;
+    if (code == "SESSION_EXTENSION_NOT_POSSIBLE" || code == "SESSION_EXTENSION_INVALID") return Message::ErrorExtensionNotPossible;
+    if (code == "SESSION_DURATION_ESTIMATE_EXCEEDS_MAXIMUM") return Message::ErrorEstimateExceedsMaximum;
+    if (code == "SESSION_DURATION_ESTIMATE_REQUIRED") return Message::ErrorEstimateRequired;
     if (code == "ENROLLMENT_EXPIRED" || code == "RESET_EXPIRED") return Message::ErrorCardOperationExpired;
     return Text();
 }

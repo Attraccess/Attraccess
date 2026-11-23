@@ -293,6 +293,10 @@ enum class Message {
     MissedHeartbeatsLastMinute, NotAvailable, Milliseconds, Percent,
     SessionYou, SessionNameJoin, SessionNamesMore, SessionUsersLine, SessionCountOf,
     BluetoothSetup, BluetoothSetupOpen, BluetoothSetupLinked, BluetoothSetupUnavailable,
+    DurationTitle, DurationHint, DurationMaxLine, DurationHours, DurationMinutes, DurationHoursMinutes, DurationHoursLabel,
+    DurationMinutesLabel, ExtendSession, ExtendStopsAt, ExtendToMax, ExtendMaxReached, ExtendStep, ExtendingSession,
+    AutoEndLine, AutoEndLineAt, ErrorExtensionExceedsMaximum, ErrorExtensionNotPossible, ErrorEstimateExceedsMaximum,
+    ErrorEstimateRequired,
     FormImageScanHint, FormImageCount,
     Count
 };

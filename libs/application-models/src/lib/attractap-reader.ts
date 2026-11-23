@@ -78,6 +78,12 @@ export interface AttractapLinkedResource {
   metadata: Record<string, unknown> | null;
   allowTakeOver: boolean;
   maxParallelSessions: number;
+  /** Longest a session may run, in minutes; null means no limit. Machines only. */
+  maxSessionDurationMinutes: number | null;
+  /** Whether a start has to state how long the machine will be used. Machines only. */
+  requireSessionDurationEstimate: boolean;
+  /** The estimate for starts that cannot ask, when one is required and there is no maximum; null means 60. */
+  defaultSessionDurationEstimateMinutes: number | null;
   retrainingMaxAgeDays: number | null;
   retrainingMaxInactivityDays: number | null;
   retrainingBlocksAccess: boolean;

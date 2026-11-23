@@ -1,11 +1,11 @@
 import type { DataSource } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { postgresMigrations } from './index';
-import { FormImages1796200000000 } from './1796200000000-form-images';
+import { FormImages1796200000002 } from './1796200000002-form-images';
 
 jest.setTimeout(120_000);
 
-describe('FormImages1796200000000 (persistence)', () => {
+describe('FormImages1796200000002 (persistence)', () => {
   let source: DataSource;
 
   beforeEach(async () => {
@@ -22,7 +22,7 @@ describe('FormImages1796200000000 (persistence)', () => {
 
     const runner = source.createQueryRunner();
     try {
-      await new FormImages1796200000000().down(runner);
+      await new FormImages1796200000002().down(runner);
     } finally {
       await runner.release();
     }

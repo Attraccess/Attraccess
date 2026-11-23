@@ -330,6 +330,7 @@ void Application::setupDisplayCallbacks()
         this->handleProjectSelection(projectId, projectName);
       });
   Display::resourceDetailsScreen.setOpenProjectsCallback([this]() { this->openProjects(); });
+  Display::resourceDetailsScreen.setOpenExtendCallback([this](uint32_t usageId) { this->openExtendScreen(usageId); });
   Display::projectSelectScreen.setProjectsPageRequestCallback(
       [this](uint32_t page, const std::string &search) { return this->requestProjectsPage(page, search); });
   Display::projectSelectScreen.setCallbacks(

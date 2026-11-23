@@ -25,6 +25,11 @@ export interface PendingSessionDraft {
   meterRates: UsageMeterRate[];
   supervisorUserId?: number;
   projectId?: number;
+  /** The deadline fixed at the start; absent when nothing limits the session. */
+  autoEndAt?: Date | null;
+  maxAutoEndAt?: Date | null;
+  estimatedDurationMinutes?: number | null;
+  autoEndWarnedOffsetMinutes?: number | null;
 }
 
 /** A door action is stored as an already ended session record. */

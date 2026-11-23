@@ -15,6 +15,7 @@
     "resource-usage-note-added": "Resource Usage Note Added",
     "resource-takeover": "Resource Takeover",
     "resource-session-ended": "Resource Session Ended",
+    "resource-session-ending-soon": "Resource Session Ending Soon",
     "access-change": "Access Change"
   },
   "form": {

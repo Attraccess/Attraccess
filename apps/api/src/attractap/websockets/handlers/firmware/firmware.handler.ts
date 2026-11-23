@@ -92,6 +92,7 @@ export class AttractapFirmwareHandler {
     // Only readers that relay card APDUs (firmware 2.0.0+) get card functions. Set before the
     // database write so a card tapped right after connecting is not refused.
     socket.state.cardRelay = data.payload?.capabilities?.cardRelay === true;
+    socket.state.sessionDuration = data.payload?.capabilities?.sessionDuration === true;
     // Firmware before 2.10.0 does not report nfc; only the BLE Bridge reports false.
     socket.state.nfc = data.payload?.capabilities?.nfc !== false;
     // Image form fields (ATT-879): only firmware that announces it can render the QR code of the phone handoff.

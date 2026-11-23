@@ -8,6 +8,7 @@ import {
 import { formatUserDisplayName } from '@attraccess/shared';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
 import { getSessionCapacity } from '../../../../resources/usage/sessions/active-usage';
+import { extensionCap } from '../../../../resources/usage/session-duration/session-duration.rules';
 import type { ResourceListService } from './resource-list.service';
 
 interface ResourceListServiceResourceListPayloadContext {
@@ -29,12 +30,34 @@ interface ReaderSessionSource {
   id: number;
   userId: number;
   startTime: Date;
+  autoEndAt?: Date | null;
+  maxAutoEndAt?: Date | null;
   /** Always loaded for the active sessions the reader lists. */
   user?: { username: string; firstName?: string | null; lastName?: string | null } | null;
   supervisorUser?: { username: string; firstName?: string | null; lastName?: string | null } | null;
 }
 
-function toReaderSession(session: ReaderSessionSource, offsetMinutes: (at: Date) => number) {
+/**
+ * The automatic end as the reader needs it (capabilities.sessionDuration). The seconds are relative to the moment the
+ * list is built, so a reader without a wall clock still counts down; `autoEndAt` with its zone offset gives the
+ * local "stops at" time. `extendLimitInSeconds` is how far the end can be pushed: the machine's maximum, or the
+ * 30 day limit when it has none (`hasMaxSessionTime` tells which).
+ */
+function readerAutoEnd(session: ReaderSessionSource, offsetMinutes: (at: Date) => number, now: Date) {
+  if (!session.autoEndAt) return {};
+  const seconds = (at: Date) => Math.max(0, Math.floor((at.getTime() - now.getTime()) / 1000));
+  return {
+    autoEndAt: session.autoEndAt.toISOString(),
+    autoEndUtcOffsetMinutes: offsetMinutes(session.autoEndAt),
+    autoEndInSeconds: seconds(session.autoEndAt),
+    hasMaxSessionTime: session.maxAutoEndAt != null,
+    extendLimitInSeconds: seconds(
+      extensionCap({ startTime: session.startTime, maxAutoEndAt: session.maxAutoEndAt ?? null }),
+    ),
+  };
+}
+
+function toReaderSession(session: ReaderSessionSource, offsetMinutes: (at: Date) => number, now = new Date()) {
   return {
     id: session.id,
     user: {
@@ -52,6 +75,7 @@ function toReaderSession(session: ReaderSessionSource, offsetMinutes: (at: Date)
           supervisorDisplayName: formatUserDisplayName(session.supervisorUser),
         }
       : {}),
+    ...readerAutoEnd(session, offsetMinutes, now),
   };
 }
 
@@ -136,6 +160,10 @@ export async function sendResourceListToSockets(
         accessOnly: resource.type === ResourceType.Door && resource.accessOnly === true,
         description: resource.description,
         allowTakeOver: resource.allowTakeOver,
+        // Machines only. A reader with capabilities.sessionDuration asks for the estimate; others ignore these.
+        requireSessionDurationEstimate:
+          resource.type === ResourceType.Machine && resource.requireSessionDurationEstimate,
+        maxSessionDurationMinutes: resource.type === ResourceType.Machine ? resource.maxSessionDurationMinutes : null,
         introducers: (introducersByResourceId.get(resource.id) ?? []).flatMap((introducer) =>
           introducer.user ? [introducer.user.username] : [],
         ),

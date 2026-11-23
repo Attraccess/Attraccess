@@ -5,6 +5,7 @@ import { ReaderDeletedEvent, ReaderTimeZoneChangedEvent, ReaderUpdatedEvent } fr
 import {
   ResourceSessionStartedEvent,
   ResourceUsageSessionEndedEvent,
+  ResourceUsageSessionExtendedEvent,
   ResourceUsageSessionTakenOverEvent,
 } from '../../resources/usage/events/resource-usage.events';
 import { ResourceChangedEvent } from '../../resources/events/resource-changed.event';
@@ -95,6 +96,12 @@ describe('WebSocketEventService', () => {
     const event = { usage: { resourceId: 10 } } as ResourceUsageSessionEndedEvent;
     await service.onResourceUsageEnded(event);
     expect(gateway.sendResourceListToReadersWithResources).toHaveBeenCalledWith([10]);
+  });
+
+  it('sends the new deadline to the readers of the machine when a session is extended', async () => {
+    const event = new ResourceUsageSessionExtendedEvent({ id: 3, resourceId: 12 } as never);
+    await service.onResourceUsageExtended(event);
+    expect(gateway.sendResourceListToReadersWithResources).toHaveBeenCalledWith([12]);
   });
 
   describe('onResourceUsageTakenOver', () => {

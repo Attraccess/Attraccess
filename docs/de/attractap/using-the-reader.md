@@ -106,6 +106,17 @@ Das Beenden aus der Liste, aus den Details oder nach dem Absenden eines Pflichtf
 
 Die Gerätebeschriftungen bleiben vorerst deutsch, einschließlich **Bis bald!**. Vorgesehene englische Entsprechungen: **Thanks, {name}!**, **Duration**, **Charged**, **See you soon!**.
 
+## Sitzungsdauer und Verlängern
+
+Bei einer Maschine, die [eine Dauerschätzung verlangt](resources/creating-resources.md#maximale-sitzungsdauer-und-dauerschätzung), öffnen Touch-Leser mit Firmware, die das unterstützt (Fähigkeit **sessionDuration**), nach der Projektauswahl und vor der Startanfrage, also vor allen Formularen, eine Vollbild-Eingabe. Stellen Sie Stunden und Minuten mit den Schaltflächen ein oder nutzen Sie eine Schnellauswahl. Der Bildschirm zeigt die maximale Sitzungsdauer an, falls die Maschine eine hat, und lässt keine längere Zeit zu. Er weist außerdem darauf hin, dass die Maschine spätestens nach dieser Zeit automatisch stoppt. **Abbrechen** bricht den Start ab. Das gilt auch für die Übernahme und für einen beaufsichtigten Start.
+
+Während Sie die Maschine nutzen, zeigen die Details die verbleibende Zeit und die Uhrzeit des automatischen Stopps, mit **+1 h**, **+2 h**, **+4 h**, **+6 h**, **+12 h**, **+24 h** und **Auf Maximum verlängern**. Schaltflächen, die über die maximale Sitzungsdauer hinausgehen würden, sind deaktiviert. Es gelten dieselben Kartenregeln wie beim Beenden: der Sitzungsbesitzer oder ein Manager, der die Sitzung beenden darf (wo der Leser anbietet, die Sitzung einer anderen Person zu beenden, bietet er auch das Verlängern an). Bei einer Maschine, die mehrere Personen gleichzeitig nutzen, verlängert der Leser nur Ihre eigene Sitzung; Manager verlängern andere Sitzungen in der Web-App. Verlängerungen aus der Web-App erscheinen live am Leser.
+
+Leser, die nicht fragen können, lehnen einen Start nie wegen einer fehlenden Schätzung ab: Attractap Lite Ethernet, die GL-S10-Bridge, Plugin-Leser und Touch-Leser mit älterer Firmware. Ihre Sitzung startet normal und endet bei der maximalen Sitzungsdauer. Ohne Maximum endet sie bei der Standardschätzung der Maschine (60 Minuten, wenn der Admin keine gesetzt hat). Verlängern Sie sie in der Web-App.
+
+> [!WARNING]
+> Zum Endzeitpunkt stoppt der Server die Maschine selbst, auch ohne Leser und auch mitten in einem Auftrag wie einem 3D-Druck. Flows laufen, der Strom kann also abgeschaltet werden. 15 und 5 Minuten vorher erhalten Sie eine Warnung (in der App, als Push oder per E-Mail, nicht am Leser).
+
 ## Gemeinsam genutzte Maschinen
 
 Manche Maschinen erlauben es, dass mehrere Personen gleichzeitig arbeiten (siehe [Ressourcen nutzen](end-user/using-resources.md#gemeinsam-genutzte-maschine-verwenden)). Am Touchleser gilt:

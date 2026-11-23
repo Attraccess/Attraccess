@@ -80,7 +80,7 @@ describe('MachineTab max parallel sessions', () => {
 
   it('sets the clamped limit', () => {
     const setField = mount(1);
-    const input = screen.getByRole('spinbutton');
+    const input = screen.getAllByRole('spinbutton')[0];
     fireEvent.change(input, { target: { value: '5' } });
     expect(setField).toHaveBeenLastCalledWith('maxParallelSessions', 5);
     fireEvent.change(input, { target: { value: '5000' } });
@@ -94,7 +94,7 @@ describe('MachineTab max parallel sessions', () => {
     mount(2);
     expect(screen.getByText('inputs.machine.maxParallelSessions.belowActiveHint 3')).toBeInTheDocument();
     // Part of the field's description, so screen readers announce it with the input.
-    expect(screen.getByRole('spinbutton')).toHaveAccessibleDescription(
+    expect(screen.getAllByRole('spinbutton')[0]).toHaveAccessibleDescription(
       /inputs\.machine\.maxParallelSessions\.belowActiveHint 3/,
     );
   });

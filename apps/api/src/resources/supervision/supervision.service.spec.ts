@@ -9,7 +9,8 @@ import {
 import { SupervisionService } from './supervision.service';
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
 import type { SupervisionUser } from './supervision.types';
-import { ResourceIntroducerType } from '@attraccess/application-models';
+import { ResourceIntroducerType, ResourceType } from '@attraccess/application-models';
+import { SessionDurationErrorCode } from '../usage/session-duration/session-duration.errors';
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
 
 describe('SupervisionService', () => {
@@ -18,7 +19,9 @@ describe('SupervisionService', () => {
   it('validates eagerly and emits a REQUESTED event to the selected supervisor', async () => {
     const { requestId } = await fixture.createRequest();
 
-    expect(fixture.resourceUsageService.validateSupervisedStart).toHaveBeenCalledWith(5, fixture.requester, 2);
+    expect(fixture.resourceUsageService.validateSupervisedStart).toHaveBeenCalledWith(5, fixture.requester, 2, undefined, {
+      id: 5,
+    });
     expect(requestId).toBeDefined();
 
     const [supervisorId, event] = fixture.live.emitToSupervisor.mock.calls[0];
@@ -52,6 +55,7 @@ describe('SupervisionService', () => {
 
     expect(fixture.resourceUsageService.startSession).toHaveBeenCalledWith(5, fixture.requester, fixture.dto, {
       supervisorUserId: 2,
+      canAskDuration: true,
       auditOrigin: { id: 2, authenticationMethod: 'api-token', apiTokenId: 9 },
     });
     expect(approved).toBe(fixture.startedSession);
@@ -93,6 +97,8 @@ describe('SupervisionService', () => {
     jest.useFakeTimers();
     const pending = fixture.service.requestSupervisedSession(5, fixture.requester, fixture.dto);
     pending.catch(() => undefined);
+    // Lets the eager checks (resource, estimate, supervisor) settle so the request is registered.
+    await Promise.resolve();
     await Promise.resolve();
 
     jest.advanceTimersByTime(SupervisionService.APPROVAL_TTL_MS);
@@ -113,6 +119,20 @@ describe('SupervisionService', () => {
       requesterUsername: 'requester',
       requesterDisplayName: 'requester',
     });
+  });
+
+  it('refuses a missing or too long duration estimate at the request, not at the approval', async () => {
+    const machine = { id: 5, type: ResourceType.Machine, requireSessionDurationEstimate: true, maxSessionDurationMinutes: 60 };
+    fixture.resourceUsageService.assertSupportsSupervision.mockResolvedValue(machine);
+    const codeOf = (error: unknown) => (error as { getResponse(): { code: string } }).getResponse().code;
+
+    const missing = await fixture.service.requestSupervisedSession(5, fixture.requester, fixture.dto).catch(codeOf);
+    expect(missing).toBe(SessionDurationErrorCode.ESTIMATE_REQUIRED);
+    const tooLong = await fixture.service
+      .requestSupervisedSession(5, fixture.requester, { ...fixture.dto, estimatedDurationMinutes: 61 })
+      .catch(codeOf);
+    expect(tooLong).toBe(SessionDurationErrorCode.ESTIMATE_EXCEEDS_MAXIMUM);
+    expect(fixture.service.listPendingForSupervisor(2)).toHaveLength(0);
   });
 
   it('rejects approval from someone other than the requested supervisor', async () => {
@@ -187,6 +207,7 @@ describe('SupervisionService', () => {
         {},
         {
           supervisorUserId: 3,
+          canAskDuration: false,
           auditOrigin: { id: 3, authenticationMethod: 'session' },
         },
       );
@@ -227,6 +248,7 @@ describe('SupervisionService', () => {
         {},
         {
           supervisorUserId: 9,
+          canAskDuration: false,
           auditOrigin: { id: 9, authenticationMethod: 'session' },
         },
       );
@@ -320,6 +342,7 @@ describe('SupervisionService', () => {
       await expect(pending).resolves.toBe(fixture.startedSession);
       expect(fixture.resourceUsageService.startSession).toHaveBeenCalledWith(5, fixture.requester, readerDto, {
         supervisorUserId: 2,
+        canAskDuration: true,
         auditOrigin: { id: 2, authenticationMethod: 'session' },
       });
       // The reader is told through the callbacks the armer handed back.

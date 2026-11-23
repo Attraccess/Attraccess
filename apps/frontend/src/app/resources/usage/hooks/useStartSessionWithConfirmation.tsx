@@ -5,8 +5,10 @@ import {
   StartUsageSessionDto,
   useResourceUsageStartBlockedKey,
   useResourceUsageStartSession,
+  UseGetOneResourceByIdKeyFn,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../components/toastProvider';
+import { getApiErrorCode } from '../../../../utils/apiError';
 import { getConfirmationRequired, getStartBlockedReason, useStartConfirmation } from './useStartConfirmation';
 
 export type StartErrorHandler = (error: ApiError, requestBody: StartUsageSessionDto) => void;
@@ -71,6 +73,10 @@ export function useStartSessionWithConfirmation(resourceId: number, options: Opt
               void queryClient.invalidateQueries({ queryKey: [useResourceUsageStartBlockedKey] });
               optionsRef.current.onPluginNotice?.();
               return;
+            }
+            // The page's copy of the machine's duration settings is stale: reload it so the next start asks.
+            if (getApiErrorCode(error as ApiError)?.startsWith('SESSION_DURATION_')) {
+              void queryClient.invalidateQueries({ queryKey: UseGetOneResourceByIdKeyFn({ path: { id: resourceId } }) });
             }
             onCallError?.(error as ApiError, requestBody);
           },

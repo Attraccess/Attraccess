@@ -52,10 +52,17 @@ private:
         uint32_t id = 0;
         std::string user; // display name of the owner
         time_t startEpoch = 0;
+        // Automatic end (ATT-43); 0 when the machine sets none. The cap is start plus the machine's maximum.
+        time_t autoEndEpoch = 0;
+        time_t maxEndEpoch = 0;
     };
     std::vector<DemoSession> _sessions[DemoStore::RESOURCE_COUNT];
     uint32_t _nextSessionId = 1;
     static uint16_t maxParallelSessionsFor(uint32_t resourceId);
+    // The shared 3D printer requires an estimate and has a maximum session time, so demo builds exercise the
+    // duration input and the extension screen. 0: no maximum / no estimate.
+    static uint32_t maxSessionMinutesFor(uint32_t resourceId);
+    static bool requiresEstimateFor(uint32_t resourceId) { return maxSessionMinutesFor(resourceId) != 0; }
     bool isOwnSession(const DemoSession &session) const { return session.user == _currentUser; }
     void addSessionJson(JsonObject target, const DemoSession &session) const;
 
@@ -86,7 +93,10 @@ private:
     void respondActionSuccess(const std::string &type);
 
     void respondProjects(uint32_t page, const std::string &search);
-    void handleStartSession(uint32_t resourceId, uint32_t projectId, bool forceTakeOver);
+    void handleStartSession(JsonObjectConst payload);
+    void handleExtendSession(JsonObjectConst payload);
+    // The shared 3D printer asks for an estimate and has a maximum session time (ATT-43).
+    void addDurationSettings(JsonObject resource, uint32_t resourceId) const;
     void handleStopSession(uint32_t resourceId, uint32_t usageId);
     void respondActionError(const std::string &type, const char *error);
     void respondFormRequest(uint32_t resourceId);

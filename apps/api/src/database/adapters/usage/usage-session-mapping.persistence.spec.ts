@@ -17,7 +17,11 @@ import { ACTIVE_RELATIONS, DETAIL_RELATIONS, type TypeOrmUsageSessionStore } fro
 jest.setTimeout(30_000);
 
 /** What the client received before sessions were mapped: the entity through the global ClassSerializerInterceptor. */
-const entityJson = (row: unknown) => JSON.parse(JSON.stringify(instanceToPlain(row)));
+// The warning bookkeeping column is internal: responses never carry it.
+const entityJson = (row: unknown) =>
+  JSON.parse(JSON.stringify(instanceToPlain(row)), (key, value) =>
+    key === 'autoEndWarnedOffsetMinutes' ? undefined : value,
+  );
 const responseJson = (session: UsageSession) => JSON.parse(JSON.stringify(toUsageSessionResponse(session)));
 
 /** Values of the private user columns the seed sets; none of them may appear in a response. */

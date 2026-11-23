@@ -4,6 +4,7 @@ import { AttractapGateway } from './websocket.gateway';
 import { ReaderDeletedEvent, ReaderTimeZoneChangedEvent, ReaderUpdatedEvent } from '../events';
 import {
   ResourceSessionStartedEvent,
+  ResourceUsageSessionExtendedEvent,
   ResourceUsageSessionEndedEvent,
   ResourceUsageSessionTakenOverEvent,
 } from '../../resources/usage/events/resource-usage.events';
@@ -55,6 +56,12 @@ export class WebSocketEventService {
 
   @OnEvent(ResourceUsageSessionEndedEvent.EVENT_NAME)
   public async onResourceUsageEnded(event: ResourceUsageSessionEndedEvent) {
+    this.attractapGateway.sendResourceListToReadersWithResources([event.usage.resourceId]);
+  }
+
+  /** The reader shows the remaining time, so an extension (from the web or another reader) needs a new list. */
+  @OnEvent(ResourceUsageSessionExtendedEvent.EVENT_NAME)
+  public async onResourceUsageExtended(event: ResourceUsageSessionExtendedEvent) {
     this.attractapGateway.sendResourceListToReadersWithResources([event.usage.resourceId]);
   }
 

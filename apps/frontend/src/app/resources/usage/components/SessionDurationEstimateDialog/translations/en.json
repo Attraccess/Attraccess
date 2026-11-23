@@ -1,0 +1,14 @@
+{
+  "title": "How long will you use this machine?",
+  "label": "Maximum time you will use the machine",
+  "hours": "Hours",
+  "minutes": "Minutes",
+  "quickPicks": "Quick picks",
+  "hint": "The machine will stop automatically after this time at the latest. You can extend while it runs.",
+  "max": "The maximum session time of this machine is {{max}}.",
+  "tooLong": "The time cannot be longer than {{max}}.",
+  "tooShort": "Enter at least one minute.",
+  "tooLongAbsolute": "The time cannot be longer than 30 days.",
+  "cancel": "Cancel",
+  "confirm": "Start"
+}

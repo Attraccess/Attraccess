@@ -132,6 +132,12 @@ async function readSqliteRows(sqlite: DataSource, table: string, columns: readon
   );
 }
 
+/** Rows that migrations after the import add on purpose, so the SQLite file cannot have them (PostgreSQL condition). */
+const ADDED_AFTER_IMPORT: Record<string, string> = {
+  // 1796200000001-session-ending-soon-email-template
+  email_templates: `"type" <> 'resource-session-ending-soon'`,
+};
+
 /**
  * Compares every core table that the SQLite file has with PostgreSQL, column by column (the columns SQLite has), row
  * by row (in a canonical order). Returns the differences; empty means equal.
@@ -152,7 +158,10 @@ export async function compareWithSqlite(pg: DataSource, sqliteFile: string): Pro
       const selects = columns.map(
         (column, at) => `${postgresExpression(column, types.get(column) as string)} AS c${at}`,
       );
-      const rows: Record<string, unknown>[] = await pg.query(`SELECT ${selects.join(', ')} FROM ${quote(table)}`);
+      const where = ADDED_AFTER_IMPORT[table] ? ` WHERE ${ADDED_AFTER_IMPORT[table]}` : '';
+      const rows: Record<string, unknown>[] = await pg.query(
+        `SELECT ${selects.join(', ')} FROM ${quote(table)}${where}`,
+      );
       const actual = rows
         .map((row) => canonical(columns.map((column, at) => postgresValue(row[`c${at}`], types.get(column) as string))))
         .sort();

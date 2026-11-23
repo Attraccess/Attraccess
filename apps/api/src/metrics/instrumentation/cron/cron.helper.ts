@@ -6,7 +6,12 @@ import { CronMetrics } from '../../definitions/cron.metrics';
 import { MetricsToggleService } from '../../settings/metrics-toggle.service';
 
 export type CronJobName =
-  'sumup_poll' | 'session_cleanup' | 'maintenance_evaluator' | 'flow_daily_cleanup' | 'flow_minute_tick';
+  | 'sumup_poll'
+  | 'session_cleanup'
+  | 'maintenance_evaluator'
+  | 'flow_daily_cleanup'
+  | 'flow_minute_tick'
+  | 'session_auto_end';
 
 @Injectable()
 export class CronTimer {

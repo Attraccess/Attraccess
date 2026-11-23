@@ -56,6 +56,8 @@ void API::sendFirmwareInfo()
     // This reader relays card APDUs to the server and holds no card keys (firmware 2.0.0+).
     if (traits.hasNfc) event["data"]["payload"]["capabilities"]["cardRelay"] = true;
 #ifdef HAS_LVGL_DISPLAY
+    // Duration input and extend controls (ATT-43): the touch readers. Others start with the server's fallback deadline.
+    if (traits.hasNfc) event["data"]["payload"]["capabilities"]["sessionDuration"] = true;
     // This reader renders image form fields as a QR code for the phone (ATT-879). Readers without a display never get them.
     event["data"]["payload"]["capabilities"]["formImages"] = true;
 #endif

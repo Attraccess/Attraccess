@@ -4,8 +4,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Image fields on forms (ATT-879): the `image` field type, the private image rows and the short-lived reader handoff
  * links that let a phone add images to a reader's open form.
  */
-export class FormImages1796200000000 implements MigrationInterface {
-  name = 'FormImages1796200000000';
+export class FormImages1796200000002 implements MigrationInterface {
+  name = 'FormImages1796200000002';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

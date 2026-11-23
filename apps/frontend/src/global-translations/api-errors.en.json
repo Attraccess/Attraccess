@@ -250,5 +250,25 @@
   "MISSING_HEADER_ROW": {
     "title": "CSV file has no data",
     "description": "The CSV file has no header row or no rows below it. The first row must contain the column names, followed by one row per user."
+  },
+  "SESSION_DURATION_ESTIMATE_REQUIRED": {
+    "title": "Duration estimate required",
+    "description": "This machine asks how long you will use it. Reload the page and enter your estimated time."
+  },
+  "SESSION_DURATION_ESTIMATE_EXCEEDS_MAXIMUM": {
+    "title": "Estimate too long",
+    "description": "Your estimated time is longer than the maximum session time of this machine. Choose a shorter time."
+  },
+  "SESSION_EXTENSION_EXCEEDS_MAXIMUM": {
+    "title": "Cannot extend further",
+    "description": "The extension would go beyond the maximum session time of this machine."
+  },
+  "SESSION_EXTENSION_NOT_POSSIBLE": {
+    "title": "Cannot extend",
+    "description": "This session cannot be extended, for example because it already ended or has no automatic stop."
+  },
+  "SESSION_EXTENSION_INVALID": {
+    "title": "Invalid extension",
+    "description": "Choose one of the offered extensions."
   }
 }

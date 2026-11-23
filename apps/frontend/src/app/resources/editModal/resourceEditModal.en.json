@@ -50,6 +50,24 @@
         "flowsWarning": "Some flows that run for this machine (its own flow or global flows) react to every session start or stop, even while other people are still working, without checking how many sessions are active. A power-off flow can cut the power too early.",
         "flowsWarningOwnFlow": "This machine's flow",
         "flowsWarningOpen": "Check the flows"
+      },
+      "sessionDuration": {
+        "maxSessionTime": {
+          "label": "Max session time",
+          "description": "The server stops a session automatically when it reaches this time. Leave both fields empty for no limit. Applies to sessions started afterwards; running sessions are not changed.",
+          "hours": "Hours",
+          "minutes": "Minutes",
+          "tooLong": "The max session time cannot be longer than 720 hours (30 days)."
+        },
+        "requireEstimate": {
+          "label": "Require duration estimate",
+          "description": "Starting a session asks how long the machine will be used at most. The machine stops automatically when that time is up; people can extend it while it runs. Stopping can switch the machine off (stop flows), so this can end long jobs such as 3D prints."
+        },
+        "defaultEstimate": {
+          "label": "Default estimate for readers that cannot ask (minutes)",
+          "description": "Readers that cannot ask for an estimate (headless readers, older firmware) start with this duration. Empty means 60 minutes.",
+          "tooLong": "The default estimate cannot be longer than the max session time."
+        }
       }
     },
     "door": {
