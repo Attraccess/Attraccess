@@ -1,16 +1,18 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { formImagesUpload } from '@attraccess/react-query-client';
+import type { ResourceFormAction } from '../types';
+import { ImageCount } from './ImageCount';
+import { ImageFieldError } from './ImageFieldError';
 import { ImageGallery } from './ImageGallery';
 import { ImagePickerButtons } from './ImagePickerButtons';
 import { useImageUploads } from './useImageUploads';
-import en from './en.json';
-import de from './de.json';
 
 interface ImageFieldInputProps {
   resourceId: number;
-  action: 'start' | 'takeover' | 'end';
+  action: ResourceFormAction;
   formId: number;
   fieldId: number;
+  /** The name of the field, for the accessible names of the controls and photos. */
+  fieldName: string;
   maxImages: number;
   /** The ids of the images added so far: the answer of the field. */
   ids: string[];
@@ -29,13 +31,13 @@ export function ImageFieldInput({
   action,
   formId,
   fieldId,
+  fieldName,
   maxImages,
   ids,
   onChange,
   onBusyChange,
   error,
 }: Readonly<ImageFieldInputProps>) {
-  const { t } = useTranslations({ en, de });
   const { pendingCount, problem, addFiles, clearProblem } = useImageUploads({
     upload: async (file) => {
       const { data } = await formImagesUpload({
@@ -51,28 +53,21 @@ export function ImageFieldInput({
     onBusyChange,
   });
   const isFull = ids.length + pendingCount >= maxImages;
-  const message =
-    error ??
-    (problem === 'upload' ? t('uploadError') : problem === 'max' ? t('maxReached', { count: maxImages }) : null);
 
   return (
     <div className="flex flex-col gap-3" data-cy="image-field-input">
       <ImageGallery
         ids={ids}
+        fieldName={fieldName}
         pendingCount={pendingCount}
         onRemove={(imageId) => {
           clearProblem();
           onChange((current) => current.filter((id) => id !== imageId));
         }}
       />
-      <ImagePickerButtons multiple={maxImages > 1} isDisabled={isFull} onFiles={addFiles} />
-      <p className="text-xs text-default-400">{t('count', { count: ids.length, max: maxImages })}</p>
-      {message && (
-        <p className="flex items-start gap-1 text-sm font-medium text-danger" role="alert">
-          <span aria-hidden="true">⚠</span>
-          <span>{message}</span>
-        </p>
-      )}
+      <ImagePickerButtons label={fieldName} multiple={maxImages > 1} isDisabled={isFull} onFiles={addFiles} />
+      <ImageCount added={ids.length} max={maxImages} />
+      <ImageFieldError error={error} problem={problem} maxImages={maxImages} />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { FormFieldType, FormFieldResponseDto, FormScope } from '@attraccess/react-query-client';
-import { DEFAULT_FORM_IMAGES, MAX_FORM_IMAGES, MIN_FORM_IMAGES, formImageLimit } from '@attraccess/application-models';
+import { DEFAULT_FORM_IMAGES, formImageLimit } from '@attraccess/application-models';
 
 export interface BooleanFieldOptions {
   trueLabel?: string;
@@ -22,17 +22,12 @@ export interface SelectFieldOptions {
 }
 
 export interface ImageFieldOptions {
-  /** How many images the field accepts, 1 to 10. A cleared input is kept as '' until it is saved. */
+  /** How many images the field accepts (see isValidFormImageLimit). A cleared input stays '' until saved. */
   maxImages: number | '';
 }
 
 export type FieldOptions =
   TextFieldOptions | NumberFieldOptions | SelectFieldOptions | BooleanFieldOptions | ImageFieldOptions;
-
-/** Whether a max-images option is a whole number the API accepts. */
-export function isValidMaxImages(value: unknown): boolean {
-  return typeof value === 'number' && Number.isInteger(value) && value >= MIN_FORM_IMAGES && value <= MAX_FORM_IMAGES;
-}
 
 export interface EditableFormField {
   id?: number;

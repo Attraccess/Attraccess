@@ -1,3 +1,4 @@
+import { FORM_PHOTO_ROUTE } from '@attraccess/application-models';
 import { client } from '@attraccess/react-query-client';
 
 const apiUrl = (path: string) => `${client.getConfig().baseUrl ?? ''}/api${path}`;
@@ -7,4 +8,4 @@ export const formImageUrl = (imageId: string) => apiUrl(`/forms/images/${encodeU
 
 /** An image added through a reader handoff link: the link token is the authorisation. */
 export const formPhotoImageUrl = (token: string, imageId: string) =>
-  apiUrl(`/form-photo/${encodeURIComponent(token)}/images/${encodeURIComponent(imageId)}`);
+  apiUrl(`${FORM_PHOTO_ROUTE}/${encodeURIComponent(token)}/images/${encodeURIComponent(imageId)}`);

@@ -6,6 +6,8 @@ import en from './en.json';
 import de from './de.json';
 
 interface ImagePickerButtonsProps {
+  /** Names the pair of buttons for assistive technology: the name of the field. */
+  label: string;
   /** Several files at once in the upload picker. The camera takes one photo at a time. */
   multiple?: boolean;
   isDisabled?: boolean;
@@ -17,6 +19,7 @@ interface ImagePickerButtonsProps {
  * are opened by the buttons, so the controls look like the rest of the app.
  */
 export function ImagePickerButtons({
+  label,
   multiple = false,
   isDisabled = false,
   onFiles,
@@ -33,7 +36,7 @@ export function ImagePickerButtons({
   };
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-2" role="group" aria-label={label}>
       <Button variant="secondary" isDisabled={isDisabled} onPress={() => cameraRef.current?.click()}>
         <Camera className="w-4 h-4" />
         {t('take')}

@@ -73,8 +73,8 @@
       },
       "image": {
         "maxImages": "Max. Bilder",
-        "maxImagesInvalid": "Gib eine ganze Zahl von 1 bis 10 ein",
-        "description": "Nutzer hängen so viele Fotos an, aufgenommen mit der Kamera oder hochgeladen. Am Attractap-Leser fügen sie die Fotos mit ihrem Handy hinzu."
+        "maxImagesInvalid": "Gib eine ganze Zahl von {{min}} bis {{max}} ein",
+        "description": "Benutzer können bis zu so viele Fotos anhängen."
       }
     },
     "types": {
@@ -90,10 +90,7 @@
     "booleanNo": "Nein",
     "booleanLabel": "Ja/Nein-Feld Vorschau",
     "selectPlaceholder": "Eine Option auswählen",
-    "empty": "Füge Felder hinzu, um die Vorschau zu sehen.",
-    "imageTake": "Foto aufnehmen",
-    "imageUpload": "Hochladen",
-    "imageMax": "Bis zu {{count}} Bild(er)"
+    "empty": "Füge Felder hinzu, um die Vorschau zu sehen."
   },
   "globalList": {
     "title": "Formulare",

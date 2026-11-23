@@ -1,15 +1,24 @@
 {
-  "alt": "Photo {{number}}",
-  "open": "Show photo {{number}} full size",
+  "alt": "Photo {{number}} of {{total}}",
+  "altNamed": "{{field}}: photo {{number}} of {{total}}",
+  "open": "Show full size: {{label}}",
   "close": "Close",
   "loadError": "Photo not available",
-  "photos": "{{count}} photos",
-  "photo": "1 photo",
   "take": "Take photo",
   "upload": "Upload",
   "remove": "Remove photo {{number}}",
+  "removeNamed": "Remove {{field}} photo {{number}}",
   "uploading": "Uploading…",
   "uploadError": "The photo could not be uploaded. Try again.",
-  "maxReached": "At most {{count}} photo(s) are allowed here.",
-  "count": "{{count}} of {{max}} photos"
+  "typeError": "Only JPEG, PNG or WebP photos can be added.",
+  "sizeError": "The photo is larger than {{maxSize}} MB and could not be made smaller.",
+  "rateLimited": "Too many photos in a short time. Wait a moment and try again.",
+  "maxReached": {
+    "one": "At most {{count}} photo is allowed here.",
+    "many": "At most {{count}} photos are allowed here."
+  },
+  "count": {
+    "one": "{{added}} of {{count}} photo",
+    "many": "{{added}} of {{count}} photos"
+  }
 }

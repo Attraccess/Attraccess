@@ -8,7 +8,8 @@ import {
   useFormsListResourcesKey,
   useResourceFormsListKey,
 } from '@attraccess/react-query-client';
-import { EditableForm, ImageFieldOptions, isValidMaxImages, parseFieldFromResponse, serializeFieldOptions } from '../types';
+import { EditableForm, ImageFieldOptions, parseFieldFromResponse, serializeFieldOptions } from '../types';
+import { isValidFormImageLimit } from '@attraccess/application-models';
 
 export const EMPTY_FORM: EditableForm = {
   name: '',
@@ -38,7 +39,8 @@ export function toEditableForm(form: FormResponseDto): EditableForm {
 /** Whether every image field has a max-images option the API accepts (the options editor flags the others). */
 export function hasValidImageFields(form: EditableForm): boolean {
   return form.fields.every(
-    (field) => field.type !== FormFieldType.IMAGE || isValidMaxImages((field.options as ImageFieldOptions).maxImages),
+    (field) =>
+      field.type !== FormFieldType.IMAGE || isValidFormImageLimit((field.options as ImageFieldOptions).maxImages),
   );
 }
 

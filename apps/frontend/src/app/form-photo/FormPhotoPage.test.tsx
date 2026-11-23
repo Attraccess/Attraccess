@@ -23,8 +23,9 @@ beforeEach(() => Object.values(api).forEach((fn) => fn.mockReset()));
 afterEach(cleanup);
 
 const ID = '3f2b6c1e-8a4d-4b7e-9c11-2d5e7f8a9b01';
-const gone = () =>
-  new ApiError({ method: 'GET', url: '/x' }, { body: {}, ok: false, status: 410, statusText: '', url: '/x' }, 'Gone');
+const apiError = (status: number) =>
+  new ApiError({ method: 'GET', url: '/x' }, { body: {}, ok: false, status, statusText: '', url: '/x' }, 'Failed');
+const gone = () => apiError(410);
 const pageData = (overrides = {}) => ({
   resourceName: 'Laser',
   formName: 'Check-in',
@@ -67,6 +68,7 @@ it('shows a plain error, not the expired state, when the page cannot be loaded',
   api.page.mockRejectedValue(new Error('offline'));
   mount();
   expect(await screen.findByText('loadError')).toBeTruthy();
+  expect(screen.getByText('loadErrorTitle')).toBeTruthy();
   expect(screen.queryByText('expired')).toBeNull();
 });
 
@@ -81,7 +83,7 @@ it('uploads, shows a spinner and then the photo with the done message', async ()
 
   expect((await screen.findAllByRole('status')).length).toBeGreaterThan(0);
   await act(async () => finish({ data: { id: ID, width: 1, height: 1 } }));
-  expect(await screen.findByAltText('alt')).toBeTruthy();
+  expect(await screen.findByAltText('altNamed')).toBeTruthy();
   expect(screen.getByText('done')).toBeTruthy();
 });
 
@@ -96,15 +98,43 @@ it('stays done after the last allowed upload used the link up', async () => {
   expect(await screen.findByText('doneUsedUp')).toBeTruthy();
   expect(screen.queryByText('expired')).toBeNull();
   expect(screen.queryByTestId('image-input-camera')).toBeNull();
+  expect(screen.queryByText('remaining')).toBeNull();
+  expect(screen.getByText('count')).toBeTruthy();
   expect(api.page).toHaveBeenCalledTimes(1);
+});
+
+it('offers the picker again after a photo of a used-up link is removed', async () => {
+  api.page.mockResolvedValue({ data: pageData({ maxImages: 1, uploadsRemaining: 1 }) });
+  api.upload.mockResolvedValue({ data: { id: ID, width: 1, height: 1 } });
+  api.remove.mockResolvedValue({});
+  mount();
+  await screen.findByText('Damage photo');
+  pick('image-input-upload');
+  expect(await screen.findByText('doneUsedUp')).toBeTruthy();
+  expect(screen.queryByTestId('image-input-upload')).toBeNull();
+
+  fireEvent.click(screen.getByRole('button', { name: 'removeNamed' }));
+
+  expect(await screen.findByTestId('image-input-upload')).toBeTruthy();
+  expect(screen.queryByText('doneUsedUp')).toBeNull();
+  expect(screen.getByText('remaining')).toBeTruthy();
+});
+
+it('says so when a photo cannot be removed, and keeps it', async () => {
+  api.page.mockResolvedValue({ data: pageData({ images: [{ id: ID, width: 1, height: 1 }] }) });
+  api.remove.mockRejectedValue(apiError(500));
+  mount();
+  fireEvent.click(await screen.findByRole('button', { name: 'removeNamed' }));
+  expect(await screen.findByText('removeError')).toBeTruthy();
+  expect(screen.getByAltText('altNamed')).toBeTruthy();
 });
 
 it('removes a photo through the token', async () => {
   api.page.mockResolvedValue({ data: pageData({ images: [{ id: ID, width: 1, height: 1 }] }) });
   api.remove.mockResolvedValue({});
   mount();
-  fireEvent.click(await screen.findByRole('button', { name: 'remove' }));
-  await waitFor(() => expect(screen.queryByAltText('alt')).toBeNull());
+  fireEvent.click(await screen.findByRole('button', { name: 'removeNamed' }));
+  await waitFor(() => expect(screen.queryByAltText('altNamed')).toBeNull());
   expect(api.remove).toHaveBeenCalledWith(expect.objectContaining({ path: { token: 'tok-123', imageId: ID } }));
 });
 

@@ -1,6 +1,6 @@
 import { LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Input, TextArea } from '@heroui/react';
-import { Camera, Upload } from 'lucide-react';
+import { Input, TextArea } from '@heroui/react';
+import { DEFAULT_FORM_IMAGES, isValidFormImageLimit } from '@attraccess/application-models';
 import { Select } from '../../../components/select';
 import { FormFieldType } from '@attraccess/react-query-client';
 import en from '../en.json';
@@ -11,8 +11,9 @@ import {
   NumberFieldOptions,
   SelectFieldOptions,
   ImageFieldOptions,
-  isValidMaxImages,
 } from '../types';
+import { ImageCount } from '../images/ImageCount';
+import { ImagePickerButtons } from '../images/ImagePickerButtons';
 
 interface FormPreviewProps {
   fields: EditableFormField[];
@@ -61,7 +62,7 @@ function renderPreviewField(field: EditableFormField, t: (key: string, vars?: Re
     case FormFieldType.BOOLEAN:
       return renderPreviewBoolean(t);
     case FormFieldType.IMAGE:
-      return renderPreviewImage(field.options as ImageFieldOptions, t);
+      return renderPreviewImage(field.options as ImageFieldOptions, field.name);
     default:
       return <Input placeholder="…" />;
   }
@@ -104,21 +105,12 @@ function renderPreviewBoolean(t: (key: string) => string) {
   );
 }
 
-function renderPreviewImage(options: ImageFieldOptions, t: (key: string, vars?: Record<string, unknown>) => string) {
-  const max = isValidMaxImages(options.maxImages) ? Number(options.maxImages) : 1;
+function renderPreviewImage(options: ImageFieldOptions, fieldName: string) {
+  const max = isValidFormImageLimit(options.maxImages) ? options.maxImages : DEFAULT_FORM_IMAGES;
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" isDisabled>
-          <Camera className="w-4 h-4" />
-          {t('preview.imageTake')}
-        </Button>
-        <Button variant="secondary" isDisabled>
-          <Upload className="w-4 h-4" />
-          {t('preview.imageUpload')}
-        </Button>
-      </div>
-      <p className="text-xs text-default-500">{t('preview.imageMax', { count: max })}</p>
+    <div className="flex flex-col gap-3">
+      <ImagePickerButtons label={fieldName} multiple={max > 1} isDisabled onFiles={() => undefined} />
+      <ImageCount added={0} max={max} />
     </div>
   );
 }

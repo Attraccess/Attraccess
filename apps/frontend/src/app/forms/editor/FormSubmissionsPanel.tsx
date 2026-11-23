@@ -44,7 +44,8 @@ type Answer = { value?: unknown; fieldDefinition?: { name?: string; position?: n
 /** One stored answer as text, or as thumbnails for photos; a yes/no answer reads as in the usage history. */
 function answerText(answer: Answer | undefined, t: (key: string) => string): ReactNode {
   if (answer?.value === undefined || answer?.value === null) return '';
-  if (answer.fieldDefinition?.type === FormFieldType.IMAGE) return <FormImageAnswer value={answer.value} />;
+  if (answer.fieldDefinition?.type === FormFieldType.IMAGE)
+    return <FormImageAnswer value={answer.value} fieldName={answer.fieldDefinition.name} />;
   if (answer.fieldDefinition?.type === FormFieldType.BOOLEAN) {
     return String(answer.value) === 'true' ? t('submissions.yes') : t('submissions.no');
   }

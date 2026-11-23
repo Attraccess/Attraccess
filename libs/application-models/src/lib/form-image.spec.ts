@@ -1,4 +1,21 @@
-import { DEFAULT_FORM_IMAGES, MAX_FORM_IMAGES, formImageLimit, parseFormImageIds } from './form-image';
+import {
+  DEFAULT_FORM_IMAGES,
+  MAX_FORM_IMAGES,
+  MIN_FORM_IMAGES,
+  formImageLimit,
+  isValidFormImageLimit,
+  parseFormImageIds,
+} from './form-image';
+
+describe('isValidFormImageLimit', () => {
+  it('accepts whole numbers within the limits only', () => {
+    expect(
+      [MIN_FORM_IMAGES - 1, MIN_FORM_IMAGES, 5, MAX_FORM_IMAGES, MAX_FORM_IMAGES + 1, 2.5, '3', null, undefined].map(
+        isValidFormImageLimit,
+      ),
+    ).toEqual([false, true, true, true, false, false, false, false, false]);
+  });
+});
 
 describe('formImageLimit', () => {
   it('reads a whole number from 1 to 10', () => {
@@ -7,12 +24,20 @@ describe('formImageLimit', () => {
     expect(formImageLimit({ maxImages: MAX_FORM_IMAGES })).toBe(MAX_FORM_IMAGES);
   });
 
-  it.each([null, undefined, {}, [], 'x', 3, { maxImages: 0 }, { maxImages: 11 }, { maxImages: 1.5 }, { maxImages: '3' }])(
-    'falls back to the default for %p',
-    (options) => {
-      expect(formImageLimit(options)).toBe(DEFAULT_FORM_IMAGES);
-    },
-  );
+  it.each([
+    null,
+    undefined,
+    {},
+    [],
+    'x',
+    3,
+    { maxImages: 0 },
+    { maxImages: 11 },
+    { maxImages: 1.5 },
+    { maxImages: '3' },
+  ])('falls back to the default for %p', (options) => {
+    expect(formImageLimit(options)).toBe(DEFAULT_FORM_IMAGES);
+  });
 });
 
 describe('parseFormImageIds', () => {

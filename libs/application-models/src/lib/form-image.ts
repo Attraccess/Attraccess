@@ -17,11 +17,22 @@ export interface FormImageFieldOptions {
   maxImages: number;
 }
 
+/**
+ * The path of the public phone page behind a reader's QR code: `<app url>/form-photo/<token>`. The API serves the
+ * endpoints of the same link under `/api/form-photo/<token>`.
+ */
+export const FORM_PHOTO_ROUTE = '/form-photo';
+
+/** Whether a max-images option is a whole number from MIN_FORM_IMAGES to MAX_FORM_IMAGES. */
+export function isValidFormImageLimit(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= MIN_FORM_IMAGES && value <= MAX_FORM_IMAGES;
+}
+
 /** How many images an image field accepts, from its stored options (null or missing means one). */
 export function formImageLimit(options: unknown): number {
   if (options && typeof options === 'object' && !Array.isArray(options)) {
     const value = (options as { maxImages?: unknown }).maxImages;
-    if (typeof value === 'number' && Number.isInteger(value) && value >= MIN_FORM_IMAGES && value <= MAX_FORM_IMAGES) {
+    if (isValidFormImageLimit(value)) {
       return value;
     }
   }

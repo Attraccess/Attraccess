@@ -430,6 +430,7 @@ export function ResourceFormsModal({
                       action={action}
                       formId={form.id}
                       fieldId={field.id}
+                      fieldName={field.name}
                       maxImages={formImageLimit(field.options)}
                       ids={Array.isArray(values[field.id]) ? (values[field.id] as string[]) : []}
                       onChange={(update) => handleImagesChange(field.id, update)}

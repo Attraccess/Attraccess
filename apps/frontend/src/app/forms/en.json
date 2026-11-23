@@ -73,8 +73,8 @@
       },
       "image": {
         "maxImages": "Max. images",
-        "maxImagesInvalid": "Enter a whole number from 1 to 10",
-        "description": "Users attach this many photos, either taken with the camera or uploaded. On an Attractap reader they add them with their phone."
+        "maxImagesInvalid": "Enter a whole number from {{min}} to {{max}}",
+        "description": "Users can attach up to this many photos."
       }
     },
     "types": {
@@ -90,10 +90,7 @@
     "booleanNo": "No",
     "booleanLabel": "Boolean field preview",
     "selectPlaceholder": "Select an option",
-    "empty": "Add fields to see the preview.",
-    "imageTake": "Take photo",
-    "imageUpload": "Upload",
-    "imageMax": "Up to {{count}} image(s)"
+    "empty": "Add fields to see the preview."
   },
   "globalList": {
     "title": "Forms",

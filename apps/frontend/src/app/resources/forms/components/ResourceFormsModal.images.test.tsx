@@ -60,7 +60,7 @@ it('uploads at once, shows the thumbnail and submits the image ids as the answer
 
   pick('image-input-camera', photo());
 
-  await waitFor(() => expect(screen.getByAltText('alt')).toBeTruthy());
+  await waitFor(() => expect(screen.getByAltText('altNamed')).toBeTruthy());
   expect(upload).toHaveBeenCalledWith(
     expect.objectContaining({ path: { resourceId: 3, formId: 7, fieldId: 4 }, query: { action: 'start' } }),
   );
@@ -89,17 +89,29 @@ it('holds the submit button while an upload runs', async () => {
   );
 });
 
-it('removes an image from the answer without any request', async () => {
+it('removes an image from the answer without any request, so an optional field submits without it', async () => {
   upload.mockResolvedValue({ data: { id: IDS[0], width: 1, height: 1 } });
-  mount(imageForm({ maxImages: 2 }, false));
+  const submit = mount(imageForm({ maxImages: 2 }, false));
   await screen.findByTestId('image-input-upload');
   pick('image-input-upload', photo());
-  await screen.findByAltText('alt');
+  await screen.findByAltText('altNamed');
 
-  fireEvent.click(screen.getByRole('button', { name: 'remove' }));
+  fireEvent.click(screen.getByRole('button', { name: 'removeNamed' }));
 
-  expect(screen.queryByAltText('alt')).toBeNull();
+  expect(screen.queryByAltText('altNamed')).toBeNull();
   expect(upload).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole('button', { name: 'modal.submit' }));
+  expect(submit).toHaveBeenCalledWith([{ formId: 7, answers: [] }]);
+});
+
+it('groups the photo buttons under the field name and refuses other file types before uploading', async () => {
+  mount(imageForm({ maxImages: 2 }));
+  expect(await screen.findByRole('group', { name: 'Damage' })).toBeTruthy();
+
+  await act(async () => pick('image-input-upload', new File(['x'], 'scan.pdf', { type: 'application/pdf' })));
+
+  expect(await screen.findByText('typeError')).toBeTruthy();
+  expect(upload).not.toHaveBeenCalled();
 });
 
 it('takes no more images than the field allows', async () => {
@@ -109,7 +121,7 @@ it('takes no more images than the field allows', async () => {
 
   pick('image-input-upload', photo('a.jpg'), photo('b.jpg'));
 
-  await screen.findByAltText('alt');
+  await screen.findByAltText('altNamed');
   expect(upload).toHaveBeenCalledTimes(1);
   expect(await screen.findByText('maxReached')).toBeTruthy();
 });
@@ -134,5 +146,5 @@ it('shows an error when the upload fails and adds nothing', async () => {
 
   await act(async () => pick('image-input-upload', photo()));
   expect(await screen.findByText('uploadError')).toBeTruthy();
-  expect(screen.queryByAltText('alt')).toBeNull();
+  expect(screen.queryByAltText('altNamed')).toBeNull();
 });

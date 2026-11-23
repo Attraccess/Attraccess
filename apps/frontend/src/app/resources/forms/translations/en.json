@@ -19,6 +19,9 @@
     "selectPlaceholder": "Select an option",
     "selectInvalid": "Choose one of the available options",
     "selectUnavailable": "No options available",
-    "imageTooMany": "At most {{count}} photo(s) are allowed."
+    "imageTooMany": {
+      "one": "At most {{count}} photo is allowed.",
+      "many": "At most {{count}} photos are allowed."
+    }
   }
 }
