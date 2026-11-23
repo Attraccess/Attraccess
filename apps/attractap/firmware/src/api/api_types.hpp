@@ -85,8 +85,9 @@ struct ResourceBrief
         bool requireSessionDurationEstimate = false;
         // Longest session in minutes; 0 means the machine has no maximum.
         uint32_t maxSessionDurationMinutes = 0;
-        // The own session's automatic end. The seconds are relative to `autoEndReceivedMs` (millis() when the list
-        // arrived), so the countdown needs no wall clock; `autoEndEpoch` (0 when unknown) gives the stop time.
+        // The automatic end of the session shown (activeUsageId: the own one, else the active one). The seconds are
+        // relative to `autoEndReceivedMs` (millis() when the list arrived), so the countdown needs no wall clock;
+        // `autoEndEpoch` (0 when unknown) gives the stop time.
         bool hasAutoEnd = false;
         bool hasMaxSessionTime = false;
         uint32_t autoEndInSeconds = 0;

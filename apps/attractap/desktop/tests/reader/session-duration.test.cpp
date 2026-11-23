@@ -1,7 +1,7 @@
 #include "workflow.hpp"
 
-// ATT-43: the duration input before a start on a machine that requires an estimate, and the extension of the
-// card holder's own running session. The production API parser, list, details and action flow run against
+// ATT-43: the duration input before a start, a takeover and a supervised start on a machine that requires an
+// estimate, and the extension of a running session by its owner or by a manager. The production API parser, list, details and action flow run against
 // hand-written RESOURCE_LIST payloads.
 void ReaderWorkflow::testSessionDuration()
 {
@@ -9,6 +9,8 @@ void ReaderWorkflow::testSessionDuration()
     struct Scenario {
         bool requireEstimate; int maxMinutes; bool own;
         int autoEndInSeconds = 3600; int limitSeconds = 3600 + 7200; bool hasMax = true; bool withDeadline = true;
+        // Another person's running session (not `own`), and what the card holder may do about it.
+        const char *otherUser = nullptr; bool allowTakeOver = false; bool manager = false; bool supervised = false;
     };
     const auto durationList = [&](const Scenario &scenario) {
         JsonDocument doc;
@@ -23,15 +25,19 @@ void ReaderWorkflow::testSessionDuration()
         door["id"] = 2; door["name"] = "Tür"; door["type"] = "door"; door["isHealthy"] = true; door["hasIntroduction"] = true;
         auto r = resources.add<JsonObject>();
         r["id"] = 1; r["name"] = "Laser"; r["description"] = ""; r["type"] = "machine";
-        r["isHealthy"] = true; r["hasIntroduction"] = true; r["requiresSupervisor"] = false; r["allowTakeOver"] = false;
+        r["isHealthy"] = true; r["hasIntroduction"] = !scenario.supervised; r["requiresSupervisor"] = scenario.supervised;
+        r["allowTakeOver"] = scenario.allowTakeOver;
+        r["canManageResource"] = scenario.manager; r["canEndOtherSessions"] = scenario.manager;
         r["maxParallelSessions"] = 1;
         r["requireSessionDurationEstimate"] = scenario.requireEstimate;
         if (scenario.maxMinutes > 0) r["maxSessionDurationMinutes"] = scenario.maxMinutes;
-        r["canStart"] = !scenario.own;
-        r["activeSessionCount"] = scenario.own ? 1 : 0;
-        if (scenario.own) {
-            auto own = r["ownUsageSession"].to<JsonObject>();
-            own["id"] = 9; own["user"]["username"] = username; own["startTime"] = "2026-01-01T10:00:00Z";
+        const bool running = scenario.own || scenario.otherUser;
+        r["canStart"] = !running;
+        r["activeSessionCount"] = running ? 1 : 0;
+        if (running) {
+            auto own = scenario.own ? r["ownUsageSession"].to<JsonObject>() : r["activeUsageSession"].to<JsonObject>();
+            own["id"] = 9; own["user"]["username"] = scenario.own ? username.c_str() : scenario.otherUser;
+            own["startTime"] = "2026-01-01T10:00:00Z";
             if (scenario.withDeadline) {
                 own["autoEndAt"] = "2026-01-01T11:00:00Z";
                 own["autoEndUtcOffsetMinutes"] = 60;
@@ -39,7 +45,7 @@ void ReaderWorkflow::testSessionDuration()
                 own["hasMaxSessionTime"] = scenario.hasMax;
                 own["extendLimitInSeconds"] = scenario.limitSeconds;
             }
-            r["activeUsageSession"] = own;
+            if (scenario.own) r["activeUsageSession"] = own;
             r["activeUsageSessions"].add(own);
         }
         std::string payload; serializeJson(doc, payload); server.push("RESOURCE_LIST", payload);
@@ -60,8 +66,8 @@ void ReaderWorkflow::testSessionDuration()
     click("Start");
     assert(server.count("START_RESOURCE_USAGE_SESSION") == starts);
     assert(lv_screen_active() == Display::durationInputScreen.getScreen());
-    assert(label(lv_screen_active(), "Wie lange nutzt du die Maschine?"));
-    assert(label(lv_screen_active(), "Höchstens 2 h"));
+    assert(label(lv_screen_active(), "Wie lange nutzen Sie die Maschine?"));
+    assert(label(lv_screen_active(), "Maximale Sitzungsdauer: 2 h"));
     display.capture(output, "duration-01-input");
 
     // Cancel aborts the start and returns to the list.
@@ -105,7 +111,7 @@ void ReaderWorkflow::testSessionDuration()
     const auto extends = server.count("EXTEND_RESOURCE_USAGE_SESSION");
     click("Verlängern");
     assert(lv_screen_active() == Display::extendSessionScreen.getScreen());
-    assert(label(lv_screen_active(), "Bis zum Maximum"));
+    assert(label(lv_screen_active(), "Auf Maximum verlängern"));
     display.capture(output, "duration-03-extend");
     click("+1 h");
     assert(server.count("EXTEND_RESOURCE_USAGE_SESSION") == extends + 1);
@@ -121,12 +127,12 @@ void ReaderWorkflow::testSessionDuration()
     // The server refuses an extension past the maximum: the reader says so and keeps the session.
     click("Verlängern");
     assert(lv_screen_active() == Display::extendSessionScreen.getScreen());
-    click("Bis zum Maximum");
+    click("Auf Maximum verlängern");
     const auto toMaxRequest = server.last("EXTEND_RESOURCE_USAGE_SESSION");
     assert(toMaxRequest["data"]["payload"]["toMax"].as<bool>());
     actionReply("EXTEND_RESOURCE_USAGE_SESSION", R"("error":"SESSION_EXTENSION_EXCEEDS_MAXIMUM")");
     pump();
-    assert(label(lv_screen_active(), "Das überschreitet die Höchstdauer"));
+    assert(label(lv_screen_active(), "Das überschreitet die maximale Sitzungsdauer"));
     display.capture(output, "duration-04-extend-refused");
     click("Zurück");
 
@@ -135,4 +141,67 @@ void ReaderWorkflow::testSessionDuration()
     if (lv_screen_active() != Display::resourceDetailsScreen.getScreen()) click("Laser");
     assert(label(lv_screen_active(), "Sitzung beenden"));
     assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Verlängern")));
+
+    // Supervised start: the estimate is chosen first and also travels with the supervision request, so a supervisor
+    // who approves on the web starts the session with it.
+    click(LV_SYMBOL_LEFT);
+    Scenario supervisedStart{true, 120, false};
+    supervisedStart.supervised = true;
+    durationList(supervisedStart);
+    const auto supervisionRequests = server.count("SUPERVISION_REQUEST");
+    click("Aufsicht");
+    assert(lv_screen_active() == Display::durationInputScreen.getScreen());
+    assert(server.count("SUPERVISION_REQUEST") == supervisionRequests);
+    click("1 h");
+    click("Start");
+    assert(lv_screen_active() == Display::supervisionScreen.getScreen());
+    assert(server.count("SUPERVISION_REQUEST") == supervisionRequests + 1);
+    const auto supervisionRequest = server.last("SUPERVISION_REQUEST");
+    const auto supervision = supervisionRequest["data"]["payload"];
+    assert(supervision["resourceId"].as<int>() == 1 && supervision["estimatedDurationMinutes"].as<int>() == 60);
+    pump(1100);
+    click("Abbrechen");
+
+    // Takeover on a machine that requires an estimate: the taker gives one, and it travels with the forced start.
+    // A card holder who may not end the other person's session is offered no Extend for it.
+    Scenario takeover{true, 120, false};
+    takeover.otherUser = "robin"; takeover.allowTakeOver = true;
+    durationList(takeover);
+    if (lv_screen_active() != Display::resourceDetailsScreen.getScreen()) click("Übernehmen");
+    assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
+    assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Verlängern")));
+    const auto takeoverStarts = server.count("START_RESOURCE_USAGE_SESSION");
+    click("Übernehmen");
+    assert(lv_screen_active() == Display::durationInputScreen.getScreen());
+    assert(server.count("START_RESOURCE_USAGE_SESSION") == takeoverStarts);
+    click("2 h");
+    click("Start");
+    assert(server.count("START_RESOURCE_USAGE_SESSION") == takeoverStarts + 1);
+    const auto takeoverRequest = server.last("START_RESOURCE_USAGE_SESSION");
+    const auto forced = takeoverRequest["data"]["payload"];
+    assert(forced["forceTakeOver"].as<bool>() && forced["estimatedDurationMinutes"].as<int>() == 120);
+    actionReply("START_RESOURCE_USAGE_SESSION", R"("error":"ResourceFullError")");
+    clearStatus();
+
+    // A manager who may end the other person's session may extend it too; the request names that session.
+    Scenario managed{true, 480, false};
+    managed.otherUser = "robin"; managed.manager = true;
+    durationList(managed);
+    if (lv_screen_active() != Display::resourceDetailsScreen.getScreen()) click("Laser");
+    assert(label(lv_screen_active(), "Fremde Sitzung beenden"));
+    assert(label(lv_screen_active(), "Stoppt automatisch in 1:00:00 (um 12:00)"));
+    display.capture(output, "duration-05-manager-details");
+    const auto managerExtends = server.count("EXTEND_RESOURCE_USAGE_SESSION");
+    click("Verlängern");
+    assert(lv_screen_active() == Display::extendSessionScreen.getScreen());
+    assert(label(lv_screen_active(), "robin"));
+    display.capture(output, "duration-06-manager-extend");
+    click("+1 h");
+    assert(server.count("EXTEND_RESOURCE_USAGE_SESSION") == managerExtends + 1);
+    const auto managerRequest = server.last("EXTEND_RESOURCE_USAGE_SESSION");
+    const auto managerExtend = managerRequest["data"]["payload"];
+    assert(managerExtend["usageId"].as<int>() == 9 && managerExtend["extendByMinutes"].as<int>() == 60);
+    actionReply("EXTEND_RESOURCE_USAGE_SESSION", R"("success":true,"usageId":9)");
+    durationList(managed);
+    clearStatus(); // "Aktion bestätigt"
 }

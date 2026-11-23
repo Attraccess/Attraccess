@@ -9,7 +9,8 @@
 #include "../../../api/api.hpp"
 #include "../../../api/session_duration.hpp"
 
-// Extension of the card holder's running session (ATT-43), reached from the session area of the resource details:
+// Extension of a running session (ATT-43), reached from the session area of the resource details: the card holder's
+// own, or another person's where the card holder may end it (the owner's name then shows under the title). It shows
 // the time left, when it stops and the extension steps. Steps past the machine's maximum are disabled; the list
 // the server resends after an extension (or after one made on the web) refreshes it live.
 class ExtendSessionScreen : public IScreen
@@ -23,9 +24,10 @@ public:
     void destroy() override;
     bool parksOrigin() const override { return true; }
 
-    // `onExtend(minutes, toMax)`: minutes is 0 for toMax. `onBack` leaves the screen.
+    // `onExtend(minutes, toMax)`: minutes is 0 for toMax. `onBack` leaves the screen. `ownerName`: the display name of
+    // another person whose session this is; empty for the card holder's own.
     void configure(const API::ResourceBrief &resource, std::function<void(uint32_t, bool)> onExtend,
-                   std::function<void()> onBack);
+                   std::function<void()> onBack, const char *ownerName = "");
     // A fresher list arrived while the screen is open.
     void update(const API::ResourceBrief &resource);
 
@@ -43,7 +45,7 @@ private:
     };
 
     lv_obj_t *screen = nullptr;
-    // What the controls need of the own session; see API::ResourceBrief.
+    // What the controls need of the session; see API::ResourceBrief.
     bool hasAutoEnd = false;
     bool hasMaxSessionTime = false;
     uint32_t autoEndInSeconds = 0;
@@ -53,6 +55,7 @@ private:
     int16_t utcOffsetMinutes = 0;
     std::function<void(uint32_t, bool)> onExtend;
     std::function<void()> onBack;
+    std::string owner;
 
     std::array<Action, SessionDuration::EXTEND_STEP_COUNT> actions{};
     lv_obj_t *remainingLabel = nullptr;

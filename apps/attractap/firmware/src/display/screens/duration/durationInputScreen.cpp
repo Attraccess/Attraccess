@@ -10,7 +10,7 @@ namespace
     constexpr int32_t RowGap = 10;
     constexpr int32_t StepperButton = 64;
     constexpr int32_t ChipWidth = 78;
-    constexpr int32_t ChipHeight = 44;
+    constexpr int32_t ChipHeight = 50;
     constexpr int32_t ControlHeight = 52;
 }
 

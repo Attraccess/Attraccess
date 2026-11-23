@@ -332,17 +332,18 @@ void API::onResourceList(JsonObject data)
         dst.hasOwnUsage = hasOwn;
         dst.requireSessionDurationEstimate = dst.type == 0 && (resource["requireSessionDurationEstimate"] | false);
         dst.maxSessionDurationMinutes = dst.type == 0 ? (resource["maxSessionDurationMinutes"] | 0u) : 0u;
-        // Only the card holder's own session is extendable here; another person's deadline is not shown.
-        if (hasOwn && own["autoEndInSeconds"].is<uint32_t>())
+        // The deadline of the session shown (the own one, else the active one): its owner extends it, and a manager
+        // who may end another person's session extends that one too.
+        if (dst.hasActiveUsage && aus["autoEndInSeconds"].is<uint32_t>())
         {
             dst.hasAutoEnd = true;
-            dst.hasMaxSessionTime = own["hasMaxSessionTime"] | false;
-            dst.autoEndInSeconds = own["autoEndInSeconds"].as<uint32_t>();
-            dst.extendLimitInSeconds = own["extendLimitInSeconds"] | 0u;
+            dst.hasMaxSessionTime = aus["hasMaxSessionTime"] | false;
+            dst.autoEndInSeconds = aus["autoEndInSeconds"].as<uint32_t>();
+            dst.extendLimitInSeconds = aus["extendLimitInSeconds"] | 0u;
             dst.autoEndReceivedMs = millis();
-            const char *endIso = own["autoEndAt"].as<const char *>();
+            const char *endIso = aus["autoEndAt"].as<const char *>();
             dst.autoEndEpoch = endIso ? parseIso8601ToTimeT(endIso) : 0;
-            dst.autoEndUtcOffsetMinutes = own["autoEndUtcOffsetMinutes"].is<int>() ? (int16_t)own["autoEndUtcOffsetMinutes"].as<int>() : 0;
+            dst.autoEndUtcOffsetMinutes = aus["autoEndUtcOffsetMinutes"].is<int>() ? (int16_t)aus["autoEndUtcOffsetMinutes"].as<int>() : 0;
         }
         dst.ownUsageId = dst.hasOwnUsage ? own["id"].as<uint32_t>() : 0;
         dst.activeSessions.clear();

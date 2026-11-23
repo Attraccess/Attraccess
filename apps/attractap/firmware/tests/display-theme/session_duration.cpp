@@ -94,10 +94,10 @@ void testDurationInputScreen(Renderer &renderer)
     input.init();
     ScreenGuard guard(input.getScreen(), &input);
     settle();
-    requireObject(guard.root, &lv_label_class, "Wie lange nutzt du die Maschine?");
+    requireObject(guard.root, &lv_label_class, "Wie lange nutzen Sie die Maschine?");
     expect(labelContaining(guard.root, "stoppt automatisch spätestens nach dieser Zeit") != nullptr, "The hint says the machine stops automatically");
     expect(input.minutes() == 60 && labelContaining(guard.root, "1 h") != nullptr, "The input opens at one hour");
-    expect(labelContaining(guard.root, "Höchstens 2 h") != nullptr, "The maximum is shown");
+    expect(labelContaining(guard.root, "Maximale Sitzungsdauer: 2 h") != nullptr, "The maximum is shown");
     // Quick picks above the maximum cannot be chosen (4 h and 8 h with a 2 h maximum).
     expect(input.pickEnabled(0) && input.pickEnabled(1) && input.pickEnabled(2) && !input.pickEnabled(3) && !input.pickEnabled(4),
            "Quick picks above the maximum are blocked");
@@ -113,6 +113,10 @@ void testDurationInputScreen(Renderer &renderer)
     input.step(-60);
     input.step(-5);
     expect(input.minutes() == 55, "Steppers move by an hour and by five minutes");
+    auto *startButton = buttonOf(requireObject(guard.root, &lv_label_class, "Start"));
+    lv_area_t startArea;
+    lv_obj_get_coords(startButton, &startArea);
+    expect(startArea.y2 < 480, "Start stays on the 480 px screen with 50 px quick picks");
     renderer.capture("duration-input-max");
     tap(buttonOf(requireObject(guard.root, &lv_label_class, "Start")));
     expect(confirmed == 55, "Start hands over the chosen minutes");
@@ -127,7 +131,7 @@ void testDurationInputWithoutMaximum(Renderer &renderer)
     input.init();
     ScreenGuard guard(input.getScreen(), &input);
     settle();
-    expect(labelContaining(guard.root, "Höchstens") == nullptr, "No maximum line without a maximum");
+    expect(labelContaining(guard.root, "Maximale Sitzungsdauer") == nullptr, "No maximum line without a maximum");
     expect(input.pickEnabled(4), "Every quick pick is open without a maximum");
     input.pick(480);
     expect(input.minutes() == 480, "Eight hours can be chosen without a maximum");
@@ -164,7 +168,7 @@ void testExtendSessionScreen(Renderer &renderer)
     expect(requests == 0, "A disabled step sends nothing");
     tap(oneHour);
     expect(requests == 1 && minutes == 60 && !toMax, "+1 h asks for 60 minutes");
-    auto *max = buttonOf(requireObject(guard.root, &lv_label_class, "Bis zum Maximum"));
+    auto *max = buttonOf(requireObject(guard.root, &lv_label_class, "Auf Maximum verlängern"));
     expect(!hidden(max) && !disabled(max), "To maximum is offered while there is room below it");
     tap(max);
     expect(requests == 2 && toMax, "To maximum asks for the maximum");
@@ -181,11 +185,29 @@ void testExtendSessionScreen(Renderer &renderer)
     extend.update(atCap);
     settle();
     expect(!extend.stepEnabled(0, Fixtures::nowMs) && !extend.toMaxEnabled(Fixtures::nowMs), "At the cap nothing can be extended");
-    requireObject(guard.root, &lv_label_class, "Höchstdauer erreicht");
+    requireObject(guard.root, &lv_label_class, "Maximale Sitzungsdauer erreicht");
     renderer.capture("extend-session-at-maximum");
     tap(buttonOf(requireObject(guard.root, &lv_label_class, "Zurück")));
     expect(backs == 1, "Back leaves the screen");
     Fixtures::nowMs = 1000;
+}
+
+void testExtendOtherPersonsSession(Renderer &renderer)
+{
+    Fixtures::nowMs = 1000;
+    ExtendSessionScreen extend;
+    auto other = runningSession(3600, 3600 + 7200, true);
+    other.hasOwnUsage = false;
+    extend.configure(other, [](uint32_t, bool) {}, [] {}, "Robin Example");
+    extend.init();
+    ScreenGuard guard(extend.getScreen(), &extend);
+    settle();
+    expect(!hidden(requireObject(guard.root, &lv_label_class, "Robin Example")), "A manager sees whose session they extend");
+    auto *back = buttonOf(requireObject(guard.root, &lv_label_class, "Zurück"));
+    lv_area_t area;
+    lv_obj_get_coords(back, &area);
+    expect(area.y2 < 480, "The owner line keeps every control on the screen");
+    renderer.capture("extend-session-other-person");
 }
 
 void testExtendWithoutMaximum()
@@ -198,7 +220,7 @@ void testExtendWithoutMaximum()
     settle();
     expect(extend.stepEnabled(5, Fixtures::nowMs), "Every step is open when only the 30 day limit applies");
     expect(!extend.toMaxEnabled(Fixtures::nowMs), "There is no maximum to extend to");
-    expect(hidden(requireObject(guard.root, &lv_label_class, "Bis zum Maximum")), "To maximum is hidden without a maximum");
+    expect(hidden(requireObject(guard.root, &lv_label_class, "Auf Maximum verlängern")), "To maximum is hidden without a maximum");
 }
 
 void testDetailsAutoEnd(Renderer &renderer)
@@ -206,7 +228,8 @@ void testDetailsAutoEnd(Renderer &renderer)
     Fixtures::nowMs = 1000;
     ResourceDetailsScreen details;
     unsigned opened = 0;
-    details.setOpenExtendCallback([&] { ++opened; });
+    uint32_t openedUsageId = UINT32_MAX;
+    details.setOpenExtendCallback([&](uint32_t usageId) { ++opened; openedUsageId = usageId; });
     details.setResourceAndUsageDetails(runningSession(3600, 3600 + 7200, true));
     details.setUserDetails({"Alex", false, true, false, false, false, true});
     details.init();
@@ -214,22 +237,41 @@ void testDetailsAutoEnd(Renderer &renderer)
     settle();
     auto *line = labelContaining(guard.root, "Stoppt automatisch in 1:00:00");
     expect(line && !hidden(line), "The own session shows the remaining time");
+    expect(lv_color_eq(lv_obj_get_style_text_color(line, LV_PART_MAIN), DisplayTheme::text()),
+           "An hour before the end the countdown is neutral");
     expect(labelContaining(guard.root, "(um 09:00)") != nullptr, "... and the local stop time");
     auto *extendButton = buttonOf(requireObject(guard.root, &lv_label_class, "Verlängern"));
     expect(!hidden(extendButton), "The own session offers Extend");
     renderer.capture("resource-details-auto-end");
     tap(extendButton);
-    expect(opened == 1, "Extend opens the extension screen");
+    expect(opened == 1 && openedUsageId == 0, "Extend opens the extension screen for the own session");
 
-    // Someone else's session: neither the countdown nor Extend.
+    // The last 15 minutes: the countdown turns to the warning colour.
+    Fixtures::nowMs = 1000 + 46 * 60 * 1000;
+    details.loop();
+    expect(lv_color_eq(lv_obj_get_style_text_color(line, LV_PART_MAIN), DisplayTheme::warning()),
+           "The countdown warns in the last 15 minutes");
+    Fixtures::nowMs = 1000;
+
+    // Someone else's session: a user who may not end it sees neither the countdown nor Extend.
     auto other = runningSession(3600, 7200, true);
     other.hasOwnUsage = false;
-    other.hasAutoEnd = false;
+    other.ownUsageId = 0;
     std::strcpy(other.activeUser, "Robin");
     details.setResourceAndUsageDetails(other);
     details.setUserDetails({"Alex", false, true, false, false, false, true});
     settle();
     expect(hidden(requireObject(guard.root, &lv_label_class, "Verlängern")), "Another person's session offers no Extend");
+
+    // A manager who may end it may extend it too, naming the session like the force-stop.
+    details.setUserDetails({"Alex", true, true, false, false, true, true});
+    settle();
+    auto *managerExtend = buttonOf(requireObject(guard.root, &lv_label_class, "Verlängern"));
+    expect(!hidden(managerExtend), "A manager is offered Extend for another person's session");
+    expect(!hidden(labelContaining(guard.root, "Stoppt automatisch in 1:00:00")), "... with its remaining time");
+    renderer.capture("resource-details-auto-end-manager");
+    tap(managerExtend);
+    expect(opened == 2 && openedUsageId == 9, "A manager's Extend names the other person's session");
 
     // A reader without the deadline fields (an older server): nothing new on screen.
     auto plain = runningSession(0, 0, false);

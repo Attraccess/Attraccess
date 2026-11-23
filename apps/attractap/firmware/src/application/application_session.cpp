@@ -193,12 +193,7 @@ void Application::resetSessionOnDisconnect() {
   this->rerouteRequested = false;
   this->resetPauseAccounting();
 
-  this->pendingActionType = PENDING_ACTION_NONE;
-  this->pendingActionResourceId = 0;
-  this->pendingActionProjectId = 0;
-  this->pendingActionIsTakeover = false;
-  this->pendingActionEstimateMinutes = 0;
-  this->pendingActionUsageId = 0;
+  this->resetPendingAction();
   this->hasPendingFormRequest = false;
   this->hasPendingServerFormFlow = false;
   this->pendingFormRequestResourceId = 0;
@@ -241,7 +236,7 @@ void Application::updateSelectedResourceDetails() {
     Display::resourceDetailsScreen.setResourceAndUsageDetails(resource);
     if (Display::isActive(&Display::extendSessionScreen)) {
       // Live update (an extension from the web or another reader); the screen closes when there is nothing to extend.
-      if (resource.hasOwnUsage && resource.hasAutoEnd) Display::extendSessionScreen.update(resource);
+      if (this->extendTargets(resource)) Display::extendSessionScreen.update(resource);
       else Display::returnFromTransient();
     }
     const bool personalized = resource.accessKnown && this->cardAuthenticationData.username == this->resourceList.authenticatedUsername;
@@ -355,8 +350,8 @@ void Application::handleResourceDetailsButtonClick(
         requiresSupervisor = this->resourceList.items[i].requiresSupervisor;
     if (requiresSupervisor && !isTakeover) {
       this->beginActionPause();
-      this->supervision.beginReaderInitiated(this->cardAuthenticationData.displayName,
-                                             this->selectedResourceId);
+      this->supervision.beginReaderInitiated(this->cardAuthenticationData.displayName, this->selectedResourceId,
+                                             this->pendingActionEstimateMinutes);
       this->state = APPLICATION_STATE_SUPERVISION;
       this->externalState = EXTERNAL_STATE_NONE;
       break;
@@ -540,16 +535,25 @@ void Application::openDurationInput(uint32_t maxMinutes) {
   Display::transitionToScreen(&Display::durationInputScreen);
 }
 
-void Application::openExtendScreen() {
+// usageId 0 extends the card holder's own session; otherwise the other person's session the details offer to stop
+// (the server checks the rule of ending a session).
+void Application::openExtendScreen(uint32_t usageId) {
+  this->extendUsageId = usageId;
   for (uint16_t i = 0; i < this->resourceList.count; ++i) {
     const auto &resource = this->resourceList.items[i];
-    if (resource.id != this->selectedResourceId || !resource.hasOwnUsage || !resource.hasAutoEnd) continue;
+    if (resource.id != this->selectedResourceId || !this->extendTargets(resource)) continue;
     Display::extendSessionScreen.configure(
         resource, [this](uint32_t minutes, bool toMax) { this->handleExtend(minutes, toMax); },
-        []() { Display::returnFromTransient(); });
+        []() { Display::returnFromTransient(); }, usageId != 0 ? resource.activeUserDisplayName : "");
     Display::transitionToScreen(&Display::extendSessionScreen);
     return;
   }
+}
+
+bool Application::extendTargets(const API::ResourceBrief &resource) const {
+  if (!resource.hasAutoEnd || !resource.hasActiveUsage) return false;
+  return this->extendUsageId == 0 ? resource.hasOwnUsage
+                                  : !resource.hasOwnUsage && resource.activeUsageId == this->extendUsageId;
 }
 
 void Application::handleExtend(uint32_t minutes, bool toMax) {
@@ -564,7 +568,7 @@ void Application::handleExtend(uint32_t minutes, bool toMax) {
   this->beginActionPause();
   this->hasPendingFormRequest = false;
   this->formFlowSubmitted = false;
-  this->api.extendResourceUsageSession(this->selectedResourceId, 0, minutes, toMax);
+  this->api.extendResourceUsageSession(this->selectedResourceId, this->extendUsageId, minutes, toMax);
 }
 
 void Application::openProjects() {

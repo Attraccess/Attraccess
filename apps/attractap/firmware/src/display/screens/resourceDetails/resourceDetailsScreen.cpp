@@ -181,6 +181,7 @@ void ResourceDetailsScreen::destroy()
    this->stopSessionButton = nullptr;
    this->stopSessionButtonLabel = nullptr;
    this->stopOtherUserNote = nullptr;
+   this->autoEndLabel = this->extendButton = nullptr;
    this->occupancyLabel = nullptr;
    this->otherSessionsContainer = nullptr;
    this->doorControls = nullptr;
@@ -529,6 +530,8 @@ void ResourceDetailsScreen::refreshAccessState()
    {
       lv_obj_set_flag(this->flowButtonsContainer, LV_OBJ_FLAG_HIDDEN, !ownsActiveUsage);
    }
+   // The countdown and Extend follow who may stop the session (the own one, or a manager's force-stop).
+   this->updateAutoEnd();
    // A failure waiting for this refresh goes back on its button, if it still means the same.
    this->applyActionError();
 }

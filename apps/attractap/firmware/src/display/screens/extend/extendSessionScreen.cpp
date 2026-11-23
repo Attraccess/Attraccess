@@ -13,10 +13,11 @@ namespace
 }
 
 void ExtendSessionScreen::configure(const API::ResourceBrief &resource, std::function<void(uint32_t, bool)> extendCallback,
-                                    std::function<void()> backCallback)
+                                    std::function<void()> backCallback, const char *ownerName)
 {
     onExtend = std::move(extendCallback);
     onBack = std::move(backCallback);
+    owner = ownerName ? ownerName : "";
     lastRemaining = UINT32_MAX;
     update(resource);
     if (screen) build();
@@ -80,6 +81,9 @@ void ExtendSessionScreen::build()
 
     ResultLayout::createText(column, FirmwareI18n::Message::ExtendSession, &attractap_font_montserrat_latin1_28,
                              DisplayTheme::text(), 1);
+    if (!owner.empty())
+        ResultLayout::createText(column, FirmwareI18n::Text::literal(owner) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */,
+                                 &attractap_font_montserrat_latin1_18, DisplayTheme::warning(), 1);
     remainingLabel = ResultLayout::createText(column, FirmwareI18n::Text(), &attractap_font_montserrat_latin1_36,
                                               DisplayTheme::primary(), 1);
     stopsAtLabel = ResultLayout::createText(column, FirmwareI18n::Text(), &attractap_font_montserrat_latin1_18,

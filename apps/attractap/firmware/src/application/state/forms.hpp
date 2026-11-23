@@ -42,6 +42,8 @@ uint32_t pendingActionEstimateMinutes = 0;
 bool durationEstimateChosen = false;
 // The start button press the duration input interrupted.
 bool durationStartPending = false;
+// The session the extension screen extends: 0 for the card holder's own, else the other person's usageId.
+uint32_t extendUsageId = 0;
 #endif
 
 #if defined(HAS_LVGL_DISPLAY)

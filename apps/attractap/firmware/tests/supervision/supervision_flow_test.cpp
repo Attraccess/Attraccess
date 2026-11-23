@@ -306,6 +306,18 @@ void timeoutReturnsToRouting() {
 }
 } // namespace
 
+// ATT-43: the estimate chosen before the request travels with it, so a supervisor's approval on the web keeps it.
+void readerRequestCarriesTheEstimate() {
+    Fixture fixture;
+    supervisionTestNowMs = 100;
+    fixture.flow.beginReaderInitiated("requester", 42, 90);
+    expect(fixture.api.requests == 1 && fixture.api.lastEstimateMinutes == 90,
+           "the supervision request must carry the chosen estimate");
+    Fixture plain;
+    plain.beginReader();
+    expect(plain.api.requests == 1 && plain.api.lastEstimateMinutes == 0, "without an estimate the request carries none");
+}
+
 int main() {
     cancelWinsOverResolution();
     successfulResolutionSettlesFlow();
@@ -327,5 +339,6 @@ int main() {
     overflowedRequestResultKeepsItsNames();
     longSupervisorNamesAreCutWhole();
     timeoutReturnsToRouting();
+    readerRequestCarriesTheEstimate();
     return 0;
 }

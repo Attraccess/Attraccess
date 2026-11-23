@@ -4,9 +4,16 @@
 #include "../../../api/session_duration.hpp"
 #include "../../../platform.hpp"
 
-// The automatic end of the card holder's own running session (ATT-43): the remaining time with the local stop time,
-// and the Extend button that opens the extension screen. Only the own session shows them; the countdown runs on
-// the monotonic clock from the seconds the server sent with the list, so a reader without a clock shows it too.
+// The automatic end of a running session (ATT-43): the remaining time with the local stop time, and the Extend button
+// that opens the extension screen. The own session shows them, and so does another person's session where the card
+// holder may end it (the force-stop is offered): extending follows the rule of stopping. The countdown runs on the
+// monotonic clock from the seconds the server sent with the list, so a reader without a clock shows it too. It is
+// neutral and turns to the warning colour in the last 15 minutes, when the server warns the owner too.
+
+namespace
+{
+   constexpr uint32_t WarnBelowSeconds = 15 * 60;
+}
 
 void ResourceDetailsScreen::createAutoEnd()
 {
@@ -15,7 +22,6 @@ void ResourceDetailsScreen::createAutoEnd()
    lv_obj_set_height(this->autoEndLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->autoEndLabel, LV_LABEL_LONG_WRAP);
    lv_obj_set_style_text_font(this->autoEndLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
-   lv_obj_set_style_text_color(this->autoEndLabel, DisplayTheme::warning(), LV_PART_MAIN);
    lv_obj_add_flag(this->autoEndLabel, LV_OBJ_FLAG_HIDDEN);
 
    this->extendButton = lv_button_create(this->sessionControls);
@@ -27,7 +33,7 @@ void ResourceDetailsScreen::createAutoEnd()
    lv_obj_add_flag(this->extendButton, LV_OBJ_FLAG_HIDDEN);
    lv_obj_add_event_cb(this->extendButton, [](lv_event_t *e) {
       auto *self = static_cast<ResourceDetailsScreen *>(lv_event_get_user_data(e));
-      if (!self->actionInProgress && self->openExtendCallback) self->openExtendCallback();
+      if (!self->actionInProgress && self->openExtendCallback) self->openExtendCallback(self->stopSessionUsageId);
    }, LV_EVENT_CLICKED, this);
    lv_obj_t *label = lv_label_create(this->extendButton);
    lv_obj_set_align(label, LV_ALIGN_CENTER);
@@ -44,7 +50,7 @@ void ResourceDetailsScreen::updateAutoEnd()
 {
    if (!this->autoEndLabel || !this->extendButton) return;
    const bool visible = this->resourceCacheValid && this->resourceCache.type == 0 && this->resourceCache.hasAutoEnd &&
-                        this->resourceCache.hasActiveUsage && this->ownsActiveUsage();
+                        this->resourceCache.hasActiveUsage && (this->ownsActiveUsage() || this->stopIsForeign);
    lv_obj_set_flag(this->autoEndLabel, LV_OBJ_FLAG_HIDDEN, !visible);
    lv_obj_set_flag(this->extendButton, LV_OBJ_FLAG_HIDDEN, !visible);
    if (!visible) { this->autoEndShownSeconds = UINT32_MAX; return; }
@@ -52,6 +58,8 @@ void ResourceDetailsScreen::updateAutoEnd()
       this->resourceCache.autoEndInSeconds, this->resourceCache.autoEndReceivedMs, millis());
    if (remaining == this->autoEndShownSeconds) return;
    this->autoEndShownSeconds = remaining;
+   lv_obj_set_style_text_color(this->autoEndLabel, remaining <= WarnBelowSeconds ? DisplayTheme::warning() : DisplayTheme::text(),
+                               LV_PART_MAIN);
    const std::string clock = SessionDuration::clockString(this->resourceCache.autoEndEpoch, this->resourceCache.autoEndUtcOffsetMinutes);
    const FirmwareI18n::Text left = FirmwareI18n::Text::literal(DurationText::countdown(remaining)) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */;
    setLabelTextIfChanged(this->autoEndLabel, clock.empty()

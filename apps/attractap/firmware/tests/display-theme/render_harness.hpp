@@ -271,6 +271,7 @@ void testDurationInputScreen(Renderer &renderer);
 void testDurationInputWithoutMaximum(Renderer &renderer);
 void testExtendSessionScreen(Renderer &renderer);
 void testExtendWithoutMaximum();
+void testExtendOtherPersonsSession(Renderer &renderer);
 void testDetailsAutoEnd(Renderer &renderer);
 
 void testDemoFixtureLocales(Renderer &renderer);

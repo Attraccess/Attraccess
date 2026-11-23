@@ -382,12 +382,7 @@ void Application::handleFormsCancel() {
   }
   this->hasPendingFormRequest = false;
   this->formFlowSubmitted = false;
-  this->pendingActionType = PENDING_ACTION_NONE;
-  this->pendingActionResourceId = 0;
-  this->pendingActionProjectId = 0;
-  this->pendingActionIsTakeover = false;
-  this->pendingActionEstimateMinutes = 0;
-  this->pendingActionUsageId = 0;
+  this->resetPendingAction();
   this->hasPendingServerFormFlow = false;
   this->pendingFormRequestResourceId = 0;
   this->pendingFormRequestAction = API::ResourceUsageFormActionType::UNKNOWN;

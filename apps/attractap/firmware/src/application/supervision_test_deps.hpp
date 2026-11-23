@@ -59,7 +59,8 @@ public:
     uint32_t cardAuthRequests = 0;
     uint32_t lastCardAuthResourceId = 0;
     std::string lastCardPurpose;
-    void requestSupervision(uint32_t) { ++requests; }
+    uint32_t lastEstimateMinutes = 0;
+    void requestSupervision(uint32_t, uint32_t estimateMinutes = 0) { ++requests; lastEstimateMinutes = estimateMinutes; }
     void sendCardDetected(const char *purpose, const uint8_t *, uint8_t, uint32_t resourceId = 0, const char * = nullptr) {
         ++cardAuthRequests;
         lastCardPurpose = purpose;
