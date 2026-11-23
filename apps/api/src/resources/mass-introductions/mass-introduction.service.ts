@@ -324,10 +324,15 @@ export class MassIntroductionService {
     if ((dto.resourceId == null) === (dto.resourceGroupId == null)) {
       throw new BadRequestException('Provide exactly one of resourceId and resourceGroupId');
     }
-    const target = await this.loadTarget(dto);
     const viaPermission = user.effectivePermissions?.has('resources.access.manage') === true;
+    const notIntroducer = () => new ForbiddenException('You are not an introducer for this target');
+    // Without the permission, a missing target answers like one the caller does not introduce, so the answer does
+    // not tell which machine ids exist (ATT-843).
+    const target = await this.loadTarget(dto).catch((error: unknown) => {
+      throw !viaPermission && error instanceof NotFoundException ? notIntroducer() : error;
+    });
     if (!viaPermission && !(await this.isIntroducer(target, user.id))) {
-      throw new ForbiddenException('You are not an introducer for this target');
+      throw notIntroducer();
     }
     return { target, viaPermission };
   }

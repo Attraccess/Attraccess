@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Req } from '@nestjs/common';
 import { ResourceGroupsService } from './resourceGroups.service';
 import { ResourceListVisibilityService } from '../visibility/resource-list-visibility.service';
+import { ResourceListVisible } from '../visibility/resource-list-visible.interceptor';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResourceGroup, toResourceGroupDto } from './dto/resource-group.dto';
 import { CreateResourceGroupDto } from './dto/createGroup.dto';
@@ -99,6 +100,7 @@ export class ResourceGroupsController {
 
   @Post(':groupId/resources/:resourceId')
   @Auth('resources.update')
+  @ResourceListVisible()
   @ApiOperation({ summary: 'Add a resource to a resource group', operationId: 'resourceGroupsAddResource' })
   @ApiParam({ name: 'groupId', description: 'The ID of the resource group', type: Number })
   @ApiParam({ name: 'resourceId', description: 'The ID of the resource', type: Number })
@@ -116,6 +118,7 @@ export class ResourceGroupsController {
 
   @Delete(':groupId/resources/:resourceId')
   @Auth('resources.update')
+  @ResourceListVisible()
   @ApiOperation({ summary: 'Remove a resource from a resource group', operationId: 'resourceGroupsRemoveResource' })
   @ApiParam({ name: 'groupId', description: 'The ID of the resource group', type: Number })
   @ApiParam({ name: 'resourceId', description: 'The ID of the resource', type: Number })

@@ -7,6 +7,7 @@ import { concatMap, filter } from 'rxjs/operators';
 import { SettingsService } from '../../../settings/settings.service';
 import { ResourceUsageService } from '../sessions/resource-usage.service';
 import { USAGE_SESSION_STORE, UsageSessionStore } from '../usage-session-store.port';
+import { isResourceManager } from '../../visibility/is-resource-manager';
 
 /** What a viewer without full access gets from a live event: free or in use, and the machine's health. */
 const LIVE_EVENT_ANONYMOUS_KEYS = new Set([
@@ -54,7 +55,7 @@ export class ResourceActivityVisibilityService {
     const permissions = user.effectivePermissions;
 
     // Resource and access managers see all activity in both modes.
-    if (permissions?.has('resources.update') || permissions?.has('resources.access.manage')) {
+    if (isResourceManager(user)) {
       for (const id of ids) access.set(id, 'full');
       return access;
     }
@@ -92,8 +93,7 @@ export class ResourceActivityVisibilityService {
   async resolveSessions(user: AuthenticatedUser, resourceId: number): Promise<ResourceActivityAccess> {
     const access = await this.resolve(user, resourceId);
     if (access !== 'full' || (await this.settings.getResourceActivityVisibility()) !== 'all') return access;
-    const permissions = user.effectivePermissions;
-    if (permissions?.has('resources.update') || permissions?.has('resources.access.manage')) return 'full';
+    if (isResourceManager(user)) return 'full';
     return (await this.usage.canControllResource(resourceId, user)) ? 'full' : 'none';
   }
 

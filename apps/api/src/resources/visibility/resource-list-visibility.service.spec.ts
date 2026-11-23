@@ -74,7 +74,10 @@ describe('ResourceListVisibilityService', () => {
     store.permittedIds.mockResolvedValue([]);
     source.next({ data: { inUse: false } });
     source.next({ data: { keepalive: true } });
+    // The end of the viewer's own session still arrives although the machine is hidden from them now.
+    source.next({ data: { ended: true, ownerUserId: 7 } });
+    source.next({ data: { ended: true, ownerUserId: 8 } });
     await tick();
-    expect(seen).toEqual([{ inUse: true }, { keepalive: true }]);
+    expect(seen).toEqual([{ inUse: true }, { keepalive: true }, { ended: true, ownerUserId: 7 }]);
   });
 });

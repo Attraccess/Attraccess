@@ -51,9 +51,9 @@ describe('ResourceActivityVisibleGuard', () => {
     await expect(guard.canActivate(signedOut)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
-  it('leaves a malformed id to the route pipe', async () => {
+  it.each(['abc', '1e1', '0x5', '5.0'])('leaves the malformed id %p to the route pipe', async (id) => {
     const { guard, resolve } = guardWith('none');
-    await expect(guard.canActivate(contextFor('abc'))).resolves.toBe(true);
+    await expect(guard.canActivate(contextFor(id))).resolves.toBe(true);
     expect(resolve).not.toHaveBeenCalled();
   });
 });

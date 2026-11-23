@@ -10,9 +10,17 @@ import { SettingsModule } from '../settings/settings.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { LiveTopicsModule } from '../live-updates/live-topics.module';
 import { MessagingLiveTopicsProvider } from './messaging-live-topics.provider';
+import { ResourceListVisibilityModule } from '../resources/visibility/resource-list-visibility.module';
 
 @Module({
-  imports: [MessagingPersistenceModule, ResourceUsageModule, SettingsModule, NotificationsModule, LiveTopicsModule],
+  imports: [
+    MessagingPersistenceModule,
+    ResourceUsageModule,
+    SettingsModule,
+    NotificationsModule,
+    LiveTopicsModule,
+    ResourceListVisibilityModule,
+  ],
   controllers: [MessagingController],
   providers: [
     MessagingService,

@@ -26,11 +26,14 @@ describe('ResourceListVisibleInterceptor', () => {
     expect(visibility.canSee).toHaveBeenCalledWith({ id: 1 }, 5);
   });
 
-  it('passes a malformed id on to the route pipe, which answers 400', async () => {
-    const { result, visibility } = await run({ user: { id: 1 }, params: { resourceId: 'abc' } }, false);
-    expect(await result).toBe('handled');
-    expect(visibility.canSee).not.toHaveBeenCalled();
-  });
+  it.each(['abc', '0x5', '1e1', '5.0', ' 5', ''])(
+    'passes the malformed id %p on to the route pipe, which answers 400',
+    async (resourceId) => {
+      const { result, visibility } = await run({ user: { id: 1 }, params: { resourceId } }, false);
+      expect(await result).toBe('handled');
+      expect(visibility.canSee).not.toHaveBeenCalled();
+    },
+  );
 
   it('passes a request without a user on: the route sign-in has refused it already', async () => {
     const { result, visibility } = await run({ params: { resourceId: '5' } }, false);

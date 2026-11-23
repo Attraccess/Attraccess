@@ -5,6 +5,7 @@ import type { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { SettingsService } from '../../settings/settings.service';
 import { RESOURCE_STORE, type ResourceStore } from '../resource-store.port';
 import type { GroupVisibilityContext } from '../groups/resource-group-store.port';
+import { isResourceManager } from './is-resource-manager';
 
 /** `all`: the viewer sees every machine. `permitted`: the list is narrowed to the machines the viewer may see. */
 export type ResourceListScope = 'all' | 'permitted';
@@ -25,13 +26,8 @@ export class ResourceListVisibilityService {
     @Inject(RESOURCE_STORE) private readonly store: ResourceStore,
   ) {}
 
-  isManager(user: AuthenticatedUser): boolean {
-    const permissions = user.effectivePermissions;
-    return permissions?.has('resources.update') === true || permissions?.has('resources.access.manage') === true;
-  }
-
   async scopeOf(user: AuthenticatedUser): Promise<ResourceListScope> {
-    if (this.isManager(user)) return 'all';
+    if (isResourceManager(user)) return 'all';
     if (user.effectivePermissions?.has('resources.read') !== true) return 'permitted';
     return (await this.settings.getResourceListVisibility()) === 'authenticated' ? 'all' : 'permitted';
   }
@@ -64,11 +60,17 @@ export class ResourceListVisibilityService {
 
   /**
    * Drops the events of a machine the viewer may no longer see. The check runs again for every event (keepalives
-   * excepted), so a changed setting or a revoked introduction takes effect on open streams.
+   * excepted), so a changed setting or a revoked introduction takes effect on open streams. Events about the viewer's
+   * own session always pass: when it ends, the machine may already be hidden from someone who saw it only through
+   * that session, and they must still hear that it ended.
    */
   followVisible<T extends { data: object }>(stream: Observable<T>, user: AuthenticatedUser, resourceId: number) {
+    const isOwnSession = (data: { usage?: { userId?: number }; ownerUserId?: unknown }) =>
+      data.usage?.userId === user.id || data.ownerUserId === user.id;
     return stream.pipe(
-      concatMap(async (event) => ('keepalive' in event.data || (await this.canSee(user, resourceId)) ? event : null)),
+      concatMap(async (event) =>
+        'keepalive' in event.data || isOwnSession(event.data) || (await this.canSee(user, resourceId)) ? event : null,
+      ),
       filter((event): event is T => event !== null),
     );
   }

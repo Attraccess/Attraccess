@@ -26,9 +26,10 @@ export class ResourceListVisibleInterceptor implements NestInterceptor {
   async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<unknown>> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const params = request.params ?? {};
-    const resourceId = Number(params['resourceId'] ?? params['id']);
-    // A malformed id is answered with a 400 by the route's ParseIntPipe.
-    if (request.user && Number.isInteger(resourceId) && !(await this.visibility.canSee(request.user, resourceId))) {
+    const raw = String(params['resourceId'] ?? params['id'] ?? '');
+    // Only plain decimal ids are checked; anything else is answered with a 400 by the route's ParseIntPipe.
+    const resourceId = /^\d+$/.test(raw) ? Number(raw) : undefined;
+    if (request.user && resourceId !== undefined && !(await this.visibility.canSee(request.user, resourceId))) {
       throw new ResourceNotFoundException(resourceId);
     }
     return next.handle();

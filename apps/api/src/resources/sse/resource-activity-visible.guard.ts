@@ -19,9 +19,10 @@ export class ResourceActivityVisibleGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     // Sign-in runs first (`@Auth()` sits below `@UseGuards` on the route); refuse rather than crash if that changes.
     if (!request.user) throw new UnauthorizedException();
-    const resourceId = Number(request.params['resourceId']);
-    // A malformed id is answered with a 400 by the route's ParseIntPipe.
-    if (!Number.isInteger(resourceId)) return true;
+    const raw = String(request.params['resourceId'] ?? '');
+    // Only plain decimal ids are checked, as in the list interceptor; anything else gets the route ParseIntPipe's 400.
+    if (!/^\d+$/.test(raw)) return true;
+    const resourceId = Number(raw);
     // A hidden machine answers 404 like one that does not exist, before the activity rule can say 403 (ATT-843).
     if (!(await this.listVisibility.canSee(request.user, resourceId))) throw new ResourceNotFoundException(resourceId);
     // Hidden activity is refused unless the user is running their own session; the stream then carries only that session.

@@ -77,7 +77,8 @@ describe('MassIntroductionService', () => {
         {
           provide: MASS_INTRODUCTION_TARGET_STORE,
           useValue: {
-            findResourceName: jest.fn((id: number) => Promise.resolve({ id, name: 'Laser' })),
+            // Machine 404 does not exist.
+            findResourceName: jest.fn((id: number) => Promise.resolve(id === 404 ? null : { id, name: 'Laser' })),
             findGroupName: jest.fn((id: number) => Promise.resolve({ id, name: 'Wood shop' })),
             // Resources of a group (group 3 holds resources 5 and 6).
             resourceIdsOfGroup: jest.fn(() => Promise.resolve([5, 6])),
@@ -107,6 +108,11 @@ describe('MassIntroductionService', () => {
 
     const session = await service.start(admin, { resourceId: 5 });
     expect(session.target).toEqual({ type: MassIntroductionTargetType.RESOURCE, id: 5, name: 'Laser' });
+  });
+
+  it('answers a missing machine like one the caller does not introduce, unless they manage access (ATT-843)', async () => {
+    await expect(service.start(introducer, { resourceId: 404 })).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.start(admin, { resourceId: 404 })).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('introduces QR participants on behalf of the introducer and reports them live', async () => {
