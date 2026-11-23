@@ -178,6 +178,27 @@ describe('audit storage safe snapshot', () => {
     ).toBeNull();
   });
 
+  it('keeps the UID-only card details on card link and unlink events, and drops anything else', () => {
+    const linked = {
+      action: 'card.linked' as const,
+      actorId: 5,
+      authenticationMethod: 'session' as const,
+      subjectId: 7,
+      details: { source: 'reader-enrollment', cardType: 'uid-only' },
+    };
+    const unlinked = {
+      ...linked,
+      action: 'card.unlinked' as const,
+      details: { source: 'uid-only-delete' },
+    };
+    expect(projectAttractapAuditEvent(linked)).toEqual(linked);
+    expect(projectAttractapAuditEvent(unlinked)).toEqual(unlinked);
+    expect(
+      projectAttractapAuditEvent({ ...linked, details: { ...linked.details, cardType: 'raw-secret' } }),
+    ).toBeNull();
+    expect(projectAttractapAuditEvent({ ...unlinked, details: { source: 'raw-secret' } })).toBeNull();
+  });
+
   it('allows system-origin lifecycle events but rejects mixed origins', () => {
     const resourceEvent = {
       action: 'usage_session.ended' as const,

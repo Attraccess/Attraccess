@@ -48,6 +48,7 @@ describe('Fresh PostgreSQL install (e2e)', () => {
       'RoleNetworkActions1796200000003',
       'ResourceListVisibility1796300000000',
       'PermittedResourceIndexes1796300000001',
+      'NfcCardType1796300000002',
     ]);
     expect(postgresBackend.migrationTrack.tableName).toBe('migrations');
     const [{ count }] = await source.query(

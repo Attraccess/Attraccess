@@ -17,7 +17,10 @@ import {
   changeKeyAndVerify,
   detectCardKind,
   findFreeKeyNo,
+  sakSpeaksIsoDep,
 } from '../card-crypto/card-operations';
+import { isRandomUid, normalizeCardUid } from '../card-uid';
+import { CardWriterPolicyService } from './card-writer-policy.service';
 import { AttractapService } from '../attractap.service';
 import { ATTRACTAP_CARD_STORE, type AttractapCardStore } from '../card-store.port';
 import { CardConversationFailure, CardConversationService, PluginCardExchange } from './card-conversation.service';
@@ -39,6 +42,9 @@ type CardCheckOrigin = { readerId: number | null } | { pluginId: string };
 /** Audit source of an interrupted enrollment or reset that a card check finished. */
 type CardRecoverySource = 'reader-recovery' | 'plugin-recovery';
 
+/** Where an audited card removal came from: a reader reset, a recovery, or the deletion of a UID-only card. */
+type CardUnlinkSource = 'reader-reset' | CardRecoverySource | 'uid-only-delete';
+
 const recoverySource = (origin: CardCheckOrigin): CardRecoverySource =>
   'pluginId' in origin ? 'plugin-recovery' : 'reader-recovery';
 
@@ -49,8 +55,11 @@ const PLUGIN_CARD_REASONS: readonly PluginCardFailureReason[] = [
   'CARD_NOT_SUPPORTED',
   'CARD_AUTHENTICATION_FAILED',
 ];
+/** A UID-only card on a plugin's device while the setting is off is a card the installation does not support. */
 const pluginCardReason = (error: string | undefined): PluginCardFailureReason =>
-  PLUGIN_CARD_REASONS.find((reason) => reason === error) ?? 'CARD_NOT_FOUND';
+  error === 'UID_ONLY_CARDS_DISABLED'
+    ? 'CARD_NOT_SUPPORTED'
+    : (PLUGIN_CARD_REASONS.find((reason) => reason === error) ?? 'CARD_NOT_FOUND');
 
 /** Error codes the reader shows; conversation failures keep their own name. */
 const conversationError = (reason: CardConversationFailure): string =>
@@ -89,6 +98,9 @@ export class CardOperationsService {
   @Inject(ATTRACTAP_CARD_STORE)
   private readonly cardStore: AttractapCardStore;
 
+  @Inject(CardWriterPolicyService)
+  private readonly policy: CardWriterPolicyService;
+
   private pendingKey(change: AttractapNfcCardPendingChange): Buffer | null {
     if (!change.key) return null;
     const plain = this.encryption.decryptIfEncrypted(change.key) ?? change.key;
@@ -96,20 +108,21 @@ export class CardOperationsService {
   }
 
   private cardKey(card: AttractapNfcCard): Buffer | null {
-    return /^[0-9a-f]{32}$/i.test(card.key) ? Buffer.from(card.key, 'hex') : null;
+    return card.key && /^[0-9a-f]{32}$/i.test(card.key) ? Buffer.from(card.key, 'hex') : null;
   }
 
   /**
-   * Proves that the card on this reader holds the key stored for its UID. Used by every flow that
-   * grants something to a card holder (taps, supervisor cards, mass introduction). It finishes an
-   * interrupted enrollment or reset it finds on the card instead of failing.
+   * Checks the card on this reader against the record for its UID. Used by every flow that grants something to a
+   * card holder (taps, supervisor cards, mass introduction). A secure record needs proof of its key; it finishes an
+   * interrupted enrollment or reset it finds on the card instead of failing. A UID-only record needs a reader that
+   * reports the card's SAK and the setting that allows such cards.
    */
   async verifyCard(
     socket: AuthenticatedWebSocket,
     purpose: 'tap' | 'supervisor' | 'mass-introduction',
     detection: CardDetection,
   ): Promise<CardOutcome<{ card: AttractapNfcCard }>> {
-    const verification = await this.prepareVerification(detection.uid, { readerId: socket.readerId });
+    const verification = await this.prepareVerification(detection.uid, { readerId: socket.readerId }, detection.sak);
     if (typeof verification !== 'function') return verification;
 
     const result = await this.conversations.run<CardOutcome<{ card: AttractapNfcCard }>>(
@@ -134,10 +147,14 @@ export class CardOperationsService {
     exchange: PluginCardExchange;
     signal?: AbortSignal;
   }): Promise<PluginCardAuthenticationResult> {
-    const { pluginId, device, uid, exchange, signal } = request;
+    const { pluginId, device, exchange, signal } = request;
+    const { uid: requestedUid } = request;
     // A new request ends the one running on the device before any check, as a new detection does on a reader.
     this.conversations.endPluginDevice({ pluginId, device });
-    if (typeof uid !== 'string' || !/^[0-9a-fA-F]{4,32}$/.test(uid)) return { ok: false, reason: 'INVALID_UID' };
+    if (typeof requestedUid !== 'string' || !/^[0-9a-fA-F]{4,32}$/.test(requestedUid)) {
+      return { ok: false, reason: 'INVALID_UID' };
+    }
+    const uid = normalizeCardUid(requestedUid);
     // Before any database work, as for reader detections.
     if (this.conversations.atLimit) return { ok: false, reason: 'BUSY' };
 
@@ -166,11 +183,30 @@ export class CardOperationsService {
   private async prepareVerification(
     uid: string,
     origin: CardCheckOrigin,
-  ): Promise<CardOutcome<{ card: AttractapNfcCard }> | ((channel: CardChannel) => Promise<CardOutcome<{ card: AttractapNfcCard }>>)> {
+    /** The card's SAK when the reader reports it; a plugin's request carries none. */
+    sak?: number,
+  ): Promise<
+    | CardOutcome<{ card: AttractapNfcCard }>
+    | ((channel: CardChannel) => Promise<CardOutcome<{ card: AttractapNfcCard }>>)
+  > {
     const card = await this.attractapService.getNFCCardByUID(uid);
     const pendingEnroll = card ? null : await this.cardStore.findPendingEnroll(uid);
     if (!card && !pendingEnroll) return { ok: false, error: 'CARD_NOT_FOUND' };
     if (card && !card.isActive) return { ok: false, error: 'CARD_NOT_ACTIVE' };
+    // The record decides how the tap is checked: a UID-only record needs nothing from the card but its UID,
+    // and only while an administrator allows it. A secure record never does.
+    if (card?.type === 'uid-only') {
+      // A reader that reports no SAK runs firmware without UID-only support: it cannot tell such a card from a
+      // secure one and does not watch it like one, so it keeps refusing it as before. Plugin requests carry no SAK.
+      if (!('pluginId' in origin) && sak === undefined) return { ok: false, error: 'CARD_NOT_SUPPORTED' };
+      return (await this.policy.isUidOnlyAllowed())
+        ? { ok: true, card }
+        : { ok: false, error: 'UID_ONLY_CARDS_DISABLED' };
+    }
+    // A card that cannot answer APDUs cannot prove a key (a cheap card carrying a copied UID).
+    if (sak !== undefined && !sakSpeaksIsoDep(sak)) {
+      return { ok: false, error: card ? 'CARD_AUTHENTICATION_FAILED' : 'CARD_NOT_FOUND' };
+    }
     const pendingResets = card ? await this.cardStore.listPendingResets(uid) : [];
     const pendingReset = pendingResets.find((change) => change.cardId === card?.id) ?? null;
 
@@ -188,7 +224,7 @@ export class CardOperationsService {
         }
         if (pendingReset && (await authenticate(channel, kind, card.keyNo, FACTORY_KEY))) {
           const actorId = pendingReset.actorId ?? card.user?.id ?? null;
-          await this.finishReset(
+          await this.unlinkCard(
             card.id,
             uid,
             actorId == null ? null : { userId: actorId, authenticationMethod: 'session' },
@@ -273,14 +309,23 @@ export class CardOperationsService {
     detection: CardDetection,
     enrollment: { userId: number; auditPrincipal: AuditPrincipal },
   ): Promise<CardOutcome> {
-    const { uid } = detection;
+    const { uid, sak } = detection;
     if (await this.attractapService.getNFCCardByUID(uid)) return { ok: false, error: 'CARD_ALREADY_ENROLLED' };
     const user = await this.usersService.findOne({ id: enrollment.userId });
     if (!user) return { ok: false, error: 'USER_NOT_FOUND' };
 
+    // A card that does not speak ISO 14443-4 has nothing to talk to: no conversation is needed (or possible).
+    if (sak !== undefined && !sakSpeaksIsoDep(sak)) return this.enrollUidOnly(user, uid, enrollment);
+
     const result = await this.conversations.run<CardOutcome>(socket, 'enroll', detection, async (channel) => {
       const detected = await detectCardKind(channel);
-      if (!detected.ok) return { ok: false, error: 'CARD_NOT_SUPPORTED' };
+      if (!detected.ok) {
+        // Only a card that is known not to do AES (a DESFire EV1) falls back, and only on a reader that reports
+        // the SAK; a secure card that fails never does.
+        return sak !== undefined
+          ? this.enrollUidOnly(user, uid, enrollment)
+          : { ok: false, error: 'CARD_NOT_SUPPORTED' };
+      }
       const kind = detected.kind;
 
       // An earlier attempt for this card may have reached the card although nobody heard back.
@@ -343,6 +388,50 @@ export class CardOperationsService {
     return result.value;
   }
 
+  /**
+   * Enrollment of a card that cannot do AES: only its UID is recorded, nothing is written to the card.
+   * Needs the setting, read now (it may have changed since the enrollment was armed).
+   */
+  private async enrollUidOnly(
+    user: AttractapCardOwner,
+    uid: string,
+    enrollment: { auditPrincipal: AuditPrincipal },
+  ): Promise<CardOutcome> {
+    if (!(await this.policy.isUidOnlyAllowed())) return { ok: false, error: 'CARD_NOT_SUPPORTED' };
+    if (isRandomUid(uid)) return { ok: false, error: 'RANDOM_UID_NOT_SUPPORTED' };
+    // An interrupted secure enrollment wrote a key to a card with this UID: that card exists and is secure, so a
+    // card without AES showing the same UID is a copy. Its record must stay, so the secure card can still be recovered.
+    if ((await this.cardStore.listPendingEnrolls(uid)).length) return { ok: false, error: 'CARD_ALREADY_ENROLLED' };
+    const { auditPrincipal } = enrollment;
+    const card = await this.attractapService.createNFCCard(
+      user,
+      { uid, type: 'uid-only', keyNo: null, key: null },
+      { activate: true },
+    );
+    await this.audit.record({
+      domain: 'attractap',
+      action: 'attractap.card.linked',
+      actor: {
+        id: auditPrincipal.userId,
+        authenticationMethod: auditPrincipal.authenticationMethod,
+        ...(auditPrincipal.authenticationMethod === 'api-token' ? { apiTokenId: auditPrincipal.apiTokenId } : {}),
+      },
+      subject: { type: 'attractap.card', id: card.id },
+      details: { source: 'reader-enrollment', cardType: 'uid-only' },
+    });
+    return { ok: true };
+  }
+
+  /**
+   * Removes a UID-only card: nothing is written to such a card, so no reader is needed. A secure card is refused
+   * (`CARD_NOT_UID_ONLY`); its key must be reset through a reader. `CARD_NOT_FOUND` when it is already gone.
+   */
+  async deleteUidOnlyCard(card: AttractapNfcCard, auditPrincipal: AuditPrincipal): Promise<CardOutcome> {
+    if (card.type !== 'uid-only') return { ok: false, error: 'CARD_NOT_UID_ONLY' };
+    const deleted = await this.unlinkCard(card.id, card.uid, auditPrincipal, 'uid-only-delete');
+    return deleted ? { ok: true } : { ok: false, error: 'CARD_NOT_FOUND' };
+  }
+
   /** Reset: write the factory key back and prove it; only then the card record is removed. */
   async reset(
     socket: AuthenticatedWebSocket,
@@ -352,7 +441,9 @@ export class CardOperationsService {
     const { uid } = detection;
     const card = await this.attractapService.getNFCCardByID(reset.cardId);
     if (!card) return { ok: false, error: 'CARD_NOT_FOUND' };
-    if (card.uid !== uid) return { ok: false, error: 'WRONG_CARD' };
+    if (normalizeCardUid(card.uid) !== uid) return { ok: false, error: 'WRONG_CARD' };
+    // Nothing is written to a UID-only card; its record is deleted without a reader.
+    if (card.type === 'uid-only') return { ok: false, error: 'CARD_IS_UID_ONLY' };
     const storedKey = this.cardKey(card);
     if (!storedKey) return { ok: false, error: 'CARD_KEY_UNAVAILABLE' };
 
@@ -392,22 +483,23 @@ export class CardOperationsService {
         if (outcome === 'master-refused') return { ok: false, error: 'CARD_MASTER_KEY_UNKNOWN' };
         if (outcome !== 'done') return { ok: false, error: 'RESET_NOT_CONFIRMED' };
       }
-      await this.finishReset(card.id, uid, reset.auditPrincipal, 'reader-reset', socket.readerId);
+      await this.unlinkCard(card.id, uid, reset.auditPrincipal, 'reader-reset', socket.readerId);
       return { ok: true };
     });
     if (!result.ok) return { ok: false, error: conversationError(result.reason) };
     return result.value;
   }
 
-  private async finishReset(
+  /** Removes a card record with its pending changes and audits the removal. */
+  private async unlinkCard(
     cardId: number,
     uid: string,
     auditPrincipal: AuditPrincipal | null,
-    source: 'reader-reset' | CardRecoverySource,
+    source: CardUnlinkSource,
     readerId?: number | null,
     /** Set instead of `readerId` when the card was on a plugin's device. */
     pluginId?: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const deleted = await this.attractapService.deleteNFCCard(cardId);
     await this.cardStore.deletePendingByUid(uid, 'reset');
     // A reset card must not come back as someone's card from an older interrupted enrollment.
@@ -422,8 +514,9 @@ export class CardOperationsService {
           ...(auditPrincipal.authenticationMethod === 'api-token' ? { apiTokenId: auditPrincipal.apiTokenId } : {}),
         },
         subject: { type: 'attractap.card', id: cardId },
-        details: pluginId ? { pluginId, source } : { readerId, source },
+        details: pluginId ? { pluginId, source } : source === 'uid-only-delete' ? { source } : { readerId, source },
       });
     }
+    return deleted;
   }
 }

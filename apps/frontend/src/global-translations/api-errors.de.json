@@ -274,5 +274,25 @@
   "SESSION_EXTENSION_INVALID": {
     "title": "Ungültige Verlängerung",
     "description": "Wähle eine der angebotenen Verlängerungen."
+  },
+  "CARD_IS_UID_ONLY": {
+    "title": "UID-only-Karte",
+    "description": "Eine UID-only-Karte muss nicht zurückgesetzt werden. Lösche sie stattdessen in der Kartenliste."
+  },
+  "CARD_NOT_UID_ONLY": {
+    "title": "Sichere Karte",
+    "description": "Nur UID-only-Karten werden ohne Lesegerät gelöscht. Setze diese Karte über ein Lesegerät zurück."
+  },
+  "UID_ONLY_CARDS_DISABLED": {
+    "title": "UID-only-Karten sind deaktiviert",
+    "description": "Ein Administrator hat UID-only-Karten ausgeschaltet. Schalte die Einstellung in den Einstellungen wieder ein, um sie zu nutzen."
+  },
+  "RANDOM_UID_NOT_SUPPORTED": {
+    "title": "Wechselnde UID nicht unterstützt",
+    "description": "Diese Karte ändert ihre UID bei jedem Auflegen, lässt sich daher nicht wiedererkennen und kann nicht als UID-only-Karte genutzt werden."
+  },
+  "CARD_NOT_SUPPORTED": {
+    "title": "Karte nicht unterstützt",
+    "description": "Dieser Kartentyp kann hier nicht verwendet werden."
   }
 }

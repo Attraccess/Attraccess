@@ -248,6 +248,13 @@ export type AttractapMessage<TPayload = any | undefined> = AttractapEvent<TPaylo
 export interface CardDetection {
   uid: string;
   detectionId: number;
+  /**
+   * The card's SAK (ISO 14443-3 select answer), when the reader firmware reports it. Bit 0x20 says the card
+   * speaks ISO 14443-4 (APDUs). Without it the server cannot tell a UID-only card from a secure one.
+   */
+  sak?: number;
+  /** The card's ATQA, when the reader reports it. Informational. */
+  atqa?: number;
 }
 
 /** What is still waiting to go out to this reader (session queue for paired readers, `bufferedAmount` otherwise). */

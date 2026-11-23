@@ -50,6 +50,8 @@ Die Schlüssel der Attractap-Karten werden nur vom Server erzeugt und geprüft; 
 > [!WARNING]
 > **Sichern Sie `AUTH_SESSION_SECRET` zusammen mit den Datenbank-Backups.** Ohne das Secret lassen sich die gespeicherten Kartenschlüssel und Kopplungsschlüssel nicht lesen. Bereits registrierte Karten können dann weder genutzt noch von Attraccess zurückgesetzt werden und müssen mit anderen Werkzeugen gelöscht werden. Gekoppelte Reader können sich nicht mehr verbinden und müssen neu gekoppelt werden.
 
+Der Schalter **UID-only-Karten erlauben (unsicher)** unter **Einstellungen -> RFID-Kartenregistrierung** ist standardmäßig aus. Er erlaubt günstige Karten ohne Verschlüsselung, die sich mit günstigen Werkzeugen kopieren lassen; siehe [UID-only-Karten](attractap/rfid-cards.md#uid-only-karten-unsicher).
+
 Wird das Secret geändert, sind die gespeicherten Kartenschlüssel und Kopplungsschlüssel unlesbar, bis sie neu verschlüsselt wurden. So tauschen Sie das Secret gezielt aus:
 
 1. Stoppen Sie die API und sichern Sie die Datenbank (siehe [Backup & Wiederherstellung](installation/backup-restore.md)). Mit Docker Compose: `docker compose stop attraccess`.

@@ -31,12 +31,20 @@ export function cardWriterSettingChanges(
       ]);
     }
   }
+  if (before.allowUidOnlyCards !== after.allowUidOnlyCards) {
+    changes.push([
+      'attractap.allowUidOnlyCards',
+      String(!!before.allowUidOnlyCards),
+      String(!!after.allowUidOnlyCards),
+    ]);
+  }
   return changes;
 }
 
 /**
- * Which readers may enroll and reset cards. Card keys are written through these readers, so an
- * operator can limit the work to readers in a trusted place. The default is every reader.
+ * The card-writing policy: which readers may enroll and reset cards, and whether cards that only offer a UID may be
+ * enrolled and used at all. Card keys are written through the allowed readers, so an operator can limit the work to
+ * readers in a trusted place. The default is every reader, and no UID-only cards.
  */
 @Injectable()
 export class CardWriterPolicyService {
@@ -57,20 +65,50 @@ export class CardWriterPolicyService {
     } catch {
       readerIds = [];
     }
-    return { mode, readerIds };
+    return { mode, readerIds, allowUidOnlyCards: await this.isUidOnlyAllowed() };
+  }
+
+  /** Whether cards that only offer a UID may be enrolled and used. Off unless an administrator turned it on. */
+  async isUidOnlyAllowed(): Promise<boolean> {
+    return (await this.settings.getPlainSetting(ATTRACTAP_PARENT, ATTRACTAP_KEYS.allowUidOnlyCards)) === 'true';
   }
 
   async set(settings: CardWriterSettingsDto): Promise<CardWriterSettingsDto> {
     const readerIds = [...new Set(settings.readerIds)].sort((a, b) => a - b);
     await this.settings.setPlainSetting(ATTRACTAP_PARENT, ATTRACTAP_KEYS.cardWriterMode, settings.mode);
     await this.settings.setPlainSetting(ATTRACTAP_PARENT, ATTRACTAP_KEYS.cardWriterReaders, JSON.stringify(readerIds));
-    return { mode: settings.mode, readerIds };
+    // Left as it is when the caller does not send it.
+    if (settings.allowUidOnlyCards !== undefined) {
+      await this.settings.setPlainSetting(
+        ATTRACTAP_PARENT,
+        ATTRACTAP_KEYS.allowUidOnlyCards,
+        String(settings.allowUidOnlyCards),
+      );
+    }
+    return { mode: settings.mode, readerIds, allowUidOnlyCards: await this.isUidOnlyAllowed() };
   }
 
   /** Stores the setting and audits every value the update changed, including a revoked reader it removes. */
   async update(settings: CardWriterSettingsDto, actor: AuditActor): Promise<CardWriterSettingsDto> {
     const before = await this.get();
     const after = await this.set(settings);
+    for (const [settingKey, oldValue, newValue] of cardWriterSettingChanges(before, after)) {
+      await this.audit.record({
+        domain: 'administration',
+        action: 'settings.updated',
+        actor,
+        subject: { type: 'setting', id: auditSubjectKeyId(settingKey) },
+        details: { settingKey, before: oldValue, after: newValue },
+      });
+    }
+    return after;
+  }
+
+  /** Turns UID-only cards on or off, leaving the reader settings alone, and audits a change. */
+  async updateUidOnlyAllowed(allowed: boolean, actor: AuditActor): Promise<CardWriterSettingsDto> {
+    const before = await this.get();
+    await this.settings.setPlainSetting(ATTRACTAP_PARENT, ATTRACTAP_KEYS.allowUidOnlyCards, String(allowed));
+    const after = { ...before, allowUidOnlyCards: allowed };
     for (const [settingKey, oldValue, newValue] of cardWriterSettingChanges(before, after)) {
       await this.audit.record({
         domain: 'administration',

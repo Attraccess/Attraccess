@@ -112,6 +112,8 @@ describe('administration audit policy', () => {
     ['networkRestriction.ipSource', 'client', 'header'],
     ['networkRestriction.headerName', 'X-Real-Ip', 'X-Client-Ip'],
     ['networkRestriction.roleActions', 'user: ', 'user: door.open,usage.start'],
+    ['attractap.allowUidOnlyCards', 'false', 'true'],
+    ['attractap.allowUidOnlyCards', 'true', 'false'],
   ])('accepts %s changes', (settingKey, before, after) => {
     expect(
       projectAdministrationAuditEvent({
@@ -128,6 +130,7 @@ describe('administration audit policy', () => {
     ['networkRestriction.ipSource', 'secret-marker'],
     ['networkRestriction.headerName', 'X Real\nInjected'],
     ['networkRestriction.roleActions', 'user: {"password":"secret-marker"}'],
+    ['attractap.allowUidOnlyCards', 'yes'],
   ])('rejects free text in %s changes', (settingKey, after) => {
     expect(
       projectAdministrationAuditEvent({

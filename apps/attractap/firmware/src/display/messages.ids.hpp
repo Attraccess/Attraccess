@@ -286,7 +286,7 @@ enum class Message {
     ErrorCardAuthenticationFailed, ErrorCardNotSupported, ErrorServerBusy, ErrorCardRemoved, ErrorCardTimeout,
     ErrorEnrollNotConfirmed, ErrorNoFreeKeySlot, ErrorCardNotFactory, ErrorResetNotConfirmed, ErrorWrongCard,
     ErrorCardKeyUnavailable, ErrorFirmwareUpdateRequired, ErrorReaderNotAllowedToWriteCards,
-    ErrorCardOperationExpired,
+    ErrorCardOperationExpired, ErrorUidOnlyCardsDisabled, ErrorRandomUidNotSupported,
     NetworkStatus, NetworkStatusShort, ConnectionQuality, ConnectionQualityGood, ConnectionQualityDegraded, ConnectionQualityOffline,
     LastMessageAge, LatestPing, AveragePing, PingTrend, ReconnectsLastMinute, SendQueueDepth, SendQueueFullLastMinute,
     SendFailuresLastMinute, ConnectionTimeoutsLastMinute, PingTimeoutsLastMinute, PingLossLastMinute,

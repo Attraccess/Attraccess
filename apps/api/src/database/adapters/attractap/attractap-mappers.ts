@@ -140,6 +140,7 @@ export function toNfcCard(card: NFCCard): AttractapNfcCard {
   return {
     id: card.id,
     uid: card.uid,
+    type: card.type,
     keyNo: card.keyNo,
     key: card.key,
     createdAt: card.createdAt,

@@ -71,6 +71,7 @@ protected:
         cardApduCallback;
     std::function<void(uint32_t detectionId, const char *conversationId)> cardConversationEndCallback;
     std::function<uint32_t()> cardConversationStartCallback;
+    std::function<bool(uint8_t &sak, uint16_t &atqa)> cardInfoProvider;
     // (event type that carried the error, error code); OTA reports its own labels.
     std::function<void(const char *eventType, const char *code)> errorCallback;
     std::function<void(const ActionResult &)> actionResultCallback;
@@ -135,6 +136,9 @@ public:
     // Called right before CARD_DETECTED goes out: the card relay opens before the first command can
     // arrive. Returns the detection id for the CARD_DETECTED payload.
     void setCardConversationStartCallback(std::function<uint32_t()> callback);
+    // SAK and ATQA of the card being announced; CARD_DETECTED carries them when this returns true. The server needs
+    // the SAK to tell UID-only cards (no ISO 14443-4) from secure ones. A reader without them behaves as before.
+    void setCardInfoProvider(std::function<bool(uint8_t &sak, uint16_t &atqa)> provider);
     // conversationId is nullptr when the server ends a detection without a conversation (early error).
     void setCardConversationEndCallback(std::function<void(uint32_t detectionId, const char *conversationId)> callback);
 

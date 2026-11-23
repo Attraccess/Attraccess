@@ -1,5 +1,5 @@
 # RFID-Karten
-<!-- llms-description: Wie RFID-Karten mit Benutzerkonten verknüpft sind, Kartenverwaltung, Kartentypen und welche Leser Karten registrieren oder zurücksetzen dürfen. -->
+<!-- llms-description: Wie RFID-Karten mit Benutzerkonten verknüpft sind, Kartenverwaltung, Kartentypen, unsichere UID-only-Karten und welche Leser Karten registrieren oder zurücksetzen dürfen. -->
 
 RFID-Karten sind die physischen Schluessel, mit denen Benutzer ueber Attractap-Leser auf Maschinen und Tueren zugreifen koennen. Jede Karte ist mit einem Benutzerkonto in Attraccess verknuepft.
 
@@ -26,7 +26,7 @@ Kartenschlüssel sind zufällig, je 16 Byte lang, und werden verschlüsselt gesp
 2. Wählen Sie einen verbundenen Attractap, der die Registrierung von Karten unterstützt
 3. Klicken Sie auf **Registrieren** und folgen Sie den Anweisungen auf dem Leser
 
-Eine Karte wird erst registriert, nachdem der Server geprüft hat, dass die Karte ihren neuen Schlüssel angenommen hat. Wird die Karte weggezogen oder schlägt das Schreiben fehl, wird nichts gespeichert; halten Sie dieselbe Karte erneut an den Reader, dann wird die Registrierung abgeschlossen.
+Eine sichere Karte wird erst registriert, nachdem der Server geprüft hat, dass die Karte ihren neuen Schlüssel angenommen hat (eine [UID-only-Karte](#uid-only-karten-unsicher) bekommt keinen Schlüssel). Wird die Karte weggezogen oder schlägt das Schreiben fehl, wird nichts gespeichert; halten Sie dieselbe Karte erneut an den Reader, dann wird die Registrierung abgeschlossen.
 
 > [!NOTE]
 > Für alle Kartenfunktionen brauchen Reader Firmware 2.0.0 oder neuer. Readern mit älterer Firmware wird das Update auf 2.0.0 beim Verbindungsaufbau automatisch angeboten (siehe [Firmware-Updates](attractap/firmware-updates.md)). Bis sie es installiert haben, lehnt der Server ihre Kartenanmeldungen ab, und sie können keine Karten registrieren oder zurücksetzen. Bereits registrierte Karten funktionieren weiter, sobald der Reader aktualisiert ist.
@@ -43,6 +43,8 @@ Klicken Sie neben einer Karte auf **Aktivieren** oder **Deaktivieren** und best�
 
 Die Karte wird aus dem Konto entfernt, nachdem der Server geprüft hat, dass die Karte wieder im Werkszustand ist. Die physische Karte wird benötigt; nutzen Sie **Deaktivieren**, falls die Karte nicht verfügbar ist.
 
+**UID-only-Karten** brauchen keinen Leser: Auf sie wird nichts geschrieben, daher fragt **Löschen** nur nach einer Bestätigung und entfernt die Karte sofort. Das können der Besitzer oder Benutzer mit `users.rfid-cards.manage`; das Audit-Log hält es fest.
+
 ## Mehrere Karten pro Benutzer
 
 Jeder Benutzer kann mehrere RFID-Karten mit seinem Konto verknuepfen. Dies ist nuetzlich, wenn:
@@ -53,17 +55,37 @@ Jeder Benutzer kann mehrere RFID-Karten mit seinem Konto verknuepfen. Dies ist n
 
 ## Kartentypen
 
-Attractap-Leser verwenden AES-verschluesselte Authentifizierung, die Karten mit Hardware-Krypto-Unterstuetzung erfordert:
+Attractap-Leser verwenden AES-verschluesselte Authentifizierung, die Karten mit Hardware-Krypto-Unterstuetzung erfordert, es sei denn, ein Administrator erlaubt UID-only-Karten:
 
 | Kartentyp | Unterstuetzt |
 |-----------|-------------|
 | NTAG424 DNA | Ja |
 | MIFARE DESFire EV2/EV3 | Ja |
-| MIFARE DESFire EV1 | Nein (fehlender Authentifizierungsmodus) |
-| MIFARE Classic / Ultralight / NTAG213-216 | Nein (keine AES-Authentifizierung) |
+| MIFARE DESFire EV1 | Nur als [UID-only-Karte](#uid-only-karten-unsicher) |
+| MIFARE Classic / Ultralight / NTAG213-216 | Nur als [UID-only-Karte](#uid-only-karten-unsicher) |
+| UID-only (unsicher, benötigt Einstellung) | Nur wenn ein Administrator es erlaubt, [siehe unten](#uid-only-karten-unsicher) |
 
 > [!NOTE]
 > Auf MIFARE-DESFire-Karten speichert Attractap seine Schluessel in einer eigenen DESFire-Applikation (AID `0xACCE55`), die bei der Registrierung automatisch angelegt wird. Andere Applikationen auf der Karte (z.B. bestehende Zugangssysteme) bleiben unberuehrt.
+
+## UID-only-Karten (unsicher)
+
+Günstige RFID-Karten (MIFARE Classic, MIFARE Ultralight, NTAG213/215/216 und DESFire EV1) können keine AES-Authentifizierung. Sie bieten nur ihre UID. Ein Administrator kann sie unter **Einstellungen -> RFID-Kartenregistrierung** mit dem Schalter **UID-only-Karten erlauben (unsicher)** zulassen. Der Schalter ist standardmäßig aus, nur Benutzer mit `system.settings.manage` können ihn ändern, und das Einschalten verlangt eine Bestätigung. Jede Änderung steht im Audit-Log.
+
+> [!WARNING]
+> **UID-only-Karten lassen sich mit günstigen Werkzeugen kopieren.** Der Server vergleicht nur die UID. Wer eine solche Karte ausliest, kann sich an Maschinen und Türen als deren Besitzer ausgeben, auch an Türen, die über Plugins wie das CES-Schloss-Plugin geöffnet werden. Erlauben Sie sie nur, wenn Sie dieses Risiko akzeptieren.
+
+So funktioniert es:
+
+- **Ein Schalter für die ganze Installation.** Er gilt für alle Reader und Plugins; es gibt keine Einstellung pro Reader oder Ressource.
+- **Die Registrierung weicht automatisch aus.** Der Reader prüft zuerst, ob die Karte AES kann. Eine Karte, die es kann, wird immer sicher registriert. Eine Karte, die es nicht kann, wird als UID-only-Karte registriert, aber nur bei eingeschalteter Einstellung; sonst zeigt der Reader „Karte wird nicht unterstützt“. Eine sichere Karte (NTAG 424 DNA, DESFire EV2/EV3) wird nie als UID-only registriert, auch nicht, wenn ihre sichere Registrierung fehlschlägt.
+- **Der Karteneintrag entscheidet, wie ein Scan geprüft wird.** Eine sichere Karte muss immer ihren Schlüssel beweisen, egal was die Einstellung sagt; ihre UID auf eine billige Karte zu kopieren funktioniert also nicht. Eine UID-only-Karte wird allein anhand der UID akzeptiert, und nur bei eingeschalteter Einstellung.
+- **Karten mit wechselnder UID werden abgelehnt.** Eine Karte, die ihre UID bei jedem Auflegen ändert, lässt sich nicht wiedererkennen; der Reader zeigt „Karte mit wechselnder UID wird nicht unterstützt“.
+- **Einstellung ausschalten.** Vorhandene UID-only-Karten bleiben in den Kartenlisten, markiert mit **Nur UID, deaktiviert**, werden aber von Readern („UID-only-Karten sind deaktiviert“) und von Plugin-Geräten (als nicht unterstützt) abgelehnt, bis die Einstellung wieder eingeschaltet wird. Sie müssen nicht neu registriert werden.
+- **Kartenlisten.** UID-only-Karten tragen ein Label **Nur UID**.
+
+> [!NOTE]
+> Der Reader meldet den Kartentyp, daher brauchen Reader Firmware 2.14.0 oder neuer, um UID-only-Karten zu registrieren und zu nutzen. Reader mit älterer Firmware verhalten sich wie bisher: Sie können keine UID-only-Karten registrieren und lehnen registrierte ab („Karte wird nicht unterstützt“).
 
 ## Welche Reader Karten registrieren und zurücksetzen dürfen
 

@@ -15,6 +15,8 @@ public:
     static constexpr size_t KeySize = 16;
     static constexpr size_t KeySlotCount = 6;
     static constexpr size_t CardCount = 4;
+    // The simulator's last card is always a UID-only card, so the UID-only flow can be tried without hardware.
+    static constexpr size_t UidOnlyCardIndex = CardCount - 1;
     using Key = std::array<uint8_t, KeySize>;
 
     enum class CardType : uint8_t
@@ -22,6 +24,8 @@ public:
         Unknown,
         Ntag424,
         Desfire,
+        // A cheap card that only offers its UID (NTAG213, MIFARE Classic): no ISO 14443-4, so it answers no APDU.
+        UidOnly,
     };
 
     struct Card
@@ -61,6 +65,7 @@ public:
     bool transceive(const uint8_t *apdu, uint8_t apduLength, uint8_t *response, uint8_t *responseLength) override;
     void setConversationActive(bool active) override { conversationActive = active; }
     bool isCardPresent() override { return !suspended && presentedCard < CardCount; }
+    bool lastDetectionInfo(uint8_t &sak, uint16_t &atqa) const override;
 
     void enableCardDetection() override { if (!suspended) cardDetectionEnabled = true; }
     void disableCardDetection() override { cardDetectionEnabled = false; }

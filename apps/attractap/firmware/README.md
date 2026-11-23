@@ -150,14 +150,23 @@ functions and answers their card events with `FIRMWARE_UPDATE_REQUIRED`. The key
 firmware 1.x (`CARD_AUTHENTICATION_DATA` with `keyNo`/`key`, enrollment and reset key events,
 `REQUEST_MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA` and friends) are gone.
 
-| Direction       | Event                   | Payload                                                                                                                                                                        |
-| --------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Reader → server | `CARD_DETECTED`         | `purpose` (`tap`, `enroll`, `reset`, `supervisor`, `mass-introduction`), `uid` (lowercase hex), `detectionId`, optional `resourceId`, optional `sessionId` (mass introduction) |
-| Server → reader | `CARD_APDU`             | `conversationId`, `detectionId`, `seq`, `apdu` (hex, at most 62 bytes)                                                                                                         |
-| Reader → server | `CARD_APDU_RESPONSE`    | `conversationId`, `seq`, `response` (hex, the card's answer including status bytes, at most 56 bytes)                                                                          |
-| Reader → server | `CARD_REMOVED`          | `conversationId` (the card did not answer: it left the field)                                                                                                                  |
-| Server → reader | `CARD_CONVERSATION_END` | `detectionId`, optional `conversationId` (absent when the server refused the card before any command)                                                                          |
-| Reader → server | `READER_SESSION_ENDED`  | none: the reader's login ended (logout or timeout), the server forgets the verified user                                                                                       |
+| Direction       | Event                   | Payload                                                                                                                                                                                                                                                      |
+| --------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Reader → server | `CARD_DETECTED`         | `purpose` (`tap`, `enroll`, `reset`, `supervisor`, `mass-introduction`), `uid` (lowercase hex), `detectionId`, optional `sak` and `atqa` (numbers: the card's select answers, since 2.14.0), optional `resourceId`, optional `sessionId` (mass introduction) |
+| Server → reader | `CARD_APDU`             | `conversationId`, `detectionId`, `seq`, `apdu` (hex, at most 62 bytes)                                                                                                                                                                                       |
+| Reader → server | `CARD_APDU_RESPONSE`    | `conversationId`, `seq`, `response` (hex, the card's answer including status bytes, at most 56 bytes)                                                                                                                                                        |
+| Reader → server | `CARD_REMOVED`          | `conversationId` (the card did not answer: it left the field)                                                                                                                                                                                                |
+| Server → reader | `CARD_CONVERSATION_END` | `detectionId`, optional `conversationId` (absent when the server refused the card before any command)                                                                                                                                                        |
+| Reader → server | `READER_SESSION_ENDED`  | none: the reader's login ended (logout or timeout), the server forgets the verified user                                                                                                                                                                     |
+
+**UID-only cards (since 2.14.0).** The reader sends the card's SAK (and ATQA) in `CARD_DETECTED` and announces
+`capabilities.uidOnlyCards: true`. A card whose SAK lacks bit `0x20` does not speak ISO 14443-4 (MIFARE Classic,
+Ultralight, NTAG21x): the server cannot send it APDUs, so it enrolls or accepts it on its UID alone, but only while
+an administrator allowed UID-only cards, and it never writes anything to it. The presence probe follows the card
+family: ISO 14443-4 cards get the keyless DESFire command, SAK `0x00` cards a READ of page 0, other cards (MIFARE
+Classic) are released and selected again by UID. A reader without the capability sends no SAK and behaves as before.
+The server answers `UID_ONLY_CARDS_DISABLED` for a UID-only card while the setting is off and
+`RANDOM_UID_NOT_SUPPORTED` for an enrollment of a random UID (4 bytes starting `0x08`).
 
 Every card presentation gets a new `detectionId` (per boot, counting from 1). The server echoes
 it in `CARD_APDU` and `CARD_CONVERSATION_END`, so a late message for an earlier card can neither
@@ -299,9 +308,9 @@ secure profile; development units stay unfused. A later secure bridge build need
 - Secure Boot v2 (RSA-PSS), which the classic ESP32 supports only from chip revision v3.0 (ECO3).
   Record each unit's revision before planning (`esptool --chip esp32 chip_id` prints it):
 
-  | Unit | Chip revision | PHY | PSRAM |
-  | ---- | ------------- | --- | ----- |
-  | (filled in during the first-deployment QA) | | | |
+  | Unit                                       | Chip revision | PHY | PSRAM |
+  | ------------------------------------------ | ------------- | --- | ----- |
+  | (filled in during the first-deployment QA) |               |     |       |
 
 - Flash encryption (release mode) with a per-device key, NVS encryption with the flash-encryption-based
   scheme (the classic ESP32 has no HMAC peripheral), and a disabled ROM download mode / JTAG.

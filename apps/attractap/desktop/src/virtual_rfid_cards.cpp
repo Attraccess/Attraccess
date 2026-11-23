@@ -11,6 +11,8 @@ VirtualNfc::Card VirtualNfc::defaultCard(size_t index)
 {
     Card card;
     card.uid[6] = static_cast<uint8_t>(index + 1);
+    if (index == UidOnlyCardIndex)
+        card.type = CardType::UidOnly;
     for (auto &key : card.keys)
         key = factoryKey();
     return card;

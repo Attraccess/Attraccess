@@ -99,12 +99,19 @@ bool Adafruit_PN532::readDetectedPassiveTargetID(uint8_t *uid,
   uint16_t sens_res = pn532_packetbuffer[9];
   sens_res <<= 8;
   sens_res |= pn532_packetbuffer[10];
+  _lastAtqa = sens_res;
+  _lastSak = pn532_packetbuffer[11];
 #ifdef MIFAREDEBUG
   PN532DEBUGPRINT.print(F("ATQA: 0x"));
   PN532DEBUGPRINT.println(sens_res, HEX);
   PN532DEBUGPRINT.print(F("SAK: 0x"));
   PN532DEBUGPRINT.println(pn532_packetbuffer[11], HEX);
 #endif
+
+  // Every caller holds a 7-byte UID (ISO 14443-3 double size). A longer one (triple size, or an emulator) is not
+  // a card the reader can use, and copying it would write past the caller's buffer.
+  if (pn532_packetbuffer[12] > PN532_MAX_UID_LENGTH)
+    return 0;
 
   /* Card appears to be Mifare Classic */
   *uidLength = pn532_packetbuffer[12];
@@ -483,4 +490,28 @@ uint8_t Adafruit_PN532::setDataTarget(uint8_t *cmd, uint8_t cmdlen)
 
   int offset = 6;
   return (pn532_packetbuffer[offset] == 0x15);
+}
+
+/**************************************************************************/
+/*!
+    @brief   Releases the inlisted target. A card that is not ISO 14443-4 only
+             answers a new InListPassiveTarget after this, which is how its
+             presence is checked.
+    @param   target  Tg number of the target, 0 releases all
+    @return  true when the PN532 confirmed the release
+*/
+/**************************************************************************/
+bool Adafruit_PN532::inRelease(uint8_t target)
+{
+  pn532_packetbuffer[0] = PN532_COMMAND_INRELEASE;
+  pn532_packetbuffer[1] = target;
+  if (!sendCommandCheckAck(pn532_packetbuffer, 2, 100))
+    return false;
+  if (!waitready(100))
+    return false;
+  readdata(pn532_packetbuffer, 10);
+  // Preamble (3), LEN, LCS, TFI, response code (InRelease + 1), status.
+  return pn532_packetbuffer[0] == 0 && pn532_packetbuffer[1] == 0 && pn532_packetbuffer[2] == 0xff &&
+         pn532_packetbuffer[5] == PN532_PN532TOHOST && pn532_packetbuffer[6] == PN532_COMMAND_INRELEASE + 1 &&
+         (pn532_packetbuffer[7] & 0x3f) == 0;
 }

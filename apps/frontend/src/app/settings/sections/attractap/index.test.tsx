@@ -10,6 +10,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   UseGetCardWriterSettingsKeyFn: () => ['card-writer-settings'],
   useGetReaders: vi.fn(),
   useUpdateCardWriterSettings: vi.fn(),
+  useUpdateUidOnlyCardsSetting: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),

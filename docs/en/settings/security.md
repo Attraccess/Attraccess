@@ -50,6 +50,8 @@ Attractap card keys are created and checked by the server only; tapping a card n
 > [!WARNING]
 > **Back up `AUTH_SESSION_SECRET` together with your database backups.** Without it the stored card keys and reader pairing keys cannot be read. Cards that were enrolled can then neither be used nor reset by Attraccess, and have to be erased with other tools. Paired readers cannot connect any more and have to be paired again.
 
+The switch **Allow UID-only cards (insecure)** under **Settings -> RFID card enrollment** is off by default. It lets cheap cards without encryption be used, which can be copied with cheap tools; see [UID-only cards](attractap/rfid-cards.md#uid-only-cards-insecure).
+
 Changing the secret makes the stored card keys and reader pairing keys unreadable until they are re-encrypted. To rotate the secret deliberately:
 
 1. Stop the API and back up the database (see [Backup & Restore](installation/backup-restore.md)). With Docker Compose: `docker compose stop attraccess`.

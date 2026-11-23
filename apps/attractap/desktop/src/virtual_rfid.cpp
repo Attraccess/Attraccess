@@ -23,6 +23,9 @@ VirtualNfc::VirtualNfc(ProfileStore &profile) : profile(profile)
                 persisted.uid = cards[index].uid;
                 persisted.uidLength = cards[index].uidLength;
                 persisted.present = false;
+                // Fixed role of this card, whatever an older profile stored for it.
+                if (index == UidOnlyCardIndex)
+                    persisted.type = CardType::UidOnly;
                 persisted.applicationExists =
                     std::any_of(persisted.keyVersions.begin(), persisted.keyVersions.end(), [](uint8_t v) { return v != 0; });
                 cards[index] = persisted;
@@ -133,6 +136,9 @@ bool VirtualNfc::transceive(const uint8_t *apdu, uint8_t apduLength, uint8_t *re
 {
     if (suspended || presentedCard >= CardCount || !currentCard().present || !response || !responseLength)
         return false;
+    // No ISO 14443-4: the reader cannot send this card an APDU.
+    if (currentCard().type == CardType::UidOnly)
+        return false;
 
     Card &card = currentCard();
     VirtualCardChip::Memory memory;
@@ -169,6 +175,17 @@ bool VirtualNfc::transceive(const uint8_t *apdu, uint8_t apduLength, uint8_t *re
         return false;
     std::copy(answer->begin(), answer->end(), response);
     *responseLength = static_cast<uint8_t>(answer->size());
+    return true;
+}
+
+bool VirtualNfc::lastDetectionInfo(uint8_t &sak, uint16_t &atqa) const
+{
+    if (presentedCard >= CardCount)
+        return false;
+    // NTAG 424 and DESFire select with SAK 0x20 (ISO 14443-4); an NTAG213 answers SAK 0x00 and has no such layer.
+    const bool uidOnly = currentCard().type == CardType::UidOnly;
+    sak = uidOnly ? 0x00 : 0x20;
+    atqa = uidOnly ? 0x0044 : 0x0344;
     return true;
 }
 

@@ -55,6 +55,9 @@ void API::sendFirmwareInfo()
                           traits, uiCaps, sizeof uiCaps);
     // This reader relays card APDUs to the server and holds no card keys (firmware 2.0.0+).
     if (traits.hasNfc) event["data"]["payload"]["capabilities"]["cardRelay"] = true;
+    // CARD_DETECTED carries the card's SAK and ATQA, and the presence probe works for cards without ISO 14443-4:
+    // UID-only cards (MIFARE Classic, Ultralight, NTAG21x, DESFire EV1) can be enrolled and used here.
+    if (traits.hasNfc) event["data"]["payload"]["capabilities"]["uidOnlyCards"] = true;
 #ifdef HAS_LVGL_DISPLAY
     // Duration input and extend controls (ATT-43): the touch readers. Others start with the server's fallback deadline.
     if (traits.hasNfc) event["data"]["payload"]["capabilities"]["sessionDuration"] = true;

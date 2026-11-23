@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { CardConversationService } from '../../card-conversation.service';
 import { createRelayReader, detect } from '../../card-relay.test-fixture';
 import { AttractapEventType } from '../../websocket.types';
@@ -31,6 +31,22 @@ describe('AttractapCardHandler card write guards', () => {
     handler().cardWriterPolicy.assertAllowed.mockRejectedValue(
       new ForbiddenException('This reader is not allowed to enroll or reset cards'),
     );
+
+  it('refuses to arm a reset for a UID-only card: it is deleted without a reader', async () => {
+    const socket = connected();
+    scope.attractapService.getNFCCardByID.mockResolvedValue({
+      id: 7,
+      uid: '04aabbcc',
+      type: 'uid-only',
+      user: { id: 1 },
+    });
+
+    await expect(scope.handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 })).rejects.toThrow(
+      new BadRequestException('CARD_IS_UID_ONLY'),
+    );
+    expect(socket.state.resetNfcCardData).toBeNull();
+    expect(socket.sendMessage).not.toHaveBeenCalled();
+  });
 
   describe('allow-list', () => {
     it('refuses to arm a reset on a reader the admin policy excludes', async () => {

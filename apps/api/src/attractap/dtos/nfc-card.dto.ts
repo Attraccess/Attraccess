@@ -14,6 +14,12 @@ export class NfcCardDto {
   uid!: string;
 
   @ApiProperty({
+    description: 'How the card is checked: with an AES key, or on its UID alone (insecure, can be copied)',
+    enum: ['aes', 'uid-only'],
+  })
+  type!: 'aes' | 'uid-only';
+
+  @ApiProperty({
     description: 'The ID of the user that owns the NFC card',
     allOf: [{ $ref: getSchemaPath('User') }],
   })
@@ -55,6 +61,7 @@ export function toNfcCardDto(card: AttractapNfcCard): NfcCardDto {
   return {
     id: card.id,
     uid: card.uid,
+    type: card.type,
     ...(card.user ? { user: toNfcCardOwnerDto(card.user) } : {}),
     createdAt: card.createdAt,
     updatedAt: card.updatedAt,

@@ -22,19 +22,33 @@ export class NFCCard {
   @ApiProperty({ description: 'The ID of the user that owns the NFC card', type: () => User })
   user!: User;
 
-  @Column({
-    type: 'integer',
-    nullable: false,
-  })
-  @Exclude()
-  keyNo!: number;
-
+  /** `aes`: the card proves a key the server holds. `uid-only`: accepted on its UID alone (insecure; no key). */
   @Column({
     type: 'text',
     nullable: false,
+    default: 'aes',
+  })
+  @ApiProperty({
+    description: 'How the card is checked: with an AES key, or on its UID alone',
+    enum: ['aes', 'uid-only'],
+  })
+  type!: 'aes' | 'uid-only';
+
+  /** Null for a UID-only card. */
+  @Column({
+    type: 'integer',
+    nullable: true,
   })
   @Exclude()
-  key!: string;
+  keyNo!: number | null;
+
+  /** Null for a UID-only card. */
+  @Column({
+    type: 'text',
+    nullable: true,
+  })
+  @Exclude()
+  key!: string | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'The date and time the NFC card was created' })

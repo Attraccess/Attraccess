@@ -10,6 +10,7 @@ import { FormImages1796200000002 } from './1796200000002-form-images';
 import { RoleNetworkActions1796200000003 } from './1796200000003-role-network-actions';
 import { ResourceListVisibility1796300000000 } from './1796300000000-resource-list-visibility';
 import { PermittedResourceIndexes1796300000001 } from './1796300000001-permitted-resource-indexes';
+import { NfcCardType1796300000002 } from './1796300000002-nfc-card-type';
 
 /** The released PostgreSQL migration track, in order. Later schema changes are appended here as new migrations. */
 export const postgresMigrations = [
@@ -25,4 +26,5 @@ export const postgresMigrations = [
   RoleNetworkActions1796200000003,
   ResourceListVisibility1796300000000,
   PermittedResourceIndexes1796300000001,
+  NfcCardType1796300000002,
 ];

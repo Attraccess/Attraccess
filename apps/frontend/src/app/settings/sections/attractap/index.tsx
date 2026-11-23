@@ -13,6 +13,7 @@ import {
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
+import { UidOnlyCardsSetting } from './UidOnlyCardsSetting';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { cardWritingBlocker, pairedReadersOnly } from '../../../attractap/cardWriting';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
@@ -141,6 +142,9 @@ export function AttractapSection() {
         onSave={() => save({ body: { mode, readerIds: mode === 'selected' ? readerIds : savedReaderIds } })}
         onDiscard={() => setDraft({})}
       />
+
+      {/* Below the save bar: it saves on its own. */}
+      <UidOnlyCardsSetting />
     </SettingsSection>
   );
 }

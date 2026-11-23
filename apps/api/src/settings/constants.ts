@@ -152,4 +152,6 @@ export const ATTRACTAP_KEYS = {
   cardWriterMode: 'card_writer_mode',
   /** JSON array of reader ids allowed to enroll and reset cards when the mode is "selected". */
   cardWriterReaders: 'card_writer_readers',
+  /** "true" lets cards that only offer a UID (no AES) be enrolled and used. Off when unset. Insecure: such cards can be copied. */
+  allowUidOnlyCards: 'allow_uid_only_cards',
 } as const;

@@ -34,6 +34,18 @@ public:
     virtual bool isCardPresent() = 0;
 
     /**
+     * SAK and ATQA of the card detected last, as the card answered its selection. The server needs the SAK to
+     * tell a card that speaks ISO 14443-4 (SAK bit 0x20: NTAG 424, DESFire) from a UID-only card (MIFARE Classic,
+     * Ultralight, NTAG21x). false: this front end does not know them, and CARD_DETECTED carries neither.
+     */
+    virtual bool lastDetectionInfo(uint8_t &sak, uint16_t &atqa) const
+    {
+        (void)sak;
+        (void)atqa;
+        return false;
+    }
+
+    /**
      * Send one complete APDU to the card and return its answer (including the status bytes).
      * `responseLength` is the capacity on entry and the received length on return. Returns false
      * when the card did not answer, i.e. it is gone.

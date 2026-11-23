@@ -105,6 +105,8 @@ inline Text knownReaderError(const std::string &code) {
     if (code == "MASS_INTRODUCTION_FAILED") return Message::ErrorMassIntroductionFailed;
     if (code == "CARD_AUTHENTICATION_FAILED") return Message::ErrorCardAuthenticationFailed;
     if (code == "CARD_NOT_SUPPORTED") return Message::ErrorCardNotSupported;
+    if (code == "UID_ONLY_CARDS_DISABLED") return Message::ErrorUidOnlyCardsDisabled;
+    if (code == "RANDOM_UID_NOT_SUPPORTED") return Message::ErrorRandomUidNotSupported;
     if (code == "BUSY") return Message::ErrorServerBusy;
     if (code == "CARD_REMOVED") return Message::ErrorCardRemoved;
     if (code == "CARD_TIMEOUT") return Message::ErrorCardTimeout;

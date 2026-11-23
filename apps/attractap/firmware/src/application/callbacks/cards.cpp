@@ -133,6 +133,7 @@ void Application::setupNfcCallbacks()
     this->sessionEndNotifyAtMs = 0; // a new card replaces the verified user on the server
     return this->cardRelay.begin(millis());
   });
+  this->api.setCardInfoProvider([this](uint8_t &sak, uint16_t &atqa) { return this->nfc.lastDetectionInfo(sak, atqa); });
   this->api.setCardApduCallback(
       [this](uint32_t detectionId, const char *id, uint32_t seq, const uint8_t *apdu, uint8_t length) {
         this->cardRelay.onApdu(detectionId, id, seq, apdu, length);

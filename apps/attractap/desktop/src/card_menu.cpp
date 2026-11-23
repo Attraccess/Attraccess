@@ -6,6 +6,8 @@
 
 namespace
 {
+// The simulator's last card is a cheap card that only offers its UID (VirtualNfc::UidOnlyCardIndex).
+constexpr size_t UidOnlyCardIndex = CardMenu::CardCount - 1;
 constexpr SDL_FRect Panel{20, 578, 460, 302};
 constexpr SDL_FRect CloseButton{436, 590, 28, 28};
 constexpr SDL_FRect ClearButton{38, 834, 424, 28};
@@ -110,7 +112,8 @@ void CardMenu::render(SDL_Renderer *renderer, float pointerX, float pointerY) co
         roundedRect(renderer, rect, 10, highlighted ? Accent : SDL_Color{62, 89, 92, 255});
         roundedRect(renderer, {rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2}, 9,
                     pressed ? SDL_Color{25, 103, 88, 255} : SDL_Color{28, 48, 51, 255});
-        centeredText(renderer, rect, rect.y + 14, "CARD " + std::to_string(index + 1), Foreground);
+        centeredText(renderer, rect, rect.y + 14,
+                     "CARD " + std::to_string(index + 1) + (index == UidOnlyCardIndex ? " (UID ONLY)" : ""), Foreground);
         centeredText(renderer, rect, rect.y + 35, CardUids[index], Muted);
         centeredText(renderer, rect, rect.y + 58, pressed ? "PRESENTED" : "PRESS AND HOLD", pressed ? Accent : Foreground);
     }
