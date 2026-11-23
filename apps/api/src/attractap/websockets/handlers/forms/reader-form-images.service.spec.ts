@@ -89,6 +89,22 @@ describe('ReaderFormImages', () => {
       ).toBeNull();
       expect(handoffs.openForReader).not.toHaveBeenCalled();
     });
+
+    it.each([
+      ['the connection closed', (s: any) => (s.readerId = null)],
+      ['someone else signed in', (s: any) => (s.state.verifiedUserId = 4)],
+    ])('ends a link that was issued while %s, and does not remember it', async (_case, change) => {
+      const s = socket();
+      handoffs.openForReader.mockImplementation(async () => {
+        change(s);
+        return { handoffId: 'late', token: 't', handoffUrl: 'u', imageCount: 0, maxImages: 2 };
+      });
+
+      expect(await service.describeField(s, where, field(11, FormFieldType.IMAGE))).toBeNull();
+
+      expect(handoffs.endHandoffs).toHaveBeenCalledWith(['late']);
+      expect(s.state.formHandoffs).toBeUndefined();
+    });
   });
 
   describe('fillAnswers', () => {

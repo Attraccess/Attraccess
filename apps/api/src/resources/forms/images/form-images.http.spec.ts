@@ -2,13 +2,23 @@ import { ExecutionContext, INestApplication, UnauthorizedException, ValidationPi
 import { Test } from '@nestjs/testing';
 import { AuthenticatedRequest, DualAuthGuard } from '@attraccess/plugins-backend-sdk';
 import request from 'supertest';
+import fs from 'node:fs';
+import path from 'node:path';
 import { FormImageHandoffService } from './form-image-handoff.service';
 import { FormImageViewerGuard } from './form-image-viewer.guard';
 import { FormImagesController } from './form-images.controller';
 import { FormImagesService } from './form-images.service';
 import { FormPhotoController } from './form-photo.controller';
 import { FormPhotoRateLimitGuard } from './form-photo-rate-limit.guard';
-import { FIELD_ID, FORM_ID, RESOURCE_ID, USER_ID, createImageServices, jpegUpload } from './form-images.test-fixture';
+import {
+  FIELD_ID,
+  FORM_ID,
+  RESOURCE_ID,
+  USER_ID,
+  createImageServices,
+  jpegUpload,
+  listFiles,
+} from './form-images.test-fixture';
 
 const UPLOAD = `/resources/${RESOURCE_ID}/forms/${FORM_ID}/fields/${FIELD_ID}/images?action=start`;
 const OTHER_USER = 99;
@@ -98,6 +108,16 @@ describe('form image endpoints (HTTP)', () => {
       await asUser(http().get(`/forms/images/${body.id}`), OTHER_USER)
         .set('If-None-Match', first.headers.etag)
         .expect(404);
+    });
+
+    it('answers a lost file with a plain 404 that no browser keeps revalidating', async () => {
+      const { body } = await upload().expect(201);
+      for (const name of listFiles(services.root)) fs.rmSync(path.join(services.root, 'form-images', name));
+
+      const missing = await asUser(http().get(`/forms/images/${body.id}`), USER_ID).expect(404);
+
+      expect(missing.headers.etag).not.toBe(`"${body.id}"`);
+      expect(missing.headers['cache-control']).toBeUndefined();
     });
 
     it('serves a user who may update resources', async () => {

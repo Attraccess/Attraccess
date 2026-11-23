@@ -12,7 +12,7 @@
   "uploadError": "Das Foto konnte nicht hochgeladen werden. Versuche es erneut.",
   "typeError": "Es können nur Fotos im Format JPEG, PNG oder WebP hinzugefügt werden.",
   "sizeError": "Das Foto ist größer als {{maxSize}} MB und konnte nicht verkleinert werden.",
-  "rateLimited": "Zu viele Fotos in kurzer Zeit. Warte einen Moment und versuche es erneut.",
+  "rateLimited": "Gerade zu viele Fotos. Sende offene Formulare ab oder brich sie ab, oder versuche es später erneut.",
   "maxReached": {
     "one": "Hier ist höchstens {{count}} Foto erlaubt.",
     "many": "Hier sind höchstens {{count}} Fotos erlaubt."

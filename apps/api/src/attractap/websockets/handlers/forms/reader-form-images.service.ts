@@ -72,6 +72,11 @@ export class ReaderFormImages {
           field.options,
           socket.state.formHandoffs?.[key],
         );
+        if (socket.readerId !== readerId || socket.state?.verifiedUserId !== userId) {
+          // The connection closed or the login changed while the link was issued: nothing ends it later, so end it now.
+          this.endIssued([view.handoffId]);
+          return null;
+        }
         socket.state.formHandoffs ??= {};
         socket.state.formHandoffs[key] = { handoffId: view.handoffId, token: view.token };
         return { handoffUrl: view.handoffUrl, imageCount: view.imageCount, maxImages: view.maxImages };

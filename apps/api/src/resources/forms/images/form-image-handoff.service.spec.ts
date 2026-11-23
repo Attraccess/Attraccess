@@ -295,6 +295,36 @@ describe('FormImageHandoffService', () => {
       expect(await handoffs.imageIds(fresh.handoffId)).toEqual(['late-photo']);
     });
 
+    it('moves a photo still processing while the reader replaced the link over to the new link', async () => {
+      const { handoffs, images, store } = createImageServices();
+      const first = await handoffs.openForReader(handoffKey, FIELD_OPTIONS);
+      const save = images.save.bind(images);
+      let fresh: Awaited<ReturnType<typeof handoffs.openForReader>> | undefined;
+      jest.spyOn(images, 'save').mockImplementation(async (...args) => {
+        fresh = await handoffs.openForReader(handoffKey, FIELD_OPTIONS, first, later(FORM_IMAGE_HANDOFF_TTL_MS));
+        return save(...args);
+      });
+
+      const photo = await handoffs.upload(first.token, await jpegUpload());
+
+      expect(await handoffs.imageIds(fresh?.handoffId as string)).toEqual([photo.id]);
+      expect(store.handoffs.get(fresh?.handoffId as string)?.uploadCount).toBe(1);
+    });
+
+    it('gives a failed upload back to the link that replaced its own', async () => {
+      const { handoffs, images, store } = createImageServices();
+      const first = await handoffs.openForReader(handoffKey, FIELD_OPTIONS);
+      let fresh: Awaited<ReturnType<typeof handoffs.openForReader>> | undefined;
+      jest.spyOn(images, 'save').mockImplementation(async () => {
+        fresh = await handoffs.openForReader(handoffKey, FIELD_OPTIONS, first, later(FORM_IMAGE_HANDOFF_TTL_MS));
+        throw new Error('not an image');
+      });
+
+      await expect(handoffs.upload(first.token, await jpegUpload())).rejects.toThrow('not an image');
+
+      expect(store.handoffs.get(fresh?.handoffId as string)?.uploadCount).toBe(0);
+    });
+
     it('ends only the links it is given', async () => {
       const { handoffs } = createImageServices();
       const mine = await handoffs.openForReader(handoffKey, FIELD_OPTIONS);

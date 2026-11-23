@@ -129,6 +129,15 @@ it('says so when a photo cannot be removed, and keeps it', async () => {
   expect(screen.getByAltText('altNamed')).toBeTruthy();
 });
 
+it('drops a photo that is already gone (404, a second tap) without an error', async () => {
+  api.page.mockResolvedValue({ data: pageData({ images: [{ id: ID, width: 1, height: 1 }] }) });
+  api.remove.mockRejectedValue(apiError(404));
+  mount();
+  fireEvent.click(await screen.findByRole('button', { name: 'removeNamed' }));
+  await waitFor(() => expect(screen.queryByAltText('altNamed')).toBeNull());
+  expect(screen.queryByText('removeError')).toBeNull();
+});
+
 it('removes a photo through the token', async () => {
   api.page.mockResolvedValue({ data: pageData({ images: [{ id: ID, width: 1, height: 1 }] }) });
   api.remove.mockResolvedValue({});

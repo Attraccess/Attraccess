@@ -107,14 +107,15 @@ export class FormImagesController {
     // Only after the access check: a browser shared by several users must ask every time (no-cache), and an image
     // never changes under its id, so the id is its entity tag and an unchanged image costs a 304.
     const etag = `"${image.id}"`;
-    res.set({ 'Cache-Control': 'private, no-cache', ETag: etag, 'X-Content-Type-Options': 'nosniff' });
+    const caching = { 'Cache-Control': 'private, no-cache', ETag: etag, 'X-Content-Type-Options': 'nosniff' };
     if (matchesEntityTag(req.headers['if-none-match'], etag)) {
-      res.status(304).end();
+      res.set(caching).status(304).end();
       return;
     }
-    // The response is written here (not returned): Nest would overwrite the 304 above with the route's 200.
+    // The response is written here (not returned): Nest would overwrite the 304 above with the route's 200. The headers
+    // follow the open, so a missing file is a plain 404 a browser does not keep revalidating.
     const stream = await this.images.open(image);
-    res.set({ 'Content-Type': image.mimeType, 'Content-Length': String(image.size) });
+    res.set({ ...caching, 'Content-Type': image.mimeType, 'Content-Length': String(image.size) });
     stream.once('error', () => res.destroy());
     res.once('close', () => stream.destroy());
     stream.pipe(res);

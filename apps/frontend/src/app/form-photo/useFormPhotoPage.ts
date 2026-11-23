@@ -73,9 +73,12 @@ export function useFormPhotoPage(token: string) {
       try {
         await formPhotoRemoveImage({ path: { token, imageId }, throwOnError: true });
       } catch (error) {
-        if (!isGone(error)) throw error;
-        setState({ status: 'expired' });
-        return;
+        // A 404 means it is gone already (a second tap): the page drops it like a removal.
+        if (isGone(error)) {
+          setState({ status: 'expired' });
+          return;
+        }
+        if (!(error instanceof ApiError && error.status === 404)) throw error;
       }
       setState((current) =>
         current.status === 'ready' && current.images.includes(imageId)

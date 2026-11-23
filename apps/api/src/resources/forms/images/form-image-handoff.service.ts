@@ -183,8 +183,9 @@ export class FormImageHandoffService {
     const { field } = await this.resolveField(handoff);
     if (field.type !== FormFieldType.IMAGE) throw new FormPhotoLinkExpiredException();
     if (!(await this.store.reserveHandoffUpload(handoff.id, new Date()))) throw new FormPhotoLinkExpiredException();
+    let image: FormImageDto;
     try {
-      return await this.images.save(file, {
+      image = await this.images.save(file, {
         formId: handoff.formId,
         fieldId: handoff.fieldId,
         userId: handoff.userId,
@@ -192,9 +193,22 @@ export class FormImageHandoffService {
         handoffId: handoff.id,
       });
     } catch (error) {
-      await this.store.releaseHandoffUpload(handoff.id);
+      // The reserved slot went over to the successor if the reader replaced the link meanwhile.
+      await this.store.releaseHandoffUpload((await this.successorOf(handoff))?.id ?? handoff.id);
       throw error;
     }
+    // Processing takes a while: if the reader replaced the link meanwhile (its count already includes this upload),
+    // the image belongs to the new link, or the reader would count a slot without its photo.
+    const successor = await this.successorOf(handoff);
+    if (successor) await this.store.moveHandoffImages(handoff.id, successor.id);
+    return image;
+  }
+
+  /** The open link that replaced this one, if the reader issued a new one for the same field and login. */
+  private async successorOf(handoff: FormImageHandoffRecord): Promise<FormImageHandoffRecord | null> {
+    const { readerId, userId, resourceId, action, formId, fieldId } = handoff;
+    const latest = await this.store.findLatestHandoff({ readerId, userId, resourceId, action, formId, fieldId });
+    return latest && latest.id !== handoff.id ? latest : null;
   }
 
   /** An image of this handoff only: any other id is gone, as far as the holder of the link can tell. */
