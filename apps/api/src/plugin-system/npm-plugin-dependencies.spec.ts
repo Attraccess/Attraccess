@@ -186,6 +186,7 @@ describe('npm plugin dependency lifecycle', () => {
     expect(fixture.service.listInstalled().map(({ version }) => version)).toEqual(['1.0.0', '1.0.0']);
   });
 
+  // The install and the update happen in one process: the update plans against the installed, not yet loaded, plugins.
   it('installs newly required plugins during a confirmed update, retaining existing dependencies', async () => {
     await fixture.publish(fixture.pkg('core'));
     await fixture.publish(fixture.pkg('provider', [fixture.dep('core')]));
@@ -204,6 +205,8 @@ describe('npm plugin dependency lifecycle', () => {
       ['new-core', '1.0.0'],
       ['provider', '1.1.0'],
     ]);
+    expect(PluginService.prototype.requestRestart).not.toHaveBeenCalled();
+    expect(isPluginRestartRequired()).toBe(true);
   });
 
   it('protects dependencies and requires the exact transitive removal approval', async () => {
