@@ -13,7 +13,7 @@ export interface AuthStatusInput {
   error: unknown;
   /** Whether a current-user request (or one of its retries) is in flight. */
   isFetching: boolean;
-  /** Whether that request waits for the browser to come back online. TanStack clears `error` meanwhile. */
+  /** Whether that request waits for the offline browser to come back online. TanStack clears `error` meanwhile. */
   isPaused: boolean;
   /** Whether an earlier current-user request failed. TanStack clears `error` while a query without data refetches. */
   hasFailedBefore: boolean;

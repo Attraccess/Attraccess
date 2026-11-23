@@ -144,10 +144,14 @@ it('keeps a signed-out user on the sign-in page when a background refetch fails 
   await act(async () => {
     await client.refetchQueries({ queryKey: UseGetCurrentKeyFn() });
   });
+  // The server banner and pull-to-refresh reload every query the same way.
+  await act(async () => {
+    await client.invalidateQueries();
+  });
   expect([...rendered].filter((shown) => shown !== 'unauthenticated')).toEqual([]);
   expect(statusOf(hook)).toEqual(['unauthenticated', 'unauthenticated']);
-  // Nothing to keep signed in, so the background answer is not retried.
-  expect(meRequests).toBe(2);
+  // Nothing to keep signed in, so the background answers are not retried.
+  expect(meRequests).toBe(3);
 });
 
 it('keeps the error state, with the request shown as running, while Retry is in flight', async () => {
@@ -204,6 +208,18 @@ it('ends on the sign-in page after logout, and shows the error (not sign-in) whe
     await restoreAuthentication(client);
   });
   await waitFor(() => expect(statusOf(hook)).toEqual(['error', 'error']));
+
+  // Retry from the error screen still reports a failure, and lands in the app once the server answers.
+  const requestsBeforeRetry = meRequests;
+  await act(async () => {
+    hook.result.current[0].retryCurrentUser();
+  });
+  await waitFor(() => expect(meRequests - requestsBeforeRetry).toBe(DEFAULT_RETRIES + 1));
+  await waitFor(() => expect(hook.result.current[0].isCurrentUserFetching).toBe(false));
+  expect(statusOf(hook)).toEqual(['error', 'error']);
+  answers = [json(user)];
+  act(() => hook.result.current[0].retryCurrentUser());
+  await waitFor(() => expect(statusOf(hook)).toEqual(['authenticated', 'authenticated']));
 });
 
 it('waits for the user reload when signing in again after logout, so the sign-in form stays pending', async () => {

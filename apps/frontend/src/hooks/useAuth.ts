@@ -2,7 +2,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../components/toastProvider';
 import logoutEn from './logout.en.json';
 import logoutDe from './logout.de.json';
-import { restoreAuthentication } from '../utils/auth-session';
+import { restoreAuthentication, SIGN_IN_RELOAD_KEY } from '../utils/auth-session';
 import { stopLiveUpdates } from '../utils/live-updates';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -109,10 +109,11 @@ export function useAuth() {
         return await getCurrent({ signal, throwOnError: true }).then(({ data }) => data);
       } catch (error) {
         const cached = queryClient.getQueryState(UseGetCurrentKeyFn());
-        // Signed out (null) and only refreshing in the background (window focus, the interval): stay signed out
-        // whatever the answer, so a server hiccup does not replace the sign-in page with the error screen. The
-        // reload after a sign-in (restoreAuthentication invalidates) and a retry after a failure still report it.
-        if (cached?.data === null && !cached.isInvalidated) return null;
+        // Signed out (null) and only refreshing (window focus, the interval, a reload of all queries): stay signed
+        // out whatever the answer, so a server hiccup does not replace the sign-in page with the error screen. The
+        // reload after a sign-in and a Retry after a failure (the query is still in error) report it instead.
+        const reportsFailure = cached?.status === 'error' || queryClient.getQueryData(SIGN_IN_RELOAD_KEY) === true;
+        if (cached?.data === null && !reportsFailure) return null;
         // A 401 without a cached user is the answer "signed out", not a failure: as data it survives refetches,
         // so the login form stays mounted. A cached user keeps the error, so a background 401 does not sign the
         // user out (unchanged behaviour).
@@ -137,7 +138,8 @@ export function useAuth() {
     data: fetchedUser,
     error: currentUserError,
     isFetching: isCurrentUserFetching,
-    isPaused: isCurrentUserPaused,
+    // TanStack also pauses retries while the tab is hidden; only an offline browser counts as an error.
+    isPaused: isCurrentUserPaused && typeof navigator !== 'undefined' && !navigator.onLine,
     hasFailedBefore: currentUserErrorUpdatedAt > 0,
   });
   const retryCurrentUser = useCallback(() => {
