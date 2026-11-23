@@ -1832,17 +1832,22 @@
   "deleteUidOnlyCard": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "3ea78c60"
+    "shape": "6f2ef09f"
   },
   "getCardWriterSettings": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "2802f69a"
+    "shape": "69241050"
   },
   "updateCardWriterSettings": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "b7871ca4"
+    "shape": "bf362e46"
+  },
+  "updateUidOnlyCardsSetting": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "ad0013d0"
   },
   "getFirmwares": {
     "decision": "allow",

@@ -30,3 +30,15 @@ export class CardWriterSettingsDto {
   @IsBoolean()
   allowUidOnlyCards?: boolean;
 }
+
+/** Body of the switch that allows UID-only cards. It changes nothing else, so it cannot undo a reader-list change. */
+export class UidOnlyCardsSettingDto {
+  @ApiProperty({
+    description:
+      'Dangerous. Lets cards that only offer a UID and no AES authentication be enrolled and used. Such cards can be copied with cheap tools.',
+  })
+  // Strict: the global implicit conversion would turn the string "false" into true, and this switch is dangerous.
+  @Transform(({ obj, key }) => obj[key])
+  @IsBoolean()
+  allowUidOnlyCards: boolean;
+}

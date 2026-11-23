@@ -59,6 +59,19 @@ describe.each(['en', 'de', 'de-DE', undefined, 'fr'])('AttractapService RFID car
     );
   });
 
+  it('stores a UID-only card with its type and no key, without encrypting anything', async () => {
+    const encryption = (service as unknown as { encryptionService: { encrypt: jest.Mock } }).encryptionService;
+
+    await service.createNFCCard(user, { uid: '04aabbccddeeff', type: 'uid-only', key: null, keyNo: null });
+
+    expect(cards.create).toHaveBeenCalledWith(
+      user,
+      { uid: '04aabbccddeeff', type: 'uid-only', key: null, keyNo: null },
+      true,
+    );
+    expect(encryption.encrypt).not.toHaveBeenCalled();
+  });
+
   it('notifies the card owner when an RFID card is registered', async () => {
     await service.createNFCCard(user, { uid: '04AABBCC', key: 'secret', keyNo: 1 });
 

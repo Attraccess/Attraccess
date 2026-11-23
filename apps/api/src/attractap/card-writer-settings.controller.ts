@@ -5,7 +5,7 @@ import { auditActorOf } from '../audit/recorder/audit-event';
 import { LicenseModuleType } from '../license/license.service';
 import { RequiresLicense } from '../license/require-license.decorator';
 import { AttractapService } from './attractap.service';
-import { CardWriterSettingsDto } from './dtos/card-writer-settings.dto';
+import { CardWriterSettingsDto, UidOnlyCardsSettingDto } from './dtos/card-writer-settings.dto';
 import { READER_NOT_PAIRED } from './reader-pairing';
 import { CardWriterPolicyService } from './websockets/card-writer-policy.service';
 
@@ -30,20 +30,24 @@ export class CardWriterSettingsController {
   @Get()
   @Auth()
   @ApiOperation({
-    summary: 'Which readers may enroll and reset cards',
+    summary: 'Which readers may enroll and reset cards, and whether UID-only cards are allowed',
     operationId: 'getCardWriterSettings',
   })
   @ApiResponse({ status: 200, type: CardWriterSettingsDto })
   async get(): Promise<CardWriterSettingsDto> {
-    // A reader that is not paired is never listed, even if it was named before its pairing was removed.
-    const [settings, paired] = await Promise.all([this.policy.get(), this.pairedReaderIds()]);
+    return this.withPairedReaders(await this.policy.get());
+  }
+
+  /** A reader that is not paired is never listed, even if it was named before its pairing was removed. */
+  private async withPairedReaders(settings: CardWriterSettingsDto): Promise<CardWriterSettingsDto> {
+    const paired = await this.pairedReaderIds();
     return { ...settings, readerIds: settings.readerIds.filter((id) => paired.has(id)) };
   }
 
   @Put()
   @Auth('system.settings.manage')
   @ApiOperation({
-    summary: 'Choose which readers may enroll and reset cards',
+    summary: 'Choose which readers may enroll and reset cards (and, optionally, whether UID-only cards are allowed)',
     operationId: 'updateCardWriterSettings',
   })
   @ApiBody({ type: CardWriterSettingsDto })
@@ -55,5 +59,22 @@ export class CardWriterSettingsController {
     const paired = await this.pairedReaderIds();
     if (settings.readerIds.some((id) => !paired.has(id))) throw new BadRequestException(READER_NOT_PAIRED);
     return this.policy.update(settings, auditActorOf(req.user));
+  }
+
+  @Put('uid-only-cards')
+  @Auth('system.settings.manage')
+  @ApiOperation({
+    summary: 'Allow or forbid UID-only cards (dangerous); the reader settings stay as they are',
+    operationId: 'updateUidOnlyCardsSetting',
+  })
+  @ApiBody({ type: UidOnlyCardsSettingDto })
+  @ApiResponse({ status: 200, type: CardWriterSettingsDto })
+  async updateUidOnlyCards(
+    @Body() body: UidOnlyCardsSettingDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<CardWriterSettingsDto> {
+    return this.withPairedReaders(
+      await this.policy.updateUidOnlyAllowed(body.allowUidOnlyCards, auditActorOf(req.user)),
+    );
   }
 }

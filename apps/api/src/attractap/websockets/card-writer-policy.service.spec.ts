@@ -84,6 +84,33 @@ describe('CardWriterPolicyService', () => {
         { settingKey: 'attractap.allowUidOnlyCards', before: 'true', after: 'false' },
       ]);
     });
+
+    it('writes and audits nothing for the setting when a reader update does not send it', async () => {
+      const record = (policy as unknown as { audit: { record: jest.Mock } }).audit.record;
+      await policy.update({ mode: 'all', readerIds: [] }, actor);
+      expect(stored.has(key)).toBe(false);
+      expect(record).not.toHaveBeenCalled();
+    });
+
+    it('switches only this setting through updateUidOnlyAllowed and audits each change', async () => {
+      const record = (policy as unknown as { audit: { record: jest.Mock } }).audit.record;
+      await policy.set({ mode: 'selected', readerIds: [2, 5] });
+
+      await expect(policy.updateUidOnlyAllowed(true, actor)).resolves.toEqual({
+        mode: 'selected',
+        readerIds: [2, 5],
+        allowUidOnlyCards: true,
+      });
+      await policy.updateUidOnlyAllowed(true, actor);
+      await policy.updateUidOnlyAllowed(false, actor);
+
+      expect(stored.get(key)).toBe('false');
+      expect(stored.get(`${ATTRACTAP_PARENT}.${ATTRACTAP_KEYS.cardWriterReaders}`)).toBe('[2,5]');
+      expect(record.mock.calls.map(([event]) => event.details)).toEqual([
+        { settingKey: 'attractap.allowUidOnlyCards', before: 'false', after: 'true' },
+        { settingKey: 'attractap.allowUidOnlyCards', before: 'true', after: 'false' },
+      ]);
+    });
   });
 
   it('allows every reader in "all" mode even with a stored list', async () => {

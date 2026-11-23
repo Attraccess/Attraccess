@@ -147,5 +147,5 @@ export function createServices() {
     const card = await originalGetById(id);
     return card && card.key != null ? { ...card, key: String(card.key).replace('encrypted:', '') } : card;
   });
-  return { cards, pending, attractapService, conversations, operations, user, settings };
+  return { cards, pending, cardStore, attractapService, conversations, operations, user, settings };
 }

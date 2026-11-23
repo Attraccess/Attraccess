@@ -1,6 +1,6 @@
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { CardWriterSettingsDto } from './card-writer-settings.dto';
+import { CardWriterSettingsDto, UidOnlyCardsSettingDto } from './card-writer-settings.dto';
 
 const base = { mode: 'all', readerIds: [] };
 
@@ -12,9 +12,9 @@ describe('CardWriterSettingsDto allowUidOnlyCards', () => {
   it.each([true, false])('accepts the boolean %j unchanged', async (allowUidOnlyCards) => {
     const body = { ...base, allowUidOnlyCards };
     expect(await errorsFor(body)).toHaveLength(0);
-    expect(
-      plainToInstance(CardWriterSettingsDto, body, { enableImplicitConversion: true }).allowUidOnlyCards,
-    ).toBe(allowUidOnlyCards);
+    expect(plainToInstance(CardWriterSettingsDto, body, { enableImplicitConversion: true }).allowUidOnlyCards).toBe(
+      allowUidOnlyCards,
+    );
   });
 
   it('treats an omitted field as "keep the stored value"', async () => {
@@ -28,4 +28,17 @@ describe('CardWriterSettingsDto allowUidOnlyCards', () => {
       expect(errors.map((error) => error.property)).toContain('allowUidOnlyCards');
     },
   );
+});
+
+describe('UidOnlyCardsSettingDto', () => {
+  const errorsOf = (body: Record<string, unknown>) =>
+    validate(plainToInstance(UidOnlyCardsSettingDto, body, { enableImplicitConversion: true }));
+
+  it.each([true, false])('accepts the boolean %j', async (allowUidOnlyCards) => {
+    expect(await errorsOf({ allowUidOnlyCards })).toHaveLength(0);
+  });
+
+  it.each([undefined, 'yes', 'false', 'true', 0, 1])('rejects %j', async (allowUidOnlyCards) => {
+    expect((await errorsOf({ allowUidOnlyCards })).map((error) => error.property)).toContain('allowUidOnlyCards');
+  });
 });

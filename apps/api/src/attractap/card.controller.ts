@@ -7,6 +7,7 @@ import {
   Patch,
   Delete,
   BadRequestException,
+  NotFoundException,
   HttpCode,
   Param,
   Query,
@@ -89,13 +90,18 @@ export class AttractapNfcCardsController {
     operationId: 'deleteUidOnlyCard',
   })
   @ApiResponse({ status: 204, description: 'The card was deleted' })
+  @ApiResponse({ status: 400, description: 'CARD_NOT_UID_ONLY: a secure card is reset through a reader instead' })
+  @ApiResponse({ status: 403, description: 'The card belongs to another user' })
+  @ApiResponse({ status: 404, description: 'The card does not exist' })
   async deleteUidOnlyCard(@Param('id', ParseIntPipe) id: number, @Req() req: AuthenticatedRequest): Promise<void> {
     const card = await this.cardAccess.getCardForManagement(id, req.user);
-    if (card.type !== 'uid-only') throw new BadRequestException('CARD_NOT_UID_ONLY');
-    await this.cardOperations.deleteUidOnlyCard(card, {
+    const outcome = await this.cardOperations.deleteUidOnlyCard(card, {
       userId: req.user.id,
       authenticationMethod: req.user.authenticationMethod ?? 'session',
       ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
     });
+    if (outcome.ok) return;
+    if (outcome.error === 'CARD_NOT_FOUND') throw new NotFoundException(`RFID card ${id} not found`);
+    throw new BadRequestException(outcome.error);
   }
 }

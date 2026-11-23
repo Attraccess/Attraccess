@@ -42,7 +42,7 @@ type CardCheckOrigin = { readerId: number | null } | { pluginId: string };
 /** Audit source of an interrupted enrollment or reset that a card check finished. */
 type CardRecoverySource = 'reader-recovery' | 'plugin-recovery';
 
-/** Where an audited card removal came from besides a reader reset or recovery. */
+/** Where an audited card removal came from: a reader reset, a recovery, or the deletion of a UID-only card. */
 type CardUnlinkSource = 'reader-reset' | CardRecoverySource | 'uid-only-delete';
 
 const recoverySource = (origin: CardCheckOrigin): CardRecoverySource =>
@@ -112,9 +112,10 @@ export class CardOperationsService {
   }
 
   /**
-   * Proves that the card on this reader holds the key stored for its UID. Used by every flow that
-   * grants something to a card holder (taps, supervisor cards, mass introduction). It finishes an
-   * interrupted enrollment or reset it finds on the card instead of failing.
+   * Checks the card on this reader against the record for its UID. Used by every flow that grants something to a
+   * card holder (taps, supervisor cards, mass introduction). A secure record needs proof of its key; it finishes an
+   * interrupted enrollment or reset it finds on the card instead of failing. A UID-only record needs a reader that
+   * reports the card's SAK and the setting that allows such cards.
    */
   async verifyCard(
     socket: AuthenticatedWebSocket,
@@ -195,6 +196,9 @@ export class CardOperationsService {
     // The record decides how the tap is checked: a UID-only record needs nothing from the card but its UID,
     // and only while an administrator allows it. A secure record never does.
     if (card?.type === 'uid-only') {
+      // A reader that reports no SAK runs firmware without UID-only support: it cannot tell such a card from a
+      // secure one and does not watch it like one, so it keeps refusing it as before. Plugin requests carry no SAK.
+      if (!('pluginId' in origin) && sak === undefined) return { ok: false, error: 'CARD_NOT_SUPPORTED' };
       return (await this.policy.isUidOnlyAllowed())
         ? { ok: true, card }
         : { ok: false, error: 'UID_ONLY_CARDS_DISABLED' };
@@ -220,7 +224,7 @@ export class CardOperationsService {
         }
         if (pendingReset && (await authenticate(channel, kind, card.keyNo, FACTORY_KEY))) {
           const actorId = pendingReset.actorId ?? card.user?.id ?? null;
-          await this.finishReset(
+          await this.unlinkCard(
             card.id,
             uid,
             actorId == null ? null : { userId: actorId, authenticationMethod: 'session' },
@@ -314,10 +318,11 @@ export class CardOperationsService {
     if (sak !== undefined && !sakSpeaksIsoDep(sak)) return this.enrollUidOnly(user, uid, enrollment);
 
     const result = await this.conversations.run<CardOutcome>(socket, 'enroll', detection, async (channel) => {
-      const detected = await detectCardKind(channel, sak);
+      const detected = await detectCardKind(channel);
       if (!detected.ok) {
-        // Only a card that is known not to do AES falls back; a secure card that fails never does.
-        return 'reason' in detected && detected.reason === 'desfire-ev1' && sak !== undefined
+        // Only a card that is known not to do AES (a DESFire EV1) falls back, and only on a reader that reports
+        // the SAK; a secure card that fails never does.
+        return sak !== undefined
           ? this.enrollUidOnly(user, uid, enrollment)
           : { ok: false, error: 'CARD_NOT_SUPPORTED' };
       }
@@ -394,13 +399,15 @@ export class CardOperationsService {
   ): Promise<CardOutcome> {
     if (!(await this.policy.isUidOnlyAllowed())) return { ok: false, error: 'CARD_NOT_SUPPORTED' };
     if (isRandomUid(uid)) return { ok: false, error: 'RANDOM_UID_NOT_SUPPORTED' };
+    // An interrupted secure enrollment wrote a key to a card with this UID: that card exists and is secure, so a
+    // card without AES showing the same UID is a copy. Its record must stay, so the secure card can still be recovered.
+    if ((await this.cardStore.listPendingEnrolls(uid)).length) return { ok: false, error: 'CARD_ALREADY_ENROLLED' };
     const { auditPrincipal } = enrollment;
     const card = await this.attractapService.createNFCCard(
       user,
       { uid, type: 'uid-only', keyNo: null, key: null },
       { activate: true },
     );
-    await this.cardStore.deletePendingByUid(uid, 'enroll');
     await this.audit.record({
       domain: 'attractap',
       action: 'attractap.card.linked',
@@ -415,9 +422,14 @@ export class CardOperationsService {
     return { ok: true };
   }
 
-  /** Removes a UID-only card: nothing is written to such a card, so no reader is needed. */
-  async deleteUidOnlyCard(card: AttractapNfcCard, auditPrincipal: AuditPrincipal): Promise<boolean> {
-    return this.finishReset(card.id, card.uid, auditPrincipal, 'uid-only-delete');
+  /**
+   * Removes a UID-only card: nothing is written to such a card, so no reader is needed. A secure card is refused
+   * (`CARD_NOT_UID_ONLY`); its key must be reset through a reader. `CARD_NOT_FOUND` when it is already gone.
+   */
+  async deleteUidOnlyCard(card: AttractapNfcCard, auditPrincipal: AuditPrincipal): Promise<CardOutcome> {
+    if (card.type !== 'uid-only') return { ok: false, error: 'CARD_NOT_UID_ONLY' };
+    const deleted = await this.unlinkCard(card.id, card.uid, auditPrincipal, 'uid-only-delete');
+    return deleted ? { ok: true } : { ok: false, error: 'CARD_NOT_FOUND' };
   }
 
   /** Reset: write the factory key back and prove it; only then the card record is removed. */
@@ -429,7 +441,7 @@ export class CardOperationsService {
     const { uid } = detection;
     const card = await this.attractapService.getNFCCardByID(reset.cardId);
     if (!card) return { ok: false, error: 'CARD_NOT_FOUND' };
-    if (card.uid !== uid) return { ok: false, error: 'WRONG_CARD' };
+    if (normalizeCardUid(card.uid) !== uid) return { ok: false, error: 'WRONG_CARD' };
     // Nothing is written to a UID-only card; its record is deleted without a reader.
     if (card.type === 'uid-only') return { ok: false, error: 'CARD_IS_UID_ONLY' };
     const storedKey = this.cardKey(card);
@@ -471,14 +483,15 @@ export class CardOperationsService {
         if (outcome === 'master-refused') return { ok: false, error: 'CARD_MASTER_KEY_UNKNOWN' };
         if (outcome !== 'done') return { ok: false, error: 'RESET_NOT_CONFIRMED' };
       }
-      await this.finishReset(card.id, uid, reset.auditPrincipal, 'reader-reset', socket.readerId);
+      await this.unlinkCard(card.id, uid, reset.auditPrincipal, 'reader-reset', socket.readerId);
       return { ok: true };
     });
     if (!result.ok) return { ok: false, error: conversationError(result.reason) };
     return result.value;
   }
 
-  private async finishReset(
+  /** Removes a card record with its pending changes and audits the removal. */
+  private async unlinkCard(
     cardId: number,
     uid: string,
     auditPrincipal: AuditPrincipal | null,

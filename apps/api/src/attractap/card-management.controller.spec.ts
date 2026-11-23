@@ -208,6 +208,8 @@ describe('RFID card management authorization', () => {
   describe('DELETE /attractap/cards/:id (UID-only cards)', () => {
     const uidOnly = { ...card, type: 'uid-only', key: null, keyNo: null } as unknown as AttractapNfcCard;
 
+    beforeEach(() => operations.deleteUidOnlyCard.mockResolvedValue({ ok: true }));
+
     it.each(['owner', 'manager'])('lets the %s delete a UID-only card and audits it as the actor', async (actor) => {
       service.getNFCCardByID.mockResolvedValue(uidOnly);
       await request(app.getHttpServer())
@@ -230,9 +232,15 @@ describe('RFID card management authorization', () => {
 
     it('refuses a secure card: it is reset through a reader', async () => {
       service.getNFCCardByID.mockResolvedValue({ ...card, type: 'aes' });
+      operations.deleteUidOnlyCard.mockResolvedValue({ ok: false, error: 'CARD_NOT_UID_ONLY' });
       const response = await request(app.getHttpServer()).delete('/attractap/cards/7').set('actor-id', '2').expect(400);
       expect(response.body.message).toBe('CARD_NOT_UID_ONLY');
-      expect(operations.deleteUidOnlyCard).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when the card was deleted in the meantime', async () => {
+      service.getNFCCardByID.mockResolvedValue(uidOnly);
+      operations.deleteUidOnlyCard.mockResolvedValue({ ok: false, error: 'CARD_NOT_FOUND' });
+      await request(app.getHttpServer()).delete('/attractap/cards/7').set('actor-id', '2').expect(404);
     });
 
     it('returns 404 for a missing card', async () => {
