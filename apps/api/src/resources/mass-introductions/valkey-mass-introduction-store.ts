@@ -58,10 +58,14 @@ redis.call('hset', KEYS[2], ARGV[1], ARGV[2])
 redis.call('pexpire', KEYS[2], ttl)
 return 1`;
 
-/** Counts a code check before it runs, so parallel guesses on several instances share one limit. */
-export const CODE_ATTEMPT_SCRIPT = `local c = redis.call('incr', KEYS[1])
+/**
+ * Counts a wrong code unless the limit is reached, in one step, so parallel guesses on several instances never get
+ * more than the limit checked: 1 counted, 0 beyond the limit (not counted).
+ */
+export const COUNT_WRONG_CODE_SCRIPT = `local c = tonumber(redis.call('get', KEYS[1]) or '0')
+if c >= tonumber(ARGV[2]) then return 0 end
+c = redis.call('incr', KEYS[1])
 if c == 1 then redis.call('pexpire', KEYS[1], ARGV[1]) end
-if c > tonumber(ARGV[2]) then return 0 end
 return 1`;
 
 const RELEASE_JOIN_SCRIPT = `if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end`;
@@ -179,18 +183,24 @@ export class ValkeyMassIntroductionStore implements MassIntroductionStore {
     }
   }
 
-  async tryCodeAttempt(sessionId: string, userId: number): Promise<boolean> {
-    const allowed = await this.call(() =>
-      this.client.eval(CODE_ATTEMPT_SCRIPT, 1, wrongKey(sessionId, userId), WRONG_CODE_WINDOW_MS, this.maxWrongCodes),
+  async wrongCodesExhausted(sessionId: string, userId: number): Promise<boolean> {
+    return Number((await this.call(() => this.client.get(wrongKey(sessionId, userId)))) ?? 0) >= this.maxWrongCodes;
+  }
+
+  async countWrongCode(sessionId: string, userId: number): Promise<boolean> {
+    const counted = await this.call(() =>
+      this.client.eval(
+        COUNT_WRONG_CODE_SCRIPT,
+        1,
+        wrongKey(sessionId, userId),
+        WRONG_CODE_WINDOW_MS,
+        this.maxWrongCodes,
+      ),
     );
-    return allowed === 1;
+    return counted === 1;
   }
 
-  async codeAttemptFailed(): Promise<void> {
-    // Counted when it was reserved.
-  }
-
-  async codeAttemptSucceeded(sessionId: string, userId: number): Promise<void> {
+  async clearWrongCodes(sessionId: string, userId: number): Promise<void> {
     await this.call(() => this.client.del(wrongKey(sessionId, userId)));
   }
 

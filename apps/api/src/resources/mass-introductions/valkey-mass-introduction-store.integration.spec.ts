@@ -125,15 +125,16 @@ describe('shared mass-introduction and supervision stores against Valkey', () =>
     );
   });
 
-  it('counts wrong codes across instances: five checks per minute, reset by a right one', async () => {
+  it('counts wrong codes across instances: five per minute, cleared by a right one', async () => {
     await a.create(session('s5'));
-    const attempts = await Promise.all(
-      Array.from({ length: 8 }, (_, index) => (index % 2 ? a : b).tryCodeAttempt('s5', 9)),
+    const counted = await Promise.all(
+      Array.from({ length: 8 }, (_, index) => (index % 2 ? a : b).countWrongCode('s5', 9)),
     );
-    expect(attempts.filter(Boolean)).toHaveLength(5);
+    expect(counted.filter(Boolean)).toHaveLength(5);
+    expect(await b.wrongCodesExhausted('s5', 9)).toBe(true);
     expect(await clientA.pttl('attraccess:mass-introduction:wrong:s5:9')).toBeGreaterThan(50_000);
-    await a.codeAttemptSucceeded('s5', 9);
-    expect(await b.tryCodeAttempt('s5', 9)).toBe(true);
+    await a.clearWrongCodes('s5', 9);
+    expect(await b.wrongCodesExhausted('s5', 9)).toBe(false);
   });
 
   it('settles a supervision request at most once across instances', async () => {

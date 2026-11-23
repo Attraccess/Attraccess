@@ -226,14 +226,15 @@ export class MassIntroductionService {
       return { target: { ...session.target }, alreadyIntroduced: existing.alreadyIntroduced };
     }
 
-    if (!(await this.store.tryCodeAttempt(session.id, user.id, nowMs))) {
-      throw new HttpException('Too many wrong codes, try again in a minute', HttpStatus.TOO_MANY_REQUESTS);
-    }
+    const tooManyWrongCodes = () =>
+      new HttpException('Too many wrong codes, try again in a minute', HttpStatus.TOO_MANY_REQUESTS);
     if (!isValidMassIntroductionCode(session.codeSecret, code, nowMs)) {
-      await this.store.codeAttemptFailed(session.id, user.id, nowMs);
+      // Counted atomically, so guesses spread over several instances share the one limit.
+      if (!(await this.store.countWrongCode(session.id, user.id, nowMs))) throw tooManyWrongCodes();
       throw new BadRequestException('Wrong or expired code');
     }
-    await this.store.codeAttemptSucceeded(session.id, user.id);
+    if (await this.store.wrongCodesExhausted(session.id, user.id, nowMs)) throw tooManyWrongCodes();
+    await this.store.clearWrongCodes(session.id, user.id);
 
     const participant = await this.join(session, user, MassIntroductionMethod.QR);
     return { target: { ...session.target }, alreadyIntroduced: participant.alreadyIntroduced };

@@ -50,10 +50,11 @@ export interface MassIntroductionStore {
     userId: number,
     grant: () => Promise<MassIntroductionParticipant>,
   ): Promise<{ participant: MassIntroductionParticipant; added: boolean }>;
-  /** Reserves one code check for the user; false when they used up their wrong codes for this minute. */
-  tryCodeAttempt(sessionId: string, userId: number, nowMs: number): Promise<boolean>;
-  codeAttemptFailed(sessionId: string, userId: number, nowMs: number): Promise<void>;
-  codeAttemptSucceeded(sessionId: string, userId: number): Promise<void>;
+  /** Whether the user used up their wrong codes for this minute. */
+  wrongCodesExhausted(sessionId: string, userId: number, nowMs: number): Promise<boolean>;
+  /** Counts a wrong code; false when it is beyond the limit (counted atomically across instances). */
+  countWrongCode(sessionId: string, userId: number, nowMs: number): Promise<boolean>;
+  clearWrongCodes(sessionId: string, userId: number): Promise<void>;
 }
 
 export const WRONG_CODE_WINDOW_MS = 60_000;
@@ -154,20 +155,25 @@ export class InMemoryMassIntroductionStore implements MassIntroductionStore {
     return joining;
   }
 
-  async tryCodeAttempt(sessionId: string, userId: number, nowMs: number): Promise<boolean> {
+  async wrongCodesExhausted(sessionId: string, userId: number, nowMs: number): Promise<boolean> {
+    return (this.currentWindow(sessionId, userId, nowMs)?.count ?? 0) >= this.maxWrongCodes;
+  }
+
+  async countWrongCode(sessionId: string, userId: number, nowMs: number): Promise<boolean> {
     const key = `${sessionId}|${userId}`;
-    const attempts = this.wrongCodes.get(key);
-    if (attempts && nowMs - attempts.windowStart < WRONG_CODE_WINDOW_MS) return attempts.count < this.maxWrongCodes;
-    this.wrongCodes.set(key, { windowStart: nowMs, count: 0 });
+    const attempts = this.currentWindow(sessionId, userId, nowMs) ?? { windowStart: nowMs, count: 0 };
+    this.wrongCodes.set(key, attempts);
+    if (attempts.count >= this.maxWrongCodes) return false;
+    attempts.count += 1;
     return true;
   }
 
-  async codeAttemptFailed(sessionId: string, userId: number): Promise<void> {
-    const attempts = this.wrongCodes.get(`${sessionId}|${userId}`);
-    if (attempts) attempts.count += 1;
+  async clearWrongCodes(sessionId: string, userId: number): Promise<void> {
+    this.wrongCodes.delete(`${sessionId}|${userId}`);
   }
 
-  async codeAttemptSucceeded(sessionId: string, userId: number): Promise<void> {
-    this.wrongCodes.delete(`${sessionId}|${userId}`);
+  private currentWindow(sessionId: string, userId: number, nowMs: number) {
+    const attempts = this.wrongCodes.get(`${sessionId}|${userId}`);
+    return attempts && nowMs - attempts.windowStart < WRONG_CODE_WINDOW_MS ? attempts : undefined;
   }
 }
