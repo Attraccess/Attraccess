@@ -93,7 +93,7 @@ Maschinen können eine **maximale Sitzungsdauer** haben und eine **Dauerschätzu
 | `SESSION_DURATION_ESTIMATE_EXCEEDS_MAXIMUM` | Die Schätzung liegt über der maximalen Sitzungsdauer. |
 
 > [!WARNING]
-> API-Token- und MCP-Clients, die Sitzungen starten, scheitern mit `SESSION_DURATION_ESTIMATE_REQUIRED` bei jeder Ressource, bei der ein Admin **Dauerschätzung verlangen** einschaltet. Senden Sie dort `estimatedDurationMinutes`.
+> API-Token- und MCP-Clients, die Sitzungen starten, scheitern mit `SESSION_DURATION_ESTIMATE_REQUIRED` bei jeder Ressource, bei der ein Admin **Dauerschätzung verlangen** einschaltet. Senden Sie dort `estimatedDurationMinutes`. Das gilt auch für eine Anfrage auf einen beaufsichtigten Start (`POST /api/resources/{resourceId}/usage/supervision/request`): Der Server prüft die Schätzung bei der Anfrage, nicht erst bei der Freigabe durch die Aufsicht.
 
 **Verlängern.** `POST /api/resources/{resourceId}/usage/extend` verschiebt `autoEndAt` nach hinten. Der Body enthält `usageId`, `extendByMinutes` oder `toMax`:
 

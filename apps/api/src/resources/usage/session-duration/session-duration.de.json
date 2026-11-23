@@ -1,9 +1,10 @@
 {
-  "endingSoonTitle": "Deine Sitzung auf {resourceName} endet bald",
-  "endingSoonBody": "Deine Sitzung wird in etwa {minutes} Minuten automatisch beendet. Öffne die Ressource, um sie zu verlängern.",
-  "autoEndedTitle": "Sitzung auf {resourceName} gestoppt",
-  "autoEndedBodyMaximum": "Deine Sitzung auf {resourceName} wurde automatisch gestoppt, weil die maximale Sitzungsdauer erreicht wurde.",
-  "autoEndedBodyEstimate": "Deine Sitzung auf {resourceName} wurde automatisch gestoppt, weil deine geschätzte Zeit erreicht wurde.",
+  "endingSoonTitle": "Deine Sitzung für {resourceName} endet bald",
+  "endingSoonBody": "Deine Sitzung wird in etwa {minutes} Minuten automatisch beendet. Öffne die Ressource, um deine Sitzung zu verlängern.",
+  "endingSoonBodyOne": "Deine Sitzung wird in etwa 1 Minute automatisch beendet. Öffne die Ressource, um deine Sitzung zu verlängern.",
+  "autoEndedTitle": "Sitzung für {resourceName} automatisch beendet",
+  "autoEndedBodyMaximum": "Deine Sitzung für {resourceName} wurde automatisch beendet, weil die maximale Sitzungsdauer erreicht wurde.",
+  "autoEndedBodyEstimate": "Deine Sitzung für {resourceName} wurde automatisch beendet, weil deine geschätzte Zeit erreicht wurde.",
   "autoEndedActorMaximum": "Das System (die maximale Sitzungsdauer wurde erreicht)",
   "autoEndedActorEstimate": "Das System (deine geschätzte Zeit wurde erreicht)"
 }

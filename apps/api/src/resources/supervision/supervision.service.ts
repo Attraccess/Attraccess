@@ -15,6 +15,7 @@ import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event'
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 
 import { ResourceUsageService } from '../usage/sessions/resource-usage.service';
+import { computeStartDeadline, SessionDurationSettings } from '../usage/session-duration/session-duration.rules';
 
 import { SupervisionLiveService } from './supervision-live.service';
 import { ResourceIntroducerType, type UsageSession } from '@attraccess/application-models';
@@ -46,6 +47,11 @@ export type {
   ReaderSupervisionArmer,
 } from './supervision.types';
 import type { AuthenticationMethod } from '@attraccess/application-models';
+
+/** The requester gives the duration estimate: a missing or too long one is refused now, not at the approval. */
+function assertEstimateAcceptable(resource: SessionDurationSettings, dto: StartUsageSessionDto): void {
+  computeStartDeadline(resource, new Date(), dto.estimatedDurationMinutes, true);
+}
 
 @Injectable()
 export class SupervisionService {
@@ -156,6 +162,7 @@ export class SupervisionService {
       await this.preStart.gateSupervision(request.resourceId, request.requester, request.dto, supervisor.id);
       const session = await this.resourceUsageService.startSession(request.resourceId, request.requester, request.dto, {
         supervisorUserId: supervisor.id,
+        canAskDuration: request.canAskDuration,
         auditOrigin: {
           id: supervisor.id,
           authenticationMethod: authenticationMethod ?? 'session',
@@ -288,6 +295,7 @@ export class SupervisionService {
     dto: StartUsageSessionDto;
     eligibleSupervisorIds: number[];
     callbacks: ReaderSupervisionCallbacks;
+    canAskDuration?: boolean;
   }): { requestId: string; expiresAt: Date } {
     const { callbacks, ...rest } = params;
 
@@ -327,6 +335,7 @@ export class SupervisionService {
     readerCallbacks?: ReaderSupervisionCallbacks;
     readerId?: number;
     signal?: AbortSignal;
+    canAskDuration?: boolean;
   }): { id: string; expiresAt: Date; promise: Promise<UsageSession> } {
     params.signal?.throwIfAborted();
     const id = params.id ?? randomUUID();
@@ -347,6 +356,7 @@ export class SupervisionService {
         supervisorUserId: params.supervisorUserId,
         eligibleSupervisorIds: params.eligibleSupervisorIds,
         dto: params.dto,
+        canAskDuration: params.canAskDuration ?? false,
         createdAt,
         expiresAt,
         timeout,
@@ -463,7 +473,9 @@ export class SupervisionService {
   ): Promise<UsageSession> {
     // Validate eagerly so the requester gets immediate, meaningful feedback instead of waiting 30s
     // for a request that could never have been approved (wrong supervisor, self-supervision, ...).
-    await this.resourceUsageService.validateSupervisedStart(resourceId, requester, supervisorUserId);
+    const resource = await this.resourceUsageService.assertSupportsSupervision(resourceId);
+    assertEstimateAcceptable(resource, dto);
+    await this.resourceUsageService.validateSupervisedStart(resourceId, requester, supervisorUserId, undefined, resource);
 
     const { id, promise } = this.createPending({
       resourceId,
@@ -472,6 +484,7 @@ export class SupervisionService {
       supervisorUserId,
       eligibleSupervisorIds: [supervisorUserId],
       signal,
+      canAskDuration: true,
     });
 
     this.logger.debug(
@@ -497,7 +510,7 @@ export class SupervisionService {
       throw new ServiceUnavailableException('Reader-based supervision is unavailable');
     }
 
-    await this.resourceUsageService.assertSupportsSupervision(resourceId);
+    assertEstimateAcceptable(await this.resourceUsageService.assertSupportsSupervision(resourceId), dto);
 
     const eligibleSupervisorIds = await this.getEligibleSupervisorIds(resourceId, requester.id);
     if (eligibleSupervisorIds.length === 0) {
@@ -527,6 +540,7 @@ export class SupervisionService {
       eligibleSupervisorIds,
       readerId,
       signal,
+      canAskDuration: true,
     });
     const request = this.pending.get(id);
 

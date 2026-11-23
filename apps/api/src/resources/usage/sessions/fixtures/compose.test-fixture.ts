@@ -104,6 +104,7 @@ export function composeResourceUsageService(
     resourceFormsService as never,
     audit as never,
     notifications,
+    deadlines,
   );
   const starts = new UsageSessionStarts(
     lifecycle,

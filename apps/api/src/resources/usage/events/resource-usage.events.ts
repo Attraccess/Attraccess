@@ -1,3 +1,4 @@
+import type { AutoEndReason } from '../session-duration/session-duration.rules';
 /**
  * Events emitted when resource usage status changes
  */
@@ -33,7 +34,7 @@ export class ResourceUsageSessionEndedEvent {
     public readonly usage: UsageSession,
     public readonly endedBy: Pick<UsageSessionUser, 'id' | 'username' | 'firstName' | 'lastName'> | null,
     /** Set when the server ended the session at its deadline: why. */
-    public readonly autoEndReason?: 'maximum' | 'estimate',
+    public readonly autoEndReason?: AutoEndReason,
   ) {}
 }
 

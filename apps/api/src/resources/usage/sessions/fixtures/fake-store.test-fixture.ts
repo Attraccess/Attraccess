@@ -120,7 +120,13 @@ async function buildUsageScope<S extends UsageSessionStore>(store: S, unitOfWork
       { provide: USAGE_SESSION_STORE, useValue: store },
       {
         provide: SESSION_DEADLINE_STORE,
-        useValue: { extend: jest.fn(), findOverdue: jest.fn(), findEndingWithin: jest.fn(), claimWarning: jest.fn() },
+        useValue: {
+          extend: jest.fn(),
+          lockDeadline: jest.fn(),
+          findOverdue: jest.fn(),
+          findEndingWithin: jest.fn(),
+          claimWarning: jest.fn(),
+        },
       },
       { provide: UNIT_OF_WORK, useValue: unitOfWork },
       { provide: ResourcesService, useValue: mocks.resourcesService },

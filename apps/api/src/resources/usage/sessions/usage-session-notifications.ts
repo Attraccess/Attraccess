@@ -1,3 +1,4 @@
+import type { AutoEndReason } from '../session-duration/session-duration.rules';
 import { ResourceUsageAction } from '@attraccess/application-models';
 import type {
   ResourceRecord,
@@ -143,7 +144,7 @@ export class UsageSessionNotifications {
     activeSession: UsageSession | null,
     skipNoteNotification: boolean,
     chargeTransactionId: number | undefined,
-    autoEndReason?: 'maximum' | 'estimate',
+    autoEndReason?: AutoEndReason,
   ): Promise<void> {
     if (chargeTransactionId !== undefined) await this.billingService.notifyResourceUsageCharge(chargeTransactionId);
     this.emitSystemUsageEvent(SystemEvent.RESOURCE_USAGE_ENDED, updatedUsage?.resource, updatedUsage?.user);

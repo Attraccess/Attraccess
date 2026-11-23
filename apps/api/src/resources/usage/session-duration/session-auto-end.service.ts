@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap, Inject } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { CronTimer } from '../../../metrics/instrumentation/cron/cron.helper';
 import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../../notifications/notification-types';
 import { createTranslator } from '../../../i18n/translate';
@@ -26,6 +27,7 @@ export class SessionAutoEndService implements OnApplicationBootstrap {
     private readonly usage: ResourceUsageService,
     private readonly notifications: NotificationDispatchService,
     @Inject(SESSION_DEADLINE_STORE) private readonly deadlines: SessionDeadlineStore,
+    private readonly cronTimer: CronTimer,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -33,12 +35,15 @@ export class SessionAutoEndService implements OnApplicationBootstrap {
   }
 
   @Cron(CronExpression.EVERY_MINUTE)
-  async run(now = new Date()): Promise<void> {
+  async run(): Promise<void> {
     if (this.running) return;
     this.running = true;
     try {
-      await this.endOverdueSessions(now);
-      await this.sendEndingSoonWarnings(now);
+      await this.cronTimer.time('session_auto_end', async () => {
+        await this.endOverdueSessions(new Date());
+        // Ending sessions runs their stop flows and can take a while: the warnings use the time they start at.
+        await this.sendEndingSoonWarnings(new Date());
+      });
     } catch (error) {
       this.logger.error(`Automatic session end run failed: ${(error as Error).message}`, (error as Error).stack);
     } finally {
@@ -48,32 +53,33 @@ export class SessionAutoEndService implements OnApplicationBootstrap {
 
   async endOverdueSessions(now: Date): Promise<number> {
     let ended = 0;
-    // Failing sessions stay overdue; remember them so one broken session cannot starve the rest of the batch.
-    const failed = new Set<number>();
+    // Sessions this run tried but did not end stay overdue: one that failed, or one another stop is ending right now
+    // (a manual stop, another instance). They wait for the next run, so the loop neither repeats nor starves on them.
+    const skipped = new Set<number>();
     for (;;) {
-      const overdue = (await this.deadlines.findOverdue(now, BATCH + failed.size)).filter(
-        (session) => !failed.has(session.id),
+      const overdue = (await this.deadlines.findOverdue(now, BATCH + skipped.size)).filter(
+        (session) => !skipped.has(session.id),
       );
       if (overdue.length === 0) return ended;
       for (const session of overdue) {
         try {
           if (await this.usage.endSessionAutomatically(session.resourceId, session.id)) ended += 1;
+          else skipped.add(session.id);
         } catch (error) {
-          failed.add(session.id);
+          skipped.add(session.id);
           this.logger.warn(
             `Ending session ${session.id} of resource ${session.resourceId} automatically failed: ${(error as Error).message}`,
           );
         }
       }
-      // Ended sessions left the overdue list; stop once a pass changed nothing.
-      if (overdue.every((session) => failed.has(session.id))) return ended;
     }
   }
 
   /** Sends the smallest due offset only: a run that was late for the 15 minute warning does not also send the 5. */
   async sendEndingSoonWarnings(now: Date): Promise<void> {
     const largest = Math.max(...ENDING_SOON_OFFSETS_MINUTES);
-    for (const session of await this.deadlines.findEndingWithin(now, largest)) {
+    const smallest = Math.min(...ENDING_SOON_OFFSETS_MINUTES);
+    for (const session of await this.deadlines.findEndingWithin(now, largest, smallest)) {
       if (!session.autoEndAt || !session.user || !session.resource) continue;
       const remainingMinutes = (session.autoEndAt.getTime() - now.getTime()) / MINUTE_MS;
       const offset = Math.min(...ENDING_SOON_OFFSETS_MINUTES.filter((candidate) => remainingMinutes <= candidate));
@@ -90,7 +96,7 @@ export class SessionAutoEndService implements OnApplicationBootstrap {
           category: NotificationCategory.RESOURCE_SESSION_ENDING_SOON,
           recipients: [recipient],
           title: (r) => t(r.locale, 'endingSoonTitle', { resourceName: resource.name }),
-          body: (r) => t(r.locale, 'endingSoonBody', { minutes }),
+          body: (r) => t(r.locale, minutes === 1 ? 'endingSoonBodyOne' : 'endingSoonBody', { minutes }),
           url: `/resources/${resource.id}`,
           severity: 'warning',
           dedupeKey: `resource_session_ending_soon:${session.id}:${endsAt.getTime()}:${offset}`,

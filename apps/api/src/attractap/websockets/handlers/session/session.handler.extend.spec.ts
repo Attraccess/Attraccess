@@ -1,5 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { SessionExtensionExceedsMaximumException } from '../../../../resources/usage/session-duration/session-duration.errors';
+import {
+  SessionDurationEstimateExceedsMaximumException,
+  SessionDurationEstimateRequiredException,
+  SessionExtensionExceedsMaximumException,
+} from '../../../../resources/usage/session-duration/session-duration.errors';
 import { AttractapEventType } from '../../websocket.types';
 import { CardSessionService } from '../ui/card-session.service';
 import { AttractapSessionHandler } from './session.handler';
@@ -55,7 +59,7 @@ const extend = (payload: Record<string, unknown> = {}) =>
   }) as any;
 
 describe('AttractapSessionHandler and session durations', () => {
-  it('passes the estimate of a reader that can ask and lets the start be refused without it', async () => {
+  it('passes the estimate of a reader that can ask', async () => {
     const { handler, usage, socket } = setup();
     socket.state.sessionDuration = true;
     await handler.handleStartResourceUsageSession(socket, start({ estimatedDurationMinutes: 90 }));
@@ -65,6 +69,38 @@ describe('AttractapSessionHandler and session durations', () => {
       expect.objectContaining({ estimatedDurationMinutes: 90 }),
       expect.objectContaining({ canAskDuration: true }),
     );
+  });
+
+  it.each([
+    ['a missing estimate', new SessionDurationEstimateRequiredException(240), 'SESSION_DURATION_ESTIMATE_REQUIRED'],
+    [
+      'an estimate above the maximum',
+      new SessionDurationEstimateExceedsMaximumException(300, 240),
+      'SESSION_DURATION_ESTIMATE_EXCEEDS_MAXIMUM',
+    ],
+  ])('answers a start refused for %s with its code', async (_name, refusal, code) => {
+    const { handler, usage, socket, replies } = setup();
+    socket.state.sessionDuration = true;
+    usage.startSession.mockRejectedValueOnce(refusal);
+    await handler.handleStartResourceUsageSession(socket, start());
+    expect(usage.startSession).toHaveBeenCalledWith(
+      10,
+      user,
+      expect.anything(),
+      expect.objectContaining({ canAskDuration: true }),
+    );
+    expect(replies(AttractapEventType.START_RESOURCE_USAGE_SESSION)).toEqual([
+      expect.objectContaining({ payload: { error: code, requestId: 4 } }),
+    ]);
+  });
+
+  it('answers a start that failed without a code with its message', async () => {
+    const { handler, usage, socket, replies } = setup();
+    usage.startSession.mockRejectedValueOnce(new Error('boom'));
+    await handler.handleStartResourceUsageSession(socket, start());
+    expect(replies(AttractapEventType.START_RESOURCE_USAGE_SESSION)).toEqual([
+      expect.objectContaining({ payload: { error: 'boom', requestId: 4 } }),
+    ]);
   });
 
   it('never lets a reader without the capability be refused for a missing estimate', async () => {

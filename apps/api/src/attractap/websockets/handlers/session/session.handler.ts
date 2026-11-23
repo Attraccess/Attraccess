@@ -456,8 +456,8 @@ export class AttractapSessionHandler {
         });
         return;
       }
-      this.logger.error(`Failed to start resource usage session: ${error.message}`);
       const code = error?.getResponse?.()?.code; // SESSION_DURATION_ESTIMATE_*: the reader maps it to a text
+      this.logger[code ? 'debug' : 'error'](`Failed to start resource usage session: ${error.message}`); // coded: user error
       await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: code ?? error.message });
     }
   }

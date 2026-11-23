@@ -49,7 +49,7 @@ export function initialWarnedOffset(remainingMinutes: number): number | null {
 export function computeStartDeadline(
   resource: SessionDurationSettings,
   startTime: Date,
-  estimate: number | undefined,
+  estimate: number | null | undefined,
   canAsk: boolean,
 ): SessionDeadline {
   const none: SessionDeadline = {
@@ -66,7 +66,7 @@ export function computeStartDeadline(
   let estimated: number | null = null;
   if (!resource.requireSessionDurationEstimate) {
     minutes = max;
-  } else if (estimate !== undefined) {
+  } else if (estimate !== undefined && estimate !== null) {
     if (max !== null && estimate > max) throw new SessionDurationEstimateExceedsMaximumException(estimate, max);
     minutes = estimated = estimate;
   } else if (canAsk) {

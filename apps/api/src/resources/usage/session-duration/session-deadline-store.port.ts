@@ -25,11 +25,21 @@ export interface SessionDeadlineStore {
     context?: TransactionScope,
   ): Promise<boolean>;
 
+  /**
+   * Locks the row of a running session until the transaction ends and reads its deadline; `null` once it ended.
+   * An extension and an automatic end of the same session both take this lock, so across API instances one of
+   * them commits first and the other sees it.
+   */
+  lockDeadline(usageId: number, context: TransactionScope): Promise<{ autoEndAt: Date | null } | null>;
+
   /** Published running sessions whose deadline is at or before `now`, earliest first. */
   findOverdue(now: Date, limit: number): Promise<OverdueSession[]>;
 
-  /** Published running sessions that end within the next `withinMinutes`, with their resource and user. */
-  findEndingWithin(now: Date, withinMinutes: number): Promise<UsageSession[]>;
+  /**
+   * Published running sessions that end within the next `withinMinutes` and still miss a warning of at least
+   * `smallestOffsetMinutes`, with their resource and user.
+   */
+  findEndingWithin(now: Date, withinMinutes: number, smallestOffsetMinutes: number): Promise<UsageSession[]>;
 
   /**
    * Marks the warning of this offset as sent for this deadline. Reports `true` for exactly one caller; `false`

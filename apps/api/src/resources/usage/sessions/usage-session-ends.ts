@@ -23,6 +23,7 @@ import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
 import { AUTO_END_NOTES, autoEndReason } from '../session-duration/session-duration.rules';
 
 import { SessionNoLongerDueError } from '../session-duration/session-no-longer-due.error';
+import { SESSION_DEADLINE_STORE, SessionDeadlineStore } from '../session-duration/session-deadline-store.port';
 
 import { TentativeSessionCancelledError } from '../errors/tentative-session-cancelled.error';
 
@@ -70,6 +71,7 @@ export class UsageSessionEnds {
     private readonly resourceFormsService: ResourceFormsService,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly notifications: UsageSessionNotifications,
+    @Inject(SESSION_DEADLINE_STORE) private readonly deadlines: SessionDeadlineStore,
   ) {}
 
   async endSession(
@@ -121,9 +123,11 @@ export class UsageSessionEnds {
       }
 
       const isSessionOwner = await this.gate.assertMayEndSession(activeSession, user);
-      if (options.autoEndReason && (!activeSession.autoEndAt || activeSession.autoEndAt.getTime() > Date.now())) {
+      if (options.autoEndReason) {
+        // The row lock orders this end with an extension on another instance; the deadline is read after it.
+        const locked = await this.deadlines.lockDeadline(activeSession.id, scope);
         // Extended (or ended and replaced) since the job found it: nothing to end any more.
-        throw new SessionNoLongerDueError();
+        if (!locked?.autoEndAt || locked.autoEndAt.getTime() > Date.now()) throw new SessionNoLongerDueError();
       }
 
       const endTime = new Date();

@@ -38,7 +38,11 @@ describe('Maximum session time and duration estimates (persistence)', () => {
       sendEmailTemplate: jest.fn().mockResolvedValue(undefined),
     };
     const { deadlines } = usagePersistenceFor({ usage: scope.source.getRepository(ResourceUsage) });
-    return { service: new SessionAutoEndService(scope.usage, notifications as never, deadlines), notifications };
+    const cronTimer = { time: <T>(_job: string, fn: () => Promise<T>) => fn() };
+    return {
+      service: new SessionAutoEndService(scope.usage, notifications as never, deadlines, cronTimer as never),
+      notifications,
+    };
   };
   const moveDeadline = (usageId: number, autoEndAt: Date) => sessions().update(usageId, { autoEndAt });
 
@@ -309,17 +313,26 @@ describe('Maximum session time and duration estimates (persistence)', () => {
     const sent = (notifications: { dispatch: jest.Mock }) => notifications.dispatch.mock.calls.length;
 
     it('warns 15 and 5 minutes before the end, once each', async () => {
-      const started = await startAt(14);
+      const started = await startAt(30);
+      const { autoEndAt } = await sessions().findOneByOrFail({ id: started.id });
+      const before = (minutes: number) => new Date(autoEndAt.getTime() - minutes * MIN);
       const { service, notifications } = autoEnd();
-      await service.sendEndingSoonWarnings(new Date());
-      await service.sendEndingSoonWarnings(new Date());
+
+      await service.sendEndingSoonWarnings(before(16));
+      expect(sent(notifications)).toBe(0);
+      await service.sendEndingSoonWarnings(before(14));
+      await service.sendEndingSoonWarnings(before(14));
+      await service.sendEndingSoonWarnings(before(6));
       expect(sent(notifications)).toBe(1);
 
-      await sessions().update(started.id, { autoEndAt: new Date(Date.now() + 4 * MIN) });
-      await service.sendEndingSoonWarnings(new Date());
-      await service.sendEndingSoonWarnings(new Date());
+      await service.sendEndingSoonWarnings(before(4));
       expect(sent(notifications)).toBe(2);
-      expect(notifications.dispatch.mock.calls[0][0].category).toBe('resource_session_ending_soon');
+      await service.sendEndingSoonWarnings(before(3));
+      expect(sent(notifications)).toBe(2);
+      expect(notifications.dispatch.mock.calls.map(([request]) => request.category)).toEqual([
+        'resource_session_ending_soon',
+        'resource_session_ending_soon',
+      ]);
     });
 
     it('sends only the smallest due warning after a late run, and nothing for a distant end', async () => {
@@ -350,12 +363,14 @@ describe('Maximum session time and duration estimates (persistence)', () => {
       await service.sendEndingSoonWarnings(new Date());
       expect(sent(notifications)).toBe(1);
       await scope.usage.extendSession(1, scope.users[0], { extendByMinutes: 60 });
-      // The new deadline is far away: nothing yet; moving time to 5 minutes before it warns once more.
+      // The new deadline is far away: nothing yet.
       await service.sendEndingSoonWarnings(new Date());
       expect(sent(notifications)).toBe(1);
-      await sessions().update(started.id, { autoEndAt: new Date(Date.now() + 4 * MIN) });
-      await service.sendEndingSoonWarnings(new Date());
+      // 14 minutes before the new deadline the 15 minute warning, already sent for the old one, comes again.
+      const { autoEndAt } = await sessions().findOneByOrFail({ id: started.id });
+      await service.sendEndingSoonWarnings(new Date(autoEndAt.getTime() - 14 * MIN));
       expect(sent(notifications)).toBe(2);
+      expect(notifications.dispatch.mock.calls[1][0].body({ locale: 'en' })).toContain('about 14 minutes');
     });
   });
 });

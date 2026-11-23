@@ -62,6 +62,12 @@ describe('computeStartDeadline', () => {
     }
   });
 
+  it('treats a null estimate as a missing one, so it cannot lift the limits', () => {
+    const both = machine({ requireSessionDurationEstimate: true, maxSessionDurationMinutes: 120 });
+    expect(codeOf(() => computeStartDeadline(both, start, null, true))).toBe(SessionDurationErrorCode.ESTIMATE_REQUIRED);
+    expect(computeStartDeadline(both, start, null, false).autoEndAt).toEqual(addMinutes(start, 120));
+  });
+
   it('ends an estimate-only session at start + estimate with no cap', () => {
     const deadline = computeStartDeadline(machine({ requireSessionDurationEstimate: true }), start, 45, true);
     expect(deadline).toMatchObject({ autoEndAt: addMinutes(start, 45), maxAutoEndAt: null, estimatedDurationMinutes: 45 });

@@ -55,13 +55,17 @@ export class UsageSessionExtensions {
       const sessions = await this.lifecycle.sessions.findActiveSessions(resourceId, scope);
       const session = pickSessionToEnd(sessions, user, dto.usageId, limit);
       await this.gate.assertMayEndSession(session, user);
+      // Waits for an automatic end of this session running on another instance; what it committed is read after.
+      const locked = await this.deadlines.lockDeadline(session.id, scope);
+      if (!locked) throw new SessionExtensionNotPossibleException('This session has just ended or changed');
       if (await this.lifecycle.sessions.isSessionBeingEnded(session.id, scope)) {
         throw new SessionExtensionNotPossibleException('This session is being ended');
       }
 
       const now = new Date();
-      const previous = session.autoEndAt as Date; // computeExtension refuses a session without a deadline
-      const next = computeExtension(session, { extendByMinutes: dto.extendByMinutes, toMax: dto.toMax }, now);
+      const current = { ...session, autoEndAt: locked.autoEndAt };
+      const next = computeExtension(current, { extendByMinutes: dto.extendByMinutes, toMax: dto.toMax }, now);
+      const previous = current.autoEndAt as Date; // computeExtension refuses a session without a deadline
       const extended = await this.deadlines.extend(
         session.id,
         previous,

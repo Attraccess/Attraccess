@@ -1,3 +1,4 @@
+import type { AutoEndReason } from '../session-duration/session-duration.rules';
 import { ResourceFlowNodeType } from '@attraccess/application-models';
 import type {
   UsageBillingItemDraft,
@@ -56,7 +57,7 @@ export interface EndSessionOptions {
    * The automatic end: why the session ends. Also makes the end conditional on the deadline still having passed when
    * the machine's turn is taken, so an extension that wins the race keeps the session running.
    */
-  autoEndReason?: 'maximum' | 'estimate';
+  autoEndReason?: AutoEndReason;
 }
 
 export interface StartSessionOptions {

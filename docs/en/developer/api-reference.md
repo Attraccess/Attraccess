@@ -95,7 +95,7 @@ Machines can have a **max session time** and can **require a duration estimate**
 | `SESSION_DURATION_ESTIMATE_EXCEEDS_MAXIMUM` | The estimate is above the max session time. |
 
 > [!WARNING]
-> API-token and MCP clients that start sessions fail with `SESSION_DURATION_ESTIMATE_REQUIRED` on every resource where an admin turns on **Require duration estimate**. Send `estimatedDurationMinutes` there.
+> API-token and MCP clients that start sessions fail with `SESSION_DURATION_ESTIMATE_REQUIRED` on every resource where an admin turns on **Require duration estimate**. Send `estimatedDurationMinutes` there. This also applies to a supervised start request (`POST /api/resources/{resourceId}/usage/supervision/request`): the server checks the estimate when the request is made, not when the supervisor approves it.
 
 **Extending.** `POST /api/resources/{resourceId}/usage/extend` moves `autoEndAt` later. The body takes `usageId`, `extendByMinutes` or `toMax`:
 
