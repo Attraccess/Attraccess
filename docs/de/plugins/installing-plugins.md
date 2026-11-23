@@ -17,6 +17,27 @@ Updates und Downgrades dürfen keine Abhängigkeiten verletzen. Beim Entfernen e
 
 Wenn eine Abhängigkeit nicht geladen werden kann, bleiben ihre abhängigen Plugins inaktiv. Öffne die Fehlerdetails unter **Einstellungen → Plugins**, repariere die Abhängigkeit oder versuche sie erneut zu laden und starte neu.
 
+## Neustart zum Übernehmen von Änderungen
+
+Wenn Sie ein Plugin installieren, aktualisieren, zurückstufen, hochladen oder entfernen, speichert Attraccess die
+Änderung, läuft aber weiter. Die Änderung wird beim nächsten Neustart wirksam. So können Sie mehrere Plugins
+installieren oder aktualisieren und danach einmal neu starten.
+
+Solange Änderungen ausstehen, sehen Plugin-Administratoren (Benutzer mit der Berechtigung `system.plugins.manage`) oben
+auf jeder Seite den Hinweis **Neustart erforderlich**. Er lässt sich nicht ausblenden. Wählen Sie im Hinweis **Jetzt
+neu starten** und bestätigen Sie: Attraccess ist kurz nicht erreichbar, offene Sitzungen und Verbindungen von
+Lesegeräten verbinden sich selbst wieder, und die Seite lädt neu, sobald der Server wieder läuft. Danach verschwindet
+der Hinweis und die geänderten Plugins sind aktiv.
+
+- Bis zum Neustart liegt ein installiertes oder aktualisiertes Plugin auf dem Datenträger, ist aber nicht geladen, und
+  ein entferntes Plugin läuft im Hintergrund weiter. Nach dem Entfernen lädt die Seite einmal neu, weil die Seiten des
+  Plugins fehlen.
+- Zwei Aktionen starten Attraccess weiterhin sofort neu: **Erneut versuchen** bei einem Plugin, das nicht geladen
+  werden konnte, und eine Änderung des Lizenzschlüssels, die ändert, welche Plugins geladen werden dürfen (siehe
+  [Lizenz fehlt](#lizenz-fehlt)). Ein solcher Neustart übernimmt auch ausstehende Änderungen.
+- Bei mehreren API-Instanzen merkt sich jede Instanz ihre ausstehenden Änderungen selbst, und **Jetzt neu starten**
+  startet die Instanz neu, die die Anfrage beantwortet.
+
 ## Release-Kanäle
 
 Offizielle Plugins werden auf npm unter diesen Dist-Tags veröffentlicht:
@@ -29,6 +50,12 @@ Offizielle Plugins werden auf npm unter diesen Dist-Tags veröffentlicht:
 
 Um ein Nightly zu testen, öffne **Einstellungen → Plugins**, öffne das Aktionsmenü (**⋯**) des installierten Plugins, wähle **Version verwalten** und trage `next` (oder eine bestimmte Nightly-Version) unter **Gewünschte Version oder Kanal** ein. Nightly-Versionen sind Vorabversionen und werden nie automatisch installiert.
 
+Der Dialog **Version verwalten** zeigt die aktuelle Version, die verfügbaren Versionen (nicht installierbare Versionen
+nennen den Grund), die Änderungen und Genehmigungen der ausgewählten Version und die **Update-Einstellungen** des
+Pakets. Das Speichern der Update-Einstellungen ändert nur, welche Versionen die Update-Prüfung anbietet; es installiert
+nichts. **Auf … aktualisieren** oder **Auf … zurückstufen** installiert die ausgewählte Version, die nach einem
+[Neustart](#neustart-zum-übernehmen-von-änderungen) wirksam wird.
+
 Sobald ein Plugin einmal released wurde, bietet der Marktplatz nur noch released Versionen an. Bis dahin gilt:
 
 - Bei WAGO, Shelly und RabbitMQ bleibt `latest` auf einem Nightly-Build (`0.1.0-nightly.925.2`, für Hosts `^1.9.0`), bis Attraccess 1.11.0 stabile Versionen veröffentlicht. Der aktuelle Plugin-Code ist für Attraccess 2.0 gebaut (`attraccessVersion.min` `2.0.0-0`) und läuft nicht auf 1.x-Hosts; 1.x-Hosts behalten daher die 1.x-Builds.
@@ -39,7 +66,8 @@ Sobald ein Plugin einmal released wurde, bietet der Marktplatz nur noch released
 1. Oeffnen Sie **Einstellungen** in der Seitenleiste und waehlen Sie den Bereich **Plugins**
 2. Klicken Sie auf die Schaltflaeche **Plugin hochladen**
 3. Waehlen Sie die Plugin-Datei von Ihrem Computer aus
-4. Das Plugin wird hochgeladen und erscheint in der Plugin-Liste
+4. Das Plugin wird hochgeladen und erscheint in der Plugin-Liste. Es wird nach einem
+   [Neustart](#neustart-zum-übernehmen-von-änderungen) aktiv.
 
 <!-- TODO: Screenshot des Plugin-Upload-Dialogs -->
 

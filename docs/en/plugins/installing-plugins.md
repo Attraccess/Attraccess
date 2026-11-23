@@ -17,6 +17,25 @@ Updates and downgrades cannot break the dependency graph. If a required plugin i
 
 If a dependency fails to load, its dependants stay inactive. Open the failure details in **Settings → Plugins**, repair or retry the failed dependency, then restart.
 
+## Restart to apply changes
+
+Installing, updating, downgrading, uploading or removing a plugin saves the change to disk, but Attraccess keeps
+running. The change takes effect after the next restart, so you can install or update several plugins first and
+restart once.
+
+While changes are pending, plugin administrators (users with the `system.plugins.manage` permission) see a
+**Restart required** banner at the top of every page. It cannot be dismissed. Choose **Restart now** in the banner and
+confirm: Attraccess is unavailable for a moment, open sessions and reader connections reconnect on their own, and the
+page reloads when the server is back. The banner then disappears and the changed plugins are active.
+
+- Until the restart, an installed or updated plugin is on disk but not loaded, and a removed plugin keeps running
+  in the background. Removing a plugin reloads the page once, because its pages are gone.
+- Two actions still restart Attraccess at once: **Retry** on a plugin that failed to load, and a license key change
+  that changes which plugins may load (see [License missing](#license-missing)). Such a restart also applies pending
+  changes.
+- With several API instances, each instance tracks its own pending changes, and **Restart now** restarts the instance
+  that answers the request.
+
 ## Release channels
 
 Official plugins are published to npm under these dist-tags:
@@ -29,6 +48,11 @@ Official plugins are published to npm under these dist-tags:
 
 To try a nightly, open **Settings → Plugins**, open the installed plugin's actions menu (**⋯**), choose **Manage version** and enter `next` (or a specific nightly version) as **Requested version or channel**. Nightly versions are prereleases, so they are never installed automatically.
 
+The **Manage version** dialog shows the current version, the available versions (versions that cannot be installed
+say why), the changes and approvals of the version you select, and the package's **Update settings**. Saving the
+update settings only changes which versions update checks offer; it installs nothing. **Update to …** or
+**Downgrade to …** installs the selected version, which takes effect after a [restart](#restart-to-apply-changes).
+
 Once a plugin has had a release, the marketplace offers only released versions. Until then:
 
 - The WAGO, Shelly and RabbitMQ `latest` versions stay at a nightly build (`0.1.0-nightly.925.2`, for hosts `^1.9.0`) until Attraccess 1.11.0 publishes them as stable versions. The current plugin code is built for Attraccess 2.0 (`attraccessVersion.min` `2.0.0-0`) and does not run on 1.x hosts, so 1.x hosts keep the 1.x builds.
@@ -39,7 +63,8 @@ Once a plugin has had a release, the marketplace offers only released versions. 
 1. Open **Settings** in the sidebar and select the **Plugins** section
 2. Click the **Upload Plugin** button
 3. Select the plugin file from your computer
-4. The plugin is uploaded and appears in the plugin list
+4. The plugin is uploaded and appears in the plugin list. It becomes active after a
+   [restart](#restart-to-apply-changes).
 
 <!-- TODO: Screenshot of upload plugin dialog -->
 
