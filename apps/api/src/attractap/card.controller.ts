@@ -5,6 +5,9 @@ import {
   Req,
   Body,
   Patch,
+  Delete,
+  BadRequestException,
+  HttpCode,
   Param,
   Query,
   ParseIntPipe,
@@ -19,6 +22,7 @@ import { NfcCardSetActiveStateDto } from './dtos/rfid-card-set-active-state.dto'
 import { RequiresLicense } from '../license/require-license.decorator';
 import { LicenseModuleType } from '../license/license.service';
 import { CardAccessService } from './card-access.service';
+import { CardOperationsService } from './websockets/card-operations.service';
 
 @ApiTags('Attractap')
 @Controller('attractap/cards')
@@ -29,6 +33,7 @@ export class AttractapNfcCardsController {
     @Inject(AttractapService)
     private readonly attractapService: AttractapService,
     private readonly cardAccess: CardAccessService,
+    private readonly cardOperations: CardOperationsService,
   ) {}
 
   @Get()
@@ -72,5 +77,25 @@ export class AttractapNfcCardsController {
     } else {
       return toNfcCardDto(await this.attractapService.deactivateNFCCard(id));
     }
+  }
+
+  @Delete('/:id')
+  @Auth()
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Delete a UID-only card',
+    description:
+      'A UID-only card has nothing written on it, so it is removed without a reader. Secure cards are reset through a reader instead.',
+    operationId: 'deleteUidOnlyCard',
+  })
+  @ApiResponse({ status: 204, description: 'The card was deleted' })
+  async deleteUidOnlyCard(@Param('id', ParseIntPipe) id: number, @Req() req: AuthenticatedRequest): Promise<void> {
+    const card = await this.cardAccess.getCardForManagement(id, req.user);
+    if (card.type !== 'uid-only') throw new BadRequestException('CARD_NOT_UID_ONLY');
+    await this.cardOperations.deleteUidOnlyCard(card, {
+      userId: req.user.id,
+      authenticationMethod: req.user.authenticationMethod ?? 'session',
+      ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
+    });
   }
 }

@@ -155,6 +155,7 @@ describe('CardWriterSettingsController', () => {
       await expect(controller.update({ mode: 'selected', readerIds: [2] }, req)).resolves.toEqual({
         mode: 'selected',
         readerIds: [2],
+        allowUidOnlyCards: false,
       });
     });
   });

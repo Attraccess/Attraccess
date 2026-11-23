@@ -1822,22 +1822,27 @@
   "getAllCards": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "0105035e"
+    "shape": "d8f23822"
   },
   "toggleCardActive": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "974c0782"
+    "shape": "7f64615a"
+  },
+  "deleteUidOnlyCard": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "3ea78c60"
   },
   "getCardWriterSettings": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "c6db4771"
+    "shape": "2802f69a"
   },
   "updateCardWriterSettings": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "0fece2fb"
+    "shape": "b7871ca4"
   },
   "getFirmwares": {
     "decision": "allow",

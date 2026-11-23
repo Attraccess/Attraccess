@@ -93,6 +93,24 @@ describe('Attractap persistence adapters on PostgreSQL', () => {
     const store = () =>
       new TypeOrmAttractapCardStore(source.getRepository(NFCCard), source.getRepository(NFCCardPendingChange));
 
+    it('stores a UID-only card without key and finds it by UID in any letter case', async () => {
+      const user = await source.getRepository(User).save({ username: 'uidonly', email: 'uidonly@example.test' });
+      const cards = store();
+
+      const created = await cards.create(
+        user,
+        { uid: '04a1b2c3d4e5f6', type: 'uid-only', keyNo: null, key: null },
+        true,
+      );
+
+      expect(created).toMatchObject({ type: 'uid-only', keyNo: null, key: null, isActive: true });
+      expect((await cards.findByUid('04A1B2C3D4E5F6'))?.id).toBe(created.id);
+      expect((await cards.findByUid('04a1b2c3d4e5f6'))?.user.id).toBe(user.id);
+      expect(await cards.findByUid('04a1b2c3d4e5f7')).toBeUndefined();
+      const secure = await cards.create(user, { uid: '0f0f', keyNo: 1, key: 'k' }, false);
+      expect(secure.type).toBe('aes');
+    });
+
     it('switches the other cards of the owner off in the same transaction that stores the new one', async () => {
       const user = await source.getRepository(User).save({ username: 'owner', email: 'owner@example.test' });
       const cards = store();

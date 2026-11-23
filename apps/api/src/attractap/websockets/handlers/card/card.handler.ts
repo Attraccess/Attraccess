@@ -235,6 +235,9 @@ export class AttractapCardHandler {
     if (!nfcCard) {
       throw new NotFoundException(CARD_WRITE_START_ERRORS.CARD_NOT_FOUND);
     }
+    if (nfcCard.type === 'uid-only') {
+      throw new BadRequestException(CARD_WRITE_START_ERRORS.CARD_IS_UID_ONLY);
+    }
     if (sockets.some((socket) => this.isBusyWithCardFlow(socket))) {
       throw new ConflictException(CARD_WRITE_START_ERRORS.READER_BUSY);
     }

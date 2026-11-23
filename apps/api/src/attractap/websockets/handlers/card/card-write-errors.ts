@@ -14,6 +14,8 @@ export const CARD_WRITE_START_ERRORS = {
   READER_CARD_ENROLLMENT_NOT_SUPPORTED: 'READER_CARD_ENROLLMENT_NOT_SUPPORTED',
   USER_NOT_FOUND: 'USER_NOT_FOUND',
   CARD_NOT_FOUND: 'CARD_NOT_FOUND',
+  /** A UID-only card has nothing to reset on the card: it is deleted without a reader. */
+  CARD_IS_UID_ONLY: 'CARD_IS_UID_ONLY',
 } as const;
 
 /**

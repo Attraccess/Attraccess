@@ -474,7 +474,12 @@ export class AttractapService {
     const activate = options.activate ?? true;
     const card = await this.cardStore.create(
       user,
-      { uid: data.uid, keyNo: data.keyNo, key: this.encryptionService.encrypt(data.key) },
+      {
+        uid: data.uid,
+        ...(data.type ? { type: data.type } : {}),
+        keyNo: data.keyNo,
+        key: data.key == null ? null : this.encryptionService.encrypt(data.key),
+      },
       activate,
     );
     this.notifyNfcCardChange(card, 'registered');

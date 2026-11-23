@@ -126,6 +126,7 @@ export const SETTING_KEYS = [
   'attractap.cardWriterMode',
   'attractap.cardWriterReaders',
   'attractap.cardWriterReaderCount',
+  'attractap.allowUidOnlyCards',
   'networkRestriction.enabled',
   'networkRestriction.allowedRanges',
   'networkRestriction.ipSource',
@@ -386,6 +387,7 @@ function safeSettingValue(key: string, value: unknown): boolean {
   if (key === 'app.defaultLanguage') return value === 'en' || value === 'de';
   if (key === 'resources.activityVisibility') return value === 'all' || value === 'introduced';
   if (key === 'attractap.cardWriterMode') return value === 'all' || value === 'selected';
+  if (key === 'attractap.allowUidOnlyCards') return value === 'true' || value === 'false';
   if (key === 'attractap.cardWriterReaders') return /^(?:\d+(?:,\d+)*)?$/.test(value);
   if (key.startsWith('networkRestriction.') && !key.endsWith('.enabled'))
     return safeNetworkRestrictionValue(key, value);

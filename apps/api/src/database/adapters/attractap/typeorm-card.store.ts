@@ -39,7 +39,12 @@ export class TypeOrmAttractapCardStore implements AttractapCardStore {
   }
 
   async findByUid(uid: string): Promise<AttractapNfcCard | undefined> {
-    const card = await this.cards.findOne({ where: { uid }, relations: { user: true } });
+    // One normalised form: a record stored in upper case still matches what a reader or plugin sends.
+    const card = await this.cards
+      .createQueryBuilder('card')
+      .leftJoinAndSelect('card.user', 'user')
+      .where('LOWER(card.uid) = :uid', { uid: uid.toLowerCase() })
+      .getOne();
     return card ? toNfcCard(card) : undefined;
   }
 

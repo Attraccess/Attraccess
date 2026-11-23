@@ -199,4 +199,73 @@ describe('CardDetectedRouter', () => {
     expect(b.socket.state.verifiedUserId).toBeNull();
     expect(b.socket.state.verifiedCardUid).toBeNull();
   });
+
+  describe('card type and UID form', () => {
+    it('passes the SAK and ATQA of the card on to the card checks', async () => {
+      const { reader, tap, operations } = await setup();
+      const spy = jest.spyOn(operations, 'verifyCard');
+      const r = reader();
+
+      await tap(r.socket, { sak: 0x20, atqa: 0x0344 });
+
+      expect(spy).toHaveBeenCalledWith(r.socket, 'tap', expect.objectContaining({ uid: UID, sak: 0x20, atqa: 0x0344 }));
+    });
+
+    it('leaves them out when the reader does not report them', async () => {
+      const { reader, tap, operations } = await setup();
+      const spy = jest.spyOn(operations, 'verifyCard');
+
+      await tap(reader().socket);
+
+      expect(spy.mock.calls[0][2]).not.toHaveProperty('sak');
+      expect(spy.mock.calls[0][2]).not.toHaveProperty('atqa');
+    });
+
+    it.each([{ sak: 256 }, { sak: -1 }, { sak: 'x' }, { sak: 1.5 }, { atqa: 0x10000 }, { atqa: 'x' }])(
+      'answers INVALID_PARAMS for %p',
+      async (payload) => {
+        const { reader, tap } = await setup();
+        const r = reader();
+
+        await tap(r.socket, payload);
+
+        expect(replies(r.socket, AttractapEventType.CARD_AUTHENTICATION_DATA)).toEqual([
+          { type: AttractapEventType.CARD_AUTHENTICATION_DATA, payload: { error: 'INVALID_PARAMS' } },
+        ]);
+      },
+    );
+
+    it('compares UIDs in one form: an upper-case UID is the same card', async () => {
+      const { reader, tap, operations } = await setup();
+      const spy = jest.spyOn(operations, 'verifyCard');
+
+      await tap(reader().socket, { uid: UID.toUpperCase() });
+
+      expect(spy.mock.calls[0][2].uid).toBe(UID);
+    });
+
+    it('logs in a UID-only card through the router without a single APDU', async () => {
+      const { reader, tap, cards, settings, user } = await setup();
+      settings.uidOnlyAllowed = true;
+      cards.push({ id: 2, uid: '1a2b3c4d', type: 'uid-only', keyNo: null, key: null, isActive: true, user });
+      const r = reader();
+
+      await tap(r.socket, { uid: '1A2B3C4D', sak: 0x08 });
+
+      expect(r.socket.state.verifiedUserId).toBe(5);
+      expect(r.apdus()).toEqual([]);
+    });
+
+    it('tells the reader when UID-only cards are disabled', async () => {
+      const { reader, tap, cards, user } = await setup();
+      cards.push({ id: 2, uid: '1a2b3c4d', type: 'uid-only', keyNo: null, key: null, isActive: true, user });
+      const r = reader();
+
+      await tap(r.socket, { uid: '1a2b3c4d', sak: 0x08 });
+
+      expect(replies(r.socket, AttractapEventType.CARD_AUTHENTICATION_DATA)).toEqual([
+        { type: AttractapEventType.CARD_AUTHENTICATION_DATA, payload: { error: 'UID_ONLY_CARDS_DISABLED' } },
+      ]);
+    });
+  });
 });

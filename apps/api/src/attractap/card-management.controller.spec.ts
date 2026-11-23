@@ -6,6 +6,7 @@ import request from 'supertest';
 import { AttractapController } from './attractap.controller';
 import { AttractapNfcCardsController } from './card.controller';
 import { CardAccessService } from './card-access.service';
+import { CardOperationsService } from './websockets/card-operations.service';
 import { AttractapService } from './attractap.service';
 import { AttractapGateway } from './websockets/websocket.gateway';
 import { WebsocketService } from './websockets/websocket.service';
@@ -34,6 +35,7 @@ describe('RFID card management authorization', () => {
   };
   const gateway = { startEnrollOfNewNfcCard: jest.fn(), startResetOfNfcCard: jest.fn() };
   const users = { findOne: jest.fn() };
+  const operations = { deleteUidOnlyCard: jest.fn() };
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
@@ -44,6 +46,7 @@ describe('RFID card management authorization', () => {
         { provide: AttractapGateway, useValue: gateway },
         { provide: WebsocketService, useValue: {} },
         { provide: UsersService, useValue: users },
+        { provide: CardOperationsService, useValue: operations },
       ],
     })
       .overrideGuard(LicenseGuard)
@@ -200,5 +203,49 @@ describe('RFID card management authorization', () => {
       .post('/attractap/readers/enroll-nfc-card')
       .send({ readerId: 4, userId: 1.5 })
       .expect(400);
+  });
+
+  describe('DELETE /attractap/cards/:id (UID-only cards)', () => {
+    const uidOnly = { ...card, type: 'uid-only', key: null, keyNo: null } as unknown as AttractapNfcCard;
+
+    it.each(['owner', 'manager'])('lets the %s delete a UID-only card and audits it as the actor', async (actor) => {
+      service.getNFCCardByID.mockResolvedValue(uidOnly);
+      await request(app.getHttpServer())
+        .delete('/attractap/cards/7')
+        .set('actor-id', actor === 'owner' ? '2' : '1')
+        .set('permissions', actor === 'manager' ? 'users.rfid-cards.manage' : '')
+        .expect(204);
+      expect(operations.deleteUidOnlyCard).toHaveBeenCalledWith(uidOnly, {
+        userId: actor === 'owner' ? 2 : 1,
+        authenticationMethod: 'api-token',
+        apiTokenId: 9,
+      });
+    });
+
+    it("refuses another user's card without the manage permission", async () => {
+      service.getNFCCardByID.mockResolvedValue(uidOnly);
+      await request(app.getHttpServer()).delete('/attractap/cards/7').set('permissions', '').expect(403);
+      expect(operations.deleteUidOnlyCard).not.toHaveBeenCalled();
+    });
+
+    it('refuses a secure card: it is reset through a reader', async () => {
+      service.getNFCCardByID.mockResolvedValue({ ...card, type: 'aes' });
+      const response = await request(app.getHttpServer()).delete('/attractap/cards/7').set('actor-id', '2').expect(400);
+      expect(response.body.message).toBe('CARD_NOT_UID_ONLY');
+      expect(operations.deleteUidOnlyCard).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 for a missing card', async () => {
+      service.getNFCCardByID.mockResolvedValue(undefined);
+      await request(app.getHttpServer()).delete('/attractap/cards/7').expect(404);
+    });
+  });
+
+  it('exposes the card type and never the key', async () => {
+    service.getNFCCardsByUserId.mockResolvedValueOnce([{ ...card, type: 'uid-only', key: null, keyNo: null }]);
+    const response = await request(app.getHttpServer()).get('/attractap/cards').expect(200);
+    expect(response.body[0]).toMatchObject({ id: 7, type: 'uid-only' });
+    expect(response.body[0].key).toBeUndefined();
+    expect(response.body[0].keyNo).toBeUndefined();
   });
 });

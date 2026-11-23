@@ -33,15 +33,23 @@ const DESFIRE_HW_TYPE = 0x01;
 const VENDOR_NXP = 0x04;
 const DESFIRE_HW_MAJOR_EV2 = 0x12;
 
-export type CardCheckResult = { ok: true; kind: CardKind } | { ok: false; reason: 'desfire-ev1' };
+/** SAK bit 0x20: the card speaks ISO 14443-4 and answers APDUs. MIFARE Classic and Ultralight/NTAG21x do not. */
+const SAK_ISO_DEP = 0x20;
+
+/** True when a card with this SAK can be sent APDUs at all. */
+export const sakSpeaksIsoDep = (sak: number): boolean => (sak & SAK_ISO_DEP) !== 0;
+
+export type CardCheckResult = { ok: true; kind: CardKind } | { ok: false; reason: 'desfire-ev1' | 'no-iso-dep' };
 
 /**
  * GetVersion (3 frames, as the firmware sends them) and classify the card like NFC::detectCardType
  * and NFC::authenticateInternal: DESFire takes the DESFire path, everything else (NTAG 424, other
  * vendors, short or garbled answers, unknown hardware types) the NTAG 424 path. DESFire EV1 has no
- * AuthenticateEV2First and is refused.
+ * AuthenticateEV2First and is refused. With the card's SAK, a card that does not speak ISO 14443-4 is
+ * refused without a single APDU (`no-iso-dep`): it cannot do AES.
  */
-export async function detectCardKind(channel: CardChannel): Promise<CardCheckResult> {
+export async function detectCardKind(channel: CardChannel, sak?: number): Promise<CardCheckResult> {
+  if (sak !== undefined && !sakSpeaksIsoDep(sak)) return { ok: false, reason: 'no-iso-dep' };
   const first = await channel.exchange(getVersion());
   await channel.exchange(additionalFrame());
   await channel.exchange(additionalFrame());

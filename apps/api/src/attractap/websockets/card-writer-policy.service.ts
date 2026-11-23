@@ -31,6 +31,13 @@ export function cardWriterSettingChanges(
       ]);
     }
   }
+  if (before.allowUidOnlyCards !== after.allowUidOnlyCards) {
+    changes.push([
+      'attractap.allowUidOnlyCards',
+      String(!!before.allowUidOnlyCards),
+      String(!!after.allowUidOnlyCards),
+    ]);
+  }
   return changes;
 }
 
@@ -57,14 +64,24 @@ export class CardWriterPolicyService {
     } catch {
       readerIds = [];
     }
-    return { mode, readerIds };
+    const allowUidOnlyCards =
+      (await this.settings.getPlainSetting(ATTRACTAP_PARENT, ATTRACTAP_KEYS.allowUidOnlyCards)) === 'true';
+    return { mode, readerIds, allowUidOnlyCards };
+  }
+
+  /** Whether cards that only offer a UID may be enrolled and used. Off unless an administrator turned it on. */
+  async isUidOnlyAllowed(): Promise<boolean> {
+    return (await this.settings.getPlainSetting(ATTRACTAP_PARENT, ATTRACTAP_KEYS.allowUidOnlyCards)) === 'true';
   }
 
   async set(settings: CardWriterSettingsDto): Promise<CardWriterSettingsDto> {
     const readerIds = [...new Set(settings.readerIds)].sort((a, b) => a - b);
     await this.settings.setPlainSetting(ATTRACTAP_PARENT, ATTRACTAP_KEYS.cardWriterMode, settings.mode);
     await this.settings.setPlainSetting(ATTRACTAP_PARENT, ATTRACTAP_KEYS.cardWriterReaders, JSON.stringify(readerIds));
-    return { mode: settings.mode, readerIds };
+    // Left as it is when the caller does not send it.
+    const allowUidOnlyCards = settings.allowUidOnlyCards ?? (await this.isUidOnlyAllowed());
+    await this.settings.setPlainSetting(ATTRACTAP_PARENT, ATTRACTAP_KEYS.allowUidOnlyCards, String(allowUidOnlyCards));
+    return { mode: settings.mode, readerIds, allowUidOnlyCards };
   }
 
   /** Stores the setting and audits every value the update changed, including a revoked reader it removes. */

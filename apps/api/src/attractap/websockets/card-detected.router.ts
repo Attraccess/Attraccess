@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { normalizeCardUid } from '../card-uid';
 import { CardConversationService } from './card-conversation.service';
 import { AttractapCardHandler } from './handlers/card/card.handler';
 import { AttractapMassIntroductionHandler } from './handlers/mass-introduction/mass-introduction.handler';
@@ -14,6 +15,11 @@ const REPLY_TYPES: Record<string, AttractapEventType> = {
   supervisor: AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA,
   'mass-introduction': AttractapEventType.MASS_INTRODUCTION_RESULT,
 };
+
+const isByte = (value: unknown): value is number =>
+  Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 0xff;
+const isWord = (value: unknown): value is number =>
+  Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 0xffff;
 
 const isDetectionId = (value: unknown): value is number =>
   Number.isInteger(value) && (value as number) >= 0 && (value as number) <= MAX_DETECTION_ID;
@@ -41,12 +47,14 @@ export class CardDetectedRouter {
    * that will not come.
    */
   async route(socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']) {
-    const { purpose, uid, resourceId, sessionId, detectionId } = (eventData.payload ?? {}) as {
+    const { purpose, uid, resourceId, sessionId, detectionId, sak, atqa } = (eventData.payload ?? {}) as {
       purpose?: string;
       uid?: unknown;
       resourceId?: unknown;
       sessionId?: unknown;
       detectionId?: unknown;
+      sak?: unknown;
+      atqa?: unknown;
     };
     // A login tap replaces whoever was logged in, whether or not the new card checks out. What the
     // previous login left behind (form answers, a reader-started supervision) is dropped once the
@@ -69,13 +77,20 @@ export class CardDetectedRouter {
       if (!validDetectionId) return await fail('INVALID_PARAMS');
       this.conversations.noteDetection(socket, detectionId);
       if (typeof uid !== 'string' || !/^[0-9a-fA-F]{4,32}$/.test(uid)) return await fail('INVALID_UID');
+      if ((sak !== undefined && !isByte(sak)) || (atqa !== undefined && !isWord(atqa)))
+        return await fail('INVALID_PARAMS');
       if ((purpose === 'tap' || purpose === 'supervisor') && !Number.isInteger(resourceId)) {
         return await fail('INVALID_PARAMS');
       }
       // Before any database work: a flood of detections must not cost queries.
       if (this.conversations.isBusy(socket)) return await fail('BUSY');
 
-      const detection: CardDetection = { uid, detectionId };
+      const detection: CardDetection = {
+        uid: normalizeCardUid(uid),
+        detectionId,
+        ...(sak !== undefined ? { sak: sak as number } : {}),
+        ...(atqa !== undefined ? { atqa: atqa as number } : {}),
+      };
       switch (purpose) {
         case 'tap':
           return await this.cardHandler.handleCardTap(socket, detection, resourceId as number, previousUserId);
