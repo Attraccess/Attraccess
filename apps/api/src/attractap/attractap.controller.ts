@@ -119,8 +119,9 @@ export class AttractapController {
   }
 
   /**
-   * Machine list visibility (ATT-843): a narrowed viewer sees only the linked machines they may see, and only the
-   * readers that serve at least one of them, so the reader list cannot be used to read the equipment list.
+   * Machine list visibility (ATT-843): a narrowed viewer sees only the linked machines they may see. Every reader
+   * stays listed: members pick readers to enroll their first card or to ask for supervision at, often before any
+   * introduction, and a reader without its hidden machines reveals nothing about the equipment.
    */
   private async visibleReaders(user: AuthenticatedRequest['user'], readers: AttractapReader[]) {
     if ((await this.listVisibility.scopeOf(user)) === 'all') return readers;
@@ -130,12 +131,11 @@ export class AttractapController {
         readers.flatMap((reader) => (reader.resources ?? []).map((resource) => resource.id)),
       ),
     );
-    return readers
-      .map((reader) => ({
-        ...reader,
-        resources: (reader.resources ?? []).filter((resource) => visible.has(resource.id)),
-      }))
-      .filter((reader) => reader.resources.length > 0);
+    return readers.map((reader) =>
+      reader.resources
+        ? { ...reader, resources: reader.resources.filter((resource) => visible.has(resource.id)) }
+        : reader,
+    );
   }
 
   @Get('to-pair')
@@ -168,7 +168,6 @@ export class AttractapController {
     @Req() req: AuthenticatedRequest,
   ): Promise<AttractapReaderDto> {
     const [reader] = await this.visibleReaders(req.user, [await this.requirePairedReader(readerId)]);
-    if (!reader) throw new NotFoundException(`Reader with ID ${readerId} not found`);
     return toReaderDto(reader);
   }
 

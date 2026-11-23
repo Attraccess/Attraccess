@@ -152,3 +152,14 @@ it('shows the not-found card without a retry for a machine that answers 404 (ATT
   expect(screen.getByText('notFound.title')).toBeTruthy();
   expect(screen.queryByText('actions.retry')).toBeNull();
 });
+
+it('shows the not-found card instead of cached data once the machine answers 404', () => {
+  Object.assign(state, {
+    resource: { id: 7, name: 'Cached laser', documentationType: 'markdown', documentationMarkdown: '# Cached' },
+    error: true,
+    cause: new (ApiError as unknown as new (status: number) => Error)(404),
+  });
+  show();
+  expect(screen.getByText('notFound.title')).toBeTruthy();
+  expect(screen.queryByText('Cached laser')).toBeNull();
+});

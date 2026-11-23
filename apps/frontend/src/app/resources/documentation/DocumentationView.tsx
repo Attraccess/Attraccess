@@ -73,8 +73,8 @@ function DocumentationViewComponent() {
     );
   }
 
-  // Handle not found state
-  if (!resource) {
+  // Handle not found state; a 404 wins over cached data from before (e.g. a revoked introduction)
+  if (isNotFoundError(resourceError) || !resource) {
     return (
       <Card className="max-w-xl mx-auto my-8">
         <Card.Header>

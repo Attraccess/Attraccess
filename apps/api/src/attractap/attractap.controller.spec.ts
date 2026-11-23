@@ -148,24 +148,25 @@ describe('AttractapController', () => {
   describe('machine list visibility (ATT-843)', () => {
     const linked = (id: number) => ({ id, name: `M${id}`, type: 'machine', separateUnlockAndUnlatch: null }) as never;
 
-    it('shows a narrowed viewer only visible machines, and only readers that serve one', async () => {
+    it('shows a narrowed viewer only visible machines, but keeps every reader for card enrollment', async () => {
       narrowTo([1]);
       const readers = [
         makeReader({ id: 1, resources: [linked(1), linked(2)] }),
         makeReader({ id: 2, resources: [linked(2)] }),
+        makeReader({ id: 3, resources: [] }),
       ];
       attractapService.getPairedReaders.mockResolvedValueOnce(readers);
 
       const result = await controller.getReaders(req);
 
-      expect(result.map((reader) => reader.id)).toEqual([1]);
-      expect(result[0].resources?.map((resource) => resource.id)).toEqual([1]);
+      expect(result.map((reader) => reader.id)).toEqual([1, 2, 3]);
+      expect(result.map((reader) => reader.resources?.map((resource) => resource.id))).toEqual([[1], [], []]);
     });
 
-    it('answers 404 for a reader that serves only hidden machines', async () => {
+    it('shows a reader by id without its hidden machines', async () => {
       narrowTo([]);
       attractapService.findReaderById.mockResolvedValueOnce(makeReader({ id: 4, resources: [linked(2)] }));
-      await expect(controller.getReaderById(4, req)).rejects.toThrow('not found');
+      await expect(controller.getReaderById(4, req)).resolves.toMatchObject({ id: 4, resources: [] });
     });
 
     it('leaves the readers of a viewer who sees every machine alone', async () => {
