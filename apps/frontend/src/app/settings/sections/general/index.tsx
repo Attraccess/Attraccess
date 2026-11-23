@@ -53,6 +53,21 @@ const withoutKeys =
   (current: Draft): Draft =>
     Object.fromEntries(Object.entries(current).filter(([key]) => !keys.includes(key as keyof Draft)));
 
+/** The hint under the machine list select: the load error, the chosen mode's effect, or (while loading) the neutral description. */
+const listVisibilityHintKey = (isError: boolean, mode: ResourceListVisibility | undefined): string => {
+  if (isError) return 'inputs.listVisibility.loadFailed';
+  if (mode === ResourceListVisibility.PERMITTED_ONLY) return 'inputs.listVisibility.permittedOnlyHint';
+  if (mode === ResourceListVisibility.AUTHENTICATED) return 'inputs.listVisibility.authenticatedHint';
+  return 'inputs.listVisibility.description';
+};
+
+/** The hint under the activity select: the load error, the "introduced" effect, or the general description. */
+const activityVisibilityHintKey = (isError: boolean, mode: ResourceActivityVisibility | undefined): string => {
+  if (isError) return 'inputs.activityVisibility.loadFailed';
+  if (mode === ResourceActivityVisibility.INTRODUCED) return 'inputs.activityVisibility.introducedHint';
+  return 'inputs.activityVisibility.description';
+};
+
 export function GeneralSection() {
   const { t, tExists } = useTranslations({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
@@ -287,15 +302,7 @@ export function GeneralSection() {
           stacked
           hintId="list-visibility-hint"
           label={t('inputs.listVisibility.label')}
-          hint={
-            isVisibilityError
-              ? t('inputs.listVisibility.loadFailed')
-              : listVisibility === ResourceListVisibility.PERMITTED_ONLY
-                ? t('inputs.listVisibility.permittedOnlyHint')
-                : listVisibility === ResourceListVisibility.AUTHENTICATED
-                  ? t('inputs.listVisibility.authenticatedHint')
-                  : t('inputs.listVisibility.description')
-          }
+          hint={t(listVisibilityHintKey(isVisibilityError, listVisibility))}
         >
           <Select
             aria-label={t('inputs.listVisibility.label')}
@@ -317,13 +324,7 @@ export function GeneralSection() {
           stacked
           hintId="activity-visibility-hint"
           label={t('inputs.activityVisibility.label')}
-          hint={
-            isVisibilityError
-              ? t('inputs.activityVisibility.loadFailed')
-              : activityVisibility === ResourceActivityVisibility.INTRODUCED
-                ? t('inputs.activityVisibility.introducedHint')
-                : t('inputs.activityVisibility.description')
-          }
+          hint={t(activityVisibilityHintKey(isVisibilityError, activityVisibility))}
         >
           <Select
             aria-label={t('inputs.activityVisibility.label')}

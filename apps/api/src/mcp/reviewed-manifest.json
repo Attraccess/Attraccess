@@ -1962,7 +1962,7 @@
   "messagingContactResourceHolder": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "308fdcb2"
+    "shape": "11686601"
   },
   "messagingListConversations": {
     "decision": "allow",
