@@ -1,0 +1,10 @@
+{
+  "title": "Restart required",
+  "description": "Plugin changes take effect after Attraccess restarts.",
+  "restartNow": "Restart now",
+  "restarting": "Restarting…",
+  "confirmTitle": "Restart Attraccess now?",
+  "confirmMessage": "The server is unavailable for a moment while it restarts and applies the pending plugin changes. Open sessions and reader connections reconnect on their own.",
+  "restartError": "The restart could not be completed",
+  "restartErrorDescription": "Attraccess did not come back in time. Reload the page, or try again."
+}

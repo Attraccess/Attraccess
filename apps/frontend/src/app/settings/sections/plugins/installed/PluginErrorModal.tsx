@@ -2,7 +2,7 @@ import { StatusDialog } from '@attraccess/plugins-frontend-ui';
 import { useGetPluginSystemStatus, useRetryPlugin } from '@attraccess/react-query-client';
 import { useState } from 'react';
 import { useToastMessage } from '../../../../../components/toastProvider';
-import { getServerInstanceId, waitForServerRestart } from './serverRestart';
+import { getServerInstanceId, waitForServerRestart } from '../../../../../components/PluginRestartBanner/serverRestart';
 import type { FailedPlugin } from '../types';
 import { usePluginsTranslations } from '../usePluginsTranslations';
 

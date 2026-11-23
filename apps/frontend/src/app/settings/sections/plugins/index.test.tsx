@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { expect, it, vi } from 'vitest';
+import { expect, it } from 'vitest';
 // Register the shared API mocks before loading the component's feature modules.
 import { chooseRowAction, deferred, hoisted, makePlugin, pickRegistry, renderWithQuery } from './index.test.hoisted';
 import { PluginsSection } from './index';
@@ -162,7 +162,7 @@ describe('PluginsSection', () => {
 
     await user.click(screen.getByRole('button', { name: 'Review updates' }));
     expect(await screen.findByRole('heading', { name: 'Manage Cool Plugin version' })).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: '1.2.4 Newer' })).toBeInTheDocument();
+    expect(await screen.findByRole('radio', { name: /^1\.2\.4 / })).toBeInTheDocument();
   });
 
   it('reports failed package update checks', async () => {
@@ -340,7 +340,7 @@ describe('PluginsSection', () => {
     await user.click(screen.getByRole('checkbox'));
     expect(confirm).toBeEnabled();
     expect(
-      screen.getByText('Installing this plugin requires an application restart to activate it.'),
+      screen.getByText('The plugin takes effect after a restart. Use “Restart now” in the banner when you are ready.'),
     ).toBeInTheDocument();
   });
 
@@ -415,6 +415,12 @@ describe('PluginsSection', () => {
         body: { registryId: 'private' },
       }),
     );
+    await waitFor(() =>
+      expect(hoisted.successToast).toHaveBeenCalledWith({
+        title: 'Plugin installed. It takes effect after a restart; use “Restart now” in the banner.',
+      }),
+    );
+    expect(hoisted.reloadPage).not.toHaveBeenCalled();
   });
 
   it('keeps the install failure and compatibility remedy visible in the install confirmation modal', async () => {
@@ -948,16 +954,15 @@ describe('PluginsSection', () => {
     expect(hoisted.deleteMutateMock).toHaveBeenCalledWith({ path: { pluginId: 'plugin-1' } });
   });
 
-  it('shows a success toast after a successful delete', () => {
-    // The success handler also schedules a full page reload; fake timers keep that out of the test.
-    vi.useFakeTimers();
+  it('shows a success toast after a successful delete and reloads the page once', () => {
     hoisted.plugins = [makePlugin()];
     renderWithQuery(<PluginsSection />);
 
     hoisted.deleteOptions?.onSuccess?.();
 
     expect(hoisted.successToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Plugin removed' }));
-    vi.useRealTimers();
+    // The removed plugin's frontend bundle is gone: the page reloads right away (the server does not restart).
+    expect(hoisted.reloadPage).toHaveBeenCalledOnce();
   });
 
   it('shows an error toast when the delete fails', () => {

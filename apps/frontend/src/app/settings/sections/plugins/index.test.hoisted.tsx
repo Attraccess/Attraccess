@@ -39,7 +39,10 @@ const hoisted = vi.hoisted(() => ({
   plugins: [] as unknown[],
   pluginSystemStatus: { disabled: false, instanceId: 'original-instance' },
   deleteOptions: undefined as DeleteOptions | undefined,
+  reloadPage: vi.fn(),
 }));
+
+vi.mock('../../../../utils/reloadPage', () => ({ reloadPage: hoisted.reloadPage }));
 
 vi.mock('@attraccess/react-query-client', async () => {
   const { useQuery } = await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query');
@@ -53,6 +56,9 @@ vi.mock('@attraccess/react-query-client', async () => {
     registryId ? `${separator}registryId=${encodeURIComponent(registryId)}` : '';
   return {
     UsePluginControllerInstalledPackagesKeyFn: () => ['installed'],
+    usePluginControllerInstalledPackagesKey: 'installed',
+    useGetPluginsKey: 'GetPlugins',
+    useGetPluginSystemStatusKey: 'GetPluginSystemStatus',
     UsePluginControllerListRegistriesKeyFn: () => ['registries'],
     usePluginControllerInstalledPackages: (_clientOptions: unknown, _key: unknown, options: object) =>
       useQuery({ queryKey: ['installed'], queryFn: () => fetchJson('/api/plugins/installed'), ...options }),
@@ -183,6 +189,7 @@ export function resetTestFixture() {
   hoisted.plugins = [];
   hoisted.pluginSystemStatus = { disabled: false, instanceId: 'original-instance' };
   hoisted.deleteOptions = undefined;
+  hoisted.reloadPage.mockReset();
   hoisted.statusRefetchMock.mockResolvedValue({ data: hoisted.pluginSystemStatus });
   hoisted.retryMutateAsyncMock.mockResolvedValue({ ok: true });
   hoisted.checkAllInstalledPackagesMock.mockResolvedValue([]);
