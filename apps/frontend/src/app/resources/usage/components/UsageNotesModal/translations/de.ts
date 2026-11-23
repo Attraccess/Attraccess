@@ -18,6 +18,8 @@ export default {
   formsTitle: 'Formulareinreichungen',
   noForms: 'Keine Formulare vorhanden',
   booleanYes: 'Ja',
+  photo: '1 Foto',
+  photos: '{{count}} Fotos',
   booleanNo: 'Nein',
   projectSelectLabel: 'Projekt',
   supervisor: 'Aufsicht',

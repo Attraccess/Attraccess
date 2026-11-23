@@ -1,8 +1,16 @@
 import { LabeledSwitch } from '@attraccess/plugins-frontend-ui';
-import { Button, TextField, Label, Input } from '@heroui/react';
+import { Button, TextField, Label, Input, FieldError } from '@heroui/react';
 import { Plus, X } from 'lucide-react';
 import { FormFieldType } from '@attraccess/react-query-client';
-import { EditableFormField, TextFieldOptions, NumberFieldOptions, SelectFieldOptions } from '../types';
+import { MAX_FORM_IMAGES, MIN_FORM_IMAGES } from '@attraccess/application-models';
+import {
+  EditableFormField,
+  TextFieldOptions,
+  NumberFieldOptions,
+  SelectFieldOptions,
+  ImageFieldOptions,
+  isValidMaxImages,
+} from '../types';
 import { useEffect, useRef, useState } from 'react';
 
 interface FieldOptionsEditorProps {
@@ -141,6 +149,24 @@ function renderOptionsByType(
     }
     case FormFieldType.BOOLEAN:
       return <p className="text-sm text-default-500">{t('fields.options.boolean.description')}</p>;
+    case FormFieldType.IMAGE: {
+      const { maxImages } = options as ImageFieldOptions;
+      const invalid = !isValidMaxImages(maxImages);
+      return (
+        <div className="space-y-3">
+          <TextField
+            value={maxImages === '' || maxImages === undefined ? '' : String(maxImages)}
+            onChange={(v) => updateOptions({ maxImages: v === '' ? '' : Number(v) })}
+            isInvalid={invalid}
+          >
+            <Label>{t('fields.options.image.maxImages')}</Label>
+            <Input type="number" min={MIN_FORM_IMAGES} max={MAX_FORM_IMAGES} step={1} />
+            {invalid && <FieldError>{t('fields.options.image.maxImagesInvalid')}</FieldError>}
+          </TextField>
+          <p className="text-xs text-default-500">{t('fields.options.image.description')}</p>
+        </div>
+      );
+    }
     default:
       return null;
   }

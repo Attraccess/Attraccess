@@ -13,6 +13,8 @@ import de from './translations/de';
 import { X } from 'lucide-react';
 import { ProjectsSelect } from '../../../../../components/projectsSelect/index';
 import { useAuth } from '../../../../../hooks/useAuth';
+import { FormImageAnswer } from '../../../../forms/images/FormImageAnswer';
+import { parseFormImageIds } from '@attraccess/application-models';
 
 export interface UsageNotesDrawerProps {
   isOpen: boolean;
@@ -78,6 +80,11 @@ export function formatFieldValue(
   switch (entry.fieldDefinition.type) {
     case FormFieldType.BOOLEAN:
       return entry.value === 'true' ? t('booleanYes') : t('booleanNo');
+    case FormFieldType.IMAGE: {
+      // Never the stored id list: a count where only text fits.
+      const count = parseFormImageIds(entry.value).length;
+      return count === 1 ? t('photo') : t('photos').replace('{{count}}', String(count));
+    }
     case FormFieldType.NUMBER:
     case FormFieldType.SELECT:
       return entry.value;
@@ -103,7 +110,13 @@ export function renderFormSubmissions(session: ResourceUsage, t: (key: string) =
         {entries.map((entry, index) => (
           <div key={`${submission.id}-${index}`}>
             <p className="text-sm font-semibold text-default-600">{entry.fieldDefinition.name}</p>
-            <p className="text-sm text-default-500">{formatFieldValue(entry, t)}</p>
+            {entry.fieldDefinition.type === FormFieldType.IMAGE ? (
+              <div className="pt-1 text-sm text-default-500">
+                <FormImageAnswer value={entry.value} />
+              </div>
+            ) : (
+              <p className="text-sm text-default-500">{formatFieldValue(entry, t)}</p>
+            )}
           </div>
         ))}
       </div>

@@ -30,6 +30,7 @@ import { VerifyEmail } from './verify-email/index';
 import { ResetPassword } from './reset-password/resetPassword';
 import { UnauthorizedLayout } from './unauthorized/unauthorized-layout/layout';
 import { AcceptInvitation } from './accept-invitation/index';
+import { FormPhotoPage } from './form-photo/FormPhotoPage';
 import { NotFound } from './not-found/index';
 import { BootScreen } from '../components/bootScreen/index';
 import { configureApiClient } from '../api/index';
@@ -131,6 +132,8 @@ export function AppRoutes() {
           </UnauthorizedLayout>
         }
       />
+      {/* The phone page behind the QR code of an image field on a reader: public, the link token authorises. */}
+      <Route path="/form-photo/:token" element={<FormPhotoPage />} />
       <Route
         path="/reset-password"
         element={

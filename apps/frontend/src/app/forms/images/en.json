@@ -1,0 +1,15 @@
+{
+  "alt": "Photo {{number}}",
+  "open": "Show photo {{number}} full size",
+  "close": "Close",
+  "loadError": "Photo not available",
+  "photos": "{{count}} photos",
+  "photo": "1 photo",
+  "take": "Take photo",
+  "upload": "Upload",
+  "remove": "Remove photo {{number}}",
+  "uploading": "Uploading…",
+  "uploadError": "The photo could not be uploaded. Try again.",
+  "maxReached": "At most {{count}} photo(s) are allowed here.",
+  "count": "{{count}} of {{max}} photos"
+}

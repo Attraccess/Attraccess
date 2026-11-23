@@ -70,13 +70,19 @@
       },
       "boolean": {
         "description": "Ja/Nein-Felder verwenden einen Schalter und benötigen keine weiteren Optionen."
+      },
+      "image": {
+        "maxImages": "Max. Bilder",
+        "maxImagesInvalid": "Gib eine ganze Zahl von 1 bis 10 ein",
+        "description": "Nutzer hängen so viele Fotos an, aufgenommen mit der Kamera oder hochgeladen. Am Attractap-Leser fügen sie die Fotos mit ihrem Handy hinzu."
       }
     },
     "types": {
       "text": "Text",
       "number": "Zahl",
       "select": "Einzelauswahl",
-      "boolean": "Ja / Nein"
+      "boolean": "Ja / Nein",
+      "image": "Bild"
     }
   },
   "preview": {
@@ -84,7 +90,10 @@
     "booleanNo": "Nein",
     "booleanLabel": "Ja/Nein-Feld Vorschau",
     "selectPlaceholder": "Eine Option auswählen",
-    "empty": "Füge Felder hinzu, um die Vorschau zu sehen."
+    "empty": "Füge Felder hinzu, um die Vorschau zu sehen.",
+    "imageTake": "Foto aufnehmen",
+    "imageUpload": "Hochladen",
+    "imageMax": "Bis zu {{count}} Bild(er)"
   },
   "globalList": {
     "title": "Formulare",

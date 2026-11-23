@@ -1,0 +1,11 @@
+{
+  "context": "{{resource}} · {{form}}",
+  "remaining": "Du kannst noch {{count}} Foto(s) hinzufügen.",
+  "maxReached": "Es können keine weiteren Fotos hinzugefügt werden.",
+  "uploadError": "Das Foto konnte nicht hochgeladen werden. Versuche es erneut.",
+  "done": "Fertig, du kannst zurück zum Leser gehen.",
+  "doneUsedUp": "Fertig, alle Fotos sind hinzugefügt. Du kannst zurück zum Leser gehen.",
+  "expiredTitle": "Link abgelaufen",
+  "expired": "Dieser Link ist abgelaufen — öffne das Formular am Leser erneut.",
+  "loadError": "Die Seite konnte nicht geladen werden. Prüfe deine Verbindung und versuche es erneut."
+}

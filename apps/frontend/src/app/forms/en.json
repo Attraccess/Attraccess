@@ -70,13 +70,19 @@
       },
       "boolean": {
         "description": "Boolean fields use a yes/no switch and do not have additional options."
+      },
+      "image": {
+        "maxImages": "Max. images",
+        "maxImagesInvalid": "Enter a whole number from 1 to 10",
+        "description": "Users attach this many photos, either taken with the camera or uploaded. On an Attractap reader they add them with their phone."
       }
     },
     "types": {
       "text": "Text",
       "number": "Number",
       "select": "Single choice",
-      "boolean": "Yes / No"
+      "boolean": "Yes / No",
+      "image": "Image"
     }
   },
   "preview": {
@@ -84,7 +90,10 @@
     "booleanNo": "No",
     "booleanLabel": "Boolean field preview",
     "selectPlaceholder": "Select an option",
-    "empty": "Add fields to see the preview."
+    "empty": "Add fields to see the preview.",
+    "imageTake": "Take photo",
+    "imageUpload": "Upload",
+    "imageMax": "Up to {{count}} image(s)"
   },
   "globalList": {
     "title": "Forms",

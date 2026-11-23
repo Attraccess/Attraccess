@@ -1,0 +1,11 @@
+{
+  "context": "{{resource}} · {{form}}",
+  "remaining": "You can add {{count}} more photo(s).",
+  "maxReached": "No more photos can be added.",
+  "uploadError": "The photo could not be uploaded. Try again.",
+  "done": "Done, you can go back to the reader.",
+  "doneUsedUp": "Done, all photos are added. You can go back to the reader.",
+  "expiredTitle": "Link expired",
+  "expired": "This link has expired — open the form on the reader again.",
+  "loadError": "The page could not be loaded. Check your connection and try again."
+}

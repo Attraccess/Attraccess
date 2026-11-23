@@ -30,7 +30,9 @@ it('validates required text and booleans, then submits typed answers while omitt
       { name: 'Optional', options: { multiline: true, placeholder: 'Optional note' } },
     ]),
   ];
-  render(<ResourceFormsModal isOpen action="start" forms={forms} onSubmit={submit} onCancel={vi.fn()} />);
+  render(
+    <ResourceFormsModal resourceId={1} isOpen action="start" forms={forms} onSubmit={submit} onCancel={vi.fn()} />,
+  );
   fireEvent.click(await screen.findByRole('button', { name: 'modal.submit' }));
   expect(await screen.findByText('modal.fieldRequired')).toBeTruthy();
   expect(submit).not.toHaveBeenCalled();
@@ -58,7 +60,9 @@ it('deduplicates select choices and submits the selected option', async () => {
       { name: 'Choice', type: FormFieldType.SELECT, isRequired: true, options: [' First ', '', 'First', 'Second'] },
     ]),
   ];
-  render(<ResourceFormsModal isOpen action="takeover" forms={forms} onSubmit={submit} onCancel={vi.fn()} />);
+  render(
+    <ResourceFormsModal resourceId={1} isOpen action="takeover" forms={forms} onSubmit={submit} onCancel={vi.fn()} />,
+  );
   expect(await screen.findByText('modal.title.takeover')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: /Choice$/ }));
   expect(await screen.findAllByRole('option')).toHaveLength(2);
@@ -70,20 +74,27 @@ it('clears values on close and supports cancel and end-session forms', async () 
   const submit = vi.fn();
   const cancel = vi.fn();
   const forms = [form([{ options: { multiline: true, placeholder: 'End notes' } }])];
-  const view = render(<ResourceFormsModal isOpen action="end" forms={forms} onSubmit={submit} onCancel={cancel} />);
+  const view = render(
+    <ResourceFormsModal resourceId={1} isOpen action="end" forms={forms} onSubmit={submit} onCancel={cancel} />,
+  );
   fireEvent.change(await screen.findByPlaceholderText('End notes'), { target: { value: 'Finished' } });
   fireEvent.click(screen.getByRole('button', { name: 'modal.submit' }));
   expect(submit).toHaveBeenCalledWith([{ formId: 7, answers: [{ fieldId: 1, value: 'Finished' }] }]);
   fireEvent.click(screen.getByRole('button', { name: 'modal.cancel' }));
   expect(cancel).toHaveBeenCalledOnce();
-  view.rerender(<ResourceFormsModal isOpen={false} action="end" forms={forms} onSubmit={submit} onCancel={cancel} />);
-  view.rerender(<ResourceFormsModal isOpen action="end" forms={forms} onSubmit={submit} onCancel={cancel} />);
+  view.rerender(
+    <ResourceFormsModal resourceId={1} isOpen={false} action="end" forms={forms} onSubmit={submit} onCancel={cancel} />,
+  );
+  view.rerender(
+    <ResourceFormsModal resourceId={1} isOpen action="end" forms={forms} onSubmit={submit} onCancel={cancel} />,
+  );
   await waitFor(() => expect(screen.getByPlaceholderText('End notes')).toHaveValue(''));
 });
 it('disables empty select lists and includes optional false boolean answers', async () => {
   const submit = vi.fn();
   render(
     <ResourceFormsModal
+      resourceId={1}
       isOpen
       action="start"
       forms={[form([{ name: 'Empty', type: FormFieldType.SELECT, options: null }, { type: FormFieldType.BOOLEAN }])]}
@@ -104,7 +115,9 @@ it('flags every unanswered required field across several forms at once and scrol
     { ...form([{ name: 'First', isRequired: true }]), id: 1 },
     { ...second, id: 2, fields: [{ ...second.fields[0], id: 11 }] },
   ];
-  render(<ResourceFormsModal isOpen action="start" forms={forms} onSubmit={submit} onCancel={vi.fn()} />);
+  render(
+    <ResourceFormsModal resourceId={1} isOpen action="start" forms={forms} onSubmit={submit} onCancel={vi.fn()} />,
+  );
   fireEvent.click(await screen.findByRole('button', { name: 'modal.submit' }));
   await waitFor(() => expect(screen.getAllByText('modal.fieldRequired')).toHaveLength(2));
   expect(submit).not.toHaveBeenCalled();

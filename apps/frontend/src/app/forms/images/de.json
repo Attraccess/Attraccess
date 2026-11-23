@@ -1,0 +1,15 @@
+{
+  "alt": "Foto {{number}}",
+  "open": "Foto {{number}} in voller Größe anzeigen",
+  "close": "Schließen",
+  "loadError": "Foto nicht verfügbar",
+  "photos": "{{count}} Fotos",
+  "photo": "1 Foto",
+  "take": "Foto aufnehmen",
+  "upload": "Hochladen",
+  "remove": "Foto {{number}} entfernen",
+  "uploading": "Wird hochgeladen…",
+  "uploadError": "Das Foto konnte nicht hochgeladen werden. Versuche es erneut.",
+  "maxReached": "Hier sind höchstens {{count}} Foto(s) erlaubt.",
+  "count": "{{count}} von {{max}} Fotos"
+}

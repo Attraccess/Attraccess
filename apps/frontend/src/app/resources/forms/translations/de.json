@@ -18,6 +18,7 @@
     "formHeading": "Formular {{name}}",
     "selectPlaceholder": "Bitte eine Option wählen",
     "selectInvalid": "Bitte eine der verfügbaren Optionen auswählen",
-    "selectUnavailable": "Keine Optionen verfügbar"
+    "selectUnavailable": "Keine Optionen verfügbar",
+    "imageTooMany": "Höchstens {{count}} Foto(s) erlaubt."
   }
 }

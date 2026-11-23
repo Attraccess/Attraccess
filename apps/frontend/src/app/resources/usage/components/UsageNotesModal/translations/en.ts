@@ -18,6 +18,8 @@ export default {
   formsTitle: 'Form submissions',
   noForms: 'No form submissions recorded',
   booleanYes: 'Yes',
+  photo: '1 photo',
+  photos: '{{count}} photos',
   booleanNo: 'No',
   projectSelectLabel: 'Project',
   supervisor: 'Supervisor',

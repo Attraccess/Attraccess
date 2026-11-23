@@ -60,3 +60,16 @@ it('enforces the twelve-choice limit and explains boolean options', () => {
   mount(FormFieldType.BOOLEAN, {});
   expect(screen.getByText('fields.options.boolean.description')).toBeTruthy();
 });
+it('edits the maximum number of images and flags values outside 1 to 10', () => {
+  mount(FormFieldType.IMAGE, { maxImages: 1 });
+  const input = screen.getByLabelText('fields.options.image.maxImages');
+  expect(input).toHaveAttribute('min', '1');
+  expect(input).toHaveAttribute('max', '10');
+  fireEvent.change(input, { target: { value: '5' } });
+  expect(JSON.parse(screen.getByTestId('field').textContent ?? '').options).toEqual({ maxImages: 5 });
+  expect(screen.queryByText('fields.options.image.maxImagesInvalid')).toBeNull();
+  fireEvent.change(input, { target: { value: '11' } });
+  expect(screen.getByText('fields.options.image.maxImagesInvalid')).toBeTruthy();
+  fireEvent.change(input, { target: { value: '' } });
+  expect(screen.getByText('fields.options.image.maxImagesInvalid')).toBeTruthy();
+});

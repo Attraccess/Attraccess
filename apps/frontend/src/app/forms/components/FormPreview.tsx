@@ -1,10 +1,17 @@
 import { LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Input, TextArea } from '@heroui/react';
+import { Button, Input, TextArea } from '@heroui/react';
+import { Camera, Upload } from 'lucide-react';
 import { Select } from '../../../components/select';
 import { FormFieldType } from '@attraccess/react-query-client';
 import en from '../en.json';
 import de from '../de.json';
-import { EditableFormField, TextFieldOptions, NumberFieldOptions, SelectFieldOptions } from '../types';
+import {
+  EditableFormField,
+  TextFieldOptions,
+  NumberFieldOptions,
+  SelectFieldOptions,
+  ImageFieldOptions,
+} from '../types';
 
 interface FormPreviewProps {
   fields: EditableFormField[];
@@ -42,7 +49,7 @@ export function FormPreview({ fields }: Readonly<FormPreviewProps>) {
   );
 }
 
-function renderPreviewField(field: EditableFormField, t: (key: string) => string) {
+function renderPreviewField(field: EditableFormField, t: (key: string, vars?: Record<string, unknown>) => string) {
   switch (field.type) {
     case FormFieldType.TEXT:
       return renderPreviewText(field.options as TextFieldOptions);
@@ -52,6 +59,8 @@ function renderPreviewField(field: EditableFormField, t: (key: string) => string
       return renderPreviewSelect(field.options as SelectFieldOptions, t, field.name);
     case FormFieldType.BOOLEAN:
       return renderPreviewBoolean(t);
+    case FormFieldType.IMAGE:
+      return renderPreviewImage(field.options as ImageFieldOptions, t);
     default:
       return <Input placeholder="…" />;
   }
@@ -90,6 +99,25 @@ function renderPreviewBoolean(t: (key: string) => string) {
       <span className="text-xs text-default-500">{t('preview.booleanNo')}</span>
       <LabeledSwitch aria-label={t('preview.booleanLabel')} />
       <span className="text-xs text-default-500">{t('preview.booleanYes')}</span>
+    </div>
+  );
+}
+
+function renderPreviewImage(options: ImageFieldOptions, t: (key: string, vars?: Record<string, unknown>) => string) {
+  const max = typeof options.maxImages === 'number' ? options.maxImages : 1;
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" isDisabled>
+          <Camera className="w-4 h-4" />
+          {t('preview.imageTake')}
+        </Button>
+        <Button variant="secondary" isDisabled>
+          <Upload className="w-4 h-4" />
+          {t('preview.imageUpload')}
+        </Button>
+      </div>
+      <p className="text-xs text-default-500">{t('preview.imageMax', { count: max })}</p>
     </div>
   );
 }

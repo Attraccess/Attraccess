@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { FormFieldType } from '@attraccess/react-query-client';
-import { parseFieldOptions, serializeFieldOptions, parseFieldFromResponse } from './types';
+import { parseFieldOptions, serializeFieldOptions, parseFieldFromResponse, isValidMaxImages } from './types';
+
+describe('image field options', () => {
+  it('defaults to one image when nothing valid is stored', () => {
+    for (const raw of [null, {}, { maxImages: 0 }, { maxImages: 11 }, { maxImages: 1.5 }, { maxImages: 'x' }]) {
+      expect(parseFieldOptions(FormFieldType.IMAGE, raw)).toEqual({ maxImages: 1 });
+    }
+  });
+  it('keeps a cleared input editable but saves it as the default of one image', () => {
+    expect(serializeFieldOptions(FormFieldType.IMAGE, { maxImages: '' })).toEqual({ maxImages: 1 });
+  });
+  it('knows which counts the API accepts', () => {
+    expect([0, 1, 10, 11, 2.5, '3'].map(isValidMaxImages)).toEqual([false, true, true, false, false, false]);
+  });
+});
 
 describe('resource form field persistence', () => {
   it.each([
@@ -8,6 +22,7 @@ describe('resource form field persistence', () => {
     [FormFieldType.NUMBER, { min: 0, max: 100, step: 0.5 }],
     [FormFieldType.SELECT, ['Red', 'Green', 'Blue']],
     [FormFieldType.BOOLEAN, { trueLabel: 'Yes', falseLabel: 'No' }],
+    [FormFieldType.IMAGE, { maxImages: 4 }],
   ] as const)('round trips %s field settings', (type, persisted) => {
     const raw = Array.isArray(persisted) ? [...persisted] : { ...persisted };
     expect(serializeFieldOptions(type, parseFieldOptions(type, raw))).toEqual(persisted);
