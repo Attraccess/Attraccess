@@ -144,11 +144,9 @@ describe('AttractapSessionHandler – session + flow button', () => {
 
       await (fixture.handler as any).handleStartResourceUsageSession(fixture.mockSocket, fixture.eventData);
 
-      expect(fixture.mockFormsHandler.ensureFormsSatisfied).toHaveBeenCalledWith({
-        socket: fixture.mockSocket,
-        resourceId: 10,
-        action: ResourceFormAction.START,
-      });
+      expect(fixture.mockFormsHandler.ensureFormsSatisfied).toHaveBeenCalledWith(
+        expect.objectContaining({ socket: fixture.mockSocket, resourceId: 10, action: ResourceFormAction.START }),
+      );
       expect(fixture.mockUsersService.findOne).not.toHaveBeenCalled();
       expect(fixture.mockResourceUsageService.startSession).not.toHaveBeenCalled();
       expect(fixture.mockSocket.sendMessage).not.toHaveBeenCalled();
@@ -535,11 +533,9 @@ describe('AttractapSessionHandler – session + flow button', () => {
 
       await (fixture.handler as any).handleStopResourceUsageSession(fixture.mockSocket, fixture.eventData);
 
-      expect(fixture.mockFormsHandler.ensureFormsSatisfied).toHaveBeenCalledWith({
-        socket: fixture.mockSocket,
-        resourceId: 10,
-        action: ResourceFormAction.END,
-      });
+      expect(fixture.mockFormsHandler.ensureFormsSatisfied).toHaveBeenCalledWith(
+        expect.objectContaining({ socket: fixture.mockSocket, resourceId: 10, action: ResourceFormAction.END }),
+      );
       expect(fixture.mockUsersService.findOne).not.toHaveBeenCalled();
       expect(fixture.mockResourceUsageService.endSession).not.toHaveBeenCalled();
       expect(fixture.mockSocket.sendMessage).not.toHaveBeenCalled();

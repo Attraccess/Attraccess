@@ -1,0 +1,24 @@
+{
+  "alt": "Foto {{number}} von {{total}}",
+  "altNamed": "{{field}}: Foto {{number}} von {{total}}",
+  "open": "In voller Größe anzeigen: {{label}}",
+  "close": "Schließen",
+  "loadError": "Foto nicht verfügbar",
+  "take": "Foto aufnehmen",
+  "upload": "Hochladen",
+  "remove": "Foto {{number}} entfernen",
+  "removeNamed": "{{field}}: Foto {{number}} entfernen",
+  "uploading": "Wird hochgeladen…",
+  "uploadError": "Das Foto konnte nicht hochgeladen werden. Versuche es erneut.",
+  "typeError": "Es können nur Fotos im Format JPEG, PNG oder WebP hinzugefügt werden.",
+  "sizeError": "Das Foto ist größer als {{maxSize}} MB und konnte nicht verkleinert werden.",
+  "rateLimited": "Gerade zu viele Fotos. Sende offene Formulare ab oder brich sie ab, oder versuche es später erneut.",
+  "maxReached": {
+    "one": "Hier ist höchstens {{count}} Foto erlaubt.",
+    "many": "Hier sind höchstens {{count}} Fotos erlaubt."
+  },
+  "count": {
+    "one": "{{added}} von {{count}} Foto",
+    "many": "{{added}} von {{count}} Fotos"
+  }
+}

@@ -31,9 +31,4 @@ inline constexpr Entry sessionDurationCatalog[] = {
     {Message::ErrorEstimateExceedsMaximum, "Die Zeit überschreitet die maximale Sitzungsdauer", "The time exceeds the maximum session time"},
     {Message::ErrorEstimateRequired, "Bitte eine Nutzungsdauer angeben", "Please enter how long you will use it"},
 };
-static_assert(sizeof(catalog) / sizeof(Entry) + sizeof(cardRelayCatalog) / sizeof(Entry) +
-                      sizeof(networkStatusCatalog) / sizeof(Entry) + sizeof(sessionUsersCatalog) / sizeof(Entry) +
-                      sizeof(btSetupCatalog) / sizeof(Entry) + sizeof(sessionDurationCatalog) / sizeof(Entry) ==
-                  static_cast<size_t>(Message::Count),
-              "every firmware message needs a catalog entry, in enum order");
 } // namespace FirmwareI18n

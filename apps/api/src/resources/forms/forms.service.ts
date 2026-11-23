@@ -7,6 +7,8 @@ import {
   type FormRequiredFlags,
   type FormResourceOverrideRecord,
   type UsageFormSubmissionDraft,
+  FormFieldType,
+  parseFormImageIds,
 } from '@attraccess/application-models';
 
 import { Inject, Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
@@ -32,10 +34,12 @@ import {
 
 import { FormResponseDto } from './dto/form-response.dto';
 
-import { parseFieldOptions, parseFieldValue } from './forms.validation';
+import { isEmptyAnswer, parseFieldOptions, parseFieldValue } from './forms.validation';
 
 import { MissingFormSubmissionException } from './errors/missingFormSubmission.exception';
 
+import { FORM_IMAGE_STORE, type FormImageStore } from './images/form-image-store.port';
+import { assertImagesUsable } from './images/form-image-rules';
 import { RESOURCE_FORM_STORE, type FormFieldInput, type FormInput, type ResourceFormStore } from './forms-store.port';
 
 import type { TransactionScope } from '../../database/unit-of-work';
@@ -50,7 +54,10 @@ const REQUIRED_FLAG = {
 
 @Injectable()
 export class ResourceFormsService {
-  constructor(@Inject(RESOURCE_FORM_STORE) protected readonly store: ResourceFormStore) {}
+  constructor(
+    @Inject(RESOURCE_FORM_STORE) protected readonly store: ResourceFormStore,
+    @Inject(FORM_IMAGE_STORE) protected readonly imageStore: FormImageStore,
+  ) {}
 
   protected readonly logger = new Logger(ResourceFormsService.name);
 
@@ -214,10 +221,13 @@ export class ResourceFormsService {
     formId: number,
     offset: number,
     limit: number,
+    options: { imageFields?: boolean } = {},
   ): Promise<{ totalFieldCount: number; fields: FormFieldResponseDto[] }> {
     await this.ensureResourceExists(resourceId);
     const form = await this.getRequiredFormOrThrow(resourceId, action, formId);
-    const fields = (form.fields ?? []).sort((a, b) => a.position - b.position);
+    const fields = (form.fields ?? [])
+      .filter((field) => options.imageFields !== false || field.type !== FormFieldType.IMAGE)
+      .sort((a, b) => a.position - b.position);
     const safeOffset = Math.max(0, offset);
     const safeLimit = Math.max(1, limit);
     const window = fields.slice(safeOffset, safeOffset + safeLimit).map((field) => this.mapFieldResponse(field));
@@ -286,6 +296,7 @@ export class ResourceFormsService {
     action: ResourceFormAction,
     formId: number,
     answers: { fieldId: number; value: unknown }[],
+    userId?: number | null,
   ): Promise<{ valid: boolean; errors: { fieldId: number; message: string; code: string }[] }> {
     await this.ensureResourceExists(resourceId);
     const form = await this.getRequiredFormOrThrow(resourceId, action, formId);
@@ -298,13 +309,15 @@ export class ResourceFormsService {
         continue;
       }
       try {
-        this.validateFieldAnswer(form, field, answer.value);
+        const value = this.validateFieldAnswer(form, field, answer.value);
+        if (value !== undefined && field.type === FormFieldType.IMAGE) {
+          await this.assertFieldImages(form, field, value, userId);
+        }
       } catch (error) {
         // Add stable identifiers for firmware; keep the diagnostic message for
         // existing clients. Field names and values remain separate display data.
         const missingRequired =
-          field.isRequired &&
-          (answer.value === undefined || answer.value === null || answer.value === '' || field.type === 'boolean');
+          field.isRequired && (isEmptyAnswer(answer.value, field.type) || field.type === 'boolean');
         const code = missingRequired
           ? 'REQUIRED_FIELD'
           : field.type === 'number'
@@ -355,7 +368,7 @@ export class ResourceFormsService {
         throw new MissingFormSubmissionException(form.name);
       }
 
-      const data = this.buildSubmissionData(form, submission);
+      const data = await this.buildSubmissionData(form, submission, options.userId);
 
       drafts.push({
         formId: form.id,
@@ -370,7 +383,7 @@ export class ResourceFormsService {
     return drafts;
   }
 
-  protected buildSubmissionData(form: FormRecord, submission: FormSubmissionRequestDto) {
+  protected async buildSubmissionData(form: FormRecord, submission: FormSubmissionRequestDto, userId: number) {
     const data: Record<string, { value: string; fieldDefinition: FormFieldRecord }> = {};
 
     const unknownField = submission.answers.find(
@@ -388,6 +401,9 @@ export class ResourceFormsService {
       if (value === undefined) {
         continue;
       }
+      if (field.type === FormFieldType.IMAGE) {
+        await this.assertFieldImages(form, field, value, userId);
+      }
       data[field.id.toString()] = { value, fieldDefinition: field };
     }
 
@@ -402,7 +418,7 @@ export class ResourceFormsService {
       }
     }
 
-    if (rawValue === undefined || rawValue === null || rawValue === '') {
+    if (isEmptyAnswer(rawValue, field.type)) {
       if (field.isRequired) {
         throw new BadRequestException(`Field "${field.name}" is required on form "${form.name}".`);
       }
@@ -410,6 +426,46 @@ export class ResourceFormsService {
     }
 
     return parseFieldValue(field.type, rawValue, field.options);
+  }
+
+  /** The images an image answer lists must be unattached, uploaded for this field and for the submitting user. */
+  protected async assertFieldImages(
+    form: FormRecord,
+    field: FormFieldRecord,
+    value: string,
+    userId: number | null | undefined,
+  ): Promise<void> {
+    if (userId === undefined || userId === null) {
+      throw new BadRequestException(`Field "${field.name}" needs a signed-in user.`);
+    }
+    await assertImagesUsable(this.imageStore, parseFormImageIds(value), {
+      userId,
+      formId: form.id,
+      fieldId: field.id,
+      fieldName: field.name,
+    });
+  }
+
+  /**
+   * An image field of a form the action requires on the resource, with the form: what an image upload or a reader
+   * handoff needs. 404 when the form does not apply, 400 when the field is not an image field.
+   */
+  async resolveImageField(
+    resourceId: number,
+    action: ResourceFormAction,
+    formId: number,
+    fieldId: number,
+  ): Promise<{ form: FormRecord; field: FormFieldRecord; resourceName: string }> {
+    await this.ensureResourceExists(resourceId);
+    const form = await this.getRequiredFormOrThrow(resourceId, action, formId);
+    const field = form.fields?.find((item) => item.id === fieldId);
+    if (!field) {
+      throw new NotFoundException(`Form field #${fieldId} not found on form #${formId}`);
+    }
+    if (field.type !== FormFieldType.IMAGE) {
+      throw new BadRequestException(`Form field #${fieldId} is not an image field.`);
+    }
+    return { form, field, resourceName: (await this.store.findResourceName(resourceId)) ?? '' };
   }
 
   async create(dto: CreateFormDto): Promise<FormResponseDto> {

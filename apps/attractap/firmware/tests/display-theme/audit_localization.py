@@ -67,11 +67,13 @@ def main() -> int:
     catalog = (ROOT / "messages.catalog.hpp").read_text()
     extra_catalogs = [ROOT / "messages.catalog.card-relay.hpp", ROOT / "messages.catalog.network-status.hpp",
                       ROOT / "messages.catalog.session-users.hpp", ROOT / "messages.catalog.bt-setup.hpp",
-                      ROOT / "messages.catalog.session-duration.hpp"]
+                      ROOT / "messages.catalog.session-duration.hpp", ROOT / "messages.catalog.form-images.hpp"]
     entries_source = catalog + "".join(path.read_text() for path in extra_catalogs if path.exists())
     entries = re.findall(r'\{Message::(\w+), ("(?:[^"\\]|\\.)*"), ("(?:[^"\\]|\\.)*")\}', entries_source)
     ids = [entry[0] for entry in entries]
-    enum = re.search(r"enum class Message\s*\{([^}]+)\}", catalog)[1]
+    ids_header = ROOT / "messages.ids.hpp"
+    enum_source = (ids_header.read_text() if ids_header.exists() else "") + catalog
+    enum = re.search(r"enum class Message\s*\{([^}]+)\}", enum_source)[1]
     declared = re.findall(r"\b(\w+)\s*(?:,|$)", enum.strip())[:-1]
     if ids != declared or len(set(ids)) != len(ids):
         errors.append("Catalog identifiers must be unique and in enum order")

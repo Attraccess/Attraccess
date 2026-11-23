@@ -1,6 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
 import { FormFieldType } from '@attraccess/application-models';
-import { parseFieldOptions, parseFieldValue } from './forms.validation';
+import { isEmptyAnswer, parseFieldOptions, parseFieldValue } from './forms.validation';
+
+const ID_A = '3f2b6c1e-8a4d-4b7e-9c11-2d5e7f8a9b01';
+const ID_B = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
 
 describe('forms.validation', () => {
   describe('parseFieldOptions', () => {
@@ -27,6 +30,57 @@ describe('forms.validation', () => {
 
     it('throws when select options are missing', () => {
       expect(() => parseFieldOptions(FormFieldType.SELECT, [])).toThrow(BadRequestException);
+    });
+  });
+
+  describe('image fields', () => {
+    it.each([undefined, null, {}])('gives one image when the options are %p', (options) => {
+      expect(parseFieldOptions(FormFieldType.IMAGE, options)).toEqual({ maxImages: 1 });
+    });
+
+    it('keeps maxImages from 1 to 10, also sent as a numeric string', () => {
+      expect(parseFieldOptions(FormFieldType.IMAGE, { maxImages: 10 })).toEqual({ maxImages: 10 });
+      expect(parseFieldOptions(FormFieldType.IMAGE, { maxImages: '3' })).toEqual({ maxImages: 3 });
+    });
+
+    it.each([0, 11, 1.5, 'many', -1])('rejects maxImages %p', (maxImages) => {
+      expect(() => parseFieldOptions(FormFieldType.IMAGE, { maxImages })).toThrow(BadRequestException);
+    });
+
+    it('stores the answer as the JSON text of the id list, whether it came as a list or as that text', () => {
+      const stored = JSON.stringify([ID_A, ID_B]);
+      expect(parseFieldValue(FormFieldType.IMAGE, [ID_A, ID_B], { maxImages: 2 })).toBe(stored);
+      expect(parseFieldValue(FormFieldType.IMAGE, stored, { maxImages: 2 })).toBe(stored);
+    });
+
+    it('rejects more images than the field accepts, repeated ids and anything but ids', () => {
+      expect(() => parseFieldValue(FormFieldType.IMAGE, [ID_A, ID_B], { maxImages: 1 })).toThrow(
+        new BadRequestException('Image field accepts at most 1 image.'),
+      );
+      expect(() => parseFieldValue(FormFieldType.IMAGE, [ID_A, ID_A], { maxImages: 3 })).toThrow(BadRequestException);
+      expect(() => parseFieldValue(FormFieldType.IMAGE, ['../etc/passwd'], { maxImages: 3 })).toThrow(
+        BadRequestException,
+      );
+      expect(() => parseFieldValue(FormFieldType.IMAGE, 'photo', { maxImages: 3 })).toThrow(BadRequestException);
+      expect(() => parseFieldValue(FormFieldType.IMAGE, { id: ID_A }, { maxImages: 3 })).toThrow(BadRequestException);
+    });
+
+    it('treats a field without options as accepting one image', () => {
+      expect(() => parseFieldValue(FormFieldType.IMAGE, [ID_A, ID_B], null)).toThrow(BadRequestException);
+    });
+
+    it('counts an empty list as no value', () => {
+      expect(isEmptyAnswer([], FormFieldType.IMAGE)).toBe(true);
+      expect(isEmptyAnswer('[]', FormFieldType.IMAGE)).toBe(true);
+      expect(isEmptyAnswer(undefined, FormFieldType.IMAGE)).toBe(true);
+      expect(isEmptyAnswer([ID_A], FormFieldType.IMAGE)).toBe(false);
+      expect(isEmptyAnswer(0, FormFieldType.NUMBER)).toBe(false);
+    });
+
+    it('keeps "[]" as the value of a text field', () => {
+      expect(isEmptyAnswer('[]', FormFieldType.TEXT)).toBe(false);
+      expect(isEmptyAnswer('', FormFieldType.TEXT)).toBe(true);
+      expect(parseFieldValue(FormFieldType.TEXT, '[]')).toBe('[]');
     });
   });
 

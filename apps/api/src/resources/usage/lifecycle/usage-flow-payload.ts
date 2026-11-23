@@ -1,5 +1,11 @@
 import { optionalUserDisplayName } from '@attraccess/shared';
-import type { UsageFormSubmissionDraft, UsageSession, UsageSessionUser } from '@attraccess/application-models';
+import {
+  FormFieldType,
+  parseFormImageIds,
+  type UsageFormSubmissionDraft,
+  type UsageSession,
+  type UsageSessionUser,
+} from '@attraccess/application-models';
 
 /** A user as a flow payload carries it: the stored fields plus the computed display name, which templates cannot compute. */
 export function withDisplayName<
@@ -8,11 +14,14 @@ export function withDisplayName<
   return { ...user, displayName: optionalUserDisplayName(user) ?? '' };
 }
 
-/** The usage session as flows see it: answered forms by form id, a sanitized user and no resource documentation. */
+/**
+ * The usage session as flows see it: answered forms by form id, a sanitized user and no resource documentation. An
+ * image answer is the list of image ids, never a URL: flows get no access to the images.
+ */
 export function usageFlowPayload(resourceUsage: UsageSession, formSubmissions?: UsageFormSubmissionDraft[]) {
   const normalizedFormSubmissions = formSubmissions ?? [];
   const mappedFormSubmissions: {
-    [key: string]: { formName: string; answers: { [key: number]: { value: string; name: string } } };
+    [key: string]: { formName: string; answers: { [key: number]: { value: string | string[]; name: string } } };
   } = {};
 
   normalizedFormSubmissions.forEach((submission) => {
@@ -21,7 +30,10 @@ export function usageFlowPayload(resourceUsage: UsageSession, formSubmissions?: 
       answers: Object.fromEntries(
         Object.values(submission.data).map((field) => [
           field.fieldDefinition.id,
-          { value: field.value, name: field.fieldDefinition.name },
+          {
+            value: field.fieldDefinition.type === FormFieldType.IMAGE ? parseFormImageIds(field.value) : field.value,
+            name: field.fieldDefinition.name,
+          },
         ]),
       ),
     };

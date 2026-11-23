@@ -16,6 +16,7 @@ import { AttractapFirmwareHandler } from './websockets/handlers/firmware/firmwar
 import { AttractapCrashReportHandler } from './websockets/handlers/crash-report/crash-report.handler';
 import { AttractapCardHandler } from './websockets/handlers/card/card.handler';
 import { AttractapFormsHandler } from './websockets/handlers/forms/forms.handler';
+import { ReaderFormImages } from './websockets/handlers/forms/reader-form-images.service';
 import { AttractapSessionHandler } from './websockets/handlers/session/session.handler';
 import { AttractapBillingHandler } from './websockets/handlers/billing/billing.handler';
 import { AttractapProjectsHandler } from './websockets/handlers/projects/projects.handler';
@@ -133,6 +134,7 @@ import { BLE_TRANSPORT_DRIVER } from '../plugin-system/ble/ble-transport-driver'
     AttractapCrashReportHandler,
     AttractapCardHandler,
     AttractapFormsHandler,
+    ReaderFormImages,
     AttractapSessionHandler,
     AttractapBillingHandler,
     AttractapProjectsHandler,

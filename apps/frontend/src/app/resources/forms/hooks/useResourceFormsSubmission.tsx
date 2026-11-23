@@ -67,6 +67,7 @@ export function useResourceFormsSubmission(resourceId: number) {
   const modal = (
     <ResourceFormsModal
       isOpen={!!pendingRequest}
+      resourceId={resourceId}
       action={pendingRequest?.action ?? 'start'}
       forms={pendingRequest?.forms ?? []}
       initialSubmissions={

@@ -10,6 +10,7 @@ import {
   Input,
   TextArea,
 } from '@heroui/react';
+import { formImageLimit, parseFormImageIds } from '@attraccess/application-models';
 import { LabeledSwitch, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FormFieldType, FormSubmissionRequestDto, FormResponseDto } from '@attraccess/react-query-client';
 import {
@@ -22,9 +23,12 @@ import {
 import en from '../translations/en.json';
 import de from '../translations/de.json';
 import { Select } from '../../../../components/select/index';
+import { ImageFieldInput } from '../../../forms/images/ImageFieldInput';
 
 export interface ResourceFormsModalProps {
   isOpen: boolean;
+  /** The resource the forms are filled in for: image uploads belong to it. */
+  resourceId: number;
   action: ResourceFormAction;
   forms: FormResponseDto[];
   initialSubmissions?: FormSubmissionRequestDto[];
@@ -52,9 +56,13 @@ export function extractSelectOptions(raw: unknown): string[] {
   return result;
 }
 
-export type FieldValue = string | boolean;
+/** An image field's value is the list of its image ids. */
+export type FieldValue = string | boolean | string[];
 
 export function fieldHasValue(type: FormFieldType, value: FieldValue | undefined) {
+  if (type === FormFieldType.IMAGE) {
+    return Array.isArray(value) && value.length > 0;
+  }
   if (type === FormFieldType.BOOLEAN) {
     return typeof value === 'boolean';
   }
@@ -75,6 +83,8 @@ export function normalizeValue(
   switch (type) {
     case FormFieldType.TEXT:
       return String(rawValue);
+    case FormFieldType.IMAGE:
+      return Array.isArray(rawValue) ? rawValue : [];
     case FormFieldType.NUMBER: {
       const numericValue = Number(rawValue);
       if (Number.isNaN(numericValue)) {
@@ -239,6 +249,7 @@ export function renderFieldInput(
 
 export function ResourceFormsModal({
   isOpen,
+  resourceId,
   action,
   forms,
   initialSubmissions,
@@ -249,11 +260,14 @@ export function ResourceFormsModal({
   const { t } = useTranslations({ en, de }, { escapeValues: false });
   const [values, setValues] = useState<Record<number, FieldValue>>({});
   const [errors, setErrors] = useState<Record<number, string | null>>({});
+  /** The image fields with an upload running: submitting then would leave the photo out. */
+  const [uploading, setUploading] = useState<ReadonlySet<number>>(new Set());
 
   useEffect(() => {
     if (!isOpen) {
       setValues({});
       setErrors({});
+      setUploading(new Set());
       return;
     }
 
@@ -263,7 +277,9 @@ export function ResourceFormsModal({
         const form = forms.find(({ id }) => id === submission.formId);
         submission.answers.forEach(({ fieldId, value }) => {
           if (form?.fields.some(({ id }) => id === fieldId)) {
-            next[fieldId] = typeof value === 'boolean' ? value : String(value);
+            const type = form.fields.find(({ id }) => id === fieldId)?.type;
+            if (type === FormFieldType.IMAGE) next[fieldId] = parseFormImageIds(value);
+            else next[fieldId] = typeof value === 'boolean' ? value : String(value);
           }
         });
       });
@@ -273,6 +289,8 @@ export function ResourceFormsModal({
             if (typeof next[field.id] !== 'boolean') {
               next[field.id] = false;
             }
+          } else if (field.type === FormFieldType.IMAGE) {
+            if (!Array.isArray(next[field.id])) next[field.id] = [];
           } else if (typeof next[field.id] !== 'string') {
             next[field.id] = '';
           }
@@ -297,6 +315,7 @@ export function ResourceFormsModal({
 
   /** Checks every field so all problems show at once, and scrolls to the first one: with several forms it is out of view. */
   const handleSubmit = () => {
+    if (uploading.size > 0) return;
     const nextErrors: Record<number, string | null> = {};
     let firstInvalidFieldId: number | null = null;
     const fail = (fieldId: number, message?: string) => {
@@ -318,6 +337,11 @@ export function ResourceFormsModal({
 
         if (!fieldHasValue(field.type, rawValue)) {
           if (field.isRequired) fail(field.id, t('modal.fieldRequired'));
+          return;
+        }
+
+        if (field.type === FormFieldType.IMAGE && (rawValue as string[]).length > formImageLimit(field.options)) {
+          fail(field.id, t('modal.imageTooMany', { count: formImageLimit(field.options) }));
           return;
         }
 
@@ -354,6 +378,23 @@ export function ResourceFormsModal({
     }
   };
 
+  const handleImagesChange = (fieldId: number, update: (ids: string[]) => string[]) => {
+    setValues((prev) => ({
+      ...prev,
+      [fieldId]: update(Array.isArray(prev[fieldId]) ? (prev[fieldId] as string[]) : []),
+    }));
+    setErrors((prev) => (prev[fieldId] ? { ...prev, [fieldId]: null } : prev));
+  };
+
+  const handleUploadingChange = (fieldId: number, busy: boolean) =>
+    setUploading((prev) => {
+      if (prev.has(fieldId) === busy) return prev;
+      const next = new Set(prev);
+      if (busy) next.add(fieldId);
+      else next.delete(fieldId);
+      return next;
+    });
+
   return (
     <StandardDrawer
       isOpen={isOpen}
@@ -383,14 +424,29 @@ export function ResourceFormsModal({
                     </p>
                     {field.description && <p className="text-xs text-default-400">{field.description}</p>}
                   </div>
-                  {renderFieldInput(
-                    field,
-                    parsedOptions,
-                    selectOptions ?? undefined,
-                    values[field.id],
-                    (value) => handleValueChange(field.id, value),
-                    errors[field.id],
-                    t,
+                  {field.type === FormFieldType.IMAGE ? (
+                    <ImageFieldInput
+                      resourceId={resourceId}
+                      action={action}
+                      formId={form.id}
+                      fieldId={field.id}
+                      fieldName={field.name}
+                      maxImages={formImageLimit(field.options)}
+                      ids={Array.isArray(values[field.id]) ? (values[field.id] as string[]) : []}
+                      onChange={(update) => handleImagesChange(field.id, update)}
+                      onBusyChange={(busy) => handleUploadingChange(field.id, busy)}
+                      error={errors[field.id]}
+                    />
+                  ) : (
+                    renderFieldInput(
+                      field,
+                      parsedOptions,
+                      selectOptions ?? undefined,
+                      values[field.id],
+                      (value) => handleValueChange(field.id, value),
+                      errors[field.id],
+                      t,
+                    )
                   )}
                 </div>
               );
@@ -402,7 +458,7 @@ export function ResourceFormsModal({
         <Button variant="ghost" onPress={onCancel}>
           {t('modal.cancel')}
         </Button>
-        <Button variant="primary" onPress={handleSubmit}>
+        <Button variant="primary" onPress={handleSubmit} isDisabled={uploading.size > 0}>
           {t('modal.submit')}
         </Button>
       </DrawerFooter>

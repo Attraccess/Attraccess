@@ -38,6 +38,8 @@ import { AttractapCardHandler } from './handlers/card/card.handler';
 import { AttractapCrashReportHandler } from './handlers/crash-report/crash-report.handler';
 import { AttractapFirmwareHandler } from './handlers/firmware/firmware.handler';
 import { AttractapFormsHandler } from './handlers/forms/forms.handler';
+import { ReaderFormImages } from './handlers/forms/reader-form-images.service';
+import { FormImageHandoffService } from '../../resources/forms/images/form-image-handoff.service';
 import { AttractapProjectsHandler } from './handlers/projects/projects.handler';
 import { ResourceActionGuard } from './handlers/resource-action.guard';
 import { ResourceListService } from './handlers/resource-list/resource-list.service';
@@ -162,6 +164,14 @@ export function gatewayProviders(
     AttractapCrashReportHandler,
     AttractapCardHandler,
     AttractapFormsHandler,
+    ReaderFormImages,
+    {
+      provide: FormImageHandoffService,
+      useValue: {
+        endForReader: jest.fn().mockResolvedValue(undefined),
+        endHandoffs: jest.fn().mockResolvedValue(undefined),
+      },
+    },
     AttractapSessionHandler,
     { provide: ResourceMeteringService, useValue: { getLive: jest.fn() } },
     { provide: ResourceOperatingAttributionService, useValue: { getForResource: jest.fn() } },

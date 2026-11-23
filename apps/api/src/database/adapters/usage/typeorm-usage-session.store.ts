@@ -1,6 +1,7 @@
 import {
   BillingTransaction,
   BillingTransactionItem,
+  FormImage,
   FormSubmission,
   Resource,
   ResourceMeter,
@@ -8,7 +9,7 @@ import {
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
 } from '@attraccess/database-entities';
-import { ResourceUsageAction } from '@attraccess/application-models';
+import { FormFieldType, ResourceUsageAction, parseFormImageIds } from '@attraccess/application-models';
 import type { SupervisionMode, UsageSessionResource } from '@attraccess/application-models';
 import type {
   UsageBillingItemDraft,
@@ -18,10 +19,11 @@ import type {
   UsageSessionWithParties,
 } from '@attraccess/application-models';
 import { Injectable } from '@nestjs/common';
-import { In, IsNull, Not } from 'typeorm';
+import { EntityManager, In, IsNull, Not } from 'typeorm';
 import {
   DoorActionDraft,
   MachineCapacity,
+  FormImageUnavailableError,
   MissingBillingTransactionError,
   PendingSessionDraft,
   SessionPage,
@@ -471,13 +473,14 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
   async applyAttemptDrafts(attempt: UsageLifecycleAttempt, context?: TransactionContext): Promise<void> {
     const manager = this.managers.resolve(context);
     for (const submission of attempt.formSubmissions) {
-      await manager.save(FormSubmission, {
+      const saved = await manager.save(FormSubmission, {
         formId: submission.formId,
         resourceUsageId: submission.resourceUsageId,
         userId: submission.userId,
         action: submission.action,
         data: submission.data,
       } as Partial<FormSubmission>);
+      await this.attachImages(manager, saved.id, submission);
     }
     for (const { usageId, quantity, ...item } of attempt.billingItems) {
       const transaction = await manager.findOne(BillingTransaction, { where: { resourceUsageId: usageId } });
@@ -496,6 +499,27 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
         await manager.save(BillingTransactionItem, { billingTransactionId: transaction.id, ...item, quantity });
       }
     }
+  }
+
+  /**
+   * Hands the images an answer lists to the saved submission, in the same transaction. An image that is gone, already
+   * attached or not the submitter's stops the whole change.
+   */
+  private async attachImages(
+    manager: EntityManager,
+    submissionId: number,
+    submission: UsageLifecycleAttempt['formSubmissions'][number],
+  ): Promise<void> {
+    const ids = Object.values(submission.data)
+      .filter((answer) => answer.fieldDefinition.type === FormFieldType.IMAGE)
+      .flatMap((answer) => parseFormImageIds(answer.value));
+    if (!ids.length) return;
+    const result = await manager.update(
+      FormImage,
+      { id: In(ids), submissionId: IsNull(), userId: submission.userId ?? -1 },
+      { submissionId },
+    );
+    if (result.affected !== new Set(ids).size) throw new FormImageUnavailableError();
   }
 
   async recordDoorAction(draft: DoorActionDraft): Promise<UsageSessionWithParties> {

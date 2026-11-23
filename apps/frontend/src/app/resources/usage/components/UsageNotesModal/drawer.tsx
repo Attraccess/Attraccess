@@ -13,6 +13,7 @@ import de from './translations/de';
 import { X } from 'lucide-react';
 import { ProjectsSelect } from '../../../../../components/projectsSelect/index';
 import { useAuth } from '../../../../../hooks/useAuth';
+import { FormImageAnswer } from '../../../../forms/images/FormImageAnswer';
 
 export interface UsageNotesDrawerProps {
   isOpen: boolean;
@@ -103,7 +104,13 @@ export function renderFormSubmissions(session: ResourceUsage, t: (key: string) =
         {entries.map((entry, index) => (
           <div key={`${submission.id}-${index}`}>
             <p className="text-sm font-semibold text-default-600">{entry.fieldDefinition.name}</p>
-            <p className="text-sm text-default-500">{formatFieldValue(entry, t)}</p>
+            {entry.fieldDefinition.type === FormFieldType.IMAGE ? (
+              <div className="pt-1 text-sm text-default-500">
+                <FormImageAnswer value={entry.value} fieldName={entry.fieldDefinition.name} />
+              </div>
+            ) : (
+              <p className="text-sm text-default-500">{formatFieldValue(entry, t)}</p>
+            )}
           </div>
         ))}
       </div>

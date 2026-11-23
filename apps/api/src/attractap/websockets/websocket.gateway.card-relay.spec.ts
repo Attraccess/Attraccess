@@ -59,6 +59,8 @@ describe('AttractapGateway card relay rules', () => {
   }
 
   const cardSessions = () => fixture.gateway['uiHandler']['cardSessions'] as CardSessionService;
+  const photoLinks = () =>
+    fixture.gateway['formsHandler']['readerImages']['handoffs'] as unknown as Record<string, jest.Mock>;
   /** A card conversation waiting for the card's answer. */
   const pendingConversation = (socket: AuthenticatedWebSocket) =>
     fixture.gateway['cardConversations'].run(socket, 'tap', { uid: '04aabbccddee80', detectionId: 1 }, (channel) =>
@@ -149,6 +151,29 @@ describe('AttractapGateway card relay rules', () => {
       expect(socket.state.massIntroductionFlow).not.toBeNull();
       expect(socket.state.enrollment).not.toBeNull();
       expect(socket.state.resetNfcCardData).not.toBeNull();
+    });
+
+    it('READER_SESSION_ENDED ends every photo link of the reader; a closed connection only the ones it issued', async () => {
+      const handoffs = { '1:start:3:4': { handoffId: 'h-1', token: 't-1' } };
+      const signedOut = loggedInReader();
+      signedOut.state.formHandoffs = { ...handoffs };
+
+      await send(signedOut, AttractapEventType.READER_SESSION_ENDED);
+
+      expect(photoLinks().endForReader).toHaveBeenCalledWith(7);
+      expect(photoLinks().endHandoffs).not.toHaveBeenCalled();
+      expect(signedOut.state.formHandoffs).toBeUndefined();
+
+      photoLinks().endForReader.mockClear();
+      const closed = loggedInReader({ id: 'reader-2' });
+      closed.state.formHandoffs = { ...handoffs };
+
+      await fixture.gateway.handleDisconnect(closed);
+
+      // A newer connection of the same reader, maybe on another instance, keeps its links.
+      expect(photoLinks().endHandoffs).toHaveBeenCalledWith(['h-1']);
+      expect(photoLinks().endForReader).not.toHaveBeenCalled();
+      expect(closed.state.formHandoffs).toBeUndefined();
     });
 
     it('READER_SESSION_ENDED cancels a supervision the reader started for the logged-in user', async () => {

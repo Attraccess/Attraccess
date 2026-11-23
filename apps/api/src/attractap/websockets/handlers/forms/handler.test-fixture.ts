@@ -15,6 +15,8 @@ export function registerAttractapFormsHandlerFixture() {
 
   let mockResourceActionGuard: { validateResourceAction: jest.Mock };
 
+  let mockReaderImages: Record<string, jest.Mock>;
+
   function createMockSocket(overrides: any = {}): any {
     return {
       id: 'sock-1',
@@ -42,7 +44,7 @@ export function registerAttractapFormsHandlerFixture() {
       findReaderById: jest.fn().mockResolvedValue(null),
     };
     mockResourceFormsService = {
-      getFormsForAction: jest.fn(),
+      getFormsForAction: jest.fn().mockResolvedValue([]),
       getFieldsWindow: jest.fn(),
       validatePageAnswers: jest.fn(),
     };
@@ -50,6 +52,16 @@ export function registerAttractapFormsHandlerFixture() {
       validateResourceAction: jest.fn(),
     };
 
+    mockReaderImages = {
+      supports: jest.fn().mockResolvedValue(false),
+      adapt: jest.fn(async (_socket: unknown, forms: unknown[]) => ({ forms, blocked: false })),
+      describeField: jest.fn().mockResolvedValue(null),
+      fillAnswers: jest.fn(async (_socket: unknown, _where: unknown, _form: unknown, answers: unknown[]) => answers),
+      refreshDraft: jest.fn().mockResolvedValue(undefined),
+      endAttempt: jest.fn(),
+      endAllForReader: jest.fn(),
+    };
+    (handler as any).readerImages = mockReaderImages;
     (handler as any).attractapService = mockAttractapService;
     (handler as any).resourceFormsService = mockResourceFormsService;
     (handler as any).resourceActionGuard = mockResourceActionGuard;
@@ -63,6 +75,9 @@ export function registerAttractapFormsHandlerFixture() {
     },
     get mockResourceFormsService() {
       return mockResourceFormsService;
+    },
+    get mockReaderImages() {
+      return mockReaderImages;
     },
     get mockResourceActionGuard() {
       return mockResourceActionGuard;
