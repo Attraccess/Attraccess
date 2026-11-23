@@ -32,14 +32,16 @@ General settings for the Attraccess instance:
 
 Under **General**, **Who can see the machine list** controls who sees which machines exist. Changing it requires the **Manage System Settings** (`system.settings.manage`) permission, and every change is recorded in the [audit log](settings/audit-log.md).
 
-| Option                                  | Who sees a machine                                                                                                                                                                                          |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Everyone with Read Resources**        | Everyone with the **Read Resources** (`resources.read`) permission sees all machines.                                                                                                                       |
-| **Only people introduced to a machine** | People see only the machines they are introduced to (directly or through a group), introduce or maintain (directly or through a group), or currently use. Nobody else learns that the other machines exist. |
+| Option                                  | Who sees a machine                                                                                                                                                                                                                                               |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Everyone with Read Resources**        | Everyone with the **Read Resources** (`resources.read`) permission sees all machines.                                                                                                                                                                            |
+| **Only people introduced to a machine** | People see the machines they are introduced to (directly or through a group), introduce or maintain (directly or through a group), or currently use, and every machine that allows or requires supervised use. Nobody else learns that the other machines exist. |
+
+Under **Only people introduced to a machine**, machines whose [supervision mode](resources/introductions.md#supervision-mode) is **Supervision allowed** or **Supervision required** stay visible to every signed-in member. Anyone may use such a machine with a supervisor, so people who are not introduced can find it and ask for a supervised session.
 
 Defaults:
 
-- **Fresh installations** start with **Only people introduced to a machine**. A newly registered account sees an empty machine overview until it is introduced to a machine.
+- **Fresh installations** start with **Only people introduced to a machine**. A newly registered account sees only the machines that allow or require supervised use until it is introduced to a machine.
 - **Upgraded instances** that already have accounts keep **Everyone with Read Resources** until an administrator changes it. The upgrade stores that value once and never overwrites a value you set.
 
 In both modes:
@@ -49,15 +51,23 @@ In both modes:
 - An introduction that is blocked until retraining still counts, so people see the machine they have to be retrained on. A revoked introduction hides the machine again. While you run a machine, you see it.
 - Accounts without **Read Resources**, for example on custom roles, get the **Only people introduced to a machine** view even in the **Everyone with Read Resources** mode.
 
-A machine hidden from someone answers `404` (resource not found), exactly like a machine that does not exist, on every per-machine address: its page, status, usage, introductions, maintenance, flows, forms and live updates. Lists, the in-use list, resource groups, the dashboard and live updates leave it out, and page counts count only the machines you may see. Resource groups appear only if they contain a machine you may see or you introduce or maintain the group or are introduced to it.
+**Create Resources** (`resources.create`) and **Delete Resources** (`resources.delete`) do not widen the view. A role that holds them without **Update Resources** or **Manage Resource Access** gets the narrowed view: after creating a machine, it gets "not found" for that machine until it is introduced, and deleting a machine it cannot see answers "not found". Give such a role **Update Resources**, or introduce its members to the machines they work on.
 
-Activity visibility (above) is applied on top: a machine you cannot see never shows up in the in-use list or live updates, whatever the activity setting says.
+A machine hidden from someone answers `404` (resource not found), exactly like a machine that does not exist, on every per-machine address: its page, status, usage, introductions, maintenance, flows, forms and live updates. Lists, the in-use list, resource groups, the dashboard and live updates leave it out, and page counts count only the machines you may see. Resource groups appear only if they contain a machine you may see or you introduce or maintain the group or are introduced to it. The same applies to the machines linked to Attractap readers in the reader list, the machine lists of companion devices and machine references in messages. Contacting a hidden machine's current user answers as if the machine did not exist.
+
+Activity visibility (below) is applied on top: a machine you cannot see never shows up in the in-use list or live updates, whatever the activity setting says.
 
 > [!WARNING]
 > Plugin pages and feeds, for example the reservations plugin, are not covered yet and may still list machines by name. Review the plugins you run before relying on this setting to hide your equipment list.
 
 > [!NOTE]
-> Kiosk accounts and printed QR labels open machine pages as a normal account. Under **Only people introduced to a machine**, a kiosk account needs introductions or the **Update Resources** / **Manage Resource Access** permission, and a member who scans a label for a machine they are not introduced to sees the not-found page.
+> Two places deliberately show machines regardless of this setting:
+>
+> - **Projects:** a project's usage history and statistics show its members the machines used in the project. This is project data shared with the project's members.
+> - **Reports:** the report export (**Export Resource Reports**, `resources.reports.export`) covers every machine.
+
+> [!NOTE]
+> Kiosk accounts and printed QR labels open machine pages as a normal account. Under **Only people introduced to a machine**, a kiosk account needs introductions or the **Update Resources** / **Manage Resource Access** permission, and a member who scans a label for a machine they are not introduced to sees the not-found page, unless the machine allows or requires supervised use.
 
 The setting is cached for up to one minute per API instance, so another instance of a multi-instance deployment may apply a change a minute later.
 

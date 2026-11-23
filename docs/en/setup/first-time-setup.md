@@ -65,8 +65,8 @@ Decide these before you open the instance to people. The defaults and what follo
 
 Every new account gets the default `user` role, which holds **Read Resources** only. What that account sees depends on the machine list visibility:
 
-- With **Only people introduced to a machine**, a new account sees no machines until someone introduces it. Equipment you own stays unknown to outsiders.
-- With **Everyone with Read Resources** and open self-registration, anyone can create an account and read your whole equipment list. That tells outsiders which machines your space holds, and which it does not. Treat this as personal and operational data you are responsible for: restrict the signup domains, or switch to **Only people introduced to a machine**.
+- With **Only people introduced to a machine**, a new account sees only the machines that allow or require supervised use until someone introduces it. Other equipment you own stays unknown to outsiders.
+- With **Everyone with Read Resources** and open self-registration, anyone can create an account and read your whole equipment list. That tells outsiders which machines your space holds, and which it does not. Treat the equipment list as operational information you are responsible for protecting: restrict the signup domains, or switch to **Only people introduced to a machine**.
 
 See [Machine List Visibility](settings/overview.md#machine-list-visibility) for the exact rules, and [Creating Users](user-management/creating-users.md#what-an-account-can-reach-before-its-email-is-verified) for what an account can do before it verifies its email address.
 

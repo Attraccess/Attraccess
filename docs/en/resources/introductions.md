@@ -117,7 +117,7 @@ Reading access information requires signing in:
 
 - The **full lists** (introductions, introducers, maintainers and history of a resource) are visible to users with **Update Resources** (`resources.update`) or **Manage Resource Access** (`resources.access.manage`), and to introducers of the resource or of one of its groups. This is the same rule as the **People** tab.
 - **Introducer checks** (whether a user is an introducer) answer only about yourself. Users with **Update Resources** or **Manage Resource Access** can ask about anyone; everyone else gets `403`.
-- **Names only:** everyone with **Read Resources** (`resources.read`) can see the usernames and roles (introducer or maintainer) of a resource's introducers, including those inherited from groups. People who are not introduced yet use this to find out who to ask. Email addresses are not included.
+- **Names only:** everyone with **Read Resources** (`resources.read`) can see the usernames and roles (introducer or maintainer) of a resource's introducers, including those inherited from groups. People who are not introduced yet use this to find out who to ask. Under the [machine list visibility](settings/overview.md#machine-list-visibility) **Only people introduced to a machine**, this works only for machines you can see; for a hidden machine the request answers `404`. Machines that allow or require supervised use stay visible to everyone. Email addresses are not included.
 
 Who sees which resource is in use is a separate [system setting](settings/overview.md#resource-activity-visibility).
 

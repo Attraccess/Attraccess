@@ -65,8 +65,8 @@ Entscheiden Sie das, bevor Sie die Instanz für Personen öffnen. Die Standardwe
 
 Jedes neue Konto erhält die Standardrolle `user`, die nur **Ressourcen lesen** enthält. Was dieses Konto sieht, hängt von der Sichtbarkeit der Maschinenliste ab:
 
-- Bei **Nur in eine Maschine eingewiesene Personen** sieht ein neues Konto keine Maschinen, bis jemand es einweist. Ihre Ausstattung bleibt Außenstehenden unbekannt.
-- Bei **Alle mit „Ressourcen lesen“** und offener Selbstregistrierung kann jede Person ein Konto anlegen und Ihre gesamte Geräteliste lesen. Das verrät Außenstehenden, welche Maschinen Ihre Werkstatt hat und welche nicht. Behandeln Sie das als personenbezogene und betriebliche Daten, für die Sie verantwortlich sind: Schränken Sie die Registrierungsdomains ein oder wechseln Sie zu **Nur in eine Maschine eingewiesene Personen**.
+- Bei **Nur in eine Maschine eingewiesene Personen** sieht ein neues Konto nur die Maschinen, die beaufsichtigte Nutzung erlauben oder erfordern, bis jemand es einweist. Ihre übrige Ausstattung bleibt Außenstehenden unbekannt.
+- Bei **Alle mit „Ressourcen lesen“** und offener Selbstregistrierung kann jede Person ein Konto anlegen und Ihre gesamte Geräteliste lesen. Das verrät Außenstehenden, welche Maschinen Ihre Werkstatt hat und welche nicht. Behandeln Sie die Geräteliste als betriebliche Information, die Sie schützen müssen: Schränken Sie die Registrierungsdomains ein oder wechseln Sie zu **Nur in eine Maschine eingewiesene Personen**.
 
 Die genauen Regeln stehen unter [Sichtbarkeit der Maschinenliste](settings/overview.md#sichtbarkeit-der-maschinenliste); was ein Konto vor der Bestätigung seiner E-Mail-Adresse kann, steht unter [Benutzer anlegen](user-management/creating-users.md#was-ein-konto-vor-der-bestätigung-der-e-mail-adresse-erreicht).
 
