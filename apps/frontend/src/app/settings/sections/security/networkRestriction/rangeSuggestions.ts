@@ -1,6 +1,6 @@
 import { NETWORK_RESTRICTION_LOCAL_RANGES, NETWORK_RESTRICTION_PRIVATE_RANGES } from '@attraccess/application-models';
 import { NetworkRestrictionSettingsDto } from '@attraccess/react-query-client';
-import { isCoveredBy } from './networkRange';
+import { containsRange, isCoveredBy } from './networkRange';
 
 export interface RangeSuggestionGroup {
   /** Translation key under `suggestions.` */
@@ -32,7 +32,7 @@ export function buildRangeSuggestions(
       key,
       ranges: ranges.filter((range) => {
         // A broader entry in the list already holds the suggestion; one offered above is not offered twice.
-        if (isCoveredBy(taken, range) || offered.includes(range)) return false;
+        if (isCoveredBy(taken, range) || containsRange(offered, range)) return false;
         offered.push(range);
         return true;
       }),

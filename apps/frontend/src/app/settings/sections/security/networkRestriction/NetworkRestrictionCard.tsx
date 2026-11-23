@@ -91,7 +91,10 @@ export function NetworkRestrictionCard({ drafts }: Readonly<NetworkRestrictionCa
               errorMessage={rangesError}
               data-cy="network-range-input"
             />
-            <RangeSuggestions groups={buildRangeSuggestions(settings, shown.ranges)} onAdd={drafts.addRanges} />
+            {/* A full list takes no more; the field above says so. */}
+            {shown.ranges.length < NETWORK_RESTRICTION_MAX_RANGES && (
+              <RangeSuggestions groups={buildRangeSuggestions(settings, shown.ranges)} onAdd={drafts.addRanges} />
+            )}
           </div>
         </SettingsRow>
 

@@ -21,6 +21,11 @@ describe('buildRangeSuggestions', () => {
     ]);
   });
 
+  it('offers a range once even when two groups spell it differently', () => {
+    const groups = buildRangeSuggestions(settings({ detectedAddress: '::1', detectedSubnet: '::/64' }), []);
+    expect(groups.flatMap((group) => group.ranges).filter((range) => range.startsWith('::1'))).toEqual(['::1']);
+  });
+
   it('drops empty groups', () => {
     const groups = buildRangeSuggestions(
       settings({ detectedAddress: null, detectedSubnet: null, serverRanges: [] }),
