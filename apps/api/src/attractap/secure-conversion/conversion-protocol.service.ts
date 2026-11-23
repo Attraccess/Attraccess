@@ -12,6 +12,7 @@ import { SECURE_VERSION_FLOOR } from '../security/efuse-report';
 import { ConversionAudit, DEVICE_ACTOR } from './conversion-audit';
 import type {
   BootloaderWrittenMessage,
+  BurnRefusal,
   BurnedMessage,
   ConversionMessage,
   ConversionStage,
@@ -185,8 +186,7 @@ export class ConversionProtocolService implements OnModuleInit, OnModuleDestroy 
       case 'conversion.burned':
         return await this.onBurned(session, seen, message);
       case 'conversion.burn-refused':
-        if (seen.state === 'transferring' || seen.state === 'digests-burned') await this.fail(seen, 'burn-refused');
-        return;
+        return await this.onBurnRefused(session, seen, message.reason);
       case 'conversion.bootloader-written':
         return await this.onBootloaderWritten(seen, message);
     }
@@ -294,6 +294,28 @@ export class ConversionProtocolService implements OnModuleInit, OnModuleDestroy 
     if (conversion.state === 'digests-burned') return this.sendWriteBootloader(session, conversion);
     const next = await this.move(conversion, { verified: true, bytesDone: conversion.bytesTotal });
     if (next) await this.sendBurn(session, next);
+  }
+
+  /**
+   * A refused burn. Every reason but `efuse-error` means the reader burned nothing, so the digests recorded before the
+   * command are taken back: the reader must not count as burned (that would block key changes). After an
+   * `efuse-error` a partial burn is possible, so the record stays.
+   */
+  private async onBurnRefused(
+    session: ConversionSession,
+    conversion: AttractapSecureConversionRecord,
+    reason: BurnRefusal,
+  ): Promise<void> {
+    if (conversion.state !== 'transferring') return;
+    const failed = await this.fail(conversion, 'burn-refused');
+    if (!failed || reason === 'efuse-error') return;
+    const reader = await this.readers.findSecurity(conversion.readerId);
+    if (reader?.secureBootDigest0 !== conversion.digest0 || reader.secureBootDigest1 !== conversion.digest1) return;
+    await this.readers.applySecurity(
+      conversion.readerId,
+      { secureBootDigest0: null, secureBootDigest1: null, secureBootSignerDigest: null },
+      session.state.fingerprint,
+    );
   }
 
   /** The read-back burn report is persisted first; only then does the next command leave. */

@@ -174,10 +174,27 @@ describe('secure conversion against the emulated reader', () => {
       expect(conversion.preflight?.find((c) => c.check === 'flash-size')?.ok).toBe(false);
   });
 
-  it('stop-before-burn ends before the burn and leaves the reader plain', async () => {
+  it('stop-before-burn ends before the burn, leaves the reader plain and takes the recorded digests back', async () => {
     const h = await started({ faults: { stopBeforeBurn: true } });
     expect(h.device.efuse).toMatchObject({ key0: null, key1: null, burns: 0 });
     expect(h.device.profile).toBe('plain');
+    // Recorded before the command (normative), cleared once the reader said it burned nothing.
+    expect(h.log).toContain('reader:digests');
+    expect(await h.readers.findSecurity(1)).toMatchObject({ secureBootDigest0: null, secureBootDigest1: null });
+  });
+
+  it('keeps the recorded digests after an eFuse error (a partial burn is possible)', async () => {
+    const h = createConversionHarness();
+    await h.connect();
+    const onControl = h.device.onControl.bind(h.device);
+    h.device.onControl = (message) =>
+      message['t'] === 'conversion.burn'
+        ? { control: [{ t: 'conversion.burn-refused', id: message['id'], reason: 'efuse-error' }], chunkRequests: [] }
+        : onControl(message);
+    await h.service.start(1, 'Lab door', ADMIN);
+    await h.pump();
+    expect(await latest(h)).toMatchObject({ state: 'failed', failureReason: 'burn-refused' });
+    expect(await h.readers.findSecurity(1)).toMatchObject({ secureBootDigest0: DIGESTS.digest0 });
   });
 
   it('retries a failed conversion when safe and completes', async () => {
