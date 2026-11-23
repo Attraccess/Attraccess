@@ -12,9 +12,9 @@ export function PreflightList(props: Readonly<{ checks: readonly PreflightCheckR
       {props.checks.map((check) => (
         <li key={check.check} className="flex items-center gap-2" data-cy={`secure-conversion-check-${check.check}`}>
           {check.ok ? (
-            <CheckCircle2Icon size={16} className="text-success" aria-label="ok" />
+            <CheckCircle2Icon size={16} className="text-success" role="img" aria-label={t('checkResult.ok')} />
           ) : (
-            <XCircleIcon size={16} className="text-danger" aria-label="failed" />
+            <XCircleIcon size={16} className="text-danger" role="img" aria-label={t('checkResult.failed')} />
           )}
           <span className="flex-1">{t(`check.${check.check}`)}</span>
           {check.value && <span className="text-muted">{check.value}</span>}

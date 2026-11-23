@@ -43,6 +43,10 @@
     "cancel": "Abbrechen",
     "failed": "Konnte nicht starten"
   },
+  "checkResult": {
+    "ok": "Bestanden",
+    "failed": "Fehlgeschlagen"
+  },
   "check": {
     "chip": "Chip",
     "flash-size": "Flash-Größe",
@@ -52,7 +56,7 @@
     "secure-boot-off": "Secure Boot noch aus",
     "flash-encryption-off": "Flash-Verschlüsselung noch aus",
     "manual-encrypt": "Verschlüsselungseinstellungen noch offen",
-    "heap": "Freier Speicher",
+    "heap": "Freier Speicher / größter Block",
     "variant": "Variante",
     "profile": "Firmware-Profil"
   },

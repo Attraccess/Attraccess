@@ -112,6 +112,8 @@ export interface HarnessOptions {
   secureConversion?: boolean;
   /** The firmware reports `conversionStopBeforeBurn` (lab/HIL builds). */
   stopBeforeBurnBuild?: boolean;
+  /** The session is open but READER_FIRMWARE_INFO has not arrived yet (a reader that is still connecting). */
+  firmwareInfoPending?: boolean;
 }
 
 /**
@@ -222,6 +224,12 @@ export function createConversionHarness(options: HarnessOptions = {}) {
     state = new SessionSecurityState(1, FINGERPRINT);
     state.secureConversion = options.secureConversion ?? true;
     state.conversionStopBeforeBurn = options.stopBeforeBurnBuild ?? false;
+    if (options.firmwareInfoPending) {
+      state.secureConversion = false;
+      control.attach(connection as unknown as SessionConnection, state);
+      return;
+    }
+    state.firmware = { name: 'attractap', variant: 'touch-v2', version: '2.14.0' };
     state.setBuild({
       secureVersion: null,
       ...(options.build ?? { profile: device.profile, release: true, variant: 'touch-v2' }),

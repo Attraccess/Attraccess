@@ -86,7 +86,8 @@ export class SecureConversionService {
     if ((await this.keys.getState()).status !== 'ready') blockers.push('recovery-check-missing');
     if (reader.pairingState !== 'paired') blockers.push('reader-unpaired');
 
-    const session = this.registry.get(readerId);
+    // A reader that is still connecting has not sent READER_FIRMWARE_INFO yet: offline, not a list of wrong gates.
+    const session = this.registry.get(readerId)?.state.firmware ? this.registry.get(readerId) : null;
     const build = session?.state.reportedBuild ?? null;
     if (!session) blockers.push('reader-offline');
     else {
@@ -117,7 +118,15 @@ export class SecureConversionService {
     if (blockers.includes('recovery-check-missing')) {
       throw new ConflictException('The recovery key check has not passed yet');
     }
-    if (blockers.length) throw new ConflictException(`This reader cannot be secured now: ${blockers.join(', ')}`);
+    // The codes go in their own field, so the admin UI can name each reason in its language.
+    if (blockers.length) {
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        message: `This reader cannot be secured now: ${blockers.join(', ')}`,
+        blockers,
+      });
+    }
   }
 
   /** Read-only preflight: asks the reader for its report and checks it. Nothing is written on the reader. */

@@ -30,6 +30,18 @@ describe('secure conversion gates (server side)', () => {
     });
   });
 
+  it('names the unmet gates in their own field when it refuses', async () => {
+    const h = createConversionHarness();
+    const refused = await h.service.start(1, 'Lab door', ADMIN).catch((error: ConflictException) => error);
+    expect(refused).toBeInstanceOf(ConflictException);
+    expect((refused as ConflictException).getResponse()).toMatchObject({ blockers: ['reader-offline'] });
+  });
+
+  it('counts a reader that is still connecting as offline, not as a list of wrong gates', async () => {
+    const h = await online({ firmwareInfoPending: true });
+    await expect(h.service.eligibility(1)).resolves.toEqual({ hidden: false, blockers: ['reader-offline'] });
+  });
+
   it('rejects preflight and start without a passed recovery check', async () => {
     const h = await online({ keysStatus: 'recovery-check-pending' });
     expect((await h.service.eligibility(1)).blockers).toEqual(['recovery-check-missing']);

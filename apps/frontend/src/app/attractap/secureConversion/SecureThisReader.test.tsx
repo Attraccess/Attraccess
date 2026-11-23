@@ -165,6 +165,8 @@ describe('SecureThisReader', () => {
     await userEvent.click(screen.getByRole('button', { name: 'risk.continue' }));
     await userEvent.type(screen.getByRole('textbox'), 'Front door');
     expect(screen.getByText('start.preflightFailed')).toBeInTheDocument();
+    // Not by colour alone: the failed check is named for screen readers, in the UI language.
+    expect(screen.getByRole('img', { name: 'checkResult.failed' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'start.start' })).toBeDisabled();
   });
 

@@ -6,7 +6,7 @@ import {
   type Attractap,
 } from '@attraccess/react-query-client';
 import { useState } from 'react';
-import { apiErrorMessage } from '../pairing/pairingUtils';
+import { conversionErrorText } from './conversionErrorText';
 import { PreflightList } from './PreflightList';
 import de from './de.json';
 import en from './en.json';
@@ -68,7 +68,7 @@ export function SecureReaderStartModal({ isOpen, reader, onClose, onStarted }: R
             )}
             {error ? (
               <StatusAlert status="danger" title={t('start.failed')} data-cy="secure-conversion-start-error">
-                {apiErrorMessage(error)}
+                {conversionErrorText(error, t)}
               </StatusAlert>
             ) : null}
           </ModalBody>

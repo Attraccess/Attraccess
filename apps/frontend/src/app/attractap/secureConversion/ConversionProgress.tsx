@@ -5,7 +5,7 @@ import {
   useRetrySecureConversion,
   type SecureConversionStatusDto,
 } from '@attraccess/react-query-client';
-import { apiErrorMessage } from '../pairing/pairingUtils';
+import { conversionErrorText } from './conversionErrorText';
 import { ConversionStateChip } from './ConversionStateChip';
 import { isCritical } from './conversionStates';
 import de from './de.json';
@@ -79,7 +79,7 @@ export function ConversionProgress({ readerId, status, onChanged }: Readonly<Pro
         </StatusAlert>
       )}
 
-      {error ? <StatusAlert status="danger">{apiErrorMessage(error)}</StatusAlert> : null}
+      {error ? <StatusAlert status="danger">{conversionErrorText(error, t)}</StatusAlert> : null}
 
       <div className="flex justify-end gap-2">
         {status.canRetry && (
