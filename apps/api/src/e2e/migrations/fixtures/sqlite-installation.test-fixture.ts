@@ -133,8 +133,18 @@ async function readSqliteRows(sqlite: DataSource, table: string, columns: readon
 }
 
 /**
+ * Rows a migration after the import writes on purpose, so PostgreSQL holds them and the SQLite file never did. Each is
+ * a SQL condition that keeps the other rows of its table in the comparison.
+ */
+const WRITTEN_AFTER_IMPORT: Record<string, string> = {
+  // ResourceListVisibility1796200000000 (ATT-843) keeps an upgraded instance with accounts on "authenticated".
+  setting: `NOT ("parent" = 'resources' AND "key" = 'list_visibility')`,
+};
+
+/**
  * Compares every core table that the SQLite file has with PostgreSQL, column by column (the columns SQLite has), row
- * by row (in a canonical order). Returns the differences; empty means equal.
+ * by row (in a canonical order). Returns the differences; empty means equal. Rows of {@link WRITTEN_AFTER_IMPORT} are
+ * left out of the PostgreSQL side.
  */
 export async function compareWithSqlite(pg: DataSource, sqliteFile: string): Promise<string[]> {
   const sqlite = createSqliteSource(sqliteFile);
@@ -152,7 +162,10 @@ export async function compareWithSqlite(pg: DataSource, sqliteFile: string): Pro
       const selects = columns.map(
         (column, at) => `${postgresExpression(column, types.get(column) as string)} AS c${at}`,
       );
-      const rows: Record<string, unknown>[] = await pg.query(`SELECT ${selects.join(', ')} FROM ${quote(table)}`);
+      const later = WRITTEN_AFTER_IMPORT[table];
+      const rows: Record<string, unknown>[] = await pg.query(
+        `SELECT ${selects.join(', ')} FROM ${quote(table)}${later ? ` WHERE ${later}` : ''}`,
+      );
       const actual = rows
         .map((row) => canonical(columns.map((column, at) => postgresValue(row[`c${at}`], types.get(column) as string))))
         .sort();

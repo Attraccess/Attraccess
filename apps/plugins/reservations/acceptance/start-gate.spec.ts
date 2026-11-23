@@ -6,6 +6,7 @@ import { PreStartService as HostPreStartService } from '../../../api/src/resourc
 import { WebStartStepStore } from '../../../api/src/resources/usage/pre-start/web-start-step.store';
 import { ResourceActivityVisibilityService } from '../../../api/src/resources/usage/authorization/resource-activity-visibility.service';
 import { ResourceUsageController } from '../../../api/src/resources/usage/sessions/resource-usage.controller';
+import { ResourceListVisibilityService } from '../../../api/src/resources/visibility/resource-list-visibility.service';
 import { ResourceUsageService } from '../../../api/src/resources/usage/sessions/resource-usage.service';
 import { SessionEndNotifier } from '../../../api/src/resources/usage/pre-start/session-end-notifier.service';
 import { ReaderUiHooksService } from '../../../api/src/plugin-system/reader-ui/reader-ui-hooks.service';
@@ -117,6 +118,8 @@ describe.each([['session' as const], ['api-token' as const]])('host start gate w
         { provide: ResourceActivityVisibilityService, useValue: {} },
         { provide: HostPreStartService, useValue: hostPreStart },
         { provide: SessionEndNotifier, useValue: {} },
+        // Machine list visibility (ATT-843) is not what this gate tests: every machine is visible here.
+        { provide: ResourceListVisibilityService, useValue: { canSee: async () => true } },
       ],
     })
       .overrideGuard(DualAuthGuard)

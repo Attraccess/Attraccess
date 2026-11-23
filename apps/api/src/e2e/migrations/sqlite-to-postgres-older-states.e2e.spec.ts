@@ -65,6 +65,12 @@ describe.each(olderStates)('starting PostgreSQL on the SQLite database of the $n
     expect(users).toBeGreaterThan(0);
   });
 
+  it("keeps the upgraded instance on today's machine list visibility, because it has accounts (ATT-843)", async () => {
+    expect(
+      await pg.query(`SELECT "value" FROM "setting" WHERE "parent" = 'resources' AND "key" = 'list_visibility'`),
+    ).toEqual([{ value: 'authenticated' }]);
+  });
+
   it('keeps foreign keys valid and continues generated ids after the highest id SQLite issued', async () => {
     expect(await pg.query('SELECT conname FROM pg_constraint WHERE NOT convalidated')).toEqual([]);
     expect(await sequencesBehindSqlite(pg, installation.backup)).toEqual([]);

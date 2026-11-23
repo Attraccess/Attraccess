@@ -42,6 +42,8 @@ describe('Fresh PostgreSQL install (e2e)', () => {
       'PostgresUserNames1796000000000',
       'AttractapNfcCapability1796100000000',
       'AttractapDropBridgeResourceLinks1796100000001',
+      'ResourceListVisibility1796200000000',
+      'PermittedResourceIndexes1796200000001',
     ]);
     expect(postgresBackend.migrationTrack.tableName).toBe('migrations');
     const [{ count }] = await source.query(
@@ -52,6 +54,10 @@ describe('Fresh PostgreSQL install (e2e)', () => {
     const [{ roles }] = await source.query('SELECT COUNT(*)::int AS roles FROM role');
     expect(roles).toBeGreaterThanOrEqual(6);
     expect(await source.query('SELECT 1 FROM "user" LIMIT 1')).toEqual([]);
+    // Without accounts the machine list visibility stays unset, which means "permitted-only" (ATT-843).
+    expect(
+      await source.query(`SELECT 1 FROM "setting" WHERE "parent" = 'resources' AND "key" = 'list_visibility'`),
+    ).toEqual([]);
   });
 
   it('is idempotent: a restart on a current database applies nothing and changes no schema', async () => {
