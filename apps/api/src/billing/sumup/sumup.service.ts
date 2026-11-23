@@ -117,6 +117,10 @@ export class SumUpService {
   }
 
   async getReaders(): Promise<SumUpReaderDto[]> {
+    if (!(await this.getIsEnabled())) {
+      return [];
+    }
+
     const sumUp = await this.getSumUp();
     const merchantCode = await this.getMerchantCode();
     const response = await this.externalCallTimer.time('sumup', 'readers_list', () => sumUp.readers.list(merchantCode));
