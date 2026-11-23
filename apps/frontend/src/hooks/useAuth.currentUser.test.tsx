@@ -15,6 +15,8 @@ type Answer = Response | Error;
 let client: QueryClient;
 let answers: Answer[];
 let meRequests: number;
+/** Every status any useAuth instance rendered, so a state shown for a single render is not missed. */
+let rendered: Set<string>;
 const originalBase = apiClient.getConfig().baseUrl;
 const json = (data: unknown) => new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
 const status = (code: number) => new Response('{}', { status: code, headers: { 'Content-Type': 'application/json' } });
@@ -22,6 +24,7 @@ const user = { id: 7, username: 'fixture' };
 
 beforeEach(() => {
   meRequests = 0;
+  rendered = new Set();
   answers = [];
   apiClient.setConfig({ baseUrl: 'http://localhost' });
   // No backoff delay in tests; the retry count comes from useAuth's own rule.
@@ -52,13 +55,20 @@ afterEach(() => {
 });
 
 function mount() {
-  return renderHook(() => [useAuth(), useAuth()], {
-    wrapper: ({ children }) => (
-      <MemoryRouter>
-        <QueryClientProvider client={client}>{children}</QueryClientProvider>
-      </MemoryRouter>
-    ),
-  });
+  return renderHook(
+    () => {
+      const auths = [useAuth(), useAuth()];
+      auths.forEach((auth) => rendered.add(auth.authStatus));
+      return auths;
+    },
+    {
+      wrapper: ({ children }) => (
+        <MemoryRouter>
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        </MemoryRouter>
+      ),
+    },
+  );
 }
 const statusOf = (hook: ReturnType<typeof mount>) => hook.result.current.map((auth) => auth.authStatus);
 
@@ -74,13 +84,9 @@ it('starts in the loading state and shows a 401 as signed out without retrying',
 it(`retries a 503 ${DEFAULT_RETRIES} times while loading, then reports an error instead of signing out`, async () => {
   answers = [status(503)];
   const hook = mount();
-  const seen = new Set<string>();
-  await waitFor(() => {
-    hook.result.current.forEach((auth) => seen.add(auth.authStatus));
-    expect(statusOf(hook)).toEqual(['error', 'error']);
-  });
+  await waitFor(() => expect(statusOf(hook)).toEqual(['error', 'error']));
   expect(meRequests).toBe(DEFAULT_RETRIES + 1);
-  expect(seen.has('unauthenticated')).toBe(false);
+  expect([...rendered]).toEqual(['loading', 'error']);
   expect(hook.result.current[0].user).toBeNull();
 });
 
@@ -120,14 +126,27 @@ it('keeps the sign-in page mounted while a signed-out answer is refetched (windo
   answers = [status(401)];
   const hook = mount();
   await waitFor(() => expect(statusOf(hook)[0]).toBe('unauthenticated'));
-  const seen = new Set<string>();
+  rendered.clear();
   await act(async () => {
-    const refetch = client.refetchQueries({ queryKey: UseGetCurrentKeyFn() });
-    hook.result.current.forEach((auth) => seen.add(auth.authStatus));
-    await refetch;
+    await client.refetchQueries({ queryKey: UseGetCurrentKeyFn() });
   });
-  hook.result.current.forEach((auth) => seen.add(auth.authStatus));
-  expect([...seen]).toEqual(['unauthenticated']);
+  expect([...rendered].filter((shown) => shown !== 'unauthenticated')).toEqual([]);
+  expect(statusOf(hook)).toEqual(['unauthenticated', 'unauthenticated']);
+  expect(meRequests).toBe(2);
+});
+
+it('keeps a signed-out user on the sign-in page when a background refetch fails (no error screen)', async () => {
+  answers = [status(401)];
+  const hook = mount();
+  await waitFor(() => expect(statusOf(hook)[0]).toBe('unauthenticated'));
+  rendered.clear();
+  answers = [status(503)];
+  await act(async () => {
+    await client.refetchQueries({ queryKey: UseGetCurrentKeyFn() });
+  });
+  expect([...rendered].filter((shown) => shown !== 'unauthenticated')).toEqual([]);
+  expect(statusOf(hook)).toEqual(['unauthenticated', 'unauthenticated']);
+  // Nothing to keep signed in, so the background answer is not retried.
   expect(meRequests).toBe(2);
 });
 

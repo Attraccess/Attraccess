@@ -1,9 +1,9 @@
 {
-  "title": "Ihr Konto konnte nicht geladen werden.",
-  "subtitle": "Die App konnte den Server nicht erreichen.",
+  "title": "Der Anmeldestatus konnte nicht geladen werden.",
+  "subtitle": "Der Server hat nicht wie erwartet geantwortet.",
   "alert": {
-    "title": "Sie sind weiterhin angemeldet.",
-    "description": "Ihre Sitzung wurde nicht beendet. Der Server ist möglicherweise ausgelastet oder nicht erreichbar. Bitte versuchen Sie es gleich noch einmal."
+    "title": "Das ist keine Abmeldung.",
+    "description": "Eine bestehende Sitzung wurde nicht beendet. Der Server ist möglicherweise ausgelastet oder nicht erreichbar. Bitte gleich noch einmal versuchen."
   },
   "actions": {
     "retry": "Erneut versuchen"

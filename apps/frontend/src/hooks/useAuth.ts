@@ -7,7 +7,6 @@ import { stopLiveUpdates } from '../utils/live-updates';
 import { useNavigate } from 'react-router-dom';
 import {
   useCreateSession,
-  ApiError,
   useGetLogoutCapability,
   useGetTwoFactorStatus,
   UseGetCurrentKeyFn,
@@ -99,17 +98,25 @@ export function useAuth() {
     error: currentUserError,
     errorUpdatedAt: currentUserErrorUpdatedAt,
     isFetching: isCurrentUserFetching,
+    isPaused: isCurrentUserPaused,
     refetch: refetchCurrentUser,
   } = useQuery({
+    // The account pages also read this key through the generated useGetCurrent(); they render only with a cached
+    // user, where both definitions agree. The sign-in rules (401 handling, retries) live here.
     queryKey: UseGetCurrentKeyFn(),
     queryFn: async ({ signal }) => {
       try {
         return await getCurrent({ signal, throwOnError: true }).then(({ data }) => data);
       } catch (error) {
-        // A 401 without a cached user is the answer "signed out", not a failure: as data it survives refetches
-        // (window focus, the interval), so the login form stays mounted. A cached user keeps the error, so a
-        // background 401 does not sign the user out (unchanged behaviour).
-        if (isUnauthenticatedError(error) && !queryClient.getQueryData(UseGetCurrentKeyFn())) return null;
+        const cached = queryClient.getQueryState(UseGetCurrentKeyFn());
+        // Signed out (null) and only refreshing in the background (window focus, the interval): stay signed out
+        // whatever the answer, so a server hiccup does not replace the sign-in page with the error screen. The
+        // reload after a sign-in (restoreAuthentication invalidates) and a retry after a failure still report it.
+        if (cached?.data === null && !cached.isInvalidated) return null;
+        // A 401 without a cached user is the answer "signed out", not a failure: as data it survives refetches,
+        // so the login form stays mounted. A cached user keeps the error, so a background 401 does not sign the
+        // user out (unchanged behaviour).
+        if (isUnauthenticatedError(error) && !cached?.data) return null;
         throw error;
       }
     },
@@ -123,13 +130,14 @@ export function useAuth() {
   });
   // Ignore late identity responses as soon as either logout action starts.
   const currentUser = hasStartedLogout ? null : fetchedUser;
-  // Derived from the shared query state, so every useAuth instance agrees.
+  // Derived from the shared query state, so every initialized useAuth instance agrees.
   const authStatus = deriveAuthStatus({
     isInitialized,
     logoutStatus,
     data: fetchedUser,
     error: currentUserError,
     isFetching: isCurrentUserFetching,
+    isPaused: isCurrentUserPaused,
     hasFailedBefore: currentUserErrorUpdatedAt > 0,
   });
   const retryCurrentUser = useCallback(() => {
@@ -153,7 +161,7 @@ export function useAuth() {
         await getCurrent({ throwOnError: true }).then(({ data }) => data);
         return null;
       } catch (error) {
-        if (error instanceof ApiError && error.status === 401) return outcome.result;
+        if (isUnauthenticatedError(error)) return outcome.result;
         return null;
       }
     },
@@ -253,10 +261,11 @@ export function useAuth() {
     user: logoutStatus === 'ended' ? null : (currentUser ?? null),
     isAuthenticated: logoutStatus !== 'ended' && !!currentUser,
     isInitialized,
-    /** loading until the first current-user answer; error when it failed with something other than a 401. */
+    /** loading until the first current-user answer; error when it failed with something other than a 401; a started logout already counts as unauthenticated. */
     authStatus,
     /** Loads the current user again, for example from the error screen. */
     retryCurrentUser,
+    /** Whether the current user (or one of its retries) is being requested, for the error screen's Retry button. */
     isCurrentUserFetching,
     logout,
     logoutEverywhere,

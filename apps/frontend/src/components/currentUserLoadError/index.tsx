@@ -23,7 +23,7 @@ export function CurrentUserLoadError({ onRetry, isRetrying }: Readonly<CurrentUs
         <StatusAlert status="danger" title={t('alert.title')}>
           {t('alert.description')}
         </StatusAlert>
-        <Button variant="primary" onPress={onRetry} isPending={isRetrying}>
+        <Button variant="primary" className="w-full" onPress={onRetry} isPending={isRetrying}>
           <RotateCwIcon className="size-4" aria-hidden />
           {t('actions.retry')}
         </Button>

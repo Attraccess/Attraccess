@@ -1,9 +1,9 @@
 {
-  "title": "Your account could not be loaded.",
-  "subtitle": "The app could not reach the server.",
+  "title": "The app could not load your sign-in status.",
+  "subtitle": "The server did not answer as expected.",
   "alert": {
-    "title": "You are still signed in.",
-    "description": "Your session was not ended. The server may be busy or unreachable. Please try again in a moment."
+    "title": "This is not a sign-out.",
+    "description": "If you were signed in, your session was not ended. The server may be busy or unreachable. Please try again in a moment."
   },
   "actions": {
     "retry": "Retry"

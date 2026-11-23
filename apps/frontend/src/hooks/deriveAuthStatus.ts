@@ -13,6 +13,8 @@ export interface AuthStatusInput {
   error: unknown;
   /** Whether a current-user request (or one of its retries) is in flight. */
   isFetching: boolean;
+  /** Whether that request waits for the browser to come back online. TanStack clears `error` meanwhile. */
+  isPaused: boolean;
   /** Whether an earlier current-user request failed. TanStack clears `error` while a query without data refetches. */
   hasFailedBefore: boolean;
 }
@@ -27,6 +29,7 @@ export function deriveAuthStatus({
   data,
   error,
   isFetching,
+  isPaused,
   hasFailedBefore,
 }: AuthStatusInput): AuthStatus {
   // Logout wins: once either logout action starts, late identity answers no longer count.
@@ -37,6 +40,8 @@ export function deriveAuthStatus({
   if (error) return isUnauthenticatedError(error) ? 'unauthenticated' : 'error';
   // `null` means signed out (a 401, or set by logout); a sign-in reloading the user keeps the login form.
   if (data === null) return 'unauthenticated';
+  // Offline: the request waits for the network, so offer Retry instead of booting indefinitely.
+  if (isPaused) return 'error';
   // Retrying after a failure: keep the error screen (its Retry button shows the request) instead of booting again.
   if (isFetching && hasFailedBefore) return 'error';
   // No answer yet: the first request, or one of its retries, is still running.

@@ -15,6 +15,7 @@ const base = {
   data: undefined,
   error: null,
   isFetching: false,
+  isPaused: false,
   hasFailedBefore: false,
 };
 
@@ -27,6 +28,12 @@ describe('deriveAuthStatus', () => {
 
   it('keeps the error screen while a retry after a failure is in flight (TanStack clears the error meanwhile)', () => {
     expect(deriveAuthStatus({ ...base, isFetching: true, hasFailedBefore: true })).toBe('error');
+  });
+
+  it('offers Retry instead of booting while the first request waits offline', () => {
+    expect(deriveAuthStatus({ ...base, isPaused: true })).toBe('error');
+    expect(deriveAuthStatus({ ...base, data: null, isPaused: true })).toBe('unauthenticated');
+    expect(deriveAuthStatus({ ...base, data: user, isPaused: true })).toBe('authenticated');
   });
 
   it('keeps the sign-in page while a signed-out answer is refetched', () => {

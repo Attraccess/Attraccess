@@ -260,8 +260,8 @@ it('shows a full-page error with Retry instead of the sign-in page when the curr
   state.initialized = true;
   state.status = 'error';
   renderApp();
-  expect(screen.getByText('Your account could not be loaded.')).toBeInTheDocument();
-  expect(screen.getByText('You are still signed in.')).toBeInTheDocument();
+  expect(screen.getByText('The app could not load your sign-in status.')).toBeInTheDocument();
+  expect(screen.getByText('This is not a sign-out.')).toBeInTheDocument();
   expect(screen.queryByText('Home route')).toBeNull();
   expect(screen.queryByText('Sign in')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
