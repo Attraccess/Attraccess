@@ -1,0 +1,61 @@
+{
+  "heading": "Netzwerkbeschränkung",
+  "description": "Ausgewählte Ressourcen-Aktionen nur aus dem lokalen Netzwerk erlauben. Reader und Automatisierungen sind nie betroffen.",
+  "loading": "Netzwerkbeschränkung wird geladen…",
+  "loadFailed": "Die Einstellungen der Netzwerkbeschränkung konnten nicht geladen werden. Lade die Seite neu und versuche es erneut.",
+  "detected": {
+    "inside": "Deine Adresse {{address}} liegt im erlaubten Netzwerk.",
+    "outside": "Deine Adresse {{address}} liegt außerhalb des erlaubten Netzwerks. Prüfe die Bereiche und die Adressquelle, bevor du die Beschränkung einschaltest, sonst braucht deine eigene Rolle die Aktionen unten.",
+    "unknown": "Deine Adresse konnte mit der aktuellen Adressquelle nicht ermittelt werden, daher giltst du als außerhalb des erlaubten Netzwerks."
+  },
+  "enabled": {
+    "label": "Aktionen auf das lokale Netzwerk beschränken",
+    "hint": "Standardmäßig aus. Solange sie aus ist, ändert die Tabelle unten nichts."
+  },
+  "ranges": {
+    "label": "Erlaubte Netzwerke",
+    "hint": "IP-Adressen und CIDR-Bereiche (IPv4 und IPv6), einer pro Zeile. Solange die Beschränkung an ist, ist mindestens einer nötig."
+  },
+  "source": {
+    "label": "Woher die Adresse kommt",
+    "hint": "Hinter einem Reverse Proxy setze TRUST_PROXY (Client-Adresse) oder lass den Proxy einen Header senden.",
+    "client": {
+      "label": "Client-Adresse",
+      "description": "Die Adresse, die der Server für die Anfrage ermittelt. Berücksichtigt TRUST_PROXY."
+    },
+    "header": {
+      "label": "Request-Header",
+      "description": "Die Adresse wird aus einem Header gelesen, den dein Reverse Proxy setzt. Fehlt er oder ist er keine Adresse, gilt der Aufrufer als außerhalb."
+    },
+    "headerName": "Header-Name",
+    "headerWarning": "Nur sicher, wenn Attraccess ausschließlich über den Proxy erreichbar ist, der diesen Header überschreibt. Sonst können Clients ihn fälschen und wirken lokal."
+  },
+  "roles": {
+    "label": "Von außerhalb erlaubt, pro Rolle",
+    "hint": "Mitglieder einer Rolle dürfen die angehakten Aktionen auch außerhalb des erlaubten Netzwerks ausführen. Ein Nutzer darf eine Aktion, wenn eine seiner Rollen sie erlaubt. Admins sind nicht ausgenommen.",
+    "ariaLabel": "Aktionen, die jede Rolle von außerhalb des erlaubten Netzwerks ausführen darf",
+    "role": "Rolle",
+    "allow": "{{action}} von außerhalb für {{role}} erlauben"
+  },
+  "actions": {
+    "usage": {
+      "start": "Starten",
+      "takeover": "Übernehmen",
+      "end": "Beenden"
+    },
+    "door": {
+      "open": "Tür öffnen",
+      "unlock": "Tür entriegeln",
+      "unlatch": "Falle öffnen",
+      "lock": "Tür verriegeln"
+    },
+    "supervision": {
+      "request": "Beaufsichtigung anfragen",
+      "approve": "Beaufsichtigung bestätigen"
+    }
+  },
+  "saved": {
+    "title": "Netzwerkbeschränkung gespeichert",
+    "description": "Die Änderung gilt sofort."
+  }
+}

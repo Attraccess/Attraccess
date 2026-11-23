@@ -16,6 +16,9 @@ const state = vi.hoisted(() => ({
   success: vi.fn(),
   onSuccess: undefined as undefined | ((data: { resourceId: number }) => void),
 }));
+vi.mock('../../../hooks/useNetworkRestriction', () => ({
+  useNetworkRestriction: () => ({ isRestricted: () => false }),
+}));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   ...(await (() => ({

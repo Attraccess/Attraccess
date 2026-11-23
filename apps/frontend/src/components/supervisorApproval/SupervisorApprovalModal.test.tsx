@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SupervisorApprovalModal } from './SupervisorApprovalModal';
 
+vi.mock('../../hooks/useNetworkRestriction', () => ({ useNetworkRestriction: () => ({ isRestricted: () => false }) }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   ...(await (() => ({

@@ -14,6 +14,12 @@ export function getApiErrorMessage(error: ApiError | Error): string {
   return String(((error as ApiError).body as { message?: string | string[] } | undefined)?.message ?? error.message);
 }
 
+/** A 403 for an action the user's network does not allow (the server's NETWORK_RESTRICTED error code). */
+export function isNetworkRestrictedError(error: unknown): boolean {
+  const body = (error as ApiError | undefined)?.body as { code?: string; message?: unknown } | undefined;
+  return body?.code === 'NETWORK_RESTRICTED' || body?.message === 'NETWORK_RESTRICTED';
+}
+
 export function getTranslationKeyForApiError(props: Props) {
   let errorMessage = getApiErrorMessage(props.error);
 

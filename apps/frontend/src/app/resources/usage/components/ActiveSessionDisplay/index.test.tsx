@@ -11,6 +11,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import usePluginState, { PluginManifestWithPlugin } from '../../../../plugins/plugin.state';
 import { ActiveSessionDisplay } from './index';
 
+vi.mock('../../../../../hooks/useNetworkRestriction', () => ({
+  useNetworkRestriction: () => ({ isRestricted: () => false }),
+}));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   ...(await (() => ({

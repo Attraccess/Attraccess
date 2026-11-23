@@ -47,6 +47,9 @@ const state = vi.hoisted(() => ({
     { onSuccess: (data: { conversationId: number }) => void; onError?: (error: Error) => void }
   >,
 }));
+vi.mock('../../../../../hooks/useNetworkRestriction', () => ({
+  useNetworkRestriction: () => ({ isRestricted: () => false }),
+}));
 vi.mock('../../../../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 1 }, hasPermission: () => state.update }),
 }));

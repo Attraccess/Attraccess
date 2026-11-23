@@ -250,5 +250,9 @@
   "MISSING_HEADER_ROW": {
     "title": "CSV file has no data",
     "description": "The CSV file has no header row or no rows below it. The first row must contain the column names, followed by one row per user."
+  },
+  "NETWORK_RESTRICTED": {
+    "title": "Only available from the local network",
+    "description": "This action is only available from the local network. Connect to the local network and try again."
   }
 }

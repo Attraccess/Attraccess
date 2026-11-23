@@ -2,6 +2,9 @@ import { useCallback, useState } from 'react';
 import { formatUserDisplayName } from '@attraccess/shared';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, UserX } from 'lucide-react';
+import { NetworkRestrictedAction } from '@attraccess/application-models';
+import { useNetworkRestriction } from '../../../../../hooks/useNetworkRestriction';
+import { NetworkRestrictedHint } from '../../../../../components/networkRestriction/NetworkRestrictedHint';
 import { AttraccessUser, Button, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
@@ -41,6 +44,8 @@ export function ParallelSessionsDisplay({
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
   });
   const navigate = useNavigate();
+  const { isRestricted } = useNetworkRestriction();
+  const endRestricted = isRestricted(NetworkRestrictedAction.UsageEnd);
   const { success, error: showError, apiError } = useToastMessage();
   const invalidateSessionHistory = useInvalidateSessionHistory(resourceId);
   const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(resourceId);
@@ -148,6 +153,7 @@ export function ParallelSessionsDisplay({
                           variant="danger-soft"
                           size="sm"
                           aria-label={t('endSession.ariaLabel', { name })}
+                          isDisabled={endRestricted}
                           onPress={() => setUsageToEnd(usage)}
                         >
                           <UserX className="w-3.5 h-3.5" />
@@ -159,6 +165,7 @@ export function ParallelSessionsDisplay({
                 );
               })}
             </ul>
+            {usages.some(canEndSession) && <NetworkRestrictedHint actions={NetworkRestrictedAction.UsageEnd} />}
           </>
         )}
       </SessionStatusCard>

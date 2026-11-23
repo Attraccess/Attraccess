@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  ApiError,
   SupervisionRequestDto,
   UseResourceUsageGetActiveSessionKeyFn,
   useSupervisionApproveRequest,
@@ -12,6 +13,9 @@ import { useLiveUpdates } from '../../utils/live-updates';
 import { useToastMessage } from '../toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SupervisorApprovalModal } from './SupervisorApprovalModal';
+import { isNetworkRestrictedError } from '../../utils/apiError';
+import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import en from './translations/en.json';
 import de from './translations/de.json';
 
@@ -26,7 +30,10 @@ export function SupervisorApprovalListener() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const toast = useToastMessage();
-  const { t } = useTranslations({ en, de });
+  const { t, tExists } = useTranslations({
+    en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
+    de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
+  });
 
   const [requests, setRequests] = useState<SupervisionRequestDto[]>([]);
 
@@ -111,13 +118,18 @@ export function SupervisorApprovalListener() {
           toast.success({ title: t('toast.approved.title'), description: t('toast.approved.description') });
           removeRequest(id);
         },
-        onError: () => {
+        onError: (error) => {
+          // The user's network changed since the popup opened: say so, and keep the request for another try.
+          if (isNetworkRestrictedError(error)) {
+            toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' });
+            return;
+          }
           toast.error({ title: t('toast.error.title'), description: t('toast.error.description') });
           removeRequest(id);
         },
       },
     );
-  }, [activeRequest, approveRequest, invalidateActiveSession, removeRequest, t, toast]);
+  }, [activeRequest, approveRequest, invalidateActiveSession, removeRequest, t, tExists, toast]);
 
   const handleReject = useCallback(() => {
     if (!activeRequest) {

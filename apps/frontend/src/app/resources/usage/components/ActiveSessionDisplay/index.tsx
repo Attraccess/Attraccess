@@ -17,6 +17,9 @@ import {
   UseResourceUsageGetHistoryKeyFn,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
+import { NetworkRestrictedAction } from '@attraccess/application-models';
+import { useNetworkRestriction } from '../../../../../hooks/useNetworkRestriction';
+import { NetworkRestrictedHint } from '../../../../../components/networkRestriction/NetworkRestrictedHint';
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { FlowButtons } from './flowButtons';
@@ -44,6 +47,8 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
     },
   });
   const toast = useToastMessage();
+  const { isRestricted } = useNetworkRestriction();
+  const endRestricted = isRestricted(NetworkRestrictedAction.UsageEnd);
   const queryClient = useQueryClient();
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
 
@@ -156,12 +161,18 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
         />
 
         <ButtonGroup className="w-full">
-          <Button variant="danger" isPending={endSession.isPending} onPress={immediatelyEndSession}>
+          <Button
+            variant="danger"
+            isPending={endSession.isPending}
+            isDisabled={endRestricted}
+            onPress={immediatelyEndSession}
+          >
             <StopCircle className="w-4 h-4" />
             {t('endSession')}
           </Button>
           <Dropdown>
             <DropdownTrigger
+              isDisabled={endRestricted}
               className={`${buttonVariants({ isIconOnly: true, variant: 'danger' })} inline-flex items-center justify-center`}
             >
               <ChevronDownIcon />
@@ -175,6 +186,7 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
             </DropdownPopover>
           </Dropdown>
         </ButtonGroup>
+        <NetworkRestrictedHint actions={NetworkRestrictedAction.UsageEnd} />
       </SessionStatusCard>
 
       <SessionNotesModal

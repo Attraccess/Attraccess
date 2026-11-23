@@ -3,10 +3,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   ApiError,
   StartUsageSessionDto,
+  useGetNetworkRestrictionStatusKey,
   useResourceUsageStartBlockedKey,
   useResourceUsageStartSession,
 } from '@attraccess/react-query-client';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../components/toastProvider';
+import { isNetworkRestrictedError } from '../../../../utils/apiError';
+import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 import { getConfirmationRequired, getStartBlockedReason, useStartConfirmation } from './useStartConfirmation';
 
 export type StartErrorHandler = (error: ApiError, requestBody: StartUsageSessionDto) => void;
@@ -25,7 +30,8 @@ const isPluginStartError = (error: unknown) =>
 
 /**
  * Starts a session through the plugin pre-start contract. A 409 CONFIRMATION_REQUIRED opens the plugin's
- * confirmation and retries with its step id; a 403 START_BLOCKED shows the plugin's reason as written.
+ * confirmation and retries with its step id; a 403 START_BLOCKED shows the plugin's reason as written. A 403
+ * NETWORK_RESTRICTED (the user's network changed since the controls were drawn) shows its translated message.
  * Every web start (start, takeover, QR link) goes through here; render `dialog` next to the start control.
  *
  * `onSuccess` and `onError` are hook-level mutation callbacks, so they still run when the caller unmounts
@@ -35,11 +41,21 @@ const isPluginStartError = (error: unknown) =>
 export function useStartSessionWithConfirmation(resourceId: number, options: Options) {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
+  const { t, tExists } = useTranslations({
+    en: { api: API_ERROR_TRANSLATIONS_EN },
+    de: { api: API_ERROR_TRANSLATIONS_DE },
+  });
   const optionsRef = useRef(options);
   optionsRef.current = options;
   const { mutate, isPending } = useResourceUsageStartSession(undefined, {
     onSuccess: (_data, { body }) => optionsRef.current.onSuccess(body),
     onError: (error, { body }) => {
+      if (isNetworkRestrictedError(error)) {
+        toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' });
+        // The controls were drawn for another network: ask again so they match.
+        void queryClient.invalidateQueries({ queryKey: [useGetNetworkRestrictionStatusKey] });
+        return;
+      }
       if (!isPluginStartError(error)) optionsRef.current.onError(error as ApiError, body);
     },
   });
@@ -60,6 +76,7 @@ export function useStartSessionWithConfirmation(resourceId: number, options: Opt
         { path: { resourceId }, body: requestBody },
         {
           onError: (error) => {
+            if (isNetworkRestrictedError(error)) return;
             if (handleStartError(error, requestBody)) {
               optionsRef.current.onPluginNotice?.();
               return;

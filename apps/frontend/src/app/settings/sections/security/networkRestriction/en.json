@@ -1,0 +1,61 @@
+{
+  "heading": "Network restriction",
+  "description": "Allow selected resource actions only from the local network. Readers and automations are never affected.",
+  "loading": "Loading network restriction…",
+  "loadFailed": "The network restriction settings could not be loaded. Reload the page to try again.",
+  "detected": {
+    "inside": "Your address {{address}} is inside the allowed network.",
+    "outside": "Your address {{address}} is outside the allowed network. Check the ranges and the address source before you switch the restriction on, otherwise your own role needs the actions below.",
+    "unknown": "Your address could not be determined with the current address source, so you count as outside the allowed network."
+  },
+  "enabled": {
+    "label": "Restrict actions to the local network",
+    "hint": "Off by default. While it is off, the table below changes nothing."
+  },
+  "ranges": {
+    "label": "Allowed networks",
+    "hint": "IP addresses and CIDR ranges (IPv4 and IPv6), one per line. At least one is required while the restriction is on."
+  },
+  "source": {
+    "label": "Where the address comes from",
+    "hint": "Behind a reverse proxy, set TRUST_PROXY (client address) or let the proxy send a header.",
+    "client": {
+      "label": "Client address",
+      "description": "The address the server resolves for the request. Honours TRUST_PROXY."
+    },
+    "header": {
+      "label": "Request header",
+      "description": "Read the address from a header your reverse proxy sets. If it is missing or not an address, the caller counts as outside."
+    },
+    "headerName": "Header name",
+    "headerWarning": "Only safe if Attraccess can be reached only through the proxy that overwrites this header. Otherwise clients can forge it and appear to be local."
+  },
+  "roles": {
+    "label": "Allowed from outside, per role",
+    "hint": "Members of a role may do the checked actions from outside the allowed network. A user may do an action if any of their roles allows it. Admins are not exempt.",
+    "ariaLabel": "Actions each role may do from outside the allowed network",
+    "role": "Role",
+    "allow": "Allow {{action}} from outside for {{role}}"
+  },
+  "actions": {
+    "usage": {
+      "start": "Start",
+      "takeover": "Take over",
+      "end": "End"
+    },
+    "door": {
+      "open": "Open door",
+      "unlock": "Unlock door",
+      "unlatch": "Unlatch door",
+      "lock": "Lock door"
+    },
+    "supervision": {
+      "request": "Request supervision",
+      "approve": "Approve supervision"
+    }
+  },
+  "saved": {
+    "title": "Network restriction saved",
+    "description": "The change applies right away."
+  }
+}

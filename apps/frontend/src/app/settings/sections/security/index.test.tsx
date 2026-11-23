@@ -21,6 +21,7 @@ const feedback = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
 }));
+vi.mock('./networkRestriction/NetworkRestrictionCard', () => ({ NetworkRestrictionCard: () => null }));
 vi.mock('@attraccess/react-query-client', () => ({
   TwoFactorPolicy: { OPTIONAL: 'optional', REQUIRED_FOR_PRIVILEGED: 'privileged', REQUIRED_FOR_ALL: 'all' },
   PasswordPolicyRole: { ADMIN: 'admin' },

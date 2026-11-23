@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { userIdentityFromDisplayName } from '../../utils/userIdentityFromDisplayName';
 import { Card, Description, ModalBody, ModalFooter, ModalHeader, ModalHeading, Spinner } from '@heroui/react';
 import { AttraccessUser, Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { NetworkRestrictedAction } from '@attraccess/application-models';
 import { SupervisionRequestDto, useGetOneResourceById } from '@attraccess/react-query-client';
+import { useNetworkRestriction } from '../../hooks/useNetworkRestriction';
+import { NetworkRestrictedHint } from '../networkRestriction/NetworkRestrictedHint';
 import en from './translations/en.json';
 import de from './translations/de.json';
 
@@ -31,6 +34,8 @@ export function SupervisorApprovalModal({
   isRejecting,
 }: Readonly<SupervisorApprovalModalProps>) {
   const { t } = useTranslations({ en, de });
+  const { isRestricted } = useNetworkRestriction();
+  const approveRestricted = isRestricted(NetworkRestrictedAction.SupervisionApprove);
   const [secondsLeft, setSecondsLeft] = useState(() => secondsUntil(request.expiresAt));
 
   const { data: resource } = useGetOneResourceById({ path: { id: request.resourceId } });
@@ -93,6 +98,10 @@ export function SupervisorApprovalModal({
                 <Spinner color="accent" size="sm" />
                 <Description className="tabular-nums">{t('countdown', { seconds: secondsLeft })}</Description>
               </div>
+              <NetworkRestrictedHint
+                actions={NetworkRestrictedAction.SupervisionApprove}
+                className="text-center text-xs text-muted"
+              />
             </div>
           </ModalBody>
 
@@ -103,7 +112,12 @@ export function SupervisorApprovalModal({
             <Button variant="danger" onPress={onReject} isPending={isRejecting} isDisabled={isBusy}>
               {t('reject')}
             </Button>
-            <Button variant="primary" onPress={onApprove} isPending={isApproving} isDisabled={isBusy}>
+            <Button
+              variant="primary"
+              onPress={onApprove}
+              isPending={isApproving}
+              isDisabled={isBusy || approveRestricted}
+            >
               {t('approve')}
             </Button>
           </ModalFooter>

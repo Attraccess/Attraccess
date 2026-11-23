@@ -8,6 +8,7 @@ import {
   useGetLocalSignupDomainWhitelist,
 } from '@attraccess/react-query-client';
 import { SettingsSection } from '../../components/SettingsSection';
+import { NetworkRestrictionCard } from './networkRestriction/NetworkRestrictionCard';
 import { PasswordPolicySettings } from './components/PasswordPolicySettings';
 import { RateLimitSettings } from './components/RateLimitSettings';
 import { SecuritySaveBar } from './components/SecuritySaveBar';
@@ -88,6 +89,8 @@ export function SecuritySection() {
         policyDraft={drafts.policyDraft}
         setPolicyDraft={drafts.setPolicyDraft}
       />
+
+      <NetworkRestrictionCard />
 
       <SecuritySaveBar
         drafts={drafts}

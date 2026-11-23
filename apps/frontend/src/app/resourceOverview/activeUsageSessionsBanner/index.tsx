@@ -12,9 +12,12 @@ import { Check, CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { NetworkRestrictedAction } from '@attraccess/application-models';
 import { useGetAllResources, useGetAllResourcesKey } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { MY_SESSIONS_QUERY } from './mySessionsQuery';
+import { useNetworkRestriction } from '../../../hooks/useNetworkRestriction';
+import { NetworkRestrictedHint } from '../../../components/networkRestriction/NetworkRestrictedHint';
 import { useEndOwnSession, useEndSessionErrorMessage } from './useEndOwnSession';
 import en from './translations/en.json';
 import de from './translations/de.json';
@@ -37,6 +40,8 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
 
   const [isEndingAll, setIsEndingAll] = useState(false);
   const endOwnSession = useEndOwnSession();
+  const { isRestricted } = useNetworkRestriction();
+  const endRestricted = isRestricted(NetworkRestrictedAction.UsageEnd);
   const endSessionErrorMessage = useEndSessionErrorMessage();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [endStatuses, setEndStatuses] = useState<Record<number, 'pending' | 'ending' | 'done' | 'error'>>({});
@@ -185,10 +190,11 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
             <Button variant="primary" onPress={onShowMySessions}>
               {t('showMine')}
             </Button>
-            <Button variant="danger-soft" onPress={openConfirmModal}>
+            <Button variant="danger-soft" isDisabled={endRestricted} onPress={openConfirmModal}>
               {t('endAll')}
             </Button>
           </div>
+          <NetworkRestrictedHint actions={NetworkRestrictedAction.UsageEnd} className="mt-2 text-xs" />
         </AlertContent>
       </Alert>
 

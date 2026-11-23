@@ -291,7 +291,10 @@ export function StartSessionControls(
     () => unlatchDoorMutate({ path: { resourceId: resourceId } }),
     [resourceId, unlatchDoorMutate],
   );
-  const handleOpenDoor = useCallback(() => openDoorMutate({ path: { resourceId: resourceId } }), [openDoorMutate, resourceId]);
+  const handleOpenDoor = useCallback(
+    () => openDoorMutate({ path: { resourceId: resourceId } }),
+    [openDoorMutate, resourceId],
+  );
 
   return (
     <div {...divProps}>
@@ -320,6 +323,7 @@ export function StartSessionControls(
               onStart={() => void handleStartSession()}
               onStartWithNotes={handleOpenStartSessionModal}
               isStarting={startUsageSessionIsPending}
+              needsSupervisor={needsSupervisor}
             />
           </StartBlockedGate>
         )}
