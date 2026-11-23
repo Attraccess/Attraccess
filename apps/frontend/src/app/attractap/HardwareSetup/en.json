@@ -22,6 +22,10 @@
         "title": "Bluetooth setup is not available in this browser",
         "description": "Setting up over Bluetooth needs Web Bluetooth, which Chrome and Edge offer on a computer and Chrome offers on Android (over HTTPS). Open this page there, or connect the device via USB, which also needs Chrome or Edge on a computer."
       },
+      "blocked": {
+        "title": "Bluetooth is blocked for this site",
+        "description": "The browser did not open its device list because Bluetooth is blocked for this site. Click the icon left of the address, open the site settings and set Bluetooth (or Bluetooth devices) to Allow, then reload the page and try again. If that setting is missing, check that sites may ask to use Bluetooth devices in the browser settings (Privacy and security → Site settings) and that your organisation does not block Web Bluetooth. In Brave, Web Bluetooth is off by default: open brave://flags/#brave-web-bluetooth-api, set Web Bluetooth API to Enabled and relaunch the browser. Or set the device up via USB."
+      },
       "failed": {
         "title": "Could not connect over Bluetooth",
         "description": "Make sure the device's Bluetooth setup is still open (it closes after 10 minutes) and keep it close to this computer or phone. If your computer asks to pair over Bluetooth, accept the request. In the browser list, pick the right device (an Attractap Touch shows its name on its screen), then try again. If it keeps failing, set it up via USB."

@@ -2,13 +2,13 @@ import { AlertStatusIcon, Button, StatusDialog, useTranslations } from '@attracc
 import { Alert, AlertContent, AlertDescription, AlertTitle, Separator } from '@heroui/react';
 import { BluetoothIcon, UsbIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { BleConfigurator, isWebBluetoothAvailable } from '../../../utils/ble-configurator';
+import { BleConfigurator, isBluetoothBlocked, isWebBluetoothAvailable } from '../../../utils/ble-configurator';
 import { ESPTools } from '../../../utils/esp-tools';
 
 import de from './de.json';
 import en from './en.json';
 
-type BluetoothNotice = 'unavailable' | 'failed' | null;
+type BluetoothNotice = 'unavailable' | 'blocked' | 'failed' | null;
 
 interface Props {
   /** The reader or bridge closed Bluetooth after it was approved; say so instead of starting blank. */
@@ -45,7 +45,7 @@ export function ConnectScreen({ closedAfterPairing = false, bluetoothLost = fals
       await BleConfigurator.getInstance().connect();
     } catch (err) {
       console.error('Failed to connect over Bluetooth', err);
-      setBluetoothNotice('failed');
+      setBluetoothNotice(isBluetoothBlocked(err) ? 'blocked' : 'failed');
     } finally {
       setIsConnectingBluetooth(false);
     }
@@ -104,6 +104,14 @@ export function ConnectScreen({ closedAfterPairing = false, bluetoothLost = fals
         title={t('connect.bluetooth.unavailable.title')}
       >
         {t('connect.bluetooth.unavailable.description')}
+      </StatusDialog>
+      <StatusDialog
+        isOpen={bluetoothNotice === 'blocked'}
+        onClose={() => setBluetoothNotice(null)}
+        status="warning"
+        title={t('connect.bluetooth.blocked.title')}
+      >
+        {t('connect.bluetooth.blocked.description')}
       </StatusDialog>
       <StatusDialog
         isOpen={bluetoothNotice === 'failed'}
