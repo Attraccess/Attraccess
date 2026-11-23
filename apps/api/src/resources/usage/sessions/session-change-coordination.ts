@@ -72,9 +72,13 @@ export class LocalSessionChangeCoordination implements SessionChangeCoordination
   }
 }
 
-/** Stable across restarts of the same instance, distinct between instances running at the same time. */
-export function defaultInstanceName(): string {
-  return `${hostname()}:${process.env.PORT ?? '3000'}`;
+/**
+ * This instance's name in heartbeats and lock tokens: stable across restarts of the same instance, distinct between
+ * instances running at the same time. `ATTRACCESS_INSTANCE_NAME` (trimmed, blank counts as unset) when given,
+ * otherwise `<hostname>:<PORT>`.
+ */
+export function resolveInstanceName(override?: string): string {
+  return override?.trim() || `${hostname()}:${process.env.PORT ?? '3000'}`;
 }
 
 type ValkeyClient = Pick<Redis, 'set' | 'get' | 'eval' | 'mget' | 'del'> & { status?: string };
@@ -84,7 +88,7 @@ const OFFLINE = new Set(['reconnecting', 'close', 'end']);
  * Valkey-backed coordination. Valkey is optional and not required for using a machine, so an unreachable
  * Valkey degrades to the in-process queue (logged) instead of blocking every start and stop.
  *
- * Heartbeats and lock tokens start with `<instance name>|<boot id>`, so an instance that restarts quickly
+ * Heartbeats and lock tokens start with `<instance name>|<boot id>` (see `resolveInstanceName`), so an instance that restarts quickly
  * recognises the attempts and locks of its previous run right away instead of waiting for them to expire.
  */
 export class ValkeySessionChangeCoordination implements SessionChangeCoordination {
@@ -96,7 +100,7 @@ export class ValkeySessionChangeCoordination implements SessionChangeCoordinatio
 
   constructor(
     private readonly client: ValkeyClient,
-    private readonly instanceName = defaultInstanceName(),
+    private readonly instanceName = resolveInstanceName(),
     private readonly bootWaitMs = BOOT_VALKEY_WAIT_MS,
   ) {
     this.heartbeat = `${instanceName}|${randomUUID()}`;
