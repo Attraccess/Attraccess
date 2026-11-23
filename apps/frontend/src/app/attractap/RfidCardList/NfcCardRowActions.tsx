@@ -1,7 +1,12 @@
 import { CheckIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { TableRowActions, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { NfcCard, UseGetAllCardsKeyFn, useToggleCardActive } from '@attraccess/react-query-client';
+import {
+  NfcCard,
+  UseGetAllCardsKeyFn,
+  useDeleteUidOnlyCard,
+  useToggleCardActive,
+} from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import de from './de.json';
 import en from './en.json';
@@ -19,6 +24,13 @@ export function NfcCardRowActions({ card, onDeleteClick }: Readonly<NfcCardRowAc
     onSuccess: () => queryClient.invalidateQueries({ queryKey: UseGetAllCardsKeyFn({}, []) }),
     onError: (error) => toast.error({ title: t('nfcCardsTable.toggleError'), description: (error as Error).message }),
   });
+
+  // Nothing is written to a UID-only card, so it is deleted right away, without a reader.
+  const { mutateAsync: deleteUidOnly } = useDeleteUidOnlyCard(undefined, {
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: UseGetAllCardsKeyFn({}, []) }),
+    onError: (error) => toast.error({ title: t('nfcCardsTable.deleteError'), description: (error as Error).message }),
+  });
+  const isUidOnly = card.type === 'uid-only';
 
   return (
     <TableRowActions
@@ -55,7 +67,16 @@ export function NfcCardRowActions({ card, onDeleteClick }: Readonly<NfcCardRowAc
           label: t('nfcCardsTable.actions.delete'),
           icon: Trash2Icon,
           tone: 'danger',
-          onPress: onDeleteClick,
+          onPress: isUidOnly ? () => deleteUidOnly({ path: { id: card.id } }) : onDeleteClick,
+          ...(isUidOnly
+            ? {
+                confirm: {
+                  title: t('nfcCardsTable.deleteUidOnlyModal.title'),
+                  message: t('nfcCardsTable.deleteUidOnlyModal.description', { id: card.id }),
+                  'data-cy': 'nfc-card-delete-uid-only-modal',
+                },
+              }
+            : {}),
           'data-cy': `nfc-card-table-cell-delete-button-${card.id}`,
         },
       ]}

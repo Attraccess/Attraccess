@@ -13,6 +13,9 @@ const state = vi.hoisted(() => ({
   toastError: vi.fn(),
   enrollFails: null as unknown,
   resetFails: null as unknown,
+  deleteUidOnly: vi.fn(),
+  allowUidOnlyCards: false,
+  settingsLoaded: true,
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   useGetAllCards: (params: unknown) => {
@@ -21,6 +24,7 @@ vi.mock('@attraccess/react-query-client', () => ({
       data: [
         { id: 7, uid: 'AA-BB', isActive: true, createdAt: '2026-09-01T10:00:00Z', lastSeen: '2026-09-02T10:00:00Z' },
         { id: 8, uid: 'CC-DD', isActive: false },
+        { id: 9, uid: 'EE-FF', isActive: true, type: 'uid-only' },
       ],
     };
   },
@@ -42,6 +46,15 @@ vi.mock('@attraccess/react-query-client', () => ({
       state.toggle(data);
       options.onSuccess();
     },
+  }),
+  useDeleteUidOnlyCard: (_mutationKey: unknown, options: { onSuccess: () => void }) => ({
+    mutateAsync: async (data: unknown) => {
+      state.deleteUidOnly(data);
+      options.onSuccess();
+    },
+  }),
+  useGetCardWriterSettings: () => ({
+    data: state.settingsLoaded ? { mode: 'all', readerIds: [], allowUidOnlyCards: state.allowUidOnlyCards } : undefined,
   }),
   UseGetAllCardsKeyFn: () => ['cards'],
   useGetOneUserById: () => ({ data: undefined }),
@@ -90,6 +103,8 @@ beforeEach(() => {
   state.licensed = true;
   state.enrollFails = null;
   state.resetFails = null;
+  state.allowUidOnlyCards = false;
+  state.settingsLoaded = true;
 });
 afterEach(cleanup);
 const openRowMenu = async (uid: string) => {
@@ -205,4 +220,51 @@ it('reports a failed reset through the same translated reasons', async () => {
   fireEvent.change(screen.getByRole('combobox', { name: 'Select Attractap' }), { target: { value: '4' } });
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
   expect(state.toastError).toHaveBeenCalledWith(expect.objectContaining({ title: 'Reader busy' }));
+});
+
+it('marks a UID-only card with a warning chip, and says so when the setting is off', () => {
+  state.allowUidOnlyCards = true;
+  const view = render(
+    <MemoryRouter>
+      <RfidCardList />
+    </MemoryRouter>,
+  );
+  const row = () => screen.getByText('EE-FF').closest('tr') as HTMLElement;
+  expect(within(row()).getByText('UID only')).toBeInTheDocument();
+  expect(within(screen.getByText('AA-BB').closest('tr') as HTMLElement).queryByText(/UID only/)).toBeNull();
+  view.unmount();
+
+  state.allowUidOnlyCards = false;
+  render(
+    <MemoryRouter>
+      <RfidCardList />
+    </MemoryRouter>,
+  );
+  expect(within(row()).getByText('UID only, disabled')).toBeInTheDocument();
+});
+
+it('does not claim "disabled" before the setting is known', () => {
+  state.settingsLoaded = false;
+  render(
+    <MemoryRouter>
+      <RfidCardList />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText('UID only')).toBeInTheDocument();
+});
+
+it('deletes a UID-only card after a confirmation, without choosing a reader', async () => {
+  render(
+    <MemoryRouter>
+      <RfidCardList />
+    </MemoryRouter>,
+  );
+  await userEvent.click(within(await openRowMenu('EE-FF')).getByRole('menuitem', { name: 'Delete' }));
+  const dialog = await screen.findByRole('alertdialog');
+  expect(screen.queryByRole('combobox')).toBeNull();
+  expect(state.deleteUidOnly).not.toHaveBeenCalled();
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+  expect(state.deleteUidOnly).toHaveBeenCalledWith({ path: { id: 9 } });
+  expect(state.reset).not.toHaveBeenCalled();
+  await waitFor(() => expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['cards'] }));
 });
