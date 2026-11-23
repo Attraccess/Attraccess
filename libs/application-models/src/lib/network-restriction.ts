@@ -33,3 +33,6 @@ export const NETWORK_RESTRICTION_DEFAULT_RANGES: readonly string[] = [
 ];
 
 export const NETWORK_RESTRICTION_DEFAULT_HEADER = 'X-Real-Ip';
+
+/** A valid header name for the header address source (an RFC 9110 token, at most 100 characters). */
+export const NETWORK_RESTRICTION_HEADER_NAME_PATTERN = /^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,100}$/;

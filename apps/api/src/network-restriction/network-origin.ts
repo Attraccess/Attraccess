@@ -24,6 +24,17 @@ function cleanAddress(value: string | undefined): string | null {
   return candidate !== '' && isIP(candidate) !== 0 ? normalizeAddress(candidate) : null;
 }
 
+/**
+ * The header's own value: `headers` inherits from Object.prototype, so a configured name like `constructor` must not
+ * read an inherited property.
+ */
+function ownHeader(headers: OriginRequest['headers'], name: string): string | string[] | undefined {
+  if (!Object.hasOwn(headers, name)) return undefined;
+  const value: unknown = headers[name];
+  if (typeof value === 'string') return value;
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string') ? value : undefined;
+}
+
 /** The last (rightmost) entry of a header, the one the nearest proxy wrote. */
 function lastHeaderEntry(value: string | string[] | undefined): string | undefined {
   const joined = Array.isArray(value) ? value.join(',') : value;
@@ -38,7 +49,7 @@ function lastHeaderEntry(value: string | string[] | undefined): string | undefin
 export function resolveNetworkOrigin(request: OriginRequest, config: NetworkRestrictionConfig): string | null {
   if (attachedOrigins.has(request)) return attachedOrigins.get(request) ?? null;
   if (config.ipSource === NetworkIpSource.Header) {
-    return cleanAddress(lastHeaderEntry(request.headers[config.headerName.toLowerCase()]));
+    return cleanAddress(lastHeaderEntry(ownHeader(request.headers, config.headerName.toLowerCase())));
   }
   return cleanAddress(request.ip);
 }

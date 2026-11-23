@@ -2,6 +2,8 @@ import { NetworkRestrictedAction } from '@attraccess/application-models';
 import { Role, RoleNetworkAction, User, UserRole } from '@attraccess/database-entities';
 import type { DataSource } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
+import { unitOfWorkFor } from '../shared-unit-of-work';
+import { TransactionContextResolver } from '../transaction-context';
 import { TypeOrmNetworkRestrictionStore } from './typeorm-network-restriction.store';
 
 describe('role network actions on real PostgreSQL', () => {
@@ -29,7 +31,7 @@ describe('role network actions on real PostgreSQL', () => {
       source.getRepository(RoleNetworkAction),
       source.getRepository(Role),
       source.getRepository(UserRole),
-      source,
+      new TransactionContextResolver(source, unitOfWorkFor(source)),
     );
   }, 120_000);
   afterAll(() => closeTestDataSource(source));

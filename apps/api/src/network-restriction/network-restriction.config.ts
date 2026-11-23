@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import {
   NETWORK_RESTRICTION_DEFAULT_HEADER,
+  NETWORK_RESTRICTION_HEADER_NAME_PATTERN,
   NetworkIpSource,
   NetworkRestrictedAction,
   NETWORK_RESTRICTED_ACTIONS,
@@ -22,8 +23,8 @@ export const NETWORK_RESTRICTION_DEFAULTS: NetworkRestrictionConfig = {
 };
 
 const MAX_RANGES = 200;
-/** An HTTP header field name (RFC 9110 token). */
-const HEADER_NAME = /^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,100}$/;
+/** The largest role id PostgreSQL can store (int4). */
+const MAX_ROLE_ID = 2_147_483_647;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -60,7 +61,7 @@ export function parseConfigUpdate(body: unknown): Partial<NetworkRestrictionConf
     update.ipSource = body.ipSource;
   }
   if (body.headerName !== undefined) {
-    if (typeof body.headerName !== 'string' || !HEADER_NAME.test(body.headerName.trim())) {
+    if (typeof body.headerName !== 'string' || !NETWORK_RESTRICTION_HEADER_NAME_PATTERN.test(body.headerName.trim())) {
       invalid(`Invalid header name: ${JSON.stringify(body.headerName)}`);
     }
     update.headerName = body.headerName.trim();
@@ -85,8 +86,14 @@ export function parseRoleActionsUpdate(body: unknown): RoleActionsUpdate[] {
   if (!isRecord(body) || !Array.isArray(body.roles)) invalid('roles must be a list');
   const seen = new Set<number>();
   return (body.roles as unknown[]).map((entry) => {
-    if (!isRecord(entry) || typeof entry.roleId !== 'number' || !Number.isInteger(entry.roleId)) {
-      invalid('Every role entry needs an integer roleId');
+    if (
+      !isRecord(entry) ||
+      typeof entry.roleId !== 'number' ||
+      !Number.isInteger(entry.roleId) ||
+      entry.roleId < 1 ||
+      entry.roleId > MAX_ROLE_ID
+    ) {
+      invalid('Every role entry needs a positive integer roleId');
     }
     if (!Array.isArray(entry.actions)) invalid('Every role entry needs a list of actions');
     const roleId = entry.roleId as number;

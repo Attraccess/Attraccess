@@ -12,6 +12,19 @@ import type { NetworkRestrictionRoleMatrixDto, NetworkRestrictionSettingsDto } f
 /** An audit value is at most 256 characters. */
 const clip = (value: string) => (value.length <= 256 ? value : `${value.slice(0, 255)}…`);
 
+/**
+ * A range list change for the audit log: both lists when they fit, otherwise what was removed and what was added, so a
+ * range appended to a long list is not cut off.
+ */
+function rangesChange(before: string[], after: string[]): [string, string] {
+  const full: [string, string] = [before.join(','), after.join(',')];
+  if (full.every((value) => value.length <= 256)) return full;
+  return [
+    `removed: ${before.filter((range) => !after.includes(range)).join(',')}`,
+    `added: ${after.filter((range) => !before.includes(range)).join(',')}`,
+  ];
+}
+
 /** Administrator reads and changes of the network restriction: the settings and the role × action matrix. */
 @Injectable()
 export class NetworkRestrictionAdministrationService {
@@ -32,9 +45,12 @@ export class NetworkRestrictionAdministrationService {
     const before = await this.config.get();
     const after = await this.config.update(body);
     for (const field of ['enabled', 'allowedRanges', 'ipSource', 'headerName'] as const) {
-      const oldValue = String(before[field]);
-      const newValue = String(after[field]);
-      if (oldValue !== newValue) await this.record(actor, `networkRestriction.${field}`, oldValue, newValue);
+      if (String(before[field]) === String(after[field])) continue;
+      const [oldValue, newValue] =
+        field === 'allowedRanges'
+          ? rangesChange(before.allowedRanges, after.allowedRanges)
+          : [String(before[field]), String(after[field])];
+      await this.record(actor, `networkRestriction.${field}`, oldValue, newValue);
     }
     return this.settings(request);
   }

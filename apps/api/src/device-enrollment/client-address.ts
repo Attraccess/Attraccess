@@ -25,8 +25,7 @@ export function compileTrust(setting: TrustProxySetting): TrustFn {
     // Preset names are case-sensitive in Express (proxy-addr); match it exactly.
     entries.push(...(Object.hasOwn(PRESETS, entry) ? PRESETS[entry] : [entry]));
   }
-  const matches = createCidrMatcher(entries);
-  return (address) => matches(address);
+  return createCidrMatcher(entries);
 }
 
 let compiled: { raw: string | null | undefined; trust: TrustFn } | undefined;

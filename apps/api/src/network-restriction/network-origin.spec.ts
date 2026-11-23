@@ -49,6 +49,14 @@ describe('resolveNetworkOrigin', () => {
       expect(resolveNetworkOrigin({ ip: '10.0.0.1', headers: { 'x-real-ip': value } }, header)).toBeNull();
     });
 
+    it.each(['constructor', '__proto__', 'toString'])('never reads an inherited property for the header %p', (name) => {
+      const inherited = config({ ipSource: NetworkIpSource.Header, headerName: name });
+      expect(resolveNetworkOrigin({ ip: '10.0.0.1', headers: {} }, inherited)).toBeNull();
+      // Node lowercases header names; fromEntries makes even `__proto__` an own property, as Node's header object does.
+      const own = { headers: Object.fromEntries([[name.toLowerCase(), '10.0.0.2']]) };
+      expect(resolveNetworkOrigin(own, inherited)).toBe('10.0.0.2');
+    });
+
     it('matches an IPv6 header value', () => {
       expect(resolveNetworkOrigin({ headers: { 'x-real-ip': '::ffff:10.0.0.4' } }, header)).toBe('10.0.0.4');
     });

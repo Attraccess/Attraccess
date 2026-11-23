@@ -48,6 +48,15 @@ describe('network restriction for MCP tool calls (real application)', () => {
     expect((await lockDoor({ 'X-Real-Ip': '203.0.113.9' })).content[0].text).toMatch(/^HTTP 404/);
   });
 
+  it('keeps the settings to administrators and reveals no configuration in the status', async () => {
+    expect(Object.keys(await status()).sort()).toEqual(['allowedFromHere', 'enabled', 'insideAllowedNetwork']);
+    // The caller has no system.settings.manage.
+    for (const name of ['getNetworkRestrictionSettings', 'getNetworkRestrictionRoleActions']) {
+      const result = resultOf((await t.rpc(token, 'tools/call', { name })).body);
+      expect(result.content[0].text).toMatch(/^HTTP 403/);
+    }
+  });
+
   describe('header mode', () => {
     beforeAll(() => config.update({ enabled: true, allowedRanges: ['10.0.0.0/8'], ipSource: NetworkIpSource.Header }));
 
@@ -77,7 +86,11 @@ describe('network restriction for MCP tool calls (real application)', () => {
   describe('client mode', () => {
     it('uses the client address of the outer request', async () => {
       // The test client connects from the loopback address.
-      await config.update({ allowedRanges: ['127.0.0.0/8', '::1/128'], ipSource: NetworkIpSource.Client });
+      await config.update({
+        enabled: true,
+        allowedRanges: ['127.0.0.0/8', '::1/128'],
+        ipSource: NetworkIpSource.Client,
+      });
       expect(await status({ 'X-Real-Ip': '203.0.113.9' })).toMatchObject({ insideAllowedNetwork: true });
       await config.update({ allowedRanges: ['10.0.0.0/8'] });
       expect(await status({ 'X-Real-Ip': '10.1.1.1' })).toMatchObject({ insideAllowedNetwork: false });

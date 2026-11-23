@@ -66,6 +66,11 @@ export class SupervisionService {
 
   protected readerArmer: ReaderSupervisionArmer | null = null;
 
+  /** The resource of a pending request, for log lines about it; undefined once it is gone. */
+  public pendingResourceId(requestId: string): number | undefined {
+    return this.pending.get(requestId)?.resourceId;
+  }
+
   /** Registered by the Attractap module at startup; see {@link ReaderSupervisionArmer}. */
   public setReaderArmer(armer: ReaderSupervisionArmer): void {
     this.readerArmer = armer;

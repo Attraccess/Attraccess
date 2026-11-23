@@ -102,4 +102,15 @@ describe('NetworkRestrictionAdministrationService', () => {
     ]);
     expect(result).toMatchObject({ enabled: true, detectedAddress: '10.1.1.1', detectedInside: true });
   });
+
+  it('audits a change to a long range list as what was removed and added, so nothing is cut off', async () => {
+    const long = Array.from({ length: 30 }, (_, index) => `10.${index}.0.0/16`);
+    config = { ...config, allowedRanges: long };
+    await service.updateSettings({ allowedRanges: [...long.slice(1), '0.0.0.0/0'] }, actor, { headers: {} });
+    expect(record.mock.calls[0][0].details).toEqual({
+      settingKey: 'networkRestriction.allowedRanges',
+      before: 'removed: 10.0.0.0/16',
+      after: 'added: 0.0.0.0/0',
+    });
+  });
 });

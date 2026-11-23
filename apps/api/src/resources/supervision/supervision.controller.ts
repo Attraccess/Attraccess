@@ -49,6 +49,10 @@ export class SupervisionController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<UsageSessionResponse> {
     await this.networkRestriction.assertAllowed(req, NetworkRestrictedAction.SupervisionRequest, resourceId);
+    // The approved request starts the session with this payload, so a takeover in it is judged as a takeover too.
+    if (dto.forceTakeOver) {
+      await this.networkRestriction.assertAllowed(req, NetworkRestrictedAction.UsageTakeover, resourceId);
+    }
     const controller = new AbortController();
     const onClose = () => {
       if (!res.writableEnded) controller.abort();
@@ -104,7 +108,11 @@ export class SupervisionController {
     @Param('requestId') requestId: string,
     @Req() req: AuthenticatedRequest,
   ): Promise<UsageSessionResponse> {
-    await this.networkRestriction.assertAllowed(req, NetworkRestrictedAction.SupervisionApprove);
+    await this.networkRestriction.assertAllowed(
+      req,
+      NetworkRestrictedAction.SupervisionApprove,
+      this.supervisionService.pendingResourceId(requestId),
+    );
     return toUsageSessionResponse(
       await this.supervisionService.approve(
         requestId,

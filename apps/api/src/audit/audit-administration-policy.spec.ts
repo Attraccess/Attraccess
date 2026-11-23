@@ -107,6 +107,8 @@ describe('administration audit policy', () => {
 
   it.each([
     ['networkRestriction.allowedRanges', '10.0.0.0/8,fc00::/7,127.0.0.0/8', '10.0.0.0/8,203.0.113.5,2001:db8::/32…'],
+    ['networkRestriction.allowedRanges', 'removed: 10.0.0.0/8', 'added: 0.0.0.0/0,::/0'],
+    ['networkRestriction.enabled', 'false', 'true'],
     ['networkRestriction.ipSource', 'client', 'header'],
     ['networkRestriction.headerName', 'X-Real-Ip', 'X-Client-Ip'],
     ['networkRestriction.roleActions', 'user: ', 'user: door.open,usage.start'],

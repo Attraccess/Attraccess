@@ -13,7 +13,7 @@ export interface NetworkRestrictionStore {
   listRoleActions(): Promise<Array<RoleNetworkActionsRecord & { key: string; name: string }>>;
   /** The actions that any role of the user allows from outside (the union). */
   actionsAllowedForUser(userId: number): Promise<NetworkRestrictedAction[]>;
-  /** Replaces the action set of each given role in one transaction. Throws when a role does not exist. */
+  /** Replaces the action set of each given role in one transaction. Callers check first that the roles exist. */
   replaceRoleActions(entries: RoleNetworkActionsRecord[]): Promise<void>;
   /** The ids that are roles. */
   existingRoleIds(roleIds: number[]): Promise<number[]>;

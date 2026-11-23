@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { EmailTemplateType } from '@attraccess/application-models';
+import { EmailTemplateType, NETWORK_RESTRICTION_HEADER_NAME_PATTERN } from '@attraccess/application-models';
 import { valid, validRange } from 'semver';
 import type { AuthenticationMethod } from '@attraccess/application-models';
 import { isAuthenticationMethod } from './projection';
@@ -374,9 +374,9 @@ export function projectAdministrationAuditEvent(input: AdministrationAuditInput)
 /** Audit values of the network restriction: IP ranges, a header name and role action lists, never free text. */
 function safeNetworkRestrictionValue(key: string, value: string): boolean {
   if (key === 'networkRestriction.ipSource') return value === 'client' || value === 'header';
-  if (key === 'networkRestriction.headerName') return /^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,100}$/.test(value);
-  // Long values are clipped with an ellipsis before they are recorded.
-  if (key === 'networkRestriction.allowedRanges') return /^[0-9A-Za-z:./%_,-]*…?$/.test(value);
+  if (key === 'networkRestriction.headerName') return NETWORK_RESTRICTION_HEADER_NAME_PATTERN.test(value);
+  // A list too long for one value is recorded as what was removed and what was added; long values end in an ellipsis.
+  if (key === 'networkRestriction.allowedRanges') return /^(?:(?:removed|added): )?[0-9A-Za-z:./%_,-]*…?$/.test(value);
   if (key === 'networkRestriction.roleActions') return /^[A-Za-z0-9_.-]+: [a-z.,]*…?$/.test(value);
   return false;
 }

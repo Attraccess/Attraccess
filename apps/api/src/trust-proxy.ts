@@ -1,6 +1,6 @@
 // Parses and validates the TRUST_PROXY env var into an Express trust-proxy value
 // FEATURE: Auth rate limiting — real client IP behind reverse proxy
-import { isIP } from 'net';
+import { parseSubnet } from './cidr-matcher';
 
 export type TrustProxySetting = boolean | number | string;
 
@@ -46,19 +46,5 @@ function isValidTrustProxyEntry(entry: string): boolean {
   if (TRUST_PROXY_PRESETS.has(entry.toLowerCase())) {
     return true;
   }
-  const parts = entry.split('/');
-  if (parts.length > 2) {
-    return false;
-  }
-  const version = isIP(parts[0]);
-  if (version === 0) {
-    return false;
-  }
-  if (parts.length === 1) {
-    return true;
-  }
-  if (!/^\d+$/.test(parts[1])) {
-    return false;
-  }
-  return Number(parts[1]) <= (version === 4 ? 32 : 128);
+  return parseSubnet(entry) !== null;
 }

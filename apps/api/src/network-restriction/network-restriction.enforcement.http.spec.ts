@@ -76,7 +76,7 @@ describe('network restriction on the resource action endpoints', () => {
         { provide: ResourceActivityVisibilityService, useValue: {} },
         { provide: PreStartService, useValue: { gateHttp: sideEffects.gateHttp } },
         { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
-        { provide: SupervisionService, useValue: sideEffects },
+        { provide: SupervisionService, useValue: { ...sideEffects, pendingResourceId: () => 5 } },
         { provide: SupervisionLiveService, useValue: {} },
         { provide: SseInstrumentation, useValue: {} },
       ],
@@ -209,6 +209,24 @@ describe('network restriction on the resource action endpoints', () => {
       .set('x-real-ip', '203.0.113.9')
       .send({ forceTakeOver: false });
     expect(plain.status).toBe(201);
+  });
+
+  it('judges a supervised takeover request as usage.takeover too', async () => {
+    allowedForUser = [NetworkRestrictedAction.SupervisionRequest];
+    const takeover = await request(app.getHttpServer())
+      .post('/resources/5/usage/supervision/request')
+      .set('x-real-ip', '203.0.113.9')
+      .send({ forceTakeOver: true, readerId: 3 });
+    expect(takeover.status).toBe(403);
+    expect(takeover.body.action).toBe('usage.takeover');
+    expect(sideEffects.requestSupervisedSession).not.toHaveBeenCalled();
+
+    allowedForUser = [NetworkRestrictedAction.SupervisionRequest, NetworkRestrictedAction.UsageTakeover];
+    const allowed = await request(app.getHttpServer())
+      .post('/resources/5/usage/supervision/request')
+      .set('x-real-ip', '203.0.113.9')
+      .send({ forceTakeOver: true, readerId: 3 });
+    expect(allowed.status).toBe(201);
   });
 
   it('does not run the pre-start gate for a refused start', async () => {

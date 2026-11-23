@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 import { NETWORK_RESTRICTED_ACTIONS, NetworkRestrictedAction } from '@attraccess/application-models';
 import { Role, RoleNetworkAction, UserRole } from '@attraccess/database-entities';
-import { DataSource, In, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import type {
   NetworkRestrictionStore,
   RoleNetworkActionsRecord,
 } from '../../../network-restriction/network-restriction.port';
+import { TransactionContextResolver } from '../transaction-context';
 
 const known = (action: string): action is NetworkRestrictedAction =>
   (NETWORK_RESTRICTED_ACTIONS as readonly string[]).includes(action);
@@ -17,7 +18,7 @@ export class TypeOrmNetworkRestrictionStore implements NetworkRestrictionStore {
     @InjectRepository(RoleNetworkAction) private readonly entries: Repository<RoleNetworkAction>,
     @InjectRepository(Role) private readonly roles: Repository<Role>,
     @InjectRepository(UserRole) private readonly userRoles: Repository<UserRole>,
-    @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly contexts: TransactionContextResolver,
   ) {}
 
   async listRoleActions() {
@@ -48,7 +49,7 @@ export class TypeOrmNetworkRestrictionStore implements NetworkRestrictionStore {
   }
 
   async replaceRoleActions(entries: RoleNetworkActionsRecord[]): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
+    await this.contexts.run(undefined, async (manager) => {
       const repository = manager.getRepository(RoleNetworkAction);
       for (const { roleId, actions } of entries) {
         await repository.delete({ roleId });
