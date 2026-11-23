@@ -5,8 +5,8 @@
     "clear": "Clear filter and search"
   },
   "restricted": {
-    "title": "No machines yet",
-    "description": "Machines appear here once you are introduced to them. Ask an introducer of the machine you want to use."
+    "title": "Nothing here yet",
+    "description": "Machines and doors appear here once you are introduced to them. Ask your workshop staff or an introducer to introduce you."
   },
   "firstResource": {
     "title": "No resources yet",

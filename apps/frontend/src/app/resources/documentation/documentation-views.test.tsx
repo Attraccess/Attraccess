@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { DocumentationView } from './DocumentationView';
 import { ResourceDocsPreviewCard } from '../details/overview/ResourceDocsPreviewCard';
+import { ApiError } from '@attraccess/react-query-client';
 const state = vi.hoisted(() => ({
   resource: undefined as Record<string, unknown> | undefined,
   loading: false,
@@ -18,6 +19,11 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await (() => ({ useTranslations: () => ({ t: (key: string) => key }) }))()),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
+  ApiError: class ApiError extends Error {
+    constructor(public status: number) {
+      super(`HTTP ${status}`);
+    }
+  },
   useGetOneResourceById: () => ({
     data: state.resource,
     isLoading: state.loading,
@@ -138,4 +144,11 @@ it('shows short markdown, URL previews and loading placeholders', () => {
   state.resource = { documentationType: 'url', documentationUrl: 'about:blank' };
   show(true);
   expect(screen.getByText('about:blank')).toBeTruthy();
+});
+
+it('shows the not-found card without a retry for a machine that answers 404 (ATT-843: hidden machines)', () => {
+  Object.assign(state, { error: true, cause: new (ApiError as unknown as new (status: number) => Error)(404) });
+  show();
+  expect(screen.getByText('notFound.title')).toBeTruthy();
+  expect(screen.queryByText('actions.retry')).toBeNull();
 });

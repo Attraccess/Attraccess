@@ -1,6 +1,6 @@
 {
   "title": "Allgemein",
-  "description": "Die URLs, unter denen diese Instanz erreichbar ist, ihre Lizenz wer die Maschinenliste sehen darf und wer die Ressourcennutzung sehen darf.",
+  "description": "Die URLs, unter denen diese Instanz erreichbar ist, ihre Lizenz sowie wer die Maschinenliste und wer die Ressourcennutzung sehen darf.",
   "loading": "Einstellungen werden geladen...",
   "inputs": {
     "url": {
@@ -27,11 +27,11 @@
     },
     "listVisibility": {
       "label": "Wer die Maschinenliste sehen darf",
-      "description": "Legt fest, wer sieht, welche Maschinen es gibt. Wer Ressourcen verwaltet, sieht immer alle Maschinen. Eine für jemanden verborgene Maschine wird als „nicht gefunden“ beantwortet.",
+      "description": "Legt fest, wer sieht, welche Maschinen es gibt. Wer Ressourcen verwaltet, sieht immer alle Maschinen. Alle anderen sehen bei einer verborgenen Maschine „nicht gefunden“.",
       "authenticated": "Alle mit „Ressourcen lesen“",
       "permitted-only": "Nur in eine Maschine eingewiesene Personen",
-      "permittedOnlyHint": "Personen sehen nur Maschinen, in die sie eingewiesen sind (direkt oder über eine Gruppe), die sie einweisen oder warten oder die sie gerade nutzen. Niemand sonst erfährt, dass die anderen Maschinen existieren. So bleibt die Geräteliste Ihrer Werkstatt vor allen verborgen, die ein Konto anlegen.",
-      "authenticatedHint": "Jedes angemeldete Konto mit „Ressourcen lesen“ sieht alle Maschinen. Bei offener Selbstregistrierung kann jede Person ein Konto anlegen und Ihre Geräteliste lesen.",
+      "permittedOnlyHint": "Personen sehen nur Maschinen, in die sie eingewiesen sind (direkt oder über eine Gruppe), die sie einweisen oder warten oder die sie gerade nutzen, sowie jede Maschine, die beaufsichtigte Nutzung erlaubt oder erfordert, damit sie um eine beaufsichtigte Sitzung bitten können. Niemand sonst erfährt, dass die anderen Maschinen existieren. So bleibt die Geräteliste deiner Werkstatt vor allen verborgen, die ein Konto anlegen. Wer „Ressourcen bearbeiten“ oder „Ressourcen-Zugriff verwalten“ hat, sieht immer alle Maschinen.",
+      "authenticatedHint": "Jedes angemeldete Konto mit „Ressourcen lesen“ sieht alle Maschinen. Bei offener Selbstregistrierung kann jede Person ein Konto anlegen und deine Geräteliste lesen. Wer „Ressourcen bearbeiten“ oder „Ressourcen-Zugriff verwalten“ hat, sieht immer alle Maschinen.",
       "loadFailed": "Die Einstellung zur Maschinenliste konnte nicht geladen werden."
     },
     "activityVisibility": {

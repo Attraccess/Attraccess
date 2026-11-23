@@ -5,8 +5,8 @@
     "clear": "Filter und Suche zurücksetzen"
   },
   "restricted": {
-    "title": "Noch keine Maschinen",
-    "description": "Maschinen erscheinen hier, sobald du in sie eingewiesen bist. Frage eine einweisende Person der Maschine, die du nutzen möchtest."
+    "title": "Noch nichts zu sehen",
+    "description": "Maschinen und Türen erscheinen hier, sobald du in sie eingewiesen bist. Bitte das Werkstatt-Team oder einen Einweiser, dich einzuweisen."
   },
   "firstResource": {
     "title": "Noch keine Ressourcen",
