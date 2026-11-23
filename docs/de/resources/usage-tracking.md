@@ -38,6 +38,19 @@ Jede Sitzung enthält:
 2. Klicken Sie auf **Sitzung beenden**
 3. Je nach Konfiguration der Ressource müssen Sie möglicherweise ein Formular ausfüllen
 
+## Automatisches Stoppen und Sitzung verlängern
+
+Hat die Ressource eine [maximale Sitzungsdauer oder verlangt eine Zeitschätzung](resources/creating-resources.md#maximale-sitzungsdauer-und-zeitschatzung), hat die Sitzung ein automatisches Ende.
+
+- **Schätzungsdialog:** Verlangt die Ressource eine Schätzung, öffnet sich beim Start (auch bei Übernahme, QR-Link und beaufsichtigtem Start) zuerst ein Dialog. Geben Sie ein, wie lange Sie die Maschine höchstens nutzen, in Stunden und Minuten oder per Schnellauswahl. Der Dialog zeigt die maximale Sitzungsdauer an, falls es eine gibt, und lässt keine längere Zeit zu. Spätestens nach dieser Zeit stoppt die Maschine automatisch.
+- **Countdown und Verlängern:** Während die Sitzung läuft, zeigt die Ressourcenseite **Stoppt automatisch um HH:MM** mit einem Live-Countdown. Mit **+1 h**, **+2 h**, **+4 h**, **+6 h**, **+12 h**, **+24 h** oder **Auf Maximum verlängern** verlängern Sie. Schaltflächen, die über die maximale Sitzungsdauer hinausgehen würden, sind deaktiviert; ist nichts mehr übrig, weist die Seite darauf hin, dass das Maximum erreicht ist. Die Steuerung sehen der Sitzungsinhaber und alle, die diese Sitzung beenden dürfen. Bei Sitzungen anderer Personen wird die Stoppzeit nur angezeigt.
+- **Warnungen:** Der Sitzungsinhaber erhält 15 und 5 Minuten vor dem Ende eine Benachrichtigung **Sitzung endet bald** (in der App, als Push und per E-Mail, gemäß seinen [Benachrichtigungseinstellungen](end-user/account.md)). Eine Warnung, deren Zeitpunkt beim Start schon vorbei war, entfällt; eine Verlängerung setzt die Warnungen für das neue Ende neu.
+- **Automatisches Stoppen:** Zum Endzeitpunkt beendet der Server die Sitzung als System mit der Notiz „Automatically ended: maximum session time reached“ oder „Automatically ended: estimated duration elapsed“. Abschlussformulare werden übersprungen, [Flows](flows/overview.md) führen ihren Stopp-Zweig aus (der Strom wird also abgeschaltet), und die Abrechnung läuft wie bei jedem anderen Ende. Der Inhaber wird benachrichtigt. Das kann bis zu etwa eine Minute nach dem Ende dauern.
+- **Parallele Sitzungen und Übernahme:** Jede Sitzung hat ihr eigenes Ende; ein automatisches Ende beendet die anderen nicht. Eine Übernahme gibt der neuen Person ein neues Ende, und sie muss eine Schätzung angeben, wenn eine verlangt wird.
+- **Audit-Log:** Das Audit-Log enthält **Nutzung verlängert** und den Grund automatischer Enden.
+
+Änderungen an den Ressourceneinstellungen ändern das Ende laufender Sitzungen nicht. Zu den Lesern siehe [Attractap-Leser](attractap/using-the-reader.md#sitzungsdauer-und-verlangern).
+
 ## Gemeinsam genutzte Maschinen (parallele Sitzungen)
 
 Eine Maschine kann über **Maximale parallele Sitzungen** von mehreren Personen gleichzeitig genutzt werden (siehe [Ressourcen erstellen](resources/creating-resources.md#maximale-parallele-sitzungen)). Jede Person hat ihre eigene Sitzung; pro Maschine ist nur eine aktive Sitzung je Person möglich. Ein Start wird mit **Sitzung bereits aktiv** abgelehnt, wenn Sie bereits eine Sitzung haben, oder mit **Maschine ist voll**, wenn alle Plätze belegt sind. Eine beaufsichtigte Sitzung zählt als eine Sitzung (die der beaufsichtigten Person); die [Aufsicht](resources/introductions.md#beaufsichtigungsmodus) zählt nicht zum Limit.

@@ -38,6 +38,19 @@ Each session contains:
 2. Click **End Session**
 3. Depending on the resource configuration, you may need to fill in a form
 
+## Automatic Stop and Extending a Session
+
+If the resource has a [max session time or requires a duration estimate](resources/creating-resources.md#max-session-time-and-duration-estimate), the session has an automatic end.
+
+- **Estimate dialog:** when the resource requires an estimate, starting a session (also takeover, QR link and supervised start) first opens a dialog. Enter how long you will use the machine at most, in hours and minutes or with a quick pick. The dialog shows the max session time, if there is one, and does not accept more. The machine will stop automatically after this time at the latest.
+- **Countdown and extending:** while the session runs, the resource page shows **Stops automatically at HH:MM** with a live countdown. Use **+1h**, **+2h**, **+4h**, **+6h**, **+12h**, **+24h** or **Extend to maximum** to extend. Buttons that would pass the max session time are disabled; when nothing is left, the page says that the maximum is reached. The session owner and everybody who may end that session see the controls. Other people's sessions show the stop time read-only.
+- **Warnings:** the session owner gets a **Session ending soon** notification 15 and 5 minutes before the end (in the app, as push and by email, according to their [notification preferences](end-user/account.md)). A warning whose time had already passed when the session started is skipped, and an extension arms the warnings for the new end.
+- **Automatic stop:** at the end time the server ends the session as the system, with the note "Automatically ended: maximum session time reached" or "Automatically ended: estimated duration elapsed". End forms are skipped, [flows](flows/overview.md) run their stop branch (so power is cut), and billing works as for any other end. The owner is notified. It can take up to about a minute after the deadline.
+- **Parallel sessions and takeover:** each person's session has its own deadline; one automatic end does not end the others. A takeover gives the new person a fresh deadline, and they must give an estimate if one is required.
+- **Audit log:** the audit log records **Usage extended** and the end reason of automatic stops.
+
+Changing the resource settings does not change the deadline of running sessions. See [Attractap readers](attractap/using-the-reader.md#session-duration-and-extending) for readers.
+
 ## Shared Machines (Parallel Sessions)
 
 A machine can allow several people to use it at the same time via **Max parallel sessions** (see [Creating Resources](resources/creating-resources.md#max-parallel-sessions)). Each person has their own session; a person can have only one active session per machine. Starting is refused with **Session already active** if you already have a session, or with **Machine is full** when as many people as allowed are already using it. A supervised session counts as one session (the supervisee's); the [supervisor](resources/introductions.md#supervision-mode) does not count towards the limit.

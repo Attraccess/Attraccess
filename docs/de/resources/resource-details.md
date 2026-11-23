@@ -61,6 +61,10 @@ Chronologische Liste aller Nutzungssitzungen mit:
 | **Wartungspläne** | Ressourcenverwalter | Automatische Wartungsauslöser |
 | **Gruppen** | Ressourcenverwalter | [Gruppenzugehörigkeit](resources/resource-groups.md) |
 
+## Automatisches Stoppen
+
+Hat die Maschine eine maximale Sitzungsdauer oder verlangt eine Zeitschätzung, zeigt der Nutzungsbereich **Stoppt automatisch um HH:MM** mit Live-Countdown und die Verlängern-Schaltflächen (**+1 h** bis **+24 h**, **Auf Maximum verlängern**). Siehe [Automatisches Stoppen und Sitzung verlängern](resources/usage-tracking.md#automatisches-stoppen-und-sitzung-verlangern).
+
 ## Siehe auch
 
 - [Ressourcen erstellen](resources/creating-resources.md)
