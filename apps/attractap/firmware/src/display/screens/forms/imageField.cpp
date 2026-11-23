@@ -13,8 +13,9 @@ extern "C" {
 namespace
 {
     // Dark modules on white whatever the theme, or phones cannot read it. The form page has to fit with the title, the
-    // hint and the count on a 480 px display, so the card is smaller than the pairing screen's.
-    constexpr int32_t IMAGE_QR_CANVAS_PX = 140;
+    // description and the buttons on a 480 px display (about 156 px of body), so the whole card, quiet zone included,
+    // stays within this many pixels whatever the version of the symbol.
+    constexpr int32_t IMAGE_QR_CARD_PX = 128;
     constexpr int32_t IMAGE_QR_QUIET_MODULES = 4;
     // The photo link is short (a token of about 24 characters); anything longer cannot be a link of ours.
     constexpr size_t IMAGE_QR_MAX_URL_BYTES = 200;
@@ -40,7 +41,7 @@ void FormsScreen::createImageField(lv_obj_t *fieldContainer, FormFieldWidget &wi
    lv_obj_set_style_radius(widget.imageQrCard, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_all(widget.imageQrCard, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    widget.imageQrCode = lv_qrcode_create(widget.imageQrCard);
-   lv_qrcode_set_size(widget.imageQrCode, IMAGE_QR_CANVAS_PX);
+   lv_qrcode_set_size(widget.imageQrCode, IMAGE_QR_CARD_PX);
    lv_qrcode_set_dark_color(widget.imageQrCode, lv_color_black());
    lv_qrcode_set_light_color(widget.imageQrCode, lv_color_white());
    lv_obj_add_flag(widget.imageQrCard, LV_OBJ_FLAG_HIDDEN);
@@ -70,7 +71,8 @@ void FormsScreen::createImageField(lv_obj_t *fieldContainer, FormFieldWidget &wi
    this->updateImageField(field);
 }
 
-// Draws the symbol and pads the white card up to the four quiet modules a phone needs around it.
+// Draws the symbol and pads the white card with the four quiet modules a phone needs around it; the module size is
+// chosen so the card never grows past IMAGE_QR_CARD_PX, however long the link makes the symbol.
 void FormsScreen::showImageQr(FormFieldWidget &widget, const std::string &url)
 {
    if (!widget.imageQrCode || !widget.imageQrCard)
@@ -83,17 +85,22 @@ void FormsScreen::showImageQr(FormFieldWidget &widget, const std::string &url)
       return;
    }
    const int version = qrcodegen_getMinFitVersion(qrcodegen_Ecc_MEDIUM, url.length());
-   if (version == 0 || lv_qrcode_update(widget.imageQrCode, url.c_str(), url.length()) != LV_RESULT_OK)
+   const int32_t modules = version == 0 ? 0 : qrcodegen_version2size(version);
+   const int32_t moduleSize = modules == 0 ? 0 : IMAGE_QR_CARD_PX / (modules + 2 * IMAGE_QR_QUIET_MODULES);
+   if (moduleSize < 1)
+   {
+      this->logger.warnf("The photo QR code is too large for the card (%u bytes)", static_cast<unsigned>(url.length()));
+      lv_obj_add_flag(widget.imageQrCard, LV_OBJ_FLAG_HIDDEN);
+      return;
+   }
+   lv_qrcode_set_size(widget.imageQrCode, modules * moduleSize);
+   if (lv_qrcode_update(widget.imageQrCode, url.c_str(), url.length()) != LV_RESULT_OK)
    {
       this->logger.warnf("Cannot build the photo QR code (%u bytes)", static_cast<unsigned>(url.length()));
       lv_obj_add_flag(widget.imageQrCard, LV_OBJ_FLAG_HIDDEN);
       return;
    }
-   const int32_t modules = qrcodegen_version2size(version);
-   const int32_t moduleSize = IMAGE_QR_CANVAS_PX / modules;
-   const int32_t margin = (IMAGE_QR_CANVAS_PX - modules * moduleSize) / 2;
-   const int32_t pad = IMAGE_QR_QUIET_MODULES * moduleSize > margin ? IMAGE_QR_QUIET_MODULES * moduleSize - margin : 0;
-   lv_obj_set_style_pad_all(widget.imageQrCard, pad, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_all(widget.imageQrCard, IMAGE_QR_QUIET_MODULES * moduleSize, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_invalidate(widget.imageQrCode);
    lv_obj_remove_flag(widget.imageQrCard, LV_OBJ_FLAG_HIDDEN);
 }
