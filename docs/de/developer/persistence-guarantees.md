@@ -165,3 +165,18 @@ Plugin-BLE-Verbindung (beide schlagen sauber fehl, wenn diese Instanz wegfällt;
 Metrik-Messwerte, Rate Limits ohne Valkey, Zeitgeber und die übrigen Live-Themen. Pub/Sub ist ohne Zustellgarantie:
 Eine Nachricht, die während eines Wiederverbindens veröffentlicht wird, geht verloren; wichtige Ergebnisse
 (Aufsichtsergebnisse, Abläufe) liegen deshalb zusätzlich in Valkey und werden nach der Frist nachgeschlagen.
+
+Ebenfalls je Instanz, gewollt oder als bekannte Grenze:
+
+- **Zulassung zur Kopplung**: Verbindungsversuche je Adresse und die Obergrenze wartender Leser schützen die Instanz,
+  die den Socket des Lesers hält. Die Zahl falscher Codes je genehmigender Person wird geteilt.
+- **Hinweise der Leser-Oberfläche**: Nach einem Crash-Loop-Hinweis pausiert die Instanz, die den Leser hält, dessen
+  Plugin-Hooks. Wird der Hinweis auf einer anderen Instanz geschlossen, endet die Pause nur dort; die Instanz des Lesers
+  setzt fort, wenn ihr 30-Minuten-Fenster endet.
+- **BLE-Schreibvorgänge ohne Antwort**: Ihr Fenster und späte Fehler verfolgt die Verbindung auf der Instanz, die den
+  Leser hält.
+
+Valkey muss eigenständig oder hinter Sentinel laufen: Die Koordination führt Lua-Skripte über mehrere Schlüssel aus, was
+ein geshardeter Cluster nicht erlaubt. Instanzen aus der Zeit vor dieser Änderung halten den geteilten Zustand im
+eigenen Prozess; beim Aktualisieren deshalb alle Instanzen gemeinsam neu starten, ein rollendes Update über diese
+Version hinweg wird nicht unterstützt.

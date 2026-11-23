@@ -155,3 +155,17 @@ Still per process: the requester's blocked supervision call and a plugin BLE lin
 (both fail cleanly when that instance dies, they are not migrated), the metrics gauges, rate limits without Valkey,
 schedulers and the other live topics. Pub/sub is fire-and-forget: a message published while an instance reconnects is
 lost, so outcomes that matter (supervision results, expiries) are also kept in Valkey and looked up after the deadline.
+
+Also per instance, on purpose or as a known limit:
+
+- **Pairing admission**: connection attempts per address and the cap on waiting readers guard the instance that holds
+  the reader's socket. The approver's wrong-code count is shared.
+- **Reader UI alerts**: after a crash-loop alert the instance holding the reader pauses that reader's plugin hooks.
+  Clearing the alert on another instance ends the pause only there; the reader's own instance resumes when its
+  30-minute window ends.
+- **BLE writes without response**: their window and late failures are tracked by the link on the instance that holds
+  the reader.
+
+Valkey must be standalone or behind Sentinel: the coordination runs Lua scripts on several keys, which a sharded cluster
+does not allow. Instances from before this change keep the shared state in their own process, so restart all instances
+together when upgrading; a rolling upgrade across that version is not supported.
