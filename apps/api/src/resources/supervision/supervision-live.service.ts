@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, Optional } from '@nestjs/common';
 import { Subject } from 'rxjs';
 import { ClusterService } from '../../cluster/cluster.service';
 import { ClusterUserSubjects } from '../../live-updates/cluster-user-subjects';
@@ -11,7 +11,7 @@ import { SupervisionLiveEventDto } from './dtos/supervisionLiveEvent.dto';
  * pushes events into. Events reach the supervisor's streams on every API instance (ATT-1163).
  */
 @Injectable()
-export class SupervisionLiveService {
+export class SupervisionLiveService implements OnModuleDestroy {
   private readonly subjects: ClusterUserSubjects<SupervisionLiveEventDto>;
 
   constructor(@Optional() cluster?: ClusterService) {
@@ -28,5 +28,9 @@ export class SupervisionLiveService {
 
   public deleteSubjectIfUnobserved(userId: number): void {
     this.subjects.deleteIfUnobserved(userId);
+  }
+
+  onModuleDestroy(): void {
+    this.subjects.completeAll();
   }
 }

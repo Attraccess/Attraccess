@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, Optional } from '@nestjs/common';
 import { Subject } from 'rxjs';
 import { ClusterService } from '../../cluster/cluster.service';
 import { ClusterUserSubjects } from '../../live-updates/cluster-user-subjects';
@@ -6,7 +6,7 @@ import { MassIntroductionLiveEventDto } from './dtos/massIntroductionLiveEvent.d
 
 /** Per-introducer realtime channel for their mass-introduction sessions, on every API instance. */
 @Injectable()
-export class MassIntroductionLiveService {
+export class MassIntroductionLiveService implements OnModuleDestroy {
   private readonly subjects: ClusterUserSubjects<MassIntroductionLiveEventDto>;
 
   constructor(@Optional() cluster?: ClusterService) {
@@ -23,5 +23,9 @@ export class MassIntroductionLiveService {
 
   public deleteSubjectIfUnobserved(userId: number): void {
     this.subjects.deleteIfUnobserved(userId);
+  }
+
+  onModuleDestroy(): void {
+    this.subjects.completeAll();
   }
 }

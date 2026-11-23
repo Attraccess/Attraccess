@@ -37,6 +37,12 @@ export class ClusterUserSubjects<T> {
     if (this.cluster?.enabled) void this.cluster.bus.broadcast(this.messageType, { userId, event });
   }
 
+  /** Ends every stream: on shutdown, so an open SSE response does not keep the HTTP server from closing. */
+  completeAll(): void {
+    for (const subject of this.subjects.values()) subject.complete();
+    this.subjects.clear();
+  }
+
   deleteIfUnobserved(userId: number): void {
     const subject = this.subjects.get(userId);
     if (subject && !subject.observed) this.subjects.delete(userId);
