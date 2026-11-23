@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@heroui/react';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ShieldCheckIcon } from 'lucide-react';
@@ -13,6 +14,8 @@ interface Props {
 /** "Secure this reader": disabled with a tooltip naming every reason while a gate is not met. */
 export function SecureReaderButton({ blockers, onPress }: Readonly<Props>) {
   const { t } = useTranslations({ de, en });
+  // Hover and keyboard focus open the tooltip by themselves; a tap on a touch screen does not, so a press opens it.
+  const [isOpen, setOpen] = useState(false);
   const button = (
     <Button
       className="shrink-0"
@@ -27,8 +30,8 @@ export function SecureReaderButton({ blockers, onPress }: Readonly<Props>) {
   );
   if (blockers.length === 0) return button;
   return (
-    <Tooltip>
-      <TooltipTrigger tabIndex={0} data-cy="secure-conversion-button-blocked">
+    <Tooltip isOpen={isOpen} onOpenChange={setOpen}>
+      <TooltipTrigger tabIndex={0} onClick={() => setOpen(true)} data-cy="secure-conversion-button-blocked">
         {button}
       </TooltipTrigger>
       <TooltipContent>

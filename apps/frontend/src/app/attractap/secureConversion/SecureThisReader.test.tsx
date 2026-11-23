@@ -204,6 +204,8 @@ describe('SecureThisReader', () => {
     mocks.status = { ...mocks.status, conversion: conversion('interrupted'), online: false };
     render(<SecureThisReader reader={reader} />);
     expect(screen.getByText('interrupted.message')).toBeInTheDocument();
+    // The interrupted warning already says what happens when it returns; no second "continues" note.
+    expect(screen.queryByText('progress.offline')).not.toBeInTheDocument();
   });
 
   it('says when no held key can sign updates for the reader', () => {

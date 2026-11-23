@@ -55,7 +55,7 @@ export function ConversionProgress({ readerId, status, onChanged }: Readonly<Pro
         </ProgressBar>
       )}
 
-      {!status.online && state !== 'secured' && state !== 'failed' && (
+      {!status.online && !['secured', 'failed', 'interrupted'].includes(state) && (
         <p className="text-sm text-muted" data-cy="secure-conversion-offline">
           {t('progress.offline')}
         </p>
