@@ -10,7 +10,6 @@ import {
   ApiError,
   useGetLogoutCapability,
   useGetTwoFactorStatus,
-  useGetCurrent,
   UseGetCurrentKeyFn,
   endSession,
   logoutEverywhere as requestLogoutEverywhere,
@@ -20,6 +19,9 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type SystemPermission } from '@attraccess/shared';
+import { shouldRetryCurrentUser } from '../api/retryRules';
+import { isUnauthenticatedError } from '../api/isUnauthenticatedError';
+import { deriveAuthStatus } from './deriveAuthStatus';
 
 interface LoginCredentials {
   username: string;
@@ -92,13 +94,44 @@ export function useAuth() {
 
   // Check authentication status by trying to fetch current user
   // This will work with cookies automatically
-  const { data: fetchedUser } = useGetCurrent({}, undefined, {
+  const {
+    data: fetchedUser,
+    error: currentUserError,
+    errorUpdatedAt: currentUserErrorUpdatedAt,
+    isFetching: isCurrentUserFetching,
+    refetch: refetchCurrentUser,
+  } = useQuery({
+    queryKey: UseGetCurrentKeyFn(),
+    queryFn: async ({ signal }) => {
+      try {
+        return await getCurrent({ signal, throwOnError: true }).then(({ data }) => data);
+      } catch (error) {
+        // A 401 without a cached user is the answer "signed out", not a failure: as data it survives refetches
+        // (window focus, the interval), so the login form stays mounted. A cached user keeps the error, so a
+        // background 401 does not sign the user out (unchanged behaviour).
+        if (isUnauthenticatedError(error) && !queryClient.getQueryData(UseGetCurrentKeyFn())) return null;
+        throw error;
+      }
+    },
     refetchInterval: 1000 * 60 * 20, // 20 minutes
-    retry: false,
+    // Only a 401 means signed out; a 5xx or network error is retried instead of ending the session.
+    retry: shouldRetryCurrentUser,
     enabled: isInitialized && !hasStartedLogout, // Stop identity refetch while signing out
   });
   // Ignore late identity responses as soon as either logout action starts.
   const currentUser = hasStartedLogout ? null : fetchedUser;
+  // Derived from the shared query state, so every useAuth instance agrees.
+  const authStatus = deriveAuthStatus({
+    isInitialized,
+    logoutStatus,
+    data: fetchedUser,
+    error: currentUserError,
+    isFetching: isCurrentUserFetching,
+    hasFailedBefore: currentUserErrorUpdatedAt > 0,
+  });
+  const retryCurrentUser = useCallback(() => {
+    void refetchCurrentUser();
+  }, [refetchCurrentUser]);
 
   const [returnToken] = useState(() => new URL(window.location.href).searchParams.get('ssoLogout'));
   const { data: providerReturn, isFetched: isReturnFetched } = useQuery({
@@ -217,6 +250,11 @@ export function useAuth() {
     user: logoutStatus === 'ended' ? null : (currentUser ?? null),
     isAuthenticated: logoutStatus !== 'ended' && !!currentUser,
     isInitialized,
+    /** loading until the first current-user answer; error when it failed with something other than a 401. */
+    authStatus,
+    /** Loads the current user again, for example from the error screen. */
+    retryCurrentUser,
+    isCurrentUserFetching,
     logout,
     logoutEverywhere,
     logoutPending,

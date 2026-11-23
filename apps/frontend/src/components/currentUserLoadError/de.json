@@ -1,0 +1,11 @@
+{
+  "title": "Ihr Konto konnte nicht geladen werden.",
+  "subtitle": "Die App konnte den Server nicht erreichen.",
+  "alert": {
+    "title": "Sie sind weiterhin angemeldet.",
+    "description": "Ihre Sitzung wurde nicht beendet. Der Server ist möglicherweise ausgelastet oder nicht erreichbar. Bitte versuchen Sie es gleich noch einmal."
+  },
+  "actions": {
+    "retry": "Erneut versuchen"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "title": "Your account could not be loaded.",
+  "subtitle": "The app could not reach the server.",
+  "alert": {
+    "title": "You are still signed in.",
+    "description": "Your session was not ended. The server may be busy or unreachable. Please try again in a moment."
+  },
+  "actions": {
+    "retry": "Retry"
+  }
+}
