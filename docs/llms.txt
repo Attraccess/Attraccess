@@ -21,7 +21,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Backup & Restore](https://docs.attraccess.org/en/installation/backup-restore.md): Explains what Attraccess data to back up (the PostgreSQL database and the storage volume), how to back it up with the balena sidecar, Coolify or pg_dump, and how to restore it.
 
 ## English: First-Time Setup
-- [Setup Wizard](https://docs.attraccess.org/en/setup/first-time-setup.md): Walks through the first-run setup wizard: application settings, email settings, administrator account and email verification.
+- [Setup Wizard](https://docs.attraccess.org/en/setup/first-time-setup.md): Walks through the five-step first-run setup wizard: application settings, email settings, license, administrator account and email verification.
 - [Email / SMTP](https://docs.attraccess.org/en/setup/smtp-email.md): Configure the SMTP email server Attraccess uses for verification, password resets and invitations, with provider examples and Mailpit testing.
 - [Email Templates](https://docs.attraccess.org/en/setup/email-templates.md): Manage and customize the email templates Attraccess sends, including available templates, plugin templates and placeholders.
 - [Branding](https://docs.attraccess.org/en/setup/branding.md): Customize the application URL, logo and name, color mode and email layout to match your organization.
@@ -184,7 +184,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Backup & Wiederherstellung](https://docs.attraccess.org/de/installation/backup-restore.md): Erklärt, welche Attraccess-Daten gesichert werden (PostgreSQL-Datenbank und Storage-Volume), wie Sie mit dem balena-Sidecar, Coolify oder pg_dump sichern und wie Sie wiederherstellen.
 
 ## Deutsch: Ersteinrichtung
-- [Einrichtungsassistent](https://docs.attraccess.org/de/setup/first-time-setup.md): Führt durch den Einrichtungsassistenten beim ersten Start: Anwendungs- und E-Mail-Einstellungen, Administrator-Konto und E-Mail-Bestätigung.
+- [Einrichtungsassistent](https://docs.attraccess.org/de/setup/first-time-setup.md): Führt durch den fünfstufigen Einrichtungsassistenten beim ersten Start: Anwendungs- und E-Mail-Einstellungen, Lizenz, Administrator-Konto und E-Mail-Bestätigung.
 - [E-Mail / SMTP](https://docs.attraccess.org/de/setup/smtp-email.md): SMTP-Server für Kontobestätigungen, Passwort-Zurücksetzungen und Einladungen konfigurieren, mit Anbieterbeispielen und Test per Mailpit.
 - [E-Mail-Vorlagen](https://docs.attraccess.org/de/setup/email-templates.md): E-Mail-Vorlagen von Attraccess verwalten und anpassen, inklusive verfügbarer Vorlagen, Plugin-Vorlagen und Platzhalter.
 - [Erscheinungsbild](https://docs.attraccess.org/de/setup/branding.md): Anwendungs-URL, Logo und Name, Farbmodus und E-Mail-Layout an das Erscheinungsbild Ihrer Organisation anpassen.
