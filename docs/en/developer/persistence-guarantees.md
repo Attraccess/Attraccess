@@ -116,7 +116,8 @@ Process-local assumptions that a second replica would break:
 
 - In-memory chains and locks such as the session change queue, reader session handling and plugin upload locks.
 - Schedulers, for example the maintenance schedule evaluation (ATT-627), which would run in every replica.
-- Live update fan-out and WebSocket sessions, which only reach clients connected to the same process.
+- Live update fan-out for most topics, and the companion device websockets, which only reach clients connected to
+  the same process (mass introductions and supervision are shared, see below).
 - The MQTT client connections and plugin event bus.
 - Rate-limit state when Valkey is not configured; with Valkey it is shared.
 
@@ -124,3 +125,33 @@ What PostgreSQL already provides for a shared database: the atomic balance and u
 (constraints, triggers, advisory locks), single-winner claims on unique keys and atomic session and token rotation.
 Still missing for several replicas: a leader or lock for schedulers and shared live updates; the scaling follow-ups own
 them.
+
+### Shared through Valkey (ATT-1163)
+
+With `VALKEY_URL` set, these hold across API instances. Without it the same guarantees hold within the one process,
+as before.
+
+- **Instance liveness**: each instance renews a heartbeat every 5 s that lapses after 15 s. A surviving instance (exactly
+  one, by an atomic claim) then drops the gone instance's readers, frees their screen claims and ends the supervision
+  requests whose requester it held.
+- **Reader presence**: which instances hold a websocket of each reader, newest connection first. "Reader is offline"
+  means no instance holds it. Reader work runs on the holding instances: in process when it is this one, over the
+  Valkey pub/sub bus (request/response with timeouts) otherwise.
+- **Reader screen claim**: one flow at a time owns a reader (mass introduction, supervision, card enrollment, card
+  reset), taken with an atomic claim and released compare-and-delete, with a TTL so a crashed holder cannot block a
+  reader. A second flow gets the usual 409.
+- **Mass introductions**: sessions, participants and wrong-code counters live in Valkey with native TTLs. A user is
+  introduced at most once per session (an atomic join claim; a concurrent join waits for the winner), five wrong codes
+  per minute count across instances, and a session ends exactly once.
+- **Supervision requests**: pending requests live in Valkey. Approve, reject, expiry, requester abort, reader cancel
+  and card settle each take the request out of pending in one atomic step, so a request settles at most once and starts
+  at most one session. One reader request per requester is an atomic reservation.
+- **Deadlines** (mass-introduction and supervision expiry): a sorted set swept by every instance every 500 ms; removing
+  an item is the claim, so each deadline fires exactly once, within about a second. No keyspace notifications.
+- **Live updates** of the `mass-introduction` and `supervision` topics (and the supervision SSE endpoint) reach the
+  user's streams on every instance. Other topics stay per process (follow-up).
+
+Still per process: the requester's blocked supervision call and a plugin BLE link routed through another instance
+(both fail cleanly when that instance dies, they are not migrated), the metrics gauges, rate limits without Valkey,
+schedulers and the other live topics. Pub/sub is fire-and-forget: a message published while an instance reconnects is
+lost, so outcomes that matter (supervision results, expiries) are also kept in Valkey and looked up after the deadline.

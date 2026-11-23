@@ -123,7 +123,8 @@ Prozesslokale Annahmen, die ein zweites Replikat brechen würde:
 
 - Speicherinterne Ketten und Sperren wie die Session-Change-Queue, die Leser-Sitzungsverwaltung und Plugin-Upload-Sperren.
 - Zeitgeber, etwa die Auswertung der Wartungspläne (ATT-627), die in jedem Replikat liefen.
-- Live-Update-Verteilung und WebSocket-Sitzungen, die nur Clients desselben Prozesses erreichen.
+- Live-Update-Verteilung der meisten Themen und die Websockets der Companion-Geräte, die nur Clients desselben
+  Prozesses erreichen (Masseneinweisungen und Aufsicht sind geteilt, siehe unten).
 - Die MQTT-Verbindungen und der Plugin-Event-Bus.
 - Rate-Limit-Zustand ohne Valkey; mit Valkey ist er geteilt.
 
@@ -131,3 +132,36 @@ Was PostgreSQL für eine geteilte Datenbank bereits liefert: die atomaren Guthab
 (Constraints, Trigger, Advisory Locks), Einzelgewinner bei Unique-Schlüsseln und atomare Sitzungs- und Token-Rotation.
 Für mehrere Replikate fehlen noch ein Leader oder eine Sperre für Zeitgeber sowie geteilte Live Updates; die
 Skalierungs-Folgearbeiten übernehmen das.
+
+### Über Valkey geteilt (ATT-1163)
+
+Mit gesetztem `VALKEY_URL` gilt Folgendes über API-Instanzen hinweg. Ohne Valkey gelten dieselben Garantien innerhalb
+des einen Prozesses, wie bisher.
+
+- **Lebenszeichen der Instanzen**: Jede Instanz erneuert alle 5 s einen Herzschlag, der nach 15 s verfällt. Eine
+  verbliebene Instanz (genau eine, per atomarer Sperre) entfernt dann die Leser der weggefallenen Instanz, gibt deren
+  Bildschirm-Sperren frei und beendet die Aufsichtsanfragen, deren Anfragende sie hielt.
+- **Leser-Präsenz**: welche Instanzen eine Websocket-Verbindung je Leser halten, neueste Verbindung zuerst. „Leser ist
+  offline" heißt, keine Instanz hält ihn. Leser-Arbeit läuft auf den haltenden Instanzen: im Prozess, wenn es diese
+  ist, sonst über den Pub/Sub-Bus in Valkey (Anfrage/Antwort mit Zeitlimits).
+- **Bildschirm-Sperre je Leser**: Ein Ablauf belegt einen Leser (Masseneinweisung, Aufsicht, Karten-Einlernen,
+  Karten-Zurücksetzen), per atomarer Sperre genommen und per Vergleichen-und-Löschen freigegeben, mit TTL, damit eine
+  abgestürzte Instanz keinen Leser blockiert. Ein zweiter Ablauf bekommt die übliche 409.
+- **Masseneinweisungen**: Sitzungen, Teilnehmende und Zähler falscher Codes liegen mit nativen TTLs in Valkey. Jede
+  Person wird je Sitzung höchstens einmal eingewiesen (atomare Beitritts-Sperre; ein gleichzeitiger Beitritt wartet auf
+  den Gewinner), fünf falsche Codes je Minute zählen über alle Instanzen, und eine Sitzung endet genau einmal.
+- **Aufsichtsanfragen**: Offene Anfragen liegen in Valkey. Genehmigen, Ablehnen, Ablauf, Abbruch durch die anfragende
+  Person, Abbruch am Leser und Abschluss per Karte nehmen die Anfrage in einem atomaren Schritt aus den offenen, sodass
+  eine Anfrage höchstens einmal endet und höchstens eine Sitzung startet. Eine Leser-Anfrage je Person ist eine atomare
+  Reservierung.
+- **Fristen** (Ablauf von Masseneinweisungen und Aufsichtsanfragen): eine sortierte Menge, die jede Instanz alle 500 ms
+  durchsieht; das Entfernen eines Eintrags ist die Sperre, sodass jede Frist genau einmal auslöst, etwa innerhalb einer
+  Sekunde. Keine Keyspace-Benachrichtigungen.
+- **Live-Updates** der Themen `mass-introduction` und `supervision` (und des Aufsichts-SSE-Endpunkts) erreichen die
+  Streams der Person auf jeder Instanz. Andere Themen bleiben je Prozess (Folgearbeit).
+
+Weiter je Prozess: der blockierte Aufsichtsaufruf der anfragenden Person und eine über eine andere Instanz geleitete
+Plugin-BLE-Verbindung (beide schlagen sauber fehl, wenn diese Instanz wegfällt; sie werden nicht verschoben), die
+Metrik-Messwerte, Rate Limits ohne Valkey, Zeitgeber und die übrigen Live-Themen. Pub/Sub ist ohne Zustellgarantie:
+Eine Nachricht, die während eines Wiederverbindens veröffentlicht wird, geht verloren; wichtige Ergebnisse
+(Aufsichtsergebnisse, Abläufe) liegen deshalb zusätzlich in Valkey und werden nach der Frist nachgeschlagen.
