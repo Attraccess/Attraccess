@@ -67,7 +67,7 @@ export function AttractapSelect(props: Props) {
         !props.forCardWriting ||
         !cardWriterSettings ||
         cardWriterSettings.mode === 'all' ||
-        cardWriterSettings.readerIds.includes(r.id),
+        (cardWriterSettings.mode === 'secured' ? r.secured : cardWriterSettings.readerIds.includes(r.id)),
     );
 
     let emptyReason: EmptyReason | null = null;

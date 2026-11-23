@@ -231,7 +231,12 @@
     "flow.deleted": "Globaler Flow gelöscht",
     "flow.canvas_updated": "Canvas eines globalen Flows geändert",
     "flow_variable.set": "Flow-Variable gesetzt",
-    "flow_variable.deleted": "Flow-Variable gelöscht"
+    "flow_variable.deleted": "Flow-Variable gelöscht",
+    "attractap.reader.secure_conversion_started": "Sichern eines Readers gestartet",
+    "attractap.reader.secure_conversion_preflight": "Vorabprüfung eines Readers ausgewertet",
+    "attractap.reader.secure_conversion_digests_burned": "Secure-Boot-Schlüssel in einen Reader eingebrannt",
+    "attractap.reader.secure_conversion_failed": "Sichern eines Readers fehlgeschlagen",
+    "attractap.reader.secure_conversion_interrupted": "Sichern eines Readers unterbrochen"
   },
   "targets": {
     "resource": "Ressource",
@@ -444,7 +449,14 @@
     "before.creditsPerUnit": "Preis pro Messwert vorher",
     "after.creditsPerUnit": "Preis pro Messwert nachher",
     "before.allocation": "Zuordnung vorher",
-    "after.allocation": "Zuordnung nachher"
+    "after.allocation": "Zuordnung nachher",
+    "conversionId": "Konvertierungs-ID",
+    "conversionState": "Schritt",
+    "targetVersion": "Ziel-Firmwareversion",
+    "digest0": "Digest des Signaturschlüssels",
+    "digest1": "Digest des Wiederherstellungsschlüssels",
+    "ok": "Bestanden",
+    "failedChecks": "Fehlgeschlagene Prüfungen"
   },
   "fieldValues": {
     "allocation": {

@@ -16,6 +16,7 @@ const data = vi.hoisted(() => ({
   deleteReader: vi.fn(),
   deleteOptions: undefined as undefined | { onSuccess?: () => void; onError?: (error: unknown) => void },
   invalidateQueries: vi.fn(),
+  activeConversion: null as unknown,
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
@@ -23,6 +24,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   useGetFirmwares: () => ({ data: [] }),
   useGetReaders: () => ({ data: data.readers, error: null }),
   useGetReadersToPair: () => ({ data: data.toPair }),
+  useGetActiveSecureConversion: () => ({ data: { conversion: data.activeConversion } }),
   useDeleteReader: (_key: unknown, options: typeof data.deleteOptions) => {
     data.deleteOptions = options;
     return { mutateAsync: data.deleteReader };
@@ -82,6 +84,7 @@ vi.mock('../pairing/ReadersToPair', () => ({
   },
 }));
 vi.mock('../../../hooks/useNow', () => ({ useNow: () => new Date() }));
+vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: () => true }) }));
 
 function mockLicense(modules: string[] | undefined) {
   vi.mocked(useGetLicenseInformation).mockReturnValue({
@@ -133,6 +136,23 @@ describe('AttractapList pairing', () => {
     data.toPair = [];
     render(<AttractapList />);
     expect(screen.queryByText('Leaked')).toBeNull();
+  });
+
+  it('shows the secured and lab-key chips and the step of the running conversion', () => {
+    mockLicense(['attractap']);
+    data.readers = [
+      { ...reader(1, 'Secured door', 'paired'), secured: true, firmwareProfile: 'secure' },
+      { ...reader(2, 'Lab reader', 'paired'), secured: false, firmwareProfile: 'secure-lab' },
+      { ...reader(3, 'Converting', 'paired'), secured: false, firmwareProfile: 'plain' },
+    ];
+    data.toPair = [];
+    data.activeConversion = { readerId: 3, state: 'transferring' };
+    render(<AttractapList />);
+    expect(document.querySelector('[data-cy="attractap-secured-chip-1"]')).not.toBeNull();
+    expect(document.querySelector('[data-cy="attractap-lab-key-chip-2"]')).not.toBeNull();
+    expect(document.querySelector('[data-cy="attractap-secured-chip-2"]')).toBeNull();
+    expect(document.querySelector('[data-cy="secure-conversion-state-transferring"]')).not.toBeNull();
+    data.activeConversion = null;
   });
 
   it('shows a dash instead of an empty type for a reader that has not reported its firmware yet', () => {
