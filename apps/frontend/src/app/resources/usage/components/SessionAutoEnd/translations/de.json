@@ -1,11 +1,15 @@
 {
-  "stopsAt": "Stoppt automatisch um {{time}} Uhr (in {{remaining}})",
-  "stopsAtReadOnly": "Stoppt automatisch um {{time}} Uhr",
-  "stoppingNow": "Wird jeden Moment automatisch gestoppt",
+  "stopsAt": "Endet automatisch {{deadline}} (in {{remaining}})",
+  "stopsAtReadOnly": "Endet automatisch {{deadline}}",
+  "deadline": {
+    "today": "um {{time}} Uhr",
+    "otherDay": "am {{date}} um {{time}} Uhr"
+  },
+  "stoppingNow": "Endet jeden Moment automatisch",
   "extend": "Verlängern",
-  "extendBy": "+{{hours}} Std.",
+  "extendBy": "+{{hours}} h",
   "extendToMax": "Auf Maximum verlängern",
   "maxReached": "Die maximale Sitzungsdauer ist erreicht, die Sitzung kann nicht weiter verlängert werden.",
   "extended": "Sitzung verlängert",
-  "extendedDescription": "Die Maschine stoppt jetzt automatisch um {{time}} Uhr."
+  "extendedDescription": "Die Sitzung endet jetzt automatisch {{deadline}}."
 }

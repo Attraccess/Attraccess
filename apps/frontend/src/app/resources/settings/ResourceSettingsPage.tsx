@@ -20,6 +20,7 @@ import { RetrainingTab } from '../editModal/tabs/retraining';
 import { SupervisionTab } from '../editModal/tabs/supervision';
 import { ResourceReaderUiSettings } from '../../readerUi/ResourceReaderUiSettings';
 import { ResourceMetadataEditor } from '../editModal/resourceMetadataEditor';
+import { sessionDurationSettingsError } from '../editModal/tabs/sessionDurationSettingsError';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -113,9 +114,9 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
       toast.error({ title: t('inputs.name.required') });
       return;
     }
-    const { maxSessionDurationMinutes: maxMinutes, defaultSessionDurationEstimateMinutes: defaultMinutes } = formData;
-    if (formData.type !== ResourceType.DOOR && maxMinutes && defaultMinutes && defaultMinutes > maxMinutes) {
-      toast.error({ title: t('inputs.machine.sessionDuration.defaultEstimate.tooLong') });
+    const durationError = sessionDurationSettingsError(formData);
+    if (durationError) {
+      toast.error({ title: t(durationError) });
       return;
     }
     submittedRevision.current = editRevision.current;

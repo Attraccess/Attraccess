@@ -35,10 +35,3 @@ export function splitMinutes(total: number): { hours: number; minutes: number } 
 export function joinMinutes(hours: number, minutes: number): number {
   return Math.max(0, hours) * 60 + Math.max(0, minutes);
 }
-
-/** "2 h 5 min", "45 min". */
-export function formatDuration(totalMinutes: number): string {
-  const { hours, minutes } = splitMinutes(Math.max(0, Math.round(totalMinutes)));
-  if (hours === 0) return `${minutes} min`;
-  return minutes === 0 ? `${hours} h` : `${hours} h ${minutes} min`;
-}

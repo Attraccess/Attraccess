@@ -132,7 +132,7 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
         chipDataCy="active-session-live-chip"
       >
         <SessionTimer startTime={startTime} variant="hero" />
-        {myUsage?.autoEndAt && <SessionAutoEnd resourceId={resourceId} usage={myUsage} canExtend />}
+        {myUsage?.autoEndAt && <SessionAutoEnd resourceId={resourceId} usage={myUsage} canExtend centered />}
 
         {(myUsage?.project || myUsage?.supervisorUser) && (
           <div className="border-t border-divider pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">

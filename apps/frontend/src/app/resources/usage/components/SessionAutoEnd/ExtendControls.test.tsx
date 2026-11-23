@@ -18,7 +18,7 @@ describe('ExtendControls', () => {
         onExtend={onExtend}
       />,
     );
-    fireEvent.click(screen.getByText('+2h'));
+    fireEvent.click(screen.getByText('+2 h'));
     expect(onExtend).toHaveBeenCalledWith({ extendByMinutes: 120 });
     fireEvent.click(screen.getByText('Extend to maximum'));
     expect(onExtend).toHaveBeenCalledWith({ toMax: true });
@@ -32,10 +32,10 @@ describe('ExtendControls', () => {
         onExtend={vi.fn()}
       />,
     );
-    expect(screen.getByText('+1h').closest('button')).toBeEnabled();
-    expect(screen.getByText('+2h').closest('button')).toBeEnabled();
-    expect(screen.getByText('+4h').closest('button')).toBeDisabled();
-    expect(screen.getByText('+24h').closest('button')).toBeDisabled();
+    expect(screen.getByText('+1 h').closest('button')).toBeEnabled();
+    expect(screen.getByText('+2 h').closest('button')).toBeEnabled();
+    expect(screen.getByText('+4 h').closest('button')).toBeDisabled();
+    expect(screen.getByText('+24 h').closest('button')).toBeDisabled();
   });
 
   it('shows no buttons and a hint when the maximum is reached', () => {
@@ -46,14 +46,26 @@ describe('ExtendControls', () => {
         onExtend={vi.fn()}
       />,
     );
-    expect(screen.queryByText('+1h')).not.toBeInTheDocument();
+    expect(screen.queryByText('+1 h')).not.toBeInTheDocument();
     expect(screen.queryByText('Extend to maximum')).not.toBeInTheDocument();
     expect(screen.getByText(/maximum session time is reached/i)).toBeInTheDocument();
+  });
+
+  it('centers the buttons for centered cards', () => {
+    render(
+      <ExtendControls
+        session={{ startTime: start, autoEndAt: at(60) }}
+        isPending={false}
+        onExtend={vi.fn()}
+        centered
+      />,
+    );
+    expect(screen.getByRole('group')).toHaveClass('justify-center');
   });
 
   it('has no to-max button on a machine without a maximum', () => {
     render(<ExtendControls session={{ startTime: start, autoEndAt: at(60) }} isPending={false} onExtend={vi.fn()} />);
     expect(screen.queryByText('Extend to maximum')).not.toBeInTheDocument();
-    expect(screen.getByText('+24h').closest('button')).toBeEnabled();
+    expect(screen.getByText('+24 h').closest('button')).toBeEnabled();
   });
 });

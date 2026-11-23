@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Input, Label, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextField } from '@heroui/react';
-import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { ABSOLUTE_LIMIT_MINUTES, formatDuration, joinMinutes, splitMinutes } from '../../sessionDuration';
+import { FieldError, Input, Label, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextField } from '@heroui/react';
+import {
+  Button,
+  DurationDisplay,
+  StandardModal,
+  useFormatedDuration,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
+import { ABSOLUTE_LIMIT_MINUTES, joinMinutes, splitMinutes } from '../../sessionDuration';
 import en from './translations/en.json';
 import de from './translations/de.json';
 
 const QUICK_PICKS_MINUTES = [30, 60, 120, 240, 480];
+const INITIAL_MINUTES = 60;
 
 export interface SessionDurationEstimateDialogProps {
   isOpen: boolean;
@@ -28,29 +35,33 @@ export function SessionDurationEstimateDialog({
   onCancel,
 }: Readonly<SessionDurationEstimateDialogProps>) {
   const { t } = useTranslations({ en, de });
-  const [hours, setHours] = useState('1');
-  const [minutes, setMinutes] = useState('0');
-
-  useEffect(() => {
-    if (isOpen) {
-      setHours('1');
-      setMinutes('0');
-    }
-  }, [isOpen]);
-
-  const total = joinMinutes(toNumber(hours), toNumber(minutes));
   const limit = maxMinutes ?? ABSOLUTE_LIMIT_MINUTES;
-  let problem: string | null = null;
-  if (total < 1) problem = t('tooShort');
-  else if (total > limit) {
-    problem = maxMinutes === null ? t('tooLongAbsolute') : t('tooLong', { max: formatDuration(maxMinutes) });
-  }
+  // Opens at one hour, or at the machine's maximum when that is shorter, so the first value is always valid.
+  const initialMinutes = Math.min(INITIAL_MINUTES, limit);
+  const [hours, setHours] = useState(() => String(splitMinutes(initialMinutes).hours));
+  const [minutes, setMinutes] = useState(() => String(splitMinutes(initialMinutes).minutes));
+  const formattedMax = useFormatedDuration(maxMinutes ?? 0);
 
   const pick = (value: number) => {
     const parts = splitMinutes(value);
     setHours(String(parts.hours));
     setMinutes(String(parts.minutes));
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const parts = splitMinutes(initialMinutes);
+    setHours(String(parts.hours));
+    setMinutes(String(parts.minutes));
+  }, [isOpen, initialMinutes]);
+
+  const total = joinMinutes(toNumber(hours), toNumber(minutes));
+  let problem: string | null = null;
+  if (total < 1) problem = t('tooShort');
+  else if (total > limit) {
+    problem = maxMinutes === null ? t('tooLongAbsolute') : t('tooLong', { max: formattedMax });
+  }
+  const isInvalid = problem !== null;
 
   return (
     <StandardModal
@@ -70,15 +81,17 @@ export function SessionDurationEstimateDialog({
               <p className="text-sm text-muted">{t('hint')}</p>
               {maxMinutes !== null && (
                 <p className="text-sm font-medium" data-cy="session-duration-estimate-max">
-                  {t('max', { max: formatDuration(maxMinutes) })}
+                  {t('max', { max: formattedMax })}
                 </p>
               )}
               <div className="flex gap-3" role="group" aria-label={t('label')}>
-                <TextField value={hours} onChange={setHours} className="min-w-0 flex-1">
+                <TextField value={hours} onChange={setHours} isInvalid={isInvalid} className="min-w-0 flex-1">
                   <Label>{t('hours')}</Label>
                   <Input type="number" min={0} data-cy="session-duration-hours" />
+                  {/* One message for both fields: the problem is their sum. */}
+                  <FieldError data-cy="session-duration-problem">{problem}</FieldError>
                 </TextField>
-                <TextField value={minutes} onChange={setMinutes} className="min-w-0 flex-1">
+                <TextField value={minutes} onChange={setMinutes} isInvalid={isInvalid} className="min-w-0 flex-1">
                   <Label>{t('minutes')}</Label>
                   <Input type="number" min={0} data-cy="session-duration-minutes" />
                 </TextField>
@@ -86,22 +99,17 @@ export function SessionDurationEstimateDialog({
               <div className="flex flex-wrap gap-2" role="group" aria-label={t('quickPicks')}>
                 {QUICK_PICKS_MINUTES.filter((value) => value <= limit).map((value) => (
                   <Button key={value} size="sm" variant="secondary" onPress={() => pick(value)}>
-                    {formatDuration(value)}
+                    <DurationDisplay minutes={value} />
                   </Button>
                 ))}
               </div>
-              {problem && (
-                <p className="text-sm text-danger" role="alert" data-cy="session-duration-problem">
-                  {problem}
-                </p>
-              )}
             </div>
           </ModalBody>
           <ModalFooter>
             <Button variant="ghost" onPress={close}>
               {t('cancel')}
             </Button>
-            <Button isDisabled={problem !== null} onPress={() => onConfirm(total)} data-cy="session-duration-confirm">
+            <Button isDisabled={isInvalid} onPress={() => onConfirm(total)} data-cy="session-duration-confirm">
               {t('confirm')}
             </Button>
           </ModalFooter>

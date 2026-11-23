@@ -64,4 +64,27 @@ describe('SessionDurationSettings', () => {
     fireEvent.change(screen.getByLabelText('Hours'), { target: { value: '1' } });
     expect(setField).toHaveBeenCalledWith('defaultSessionDurationEstimateMinutes', null);
   });
+
+  it('shows an error instead of silently clamping a maximum above 720 hours', () => {
+    const setField = vi.fn();
+    const { rerender } = render(
+      <SessionDurationSettings formData={{ maxSessionDurationMinutes: null }} setField={setField} />,
+    );
+    fireEvent.change(screen.getByLabelText('Hours'), { target: { value: '721' } });
+    // The form keeps what the field shows; saving refuses it.
+    expect(setField).toHaveBeenCalledWith('maxSessionDurationMinutes', 721 * 60);
+    rerender(<SessionDurationSettings formData={{ maxSessionDurationMinutes: 721 * 60 }} setField={setField} />);
+    expect(screen.getByLabelText('Hours')).toHaveValue(721);
+    expect(screen.getByText(/cannot be longer than 720 hours/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Hours')).toHaveAttribute('aria-invalid', 'true');
+
+    rerender(<SessionDurationSettings formData={{ maxSessionDurationMinutes: 720 * 60 }} setField={setField} />);
+    expect(screen.queryByText(/cannot be longer than 720 hours/)).not.toBeInTheDocument();
+  });
+
+  it('describes both fields with the help text', () => {
+    render(<SessionDurationSettings formData={{ maxSessionDurationMinutes: 90 }} setField={vi.fn()} />);
+    expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription(/stops a session automatically/);
+    expect(screen.getByLabelText('Minutes')).toHaveAccessibleDescription(/stops a session automatically/);
+  });
 });

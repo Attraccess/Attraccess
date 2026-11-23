@@ -237,7 +237,12 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
         </p>
 
         {activeSession.autoEndAt && (
-          <SessionAutoEnd resourceId={resourceId} usage={activeSession} canExtend={canEndSession(activeSession)} />
+          <SessionAutoEnd
+            resourceId={resourceId}
+            usage={activeSession}
+            canExtend={canEndSession(activeSession)}
+            centered
+          />
         )}
 
         {activeSession.supervisorUser && (

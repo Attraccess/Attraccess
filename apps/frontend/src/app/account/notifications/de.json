@@ -46,7 +46,7 @@
     },
     "resource_session_ending_soon": {
       "label": "Ressourcennutzung endet bald",
-      "description": "15 und 5 Minuten bevor der Server deine Sitzung automatisch stoppt (maximale Sitzungsdauer oder deine Schätzung)."
+      "description": "15 und 5 Minuten bevor der Server deine Sitzung automatisch beendet (maximale Sitzungsdauer oder deine Schätzung)."
     },
     "resource_session_ended": {
       "label": "Ressourcennutzung fremdbeendet",

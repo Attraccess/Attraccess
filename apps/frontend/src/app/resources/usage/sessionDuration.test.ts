@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extensionCap, extensionRoomMinutes, formatDuration, joinMinutes, splitMinutes } from './sessionDuration';
+import { extensionCap, extensionRoomMinutes, joinMinutes, splitMinutes } from './sessionDuration';
 
 const start = '2026-01-01T10:00:00.000Z';
 const at = (minutes: number) => new Date(new Date(start).getTime() + minutes * 60_000).toISOString();
@@ -19,11 +19,8 @@ describe('sessionDuration', () => {
     expect(extensionRoomMinutes({ startTime: start, autoEndAt: at(60) })).toBe(43_140);
   });
 
-  it('splits, joins and formats minutes', () => {
+  it('splits and joins minutes', () => {
     expect(splitMinutes(135)).toEqual({ hours: 2, minutes: 15 });
     expect(joinMinutes(2, 15)).toBe(135);
-    expect(formatDuration(45)).toBe('45 min');
-    expect(formatDuration(120)).toBe('2 h');
-    expect(formatDuration(135)).toBe('2 h 15 min');
   });
 });

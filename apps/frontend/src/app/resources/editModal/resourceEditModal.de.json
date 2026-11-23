@@ -56,14 +56,15 @@
           "label": "Maximale Sitzungsdauer",
           "description": "Der Server beendet eine Sitzung automatisch, wenn diese Zeit erreicht ist. Beide Felder leer lassen für keine Begrenzung. Gilt für danach gestartete Sitzungen; laufende Sitzungen bleiben unverändert.",
           "hours": "Stunden",
-          "minutes": "Minuten"
+          "minutes": "Minuten",
+          "tooLong": "Die maximale Sitzungsdauer darf höchstens 720 Stunden (30 Tage) betragen."
         },
         "requireEstimate": {
           "label": "Dauerschätzung verlangen",
-          "description": "Beim Start einer Sitzung wird gefragt, wie lange die Maschine höchstens genutzt wird. Die Maschine stoppt automatisch, wenn die Zeit abgelaufen ist; während der Nutzung kann verlängert werden. Das Stoppen kann die Maschine ausschalten (Stopp-Flows) und so lange Aufträge wie 3D-Drucke beenden."
+          "description": "Beim Start einer Sitzung wird gefragt, wie lange die Maschine höchstens genutzt wird. Die Sitzung endet automatisch, wenn diese Zeit abgelaufen ist; während der Nutzung kann verlängert werden. Das Beenden kann die Maschine über Flows ausschalten und so lange Aufträge wie 3D-Drucke abbrechen."
         },
         "defaultEstimate": {
-          "label": "Standardschätzung für Reader ohne Display (Minuten)",
+          "label": "Standardschätzung für Reader, die nicht nachfragen können (Minuten)",
           "description": "Reader, die keine Schätzung abfragen können (Reader ohne Display, ältere Firmware), starten mit dieser Dauer. Leer bedeutet 60 Minuten.",
           "tooLong": "Die Standardschätzung darf nicht länger als die maximale Sitzungsdauer sein."
         }
