@@ -69,6 +69,48 @@ export const resourceSessionEndedTranslations: ShippedTranslation[] = [
   },
 ];
 
+export const resourceSessionEndingSoonTranslations: ShippedTranslation[] = [
+  {
+    templateType: EmailTemplateType.RESOURCE_SESSION_ENDING_SOON,
+    locale: 'de',
+    key: 'greeting',
+    value: 'Hallo {name},',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_SESSION_ENDING_SOON,
+    locale: 'de',
+    key: 'body',
+    value:
+      'Deine Sitzung auf <strong>{resource}</strong> wird in etwa {minutes} Minuten automatisch beendet. Öffne die Ressource, wenn du sie verlängern möchtest.',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_SESSION_ENDING_SOON,
+    locale: 'de',
+    key: 'ends_at',
+    value: 'Automatisches Ende: {time}',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_SESSION_ENDING_SOON,
+    locale: 'de',
+    key: 'button',
+    value: 'Ressource ansehen',
+  },
+  { templateType: EmailTemplateType.RESOURCE_SESSION_ENDING_SOON, locale: 'de', key: 'copy_link', value: COPY_LINK_DE },
+  {
+    templateType: EmailTemplateType.RESOURCE_SESSION_ENDING_SOON,
+    locale: 'de',
+    key: 'footer',
+    value:
+      'Du erhältst diese E-Mail, weil Benachrichtigungen über das bevorstehende Ende von Ressourcensitzungen in deinen Einstellungen aktiviert sind.',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_SESSION_ENDING_SOON,
+    locale: 'de',
+    key: 'subject',
+    value: 'Deine Sitzung auf {resource} endet bald',
+  },
+];
+
 export const maintenanceRequestCreatedTranslations: ShippedTranslation[] = [
   {
     templateType: EmailTemplateType.MAINTENANCE_REQUEST_CREATED,

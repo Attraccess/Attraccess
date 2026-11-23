@@ -30,6 +30,7 @@ import { WebStartStepStore } from './pre-start/web-start-step.store';
 import { RESOURCE_USAGE_COLLABORATORS } from './resource-usage.collaborators';
 import { ResourceUsageFlowsBridge } from './sessions/resource-usage-flows.bridge';
 import { ResourceListVisibilityModule } from '../visibility/resource-list-visibility.module';
+import { SessionAutoEndService } from './session-duration/session-auto-end.service';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { ResourceListVisibilityModule } from '../visibility/resource-list-visibi
     WebStartStepStore,
     SessionEndNotifier,
     ResourceUsageFlowsBridge,
+    SessionAutoEndService,
   ],
   exports: [ResourceUsageService, ResourceActivityVisibilityService, PreStartService, SessionEndNotifier],
 })

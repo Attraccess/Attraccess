@@ -47,13 +47,13 @@ Pfade sind relativ zu `apps/attractap/firmware`.
 - Der serielle WLAN-Scan-Befehl blockiert die Main-Loop weiter bis zu 10 s, [ATT-1390](https://linear.app/attraccess/issue/ATT-1390).
 - WebSocket-Textframes über dem 4096-Byte-Client-Puffer werden weiter als Fragmente weitergereicht, [ATT-1389](https://linear.app/attraccess/issue/ATT-1389).
 - Einige Quellkommentare sind veraltet oder verweisen auf die alte Berichtsdatei, die nie in `main` gelandet ist, [ATT-1392](https://linear.app/attraccess/issue/ATT-1392).
-- Der freie PSRAM ist weiter nicht Teil des periodischen Heap-Logs, und die FreeRTOS-Laufzeitstatistik ist aus. Beides wird in [ATT-1276](https://linear.app/attraccess/issue/ATT-1276) verfolgt. `LOG_MEMORY_DEBUG` ist nur für UI-Selftest-Lab-Builds definiert (`main/CMakeLists.txt`).
+- `LOG_MEMORY_DEBUG` ist nur für UI-Selftest-Lab-Builds definiert (`main/CMakeLists.txt`). Seine Stack-Werte liefert `debug.stats` auf Debug- und Lab-Builds.
 
 ## Empfehlungen
 
-Die IDs stammen aus dem Bericht vom August. Wirkung, Aufwand und Risiko sind die ursprünglichen Schätzungen, keine Messwerte; „–“ heißt, der alte Bericht nannte keinen Wert. Ticket-Links führen zu Linear. Was in ATT-1276 verfolgt wird, ist in diesem Ticket beschrieben; dort steht auch, was bereits gemergt ist.
+Die IDs stammen aus dem Bericht vom August. Wirkung, Aufwand und Risiko sind die ursprünglichen Schätzungen, keine Messwerte; „–“ heißt, der alte Bericht nannte keinen Wert. Ticket-Links führen zu Linear.
 
-**Status-Legende:** Erledigt (eine Anmerkung in Klammern sagt, worin es vom Vorschlag abweicht), Teilweise erledigt, Offen, Abgedeckt durch ATT-1276, Verworfen.
+**Status-Legende:** Erledigt (eine Anmerkung in Klammern sagt, worin es vom Vorschlag abweicht), Teilweise erledigt, Offen, Verworfen.
 
 ### Quick Wins
 
@@ -68,7 +68,7 @@ Die IDs stammen aus dem Bericht vom August. Wirkung, Aufwand und Risiko sind die
 | Q7 | Connect-Task nur bei Zustandsänderung wecken | Niedrig / niedrig / niedrig | Offen | [ATT-1391](https://linear.app/attraccess/issue/ATT-1391) |
 | Q8 | I2C-Takt-Kommentar klären (400 kHz vs. 100 kHz) | Niedrig / trivial / niedrig | Offen | Der Takt ist 400 kHz, aber der Kommentar in `utils.hpp` sagt noch, er sei zurückgenommen. [ATT-1392](https://linear.app/attraccess/issue/ATT-1392) |
 | Q9 | Unbedingte serielle Ausgaben im NTAG424-Code abschalten | Niedrig / niedrig / niedrig | Verworfen | Der NTAG424-Code wurde aus der Firmware entfernt, als die Kartenprüfung auf den Server wanderte ([#2039](https://github.com/Attraccess/Attraccess/pull/2039), ATT-1145) |
-| Q10 | Beobachtbarkeit: Laufzeitstatistik, `LOG_MEMORY_DEBUG`, PSRAM-Werte im Log | Hoch / niedrig / kein | Abgedeckt durch ATT-1276 | Laufzeitstatistik, der Befehl `debug.stats` (der auch die Stack-Reserve jedes Tasks meldet) und PSRAM im 30-s-Heap-Log: [ATT-1276](https://linear.app/attraccess/issue/ATT-1276). `LOG_MEMORY_DEBUG` und PSRAM im Boot-Record gehören nicht dazu; `debug.stats` liefert die Stack-Werte, die `LOG_MEMORY_DEBUG` lieferte |
+| Q10 | Beobachtbarkeit: Laufzeitstatistik, `LOG_MEMORY_DEBUG`, PSRAM-Werte im Log | Hoch / niedrig / kein | Erledigt (Debug- und Lab-Builds; ohne `LOG_MEMORY_DEBUG`) | FreeRTOS-Laufzeitstatistik in `sdkconfig.debug` und jedem Lab-Build mit Test-Hooks, der Befehl `debug.stats` (CPU-Anteil und Stack-Reserve je Task) und PSRAM im 30-s-Heap-Log, [#2290](https://github.com/Attraccess/Attraccess/pull/2290). `LOG_MEMORY_DEBUG` und PSRAM im Boot-Record gehören nicht dazu; `debug.stats` liefert die Stack-Werte, die `LOG_MEMORY_DEBUG` lieferte |
 
 ### Mittlerer Aufwand
 
@@ -78,7 +78,7 @@ Die IDs stammen aus dem Bericht vom August. Wirkung, Aufwand und Risiko sind die
 | M2 | Präsenzprüfung einer aufliegenden Karte drosseln | Hoch / niedrig / niedrig | Teilweise erledigt | Auf 250 ms gedrosselt ([#1693](https://github.com/Attraccess/Attraccess/pull/1693)) und auf einen Befehl reduziert ([#2039](https://github.com/Attraccess/Attraccess/pull/2039)). Die alte Auflage gilt weiter: Die Prüfung ist ein einfacher, nicht authentifizierter Befehl (der Reader hält keine Kartenschlüssel), daher hält jedes Gerät, das auf ISO-DEP antwortet, etwa ein Handy, die Karte als aufliegend. Eine authentifizierte Prüfung bräuchte den Server. Dies und Karten, die auf die Prüfung nicht antworten: [ATT-1380](https://linear.app/attraccess/issue/ATT-1380) |
 | M3 | String-Kopien pro Durchlauf entfernen | Mittel / niedrig / niedrig | Offen | [ATT-1391](https://linear.app/attraccess/issue/ATT-1391) |
 | M4 | Häufig genutzte Screens geladen halten | Mittel / mittel / niedrig-mittel | Erledigt | `shouldAutoUnload()` gibt in `src/display/screens/lockscreen/lockscreen.hpp` und `src/display/screens/init/initscreen.hpp` `false` zurück, [#1694](https://github.com/Attraccess/Attraccess/pull/1694) |
-| M5 | LVGL-Performance-Monitor als Baseline-Werkzeug | Messung / trivial / kein | Abgedeckt durch ATT-1276 | Der Code-Pfad existiert (`ATTRACTAP_LV_PERF_MONITOR` in `lv_conf.h` und `display.cpp`), aber keine Build-Option setzt ihn bisher. Ein Build-Schalter dafür wird in [ATT-1276](https://linear.app/attraccess/issue/ATT-1276) verfolgt |
+| M5 | LVGL-Performance-Monitor als Baseline-Werkzeug | Messung / trivial / kein | Erledigt | CMake-Option `-DATTRACTAP_LV_PERF_MONITOR=ON` (nur Display-Varianten), [#2290](https://github.com/Attraccess/Attraccess/pull/2290). Das Release-Gate weist damit gebaute Images ab |
 | M6 | Nicht blockierende Beeps | Mittel / mittel / niedrig | Erledigt | Beeper-Worker-Task mit Pattern-Queue in `src/beeper/beeper.cpp`, [#1695](https://github.com/Attraccess/Attraccess/pull/1695) |
 | M7 | Serieller WLAN-Scan: Watchdog und kürzeres Limit | Mittel / niedrig / niedrig | Offen | [ATT-1390](https://linear.app/attraccess/issue/ATT-1390) |
 | M8 | Einstellungen im RAM zwischenspeichern | Niedrig-mittel / niedrig / niedrig | Erledigt | `src/settings/settings.cpp` hält API-Konfiguration und Sprache im Cache |
@@ -103,9 +103,9 @@ Die IDs stammen aus dem Bericht vom August. Wirkung, Aufwand und Risiko sind die
 Das alles gehört auf einen Bench-Reader, nicht auf einen produktiven. Nichts davon läuft automatisch in der CI.
 
 1. **Debug-Build.** Mit dem Debug-Overlay: `idf.py -B build/dbg -DATTRACTAP_VARIANT=<variant> -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.debug" build`. Es stellt den Compiler auf `-Og` mit aktiven Assertions um, die absoluten Zeiten sind also nicht mit Release-Builds vergleichbar.
-2. **LVGL-Performance-Monitor.** Der Code wird einkompiliert, wenn `ATTRACTAP_LV_PERF_MONITOR` definiert ist (`include/lv_conf.h`, `src/display/display.cpp`). Er loggt FPS sowie Render- und Flush-Zeiten auf die serielle Konsole. Keine Firmware-CMake-Option setzt das Makro heute; ein Build-Schalter dafür wird in ATT-1276 verfolgt (sobald gemergt).
-3. **Laufzeitstatistik und `debug.stats`.** FreeRTOS-Laufzeitstatistik, der serielle Befehl `debug.stats` und PSRAM-Werte im Heap-Log werden in ATT-1276 verfolgt (sobald gemergt).
-4. **Heap-Log.** `Websocket::loop()`, das auf der Main-Loop läuft, loggt alle 30 Sekunden freien internen Heap, größten Block und Minimum (`Websocket::logHeapStats`). Der größte freie Block zeigt die Fragmentierung; das Minimum des freien Heaps ist der Tiefstand seit dem Boot und fällt daher nur. Beides über 24 Stunden vergleichen.
+2. **LVGL-Performance-Monitor.** Mit `-DATTRACTAP_LV_PERF_MONITOR=ON` bauen (nur Display-Varianten). Er loggt FPS sowie Render- und Flush-Zeiten auf die serielle Konsole (`include/lv_conf.h`, `src/display/display.cpp`).
+3. **Laufzeitstatistik und `debug.stats`.** Debug-Builds und Builds mit `-DATTRACTAP_TEST_HOOKS=ON` haben die FreeRTOS-Laufzeitstatistik. `CMND debug.stats` auf der seriellen Konsole liefert je Task eine Zeile mit Laufzeit, CPU-Anteil, Stack-Reserve und Kern. Die Zähler laufen seit dem Boot, also zwei Messungen nehmen und vergleichen. Die Firmware-README („Task stats“) beschreibt die Ausgabe.
+4. **Heap-Log.** `Websocket::loop()`, das auf der Main-Loop läuft, loggt alle 30 Sekunden freien internen Heap, größten Block und Minimum sowie freien PSRAM und dessen größten Block (`Websocket::logHeapStats`). Der größte freie Block zeigt die Fragmentierung; das Minimum des freien Heaps ist der Tiefstand seit dem Boot und fällt daher nur. Beides über 24 Stunden vergleichen.
 5. **Was vor und nach einer Änderung zu vergleichen ist:** Frame-Zeit mit dem Performance-Monitor, Touch-Latenz während eine Karte gepollt wird und während eine aufliegt, Latenz vom Antippen bis zum Ergebnis, Dauer eines Reconnect-Zyklus und das Minimum des internen Heaps.
 
 ## Historie

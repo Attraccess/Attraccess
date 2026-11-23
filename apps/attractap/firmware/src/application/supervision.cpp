@@ -52,7 +52,7 @@ void SupervisionFlow::enter(const char *requester, const FirmwareI18n::Text &hin
     Display::transitionToScreen(&screen);
 }
 
-void SupervisionFlow::beginReaderInitiated(const std::string &requester, uint32_t id) {
+void SupervisionFlow::beginReaderInitiated(const std::string &requester, uint32_t id, uint32_t estimateMinutes) {
     // Release a queued web transaction before the reader flow takes ownership.
     processEvents();
     if (pendingWebStart) {
@@ -66,7 +66,7 @@ void SupervisionFlow::beginReaderInitiated(const std::string &requester, uint32_
     const uint32_t now = millis();
     enter(requester.c_str(), FirmwareI18n::Message::TapSupervisorCardOrApproveInTheAppWebInterface, now,
           now + TIMEOUT_MS);
-    api.requestSupervision(resourceId);
+    api.requestSupervision(resourceId, estimateMinutes);
 }
 
 void SupervisionFlow::armWebInitiated(const API::SupervisionStartCommand &command) {

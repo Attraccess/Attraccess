@@ -32,6 +32,9 @@ export interface NewResource {
   documentationUrl: string | null;
   allowTakeOver: boolean;
   maxParallelSessions: number;
+  maxSessionDurationMinutes: number | null;
+  requireSessionDurationEstimate: boolean;
+  defaultSessionDurationEstimateMinutes: number | null;
   type: ResourceType;
   separateUnlockAndUnlatch: boolean;
   accessOnly: boolean;

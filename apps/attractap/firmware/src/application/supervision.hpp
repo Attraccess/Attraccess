@@ -30,7 +30,8 @@ public:
                     SupervisionScreen &screen);
 
     void setup();
-    void beginReaderInitiated(const std::string &requesterName, uint32_t resourceId);
+    // estimateMinutes: the duration estimate chosen before the request (ATT-43), 0 for none.
+    void beginReaderInitiated(const std::string &requesterName, uint32_t resourceId, uint32_t estimateMinutes = 0);
     void armWebInitiated(const API::SupervisionStartCommand &command);
     bool takePendingWebStart(uint32_t now, bool readerBusy);
     void onDisconnect();

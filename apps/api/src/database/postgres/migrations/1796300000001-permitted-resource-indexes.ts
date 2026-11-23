@@ -5,8 +5,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * introduces it and whether the latest history entry of one of the viewer's introductions is a grant. Without these
  * indexes both checks scan the whole table once per machine.
  */
-export class PermittedResourceIndexes1796200000001 implements MigrationInterface {
-  name = 'PermittedResourceIndexes1796200000001';
+export class PermittedResourceIndexes1796300000001 implements MigrationInterface {
+  name = 'PermittedResourceIndexes1796300000001';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

@@ -55,6 +55,10 @@ void API::sendFirmwareInfo()
                           traits, uiCaps, sizeof uiCaps);
     // This reader relays card APDUs to the server and holds no card keys (firmware 2.0.0+).
     if (traits.hasNfc) event["data"]["payload"]["capabilities"]["cardRelay"] = true;
+#ifdef HAS_LVGL_DISPLAY
+    // Duration input and extend controls (ATT-43): the touch readers. Others start with the server's fallback deadline.
+    if (traits.hasNfc) event["data"]["payload"]["capabilities"]["sessionDuration"] = true;
+#endif
     // Plugin BLE proxy, protocol v1 (ATT-1033). Builds without it send no `ble`: the API answers READER_UNSUPPORTED.
     char bleCaps[ble::CAPABILITY_SCRATCH];
     if (BleProxy::supported())

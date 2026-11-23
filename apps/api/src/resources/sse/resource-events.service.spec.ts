@@ -10,6 +10,7 @@ import { ResourceEventsService } from './resource-events.service';
 import {
   ResourceSessionStartedEvent,
   ResourceUsageSessionEndedEvent,
+  ResourceUsageSessionExtendedEvent,
   ResourceUsageSessionTakenOverEvent,
 } from '../usage/events/resource-usage.events';
 import { ResourceHealthChangedEvent } from '../health/events/resource-health-changed.event';
@@ -191,6 +192,41 @@ describe('session and health events', () => {
       },
     });
     sub.unsubscribe();
+  });
+
+  it('tells viewers that a session was extended, naming only its owner and keeping the slot state', async () => {
+    const { service, callback, sub } = await open({ usages: [row({ id: 3, userId: 42 })] });
+    service.handleResourceSessionExtended(
+      new ResourceUsageSessionExtendedEvent({
+        id: 3,
+        resourceId: 1,
+        userId: 42,
+        user: { id: 42, username: 'owner', email: 'owner@example.com' },
+        autoEndAt: new Date('2026-06-04T13:00:00.000Z'),
+      } as unknown as ResourceUsage),
+    );
+    await flush();
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledWith({
+      data: {
+        eventType: ResourceUsageSessionExtendedEvent.EVENT_NAME,
+        resourceId: 1,
+        inUse: true,
+        activeSessionCount: 1,
+        maxParallelSessions: 1,
+        ownerUserId: 42,
+      },
+    });
+    sub.unsubscribe();
+  });
+
+  it('reads nothing for an extension on a resource nobody follows', async () => {
+    const { service, resourceRepository } = createService();
+    service.handleResourceSessionExtended(
+      new ResourceUsageSessionExtendedEvent({ id: 3, resourceId: 1, userId: 42 } as ResourceUsage),
+    );
+    await flush();
+    expect(resourceRepository.findOne).not.toHaveBeenCalled();
   });
 
   it('never reports inUse:false while other sessions remain and carries count and limit', async () => {

@@ -1,11 +1,11 @@
 import type { DataSource } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { PostgresBaseline1760000000000 } from './1760000000000-baseline';
-import { ResourceListVisibility1796200000000 } from './1796200000000-resource-list-visibility';
+import { ResourceListVisibility1796300000000 } from './1796300000000-resource-list-visibility';
 
 jest.setTimeout(120_000);
 
-describe('ResourceListVisibility1796200000000 (persistence)', () => {
+describe('ResourceListVisibility1796300000000 (persistence)', () => {
   let source: DataSource;
 
   beforeEach(async () => {
@@ -16,7 +16,7 @@ describe('ResourceListVisibility1796200000000 (persistence)', () => {
   const runMigration = async () => {
     const runner = source.createQueryRunner();
     try {
-      await new ResourceListVisibility1796200000000().up(runner);
+      await new ResourceListVisibility1796300000000().up(runner);
     } finally {
       await runner.release();
     }

@@ -82,6 +82,7 @@ vi.mock('@attraccess/react-query-client', () => ({
     RESOURCE_HEALTH: 'resource_health',
     RESOURCE_TAKEOVER: 'resource_takeover',
     RESOURCE_SESSION_ENDED: 'resource_session_ended',
+    RESOURCE_SESSION_ENDING_SOON: 'resource_session_ending_soon',
     NFC_CARDS: 'nfc_cards',
     PROJECT_INVITATIONS: 'project_invitations',
     ACCESS_CHANGES: 'access_changes',

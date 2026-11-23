@@ -24,6 +24,8 @@ const state = vi.hoisted(() => ({
     };
   },
   navigate: vi.fn(),
+  /** What the duration estimate dialog answers: undefined = not required, null = cancelled. */
+  estimate: undefined as number | null | undefined,
   start: vi.fn(),
   end: vi.fn(),
   invalidate: vi.fn(),
@@ -49,6 +51,9 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: state.success, apiError: state.apiError, error: state.error }),
 }));
+vi.mock('../usage/hooks/useSessionDurationEstimate', () => ({
+  useSessionDurationEstimate: () => ({ ask: async () => state.estimate, dialog: null, required: false }),
+}));
 vi.mock('@attraccess/react-query-client', async (original) => ({
   ApiError: (await original<typeof import('@attraccess/react-query-client')>()).ApiError,
   useResourceUsageStartBlockedKey: 'start-blocked',
@@ -70,19 +75,25 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   state.callbacks = {};
+  state.estimate = undefined;
 });
 afterEach(cleanup);
-function setup(action?: string) {
-  return renderHook(() => useQrCodeAction({ resourceId: 7 }), {
-    wrapper: ({ children }: { children: ReactNode }) => (
-      <MemoryRouter initialEntries={[`/resources/7${action ? `?action=${action}` : ''}`]}>{children}</MemoryRouter>
-    ),
+async function setup(action?: string) {
+  let view!: ReturnType<typeof renderHook<ReturnType<typeof useQrCodeAction>, unknown>>;
+  // The start asks for the duration estimate first, so it runs a microtask after the link is read.
+  await act(async () => {
+    view = renderHook(() => useQrCodeAction({ resourceId: 7 }), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <MemoryRouter initialEntries={[`/resources/7${action ? `?action=${action}` : ''}`]}>{children}</MemoryRouter>
+      ),
+    });
   });
+  return view;
 }
 it.each(['start', 'startAndTakeover', 'stop', 'view', 'unknown'])(
   'executes the %s link once and removes its URL action',
-  (action) => {
-    const { rerender } = setup(action);
+  async (action) => {
+    const { rerender } = await setup(action);
     expect(state.navigate).toHaveBeenCalledWith('/resources/7', { replace: true });
     rerender();
     expect(state.navigate).toHaveBeenCalledOnce();
@@ -100,14 +111,14 @@ it.each(['start', 'startAndTakeover', 'stop', 'view', 'unknown'])(
     else expect(state.end).not.toHaveBeenCalled();
   },
 );
-it('does nothing without an action', () => {
-  setup();
+it('does nothing without an action', async () => {
+  await setup();
   expect(state.navigate).not.toHaveBeenCalled();
   expect(state.start).not.toHaveBeenCalled();
   expect(state.end).not.toHaveBeenCalled();
 });
-it('invalidates only resource-specific history after start and resets the active session after stop', () => {
-  setup('start');
+it('invalidates only resource-specific history after start and resets the active session after stop', async () => {
+  await setup('start');
   act(() => state.callbacks.start.onSuccess({}, { body: { forceTakeOver: false } }));
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['active', { path: { resourceId: 7 } }] });
   expect(state.success).toHaveBeenCalledWith({
@@ -128,9 +139,9 @@ it('invalidates only resource-specific history after start and resets the active
     expect(options.predicate({ queryKey: ['history'] })).toBe(false);
   }
 });
-it('reports failed start and stop requests without a success toast', () => {
-  setup('start');
-  setup('stop');
+it('reports failed start and stop requests without a success toast', async () => {
+  await setup('start');
+  await setup('stop');
   const error = new Error('Forbidden');
   for (const action of ['start', 'end']) act(() => state.callbacks[action].onError(error));
   expect(state.apiError).toHaveBeenCalledTimes(2);
@@ -141,8 +152,8 @@ it('reports failed start and stop requests without a success toast', () => {
 const startError = (status: number, body: unknown) =>
   new ApiError({ method: 'POST', url: '/start' }, { url: '/start', ok: false, status, statusText: 'x', body }, 'x');
 
-it('asks a plugin confirmation for a QR start and shows a block reason as written', () => {
-  const { result } = setup('start');
+it('asks a plugin confirmation for a QR start and shows a block reason as written', async () => {
+  const { result } = await setup('start');
   const confirmation = { title: 'Reserved from 14:00', body: 'Start anyway?' };
   act(() =>
     state.callbacks.start.onError(startError(409, { code: 'CONFIRMATION_REQUIRED', stepId: 's1', confirmation })),
@@ -153,4 +164,18 @@ it('asks a plugin confirmation for a QR start and shows a block reason as writte
   act(() => state.callbacks.start.onError(startError(403, { code: 'START_BLOCKED', reason })));
   expect(state.error).toHaveBeenCalledWith({ title: 'Reserved', description: 'Booked until 14:00' });
   expect(state.apiError).not.toHaveBeenCalled();
+});
+
+it('sends the estimate of a machine that requires one with the QR start', async () => {
+  state.estimate = 90;
+  await setup('start');
+  expect(state.start).toHaveBeenCalledExactlyOnceWith({
+    path: { resourceId: 7 },
+    body: { notes: '-- by QR-Code --', forceTakeOver: false, estimatedDurationMinutes: 90 },
+  });
+});
+it('does not start when the estimate dialog is cancelled', async () => {
+  state.estimate = null;
+  await setup('start');
+  expect(state.start).not.toHaveBeenCalled();
 });

@@ -51,6 +51,8 @@ import { USAGE_SESSION_STORE, UsageSessionStore } from '../usage-session-store.p
 
 import { sessionLimitOf } from './active-usage';
 
+import { computeStartDeadline } from '../session-duration/session-duration.rules';
+
 import { UsageSessionRecords } from './usage-session-records';
 
 export type PreparedSessionStart = Awaited<ReturnType<UsageSessionStartPreparation['prepareSessionStart']>>;
@@ -179,6 +181,13 @@ export class UsageSessionStartPreparation {
         }
 
         const startTime = new Date();
+        // Fixed now: later changes of the machine's settings never move the deadline of this session.
+        const deadline = computeStartDeadline(
+          resource,
+          startTime,
+          dto.estimatedDurationMinutes,
+          options.canAskDuration === true,
+        );
         const billingConfiguration = await this.billingService.getResourceBillingConfiguration(resourceId, scope);
         const meterRates = this.lifecycle.metered ? await this.sessions.findMeterRates(resourceId, scope) : [];
 
@@ -196,6 +205,7 @@ export class UsageSessionStartPreparation {
             meterRates,
             ...(supervisorUserId === null ? {} : { supervisorUserId }),
             ...(projectId === undefined ? {} : { projectId }),
+            ...(deadline.autoEndAt ? deadline : {}),
           },
           scope,
         );

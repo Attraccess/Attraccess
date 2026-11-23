@@ -4,12 +4,14 @@
 #include <cstring>
 #include <string>
 
-void API::requestSupervision(uint32_t resourceId)
+void API::requestSupervision(uint32_t resourceId, uint32_t estimatedDurationMinutes)
 {
     this->logger.info("Requesting supervision");
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["resourceId"] = resourceId;
+    // A supervisor may approve on the web, where the session starts without this reader's start request.
+    if (estimatedDurationMinutes != 0) payload["estimatedDurationMinutes"] = estimatedDurationMinutes;
     this->sendMessage("SUPERVISION_REQUEST", payload);
 }
 

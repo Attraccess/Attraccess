@@ -6,6 +6,8 @@ import type { TransactionScope } from '../../../database/unit-of-work';
 
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
+import type { AuditActor } from '../../../audit/recorder/audit-event';
+
 import { UserPermissionsChangedEvent } from '../../../users-and-auth/rbac/events/user-permissions-changed.event';
 
 import { ResourceChangedEvent } from '../../events/resource-changed.event';
@@ -34,6 +36,10 @@ import { UsageSessionStartPreparation } from './usage-session-start-preparation'
 
 import { UsageSessionStarts } from './usage-session-starts';
 
+import { UsageSessionExtensions } from '../session-duration/usage-session-extensions';
+
+import { ExtendUsageSessionDto } from '../dtos/extendUsageSession.dto';
+
 export { EndSessionOptions, StartSessionOptions } from '../lifecycle/usage-lifecycle';
 
 /** The resource record the supervision checks work with. */
@@ -54,6 +60,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     private readonly preparation: UsageSessionStartPreparation,
     private readonly starts: UsageSessionStarts,
     private readonly ends: UsageSessionEnds,
+    private readonly extensions: UsageSessionExtensions,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -184,6 +191,21 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     options: EndSessionOptions = {},
   ): Promise<UsageSession> {
     return this.ends.endSession(resourceId, user, dto, options);
+  }
+
+  /** Moves the automatic end of a running session later; refused past its cap. */
+  async extendSession(
+    resourceId: number,
+    user: UsageSessionUser,
+    dto: ExtendUsageSessionDto,
+    auditOrigin?: AuditActor,
+  ): Promise<UsageSession> {
+    return this.extensions.extendSession(resourceId, user, dto, auditOrigin);
+  }
+
+  /** Ends a session at its deadline as the system; `null` when it was already ended or extended. */
+  async endSessionAutomatically(resourceId: number, usageId: number): Promise<UsageSession | null> {
+    return this.ends.endSessionAutomatically(resourceId, usageId);
   }
 
   /**

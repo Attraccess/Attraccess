@@ -162,4 +162,21 @@ describe('getTranslationKeyForApiError', () => {
     expect(getTranslation(translations, 'METER_SHARING_UNSUPPORTED.title')).toBe(expectedTitle);
     expect(getTranslation(translations, 'METER_SHARING_UNSUPPORTED.description')).toContain('{{error}}');
   });
+
+  it.each([
+    ['English', API_ERROR_TRANSLATIONS_EN, 'Duration estimate required'],
+    ['German', API_ERROR_TRANSLATIONS_DE, 'Dauerschätzung erforderlich'],
+  ])('translates a coded session duration error by its code in %s', (_locale, translations, expectedTitle) => {
+    const result = getTranslationKeyForApiError({
+      error: {
+        body: { message: 'This machine requires an estimate', code: 'SESSION_DURATION_ESTIMATE_REQUIRED' },
+      } as unknown as Error,
+      t: (key: string) => key,
+      tExists: (key: string) => getTranslation({ api: translations }, key) !== undefined,
+      baseTranslationKey: 'api',
+    });
+
+    expect(result.key).toBe('api.SESSION_DURATION_ESTIMATE_REQUIRED');
+    expect(getTranslation({ api: translations }, `${result.key}.title`)).toBe(expectedTitle);
+  });
 });

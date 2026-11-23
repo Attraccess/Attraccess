@@ -22,7 +22,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLiveUpdates } from '../../../../../utils/live-updates';
-import { SESSION_EVENTS } from '../../sessionEvents';
+import { SESSION_EVENTS, SESSION_EXTENDED_EVENT } from '../../sessionEvents';
 import { mySessionsQueryKey } from '../../../../resourceOverview/activeUsageSessionsBanner/mySessionsQuery';
 import en from './translations/en.json';
 import de from './translations/de.json';
@@ -66,12 +66,20 @@ export function ResourceUsageSession({
     invalidateStartBlocked();
   }, [queryClient, resourceId, invalidateStartBlocked]);
 
+  // A moved automatic end shows only in the session itself and in "My sessions".
+  const invalidateSessionDeadline = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: UseResourceUsageGetActiveSessionKeyFn({ path: { resourceId } }) });
+    queryClient.invalidateQueries({ queryKey: mySessionsQueryKey(), exact: true });
+  }, [queryClient, resourceId]);
+
   useLiveUpdates({
     topic: 'resource',
     resourceId,
     onUpdate: (data: { eventType?: string; inUse?: boolean }) => {
       if (data.eventType === START_BLOCKED_CHANGED_EVENT) {
         invalidateStartBlocked();
+      } else if (data.eventType === SESSION_EXTENDED_EVENT) {
+        invalidateSessionDeadline();
       } else if (data.eventType && SESSION_EVENTS.has(data.eventType)) {
         invalidateSessionQueries();
       }

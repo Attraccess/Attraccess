@@ -132,12 +132,18 @@ async function readSqliteRows(sqlite: DataSource, table: string, columns: readon
   );
 }
 
+/** Rows that migrations after the import add on purpose, so the SQLite file cannot have them (PostgreSQL condition). */
+const ADDED_AFTER_IMPORT: Record<string, string> = {
+  // 1796200000001-session-ending-soon-email-template
+  email_templates: `"type" <> 'resource-session-ending-soon'`,
+};
+
 /**
  * Rows a migration after the import writes on purpose, so PostgreSQL holds them and the SQLite file never did. Each is
  * a SQL condition that keeps the other rows of its table in the comparison.
  */
 const WRITTEN_AFTER_IMPORT: Record<string, string> = {
-  // ResourceListVisibility1796200000000 (ATT-843) keeps an upgraded instance with accounts on "authenticated".
+  // ResourceListVisibility1796300000000 (ATT-843) keeps an upgraded instance with accounts on "authenticated".
   setting: `NOT ("parent" = 'resources' AND "key" = 'list_visibility')`,
 };
 
@@ -162,9 +168,9 @@ export async function compareWithSqlite(pg: DataSource, sqliteFile: string): Pro
       const selects = columns.map(
         (column, at) => `${postgresExpression(column, types.get(column) as string)} AS c${at}`,
       );
-      const later = WRITTEN_AFTER_IMPORT[table];
+      const where = [ADDED_AFTER_IMPORT[table], WRITTEN_AFTER_IMPORT[table]].filter(Boolean);
       const rows: Record<string, unknown>[] = await pg.query(
-        `SELECT ${selects.join(', ')} FROM ${quote(table)}${later ? ` WHERE ${later}` : ''}`,
+        `SELECT ${selects.join(', ')} FROM ${quote(table)}${where.length ? ` WHERE ${where.map((c) => `(${c})`).join(' AND ')}` : ''}`,
       );
       const actual = rows
         .map((row) => canonical(columns.map((column, at) => postgresValue(row[`c${at}`], types.get(column) as string))))

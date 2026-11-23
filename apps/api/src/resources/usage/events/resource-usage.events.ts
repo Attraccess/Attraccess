@@ -1,3 +1,4 @@
+import type { AutoEndReason } from '../session-duration/session-duration.rules';
 /**
  * Events emitted when resource usage status changes
  */
@@ -32,6 +33,8 @@ export class ResourceUsageSessionEndedEvent {
   constructor(
     public readonly usage: UsageSession,
     public readonly endedBy: Pick<UsageSessionUser, 'id' | 'username' | 'firstName' | 'lastName'> | null,
+    /** Set when the server ended the session at its deadline: why. */
+    public readonly autoEndReason?: AutoEndReason,
   ) {}
 }
 
@@ -85,4 +88,14 @@ export class ResourceSupervisedUsageEndedEvent {
 export class ResourceUsageLifecycleAbortedEvent {
   static readonly EVENT_NAME = 'resource.usage.lifecycle.aborted';
   constructor(public readonly resourceId: number) {}
+}
+
+/**
+ * Emitted when the automatic end of a running session was moved. Drives the live feed of the web and the reader
+ * lists. It carries the session, not a response: the live feed reduces it for viewers that may not see the owner.
+ */
+export class ResourceUsageSessionExtendedEvent {
+  public static readonly EVENT_NAME = 'resource.usage.session_extended';
+
+  constructor(public readonly usage: UsageSession) {}
 }

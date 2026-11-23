@@ -8,8 +8,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Instances upgraded from SQLite already have their accounts here: the import runs earlier, as 1760000000001.
  * A fresh installation has no account at this point; the first-time setup creates the first one later.
  */
-export class ResourceListVisibility1796200000000 implements MigrationInterface {
-  name = 'ResourceListVisibility1796200000000';
+export class ResourceListVisibility1796300000000 implements MigrationInterface {
+  name = 'ResourceListVisibility1796300000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

@@ -292,6 +292,59 @@ secure profile; development units stay unfused. A later secure bridge build need
 Installations that rely on the reader secure profile get bridges without it; physical access to a
 bridge exposes its flash, including its pairing credentials.
 
+## Session duration protocol (2.12.0)
+
+Machines can limit how long a session runs (ATT-43): a **maximum session time**, and an option that **requires the
+user to say how long they will use the machine**. The server ends a session automatically at its deadline. The
+Touch and Touch V2 readers (also their demo variants) ask for the estimate and extend running sessions; the
+reader announces this with `capabilities.sessionDuration: true` in its firmware info. Lite, the BLE bridge, plugin
+readers and Touch readers on older firmware are never refused for a missing estimate: the server starts them with
+the machine's maximum as the deadline, or with its default estimate (60 minutes unless set) when there is no maximum.
+
+| Direction       | Event                           | Payload                                                                                                                                                                           |
+| --------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reader → server | `READER_FIRMWARE_INFO`          | `capabilities.sessionDuration: true`                                                                                                                                              |
+| Server → reader | `RESOURCE_LIST`                 | per machine `requireSessionDurationEstimate` (bool), `maxSessionDurationMinutes` (int or `null`)                                                                                  |
+| Server → reader | `RESOURCE_LIST` (session)       | on `ownUsageSession`, `activeUsageSession` and the listed sessions: `autoEndAt` (ISO), `autoEndUtcOffsetMinutes`, `autoEndInSeconds`, `hasMaxSessionTime`, `extendLimitInSeconds` |
+| Reader → server | `START_RESOURCE_USAGE_SESSION`  | optional `estimatedDurationMinutes` (1 to 43200); the server refuses a value above the maximum                                                                                    |
+| Reader → server | `SUPERVISION_REQUEST`           | optional `estimatedDurationMinutes`: the estimate chosen before asking for supervision, so a supervisor's approval on the web starts the session with it                          |
+| Reader → server | `EXTEND_RESOURCE_USAGE_SESSION` | `resourceId`, `usageId` (only for another person's session), `extendByMinutes` (60, 120, 240, 360, 720 or 1440) or `toMax: true`, `cardSessionId`                                 |
+| Server → reader | `EXTEND_RESOURCE_USAGE_SESSION` | `success: true` with `usageId`, or `error` (`SESSION_EXTENSION_EXCEEDS_MAXIMUM`, `SESSION_EXTENSION_NOT_POSSIBLE`, `SESSION_EXTENSION_INVALID`)                                   |
+
+The seconds in the list (`autoEndInSeconds`, `extendLimitInSeconds`) are relative to the moment the server built the
+list. The reader stores `millis()` when the list arrives and counts down from it, so the remaining time is right on a
+reader without a wall clock; the stop time ("Stops at 17:30") comes from `autoEndAt` and the zone offset, never from
+the reader's clock. `extendLimitInSeconds` is how far the end can still be pushed: the machine's maximum, or 30 days
+when it has none (`hasMaxSessionTime` tells which). The reader only enables a step that fits, and "Extend to
+maximum" only for a machine with a maximum and room below it; the server decides anyway and refuses with a code
+(nothing is clipped).
+
+Start: when `requireSessionDurationEstimate` is set the reader opens the **duration input** (hours and minutes
+steppers, quick picks 30 min / 1 h / 2 h / 4 h / 8 h, the maximum and the hint that the machine stops automatically)
+before it sends the start request, for a start, a takeover and a supervised start. Quick picks and values above the
+maximum cannot be chosen; Cancel aborts the start. The chosen minutes travel with the start request and with its
+retries after a usage form or a plugin confirmation. The input comes before the forms because the server asks for
+forms in answer to the first start request, which must already carry the estimate. A supervised start asks before the
+supervision: the reader sends the estimate in `SUPERVISION_REQUEST` (a supervisor may approve on the web, where the
+session starts without another request from the reader) and again in the start request after a supervisor card.
+
+Running session: the session area of the details screen shows "Stops automatically in 1:23:45 (at 17:30)" and an
+**Extend** button. The countdown is neutral and turns amber in the last 15 minutes. Extend opens a screen with +1 h,
++2 h, +4 h, +6 h, +12 h, +24 h and "Extend to maximum". The server resends the list after an extension, and also after
+one made on the web, so the screen updates live and closes when the session no longer has a deadline (or another
+session took its place). Extending needs the same identity as stopping: the card holder's own session (sent without
+`usageId`), or, on a machine with one session at a time, another person's session where the reader offers the card
+holder the force-stop (an introducer or a resource manager). Then the request names that session's `usageId`, like the
+force-stop, and the extension screen shows the owner's name. The server checks the rule of ending a session either way.
+On a machine with parallel sessions the reader extends only the own session.
+
+Memory: the list adds about 40 bytes to each of the (at most 10) listed resources; the two screens are built on entry and
+destroyed on leaving, like the project picker.
+
+Compatibility: an older reader ignores the new list fields and never sends `estimatedDurationMinutes`; an older
+server sends none of the fields, so the reader shows nothing new. `EXTEND_RESOURCE_USAGE_SESSION` is only sent to a
+server that put `autoEndInSeconds` in the list.
+
 ## Bluetooth setup (2.11.0)
 
 `src/bt_setup/` (ATT-1315 for the bridge, ATT-1371 for the readers): the web app's **Set up over Bluetooth**
@@ -705,6 +758,15 @@ idf.py -B build/dbg -DATTRACTAP_VARIANT=attractap-touch \
        -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.debug" build
 ```
 
+The debug overlay also turns on the FreeRTOS run-time stats (the same options as
+`sdkconfig.lab-stats`), which add the `debug.stats` serial topic (see "Task stats").
+
+LVGL perf monitor (development builds only): `-DATTRACTAP_LV_PERF_MONITOR=ON` on a display variant
+such as `attractap-touch-v2` turns on LVGL's sysmon perf monitor in log mode. FPS, render and flush
+time go to the serial log, not to the panel. Other variants fail the configure step. The option is
+`OFF` by default, `build_firmwares.py` passes `OFF`, such an image does not claim `release: true`,
+and `tools/check_release_build.py` fails a release image compiled with it.
+
 Note: `tools/build_individual_ca_certs.py` needs network access on the first
 run (it downloads Mozilla's CA bundle, cached for 7 days). Run it once before
 `idf.py` when building without `build_firmwares.py`.
@@ -730,6 +792,13 @@ partition such as `otadata` on the secure profile): ESP-IDF asserts that the sta
 RAM while the cache is frozen for the mapping. The main task, `LvglTask`, `LedTask`, `Beeper` and
 the `esp_websocket_client` task (`websocket_task`, 16 KB, created by the component with plain
 `xTaskCreate`; no released component version can put it in PSRAM) keep internal stacks.
+
+`CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP` stays off: an HIL A/B run on a Touch V2 (ATT-1276) showed
+no internal RAM gain with it (1 KB lower minimum free) and about 60 KB less free PSRAM, because
+`ALWAYSINTERNAL=1024` already sends the larger blocks to PSRAM.
+
+The heap log (every 30 s, INFO) shows both kinds: `Heap internal: free= largest= min=` and
+`Heap PSRAM: free= largest=`.
 
 ## Display Theme
 
@@ -816,7 +885,8 @@ shows over the same console. These topics exist only in firmware built with
 `-DATTRACTAP_TEST_HOOKS=ON` (display variants; configuring a headless variant
 with it fails). Release builds never contain them: the option defaults to
 `OFF` and `build_firmwares.py` passes `-DATTRACTAP_TEST_HOOKS=OFF`. Like all
-topics except `auth.*`, each command needs the serial PIN in `authCode`.
+topics except `auth.*` and the lab-only `debug.*` topics, each command needs
+the serial PIN in `authCode`.
 
 `-DATTRACTAP_BEEPER_DEFAULT=OFF` turns the beeper off on readers without a
 saved beeper setting (new or erased readers). The setting itself still works;
@@ -929,6 +999,39 @@ Errors: `INVALID_PAYLOAD` (missing or out-of-range value), `WIDGET_NOT_FOUND`,
 The lookup reads LVGL objects only: text drawn without a label (images, canvas
 content, button-matrix keys without text) cannot be matched, and keys are
 reported without separate hit-testing of overlapping keys.
+
+### Task stats (debug and lab builds only)
+
+`CMND debug.stats` (no PIN, like `debug.crash`) logs one row per FreeRTOS task at INFO, between
+`=== FreeRTOS run-time stats (...) ===` and `=== End run-time stats ===`:
+
+```
+[TaskStats] INFO: Task               Runtime us    CPU  StackHWM  Core
+[TaskStats] INFO: IDLE1             12345678901  48.3%      1234  1
+```
+
+- Runtime: microseconds the task ran since boot (64-bit counters, so they do not wrap). A short
+  sample needs two calls.
+- CPU: share of both cores, cut to one decimal. All rows, including `IDLE0` and `IDLE1`, add up to
+  about 97-100 %: interrupt time and the slices still running are not counted.
+- StackHWM: free stack bytes at the lowest point. Core: `0`, `1` or `any` (unpinned).
+
+The rows go out 20 ms apart, because the console's 1 KB TX buffer drops lines of a burst, so a call
+takes about half a second. The reply `RESP debug.stats {"success":true}` comes after the end line;
+`{"error":"STATS_UNAVAILABLE"}` means the snapshot could not be taken (the log says why). Taking
+the snapshot briefly masks interrupts on the calling core, which can disturb one display frame: do
+not call it during timing or display measurements.
+
+The topic exists where `CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS` is on: builds with
+`sdkconfig.debug`, and every build with `-DATTRACTAP_TEST_HOOKS=ON` (CMake layers
+`sdkconfig.lab-stats` after the defaults, also with `ATTRACTAP_SECURE_LAB`, never for a release
+secure profile). sdkconfig defaults only reach a new `sdkconfig`: delete the build directory after
+switching the test hooks on or off, and once for a directory created before firmware 2.11.1 (such
+as an old `build/hil-*` of `apps/attractap-lab/hil/run.sh`). Other builds answer `UNKNOWN_TOPIC`
+after the PIN check, like any unknown topic (`PIN_NOT_SET` on a reader without a PIN).
+`tools/check_release_build.py` fails a release build whose sdkconfig enables the stats or whose
+image contains the `debug.stats` topic. The stats cost a little CPU and RAM, so lab and debug
+images differ slightly from release.
 
 ## Crash reports and coredump upload (ATT-474, ATT-1144)
 

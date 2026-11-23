@@ -141,7 +141,7 @@ export type ResourceListVisibility = (typeof RESOURCE_LIST_VISIBILITY_VALUES)[nu
 
 /**
  * A missing or unknown stored value means the restrictive mode: a fresh install has no stored value, and an upgraded
- * instance gets "authenticated" stored by migration 1796200000000.
+ * instance gets "authenticated" stored by migration 1796300000000.
  */
 export const RESOURCE_LIST_VISIBILITY_DEFAULT: ResourceListVisibility = 'permitted-only';
 
