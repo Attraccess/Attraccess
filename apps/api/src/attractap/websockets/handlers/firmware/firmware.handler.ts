@@ -92,6 +92,7 @@ export class AttractapFirmwareHandler {
     // Only readers that relay card APDUs (firmware 2.0.0+) get card functions. Set before the
     // database write so a card tapped right after connecting is not refused.
     socket.state.cardRelay = data.payload?.capabilities?.cardRelay === true;
+    socket.state.sessionDuration = data.payload?.capabilities?.sessionDuration === true;
     // Firmware before 2.10.0 does not report nfc; only the BLE Bridge reports false.
     socket.state.nfc = data.payload?.capabilities?.nfc !== false;
     // Plugin BLE (protocol v1): older or incompatible firmware makes plugins see READER_UNSUPPORTED.

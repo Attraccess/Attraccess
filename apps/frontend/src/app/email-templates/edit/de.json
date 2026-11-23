@@ -15,6 +15,7 @@
     "resource-usage-note-added": "Ressourcen-Nutzungsnotiz hinzugefügt",
     "resource-takeover": "Ressourcenübernahme",
     "resource-session-ended": "Ressourcen-Sitzung beendet",
+    "resource-session-ending-soon": "Ressourcen-Sitzung endet bald",
     "access-change": "Zugriffsänderung"
   },
   "form": {

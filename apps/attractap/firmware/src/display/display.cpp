@@ -81,6 +81,8 @@ NetworkStatusScreen Display::networkStatusScreen;
 TopUpScreen Display::topUpScreen;
 FormsScreen Display::formsScreen;
 ProjectSelectScreen Display::projectSelectScreen;
+DurationInputScreen Display::durationInputScreen;
+ExtendSessionScreen Display::extendSessionScreen;
 #ifdef DEMO_MODE
 DemoSettingsScreen Display::demoSettingsScreen;
 #endif

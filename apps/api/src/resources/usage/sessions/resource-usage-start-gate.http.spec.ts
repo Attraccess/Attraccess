@@ -131,6 +131,7 @@ describe('POST /resources/:id/usage/start through the pre-start gate', () => {
       auditOrigin,
       origin,
       confirmedStepKeys: { reservations: ['override-4'] },
+      canAskDuration: true,
     });
   });
 

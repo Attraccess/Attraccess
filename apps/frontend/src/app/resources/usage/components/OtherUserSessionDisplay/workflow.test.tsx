@@ -35,6 +35,7 @@ const state = vi.hoisted(() => ({
   introducer: false,
   canControl: false,
   allowTakeover: true,
+  requireEstimate: false,
   start: vi.fn(),
   end: vi.fn(),
   contact: vi.fn(),
@@ -68,7 +69,13 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
   useResourceIntroducersGetNames: () => ({
     data: state.introducer ? [{ userId: 1, username: 'me', role: 'introducer' }] : [],
   }),
-  useGetOneResourceById: () => ({ data: { allowTakeOver: state.allowTakeover } }),
+  useGetOneResourceById: () => ({
+    data: {
+      type: 'machine',
+      allowTakeOver: state.allowTakeover,
+      requireSessionDurationEstimate: state.requireEstimate,
+    },
+  }),
   // The shared start hook passes onSuccess/onError at hook level and plugin handling per call.
   useResourceUsageStartSession: (_mutationKey: unknown, options: unknown) => ({
     mutate: (variables: unknown, callbacks: unknown) => {
@@ -118,6 +125,7 @@ beforeEach(() => {
   state.canControl = false;
   state.allowTakeover = true;
   state.restricted = new Set();
+  state.requireEstimate = false;
   state.forms.mockReset().mockResolvedValue([{ formId: 7, data: { ack: true } }]);
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
@@ -325,4 +333,35 @@ it('shows the translated refusal when stopping fails outside the network, and as
   expect(state.apiError).toHaveBeenCalledWith(expect.objectContaining({ error: refusal, baseTranslationKey: 'api' }));
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['network-status'] });
   expect(state.success).not.toHaveBeenCalled();
+});
+
+it('asks the new holder for a duration estimate on takeover and sends it', async () => {
+  state.requireEstimate = true;
+  mount();
+  fireEvent.click(screen.getByRole('button', { name: 'Takeover Resource' }));
+  await screen.findByText('How long will you use this machine?');
+  expect(state.forms).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: '4h 0m' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+  await waitFor(() =>
+    expect(state.start).toHaveBeenCalledWith({
+      path: { resourceId: 7 },
+      body: {
+        forceTakeOver: true,
+        formSubmissions: [{ formId: 7, data: { ack: true } }],
+        estimatedDurationMinutes: 240,
+      },
+    }),
+  );
+});
+
+it('aborts the takeover when the duration estimate is cancelled', async () => {
+  state.requireEstimate = true;
+  mount();
+  fireEvent.click(screen.getByRole('button', { name: 'Takeover Resource' }));
+  await screen.findByText('How long will you use this machine?');
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByText('How long will you use this machine?')).toBeNull());
+  expect(state.forms).not.toHaveBeenCalled();
+  expect(state.start).not.toHaveBeenCalled();
 });

@@ -45,9 +45,15 @@ function setup() {
 }
 
 const start = (payload: Record<string, unknown> = {}) =>
-  ({ type: AttractapEventType.START_RESOURCE_USAGE_SESSION, payload: { resourceId: 10, requestId: 4, ...payload } }) as any;
+  ({
+    type: AttractapEventType.START_RESOURCE_USAGE_SESSION,
+    payload: { resourceId: 10, requestId: 4, ...payload },
+  }) as any;
 const stop = (payload: Record<string, unknown> = {}) =>
-  ({ type: AttractapEventType.STOP_RESOURCE_USAGE_SESSION, payload: { resourceId: 10, requestId: 5, ...payload } }) as any;
+  ({
+    type: AttractapEventType.STOP_RESOURCE_USAGE_SESSION,
+    payload: { resourceId: 10, requestId: 5, ...payload },
+  }) as any;
 
 describe('AttractapSessionHandler and the pre-start gate', () => {
   it('sends no reply and starts nothing while a step holds the START', async () => {
@@ -91,6 +97,7 @@ describe('AttractapSessionHandler and the pre-start gate', () => {
       auditOrigin: { id: 1, authenticationMethod: null },
       origin: 'reader',
       confirmedStepKeys: { reservations: ['override-4'] },
+      canAskDuration: false,
       language: 'de',
     });
   });

@@ -119,15 +119,22 @@ void Application::closeUiStep()
   Display::stepModal.hide();
 }
 
+void Application::resetPendingAction()
+{
+  this->pendingActionType = PENDING_ACTION_NONE;
+  this->pendingActionResourceId = 0;
+  this->pendingActionProjectId = 0;
+  this->pendingActionIsTakeover = false;
+  this->pendingActionEstimateMinutes = 0;
+  this->pendingActionUsageId = 0;
+}
+
 void Application::clearPendingStartLocally()
 {
   // Like cancelling a form, minus the form-draft cancel: UI_STEP_RESULT already told the server.
   this->hasPendingFormRequest = false;
   this->formFlowSubmitted = false;
-  this->pendingActionType = PENDING_ACTION_NONE;
-  this->pendingActionResourceId = 0;
-  this->pendingActionProjectId = 0;
-  this->pendingActionIsTakeover = false;
+  this->resetPendingAction();
   this->hasPendingServerFormFlow = false;
   if (!this->waitingForResourceRefresh) Display::resourceDetailsScreen.hideActionProgress();
   this->finishReaderAction(false);
@@ -156,7 +163,8 @@ void Application::handleUiStepAction(const std::string &stepId, const std::strin
   this->showReaderActionProgress(this->pendingActionIsTakeover ? FirmwareI18n::Message::TakingOverSession
                                                                : FirmwareI18n::Message::StartingSession);
   this->api.startResourceUsageSession(this->pendingActionResourceId, this->pendingActionProjectId,
-                                      this->pendingActionIsTakeover, id.c_str(), isChoice ? action.c_str() : nullptr);
+                                      this->pendingActionIsTakeover, id.c_str(), isChoice ? action.c_str() : nullptr,
+                                      this->pendingActionEstimateMinutes);
 }
 
 void Application::handleUiStepCancel(const std::string &stepId)

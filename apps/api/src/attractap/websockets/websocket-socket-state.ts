@@ -58,6 +58,8 @@ export enum AttractapEventType {
   READER_SESSION_ENDED = 'READER_SESSION_ENDED',
   START_RESOURCE_USAGE_SESSION = 'START_RESOURCE_USAGE_SESSION',
   STOP_RESOURCE_USAGE_SESSION = 'STOP_RESOURCE_USAGE_SESSION',
+  /** Reader → server (capabilities.sessionDuration): move the automatic end of the card holder's session later. */
+  EXTEND_RESOURCE_USAGE_SESSION = 'EXTEND_RESOURCE_USAGE_SESSION',
   LOCK_DOOR = 'LOCK_DOOR',
   UNLOCK_DOOR = 'UNLOCK_DOOR',
   UNLATCH_DOOR = 'UNLATCH_DOOR',
@@ -292,6 +294,11 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
     signingIn?: { readerId: number; attempt: symbol };
     /** The reader runs firmware that relays card APDUs (capabilities.cardRelay, 2.0.0+). Older readers get no card functions. */
     cardRelay?: boolean;
+    /**
+     * The reader has a duration input and extend controls (capabilities.sessionDuration). Other readers are never
+     * refused for the missing estimate: the machine's maximum or default estimate sets their deadline.
+     */
+    sessionDuration?: boolean;
     /** False for the BLE Bridge (capabilities.nfc): it gets no resource list. Undefined until READER_FIRMWARE_INFO. */
     nfc?: boolean;
     /**

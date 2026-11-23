@@ -256,6 +256,20 @@ describe('ResourceUsageSession routing', () => {
       expect(invalidateQueries).not.toHaveBeenCalled();
     });
 
+    it('refetches only the session and "My sessions" when a session was extended', () => {
+      parallel.value = response([other]);
+      renderSession(SupervisionMode.INTRODUCTION_REQUIRED);
+
+      liveUpdate.onUpdate?.({ eventType: 'resource.usage.session_extended', inUse: true, activeSessionCount: 1 });
+      // Who may start or control the machine stays the same, so those queries are not asked again.
+      expect(invalidateQueries).toHaveBeenCalledTimes(2);
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['activeSession', { resourceId: 7 }] });
+      expect(invalidateQueries).toHaveBeenCalledWith({
+        queryKey: ['allResources', { query: { onlyInUseByMe: true, limit: 50, page: 1 } }],
+        exact: true,
+      });
+    });
+
     it('keeps the single-user display at limit 1', () => {
       parallel.value = response([other], 1);
 

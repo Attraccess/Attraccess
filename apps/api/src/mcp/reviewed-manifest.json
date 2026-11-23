@@ -437,22 +437,22 @@
   "EmailTemplateController_findAll": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "8863241b"
+    "shape": "aea40ea2"
   },
   "EmailTemplateController_findOne": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "ff81d717"
+    "shape": "d630c7ae"
   },
   "EmailTemplateController_update": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "2e856fe3"
+    "shape": "20fbe8fc"
   },
   "EmailTemplateController_resetToDefault": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "531346f7"
+    "shape": "50e30a38"
   },
   "EmailTemplateController_getTranslations": {
     "decision": "allow",
@@ -627,12 +627,12 @@
   "notificationsGetPreferences": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "16ee227e"
+    "shape": "78f2f0d5"
   },
   "notificationsUpdatePreferences": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "e5230384"
+    "shape": "a164239d"
   },
   "notificationsUpdateWebPresence": {
     "decision": "allow",
@@ -702,27 +702,27 @@
   "createOneResource": {
     "decision": "deny",
     "reason": "Non-JSON request: multipart/form-data with an image upload.",
-    "shape": "bc119374"
+    "shape": "48909dc8"
   },
   "getAllResources": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "b0ae2943"
+    "shape": "4f191e8d"
   },
   "getAllResourcesInUse": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "7568e349"
+    "shape": "61554813"
   },
   "getOneResourceById": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "5d4ea2cc"
+    "shape": "5292f6cc"
   },
   "updateOneResource": {
     "decision": "deny",
     "reason": "Non-JSON request: multipart/form-data with an image upload.",
-    "shape": "43b7f001"
+    "shape": "331ccc3f"
   },
   "deleteOneResource": {
     "decision": "allow",
@@ -767,27 +767,27 @@
   "lockDoor": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "9980449b"
+    "shape": "a450d9e5"
   },
   "unlockDoor": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "75523655"
+    "shape": "5d5ee5bb"
   },
   "unlatchDoor": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "4ecc8388"
+    "shape": "31c7a62c"
   },
   "openDoor": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "629e20f2"
+    "shape": "6af3916a"
   },
   "resourceUsageGetHistory": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "1a9d03d4"
+    "shape": "80629070"
   },
   "resourceUsageCanControl": {
     "decision": "allow",
@@ -802,27 +802,32 @@
   "resourceUsageStartSession": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "8e52c2fb"
+    "shape": "1c03c98c"
   },
   "resourceUsageEndSession": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "197f164e"
+    "shape": "0cb0cbde"
+  },
+  "resourceUsageExtendSession": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "e77a7774"
   },
   "resourceUsageUpdateSessionProject": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "8f05839d"
+    "shape": "89b7df13"
   },
   "resourceUsageGetActiveSession": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "943c9582"
+    "shape": "5538969a"
   },
   "resourceUsageGetSession": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "045dba4b"
+    "shape": "a0a231b5"
   },
   "resourceIntroducersIsIntroducer": {
     "decision": "allow",
@@ -1032,12 +1037,12 @@
   "getResourceBillingConfiguration": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "0b8baad3"
+    "shape": "f1f4b8b5"
   },
   "updateResourceBillingConfiguration": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "4977ebe8"
+    "shape": "f9ee9da8"
   },
   "setBillingConfiguration": {
     "decision": "allow",
@@ -1057,7 +1062,7 @@
   "getBillingTransactions": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "327022ff"
+    "shape": "f540cadf"
   },
   "createManualTransaction": {
     "decision": "allow",
@@ -1072,12 +1077,12 @@
   "getBillingTransaction": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "96180dbe"
+    "shape": "49e0ca2e"
   },
   "refundTransaction": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "79e63d88"
+    "shape": "bee5c42c"
   },
   "setSumUpApiKey": {
     "decision": "deny",
@@ -1107,7 +1112,7 @@
   "topUpWithSumUpReader": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "fe1c5082"
+    "shape": "b9455308"
   },
   "sumUpTopUpCallback": {
     "decision": "deny",
@@ -1367,7 +1372,7 @@
   "getProjectUsageHistory": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "79d461ba"
+    "shape": "8cb82722"
   },
   "getProjectUsageStats": {
     "decision": "allow",
@@ -1487,7 +1492,7 @@
   "resourceUsageRequestSupervisedSession": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "098f30d3"
+    "shape": "6f264c26"
   },
   "supervisionListPendingRequests": {
     "decision": "allow",
@@ -1502,7 +1507,7 @@
   "supervisionApproveRequest": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "1594c8b9"
+    "shape": "b04a06b7"
   },
   "supervisionRejectRequest": {
     "decision": "allow",
@@ -1742,12 +1747,12 @@
   "updateReader": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "e2ae70ba"
+    "shape": "a926d368"
   },
   "getReaderById": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "8e4b3cdd"
+    "shape": "13ab0ccf"
   },
   "deleteReader": {
     "decision": "allow",
@@ -1757,12 +1762,12 @@
   "getReaders": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "f32773da"
+    "shape": "25bbe6ea"
   },
   "getReadersToPair": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "fa2ca76d"
+    "shape": "04914dbf"
   },
   "getReaderCrashReports": {
     "decision": "allow",
@@ -1822,12 +1827,12 @@
   "getResourceAttractaps": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "1f96332b"
+    "shape": "1f6839b5"
   },
   "getResourceGroupAttractaps": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "efc0303a"
+    "shape": "5dd9dcca"
   },
   "getPairings": {
     "decision": "allow",
@@ -1932,7 +1937,7 @@
   "getResourceUsageHoursInDateRange": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "3d545110"
+    "shape": "97a6c4ee"
   },
   "getResourceHoursSummaryInDateRange": {
     "decision": "allow",
@@ -1947,7 +1952,7 @@
   "getBillingTransactionsInDateRange": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "7d57a7db"
+    "shape": "801758a5"
   },
   "getCsvExportTemplates": {
     "decision": "allow",

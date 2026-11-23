@@ -44,6 +44,10 @@
       "label": "Resource takeover",
       "description": "When your active resource session is taken over."
     },
+    "resource_session_ending_soon": {
+      "label": "Resource session ending soon",
+      "description": "15 and 5 minutes before the server stops your session automatically (maximum session time or your estimate)."
+    },
     "resource_session_ended": {
       "label": "Resource session force-ended",
       "description": "When someone else or the system ends your active resource session (not when you end it yourself)."

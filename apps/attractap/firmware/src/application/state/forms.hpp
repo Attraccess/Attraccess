@@ -35,6 +35,18 @@ bool pendingActionIsTakeover = false;
 #endif
 
 #if defined(HAS_LVGL_DISPLAY)
+// The duration the user chose for the start in progress (ATT-43), carried through form and plugin-step retries;
+// 0 when the machine asks for none.
+uint32_t pendingActionEstimateMinutes = 0;
+// Set when the duration input answered, so the start it interrupted runs without asking again.
+bool durationEstimateChosen = false;
+// The start button press the duration input interrupted.
+bool durationStartPending = false;
+// The session the extension screen extends: 0 for the card holder's own, else the other person's usageId.
+uint32_t extendUsageId = 0;
+#endif
+
+#if defined(HAS_LVGL_DISPLAY)
 bool hasPendingFormRequest = false;
 #endif
 

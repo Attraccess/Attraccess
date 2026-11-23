@@ -7,8 +7,11 @@ import { NotificationCategory } from '../../../notifications/notification-types'
 import { createTranslator } from '../../../i18n/translate';
 import * as en from './session.en.json';
 import * as de from './session.de.json';
+import * as durationEn from '../session-duration/session-duration.en.json';
+import * as durationDe from '../session-duration/session-duration.de.json';
 
 const t = createTranslator({ en, de });
+const tDuration = createTranslator({ en: durationEn, de: durationDe });
 
 @Injectable()
 export class ResourceSessionNotificationListener {
@@ -50,13 +53,20 @@ export class ResourceSessionNotificationListener {
     }
 
     const endedByName = optionalUserDisplayName(event.endedBy);
+    const autoReason = event.autoEndReason;
+    const reasonKey = autoReason === 'maximum' ? 'Maximum' : 'Estimate';
 
     await this.notifications.dispatch({
       category: NotificationCategory.RESOURCE_SESSION_ENDED,
       recipients: [recipient],
       actorId: event.endedBy?.id,
-      title: (r) => t(r.locale, 'sessionEndedTitle', { resourceName: resource.name }),
+      title: (r) =>
+        autoReason
+          ? tDuration(r.locale, 'autoEndedTitle', { resourceName: resource.name })
+          : t(r.locale, 'sessionEndedTitle', { resourceName: resource.name }),
       body: (r) => {
+        // The server stopped it at its deadline: say why instead of "The system ended your session".
+        if (autoReason) return tDuration(r.locale, `autoEndedBody${reasonKey}`, { resourceName: resource.name });
         const endedBy = endedByName ?? t(r.locale, 'fallbackSystem');
         return t(r.locale, 'sessionEndedBody', { endedBy });
       },
@@ -69,7 +79,9 @@ export class ResourceSessionNotificationListener {
           session: {
             id: event.usage.id,
             endedAt: event.usage.endTime,
-            endedBy: endedByName ?? t(language, 'fallbackSystem'),
+            endedBy: autoReason
+              ? tDuration(language, `autoEndedActor${reasonKey}`)
+              : (endedByName ?? t(language, 'fallbackSystem')),
           },
         }),
     });

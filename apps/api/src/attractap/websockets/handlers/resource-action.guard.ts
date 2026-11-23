@@ -12,6 +12,7 @@ import {
 const READER_ACTION_OF_EVENT: Partial<Record<AttractapEventType, ReaderAction>> = {
   [AttractapEventType.START_RESOURCE_USAGE_SESSION]: 'start',
   [AttractapEventType.STOP_RESOURCE_USAGE_SESSION]: 'stop',
+  [AttractapEventType.EXTEND_RESOURCE_USAGE_SESSION]: 'stop',
   [AttractapEventType.LOCK_DOOR]: 'lock',
   [AttractapEventType.UNLOCK_DOOR]: 'unlock',
   [AttractapEventType.UNLATCH_DOOR]: 'unlatch',

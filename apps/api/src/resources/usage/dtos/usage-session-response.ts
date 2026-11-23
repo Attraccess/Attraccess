@@ -14,7 +14,10 @@ export type UsageSessionFormSubmissionResponse = Omit<UsageSessionFormSubmission
  * A usage session as responses carry it (the `ResourceUsage` schema): every user in it is reduced to the public
  * profile, so the mail address the session keeps for flows and notifications never leaves the server.
  */
-export type UsageSessionResponse = Omit<UsageSession, 'user' | 'supervisorUser' | 'formSubmissions'> & {
+export type UsageSessionResponse = Omit<
+  UsageSession,
+  'user' | 'supervisorUser' | 'formSubmissions' | 'autoEndWarnedOffsetMinutes'
+> & {
   user?: UserProfile | null;
   supervisorUser?: UserProfile | null;
   formSubmissions?: UsageSessionFormSubmissionResponse[];
@@ -59,6 +62,8 @@ function toFormSubmissionResponse(submission: UsageSessionFormSubmission): Usage
 /** The response of a session. Copies only the keys the session has, so a redacted view stays redacted. */
 export function toUsageSessionResponse(session: UsageSession): UsageSessionResponse {
   const { user, supervisorUser, formSubmissions, project, ...rest } = session;
+  // The warning bookkeeping is internal.
+  delete rest.autoEndWarnedOffsetMinutes;
   const supervisor = publicRelation(supervisorUser).user;
   return {
     ...rest,

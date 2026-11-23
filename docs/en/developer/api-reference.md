@@ -83,6 +83,44 @@ Unbilled reply (including zero charges):
 {"event":"EVENT","data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"success":true,"requestId":43,"endedOwnSession":true,"durationSeconds":1440}}}
 ```
 
+## Session duration and extension
+
+Machines can have a **max session time** and can **require a duration estimate** (resource fields `maxSessionDurationMinutes`, `requireSessionDurationEstimate` and `defaultSessionDurationEstimateMinutes`; machines only, doors ignore them). A session stores its deadline when it starts: `autoEndAt` (when the server ends it), `maxAutoEndAt` (the latest the end can be extended to; `null` without a max session time, then the 30 day limit applies) and `estimatedDurationMinutes`. Changing the resource settings later does not change running sessions.
+
+**Starting.** `POST /api/resources/{resourceId}/usage/start` accepts the optional `estimatedDurationMinutes` (1–43200). It is ignored on resources that do not require an estimate. Errors are `400` with a machine-readable `code`:
+
+| Code | Meaning |
+|------|---------|
+| `SESSION_DURATION_ESTIMATE_REQUIRED` | The resource requires an estimate and the request has none. The body names `maxSessionDurationMinutes` (or `null`). |
+| `SESSION_DURATION_ESTIMATE_EXCEEDS_MAXIMUM` | The estimate is above the max session time. |
+
+> [!WARNING]
+> API-token and MCP clients that start sessions fail with `SESSION_DURATION_ESTIMATE_REQUIRED` on every resource where an admin turns on **Require duration estimate**. Send `estimatedDurationMinutes` there. This also applies to a supervised start request (`POST /api/resources/{resourceId}/usage/supervision/request`): the server checks the estimate when the request is made, not when the supervisor approves it.
+
+**Extending.** `POST /api/resources/{resourceId}/usage/extend` moves `autoEndAt` later. The body takes `usageId`, `extendByMinutes` or `toMax`:
+
+```json
+{ "usageId": 123, "extendByMinutes": 60 }
+```
+
+`usageId` is optional; `extendByMinutes` is one of 60, 120, 240, 360, 720 or 1440; `toMax` (boolean) replaces it. Without `usageId` your own session is extended. The session owner and everybody allowed to end the session may extend it. `toMax: true` sets exactly the start plus the max session time. The response is the session with its new `autoEndAt`; the change is audited (`usage_session.extended`) and pushed to the web app and to readers. Errors are `400` with a `code` (or `403` if you may not end the session); nothing is clipped:
+
+| Code | Meaning |
+|------|---------|
+| `SESSION_EXTENSION_EXCEEDS_MAXIMUM` | The new end would be later than `maxAutoEndAt` (or the 30 day limit). The body has `maxAutoEndAt`. |
+| `SESSION_EXTENSION_NOT_POSSIBLE` | The session has no automatic end, it has passed, the session is being ended, or `toMax` on a machine without max session time. |
+| `SESSION_EXTENSION_INVALID` | Neither a permitted `extendByMinutes` nor `toMax` was sent. |
+
+**Automatic end.** A job ends sessions that reached `autoEndAt` as the system, normally within a minute: end forms are skipped, stop flows run, billing is unchanged, and the end note is "Automatically ended: maximum session time reached" or "Automatically ended: estimated duration elapsed". The audit entry carries the end reason (`auto_maximum` or `auto_estimate`).
+
+## Attractap WebSocket: session duration
+
+A reader announces `capabilities.sessionDuration: true` in `READER_FIRMWARE_INFO` when it has a duration input and extend controls. The resource list then carries, per machine, `requireSessionDurationEstimate` and `maxSessionDurationMinutes`. Every listed session may carry `autoEndAt` (ISO), `autoEndUtcOffsetMinutes`, `autoEndInSeconds`, `hasMaxSessionTime` and `extendLimitInSeconds` (seconds until the latest possible end), counted from the moment the list was built.
+
+`START_RESOURCE_USAGE_SESSION` accepts the optional `estimatedDurationMinutes`; the server validates it like a web start. A start from a reader without the capability is never refused for a missing estimate: the deadline is the max session time, or the default estimate (60 minutes if unset) without a max.
+
+`EXTEND_RESOURCE_USAGE_SESSION` with `payload: { resourceId, usageId?, extendByMinutes?, toMax?, requestId? }` extends the card holder's session under the same identity rules as a stop. The reply is `{ success: true, usageId }` or `{ error }` with the codes above. The reader receives a fresh resource list, also when the session was extended elsewhere.
+
 ## Regenerating Clients
 
 After making changes to API endpoints, regenerate the client libraries to keep them in sync with the backend. Refer to the project's build scripts for the exact regeneration commands.

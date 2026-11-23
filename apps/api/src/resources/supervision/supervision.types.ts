@@ -22,6 +22,11 @@ export interface PendingSupervisionRequest {
   /** Supervisors the request was broadcast to (reader flow); used to fan out resolution/expiry events. */
   eligibleSupervisorIds: number[];
   dto: StartUsageSessionDto;
+  /**
+   * Whether the requester could be asked for the duration estimate (web, API, readers with
+   * capabilities.sessionDuration). Otherwise a missing estimate falls back to the machine's maximum or default.
+   */
+  canAskDuration: boolean;
   createdAt: Date;
   expiresAt: Date;
   timeout: ReturnType<typeof setTimeout>;

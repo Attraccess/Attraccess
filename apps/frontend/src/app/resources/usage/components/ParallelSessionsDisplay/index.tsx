@@ -19,6 +19,7 @@ import { useInvalidateSessionHistory } from '../OtherUserSessionDisplay';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { useRefreshNetworkRestrictionOnError } from '../../../../../hooks/useRefreshNetworkRestrictionOnError';
+import { SessionAutoEnd } from '../SessionAutoEnd';
 import { useCanEndOtherSessions } from '../../hooks/useCanEndOtherSessions';
 import en from './translations/en.json';
 import de from './translations/de.json';
@@ -128,6 +129,7 @@ export function ParallelSessionsDisplay({
                       <p className="text-xs text-muted">
                         {t('sessionStarted')} <DateTimeDisplay date={usage.startTime} />
                       </p>
+                      {usage.autoEndAt && <SessionAutoEnd resourceId={resourceId} usage={usage} canExtend={canEnd} />}
                       {usage.supervisorUser && (
                         <div className="flex items-center gap-1 text-xs text-muted">
                           {t('supervisedBy')} <AttraccessUser user={usage.supervisorUser} />

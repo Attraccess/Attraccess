@@ -285,7 +285,8 @@ bool Application::processCardFlowState()
         this->pendingActionProjectId = this->selectedProjectId;
         this->pendingActionIsTakeover = false;
         this->hasPendingFormRequest = false;
-        this->api.startResourceUsageSession(this->selectedResourceId, this->selectedProjectId);
+        this->api.startResourceUsageSession(this->selectedResourceId, this->selectedProjectId, false, nullptr, nullptr,
+                                            this->pendingActionEstimateMinutes);
       } else if (hadLogin) {
         this->finishReaderAction(outcome == SupervisionFlow::Outcome::Unlock);
       }

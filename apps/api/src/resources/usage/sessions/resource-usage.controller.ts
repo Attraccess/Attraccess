@@ -24,6 +24,7 @@ import { PreStartService } from '../pre-start/pre-start.service';
 import { SessionEndNotifier } from '../pre-start/session-end-notifier.service';
 import { ResourceActivityVisibilityService } from '../authorization/resource-activity-visibility.service';
 import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
+import { ExtendUsageSessionDto } from '../dtos/extendUsageSession.dto';
 
 import { GetActiveUsageSessionDto } from '../dtos/getActiveUsageSession.dto';
 import { toUsageSessionResponse, type UsageSessionResponse } from '../dtos/usage-session-response';
@@ -295,6 +296,7 @@ export class ResourceUsageController {
       auditOrigin: auditActorOf(req.user),
       origin,
       confirmedStepKeys,
+      canAskDuration: true,
     });
     return toUsageSessionResponse(started);
   }
@@ -338,6 +340,31 @@ export class ResourceUsageController {
       );
     }
     return ended && toUsageSessionResponse(ended);
+  }
+
+  @Post('extend')
+  @Auth()
+  @ApiOperation({
+    summary: 'Extend the automatic end of a running session',
+    description:
+      'Moves the automatic end of your own session (or of one you may end) later by 60, 120, 240, 360, 720 or 1440 minutes, or to the maximum with `toMax`. Refused with a machine-readable `code` when the session has no automatic end (SESSION_EXTENSION_NOT_POSSIBLE), would exceed the maximum session time (SESSION_EXTENSION_EXCEEDS_MAXIMUM) or the request names no permitted step (SESSION_EXTENSION_INVALID). Nothing is clipped.',
+    operationId: 'resourceUsageExtendSession',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'The session with its new automatic end (`autoEndAt`).',
+    type: ResourceUsageResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Bad Request - the extension is not possible; see `code`' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
+  @ApiResponse({ status: 403, description: 'Forbidden - You may not end this session' })
+  async extendSession(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Body() dto: ExtendUsageSessionDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<UsageSessionResponse> {
+    const extended = await this.resourceUsageService.extendSession(resourceId, req.user, dto, auditActorOf(req.user));
+    return toUsageSessionResponse(extended);
   }
 
   @Put('sessions/:usageId/project')

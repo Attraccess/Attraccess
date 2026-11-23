@@ -93,6 +93,8 @@ export function buildEventHandlers(d: EventHandlerDeps): Record<AttractapEventTy
       d.sessionHandler.handleStartResourceUsageSession(socket, eventData),
     [AttractapEventType.STOP_RESOURCE_USAGE_SESSION]: (socket, eventData) =>
       d.sessionHandler.handleStopResourceUsageSession(socket, eventData),
+    [AttractapEventType.EXTEND_RESOURCE_USAGE_SESSION]: (socket, eventData) =>
+      d.sessionHandler.handleExtendResourceUsageSession(socket, eventData),
     [AttractapEventType.RESOURCE_USAGE_STATS]: (socket, eventData) =>
       d.sessionHandler.handleResourceUsageStats(socket, eventData),
     [AttractapEventType.LOCK_DOOR]: (socket, eventData) => d.sessionHandler.handleLockDoor(socket, eventData),

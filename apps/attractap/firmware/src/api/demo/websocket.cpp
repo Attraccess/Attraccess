@@ -130,15 +130,19 @@ void DemoWebsocket::processOutbound(const char *data, size_t len)
     }
 
     if (strcmp(type, "START_RESOURCE_USAGE_SESSION") == 0 || strcmp(type, "STOP_RESOURCE_USAGE_SESSION") == 0 ||
-        strcmp(type, "LOCK_DOOR") == 0 || strcmp(type, "UNLOCK_DOOR") == 0 ||
+        strcmp(type, "EXTEND_RESOURCE_USAGE_SESSION") == 0 || strcmp(type, "LOCK_DOOR") == 0 || strcmp(type, "UNLOCK_DOOR") == 0 ||
         strcmp(type, "UNLATCH_DOOR") == 0 || strcmp(type, "TRIGGER_FLOW_BUTTON") == 0)
         _actionRequestId = doc["data"]["payload"]["requestId"] | 0u;
 
     if (strcmp(type, "START_RESOURCE_USAGE_SESSION") == 0)
     {
-        handleStartSession(doc["data"]["payload"]["resourceId"] | 0u,
-                           doc["data"]["payload"]["projectId"] | 0u,
-                           doc["data"]["payload"]["forceTakeOver"] | false);
+        handleStartSession(doc["data"]["payload"]);
+        return;
+    }
+
+    if (strcmp(type, "EXTEND_RESOURCE_USAGE_SESSION") == 0)
+    {
+        handleExtendSession(doc["data"]["payload"]);
         return;
     }
 
@@ -264,6 +268,7 @@ void DemoWebsocket::respondResourceList(uint32_t requestId, const char *language
         // Takeover stays disabled: another user's session blocks non-managers,
         // while admins (canManageResource) can still force-stop it.
         obj["allowTakeOver"] = false;
+        addDurationSettings(obj, r.id);
         JsonArray intro = obj["introducers"].to<JsonArray>();
         for (const std::string &name : introducers)
             intro.add(name);
@@ -517,81 +522,6 @@ void DemoWebsocket::respondFormPageResult(JsonObjectConst data)
     doc["data"]["payload"]["valid"] = (errors.size() == 0);
 
     char buf[512];
-    size_t n = serializeJson(doc, buf, sizeof(buf));
-    if (n > 0)
-        enqueue(std::string(buf, n));
-}
-
-#endif
-
-#ifdef DEMO_MODE
-
-#include "websocket.hpp"
-#include "../../state/state.hpp"
-#include <ArduinoJson.h>
-#include <cstring>
-#include <cstdio>
-#include <ctime>
-#include <string>
-#include <vector>
-
-#include "fixtures.hpp"
-
-// ---------------------------------------------------------------------------
-// Stateful demo handlers
-// ---------------------------------------------------------------------------
-
-int DemoWebsocket::sessionIndexForResource(uint32_t resourceId)
-{
-    for (uint8_t i = 0; i < DemoStore::getResourceCount(); i++)
-    {
-        if (DemoStore::getResource(i).id == resourceId)
-            return i;
-    }
-    return -1;
-}
-
-static bool demoProjectMatches(const char *name, const std::string &search)
-{
-    std::string haystack(name);
-    std::string needle(search);
-    for (auto *text : {&haystack, &needle})
-        for (char &c : *text)
-            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return haystack.find(needle) != std::string::npos;
-}
-
-void DemoWebsocket::respondProjects(uint32_t page, const std::string &search)
-{
-    if (page == 0)
-        page = 1;
-
-    const bool english = State::getActiveLanguage() == "en";
-    std::vector<uint32_t> matches;
-    for (uint32_t i = 0; i < DEMO_PROJECT_COUNT; i++)
-    {
-        if (demoProjectMatches(DemoLocalization::projectName(i, english), search))
-            matches.push_back(i);
-    }
-
-    StaticJsonDocument<1024> doc;
-    doc["event"] = "EVENT";
-    doc["data"]["type"] = "PROJECTS_OF_USER";
-    doc["data"]["payload"]["page"] = page;
-    doc["data"]["payload"]["limit"] = DEMO_PROJECT_PAGE_SIZE;
-    doc["data"]["payload"]["total"] = matches.size();
-    doc["data"]["payload"]["search"] = search;
-
-    JsonArray projects = doc["data"]["payload"]["projects"].to<JsonArray>();
-    uint32_t start = (page - 1) * DEMO_PROJECT_PAGE_SIZE;
-    for (uint32_t i = start; i < start + DEMO_PROJECT_PAGE_SIZE && i < matches.size(); i++)
-    {
-        JsonObject obj = projects.createNestedObject();
-        obj["id"] = matches[i] + 1;
-        obj["name"] = DemoLocalization::projectName(matches[i], english);
-    }
-
-    char buf[1024];
     size_t n = serializeJson(doc, buf, sizeof(buf));
     if (n > 0)
         enqueue(std::string(buf, n));

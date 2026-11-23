@@ -29,9 +29,11 @@ import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-er
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
+import { SessionAutoEnd } from '../SessionAutoEnd';
 import { useCanEndOtherSessions } from '../../hooks/useCanEndOtherSessions';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStartSessionWithConfirmation } from '../../hooks/useStartSessionWithConfirmation';
+import { useSessionDurationEstimate } from '../../hooks/useSessionDurationEstimate';
 
 export function useInvalidateSessionHistory(resourceId: number) {
   const queryClient = useQueryClient();
@@ -120,6 +122,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
   });
 
   const { start: startTakeover } = startSession;
+  const { ask: askDuration, dialog: durationDialog } = useSessionDurationEstimate(resourceId);
 
   const stopSession = useResourceUsageEndSession(undefined, {
     onSuccess: () => {
@@ -157,6 +160,9 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
 
   const runTakeover = useCallback(
     async (body: { notes?: string }) => {
+      // The new holder states how long they will use the machine, as for a start.
+      const estimate = await askDuration();
+      if (estimate === null) return;
       let formSubmissions: FormSubmissionRequestDto[];
       try {
         formSubmissions = await requestForms('takeover');
@@ -167,9 +173,14 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
         throw error;
       }
 
-      startTakeover({ ...body, forceTakeOver: true, formSubmissions });
+      startTakeover({
+        ...body,
+        forceTakeOver: true,
+        formSubmissions,
+        ...(estimate === undefined ? {} : { estimatedDurationMinutes: estimate }),
+      });
     },
-    [requestForms, startTakeover],
+    [askDuration, requestForms, startTakeover],
   );
 
   const runStopOtherSession = useCallback(
@@ -244,6 +255,15 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
         <p className="text-xs text-gray-400 dark:text-gray-500">
           ({t('sessionStarted')} <DateTimeDisplay date={activeSession.startTime} />)
         </p>
+
+        {activeSession.autoEndAt && (
+          <SessionAutoEnd
+            resourceId={resourceId}
+            usage={activeSession}
+            canExtend={canEndSession(activeSession)}
+            centered
+          />
+        )}
 
         {activeSession.supervisorUser && (
           <div className="space-y-1 flex flex-col items-center">
@@ -356,6 +376,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
       />
       {formsModal}
       {startSession.dialog}
+      {durationDialog}
     </>
   );
 }
