@@ -1,4 +1,4 @@
-import { LabeledSwitch } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, LabeledSwitch } from '@attraccess/plugins-frontend-ui';
 import type { InstalledPluginVersionDto } from '@attraccess/react-query-client';
 import { Alert, AlertContent, AlertDescription, Checkbox, Label } from '@heroui/react';
 import { usePluginsTranslations } from '../usePluginsTranslations';
@@ -28,6 +28,7 @@ export function VersionMetadata({
     <>
       {notices.map((notice) => (
         <Alert key={notice} status="warning">
+          <AlertStatusIcon status="warning" />
           <AlertContent>
             <AlertDescription className="break-words">{notice}</AlertDescription>
           </AlertContent>
