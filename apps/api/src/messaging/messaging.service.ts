@@ -78,12 +78,17 @@ export class MessagingService {
     senderId: number,
     content: string,
     reference?: MessageReference,
+    { labelReference = true }: { labelReference?: boolean } = {},
   ): Promise<MessageRecord> {
     await this.messageRateLimitService.assertWithinLimit('send_message', senderId);
 
     await this.assertParticipant(conversationId, senderId);
 
-    const decoration = await this.resolveReferenceDecoration(reference);
+    // Without a label the reference is stored like one to a machine that does not exist (ATT-843: a machine hidden
+    // from the sender must not reveal its name).
+    const decoration = labelReference
+      ? await this.resolveReferenceDecoration(reference)
+      : { referenceLabel: null, referenceUrl: null };
 
     const message = await this.store.appendMessage({
       conversationId,

@@ -42,6 +42,7 @@ import { ResourceLiveTopicsProvider } from './resource-live-topics.provider';
 import { LiveTopicsService } from '../live-updates/live-topics.service';
 import { FlowLogRecorderService } from './flows/logs/flow-log-recorder.service';
 import { SettingsService } from '../settings/settings.service';
+import { ResourceListVisibilityService } from './visibility/resource-list-visibility.service';
 
 const MACHINE = 1;
 const SUPERVISED_MACHINE = 2;
@@ -190,6 +191,7 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
       ],
       providers: [
         ResourceActivityVisibilityService,
+        ResourceListVisibilityService,
         ResourceLiveTopicsProvider,
         { provide: ResourcesService, useValue: resourcesService },
         { provide: ResourceImageService, useValue: { getPublicPath: jest.fn() } },
@@ -208,9 +210,18 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
         },
         { provide: ResourceEventsService, useValue: eventsService },
         { provide: SseInstrumentation, useValue: { wrap: (_name: string, source: unknown) => source } },
-        { provide: SettingsService, useValue: { getResourceActivityVisibility: jest.fn(async () => mode) } },
+        {
+          provide: SettingsService,
+          useValue: {
+            getResourceActivityVisibility: jest.fn(async () => mode),
+            getResourceListVisibility: jest.fn(async () => 'authenticated'),
+          },
+        },
         { provide: USAGE_SESSION_STORE, useValue: supervisionModesFrom(supervisionFind) },
-        { provide: RESOURCE_STORE, useValue: { existingIds: jest.fn(async (ids: number[]) => ids) } },
+        {
+          provide: RESOURCE_STORE,
+          useValue: { existingIds: jest.fn(async (ids: number[]) => ids), permittedIds: jest.fn(async (_user: number, ids: number[]) => ids) },
+        },
         { provide: LiveTopicsService, useValue: { register: jest.fn() } },
         { provide: FlowLogRecorderService, useValue: {} },
         { provide: PreStartService, useValue: { gateHttp: jest.fn() } },

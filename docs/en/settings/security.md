@@ -335,3 +335,4 @@ docker compose logs attraccess | grep -E 'auth\.failed'
 - [SSL Setup](installation/ssl-setup.md) -- Configure HTTPS
 - [SSO Overview](user-management/sso-overview.md) -- Single Sign-On setup
 - [Settings Overview](settings/overview.md) -- All system settings
+- [Machine List Visibility](settings/overview.md#machine-list-visibility) -- Who can see which machines

@@ -27,6 +27,7 @@ import { Auth, type AuthenticatedRequest } from '@attraccess/plugins-backend-sdk
 import type { FileUpload } from '../../../common/types/file-upload.types';
 import { FormImageDto, FormImageUploadQueryDto } from './form-image.dto';
 import { FORM_IMAGE_BODY, FormImageUploadInterceptor } from './form-image-upload.interceptor';
+import { ResourceListVisible } from '../../visibility/resource-list-visible.interceptor';
 import { FormImagesService } from './form-images.service';
 import { FormImageViewerGuard } from './form-image-viewer.guard';
 import { FormPhotoRateLimit, FormPhotoRateLimitGuard } from './form-photo-rate-limit.guard';
@@ -66,6 +67,8 @@ export class FormImagesController {
   @ApiResponse({ status: 201, type: FormImageDto })
   @ApiResponse({ status: 429, description: 'Too many uploads, or too many photos waiting for a submission' })
   @UseInterceptors(FormImageUploadInterceptor())
+  // Last decorator, so it runs first: a machine the caller may not see answers 404 before the upload is read.
+  @ResourceListVisible()
   async upload(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('formId', ParseIntPipe) formId: number,

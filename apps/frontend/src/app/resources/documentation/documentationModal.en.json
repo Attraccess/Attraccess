@@ -8,10 +8,16 @@
     "openInNewTab": "Open in New Tab",
     "close": "Close",
     "refresh": "Refresh",
-    "retry": "Try Again"
+    "retry": "Try Again",
+    "backToResources": "Back to Resources"
   },
   "loading": "Loading documentation...",
   "error": {
+    "title": "Failed to load documentation",
     "unknown": "An unknown error occurred while loading the documentation."
+  },
+  "notFound": {
+    "title": "Resource not found",
+    "message": "The resource does not exist or you don't have permission to view it."
   }
 }

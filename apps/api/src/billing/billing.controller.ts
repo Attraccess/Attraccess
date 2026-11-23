@@ -77,9 +77,11 @@ import { SumUpReaderDto } from './dto/sumup/sumup-reader.dto';
 import { SumupTransactionCallbackDto } from './dto/sumup/sumup-transaction-callback.dto';
 
 import { SumupTopUpDto } from './dto/sumup/top-up.dto';
+import { ResourceListVisible } from '../resources/visibility/resource-list-visible.interceptor';
 
 @RequiresLicense(LicenseModuleType.BILLING)
 @ApiTags('Billing')
+@ResourceListVisible()
 @Controller()
 export class BillingController {
   constructor(

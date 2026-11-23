@@ -26,6 +26,8 @@ import { ListMessagesResponseDto } from './dtos/listMessagesResponse.dto';
 import { ConversationListItemDto } from './dtos/conversationListItem.dto';
 import { UnreadCountResponseDto } from './dtos/unreadCountResponse.dto';
 import { ResourceActivityVisibilityService } from '../resources/usage/authorization/resource-activity-visibility.service';
+import { ResourceListVisibilityService } from '../resources/visibility/resource-list-visibility.service';
+import { ResourceListVisible } from '../resources/visibility/resource-list-visible.interceptor';
 
 @ApiTags('Messaging')
 @Controller('messaging')
@@ -35,6 +37,7 @@ export class MessagingController {
     private readonly messagingLiveService: MessagingLiveService,
     private readonly sse: SseInstrumentation,
     private readonly activityVisibility: ResourceActivityVisibilityService,
+    private readonly listVisibility: ResourceListVisibilityService,
   ) {}
 
   @Sse('live')
@@ -63,6 +66,8 @@ export class MessagingController {
 
   @Post('resources/:resourceId/contact')
   @Auth()
+  // A machine hidden from the caller answers like one that does not exist (ATT-843), before the activity rule.
+  @ResourceListVisible()
   @ApiOperation({
     summary: 'Resolve the active holder of a resource and open a 1:1 conversation with them',
     operationId: 'messagingContactResourceHolder',
@@ -75,7 +80,7 @@ export class MessagingController {
     type: Number,
     description: 'Whose session to contact when several are active',
   })
-  @ApiResponse({ status: 404, description: 'No active session for this resource' })
+  @ApiResponse({ status: 404, description: 'No active session for this resource, or the resource is not visible' })
   @ApiResponse({ status: 429, description: 'Contact rate limit exceeded' })
   async contactResourceHolder(
     @Param('resourceId', ParseIntPipe) resourceId: number,
@@ -165,13 +170,14 @@ export class MessagingController {
     @Body() dto: SendMessageDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<MessageRecord> {
-    return this.messagingService.sendMessage(
-      id,
-      req.user.id,
-      dto.content,
+    const reference =
       dto.referenceType !== undefined && dto.referenceId !== undefined
         ? { referenceType: dto.referenceType, referenceId: dto.referenceId }
-        : undefined,
-    );
+        : undefined;
+    // A machine hidden from the sender gets no name label, the same as an id that does not exist (ATT-843).
+    const labelReference =
+      reference?.referenceType !== MessageReferenceType.RESOURCE ||
+      (await this.listVisibility.canSee(req.user, reference.referenceId));
+    return this.messagingService.sendMessage(id, req.user.id, dto.content, reference, { labelReference });
   }
 }

@@ -8,6 +8,7 @@ import { BillingController } from './billing.controller';
 import { BillingService } from './charges/billing.service';
 import { LiveNotificationsService } from './live-notifications/live-notifications.service';
 import { SumUpService } from './sumup/sumup.service';
+import { ResourceListVisibilityService } from '../resources/visibility/resource-list-visibility.service';
 
 const baseReq = (userOverrides: { id?: number; effectivePermissions?: Set<string> } = {}) =>
   ({
@@ -77,6 +78,7 @@ export function registerBillingControllerFixture() {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [BillingController],
       providers: [
+        { provide: ResourceListVisibilityService, useValue: { canSee: jest.fn(async () => true) } },
         {
           provide: BillingService,
           useValue: service,

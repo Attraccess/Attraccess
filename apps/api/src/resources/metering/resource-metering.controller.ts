@@ -13,8 +13,10 @@ import {
   ResourceMeteringStatusDto,
 } from './resource-metering.dto';
 import { ResourceActivityVisibilityService } from '../usage/authorization/resource-activity-visibility.service';
+import { ResourceListVisible } from '../visibility/resource-list-visible.interceptor';
 
 @ApiTags('Resource Metering')
+@ResourceListVisible()
 @Controller('resources/:resourceId/metering')
 @Auth('billing.manage')
 export class ResourceMeteringController {

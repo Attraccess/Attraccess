@@ -1,4 +1,4 @@
-import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { ExecutionContext, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import {
   ResourceActivityAccess,
   ResourceActivityVisibilityService,
@@ -9,7 +9,7 @@ describe('ResourceActivityVisibleGuard', () => {
   const user = { id: 3, effectivePermissions: new Set(['resources.read']) };
   const contextFor = (resourceId: string) =>
     ({ switchToHttp: () => ({ getRequest: () => ({ user, params: { resourceId } }) }) }) as unknown as ExecutionContext;
-  const guardWith = (access: ResourceActivityAccess, activeUserId: number | null = null) => {
+  const guardWith = (access: ResourceActivityAccess, activeUserId: number | null = null, listVisible = true) => {
     const resolve = jest.fn(async () => access);
     const visibility = new ResourceActivityVisibilityService(
       {} as never,
@@ -17,13 +17,20 @@ describe('ResourceActivityVisibleGuard', () => {
       { getActiveSession: jest.fn(async () => (activeUserId === null ? null : { userId: activeUserId })) } as never,
     );
     visibility.resolve = resolve;
-    return { guard: new ResourceActivityVisibleGuard(visibility), resolve };
+    const listVisibility = { canSee: jest.fn(async () => listVisible) };
+    return { guard: new ResourceActivityVisibleGuard(visibility, listVisibility as never), resolve };
   };
 
   it.each<ResourceActivityAccess>(['full', 'anonymous'])('lets %s access open the stream', async (access) => {
     const { guard, resolve } = guardWith(access);
     await expect(guard.canActivate(contextFor('7'))).resolves.toBe(true);
     expect(resolve).toHaveBeenCalledWith(user, 7);
+  });
+
+  it('answers 404, not 403, for a machine the viewer may not see at all', async () => {
+    const { guard, resolve } = guardWith('none', null, false);
+    await expect(guard.canActivate(contextFor('7'))).rejects.toBeInstanceOf(NotFoundException);
+    expect(resolve).not.toHaveBeenCalled();
   });
 
   it('refuses before the stream opens when activity is hidden', async () => {
@@ -44,9 +51,9 @@ describe('ResourceActivityVisibleGuard', () => {
     await expect(guard.canActivate(signedOut)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
-  it('leaves a malformed id to the route pipe', async () => {
+  it.each(['abc', '1e1', '0x5', '5.0'])('leaves the malformed id %p to the route pipe', async (id) => {
     const { guard, resolve } = guardWith('none');
-    await expect(guard.canActivate(contextFor('abc'))).resolves.toBe(true);
+    await expect(guard.canActivate(contextFor(id))).resolves.toBe(true);
     expect(resolve).not.toHaveBeenCalled();
   });
 });

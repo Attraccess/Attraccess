@@ -3,9 +3,11 @@ import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { ResourceFormsService } from './forms.service';
 import { FormRequirementsQueryDto, FormResourceOverrideDto, FormResponseDto, ResourceApplicableFormDto } from './dto';
+import { ResourceListVisible } from '../visibility/resource-list-visible.interceptor';
 
 /** The forms that apply to one resource and how the resource deviates from them. */
 @ApiTags('Forms')
+@ResourceListVisible()
 @Controller('resources/:resourceId/forms')
 export class ResourceFormsController {
   constructor(private readonly resourceFormsService: ResourceFormsService) {}

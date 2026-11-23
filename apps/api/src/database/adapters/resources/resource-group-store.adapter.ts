@@ -1,6 +1,6 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, EntityManager } from 'typeorm';
+import { Brackets, DataSource, EntityManager } from 'typeorm';
 import { Resource, ResourceGroup, ResourceIntroducer, ResourceIntroduction } from '@attraccess/database-entities';
 import type {
   ResourceGroupRecord,
@@ -21,6 +21,7 @@ import { managerFor } from './persistence-context';
 import { toGroupRecord } from './introduction-mappers';
 import { toIntroducerRecord } from './resource-introducer-store.adapter';
 import { findRelations } from '../find-options';
+import { VIEWER_PARAMETER, permittedResourceSql } from './permitted-resource-sql';
 
 /**
  * SQL fragment (for use against the `group` query-builder alias) that is true when the user has a currently valid
@@ -52,17 +53,47 @@ export class TypeOrmResourceGroupStore implements ResourceGroupStore {
     const query = this.groups.createQueryBuilder('group');
     if (!visibility || visibility.canUpdateResources) return query;
 
-    return query
-      .where('group.isHidden = :notHidden', { notHidden: false })
-      .orWhere(
-        `EXISTS (SELECT 1 FROM "resource_introducer" "ri" WHERE "ri"."resourceGroupId" = group.id AND "ri"."userId" = :userId)`,
-        { userId: visibility.userId },
-      )
-      .orWhere(ACTIVE_INTRODUCTION_EXISTS_SQL, { userId: visibility.userId });
+    const isPartOfGroup = new Brackets((qb) =>
+      qb
+        .where(
+          `EXISTS (SELECT 1 FROM "resource_introducer" "ri" WHERE "ri"."resourceGroupId" = group.id AND "ri"."userId" = :userId)`,
+        )
+        .orWhere(ACTIVE_INTRODUCTION_EXISTS_SQL),
+    );
+    query.setParameter('userId', visibility.userId);
+
+    // Hidden groups (ATT-515): only for people who are part of them.
+    query.where(
+      new Brackets((qb) => qb.where('group.isHidden = :notHidden', { notHidden: false }).orWhere(isPartOfGroup)),
+    );
+    if (visibility.permittedOnly) {
+      // ATT-843: and only groups with a machine the viewer may see, or that the viewer is part of.
+      query.andWhere(
+        new Brackets((qb) =>
+          qb
+            .where(
+              `EXISTS (
+                SELECT 1 FROM "resource_groups_resource_group" "pg"
+                JOIN "resource" "pr" ON "pr"."id" = "pg"."resourceId" AND "pr"."deletedAt" IS NULL
+                WHERE "pg"."resourceGroupId" = group.id AND ${permittedResourceSql('"pr"."id"')}
+              )`,
+              { [VIEWER_PARAMETER]: visibility.userId },
+            )
+            .orWhere(isPartOfGroup),
+        ),
+      );
+    }
+    return query;
   }
 
   async listVisible(visibility?: GroupVisibilityContext): Promise<ResourceGroupRecord[]> {
     return (await this.visibleGroupsQuery(visibility).getMany()).map(toGroupRecord);
+  }
+
+  async isVisible(groupId: number, visibility: GroupVisibilityContext): Promise<boolean> {
+    return this.visibleGroupsQuery(visibility)
+      .andWhere('group.id = :visibleGroupId', { visibleGroupId: groupId })
+      .getExists();
   }
 
   async hasVisibleResources(visibility: GroupVisibilityContext): Promise<boolean> {
@@ -70,12 +101,18 @@ export class TypeOrmResourceGroupStore implements ResourceGroupStore {
     if (visibility.canUpdateResources) return resources.getExists();
 
     const visibleGroups = this.visibleGroupsQuery(visibility).select('group.id');
-    return resources
+    const query = resources
       .leftJoin('resource.groups', 'resourceGroup')
-      .where('resourceGroup.id IS NULL')
-      .orWhere(`resourceGroup.id IN (${visibleGroups.getQuery()})`)
-      .setParameters(visibleGroups.getParameters())
-      .getExists();
+      .where(
+        new Brackets((qb) =>
+          qb.where('resourceGroup.id IS NULL').orWhere(`resourceGroup.id IN (${visibleGroups.getQuery()})`),
+        ),
+      )
+      .setParameters(visibleGroups.getParameters());
+    if (visibility.permittedOnly) {
+      query.andWhere(permittedResourceSql('resource.id'), { [VIEWER_PARAMETER]: visibility.userId });
+    }
+    return query.getExists();
   }
 
   async findById(groupId: number, withResources = false): Promise<ResourceGroupDetail | null> {

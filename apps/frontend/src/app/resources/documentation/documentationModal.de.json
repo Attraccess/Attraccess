@@ -8,10 +8,16 @@
     "openInNewTab": "In neuem Tab öffnen",
     "close": "Schließen",
     "refresh": "Aktualisieren",
-    "retry": "Erneut versuchen"
+    "retry": "Erneut versuchen",
+    "backToResources": "Zurück zu Ressourcen"
   },
   "loading": "Dokumentation wird geladen...",
   "error": {
+    "title": "Dokumentation konnte nicht geladen werden",
     "unknown": "Ein unbekannter Fehler ist beim Laden der Dokumentation aufgetreten."
+  },
+  "notFound": {
+    "title": "Ressource nicht gefunden",
+    "message": "Die Ressource existiert nicht oder du darfst sie nicht sehen."
   }
 }

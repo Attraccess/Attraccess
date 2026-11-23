@@ -5,14 +5,18 @@ import { ResourceEventsService } from './resource-events.service';
 import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper';
 import { ResourceActivityVisibilityService } from '../usage/authorization/resource-activity-visibility.service';
 import { ResourceActivityVisibleGuard } from './resource-activity-visible.guard';
+import { ResourceListVisibilityService } from '../visibility/resource-list-visibility.service';
+import { ResourceListVisible } from '../visibility/resource-list-visible.interceptor';
 
 @ApiTags('Resources')
+@ResourceListVisible()
 @Controller('resources')
 export class SSEController {
   constructor(
     private readonly events: ResourceEventsService,
     private readonly sse: SseInstrumentation,
     private readonly activityVisibility: ResourceActivityVisibilityService,
+    private readonly listVisibility: ResourceListVisibilityService,
   ) {}
 
   @Sse(':resourceId/events')
@@ -23,6 +27,13 @@ export class SSEController {
   async streamEvents(@Param('resourceId', ParseIntPipe) resourceId: number, @Req() req: AuthenticatedRequest) {
     // The guard has already refused viewers who may not see activity; every event is checked again on the way out.
     const stream = await this.events.subscribeResource(resourceId);
-    return this.sse.wrap('resource_usage', this.activityVisibility.viewLiveStream(stream, req.user, resourceId));
+    return this.sse.wrap(
+      'resource_usage',
+      this.activityVisibility.viewLiveStream(
+        this.listVisibility.followVisible(stream, req.user, resourceId),
+        req.user,
+        resourceId,
+      ),
+    );
   }
 }

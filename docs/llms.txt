@@ -21,14 +21,14 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Backup & Restore](https://docs.attraccess.org/en/installation/backup-restore.md): Explains what Attraccess data to back up (the PostgreSQL database and the storage volume), how to back it up with the balena sidecar, Coolify or pg_dump, and how to restore it.
 
 ## English: First-Time Setup
-- [Setup Wizard](https://docs.attraccess.org/en/setup/first-time-setup.md): Walks through the first-run setup wizard: application settings, email settings, administrator account and email verification.
+- [Setup Wizard](https://docs.attraccess.org/en/setup/first-time-setup.md): Walks through the first-run setup wizard: application settings, email settings, administrator account, email verification and the default registration and machine visibility policy.
 - [Email / SMTP](https://docs.attraccess.org/en/setup/smtp-email.md): Configure the SMTP email server Attraccess uses for verification, password resets and invitations, with provider examples and Mailpit testing.
 - [Email Templates](https://docs.attraccess.org/en/setup/email-templates.md): Manage and customize the email templates Attraccess sends, including available templates, plugin templates and placeholders.
 - [Branding](https://docs.attraccess.org/en/setup/branding.md): Customize the application URL, logo and name, color mode and email layout to match your organization.
 
 ## English: User Management
 - [Overview](https://docs.attraccess.org/en/user-management/overview.md): Overview of user management: creating accounts, assigning permissions and configuring login methods as an administrator.
-- [Creating Users](https://docs.attraccess.org/en/user-management/creating-users.md): The ways users get an account: self-registration, SSO registration, project invitations and creation by an administrator.
+- [Creating Users](https://docs.attraccess.org/en/user-management/creating-users.md): The ways users get an account: self-registration, SSO registration, project invitations and creation by an administrator, and what an account can reach before its email is verified.
 - [Permissions](https://docs.attraccess.org/en/user-management/permissions.md): Explains the role-based permission model, default roles, permission keys, plugin-declared permissions, assigning roles and SSO-managed roles.
 - [SSO Overview](https://docs.attraccess.org/en/user-management/sso-overview.md): Overview of Single Sign-On with OIDC and SAML: prerequisites, providers, auto-discovery, permission mapping and account linking.
 - [OIDC Setup](https://docs.attraccess.org/en/user-management/sso-oidc.md): How to create and configure an OpenID Connect SSO provider, including the callback URL and testing the login.
@@ -138,7 +138,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Metrics Reference](https://docs.attraccess.org/en/monitoring/metrics-reference.md): Reference of all metrics at the /api/metrics endpoint: HTTP, authentication, user, resource and Attractap device metrics.
 
 ## English: System Settings
-- [Overview](https://docs.attraccess.org/en/settings/overview.md): Administrator overview of System Settings: application settings, resource activity visibility, email and additional settings.
+- [Overview](https://docs.attraccess.org/en/settings/overview.md): Administrator overview of System Settings: application settings, machine list visibility, resource activity visibility, email and additional settings.
 - [Security](https://docs.attraccess.org/en/settings/security.md): Security settings for session cookies and authentication, including SameSite, session configuration, card keys and rate limiting, and the network restriction.
 - [Audit log](https://docs.attraccess.org/en/settings/audit-log.md): How to browse, filter, inspect and export the audit log of recorded activity and control recording and retention.
 
@@ -184,14 +184,14 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Backup & Wiederherstellung](https://docs.attraccess.org/de/installation/backup-restore.md): Erklärt, welche Attraccess-Daten gesichert werden (PostgreSQL-Datenbank und Storage-Volume), wie Sie mit dem balena-Sidecar, Coolify oder pg_dump sichern und wie Sie wiederherstellen.
 
 ## Deutsch: Ersteinrichtung
-- [Einrichtungsassistent](https://docs.attraccess.org/de/setup/first-time-setup.md): Führt durch den Einrichtungsassistenten beim ersten Start: Anwendungs- und E-Mail-Einstellungen, Administrator-Konto und E-Mail-Bestätigung.
+- [Einrichtungsassistent](https://docs.attraccess.org/de/setup/first-time-setup.md): Führt durch den Einrichtungsassistenten beim ersten Start: Anwendungs- und E-Mail-Einstellungen, Administrator-Konto, E-Mail-Bestätigung sowie Standardrichtlinie für Registrierung und Sichtbarkeit.
 - [E-Mail / SMTP](https://docs.attraccess.org/de/setup/smtp-email.md): SMTP-Server für Kontobestätigungen, Passwort-Zurücksetzungen und Einladungen konfigurieren, mit Anbieterbeispielen und Test per Mailpit.
 - [E-Mail-Vorlagen](https://docs.attraccess.org/de/setup/email-templates.md): E-Mail-Vorlagen von Attraccess verwalten und anpassen, inklusive verfügbarer Vorlagen, Plugin-Vorlagen und Platzhalter.
 - [Erscheinungsbild](https://docs.attraccess.org/de/setup/branding.md): Anwendungs-URL, Logo und Name, Farbmodus und E-Mail-Layout an das Erscheinungsbild Ihrer Organisation anpassen.
 
 ## Deutsch: Benutzerverwaltung
 - [Überblick](https://docs.attraccess.org/de/user-management/overview.md): Überblick über die Benutzerverwaltung: Konten anlegen, Berechtigungen vergeben und Anmeldemethoden als Administrator konfigurieren.
-- [Benutzer anlegen](https://docs.attraccess.org/de/user-management/creating-users.md): Die Wege zu einem Benutzerkonto: Selbstregistrierung, SSO-Registrierung, Projekteinladungen und Anlegen durch einen Administrator.
+- [Benutzer anlegen](https://docs.attraccess.org/de/user-management/creating-users.md): Die Wege zu einem Benutzerkonto (Selbstregistrierung, SSO-Registrierung, Projekteinladungen, Anlegen durch einen Administrator) und was ein Konto vor der E-Mail-Bestätigung erreicht.
 - [Berechtigungen](https://docs.attraccess.org/de/user-management/permissions.md): Erklärt das rollenbasierte Berechtigungsmodell, Standardrollen, Berechtigungsschlüssel, Plugin-Berechtigungen, die Vergabe von Rollen und SSO-verwaltete Rollen.
 - [SSO Überblick](https://docs.attraccess.org/de/user-management/sso-overview.md): Überblick über Single Sign-On mit OIDC und SAML: Voraussetzungen, Anbieter, automatische Erkennung, Berechtigungszuordnung und Kontoverknüpfung.
 - [OIDC einrichten](https://docs.attraccess.org/de/user-management/sso-oidc.md): So legen Sie einen OpenID-Connect-SSO-Anbieter an und konfigurieren ihn, inklusive Callback-URL und Test der Anmeldung.
@@ -300,7 +300,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Metriken-Referenz](https://docs.attraccess.org/de/monitoring/metrics-reference.md): Referenz aller Metriken am Endpunkt /api/metrics: HTTP, Authentifizierung, Benutzer, Ressourcen und Attractap-Geräte.
 
 ## Deutsch: Systemeinstellungen
-- [Überblick](https://docs.attraccess.org/de/settings/overview.md): Administratorübersicht der Systemeinstellungen: Anwendung, Sichtbarkeit der Ressourcennutzung, E-Mail und weitere Einstellungen.
+- [Überblick](https://docs.attraccess.org/de/settings/overview.md): Administratorübersicht der Systemeinstellungen: Anwendung, Sichtbarkeit der Maschinenliste, Sichtbarkeit der Ressourcennutzung, E-Mail und weitere Einstellungen.
 - [Sicherheit](https://docs.attraccess.org/de/settings/security.md): Sicherheitseinstellungen für Sitzungs-Cookies und Authentifizierung: SameSite, Sitzungskonfiguration, Kartenschlüssel, Rate-Limiting und Netzwerkbeschränkung.
 - [Audit-Protokoll](https://docs.attraccess.org/de/settings/audit-log.md): Wie Sie das Audit-Protokoll durchsuchen, filtern, prüfen und exportieren sowie Aufzeichnung und Aufbewahrung steuern.
 

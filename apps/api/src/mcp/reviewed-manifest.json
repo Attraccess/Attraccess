@@ -567,12 +567,12 @@
   "getResourceVisibilitySettings": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "5db619ae"
+    "shape": "85d5cace"
   },
   "updateResourceVisibilitySettings": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "f8bb300a"
+    "shape": "ae491a47"
   },
   "getLicenseInformation": {
     "decision": "allow",
@@ -707,7 +707,7 @@
   "getAllResources": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "8d187d7a"
+    "shape": "166d9b0c"
   },
   "getAllResourcesInUse": {
     "decision": "allow",
@@ -2022,7 +2022,7 @@
   "messagingContactResourceHolder": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "308fdcb2"
+    "shape": "11686601"
   },
   "messagingListConversations": {
     "decision": "allow",

@@ -9,6 +9,8 @@ import en from './en.json';
 
 interface Props {
   hasResources: boolean;
+  /** The server narrowed the list to the machines this person may see (machine list visibility). */
+  isRestricted?: boolean;
   onClearFilterAndSearch: () => void;
   onOpenCreate: () => void;
 }
@@ -17,6 +19,8 @@ export function NoResourcesFound(props: Props) {
   const { onClearFilterAndSearch, hasResources, onOpenCreate } = props;
   const { hasPermission } = useAuth();
   const canCreateResources = hasPermission('resources.create');
+  // People who may add machines are shown how to, whatever the list visibility is.
+  const isRestricted = (props.isRestricted ?? false) && !canCreateResources;
   const { t } = useTranslations({
     de,
     en,
@@ -28,15 +32,17 @@ export function NoResourcesFound(props: Props) {
       </div>
       <div className="space-y-1 max-w-md">
         <h2 className="text-lg font-semibold text-foreground">
-          {t(hasResources ? 'alert.title' : 'firstResource.title')}
+          {t(hasResources ? 'alert.title' : isRestricted ? 'restricted.title' : 'firstResource.title')}
         </h2>
         <p className="text-sm text-muted">
           {t(
             hasResources
               ? 'alert.description'
-              : canCreateResources
-                ? 'firstResource.description'
-                : 'firstResource.noPermission',
+              : isRestricted
+                ? 'restricted.description'
+                : canCreateResources
+                  ? 'firstResource.description'
+                  : 'firstResource.noPermission',
           )}
         </p>
       </div>
@@ -45,7 +51,7 @@ export function NoResourcesFound(props: Props) {
           <RotateCcwIcon className="w-4 h-4" />
           {t('alert.clear')}
         </Button>
-      ) : canCreateResources ? (
+      ) : isRestricted ? null : canCreateResources ? (
         <CreateResourceButton onOpen={onOpenCreate} />
       ) : null}
     </div>

@@ -52,4 +52,32 @@ describe.each([
     expect(reset).toHaveBeenCalledOnce();
     expect(screen.queryByRole('button', { name: 'Create resource' })).not.toBeInTheDocument();
   });
+
+  it('tells an introduced-only member that machines appear once they are introduced', () => {
+    state.permissions = [];
+    render(
+      <NoResourcesFound hasResources={false} isRestricted onClearFilterAndSearch={vi.fn()} onOpenCreate={vi.fn()} />,
+    );
+    expect(screen.getByRole('heading', { name: translations.restricted.title })).toBeInTheDocument();
+    expect(screen.getByText(translations.restricted.description)).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('keeps filter recovery when a narrowed list still has machines the filters hide', () => {
+    state.permissions = [];
+    const reset = vi.fn();
+    render(<NoResourcesFound hasResources isRestricted onClearFilterAndSearch={reset} onOpenCreate={vi.fn()} />);
+    expect(screen.queryByText(translations.restricted.title)).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: translations.alert.title })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: translations.alert.clear }));
+    expect(reset).toHaveBeenCalledOnce();
+  });
+
+  it('still offers creation to people who may create machines, even when the list is narrowed', () => {
+    render(
+      <NoResourcesFound hasResources={false} isRestricted onClearFilterAndSearch={vi.fn()} onOpenCreate={vi.fn()} />,
+    );
+    expect(screen.getByRole('heading', { name: translations.firstResource.title })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create resource' })).toBeInTheDocument();
+  });
 });

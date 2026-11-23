@@ -117,7 +117,7 @@ Zugangsinformationen zu lesen setzt eine Anmeldung voraus:
 
 - Die **vollständigen Listen** (Einweisungen, Einweiser, Wartende und Verlauf einer Ressource) sehen Benutzer mit **Ressourcen bearbeiten** (`resources.update`) oder **Ressourcen-Zugriff verwalten** (`resources.access.manage`) sowie Einweiser der Ressource oder einer ihrer Gruppen. Das ist dieselbe Regel wie beim Reiter **Personen**.
 - **Prüfungen auf Einweiser-Status** (ob ein Benutzer einweisen darf) antworten nur für Sie selbst. Benutzer mit **Ressourcen bearbeiten** oder **Ressourcen-Zugriff verwalten** können nach beliebigen Personen fragen; alle anderen erhalten `403`.
-- **Nur Namen:** Alle mit **Ressourcen lesen** (`resources.read`) sehen Benutzernamen und Rolle (Einweiser oder Wartender) der Einweiser einer Ressource, auch wenn sie über Gruppen geerbt sind. Noch nicht eingewiesene Personen erfahren so, wen sie fragen können. E-Mail-Adressen sind nicht enthalten.
+- **Nur Namen:** Alle mit **Ressourcen lesen** (`resources.read`) sehen Benutzernamen und Rolle (Einweiser oder Wartender) der Einweiser einer Ressource, auch wenn sie über Gruppen geerbt sind. Noch nicht eingewiesene Personen erfahren so, wen sie fragen können. Bei der [Sichtbarkeit der Maschinenliste](settings/overview.md#sichtbarkeit-der-maschinenliste) **Nur in eine Maschine eingewiesene Personen** gilt das nur für Maschinen, die Sie sehen dürfen; bei einer verborgenen Maschine antwortet die Anfrage mit `404`. Maschinen, die beaufsichtigte Nutzung erlauben oder erfordern, bleiben für alle sichtbar. E-Mail-Adressen sind nicht enthalten.
 
 Wer sehen darf, welche Ressource in Benutzung ist, regelt eine eigene [Systemeinstellung](settings/overview.md#sichtbarkeit-der-ressourcennutzung).
 

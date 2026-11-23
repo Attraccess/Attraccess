@@ -26,6 +26,7 @@ import {
   ResourceReaderUiSettingsDto,
 } from './dtos/reader-ui-settings.dto';
 import { UiSlotService } from './websockets/handlers/ui/ui-slot.service';
+import { ResourceListVisible } from '../resources/visibility/resource-list-visible.interceptor';
 
 /**
  * Who may clear an alert. Plugin alerts reset the plugin globally (plugin managers); reader alerts belong to the
@@ -40,6 +41,7 @@ const CLEAR_PERMISSIONS: Record<string, SystemPermission[]> = {
 
 /** Admin side of the reader UI: settings, contribution status and alerts (ATT-1187 phase A). */
 @ApiTags('Attractap')
+@ResourceListVisible()
 @Controller()
 @RequiresLicense(LicenseModuleType.ATTRACTAP)
 export class ReaderUiAdminController {

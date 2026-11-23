@@ -13,6 +13,8 @@ import { ResourceGroup } from './resourceGroup.entity';
   unique: true,
   where: '"resourceId" IS NOT NULL',
 })
+/** The "permitted-only" machine list asks per machine whether the viewer introduces it (ATT-843). */
+@Index('IDX_resource_introducer_user', ['userId'])
 @Entity()
 export class ResourceIntroducer {
   @PrimaryGeneratedColumn()

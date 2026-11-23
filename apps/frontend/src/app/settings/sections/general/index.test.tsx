@@ -12,6 +12,7 @@ import { GeneralSection } from './index';
 
 vi.mock('@attraccess/react-query-client', () => ({
   ResourceActivityVisibility: { ALL: 'all', INTRODUCED: 'introduced' },
+  ResourceListVisibility: { AUTHENTICATED: 'authenticated', PERMITTED_ONLY: 'permitted-only' },
   useGetSystemSettings: vi.fn(),
   UseGetSystemSettingsKeyFn: () => ['settings'],
   UseGetSystemLanguageKeyFn: () => ['system-language'],
@@ -47,7 +48,11 @@ vi.mock('../../../../components/CommunityLicenseButton', () => ({
 const saveSettings = vi.fn();
 const saveVisibility = vi.fn();
 
-function mockVisibility(state: { data?: { activityVisibility: string }; isLoading?: boolean; isError?: boolean }) {
+function mockVisibility(state: {
+  data?: { activityVisibility: string; listVisibility?: string };
+  isLoading?: boolean;
+  isError?: boolean;
+}) {
   vi.mocked(useGetResourceVisibilitySettings).mockReturnValue({
     isLoading: false,
     isError: false,
@@ -70,7 +75,7 @@ function mockSaves() {
     mutateAsync: saveVisibility,
     isPending: false,
   } as unknown as ReturnType<typeof useUpdateResourceVisibilitySettings>);
-  mockVisibility({ data: { activityVisibility: 'all' } });
+  mockVisibility({ data: { activityVisibility: 'all', listVisibility: 'authenticated' } });
 }
 
 describe('GeneralSection', () => {
@@ -138,6 +143,7 @@ describe('GeneralSection', () => {
     }
     expect(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /inputs.activityVisibility.label$/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /inputs.listVisibility.label$/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'community license' })).toBeDisabled();
     expect(urlField()).toHaveValue('https://example.org/submitted');
     expect(screen.getByLabelText('inputs.licenseKey.label')).toHaveValue('submitted-license');
@@ -452,5 +458,69 @@ describe('GeneralSection — activity visibility', () => {
     expect(screen.getByText('inputs.activityVisibility.loadFailed')).toBeInTheDocument();
     expect(visibilitySelect()).toBeDisabled();
     expect(screen.getByLabelText('inputs.url.label')).toBeEnabled();
+  });
+});
+
+describe('GeneralSection — machine list visibility', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSaves();
+  });
+
+  const listSelect = () => screen.getByRole('button', { name: /inputs.listVisibility.label$/ });
+  const choosePermittedOnly = async () => {
+    await userEvent.click(listSelect());
+    await userEvent.click(await screen.findByRole('option', { name: 'inputs.listVisibility.permitted-only' }));
+  };
+
+  it('shows the saved mode with the data-protection hint for open lists', () => {
+    render(<GeneralSection />);
+    expect(listSelect()).toHaveTextContent('inputs.listVisibility.authenticated');
+    expect(screen.getByText('inputs.listVisibility.authenticatedHint')).toBeInTheDocument();
+  });
+
+  it('is not dirty until the select changes, then saves only the list visibility', async () => {
+    const { container } = render(<GeneralSection />);
+    expect(container.querySelector('[data-slot="settings-save-bar"]')).toBeNull();
+
+    await choosePermittedOnly();
+    expect(container.querySelector('[data-slot="settings-save-bar"]')).toBeInTheDocument();
+    expect(screen.getByText('inputs.listVisibility.permittedOnlyHint')).toBeInTheDocument();
+    expect(saveVisibility).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
+    expect(saveVisibility).toHaveBeenCalledWith({ body: { listVisibility: 'permitted-only' } });
+    expect(saveSettings).not.toHaveBeenCalled();
+  });
+
+  it('discards an unsaved list visibility change', async () => {
+    const { container } = render(<GeneralSection />);
+    await choosePermittedOnly();
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.discard' }));
+    expect(container.querySelector('[data-slot="settings-save-bar"]')).toBeNull();
+    expect(listSelect()).toHaveTextContent('inputs.listVisibility.authenticated');
+  });
+
+  it('points the select at its hint', () => {
+    render(<GeneralSection />);
+    const hintId = listSelect().getAttribute('aria-describedby');
+    expect(hintId).toBeTruthy();
+    expect(document.getElementById(hintId as string)).toHaveTextContent('inputs.listVisibility.');
+  });
+
+  it('does not claim a mode while the setting is still loading', () => {
+    mockVisibility({ isLoading: true });
+    render(<GeneralSection />);
+    expect(listSelect()).toBeDisabled();
+    expect(screen.getByText('inputs.listVisibility.description')).toBeInTheDocument();
+    expect(screen.queryByText('inputs.listVisibility.authenticatedHint')).not.toBeInTheDocument();
+    expect(screen.queryByText('inputs.listVisibility.permittedOnlyHint')).not.toBeInTheDocument();
+  });
+
+  it('disables the select when the setting cannot be loaded', () => {
+    mockVisibility({ isError: true });
+    render(<GeneralSection />);
+    expect(listSelect()).toBeDisabled();
+    expect(screen.getByText('inputs.listVisibility.loadFailed')).toBeInTheDocument();
   });
 });

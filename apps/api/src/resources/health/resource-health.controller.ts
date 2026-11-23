@@ -5,8 +5,10 @@ import { ResourceHealthService } from './resource-health.service';
 import { ResourceHealthSummaryDto } from './dtos/resource-health-state.dto';
 import { CanManageMaintenance } from '../maintenances/canManageMaintenance.decorator';
 import { auditActorOf } from '../../audit/recorder/audit-event';
+import { ResourceListVisible } from '../visibility/resource-list-visible.interceptor';
 
 @ApiTags('Resource Health')
+@ResourceListVisible()
 @Controller('resources/:resourceId/health')
 @Auth()
 export class ResourceHealthController {

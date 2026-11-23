@@ -13,6 +13,7 @@ import type { ListResourcesQuery, NewResource, ResourceStore } from '../../../re
 import { activeUsageSql, activeUsageWhere } from '../usage/active-usage-queries';
 import { toUsageSession } from '../usage/usage-session-mapping';
 import { toResourceRecord as toResourceRecordBase } from './resource-mapping';
+import { VIEWER_PARAMETER, permittedResourceSql } from './permitted-resource-sql';
 
 /** A resource row as a record, with its embedded sessions mapped like every other session read. */
 export const toResourceRecord = (entity: Resource): ResourceRecord => {
@@ -46,6 +47,7 @@ export class TypeOrmResourceStore implements ResourceStore {
       ids,
       onlyInUseByUserId,
       onlyWithPermissionForUserId,
+      permittedForUserId,
       onlyInUse,
       returnUsingUser,
     } = query;
@@ -137,6 +139,10 @@ export class TypeOrmResourceStore implements ResourceStore {
       );
     }
 
+    if (permittedForUserId !== undefined) {
+      queryBuilder.andWhere(permittedResourceSql('resource.id'), { [VIEWER_PARAMETER]: permittedForUserId });
+    }
+
     // Handle IDs filtering
     if (ids && ids.length > 0) {
       queryBuilder.andWhere('resource.id IN (:...ids)', { ids });
@@ -170,6 +176,17 @@ export class TypeOrmResourceStore implements ResourceStore {
       .getManyAndCount();
 
     return { data: resources.map(toResourceRecord), total };
+  }
+
+  async permittedIds(userId: number, ids: number[]): Promise<number[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.resources
+      .createQueryBuilder('resource')
+      .select('resource.id', 'id')
+      .where('resource.id IN (:...ids)', { ids })
+      .andWhere(permittedResourceSql('resource.id'), { [VIEWER_PARAMETER]: userId })
+      .getRawMany<{ id: number }>();
+    return rows.map((row) => Number(row.id));
   }
 
   async count(): Promise<number> {

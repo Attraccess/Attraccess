@@ -474,6 +474,7 @@
     "smtp.passConfigured": "Email password configured",
     "smtp.passwordChanged": "Email password changed",
     "resources.activityVisibility": "Resource activity visibility",
+    "resources.listVisibility": "Machine list visibility",
     "metrics.apiKeyConfigured": "Monitoring API key",
     "metrics.slowQueryThresholdSeconds": "Slow query threshold",
     "auth.rateLimit.maxAttempts": "Maximum authentication attempts",

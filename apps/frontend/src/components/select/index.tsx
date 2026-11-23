@@ -44,6 +44,8 @@ export interface Props {
   fullWidth?: boolean;
   popoverProps?: Pick<ComponentProps<typeof SelectPopover>, 'placement' | 'offset'>;
   'aria-label'?: string;
+  /** Id of an element outside the select that describes it. */
+  'aria-describedby'?: string;
   'data-cy'?: string;
   isLoading?: boolean;
 }
@@ -68,6 +70,7 @@ export function Select({
   fullWidth,
   popoverProps,
   'aria-label': ariaLabel,
+  'aria-describedby': ariaDescribedBy,
   'data-cy': dataCy,
 }: Props) {
   return (
@@ -85,6 +88,7 @@ export function Select({
       fullWidth={fullWidth}
       className={className}
       aria-label={ariaLabel}
+      aria-describedby={ariaDescribedBy}
       data-cy={dataCy}
     >
       {label && <Label>{label}</Label>}

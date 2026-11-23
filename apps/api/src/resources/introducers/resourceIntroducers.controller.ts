@@ -18,8 +18,10 @@ import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { IsResourceIntroducerResponseDto } from './dtos/isIntroducer.response.dto';
 import { GrantIntroducerDto } from './dtos/grantIntroducer.dto';
 import { ResourceIntroducerNameDto } from './dtos/introducerName.dto';
+import { ResourceListVisible } from '../visibility/resource-list-visible.interceptor';
 
 @ApiTags('Access Control')
+@ResourceListVisible()
 @Controller('resources/:resourceId/introducers')
 export class ResourceIntroducersController {
   constructor(private readonly resourceIntroducersService: ResourceIntroducersService) {}

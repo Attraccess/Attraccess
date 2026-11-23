@@ -15,8 +15,10 @@ import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto
 import { SupervisionRequestDto } from './dtos/supervisionRequest.dto';
 import { SupervisionDecisionResponseDto } from './dtos/supervisionDecision.response.dto';
 import { SupervisionLiveEventDto } from './dtos/supervisionLiveEvent.dto';
+import { ResourceListVisible } from '../visibility/resource-list-visible.interceptor';
 
 @ApiTags('Resources')
+@ResourceListVisible()
 @Controller('resources')
 export class SupervisionController {
   constructor(

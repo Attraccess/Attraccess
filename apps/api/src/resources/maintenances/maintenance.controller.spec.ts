@@ -3,6 +3,7 @@ import { ResourceMaintenanceController } from './maintenance.controller';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { LicenseService } from '../../license/license.service';
+import { ResourceListVisibilityService } from '../visibility/resource-list-visibility.service';
 
 // Mock the decorator
 jest.mock('./canManageMaintenance.decorator', () => ({
@@ -42,6 +43,7 @@ describe('ResourceMaintenanceController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ResourceMaintenanceController],
       providers: [
+        { provide: ResourceListVisibilityService, useValue: { canSee: jest.fn(async () => true) } },
         {
           provide: ResourceMaintenanceService,
           useValue: {

@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { AuthenticatedRequest, DualAuthGuard } from '@attraccess/plugins-backend-sdk';
 import type { AttractapNfcCard, PluginUserModel } from '@attraccess/application-models';
 import request from 'supertest';
+import { ResourceListVisibilityService } from '../resources/visibility/resource-list-visibility.service';
 import { AttractapController } from './attractap.controller';
 import { AttractapNfcCardsController } from './card.controller';
 import { CardAccessService } from './card-access.service';
@@ -44,6 +45,7 @@ describe('RFID card management authorization', () => {
         { provide: AttractapGateway, useValue: gateway },
         { provide: WebsocketService, useValue: {} },
         { provide: UsersService, useValue: users },
+        { provide: ResourceListVisibilityService, useValue: {} },
       ],
     })
       .overrideGuard(LicenseGuard)

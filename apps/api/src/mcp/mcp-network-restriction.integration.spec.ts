@@ -32,7 +32,9 @@ describe('network restriction for MCP tool calls (real application)', () => {
 
   beforeAll(async () => {
     t = await startMcpTestApp(PUBLIC_URL);
-    const permissions = ['users.api-tokens.manage', 'users.roles.manage'];
+    // resources.update lets the caller see every machine (ATT-843), so the call reaches the network check, which is
+    // what these tests are about; a machine the caller may not see answers 404 first.
+    const permissions = ['users.api-tokens.manage', 'users.roles.manage', 'resources.update'];
     const user = await t.createUser(permissions);
     token = await t.createApiToken(user.id, permissions);
     config = t.app.get(NetworkRestrictionConfigService);
