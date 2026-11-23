@@ -1,4 +1,5 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
+import { ReaderRouter } from '../../reader-router';
 import { ResourceFlowsService } from '../../../../resources/flows/resource-flows.service';
 import { ResourceHealthService } from '../../../../resources/health/resource-health.service';
 import { ResourceIntroducersService } from '../../../../resources/introducers/resourceIntroducers.service';
@@ -12,9 +13,10 @@ import { WebsocketService } from '../../websocket.service';
 import { AuthenticatedWebSocket } from '../../websocket.types';
 import { sendResourceListToSockets as sendResourceListToSocketsImplementation } from './payload';
 export const DEBOUNCE_MS = 200;
+const RESOURCES_CHANGED = 'resource-list.resources-changed';
 
 @Injectable()
-export class ResourceListService {
+export class ResourceListService implements OnModuleInit {
   private readonly logger = new Logger(ResourceListService.name);
 
   @Inject(WebsocketService)
@@ -47,7 +49,16 @@ export class ResourceListService {
   @Inject(ReaderTimeZoneService)
   private readerTimeZone: ReaderTimeZoneService;
 
+  @Optional()
+  @Inject(ReaderRouter)
+  private readerRouter?: ReaderRouter;
+
   private resourceListRevision = 0;
+
+  /** Readers on other API instances get the lists of changes made here (ATT-1163). */
+  onModuleInit(): void {
+    this.readerRouter?.on(RESOURCES_CHANGED, (resourceIds: number[]) => this.scheduleSendsFor(resourceIds));
+  }
 
   private readonly pendingSends = new Map<number, { timer: ReturnType<typeof setTimeout>; resourceIds: Set<number> }>();
 
@@ -70,7 +81,13 @@ export class ResourceListService {
     if (resourceIds.length === 0) {
       return;
     }
+    if (this.readerRouter)
+      this.readerRouter.everywhere(RESOURCES_CHANGED, resourceIds, () => this.scheduleSendsFor(resourceIds));
+    else this.scheduleSendsFor(resourceIds);
+  }
 
+  /** Debounced lists for this instance's readers. */
+  private scheduleSendsFor(resourceIds: number[]): void {
     const readerIds = new Set<number>();
     for (const socket of this.websocketService.sockets.values()) {
       readerIds.add(socket.readerId);

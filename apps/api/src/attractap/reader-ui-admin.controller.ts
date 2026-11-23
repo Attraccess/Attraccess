@@ -123,7 +123,7 @@ export class ReaderUiAdminController {
   @ApiResponse({ status: 200, type: [ReaderUiContributionStatusDto] })
   async getContributions(@Param('readerId', ParseIntPipe) readerId: number): Promise<ReaderUiContributionStatusDto[]> {
     await this.requireReader(readerId);
-    return this.slots.contributionsOf(readerId);
+    return this.slots.contributionsAnywhere(readerId);
   }
 
   @Get('reader-ui/alerts')

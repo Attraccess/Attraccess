@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { remoteEvent } from './reader-event-relay';
 import { READER_UI_TIMING } from '@attraccess/plugins-backend-sdk';
 import { ReaderDeletedEvent, ReaderTimeZoneChangedEvent, ReaderUpdatedEvent } from '../events';
 import { AttractapService } from '../attractap.service';
@@ -187,6 +188,7 @@ export class ReaderTimeZoneService {
 
   /** A plugin changed its reader content or time zone: the affected readers get the new offset at once. */
   @OnEvent(READER_UI_INVALIDATE_EVENT)
+  @OnEvent(remoteEvent(READER_UI_INVALIDATE_EVENT))
   async onInvalidate(event: ReaderUiInvalidation): Promise<void> {
     // Only a plugin that declares reader zones can change one; content-only invalidations cost nothing here.
     if (!this.zoneProviders().some(({ plugin }) => plugin === event.pluginName)) return;
@@ -207,6 +209,7 @@ export class ReaderTimeZoneService {
   }
 
   @OnEvent(ReaderUpdatedEvent.EVENT_NAME)
+  @OnEvent(remoteEvent(ReaderUpdatedEvent.EVENT_NAME))
   async onReaderUpdated(event: ReaderUpdatedEvent): Promise<void> {
     const readerId = event.reader.id;
     this.resourceGenerations.set(readerId, this.resourceGeneration(readerId) + 1);
@@ -223,6 +226,7 @@ export class ReaderTimeZoneService {
 
   /** A deleted reader leaves nothing behind. */
   @OnEvent(ReaderDeletedEvent.EVENT_NAME)
+  @OnEvent(remoteEvent(ReaderDeletedEvent.EVENT_NAME))
   onReaderDeleted(event: ReaderDeletedEvent): void {
     this.forget(event.readerId);
     this.resourceGenerations.delete(event.readerId);

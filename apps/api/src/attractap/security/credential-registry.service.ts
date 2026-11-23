@@ -1,5 +1,7 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { remoteEvent } from '../websockets/reader-event-relay';
+import { CREDENTIAL_CHANGED_EVENT } from './pairing-model';
 import type {
   AttractapCredentialEventRecord,
   AttractapCredentialSnapshot,
@@ -68,8 +70,15 @@ export class CredentialRegistryService {
   }
 
   @OnEvent(ReaderDeletedEvent.EVENT_NAME)
+  @OnEvent(remoteEvent(ReaderDeletedEvent.EVENT_NAME))
   public onReaderDeleted(event: ReaderDeletedEvent): void {
     this.invalidate(event.readerId);
+  }
+
+  /** A credential revoked or replaced on another API instance must not stay cached here (ATT-1163). */
+  @OnEvent(remoteEvent(CREDENTIAL_CHANGED_EVENT))
+  public onRemoteCredentialChanged(readerId: number): void {
+    this.invalidate(readerId);
   }
 
   /** True when the key fingerprint is the reader's current, active credential. */

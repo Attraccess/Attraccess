@@ -1,5 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
+import { ReaderRouter } from '../../reader-router';
+import { rethrowValkeyUnavailable } from '../../../../cluster/valkey-call';
 import { OnEvent } from '@nestjs/event-emitter';
+import { remoteEvent } from '../../reader-event-relay';
 import { ResourceUsageAction } from '@attraccess/application-models';
 import { READER_UI_SLOTS, READER_UI_TIMING, type ReaderUiCapabilities } from '@attraccess/plugins-backend-sdk';
 import { AttractapService } from '../../../attractap.service';
@@ -26,6 +29,10 @@ import { UiSlotRateLimiter } from './ui-rate-limiter';
 import { collectContributions, pendingKey, skipProvider, type Collected, type Desired } from './ui-slot-contributions';
 import { contributionKey, type UiContributionRecord, type UiSlotsState } from './ui-socket-state';
 
+const USAGE_CHANGED = 'ui-slot.usage-changed';
+const CONTRIBUTIONS = 'ui-slot.contributions';
+const CONTRIBUTIONS_TIMEOUT_MS = 5_000;
+
 /** Plugin invalidations within this window become one sync per reader. */
 export const UI_INVALIDATE_DEBOUNCE_MS = 100;
 /** Hash of a record the reader cleared on its own: the next sync sends it again. */
@@ -46,7 +53,7 @@ interface Pass {
 
 /** Pushes plugin slot contributions to a reader and keeps its view of them in step (UI_SLOT_UPDATE). */
 @Injectable()
-export class UiSlotService {
+export class UiSlotService implements OnModuleInit {
   private readonly logger = new Logger(UiSlotService.name);
   /** Public slots use the reader language (D18); null until read or changed. */
   private defaultLanguage: 'en' | 'de' | null = null;
@@ -60,6 +67,7 @@ export class UiSlotService {
     private readonly cardSessions: CardSessionService,
     private readonly settingsService: SettingsService,
     private readonly activeUsage: ReaderActiveUsageService,
+    @Optional() private readonly router?: ReaderRouter,
   ) {
     cardSessions.onStarted((socket) => this.privacySync(socket));
     cardSessions.onEnded((socket) => this.readerSignedOut(socket));
@@ -105,6 +113,23 @@ export class UiSlotService {
     record.reason = `reader-${reason || 'dropped'}`;
   }
 
+  /** Other API instances: the usage changes made here, and the admin view of readers held here (ATT-1163). */
+  onModuleInit(): void {
+    this.router?.on(USAGE_CHANGED, (resourceId: number) => this.invalidateResource(resourceId));
+    this.router?.handle(CONTRIBUTIONS, (readerId: number) => this.contributionsOf(readerId));
+  }
+
+  /** The reader's slot contributions, from whichever instance holds it (the admin view). */
+  async contributionsAnywhere(readerId: number): Promise<ReturnType<UiSlotService['contributionsOf']>> {
+    const local = this.contributionsOf(readerId);
+    if (local.length > 0 || !this.router?.cluster.enabled || this.router.localSockets(readerId).length > 0)
+      return local;
+    const [holder] = await this.router.holders(readerId).catch(rethrowValkeyUnavailable);
+    if (!holder) return local;
+    return this.router.cluster.bus.request(holder, CONTRIBUTIONS, readerId, CONTRIBUTIONS_TIMEOUT_MS);
+  }
+
+  /** This instance's view of the reader's slot contributions. */
   contributionsOf(readerId: number) {
     const socket = [...this.websocketService.sockets.values()].find((s) => s.readerId === readerId);
     return [...(socket?.state.uiSlots?.contributions.values() ?? [])].map(
@@ -114,6 +139,7 @@ export class UiSlotService {
 
   /** `scope.readerId` / `scope.resourceId` narrow the readers; bursts become one sync per reader. */
   @OnEvent(READER_UI_INVALIDATE_EVENT)
+  @OnEvent(remoteEvent(READER_UI_INVALIDATE_EVENT))
   onInvalidate(event: ReaderUiInvalidation): void {
     const { readerId, resourceId } = event.scope ?? {};
     for (const socket of this.websocketService.sockets.values()) {
@@ -139,21 +165,32 @@ export class UiSlotService {
   onUsageStarted(event: ResourceSessionStartedEvent): void {
     // Door actions fire this event too, stored already ended: they never make a usage active.
     if (event.usage?.usageAction !== ResourceUsageAction.Usage) return;
-    this.onInvalidate({ scope: { resourceId: event.usage.resourceId } } as ReaderUiInvalidation);
+    this.usageChanged(event.usage.resourceId);
   }
 
   @OnEvent(ResourceUsageSessionEndedEvent.EVENT_NAME)
   onUsageEnded(event: ResourceUsageSessionEndedEvent): void {
-    this.onInvalidate({ scope: { resourceId: event.usage.resourceId } } as ReaderUiInvalidation);
+    this.usageChanged(event.usage.resourceId);
   }
 
   @OnEvent(ResourceUsageSessionTakenOverEvent.EVENT_NAME)
   onUsageTakenOver(event: ResourceUsageSessionTakenOverEvent): void {
-    this.onInvalidate({ scope: { resourceId: event.resource.id } } as ReaderUiInvalidation);
+    this.usageChanged(event.resource.id);
+  }
+
+  /** A usage changed on this instance: the readers of the resource re-evaluate here and on the other instances. */
+  private usageChanged(resourceId: number): void {
+    if (this.router) this.router.everywhere(USAGE_CHANGED, resourceId, () => this.invalidateResource(resourceId));
+    else this.invalidateResource(resourceId);
+  }
+
+  private invalidateResource(resourceId: number): void {
+    this.onInvalidate({ scope: { resourceId } } as ReaderUiInvalidation);
   }
 
   /** Attaching or detaching resources changes which rows the reader shows, so its slot content must follow. */
   @OnEvent(ReaderUpdatedEvent.EVENT_NAME)
+  @OnEvent(remoteEvent(ReaderUpdatedEvent.EVENT_NAME))
   onReaderUpdated(event: ReaderUpdatedEvent): void {
     const resourceIds = event.reader.resources?.map((resource) => resource.id) ?? null;
     for (const socket of this.websocketService.sockets.values()) {
@@ -165,6 +202,7 @@ export class UiSlotService {
 
   /** Public slots follow the default language. */
   @OnEvent('settings.default-language')
+  @OnEvent(remoteEvent('settings.default-language'))
   onDefaultLanguage(language: 'en' | 'de'): void {
     this.defaultLanguage = language;
     this.syncReader(undefined);

@@ -10,7 +10,7 @@ function setup() {
     setReader: jest.fn().mockResolvedValue(undefined),
   };
   const alerts = { listOpen: jest.fn().mockResolvedValue([{ id: 1 }]), clear: jest.fn(), findOpen: jest.fn() };
-  const slots = { syncReader: jest.fn(), contributionsOf: jest.fn().mockReturnValue([{ plugin: 'p' }]) };
+  const slots = { syncReader: jest.fn(), contributionsAnywhere: jest.fn().mockResolvedValue([{ plugin: 'p' }]) };
   const resources = { getResourceById: jest.fn().mockResolvedValue({ id: 3 }) };
   const readers = {
     findReaderById: jest.fn().mockResolvedValue({ id: 8, pairingState: 'paired' }),
