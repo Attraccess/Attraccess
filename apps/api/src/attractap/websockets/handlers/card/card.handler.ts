@@ -10,7 +10,13 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleInit,
+  Optional,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import { rethrowValkeyUnavailable } from '../../../../cluster/valkey-call';
+import { ReaderRouter, armFailure } from '../../reader-router';
+import { ReaderScreenService, screenOwner } from '../../reader-screen.service';
 import { WebSocket } from 'ws';
 
 import { MetricsService } from '../../../../metrics/metrics.service';
@@ -54,7 +60,7 @@ const armedTooLongAgo = (armedAt: number | undefined) =>
   armedAt == null || Date.now() - armedAt > ARMED_CARD_OPERATION_TTL_MS;
 
 @Injectable()
-export class AttractapCardHandler {
+export class AttractapCardHandler implements OnModuleInit {
   protected readonly logger = new Logger(AttractapCardHandler.name);
 
   @Inject(SettingsService)
@@ -104,6 +110,41 @@ export class AttractapCardHandler {
 
   @Inject(AttractapFormsHandler)
   protected formsHandler: AttractapFormsHandler;
+
+  @Optional()
+  @Inject(ReaderRouter)
+  protected readerRouter?: ReaderRouter;
+
+  @Optional()
+  @Inject(ReaderScreenService)
+  protected readerScreen?: ReaderScreenService;
+
+  /** Without Nest (unit tests) this instance is the whole cluster. */
+  protected get router(): ReaderRouter {
+    return (this.readerRouter ??= new ReaderRouter(this.websocketService));
+  }
+
+  protected get screen(): ReaderScreenService {
+    return (this.readerScreen ??= new ReaderScreenService());
+  }
+
+  /** Other instances arm the readers this instance holds through these (ATT-1163). */
+  public onModuleInit(): void {
+    this.router.handle(ENROLL, (payload: EnrollPayload) => this.armEnrollmentLocally(payload));
+    this.router.handle(RESET, (payload: ResetPayload) => this.armResetLocally(payload));
+  }
+
+  /** An armed enrollment or reset ended on this socket (also on disconnect): its reader screen claim goes. */
+  public endCardFlows(socket: AuthenticatedWebSocket, readerId: number | null = socket.readerId): void {
+    this.releaseClaim(readerId, socket.state.enrollment?.screenClaim);
+    this.releaseClaim(readerId, socket.state.resetNfcCardData?.screenClaim);
+    socket.state.enrollment = null;
+    socket.state.resetNfcCardData = null;
+  }
+
+  private releaseClaim(readerId: number | null, claim: string | undefined): void {
+    if (claim && readerId != null) this.screen.release(readerId, claim);
+  }
 
   /**
    * A card was tapped for a login. The user becomes the connection's verified user only after the
@@ -225,11 +266,12 @@ export class AttractapCardHandler {
       throw new NotFoundException(CARD_WRITE_START_ERRORS.USER_NOT_FOUND);
     }
 
-    const sockets = this.readerSockets(data.readerId);
-    if (sockets.length === 0) {
+    const holders = await this.router.holders(data.readerId).catch(rethrowValkeyUnavailable);
+    if (holders.length === 0) {
       throw new NotFoundException(CARD_WRITE_START_ERRORS.READER_OFFLINE);
     }
-    assertReaderRelaysCards(sockets);
+    const local = this.router.localSockets(data.readerId);
+    if (local.length > 0) assertReaderRelaysCards(local);
     const nfcCard = await this.attractapService.getNFCCardByID(data.cardId);
 
     if (!nfcCard) {
@@ -238,30 +280,64 @@ export class AttractapCardHandler {
     if (nfcCard.type === 'uid-only') {
       throw new BadRequestException(CARD_WRITE_START_ERRORS.CARD_IS_UID_ONLY);
     }
-    if (sockets.some((socket) => this.isBusyWithCardFlow(socket))) {
+
+    const screenClaim = screenOwner('reset', randomUUID());
+    if (!(await this.screen.claim(data.readerId, screenClaim, ARMED_CARD_OPERATION_TTL_MS))) {
       throw new ConflictException(CARD_WRITE_START_ERRORS.READER_BUSY);
     }
-    // The reset is armed on one connection; the server resets the card that arrives there.
-    const socket = sockets[0];
-
-    // The reader only learns who the card belongs to. The key stays on the server: the next card
-    // presented here is reset by the server, and the record is dropped once the card confirmed it.
-    socket.state.resetNfcCardData = {
+    const payload: ResetPayload = {
+      readerId: data.readerId,
       cardId: nfcCard.id,
       auditPrincipal: {
         userId: user.id,
         authenticationMethod: data.authenticationMethod ?? 'session',
         ...(data.authenticationMethod === 'api-token' ? { apiTokenId: data.apiTokenId } : {}),
       },
+      username: nfcCard.user.username,
+      displayName: formatUserDisplayName(nfcCard.user),
+      // Without other instances the claim is not kept, and the socket state stays as it always was.
+      screenClaim: this.router.cluster.enabled ? screenClaim : undefined,
+    };
+    // The reset is armed on one connection, the reader's newest; the server resets the card that arrives there.
+    const [outcome] = await this.router.onHolders([holders[0]], {
+      type: RESET,
+      payload,
+      local: () => this.armResetLocally(payload),
+      timeoutMs: ROUTE_TIMEOUT_MS,
+    });
+    if (!outcome.ok) {
+      this.screen.release(data.readerId, screenClaim);
+      throw outcome.error;
+    }
+  }
+
+  /** Arms the reset on this instance's connection of the reader. */
+  protected async armResetLocally(payload: ResetPayload): Promise<void> {
+    const sockets = this.router.localSockets(payload.readerId);
+    if (sockets.length === 0) {
+      throw new NotFoundException(CARD_WRITE_START_ERRORS.READER_OFFLINE);
+    }
+    assertReaderRelaysCards(sockets);
+    if (sockets.some((socket) => this.isBusyWithCardFlow(socket))) {
+      throw new ConflictException(CARD_WRITE_START_ERRORS.READER_BUSY);
+    }
+    const socket = sockets[0];
+
+    // The reader only learns who the card belongs to. The key stays on the server: the next card
+    // presented here is reset by the server, and the record is dropped once the card confirmed it.
+    socket.state.resetNfcCardData = {
+      cardId: payload.cardId,
+      auditPrincipal: payload.auditPrincipal,
       armedAt: Date.now(),
+      ...(payload.screenClaim ? { screenClaim: payload.screenClaim } : {}),
     };
     const reset = socket.state.resetNfcCardData;
 
     try {
       await socket.sendMessage(
         new AttractapEvent(AttractapEventType.RESET_NFC_CARD, {
-          username: nfcCard.user.username,
-          displayName: formatUserDisplayName(nfcCard.user),
+          username: payload.username,
+          displayName: payload.displayName,
         }),
       );
     } catch (error) {
@@ -282,7 +358,7 @@ export class AttractapCardHandler {
     }
     const refusal = await this.refuseCardWrite(socket, reset.armedAt, 'RESET_EXPIRED');
     if (refusal) {
-      if (socket.state.resetNfcCardData === reset) socket.state.resetNfcCardData = null;
+      if (socket.state.resetNfcCardData === reset) this.endCardFlows(socket);
       await reply({ error: refusal });
       return;
     }
@@ -295,13 +371,14 @@ export class AttractapCardHandler {
       await socket.sendMessage(new AttractapEvent(AttractapEventType.RESET_NFC_CARD, { error: outcome.error }));
       return;
     }
-    socket.state.resetNfcCardData = null;
+    this.endCardFlows(socket);
     await socket.sendMessage(new AttractapEvent(AttractapEventType.RESET_NFC_CARD, { success: true }));
   }
 
   // Reader actively cancelled (user pressed cancel) or the reset timed out.
   public async onResetNfcCardCancel(socket: AuthenticatedWebSocket) {
     this.logger.log('Reset of NFC card cancelled by reader');
+    this.releaseClaim(socket.readerId, socket.state.resetNfcCardData?.screenClaim);
     socket.state.resetNfcCardData = null;
     this.cardConversations.abort(socket, 'CARD_REMOVED', 'reset');
   }
@@ -331,7 +408,46 @@ export class AttractapCardHandler {
       throw new NotFoundException(CARD_WRITE_START_ERRORS.USER_NOT_FOUND);
     }
 
-    const sockets = this.readerSockets(data.readerId);
+    const holders = await this.router.holders(data.readerId).catch(rethrowValkeyUnavailable);
+    if (holders.length === 0) {
+      throw new NotFoundException(CARD_WRITE_START_ERRORS.READER_OFFLINE);
+    }
+    const local = this.router.localSockets(data.readerId);
+    if (local.length > 0) assertReaderRelaysCards(local);
+
+    const screenClaim = screenOwner('enrollment', randomUUID());
+    if (!(await this.screen.claim(data.readerId, screenClaim, ARMED_CARD_OPERATION_TTL_MS))) {
+      throw new ConflictException(CARD_WRITE_START_ERRORS.READER_BUSY);
+    }
+    const authenticationMethod = data.authenticationMethod ?? 'session';
+    const payload: EnrollPayload = {
+      readerId: data.readerId,
+      userId: user.id,
+      auditPrincipal: {
+        userId: data.actorId ?? user.id,
+        authenticationMethod,
+        ...(authenticationMethod === 'api-token' ? { apiTokenId: data.apiTokenId } : {}),
+      },
+      username: user.username,
+      displayName: formatUserDisplayName(user),
+      screenClaim: this.router.cluster.enabled ? screenClaim : undefined,
+    };
+    const outcomes = await this.router.onHolders(holders, {
+      type: ENROLL,
+      payload,
+      local: () => this.armEnrollmentLocally(payload),
+      timeoutMs: ROUTE_TIMEOUT_MS,
+    });
+    // As before, a reader that took no event still answers the caller with success; it only frees the claim.
+    if (!outcomes.some((outcome) => outcome.ok && outcome.value)) this.screen.release(data.readerId, screenClaim);
+    if (!outcomes.some((outcome) => outcome.ok)) {
+      throw armFailure(outcomes, new NotFoundException(CARD_WRITE_START_ERRORS.READER_OFFLINE));
+    }
+  }
+
+  /** Arms the enrollment on this instance's sockets of the reader; true when one of them took it. */
+  protected async armEnrollmentLocally(payload: EnrollPayload): Promise<boolean> {
+    const sockets = this.router.localSockets(payload.readerId);
     if (sockets.length === 0) {
       throw new NotFoundException(CARD_WRITE_START_ERRORS.READER_OFFLINE);
     }
@@ -342,35 +458,34 @@ export class AttractapCardHandler {
 
     // Send to all active sockets for this reader to avoid targeting a stale/disconnecting socket
     const tasks = sockets.map(async (socket) => {
-      const authenticationMethod = data.authenticationMethod ?? 'session';
       socket.state.enrollment = {
-        userId: user.id,
-        auditPrincipal: {
-          userId: data.actorId ?? user.id,
-          authenticationMethod,
-          ...(authenticationMethod === 'api-token' ? { apiTokenId: data.apiTokenId } : {}),
-        },
+        userId: payload.userId,
+        auditPrincipal: payload.auditPrincipal,
         armedAt: Date.now(),
+        ...(payload.screenClaim ? { screenClaim: payload.screenClaim } : {}),
       };
       const enrollment = socket.state.enrollment;
       try {
         const delivered = await socket.sendMessage(
           new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO, {
-            username: user.username,
-            displayName: formatUserDisplayName(user),
+            username: payload.username,
+            displayName: payload.displayName,
           }),
         );
         if (!delivered && socket.state.enrollment === enrollment) socket.state.enrollment = null;
+        return Boolean(delivered);
       } catch (error) {
         if (socket.state.enrollment === enrollment) socket.state.enrollment = null;
         // Log and continue; other sockets may still deliver the event
         this.logger.debug(
           `Failed to send ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO to client ${socket.id}: ${String(error)}`,
         );
+        return false;
       }
     });
 
-    await Promise.allSettled(tasks);
+    const results = await Promise.allSettled(tasks);
+    return results.some((result) => result.status === 'fulfilled' && result.value);
   }
 
   /** A card was presented to a reader that is waiting to enroll one. The server writes and proves the key. */
@@ -384,7 +499,10 @@ export class AttractapCardHandler {
     }
     const refusal = await this.refuseCardWrite(socket, enrollment.armedAt, 'ENROLLMENT_EXPIRED');
     if (refusal) {
-      if (socket.state.enrollment === enrollment) socket.state.enrollment = null;
+      if (socket.state.enrollment === enrollment) {
+        this.releaseClaim(socket.readerId, enrollment.screenClaim);
+        socket.state.enrollment = null;
+      }
       await reply({ error: refusal });
       return;
     }
@@ -397,6 +515,7 @@ export class AttractapCardHandler {
       await socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { error: outcome.error }));
       return;
     }
+    this.releaseClaim(socket.readerId, enrollment.screenClaim);
     socket.state.enrollment = null;
     await socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { success: true }));
   }
@@ -404,12 +523,9 @@ export class AttractapCardHandler {
   // Reader actively cancelled (user pressed cancel) or the enrollment timed out.
   public async onEnrollNewCardCancel(socket: AuthenticatedWebSocket) {
     this.logger.log('Enroll new card cancelled by reader');
+    this.releaseClaim(socket.readerId, socket.state.enrollment?.screenClaim);
     socket.state.enrollment = null;
     this.cardConversations.abort(socket, 'CARD_REMOVED', 'enroll');
-  }
-
-  private readerSockets(readerId: number): AuthenticatedWebSocket[] {
-    return Array.from(this.websocketService.sockets.values()).filter((socket) => socket.readerId === readerId);
   }
 
   private isBusyWithCardFlow(socket: AuthenticatedWebSocket): boolean {
@@ -449,4 +565,29 @@ export class AttractapCardHandler {
       return CARD_WRITE_START_ERRORS.READER_NOT_ALLOWED_TO_WRITE_CARDS;
     }
   }
+}
+
+const ENROLL = 'card.enroll';
+const RESET = 'card.reset';
+/** Arming waits for the reader's ACK (with retries) on the holding instance. */
+const ROUTE_TIMEOUT_MS = 20_000;
+
+type AuditPrincipal = NonNullable<AuthenticatedWebSocket['state']['enrollment']>['auditPrincipal'];
+
+interface EnrollPayload {
+  readerId: number;
+  userId: number;
+  auditPrincipal: AuditPrincipal;
+  username: string;
+  displayName: string;
+  screenClaim?: string;
+}
+
+interface ResetPayload {
+  readerId: number;
+  cardId: number;
+  auditPrincipal: AuditPrincipal;
+  username: string;
+  displayName: string;
+  screenClaim?: string;
 }

@@ -1,4 +1,5 @@
 import { OnEvent } from '@nestjs/event-emitter';
+import { remoteEvent } from './reader-event-relay';
 import { Inject, Logger, Optional, UseInterceptors } from '@nestjs/common';
 import {
   OnGatewayConnection,
@@ -213,8 +214,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     this.onReaderSessionEnded(socket, reason, readerId);
     if (socket.state.supervisionFlow) this.supervisionHandler.cancelForSocket(socket);
     if (socket.state.massIntroductionFlow) this.massIntroductionHandler.cancelForSocket(socket, readerId);
-    socket.state.enrollment = null;
-    socket.state.resetNfcCardData = null;
+    this.cardHandler.endCardFlows(socket, readerId);
   }
 
   public async sendResourceList(readerId: number) {
@@ -222,6 +222,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   @OnEvent('settings.default-language')
+  @OnEvent(remoteEvent('settings.default-language'))
   async updateReaderLanguage(language: 'en' | 'de') {
     this.websocketService.readerLanguage = language;
     const readers = Array.from(this.websocketService.sockets.values()).filter((socket) =>
@@ -258,6 +259,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   /** Revoked or re-paired credentials end live sessions immediately. */
   @OnEvent(CREDENTIAL_CHANGED_EVENT)
+  @OnEvent(remoteEvent(CREDENTIAL_CHANGED_EVENT))
   public async onCredentialChanged(readerId: number) {
     await this.disconnectReader(readerId);
   }
