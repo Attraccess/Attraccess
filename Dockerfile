@@ -109,6 +109,10 @@ ENV WAGO_CC100_BUILD_ASSETS_PATH=/app/share/cc100-runtime
 # so they can be copied into shared volumes by a monitoring-init container.
 COPY --from=builder /app/monitoring /app/share/monitoring
 
+# Commit the image was built from, shown on the About page (version.service)
+ARG COMMIT_SHA=
+ENV COMMIT_SHA=${COMMIT_SHA}
+
 # Set environment variable to tell API about frontend location
 ENV NODE_ENV=production
 ENV STATIC_FRONTEND_FILE_PATH=/app/dist/apps/frontend
