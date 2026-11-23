@@ -243,6 +243,20 @@ void testGallery(SdlDisplay &display, const std::filesystem::path &screenshots)
             shot("form-select");
             forms.showSubmitError(FirmwareI18n::readerError("CARD_NOT_ACTIVE"));
             shot("form-submit-error");
+            field = API::ResourceUsageFormField{};
+            field.id = 3;
+            field.name = "Foto des Schadens";
+            field.description = "Bitte den Schaden aus zwei Richtungen fotografieren.";
+            field.type = API::ResourceUsageFormFieldType::IMAGE;
+            field.isRequired = true;
+            field.handoffUrl = "https://att.example/form-photo/AAAAAAAAAAAAAAAAAAAAAAAA";
+            field.imageCount = 1;
+            field.maxImages = 3;
+            forms.renderFormField(page, true, true, 3, 3);
+            shot("form-image");
+            result.errors[0].fieldId = 3;
+            forms.showFormPageErrors(result);
+            shot("form-image-required");
             forms.setFormPageNextCallback({});
         }
 

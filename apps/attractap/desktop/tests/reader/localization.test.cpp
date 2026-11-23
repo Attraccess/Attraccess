@@ -128,6 +128,19 @@ void ReaderWorkflow::testLocalization()
         assert(label(lv_screen_active(), "Required field"));
         assert(label(lv_screen_active(), "Please complete before starting") && label(lv_screen_active(), "Maintenance \xE2\x80\x93 Notes %s"));
         display.capture(output, "i18n-form-screen-english");
+        // The image field's instruction and live count follow the language without a rebuild.
+        page.fields[0].id = 6; page.fields[0].name = "Photos"; page.fields[0].type = API::ResourceUsageFormFieldType::IMAGE;
+        page.fields[0].handoffUrl = "https://att.example/form-photo/AAAAAAAAAAAAAAAAAAAAAAAA";
+        page.fields[0].imageCount = 1; page.fields[0].maxImages = 4;
+        Display::formsScreen.renderFormField(page, false, true, 2, 3);
+        auto *photoCount = label(lv_screen_active(), "1 of 4 photos");
+        assert(photoCount && label(lv_screen_active(), "Scan with your phone to add photos"));
+        refreshScreens("de");
+        assert(label(lv_screen_active(), "1 von 4 Fotos") == photoCount && label(lv_screen_active(), "Mit dem Handy scannen, um Fotos hinzuzufügen"));
+        display.capture(output, "i18n-form-image-german");
+        refreshScreens("en");
+        assert(label(lv_screen_active(), "1 of 4 photos") == photoCount);
+        display.capture(output, "i18n-form-image-english");
         Display::formsScreen.resetForm();
         Display::transitionToScreen(&Display::resourceListScreen);
         pump(1100); // Retire the fixture through the production screen router.

@@ -11,7 +11,9 @@ it('shows a form name with HTML characters as typed, not escaped twice', async (
     name: 'A & B <test> "quoted"',
     fields: [{ id: 1, name: 'Ø & ü', type: FormFieldType.TEXT, isRequired: true }],
   } as FormResponseDto;
-  render(<ResourceFormsModal isOpen action="start" forms={[form]} onSubmit={vi.fn()} onCancel={vi.fn()} />);
+  render(
+    <ResourceFormsModal resourceId={1} isOpen action="start" forms={[form]} onSubmit={vi.fn()} onCancel={vi.fn()} />,
+  );
   expect(await screen.findByText('Form A & B <test> "quoted"')).toBeTruthy();
   expect(screen.queryByText(/&amp;|&lt;|&quot;/)).toBeNull();
 });

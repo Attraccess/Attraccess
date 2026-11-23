@@ -100,6 +100,43 @@ void testFormScreens(SdlDisplay &display, const std::filesystem::path &screensho
         assert(submitted == "Option 12");
         page.fields[0] = field;
     }
+    {
+        // The image field: the QR code of the phone link and the live count, which changes in place.
+        const auto saved = field; // the page's field is a reference: put it back afterwards
+        field = API::ResourceUsageFormField{};
+        auto &image = field;
+        image.id = 7;
+        image.name = "Foto";
+        image.type = API::ResourceUsageFormFieldType::IMAGE;
+        image.isRequired = true;
+        image.handoffUrl = "https://att.example/form-photo/AAAAAAAAAAAAAAAAAAAAAAAA";
+        image.imageCount = 1;
+        image.maxImages = 3;
+        screen.renderFormField(page, false, true, 1, 1);
+        expectCleanLayout("form image field");
+        lv_refr_now(nullptr);
+        assert(display.pollEvents());
+        screenshot(screenshots, "usage-form-image.png");
+        auto *count = findLabel(lv_screen_active(), "1 von 3 Fotos");
+        auto *qr = findWidget(lv_screen_active(), &lv_qrcode_class);
+        assert(count && qr && lv_obj_is_visible(qr) && findLabel(lv_screen_active(), "Foto *"));
+        assert(findLabel(lv_screen_active(), "Mit dem Handy scannen, um Fotos hinzuzufügen"));
+        image.imageCount = 3;
+        screen.updateImageField(image);
+        assert(findLabel(lv_screen_active(), "3 von 3 Fotos") == count && findWidget(lv_screen_active(), &lv_qrcode_class) == qr);
+        // A field without a link shows no QR code.
+        image.handoffUrl.clear();
+        screen.updateImageField(image);
+        assert(!lv_obj_is_visible(qr));
+        FirmwareI18n::refreshTree(lv_screen_active(), "en");
+        assert(findLabel(lv_screen_active(), "3 of 3 photos") == count);
+        FirmwareI18n::refreshTree(lv_screen_active(), "de");
+        // The server fills in the photo ids: the page sends the field with an empty value and no local check.
+        submitted = "unset";
+        lv_obj_send_event(lv_obj_get_parent(findLabel(lv_screen_active(), "Absenden")), LV_EVENT_CLICKED, nullptr);
+        assert(submitted.empty());
+        field = saved;
+    }
     // A normal reader must preserve supplied options even when their IDs and
     // wording happen to match the built-in demo form.
     page.resourceId = 1;

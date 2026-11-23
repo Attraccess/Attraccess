@@ -1,10 +1,19 @@
 import { LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Input, TextArea } from '@heroui/react';
+import { DEFAULT_FORM_IMAGES, isValidFormImageLimit } from '@attraccess/application-models';
 import { Select } from '../../../components/select';
 import { FormFieldType } from '@attraccess/react-query-client';
 import en from '../en.json';
 import de from '../de.json';
-import { EditableFormField, TextFieldOptions, NumberFieldOptions, SelectFieldOptions } from '../types';
+import {
+  EditableFormField,
+  TextFieldOptions,
+  NumberFieldOptions,
+  SelectFieldOptions,
+  ImageFieldOptions,
+} from '../types';
+import { ImageCount } from '../images/ImageCount';
+import { ImagePickerButtons } from '../images/ImagePickerButtons';
 
 interface FormPreviewProps {
   fields: EditableFormField[];
@@ -42,7 +51,7 @@ export function FormPreview({ fields }: Readonly<FormPreviewProps>) {
   );
 }
 
-function renderPreviewField(field: EditableFormField, t: (key: string) => string) {
+function renderPreviewField(field: EditableFormField, t: (key: string, vars?: Record<string, unknown>) => string) {
   switch (field.type) {
     case FormFieldType.TEXT:
       return renderPreviewText(field.options as TextFieldOptions);
@@ -52,6 +61,8 @@ function renderPreviewField(field: EditableFormField, t: (key: string) => string
       return renderPreviewSelect(field.options as SelectFieldOptions, t, field.name);
     case FormFieldType.BOOLEAN:
       return renderPreviewBoolean(t);
+    case FormFieldType.IMAGE:
+      return renderPreviewImage(field.options as ImageFieldOptions, field.name);
     default:
       return <Input placeholder="…" />;
   }
@@ -90,6 +101,16 @@ function renderPreviewBoolean(t: (key: string) => string) {
       <span className="text-xs text-default-500">{t('preview.booleanNo')}</span>
       <LabeledSwitch aria-label={t('preview.booleanLabel')} />
       <span className="text-xs text-default-500">{t('preview.booleanYes')}</span>
+    </div>
+  );
+}
+
+function renderPreviewImage(options: ImageFieldOptions, fieldName: string) {
+  const max = isValidFormImageLimit(options.maxImages) ? options.maxImages : DEFAULT_FORM_IMAGES;
+  return (
+    <div className="flex flex-col gap-3">
+      <ImagePickerButtons label={fieldName} multiple={max > 1} isDisabled onFiles={() => undefined} />
+      <ImageCount added={0} max={max} />
     </div>
   );
 }

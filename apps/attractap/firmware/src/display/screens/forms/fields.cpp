@@ -85,8 +85,16 @@ void FormsScreen::buildCurrentFormField()
          widget.definition = &field;
          widget.owner = this;
          widget.selectOptionEventCount = 0;
+         widget.imageQrCard = nullptr;
+         widget.imageQrCode = nullptr;
+         widget.imageCountLabel = nullptr;
+         widget.imageUrl.clear();
 
-         if (field.type == API::ResourceUsageFormFieldType::BOOLEAN)
+         if (field.type == API::ResourceUsageFormFieldType::IMAGE)
+         {
+            this->createImageField(fieldContainer, widget, field);
+         }
+         else if (field.type == API::ResourceUsageFormFieldType::BOOLEAN)
          {
             lv_obj_t *sw = lv_switch_create(fieldContainer);
             widget.input = sw;
@@ -456,6 +464,16 @@ bool FormsScreen::collectCurrentField(API::FormPageSubmission &outPage)
          hasErrors = true;
       };
 
+      if (widget.type == API::ResourceUsageFormFieldType::IMAGE)
+      {
+         // The photos reach the server from the phone; the server fills in their ids and decides whether enough were
+         // added (REQUIRED_FIELD comes back on the button like for any other field).
+         API::FormSubmissionAnswer &answer = outPage.answers[outPage.answerCount++];
+         answer.fieldId = widget.fieldId;
+         answer.type = API::FormSubmissionAnswer::ValueType::STRING;
+         answer.stringValue = "";
+         continue;
+      }
       if (widget.type == API::ResourceUsageFormFieldType::BOOLEAN)
       {
          bool isChecked = widget.input && lv_obj_has_state(widget.input, LV_STATE_CHECKED);

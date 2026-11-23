@@ -1,6 +1,6 @@
 # Formulare
 
-<!-- llms-description: Stellt Formulare vor, die bei der Ressourcennutzung abgefragt werden, inklusive Geltungsbereich, Anzeigezeitpunkten, Feldtypen und Einreichungen. -->
+<!-- llms-description: Stellt Formulare vor, die bei der Ressourcennutzung abgefragt werden, inklusive Geltungsbereich, Anzeigezeitpunkten, Feldtypen (auch Fotos) und Einreichungen. -->
 
 Mit Formularen können Sie Informationen von Benutzern erfassen, wenn diese mit einer Ressource interagieren. Sie legen ein Formular einmal an und wählen, wo es gilt: für eine Ressource, für alle Ressourcen einer Ressourcengruppe oder für alle Ressourcen. Ein Formular kann zu verschiedenen Zeitpunkten während einer Nutzungssitzung verlangt werden.
 
@@ -61,15 +61,18 @@ Formulare unterstützen die folgenden Feldtypen:
 | **Zahl**          | Numerische Eingabe                   | Dauer, Gewicht, Menge                                                                  |
 | **Ja / Nein**     | Schalter (Ja/Nein)                   | "Arbeitsplatz aufgeräumt?", "Sicherheitscheck durchgeführt?", "Ich akzeptiere die AGB" |
 | **Einzelauswahl** | Dropdown mit vordefinierten Optionen | Materialtyp, Projektauswahl                                                            |
+| **Bild**          | Ein oder mehrere Fotos (bis zu 10)   | Foto eines Schadens, des fertigen Teils                                                |
 
 > [!TIP]
 > Ein **Ja / Nein**-Feld, das als **Pflichtfeld** markiert ist, muss auf **Ja** (aktiviert) gesetzt werden, bevor das Formular abgesendet werden kann. Dies eignet sich ideal dazu, Benutzer zum Akzeptieren der AGB oder zur Bestätigung von Sicherheitshinweisen zu zwingen. Details siehe [Formulare erstellen](forms/creating-forms.md).
+
+Mit einem **Bild**-Feld nehmen Benutzer im Web Fotos auf oder laden sie hoch, an einem Touchleser fügen sie diese per QR-Code vom Smartphone aus hinzu. Die Fotos sehen nur der Absender und Benutzer mit der Berechtigung **Ressourcen verwalten**. Details sowie Hinweise zu Datenschutz und Speicher stehen unter [Formulare erstellen](forms/creating-forms.md).
 
 Formulare werden bei Maschinen-Ressourcen angezeigt. Ein Formular, das zu keinem Zeitpunkt verlangt wird, wird nie angezeigt.
 
 ## Formulare auf Attractap-Lesegeräten
 
-Lesegeräte laden die Felder eines Formulars live, Änderungen kommen also bei der nächsten Abfrage an. Ein Lesegerät zeigt höchstens vier Formulare auf einmal. Sind mehr Formulare verlangt, fragt das Lesegerät die nächsten ab, sobald die ersten ausgefüllt sind. Die Sitzung startet oder endet erst, wenn alle ausgefüllt sind. Dafür ist eine Lesegeräte-Firmware nötig, die das unterstützt; ältere Firmware bleibt nach den ersten vier Formularen stehen.
+Lesegeräte laden die Felder eines Formulars live, Änderungen kommen also bei der nächsten Abfrage an. Ein Lesegerät zeigt höchstens vier Formulare auf einmal. Sind mehr Formulare verlangt, fragt das Lesegerät die nächsten ab, sobald die ersten ausgefüllt sind. Die Sitzung startet oder endet erst, wenn alle ausgefüllt sind. Dafür ist eine Lesegeräte-Firmware nötig, die das unterstützt; ältere Firmware bleibt nach den ersten vier Formularen stehen. Ältere Firmware kann außerdem keine **Bild**-Felder anzeigen: optionale werden übersprungen, ein erforderliches muss in der Web-App ausgefüllt werden.
 
 ## Formulareinreichungen
 

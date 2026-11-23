@@ -70,13 +70,19 @@
       },
       "boolean": {
         "description": "Ja/Nein-Felder verwenden einen Schalter und benötigen keine weiteren Optionen."
+      },
+      "image": {
+        "maxImages": "Max. Bilder",
+        "maxImagesInvalid": "Gib eine ganze Zahl von {{min}} bis {{max}} ein",
+        "description": "Benutzer können bis zu so viele Fotos anhängen."
       }
     },
     "types": {
       "text": "Text",
       "number": "Zahl",
       "select": "Einzelauswahl",
-      "boolean": "Ja / Nein"
+      "boolean": "Ja / Nein",
+      "image": "Bild"
     }
   },
   "preview": {

@@ -54,6 +54,11 @@ protected:
         uint16_t widgetIndex = 0;
         SelectOptionEventData selectOptionEvents[API::MAX_SELECT_OPTIONS];
         uint8_t selectOptionEventCount = 0;
+        // IMAGE fields: the QR code of the phone link and the live count; both are updated in place.
+        lv_obj_t *imageQrCard = nullptr;
+        lv_obj_t *imageQrCode = nullptr;
+        lv_obj_t *imageCountLabel = nullptr;
+        std::string imageUrl; // what the QR code shows now
     };
 
     FormFieldWidget formFieldWidgets[API::MAX_FORM_PAGE_FIELDS];

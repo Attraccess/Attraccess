@@ -17,7 +17,8 @@ const AUTH_DECORATORS = new Set([
 ]);
 
 /** Guards accepted inside @UseGuards(...) as a sign-in. */
-const AUTH_GUARDS = new Set(['DualAuthGuard', 'MetricsGuard', 'CompanionAuthGuard']);
+// FormImageViewerGuard signs in through DualAuthGuard and only changes the failure from 401 to 404.
+const AUTH_GUARDS = new Set(['DualAuthGuard', 'MetricsGuard', 'CompanionAuthGuard', 'FormImageViewerGuard']);
 
 /** What a public route checks. `none` routes serve public data; everything else must be rate limited or exempt. */
 type Credential = 'none' | 'password' | 'shared-secret' | 'signature' | 'random-token';
@@ -225,6 +226,30 @@ const REVIEWED_PUBLIC_ROUTES: Record<string, ReviewedPublicRoute> = {
     reason: 'emailed single-use token',
     credential: 'random-token',
     exemption: 'emailed 128-bit single-use token; guessing is infeasible',
+  },
+  'FormPhotoController.page': {
+    reason: 'phone page of a reader photo link; the 144-bit link token authorises, 410 for any other token',
+    credential: 'random-token',
+    exemption:
+      '144-bit random link token, so guessing is infeasible; the routes also have a per-IP limit of their own (FormPhotoRateLimitGuard)',
+  },
+  'FormPhotoController.upload': {
+    reason: 'phone upload through a reader photo link; only that link can add photos to its open form',
+    credential: 'random-token',
+    exemption:
+      '144-bit random link token, so guessing is infeasible; the routes also have a per-IP limit of their own (FormPhotoRateLimitGuard)',
+  },
+  'FormPhotoController.image': {
+    reason: 'phone page thumbnail; only images uploaded under the same link token',
+    credential: 'random-token',
+    exemption:
+      '144-bit random link token, so guessing is infeasible; the routes also have a per-IP limit of their own (FormPhotoRateLimitGuard)',
+  },
+  'FormPhotoController.remove': {
+    reason: 'phone page removal; only images uploaded under the same link token',
+    credential: 'random-token',
+    exemption:
+      '144-bit random link token, so guessing is infeasible; the routes also have a per-IP limit of their own (FormPhotoRateLimitGuard)',
   },
   'UsersRegistrationController.requestPasswordReset': { reason: 'password reset flow', credential: 'none' },
   'UsersRegistrationController.changePasswordViaResetToken': {

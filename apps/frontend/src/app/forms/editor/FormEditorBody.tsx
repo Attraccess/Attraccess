@@ -8,7 +8,7 @@ import { FormFieldsSection } from './FormFieldsSection';
 import { FormSettingsSections } from './FormSettingsSections';
 import { FormScopeSection } from './FormScopeSection';
 import { FormAppliesToSection } from './FormAppliesToSection';
-import { hasScopeOwner } from './formPayloads';
+import { hasScopeOwner, hasValidImageFields } from './formPayloads';
 import { useFormsTranslations } from '../useFormsTranslations';
 
 interface FormEditorBodyProps {
@@ -32,7 +32,7 @@ export function FormEditorBody({
 }: Readonly<FormEditorBodyProps>) {
   const { t } = useFormsTranslations();
   const activeResourceCount = (appliedResources ?? []).filter((resource) => !resource.disabled).length;
-  const canSave = form.name !== '' && form.fields.length > 0 && hasScopeOwner(form);
+  const canSave = form.name !== '' && form.fields.length > 0 && hasScopeOwner(form) && hasValidImageFields(form);
 
   return (
     <div className="grid gap-8 lg:grid-cols-[2fr_1fr]" data-cy="form-editor-page">

@@ -1,6 +1,6 @@
 # Forms
 
-<!-- llms-description: Introduces forms collected from users at points of resource use, including where a form applies, when it is shown, field types and submissions. -->
+<!-- llms-description: Introduces forms collected from users at points of resource use, including where a form applies, when it is shown, field types (including photos) and submissions. -->
 
 Forms let you collect information from users when they interact with a resource. You define a form once and choose where it applies: one resource, every resource in a resource group, or every resource. A form can be required at different points during a usage session.
 
@@ -61,15 +61,18 @@ Forms support the following field types:
 | **Number**        | Numeric input                    | Duration, weight, quantity                                       |
 | **Yes / No**      | Switch (yes/no)                  | "Workspace cleaned?", "Safety check done?", "I accept the terms" |
 | **Single choice** | Dropdown with predefined options | Material type, project selection                                 |
+| **Image**         | One or more photos (up to 10)    | Photo of damage, of the finished part                            |
 
 > [!TIP]
 > A **Yes / No** field marked as **Required** must be set to **Yes** (checked) before the form can be submitted. This is ideal for forcing users to accept terms and conditions or confirm safety instructions. See [Creating Forms](forms/creating-forms.md) for details.
+
+An **Image** field lets users take or upload photos on the web and, on a touch reader, add them from their phone through a QR code. Only the submitter and users with the **Manage Resources** permission can see the photos. Details, privacy and storage notes are in [Creating Forms](forms/creating-forms.md).
 
 Forms are shown for machine resources. A form with no required point is never shown.
 
 ## Forms on Attractap Readers
 
-Readers fetch a form's fields live, so changes reach them the next time a form is requested. A reader shows at most four forms at a time. If more forms are required, the reader asks for the next forms after the first ones are filled in, and the session only starts or ends once all of them are done. This needs reader firmware that supports it; older firmware stops after the first four forms.
+Readers fetch a form's fields live, so changes reach them the next time a form is requested. A reader shows at most four forms at a time. If more forms are required, the reader asks for the next forms after the first ones are filled in, and the session only starts or ends once all of them are done. This needs reader firmware that supports it; older firmware stops after the first four forms. Older firmware also cannot show **Image** fields: optional ones are skipped, and a required one has to be completed in the web app.
 
 ## Form Submissions
 

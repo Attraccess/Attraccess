@@ -105,7 +105,7 @@ static JsonDocument loadFixture(const char *name)
     return doc;
 }
 
-// The event API::sendFirmwareInfo sends, built the same way (buildFirmwareInfo plus the cardRelay and ble
+// The event API::sendFirmwareInfo sends, built the same way (buildFirmwareInfo plus the cardRelay, formImages and ble
 // blocks auth.cpp adds), against the shared capability fixtures. Longest identity strings of the real
 // variants, so the size check is the worst case.
 static void roundTrip(const char *name, const ui::VariantTraits &traits, const char *fixture)
@@ -117,6 +117,8 @@ static void roundTrip(const char *name, const ui::VariantTraits &traits, const c
                            4294967295u, "secure-lab", false, 65535},
                           traits, uiCaps, sizeof uiCaps);
     event["data"]["payload"]["capabilities"]["cardRelay"] = true;
+    // auth.cpp adds it in display (HAS_LVGL_DISPLAY) builds only: readers without a display never get image fields.
+    if (traits.hasDisplay) event["data"]["payload"]["capabilities"]["formImages"] = true;
     char bleCaps[ble::CAPABILITY_SCRATCH];
     ble::fillCapability(event["data"]["payload"]["capabilities"], bleCaps, sizeof bleCaps);
     CHECK(std::strlen(bleCaps) + 1 < sizeof bleCaps, name << ": ble capability fits its scratch");
@@ -146,6 +148,8 @@ static void roundTrip(const char *name, const ui::VariantTraits &traits, const c
           name << ": core capabilities");
     CHECK(payload["capabilities"]["cardRelay"] == true && payload["capabilities"]["ble"]["version"] == 1,
           name << ": cardRelay and ble blocks");
+    CHECK(traits.hasDisplay ? payload["capabilities"]["formImages"] == true : payload["capabilities"]["formImages"].isNull(),
+          name << ": formImages only on display builds");
     JsonDocument expected = loadFixture(fixture);
     CHECK(payload["capabilities"]["ui"] == expected["payload"], name << ": capabilities.ui equals " << fixture);
 }
