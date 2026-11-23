@@ -242,6 +242,29 @@ describe('administration lifecycle hooks', () => {
     ]);
   });
 
+  it('records a machine list visibility change with its before and after values (ATT-843)', async () => {
+    const audit = recorder();
+    const service = {
+      getResourceVisibilitySettings: jest
+        .fn()
+        .mockResolvedValue({ activityVisibility: 'all', listVisibility: 'authenticated' }),
+      updateResourceVisibilitySettings: jest
+        .fn()
+        .mockResolvedValue({ activityVisibility: 'all', listVisibility: 'permitted-only' }),
+    };
+    const controller = new SettingsController(
+      service as never,
+      new SettingsAdministrationService(service as never, audit as never),
+    );
+    await controller.updateResourceVisibilitySettings({ listVisibility: 'permitted-only' }, req);
+    expect(service.updateResourceVisibilitySettings).toHaveBeenCalledWith({ listVisibility: 'permitted-only' });
+    expect(recorded(audit)).toEqual([
+      expect.objectContaining({
+        details: { settingKey: 'resources.listVisibility', before: 'authenticated', after: 'permitted-only' },
+      }),
+    ]);
+  });
+
   it('records ZIP upload/deletion and retry without archive content or raw errors', async () => {
     const audit = recorder();
     const manifest = { id: 'zip-plugin', name: 'Example', version: '1.0.0', pluginDirectory: 'example' };

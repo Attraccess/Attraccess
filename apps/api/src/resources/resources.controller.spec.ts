@@ -24,6 +24,7 @@ const dto = (resource: Resource, imageFilename = resource.imageFilename) =>
 describe('ResourcesController', () => {
   let controller: ResourcesController;
   let service: ResourcesService;
+  let listVisibility: { permittedForUserId: jest.Mock };
   const request = { user: { id: 9 } } as AuthenticatedRequest;
 
   beforeEach(async () => {
@@ -69,6 +70,7 @@ describe('ResourcesController', () => {
 
     controller = module.get<ResourcesController>(ResourcesController);
     service = module.get<ResourcesService>(ResourcesService);
+    listVisibility = module.get(ResourceListVisibilityService);
   });
 
   it('should be defined', () => {
@@ -107,6 +109,34 @@ describe('ResourcesController', () => {
         data: [dto(resources[0], 'public/path/1/test.jpg')],
       });
       expect(service.listResources).toHaveBeenCalledWith({ page: 1, limit: 10 });
+    });
+  });
+
+  describe('narrowed to permitted machines (ATT-843)', () => {
+    const reader = { user: { id: 7, effectivePermissions: new Set(['resources.read']) } } as AuthenticatedRequest;
+
+    beforeEach(() => {
+      listVisibility.permittedForUserId.mockResolvedValue(7);
+    });
+
+    it('getAll filters the query to the caller and says the list is narrowed', async () => {
+      jest.spyOn(service, 'listResources').mockResolvedValue({ data: [], total: 0, page: 1, limit: 10 });
+
+      const result = await controller.getAll({ page: 1, limit: 10 }, reader);
+
+      expect(listVisibility.permittedForUserId).toHaveBeenCalledWith(reader.user);
+      expect(service.listResources).toHaveBeenCalledWith(expect.objectContaining({ permittedForUserId: 7 }));
+      expect(result).toEqual({ data: [], total: 0, page: 1, limit: 10, visibilityScope: 'permitted' });
+    });
+
+    it('getAllInUse filters every page of the query to the caller', async () => {
+      jest.spyOn(service, 'listResources').mockResolvedValue({ data: [], total: 0, page: 1, limit: 100 });
+
+      expect(await controller.getAllInUse(reader)).toEqual([]);
+
+      expect(service.listResources).toHaveBeenCalledWith(
+        expect.objectContaining({ onlyInUse: true, permittedForUserId: 7 }),
+      );
     });
   });
 

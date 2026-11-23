@@ -120,6 +120,17 @@ describe('resource activity visibility setting (ATT-1149)', () => {
       expect(store.setPlainSetting).toHaveBeenCalledWith(RESOURCES_PARENT, 'list_visibility', 'authenticated');
     });
 
+    it('stores both fields when both are sent', async () => {
+      const { service, store } = serviceWith('permitted-only');
+      await service.updateResourceVisibilitySettings({
+        activityVisibility: 'introduced',
+        listVisibility: 'authenticated',
+      });
+      expect(store.setPlainSetting).toHaveBeenCalledTimes(2);
+      expect(store.setPlainSetting).toHaveBeenCalledWith(RESOURCES_PARENT, 'activity_visibility', 'introduced');
+      expect(store.setPlainSetting).toHaveBeenCalledWith(RESOURCES_PARENT, 'list_visibility', 'authenticated');
+    });
+
     it('rejects "public" and other values over HTTP, and accepts the two modes on their own', async () => {
       const settingsService = {
         getResourceVisibilitySettings: jest.fn(async () => ({
@@ -152,9 +163,19 @@ describe('resource activity visibility setting (ATT-1149)', () => {
             .set('x-test-permissions', JSON.stringify(['system.settings.manage']))
             .send(body);
         expect((await patch({ listVisibility: 'public' })).status).toBe(400);
+        // "all" is a value of the activity setting, not of the list setting.
+        expect((await patch({ listVisibility: 'all' })).status).toBe(400);
+        expect((await patch({ activityVisibility: 'introduced', listVisibility: 'all' })).status).toBe(400);
+        expect(settingsService.updateResourceVisibilitySettings).not.toHaveBeenCalled();
         expect((await patch({ listVisibility: 'authenticated' })).status).toBe(200);
         expect(settingsService.updateResourceVisibilitySettings).toHaveBeenCalledWith({
           listVisibility: 'authenticated',
+        });
+        const both = await patch({ activityVisibility: 'introduced', listVisibility: 'permitted-only' });
+        expect(both.status).toBe(200);
+        expect(settingsService.updateResourceVisibilitySettings).toHaveBeenLastCalledWith({
+          activityVisibility: 'introduced',
+          listVisibility: 'permitted-only',
         });
       } finally {
         await app.close();

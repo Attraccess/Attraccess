@@ -27,6 +27,7 @@ describe('ResourceGroupsService audit events', () => {
     update: jest.fn(),
     delete: jest.fn(),
     findById: jest.fn(),
+    isVisible: jest.fn(),
     resourceExists: jest.fn(),
     addResource: jest.fn(),
     removeResource: jest.fn(),
@@ -120,5 +121,34 @@ describe('ResourceGroupsService audit events', () => {
         details: { 'before.name': 'Workshop', 'before.isHidden': 0 },
       }),
     );
+  });
+
+  describe('getOne for a narrowed viewer (ATT-843)', () => {
+    const narrowed = { userId: 7, canUpdateResources: false, permittedOnly: true };
+
+    it('answers 404 for a group without a machine the viewer may see', async () => {
+      store.findById.mockResolvedValue(record());
+      store.isVisible.mockResolvedValue(false);
+      await expect(service.getOne({ id: 5 }, undefined, narrowed)).rejects.toMatchObject({ status: 404 });
+      expect(store.isVisible).toHaveBeenCalledWith(5, narrowed);
+    });
+
+    it('returns a group the viewer may see', async () => {
+      store.findById.mockResolvedValue(record());
+      store.isVisible.mockResolvedValue(true);
+      await expect(service.getOne({ id: 5 }, undefined, narrowed)).resolves.toMatchObject({ id: 5 });
+    });
+
+    it('does not ask the store for a resource manager or a viewer who sees every machine', async () => {
+      store.findById.mockResolvedValue(record());
+      await expect(
+        service.getOne({ id: 5 }, undefined, { ...narrowed, canUpdateResources: true }),
+      ).resolves.toMatchObject({ id: 5 });
+      await expect(service.getOne({ id: 5 }, undefined, { ...narrowed, permittedOnly: false })).resolves.toMatchObject({
+        id: 5,
+      });
+      await expect(service.getOne({ id: 5 })).resolves.toMatchObject({ id: 5 });
+      expect(store.isVisible).not.toHaveBeenCalled();
+    });
   });
 });
