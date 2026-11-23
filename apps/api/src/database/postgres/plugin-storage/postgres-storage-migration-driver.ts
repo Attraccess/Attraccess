@@ -9,7 +9,7 @@ import {
   type CompiledSchema,
   type PluginStorageOwner,
   type ResolvedStep,
-  legacyMigrationsTableName,
+  legacyMigrationsTableOf,
   versionsTableName,
 } from '../../../plugin-system/plugin-storage/storage-model';
 import { createRecordPort } from '../../../plugin-system/plugin-storage/storage-records';
@@ -30,7 +30,7 @@ class PostgresMigrationSession implements PluginStorageMigrationSession {
   ) {
     this.executor = new PostgresManagerExecutor(manager);
     this.versions = versionsTableName(owner.namespace);
-    this.legacy = legacyMigrationsTableName(owner.pluginName);
+    this.legacy = legacyMigrationsTableOf(owner);
   }
 
   private async tableExists(name: string): Promise<boolean> {
