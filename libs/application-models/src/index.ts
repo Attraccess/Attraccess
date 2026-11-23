@@ -4,6 +4,7 @@ export * from './lib/csv-export-template';
 export * from './lib/documentation-type';
 export * from './lib/email-template';
 export * from './lib/form';
+export * from './lib/form-image';
 export * from './lib/message';
 export * from './lib/node-type';
 export * from './lib/password-policy';

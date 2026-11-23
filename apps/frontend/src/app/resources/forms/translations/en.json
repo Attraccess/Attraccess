@@ -18,6 +18,10 @@
     "formHeading": "Form {{name}}",
     "selectPlaceholder": "Select an option",
     "selectInvalid": "Choose one of the available options",
-    "selectUnavailable": "No options available"
+    "selectUnavailable": "No options available",
+    "imageTooMany": {
+      "one": "At most {{count}} photo is allowed.",
+      "many": "At most {{count}} photos are allowed."
+    }
   }
 }

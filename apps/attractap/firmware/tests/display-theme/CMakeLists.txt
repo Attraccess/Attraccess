@@ -51,6 +51,7 @@ add_executable(display-theme-host
     parallel_sessions.cpp
     session_duration.cpp
     demo_form_options.cpp
+    forms_screen.cpp
     host_shims.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/logos.S"
     "${FIRMWARE_DIR}/src/display/theme.cpp"
@@ -84,6 +85,7 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/layout.cpp"
     "${FIRMWARE_DIR}/src/display/screens/forms/fields.cpp"
     "${FIRMWARE_DIR}/src/display/screens/forms/editor.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/forms/imageField.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsUiSlots.cpp"
     "${FIRMWARE_DIR}/src/display/ui/ui_builder.cpp"
     "${FIRMWARE_DIR}/src/display/ui/ui_slot_cache.cpp"

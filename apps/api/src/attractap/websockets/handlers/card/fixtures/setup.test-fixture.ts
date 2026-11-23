@@ -2,6 +2,7 @@
 import { SettingsService } from '../../../../../settings/settings.service';
 import { AttractapCardHandler } from '../card.handler';
 import { CardSessionService } from '../../ui/card-session.service';
+import { forgetReaderFormState } from '../../../websocket.types';
 import type { AttractapCardHandlerTestScope } from '../card.handler.spec';
 export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
   scope.handler = Object.create(AttractapCardHandler.prototype);
@@ -67,6 +68,10 @@ export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
       data.payload.resourceId,
     );
   (scope.handler as any).cardSessions = new CardSessionService();
+  // The forms handler forgets the form state of a login (and ends its photo links, not observed here).
+  (scope.handler as any).formsHandler = {
+    endReaderForms: jest.fn((socket: Parameters<typeof forgetReaderFormState>[0]) => forgetReaderFormState(socket)),
+  };
   (scope.handler as any).supervisionHandler = {
     cancelForSocket: jest.fn((socket: any) => {
       socket.state.supervisionFlow = null;

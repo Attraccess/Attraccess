@@ -297,6 +297,23 @@ describe('AttractapFirmwareHandler', () => {
     });
 
     it.each([
+      ['a reader that announces image fields', { capabilities: { formImages: true } }, true],
+      ['a non-boolean capability', { capabilities: { formImages: 'true' } }, false],
+      ['firmware without the capability', { capabilities: {} }, false],
+      ['firmware without capabilities', {}, false],
+    ])('sets formImages from FIRMWARE_INFO: %s', async (_name, info, expected) => {
+      fixture.mockFirmwareService.getFirmwareDefinition.mockResolvedValue(null);
+      // A reconnecting reader that downgraded must not keep a previous connection's capability.
+      fixture.socket.state.formImages = !expected;
+
+      await fixture.handler.handleFirmwareInfo(fixture.socket, {
+        payload: { name: 'attractap', variant: 'touch', version: '2.10.0', ...info },
+      } as AttractapEvent['data']);
+
+      expect(fixture.socket.state.formImages).toBe(expected);
+    });
+
+    it.each([
       [
         'a touch reader with the sessionDuration capability',
         { version: '3.0.0', capabilities: { sessionDuration: true } },

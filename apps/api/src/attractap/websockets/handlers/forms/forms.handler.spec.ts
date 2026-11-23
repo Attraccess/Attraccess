@@ -378,6 +378,7 @@ describe('AttractapFormsHandler', () => {
         7,
         0,
         5,
+        { imageFields: false },
       );
       expect(socket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -452,6 +453,7 @@ describe('AttractapFormsHandler', () => {
         ResourceFormAction.START,
         7,
         answers,
+        1,
       );
       expect(socket.state.formDrafts).toEqual({
         [`10:${ResourceFormAction.START}`]: { 1: 'v1', 2: 'v2' },
@@ -516,6 +518,7 @@ describe('AttractapFormsHandler', () => {
         ResourceFormAction.START,
         7,
         answers,
+        1,
       );
       expect(socket.state.formDrafts).toBeUndefined();
       expect(socket.sendMessage).toHaveBeenCalledWith(

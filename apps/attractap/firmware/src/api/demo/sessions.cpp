@@ -123,6 +123,7 @@ void DemoWebsocket::handleStartSession(JsonObjectConst payload)
     }
     sessions.push_back(session);
     _cncDraft.clear();
+    _cncImageCount = 0;
 
     respondActionSuccess("START_RESOURCE_USAGE_SESSION");
     respondResourceList();

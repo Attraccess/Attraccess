@@ -159,6 +159,16 @@ void API::onResourceUsageFormFields(JsonObject data)
             field.isRequired = fieldObj["isRequired"].is<bool>() ? fieldObj["isRequired"].as<bool>() : false;
             field.type = this->parseFormFieldType(fieldObj["type"].as<const char *>());
             this->parseFormFieldOptions(field, fieldObj["options"]);
+            if (field.type == ResourceUsageFormFieldType::IMAGE)
+            {
+                // The server owns the link; the reader only renders it as a QR code.
+                if (fieldObj["handoffUrl"].is<const char *>())
+                {
+                    field.handoffUrl = fieldObj["handoffUrl"].as<const char *>();
+                }
+                field.imageCount = fieldObj["imageCount"].is<uint32_t>() ? fieldObj["imageCount"].as<uint32_t>() : 0;
+                field.maxImages = fieldObj["maxImages"].is<uint32_t>() ? fieldObj["maxImages"].as<uint32_t>() : 1;
+            }
 
             JsonVariantConst valueVariant = fieldObj["value"];
             field.hasValue = false;
@@ -298,6 +308,10 @@ API::ResourceUsageFormFieldType API::parseFormFieldType(const char *type)
     {
         return ResourceUsageFormFieldType::SELECT;
     }
+    if (strcmp(type, "image") == 0)
+    {
+        return ResourceUsageFormFieldType::IMAGE;
+    }
     return ResourceUsageFormFieldType::UNKNOWN;
 }
 
@@ -417,6 +431,9 @@ void API::resetResourceUsageFormField(ResourceUsageFormField &field)
     field.options = ResourceUsageFormFieldOptions{};
     field.hasValue = false;
     field.value = "";
+    field.handoffUrl = "";
+    field.imageCount = 0;
+    field.maxImages = 1;
 }
 
 void API::serializeFormPageSubmission(JsonObject payload, const FormPageSubmission &page)

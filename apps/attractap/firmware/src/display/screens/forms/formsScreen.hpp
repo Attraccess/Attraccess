@@ -31,6 +31,9 @@ public:
     void showFormPageErrors(const API::ResourceUsageFormPageResult &result);
     // The server could not take the page at all: shown in place on Next/Submit.
     void showSubmitError(const FirmwareI18n::Text &text);
+    // A fresh copy of the image field on the page: the count follows and the QR code changes only with its link.
+    // Nothing else on the page (typed answers, scroll position, errors) is touched.
+    void updateImageField(const API::ResourceUsageFormField &field);
     // Closes an open text editor; leaving the screen is the router's business.
     void resetForm();
     void setFormPageNextCallback(std::function<void(const API::FormPageSubmission &)> callback);
@@ -53,6 +56,8 @@ private:
     static void onFormsEditorCancel(lv_event_t *e);
     static void onSelectOptionClick(lv_event_t *e);
     static void onSelectContainerSizeChanged(lv_event_t *e);
+    void createImageField(lv_obj_t *fieldContainer, FormFieldWidget &widget, const API::ResourceUsageFormField &field);
+    void showImageQr(FormFieldWidget &widget, const std::string &url);
     void updateSelectButtonStyles(FormFieldWidget &widget);
     void updateSelectOptionLayout(FormFieldWidget &widget);
     void buildFormsView();

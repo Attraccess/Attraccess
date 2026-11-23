@@ -38,7 +38,12 @@ import { AuditActor } from '../../../audit/recorder/audit-event';
 import type { PreStartOrigin } from '@attraccess/plugins-backend-sdk';
 import type { ReaderUiLanguage } from '../../../plugin-system/reader-ui/host-texts';
 import { usageFlowPayload } from './usage-flow-payload';
-import { MissingBillingTransactionError, USAGE_SESSION_STORE, UsageSessionStore } from '../usage-session-store.port';
+import {
+  FormImageUnavailableError,
+  MissingBillingTransactionError,
+  USAGE_SESSION_STORE,
+  UsageSessionStore,
+} from '../usage-session-store.port';
 
 /** Log context shared by the usage collaborators, so their log lines read as before the split. */
 export const RESOURCE_USAGE_LOG_CONTEXT = 'ResourceUsageService';
@@ -153,7 +158,9 @@ export class UsageLifecycle {
     try {
       await this.sessions.applyAttemptDrafts(attempt, context);
     } catch (error) {
-      if (error instanceof MissingBillingTransactionError) throw new ConflictException(error.message);
+      if (error instanceof MissingBillingTransactionError || error instanceof FormImageUnavailableError) {
+        throw new ConflictException(error.message);
+      }
       throw error;
     }
   }
