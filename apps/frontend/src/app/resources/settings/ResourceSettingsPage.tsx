@@ -38,6 +38,9 @@ export function fromResource(resource: Resource): FormData {
     description: resource.description ?? '',
     allowTakeOver: resource.allowTakeOver ?? false,
     maxParallelSessions: resource.maxParallelSessions ?? 1,
+    maxSessionDurationMinutes: resource.maxSessionDurationMinutes ?? null,
+    requireSessionDurationEstimate: resource.requireSessionDurationEstimate ?? false,
+    defaultSessionDurationEstimateMinutes: resource.defaultSessionDurationEstimateMinutes ?? null,
     type: resource.type ?? ResourceType.MACHINE,
     separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch ?? false,
     accessOnly: resource.accessOnly ?? false,
@@ -108,6 +111,11 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
     if (updateResource.isPending) return;
     if (!formData || !formData.name?.trim()) {
       toast.error({ title: t('inputs.name.required') });
+      return;
+    }
+    const { maxSessionDurationMinutes: maxMinutes, defaultSessionDurationEstimateMinutes: defaultMinutes } = formData;
+    if (formData.type !== ResourceType.DOOR && maxMinutes && defaultMinutes && defaultMinutes > maxMinutes) {
+      toast.error({ title: t('inputs.machine.sessionDuration.defaultEstimate.tooLong') });
       return;
     }
     submittedRevision.current = editRevision.current;

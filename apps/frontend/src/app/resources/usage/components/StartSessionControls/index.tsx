@@ -20,6 +20,7 @@ import {
   SupervisionMode,
 } from '@attraccess/react-query-client';
 import { useStartSessionWithConfirmation } from '../../hooks/useStartSessionWithConfirmation';
+import { useSessionDurationEstimate } from '../../hooks/useSessionDurationEstimate';
 import { ResourceFormAction } from '../../../../forms/types';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -147,6 +148,7 @@ export function StartSessionControls(
   );
 
   const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(resourceId);
+  const { ask: askDuration, dialog: durationDialog } = useSessionDurationEstimate(resourceId);
   const notifyStartSuccess = onStartSuccessBase;
   const onStartSuccess = useCallback(() => {
     clearFormsDraft();
@@ -244,6 +246,11 @@ export function StartSessionControls(
   const handleStartSession = useCallback(
     async (opts?: StartUsageSessionDto) => {
       const action: ResourceFormAction = opts?.forceTakeOver ? 'takeover' : 'start';
+      // The estimate comes first and stays in the request body, so every retry (forms, plugin confirmation) sends it.
+      const estimate = await askDuration();
+      if (estimate === null) {
+        return;
+      }
       const formSubmissions = await gatherFormSubmissions(action);
       if (formSubmissions === null) {
         return;
@@ -253,6 +260,7 @@ export function StartSessionControls(
         ...(opts ?? {}),
         projectId: selectedProjectId,
         formSubmissions,
+        ...(estimate === undefined ? {} : { estimatedDurationMinutes: estimate }),
       };
 
       // Not introduced but supervision is allowed: defer to supervisor approval
@@ -266,6 +274,7 @@ export function StartSessionControls(
       submitStartSessionWithRetry(action, requestBody);
     },
     [
+      askDuration,
       gatherFormSubmissions,
       needsSupervisor,
       selectedProjectId,
@@ -291,7 +300,10 @@ export function StartSessionControls(
     () => unlatchDoorMutate({ path: { resourceId: resourceId } }),
     [resourceId, unlatchDoorMutate],
   );
-  const handleOpenDoor = useCallback(() => openDoorMutate({ path: { resourceId: resourceId } }), [openDoorMutate, resourceId]);
+  const handleOpenDoor = useCallback(
+    () => openDoorMutate({ path: { resourceId: resourceId } }),
+    [openDoorMutate, resourceId],
+  );
 
   return (
     <div {...divProps}>
@@ -352,6 +364,7 @@ export function StartSessionControls(
         />
       )}
       {formsModal}
+      {durationDialog}
       {confirmationDialog}
     </div>
   );

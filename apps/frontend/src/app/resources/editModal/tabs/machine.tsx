@@ -19,6 +19,7 @@ import { AlertStatusIcon, LabeledSwitch, useTranslations } from '@attraccess/plu
 import nodeTranslationsDe from '../../details/flows/node/de.json';
 import nodeTranslationsEn from '../../details/flows/node/en.json';
 import { EditorTabProps } from './props';
+import { SessionDurationSettings } from './SessionDurationSettings';
 import en from '../resourceEditModal.en.json';
 import de from '../resourceEditModal.de.json';
 
@@ -149,6 +150,8 @@ export function MachineTab(props: EditorTabProps) {
           </AlertContent>
         </Alert>
       )}
+
+      <SessionDurationSettings formData={formData} setField={setField} />
     </div>
   );
 }

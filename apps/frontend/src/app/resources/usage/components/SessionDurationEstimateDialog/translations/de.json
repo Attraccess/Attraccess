@@ -1,0 +1,14 @@
+{
+  "title": "Wie lange nutzt du diese Maschine?",
+  "label": "Maximale Nutzungsdauer",
+  "hours": "Stunden",
+  "minutes": "Minuten",
+  "quickPicks": "Schnellauswahl",
+  "hint": "Die Maschine stoppt spätestens nach dieser Zeit automatisch. Du kannst während der Nutzung verlängern.",
+  "max": "Die maximale Sitzungsdauer dieser Maschine beträgt {{max}}.",
+  "tooLong": "Die Zeit darf nicht länger als {{max}} sein.",
+  "tooShort": "Gib mindestens eine Minute ein.",
+  "tooLongAbsolute": "Die Zeit darf nicht länger als 30 Tage sein.",
+  "cancel": "Abbrechen",
+  "confirm": "Starten"
+}
