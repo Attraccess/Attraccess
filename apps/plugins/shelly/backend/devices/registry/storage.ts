@@ -38,7 +38,7 @@ export const SHELLY_LEGACY_MIGRATIONS = ['CreateShellyDevices1749470400000'] as 
 export const shellyStorage = definePluginStorage({
   tables: { devices },
   migrations: [{ version: 1, name: 'baseline', steps: [step.createTable('devices', devices)] }],
-  adoption: { legacyMigrations: SHELLY_LEGACY_MIGRATIONS },
+  adoption: { legacyMigrations: SHELLY_LEGACY_MIGRATIONS, namespace: 'shelly' },
 });
 
 /** The persisted device record (`authState` narrowed to the values the plugin writes). */

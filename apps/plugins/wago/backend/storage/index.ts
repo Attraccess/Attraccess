@@ -16,7 +16,7 @@ export const wagoStorage = definePluginStorage({
       steps: Object.entries(wagoTables).map(([name, definition]) => step.createTable(name, definition)),
     },
   ],
-  adoption: { legacyMigrations: WAGO_LEGACY_MIGRATIONS },
+  adoption: { legacyMigrations: WAGO_LEGACY_MIGRATIONS, namespace: 'wago' },
 });
 
 /** Opens the record port of every WAGO table. Cheap: call it once per service. */

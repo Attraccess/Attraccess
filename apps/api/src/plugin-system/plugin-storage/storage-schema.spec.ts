@@ -132,6 +132,31 @@ describe('applyStep through compilePluginStorage', () => {
     expect(fromHead.migrations[0].steps[0]).toMatchObject({ table: { physical: 'plugin_demo_legacy' } });
   });
 
+  it('adopts 1.x names of the legacy namespace when the package name derives another one', () => {
+    const legacy = table(
+      { id: f.id(), ip: f.string() },
+      {
+        physicalName: 'plugin_shelly_devices',
+        indexes: [{ name: 'UQ_plugin_shelly_devices_ip', fields: ['ip'], unique: true }],
+      },
+    );
+    const definition = (adoption: Record<string, unknown>) => ({
+      tables: { devices: legacy },
+      migrations: [{ version: 1, name: 'baseline', steps: [step.createTable('devices', legacy)] }],
+      adoption: { legacyMigrations: ['CreateDevices1700000000000'], ...adoption },
+    });
+    const name = '@attraccess/plugin-shelly';
+
+    expect(() => compilePluginStorage(name, definition({}), options)).toThrow(
+      /physicalName "plugin_shelly_devices" must start with "plugin_attraccess_plugin_shelly_" or "attraccess_plugin_shelly_"/,
+    );
+    const compiled = compilePluginStorage(name, definition({ namespace: 'shelly' }), options);
+    expect(compiled.tables.get('devices')?.physical).toBe('plugin_shelly_devices');
+    expect(() => compilePluginStorage(name, definition({ namespace: 'Bad Name' }), options)).toThrow(
+      /adoption.namespace must be a lowercase identifier/,
+    );
+  });
+
   it('rejects a step that is no object and an operation it does not know', () => {
     rejectSteps(['createTable'], /migration 2 step 1 is not a step/);
     rejectSteps([null], /is not a step/);

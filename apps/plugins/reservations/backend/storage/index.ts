@@ -38,7 +38,7 @@ export const reservationsStorage = definePluginStorage({
       steps: Object.entries(tables).map(([name, definition]) => step.createTable(name, definition)),
     },
   ],
-  adoption: { legacyMigrations: RESERVATIONS_LEGACY_MIGRATIONS },
+  adoption: { legacyMigrations: RESERVATIONS_LEGACY_MIGRATIONS, namespace: 'reservations' },
 });
 
 export type ReservationsTables = PluginStorageTablesApi<typeof reservationsStorage.tables>;

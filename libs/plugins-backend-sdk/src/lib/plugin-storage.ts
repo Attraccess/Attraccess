@@ -145,7 +145,7 @@ export interface PluginStorageTable<Fields extends Record<string, PluginStorageF
   /**
    * Host-side table name when it differs from the derived `plugin_<plugin>_<logical>` name, to adopt a table a 1.x
    * release created. Allowed only on the tables version 1 of a definition with `adoption` creates; it must start with
-   * `plugin_<plugin>_` or `<plugin>_` and stay out of every other installed plugin's namespace. An adopted table may
+   * `plugin_<plugin>_` or `<plugin>_` (or those of `adoption.namespace`) and stay out of every other installed plugin's namespace. An adopted table may
    * not declare `decimal` fields (1.x stored decimals as REAL or text).
    */
   readonly physicalName?: string;
@@ -247,6 +247,13 @@ export const step = {
 export interface PluginStorageLegacyAdoption {
   /** Class names (with timestamp suffix) of every migration the 1.x plugin shipped, in order. */
   readonly legacyMigrations: readonly string[];
+  /**
+   * The storage namespace of the 1.x release (its plugin.json name, e.g. `shelly`) when the 2.x package name derives
+   * another one (`@attraccess/plugin-shelly` is `attraccess_plugin_shelly`). Adopted `physicalName`s and index names may
+   * then start with `plugin_<namespace>_` or `<namespace>_` of it as well as of the derived one, so installed 1.x
+   * tables keep their names and data.
+   */
+  readonly namespace?: string;
 }
 
 export interface PluginStorageDefinition<Tables extends PluginStorageTables = PluginStorageTables> {

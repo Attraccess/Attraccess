@@ -14,6 +14,7 @@ import {
   type CompiledPluginStorage,
   type CompiledSchema,
   type CompiledTable,
+  PluginStorageDeclarationError,
   type ResolvedStep,
 } from './storage-model';
 import { applyStep } from './storage-steps';
@@ -118,6 +119,7 @@ export function compilePluginStorage(
     reservedTables: options.reservedTables,
     siblingNamespaces: options.siblingNamespaces,
     adoptable: adopting,
+    legacyNamespace: legacyNamespaceOf(pluginName, definition),
   };
   if (!isRecord(definition) || !isRecord(definition.tables))
     return fail(naming, 'use definePluginStorage({ tables, migrations })');
@@ -199,6 +201,17 @@ function alignIndexNames(
     head.set(logical, { ...table, indexes });
   }
   return head;
+}
+
+/** The 1.x namespace an adopting definition declares (`adoption.namespace`), or undefined. */
+function legacyNamespaceOf(pluginName: string, definition: unknown): string | undefined {
+  const adoption = isRecord(definition) && isRecord(definition.adoption) ? definition.adoption : undefined;
+  const declared = adoption?.namespace;
+  if (declared === undefined) return undefined;
+  if (typeof declared !== 'string' || !/^[a-z][a-z0-9_]{0,40}$/.test(declared)) {
+    throw new PluginStorageDeclarationError(pluginName, 'adoption.namespace must be a lowercase identifier');
+  }
+  return declared;
 }
 
 function readLegacy(naming: StorageNaming, adoption: unknown): string[] {
