@@ -20,7 +20,7 @@ describe('hasValidImageFields', () => {
     ).toBe(true);
   });
 
-  it.each([0, 11, -1, 1.5, ''])('blocks saving with max images %s', (maxImages) => {
+  it.each<number | ''>([0, 11, -1, 1.5, ''])('blocks saving with max images %s', (maxImages) => {
     expect(hasValidImageFields(formWith(imageField(1), imageField(maxImages)))).toBe(false);
   });
 });
