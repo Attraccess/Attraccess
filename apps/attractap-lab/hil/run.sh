@@ -159,9 +159,14 @@ elif [[ -z "${READER_IMAGE:-}" ]]; then
   require_idf
   firmware="$ROOT/apps/attractap/firmware"
   build="$firmware/build/hil-$VARIANT"
+  # A plain lab image runs the "Secure this reader" conversion up to verify and refuses every burn (ATT-1208):
+  # -DATTRACTAP_CONVERSION_STOP_BEFORE_BURN=ON. Its conversion client needs sdkconfig.conversion, which ESP-IDF
+  # applies only to a fresh sdkconfig: an older build directory's sdkconfig is dropped once.
+  grep -q '^CONFIG_SPI_FLASH_DANGEROUS_WRITE_ALLOWED=y' "$build/sdkconfig" 2>/dev/null || rm -f "$build/sdkconfig"
   (cd "$firmware" && python3 tools/build_individual_ca_certs.py >/dev/null &&
     idf.py -B "$build" -DSDKCONFIG="$build/sdkconfig" -DATTRACTAP_VARIANT="$VARIANT" \
       -DATTRACTAP_LOG_LEVEL=DEBUG -DATTRACTAP_TEST_HOOKS=ON -DATTRACTAP_BEEPER_DEFAULT=OFF \
+      -DATTRACTAP_CONVERSION_STOP_BEFORE_BURN=ON \
       -DATTRACTAP_CRASH_TRIGGER=ON -DATTRACTAP_VERSION_OVERRIDE= -DATTRACTAP_LAB_CA="$LAB_CA" ${READER_CMAKE_ARGS:-} \
       build >"$WORK/reader-build.log")
   (cd "$build" && esptool --chip esp32s3 merge-bin -o "$WORK/reader.bin" @flash_args >/dev/null)
@@ -170,7 +175,7 @@ elif [[ -z "${READER_IMAGE:-}" ]]; then
   # ELF and build id): the reader runs this build, and its coredumps carry this ELF's build id.
   cp "$build/attractap.elf" "$WORK/reader.elf"
   READER_ELF="${READER_ELF:-$WORK/reader.elf}"
-  build_ota_image "$build" -DATTRACTAP_CRASH_TRIGGER=ON
+  build_ota_image "$build" -DATTRACTAP_CRASH_TRIGGER=ON -DATTRACTAP_CONVERSION_STOP_BEFORE_BURN=ON
 fi
 if [[ -n "$LAB_CA" ]]; then
   # A reader without the CA would only fail its handshakes; the update image must trust it too, or the

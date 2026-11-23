@@ -1,8 +1,27 @@
 #include "application.hpp"
 #include "../platform.hpp"
 #include "lite_door_tap.hpp"
+#include "../api/conversion/conversion_ui.hpp"
 
 void Application::processState() {
+  // The "Secure this reader" conversion (ATT-1208) owns NFC and the screen while it runs, like an OTA update.
+  const ConversionUi::Phase conversionPhase = ConversionUi::phase();
+  if (conversionPhase != ConversionUi::Phase::None) {
+    if (!this->conversionNfcSuspended) {
+      this->conversionNfcSuspended = true;
+      this->nfc.suspend();
+#ifdef HAS_LVGL_DISPLAY
+      this->massIntroduction.preempt(millis());
+#endif
+    }
+#ifdef HAS_LVGL_DISPLAY
+    if (Display::activeScreenName() != Display::secureConversionScreen.getName())
+      Display::transitionToScreen(&Display::secureConversionScreen);
+    Display::secureConversionScreen.show(conversionPhase, ConversionUi::percent());
+#endif
+    this->state = APPLICATION_STATE_FIRMWARE_UPDATE;
+    return;
+  }
   // OTA owns the UI even across disconnects and late card-flow callbacks.
   // Do not run sticky enrollment/reset workflows against suspended NFC.
   if (this->firmwareUpdateActive) {

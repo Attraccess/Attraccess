@@ -26,6 +26,7 @@
 #include "screens/supervision/supervisionScreen.hpp"
 #include "screens/massIntroduction/massIntroductionScreen.hpp"
 #include "screens/firmwareUpdate/firmwareUpdateScreen.hpp"
+#include "screens/secureConversion/secureConversionScreen.hpp"
 #include "screens/status/statusScreen.hpp"
 #include "screens/confirm/confirmScreen.hpp"
 #include "screens/networkStatus/networkStatusScreen.hpp"
@@ -75,6 +76,7 @@ public:
     static SupervisionScreen supervisionScreen;
     static MassIntroductionScreen massIntroductionScreen;
     static FirmwareUpdateScreen firmwareUpdateScreen;
+    static SecureConversionScreen secureConversionScreen;
     static StatusScreen statusScreen;
     static ConfirmScreen confirmScreen;
     static NetworkStatusScreen networkStatusScreen;

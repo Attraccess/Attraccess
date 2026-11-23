@@ -684,7 +684,9 @@ API signs them per installation. It is never available for demo variants.
   `"true"` while the variant's secure build is on. Customers see no change until a
   variant is flipped after its hardware run.
 - Standard builds refuse every fuse-burning option (Secure Boot, flash encryption, NVS
-  encryption, anti-rollback), so a web-flashable image can never burn eFuses.
+  encryption, anti-rollback), so a web-flashable image never burns eFuses on its own. The
+  only eFuse write a standard build can make is the conversion's digest burn (step 4
+  below), and only on the server's burn command naming this reader and the verified digests.
 - `secure-version-floor.txt` must equal `CONFIG_BOOTLOADER_APP_SECURE_VERSION`; CI
   fails if either decreases. The eFuse field has 16 steps: bump only for security fixes.
 - No TLS key material in PSRAM: mbedTLS keys, secrets, bignums, PK and cipher contexts
@@ -728,7 +730,9 @@ marks a reader secured only after its eFuse report shows that lock.
 
 ### eFuse report and profile claims (ATT-1207)
 
-The firmware never writes an eFuse. Secure builds only read them: once per session, right after
+The firmware writes exactly two eFuse fields, both during a "Secure this reader" conversion (see
+below): the digest burn (KEY0/KEY1) in the plain app and the `WR_DIS_RD_DIS` lock in the release
+secure app. Everything else is read only. Secure builds read the eFuses once per session, right after
 `READER_FIRMWARE_INFO`, the reader sends one `efuse.report` control frame inside the TLS session
 (`src/api/security/efuse_report.cpp`, `efuse_snapshot.cpp`). It lists, per key block, the purpose
 and whether it is used or read-protected, the two public Secure Boot digests (never any key
@@ -742,6 +746,72 @@ is expected to report _not secured_. `tests/efuse-report` checks the message for
 
 Lab secure readers use public keys and development-mode flash encryption; see
 `lab/secure-boot/README.md`.
+
+### "Secure this reader" conversion (ATT-1208, 2.14.0)
+
+A paired plain reader moves to the release secure profile over the network, keeping its P-256
+pairing identity. The server drives every step inside the `attractap-session.v1` session
+(`conversion.*` CONTROL frames); the reader only acts on them. Code: `src/api/conversion/`.
+
+Plain builds of a variant with `ATTRACTAP_SECURE_PROFILE_BUILD "true"` compile the conversion
+client (`ATTRACTAP_CONVERSION_CLIENT`) and send `capabilities.secureConversion: true` in
+`READER_FIRMWARE_INFO`. Once per session, before the eFuse report, every reader sends
+`conversion.status` (`none`, `transferring` with bytes/total, `verified`, `burned`; a secure app
+after its migration `migrated` with `rdDisLocked`).
+
+| Step | Who                | What                                                                                                                                                                                                                                                                                                                                                   |
+| ---- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1    | plain app          | `conversion.preflight` → `conversion.preflight-report`: chip and revision, flash size, MAC, partition-table SHA-256, KEY0–5 purpose/used/read/write protection, `SECURE_BOOT_EN`, `SPI_BOOT_CRYPT_CNT`, `DIS_DOWNLOAD_MANUAL_ENCRYPT`, JTAG, free internal heap and largest block, variant, version, profile. Read only; the server judges it. |
+| 2    | plain app          | `conversion.offer` (signed app and bootloader: sizes, SHA-256; both digests; variant; profile marker; secure-version floor). The reader requests 4 KiB chunks with `FIRMWARE_REQUEST_CHUNK` `{offset, length, conversion: "app" \| "bootloader", id}`; the app goes into the inactive OTA slot, the bootloader into the staging region. Then the NVS backup is staged. Resumable after any disconnect or power cut. |
+| 3    | plain app          | Verify, sent as `conversion.verified`: both signature blocks (RSA-PSS, the key digest equals `digest0`), both SHA-256 values, the variant (`FIRMWARE_VARIANT` and the firmware name in the image), the profile marker, `secure_version` ≥ floor, bootloader ≤ 0x8000, the NVS backup. |
+| 4    | plain app          | `conversion.burn {id, mac, digest0, digest1}`: burned only when the MAC is this reader's, the digests are the verified ones and KEY0/KEY1 are free; KEY0/KEY1 get purposes `SECURE_BOOT_DIGEST0/1` in one eFuse batch. The reader reports what it reads back (`conversion.burned`), or `conversion.burn-refused {reason}`. A repeated command burns nothing and reports again. |
+| 5, 6 | plain app          | `conversion.write-bootloader`: re-verify against the burned digests, re-stage the NVS backup if settings changed, then "Don't unplug": select the new slot, write the bootloader at 0x0 and read it back (on a mismatch the original bootloader is written back), erase the first sector of the old plain app, report `conversion.bootloader-written`, restart. |
+| 7    | bootloader         | Secure Boot on, release-mode flash encryption in place (brick window 2; nothing on screen).                                                                                                                                                                                                                                                       |
+| 8    | secure app         | Before anything else (`ConversionMigration::initNvs`, main.cpp): erase the plain NVS, init encrypted NVS (KEY4 HMAC key burned read-protected by ESP-IDF), write the staged namespaces, read them back, erase the staging region, then lock RD_DIS (`WR_DIS_RD_DIS`). The P-256 key in the staging region is erased with it.                    |
+| 10   | secure app, server | `conversion.status` `migrated`, then the eFuse report: the server marks the reader secured.                                                                                                                                                                                                                                                  |
+
+**Prepare boot (step 5).** `esp_ota_set_boot_partition` selects the new app, and after the bootloader
+write the first 4 KiB of the old plain app are erased. That app has no valid image header any more:
+the secure bootloader cannot boot it (it is unsigned anyway), and first-boot flash encryption skips
+an app partition without a valid image, so only the new app is encrypted, which keeps brick window 2
+short. To be validated on hardware in T4 (ATT-1209). Plain builds of conversion variants allow writes
+to the bootloader region (`sdkconfig.conversion`, `CONFIG_SPI_FLASH_DANGEROUS_WRITE_ALLOWED`);
+`sdkconfig.secure` and CMake forbid it in secure builds.
+
+**Staging region.** The last 256 KiB of `spiffs`: flash 0xFA0000..0xFE0000 (spiffs spans
+0xC90000..0xFE0000, coredump follows). Nothing in the firmware mounts or uses spiffs, and it is not
+flagged `encrypted`, so the secure app reads the region as the plain app wrote it.
+
+| Offset (in region) | Size    | Content                                                                                       |
+| ------------------ | ------- | --------------------------------------------------------------------------------------------- |
+| 0x00000            | 4 KiB   | Header: magic `ATSC`, version, conversion id, both digests, image sizes and SHA-256, app slot, CRC-32 |
+| 0x01000            | 4 KiB   | Progress: one bit per done 4 KiB chunk (cleared, never erased), NVS record, verified record    |
+| 0x02000            | 32 KiB  | Signed bootloader                                                                              |
+| 0x0A000            | 216 KiB | NVS backup of `readerpair`, `settings`, `cert_mgr` (not `demo_store`), format in `nvs_backup_codec.hpp` |
+
+While a valid header is present, nothing erases NVS: start-up skips the usual erase on
+`NO_FREE_PAGES`/`NEW_VERSION_FOUND`, and the bridge's factory reset is gated too. The staging data is
+deleted only after the secure app read the migrated entries back (a server `conversion.cancel`
+before the burn also wipes it). No log line carries keys, NVS values or staging payloads.
+
+**RD_DIS lock.** Compiled only into release secure images (`ATTRACTAP_RD_DIS_LOCK` in
+`conversion_build.hpp`): never into secure-lab, demo, debug (`sdkconfig.debug`), test-hook or
+stop-before-burn builds. It runs only while a conversion is pending (the staging header, or the
+`conversion` NVS marker after the region is gone), only once KEY4 holds the read-protected HMAC key,
+and only once (it checks the lock first). `tests/secure-conversion` proves the lock is compiled out
+of every other build flavour.
+
+**Screens.** A routed full-screen layout (`src/display/screens/secureConversion`), never a popup:
+transfer progress, "checking", and "Don't unplug" from the burn until the restart. NFC is suspended
+while it shows; a conversion that stops before the burn restarts the reader to give NFC back.
+Step 8 runs before the display exists and takes well under a second.
+
+**Stop-before-burn (lab/HIL only).** `-DATTRACTAP_CONVERSION_STOP_BEFORE_BURN=ON` needs
+`ATTRACTAP_TEST_HOOKS=ON`, and every test-hooks build has it on: the reader runs steps 1–3 and
+refuses every `conversion.burn` with reason `stop-before-burn` (the server records the conversion as
+failed and the reader stays plain), and the burn code itself is compiled out. `apps/attractap-lab/hil/run.sh`
+builds plain lab images with it; `build_firmwares.py` forces it off and `tools/check_release_build.py`
+fails a release image compiled with it.
 
 ## Building
 
@@ -859,7 +929,9 @@ asset shared by those screens, embedded once with four-byte alignment through
 ## Host Tests
 
 From the repository root, run `pnpm nx run attractap-firmware:test`. It runs
-SupervisionFlow logic tests, the UTF-8-safe text copy used for server-supplied names (`tests/text`:
+the "Secure this reader" conversion tests (`tests/secure-conversion`: staging format, NVS backup codec,
+conversion messages, burn decision incl. stop-before-burn, signature check against espsecure's output,
+and the RD_DIS lock build matrix), SupervisionFlow logic tests, the UTF-8-safe text copy used for server-supplied names (`tests/text`:
 display names are cut to 79 bytes in whole characters) and the
 [real LVGL host-rendering harness](tests/display-theme/README.md).
 The latter checks theme states, both logo assets, selected production screens

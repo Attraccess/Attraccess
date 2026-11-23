@@ -89,7 +89,7 @@ public:
     void setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback) override;
 #endif
     bool authenticatesReader() const override { return channel == Channel::Session; }
-    // Secure builds: sends the eFuse report once per session. No-op on plain builds and outside a session.
+    // Sends `conversion.status` and, on secure builds, the eFuse report once per session. No-op outside a session.
     void onFirmwareInfoSent() override;
 
     Channel currentChannel() const { return channel.load(); }
@@ -151,7 +151,7 @@ private:
     bool loadIdentity();
     bool newIdentity();
 
-    // Sends the eFuse report once per session (reader_link_report.cpp).
+    // Sends `conversion.status`, then the eFuse report, once per session (reader_link_report.cpp).
     void sendEfuseReport();
     bool sendControl(const std::string &json);
 
@@ -219,6 +219,8 @@ private:
     // handshake step on the worker (LVGL, LEDs and NFC would stall).
     std::atomic<bool> sessionReady{false};
     bool efuseReportSent = false;
+    // `conversion.status` (ATT-1208) went out this session; it precedes the eFuse report.
+    bool conversionStatusSent = false;
     // The firmware info went out, so the eFuse report is due; a refused one is retried from loop() (main task).
     bool efuseReportDue = false;
     uint32_t efuseRetryAt = 0;
