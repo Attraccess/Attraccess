@@ -2,8 +2,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadMatterPlatform, type MatterPlatform } from './matter-platform';
+import { expectOk } from './testing/expect-ok';
+import { http, REAL_CONTROLLER_DEADLINE_MS, startSidecar, validHeaders, type Running } from './testing/harness';
 import { freeUdpPort } from './testing/ports';
-import { http, startSidecar, validHeaders, type Running } from './testing/harness';
 import {
   commissionVirtualDevice,
   startVirtualDevice,
@@ -43,7 +44,7 @@ describe('restoring a snapshot keeps a commissioned device controllable', () => 
   async function startReal(storageDir: string) {
     let platform: MatterPlatform | undefined;
     const sidecar = await startSidecar(
-      { storageDir },
+      { storageDir, requestDeadlineMs: REAL_CONTROLLER_DEADLINE_MS },
       { loadPlatform: async (context) => (platform = await loadMatterPlatform(context)) },
     );
     stoppers.push(() => sidecar.stop());
@@ -56,7 +57,8 @@ describe('restoring a snapshot keeps a commissioned device controllable', () => 
 
     const original = tmp();
     const first = await startReal(original);
-    const created = (await post(first.sidecar, '/v1/fabric', { label: 'Attraccess' })).body;
+    const created = expectOk(first.sidecar, await post(first.sidecar, '/v1/fabric', { label: 'Attraccess' }));
+    expect(created.state).toBe('initialized');
     const controller = first.platform().fabric?.controller;
     if (!controller) throw new Error('the controller is not running');
     const nodeId = await commissionVirtualDevice(controller, device);
@@ -65,7 +67,7 @@ describe('restoring a snapshot keeps a commissioned device controllable', () => 
     await toggleDevice(controller, nodeId);
     expect(device.isOn()).toBe(true);
 
-    const snapshot = (await post(first.sidecar, '/v1/backup/snapshot', {})).body;
+    const snapshot = expectOk(first.sidecar, await post(first.sidecar, '/v1/backup/snapshot', {}));
     expect(snapshot.header.fabricId).toBe(created.fabricId);
     await first.sidecar.stop();
     rmSync(original, { recursive: true, force: true });
@@ -74,10 +76,12 @@ describe('restoring a snapshot keeps a commissioned device controllable', () => 
     expect((await http(second.sidecar.port, 'GET', '/v1/fabric', { headers: validHeaders() })).body.state).toBe(
       'uninitialized',
     );
-    const staged = (await post(second.sidecar, '/v1/backup/restore/stage', snapshot)).body;
-    const committed = await post(second.sidecar, '/v1/backup/restore/commit', { stageId: staged.stageId });
-    expect(committed.body.fabric).toMatchObject({ state: 'initialized', fabricId: created.fabricId });
-    await post(second.sidecar, '/v1/backup/restore/finalize', { stageId: staged.stageId });
+    const { stageId } = expectOk(second.sidecar, await post(second.sidecar, '/v1/backup/restore/stage', snapshot));
+    const committed = expectOk(second.sidecar, await post(second.sidecar, '/v1/backup/restore/commit', { stageId }));
+    expect(committed.fabric).toMatchObject({ state: 'initialized', fabricId: created.fabricId });
+    expect(expectOk(second.sidecar, await post(second.sidecar, '/v1/backup/restore/finalize', { stageId })).state).toBe(
+      'finalized',
+    );
 
     const restored = second.platform().fabric?.controller;
     if (!restored) throw new Error('the restored controller is not running');
