@@ -100,6 +100,31 @@ describe('permitted machines (persistence)', () => {
     expect(await store.permittedIds(viewer, [6])).toEqual([]);
   });
 
+  it('narrows further with the "only with permission" flag', async () => {
+    // Machine 6 is visible through the running session only, which is no permission to use it.
+    const found = await store.list({
+      page: 1,
+      limit: 50,
+      permittedForUserId: viewer,
+      onlyWithPermissionForUserId: viewer,
+    });
+    expect(found.data.map((resource) => resource.id)).toEqual([1, 3, 4, 5, 7, 8]);
+    expect(found.total).toBe(6);
+  });
+
+  it('narrows further with the "only in use by me" flag', async () => {
+    const mine = await store.list({ page: 1, limit: 50, permittedForUserId: viewer, onlyInUseByUserId: viewer });
+    expect(mine).toMatchObject({ total: 1, data: [expect.objectContaining({ id: 6 })] });
+    const both = await store.list({
+      page: 1,
+      limit: 50,
+      permittedForUserId: viewer,
+      onlyInUseByUserId: viewer,
+      onlyWithPermissionForUserId: viewer,
+    });
+    expect(both).toEqual({ data: [], total: 0 });
+  });
+
   describe('groups', () => {
     const narrowed = { userId: viewer, canUpdateResources: false, permittedOnly: true };
 
@@ -131,6 +156,98 @@ describe('permitted machines (persistence)', () => {
       // Only machine 2 is left: ungrouped, and its introduction was revoked.
       await source.query(`UPDATE "resource" SET "deletedAt" = now() WHERE id <> 2`);
       expect(await groups.hasVisibleResources(narrowed)).toBe(false);
+    });
+  });
+  /**
+   * Rule details on top of the shared rows, viewer 7 unless noted: 21 introduction blocked by retraining, 22 and 23 in
+   * group 40 whose introduction was revoked, 24 revoked then granted again at the same instant, 25 granted then revoked
+   * at the same instant, 26 someone else's running session, 27 direct introducer, 28 in group 41 the viewer maintains,
+   * 29 supervision allowed (alone in group 42), 30 supervision required, 31 introduction required.
+   */
+  describe('rule details', () => {
+    const stranger = 9;
+
+    beforeEach(async () => {
+      await source.query(`INSERT INTO "user" (id, username, email) VALUES (9, 'stranger', 'stranger@example.test')`);
+      await source.query(
+        `INSERT INTO "resource" (id, name, type) SELECT id, 'Machine ' || id, 'machine' FROM generate_series(21, 31) AS id`,
+      );
+      await source.query(
+        `UPDATE "resource" SET "retrainingMaxAgeDays" = 1, "retrainingBlocksAccess" = true WHERE id = 21`,
+      );
+      await source.query(`UPDATE "resource" SET "supervisionMode" = 'supervision_allowed' WHERE id = 29`);
+      await source.query(`UPDATE "resource" SET "supervisionMode" = 'supervision_required' WHERE id = 30`);
+      await source.query(`UPDATE "resource" SET "supervisionMode" = 'introduction_required' WHERE id = 31`);
+      await source.query(
+        `INSERT INTO "resource_group" (id, name, "isHidden") VALUES (40, 'Revoked', false), (41, 'Maintained', false), (42, 'Supervised', false)`,
+      );
+      await source.query(
+        `INSERT INTO "resource_groups_resource_group" ("resourceId", "resourceGroupId") VALUES (22, 40), (23, 40), (28, 41), (29, 42)`,
+      );
+      await source.query(
+        `INSERT INTO "resource_introduction" (id, "resourceId", "resourceGroupId", "receiverUserId", "completedAt") VALUES
+           (21, 21, NULL, 7, '2020-01-01'), (22, NULL, 40, 7, '2026-01-01'), (24, 24, NULL, 7, '2026-01-01'),
+           (25, 25, NULL, 7, '2026-01-01')`,
+      );
+      await source.query(
+        `INSERT INTO "resource_introduction_history_item" (id, "introductionId", action, "performedByUserId", "createdAt") VALUES
+           (21, 21, 'grant', 8, '2020-01-01'),
+           (22, 22, 'grant', 8, '2026-01-01'), (23, 22, 'revoke', 8, '2026-01-02'),
+           (24, 24, 'revoke', 8, '2026-01-03'), (25, 24, 'grant', 8, '2026-01-03'),
+           (26, 25, 'grant', 8, '2026-01-03'), (27, 25, 'revoke', 8, '2026-01-03')`,
+      );
+      await source.query(
+        `INSERT INTO "resource_introducer" ("resourceId", "resourceGroupId", "userId", type) VALUES
+           (27, NULL, 7, 'introducer'), (NULL, 41, 7, 'maintainer')`,
+      );
+      await source.query(
+        `INSERT INTO "resource_usage" ("usageAction", "resourceId", "userId", "isFinalized", "lifecyclePending") VALUES
+           ('usage', 26, 8, true, false)`,
+      );
+    });
+
+    it('still shows a machine whose introduction is blocked pending retraining', async () => {
+      expect(await store.permittedIds(viewer, [21])).toEqual([21]);
+    });
+
+    it('hides the machines of a group whose introduction was revoked', async () => {
+      expect(await store.permittedIds(viewer, [22, 23])).toEqual([]);
+      expect(await groups.isVisible(40, { userId: viewer, canUpdateResources: false, permittedOnly: true })).toBe(
+        false,
+      );
+    });
+
+    it('decides a revoke and a grant at the same instant by the later history id', async () => {
+      expect(await store.permittedIds(viewer, [24, 25])).toEqual([24]);
+    });
+
+    it("does not show a machine because of someone else's running session", async () => {
+      expect(await store.permittedIds(viewer, [26])).toEqual([]);
+      expect(await store.permittedIds(8, [26])).toEqual([26]);
+    });
+
+    it('shows a machine the viewer introduces directly or maintains through its group', async () => {
+      expect((await store.permittedIds(viewer, [27, 28])).sort()).toEqual([27, 28]);
+    });
+
+    it('shows machines that allow or require supervision to everyone, but not those that require an introduction', async () => {
+      expect((await store.permittedIds(stranger, [29, 30, 31])).sort()).toEqual([29, 30]);
+      const list = await store.list({ page: 1, limit: 50, permittedForUserId: stranger });
+      expect(list.data.map((resource) => resource.id)).toEqual([29, 30]);
+      expect(list.total).toBe(2);
+    });
+
+    it('lists a group that holds a supervised machine for everyone', async () => {
+      const narrowed = { userId: stranger, canUpdateResources: false, permittedOnly: true };
+      expect((await groups.listVisible(narrowed)).map((group) => group.id)).toEqual([42]);
+      expect(await groups.isVisible(42, narrowed)).toBe(true);
+      expect(await groups.hasVisibleResources(narrowed)).toBe(true);
+    });
+
+    it('lists the viewer every machine the rules allow, in name order', async () => {
+      const list = await store.list({ page: 1, limit: 50, permittedForUserId: viewer });
+      expect(list.data.map((resource) => resource.id)).toEqual([1, 21, 24, 27, 28, 29, 3, 30, 4, 5, 6, 7, 8]);
+      expect(list.total).toBe(13);
     });
   });
 });

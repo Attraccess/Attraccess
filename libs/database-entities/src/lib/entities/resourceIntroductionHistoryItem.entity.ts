@@ -1,9 +1,11 @@
 import { IntroductionHistoryAction } from '@attraccess/application-models';
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { ResourceIntroduction } from './resourceIntroduction.entity';
 import { User } from './user.entity';
 
+/** The latest entry of an introduction decides whether it is granted (ATT-843 and the introduction checks). */
+@Index('IDX_resource_introduction_history_item_latest', ['introductionId', 'createdAt', 'id'])
 @Entity()
 export class ResourceIntroductionHistoryItem {
   @PrimaryGeneratedColumn()

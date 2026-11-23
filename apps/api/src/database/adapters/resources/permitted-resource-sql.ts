@@ -1,3 +1,4 @@
+import { SupervisionMode } from '@attraccess/application-models';
 import { publishedState } from '../../../resources/usage/sessions/published-state';
 
 /** The value `:viewerId` must be bound to when {@link permittedResourceSql} is used. */
@@ -16,7 +17,8 @@ const groupsOf = (resourceIdSql: string) =>
 /**
  * True when the user may see the machine under the "permitted-only" rule (ATT-843): introducer or maintainer of it,
  * directly or through one of its groups; a currently granted introduction to it, directly or through a group (the
- * latest history item is a grant, so an introduction blocked by retraining still counts); or a running session on it.
+ * latest history item is a grant, so an introduction blocked by retraining still counts); a running session on it; or
+ * the machine allows or requires supervised use, so anyone may use it with a supervisor and must be able to find it.
  * Managers are decided by the caller, not here.
  *
  * `resourceIdSql` is the SQL expression of the machine's id. The viewer is the `:viewerId` named parameter.
@@ -39,6 +41,10 @@ export function permittedResourceSql(resourceIdSql: string): string {
         ORDER BY "ph"."createdAt" DESC, "ph"."id" DESC
         LIMIT 1
       ) = 'grant'
+    )
+    OR EXISTS (
+      SELECT 1 FROM "resource" "psr"
+      WHERE "psr"."id" = ${resourceIdSql} AND "psr"."supervisionMode" <> '${SupervisionMode.INTRODUCTION_REQUIRED}'
     )
     OR EXISTS (
       SELECT 1 FROM "resource_usage" "pu"
