@@ -74,6 +74,7 @@ void Application::handleFormFields(const API::ResourceUsageFormFieldsPage &page)
       this->formCursorFormIdx < this->pendingFormRequest.formCount &&
       page.formId == this->pendingFormRequest.forms[this->formCursorFormIdx].id &&
       page.offset == this->formCursorOffset) {
+    this->formImagePollInFlight = false;
     Display::formsScreen.updateImageField(entry->page.fields[0]);
     return;
   }
@@ -102,7 +103,11 @@ void Application::pollFormImageCount() {
   }
   const uint32_t now = millis();
   if (static_cast<int32_t>(now - this->formImagePollAt) < 0) return;
+  // A slow server must not pile up requests: wait for the answer to the last one, unless it got lost.
+  if (this->formImagePollInFlight && now - this->formImagePollSentAt < FORM_IMAGE_POLL_TIMEOUT_MS) return;
   this->formImagePollAt = now + FORM_IMAGE_POLL_MS;
+  this->formImagePollInFlight = true;
+  this->formImagePollSentAt = now;
   this->api.requestFormFields(this->pendingFormRequest.resourceId, this->pendingFormRequest.action,
                               this->pendingFormRequest.forms[this->formCursorFormIdx].id, this->formCursorOffset,
                               API::MAX_FORM_PAGE_FIELDS);
@@ -184,6 +189,7 @@ void Application::renderFormFieldPage(
   this->formImagePolling =
       page.fieldCount > 0 && page.fields[0].type == API::ResourceUsageFormFieldType::IMAGE;
   this->formImagePollAt = millis() + FORM_IMAGE_POLL_MS;
+  this->formImagePollInFlight = false;
   Display::formsScreen.renderFormField(
       page, canGoBack, this->isLastFormField(), this->globalFormFieldNumber(),
       this->totalFormFields());

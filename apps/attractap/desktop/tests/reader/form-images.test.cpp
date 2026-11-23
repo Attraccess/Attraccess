@@ -23,6 +23,8 @@ namespace
 
 void ReaderWorkflow::testFormImageField()
 {
+    // The handshake (api/handlers/auth.cpp) announces that this display build renders image fields.
+    assert(server.last("READER_FIRMWARE_INFO")["data"]["payload"]["capabilities"]["formImages"] == true);
     supervised = false; active = false;
     login();
     click("Lasercutter");
@@ -53,10 +55,21 @@ void ReaderWorkflow::testFormImageField()
     assert(poll["formId"].as<uint32_t>() == 8 && poll["offset"].as<uint32_t>() == 0 && poll["resourceId"].as<uint32_t>() == 1 &&
            poll["action"].as<std::string>() == "start" && poll["limit"].as<uint32_t>() == 1);
 
+    // One request at a time: a slow server gets no second one while the first is unanswered...
+    const auto polled = server.count("RESOURCE_USAGE_FORM_GET_FIELDS");
+    pump(3500);
+    assert(server.count("RESOURCE_USAGE_FORM_GET_FIELDS") == polled);
+    // ...but a lost answer does not stop the polling: after 15 s (FORM_IMAGE_POLL_TIMEOUT_MS) the reader asks again.
+    hostAdvanceMillis(15000); pump();
+    assert(server.count("RESOURCE_USAGE_FORM_GET_FIELDS") == polled + 1);
+
     // The answer updates the count in place: the page, the QR code and its link stay as they are.
     server.push("RESOURCE_USAGE_FORM_FIELDS", imageFields(2, firstUrl)); pump();
     assert(label(lv_screen_active(), "2 von 3 Fotos") == count && label(lv_screen_active(), "Foto des Schadens *") == title);
     assert(findQr(lv_screen_active()) == qr && lv_screen_active() == Display::formsScreen.getScreen());
+    // After the answer the next request goes out on the usual interval.
+    pump(3500);
+    assert(server.count("RESOURCE_USAGE_FORM_GET_FIELDS") == polled + 2);
     // A new link (the old one expired) redraws the symbol in the same widget.
     server.push("RESOURCE_USAGE_FORM_FIELDS", imageFields(2, "https://att.example/form-photo/BBBBBBBBBBBBBBBBBBBBBBBB")); pump();
     assert(findQr(lv_screen_active()) == qr && lv_obj_is_visible(qr));

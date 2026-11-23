@@ -50,6 +50,7 @@ add_executable(display-theme-host
     resource_details.cpp
     parallel_sessions.cpp
     demo_form_options.cpp
+    forms_screen.cpp
     host_shims.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/logos.S"
     "${FIRMWARE_DIR}/src/display/theme.cpp"

@@ -110,10 +110,14 @@ bool awaitingFieldRender = false;
 #endif
 
 // The open page is an image field: its count is re-requested while the user adds photos on the phone (ATT-879).
+// One request at a time: the next waits for the answer, or for FORM_IMAGE_POLL_TIMEOUT_MS if the answer was lost.
 #if defined(HAS_LVGL_DISPLAY)
 static constexpr uint32_t FORM_IMAGE_POLL_MS = 3000;
+static constexpr uint32_t FORM_IMAGE_POLL_TIMEOUT_MS = 15000;
 bool formImagePolling = false;
 uint32_t formImagePollAt = 0;
+bool formImagePollInFlight = false;
+uint32_t formImagePollSentAt = 0;
 #endif
 
 #if defined(HAS_LVGL_DISPLAY)
