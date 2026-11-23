@@ -279,13 +279,16 @@ export const parseFieldValue = (type: FormFieldType, rawValue: unknown, options?
   return normalized;
 };
 
-/** True when an answer carries no value: nothing, an empty string or an empty image list. */
-export const isEmptyAnswer = (rawValue: unknown): boolean =>
+/**
+ * True when an answer carries no value: nothing or an empty string, and for an image field also an empty image list
+ * (`[]`, as an array or as JSON). For any other field type `"[]"` is a value like any other text.
+ */
+export const isEmptyAnswer = (rawValue: unknown, type: FormFieldType): boolean =>
   rawValue === undefined ||
   rawValue === null ||
   rawValue === '' ||
-  (Array.isArray(rawValue) && rawValue.length === 0) ||
-  (typeof rawValue === 'string' && rawValue.trim() === '[]');
+  (type === FormFieldType.IMAGE &&
+    ((Array.isArray(rawValue) && rawValue.length === 0) || (typeof rawValue === 'string' && rawValue.trim() === '[]')));
 
 export const fieldOptionsSchemas = formFieldOptionsSchemaByType;
 export const fieldValueSchemas = formFieldValueSchemaByType;

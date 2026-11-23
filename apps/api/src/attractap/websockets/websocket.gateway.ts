@@ -43,7 +43,7 @@ import { readerWebSocketOptions } from './websocket-transport-options';
 import { WebsocketService } from './websocket.service';
 import { ReaderTimeZoneService } from './reader-time-zone.service';
 import { readerHeartbeat } from './websocket-reader-payloads';
-import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, forgetReaderFormState } from './websocket.types';
+import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 import { SKIPS_ACTIVITY_WRITE } from './websocket-activity';
 import { randomBytes } from 'crypto';
 import type { IncomingMessage } from 'http';
@@ -175,8 +175,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     this.cardConversations.abort(socket, reason);
     this.cardHandler.clearVerifiedUser(socket);
     if (reason === 'READER_SESSION_ENDED') this.uiHandler.endCardSession(socket);
-    forgetReaderFormState(socket);
-    this.formsHandler.endReaderAttempts(socket, readerId);
+    // A closed connection (READER_UNREACHABLE) ends only the photo links it issued: a newer connection of the same
+    // reader, maybe on another instance, keeps its own.
+    this.formsHandler.endReaderForms(socket, { readerId, connectionClosed: reason === 'READER_UNREACHABLE' });
     if (socket.state.supervisionFlow && !socket.state.supervisionFlow.webInitiated) {
       this.supervisionHandler.cancelForSocket(socket);
     }

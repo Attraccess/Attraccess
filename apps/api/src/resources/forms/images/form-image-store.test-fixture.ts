@@ -1,22 +1,23 @@
-import type { FormImageHandoffRecord, FormImageRecord, ResourceFormAction } from '@attraccess/application-models';
+import type { FormImageHandoffRecord, ResourceFormAction } from '@attraccess/application-models';
 import type {
   FormImageHandoffKey,
   FormImageOwnership,
   FormImageStore,
   NewFormImage,
   NewFormImageHandoff,
+  StoredFormImage,
 } from './form-image-store.port';
 
 /** An in-memory form image store with the semantics of the database one. */
 export class InMemoryFormImageStore implements FormImageStore {
-  readonly images = new Map<string, FormImageRecord>();
+  readonly images = new Map<string, StoredFormImage>();
   readonly handoffs = new Map<string, FormImageHandoffRecord & { tokenHash: string }>();
   /** The user of each submission id, for ownership checks. */
   readonly submissionUsers = new Map<number, number>();
   now = () => new Date();
 
-  async insertImage(image: NewFormImage): Promise<FormImageRecord> {
-    const record: FormImageRecord = { ...image, submissionId: null, createdAt: this.now() };
+  async insertImage(image: NewFormImage): Promise<StoredFormImage> {
+    const record: StoredFormImage = { ...image, submissionId: null, createdAt: this.now() };
     this.images.set(record.id, record);
     return record;
   }
@@ -35,17 +36,32 @@ export class InMemoryFormImageStore implements FormImageStore {
   }
 
   async findImages(ids: string[]) {
-    return ids.flatMap((id) => (this.images.has(id) ? [this.images.get(id) as FormImageRecord] : []));
+    return ids.flatMap((id) => (this.images.has(id) ? [this.images.get(id) as StoredFormImage] : []));
   }
 
   async listHandoffImages(handoffId: string) {
     return [...this.images.values()]
-      .filter((image) => image.handoffId === handoffId)
+      .filter((image) => image.handoffId === handoffId && image.submissionId === null)
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   }
 
-  async deleteImage(id: string) {
+  async countHandoffImages(handoffId: string) {
+    return (await this.listHandoffImages(handoffId)).length;
+  }
+
+  async countUnattachedImages(userId: number, since: Date) {
+    return [...this.images.values()].filter(
+      (image) => image.userId === userId && image.submissionId === null && image.createdAt >= since,
+    ).length;
+  }
+
+  async deleteUnattachedImage(id: string, handoffId?: string) {
+    const image = this.images.get(id);
+    if (!image || image.submissionId !== null || (handoffId !== undefined && image.handoffId !== handoffId)) {
+      return false;
+    }
     this.images.delete(id);
+    return true;
   }
 
   async insertHandoff(handoff: NewFormImageHandoff) {
@@ -69,7 +85,7 @@ export class InMemoryFormImageStore implements FormImageStore {
 
   async moveHandoffImages(fromHandoffId: string, toHandoffId: string) {
     for (const image of this.images.values()) {
-      if (image.handoffId === fromHandoffId) image.handoffId = toHandoffId;
+      if (image.handoffId === fromHandoffId && image.submissionId === null) image.handoffId = toHandoffId;
     }
   }
 
@@ -78,6 +94,18 @@ export class InMemoryFormImageStore implements FormImageStore {
     for (const handoff of this.handoffs.values()) {
       const matches = !only || (handoff.resourceId === only.resourceId && handoff.action === only.action);
       if (handoff.readerId === readerId && handoff.endedAt === null && matches) {
+        handoff.endedAt = now;
+        ended += 1;
+      }
+    }
+    return ended;
+  }
+
+  async endHandoffsById(ids: string[], now: Date) {
+    let ended = 0;
+    for (const id of ids) {
+      const handoff = this.handoffs.get(id);
+      if (handoff && handoff.endedAt === null) {
         handoff.endedAt = now;
         ended += 1;
       }
@@ -106,19 +134,30 @@ export class InMemoryFormImageStore implements FormImageStore {
 
   async findOrphanImages(uploadedBefore: Date, limit: number) {
     return [...this.images.values()]
-      .filter((image) => image.submissionId === null && image.createdAt < uploadedBefore)
+      .filter((image) => image.submissionId === null && (image.createdAt < uploadedBefore || image.userId === null))
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
       .slice(0, limit);
   }
 
-  async deleteImages(ids: string[]) {
-    ids.forEach((id) => this.images.delete(id));
+  async deleteOrphanImages(ids: string[]) {
+    const filenames: string[] = [];
+    for (const id of ids) {
+      const image = this.images.get(id);
+      if (image && image.submissionId === null) {
+        this.images.delete(id);
+        filenames.push(image.filename);
+      }
+    }
+    return filenames;
   }
 
   async deleteStaleHandoffs(before: Date) {
     let deleted = 0;
     for (const [id, handoff] of this.handoffs) {
-      if (handoff.expiresAt < before || (handoff.endedAt !== null && handoff.endedAt < before)) {
+      const stale = handoff.expiresAt < before || (handoff.endedAt !== null && handoff.endedAt < before);
+      if (stale && (await this.countHandoffImages(id)) === 0) {
         this.handoffs.delete(id);
+        for (const image of this.images.values()) if (image.handoffId === id) image.handoffId = null;
         deleted += 1;
       }
     }

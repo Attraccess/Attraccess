@@ -1462,12 +1462,12 @@
   "formImagesUpload": {
     "decision": "deny",
     "reason": "Multipart file upload; a tool call carries JSON only.",
-    "shape": "845fefb9"
+    "shape": "7d8655ef"
   },
   "formImagesGet": {
     "decision": "deny",
     "reason": "Streams a binary JPEG, not JSON.",
-    "shape": "5e37bd46"
+    "shape": "08775ab6"
   },
   "formPhotoGetPage": {
     "decision": "deny",

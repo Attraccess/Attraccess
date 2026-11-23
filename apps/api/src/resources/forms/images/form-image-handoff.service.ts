@@ -3,24 +3,30 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { ReadStream } from 'fs';
 import {
   FORM_IMAGE_HANDOFF_TTL_MS,
+  FORM_PHOTO_ROUTE,
   FormFieldType,
   formImageLimit,
   type FormImageHandoffRecord,
   type ResourceFormAction,
-  type FormImageRecord,
 } from '@attraccess/application-models';
 import type { FileUpload } from '../../../common/types/file-upload.types';
 import { SettingsService } from '../../../settings/settings.service';
 import { ResourceFormsService } from '../forms.service';
 import { FormImageDto, FormPhotoPageDto } from './form-image.dto';
-import { FORM_IMAGE_STORE, type FormImageHandoffKey, type FormImageStore } from './form-image-store.port';
+import {
+  FORM_IMAGE_STORE,
+  type FormImageHandoffKey,
+  type FormImageStore,
+  type StoredFormImage,
+} from './form-image-store.port';
 import { FormImagesService, toImageDto } from './form-images.service';
 
 /** 18 random bytes: 144 bits, 24 base64url characters, which keeps the QR code small. */
 const TOKEN_BYTES = 18;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{20,64}$/;
 
-export const FORM_PHOTO_ROUTE = '/form-photo';
+/** How long the public app URL is reused: readers ask for their links every few seconds while a form is open. */
+const APP_URL_CACHE_MS = 30_000;
 
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 
@@ -51,6 +57,8 @@ class FormPhotoLinkExpiredException extends GoneException {
  */
 @Injectable()
 export class FormImageHandoffService {
+  private appUrlCache: { value: string | null; fetchedAt: number } | null = null;
+
   constructor(
     @Inject(FORM_IMAGE_STORE) private readonly store: FormImageStore,
     private readonly forms: ResourceFormsService,
@@ -64,7 +72,11 @@ export class FormImageHandoffService {
   }
 
   private async appUrl(): Promise<string | null> {
-    return ((await this.settings.getUrl().catch(() => null)) || '').replace(/\/+$/, '') || null;
+    const now = Date.now();
+    if (this.appUrlCache && now - this.appUrlCache.fetchedAt < APP_URL_CACHE_MS) return this.appUrlCache.value;
+    const value = ((await this.settings.getUrl().catch(() => null)) || '').replace(/\/+$/, '') || null;
+    this.appUrlCache = { value, fetchedAt: now };
+    return value;
   }
 
   // --- reader side ------------------------------------------------------------------------------------------------
@@ -96,6 +108,9 @@ export class FormImageHandoffService {
     if (latest) {
       await this.store.moveHandoffImages(latest.id, created.id);
       await this.store.endHandoff(latest.id, now);
+      // An upload that reserved its slot on the old link just before it ended may have stored its row after the first
+      // move: move again once the old link takes no more uploads.
+      await this.store.moveHandoffImages(latest.id, created.id);
     }
     return this.view(created, token);
   }
@@ -105,7 +120,7 @@ export class FormImageHandoffService {
       handoffId: handoff.id,
       token,
       handoffUrl: `${(await this.appUrl()) ?? ''}${FORM_PHOTO_ROUTE}/${token}`,
-      imageCount: (await this.store.listHandoffImages(handoff.id)).length,
+      imageCount: await this.store.countHandoffImages(handoff.id),
       maxImages: handoff.maxImages,
     };
   }
@@ -118,6 +133,11 @@ export class FormImageHandoffService {
   /** The form attempt of the reader ended (submit, cancel, sign-out, another user): its links stop working. */
   async endForReader(readerId: number, only?: { resourceId: number; action: ResourceFormAction }): Promise<void> {
     await this.store.endHandoffs(readerId, new Date(), only);
+  }
+
+  /** A reader connection closed: the links it issued stop working, not those a newer connection of the reader issued. */
+  async endHandoffs(handoffIds: string[]): Promise<void> {
+    await this.store.endHandoffsById(handoffIds, new Date());
   }
 
   // --- phone side, by token -----------------------------------------------------------------------------------------
@@ -178,7 +198,7 @@ export class FormImageHandoffService {
   }
 
   /** An image of this handoff only: any other id is gone, as far as the holder of the link can tell. */
-  private async imageOf(handoff: FormImageHandoffRecord, imageId: string): Promise<FormImageRecord> {
+  private async imageOf(handoff: FormImageHandoffRecord, imageId: string): Promise<StoredFormImage> {
     const image = await this.store.findImage(imageId);
     if (!image || image.handoffId !== handoff.id || image.submissionId !== null) {
       throw new NotFoundException('Image not found');
@@ -194,7 +214,9 @@ export class FormImageHandoffService {
   async removeImage(token: string, imageId: string): Promise<void> {
     const handoff = await this.resolve(token);
     const image = await this.imageOf(handoff, imageId);
-    await this.images.remove(image);
+    // Only the request that deleted the row frees the slot: a second DELETE of the same photo, or a photo a submission
+    // took meanwhile, is 404 and changes nothing.
+    await this.images.remove(image, handoff.id);
     // A removed photo makes room for another one, so the field never ends up with fewer photos than it needs.
     await this.store.releaseHandoffUpload(handoff.id);
   }

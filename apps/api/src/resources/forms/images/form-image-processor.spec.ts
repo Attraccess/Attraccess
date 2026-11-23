@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import sharp from 'sharp';
-import { processFormImage } from './form-image-processor';
+import { limitConcurrency, processFormImage } from './form-image-processor';
 
 const photo = (width: number, height: number) =>
   sharp({ create: { width, height, channels: 3, background: { r: 200, g: 30, b: 30 } } });
@@ -76,5 +76,37 @@ describe('processFormImage', () => {
     await expect(processFormImage(gif)).rejects.toThrow('not a JPEG, PNG or WebP');
     const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"/>');
     await expect(processFormImage(svg)).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('limitConcurrency', () => {
+  it('runs at most the given number of tasks at once and every task in the end', async () => {
+    const run = limitConcurrency(2);
+    let active = 0;
+    let peak = 0;
+    const releases: (() => void)[] = [];
+    const task = (value: number) =>
+      run(async () => {
+        active += 1;
+        peak = Math.max(peak, active);
+        await new Promise<void>((resolve) => releases.push(resolve));
+        active -= 1;
+        return value;
+      });
+
+    const results = Promise.all([1, 2, 3, 4, 5].map(task));
+    for (let i = 0; i < 5; i++) {
+      await new Promise((resolve) => setImmediate(resolve));
+      releases.shift()?.();
+    }
+
+    expect(await results).toEqual([1, 2, 3, 4, 5]);
+    expect(peak).toBe(2);
+  });
+
+  it('frees the slot of a task that fails', async () => {
+    const run = limitConcurrency(1);
+    await expect(run(async () => Promise.reject(new Error('broken')))).rejects.toThrow('broken');
+    await expect(run(async () => 'next')).resolves.toBe('next');
   });
 });

@@ -1,29 +1,34 @@
-import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable, SetMetadata } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { Request, Response } from 'express';
-import { FixedWindowCounterStore, WindowCounterEntry } from '../../../common/rate-limiting/fixed-window-counter';
+import type { Request } from 'express';
+import { KeyedFixedWindowLimiter } from '../../../common/rate-limiting/keyed-fixed-window-limiter';
 import { addressBucket } from '../../../device-enrollment/client-address';
 import { resolveIp } from '../../../users-and-auth/rate-limiting/login.rate-limit.guard';
 
-export type FormPhotoRateLimitName = 'read' | 'write';
+/** `read`, `write`: the public phone endpoints, per client address. `upload`: signed-in uploads, per user. */
+export type FormPhotoRateLimitName = 'read' | 'write' | 'upload';
 
 const LIMITS: Record<FormPhotoRateLimitName, { limit: number; windowMs: number }> = {
   // Page loads and thumbnails of a phone that has the link open.
   read: { limit: 120, windowMs: 60_000 },
   // Uploads and deletions: a handful of photos, however the link is held.
   write: { limit: 30, windowMs: 10 * 60_000 },
+  // A form takes at most ten photos per field; a member uploading more than this is not filling in a form.
+  upload: { limit: 30, windowMs: 10 * 60_000 },
 };
 
 const FORM_PHOTO_RATE_LIMIT = 'form_photo_rate_limit';
 export const FormPhotoRateLimit = (name: FormPhotoRateLimitName) => SetMetadata(FORM_PHOTO_RATE_LIMIT, name);
 
 /**
- * Per-client-address fixed window for the public reader handoff endpoints (IPv6 bucketed by /64), like the MCP and
- * OAuth limits. State is per process; the token itself carries a hard cap on uploads in the database.
+ * Fixed windows for the form image endpoints: the public reader handoff endpoints per client address (IPv6 bucketed by
+ * /64), like the MCP and OAuth limits, and signed-in uploads per user, so one member cannot fill the disk. State is per
+ * process; the handoff token itself carries a hard cap on uploads in the database. For `upload` the guard must run
+ * after the sign-in guard: a request without a user is not counted.
  */
 @Injectable()
 export class FormPhotoRateLimitGuard implements CanActivate {
-  private readonly counters = new Map<FormPhotoRateLimitName, FixedWindowCounterStore<string, WindowCounterEntry>>();
+  private readonly limiter = new KeyedFixedWindowLimiter(LIMITS);
 
   constructor(private readonly reflector: Reflector) {}
 
@@ -33,32 +38,14 @@ export class FormPhotoRateLimitGuard implements CanActivate {
       context.getClass(),
     ]);
     if (!name) return true;
-    const { limit, windowMs } = LIMITS[name];
     const request = context.switchToHttp().getRequest<Request>();
-    const key = addressBucket(resolveIp(request));
-    const store = this.store(name);
-    const now = Date.now();
-    let entry = store.get(key);
-    if (!entry || now - entry.firstAt >= windowMs) {
-      store.evict((candidate) => now - candidate.firstAt >= windowMs);
-      entry = { count: 0, firstAt: now };
-      store.set(key, entry);
-    }
-    entry.count += 1;
-    if (entry.count > limit) {
-      const retryAfter = Math.max(1, Math.ceil((entry.firstAt + windowMs - now) / 1000));
-      context.switchToHttp().getResponse<Response>().setHeader('Retry-After', String(retryAfter));
-      throw new HttpException('Too many requests', HttpStatus.TOO_MANY_REQUESTS);
-    }
+    const key = name === 'upload' ? userKey(request) : addressBucket(resolveIp(request));
+    if (key !== null) this.limiter.hit(context, name, key);
     return true;
   }
+}
 
-  private store(name: FormPhotoRateLimitName): FixedWindowCounterStore<string, WindowCounterEntry> {
-    let store = this.counters.get(name);
-    if (!store) {
-      store = new FixedWindowCounterStore<string, WindowCounterEntry>(10_000);
-      this.counters.set(name, store);
-    }
-    return store;
-  }
+function userKey(request: Request): string | null {
+  const userId = (request.user as { id?: number } | undefined)?.id;
+  return userId == null ? null : `user:${userId}`;
 }

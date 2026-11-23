@@ -1,17 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, In, IsNull, LessThan } from 'typeorm';
+import { DataSource, In, IsNull, MoreThanOrEqual } from 'typeorm';
 import { FormImage, FormImageHandoff, FormSubmission } from '@attraccess/database-entities';
-import type { FormImageHandoffRecord, FormImageRecord } from '@attraccess/application-models';
+import type { FormImageHandoffRecord } from '@attraccess/application-models';
 import type {
   FormImageHandoffKey,
   FormImageOwnership,
   FormImageStore,
   NewFormImage,
   NewFormImageHandoff,
+  StoredFormImage,
 } from '../../../resources/forms/images/form-image-store.port';
 
-const toImageRecord = (row: FormImage): FormImageRecord => ({
+const toImageRecord = (row: FormImage): StoredFormImage => ({
   id: row.id,
   userId: row.userId,
   uploadedByUserId: row.uploadedByUserId,
@@ -55,11 +56,11 @@ export class TypeOrmFormImageStore implements FormImageStore {
     return this.dataSource.getRepository(FormImageHandoff);
   }
 
-  async insertImage(image: NewFormImage): Promise<FormImageRecord> {
+  async insertImage(image: NewFormImage): Promise<StoredFormImage> {
     return toImageRecord(await this.images.save(this.images.create(image)));
   }
 
-  async findImage(id: string): Promise<FormImageRecord | null> {
+  async findImage(id: string): Promise<StoredFormImage | null> {
     const row = await this.images.findOneBy({ id });
     return row && toImageRecord(row);
   }
@@ -76,19 +77,35 @@ export class TypeOrmFormImageStore implements FormImageStore {
     return { image: toImageRecord(row), submissionUserId: submission?.userId ?? null };
   }
 
-  async findImages(ids: string[]): Promise<FormImageRecord[]> {
+  async findImages(ids: string[]): Promise<StoredFormImage[]> {
     if (!ids.length) return [];
     return (await this.images.findBy({ id: In(ids) })).map(toImageRecord);
   }
 
-  async listHandoffImages(handoffId: string): Promise<FormImageRecord[]> {
-    return (await this.images.find({ where: { handoffId }, order: { createdAt: 'ASC', id: 'ASC' } })).map(
-      toImageRecord,
-    );
+  async listHandoffImages(handoffId: string): Promise<StoredFormImage[]> {
+    return (
+      await this.images.find({
+        where: { handoffId, submissionId: IsNull() },
+        order: { createdAt: 'ASC', id: 'ASC' },
+      })
+    ).map(toImageRecord);
   }
 
-  async deleteImage(id: string): Promise<void> {
-    await this.images.delete({ id });
+  async countHandoffImages(handoffId: string): Promise<number> {
+    return this.images.count({ where: { handoffId, submissionId: IsNull() } });
+  }
+
+  async countUnattachedImages(userId: number, since: Date): Promise<number> {
+    return this.images.count({ where: { userId, submissionId: IsNull(), createdAt: MoreThanOrEqual(since) } });
+  }
+
+  async deleteUnattachedImage(id: string, handoffId?: string): Promise<boolean> {
+    const result = await this.images.delete({
+      id,
+      submissionId: IsNull(),
+      ...(handoffId === undefined ? {} : { handoffId }),
+    });
+    return (result.affected ?? 0) === 1;
   }
 
   async insertHandoff(handoff: NewFormImageHandoff): Promise<FormImageHandoffRecord> {
@@ -109,7 +126,7 @@ export class TypeOrmFormImageStore implements FormImageStore {
   }
 
   async moveHandoffImages(fromHandoffId: string, toHandoffId: string): Promise<void> {
-    await this.images.update({ handoffId: fromHandoffId }, { handoffId: toHandoffId });
+    await this.images.update({ handoffId: fromHandoffId, submissionId: IsNull() }, { handoffId: toHandoffId });
   }
 
   async endHandoffs(
@@ -118,6 +135,12 @@ export class TypeOrmFormImageStore implements FormImageStore {
     only?: { resourceId: number; action: FormImageHandoffRecord['action'] },
   ): Promise<number> {
     const result = await this.handoffs.update({ readerId, endedAt: IsNull(), ...(only ?? {}) }, { endedAt: now });
+    return result.affected ?? 0;
+  }
+
+  async endHandoffsById(ids: string[], now: Date): Promise<number> {
+    if (!ids.length) return 0;
+    const result = await this.handoffs.update({ id: In(ids), endedAt: IsNull() }, { endedAt: now });
     return result.affected ?? 0;
   }
 
@@ -147,22 +170,42 @@ export class TypeOrmFormImageStore implements FormImageStore {
     await this.handoffs.update({ id: handoffId, endedAt: IsNull() }, { endedAt: now });
   }
 
-  async findOrphanImages(uploadedBefore: Date, limit: number): Promise<FormImageRecord[]> {
+  async findOrphanImages(uploadedBefore: Date, limit: number): Promise<StoredFormImage[]> {
     return (
-      await this.images.find({
-        where: { submissionId: IsNull(), createdAt: LessThan(uploadedBefore) },
-        order: { createdAt: 'ASC' },
-        take: limit,
-      })
+      await this.images
+        .createQueryBuilder('image')
+        .where('image."submissionId" IS NULL')
+        .andWhere('(image."createdAt" < :uploadedBefore OR image."userId" IS NULL)', { uploadedBefore })
+        .orderBy('image."createdAt"', 'ASC')
+        .addOrderBy('image."id"', 'ASC')
+        .limit(limit)
+        .getMany()
     ).map(toImageRecord);
   }
 
-  async deleteImages(ids: string[]): Promise<void> {
-    if (ids.length) await this.images.delete({ id: In(ids) });
+  async deleteOrphanImages(ids: string[]): Promise<string[]> {
+    if (!ids.length) return [];
+    // Only rows that are still unattached: an image a submission took since it was found keeps its row and file.
+    const result = await this.images
+      .createQueryBuilder()
+      .delete()
+      .where({ id: In(ids), submissionId: IsNull() })
+      .returning(['filename'])
+      .execute();
+    return (result.raw as { filename: string }[]).map((row) => row.filename);
   }
 
   async deleteStaleHandoffs(before: Date): Promise<number> {
-    const result = await this.handoffs.delete([{ expiresAt: LessThan(before) }, { endedAt: LessThan(before) }]);
+    // A handoff that still holds unattached images stays: an open reader attempt reads its answer through it.
+    const result = await this.handoffs
+      .createQueryBuilder()
+      .delete()
+      .where('("expiresAt" < :before OR "endedAt" < :before)', { before })
+      .andWhere(
+        'NOT EXISTS (SELECT 1 FROM "form_image" "image" WHERE "image"."handoffId" = "form_image_handoff"."id" ' +
+          'AND "image"."submissionId" IS NULL)',
+      )
+      .execute();
     return result.affected ?? 0;
   }
 }

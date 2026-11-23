@@ -3,7 +3,13 @@ import type { PluginBlockReason } from '@attraccess/plugins-backend-sdk';
 export type ReaderUiLanguage = 'en' | 'de';
 
 /** Reasons the host itself gives when a start cannot go ahead. Shown as written on readers and the web. */
-export type HostReasonCode = 'HOOK_UNAVAILABLE' | 'CONFIRMATION_UNAVAILABLE' | 'STEP_EXPIRED' | 'STEP_UNKNOWN';
+export type HostReasonCode =
+  | 'HOOK_UNAVAILABLE'
+  | 'CONFIRMATION_UNAVAILABLE'
+  | 'STEP_EXPIRED'
+  | 'STEP_UNKNOWN'
+  /** A required form has an image field, and the reader's firmware cannot show one (ATT-879). */
+  | 'FORM_PHOTO_UNSUPPORTED';
 
 /**
  * Block codes only the host may send. Readers and the web treat them as host decisions (Lite plays its own
@@ -12,6 +18,7 @@ export type HostReasonCode = 'HOOK_UNAVAILABLE' | 'CONFIRMATION_UNAVAILABLE' | '
 export const HOST_RESERVED_BLOCK_CODES: readonly string[] = [
   'CONFIRMATION_REQUIRED',
   'CONFIRMATION_UNAVAILABLE',
+  'FORM_PHOTO_UNSUPPORTED',
   'HOOK_UNAVAILABLE',
   'STEP_EXPIRED',
   'STEP_UNKNOWN',
@@ -51,6 +58,10 @@ const TEXTS: Record<HostReasonCode, Record<ReaderUiLanguage, { title: string; bo
       title: 'Bestätigung nicht mehr gültig',
       body: 'Diese Bestätigung wurde schon verwendet oder ersetzt. Bitte starten Sie erneut.',
     },
+  },
+  FORM_PHOTO_UNSUPPORTED: {
+    en: { title: 'Form with photo', body: 'Please complete this form in the web app.' },
+    de: { title: 'Formular mit Foto', body: 'Formular mit Foto bitte in der Web-App ausfüllen.' },
   },
 };
 

@@ -70,11 +70,17 @@ describe('forms.validation', () => {
     });
 
     it('counts an empty list as no value', () => {
-      expect(isEmptyAnswer([])).toBe(true);
-      expect(isEmptyAnswer('[]')).toBe(true);
-      expect(isEmptyAnswer(undefined)).toBe(true);
-      expect(isEmptyAnswer([ID_A])).toBe(false);
-      expect(isEmptyAnswer(0)).toBe(false);
+      expect(isEmptyAnswer([], FormFieldType.IMAGE)).toBe(true);
+      expect(isEmptyAnswer('[]', FormFieldType.IMAGE)).toBe(true);
+      expect(isEmptyAnswer(undefined, FormFieldType.IMAGE)).toBe(true);
+      expect(isEmptyAnswer([ID_A], FormFieldType.IMAGE)).toBe(false);
+      expect(isEmptyAnswer(0, FormFieldType.NUMBER)).toBe(false);
+    });
+
+    it('keeps "[]" as the value of a text field', () => {
+      expect(isEmptyAnswer('[]', FormFieldType.TEXT)).toBe(false);
+      expect(isEmptyAnswer('', FormFieldType.TEXT)).toBe(true);
+      expect(parseFieldValue(FormFieldType.TEXT, '[]')).toBe('[]');
     });
   });
 

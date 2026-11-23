@@ -29,6 +29,7 @@ describe('ReaderFormImages', () => {
         .mockResolvedValue({ handoffId: 'h', token: 't', handoffUrl: 'u', imageCount: 1, maxImages: 2 }),
       imageIds: jest.fn().mockResolvedValue(['a', 'b']),
       endForReader: jest.fn().mockResolvedValue(undefined),
+      endHandoffs: jest.fn().mockResolvedValue(undefined),
     };
     service = new ReaderFormImages();
     (service as any).handoffs = handoffs;
@@ -186,6 +187,27 @@ describe('ReaderFormImages', () => {
       await service.refreshDraft(s, { resourceId: 5, action: ResourceFormAction.START }, forms, draft);
       expect(draft).toEqual({ 1: 'x' });
     });
+
+    it('takes in photos the phone finished after the user passed an optional photo page with none', async () => {
+      const s = socket({ formHandoffs: { '5:start:7:11': { handoffId: 'h', token: 't' } } });
+      // The page was submitted with no photo, so the draft has no entry for the image field.
+      const draft: Record<number, string> = { 1: 'x' };
+      const forms = [form(7, [field(1, FormFieldType.TEXT), field(11, FormFieldType.IMAGE)])];
+
+      await service.refreshDraft(s, { resourceId: 5, action: ResourceFormAction.START }, forms, draft);
+
+      expect(draft).toEqual({ 1: 'x', 11: JSON.stringify(['a', 'b']) });
+    });
+
+    it('leaves an image field without a handoff alone', async () => {
+      const draft: Record<number, string> = { 1: 'x' };
+      const forms = [form(7, [field(1, FormFieldType.TEXT), field(11, FormFieldType.IMAGE)])];
+
+      await service.refreshDraft(socket(), { resourceId: 5, action: ResourceFormAction.START }, forms, draft);
+
+      expect(draft).toEqual({ 1: 'x' });
+      expect(handoffs.imageIds).not.toHaveBeenCalled();
+    });
   });
 
   describe('ending links', () => {
@@ -198,22 +220,28 @@ describe('ReaderFormImages', () => {
       });
 
       service.endAttempt(s, 5, ResourceFormAction.START);
-      service.endAllForReader(s);
+      service.endAllForReader(42);
 
       expect(s.state.formHandoffs).toEqual({ '6:start:7:11': { handoffId: 'g', token: 'u' } });
       expect(handoffs.endForReader.mock.calls).toEqual([[42, { resourceId: 5, action: 'start' }], [42]]);
     });
 
-    it('ends the links of the reader a disconnect names, although the socket no longer holds its id', () => {
-      service.endAllForReader({ readerId: null }, 42);
-      expect(handoffs.endForReader).toHaveBeenCalledWith(42);
+    it('ends only the links a closed connection issued', () => {
+      service.endIssued(['h', 'g']);
+      service.endIssued([]);
+
+      expect(handoffs.endHandoffs.mock.calls).toEqual([[['h', 'g']]]);
+      expect(handoffs.endForReader).not.toHaveBeenCalled();
     });
 
-    it('does not throw when ending fails, and does nothing for a socket without a reader', async () => {
+    it('does not throw when ending fails, and does nothing without a reader', async () => {
       handoffs.endForReader.mockRejectedValue(new Error('db down'));
+      handoffs.endHandoffs.mockRejectedValue(new Error('db down'));
       expect(() => service.endAttempt(socket(), 5, ResourceFormAction.START)).not.toThrow();
-      service.endAllForReader({ readerId: null } as any);
+      service.endAllForReader(null);
+      service.endIssued(['h']);
       await new Promise((resolve) => setImmediate(resolve));
+      expect(handoffs.endForReader).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -165,7 +165,13 @@ export function gatewayProviders(
     AttractapCardHandler,
     AttractapFormsHandler,
     ReaderFormImages,
-    { provide: FormImageHandoffService, useValue: { endForReader: jest.fn().mockResolvedValue(undefined) } },
+    {
+      provide: FormImageHandoffService,
+      useValue: {
+        endForReader: jest.fn().mockResolvedValue(undefined),
+        endHandoffs: jest.fn().mockResolvedValue(undefined),
+      },
+    },
     AttractapSessionHandler,
     { provide: ResourceMeteringService, useValue: { getLive: jest.fn() } },
     { provide: ResourceOperatingAttributionService, useValue: { getForResource: jest.fn() } },

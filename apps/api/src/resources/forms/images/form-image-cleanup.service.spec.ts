@@ -71,6 +71,48 @@ describe('FormImageCleanupService', () => {
     expect([...store.handoffs.keys()]).toEqual([live.handoffId]);
   });
 
+  it('keeps the row and file of an image a submission takes between finding and deleting the orphans', async () => {
+    const { images, cleanup, store, root } = createImageServices();
+    const racing = await images.upload(await jpegUpload(), where, USER_ID);
+    const record = store.images.get(racing.id) as { createdAt: Date; submissionId: number | null };
+    record.createdAt = new Date(Date.now() - FORM_IMAGE_ORPHAN_TTL_MS - HOUR);
+    const find = store.findOrphanImages.bind(store);
+    jest.spyOn(store, 'findOrphanImages').mockImplementation(async (before, limit) => {
+      const found = (await find(before, limit)).map((image) => ({ ...image }));
+      record.submissionId = 12;
+      return found;
+    });
+
+    const result = await cleanup.run();
+
+    expect(result.images).toBe(0);
+    expect(store.images.has(racing.id)).toBe(true);
+    expect(listFiles(root)).toEqual([store.images.get(racing.id)?.filename]);
+  });
+
+  it('removes the images of a deleted user right away, file included', async () => {
+    const { images, cleanup, store, root } = createImageServices();
+    const photo = await images.upload(await jpegUpload(), where, USER_ID);
+    (store.images.get(photo.id) as { userId: number | null }).userId = null;
+
+    expect((await cleanup.run()).images).toBe(1);
+
+    expect(store.images.size).toBe(0);
+    expect(listFiles(root)).toEqual([]);
+  });
+
+  it('keeps a long expired handoff while it holds unattached images an open attempt still needs', async () => {
+    const { handoffs, cleanup, store } = createImageServices();
+    const view = await handoffs.openForReader(handoffKey, { maxImages: 1 });
+    await handoffs.upload(view.token, await jpegUpload());
+    (store.handoffs.get(view.handoffId) as { expiresAt: Date }).expiresAt = new Date(Date.now() - 2 * HOUR);
+
+    expect((await cleanup.run()).handoffs).toBe(0);
+
+    expect(store.handoffs.has(view.handoffId)).toBe(true);
+    expect(await handoffs.imageIds(view.handoffId)).toHaveLength(1);
+  });
+
   it('does not throw from the schedule when the store fails', async () => {
     const { cleanup, store } = createImageServices();
     jest.spyOn(store, 'findOrphanImages').mockRejectedValue(new Error('db down'));

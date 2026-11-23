@@ -4,11 +4,13 @@ import { AttractapService } from '../../../attractap.service';
 import { ResourceFormsService } from '../../../../resources/forms/forms.service';
 import { FormSubmissionRequestDto } from '../../../../resources/forms/dto/form-submission-request.dto';
 import { ResourceActionGuard } from '../resource-action.guard';
-import { FORM_PHOTO_UNSUPPORTED_REASON, ReaderFormImages } from './reader-form-images.service';
+import { ReaderFormImages } from './reader-form-images.service';
+import { hostReason } from '../../../../plugin-system/reader-ui/host-texts';
 import type { FormResponseDto } from '../../../../resources/forms/dto/form-response.dto';
 import {
   AuthenticatedWebSocket,
   AttractapEvent,
+  forgetReaderFormState,
   AttractapEventType,
   FormFieldAnswerValue,
   ResourceUsageFormRequestPayload,
@@ -62,9 +64,23 @@ export class AttractapFormsHandler {
     this.readerImages.endAttempt(socket, resourceId, action);
   }
 
-  /** The reader's login ended or changed: the phone links of its image fields stop working (ATT-879). */
-  public endReaderAttempts(socket: AuthenticatedWebSocket, readerId = socket.readerId): void {
-    this.readerImages.endAllForReader(socket, readerId);
+  /**
+   * The reader's login ended or changed, or its connection closed: the form answers, the forms shown and the phone
+   * links of image fields (ATT-879) all go. A login change or sign-out ends every link of the reader; a closed
+   * connection only the links it issued, since a newer connection of the same reader may already have its own.
+   * `readerId` names the reader when the socket no longer does.
+   */
+  public endReaderForms(
+    socket: AuthenticatedWebSocket,
+    options: { connectionClosed?: boolean; readerId?: number | null } = {},
+  ): void {
+    const issued = Object.values(socket.state.formHandoffs ?? {}).map((handoff) => handoff.handoffId);
+    forgetReaderFormState(socket);
+    if (options.connectionClosed) {
+      this.readerImages.endIssued(issued);
+    } else {
+      this.readerImages.endAllForReader(options.readerId === undefined ? socket.readerId : options.readerId);
+    }
   }
 
   public handleResourceUsageFormCancel(socket: AuthenticatedWebSocket, data: AttractapEvent['data']): void {
@@ -84,7 +100,7 @@ export class AttractapFormsHandler {
     action: ResourceFormAction;
     requestId?: number;
     /** Answers the pending action with an error, for a form this reader can never complete. */
-    reject?: (payload: { error: string; reason: unknown }) => Promise<unknown>;
+    reject: (payload: { error: string; reason: unknown }) => Promise<unknown>;
   }): Promise<FormSubmissionRequestDto[] | null> {
     const allForms = await this.resourceFormsService.getFormsForAction(resourceId, action);
     if (!allForms.length) {
@@ -95,7 +111,8 @@ export class AttractapFormsHandler {
     // makes the action fail with a pointer to the web app.
     const adapted = await this.readerImages.adapt(socket, allForms);
     if (adapted.blocked) {
-      await reject?.({ error: 'START_BLOCKED', reason: FORM_PHOTO_UNSUPPORTED_REASON });
+      const language = socket.state.cardSession?.language;
+      await reject({ error: 'START_BLOCKED', reason: hostReason('FORM_PHOTO_UNSUPPORTED', language) });
       return null;
     }
     const forms = adapted.forms;

@@ -416,21 +416,42 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
         ]);
       });
 
-      it('refuses a required image field with a message that points to the web app, and sends no form', async () => {
-        formStore.findRequiredForAction.mockResolvedValue([imageForm(true)]);
-        const socket = photoSocket(false);
+      it.each([
+        ['START', { resourceId: RESOURCE_ID }, false, 'de', 'Formular mit Foto bitte in der Web-App ausfüllen.'],
+        [
+          'TAKEOVER',
+          { resourceId: RESOURCE_ID, forceTakeOver: true },
+          false,
+          'en',
+          'Please complete this form in the web app.',
+        ],
+        ['END', { resourceId: RESOURCE_ID }, true, 'de', 'Formular mit Foto bitte in der Web-App ausfüllen.'],
+      ])(
+        'refuses %s with a required image field in the reader language, and sends no form',
+        async (_action, payload, stop, language, body) => {
+          const everyAction = { isRequiredOnResourceUsageTakeOver: true, isRequiredOnResourceUsageEnd: true };
+          formStore.findRequiredForAction.mockResolvedValue([{ ...imageForm(true), ...everyAction }]);
+          const socket = photoSocket(false);
+          socket.state.cardSession = { id: 'card-1', userId: 7, language, issuedAt: 0, expiryTimer: null };
+          const type = stop
+            ? AttractapEventType.STOP_RESOURCE_USAGE_SESSION
+            : AttractapEventType.START_RESOURCE_USAGE_SESSION;
 
-        await start(socket);
+          await (
+            stop ? sessionHandler.handleStopResourceUsageSession : sessionHandler.handleStartResourceUsageSession
+          ).call(sessionHandler, socket, { type, payload } as AttractapEvent['data']);
 
-        expect(sentTypes(socket)).not.toContain(AttractapEventType.RESOURCE_USAGE_FORM_REQUEST);
-        const reply = socket.sendMessage.mock.calls.at(-1)[0].data;
-        expect(reply.type).toBe(AttractapEventType.START_RESOURCE_USAGE_SESSION);
-        expect(reply.payload).toMatchObject({
-          error: 'START_BLOCKED',
-          reason: { code: 'FORM_PHOTO_UNSUPPORTED', body: expect.stringContaining('Web-App') },
-        });
-        expect(startSession).not.toHaveBeenCalled();
-      });
+          expect(sentTypes(socket)).not.toContain(AttractapEventType.RESOURCE_USAGE_FORM_REQUEST);
+          const reply = socket.sendMessage.mock.calls.at(-1)[0].data;
+          expect(reply.type).toBe(type);
+          expect(reply.payload).toMatchObject({
+            error: 'START_BLOCKED',
+            reason: { code: 'FORM_PHOTO_UNSUPPORTED', body },
+          });
+          expect(startSession).not.toHaveBeenCalled();
+          expect(endSession).not.toHaveBeenCalled();
+        },
+      );
 
       it('also refuses when the app URL is not set, because no link can be built', async () => {
         formStore.findRequiredForAction.mockResolvedValue([imageForm(true)]);

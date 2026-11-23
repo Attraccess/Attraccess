@@ -1,6 +1,7 @@
 import { GoneException, NotFoundException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { FORM_IMAGE_HANDOFF_TTL_MS } from '@attraccess/application-models';
+import type { StoredFormImage } from './form-image-store.port';
 import { createImageServices, handoffKey, jpegUpload, listFiles } from './form-images.test-fixture';
 
 const FIELD_OPTIONS = { maxImages: 2 };
@@ -216,5 +217,102 @@ describe('FormImageHandoffService', () => {
       await expect(handoffs.page(token)).rejects.toBeInstanceOf(GoneException);
       await expect(handoffs.upload(token, await jpegUpload())).rejects.toBeInstanceOf(GoneException);
     });
+  });
+
+  describe('races', () => {
+    it('frees the upload slot once when the same photo is deleted twice', async () => {
+      const { handoffs, store } = createImageServices();
+      const { token, handoffId } = await handoffs.openForReader(handoffKey, FIELD_OPTIONS);
+      const first = await handoffs.upload(token, await jpegUpload());
+      await handoffs.upload(token, await jpegUpload());
+      const image = store.images.get(first.id);
+      // The second DELETE found the row before the first one deleted it.
+      jest.spyOn(store, 'findImage').mockResolvedValue(image ?? null);
+
+      await handoffs.removeImage(token, first.id);
+      await expect(handoffs.removeImage(token, first.id)).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(store.handoffs.get(handoffId)?.uploadCount).toBe(1);
+    });
+
+    it('does not show or remove a photo that a submission took', async () => {
+      const { handoffs, store, root } = createImageServices();
+      const { token } = await handoffs.openForReader(handoffKey, FIELD_OPTIONS);
+      const photo = await handoffs.upload(token, await jpegUpload());
+      (store.images.get(photo.id) as { submissionId: number }).submissionId = 40;
+
+      await expect(handoffs.openImage(token, photo.id)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(handoffs.removeImage(token, photo.id)).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(store.images.has(photo.id)).toBe(true);
+      expect(listFiles(root)).toHaveLength(1);
+    });
+
+    it('keeps a photo that was attached between the check and the delete, and its slot', async () => {
+      const { handoffs, store, root } = createImageServices();
+      const { token, handoffId } = await handoffs.openForReader(handoffKey, FIELD_OPTIONS);
+      const photo = await handoffs.upload(token, await jpegUpload());
+      const unattached = { ...(store.images.get(photo.id) as StoredFormImage) };
+      jest.spyOn(store, 'findImage').mockResolvedValue(unattached);
+      (store.images.get(photo.id) as { submissionId: number }).submissionId = 40;
+
+      await expect(handoffs.removeImage(token, photo.id)).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(store.images.has(photo.id)).toBe(true);
+      expect(listFiles(root)).toHaveLength(1);
+      expect(store.handoffs.get(handoffId)?.uploadCount).toBe(1);
+    });
+
+    it('hands a photo stored under the old link while it was replaced over to the new link', async () => {
+      const { handoffs, store } = createImageServices();
+      const first = await handoffs.openForReader(handoffKey, FIELD_OPTIONS, undefined, T0);
+      const old = store.handoffs.get(first.handoffId) as NonNullable<ReturnType<typeof store.handoffs.get>>;
+      // An upload reserved its slot on the old link before it expired and stores its row after the first move.
+      const move = store.moveHandoffImages.bind(store);
+      let moves = 0;
+      jest.spyOn(store, 'moveHandoffImages').mockImplementation(async (from, to) => {
+        await move(from, to);
+        moves += 1;
+        if (moves === 1) {
+          await store.insertImage({
+            id: 'late-photo',
+            formId: old.formId,
+            fieldId: old.fieldId,
+            userId: old.userId,
+            uploadedByUserId: null,
+            handoffId: old.id,
+            mimeType: 'image/jpeg',
+            size: 1,
+            width: 1,
+            height: 1,
+            filename: 'late-photo.jpg',
+          });
+        }
+      });
+
+      const fresh = await handoffs.openForReader(handoffKey, FIELD_OPTIONS, first, later(FORM_IMAGE_HANDOFF_TTL_MS));
+
+      expect(await handoffs.imageIds(fresh.handoffId)).toEqual(['late-photo']);
+    });
+
+    it('ends only the links it is given', async () => {
+      const { handoffs } = createImageServices();
+      const mine = await handoffs.openForReader(handoffKey, FIELD_OPTIONS);
+      const newer = await handoffs.openForReader({ ...handoffKey, fieldId: handoffKey.fieldId + 1 }, FIELD_OPTIONS);
+
+      await handoffs.endHandoffs([mine.handoffId]);
+
+      await expect(handoffs.resolve(mine.token)).rejects.toBeInstanceOf(GoneException);
+      await expect(handoffs.resolve(newer.token)).resolves.toBeDefined();
+    });
+  });
+
+  it('reads the app URL once for the links of several polls', async () => {
+    const { handoffs, settings } = createImageServices();
+    const view = await handoffs.openForReader(handoffKey, FIELD_OPTIONS);
+    await handoffs.openForReader(handoffKey, FIELD_OPTIONS, view);
+    await handoffs.canIssue();
+
+    expect(settings.getUrl).toHaveBeenCalledTimes(1);
   });
 });

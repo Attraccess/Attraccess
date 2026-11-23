@@ -19,6 +19,11 @@ import {
 import { FormImageUnavailableError } from '../../../resources/usage/usage-session-store.port';
 import { createMigratedUsageDatabase, userRow } from '../usage/migrated-usage-database.test-fixture';
 import { TypeOrmFormImageStore } from './form-image-store.adapter';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { FormImageCleanupService } from '../../../resources/forms/images/form-image-cleanup.service';
+import { FormImageFileStorage } from '../../../resources/forms/images/form-image-file-storage';
 
 jest.setTimeout(60_000);
 
@@ -173,22 +178,35 @@ describe('TypeOrmFormImageStore on real PostgreSQL (the migrated schema)', () =>
       expect(await store.findImage(image.id)).toMatchObject({ submissionId: null });
     });
 
-    it('deletes the images and handoffs of a deleted user', async () => {
+    it('keeps the images of a deleted user without a user, and the cleanup job removes them with their files', async () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'form-images-persistence-'));
+      const files = new FormImageFileStorage({ get: () => ({ root }) } as never);
+      const cleanup = new FormImageCleanupService(store, files);
       const handoff = await insertHandoff(newHandoff({ userId: 2 }));
       const image = await store.insertImage(newImage({ userId: 2, handoffId: handoff.id }));
+      const kept = await store.insertImage(newImage());
+      for (const item of [image, kept]) await files.write(item.filename, Buffer.from('jpeg'));
 
       await instance.source.getRepository(User).delete({ id: 2 });
 
-      expect(await store.findImage(image.id)).toBeNull();
+      // The handoff goes with the user; the image row stays, belonging to nobody, until the cleanup job runs.
       expect(await store.findHandoffByTokenHash(handoff.tokenHash)).toBeNull();
+      expect(await store.findImage(image.id)).toMatchObject({ userId: null, handoffId: null, submissionId: null });
+
+      expect((await cleanup.run()).images).toBe(1);
+
+      expect(await store.findImage(image.id)).toBeNull();
+      expect(await store.findImage(kept.id)).not.toBeNull();
+      expect(fs.readdirSync(path.join(root, 'form-images'))).toEqual([kept.filename]);
     });
 
-    it('lists unattached images uploaded before a cut-off, and deletes by id', async () => {
+    it('lists unattached images uploaded before a cut-off, and deletes only rows that are still unattached', async () => {
       const old = await store.insertImage(newImage());
-      await instance.source
-        .getRepository(FormImage)
-        .update({ id: old.id }, { createdAt: new Date(Date.now() - 48 * HOUR) });
-      const fresh = await store.insertImage(newImage());
+      const racing = await store.insertImage(newImage());
+      for (const id of [old.id, racing.id]) {
+        await instance.source.getRepository(FormImage).update({ id }, { createdAt: new Date(Date.now() - 48 * HOUR) });
+      }
+      await store.insertImage(newImage());
       const attached = await store.insertImage(newImage());
       await instance.source
         .getRepository(FormImage)
@@ -198,13 +216,52 @@ describe('TypeOrmFormImageStore on real PostgreSQL (the migrated schema)', () =>
         );
 
       const orphans = await store.findOrphanImages(new Date(Date.now() - 24 * HOUR), 10);
-      expect(orphans.map((item) => item.id)).toEqual([old.id]);
+      expect(orphans.map((item) => item.id).sort()).toEqual([old.id, racing.id].sort());
 
-      await store.deleteImages([old.id]);
-      await store.deleteImage(fresh.id);
+      // A submission takes one of them between the find and the delete.
+      await instance.source
+        .getRepository(FormImage)
+        .update({ id: racing.id }, { submissionId: (await submission()).id });
+      expect(await store.deleteOrphanImages(orphans.map((item) => item.id))).toEqual([old.filename]);
+      expect(await store.deleteOrphanImages([])).toEqual([]);
+
       expect(await store.findImage(old.id)).toBeNull();
-      expect(await store.findImage(fresh.id)).toBeNull();
+      expect(await store.findImage(racing.id)).not.toBeNull();
       expect(await store.findImage(attached.id)).not.toBeNull();
+    });
+
+    it('deletes one image only while it is unattached and, if asked, of the given handoff', async () => {
+      const handoff = await insertHandoff(newHandoff());
+      const image = await store.insertImage(newImage({ handoffId: handoff.id }));
+      const attached = await store.insertImage(newImage({ handoffId: handoff.id }));
+      await instance.source
+        .getRepository(FormImage)
+        .update({ id: attached.id }, { submissionId: (await submission()).id });
+
+      expect(await store.deleteUnattachedImage(image.id, randomUUID())).toBe(false);
+      expect(await store.deleteUnattachedImage(attached.id, handoff.id)).toBe(false);
+      expect(await store.deleteUnattachedImage(image.id, handoff.id)).toBe(true);
+      expect(await store.deleteUnattachedImage(image.id, handoff.id)).toBe(false);
+      expect(await store.findImage(attached.id)).not.toBeNull();
+    });
+
+    it('counts the unattached images of a handoff and the recent unattached images of a user', async () => {
+      const handoff = await insertHandoff(newHandoff());
+      await store.insertImage(newImage({ handoffId: handoff.id }));
+      const attached = await store.insertImage(newImage({ handoffId: handoff.id }));
+      await instance.source
+        .getRepository(FormImage)
+        .update({ id: attached.id }, { submissionId: (await submission()).id });
+      const old = await store.insertImage(newImage());
+      await instance.source
+        .getRepository(FormImage)
+        .update({ id: old.id }, { createdAt: new Date(Date.now() - 48 * HOUR) });
+      await store.insertImage(newImage({ userId: 2, uploadedByUserId: 2 }));
+
+      expect(await store.countHandoffImages(handoff.id)).toBe(1);
+      expect((await store.listHandoffImages(handoff.id)).map((item) => item.id)).not.toContain(attached.id);
+      expect(await store.countUnattachedImages(1, new Date(Date.now() - 24 * HOUR))).toBe(1);
+      expect(await store.countUnattachedImages(2, new Date(Date.now() - 24 * HOUR))).toBe(1);
     });
   });
 
@@ -232,14 +289,30 @@ describe('TypeOrmFormImageStore on real PostgreSQL (the migrated schema)', () =>
       expect(await store.findLatestHandoff({ ...key, fieldId: fieldId + 1 })).toBeNull();
     });
 
-    it('moves images to a successor handoff', async () => {
+    it('moves the unattached images to a successor handoff', async () => {
       const from = await insertHandoff(newHandoff());
       const to = await insertHandoff(newHandoff());
       const image = await store.insertImage(newImage({ handoffId: from.id }));
+      const attached = await store.insertImage(newImage({ handoffId: from.id }));
+      await instance.source
+        .getRepository(FormImage)
+        .update({ id: attached.id }, { submissionId: (await submission()).id });
 
       await store.moveHandoffImages(from.id, to.id);
 
       expect((await store.findImage(image.id))?.handoffId).toBe(to.id);
+      expect((await store.findImage(attached.id))?.handoffId).toBe(from.id);
+    });
+
+    it('ends only the open handoffs it is given', async () => {
+      const mine = await insertHandoff(newHandoff());
+      const other = await insertHandoff(newHandoff());
+
+      expect(await store.endHandoffsById([mine.id], new Date())).toBe(1);
+      expect(await store.endHandoffsById([mine.id], new Date())).toBe(0);
+      expect(await store.endHandoffsById([], new Date())).toBe(0);
+      expect((await store.findHandoffByTokenHash(mine.tokenHash))?.endedAt).not.toBeNull();
+      expect((await store.findHandoffByTokenHash(other.tokenHash))?.endedAt).toBeNull();
     });
 
     it('ends the open handoffs of a reader, all or of one resource and action', async () => {
@@ -279,19 +352,27 @@ describe('TypeOrmFormImageStore on real PostgreSQL (the migrated schema)', () =>
       expect(await store.reserveHandoffUpload(ended.id, new Date())).toBe(false);
     });
 
-    it('deletes handoffs that expired or ended before a cut-off and keeps the rest', async () => {
+    it('deletes handoffs that expired or ended before a cut-off, except those holding unattached images', async () => {
       const live = await insertHandoff(newHandoff());
       const expired = await insertHandoff(newHandoff({ expiresAt: new Date(Date.now() - 3 * HOUR) }));
       const ended = await insertHandoff(newHandoff());
       await store.endHandoff(ended.id, new Date(Date.now() - 3 * HOUR));
-      const image = await store.insertImage(newImage({ handoffId: expired.id }));
+      const holding = await insertHandoff(newHandoff({ expiresAt: new Date(Date.now() - 3 * HOUR) }));
+      const waiting = await store.insertImage(newImage({ handoffId: holding.id }));
+      const submitted = await store.insertImage(newImage({ handoffId: expired.id }));
+      await instance.source
+        .getRepository(FormImage)
+        .update({ id: submitted.id }, { submissionId: (await submission()).id });
 
       expect(await store.deleteStaleHandoffs(new Date(Date.now() - HOUR))).toBe(2);
 
       expect(await store.findHandoffByTokenHash(live.tokenHash)).not.toBeNull();
       expect(await store.findHandoffByTokenHash(expired.tokenHash)).toBeNull();
-      // The image outlives its handoff, unattached, until the cleanup job sweeps it.
-      expect(await store.findImage(image.id)).toMatchObject({ handoffId: null });
+      // An open reader attempt still reads its answer through this handoff.
+      expect(await store.findHandoffByTokenHash(holding.tokenHash)).not.toBeNull();
+      expect(await store.findImage(waiting.id)).toMatchObject({ handoffId: holding.id });
+      // A submitted image outlives its handoff.
+      expect(await store.findImage(submitted.id)).toMatchObject({ handoffId: null });
     });
   });
 

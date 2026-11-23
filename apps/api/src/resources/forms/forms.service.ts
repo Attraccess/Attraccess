@@ -316,7 +316,8 @@ export class ResourceFormsService {
       } catch (error) {
         // Add stable identifiers for firmware; keep the diagnostic message for
         // existing clients. Field names and values remain separate display data.
-        const missingRequired = field.isRequired && (isEmptyAnswer(answer.value) || field.type === 'boolean');
+        const missingRequired =
+          field.isRequired && (isEmptyAnswer(answer.value, field.type) || field.type === 'boolean');
         const code = missingRequired
           ? 'REQUIRED_FIELD'
           : field.type === 'number'
@@ -417,7 +418,7 @@ export class ResourceFormsService {
       }
     }
 
-    if (isEmptyAnswer(rawValue)) {
+    if (isEmptyAnswer(rawValue, field.type)) {
       if (field.isRequired) {
         throw new BadRequestException(`Field "${field.name}" is required on form "${form.name}".`);
       }

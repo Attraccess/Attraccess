@@ -5,13 +5,6 @@ import type { FormResponseDto } from '../../../../resources/forms/dto/form-respo
 import type { FormFieldResponseDto } from '../../../../resources/forms/dto/form-field.dto';
 import type { AuthenticatedWebSocket, FormFieldAnswerValue } from '../../websocket.types';
 
-/** What an old reader shows (as a start block, on its button) when a required form needs a photo it cannot take. */
-export const FORM_PHOTO_UNSUPPORTED_REASON = {
-  code: 'FORM_PHOTO_UNSUPPORTED',
-  title: 'Formular mit Foto',
-  body: 'Formular mit Foto bitte in der Web-App ausfüllen.\nComplete this form in the web app.',
-} as const;
-
 const isImage = (field: Pick<FormFieldResponseDto, 'type'>) => field.type === FormFieldType.IMAGE;
 
 /**
@@ -71,16 +64,18 @@ export class ReaderFormImages {
     // calls that both find no usable link would each create one, leaving the phone on a link the reader does not show.
     const lane = `${readerId}:${key}`;
     const previous = this.lanes.get(lane) ?? Promise.resolve();
-    const run = previous.catch(() => undefined).then(async () => {
-      const view = await this.handoffs.openForReader(
-        { readerId, userId, ...where, fieldId: field.id },
-        field.options,
-        socket.state.formHandoffs?.[key],
-      );
-      socket.state.formHandoffs ??= {};
-      socket.state.formHandoffs[key] = { handoffId: view.handoffId, token: view.token };
-      return { handoffUrl: view.handoffUrl, imageCount: view.imageCount, maxImages: view.maxImages };
-    });
+    const run = previous
+      .catch(() => undefined)
+      .then(async () => {
+        const view = await this.handoffs.openForReader(
+          { readerId, userId, ...where, fieldId: field.id },
+          field.options,
+          socket.state.formHandoffs?.[key],
+        );
+        socket.state.formHandoffs ??= {};
+        socket.state.formHandoffs[key] = { handoffId: view.handoffId, token: view.token };
+        return { handoffUrl: view.handoffUrl, imageCount: view.imageCount, maxImages: view.maxImages };
+      });
     this.lanes.set(lane, run);
     try {
       return await run;
@@ -120,7 +115,11 @@ export class ReaderFormImages {
     return filled;
   }
 
-  /** Brings the draft answers of image fields up to date: the phone may have removed photos since the page was sent. */
+  /**
+   * Brings the draft answers of image fields up to date from their handoffs: the phone may have removed photos since
+   * the page was sent, or finished an upload after the user went past an optional photo page with none. A submit
+   * always passes every page, so a photo that arrived late belongs to the answer.
+   */
   async refreshDraft(
     socket: AuthenticatedWebSocket,
     where: { resourceId: number; action: ResourceFormAction },
@@ -130,7 +129,7 @@ export class ReaderFormImages {
     for (const form of forms) {
       for (const field of form.fields.filter(isImage)) {
         const handoff = socket.state.formHandoffs?.[this.key(where.resourceId, where.action, form.id, field.id)];
-        if (!handoff || draft[field.id] === undefined) continue;
+        if (!handoff) continue;
         const ids = await this.handoffs.imageIds(handoff.handoffId);
         if (ids.length) draft[field.id] = JSON.stringify(ids);
         else delete draft[field.id];
@@ -153,11 +152,21 @@ export class ReaderFormImages {
   }
 
   /** The reader's login ended or changed: every link of the reader stops working. */
-  endAllForReader(socket: Pick<AuthenticatedWebSocket, 'readerId'>, readerId = socket.readerId): void {
-    // A disconnect clears `socket.readerId` first, so it names the reader itself.
+  endAllForReader(readerId: number | null | undefined): void {
     if (readerId == null) return;
     void this.handoffs.endForReader(readerId).catch((error) => {
       this.logger.warn(`Could not end the photo links of reader ${readerId}: ${(error as Error).message}`);
+    });
+  }
+
+  /**
+   * A reader connection closed: only the links it issued stop working. A newer connection of the same reader (maybe on
+   * another API instance) keeps its own.
+   */
+  endIssued(handoffIds: string[]): void {
+    if (!handoffIds.length) return;
+    void this.handoffs.endHandoffs(handoffIds).catch((error) => {
+      this.logger.warn(`Could not end the photo links of a closed reader connection: ${(error as Error).message}`);
     });
   }
 }

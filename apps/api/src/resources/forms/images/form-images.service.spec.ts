@@ -11,6 +11,8 @@ import {
   jpegUpload,
   listFiles,
 } from './form-images.test-fixture';
+import type { StoredFormImage } from './form-image-store.port';
+import { MAX_UNATTACHED_IMAGES_PER_USER } from './form-images.service';
 
 const where = { resourceId: RESOURCE_ID, action: ResourceFormAction.START, formId: FORM_ID, fieldId: FIELD_ID };
 
@@ -94,7 +96,64 @@ describe('FormImagesService', () => {
     });
   });
 
-  describe('openForViewer', () => {
+  describe('limits', () => {
+    it('refuses with 429 once a user has 50 photos waiting for a submission, before processing the upload', async () => {
+      const { images, store, root } = createImageServices();
+      for (let i = 0; i < MAX_UNATTACHED_IMAGES_PER_USER; i++) {
+        await store.insertImage({
+          id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+          formId: FORM_ID,
+          fieldId: FIELD_ID,
+          userId: USER_ID,
+          uploadedByUserId: USER_ID,
+          handoffId: null,
+          mimeType: 'image/jpeg',
+          size: 1,
+          width: 1,
+          height: 1,
+          filename: `waiting-${i}.jpg`,
+        });
+      }
+
+      const refused = images.upload(await jpegUpload(), where, USER_ID);
+
+      await expect(refused).rejects.toMatchObject({ status: 429 });
+      await expect(refused).rejects.toThrow(/at most 50/);
+      expect(listFiles(root)).toEqual([]);
+      // Another user, and the same user once a photo is attached, may upload.
+      await expect(images.upload(await jpegUpload(), where, USER_ID + 1)).resolves.toBeDefined();
+      (store.images.get('00000000-0000-4000-8000-000000000000') as { submissionId: number }).submissionId = 1;
+      await expect(images.upload(await jpegUpload(), where, USER_ID)).resolves.toBeDefined();
+    });
+  });
+
+  describe('remove', () => {
+    it('deletes a not yet attached image with its file, and is 404 the second time', async () => {
+      const { images, store, root } = createImageServices();
+      const { id } = await images.upload(await jpegUpload(), where, USER_ID);
+      const image = store.images.get(id) as StoredFormImage;
+
+      await images.remove(image);
+
+      expect(store.images.has(id)).toBe(false);
+      expect(listFiles(root)).toEqual([]);
+      await expect(images.remove(image)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('keeps an image (row and file) that a submission took meanwhile', async () => {
+      const { images, store, root } = createImageServices();
+      const { id } = await images.upload(await jpegUpload(), where, USER_ID);
+      const image = { ...(store.images.get(id) as StoredFormImage) };
+      (store.images.get(id) as { submissionId: number }).submissionId = 40;
+
+      await expect(images.remove(image)).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(store.images.has(id)).toBe(true);
+      expect(listFiles(root)).toHaveLength(1);
+    });
+  });
+
+  describe('findForViewer', () => {
     const OTHER = 99;
 
     async function stored() {
@@ -106,10 +165,8 @@ describe('FormImagesService', () => {
     it('lets the uploader preview an image that is not attached yet, and nobody else', async () => {
       const { images, id } = await stored();
 
-      await expect(images.openForViewer(id, { id: USER_ID, mayViewAll: false })).resolves.toMatchObject({
-        image: { id },
-      });
-      await expect(images.openForViewer(id, { id: OTHER, mayViewAll: false })).rejects.toBeInstanceOf(
+      await expect(images.findForViewer(id, { id: USER_ID, mayViewAll: false })).resolves.toMatchObject({ id });
+      await expect(images.findForViewer(id, { id: OTHER, mayViewAll: false })).rejects.toBeInstanceOf(
         NotFoundException,
       );
     });
@@ -119,9 +176,9 @@ describe('FormImagesService', () => {
       (store.images.get(id) as { submissionId: number }).submissionId = 40;
       store.submissionUsers.set(40, USER_ID);
 
-      await expect(images.openForViewer(id, { id: USER_ID, mayViewAll: false })).resolves.toBeDefined();
-      await expect(images.openForViewer(id, { id: OTHER, mayViewAll: true })).resolves.toBeDefined();
-      await expect(images.openForViewer(id, { id: OTHER, mayViewAll: false })).rejects.toBeInstanceOf(
+      await expect(images.findForViewer(id, { id: USER_ID, mayViewAll: false })).resolves.toBeDefined();
+      await expect(images.findForViewer(id, { id: OTHER, mayViewAll: true })).resolves.toBeDefined();
+      await expect(images.findForViewer(id, { id: OTHER, mayViewAll: false })).rejects.toBeInstanceOf(
         NotFoundException,
       );
     });
@@ -129,16 +186,25 @@ describe('FormImagesService', () => {
     it('answers an unknown id like a forbidden one', async () => {
       const { images } = await stored();
       await expect(
-        images.openForViewer('3f2b6c1e-8a4d-4b7e-9c11-2d5e7f8a9b01', { id: USER_ID, mayViewAll: true }),
+        images.findForViewer('3f2b6c1e-8a4d-4b7e-9c11-2d5e7f8a9b01', { id: USER_ID, mayViewAll: true }),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('is a 404 when the file is gone', async () => {
       const { images, files, store, id } = await stored();
       await files.remove(store.images.get(id)?.filename ?? '');
-      await expect(images.openForViewer(id, { id: USER_ID, mayViewAll: false })).rejects.toBeInstanceOf(
+      const image = await images.findForViewer(id, { id: USER_ID, mayViewAll: false });
+      await expect(images.open(image)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('shows the image of a deleted user (no user left) only to users who may view all', async () => {
+      const { images, store, id } = await stored();
+      (store.images.get(id) as { userId: number | null }).userId = null;
+
+      await expect(images.findForViewer(id, { id: USER_ID, mayViewAll: false })).rejects.toBeInstanceOf(
         NotFoundException,
       );
+      await expect(images.findForViewer(id, { id: OTHER, mayViewAll: true })).resolves.toMatchObject({ id });
     });
   });
 });

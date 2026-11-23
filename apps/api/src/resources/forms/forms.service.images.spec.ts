@@ -137,6 +137,15 @@ describe('ResourceFormsService image fields', () => {
       const [draft] = await submit([]);
       expect(draft.data).toEqual({});
     });
+
+    it('keeps "[]" as the answer of a text field: only an image field reads it as empty', async () => {
+      const text = field({ type: FormFieldType.TEXT, name: 'Note', isRequired: true, options: null });
+      store.findRequiredForAction.mockResolvedValue([{ ...form, fields: [text] }]);
+
+      const [draft] = await submit('[]');
+
+      expect(draft.data['21'].value).toBe('[]');
+    });
   });
 
   describe('a reader page', () => {

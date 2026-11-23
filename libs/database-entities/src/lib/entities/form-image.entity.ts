@@ -65,22 +65,24 @@ export class FormImageHandoff {
  * A processed image (JPEG, metadata stripped) uploaded for an image field. The file lives in the private form image
  * directory, never under the public CDN. `submissionId` stays null until a submission references it; the cleanup job
  * deletes images that stay unreferenced for a day, and those whose submission was deleted (the column is then reset).
+ * Deleting a user resets `userId`, so the cleanup job also finds their images and removes the files with the rows.
  */
 @Entity()
 @Index('IDX_form_image_submission', ['submissionId'])
-@Index('IDX_form_image_created', ['createdAt'])
+@Index('IDX_form_image_unattached_created', ['createdAt'], { where: '"submissionId" IS NULL' })
 @Index('IDX_form_image_handoff', ['handoffId'])
+@Index('IDX_form_image_user', ['userId'])
 export class FormImage {
   @PrimaryColumn({ type: 'uuid' })
   id!: string;
 
-  /** The user the image is for: its uploader, or the user of the handoff it came through. */
-  @Column({ type: 'integer' })
-  userId!: number;
+  /** The user the image is for: its uploader, or the user of the handoff it came through. Null once they are deleted. */
+  @Column({ type: 'integer', nullable: true })
+  userId!: number | null;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'userId' })
-  user!: User;
+  user!: User | null;
 
   /** Null for uploads through a reader handoff link. */
   @Column({ type: 'integer', nullable: true })

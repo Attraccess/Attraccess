@@ -98,7 +98,8 @@ export enum AttractapEventType {
   //    CARD_SESSION_ENDED { cardSessionId }.
   //  START_RESOURCE_USAGE_SESSION gains optional `stepId`, `choice` and `cardSessionId`; replies may carry
   //  { error: 'START_BLOCKED', reason: { code, title, body } }. Host codes in `reason.code`: HOOK_UNAVAILABLE,
-  //  CONFIRMATION_UNAVAILABLE, CONFIRMATION_REQUIRED, STEP_EXPIRED, STEP_UNKNOWN.
+  //  CONFIRMATION_UNAVAILABLE, CONFIRMATION_REQUIRED, STEP_EXPIRED, STEP_UNKNOWN, FORM_PHOTO_UNSUPPORTED (also on
+  //  STOP_RESOURCE_USAGE_SESSION replies).
   UI_SLOT_UPDATE = 'UI_SLOT_UPDATE',
   UI_STEP_REQUEST = 'UI_STEP_REQUEST',
   UI_STEP_RESULT = 'UI_STEP_RESULT',

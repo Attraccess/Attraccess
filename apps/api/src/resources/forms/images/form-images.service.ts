@@ -1,10 +1,10 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { ReadStream } from 'fs';
 import {
+  FORM_IMAGE_ORPHAN_TTL_MS,
   FormFieldType,
   ResourceFormAction,
-  type FormImageRecord,
   type FormRecord,
   type FormFieldRecord,
 } from '@attraccess/application-models';
@@ -16,7 +16,13 @@ import { ResourceFormsService } from '../forms.service';
 import { FormImageDto } from './form-image.dto';
 import { FormImageFileStorage } from './form-image-file-storage';
 import { processFormImage } from './form-image-processor';
-import { FORM_IMAGE_STORE, type FormImageStore } from './form-image-store.port';
+import { FORM_IMAGE_STORE, type FormImageStore, type StoredFormImage } from './form-image-store.port';
+
+/**
+ * How many images one user may have waiting for a submission (uploaded within the orphan lifetime, not attached). A
+ * form takes at most ten per field; this stops one member from filling the disk with uploads that are never submitted.
+ */
+export const MAX_UNATTACHED_IMAGES_PER_USER = 50;
 
 /** Who looks at an image. */
 export interface FormImageViewer {
@@ -35,7 +41,7 @@ export interface FormImageTarget {
   handoffId: string | null;
 }
 
-export const toImageDto = (image: FormImageRecord): FormImageDto => ({
+export const toImageDto = (image: StoredFormImage): FormImageDto => ({
   id: image.id,
   width: image.width,
   height: image.height,
@@ -77,6 +83,7 @@ export class FormImagesService {
         `File type ${file.mimetype} is not allowed. Allowed types: ${this.allowedMimeTypes.join(', ')}`,
       );
     }
+    await this.assertRoomForImages(target.userId);
     const processed = await processFormImage(file.buffer);
     const id = randomUUID();
     const filename = `${id}.jpg`;
@@ -95,6 +102,17 @@ export class FormImagesService {
     } catch (error) {
       await this.files.remove(filename);
       throw error;
+    }
+  }
+
+  private async assertRoomForImages(userId: number): Promise<void> {
+    const since = new Date(Date.now() - FORM_IMAGE_ORPHAN_TTL_MS);
+    if ((await this.store.countUnattachedImages(userId, since)) >= MAX_UNATTACHED_IMAGES_PER_USER) {
+      throw new HttpException(
+        `Too many photos are waiting for a form to be submitted (at most ${MAX_UNATTACHED_IMAGES_PER_USER}). ` +
+          'Submit or cancel the open forms, or try again tomorrow.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
   }
 
@@ -122,30 +140,33 @@ export class FormImagesService {
   }
 
   /**
-   * The image file for a viewer. Everyone but the submission's user, a user who may view all submissions, and the
-   * uploader of a not yet attached image gets 404, so ids cannot be probed.
+   * The image a viewer may see. Everyone but the submission's user, a user who may view all submissions, and the
+   * uploader of a not yet attached image gets 404, so ids cannot be probed. An image whose user was deleted belongs to
+   * nobody.
    */
-  async openForViewer(
-    imageId: string,
-    viewer: FormImageViewer,
-  ): Promise<{ stream: ReadStream; image: FormImageRecord }> {
+  async findForViewer(imageId: string, viewer: FormImageViewer): Promise<StoredFormImage> {
     const found = await this.store.findImageWithOwner(imageId);
     if (!found) throw new NotFoundException('Image not found');
     const { image, submissionUserId } = found;
-    const allowed =
-      viewer.mayViewAll || (image.submissionId !== null ? submissionUserId === viewer.id : image.userId === viewer.id);
+    const owner = image.submissionId !== null ? submissionUserId : image.userId;
+    const allowed = viewer.mayViewAll || (owner !== null && owner === viewer.id);
     if (!allowed) throw new NotFoundException('Image not found');
-    return { image, stream: await this.files.open(image.filename) };
+    return image;
   }
 
-  /** The file of an image, for a caller that already proved access (a handoff holder). */
-  async open(image: FormImageRecord): Promise<ReadStream> {
+  /** The file of an image, for a caller that already proved access. */
+  async open(image: StoredFormImage): Promise<ReadStream> {
     return this.files.open(image.filename);
   }
 
-  /** Deletes the image row and its file. */
-  async remove(image: FormImageRecord): Promise<void> {
-    await this.store.deleteImage(image.id);
+  /**
+   * Deletes a not yet attached image and its file; with `handoffId`, only an image of that handoff. An image that a
+   * submission took, or that is gone already, is 404 and keeps its file.
+   */
+  async remove(image: StoredFormImage, handoffId?: string): Promise<void> {
+    if (!(await this.store.deleteUnattachedImage(image.id, handoffId))) {
+      throw new NotFoundException('Image not found');
+    }
     await this.files.remove(image.filename);
   }
 }
