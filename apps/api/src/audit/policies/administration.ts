@@ -371,12 +371,24 @@ export function projectAdministrationAuditEvent(input: AdministrationAuditInput)
   }
 }
 
+/** Audit values of the network restriction: IP ranges, a header name and role action lists, never free text. */
+function safeNetworkRestrictionValue(key: string, value: string): boolean {
+  if (key === 'networkRestriction.ipSource') return value === 'client' || value === 'header';
+  if (key === 'networkRestriction.headerName') return /^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,100}$/.test(value);
+  // Long values are clipped with an ellipsis before they are recorded.
+  if (key === 'networkRestriction.allowedRanges') return /^[0-9A-Za-z:./%_,-]*…?$/.test(value);
+  if (key === 'networkRestriction.roleActions') return /^[A-Za-z0-9_.-]+: [a-z.,]*…?$/.test(value);
+  return false;
+}
+
 function safeSettingValue(key: string, value: unknown): boolean {
   if (typeof value !== 'string') return false;
   if (key === 'app.defaultLanguage') return value === 'en' || value === 'de';
   if (key === 'resources.activityVisibility') return value === 'all' || value === 'introduced';
   if (key === 'attractap.cardWriterMode') return value === 'all' || value === 'selected';
   if (key === 'attractap.cardWriterReaders') return /^(?:\d+(?:,\d+)*)?$/.test(value);
+  if (key.startsWith('networkRestriction.') && !key.endsWith('.enabled'))
+    return safeNetworkRestrictionValue(key, value);
   if (value === '') return true;
   if (['app.url', 'app.publicInternetUrl'].includes(key)) return value === safeAuditOrigin(value);
   if (key === 'smtp.host') return value === safeAuditHost(value);
