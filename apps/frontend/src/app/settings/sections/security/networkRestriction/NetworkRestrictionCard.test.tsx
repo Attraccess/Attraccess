@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NETWORK_RESTRICTION_DEFAULT_RANGES } from '@attraccess/application-models';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsSaveBar } from '../../../components/SettingsSaveBar';
 import { useNetworkRestrictionDrafts } from '../useNetworkRestrictionDrafts';
 import { NetworkRestrictionCard } from './NetworkRestrictionCard';
@@ -66,6 +67,13 @@ const settings = (over = {}) => ({
   serverRanges: ['192.168.50.0/24'],
   ...over,
 });
+const rangeInput = () => screen.getByRole('textbox', { name: 'Allowed networks' });
+/** Leaves the input and the Add button beside it: moving from the input to Add keeps the draft. */
+const leaveRangeField = async () => {
+  await userEvent.tab();
+  await userEvent.tab();
+};
+
 const matrix = {
   actions: ['usage.start', 'usage.end'],
   roles: [{ roleId: 4, key: 'member', name: 'Member', actions: ['usage.start'] }],
@@ -79,6 +87,11 @@ describe('NetworkRestrictionCard', () => {
     state.matrixError = false;
     state.updateSettings.mockResolvedValue({});
     state.updateRoleActions.mockResolvedValue({});
+    // jsdom reports the document as unfocused; browsers report true while the window is active.
+    vi.spyOn(document, 'hasFocus').mockReturnValue(true);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('shows the detected address judged with the saved ranges', () => {
@@ -106,13 +119,13 @@ describe('NetworkRestrictionCard', () => {
   it('adds typed ranges one by one, names a bad entry inline and rejects duplicates', async () => {
     state.settings = settings({ allowedRanges: ['10.0.0.0/8'] });
     render(<Harness />);
-    const input = screen.getByTestId('network-range-input');
+    const input = rangeInput();
     await userEvent.type(input, '10.0.0.0/40');
     await userEvent.click(screen.getByRole('button', { name: 'Add' }));
     expect(screen.getByText('"10.0.0.0/40" is not a valid IP address or CIDR range.')).toBeInTheDocument();
     await userEvent.clear(input);
     await userEvent.type(input, '10.0.0.0/8{Enter}');
-    expect(screen.getByText('"10.0.0.0/8" is already in the list.')).toBeInTheDocument();
+    expect(screen.getByText('This value is already in the list.')).toBeInTheDocument();
     await userEvent.clear(input);
     await userEvent.type(input, '192.168.5.0/24, fd00::/8{Enter}');
     expect(screen.getByRole('row', { name: /192\.168\.5\.0\/24/ })).toBeInTheDocument();
@@ -127,18 +140,19 @@ describe('NetworkRestrictionCard', () => {
   });
 
   it('offers the detected subnet, the server networks and the private ranges, hiding those already added', async () => {
-    state.settings = settings({ allowedRanges: ['192.168.0.0/16'] });
+    state.settings = settings({ allowedRanges: ['10.0.0.0/8'] });
     render(<Harness />);
-    const suggestions = screen.getByTestId('network-range-suggestions');
-    expect(suggestions).toHaveTextContent('203.0.113.0/24');
-    expect(suggestions).toHaveTextContent('192.168.50.0/24');
-    expect(suggestions).toHaveTextContent('fc00::/7');
-    expect(suggestions).not.toHaveTextContent('192.168.0.0/16');
+    expect(screen.getByRole('button', { name: 'Add 203.0.113.0/24' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add 192.168.50.0/24' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add fc00::/7' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add 10.0.0.0/8' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Add 203.0.113.0/24' }));
+    // The detected address lies within the subnet just added, so it is no longer offered either.
     expect(screen.queryByRole('button', { name: 'Add 203.0.113.0/24' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add 203.0.113.9' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(state.updateSettings).toHaveBeenCalledTimes(1));
-    expect(state.updateSettings.mock.calls[0][0].body.allowedRanges).toEqual(['192.168.0.0/16', '203.0.113.0/24']);
+    expect(state.updateSettings.mock.calls[0][0].body.allowedRanges).toEqual(['10.0.0.0/8', '203.0.113.0/24']);
   });
 
   it('discards the edits', async () => {
@@ -181,7 +195,7 @@ describe('NetworkRestrictionCard', () => {
     expect(state.updateSettings.mock.calls[0][0].body).toMatchObject({
       enabled: true,
       ipSource: 'client',
-      allowedRanges: expect.arrayContaining(['10.0.0.0/8', '192.168.0.0/16', 'fc00::/7']),
+      allowedRanges: [...NETWORK_RESTRICTION_DEFAULT_RANGES],
     });
     expect(state.updateRoleActions).not.toHaveBeenCalled();
     await waitFor(() => expect(state.success).toHaveBeenCalled());
@@ -225,20 +239,24 @@ describe('NetworkRestrictionCard', () => {
   it('names a range spelled differently from one in the list as a duplicate', async () => {
     state.settings = settings({ allowedRanges: ['10.0.0.0/8', 'fc00::/7'] });
     render(<Harness />);
-    const input = screen.getByTestId('network-range-input');
+    const input = rangeInput();
     await userEvent.type(input, '10.0.0.1/8{Enter}');
-    expect(screen.getByText('"10.0.0.1/8" is already in the list.')).toBeInTheDocument();
+    expect(screen.getByText('This value is already in the list.')).toBeInTheDocument();
     await userEvent.clear(input);
     await userEvent.type(input, 'FC00::/7{Enter}');
-    expect(screen.getByText('"FC00::/7" is already in the list.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+    expect(screen.getByText('This value is already in the list.')).toBeInTheDocument();
+    // In a pasted list, the entries already there are skipped and the others added.
+    await userEvent.clear(input);
+    await userEvent.type(input, 'fc00::1/7 172.16.0.0/12{Enter}');
+    expect(screen.getByRole('row', { name: /172\.16\.0\.0\/12/ })).toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /fc00::1\/7/ })).not.toBeInTheDocument();
   });
 
   it('adds a valid entry left in the field when it loses focus, so it is not lost silently', async () => {
     state.settings = settings({ allowedRanges: ['10.0.0.0/8'] });
     render(<Harness />);
-    await userEvent.type(screen.getByTestId('network-range-input'), '192.168.1.0/24');
-    await userEvent.tab();
+    await userEvent.type(rangeInput(), '192.168.1.0/24');
+    await leaveRangeField();
     expect(screen.getByRole('row', { name: /192\.168\.1\.0\/24/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
   });
@@ -251,5 +269,34 @@ describe('NetworkRestrictionCard', () => {
     await userEvent.click(toggle);
     expect(screen.queryByRole('row', { name: /10\.0\.0\.0\/8/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+  });
+
+  it('saves an entry typed and not yet added when Save is clicked straight away', async () => {
+    state.settings = settings({ allowedRanges: ['10.0.0.0/8'] });
+    render(<Harness />);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Allow End session from outside for Member' }));
+    await userEvent.type(rangeInput(), '192.168.7.0/24');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(state.updateSettings).toHaveBeenCalledTimes(1));
+    expect(state.updateSettings.mock.calls[0][0].body.allowedRanges).toEqual(['10.0.0.0/8', '192.168.7.0/24']);
+  });
+
+  it('names an invalid entry left in the field when it loses focus, instead of dropping it silently', async () => {
+    render(<Harness />);
+    await userEvent.type(rangeInput(), '192.168.1.0/33');
+    await leaveRangeField();
+    expect(screen.getByText('"192.168.1.0/33" is not a valid IP address or CIDR range.')).toBeInTheDocument();
+    expect(rangeInput()).toHaveValue('192.168.1.0/33');
+  });
+
+  it('hides a suggestion the list already holds in another spelling or within a broader range', () => {
+    state.settings = settings({ allowedRanges: ['FC00::/7', '203.0.113.9/32', '192.168.0.0/16'] });
+    render(<Harness />);
+    expect(screen.queryByRole('button', { name: 'Add fc00::/7' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add 203.0.113.9' })).not.toBeInTheDocument();
+    // 192.168.50.0/24 (a server network) lies within 192.168.0.0/16.
+    expect(screen.queryByRole('button', { name: 'Add 192.168.50.0/24' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add 203.0.113.0/24' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add 169.254.0.0/16' })).toBeInTheDocument();
   });
 });

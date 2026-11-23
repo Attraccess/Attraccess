@@ -5,7 +5,7 @@
   "loadFailed": "The network restriction settings could not be loaded. Reload the page to try again.",
   "detected": {
     "inside": "With the saved settings, your address {{address}} is inside the allowed network.",
-    "outside": "With the saved settings, your address {{address}} is outside the allowed network. Check the ranges and the address source before you switch the restriction on, or allow the actions you need for one of your roles below.",
+    "outside": "With the saved settings, your address {{address}} is outside the allowed network. Check the allowed networks and the address source before you switch the restriction on, or allow the actions you need for one of your roles below.",
     "noRanges": "Your address is {{address}}. No allowed networks are saved yet.",
     "unknown": "With the saved address source, your address could not be determined, so you count as outside the allowed network."
   },
@@ -16,14 +16,10 @@
   "ranges": {
     "label": "Allowed networks",
     "hint": "IP addresses and CIDR ranges (IPv4 and IPv6). At least one is required while the restriction is on.",
-    "inputLabel": "Add an allowed network",
     "placeholder": "e.g. 192.168.1.0/24 or fd00::/8",
-    "add": "Add",
     "empty": "No allowed networks yet.",
     "invalid": "\"{{entry}}\" is not a valid IP address or CIDR range.",
-    "duplicate": "\"{{entry}}\" is already in the list.",
-    "required": "Enter at least one allowed network while the restriction is on.",
-    "remove": "Remove {{range}}"
+    "required": "Enter at least one allowed network while the restriction is on."
   },
   "source": {
     "label": "Address source",
@@ -74,7 +70,7 @@
   "suggestions": {
     "detected": "Your connection",
     "server": "This server's networks",
-    "private": "Private ranges",
+    "private": "Private networks",
     "local": "Loopback and link-local",
     "add": "Add {{range}}"
   }

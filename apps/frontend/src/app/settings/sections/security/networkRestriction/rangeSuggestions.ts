@@ -1,4 +1,6 @@
+import { NETWORK_RESTRICTION_LOCAL_RANGES, NETWORK_RESTRICTION_PRIVATE_RANGES } from '@attraccess/application-models';
 import { NetworkRestrictionSettingsDto } from '@attraccess/react-query-client';
+import { isCoveredBy } from './networkRange';
 
 export interface RangeSuggestionGroup {
   /** Translation key under `suggestions.` */
@@ -6,10 +8,10 @@ export interface RangeSuggestionGroup {
   ranges: string[];
 }
 
-const PRIVATE = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'fc00::/7'];
-const LOCAL = ['127.0.0.0/8', '::1/128', 'fe80::/10'];
-
-/** Quick-add suggestions: what was detected for this admin and server, then the usual private ranges. Added ones drop out. */
+/**
+ * Quick-add suggestions: what was detected for this admin and server, then the usual private and local ranges. A
+ * suggestion that the list (or an earlier group) already holds, however it is spelled, drops out.
+ */
 export function buildRangeSuggestions(
   settings: NetworkRestrictionSettingsDto,
   added: readonly string[],
@@ -20,16 +22,18 @@ export function buildRangeSuggestions(
   const groups: RangeSuggestionGroup[] = [
     { key: 'detected', ranges: detected },
     { key: 'server', ranges: settings.serverRanges ?? [] },
-    { key: 'private', ranges: PRIVATE },
-    { key: 'local', ranges: LOCAL },
+    { key: 'private', ranges: [...NETWORK_RESTRICTION_PRIVATE_RANGES] },
+    { key: 'local', ranges: [...NETWORK_RESTRICTION_LOCAL_RANGES] },
   ];
-  const seen = new Set(added);
+  const taken = [...added];
+  const offered: string[] = [];
   return groups
     .map(({ key, ranges }) => ({
       key,
       ranges: ranges.filter((range) => {
-        if (seen.has(range)) return false;
-        seen.add(range);
+        // A broader entry in the list already holds the suggestion; one offered above is not offered twice.
+        if (isCoveredBy(taken, range) || offered.includes(range)) return false;
+        offered.push(range);
         return true;
       }),
     }))

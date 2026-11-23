@@ -1,11 +1,11 @@
 import { Description, Input, Label, Radio, RadioGroup, Spinner, TextField } from '@heroui/react';
-import { LabeledSwitch, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { NETWORK_RESTRICTION_MAX_RANGES } from '@attraccess/application-models';
+import { LabeledSwitch, StatusAlert, StringListField, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { NetworkIpSource, NetworkRestrictionSettingsDto } from '@attraccess/react-query-client';
 import { SettingsRow } from '../../../components/SettingsRow';
 import { SubHeading } from '../components/SubHeading';
 import { NetworkRestrictionDrafts } from '../useNetworkRestrictionDrafts';
-import { AllowedRangesInput } from './AllowedRangesInput';
-import { AllowedRangesList } from './AllowedRangesList';
+import { isSameRange, isValidRange, splitRangeInput } from './networkRange';
 import { RangeSuggestions } from './RangeSuggestions';
 import { buildRangeSuggestions } from './rangeSuggestions';
 import { NetworkRestrictionRoleTable } from './NetworkRestrictionRoleTable';
@@ -77,9 +77,20 @@ export function NetworkRestrictionCard({ drafts }: Readonly<NetworkRestrictionCa
 
         <SettingsRow stacked label={t('ranges.label')} hint={t('ranges.hint')}>
           <div className="flex w-full flex-col gap-3">
-            <AllowedRangesList ranges={shown.ranges} onRemove={drafts.removeRange} />
-            <AllowedRangesInput existing={shown.ranges} onAdd={drafts.addRanges} isInvalid={rangesError !== null} />
-            {rangesError !== null && <StatusAlert status="danger">{rangesError}</StatusAlert>}
+            <StringListField
+              isLabelHidden
+              label={t('ranges.label')}
+              placeholder={t('ranges.placeholder')}
+              emptyHint={t('ranges.empty')}
+              values={shown.ranges}
+              onChange={drafts.setRanges}
+              parseEntries={splitRangeInput}
+              validateEntry={(entry) => (isValidRange(entry) ? null : t('ranges.invalid', { entry }))}
+              isSameEntry={isSameRange}
+              maxEntries={NETWORK_RESTRICTION_MAX_RANGES}
+              errorMessage={rangesError}
+              data-cy="network-range-input"
+            />
             <RangeSuggestions groups={buildRangeSuggestions(settings, shown.ranges)} onAdd={drafts.addRanges} />
           </div>
         </SettingsRow>

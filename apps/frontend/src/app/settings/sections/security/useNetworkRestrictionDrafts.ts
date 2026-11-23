@@ -43,8 +43,9 @@ export interface NetworkRestrictionDrafts {
   isMatrixError: boolean;
   shown: NetworkRestrictionShown;
   toggleEnabled: (next: boolean) => void;
+  setRanges: (ranges: string[]) => void;
+  /** Adds the entries the list does not hold yet, however they are spelled (the quick-add suggestions). */
   addRanges: (entries: string[]) => void;
-  removeRange: (entry: string) => void;
   setIpSource: (source: NetworkIpSource) => void;
   setHeaderName: (name: string) => void;
   roleDraft: Record<number, NetworkRestrictedAction[]>;
@@ -123,7 +124,6 @@ export function useNetworkRestrictionDrafts(): NetworkRestrictionDrafts {
 
   const addRanges = (entries: string[]) =>
     setRanges(entries.reduce((list, entry) => (containsRange(list, entry) ? list : [...list, entry]), shown.ranges));
-  const removeRange = (entry: string) => setRanges(shown.ranges.filter((range) => range !== entry));
 
   const toggleEnabled = (next: boolean) => {
     setEnabled(next);
@@ -188,8 +188,8 @@ export function useNetworkRestrictionDrafts(): NetworkRestrictionDrafts {
     isMatrixError,
     shown,
     toggleEnabled,
+    setRanges,
     addRanges,
-    removeRange,
     setIpSource,
     setHeaderName,
     roleDraft,

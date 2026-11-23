@@ -5,7 +5,7 @@
   "loadFailed": "Die Einstellungen der Netzwerkbeschränkung konnten nicht geladen werden. Lade die Seite neu und versuche es erneut.",
   "detected": {
     "inside": "Mit den gespeicherten Einstellungen liegt deine Adresse {{address}} im erlaubten Netzwerk.",
-    "outside": "Mit den gespeicherten Einstellungen liegt deine Adresse {{address}} außerhalb des erlaubten Netzwerks. Prüfe die Bereiche und die Adressquelle, bevor du die Beschränkung einschaltest, oder erlaube die Aktionen, die du brauchst, unten für eine deiner Rollen.",
+    "outside": "Mit den gespeicherten Einstellungen liegt deine Adresse {{address}} außerhalb des erlaubten Netzwerks. Prüfe die erlaubten Netzwerke und die Adressquelle, bevor du die Beschränkung einschaltest, oder erlaube die Aktionen, die du brauchst, unten für eine deiner Rollen.",
     "noRanges": "Deine Adresse ist {{address}}. Es sind noch keine erlaubten Netzwerke gespeichert.",
     "unknown": "Mit der gespeicherten Adressquelle konnte deine Adresse nicht ermittelt werden, daher giltst du als außerhalb des erlaubten Netzwerks."
   },
@@ -16,14 +16,10 @@
   "ranges": {
     "label": "Erlaubte Netzwerke",
     "hint": "IP-Adressen und CIDR-Bereiche (IPv4 und IPv6). Solange die Beschränkung aktiv ist, ist mindestens einer erforderlich.",
-    "inputLabel": "Erlaubtes Netzwerk hinzufügen",
     "placeholder": "z. B. 192.168.1.0/24 oder fd00::/8",
-    "add": "Hinzufügen",
     "empty": "Noch keine erlaubten Netzwerke.",
     "invalid": "„{{entry}}“ ist keine gültige IP-Adresse und kein gültiger CIDR-Bereich.",
-    "duplicate": "„{{entry}}“ steht bereits in der Liste.",
-    "required": "Gib mindestens ein erlaubtes Netzwerk an, solange die Beschränkung aktiv ist.",
-    "remove": "{{range}} entfernen"
+    "required": "Gib mindestens ein erlaubtes Netzwerk an, solange die Beschränkung aktiv ist."
   },
   "source": {
     "label": "Adressquelle",
@@ -74,7 +70,7 @@
   "suggestions": {
     "detected": "Deine Verbindung",
     "server": "Netzwerke dieses Servers",
-    "private": "Private Bereiche",
+    "private": "Private Netzwerke",
     "local": "Loopback und Link-lokal",
     "add": "{{range}} hinzufügen"
   }
