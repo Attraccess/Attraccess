@@ -374,19 +374,6 @@ void DemoWebsocket::respondActionSuccess(const std::string &type)
 
 #include "fixtures.hpp"
 
-bool DemoWebsocket::cncFormComplete() const
-{
-    for (uint32_t i = 0; i < CNC_FIELD_COUNT; i++)
-    {
-        if (!CNC_FIELDS_DE[i].required)
-            continue;
-        auto it = _cncDraft.find(CNC_FIELDS_DE[i].id);
-        if (it == _cncDraft.end() || it->second.empty())
-            return false;
-    }
-    return true;
-}
-
 void DemoWebsocket::respondFormRequest(uint32_t resourceId)
 {
     StaticJsonDocument<512> doc;
@@ -412,7 +399,7 @@ void DemoWebsocket::respondFormRequest(uint32_t resourceId)
 
 void DemoWebsocket::respondFormFields(uint32_t resourceId, const char *action, uint32_t formId, uint32_t offset)
 {
-    StaticJsonDocument<768> doc;
+    StaticJsonDocument<1024> doc;
     doc["event"] = "EVENT";
     doc["data"]["type"] = "RESOURCE_USAGE_FORM_FIELDS";
     doc["data"]["payload"]["resourceId"] = resourceId;
@@ -447,17 +434,19 @@ void DemoWebsocket::respondFormFields(uint32_t resourceId, const char *action, u
             obj["options"]["max"] = 480.0;
             obj["options"]["step"] = 1.0;
         }
+        else if (strcmp(f.type, "image") == 0)
+            describeImageField(obj);
         else if (strcmp(f.type, "text") == 0)
         {
             obj["options"]["placeholder"] = english ? "e.g. 2024-042" : "z.B. 2024-042";
         }
 
         auto draft = _cncDraft.find(f.id);
-        if (draft != _cncDraft.end())
+        if (draft != _cncDraft.end() && strcmp(f.type, "image") != 0)
             obj["value"] = draft->second;
     }
 
-    char buf[768];
+    char buf[1024];
     size_t n = serializeJson(doc, buf, sizeof(buf));
     if (n > 0)
         enqueue(std::string(buf, n));

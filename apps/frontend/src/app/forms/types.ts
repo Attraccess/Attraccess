@@ -1,4 +1,5 @@
 import { FormFieldType, FormFieldResponseDto, FormScope } from '@attraccess/react-query-client';
+import { DEFAULT_FORM_IMAGES, formImageLimit } from '@attraccess/application-models';
 
 export interface BooleanFieldOptions {
   trueLabel?: string;
@@ -20,7 +21,13 @@ export interface SelectFieldOptions {
   options: string[];
 }
 
-export type FieldOptions = TextFieldOptions | NumberFieldOptions | SelectFieldOptions | BooleanFieldOptions;
+export interface ImageFieldOptions {
+  /** How many images the field accepts (see isValidFormImageLimit). A cleared input stays '' until saved. */
+  maxImages: number | '';
+}
+
+export type FieldOptions =
+  TextFieldOptions | NumberFieldOptions | SelectFieldOptions | BooleanFieldOptions | ImageFieldOptions;
 
 export interface EditableFormField {
   id?: number;
@@ -62,6 +69,9 @@ export const defaultFieldOptions: Record<FormFieldType, FieldOptions> = {
   [FormFieldType.BOOLEAN]: {
     trueLabel: '',
     falseLabel: '',
+  },
+  [FormFieldType.IMAGE]: {
+    maxImages: DEFAULT_FORM_IMAGES,
   },
 };
 
@@ -134,6 +144,9 @@ export function parseFieldOptions(type: FormFieldType, raw?: Record<string, unkn
       }
       return booleanOptions;
     }
+    case FormFieldType.IMAGE: {
+      return { maxImages: formImageLimit(raw) };
+    }
     default:
       return options;
   }
@@ -197,6 +210,10 @@ export function serializeFieldOptions(
         payload.falseLabel = falseLabel.trim();
       }
       return Object.keys(payload).length ? payload : null;
+    }
+    case FormFieldType.IMAGE: {
+      const { maxImages } = options as ImageFieldOptions;
+      return { maxImages: maxImages === '' || maxImages === undefined ? DEFAULT_FORM_IMAGES : Number(maxImages) };
     }
     default:
       return null;

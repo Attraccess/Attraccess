@@ -100,7 +100,8 @@ export enum AttractapEventType {
   //    CARD_SESSION_ENDED { cardSessionId }.
   //  START_RESOURCE_USAGE_SESSION gains optional `stepId`, `choice` and `cardSessionId`; replies may carry
   //  { error: 'START_BLOCKED', reason: { code, title, body } }. Host codes in `reason.code`: HOOK_UNAVAILABLE,
-  //  CONFIRMATION_UNAVAILABLE, CONFIRMATION_REQUIRED, STEP_EXPIRED, STEP_UNKNOWN.
+  //  CONFIRMATION_UNAVAILABLE, CONFIRMATION_REQUIRED, STEP_EXPIRED, STEP_UNKNOWN, FORM_PHOTO_UNSUPPORTED (also on
+  //  STOP_RESOURCE_USAGE_SESSION replies).
   UI_SLOT_UPDATE = 'UI_SLOT_UPDATE',
   UI_STEP_REQUEST = 'UI_STEP_REQUEST',
   UI_STEP_RESULT = 'UI_STEP_RESULT',
@@ -175,6 +176,10 @@ export interface ResourceUsageFormFieldPayload {
   isRequired: boolean;
   options: Record<string, unknown> | string[] | null;
   value?: FormFieldAnswerValue | null;
+  /** Image fields only (ATT-879): the link the reader shows as a QR code, the images added so far and the limit. */
+  handoffUrl?: string;
+  imageCount?: number;
+  maxImages?: number;
 }
 
 export interface ResourceUsageFormMetaPayload {
@@ -257,6 +262,7 @@ export function queuedSendBytes(socket: Pick<AuthenticatedWebSocket, 'pendingSen
 export function forgetReaderFormState(socket: Pick<AuthenticatedWebSocket, 'state'>): void {
   socket.state.formDrafts = undefined;
   socket.state.formsPresented = undefined;
+  socket.state.formHandoffs = undefined;
 }
 
 export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
@@ -376,6 +382,13 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
     formDrafts?: Record<string, Record<number, FormFieldAnswerValue>>;
     /** Per draft key, the forms already sent to the reader; it shows at most four at a time (ATT-796). */
     formsPresented?: Record<string, number[]>;
+    /**
+     * The reader announced `capabilities.formImages` (ATT-879): it can show an image field as a QR code. Readers
+     * without it never get a field of type `image`.
+     */
+    formImages?: boolean;
+    /** Image fields on screen: the handoff and its token per `resource:action:form:field`. The database holds the rest. */
+    formHandoffs?: Record<string, { handoffId: string; token: string }>;
     /** Live card authentication (ATT-1187). Null once the reader reported sign-out or the server expired it. */
     cardSession?: CardSessionState | null;
     /** Open reader UI steps by stepId; discarded when the socket closes. */

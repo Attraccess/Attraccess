@@ -932,9 +932,9 @@ const sessionEndHook: SessionEndHook = async (ctx) => ({
   (zum Beispiel eine Bestätigung mit ungültigem Step-Key) zählen jeweils als Hook-Fehler. Standard ist **fail
   closed**: Der Start wird mit „Vorübergehend nicht startbar“ blockiert.
 - Ein `block` mit ungültigem `reason` (fehlend, einen Kernstatus nachahmend oder mit einem Host-Code wie
-  `CONFIRMATION_REQUIRED`, `CONFIRMATION_UNAVAILABLE`, `HOOK_UNAVAILABLE`, `STEP_EXPIRED` oder `STEP_UNKNOWN`)
-  blockiert trotzdem, auch bei fail open, mit „Vorübergehend nicht startbar“. Er wird protokolliert und zählt nicht
-  für den Circuit Breaker.
+  `CONFIRMATION_REQUIRED`, `CONFIRMATION_UNAVAILABLE`, `HOOK_UNAVAILABLE`, `STEP_EXPIRED`, `STEP_UNKNOWN` oder
+  `FORM_PHOTO_UNSUPPORTED`) blockiert trotzdem, auch bei fail open, mit „Vorübergehend nicht startbar“. Er wird
+  protokolliert und zählt nicht für den Circuit Breaker.
 - Nach 5 aufeinanderfolgenden Fehlern öffnet ein Circuit Breaker für das Plugin: Die Ausfallrichtlinie gilt, ohne
   den Hook aufzurufen; nach 60 s geht der nächste Aufruf als Probe durch und schließt den Breaker, wenn er gelingt;
   außerdem entsteht ein Admin-Alarm. Session-End-Hooks haben einen eigenen Breaker. Admins können den Alarm

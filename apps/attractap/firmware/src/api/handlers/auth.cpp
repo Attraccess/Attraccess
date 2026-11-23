@@ -58,6 +58,8 @@ void API::sendFirmwareInfo()
 #ifdef HAS_LVGL_DISPLAY
     // Duration input and extend controls (ATT-43): the touch readers. Others start with the server's fallback deadline.
     if (traits.hasNfc) event["data"]["payload"]["capabilities"]["sessionDuration"] = true;
+    // This reader renders image form fields as a QR code for the phone (ATT-879). Readers without a display never get them.
+    event["data"]["payload"]["capabilities"]["formImages"] = true;
 #endif
     // Plugin BLE proxy, protocol v1 (ATT-1033). Builds without it send no `ble`: the API answers READER_UNSUPPORTED.
     char bleCaps[ble::CAPABILITY_SCRATCH];

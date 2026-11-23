@@ -47,6 +47,14 @@ export class MissingBillingTransactionError extends Error {
   }
 }
 
+/** A submission references an image that is gone, already attached elsewhere or not the submitter's (ATT-879). */
+export class FormImageUnavailableError extends Error {
+  constructor() {
+    super('A form image is no longer available. Add it again.');
+    this.name = 'FormImageUnavailableError';
+  }
+}
+
 export interface SessionPage {
   data: UsageSession[];
   total: number;

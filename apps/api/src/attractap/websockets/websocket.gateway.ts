@@ -43,7 +43,7 @@ import { readerWebSocketOptions } from './websocket-transport-options';
 import { WebsocketService } from './websocket.service';
 import { ReaderTimeZoneService } from './reader-time-zone.service';
 import { readerHeartbeat } from './websocket-reader-payloads';
-import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, forgetReaderFormState } from './websocket.types';
+import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 import { SKIPS_ACTIVITY_WRITE } from './websocket-activity';
 import { randomBytes } from 'crypto';
 import type { IncomingMessage } from 'http';
@@ -170,11 +170,14 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   protected onReaderSessionEnded(
     socket: AuthenticatedWebSocket,
     reason: CardConversationFailure = 'READER_SESSION_ENDED',
+    readerId: number | null = socket.readerId,
   ) {
     this.cardConversations.abort(socket, reason);
     this.cardHandler.clearVerifiedUser(socket);
     if (reason === 'READER_SESSION_ENDED') this.uiHandler.endCardSession(socket);
-    forgetReaderFormState(socket);
+    // A closed connection (READER_UNREACHABLE) ends only the photo links it issued: a newer connection of the same
+    // reader, maybe on another instance, keeps its own.
+    this.formsHandler.endReaderForms(socket, { readerId, connectionClosed: reason === 'READER_UNREACHABLE' });
     if (socket.state.supervisionFlow && !socket.state.supervisionFlow.webInitiated) {
       this.supervisionHandler.cancelForSocket(socket);
     }
@@ -193,7 +196,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     if (!socket.state) return;
     // Plugin BLE sessions and pending calls are bound to this connection's reader identity.
     this.readerBleDriver.socketClosed(socket);
-    this.onReaderSessionEnded(socket, reason);
+    this.onReaderSessionEnded(socket, reason, readerId);
     if (socket.state.supervisionFlow) this.supervisionHandler.cancelForSocket(socket);
     if (socket.state.massIntroductionFlow) this.massIntroductionHandler.cancelForSocket(socket, readerId);
     socket.state.enrollment = null;

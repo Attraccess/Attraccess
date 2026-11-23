@@ -32,16 +32,11 @@ import { CardOperationsService } from '../../card-operations.service';
 import { CardWriterPolicyService } from '../../card-writer-policy.service';
 import { WebsocketService } from '../../websocket.service';
 
-import {
-  AttractapEvent,
-  AttractapEventType,
-  AuthenticatedWebSocket,
-  CardDetection,
-  forgetReaderFormState,
-} from '../../websocket.types';
+import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, CardDetection } from '../../websocket.types';
 
 import { ResourceListService } from '../resource-list/resource-list.service';
 import { AttractapSupervisionHandler } from '../supervision/supervision.handler';
+import { AttractapFormsHandler } from '../forms/forms.handler';
 import { CardSessionService } from '../ui/card-session.service';
 import { CARD_WRITE_START_ERRORS, assertReaderRelaysCards } from './card-write-errors';
 import { assertReaderPaired } from '../../../reader-pairing';
@@ -106,6 +101,9 @@ export class AttractapCardHandler {
 
   @Inject(AttractapSupervisionHandler)
   protected supervisionHandler: AttractapSupervisionHandler;
+
+  @Inject(AttractapFormsHandler)
+  protected formsHandler: AttractapFormsHandler;
 
   /**
    * A card was tapped for a login. The user becomes the connection's verified user only after the
@@ -191,7 +189,9 @@ export class AttractapCardHandler {
    * keeps both. A web-started supervision belongs to the reader, not to a login, and stays.
    */
   private forgetLoginState(socket: AuthenticatedWebSocket, userId: number | null, previousUserId: number | null) {
-    if (userId === null || userId !== previousUserId) forgetReaderFormState(socket);
+    if (userId === null || userId !== previousUserId) {
+      this.formsHandler.endReaderForms(socket);
+    }
     const flow = socket.state.supervisionFlow;
     if (flow && !flow.webInitiated && flow.requesterUserId !== userId) {
       this.supervisionHandler.cancelForSocket(socket);

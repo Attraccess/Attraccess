@@ -29,7 +29,7 @@ describe('MCP OAuth (real application)', () => {
   // Every request comes from 127.0.0.1: start each test with fresh windows so that the suite never trips the per-IP
   // limits by its size alone. The limiter tests count within one test.
   beforeEach(() => {
-    t.app.get(McpRateLimitGuard)['counters'].clear();
+    t.app.get(McpRateLimitGuard)['limiter'].reset();
   });
 
   // Registration is rate limited per IP, so flows register through the service; the HTTP endpoint has its own tests.

@@ -4,8 +4,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Network restriction (ATT-46): the resource actions the members of a role may still perform from outside the
  * allowed network. A role has no rows until an administrator allows something, so nothing changes on upgrade.
  */
-export class RoleNetworkActions1796200000002 implements MigrationInterface {
-  name = 'RoleNetworkActions1796200000002';
+export class RoleNetworkActions1796200000003 implements MigrationInterface {
+  name = 'RoleNetworkActions1796200000003';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

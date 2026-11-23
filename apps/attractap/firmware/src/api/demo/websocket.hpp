@@ -80,7 +80,11 @@ private:
     // Draft answers for the CNC start form (fieldId -> value), like the real
     // server's per-socket form draft. Cleared once the session starts.
     std::map<uint32_t, std::string> _cncDraft;
+    // Photos the pretend phone has added to the demo image field; one more on every count poll.
+    uint32_t _cncImageCount = 0;
 
+    // The demo image field's QR link and count (demo/form_helpers.cpp).
+    void describeImageField(JsonObject field);
     void enqueue(const std::string &msg);
     void processOutbound(const char *data, size_t len);
     void respondAuthenticated();
