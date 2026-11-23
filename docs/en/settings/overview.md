@@ -49,7 +49,7 @@ In both modes:
 - An introduction that is blocked until retraining still counts, so people see the machine they have to be retrained on. A revoked introduction hides the machine again. While you run a machine, you see it.
 - Accounts without **Read Resources**, for example on custom roles, get the **Only people introduced to a machine** view even in the **Everyone with Read Resources** mode.
 
-A machine hidden from someone answers `404 Not found`, exactly like a machine that does not exist, on every per-machine address: its page, status, usage, introductions, maintenance, flows, forms and live updates. Lists, the in-use list, resource groups, the dashboard and live updates leave it out, and page counts count only the machines you may see. Resource groups appear only if they contain a machine you may see or you introduce or maintain the group.
+A machine hidden from someone answers `404` (resource not found), exactly like a machine that does not exist, on every per-machine address: its page, status, usage, introductions, maintenance, flows, forms and live updates. Lists, the in-use list, resource groups, the dashboard and live updates leave it out, and page counts count only the machines you may see. Resource groups appear only if they contain a machine you may see or you introduce or maintain the group or are introduced to it.
 
 Activity visibility (above) is applied on top: a machine you cannot see never shows up in the in-use list or live updates, whatever the activity setting says.
 

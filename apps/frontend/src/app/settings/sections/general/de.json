@@ -1,6 +1,6 @@
 {
   "title": "Allgemein",
-  "description": "Die URLs, unter denen diese Instanz erreichbar ist, ihre Lizenz und wer die Ressourcennutzung sehen darf.",
+  "description": "Die URLs, unter denen diese Instanz erreichbar ist, ihre Lizenz wer die Maschinenliste sehen darf und wer die Ressourcennutzung sehen darf.",
   "loading": "Einstellungen werden geladen...",
   "inputs": {
     "url": {

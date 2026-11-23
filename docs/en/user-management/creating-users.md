@@ -19,9 +19,9 @@ After registration, the user gets the default `user` role. It holds only **Read 
 
 ### What an account can reach before its email is verified
 
-- **Password sign-in and passkey sign-in refuse an account whose email address is not verified.** A self-registered account that has not clicked its link gets no session, so it sees no machines and no data. It can only use the sign-in page's flows that need no account session: verify the email, resend the verification email, change the unverified email address (with its password), and reset the password.
-- **SSO accounts can be unverified.** When the identity provider reports `email_verified=false` and the email address is not yet taken, the first sign-in still creates the account with an unverified email and signs it in, unless your provisioning rules reject it. It has the default `user` role like any other account: with **Everyone with Read Resources** it sees all machines, with **Only people introduced to a machine** none until it is introduced.
-- **Changing the email address clears the verified flag, but existing sessions and API tokens keep working.** Sign-in is refused again once the session ends.
+- **Password sign-in and passkey sign-in refuse an account whose email address is not verified.** A self-registered account that has not clicked its link gets no session, so it sees no machines and no data. It can only use the sign-in page's flows that need no account session: verify the email, resend the verification email, change the unverified email address (with its password, not while two-factor authentication is enabled), and reset the password.
+- **SSO accounts can be unverified.** When the identity provider reports `email_verified=false` and the email address is not yet taken, the first sign-in still creates the account with an unverified email and signs it in. It has the default `user` role like any other account, plus any roles your [permission mapping](user-management/sso-overview.md#permission-mapping) grants: with **Everyone with Read Resources** it sees all machines, with **Only people introduced to a machine** none until it is introduced.
+- **Changing the email address clears the verified flag, but existing sessions, API tokens and MCP tokens keep working.** This applies to a change by the user and by an administrator. Password and passkey sign-in is refused again on the next sign-in until the new address is verified; SSO sign-in is not affected.
 
 These rules describe the current behaviour; they are not changed by the machine list visibility setting.
 

@@ -63,6 +63,16 @@ describe.each([
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
+  it('keeps filter recovery when a narrowed list still has machines the filters hide', () => {
+    state.permissions = [];
+    const reset = vi.fn();
+    render(<NoResourcesFound hasResources isRestricted onClearFilterAndSearch={reset} onOpenCreate={vi.fn()} />);
+    expect(screen.queryByText(translations.restricted.title)).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: translations.alert.title })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: translations.alert.clear }));
+    expect(reset).toHaveBeenCalledOnce();
+  });
+
   it('still offers creation to people who may create machines, even when the list is narrowed', () => {
     render(
       <NoResourcesFound hasResources={false} isRestricted onClearFilterAndSearch={vi.fn()} onOpenCreate={vi.fn()} />,

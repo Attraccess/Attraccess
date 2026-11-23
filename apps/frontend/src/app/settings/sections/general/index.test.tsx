@@ -501,6 +501,22 @@ describe('GeneralSection — machine list visibility', () => {
     expect(listSelect()).toHaveTextContent('inputs.listVisibility.authenticated');
   });
 
+  it('points the select at its hint', () => {
+    render(<GeneralSection />);
+    const hintId = listSelect().getAttribute('aria-describedby');
+    expect(hintId).toBeTruthy();
+    expect(document.getElementById(hintId as string)).toHaveTextContent('inputs.listVisibility.');
+  });
+
+  it('does not claim a mode while the setting is still loading', () => {
+    mockVisibility({ isLoading: true });
+    render(<GeneralSection />);
+    expect(listSelect()).toBeDisabled();
+    expect(screen.getByText('inputs.listVisibility.description')).toBeInTheDocument();
+    expect(screen.queryByText('inputs.listVisibility.authenticatedHint')).not.toBeInTheDocument();
+    expect(screen.queryByText('inputs.listVisibility.permittedOnlyHint')).not.toBeInTheDocument();
+  });
+
   it('disables the select when the setting cannot be loaded', () => {
     mockVisibility({ isError: true });
     render(<GeneralSection />);

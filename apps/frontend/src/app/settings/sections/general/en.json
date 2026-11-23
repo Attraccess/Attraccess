@@ -1,6 +1,6 @@
 {
   "title": "General",
-  "description": "The URLs this instance is reached at, its license, and who can see resource activity.",
+  "description": "The URLs this instance is reached at, its license, who can see the machine list, and who can see resource activity.",
   "loading": "Loading settings...",
   "inputs": {
     "url": {

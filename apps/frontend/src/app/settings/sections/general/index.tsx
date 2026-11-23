@@ -285,17 +285,21 @@ export function GeneralSection() {
 
         <SettingsRow
           stacked
+          hintId="list-visibility-hint"
           label={t('inputs.listVisibility.label')}
           hint={
             isVisibilityError
               ? t('inputs.listVisibility.loadFailed')
               : listVisibility === ResourceListVisibility.PERMITTED_ONLY
                 ? t('inputs.listVisibility.permittedOnlyHint')
-                : t('inputs.listVisibility.authenticatedHint')
+                : listVisibility === ResourceListVisibility.AUTHENTICATED
+                  ? t('inputs.listVisibility.authenticatedHint')
+                  : t('inputs.listVisibility.description')
           }
         >
           <Select
             aria-label={t('inputs.listVisibility.label')}
+            aria-describedby="list-visibility-hint"
             value={listVisibility}
             onChange={(next) => {
               const mode = LIST_VISIBILITY_MODES.find((candidate) => candidate === next);
@@ -311,6 +315,7 @@ export function GeneralSection() {
         </SettingsRow>
         <SettingsRow
           stacked
+          hintId="activity-visibility-hint"
           label={t('inputs.activityVisibility.label')}
           hint={
             isVisibilityError
@@ -322,6 +327,7 @@ export function GeneralSection() {
         >
           <Select
             aria-label={t('inputs.activityVisibility.label')}
+            aria-describedby="activity-visibility-hint"
             value={activityVisibility}
             onChange={(next) => {
               const mode = ACTIVITY_VISIBILITY_MODES.find((candidate) => candidate === next);
