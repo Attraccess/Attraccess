@@ -186,3 +186,20 @@ it('ends on the sign-in page after logout, and shows the error (not sign-in) whe
   });
   await waitFor(() => expect(statusOf(hook)).toEqual(['error', 'error']));
 });
+
+it('waits for the user reload when signing in again after logout, so the sign-in form stays pending', async () => {
+  answers = [json(user)];
+  const hook = mount();
+  await waitFor(() => expect(statusOf(hook)[0]).toBe('authenticated'));
+  act(() => hook.result.current[0].logout());
+  await waitFor(() => expect(statusOf(hook)).toEqual(['unauthenticated', 'unauthenticated']));
+  const requestsBeforeSignIn = meRequests;
+
+  // restoreAuthentication is the sign-in mutation's onSuccess: it must not resolve before the user is loaded.
+  answers = [status(503), json(user)];
+  await act(async () => {
+    await restoreAuthentication(client);
+  });
+  expect(meRequests - requestsBeforeSignIn).toBe(2);
+  expect(client.getQueryData(UseGetCurrentKeyFn())).toEqual(user);
+});

@@ -116,7 +116,10 @@ export function useAuth() {
     refetchInterval: 1000 * 60 * 20, // 20 minutes
     // Only a 401 means signed out; a 5xx or network error is retried instead of ending the session.
     retry: shouldRetryCurrentUser,
-    enabled: isInitialized && !hasStartedLogout, // Stop identity refetch while signing out
+    // Stop identity refetch while signing out. Read from the cache, not this render's value: a sign-in after a
+    // logout sets the status back to idle and invalidates this query at once, and the sign-in waits for that
+    // reload (keeping its form pending) only if the query already counts as enabled.
+    enabled: () => isInitialized && queryClient.getQueryData(['auth-logout-status']) === 'idle',
   });
   // Ignore late identity responses as soon as either logout action starts.
   const currentUser = hasStartedLogout ? null : fetchedUser;
