@@ -77,7 +77,7 @@ export class SupervisionController {
   })
   @ApiResponse({ status: 200, description: 'The pending supervision requests.', type: [SupervisionRequestDto] })
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
-  listPendingRequests(@Req() req: AuthenticatedRequest): SupervisionRequestDto[] {
+  listPendingRequests(@Req() req: AuthenticatedRequest): Promise<SupervisionRequestDto[]> {
     return this.supervisionService.listPendingForSupervisor(req.user.id);
   }
 
@@ -138,7 +138,7 @@ export class SupervisionController {
   rejectRequest(
     @Param('requestId') requestId: string,
     @Req() req: AuthenticatedRequest,
-  ): SupervisionDecisionResponseDto {
+  ): Promise<SupervisionDecisionResponseDto> {
     return this.supervisionService.reject(
       requestId,
       req.user,

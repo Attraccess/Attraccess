@@ -1,32 +1,32 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { Subject } from 'rxjs';
+import { ClusterService } from '../../cluster/cluster.service';
+import { ClusterUserSubjects } from '../../live-updates/cluster-user-subjects';
 import { SupervisionLiveEventDto } from './dtos/supervisionLiveEvent.dto';
 
 /**
  * Per-supervisor realtime channel for supervision approval requests.
  *
- * Mirrors the billing/messaging live-notification pattern: each supervisor gets an on-demand
- * RxJS Subject that the SSE endpoint subscribes to, and the supervision service pushes events into.
+ * Each supervisor gets an on-demand RxJS Subject that the SSE endpoints subscribe to and the supervision service
+ * pushes events into. Events reach the supervisor's streams on every API instance (ATT-1163).
  */
 @Injectable()
 export class SupervisionLiveService {
-  private readonly subjects = new Map<number, Subject<{ data: SupervisionLiveEventDto }>>();
+  private readonly subjects: ClusterUserSubjects<SupervisionLiveEventDto>;
+
+  constructor(@Optional() cluster?: ClusterService) {
+    this.subjects = new ClusterUserSubjects('supervision', cluster);
+  }
 
   public getSupervisorSubject(userId: number): Subject<{ data: SupervisionLiveEventDto }> {
-    if (!this.subjects.has(userId)) {
-      this.subjects.set(userId, new Subject<{ data: SupervisionLiveEventDto }>());
-    }
-    return this.subjects.get(userId);
+    return this.subjects.subject(userId);
   }
 
   public emitToSupervisor(userId: number, event: SupervisionLiveEventDto): void {
-    this.subjects.get(userId)?.next({ data: event });
+    this.subjects.emit(userId, event);
   }
 
   public deleteSubjectIfUnobserved(userId: number): void {
-    const subject = this.subjects.get(userId);
-    if (subject && !subject.observed) {
-      this.subjects.delete(userId);
-    }
+    this.subjects.deleteIfUnobserved(userId);
   }
 }

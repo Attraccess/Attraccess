@@ -419,7 +419,7 @@ export class AttractapSessionHandler {
       this.formsHandler.clearFormDraft(socket, resourceId, formAction);
       // The card channel won — settle the still-open web request so any supervisor popups close.
       if (flow?.requestId) {
-        this.supervisionService.settleByCard(flow.requestId);
+        void this.supervisionService.settleByCard(flow.requestId);
       }
       if (flow && socket.state.supervisionFlow === flow) socket.state.supervisionFlow = null;
       await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, {
