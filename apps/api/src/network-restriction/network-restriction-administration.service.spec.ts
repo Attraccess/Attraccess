@@ -55,6 +55,20 @@ describe('NetworkRestrictionAdministrationService', () => {
     expect(record).not.toHaveBeenCalled();
   });
 
+  it('reports a role deleted during the write as an unknown role, not as a server error', async () => {
+    replaceRoleActions.mockRejectedValue(Object.assign(new Error('fk'), { driverError: { code: '23503' } }));
+    await expect(service.updateRoleMatrix({ roles: [{ roleId: 1, actions: ['door.open'] }] }, actor)).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(record).not.toHaveBeenCalled();
+  });
+
+  it('lets any other write failure through', async () => {
+    const failure = new Error('connection lost');
+    replaceRoleActions.mockRejectedValue(failure);
+    await expect(service.updateRoleMatrix({ roles: [{ roleId: 1, actions: [] }] }, actor)).rejects.toBe(failure);
+  });
+
   it('replaces the given roles and audits only those whose action set changed', async () => {
     await service.updateRoleMatrix(
       {

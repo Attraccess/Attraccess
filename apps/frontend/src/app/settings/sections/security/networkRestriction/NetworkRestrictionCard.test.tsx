@@ -221,4 +221,35 @@ describe('NetworkRestrictionCard', () => {
     expect(screen.getByTestId('network-header-name')).toHaveValue('X-Real-Ip');
     expect(screen.getByText(/Only safe if Attraccess can be reached only through the proxy/)).toBeInTheDocument();
   });
+
+  it('names a range spelled differently from one in the list as a duplicate', async () => {
+    state.settings = settings({ allowedRanges: ['10.0.0.0/8', 'fc00::/7'] });
+    render(<Harness />);
+    const input = screen.getByTestId('network-range-input');
+    await userEvent.type(input, '10.0.0.1/8{Enter}');
+    expect(screen.getByText('"10.0.0.1/8" is already in the list.')).toBeInTheDocument();
+    await userEvent.clear(input);
+    await userEvent.type(input, 'FC00::/7{Enter}');
+    expect(screen.getByText('"FC00::/7" is already in the list.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+  });
+
+  it('adds a valid entry left in the field when it loses focus, so it is not lost silently', async () => {
+    state.settings = settings({ allowedRanges: ['10.0.0.0/8'] });
+    render(<Harness />);
+    await userEvent.type(screen.getByTestId('network-range-input'), '192.168.1.0/24');
+    await userEvent.tab();
+    expect(screen.getByRole('row', { name: /192\.168\.1\.0\/24/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+
+  it('leaves the form unchanged when the restriction is switched on and off again', async () => {
+    render(<Harness />);
+    const toggle = screen.getByRole('switch', { name: /Restrict actions to the local network/ });
+    await userEvent.click(toggle);
+    expect(screen.getByRole('row', { name: /10\.0\.0\.0\/8/ })).toBeInTheDocument();
+    await userEvent.click(toggle);
+    expect(screen.queryByRole('row', { name: /10\.0\.0\.0\/8/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+  });
 });

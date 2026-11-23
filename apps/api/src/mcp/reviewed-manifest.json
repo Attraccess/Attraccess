@@ -672,12 +672,12 @@
   "getNetworkRestrictionSettings": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "94ee0a42"
+    "shape": "cb3437f0"
   },
   "updateNetworkRestrictionSettings": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "94d51596"
+    "shape": "6e952cf4"
   },
   "getNetworkRestrictionRoleActions": {
     "decision": "allow",

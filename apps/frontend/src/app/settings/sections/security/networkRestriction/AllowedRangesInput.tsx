@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button, FieldError, Input, TextField } from '@heroui/react';
 import { PlusIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { isValidRange, splitRangeInput } from './networkRange';
+import { containsRange, isValidRange, splitRangeInput } from './networkRange';
 import en from './en.json';
 import de from './de.json';
 
@@ -26,7 +26,9 @@ export function AllowedRangesInput({ existing, onAdd, isInvalid = false }: Reado
       setProblem(t('ranges.invalid', { entry: bad }));
       return;
     }
-    const fresh = entries.filter((entry) => !existing.includes(entry));
+    const fresh = entries.filter(
+      (entry, index) => !containsRange(existing, entry) && !containsRange(entries.slice(0, index), entry),
+    );
     if (fresh.length === 0) {
       setProblem(t('ranges.duplicate', { entry: entries[0] }));
       return;
@@ -42,6 +44,10 @@ export function AllowedRangesInput({ existing, onAdd, isInvalid = false }: Reado
         <TextField
           fullWidth
           value={text}
+          onBlur={() => {
+            // Text left in the field would be lost with the page: add it if it is valid, otherwise leave the error for later.
+            if (text.trim() !== '' && splitRangeInput(text).every(isValidRange)) submit();
+          }}
           onChange={(next) => {
             setText(next);
             setProblem(null);

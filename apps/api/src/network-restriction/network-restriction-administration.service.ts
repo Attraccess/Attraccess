@@ -4,11 +4,18 @@ import { auditSubjectKeyId } from '../audit/policies/administration';
 import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../audit/recorder/audit-event';
 import { NetworkRestrictionConfigService } from './network-restriction-config.service';
 import { NetworkRestrictionService } from './network-restriction.service';
-import { NETWORK_RESTRICTION_STORE, NetworkRestrictionStore } from './network-restriction.port';
+import {
+  NETWORK_RESTRICTION_STORE,
+  NetworkRestrictionStore,
+  RoleNetworkActionsRecord,
+} from './network-restriction.port';
 import { parseRoleActionsUpdate } from './network-restriction.config';
 import { serverInterfaceRanges, subnetOf } from './network-suggestions';
 import type { OriginRequest } from './network-origin';
 import type { NetworkRestrictionRoleMatrixDto, NetworkRestrictionSettingsDto } from './network-restriction.dto';
+
+/** PostgreSQL error code for a foreign key violation. */
+const FOREIGN_KEY_VIOLATION = '23503';
 
 /** An audit value is at most 256 characters. */
 const clip = (value: string) => (value.length <= 256 ? value : `${value.slice(0, 255)}…`);
@@ -73,7 +80,7 @@ export class NetworkRestrictionAdministrationService {
     if (missing) throw new BadRequestException(`Unknown role: ${missing.roleId}`);
 
     const before = new Map((await this.store.listRoleActions()).map((role) => [role.roleId, role]));
-    await this.store.replaceRoleActions(updates);
+    await this.replaceRoleActions(updates);
     for (const { roleId, actions } of updates) {
       const role = before.get(roleId);
       const oldActions = [...(role?.actions ?? [])].sort().join(',');
@@ -83,6 +90,17 @@ export class NetworkRestrictionAdministrationService {
       await this.record(actor, 'networkRestriction.roleActions', clip(label + oldActions), clip(label + newActions));
     }
     return this.roleMatrix();
+  }
+
+  /** A role deleted between the check above and the write fails the foreign key: report it like an unknown role. */
+  private async replaceRoleActions(updates: RoleNetworkActionsRecord[]) {
+    try {
+      await this.store.replaceRoleActions(updates);
+    } catch (error) {
+      const code = (error as { driverError?: { code?: string } }).driverError?.code;
+      if (code === FOREIGN_KEY_VIOLATION) throw new BadRequestException('Unknown role: it was deleted meanwhile');
+      throw error;
+    }
   }
 
   private async record(actor: AuditActor, key: string, before: string, after: string) {

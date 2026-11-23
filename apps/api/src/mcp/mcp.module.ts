@@ -15,7 +15,13 @@ import { McpRateLimitGuard } from './mcp-rate-limit.guard';
 import { McpToolRegistry } from './mcp-tool-registry';
 
 @Module({
-  imports: [McpPersistenceModule, SessionsPersistenceModule, SettingsModule, UsersAndAuthModule, NetworkRestrictionModule],
+  imports: [
+    McpPersistenceModule,
+    SessionsPersistenceModule,
+    SettingsModule,
+    UsersAndAuthModule,
+    NetworkRestrictionModule,
+  ],
   controllers: [McpController, McpOAuthController, McpOAuthConsentController, McpConnectionController],
   providers: [McpToolRegistry, McpPublicUrls, McpOAuthService, McpBearerGuard, McpRateLimitGuard, McpRestGateway],
   exports: [McpToolRegistry],

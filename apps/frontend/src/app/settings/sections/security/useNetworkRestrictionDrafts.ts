@@ -18,6 +18,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { getApiErrorMessage } from '../../../../utils/apiError';
+import { containsRange } from './networkRestriction/networkRange';
 import en from './networkRestriction/en.json';
 import de from './networkRestriction/de.json';
 
@@ -57,6 +58,11 @@ export interface NetworkRestrictionDrafts {
   save: () => Promise<void>;
   discard: () => void;
 }
+
+const isDefaultSuggestion = (ranges: string[] | undefined) =>
+  ranges !== undefined &&
+  ranges.length === NETWORK_RESTRICTION_DEFAULT_RANGES.length &&
+  NETWORK_RESTRICTION_DEFAULT_RANGES.every((range) => ranges.includes(range));
 
 /** Unsaved network restriction edits, shared by NetworkRestrictionCard (the form) and SecuritySaveBar (save/discard). */
 export function useNetworkRestrictionDrafts(): NetworkRestrictionDrafts {
@@ -115,11 +121,14 @@ export function useNetworkRestrictionDrafts(): NetworkRestrictionDrafts {
     });
   };
 
-  const addRanges = (entries: string[]) => setRanges([...new Set([...shown.ranges, ...entries])]);
+  const addRanges = (entries: string[]) =>
+    setRanges(entries.reduce((list, entry) => (containsRange(list, entry) ? list : [...list, entry]), shown.ranges));
   const removeRange = (entry: string) => setRanges(shown.ranges.filter((range) => range !== entry));
 
   const toggleEnabled = (next: boolean) => {
     setEnabled(next);
+    // Switching off again takes back the suggested ranges, so the form is not left changed by a mere toggle.
+    if (!next && isDefaultSuggestion(ranges) && settings?.allowedRanges.length === 0) setRanges(undefined);
     // Suggest the private ranges when switching on with an empty list; the admin can edit them before saving.
     if (next && shown.ranges.length === 0) setRanges([...NETWORK_RESTRICTION_DEFAULT_RANGES]);
   };
