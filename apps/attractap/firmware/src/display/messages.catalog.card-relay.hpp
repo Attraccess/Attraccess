@@ -20,7 +20,7 @@ inline constexpr Entry cardRelayCatalog[] = {
     {Message::ErrorFirmwareUpdateRequired, "Firmware-Update erforderlich", "Firmware update required"},
     {Message::ErrorReaderNotAllowedToWriteCards, "Dieses Lesegerät darf keine Karten beschreiben", "This reader may not write cards"},
     {Message::ErrorCardOperationExpired, "Zeit abgelaufen, bitte erneut starten", "Timed out, please start again"},
-    {Message::ErrorUidOnlyCardsDisabled, "UID-Karten sind deaktiviert", "UID-only cards are disabled"},
+    {Message::ErrorUidOnlyCardsDisabled, "UID-only-Karten sind deaktiviert", "UID-only cards are disabled"},
     {Message::ErrorRandomUidNotSupported, "Karte mit wechselnder UID wird nicht unterstützt", "Card with a random UID is not supported"},
 };
 } // namespace FirmwareI18n

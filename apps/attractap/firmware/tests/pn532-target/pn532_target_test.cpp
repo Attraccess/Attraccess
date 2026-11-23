@@ -48,6 +48,12 @@ int main() {
   releaseStatus = 0x01;
   if (pn.inRelease()) { std::puts("InRelease accepted an error status"); return 1; }
   releaseStatus = 0;
+  // A 10-byte UID does not fit the caller's 7-byte buffer: the card is not reported, nothing is written past it.
+  uint8_t guarded[10] = {0, 0, 0, 0, 0, 0, 0, 0xCC, 0, 0}; // room for the overflow, so a regression fails cleanly
+  frame = {0,0,0xFF,0x12,0xEE,0xD5,0x4B,1,1,0x00,0x44,0x20,10,1,2,3,4,5,6,7,8,9,10,0,0};
+  if (pn.readPassiveTargetID(PN532_MIFARE_ISO14443A, guarded, &len, 100) || guarded[7] != 0xCC) {
+    std::puts("a 10-byte UID was copied into a 7-byte buffer"); return 1;
+  }
   frame = {0,0,0xFF,0x0F,0xF1,0xD5,0x4B,1,1,0x00,0x44,0x20,7,0x04,1,2,3,4,5,6,0,0};
   assert(pn.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &len, 100));
   uint8_t apdu[] = {0x90, 0x5A, 0, 0, 3, 0, 0, 0, 0}, answer[64]; uint8_t answerLen = 16;

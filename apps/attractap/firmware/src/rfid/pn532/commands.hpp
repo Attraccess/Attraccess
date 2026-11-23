@@ -62,6 +62,7 @@
 #define PN532_I2C_READYTIMEOUT (20)   ///< Ready timeout
 
 #define PN532_MIFARE_ISO14443A (0x00) ///< MiFare
+#define PN532_MAX_UID_LENGTH (7)      ///< Longest UID the reader handles (ISO 14443-3 double size)
 
 // Mifare Commands
 #define MIFARE_CMD_AUTH_A (0x60)           ///< Auth A

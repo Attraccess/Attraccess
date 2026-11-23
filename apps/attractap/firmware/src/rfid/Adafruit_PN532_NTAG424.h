@@ -45,7 +45,7 @@ public:
   uint8_t readGPIO(void);
   bool setPassiveActivationRetries(uint8_t maxRetries);
 
-  // ISO14443A functions
+  // ISO14443A functions. `uid` must hold PN532_MAX_UID_LENGTH bytes; a card with a longer UID is not reported.
   bool readPassiveTargetID(
       uint8_t cardbaudrate, uint8_t *uid, uint8_t *uidLength,
       uint16_t timeout = 0); // timeout 0 means no timeout - will block forever.

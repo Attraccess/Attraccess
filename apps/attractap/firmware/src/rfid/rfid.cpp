@@ -257,7 +257,7 @@ bool NFC::reselectCard()
 {
     if (!this->pn532.inRelease())
         return false;
-    uint8_t uid[7] = {0};
+    uint8_t uid[PN532_MAX_UID_LENGTH] = {0};
     uint8_t uidLength = 0;
     if (!this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, NFC::detectionPollTimeoutMs))
         return false;

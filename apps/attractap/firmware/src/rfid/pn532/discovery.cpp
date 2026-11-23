@@ -108,6 +108,11 @@ bool Adafruit_PN532::readDetectedPassiveTargetID(uint8_t *uid,
   PN532DEBUGPRINT.println(pn532_packetbuffer[11], HEX);
 #endif
 
+  // Every caller holds a 7-byte UID (ISO 14443-3 double size). A longer one (triple size, or an emulator) is not
+  // a card the reader can use, and copying it would write past the caller's buffer.
+  if (pn532_packetbuffer[12] > PN532_MAX_UID_LENGTH)
+    return 0;
+
   /* Card appears to be Mifare Classic */
   *uidLength = pn532_packetbuffer[12];
 #ifdef MIFAREDEBUG
