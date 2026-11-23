@@ -251,7 +251,8 @@ export interface PluginStorageLegacyAdoption {
    * The storage namespace of the 1.x release (its plugin.json name, e.g. `shelly`) when the 2.x package name derives
    * another one (`@attraccess/plugin-shelly` is `attraccess_plugin_shelly`). Adopted `physicalName`s and index names may
    * then start with `plugin_<namespace>_` or `<namespace>_` of it as well as of the derived one, so installed 1.x
-   * tables keep their names and data.
+   * tables keep their names and data. Only the plugin of that name or its npm package `@attraccess/plugin-<namespace>`
+   * may declare it.
    */
   readonly namespace?: string;
 }

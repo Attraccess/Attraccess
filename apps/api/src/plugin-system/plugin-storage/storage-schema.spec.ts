@@ -1,7 +1,7 @@
 import { definePluginStorage, f, step, table } from '@attraccess/plugins-backend-sdk';
 import type { PluginStorageMigrationStep } from '@attraccess/plugins-backend-sdk';
 import { compilePluginStorage } from './storage-schema';
-import { PluginStorageDeclarationError } from './storage-model';
+import { PluginStorageDeclarationError, legacyMigrationsTableOf } from './storage-model';
 
 const options = { reservedTables: new Set<string>(['users']) };
 const items = table({ id: f.id(), name: f.string({ length: 40 }) });
@@ -152,8 +152,15 @@ describe('applyStep through compilePluginStorage', () => {
     );
     const compiled = compilePluginStorage(name, definition({ namespace: 'shelly' }), options);
     expect(compiled.tables.get('devices')?.physical).toBe('plugin_shelly_devices');
+    expect(legacyMigrationsTableOf(compiled)).toBe('plugin_migrations_shelly');
+    expect(legacyMigrationsTableOf(compilePluginStorage('shelly', definition({}), options))).toBe(
+      'plugin_migrations_shelly',
+    );
     expect(() => compilePluginStorage(name, definition({ namespace: 'Bad Name' }), options)).toThrow(
       /adoption.namespace must be a lowercase identifier/,
+    );
+    expect(() => compilePluginStorage('@someone/plugin-shelly', definition({ namespace: 'shelly' }), options)).toThrow(
+      /adoption.namespace "shelly" is only allowed for the plugin "shelly" or its npm package "@attraccess\/plugin-shelly"/,
     );
   });
 

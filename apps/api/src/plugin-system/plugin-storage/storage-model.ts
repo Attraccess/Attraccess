@@ -87,6 +87,11 @@ export interface CompiledPluginStorage {
   readonly migrations: readonly CompiledMigration[];
   /** Class names of every legacy TypeORM migration of the 1.x plugin. Empty when the plugin has no legacy storage. */
   readonly legacyMigrations: readonly string[];
+  /**
+   * The 1.x namespace (`adoption.namespace`) when the plugin adopts the storage of a 1.x release under another name:
+   * the legacy migrations table follows the 1.x name, not this plugin's name.
+   */
+  readonly legacyNamespace?: string;
   /** Every physical table the migrations ever create, parents before children: the table names the plugin claims. */
   readonly ownedTables: readonly string[];
   /** The declaration object itself, to recognise it when the plugin opens its tables. */
@@ -102,7 +107,7 @@ export class PluginStorageDeclarationError extends Error {
 }
 
 /** What names a plugin's storage bookkeeping: enough to read it without the plugin's declaration. */
-export type PluginStorageOwner = Pick<CompiledPluginStorage, 'pluginName' | 'namespace'>;
+export type PluginStorageOwner = Pick<CompiledPluginStorage, 'pluginName' | 'namespace' | 'legacyNamespace'>;
 
 /** Bookkeeping table of a plugin's neutral migrations: one row per applied version. */
 export const versionsTableName = (namespace: string): string => `plugin_storage_migrations_${namespace}`;
@@ -113,6 +118,10 @@ export const versionsTableName = (namespace: string): string => `plugin_storage_
  */
 export const legacyMigrationsTableName = (pluginName: string): string =>
   `plugin_migrations_${pluginName.replace(/[^a-zA-Z0-9_]/g, '_')}`;
+
+/** The legacy migrations table of `owner`: the one of its 1.x name when it adopts a 1.x release under another name. */
+export const legacyMigrationsTableOf = (owner: PluginStorageOwner): string =>
+  legacyMigrationsTableName(owner.legacyNamespace ?? owner.pluginName);
 
 /** The plugin's storage cannot be brought to this release's shape without losing data or guessing. Nothing changed. */
 export class PluginStorageMigrationRefused extends Error {
