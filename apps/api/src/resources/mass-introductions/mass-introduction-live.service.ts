@@ -1,27 +1,27 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { Subject } from 'rxjs';
+import { ClusterService } from '../../cluster/cluster.service';
+import { ClusterUserSubjects } from '../../live-updates/cluster-user-subjects';
 import { MassIntroductionLiveEventDto } from './dtos/massIntroductionLiveEvent.dto';
 
-/** Per-introducer realtime channel for their mass-introduction sessions. */
+/** Per-introducer realtime channel for their mass-introduction sessions, on every API instance. */
 @Injectable()
 export class MassIntroductionLiveService {
-  private readonly subjects = new Map<number, Subject<{ data: MassIntroductionLiveEventDto }>>();
+  private readonly subjects: ClusterUserSubjects<MassIntroductionLiveEventDto>;
+
+  constructor(@Optional() cluster?: ClusterService) {
+    this.subjects = new ClusterUserSubjects('mass-introduction', cluster);
+  }
 
   public getIntroducerSubject(userId: number): Subject<{ data: MassIntroductionLiveEventDto }> {
-    if (!this.subjects.has(userId)) {
-      this.subjects.set(userId, new Subject<{ data: MassIntroductionLiveEventDto }>());
-    }
-    return this.subjects.get(userId);
+    return this.subjects.subject(userId);
   }
 
   public emitToIntroducer(userId: number, event: MassIntroductionLiveEventDto): void {
-    this.subjects.get(userId)?.next({ data: event });
+    this.subjects.emit(userId, event);
   }
 
   public deleteSubjectIfUnobserved(userId: number): void {
-    const subject = this.subjects.get(userId);
-    if (subject && !subject.observed) {
-      this.subjects.delete(userId);
-    }
+    this.subjects.deleteIfUnobserved(userId);
   }
 }

@@ -55,7 +55,7 @@ export class MassIntroductionController {
   get(
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
     @Req() req: AuthenticatedRequest,
-  ): MassIntroductionSessionDto {
+  ): Promise<MassIntroductionSessionDto> {
     return this.massIntroductionService.get(sessionId, req.user.id);
   }
 
@@ -65,7 +65,7 @@ export class MassIntroductionController {
   @ApiOperation({ summary: 'End one of your running mass introductions', operationId: 'massIntroductionCancel' })
   @ApiResponse({ status: 204, description: 'Ended; the QR code and reader stop accepting participants' })
   @ApiResponse({ status: 404, description: 'Not found, ended, or started by someone else' })
-  cancel(@Param('sessionId', ParseUUIDPipe) sessionId: string, @Req() req: AuthenticatedRequest): void {
-    this.massIntroductionService.cancel(sessionId, req.user.id);
+  cancel(@Param('sessionId', ParseUUIDPipe) sessionId: string, @Req() req: AuthenticatedRequest): Promise<void> {
+    return this.massIntroductionService.cancel(sessionId, req.user.id);
   }
 }
