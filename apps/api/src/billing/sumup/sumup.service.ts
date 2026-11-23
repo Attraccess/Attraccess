@@ -117,7 +117,9 @@ export class SumUpService {
   }
 
   async getReaders(): Promise<SumUpReaderDto[]> {
-    if (!(await this.getIsEnabled())) {
+    // No key stored means SumUp is not set up: there are no readers. A stored key that fails to
+    // decrypt still throws from getSumUp(), so broken credentials stay visible.
+    if (!(await this.credentialStore.getEncryptedApiKey())) {
       return [];
     }
 
