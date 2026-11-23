@@ -4,6 +4,7 @@ import { EmailTemplate, Resource, User } from '@attraccess/database-entities';
 import { EmailTemplateType, type UsageSession } from '@attraccess/application-models';
 import { createTransport } from 'nodemailer';
 import { EmailService } from '../email/email.service';
+import { SessionEndingSoonEmailService } from '../email/session-ending-soon-email.service';
 import { EmailTemplateService } from '../email-template/email-template.service';
 import { EMAIL_RECIPIENT_DIRECTORY } from '../email/email-recipient-directory.port';
 import {
@@ -84,6 +85,7 @@ describe('Notification email language fallback', () => {
       providers: [
         NotificationDispatchService,
         EmailService,
+        SessionEndingSoonEmailService,
         ResourceSessionNotificationListener,
         ResourceUsageNoteNotificationListener,
         { provide: SettingsService, useValue: settings },

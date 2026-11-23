@@ -84,6 +84,13 @@ export function computeStartDeadline(
   };
 }
 
+/** A reader's estimate as a start field: only a whole number of 1 to 43200 minutes counts, anything else is no estimate. */
+export function validReaderEstimate(value: unknown): { estimatedDurationMinutes?: number } {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= MAX_SESSION_DURATION_MINUTES
+    ? { estimatedDurationMinutes: value }
+    : {};
+}
+
 export interface ExtensionRequest {
   extendByMinutes?: number;
   toMax?: boolean;

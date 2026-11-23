@@ -9,6 +9,7 @@ import { NotificationLiveService } from './notification-live.service';
 import { NotificationCategory, NotificationChannel } from './notification-types';
 import { PushService } from '../push/push.service';
 import { EmailService } from '../email/email.service';
+import { SessionEndingSoonEmailService } from '../email/session-ending-soon-email.service';
 import { EMAIL_RECIPIENT_DIRECTORY } from '../email/email-recipient-directory.port';
 
 describe('NotificationDispatchService', () => {
@@ -48,6 +49,7 @@ describe('NotificationDispatchService', () => {
         { provide: PushService, useValue: push },
         { provide: NotificationLiveService, useValue: live },
         { provide: EmailService, useValue: email },
+        { provide: SessionEndingSoonEmailService, useValue: { send: jest.fn() } },
         { provide: EMAIL_RECIPIENT_DIRECTORY, useValue: directory },
       ],
     }).compile();

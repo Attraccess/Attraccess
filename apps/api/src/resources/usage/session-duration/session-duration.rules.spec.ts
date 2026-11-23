@@ -7,6 +7,7 @@ import {
   initialWarnedOffset,
   normalizeSessionDurationSettings,
   sessionDurationSettingsProblem,
+  validReaderEstimate,
 } from './session-duration.rules';
 import { SessionDurationErrorCode } from './session-duration.errors';
 
@@ -233,5 +234,15 @@ describe('resource settings', () => {
       requireSessionDurationEstimate: false,
       defaultSessionDurationEstimateMinutes: null,
     });
+  });
+});
+
+describe('validReaderEstimate', () => {
+  it.each([[0], [-5], [43_201], [1.5], ['60'], [null], [undefined]])('counts %p as no estimate', (value) => {
+    expect(validReaderEstimate(value)).toEqual({});
+  });
+
+  it.each([[1], [60], [43_200]])('keeps the whole number %p', (value) => {
+    expect(validReaderEstimate(value)).toEqual({ estimatedDurationMinutes: value });
   });
 });

@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { BadRequestException } from '@nestjs/common';
 import { SessionExtensionExceedsMaximumException } from '../../../../resources/usage/session-duration/session-duration.errors';
 import { AttractapEventType } from '../../websocket.types';
 import { CardSessionService } from '../ui/card-session.service';
@@ -76,6 +75,18 @@ describe('AttractapSessionHandler and session durations', () => {
       user,
       expect.not.objectContaining({ estimatedDurationMinutes: expect.anything() }),
       expect.objectContaining({ canAskDuration: false }),
+    );
+  });
+
+  it.each([0, -5, 43201, 1.5])('treats the out-of-range estimate %s of a reader as no estimate', async (value) => {
+    const { handler, usage, socket } = setup();
+    socket.state.sessionDuration = true;
+    await handler.handleStartResourceUsageSession(socket, start({ estimatedDurationMinutes: value }));
+    expect(usage.startSession).toHaveBeenCalledWith(
+      10,
+      user,
+      expect.not.objectContaining({ estimatedDurationMinutes: expect.anything() }),
+      expect.objectContaining({ canAskDuration: true }),
     );
   });
 

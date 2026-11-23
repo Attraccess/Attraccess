@@ -16,6 +16,8 @@ import { SupervisionService } from '../../../../resources/supervision/supervisio
 
 import { ResourceUsageService } from '../../../../resources/usage/sessions/resource-usage.service';
 
+import { validReaderEstimate } from '../../../../resources/usage/session-duration/session-duration.rules';
+
 import { UsersService } from '../../../../users-and-auth/users/users.service';
 
 import {
@@ -398,7 +400,7 @@ export class AttractapSessionHandler {
             projectId,
             formSubmissions,
             forceTakeOver,
-            ...(Number.isInteger(estimatedDurationMinutes) ? { estimatedDurationMinutes } : {}),
+            ...validReaderEstimate(estimatedDurationMinutes),
           },
           {
             ...(supervisorUserId ? { supervisorUserId } : {}),
