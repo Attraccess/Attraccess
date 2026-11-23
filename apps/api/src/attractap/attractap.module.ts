@@ -35,6 +35,15 @@ import { SessionMetrics } from './security/session-metrics';
 import { SecureBootKeyService } from './secure-boot/secure-boot-key.service';
 import { SecureImageService } from './secure-boot/secure-image.service';
 import { AttractapSecureBootKeysController } from './secure-boot/secure-boot-keys.controller';
+import { ConversionAudit } from './secure-conversion/conversion-audit';
+import { ConversionImages } from './secure-conversion/conversion-images';
+import { ConversionProtocolService } from './secure-conversion/conversion-protocol.service';
+import { ConversionSessionRegistry } from './secure-conversion/conversion-session-registry';
+import { ConversionTransferService } from './secure-conversion/conversion-transfer.service';
+import { PreflightExpectations } from './secure-conversion/preflight-expectations';
+import { SecureConversionController } from './secure-conversion/secure-conversion.controller';
+import { SecureConversionService } from './secure-conversion/secure-conversion.service';
+import { SecuredReaderUpdates } from './secure-conversion/secured-reader-updates';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { ResourcesModule } from '../resources/resources.module';
 import { ResourceUsageModule } from '../resources/usage/resourceUsage.module';
@@ -117,6 +126,14 @@ import { ResourceListVisibilityModule } from '../resources/visibility/resource-l
     ReaderSessionService,
     SecureBootKeyService,
     SecureImageService,
+    ConversionAudit,
+    ConversionImages,
+    ConversionProtocolService,
+    ConversionSessionRegistry,
+    ConversionTransferService,
+    PreflightExpectations,
+    SecureConversionService,
+    SecuredReaderUpdates,
     SessionMetrics,
     CardAccessService,
     AttractapService,
@@ -163,6 +180,7 @@ import { ResourceListVisibilityModule } from '../resources/visibility/resource-l
     ResourceAttractapsController,
     AttractapPairingController,
     AttractapSecureBootKeysController,
+    SecureConversionController,
     ReaderUiAdminController,
   ],
 })

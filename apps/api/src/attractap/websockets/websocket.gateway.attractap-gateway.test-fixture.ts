@@ -34,6 +34,8 @@ import { CardConversationService } from './card-conversation.service';
 import { CardDetectedRouter } from './card-detected.router';
 import { CardOperationsService } from './card-operations.service';
 import { CardWriterPolicyService } from './card-writer-policy.service';
+import { ConversionTransferService } from '../secure-conversion/conversion-transfer.service';
+import { SecuredReaderUpdates } from '../secure-conversion/secured-reader-updates';
 import { AttractapCardHandler } from './handlers/card/card.handler';
 import { AttractapCrashReportHandler } from './handlers/crash-report/crash-report.handler';
 import { AttractapFirmwareHandler } from './handlers/firmware/firmware.handler';
@@ -163,6 +165,8 @@ export function gatewayProviders(
     AttractapAuthHandler,
     AttractapFirmwareHandler,
     LegacyFirmwareUpdateService,
+    { provide: ConversionTransferService, useValue: { chunk: jest.fn().mockResolvedValue(null) } },
+    { provide: SecuredReaderUpdates, useValue: { prepare: jest.fn().mockResolvedValue(null) } },
     AttractapCrashReportHandler,
     AttractapCardHandler,
     AttractapFormsHandler,

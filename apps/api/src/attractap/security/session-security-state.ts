@@ -37,6 +37,10 @@ export function parseReportedBuild(payload: unknown): ReportedBuild {
  */
 export class SessionSecurityState {
   private build: ReportedBuild | null = null;
+  /** The firmware announced `capabilities.secureConversion` (ATT-1208) in READER_FIRMWARE_INFO. */
+  public secureConversion = false;
+  /** Firmware name, variant and version from READER_FIRMWARE_INFO; null until it arrived. */
+  public firmware: { name: string; variant: string; version: string } | null = null;
   private waiters: Array<(build: ReportedBuild | null) => void> = [];
 
   public constructor(
@@ -50,6 +54,11 @@ export class SessionSecurityState {
     const waiting = this.waiters;
     this.waiters = [];
     waiting.forEach((resolve) => resolve(build));
+  }
+
+  /** The build reported so far, without waiting. */
+  public get reportedBuild(): ReportedBuild | null {
+    return this.build;
   }
 
   public whenBuild(timeoutMs: number): Promise<ReportedBuild | null> {

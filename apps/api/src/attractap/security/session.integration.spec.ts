@@ -18,6 +18,9 @@ import { HandshakeLimiter } from './handshake-limiter';
 import { InstallationIdentityService } from './installation-identity.service';
 import { CREDENTIAL_CHANGED_EVENT, PairingService } from './pairing.service';
 import { ReaderControlService } from './reader-control.service';
+import { ConversionSessionRegistry } from '../secure-conversion/conversion-session-registry';
+import type { ConversionProtocolService } from '../secure-conversion/conversion-protocol.service';
+import { EmulatedConversionDevice } from './testing/emulated-conversion';
 import { ReaderSessionService } from './reader-session.service';
 import type { EfuseReportService } from './efuse-report.service';
 import { FrameType, SESSION_SUBPROTOCOL } from './session-framing';
@@ -40,6 +43,13 @@ describe('reader session through the real gateway', () => {
   const recordCertificate = jest.fn(async () => undefined);
   // The eFuse report check has its own specs; here only the wiring of the control channel counts.
   const efuse = { handle: jest.fn(async () => 'recorded') } as unknown as EfuseReportService;
+  // The conversion has its own specs (secure-conversion/*.spec.ts); here only the session wiring counts.
+  const conversionRegistry = new ConversionSessionRegistry();
+  const conversionProtocol = {
+    handle: jest.fn(async () => undefined),
+    onSessionClosed: jest.fn(async () => undefined),
+    onEfuseReportChecked: jest.fn(async () => undefined),
+  } as unknown as ConversionProtocolService;
   const issueReaderCertificate = jest.fn(async () => ({
     pem: 'RENEWED-CERT-PEM',
     serial: '0b',
@@ -93,7 +103,10 @@ describe('reader session through the real gateway', () => {
         provide: SessionMetrics,
         useValue: { activeSessions: { inc: jest.fn(), dec: jest.fn() }, handshakeFailures: { inc: jest.fn() } },
       },
-      { provide: ReaderControlService, useFactory: () => new ReaderControlService(efuse) },
+      {
+        provide: ReaderControlService,
+        useFactory: () => new ReaderControlService(efuse, conversionRegistry, conversionProtocol),
+      },
       ReaderSessionService,
     ];
     const module = await Test.createTestingModule({
@@ -407,6 +420,37 @@ describe('reader session through the real gateway', () => {
       ];
       expect(state).toMatchObject({ readerId: 24, fingerprint: identity.fingerprint });
       expect(body).toMatchObject({ mac: 'dc:b4:d9:21:71:c8' });
+    });
+
+    it('plays the reader side of a conversion over the session and registers it as online', async () => {
+      const { reader } = await connectPaired(26);
+      await reader.nextFrame((f) => f.type === FrameType.JSON);
+      expect(conversionRegistry.isOnline(26)).toBe(true);
+      const device = new EmulatedConversionDevice({ partitionTableSha256: 'e'.repeat(64) });
+      reader.playConversion(device);
+      await new Promise((r) => setTimeout(r, 200));
+      const [session, status] = (conversionProtocol.handle as jest.Mock).mock.calls.at(-1) as [
+        { state: { readerId: number } },
+        unknown,
+      ];
+      expect(session.state.readerId).toBe(26);
+      expect(status).toMatchObject({ t: 'conversion.status', id: null, stage: 'none' });
+
+      // A server command reaches the device through TLS, and its answer comes back the same way.
+      (conversionProtocol.handle as jest.Mock).mockClear();
+      expect(conversionRegistry.get(26)?.send({ t: 'conversion.preflight', id: 7 })).toBe(true);
+      await new Promise((r) => setTimeout(r, 200));
+      expect((conversionProtocol.handle as jest.Mock).mock.calls.at(-1)?.[1]).toMatchObject({
+        t: 'conversion.preflight-report',
+        id: 7,
+        mac: device.mac,
+      });
+
+      reader.close();
+      await reader.closed;
+      await new Promise((r) => setTimeout(r, 100));
+      expect(conversionRegistry.isOnline(26)).toBe(false);
+      expect(conversionProtocol.onSessionClosed).toHaveBeenCalledWith(26);
     });
 
     it.each([
