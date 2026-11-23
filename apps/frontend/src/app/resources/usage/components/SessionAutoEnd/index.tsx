@@ -15,6 +15,8 @@ import { formatDuration, type ExtendStep } from '../../sessionDuration';
 import { ExtendControls } from './ExtendControls';
 import en from './translations/en.json';
 import de from './translations/de.json';
+import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 
 interface SessionAutoEndProps {
   resourceId: number;
@@ -23,11 +25,18 @@ interface SessionAutoEndProps {
   canExtend: boolean;
 }
 
-const timeOf = (date: Date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+/** The clock time, with the date once the deadline is not today (an extension can reach days ahead). */
+const timeOf = (date: Date, now = Date.now()) =>
+  date.toDateString() === new Date(now).toDateString()
+    ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : date.toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 /** "Stops automatically at HH:MM (in X)" with a live countdown, and the extend controls for those who may use them. */
 export function SessionAutoEnd({ resourceId, usage, canExtend }: Readonly<SessionAutoEndProps>) {
-  const { t } = useTranslations({ en, de });
+  const { t, tExists } = useTranslations({
+    en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
+    de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
+  });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const now = useNow();
@@ -42,7 +51,7 @@ export function SessionAutoEnd({ resourceId, usage, canExtend }: Readonly<Sessio
       });
     },
     onError: (error) => {
-      toast.error({ title: t('extendFailed'), description: (error as ApiError).message });
+      toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' });
     },
   });
 
@@ -63,8 +72,8 @@ export function SessionAutoEnd({ resourceId, usage, canExtend }: Readonly<Sessio
         {canExtend
           ? remainingMinutes <= 0
             ? t('stoppingNow')
-            : t('stopsAt', { time: timeOf(endsAt), remaining: formatDuration(remainingMinutes) })
-          : t('stopsAtReadOnly', { time: timeOf(endsAt) })}
+            : t('stopsAt', { time: timeOf(endsAt, now), remaining: formatDuration(remainingMinutes) })
+          : t('stopsAtReadOnly', { time: timeOf(endsAt, now) })}
       </p>
       {canExtend && remainingMinutes > 0 && (
         <ExtendControls session={usage} isPending={extend.isPending} onExtend={onExtend} />

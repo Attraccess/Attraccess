@@ -7,6 +7,5 @@
   "extendToMax": "Extend to maximum",
   "maxReached": "The maximum session time is reached, the session cannot be extended any further.",
   "extended": "Session extended",
-  "extendedDescription": "The machine now stops automatically at {{time}}.",
-  "extendFailed": "Could not extend the session"
+  "extendedDescription": "The machine now stops automatically at {{time}}."
 }

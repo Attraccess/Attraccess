@@ -74,11 +74,11 @@ export function SessionDurationEstimateDialog({
                 </p>
               )}
               <div className="flex gap-3" role="group" aria-label={t('label')}>
-                <TextField value={hours} onChange={setHours} className="w-full">
+                <TextField value={hours} onChange={setHours} className="min-w-0 flex-1">
                   <Label>{t('hours')}</Label>
                   <Input type="number" min={0} data-cy="session-duration-hours" />
                 </TextField>
-                <TextField value={minutes} onChange={setMinutes} className="w-full">
+                <TextField value={minutes} onChange={setMinutes} className="min-w-0 flex-1">
                   <Label>{t('minutes')}</Label>
                   <Input type="number" min={0} data-cy="session-duration-minutes" />
                 </TextField>

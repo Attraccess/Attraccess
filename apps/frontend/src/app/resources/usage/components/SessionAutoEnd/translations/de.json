@@ -7,6 +7,5 @@
   "extendToMax": "Auf Maximum verlängern",
   "maxReached": "Die maximale Sitzungsdauer ist erreicht, die Sitzung kann nicht weiter verlängert werden.",
   "extended": "Sitzung verlängert",
-  "extendedDescription": "Die Maschine stoppt jetzt automatisch um {{time}} Uhr.",
-  "extendFailed": "Die Sitzung konnte nicht verlängert werden"
+  "extendedDescription": "Die Maschine stoppt jetzt automatisch um {{time}} Uhr."
 }

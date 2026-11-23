@@ -44,4 +44,24 @@ describe('SessionDurationSettings', () => {
     );
     expect(screen.queryByLabelText(/Default estimate/)).not.toBeInTheDocument();
   });
+
+  it('does not turn a negative value into "no limit"', () => {
+    const setField = vi.fn();
+    render(<SessionDurationSettings formData={{ maxSessionDurationMinutes: 90 }} setField={setField} />);
+    fireEvent.change(screen.getByLabelText('Hours'), { target: { value: '-2' } });
+    // The minus sign is dropped: 2 h plus the 30 min already entered.
+    expect(setField).toHaveBeenCalledWith('maxSessionDurationMinutes', 150);
+  });
+
+  it('drops the hidden default estimate once a maximum is set', () => {
+    const setField = vi.fn();
+    render(
+      <SessionDurationSettings
+        formData={{ requireSessionDurationEstimate: true, maxSessionDurationMinutes: null }}
+        setField={setField}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('Hours'), { target: { value: '1' } });
+    expect(setField).toHaveBeenCalledWith('defaultSessionDurationEstimateMinutes', null);
+  });
 });

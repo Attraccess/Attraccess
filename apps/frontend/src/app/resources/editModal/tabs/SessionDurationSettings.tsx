@@ -21,10 +21,15 @@ export function SessionDurationSettings({
   const shownHours = draft?.hours ?? (max === null ? '' : String(hours));
   const shownMinutes = draft?.minutes ?? (max === null ? '' : String(minutes));
 
-  const onChange = (next: { hours: string; minutes: string }) => {
+  const onChange = (raw: { hours: string; minutes: string }) => {
+    // Digits only: a minus sign or exponent must not silently turn into "no limit".
+    const next = { hours: raw.hours.replace(/\D/g, ''), minutes: raw.minutes.replace(/\D/g, '') };
     setDraft(next);
     const total = joinMinutes(Math.floor(Number(next.hours) || 0), Math.floor(Number(next.minutes) || 0));
     setField('maxSessionDurationMinutes', total <= 0 ? null : Math.min(MAX_MINUTES, total));
+    // The default estimate only applies without a maximum and its field is hidden while one is set, so a stale
+    // value must not make the save fail for a reason the user cannot see.
+    if (total > 0) setField('defaultSessionDurationEstimateMinutes', null);
   };
 
   const required = formData.requireSessionDurationEstimate === true;
@@ -33,13 +38,13 @@ export function SessionDurationSettings({
   return (
     <div className="flex flex-col gap-2" data-cy="resource-edit-modal-session-duration">
       <div className="flex flex-col gap-1">
-        <span className="text-small font-medium">{t('inputs.machine.sessionDuration.maxSessionTime.label')}</span>
-        <div className="flex gap-3" role="group">
+        <Label id="max-session-time-label">{t('inputs.machine.sessionDuration.maxSessionTime.label')}</Label>
+        <div className="flex gap-3" role="group" aria-labelledby="max-session-time-label">
           <TextField
             value={shownHours}
             onChange={(value) => onChange({ hours: value, minutes: shownMinutes })}
             onBlur={() => setDraft(null)}
-            className="w-full"
+            className="min-w-0 flex-1"
           >
             <Label>{t('inputs.machine.sessionDuration.maxSessionTime.hours')}</Label>
             <Input type="number" min={0} data-cy="resource-edit-modal-max-session-hours" />
@@ -48,15 +53,13 @@ export function SessionDurationSettings({
             value={shownMinutes}
             onChange={(value) => onChange({ hours: shownHours, minutes: value })}
             onBlur={() => setDraft(null)}
-            className="w-full"
+            className="min-w-0 flex-1"
           >
             <Label>{t('inputs.machine.sessionDuration.maxSessionTime.minutes')}</Label>
             <Input type="number" min={0} data-cy="resource-edit-modal-max-session-minutes" />
           </TextField>
         </div>
-        <span className="text-tiny text-default-400">
-          {t('inputs.machine.sessionDuration.maxSessionTime.description')}
-        </span>
+        <Description>{t('inputs.machine.sessionDuration.maxSessionTime.description')}</Description>
       </div>
 
       <LabeledSwitch
