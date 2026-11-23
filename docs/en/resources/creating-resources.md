@@ -19,7 +19,7 @@ You need the **Manage Resources** permission to create new resources.
 | **Max parallel sessions** | No | Machines only: how many people may use the machine at the same time (1–1000, default 1). Doors ignore this setting |
 | **Max session time** | No | Machines only: the longest a session may run (1 minute to 30 days, as hours and minutes). Empty means no limit. Doors ignore this setting |
 | **Require duration estimate** | No | Machines only: users must say how long they will use the machine at most when they start. Doors ignore this setting |
-| **Default estimate for readers without a screen** | No | Machines only: used when an estimate is required and no max session time is set. Default 60 minutes |
+| **Default estimate for readers that cannot ask (minutes)** | No | Machines only: used when an estimate is required and no max session time is set. Default 60 minutes |
 
 4. Click **Save**
 
@@ -45,9 +45,9 @@ You can lower the limit at any time. Running sessions are never ended automatica
 These settings stop people from blocking a machine for ever. You find them in the resource settings under **Resource type and behavior** (with **Machine** selected), next to **Max parallel sessions**. Doors ignore them and do not show them.
 
 - **Max session time** is the longest a session may run. The server ends every session that reaches it, automatically.
-- **Require duration estimate** makes the web app and capable readers ask, when a session starts (also on takeover, QR link and supervised start), how long the person will use the machine at most. The machine stops automatically when that time is up at the latest. While the session runs, the person can extend it with **+1h**, **+2h**, **+4h**, **+6h**, **+12h**, **+24h** or **Extend to maximum**.
+- **Require duration estimate** makes the web app and capable readers ask, when a session starts (also on takeover, QR link and supervised start), how long the person will use the machine at most. The machine stops automatically when that time is up at the latest. While the session runs, the person can extend it with **+1 h**, **+2 h**, **+4 h**, **+6 h**, **+12 h**, **+24 h** or **Extend to maximum**.
 - When both are set, neither the estimate nor any extension can take the session past the max session time. An estimate above the max is refused.
-- **Default estimate for readers without a screen** applies only when an estimate is required and no max session time is set. Readers that cannot ask (Attractap Lite Ethernet, the GL-S10 bridge, plugin readers and touch readers with older firmware) never refuse a start for a missing estimate. Their sessions end at the max session time, or at the default estimate when there is no max (60 minutes if you leave it empty). The default estimate must not be longer than the max session time.
+- **Default estimate for readers that cannot ask (minutes)** applies only when an estimate is required and no max session time is set. Readers that cannot ask (Attractap Lite Ethernet, the GL-S10 bridge, plugin readers and touch readers with older firmware) never refuse a start for a missing estimate. Their sessions end at the max session time, or at the default estimate when there is no max (60 minutes if you leave it empty). The default estimate must not be longer than the max session time.
 
 The deadline is fixed when a session starts. Changing these settings affects only sessions started afterwards; running sessions are not changed. With parallel sessions, every person's session has its own deadline; a takeover gives the new person a fresh deadline (and requires their estimate). API clients that start sessions must send `estimatedDurationMinutes` on resources that require an estimate (see the [API reference](developer/api-reference.md#session-duration-and-extension)).
 
