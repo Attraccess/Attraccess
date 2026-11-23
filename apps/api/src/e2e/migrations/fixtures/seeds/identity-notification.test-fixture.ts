@@ -18,6 +18,7 @@ import {
   Permission,
   PushSubscription,
   Role,
+  RoleNetworkAction,
   User,
   UserRole,
 } from '@attraccess/database-entities';
@@ -192,6 +193,11 @@ export async function migrationIdentityNotificationSeeds(dataSource: DataSource,
       ssoProviderType: null,
       ssoProviderId: null,
       externalValue: null,
+    }));
+
+    await ensureEntity(dataSource.getRepository(RoleNetworkAction), () => ({
+      roleId: userRole.id,
+      action: 'usage.start',
     }));
   }
 }
