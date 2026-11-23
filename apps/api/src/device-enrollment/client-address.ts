@@ -1,6 +1,7 @@
 // Resolves the client address of a request using the same TRUST_PROXY policy as the HTTP server
-import { BlockList, isIP } from 'net';
+import { isIP } from 'net';
 import { IncomingMessage } from 'http';
+import { createCidrMatcher, normalizeAddress as normalize } from '../cidr-matcher';
 import { isValidTrustProxyValue, resolveTrustProxySetting, TrustProxySetting } from '../trust-proxy';
 
 const PRESETS: Record<string, string[]> = {
@@ -13,34 +14,19 @@ type TrustFn = (address: string, hop: number) => boolean;
 
 const trustNothing: TrustFn = () => false;
 
-function normalize(address: string): string {
-  return address.startsWith('::ffff:') && isIP(address.slice(7)) === 4 ? address.slice(7) : address;
-}
-
 export function compileTrust(setting: TrustProxySetting): TrustFn {
   if (setting === true) return () => true;
   if (setting === false) return trustNothing;
   if (typeof setting === 'number') return (_address, hop) => hop < setting;
 
-  const list = new BlockList();
+  const entries: string[] = [];
   for (const token of setting.split(',')) {
     const entry = token.trim();
     // Preset names are case-sensitive in Express (proxy-addr); match it exactly.
-    const subnets = Object.hasOwn(PRESETS, entry) ? PRESETS[entry] : [entry];
-    for (const subnet of subnets) {
-      const [address, prefix] = subnet.split('/');
-      const family = isIP(address);
-      if (family === 0) continue;
-      const type = family === 4 ? 'ipv4' : 'ipv6';
-      if (prefix === undefined) list.addAddress(address, type);
-      else list.addSubnet(address, Number(prefix), type);
-    }
+    entries.push(...(Object.hasOwn(PRESETS, entry) ? PRESETS[entry] : [entry]));
   }
-  return (address) => {
-    const normalized = normalize(address);
-    const family = isIP(normalized);
-    return family !== 0 && list.check(normalized, family === 4 ? 'ipv4' : 'ipv6');
-  };
+  const matches = createCidrMatcher(entries);
+  return (address) => matches(address);
 }
 
 let compiled: { raw: string | null | undefined; trust: TrustFn } | undefined;

@@ -1,3 +1,4 @@
+import { NetworkRestrictionModule } from '../../network-restriction/network-restriction.module';
 import { Module } from '@nestjs/common';
 import { ResourceUsageController } from './sessions/resource-usage.controller';
 import { ResourceUsageService } from './sessions/resource-usage.service';
@@ -37,6 +38,7 @@ import { ResourceUsageFlowsBridge } from './sessions/resource-usage-flows.bridge
     HealthPersistenceModule,
     RbacModule,
     SettingsModule,
+    NetworkRestrictionModule,
     NotificationsModule,
     ResourceIntroducersModule,
     ResourceIntroductionsModule,

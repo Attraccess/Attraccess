@@ -1,3 +1,4 @@
+import { NetworkRestrictionService } from '../../../network-restriction/network-restriction.service';
 import {
   CanActivate,
   ClassSerializerInterceptor,
@@ -101,6 +102,7 @@ describe('usage session responses', () => {
         },
         { provide: PreStartService, useValue: { gateHttp: jest.fn().mockResolvedValue(undefined) } },
         { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
+        { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
       ],
     })
       .overrideGuard(DualAuthGuard)

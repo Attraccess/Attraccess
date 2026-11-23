@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { McpPersistenceModule } from '../database/adapters/mcp/mcp-persistence.module';
 import { SessionsPersistenceModule } from '../database/adapters/sessions/sessions-persistence.module';
+import { NetworkRestrictionModule } from '../network-restriction/network-restriction.module';
 import { SettingsModule } from '../settings/settings.module';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { McpBearerGuard } from './mcp-bearer.guard';
@@ -14,7 +15,7 @@ import { McpRateLimitGuard } from './mcp-rate-limit.guard';
 import { McpToolRegistry } from './mcp-tool-registry';
 
 @Module({
-  imports: [McpPersistenceModule, SessionsPersistenceModule, SettingsModule, UsersAndAuthModule],
+  imports: [McpPersistenceModule, SessionsPersistenceModule, SettingsModule, UsersAndAuthModule, NetworkRestrictionModule],
   controllers: [McpController, McpOAuthController, McpOAuthConsentController, McpConnectionController],
   providers: [McpToolRegistry, McpPublicUrls, McpOAuthService, McpBearerGuard, McpRateLimitGuard, McpRestGateway],
   exports: [McpToolRegistry],
