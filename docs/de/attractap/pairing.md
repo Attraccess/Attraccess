@@ -148,8 +148,8 @@ Bericht und das Entfernen der Kopplung setzen den Status zurück. Der Bericht is
 Readers und kein Hardware-Nachweis; einfache Reader zeigen hier nichts.
 
 Für **Gesichert** braucht der Server außerdem die Fingerabdrücke der Secure-Boot-Schlüssel des Readers,
-die er erst beim Sichern des Readers speichert. Dieser Ablauf ist noch nicht verfügbar, deshalb zeigen
-sichere Reader vorerst **Nicht gesichert**. Siehe
+die er erst beim Sichern mit **Diesen Reader sichern** speichert. Ein sicherer Reader ohne sie, etwa ein
+Reader aus dem Gerätelabor (Chip **Laborschlüssel (nicht gesichert)**), zeigt **Nicht gesichert**. Siehe
 [Reader-Sicherheit](attractap/reader-security.md#identität-und-sicherheitsstatus-des-readers).
 
 ### Was ein Angreifer kann und was nicht
