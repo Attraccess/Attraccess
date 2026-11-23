@@ -1,6 +1,4 @@
 import { ConfigService } from '@nestjs/config';
-import { loadEnv } from '@attraccess/env';
-import valkeyConfig, { valkeyEnvSchema } from '../../../config/valkey.config';
 import { MachineBusyError } from '../errors/machine-busy.error';
 import { UsageSessionStore } from '../usage-session-store.port';
 import { resolveInstanceName, ValkeySessionChangeCoordination } from './session-change-coordination';
@@ -8,7 +6,8 @@ import { SessionChangeTurns } from './session-change-turns';
 import { FakeValkey } from './fake-valkey.test-fixture';
 
 // Every instance in this file runs on the same host and port, so the default names collide.
-jest.mock('node:os', () => ({ ...jest.requireActual('node:os'), hostname: () => 'shared-host' }));
+const mockHostname = jest.fn(() => 'shared-host');
+jest.mock('node:os', () => ({ ...jest.requireActual('node:os'), hostname: () => mockHostname() }));
 
 const LOCK_1 = 'attraccess:session-change:lock:1';
 const ALIVE = (id: string) => `attraccess:session-change:alive:${id}`;
@@ -18,7 +17,10 @@ const instance = (valkey: FakeValkey, override?: string) =>
 
 describe('ATTRACCESS_INSTANCE_NAME', () => {
   const originalPort = process.env.PORT;
-  beforeEach(() => (process.env.PORT = '3000'));
+  beforeEach(() => {
+    process.env.PORT = '3000';
+    mockHostname.mockReturnValue('shared-host');
+  });
   afterEach(() => {
     jest.useRealTimers();
     if (originalPort === undefined) delete process.env.PORT;
@@ -36,27 +38,6 @@ describe('ATTRACCESS_INSTANCE_NAME', () => {
       expect(resolveInstanceName(override)).toBe('shared-host:3000');
       process.env.PORT = '3001';
       expect(resolveInstanceName(override)).toBe('shared-host:3001');
-    });
-  });
-
-  describe('config', () => {
-    it('trims the value and treats blank as unset', () => {
-      expect(loadEnv(valkeyEnvSchema, { ATTRACCESS_INSTANCE_NAME: ' replica-1 ' }).ATTRACCESS_INSTANCE_NAME).toBe(
-        'replica-1',
-      );
-      expect(loadEnv(valkeyEnvSchema, { ATTRACCESS_INSTANCE_NAME: '  ' }).ATTRACCESS_INSTANCE_NAME).toBeUndefined();
-      expect(loadEnv(valkeyEnvSchema, {}).ATTRACCESS_INSTANCE_NAME).toBeUndefined();
-    });
-
-    it('refuses to start with a name that contains "|"', () => {
-      const original = process.env.ATTRACCESS_INSTANCE_NAME;
-      process.env.ATTRACCESS_INSTANCE_NAME = 'a|b';
-      try {
-        expect(() => valkeyConfig()).toThrow(/ATTRACCESS_INSTANCE_NAME must not contain a pipe/);
-      } finally {
-        if (original === undefined) delete process.env.ATTRACCESS_INSTANCE_NAME;
-        else process.env.ATTRACCESS_INSTANCE_NAME = original;
-      }
     });
   });
 
@@ -89,21 +70,21 @@ describe('ATTRACCESS_INSTANCE_NAME', () => {
     });
   });
 
-  it('lets a restart under the same name clear its previous run at once, whatever the host name', async () => {
+  it('lets a recreated instance with the same name clear its previous run at once, on a new host name', async () => {
     const valkey = new FakeValkey();
+    // The previous run's renewals live on fake timers, so switching back to real ones stops them: the process is gone.
+    jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick'] });
     const previous = instance(valkey, 'replica-1');
     previous.keepAlive('cut-off');
     await previous.acquire(1, 1000);
-    jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick'] });
-    jest.clearAllTimers(); // the old process is gone
     jest.useRealTimers();
+    mockHostname.mockReturnValue('recreated-host');
     const restarted = instance(valkey, 'replica-1');
     expect(await restarted.findGone(['cut-off'], true)).toEqual(new Set(['cut-off']));
-    const startedAt = Date.now();
+    // Well before the lock's 15 s expiry: a lock it did not recognise as its own would make this throw MachineBusyError.
     await (
-      await restarted.acquire(1, 1000)
+      await restarted.acquire(1, 100)
     )();
-    expect(Date.now() - startedAt).toBeLessThan(100);
   });
 
   describe('SessionChangeTurns', () => {

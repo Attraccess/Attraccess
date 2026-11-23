@@ -88,8 +88,8 @@ const OFFLINE = new Set(['reconnecting', 'close', 'end']);
  * Valkey-backed coordination. Valkey is optional and not required for using a machine, so an unreachable
  * Valkey degrades to the in-process queue (logged) instead of blocking every start and stop.
  *
- * Heartbeats and lock tokens start with `<instance name>|<boot id>` (see `resolveInstanceName`), so an instance that restarts quickly
- * recognises the attempts and locks of its previous run right away instead of waiting for them to expire.
+ * Heartbeats and lock tokens start with `<instance name>|<boot id>` (see `resolveInstanceName`), so an instance that
+ * restarts quickly recognises the attempts and locks of its previous run right away instead of waiting for them to expire.
  */
 export class ValkeySessionChangeCoordination implements SessionChangeCoordination {
   private readonly logger = new Logger(ValkeySessionChangeCoordination.name);
@@ -100,7 +100,7 @@ export class ValkeySessionChangeCoordination implements SessionChangeCoordinatio
 
   constructor(
     private readonly client: ValkeyClient,
-    private readonly instanceName = resolveInstanceName(),
+    private readonly instanceName: string,
     private readonly bootWaitMs = BOOT_VALKEY_WAIT_MS,
   ) {
     this.heartbeat = `${instanceName}|${randomUUID()}`;

@@ -45,7 +45,7 @@ describe('session change coordination against Valkey', () => {
   });
 
   it('does not release a lock another holder took over', async () => {
-    const a = new ValkeySessionChangeCoordination(clientA);
+    const a = new ValkeySessionChangeCoordination(clientA, 'host-a:3000');
     const release = await a.acquire(2, 1000);
     await clientA.set('attraccess:session-change:lock:2', 'someone-else');
     await release();
