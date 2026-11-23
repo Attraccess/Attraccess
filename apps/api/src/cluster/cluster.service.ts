@@ -37,6 +37,7 @@ export class ClusterService implements OnModuleInit, OnApplicationShutdown {
   readonly claims: ReaderScreenClaims;
   readonly deadlines: ClusterDeadlines;
   private resync: NodeJS.Timeout | null = null;
+  private started = false;
 
   constructor(
     @Inject(VALKEY_CLIENT) valkey: Redis | null,
@@ -76,7 +77,8 @@ export class ClusterService implements OnModuleInit, OnApplicationShutdown {
   }
 
   onModuleInit(): void {
-    if (!this.enabled) return;
+    if (!this.enabled || this.started) return;
+    this.started = true;
     (this.instances as ValkeyClusterInstances).start();
     (this.bus as ValkeyClusterBus).start();
     (this.deadlines as ValkeyClusterDeadlines).start(this.options.timing?.deadlineSweepEveryMs);

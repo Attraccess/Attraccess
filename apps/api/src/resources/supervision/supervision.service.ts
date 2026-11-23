@@ -8,8 +8,6 @@ import {
   ConflictException,
   ServiceUnavailableException,
   Inject,
-  OnModuleInit,
-  OnApplicationShutdown,
   Optional,
 } from '@nestjs/common';
 

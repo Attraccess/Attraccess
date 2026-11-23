@@ -11,15 +11,15 @@ const queueKey = (queue: string) => `attraccess:cluster:deadlines:${queue}`;
 
 type Handler = (itemId: string) => Promise<void> | void;
 
-abstract class DeadlineHandlers {
-  protected readonly logger = new Logger('ClusterDeadlines');
-  protected readonly handlers = new Map<string, Handler>();
+class DeadlineHandlers {
+  readonly logger = new Logger('ClusterDeadlines');
+  readonly handlers = new Map<string, Handler>();
 
   onDue(queue: string, handler: Handler): void {
     this.handlers.set(queue, handler);
   }
 
-  protected async fire(queue: string, itemId: string): Promise<void> {
+  async fire(queue: string, itemId: string): Promise<void> {
     try {
       await this.handlers.get(queue)?.(itemId);
     } catch (error) {
@@ -29,7 +29,13 @@ abstract class DeadlineHandlers {
 }
 
 /** One instance: a timer per item, as the features had before (fake timers in tests drive it). */
-export class LocalClusterDeadlines extends DeadlineHandlers implements ClusterDeadlines {
+export class LocalClusterDeadlines implements ClusterDeadlines {
+  private readonly due = new DeadlineHandlers();
+
+  onDue(queue: string, handler: Handler): void {
+    this.due.onDue(queue, handler);
+  }
+
   private readonly timers = new Map<string, NodeJS.Timeout>();
 
   async schedule(queue: string, itemId: string, atMs: number): Promise<void> {
@@ -37,7 +43,7 @@ export class LocalClusterDeadlines extends DeadlineHandlers implements ClusterDe
     const timer = setTimeout(
       () => {
         this.timers.delete(`${queue}/${itemId}`);
-        void this.fire(queue, itemId);
+        void this.due.fire(queue, itemId);
       },
       Math.max(0, atMs - Date.now()),
     );
@@ -60,12 +66,15 @@ export class LocalClusterDeadlines extends DeadlineHandlers implements ClusterDe
  * A sorted set per queue, scored by deadline, swept by every instance. Removing the item (`ZREM` answers 1 to one
  * caller only) is the claim, so each deadline fires on exactly one instance. No keyspace notifications needed.
  */
-export class ValkeyClusterDeadlines extends DeadlineHandlers implements ClusterDeadlines {
+export class ValkeyClusterDeadlines implements ClusterDeadlines {
+  private readonly due = new DeadlineHandlers();
   private timer: NodeJS.Timeout | null = null;
   private sweeping = false;
 
-  constructor(private readonly client: Pick<Redis, 'status' | 'zadd' | 'zrem' | 'zrangebyscore'>) {
-    super();
+  constructor(private readonly client: Pick<Redis, 'status' | 'zadd' | 'zrem' | 'zrangebyscore'>) {}
+
+  onDue(queue: string, handler: Handler): void {
+    this.due.onDue(queue, handler);
   }
 
   start(everyMs = DEADLINE_SWEEP_EVERY_MS): void {
@@ -91,7 +100,7 @@ export class ValkeyClusterDeadlines extends DeadlineHandlers implements ClusterD
     if (this.sweeping) return;
     this.sweeping = true;
     try {
-      for (const queue of this.handlers.keys()) {
+      for (const queue of this.due.handlers.keys()) {
         let due: string[];
         try {
           due = await valkeyCall(this.client, () =>
@@ -102,7 +111,7 @@ export class ValkeyClusterDeadlines extends DeadlineHandlers implements ClusterD
         }
         for (const itemId of due) {
           const won = await valkeyCall(this.client, () => this.client.zrem(queueKey(queue), itemId)).catch(() => 0);
-          if (won === 1) await this.fire(queue, itemId);
+          if (won === 1) await this.due.fire(queue, itemId);
         }
       }
     } finally {

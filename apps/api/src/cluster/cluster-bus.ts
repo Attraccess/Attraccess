@@ -37,10 +37,10 @@ interface PendingRequest {
 }
 
 /** Runs handlers registered for this instance. Shared by both buses: a message to oneself never leaves the process. */
-abstract class HandlerRegistry {
-  protected readonly logger = new Logger('ClusterBus');
-  protected readonly handlers = new Map<string, BusHandler>();
-  protected readonly requestHandlers = new Map<string, BusRequestHandler>();
+class HandlerRegistry {
+  readonly logger = new Logger('ClusterBus');
+  private readonly handlers = new Map<string, BusHandler>();
+  private readonly requestHandlers = new Map<string, BusRequestHandler>();
 
   constructor(readonly instanceId: string) {}
 
@@ -52,7 +52,7 @@ abstract class HandlerRegistry {
     this.requestHandlers.set(type, handler);
   }
 
-  protected async deliver(type: string, payload: unknown, from: string): Promise<void> {
+  async deliver(type: string, payload: unknown, from: string): Promise<void> {
     const handler = this.handlers.get(type);
     if (!handler) return;
     try {
@@ -62,7 +62,7 @@ abstract class HandlerRegistry {
     }
   }
 
-  protected async answer(type: string, payload: unknown, from: string): Promise<unknown> {
+  async answer(type: string, payload: unknown, from: string): Promise<unknown> {
     const handler = this.requestHandlers.get(type);
     if (!handler) throw new Error(`No handler for cluster request ${type}`);
     return handler(payload, from);
@@ -70,18 +70,32 @@ abstract class HandlerRegistry {
 }
 
 /** One instance: messages to itself run in process, there is nobody to broadcast to. */
-export class LocalClusterBus extends HandlerRegistry implements ClusterBus {
+export class LocalClusterBus implements ClusterBus {
+  private readonly registry: HandlerRegistry;
+
+  constructor(readonly instanceId: string) {
+    this.registry = new HandlerRegistry(instanceId);
+  }
+
+  on(type: string, handler: BusHandler): void {
+    this.registry.on(type, handler);
+  }
+
+  handle(type: string, handler: BusRequestHandler): void {
+    this.registry.handle(type, handler);
+  }
+
   async broadcast(): Promise<void> {
     // No other instance.
   }
 
   async send(instanceId: string, type: string, payload: unknown): Promise<void> {
-    if (instanceId === this.instanceId) await this.deliver(type, payload, this.instanceId);
+    if (instanceId === this.instanceId) await this.registry.deliver(type, payload, this.instanceId);
   }
 
   async request<T>(instanceId: string, type: string, payload: unknown): Promise<T> {
     if (instanceId !== this.instanceId) throw new ClusterInstanceGoneError(instanceId);
-    return (await this.answer(type, payload, this.instanceId)) as T;
+    return (await this.registry.answer(type, payload, this.instanceId)) as T;
   }
 }
 
@@ -91,7 +105,9 @@ type BusClient = Pick<Redis, 'status' | 'publish' | 'duplicate'>;
  * Valkey pub/sub: one broadcast channel and one channel per instance, on a dedicated subscriber connection that
  * subscribes again after every reconnect (as the authorization cache does).
  */
-export class ValkeyClusterBus extends HandlerRegistry implements ClusterBus {
+export class ValkeyClusterBus implements ClusterBus {
+  private readonly registry: HandlerRegistry;
+  private readonly logger: Logger;
   private subscriber: Redis | null = null;
   private readonly pending = new Map<string, PendingRequest>();
   private subscribed: Promise<void> = Promise.resolve();
@@ -99,10 +115,19 @@ export class ValkeyClusterBus extends HandlerRegistry implements ClusterBus {
 
   constructor(
     private readonly client: BusClient,
-    instanceId: string,
+    readonly instanceId: string,
     private readonly isAlive: (instanceId: string) => Promise<boolean>,
   ) {
-    super(instanceId);
+    this.registry = new HandlerRegistry(instanceId);
+    this.logger = this.registry.logger;
+  }
+
+  on(type: string, handler: BusHandler): void {
+    this.registry.on(type, handler);
+  }
+
+  handle(type: string, handler: BusRequestHandler): void {
+    this.registry.handle(type, handler);
   }
 
   /** Resolves once both channels are subscribed (tests wait for it before publishing). */
@@ -142,12 +167,12 @@ export class ValkeyClusterBus extends HandlerRegistry implements ClusterBus {
   }
 
   async send(instanceId: string, type: string, payload: unknown): Promise<void> {
-    if (instanceId === this.instanceId) return this.deliver(type, payload, this.instanceId);
+    if (instanceId === this.instanceId) return this.registry.deliver(type, payload, this.instanceId);
     await this.publish(instanceChannel(instanceId), { v: 1, from: this.instanceId, type, payload });
   }
 
   async request<T>(instanceId: string, type: string, payload: unknown, timeoutMs: number): Promise<T> {
-    if (instanceId === this.instanceId) return (await this.answer(type, payload, this.instanceId)) as T;
+    if (instanceId === this.instanceId) return (await this.registry.answer(type, payload, this.instanceId)) as T;
     const rid = randomUUID();
     const result = new Promise<unknown>((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -211,7 +236,7 @@ export class ValkeyClusterBus extends HandlerRegistry implements ClusterBus {
       void this.onRequest(envelope);
       return;
     }
-    void this.deliver(envelope.type, envelope.payload, envelope.from);
+    void this.registry.deliver(envelope.type, envelope.payload, envelope.from);
   }
 
   private onReply(envelope: Envelope): void {
@@ -226,7 +251,7 @@ export class ValkeyClusterBus extends HandlerRegistry implements ClusterBus {
   private async onRequest(envelope: Envelope): Promise<void> {
     const reply: Envelope = { v: 1, from: this.instanceId, type: envelope.type, rid: envelope.rid, reply: true };
     try {
-      reply.payload = await this.answer(envelope.type, envelope.payload, envelope.from);
+      reply.payload = await this.registry.answer(envelope.type, envelope.payload, envelope.from);
     } catch (error) {
       reply.error = serializeClusterError(error);
     }
