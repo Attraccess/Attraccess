@@ -1,5 +1,5 @@
 # RFID Cards
-<!-- llms-description: How RFID cards link to user accounts, how to manage cards, supported card types and which readers may enroll or reset cards. -->
+<!-- llms-description: How RFID cards link to user accounts, how to manage cards, supported card types, insecure UID-only cards and which readers may enroll or reset cards. -->
 
 RFID cards are the physical keys that let users access machines and doors via Attractap readers. Each card is linked to a user account in Attraccess.
 
@@ -43,6 +43,8 @@ Use **Activate** or **Deactivate** next to a card and confirm the action. Activa
 
 The card is removed from the account after the server has checked that the card is back in its factory state. The physical card is required; use **Deactivate** if it is unavailable.
 
+**UID-only cards** need no reader: nothing is written to them, so **Delete** asks for a confirmation and removes the card right away. The owner or a user with `users.rfid-cards.manage` can do this, and the audit log records it.
+
 ## Multiple Cards Per User
 
 Each user can have multiple RFID cards linked to their account. This is useful when:
@@ -59,11 +61,31 @@ Attractap readers use AES-encrypted authentication, which requires cards with ha
 |-----------|-----------|
 | NTAG424 DNA | Yes |
 | MIFARE DESFire EV2/EV3 | Yes |
-| MIFARE DESFire EV1 | No (lacks the required authentication mode) |
-| MIFARE Classic / Ultralight / NTAG213-216 | No (no AES authentication) |
+| MIFARE DESFire EV1 | Only as a [UID-only card](#uid-only-cards-insecure) |
+| MIFARE Classic / Ultralight / NTAG213-216 | Only as a [UID-only card](#uid-only-cards-insecure) |
+| UID-only (insecure, needs setting) | Cards without AES that only offer their UID: MIFARE Classic, MIFARE Ultralight, NTAG213/215/216 and DESFire EV1. Off by default; an administrator has to allow them. |
 
 > [!NOTE]
 > On MIFARE DESFire cards, Attractap stores its keys in a dedicated DESFire application (AID `0xACCE55`), which is created automatically during enrollment. Other applications on the card (e.g. existing access systems) are not touched.
+
+## UID-Only Cards (Insecure)
+
+Cheap RFID cards (MIFARE Classic, MIFARE Ultralight, NTAG213/215/216 and DESFire EV1) cannot do AES authentication. They only offer their UID. An administrator can allow them under **Settings -> RFID card enrollment** with the switch **Allow UID-only cards (insecure)**. It is off by default, only users with `system.settings.manage` can change it, and turning it on asks for a confirmation. Every change is recorded in the audit log.
+
+> [!CAUTION]
+> **UID-only cards can be copied with cheap tools.** The server only compares the UID, so anyone who reads such a card can impersonate its owner on machines and doors, including doors opened through plugins such as the CES lock plugin. Allow them only if you accept this risk.
+
+How it works:
+
+- **One switch for the installation.** It covers all readers and plugins; there is no per-reader or per-resource setting.
+- **Enrollment falls back automatically.** The reader first checks whether the card can do AES. A card that can is always enrolled securely. A card that cannot is enrolled as a UID-only card, but only while the setting is on; otherwise the reader shows "Card is not supported". A secure card (NTAG 424 DNA, DESFire EV2/EV3) is never enrolled as UID-only, even when its secure enrollment fails.
+- **The card record decides how a tap is checked.** A secure card always has to prove its key, whatever the setting says, so copying its UID onto a cheap card does not work. A UID-only card is accepted on its UID alone, and only while the setting is on.
+- **Cards with a random UID are refused.** A phone or bank card changes its UID on every tap, so the reader shows "Card with a random UID is not supported".
+- **Turning the setting off.** Existing UID-only cards stay in the card lists, marked **UID only, disabled**, but readers and plugins refuse them ("UID-only cards are disabled") until the setting is turned on again. They do not have to be enrolled again.
+- **Cards lists.** UID-only cards carry a **UID only** chip.
+
+> [!NOTE]
+> The reader reports the card type, so readers need firmware 2.14.0 or later to enroll and use UID-only cards. Readers on older firmware behave as before.
 
 ## Which Readers May Enroll and Reset Cards
 

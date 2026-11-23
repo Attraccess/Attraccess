@@ -47,6 +47,8 @@ Die Sitzungssicherheit wird ueber Umgebungsvariablen gesteuert:
 
 Die Schlüssel der Attractap-Karten werden nur vom Server erzeugt und geprüft; beim Vorhalten einer Karte erfährt ein Reader ihren Schlüssel nicht. (Ausnahme sind das Registrieren und Zurücksetzen von Karten, siehe [RFID-Karten](attractap/rfid-cards.md#welche-reader-karten-registrieren-und-zurücksetzen-dürfen).) Der Server speichert jeden Schlüssel verschlüsselt mit einem aus `AUTH_SESSION_SECRET` abgeleiteten Schlüssel. Dasselbe gilt für die Kopplungsschlüssel der Reader: die privaten Schlüssel der Zertifizierungsstelle für Reader und des Serverzertifikats (siehe [Reader koppeln](attractap/pairing.md#datensicherung)).
 
+Der Schalter **UID-only-Karten erlauben (unsicher)** unter **Einstellungen -> RFID-Kartenregistrierung** ist standardmäßig aus. Er erlaubt günstige Karten ohne Verschlüsselung, die sich mit günstigen Werkzeugen kopieren lassen; siehe [UID-only-Karten](attractap/rfid-cards.md#uid-only-karten-unsicher).
+
 > [!WARNING]
 > **Sichern Sie `AUTH_SESSION_SECRET` zusammen mit den Datenbank-Backups.** Ohne das Secret lassen sich die gespeicherten Kartenschlüssel und Kopplungsschlüssel nicht lesen. Bereits registrierte Karten können dann weder genutzt noch von Attraccess zurückgesetzt werden und müssen mit anderen Werkzeugen gelöscht werden. Gekoppelte Reader können sich nicht mehr verbinden und müssen neu gekoppelt werden.
 

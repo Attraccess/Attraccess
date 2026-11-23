@@ -47,6 +47,8 @@ Session security is controlled via environment variables:
 
 Attractap card keys are created and checked by the server only; tapping a card never exposes its key to a reader. (Enrolling and resetting cards is the exception, see [RFID Cards](attractap/rfid-cards.md#which-readers-may-enroll-and-reset-cards).) The server stores each key encrypted with a key derived from `AUTH_SESSION_SECRET`. The same applies to the reader pairing keys: the private keys of the certificate authority for readers and of the server certificate (see [Reader Pairing](attractap/pairing.md#backup)).
 
+The switch **Allow UID-only cards (insecure)** under **Settings -> RFID card enrollment** is off by default. It lets cheap cards without encryption be used, which can be copied with cheap tools; see [UID-only cards](attractap/rfid-cards.md#uid-only-cards-insecure).
+
 > [!WARNING]
 > **Back up `AUTH_SESSION_SECRET` together with your database backups.** Without it the stored card keys and reader pairing keys cannot be read. Cards that were enrolled can then neither be used nor reset by Attraccess, and have to be erased with other tools. Paired readers cannot connect any more and have to be paired again.
 
