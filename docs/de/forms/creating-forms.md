@@ -84,7 +84,7 @@ Auf einem [Attractap](attractap/using-the-reader.md)-Touchleser zeigt das Gerät
 
 **Die Smartphone-Seite**
 
-- Sie öffnet sich ohne Anmeldung. Wer den Link hat, kann Fotos zu diesem offenen Formular hinzufügen. Der Link ist deshalb kurzlebig: Er funktioniert 15 Minuten lang, endet, sobald das Formular am Lesegerät beendet ist (abgesendet, abgebrochen, abgemeldet oder ein anderer Benutzer meldet sich an), und endet, sobald die maximale Anzahl Fotos hochgeladen wurde.
+- Sie öffnet sich ohne Anmeldung. Wer den Link hat, kann Fotos zu diesem offenen Formular hinzufügen. Der Link ist deshalb kurzlebig: Er funktioniert 15 Minuten lang, endet, sobald das Formular am Lesegerät beendet ist (abgesendet, abgebrochen, abgemeldet oder ein anderer Benutzer meldet sich an), und nimmt keine weiteren Fotos mehr an, sobald die maximale Anzahl hochgeladen wurde (ein entferntes Foto schafft wieder Platz).
 - Wer einen abgelaufenen Link öffnet, sieht den Hinweis, das Formular am Lesegerät erneut zu öffnen.
 - Die Fotos werden Teil der Einreichung, sobald der Benutzer das Formular am Lesegerät absendet.
 

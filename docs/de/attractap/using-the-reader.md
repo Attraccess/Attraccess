@@ -137,7 +137,7 @@ Ein Fotofeld zeigt einen QR-Code, den Hinweis **Mit dem Handy scannen, um Fotos 
 2. Nehmen Sie Fotos auf oder laden Sie sie vom Smartphone hoch.
 3. Der Zähler am Leser aktualisiert sich innerhalb weniger Sekunden. Tippen Sie dann wie gewohnt auf **Weiter** oder **Absenden**.
 
-Ist das Feld erforderlich und noch kein Foto angekommen, erscheint der Grund auf der Schaltfläche. Der Link gilt 15 Minuten, bis Sie das Formular absenden oder abbrechen, sich abmelden oder sich jemand anderes anmeldet, oder bis die maximale Anzahl Fotos hochgeladen ist. Ist er abgelaufen, öffnen Sie das Formular am Leser erneut. Ein Leser mit älterer Firmware kann keine Fotofelder anzeigen: Er überspringt optionale, bei einem erforderlichen bittet er Sie, das Formular in der Web-App auszufüllen.
+Ist das Feld erforderlich und noch kein Foto angekommen, erscheint der Grund auf der Schaltfläche. Der Link gilt 15 Minuten, bis Sie das Formular absenden oder abbrechen, sich abmelden oder sich jemand anderes anmeldet, und er nimmt keine weiteren Fotos mehr an, sobald die maximale Anzahl hochgeladen ist (ein entferntes Foto schafft wieder Platz). Ist er abgelaufen, öffnen Sie das Formular am Leser erneut. Ein Leser mit älterer Firmware kann keine Fotofelder anzeigen: Er überspringt optionale, bei einem erforderlichen bittet er Sie, das Formular in der Web-App auszufüllen.
 
 Zum Abbrechen tippen Sie auf das **×** oben rechts. Sie kehren zur Liste oder zu den Details zurück, von wo aus Sie die Aktion begonnen haben. Wenn Sie ein erforderliches Formular abbrechen, wird auch die Anfrage zum Starten oder Beenden der Nutzung abgebrochen.
 

@@ -84,7 +84,7 @@ On an [Attractap](attractap/using-the-reader.md) touch reader, the reader shows 
 
 **The phone page**
 
-- It opens without signing in. Whoever holds the link can add photos to that open form, so the link is short-lived: it stops working after 15 minutes, as soon as the form on the reader ends (submitted, cancelled, signed out or another user signs in) or once the maximum number of photos has been uploaded.
+- It opens without signing in. Whoever holds the link can add photos to that open form, so the link is short-lived: it stops working after 15 minutes, as soon as the form on the reader ends (submitted, cancelled, signed out or another user signs in) and it takes no more photos once the maximum number has been uploaded (removing a photo makes room for another).
 - A user who opens an expired link sees a notice to open the form on the reader again.
 - The photos become part of the submission when the user submits the form on the reader.
 

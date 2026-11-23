@@ -137,7 +137,7 @@ A photo field shows a QR code, the instruction **Mit dem Handy scannen, um Fotos
 2. Take photos or upload them from your phone.
 3. The count on the reader updates within a few seconds. Then tap **Weiter** or **Absenden** as usual.
 
-If the field is required and no photo has arrived, the reason appears on the button. The link works for 15 minutes, until you submit or cancel the form, sign out or someone else signs in, or until the maximum number of photos is uploaded. If it has expired, open the form on the reader again. A reader with older firmware cannot show photo fields: it skips optional ones, and for a required one it asks you to complete the form in the web app.
+If the field is required and no photo has arrived, the reason appears on the button. The link works for 15 minutes, until you submit or cancel the form, sign out or someone else signs in, and it takes no more photos once the maximum number is uploaded (removing a photo makes room for another). If it has expired, open the form on the reader again. A reader with older firmware cannot show photo fields: it skips optional ones, and for a required one it asks you to complete the form in the web app.
 
 To cancel, tap the **×** in the top-right corner. You return to the list or details where you began. Cancelling a required form cancels the start or stop request; it does not complete it.
 
