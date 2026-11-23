@@ -2,15 +2,13 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../components/toastProvider';
 import logoutEn from './logout.en.json';
 import logoutDe from './logout.de.json';
-import { restoreAuthentication } from '../utils/auth-session';
+import { restoreAuthentication, SIGN_IN_RELOAD_KEY } from '../utils/auth-session';
 import { stopLiveUpdates } from '../utils/live-updates';
 import { useNavigate } from 'react-router-dom';
 import {
   useCreateSession,
-  ApiError,
   useGetLogoutCapability,
   useGetTwoFactorStatus,
-  useGetCurrent,
   UseGetCurrentKeyFn,
   endSession,
   logoutEverywhere as requestLogoutEverywhere,
@@ -20,6 +18,9 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type SystemPermission } from '@attraccess/shared';
+import { shouldRetryCurrentUser } from '../api/retryRules';
+import { isUnauthenticatedError } from '../api/isUnauthenticatedError';
+import { deriveAuthStatus } from './deriveAuthStatus';
 
 interface LoginCredentials {
   username: string;
@@ -92,13 +93,58 @@ export function useAuth() {
 
   // Check authentication status by trying to fetch current user
   // This will work with cookies automatically
-  const { data: fetchedUser } = useGetCurrent({}, undefined, {
+  const {
+    data: fetchedUser,
+    error: currentUserError,
+    errorUpdatedAt: currentUserErrorUpdatedAt,
+    isFetching: isCurrentUserFetching,
+    isPaused: isCurrentUserPaused,
+    refetch: refetchCurrentUser,
+  } = useQuery({
+    // The account pages also read this key through the generated useGetCurrent(); they render only with a cached
+    // user, where both definitions agree. The sign-in rules (401 handling, retries) live here.
+    queryKey: UseGetCurrentKeyFn(),
+    queryFn: async ({ signal }) => {
+      try {
+        return await getCurrent({ signal, throwOnError: true }).then(({ data }) => data);
+      } catch (error) {
+        const cached = queryClient.getQueryState(UseGetCurrentKeyFn());
+        // Signed out (null) and only refreshing (window focus, the interval, a reload of all queries): stay signed
+        // out whatever the answer, so a server hiccup does not replace the sign-in page with the error screen. The
+        // reload after a sign-in and a Retry after a failure (the query is still in error) report it instead.
+        const reportsFailure = cached?.status === 'error' || queryClient.getQueryData(SIGN_IN_RELOAD_KEY) === true;
+        if (cached?.data === null && !reportsFailure) return null;
+        // A 401 without a cached user is the answer "signed out", not a failure: as data it survives refetches,
+        // so the login form stays mounted. A cached user keeps the error, so a background 401 does not sign the
+        // user out (unchanged behaviour).
+        if (isUnauthenticatedError(error) && !cached?.data) return null;
+        throw error;
+      }
+    },
     refetchInterval: 1000 * 60 * 20, // 20 minutes
-    retry: false,
-    enabled: isInitialized && !hasStartedLogout, // Stop identity refetch while signing out
+    // Only a 401 means signed out; a 5xx or network error is retried instead of ending the session.
+    retry: shouldRetryCurrentUser,
+    // Stop identity refetch while signing out. Read from the cache, not this render's value: a sign-in after a
+    // logout sets the status back to idle and invalidates this query at once, and the sign-in waits for that
+    // reload (keeping its form pending) only if the query already counts as enabled.
+    enabled: () => isInitialized && queryClient.getQueryData(['auth-logout-status']) === 'idle',
   });
   // Ignore late identity responses as soon as either logout action starts.
   const currentUser = hasStartedLogout ? null : fetchedUser;
+  // Derived from the shared query state, so every initialized useAuth instance agrees.
+  const authStatus = deriveAuthStatus({
+    isInitialized,
+    logoutStatus,
+    data: fetchedUser,
+    error: currentUserError,
+    isFetching: isCurrentUserFetching,
+    // TanStack also pauses retries while the tab is hidden; only an offline browser counts as an error.
+    isPaused: isCurrentUserPaused && typeof navigator !== 'undefined' && !navigator.onLine,
+    hasFailedBefore: currentUserErrorUpdatedAt > 0,
+  });
+  const retryCurrentUser = useCallback(() => {
+    void refetchCurrentUser();
+  }, [refetchCurrentUser]);
 
   const [returnToken] = useState(() => new URL(window.location.href).searchParams.get('ssoLogout'));
   const { data: providerReturn, isFetched: isReturnFetched } = useQuery({
@@ -117,7 +163,7 @@ export function useAuth() {
         await getCurrent({ throwOnError: true }).then(({ data }) => data);
         return null;
       } catch (error) {
-        if (error instanceof ApiError && error.status === 401) return outcome.result;
+        if (isUnauthenticatedError(error)) return outcome.result;
         return null;
       }
     },
@@ -217,6 +263,12 @@ export function useAuth() {
     user: logoutStatus === 'ended' ? null : (currentUser ?? null),
     isAuthenticated: logoutStatus !== 'ended' && !!currentUser,
     isInitialized,
+    /** loading until the first current-user answer; error when it failed with something other than a 401; a started logout already counts as unauthenticated. */
+    authStatus,
+    /** Loads the current user again, for example from the error screen. */
+    retryCurrentUser,
+    /** Whether the current user (or one of its retries) is being requested, for the error screen's Retry button. */
+    isCurrentUserFetching,
     logout,
     logoutEverywhere,
     logoutPending,

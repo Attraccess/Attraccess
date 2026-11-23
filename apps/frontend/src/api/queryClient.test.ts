@@ -27,4 +27,8 @@ describe('queryClient retry rule', () => {
     expect(retry(DEFAULT_RETRIES, apiError(500))).toBe(false);
     expect(retry(0, new TypeError('Failed to fetch'))).toBe(true);
   });
+
+  it('keeps retrying a 401 for other queries (unchanged app-wide behaviour)', () => {
+    expect(retry(0, apiError(401))).toBe(true);
+  });
 });

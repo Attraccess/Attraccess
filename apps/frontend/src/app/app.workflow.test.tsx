@@ -9,6 +9,9 @@ const state = vi.hoisted(() => ({
   twoFactorLoading: false,
   liveUserId: undefined as number | undefined,
   initialized: false,
+  status: undefined as 'loading' | 'authenticated' | 'unauthenticated' | 'error' | undefined,
+  fetching: false,
+  retry: vi.fn(),
   touch: false,
   ptr: true,
   invalidate: vi.fn(),
@@ -19,6 +22,10 @@ const state = vi.hoisted(() => ({
 vi.mock('../hooks/useAuth', () => ({
   useAuth: () => ({
     isInitialized: state.initialized,
+    authStatus:
+      state.status ?? (!state.initialized ? 'loading' : state.authenticated ? 'authenticated' : 'unauthenticated'),
+    retryCurrentUser: state.retry,
+    isCurrentUserFetching: state.fetching,
     isAuthenticated: state.authenticated,
     needsTwoFactorSetup: state.setup,
     isTwoFactorStatusLoading: state.twoFactorLoading,
@@ -39,7 +46,8 @@ vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQue
 vi.mock('@attraccess/react-query-client', () => ({
   client: { setConfig: () => undefined, interceptors: { request: { use: () => 0 } } },
 }));
-vi.mock('./routes', () => ({ useAllRoutes: () => [{ path: '/', element: <p>Home route</p>, authRequired: false }] }));
+const useAllRoutesMock = vi.hoisted(() => vi.fn());
+vi.mock('./routes', () => ({ useAllRoutes: useAllRoutesMock }));
 vi.mock('./layout/layout', () => ({ Layout: ({ children }: PropsWithChildren) => <main>{children}</main> }));
 vi.mock('../components/toastProvider', () => ({ ToastProvider: ({ children }: PropsWithChildren) => children }));
 vi.mock('../components/attraccessUserActionsBridge', () => ({
@@ -90,8 +98,11 @@ beforeEach(() => {
   state.twoFactorLoading = false;
   state.liveUserId = undefined;
   state.initialized = false;
+  state.status = undefined;
+  state.fetching = false;
   state.touch = false;
   state.ptr = true;
+  useAllRoutesMock.mockReturnValue([{ path: '/', element: <p>Home route</p>, authRequired: false }]);
   vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
     matches: state.touch,
     media: query,
@@ -227,4 +238,57 @@ it('keeps the install action out of the signed-in shell, which offers it in the 
   );
   expect(screen.queryByRole('button', { name: 'Install app' })).toBeNull();
   expect(screen.getByText('Install prompts')).toBeInTheDocument();
+});
+
+const renderApp = (path = '/') =>
+  render(
+    <MemoryRouter initialEntries={[path]}>
+      <App />
+    </MemoryRouter>,
+  );
+
+it('shows the boot screen, not the sign-in page, while the current user is still loading', () => {
+  state.initialized = true;
+  state.status = 'loading';
+  renderApp();
+  expect(screen.getByText('Starting app')).toBeInTheDocument();
+  expect(screen.queryByText('Home route')).toBeNull();
+  expect(screen.queryByText('Sign in')).toBeNull();
+});
+
+it('shows a full-page error with Retry instead of the sign-in page when the current user cannot be loaded', () => {
+  state.initialized = true;
+  state.status = 'error';
+  renderApp();
+  expect(screen.getByText('The app could not load your sign-in status.')).toBeInTheDocument();
+  expect(screen.getByText('This is not a sign-out.')).toBeInTheDocument();
+  expect(screen.queryByText('Home route')).toBeNull();
+  expect(screen.queryByText('Sign in')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+  expect(state.retry).toHaveBeenCalledOnce();
+});
+
+it('shows the pending Retry button while the current user is loaded again', () => {
+  state.initialized = true;
+  state.status = 'error';
+  state.fetching = true;
+  renderApp();
+  expect(screen.getByRole('button', { name: /Retry/ })).toHaveAttribute('data-pending', 'true');
+});
+
+it('gates public routes on the first current-user answer too', () => {
+  state.initialized = true;
+  state.status = 'error';
+  renderApp('/verify-email?token=t&email=a%40b.c');
+  expect(screen.queryByText('Verify email page')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+});
+
+it('shows the sign-in page for an unauthenticated user on an auth-required route', () => {
+  useAllRoutesMock.mockReturnValue([{ path: '/', element: <p>Home route</p>, authRequired: true }]);
+  state.initialized = true;
+  state.status = 'unauthenticated';
+  renderApp();
+  expect(screen.getByText('Sign in')).toBeInTheDocument();
+  expect(screen.queryByText('Home route')).toBeNull();
 });

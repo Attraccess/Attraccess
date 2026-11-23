@@ -1,0 +1,11 @@
+{
+  "title": "Der Anmeldestatus konnte nicht geladen werden.",
+  "subtitle": "Der Server hat nicht wie erwartet geantwortet.",
+  "alert": {
+    "title": "Das ist keine Abmeldung.",
+    "description": "Eine bestehende Sitzung wurde nicht beendet. Der Server ist möglicherweise ausgelastet oder nicht erreichbar. Bitte gleich noch einmal versuchen."
+  },
+  "actions": {
+    "retry": "Erneut versuchen"
+  }
+}
