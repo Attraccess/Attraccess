@@ -95,7 +95,11 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<UsageSessionResponse> {
-    await this.networkRestriction.assertAllowed(req, NetworkRestrictedAction.DoorUnlock, resourceId);
+    // On an access-only door an unlock opens it, so it needs what Open needs.
+    const action = (await this.resourceUsageService.isAccessOnlyDoor(resourceId))
+      ? NetworkRestrictedAction.DoorOpen
+      : NetworkRestrictedAction.DoorUnlock;
+    await this.networkRestriction.assertAllowed(req, action, resourceId);
     return toUsageSessionResponse(await this.resourceUsageService.unlockDoor(resourceId, req.user));
   }
 

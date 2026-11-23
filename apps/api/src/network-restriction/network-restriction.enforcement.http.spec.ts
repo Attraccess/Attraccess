@@ -18,6 +18,7 @@ import { NETWORK_RESTRICTION_STORE } from './network-restriction.port';
 import type { NetworkRestrictionConfig } from './network-restriction.config';
 
 let allowedForUser: NetworkRestrictedAction[] = [];
+let accessOnlyDoor = false;
 
 class FakeAuth implements CanActivate {
   canActivate(context: ExecutionContext) {
@@ -55,6 +56,7 @@ describe('network restriction on the resource action endpoints', () => {
 
   beforeEach(async () => {
     allowedForUser = [];
+    accessOnlyDoor = false;
     config = {
       enabled: true,
       allowedRanges: ['10.0.0.0/8', '127.0.0.0/8', '::1/128'],
@@ -72,7 +74,10 @@ describe('network restriction on the resource action endpoints', () => {
           provide: NETWORK_RESTRICTION_STORE,
           useValue: { actionsAllowedForUser: async () => allowedForUser },
         },
-        { provide: ResourceUsageService, useValue: sideEffects },
+        {
+          provide: ResourceUsageService,
+          useValue: { ...sideEffects, isAccessOnlyDoor: async () => accessOnlyDoor },
+        },
         { provide: ResourceActivityVisibilityService, useValue: {} },
         { provide: PreStartService, useValue: { gateHttp: sideEffects.gateHttp } },
         { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
@@ -226,6 +231,23 @@ describe('network restriction on the resource action endpoints', () => {
       .post('/resources/5/usage/supervision/request')
       .set('x-real-ip', '203.0.113.9')
       .send({ forceTakeOver: true, readerId: 3 });
+    expect(allowed.status).toBe(201);
+  });
+
+  it('judges an unlock of an access-only door as door.open, because it opens the door', async () => {
+    accessOnlyDoor = true;
+    allowedForUser = [NetworkRestrictedAction.DoorUnlock];
+    const refused = await request(app.getHttpServer())
+      .post('/resources/5/usage/unlock')
+      .set('x-real-ip', '203.0.113.9');
+    expect(refused.status).toBe(403);
+    expect(refused.body.action).toBe('door.open');
+    expect(sideEffects.unlockDoor).not.toHaveBeenCalled();
+
+    allowedForUser = [NetworkRestrictedAction.DoorOpen];
+    const allowed = await request(app.getHttpServer())
+      .post('/resources/5/usage/unlock')
+      .set('x-real-ip', '203.0.113.9');
     expect(allowed.status).toBe(201);
   });
 

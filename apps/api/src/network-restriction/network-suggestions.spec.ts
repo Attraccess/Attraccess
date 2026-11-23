@@ -28,9 +28,14 @@ describe('serverInterfaceRanges', () => {
         entry('192.168.1.5', 'IPv4', '192.168.1.5/24'),
         entry('192.168.1.6', 'IPv4', '192.168.1.6/24'),
         entry('fe80::1', 'IPv6', 'fe80::1/64'),
+        entry('169.254.3.4', 'IPv4', '169.254.3.4/16'),
         entry('fd12:3456::9', 'IPv6', 'fd12:3456::9/64'),
       ],
     });
     expect(ranges).toEqual(['192.168.1.0/24', 'fd12:3456::/64']);
+  });
+
+  it('suggests nothing when the interfaces cannot be listed', () => {
+    expect(serverInterfaceRanges(null)).toEqual([]);
   });
 });

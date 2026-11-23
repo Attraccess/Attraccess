@@ -86,7 +86,7 @@ describe('role network actions on real PostgreSQL', () => {
   it('rejects entries for a role that does not exist', async () => {
     await expect(
       store.replaceRoleActions([{ roleId: 987654, actions: [NetworkRestrictedAction.UsageStart] }]),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ driverError: { code: '23503' } });
     expect(await store.existingRoleIds([987654])).toEqual([]);
   });
 

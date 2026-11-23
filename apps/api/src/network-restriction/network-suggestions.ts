@@ -52,16 +52,26 @@ export function subnetOf(address: string, ipv4Prefix = 24, ipv6Prefix = 64): str
   return null;
 }
 
+const isLinkLocal = (address: string) => /^(169\.254\.|fe[89ab][0-9a-f]:)/i.test(address);
+
+/** The interfaces, or none where the platform refuses to list them (some sandboxes): the hint must not break settings. */
+function readInterfaces(): ReturnType<typeof networkInterfaces> | null {
+  try {
+    return networkInterfaces();
+  } catch {
+    return null;
+  }
+}
+
 /** The subnets of this server's own network interfaces (not loopback, not link-local), as a hint for administrators. */
 export function serverInterfaceRanges(
-  interfaces: ReturnType<typeof networkInterfaces> = networkInterfaces(),
+  interfaces: ReturnType<typeof networkInterfaces> | null = readInterfaces(),
 ): string[] {
   const ranges = new Set<string>();
-  for (const entries of Object.values(interfaces)) {
+  for (const entries of Object.values(interfaces ?? {})) {
     for (const entry of entries ?? []) {
-      if (entry.internal || !entry.cidr) continue;
+      if (entry.internal || !entry.cidr || isLinkLocal(entry.address)) continue;
       const prefix = Number(entry.cidr.split('/')[1]);
-      if (entry.family === 'IPv6' && entry.address.toLowerCase().startsWith('fe80')) continue;
       const subnet = subnetOf(entry.address, prefix, prefix);
       if (subnet) ranges.add(subnet);
     }

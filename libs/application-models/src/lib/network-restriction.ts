@@ -22,15 +22,30 @@ export enum NetworkIpSource {
 /** The stable error code of a 403 for an action that is not allowed from the caller's network. */
 export const NETWORK_RESTRICTED_ERROR_CODE = 'NETWORK_RESTRICTED';
 
-export const NETWORK_RESTRICTION_DEFAULT_RANGES: readonly string[] = [
+/** The private address ranges (RFC 1918 and IPv6 unique local addresses). */
+export const NETWORK_RESTRICTION_PRIVATE_RANGES: readonly string[] = [
   '10.0.0.0/8',
   '172.16.0.0/12',
   '192.168.0.0/16',
+  'fc00::/7',
+];
+
+/** Loopback and link-local, IPv4 and IPv6. */
+export const NETWORK_RESTRICTION_LOCAL_RANGES: readonly string[] = [
   '127.0.0.0/8',
   '::1/128',
-  'fc00::/7',
+  '169.254.0.0/16',
   'fe80::/10',
 ];
+
+/** What the settings fill in when the restriction is switched on with no range yet. */
+export const NETWORK_RESTRICTION_DEFAULT_RANGES: readonly string[] = [
+  ...NETWORK_RESTRICTION_PRIVATE_RANGES,
+  ...NETWORK_RESTRICTION_LOCAL_RANGES,
+];
+
+/** The most allowed ranges the setting holds. */
+export const NETWORK_RESTRICTION_MAX_RANGES = 200;
 
 export const NETWORK_RESTRICTION_DEFAULT_HEADER = 'X-Real-Ip';
 

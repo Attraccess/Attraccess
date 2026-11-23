@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import {
   NETWORK_RESTRICTION_DEFAULT_HEADER,
+  NETWORK_RESTRICTION_MAX_RANGES,
   NETWORK_RESTRICTION_HEADER_NAME_PATTERN,
   NetworkIpSource,
   NetworkRestrictedAction,
@@ -22,7 +23,6 @@ export const NETWORK_RESTRICTION_DEFAULTS: NetworkRestrictionConfig = {
   headerName: NETWORK_RESTRICTION_DEFAULT_HEADER,
 };
 
-const MAX_RANGES = 200;
 /** The largest role id PostgreSQL can store (int4). */
 const MAX_ROLE_ID = 2_147_483_647;
 
@@ -43,7 +43,8 @@ export function parseConfigUpdate(body: unknown): Partial<NetworkRestrictionConf
   }
   if (body.allowedRanges !== undefined) {
     if (!Array.isArray(body.allowedRanges)) invalid('allowedRanges must be a list of IP addresses or CIDR ranges');
-    if (body.allowedRanges.length > MAX_RANGES) invalid(`allowedRanges can hold at most ${MAX_RANGES} entries`);
+    if (body.allowedRanges.length > NETWORK_RESTRICTION_MAX_RANGES)
+      invalid(`allowedRanges can hold at most ${NETWORK_RESTRICTION_MAX_RANGES} entries`);
     const ranges: string[] = [];
     for (const entry of body.allowedRanges as unknown[]) {
       if (typeof entry !== 'string' || !parseSubnet(entry)) {

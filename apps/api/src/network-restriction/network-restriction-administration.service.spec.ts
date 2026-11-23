@@ -57,9 +57,9 @@ describe('NetworkRestrictionAdministrationService', () => {
 
   it('reports a role deleted during the write as an unknown role, not as a server error', async () => {
     replaceRoleActions.mockRejectedValue(Object.assign(new Error('fk'), { driverError: { code: '23503' } }));
-    await expect(service.updateRoleMatrix({ roles: [{ roleId: 1, actions: ['door.open'] }] }, actor)).rejects.toThrow(
-      BadRequestException,
-    );
+    const attempt = service.updateRoleMatrix({ roles: [{ roleId: 1, actions: ['door.open'] }] }, actor);
+    await expect(attempt).rejects.toThrow(BadRequestException);
+    await expect(attempt).rejects.toThrow(/^Unknown role/);
     expect(record).not.toHaveBeenCalled();
   });
 
@@ -114,7 +114,21 @@ describe('NetworkRestrictionAdministrationService', () => {
       'networkRestriction.enabled',
       'networkRestriction.allowedRanges',
     ]);
-    expect(result).toMatchObject({ enabled: true, detectedAddress: '10.1.1.1', detectedInside: true });
+    expect(result).toMatchObject({
+      enabled: true,
+      detectedAddress: '10.1.1.1',
+      detectedInside: true,
+      detectedSubnet: '10.1.1.0/24',
+    });
+    expect(Array.isArray(result.serverRanges)).toBe(true);
+  });
+
+  it('has no detected subnet when the address cannot be determined', async () => {
+    config = { ...config, ipSource: NetworkIpSource.Header };
+    expect(await service.settings({ ip: '10.1.1.1', headers: {} })).toMatchObject({
+      detectedAddress: null,
+      detectedSubnet: null,
+    });
   });
 
   it('audits a change to a long range list as what was removed and added, so nothing is cut off', async () => {

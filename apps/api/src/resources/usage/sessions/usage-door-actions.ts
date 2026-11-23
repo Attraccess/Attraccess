@@ -59,6 +59,12 @@ export class UsageDoorActions {
     return await this.handleDoorAction(resourceId, user, ResourceUsageAction.DoorLock);
   }
 
+  /** Whether an unlock of this resource is the Open of an access-only door (see unlockDoor). */
+  async isAccessOnlyDoor(resourceId: number): Promise<boolean> {
+    const resource = await this.sessions.findResource(resourceId);
+    return resource?.type === ResourceType.Door && resource.accessOnly === true;
+  }
+
   /** Also the Open of an access-only door: readers that predate access-only doors send unlock for it. */
   async unlockDoor(resourceId: number, user: DoorActionUser): Promise<UsageSession> {
     const resource = await this.gate.getResource(resourceId, user, {
