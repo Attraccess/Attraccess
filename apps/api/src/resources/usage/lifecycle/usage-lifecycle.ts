@@ -52,6 +52,11 @@ export interface EndSessionOptions {
   triggeredByUserId?: number;
   /** Internal: the caller already holds this machine's turn in the session-change queue (deferred flow ends). */
   withinSessionChange?: boolean;
+  /**
+   * The automatic end: why the session ends. Also makes the end conditional on the deadline still having passed when
+   * the machine's turn is taken, so an extension that wins the race keeps the session running.
+   */
+  autoEndReason?: 'maximum' | 'estimate';
 }
 
 export interface StartSessionOptions {
@@ -70,6 +75,12 @@ export interface StartSessionOptions {
   language?: ReaderUiLanguage;
   /** plugin -> step keys the user confirmed in this start attempt (from the pre-start gate). */
   confirmedStepKeys?: Record<string, string[]>;
+  /**
+   * Whether the client can ask the user for a duration estimate (the web, API clients and readers with a duration
+   * input). A start that cannot ask is never refused for the missing estimate; the machine's maximum or default
+   * estimate sets its deadline instead.
+   */
+  canAskDuration?: boolean;
 }
 
 /** Published usage sessions on the machine around a start, stop or takeover, handed to flows as `activeSessions`. */

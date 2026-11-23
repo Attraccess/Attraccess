@@ -143,6 +143,7 @@ export class UsageSessionNotifications {
     activeSession: UsageSession | null,
     skipNoteNotification: boolean,
     chargeTransactionId: number | undefined,
+    autoEndReason?: 'maximum' | 'estimate',
   ): Promise<void> {
     if (chargeTransactionId !== undefined) await this.billingService.notifyResourceUsageCharge(chargeTransactionId);
     this.emitSystemUsageEvent(SystemEvent.RESOURCE_USAGE_ENDED, updatedUsage?.resource, updatedUsage?.user);
@@ -160,6 +161,7 @@ export class UsageSessionNotifications {
             skipNoteNotification
               ? null
               : { id: user.id, username: user.username, firstName: user.firstName, lastName: user.lastName },
+            autoEndReason,
           ),
         );
       } catch (error) {

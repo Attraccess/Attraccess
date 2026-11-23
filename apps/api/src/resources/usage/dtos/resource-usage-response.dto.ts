@@ -52,6 +52,32 @@ export class ResourceUsageResponseDto {
   })
   attributedOperatingDurationInMinutes!: number | null;
 
+  @ApiProperty({
+    description:
+      'When the server ends this session automatically (fixed at the start, only raised by extensions). Null means it never ends automatically.',
+    required: false,
+    nullable: true,
+    type: Date,
+  })
+  autoEndAt!: Date | null;
+
+  @ApiProperty({
+    description:
+      'The latest the automatic end can be extended to (start plus the maximum session time the machine had then). Null when the machine had no maximum; the 30 day limit applies then.',
+    required: false,
+    nullable: true,
+    type: Date,
+  })
+  maxAutoEndAt!: Date | null;
+
+  @ApiProperty({
+    description: 'The duration estimate the user gave when starting, in minutes',
+    required: false,
+    nullable: true,
+    type: Number,
+  })
+  estimatedDurationMinutes!: number | null;
+
   @ApiProperty({ description: 'The unique identifier of the resource usage', example: 1 })
   id!: number;
 

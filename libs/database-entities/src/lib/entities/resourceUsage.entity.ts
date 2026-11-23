@@ -1,6 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, OneToMany, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  OneToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 
 import { BillingTransaction } from './billing-transaction.entity';
 
@@ -21,6 +31,9 @@ import { User } from './user.entity';
 @Index('IDX_resource_usage_pending_resource_user', ['resourceId', 'userId'], {
   unique: true,
   where: '"lifecyclePending" = true AND "endTime" IS NULL',
+})
+@Index('IDX_resource_usage_auto_end_at', ['autoEndAt'], {
+  where: '"autoEndAt" IS NOT NULL AND "endTime" IS NULL',
 })
 @Entity()
 export class ResourceUsage {
@@ -72,6 +85,40 @@ export class ResourceUsage {
     nullable: true,
   })
   attributedOperatingDurationInMinutes!: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  @ApiProperty({
+    description:
+      'When the server ends this session automatically. Fixed when the session starts and only raised by an extension. Null means no automatic end.',
+    type: Date,
+    required: false,
+    nullable: true,
+  })
+  autoEndAt!: Date | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  @ApiProperty({
+    description:
+      'The latest the automatic end may be extended to: the session start plus the maximum session time the machine had then. Null when the machine had no maximum (the 30 day limit still applies).',
+    type: Date,
+    required: false,
+    nullable: true,
+  })
+  maxAutoEndAt!: Date | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'The duration estimate the user gave when starting the session, in minutes. Kept for history.',
+    example: 120,
+    required: false,
+    nullable: true,
+    type: Number,
+  })
+  estimatedDurationMinutes!: number | null;
+
+  /** The smallest "ending soon" offset already warned about for the current deadline; null when none was sent. */
+  @Column({ type: 'integer', nullable: true })
+  autoEndWarnedOffsetMinutes!: number | null;
 
   @PrimaryGeneratedColumn()
   @ApiProperty({

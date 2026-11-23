@@ -21,6 +21,7 @@ import { ResourceMaintenanceService } from '../../../maintenances/maintenance.se
 import { ResourcesService } from '../../../resources.service';
 import { ResourceRetrainingService } from '../../../retraining/resourceRetraining.service';
 import { RESOURCE_USAGE_COLLABORATORS } from '../../resource-usage.collaborators';
+import { SESSION_DEADLINE_STORE } from '../../session-duration/session-deadline-store.port';
 import { USAGE_SESSION_STORE, UsageSessionStore } from '../../usage-session-store.port';
 import { ResourceUsageService } from '../resource-usage.service';
 import { InMemoryUsageSessionStore } from './in-memory-store.test-fixture';
@@ -117,6 +118,10 @@ async function buildUsageScope<S extends UsageSessionStore>(store: S, unitOfWork
       ResourceUsageService,
       ...RESOURCE_USAGE_COLLABORATORS,
       { provide: USAGE_SESSION_STORE, useValue: store },
+      {
+        provide: SESSION_DEADLINE_STORE,
+        useValue: { extend: jest.fn(), findOverdue: jest.fn(), findEndingWithin: jest.fn(), claimWarning: jest.fn() },
+      },
       { provide: UNIT_OF_WORK, useValue: unitOfWork },
       { provide: ResourcesService, useValue: mocks.resourcesService },
       { provide: ResourceIntroductionsService, useValue: mocks.introductions },

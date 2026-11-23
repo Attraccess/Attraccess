@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { NotificationRecipient, ResourceHealthStatus } from '@attraccess/application-models';
 import { PushService } from '../push/push.service';
 import { EmailService } from '../email/email.service';
+import { SessionEndingSoonEmailService } from '../email/session-ending-soon-email.service';
 import { NotificationPreferenceService } from './notification-preference.service';
 import { NotificationLiveService } from './notification-live.service';
 import { AnyNotificationCategory, NotificationCategory, NotificationChannel } from './notification-types';
@@ -32,6 +33,7 @@ export class NotificationDispatchService {
     private readonly pushService: PushService,
     private readonly liveService: NotificationLiveService,
     private readonly emailService: EmailService,
+    private readonly endingSoonEmail: SessionEndingSoonEmailService,
     private readonly settingsService: SettingsService,
     @Inject(EMAIL_RECIPIENT_DIRECTORY) private readonly recipientDirectory: EmailRecipientDirectory,
   ) {}
@@ -198,6 +200,14 @@ export class NotificationDispatchService {
       await this.emailService.sendAccessChangeEmail(
         recipient,
         context.accessChange as { title: string; body: string; url?: string },
+      );
+    }
+
+    if (category === NotificationCategory.RESOURCE_SESSION_ENDING_SOON) {
+      await this.endingSoonEmail.send(
+        recipient,
+        context.resource as { id: number; name: string },
+        context.session as { id: number; endsAt: Date | string; minutesLeft: number },
       );
     }
 

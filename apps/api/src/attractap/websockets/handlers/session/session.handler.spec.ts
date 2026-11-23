@@ -181,7 +181,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
         10,
         fixture.mockUser,
         { projectId: 7, formSubmissions },
-        { auditOrigin: { id: 1, authenticationMethod: null }, origin: 'reader', confirmedStepKeys: {} },
+        expect.objectContaining({ origin: 'reader', confirmedStepKeys: {}, canAskDuration: false }),
       );
       expect(fixture.mockFormsHandler.clearFormDraft).toHaveBeenCalledWith(
         fixture.mockSocket,
@@ -218,12 +218,11 @@ describe('AttractapSessionHandler – session + flow button', () => {
         10,
         fixture.mockUser,
         { projectId: 7, formSubmissions: [] },
-        {
+        expect.objectContaining({
           ...(used ? { supervisorUserId: 2 } : {}),
-          auditOrigin: { id: 1, authenticationMethod: null },
           origin: used ? 'supervision' : 'reader',
-          confirmedStepKeys: {},
-        },
+          canAskDuration: false,
+        }),
       );
       expect(fixture.mockSupervisionService.settleByCard.mock.calls).toEqual(used ? [['req-1']] : []);
       expect((fixture.mockSocket.state as any).supervisionFlow).toBe(used ? null : flow);

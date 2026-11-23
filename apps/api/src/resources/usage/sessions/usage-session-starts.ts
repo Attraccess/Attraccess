@@ -177,6 +177,10 @@ export class UsageSessionStarts {
               usageId: createdSession.id,
               usageUserId: createdSession.userId,
               ...(supervisorUserId === null ? {} : { supervisorUserId }),
+              ...(createdSession.autoEndAt ? { autoEndAt: createdSession.autoEndAt.toISOString() } : {}),
+              ...(createdSession.estimatedDurationMinutes === null
+                ? {}
+                : { estimatedDurationMinutes: createdSession.estimatedDurationMinutes }),
             },
           },
           scope,

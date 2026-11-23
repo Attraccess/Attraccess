@@ -1,0 +1,9 @@
+{
+  "endingSoonTitle": "Your session on {resourceName} ends soon",
+  "endingSoonBody": "Your session will be stopped automatically in about {minutes} minutes. Open the resource to extend it.",
+  "autoEndedTitle": "{resourceName} session stopped",
+  "autoEndedBodyMaximum": "Your session on {resourceName} was stopped automatically because the maximum session time was reached.",
+  "autoEndedBodyEstimate": "Your session on {resourceName} was stopped automatically because your estimated time was reached.",
+  "autoEndedActorMaximum": "The system (the maximum session time was reached)",
+  "autoEndedActorEstimate": "The system (your estimated time was reached)"
+}
