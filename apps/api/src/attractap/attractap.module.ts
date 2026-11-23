@@ -6,6 +6,8 @@ import { AttractapService } from './attractap.service';
 import { WebsocketService } from './websockets/websocket.service';
 import { ReaderRouter } from './websockets/reader-router';
 import { ReaderScreenService } from './websockets/reader-screen.service';
+import { ReaderEventRelay } from './websockets/reader-event-relay';
+import { ClusterPairingService } from './security/cluster-pairing.service';
 import { AttractapGateway } from './websockets/websocket.gateway';
 import { AttractapNfcCardsController } from './card.controller';
 import { CardAccessService } from './card-access.service';
@@ -114,6 +116,7 @@ import { ResourceListVisibilityModule } from '../resources/visibility/resource-l
     InstallationIdentityService,
     CredentialRegistryService,
     PairingService,
+    ClusterPairingService,
     ReaderControlService,
     EfuseReportService,
     ReaderSessionService,
@@ -129,6 +132,7 @@ import { ResourceListVisibilityModule } from '../resources/visibility/resource-l
     WebsocketService,
     ReaderRouter,
     ReaderScreenService,
+    ReaderEventRelay,
     AttractapGateway,
     WebSocketEventService,
     AttractapFirmwareService,
