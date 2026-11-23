@@ -289,10 +289,10 @@
   },
   "RANDOM_UID_NOT_SUPPORTED": {
     "title": "Random UID not supported",
-    "description": "This card changes its UID on every tap (a phone or bank card), so it cannot be used as a UID-only card."
+    "description": "This card changes its UID on every tap, so it cannot be recognised again and cannot be used as a UID-only card."
   },
   "CARD_NOT_SUPPORTED": {
     "title": "Card not supported",
-    "description": "This card cannot be used. Cards without AES need UID-only cards to be allowed in the settings."
+    "description": "This card type cannot be used here."
   }
 }

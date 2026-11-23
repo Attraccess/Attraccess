@@ -42,7 +42,7 @@
     },
     "deleteUidOnlyModal": {
       "title": "UID-only-Karte löschen",
-      "description": "Du bist dabei, die UID-only-RFID-Karte mit der ID {{id}} zu löschen. Auf eine solche Karte wird nichts geschrieben, daher ist kein Lesegerät nötig. Diese Aktion kann nicht rückgängig gemacht werden."
+      "description": "Sie sind dabei, die UID-only-RFID-Karte mit der ID {{id}} zu löschen. Auf eine solche Karte wird nichts geschrieben, daher ist kein Attractap nötig. Diese Aktion kann nicht rückgängig gemacht werden."
     }
   },
   "enroll": "RFID-Karte registrieren",

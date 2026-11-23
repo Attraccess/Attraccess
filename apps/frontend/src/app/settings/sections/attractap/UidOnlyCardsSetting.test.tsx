@@ -2,13 +2,13 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useGetCardWriterSettings, useUpdateCardWriterSettings } from '@attraccess/react-query-client';
+import { useGetCardWriterSettings, useUpdateUidOnlyCardsSetting } from '@attraccess/react-query-client';
 import { UidOnlyCardsSetting } from './UidOnlyCardsSetting';
 
 vi.mock('@attraccess/react-query-client', () => ({
   useGetCardWriterSettings: vi.fn(),
   UseGetCardWriterSettingsKeyFn: () => ['card-writer-settings'],
-  useUpdateCardWriterSettings: vi.fn(),
+  useUpdateUidOnlyCardsSetting: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -27,10 +27,10 @@ const settings = (allowUidOnlyCards?: boolean) =>
 beforeEach(() => {
   vi.clearAllMocks();
   save.mockResolvedValue(undefined);
-  vi.mocked(useUpdateCardWriterSettings).mockReturnValue({
+  vi.mocked(useUpdateUidOnlyCardsSetting).mockReturnValue({
     mutateAsync: save,
     isPending: false,
-  } as unknown as ReturnType<typeof useUpdateCardWriterSettings>);
+  } as unknown as ReturnType<typeof useUpdateUidOnlyCardsSetting>);
 });
 afterEach(cleanup);
 
@@ -43,7 +43,7 @@ describe('UidOnlyCardsSetting (dangerous, off by default)', () => {
     expect(screen.getByText('uidOnly.offNote')).toBeInTheDocument();
   });
 
-  it('saves nothing until the warning is confirmed, and keeps the reader settings as they were', async () => {
+  it('saves nothing until the warning is confirmed, and sends only its own value', async () => {
     settings(false);
     render(<UidOnlyCardsSetting />);
 
@@ -53,7 +53,8 @@ describe('UidOnlyCardsSetting (dangerous, off by default)', () => {
     expect(save).not.toHaveBeenCalled();
 
     await userEvent.click(dialog.querySelector('[data-cy="uid-only-cards-confirm"]') as HTMLElement);
-    expect(save).toHaveBeenCalledWith({ body: { mode: 'selected', readerIds: [3], allowUidOnlyCards: true } });
+    // Only the switch's own value: the reader settings are not sent, so a stale copy cannot overwrite them.
+    expect(save).toHaveBeenCalledWith({ body: { allowUidOnlyCards: true } });
   });
 
   it('saves nothing when the warning is cancelled', async () => {
@@ -74,22 +75,44 @@ describe('UidOnlyCardsSetting (dangerous, off by default)', () => {
     await userEvent.click(screen.getByRole('switch'));
 
     expect(screen.queryByRole('alertdialog')).toBeNull();
-    expect(save).toHaveBeenCalledWith({ body: { mode: 'selected', readerIds: [3], allowUidOnlyCards: false } });
+    expect(save).toHaveBeenCalledWith({ body: { allowUidOnlyCards: false } });
   });
 
   it('tells the admin when a change was saved, and shows the API error when it was not', () => {
     settings(false);
     render(<UidOnlyCardsSetting />);
-    const options = vi.mocked(useUpdateCardWriterSettings).mock.calls[0][1] as {
+    const options = vi.mocked(useUpdateUidOnlyCardsSetting).mock.calls[0][1] as {
       onSuccess: (data: unknown) => void;
       onError: (error: Error) => void;
     };
 
     options.onSuccess({ mode: 'selected', readerIds: [3], allowUidOnlyCards: true });
-    expect(toast.success).toHaveBeenCalledWith({ title: 'success.title', description: 'success.description' });
+    expect(toast.success).toHaveBeenCalledWith({ title: 'uidOnly.saved.enabled' });
+    options.onSuccess({ mode: 'selected', readerIds: [3], allowUidOnlyCards: false });
+    expect(toast.success).toHaveBeenCalledWith({ title: 'uidOnly.saved.disabled' });
 
     options.onError(new Error('boom'));
     expect(toast.apiError).toHaveBeenCalled();
+  });
+
+  it('keeps the same switch element when the value changes, so keyboard focus is not lost', () => {
+    settings(false);
+    const view = render(<UidOnlyCardsSetting />);
+    const before = screen.getByRole('switch');
+    settings(true);
+    view.rerender(<UidOnlyCardsSetting />);
+    expect(screen.getByRole('switch')).toBe(before);
+    expect(before).toBeChecked();
+  });
+
+  it('disables the switch while a change is saving', () => {
+    settings(false);
+    vi.mocked(useUpdateUidOnlyCardsSetting).mockReturnValue({
+      mutateAsync: save,
+      isPending: true,
+    } as unknown as ReturnType<typeof useUpdateUidOnlyCardsSetting>);
+    render(<UidOnlyCardsSetting />);
+    expect(screen.getByRole('switch')).toBeDisabled();
   });
 
   it('renders nothing before the settings are loaded', () => {

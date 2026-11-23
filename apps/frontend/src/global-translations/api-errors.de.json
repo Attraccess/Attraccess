@@ -289,10 +289,10 @@
   },
   "RANDOM_UID_NOT_SUPPORTED": {
     "title": "Wechselnde UID nicht unterstützt",
-    "description": "Diese Karte ändert ihre UID bei jedem Auflegen (Handy oder Bankkarte) und kann daher nicht als UID-only-Karte genutzt werden."
+    "description": "Diese Karte ändert ihre UID bei jedem Auflegen, lässt sich daher nicht wiedererkennen und kann nicht als UID-only-Karte genutzt werden."
   },
   "CARD_NOT_SUPPORTED": {
     "title": "Karte nicht unterstützt",
-    "description": "Diese Karte kann nicht verwendet werden. Karten ohne AES erfordern, dass UID-only-Karten in den Einstellungen erlaubt sind."
+    "description": "Dieser Kartentyp kann hier nicht verwendet werden."
   }
 }

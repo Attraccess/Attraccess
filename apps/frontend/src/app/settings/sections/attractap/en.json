@@ -33,7 +33,7 @@
   },
   "uidOnly": {
     "label": "Allow UID-only cards (insecure)",
-    "description": "Cheap RFID cards (MIFARE Classic, MIFARE Ultralight, NTAG213/215/216, DESFire EV1) only offer a UID and no encryption. Off by default.",
+    "description": "Cheap RFID cards (MIFARE Classic, MIFARE Ultralight, NTAG213/215/216, DESFire EV1) only offer a UID and no encryption. Off by default. This switch applies immediately; it is not saved with the reader settings above.",
     "warningTitle": "Dangerous setting",
     "warning": "UID-only cards can be copied with cheap tools. Anyone who reads such a card can impersonate its owner on machines and doors. Cards with AES (NTAG 424 DNA, DESFire EV2/EV3) are never affected and always need their key.",
     "switch": "Allow UID-only cards",
@@ -43,6 +43,10 @@
       "message": "UID-only cards can be copied with cheap tools. Anyone who reads such a card can impersonate its owner on machines and doors, including doors opened through plugins. Only turn this on if you accept this risk. Each change is recorded in the audit log.",
       "confirm": "Allow UID-only cards",
       "cancel": "Cancel"
+    },
+    "saved": {
+      "enabled": "UID-only cards are now allowed",
+      "disabled": "UID-only cards are now refused"
     }
   }
 }

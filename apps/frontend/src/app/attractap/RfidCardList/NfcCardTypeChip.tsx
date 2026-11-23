@@ -8,8 +8,10 @@ import en from './en.json';
 
 export function NfcCardTypeChip({ card }: Readonly<{ card: Pick<NfcCard, 'type'> }>) {
   const { t } = useTranslations({ de, en });
-  const { data: settings } = useGetCardWriterSettings();
-  if (card.type !== 'uid-only') return null;
+  const uidOnly = card.type === 'uid-only';
+  // Only a UID-only card needs the setting; secure rows ask for nothing.
+  const { data: settings } = useGetCardWriterSettings({}, undefined, { enabled: uidOnly });
+  if (!uidOnly) return null;
   // Until the setting is known the card is shown as it usually is: allowed is the exception, but "disabled" would be a claim.
   const disabled = settings ? settings.allowUidOnlyCards !== true : false;
   return (

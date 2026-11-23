@@ -135,8 +135,6 @@ export function AttractapSection() {
         </SettingsRow>
       )}
 
-      <UidOnlyCardsSetting />
-
       <SettingsSaveBar
         isDirty={isDirty}
         isSaving={isSaving}
@@ -144,6 +142,9 @@ export function AttractapSection() {
         onSave={() => save({ body: { mode, readerIds: mode === 'selected' ? readerIds : savedReaderIds } })}
         onDiscard={() => setDraft({})}
       />
+
+      {/* Below the save bar: it saves on its own. */}
+      <UidOnlyCardsSetting />
     </SettingsSection>
   );
 }
