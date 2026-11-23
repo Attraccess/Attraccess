@@ -15,8 +15,15 @@
   },
   "ranges": {
     "label": "Erlaubte Netzwerke",
-    "hint": "IP-Adressen und CIDR-Bereiche (IPv4 und IPv6), einer pro Zeile. Solange die Beschränkung an ist, ist mindestens einer nötig.",
-    "required": "Gib mindestens ein erlaubtes Netzwerk an, solange die Beschränkung an ist."
+    "hint": "IP-Adressen und CIDR-Bereiche (IPv4 und IPv6). Solange die Einschränkung aktiv ist, ist mindestens einer erforderlich.",
+    "inputLabel": "Erlaubtes Netzwerk hinzufügen",
+    "placeholder": "z. B. 192.168.1.0/24 oder fd00::/8",
+    "add": "Hinzufügen",
+    "empty": "Noch keine erlaubten Netzwerke.",
+    "invalid": "„{{entry}}“ ist keine gültige IP-Adresse und kein gültiger CIDR-Bereich.",
+    "duplicate": "„{{entry}}“ steht bereits in der Liste.",
+    "required": "Geben Sie mindestens ein erlaubtes Netzwerk an, solange die Einschränkung aktiv ist.",
+    "remove": "{{range}} entfernen"
   },
   "source": {
     "label": "Adressquelle",
@@ -63,5 +70,12 @@
   },
   "error": {
     "title": "Netzwerkbeschränkung nicht gespeichert"
+  },
+  "suggestions": {
+    "detected": "Ihre Verbindung",
+    "server": "Netzwerke dieses Servers",
+    "private": "Private Bereiche",
+    "local": "Loopback und Link-lokal",
+    "add": "{{range}} hinzufügen"
   }
 }

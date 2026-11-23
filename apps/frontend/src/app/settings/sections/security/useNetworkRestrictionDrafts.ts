@@ -21,12 +21,10 @@ import { getApiErrorMessage } from '../../../../utils/apiError';
 import en from './networkRestriction/en.json';
 import de from './networkRestriction/de.json';
 
-export const splitRanges = (text: string) => text.split(/[\s,;]+/).filter(Boolean);
-
 /** The network restriction form as shown: the edited value where there is one, the saved value otherwise. */
 export interface NetworkRestrictionShown {
   enabled: boolean;
-  rangesText: string;
+  ranges: string[];
   ipSource: NetworkIpSource;
   headerName: string;
 }
@@ -44,7 +42,8 @@ export interface NetworkRestrictionDrafts {
   isMatrixError: boolean;
   shown: NetworkRestrictionShown;
   toggleEnabled: (next: boolean) => void;
-  setRangesText: (text: string) => void;
+  addRanges: (entries: string[]) => void;
+  removeRange: (entry: string) => void;
   setIpSource: (source: NetworkIpSource) => void;
   setHeaderName: (name: string) => void;
   roleDraft: Record<number, NetworkRestrictedAction[]>;
@@ -70,7 +69,7 @@ export function useNetworkRestrictionDrafts(): NetworkRestrictionDrafts {
   const updateRoleActions = useUpdateNetworkRestrictionRoleActions();
 
   const [enabled, setEnabled] = useState<boolean | undefined>();
-  const [rangesText, setRangesText] = useState<string | undefined>();
+  const [ranges, setRanges] = useState<string[] | undefined>();
   const [ipSource, setIpSource] = useState<NetworkIpSource | undefined>();
   const [headerName, setHeaderName] = useState<string | undefined>();
   const [roleDraft, setRoleDraft] = useState<Record<number, NetworkRestrictedAction[]>>({});
@@ -78,7 +77,7 @@ export function useNetworkRestrictionDrafts(): NetworkRestrictionDrafts {
 
   const shown: NetworkRestrictionShown = {
     enabled: enabled ?? settings?.enabled ?? false,
-    rangesText: rangesText ?? (settings?.allowedRanges ?? []).join('\n'),
+    ranges: ranges ?? settings?.allowedRanges ?? [],
     ipSource: ipSource ?? settings?.ipSource ?? NetworkIpSource.CLIENT,
     headerName: headerName ?? settings?.headerName ?? NETWORK_RESTRICTION_DEFAULT_HEADER,
   };
@@ -86,15 +85,15 @@ export function useNetworkRestrictionDrafts(): NetworkRestrictionDrafts {
   const settingsDirty =
     settings !== undefined &&
     (shown.enabled !== settings.enabled ||
-      splitRanges(shown.rangesText).join(',') !== settings.allowedRanges.join(',') ||
+      shown.ranges.join(',') !== settings.allowedRanges.join(',') ||
       shown.ipSource !== settings.ipSource ||
       shown.headerName !== settings.headerName);
   const rolesDirty = Object.keys(roleDraft).length > 0;
-  const isRangesMissing = shown.enabled && splitRanges(shown.rangesText).length === 0;
+  const isRangesMissing = shown.enabled && shown.ranges.length === 0;
 
   const discardSettings = () => {
     setEnabled(undefined);
-    setRangesText(undefined);
+    setRanges(undefined);
     setIpSource(undefined);
     setHeaderName(undefined);
   };
@@ -116,11 +115,13 @@ export function useNetworkRestrictionDrafts(): NetworkRestrictionDrafts {
     });
   };
 
+  const addRanges = (entries: string[]) => setRanges([...new Set([...shown.ranges, ...entries])]);
+  const removeRange = (entry: string) => setRanges(shown.ranges.filter((range) => range !== entry));
+
   const toggleEnabled = (next: boolean) => {
     setEnabled(next);
     // Suggest the private ranges when switching on with an empty list; the admin can edit them before saving.
-    if (next && splitRanges(shown.rangesText).length === 0)
-      setRangesText(NETWORK_RESTRICTION_DEFAULT_RANGES.join('\n'));
+    if (next && shown.ranges.length === 0) setRanges([...NETWORK_RESTRICTION_DEFAULT_RANGES]);
   };
 
   const fail = (group: NetworkRestrictionSaveError['group'], failure: unknown) => {
@@ -138,7 +139,7 @@ export function useNetworkRestrictionDrafts(): NetworkRestrictionDrafts {
         saved = await updateSettings.mutateAsync({
           body: {
             enabled: shown.enabled,
-            allowedRanges: splitRanges(shown.rangesText),
+            allowedRanges: shown.ranges,
             ipSource: shown.ipSource,
             headerName: shown.headerName,
           },
@@ -178,7 +179,8 @@ export function useNetworkRestrictionDrafts(): NetworkRestrictionDrafts {
     isMatrixError,
     shown,
     toggleEnabled,
-    setRangesText,
+    addRanges,
+    removeRange,
     setIpSource,
     setHeaderName,
     roleDraft,

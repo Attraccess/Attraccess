@@ -15,8 +15,15 @@
   },
   "ranges": {
     "label": "Allowed networks",
-    "hint": "IP addresses and CIDR ranges (IPv4 and IPv6), one per line. At least one is required while the restriction is on.",
-    "required": "Enter at least one allowed network while the restriction is on."
+    "hint": "IP addresses and CIDR ranges (IPv4 and IPv6). At least one is required while the restriction is on.",
+    "inputLabel": "Add an allowed network",
+    "placeholder": "e.g. 192.168.1.0/24 or fd00::/8",
+    "add": "Add",
+    "empty": "No allowed networks yet.",
+    "invalid": "\"{{entry}}\" is not a valid IP address or CIDR range.",
+    "duplicate": "\"{{entry}}\" is already in the list.",
+    "required": "Enter at least one allowed network while the restriction is on.",
+    "remove": "Remove {{range}}"
   },
   "source": {
     "label": "Address source",
@@ -63,5 +70,12 @@
   },
   "error": {
     "title": "Network restriction not saved"
+  },
+  "suggestions": {
+    "detected": "Your connection",
+    "server": "This server's networks",
+    "private": "Private ranges",
+    "local": "Loopback and link-local",
+    "add": "Add {{range}}"
   }
 }

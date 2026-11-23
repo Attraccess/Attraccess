@@ -1,10 +1,13 @@
-import { Description, FieldError, Input, Label, Radio, RadioGroup, Spinner, TextArea, TextField } from '@heroui/react';
+import { Description, Input, Label, Radio, RadioGroup, Spinner, TextField } from '@heroui/react';
 import { LabeledSwitch, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { NetworkIpSource, NetworkRestrictionSettingsDto } from '@attraccess/react-query-client';
-import { NETWORK_RESTRICTION_DEFAULT_RANGES } from '@attraccess/application-models';
 import { SettingsRow } from '../../../components/SettingsRow';
 import { SubHeading } from '../components/SubHeading';
 import { NetworkRestrictionDrafts } from '../useNetworkRestrictionDrafts';
+import { AllowedRangesInput } from './AllowedRangesInput';
+import { AllowedRangesList } from './AllowedRangesList';
+import { RangeSuggestions } from './RangeSuggestions';
+import { buildRangeSuggestions } from './rangeSuggestions';
 import { NetworkRestrictionRoleTable } from './NetworkRestrictionRoleTable';
 import en from './en.json';
 import de from './de.json';
@@ -73,21 +76,12 @@ export function NetworkRestrictionCard({ drafts }: Readonly<NetworkRestrictionCa
         </SettingsRow>
 
         <SettingsRow stacked label={t('ranges.label')} hint={t('ranges.hint')}>
-          <TextField
-            fullWidth
-            value={shown.rangesText}
-            onChange={drafts.setRangesText}
-            isInvalid={rangesError !== null}
-            aria-label={t('ranges.label')}
-          >
-            <TextArea
-              fullWidth
-              rows={5}
-              placeholder={NETWORK_RESTRICTION_DEFAULT_RANGES.join('\n')}
-              data-testid="network-ranges"
-            />
-            {rangesError !== null && <FieldError>{rangesError}</FieldError>}
-          </TextField>
+          <div className="flex w-full flex-col gap-3">
+            <AllowedRangesList ranges={shown.ranges} onRemove={drafts.removeRange} />
+            <AllowedRangesInput existing={shown.ranges} onAdd={drafts.addRanges} isInvalid={rangesError !== null} />
+            {rangesError !== null && <StatusAlert status="danger">{rangesError}</StatusAlert>}
+            <RangeSuggestions groups={buildRangeSuggestions(settings, shown.ranges)} onAdd={drafts.addRanges} />
+          </div>
         </SettingsRow>
 
         <SettingsRow stacked label={t('source.label')} hint={t('source.hint')}>

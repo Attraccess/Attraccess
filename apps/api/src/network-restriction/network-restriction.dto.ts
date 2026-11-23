@@ -37,6 +37,19 @@ export class NetworkRestrictionSettingsDto {
 
   @ApiProperty({ description: "Whether the administrator's own request is inside the allowed ranges" })
   detectedInside!: boolean;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: "The /24 (IPv4) or /64 (IPv6) network around the administrator's own address, if known",
+  })
+  detectedSubnet!: string | null;
+
+  @ApiProperty({
+    type: [String],
+    description: "Subnets of the server's own network interfaces (without loopback and link-local), as suggestions",
+  })
+  serverRanges!: string[];
 }
 
 export class UpdateNetworkRestrictionSettingsDto {

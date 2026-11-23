@@ -6,6 +6,7 @@ import { NetworkRestrictionConfigService } from './network-restriction-config.se
 import { NetworkRestrictionService } from './network-restriction.service';
 import { NETWORK_RESTRICTION_STORE, NetworkRestrictionStore } from './network-restriction.port';
 import { parseRoleActionsUpdate } from './network-restriction.config';
+import { serverInterfaceRanges, subnetOf } from './network-suggestions';
 import type { OriginRequest } from './network-origin';
 import type { NetworkRestrictionRoleMatrixDto, NetworkRestrictionSettingsDto } from './network-restriction.dto';
 
@@ -38,7 +39,13 @@ export class NetworkRestrictionAdministrationService {
   async settings(request: OriginRequest): Promise<NetworkRestrictionSettingsDto> {
     const config = await this.config.get();
     const detectedAddress = await this.restriction.originOf(request, config);
-    return { ...config, detectedAddress, detectedInside: this.config.isInside(config, detectedAddress) };
+    return {
+      ...config,
+      detectedAddress,
+      detectedInside: this.config.isInside(config, detectedAddress),
+      detectedSubnet: detectedAddress === null ? null : subnetOf(detectedAddress),
+      serverRanges: serverInterfaceRanges(),
+    };
   }
 
   async updateSettings(body: unknown, actor: AuditActor, request: OriginRequest) {

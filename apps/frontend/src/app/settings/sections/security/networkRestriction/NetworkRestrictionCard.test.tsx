@@ -62,6 +62,8 @@ const settings = (over = {}) => ({
   headerName: 'X-Real-Ip',
   detectedAddress: '203.0.113.9',
   detectedInside: false,
+  detectedSubnet: '203.0.113.0/24',
+  serverRanges: ['192.168.50.0/24'],
   ...over,
 });
 const matrix = {
@@ -94,11 +96,49 @@ describe('NetworkRestrictionCard', () => {
   });
 
   it('blocks Save while switched on with an empty list and says why at the field', async () => {
+    state.settings = settings({ enabled: true, allowedRanges: ['10.0.0.0/8'] });
     render(<Harness />);
-    await userEvent.click(screen.getByRole('switch', { name: 'Restrict actions to the local network' }));
-    await userEvent.clear(screen.getByTestId('network-ranges'));
+    await userEvent.click(screen.getByRole('button', { name: /^Remove 10\.0\.0\.0\/8/ }));
     expect(screen.getByText('Enter at least one allowed network while the restriction is on.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  });
+
+  it('adds typed ranges one by one, names a bad entry inline and rejects duplicates', async () => {
+    state.settings = settings({ allowedRanges: ['10.0.0.0/8'] });
+    render(<Harness />);
+    const input = screen.getByTestId('network-range-input');
+    await userEvent.type(input, '10.0.0.0/40');
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(screen.getByText('"10.0.0.0/40" is not a valid IP address or CIDR range.')).toBeInTheDocument();
+    await userEvent.clear(input);
+    await userEvent.type(input, '10.0.0.0/8{Enter}');
+    expect(screen.getByText('"10.0.0.0/8" is already in the list.')).toBeInTheDocument();
+    await userEvent.clear(input);
+    await userEvent.type(input, '192.168.5.0/24, fd00::/8{Enter}');
+    expect(screen.getByRole('row', { name: /192\.168\.5\.0\/24/ })).toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /fd00::\/8/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(state.updateSettings).toHaveBeenCalledTimes(1));
+    expect(state.updateSettings.mock.calls[0][0].body.allowedRanges).toEqual([
+      '10.0.0.0/8',
+      '192.168.5.0/24',
+      'fd00::/8',
+    ]);
+  });
+
+  it('offers the detected subnet, the server networks and the private ranges, hiding those already added', async () => {
+    state.settings = settings({ allowedRanges: ['192.168.0.0/16'] });
+    render(<Harness />);
+    const suggestions = screen.getByTestId('network-range-suggestions');
+    expect(suggestions).toHaveTextContent('203.0.113.0/24');
+    expect(suggestions).toHaveTextContent('192.168.50.0/24');
+    expect(suggestions).toHaveTextContent('fc00::/7');
+    expect(suggestions).not.toHaveTextContent('192.168.0.0/16');
+    await userEvent.click(screen.getByRole('button', { name: 'Add 203.0.113.0/24' }));
+    expect(screen.queryByRole('button', { name: 'Add 203.0.113.0/24' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(state.updateSettings).toHaveBeenCalledTimes(1));
+    expect(state.updateSettings.mock.calls[0][0].body.allowedRanges).toEqual(['192.168.0.0/16', '203.0.113.0/24']);
   });
 
   it('discards the edits', async () => {
@@ -135,7 +175,7 @@ describe('NetworkRestrictionCard', () => {
   it('suggests the private ranges when switching on with an empty list, and saves them', async () => {
     render(<Harness />);
     await userEvent.click(screen.getByRole('switch', { name: 'Restrict actions to the local network' }));
-    expect((screen.getByTestId('network-ranges') as HTMLTextAreaElement).value).toContain('192.168.0.0/16');
+    expect(screen.getByRole('row', { name: /192\.168\.0\.0\/16/ })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(state.updateSettings).toHaveBeenCalledTimes(1));
     expect(state.updateSettings.mock.calls[0][0].body).toMatchObject({
