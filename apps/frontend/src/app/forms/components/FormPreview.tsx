@@ -11,6 +11,7 @@ import {
   NumberFieldOptions,
   SelectFieldOptions,
   ImageFieldOptions,
+  isValidMaxImages,
 } from '../types';
 
 interface FormPreviewProps {
@@ -104,7 +105,7 @@ function renderPreviewBoolean(t: (key: string) => string) {
 }
 
 function renderPreviewImage(options: ImageFieldOptions, t: (key: string, vars?: Record<string, unknown>) => string) {
-  const max = typeof options.maxImages === 'number' ? options.maxImages : 1;
+  const max = isValidMaxImages(options.maxImages) ? Number(options.maxImages) : 1;
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-2">

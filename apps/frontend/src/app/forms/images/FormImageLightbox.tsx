@@ -28,7 +28,7 @@ export function FormImageLightbox({ url, label, isOpen, onClose }: Readonly<Form
       <ModalHeader className="flex justify-end">
         <ModalCloseTrigger aria-label={t('close')} />
       </ModalHeader>
-      <ModalBody className="items-center">
+      <ModalBody className="flex items-center justify-center">
         {isLoading && <Spinner color="accent" />}
         {isError && <p className="text-sm text-danger">{t('loadError')}</p>}
         {src && <img src={src} alt={label} className="max-h-[80vh] max-w-full rounded-lg object-contain" />}

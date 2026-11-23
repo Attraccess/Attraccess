@@ -20,15 +20,15 @@ export function ImageGallery({ ids, pendingCount = 0, urlFor, zoomable, onRemove
   const { t } = useTranslations({ en, de });
   if (!ids.length && !pendingCount) return null;
   return (
-    <div className="flex flex-wrap gap-3" data-cy="image-gallery">
+    <div className="flex flex-wrap gap-4" data-cy="image-gallery">
       {ids.map((id, index) => (
         <div key={id} className="relative">
           <FormImageThumbnail imageId={id} number={index + 1} url={urlFor?.(id)} zoomable={zoomable} />
           <Button
             isIconOnly
             size="sm"
-            variant="danger-soft"
-            className="absolute -right-2 -top-2 size-6 min-w-6 rounded-full"
+            variant="danger"
+            className="absolute -right-3 -top-3 size-7 min-w-7 rounded-full before:absolute before:-inset-2 before:content-['']"
             aria-label={t('remove', { number: index + 1 })}
             onPress={() => onRemove(id)}
           >
