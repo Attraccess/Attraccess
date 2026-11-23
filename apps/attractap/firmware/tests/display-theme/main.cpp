@@ -274,6 +274,7 @@ int main(int argc, char **argv)
         test("screen/power-off-bilingual", [&] { testPowerOffLocales(renderer); });
         test("screen/forms-and-projects-locale-refresh", [&] { testFormAndProjectLocaleRefresh(renderer); });
         test("screen/demo-material-captions", [&] { testDemoMaterialCaptions(renderer); });
+        test("screen/form-image-field", [&] { testFormImageField(renderer); });
         test("screen/firmware-update-bilingual", [&] { testFirmwareUpdateLocales(renderer); });
         std::cout << "RESULT " << passed << " passed, " << failed << " failed; " << checks << " checks; "
                   << renderer.captures << " real LVGL frames\n";

@@ -21,7 +21,7 @@ namespace
         uint32_t id;
         const char *name;
         const char *description;
-        const char *type; // text | number | boolean | select
+        const char *type; // text | number | boolean | select | image
         bool required;
     };
     const CncField CNC_FIELDS_DE[] = {
@@ -29,13 +29,18 @@ namespace
         {102, "Auftragsnummer", "Interne Auftrags-ID", "text", true},
         {103, "Geschätzte Laufzeit (Min)", "Optional", "number", false},
         {104, "Absaugung geprüft", "Späneabsaugung aktiv?", "boolean", true},
+        {105, "Foto des Werkstücks", "Optional, mit dem Handy", "image", false},
     };
     const CncField CNC_FIELDS_EN[] = {
         {101, "Material", "Workpiece material", "select", true},
         {102, "Job number", "Internal job ID", "text", true},
         {103, "Estimated runtime (min)", "Estimated runtime", "number", false},
         {104, "Extraction checked", "Is chip extraction active?", "boolean", true},
+        {105, "Photo of the workpiece", "Optional, with your phone", "image", false},
     };
+    // The demo image field: a made-up photo link and a count that grows as if the phone uploaded.
+    constexpr uint32_t CNC_IMAGE_MAX = 3;
+    constexpr const char *CNC_IMAGE_URL = "https://demo.attraccess.invalid/form-photo/DemoToken0123456789abc";
     constexpr uint32_t CNC_FIELD_COUNT = sizeof(CNC_FIELDS_DE) / sizeof(CNC_FIELDS_DE[0]);
     // Stable submitted values. The demo-only display mapping in
     // display/demoFormOptions.hpp gives them bilingual, refreshable captions.

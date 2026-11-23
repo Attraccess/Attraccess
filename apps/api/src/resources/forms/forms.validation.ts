@@ -1,4 +1,10 @@
-import { FormFieldType } from '@attraccess/application-models';
+import {
+  DEFAULT_FORM_IMAGES,
+  FormFieldType,
+  MAX_FORM_IMAGES,
+  MIN_FORM_IMAGES,
+  formImageLimit,
+} from '@attraccess/application-models';
 import { BadRequestException } from '@nestjs/common';
 import { z, ZodError, ZodIssueCode } from 'zod';
 
@@ -32,11 +38,36 @@ export const selectFieldValueSchema = z.custom<string>((value) => typeof value =
   message: 'Select field values must be strings.',
 });
 
+const IMAGE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The ids of an image answer: a JSON array, or the JSON text of one (the stored form). Whether the ids are usable
+ * (known, unattached, uploaded for this field and user) is checked against the store, not here.
+ */
+export const imageFieldValueSchema = z
+  .preprocess(
+    (value) => {
+      if (typeof value !== 'string') {
+        return value;
+      }
+      try {
+        return JSON.parse(value) as unknown;
+      } catch {
+        return value;
+      }
+    },
+    z.array(z.string().regex(IMAGE_ID_PATTERN, { message: 'Image field values must be image ids.' }), {
+      message: 'Image field values must be a list of image ids.',
+    }),
+  )
+  .transform((ids) => JSON.stringify(ids));
+
 export const formFieldValueSchemaByType: Record<FormFieldType, z.ZodType<string>> = {
   [FormFieldType.TEXT]: textFieldValueSchema,
   [FormFieldType.NUMBER]: numberFieldValueSchema,
   [FormFieldType.BOOLEAN]: booleanFieldValueSchema,
   [FormFieldType.SELECT]: selectFieldValueSchema,
+  [FormFieldType.IMAGE]: imageFieldValueSchema,
 };
 
 export const coerceOptionalNumber = (message: string) =>
@@ -153,6 +184,25 @@ export const selectFieldOptionsSchema = z
   }, selectOptionsArraySchema)
   .transform((value) => (value.length ? value : null));
 
+export const imageFieldOptionsSchema = z
+  .object({
+    maxImages: z.preprocess(
+      (value) => {
+        const normalized = normalizeOptionalInput(value) ?? DEFAULT_FORM_IMAGES;
+        return typeof normalized === 'string' ? Number(normalized) : normalized;
+      },
+      z
+        .number({ message: 'Image field maxImages option must be a whole number.' })
+        .int('Image field maxImages option must be a whole number.')
+        .min(MIN_FORM_IMAGES, `Image field maxImages option must be between ${MIN_FORM_IMAGES} and ${MAX_FORM_IMAGES}.`)
+        .max(
+          MAX_FORM_IMAGES,
+          `Image field maxImages option must be between ${MIN_FORM_IMAGES} and ${MAX_FORM_IMAGES}.`,
+        ),
+    ),
+  })
+  .transform((value) => ({ maxImages: value.maxImages }));
+
 export type FieldOptionsPayload = Record<string, unknown> | string[] | null;
 
 export const formFieldOptionsSchemaByType: Record<FormFieldType, z.ZodType<FieldOptionsPayload>> = {
@@ -160,7 +210,9 @@ export const formFieldOptionsSchemaByType: Record<FormFieldType, z.ZodType<Field
   [FormFieldType.NUMBER]: numberFieldOptionsSchema,
   [FormFieldType.BOOLEAN]: booleanFieldOptionsSchema,
   [FormFieldType.SELECT]: selectFieldOptionsSchema,
+  [FormFieldType.IMAGE]: imageFieldOptionsSchema,
 };
+
 const parseWithSchema = <T>(schema: z.ZodType<T>, payload: unknown, fallbackMessage: string): T => {
   try {
     return schema.parse(payload);
@@ -198,6 +250,8 @@ export const parseFieldValue = (type: FormFieldType, rawValue: unknown, options?
         return 'Boolean field values must be true or false.';
       case FormFieldType.SELECT:
         return 'Select field values must match one of the available options.';
+      case FormFieldType.IMAGE:
+        return 'Image field values must be a list of image ids.';
       default:
         return `Invalid value for field type ${type}`;
     }
@@ -212,8 +266,29 @@ export const parseFieldValue = (type: FormFieldType, rawValue: unknown, options?
       throw new BadRequestException('Select field values must match one of the available options.');
     }
   }
+  if (type === FormFieldType.IMAGE) {
+    const ids = JSON.parse(normalized) as string[];
+    const limit = formImageLimit(options);
+    if (new Set(ids).size !== ids.length) {
+      throw new BadRequestException('Image field values must not repeat an image.');
+    }
+    if (ids.length > limit) {
+      throw new BadRequestException(`Image field accepts at most ${limit} image${limit === 1 ? '' : 's'}.`);
+    }
+  }
   return normalized;
 };
+
+/**
+ * True when an answer carries no value: nothing or an empty string, and for an image field also an empty image list
+ * (`[]`, as an array or as JSON). For any other field type `"[]"` is a value like any other text.
+ */
+export const isEmptyAnswer = (rawValue: unknown, type: FormFieldType): boolean =>
+  rawValue === undefined ||
+  rawValue === null ||
+  rawValue === '' ||
+  (type === FormFieldType.IMAGE &&
+    ((Array.isArray(rawValue) && rawValue.length === 0) || (typeof rawValue === 'string' && rawValue.trim() === '[]')));
 
 export const fieldOptionsSchemas = formFieldOptionsSchemaByType;
 export const fieldValueSchemas = formFieldValueSchemaByType;

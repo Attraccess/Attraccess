@@ -8,6 +8,10 @@ import {
   type FormRecord,
 } from '@attraccess/application-models';
 import { RESOURCE_FORM_STORE } from '../../../../resources/forms/forms-store.port';
+import { FORM_IMAGE_STORE } from '../../../../resources/forms/images/form-image-store.port';
+import { InMemoryFormImageStore } from '../../../../resources/forms/images/form-image-store.test-fixture';
+import { FormImageHandoffService } from '../../../../resources/forms/images/form-image-handoff.service';
+import { ReaderFormImages } from '../forms/reader-form-images.service';
 import { ResourceFormsService } from '../../../../resources/forms/forms.service';
 import { AttractapFormsHandler } from '../forms/forms.handler';
 import { ReaderStartGate } from './reader-start-gate.service';
@@ -71,6 +75,13 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
   let sessionHandler: AttractapSessionHandler;
   let startSession: jest.Mock;
   let endSession: jest.Mock;
+  let imageStore: InMemoryFormImageStore;
+  let handoffs: {
+    canIssue: jest.Mock;
+    openForReader: jest.Mock;
+    imageIds: jest.Mock;
+    endForReader: jest.Mock;
+  };
   let formStore: {
     resourceExists: jest.Mock;
     findRequiredForAction: jest.Mock;
@@ -101,10 +112,27 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
       findForm: jest.fn().mockResolvedValue(form),
     };
 
+    imageStore = new InMemoryFormImageStore();
+    handoffs = {
+      canIssue: jest.fn().mockResolvedValue(true),
+      openForReader: jest.fn(async () => ({
+        handoffId: 'handoff-1',
+        token: 'token-1',
+        handoffUrl: 'https://app.example/form-photo/token-1',
+        imageCount: (await imageStore.listHandoffImages('handoff-1')).length,
+        maxImages: 2,
+      })),
+      imageIds: jest.fn(async (id: string) => (await imageStore.listHandoffImages(id)).map((image) => image.id)),
+      endForReader: jest.fn().mockResolvedValue(undefined),
+    };
+
     const moduleRef = await Test.createTestingModule({
       providers: [
         ResourceFormsService,
         AttractapFormsHandler,
+        ReaderFormImages,
+        { provide: FORM_IMAGE_STORE, useValue: imageStore },
+        { provide: FormImageHandoffService, useValue: handoffs },
         AttractapSessionHandler,
         { provide: RESOURCE_FORM_STORE, useValue: formStore },
         { provide: ResourceActionGuard, useValue: { validateResourceAction: jest.fn().mockResolvedValue(true) } },
@@ -297,5 +325,271 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
       [1, 2, 3, 4, 5].map((n) => ({ formId: 100 + n, answers: [{ fieldId: 1000 + n, value: `A${n}` }] })),
     );
     expect(sentTypes(socket)).toContain(AttractapEventType.START_RESOURCE_USAGE_SESSION);
+  });
+  describe('image fields (ATT-879)', () => {
+    const IMAGE_FIELD = 15;
+    const PHOTO = '3f2b6c1e-8a4d-4b7e-9c11-2d5e7f8a9b01';
+    const imageForm = (required: boolean): FormRecord =>
+      ({
+        ...form,
+        fields: [
+          makeField({ id: 11, name: 'Name', type: FormFieldType.TEXT, isRequired: true }),
+          makeField({
+            id: IMAGE_FIELD,
+            name: 'Photo',
+            type: FormFieldType.IMAGE,
+            isRequired: required,
+            options: { maxImages: 2 },
+            position: 1,
+          }),
+        ],
+      }) as FormRecord;
+    const photoSocket = (formImages: boolean) => {
+      const socket = makeSocket();
+      socket.state.formImages = formImages;
+      return socket;
+    };
+    const start = (socket: any) =>
+      sessionHandler.handleStartResourceUsageSession(socket, {
+        payload: { resourceId: RESOURCE_ID },
+      } as AttractapEvent['data']);
+    const fieldsWindow = async (socket: any) => {
+      await formsHandler.handleResourceUsageFormGetFields(socket, {
+        payload: { resourceId: RESOURCE_ID, action: ACTION, formId: FORM_ID, offset: 0, limit: 5 },
+      } as AttractapEvent['data']);
+      return socket.sendMessage.mock.calls.at(-1)[0].data.payload;
+    };
+    const phoneUploads = async (id = PHOTO) => {
+      await imageStore.insertImage({
+        id,
+        userId: 7,
+        uploadedByUserId: null,
+        handoffId: 'handoff-1',
+        formId: FORM_ID,
+        fieldId: IMAGE_FIELD,
+        mimeType: 'image/jpeg',
+        size: 1,
+        width: 1,
+        height: 1,
+        filename: `${id}.jpg`,
+      });
+    };
+    const requestedForms = (socket: any) =>
+      socket.sendMessage.mock.calls
+        .map((call: any[]) => call[0].data)
+        .filter((data: any) => data.type === AttractapEventType.RESOURCE_USAGE_FORM_REQUEST)
+        .map((data: any) => data.payload.forms);
+
+    describe('on a reader without the formImages capability', () => {
+      it('leaves an optional image field out of the form and the field count', async () => {
+        formStore.findRequiredForAction.mockResolvedValue([imageForm(false)]);
+        const socket = photoSocket(false);
+
+        await start(socket);
+
+        expect(requestedForms(socket)).toEqual([[{ id: FORM_ID, name: 'Safety', fieldCount: 1 }]]);
+        const window = await fieldsWindow(socket);
+        expect(window.totalFieldCount).toBe(1);
+        expect(window.fields.map((field: any) => field.type)).toEqual(['text']);
+        expect(handoffs.openForReader).not.toHaveBeenCalled();
+      });
+
+      it('completes the form without the optional image and sends an empty answer for it', async () => {
+        formStore.findRequiredForAction.mockResolvedValue([imageForm(false)]);
+        const socket = photoSocket(false);
+        await start(socket);
+        await formsHandler.handleResourceUsageFormSubmitPage(socket, {
+          payload: {
+            resourceId: RESOURCE_ID,
+            action: ACTION,
+            formId: FORM_ID,
+            offset: 0,
+            answers: [{ fieldId: 11, value: 'Alice' }],
+          },
+        } as AttractapEvent['data']);
+
+        await start(socket);
+
+        expect(startSession).toHaveBeenCalledTimes(1);
+        expect(startSession.mock.calls[0][2].formSubmissions).toEqual([
+          { formId: FORM_ID, answers: [{ fieldId: 11, value: 'Alice' }] },
+        ]);
+      });
+
+      it.each([
+        ['START', { resourceId: RESOURCE_ID }, false, 'de', 'Formular mit Foto bitte in der Web-App ausfüllen.'],
+        [
+          'TAKEOVER',
+          { resourceId: RESOURCE_ID, forceTakeOver: true },
+          false,
+          'en',
+          'Please complete this form in the web app.',
+        ],
+        ['END', { resourceId: RESOURCE_ID }, true, 'de', 'Formular mit Foto bitte in der Web-App ausfüllen.'],
+      ])(
+        'refuses %s with a required image field in the reader language, and sends no form',
+        async (_action, payload, stop, language, body) => {
+          const everyAction = { isRequiredOnResourceUsageTakeOver: true, isRequiredOnResourceUsageEnd: true };
+          formStore.findRequiredForAction.mockResolvedValue([{ ...imageForm(true), ...everyAction }]);
+          const socket = photoSocket(false);
+          socket.state.cardSession = { id: 'card-1', userId: 7, language, issuedAt: 0, expiryTimer: null };
+          const type = stop
+            ? AttractapEventType.STOP_RESOURCE_USAGE_SESSION
+            : AttractapEventType.START_RESOURCE_USAGE_SESSION;
+
+          await (
+            stop ? sessionHandler.handleStopResourceUsageSession : sessionHandler.handleStartResourceUsageSession
+          ).call(sessionHandler, socket, { type, payload } as AttractapEvent['data']);
+
+          expect(sentTypes(socket)).not.toContain(AttractapEventType.RESOURCE_USAGE_FORM_REQUEST);
+          const reply = socket.sendMessage.mock.calls.at(-1)[0].data;
+          expect(reply.type).toBe(type);
+          expect(reply.payload).toMatchObject({
+            error: 'START_BLOCKED',
+            reason: { code: 'FORM_PHOTO_UNSUPPORTED', body },
+          });
+          expect(startSession).not.toHaveBeenCalled();
+          expect(endSession).not.toHaveBeenCalled();
+        },
+      );
+
+      it('also refuses when the app URL is not set, because no link can be built', async () => {
+        formStore.findRequiredForAction.mockResolvedValue([imageForm(true)]);
+        handoffs.canIssue.mockResolvedValue(false);
+
+        const socket = photoSocket(true);
+        await start(socket);
+
+        expect(socket.sendMessage.mock.calls.at(-1)[0].data.payload).toMatchObject({ error: 'START_BLOCKED' });
+      });
+    });
+
+    describe('on a reader with the formImages capability', () => {
+      beforeEach(() => formStore.findRequiredForAction.mockResolvedValue([imageForm(true)]));
+
+      it('sends the image field with the link, the count and the limit, and no value', async () => {
+        const socket = photoSocket(true);
+        await start(socket);
+        expect(requestedForms(socket)).toEqual([[{ id: FORM_ID, name: 'Safety', fieldCount: 2 }]]);
+
+        const window = await fieldsWindow(socket);
+
+        expect(window.fields[1]).toEqual({
+          id: IMAGE_FIELD,
+          name: 'Photo',
+          description: null,
+          type: 'image',
+          isRequired: true,
+          options: { maxImages: 2 },
+          value: null,
+          handoffUrl: 'https://app.example/form-photo/token-1',
+          imageCount: 0,
+          maxImages: 2,
+        });
+        expect(handoffs.openForReader).toHaveBeenCalledWith(
+          { readerId: 42, userId: 7, resourceId: RESOURCE_ID, action: ACTION, formId: FORM_ID, fieldId: IMAGE_FIELD },
+          { maxImages: 2 },
+          undefined,
+        );
+      });
+
+      it('shows the live count when the reader asks again, with the same link', async () => {
+        const socket = photoSocket(true);
+        await start(socket);
+        await fieldsWindow(socket);
+        await phoneUploads();
+
+        const window = await fieldsWindow(socket);
+
+        expect(window.fields[1]).toMatchObject({ imageCount: 1, handoffUrl: 'https://app.example/form-photo/token-1' });
+        expect(handoffs.openForReader.mock.calls[1][2]).toEqual({ handoffId: 'handoff-1', token: 'token-1' });
+      });
+
+      it('answers the page with the image ids the server knows, whatever the reader sent', async () => {
+        const socket = photoSocket(true);
+        await start(socket);
+        await fieldsWindow(socket);
+        await phoneUploads();
+
+        const result = await submitPage(socket, 0, [
+          { fieldId: 11, value: 'Alice' },
+          { fieldId: IMAGE_FIELD, value: 'ignored by the server' },
+        ]);
+
+        expect(result).toEqual(expect.objectContaining({ valid: true }));
+        expect(socket.state.formDrafts[`${RESOURCE_ID}:${ACTION}`]).toEqual({
+          11: 'Alice',
+          [IMAGE_FIELD]: JSON.stringify([PHOTO]),
+        });
+        await start(socket);
+        expect(startSession.mock.calls[0][2].formSubmissions).toEqual([
+          {
+            formId: FORM_ID,
+            answers: [
+              { fieldId: 11, value: 'Alice' },
+              { fieldId: IMAGE_FIELD, value: JSON.stringify([PHOTO]) },
+            ],
+          },
+        ]);
+      });
+
+      it('gives REQUIRED_FIELD on the page while the phone has added no photo', async () => {
+        const socket = photoSocket(true);
+        await start(socket);
+        await fieldsWindow(socket);
+
+        const result = await submitPage(socket, 0, [
+          { fieldId: 11, value: 'Alice' },
+          { fieldId: IMAGE_FIELD, value: '' },
+        ]);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toEqual([expect.objectContaining({ fieldId: IMAGE_FIELD, code: 'REQUIRED_FIELD' })]);
+        expect(socket.state.formDrafts).toBeUndefined();
+      });
+
+      it('rejects an image that another user uploaded', async () => {
+        const socket = photoSocket(true);
+        await start(socket);
+        await fieldsWindow(socket);
+        await phoneUploads();
+        (imageStore.images.get(PHOTO) as { userId: number }).userId = 8;
+
+        const result = await submitPage(socket, 0, [{ fieldId: IMAGE_FIELD, value: '' }]);
+
+        expect(result.valid).toBe(false);
+      });
+
+      it('asks for the form again when the phone removed the photo after the page was accepted', async () => {
+        const socket = photoSocket(true);
+        await start(socket);
+        await fieldsWindow(socket);
+        await phoneUploads();
+        await submitPage(socket, 0, [
+          { fieldId: 11, value: 'Alice' },
+          { fieldId: IMAGE_FIELD, value: '' },
+        ]);
+        imageStore.images.clear();
+        socket.sendMessage.mockClear();
+
+        await start(socket);
+
+        expect(sentTypes(socket)).toContain(AttractapEventType.RESOURCE_USAGE_FORM_REQUEST);
+        expect(startSession).not.toHaveBeenCalled();
+      });
+
+      it('ends the phone links when the form is cancelled', async () => {
+        const socket = photoSocket(true);
+        await start(socket);
+        await fieldsWindow(socket);
+
+        formsHandler.handleResourceUsageFormCancel(socket, {
+          payload: { resourceId: RESOURCE_ID, action: ACTION },
+        } as AttractapEvent['data']);
+
+        expect(handoffs.endForReader).toHaveBeenCalledWith(42, { resourceId: RESOURCE_ID, action: ACTION });
+        expect(socket.state.formHandoffs).toEqual({});
+      });
+    });
   });
 });

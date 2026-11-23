@@ -9,7 +9,11 @@ function Editor({ initial }: { initial: EditableFormField }) {
   const [field, setField] = useState(initial);
   return (
     <>
-      <FieldOptionsEditor field={field} onChange={setField} t={(key) => key} />
+      <FieldOptionsEditor
+        field={field}
+        onChange={setField}
+        t={(key, vars) => (vars ? `${key} ${JSON.stringify(vars)}` : key)}
+      />
       <output data-testid="field">{JSON.stringify(field)}</output>
     </>
   );
@@ -59,4 +63,19 @@ it('enforces the twelve-choice limit and explains boolean options', () => {
   view.unmount();
   mount(FormFieldType.BOOLEAN, {});
   expect(screen.getByText('fields.options.boolean.description')).toBeTruthy();
+});
+it('edits the maximum number of images and flags values outside 1 to 10', () => {
+  mount(FormFieldType.IMAGE, { maxImages: 1 });
+  const invalid = 'fields.options.image.maxImagesInvalid {"min":1,"max":10}';
+  expect(screen.getByText('fields.options.image.description')).toBeTruthy();
+  const input = screen.getByLabelText('fields.options.image.maxImages');
+  expect(input).toHaveAttribute('min', '1');
+  expect(input).toHaveAttribute('max', '10');
+  fireEvent.change(input, { target: { value: '5' } });
+  expect(JSON.parse(screen.getByTestId('field').textContent ?? '').options).toEqual({ maxImages: 5 });
+  expect(screen.queryByText(invalid)).toBeNull();
+  fireEvent.change(input, { target: { value: '11' } });
+  expect(screen.getByText(invalid)).toBeTruthy();
+  fireEvent.change(input, { target: { value: '' } });
+  expect(screen.getByText(invalid)).toBeTruthy();
 });

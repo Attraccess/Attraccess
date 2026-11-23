@@ -1,0 +1,14 @@
+{
+  "context": "{{resource}} · {{form}}",
+  "remaining": {
+    "one": "Du kannst noch {{count}} Foto hinzufügen.",
+    "many": "Du kannst noch {{count}} Fotos hinzufügen."
+  },
+  "removeError": "Das Foto konnte nicht entfernt werden. Versuche es erneut.",
+  "done": "Fertig, du kannst zurück zum Leser gehen.",
+  "doneUsedUp": "Fertig, alle Fotos sind hinzugefügt. Du kannst zurück zum Leser gehen.",
+  "expiredTitle": "Link abgelaufen",
+  "expired": "Dieser Link ist abgelaufen — öffne das Formular am Leser erneut.",
+  "loadErrorTitle": "Seite nicht verfügbar",
+  "loadError": "Die Seite konnte nicht geladen werden. Prüfe deine Verbindung und versuche es erneut."
+}

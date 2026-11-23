@@ -55,7 +55,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Meters](https://docs.attraccess.org/en/flows/energy-metering.md): Named meters per resource for electricity, water or any value, with cumulative counters, session boundaries and optional billing.
 
 ## English: Forms
-- [Overview](https://docs.attraccess.org/en/forms/overview.md): Introduces forms collected from users at points of resource use, including where a form applies, when it is shown, field types and submissions.
+- [Overview](https://docs.attraccess.org/en/forms/overview.md): Introduces forms collected from users at points of resource use, including where a form applies, when it is shown, field types (including photos) and submissions.
 - [Creating Forms](https://docs.attraccess.org/en/forms/creating-forms.md): How to create, edit, move and delete forms and their fields for one resource, a resource group or every resource, which requires the Manage Resources permission.
 
 ## English: Projects
@@ -218,7 +218,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Zähler](https://docs.attraccess.org/de/flows/energy-metering.md): Benannte Zähler pro Ressource für Strom, Wasser oder beliebige Werte, mit Sitzungsgrenzen, kumulativen Zählern und optionaler Abrechnung.
 
 ## Deutsch: Formulare
-- [Überblick](https://docs.attraccess.org/de/forms/overview.md): Stellt Formulare vor, die bei der Ressourcennutzung abgefragt werden, inklusive Geltungsbereich, Anzeigezeitpunkten, Feldtypen und Einreichungen.
+- [Überblick](https://docs.attraccess.org/de/forms/overview.md): Stellt Formulare vor, die bei der Ressourcennutzung abgefragt werden, inklusive Geltungsbereich, Anzeigezeitpunkten, Feldtypen (auch Fotos) und Einreichungen.
 - [Formulare erstellen](https://docs.attraccess.org/de/forms/creating-forms.md): So erstellen, bearbeiten, verschieben und löschen Sie Formulare und Felder für eine Ressource, eine Ressourcengruppe oder alle Ressourcen; erfordert die Berechtigung Ressourcen verwalten.
 
 ## Deutsch: Projekte

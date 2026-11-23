@@ -280,4 +280,5 @@ void testCatalogLocales(Renderer &renderer);
 void testPowerOffLocales(Renderer &renderer);
 void testFormAndProjectLocaleRefresh(Renderer &renderer);
 void testDemoMaterialCaptions(Renderer &renderer);
+void testFormImageField(Renderer &renderer);
 void testFirmwareUpdateLocales(Renderer &renderer);

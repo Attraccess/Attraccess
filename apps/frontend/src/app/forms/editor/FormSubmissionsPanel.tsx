@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import {
   Alert,
   AlertContent,
@@ -26,6 +26,7 @@ import { Select } from '../../../components/select';
 import { SimplePagination } from '../../../components/simplePagination/index';
 import en from '../en.json';
 import de from '../de.json';
+import { FormImageAnswer } from '../images/FormImageAnswer';
 
 const PAGE_SIZE = 20;
 const ALL = 'all';
@@ -40,9 +41,11 @@ interface FormSubmissionsPanelProps {
 
 type Answer = { value?: unknown; fieldDefinition?: { name?: string; position?: number; type?: FormFieldType } };
 
-/** One stored answer as text; a yes/no answer reads as in the usage history. */
-function answerText(answer: Answer | undefined, t: (key: string) => string) {
+/** One stored answer as text, or as thumbnails for photos; a yes/no answer reads as in the usage history. */
+function answerText(answer: Answer | undefined, t: (key: string) => string): ReactNode {
   if (answer?.value === undefined || answer?.value === null) return '';
+  if (answer.fieldDefinition?.type === FormFieldType.IMAGE)
+    return <FormImageAnswer value={answer.value} fieldName={answer.fieldDefinition.name} />;
   if (answer.fieldDefinition?.type === FormFieldType.BOOLEAN) {
     return String(answer.value) === 'true' ? t('submissions.yes') : t('submissions.no');
   }
