@@ -1,3 +1,4 @@
+import { NetworkRestrictionService } from '../../../api/src/network-restriction/network-restriction.service';
 import { CanActivate, ExecutionContext, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -120,6 +121,7 @@ describe.each([['session' as const], ['api-token' as const]])('host start gate w
         { provide: SessionEndNotifier, useValue: {} },
         // Machine list visibility (ATT-843) is not what this gate tests: every machine is visible here.
         { provide: ResourceListVisibilityService, useValue: { canSee: async () => true } },
+        { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
       ],
     })
       .overrideGuard(DualAuthGuard)

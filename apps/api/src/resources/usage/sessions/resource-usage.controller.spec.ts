@@ -1,3 +1,4 @@
+import { NetworkRestrictionService } from '../../../network-restriction/network-restriction.service';
 import { ForbiddenException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
@@ -12,6 +13,7 @@ import { ResourceListVisibilityService } from '../../visibility/resource-list-vi
 const gateProviders = [
   { provide: PreStartService, useValue: { gateHttp: jest.fn() } },
   { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
+  { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
 ];
 
 it('passes the authenticated user and both IDs to the usage details lookup', async () => {
@@ -163,6 +165,7 @@ it("runs the session-end default for the ended session's owner when a manager en
       },
       { provide: PreStartService, useValue: { gateHttp: jest.fn() } },
       { provide: SessionEndNotifier, useValue: { applyDefault } },
+      { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
       { provide: ResourceUsageService, useValue: { endSession } },
       { provide: ResourceActivityVisibilityService, useValue: {} },
     ],
@@ -184,6 +187,7 @@ describe('start-blocked query', () => {
         },
         { provide: PreStartService, useValue: { gateHttp: jest.fn(), queryStartBlocked } },
         { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
+        { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
         { provide: ResourceUsageService, useValue: {} },
         { provide: ResourceActivityVisibilityService, useValue: {} },
       ],

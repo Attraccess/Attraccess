@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { NetworkRestrictionService } from '../../../network-restriction/network-restriction.service';
 import { CanActivate, ExecutionContext, INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -130,6 +131,7 @@ describe('Access-only doors', () => {
           { provide: ResourceActivityVisibilityService, useValue: {} },
           { provide: PreStartService, useValue: {} },
           { provide: SessionEndNotifier, useValue: {} },
+          { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
         ],
       })
         .overrideGuard(DualAuthGuard)

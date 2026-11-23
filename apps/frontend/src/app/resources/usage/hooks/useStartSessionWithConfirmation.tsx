@@ -7,8 +7,12 @@ import {
   useResourceUsageStartSession,
   UseGetOneResourceByIdKeyFn,
 } from '@attraccess/react-query-client';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../components/toastProvider';
-import { getApiErrorCode } from '../../../../utils/apiError';
+import { getApiErrorCode, isNetworkRestrictedError } from '../../../../utils/apiError';
+import { useRefreshNetworkRestrictionOnError } from '../../../../hooks/useRefreshNetworkRestrictionOnError';
+import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 import { getConfirmationRequired, getStartBlockedReason, useStartConfirmation } from './useStartConfirmation';
 
 export type StartErrorHandler = (error: ApiError, requestBody: StartUsageSessionDto) => void;
@@ -27,7 +31,8 @@ const isPluginStartError = (error: unknown) =>
 
 /**
  * Starts a session through the plugin pre-start contract. A 409 CONFIRMATION_REQUIRED opens the plugin's
- * confirmation and retries with its step id; a 403 START_BLOCKED shows the plugin's reason as written.
+ * confirmation and retries with its step id; a 403 START_BLOCKED shows the plugin's reason as written. A 403
+ * NETWORK_RESTRICTED (the user's network changed since the controls were drawn) shows its translated message.
  * Every web start (start, takeover, QR link) goes through here; render `dialog` next to the start control.
  *
  * `onSuccess` and `onError` are hook-level mutation callbacks, so they still run when the caller unmounts
@@ -37,11 +42,21 @@ const isPluginStartError = (error: unknown) =>
 export function useStartSessionWithConfirmation(resourceId: number, options: Options) {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
+  const refreshNetworkRestriction = useRefreshNetworkRestrictionOnError();
+  const { t, tExists } = useTranslations({
+    en: { api: API_ERROR_TRANSLATIONS_EN },
+    de: { api: API_ERROR_TRANSLATIONS_DE },
+  });
   const optionsRef = useRef(options);
   optionsRef.current = options;
   const { mutate, isPending } = useResourceUsageStartSession(undefined, {
     onSuccess: (_data, { body }) => optionsRef.current.onSuccess(body),
     onError: (error, { body }) => {
+      // The controls were drawn for another network: say why, and ask again so they match.
+      if (refreshNetworkRestriction(error)) {
+        toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' });
+        return;
+      }
       if (!isPluginStartError(error)) optionsRef.current.onError(error as ApiError, body);
     },
   });
@@ -62,6 +77,7 @@ export function useStartSessionWithConfirmation(resourceId: number, options: Opt
         { path: { resourceId }, body: requestBody },
         {
           onError: (error) => {
+            if (isNetworkRestrictedError(error)) return;
             if (handleStartError(error, requestBody)) {
               optionsRef.current.onPluginNotice?.();
               return;

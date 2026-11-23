@@ -78,3 +78,4 @@ export * from './lib/dashboard-pins';
 export * from './lib/mcp-oauth';
 export * from './lib/plugin-ble-endpoint';
 export * from './lib/plugin-reader';
+export * from './lib/network-restriction';

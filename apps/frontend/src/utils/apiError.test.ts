@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getTranslationKeyForApiError } from './apiError';
+import { getTranslationKeyForApiError, isNetworkRestrictedError } from './apiError';
 import API_ERROR_TRANSLATIONS_EN from '../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../global-translations/api-errors.de.json';
 
@@ -177,6 +177,32 @@ describe('getTranslationKeyForApiError', () => {
     });
 
     expect(result.key).toBe('api.SESSION_DURATION_ESTIMATE_REQUIRED');
+    expect(getTranslation({ api: translations }, `${result.key}.title`)).toBe(expectedTitle);
+  });
+});
+
+describe('isNetworkRestrictedError', () => {
+  it.each([
+    [{ body: { message: 'NETWORK_RESTRICTED', code: 'NETWORK_RESTRICTED', action: 'usage.start' } }, true],
+    [{ body: { code: 'NETWORK_RESTRICTED' } }, true],
+    [{ body: { message: 'START_BLOCKED' } }, false],
+    [{ body: undefined }, false],
+    [undefined, false],
+  ])('recognises the network restriction refusal in %j', (error, expected) => {
+    expect(isNetworkRestrictedError(error)).toBe(expected);
+  });
+
+  it.each([
+    ['English', API_ERROR_TRANSLATIONS_EN, 'Only available from the local network'],
+    ['German', API_ERROR_TRANSLATIONS_DE, 'Nur aus dem lokalen Netzwerk verfügbar'],
+  ])('translates NETWORK_RESTRICTED in %s', (_locale, translations, expectedTitle) => {
+    const result = getTranslationKeyForApiError({
+      error: { body: { message: 'NETWORK_RESTRICTED', code: 'NETWORK_RESTRICTED' } } as unknown as Error,
+      t: (key: string) => key,
+      tExists: (key: string) => getTranslation({ api: translations }, key) !== undefined,
+      baseTranslationKey: 'api',
+    });
+    expect(result.key).toBe('api.NETWORK_RESTRICTED');
     expect(getTranslation({ api: translations }, `${result.key}.title`)).toBe(expectedTitle);
   });
 });

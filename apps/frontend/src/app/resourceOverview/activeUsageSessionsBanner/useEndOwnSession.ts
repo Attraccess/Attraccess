@@ -8,6 +8,7 @@ import {
   resourceUsageGetActiveSession,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../hooks/useAuth';
+import { useRefreshNetworkRestrictionOnError } from '../../../hooks/useRefreshNetworkRestrictionOnError';
 import { getTranslationKeyForApiError } from '../../../utils/apiError';
 import en from './translations/en.json';
 import de from './translations/de.json';
@@ -21,6 +22,7 @@ import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.e
 export function useEndOwnSession() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const refreshNetworkRestriction = useRefreshNetworkRestrictionOnError();
   const invalidateActiveSession = useCallback(
     (resourceId: number) =>
       queryClient.invalidateQueries({
@@ -30,6 +32,9 @@ export function useEndOwnSession() {
   );
   const { mutateAsync: endSession } = useResourceUsageEndSession(undefined, {
     onSuccess: (data) => invalidateActiveSession(data.resourceId),
+    onError: (error) => {
+      refreshNetworkRestriction(error);
+    },
   });
 
   return useCallback(

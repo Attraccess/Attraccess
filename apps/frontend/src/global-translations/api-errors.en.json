@@ -251,6 +251,10 @@
     "title": "CSV file has no data",
     "description": "The CSV file has no header row or no rows below it. The first row must contain the column names, followed by one row per user."
   },
+  "NETWORK_RESTRICTED": {
+    "title": "Only available from the local network",
+    "description": "This action is only available from the local network. Connect to the local network and try again."
+  },
   "SESSION_DURATION_ESTIMATE_REQUIRED": {
     "title": "Duration estimate required",
     "description": "This machine asks how long you will use it. Reload the page and enter your estimated time."

@@ -260,6 +260,54 @@ describe('StringListField', () => {
     expect(screen.getByText('resource_access.<clientId>.roles')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Remove resource_access\.<clientId>\.roles/ })).toBeInTheDocument();
   });
+
+  describe('with parseEntries, validateEntry and isSameEntry', () => {
+    const lowerCaseSame = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+    const parsing = {
+      parseEntries: (draft: string) => draft.split(/[\s,]+/).filter(Boolean),
+      validateEntry: (entry: string) => (entry.startsWith('x') ? `"${entry}" is not allowed` : null),
+      isSameEntry: lowerCaseSame,
+    };
+
+    it('adds every parsed entry and skips those already in the list in another spelling', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={['A']} {...parsing} />);
+      await user.type(screen.getByRole('textbox', { name: 'Paths' }), 'a, b c b{Enter}');
+      expect(stored()).toEqual(['A', 'b', 'c']);
+    });
+
+    it('adds nothing and shows the message when one entry is refused', async () => {
+      const user = userEvent.setup();
+      render(<Harness {...parsing} />);
+      const field = screen.getByRole('textbox', { name: 'Paths' });
+      await user.type(field, 'a xb{Enter}');
+      expect(stored()).toEqual([]);
+      expect(field).toHaveAccessibleDescription(/"xb" is not allowed/);
+    });
+
+    it('says duplicate only when every entry is already there', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={['a']} {...parsing} />);
+      await user.type(screen.getByRole('textbox', { name: 'Paths' }), 'A{Enter}');
+      expect(screen.getByText('This value is already in the list.')).toBeInTheDocument();
+    });
+
+    it('refuses a paste that would go over the limit', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={['a']} maxEntries={2} {...parsing} />);
+      await user.type(screen.getByRole('textbox', { name: 'Paths' }), 'b c{Enter}');
+      expect(stored()).toEqual(['a']);
+      expect(screen.getByText('The list can have at most 2 entries.')).toBeInTheDocument();
+    });
+  });
+
+  it('shows an error about the whole list and can hide its label visually', () => {
+    render(<Harness isLabelHidden errorMessage="At least one path is needed." />);
+    const field = screen.getByRole('textbox', { name: 'Paths' });
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    expect(field).toHaveAccessibleDescription(/At least one path is needed\./);
+    expect(screen.getByText('Paths')).toHaveClass('sr-only');
+  });
 });
 
 describe('validateStringListEntry', () => {

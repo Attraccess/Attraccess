@@ -6,6 +6,7 @@ import { createServer, request as httpRequest, RequestListener, Server } from 'n
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { attachNetworkOrigin } from '../network-restriction/network-origin';
 import { McpDelegation, setMcpDelegation } from '../users-and-auth/strategies/mcp-delegation';
 import { formatRestResponse, MAX_RESULT_CHARS, RestRequest } from './mcp-rest-bridge';
 
@@ -15,6 +16,11 @@ export type CallerContext = {
   /** Set for MCP OAuth callers; travels in-process, never as a header. */
   delegation?: McpDelegation;
   ip: string;
+  /**
+   * The network origin of the outer MCP request (null: unknown). The restricted actions judge a tool call by it, in
+   * memory, so a call never counts as local because it arrives on the private socket.
+   */
+  networkOrigin?: string | null;
   userAgent?: string;
   host?: string;
 };
@@ -93,6 +99,7 @@ export class McpRestGateway implements OnApplicationShutdown {
       if (caller) {
         if (caller.delegation) setMcpDelegation(req, caller.delegation);
         // Audit and rate limiting must see the real client, not the private socket.
+        if (caller.networkOrigin !== undefined) attachNetworkOrigin(req, caller.networkOrigin);
         Object.defineProperty(req, 'ip', { value: caller.ip, configurable: true });
         Object.defineProperty(req.socket, 'remoteAddress', { value: caller.ip, configurable: true });
       }

@@ -150,6 +150,10 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     return this.doors.lockDoor(resourceId, user);
   }
 
+  async isAccessOnlyDoor(resourceId: number): Promise<boolean> {
+    return this.doors.isAccessOnlyDoor(resourceId);
+  }
+
   async unlockDoor(resourceId: number, user: UsageSessionUser): Promise<UsageSession> {
     return this.doors.unlockDoor(resourceId, user);
   }

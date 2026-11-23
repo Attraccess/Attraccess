@@ -76,6 +76,7 @@ describe('who reads other people’s sessions', () => {
       ),
       {} as never,
       {} as never,
+      {} as never,
     );
     scope.store.findPublishedSession.mockImplementation(async (resourceId) =>
       resourceId === SUPERVISED ? operatorSession(SUPERVISED) : operatorSession(),

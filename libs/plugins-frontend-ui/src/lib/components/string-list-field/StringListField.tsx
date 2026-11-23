@@ -36,12 +36,26 @@ export interface StringListFieldProps {
   maxEntries?: number;
   maxLength?: number;
   isDisabled?: boolean;
+  /** Splits the typed text into entries, e.g. a pasted list. Without it the whole trimmed text is one entry. */
+  parseEntries?: (draft: string) => string[];
+  /** A further check of each entry; returns the message to show, or null when the entry is fine. */
+  validateEntry?: (entry: string) => string | null;
+  /** Whether two entries are the same value, e.g. two spellings of one address. Without it: the same text. */
+  isSameEntry?: (a: string, b: string) => boolean;
+  /** A problem with the list as a whole, shown and announced like an entry error. */
+  errorMessage?: string | null;
+  /** Shows the label to screen readers only, for a field whose surrounding row already shows it. */
+  isLabelHidden?: boolean;
   'data-cy'?: string;
 }
 
+type EntryProblem = { code: StringListEntryError } | { message: string };
+
 /**
- * Edits an ordered list of strings, one entry at a time. Entries are never split on commas, so values
- * that contain them cannot be created by accident; entries keep the order in which they were added.
+ * Edits an ordered list of strings, one entry at a time. Entries are never split on commas unless
+ * `parseEntries` says so, so values that contain them cannot be created by accident; entries keep the
+ * order in which they were added. With `parseEntries`, an entry already in the list is skipped and the
+ * others are added; an invalid entry adds nothing.
  */
 export const StringListField: React.FC<StringListFieldProps> = ({
   label,
@@ -53,11 +67,16 @@ export const StringListField: React.FC<StringListFieldProps> = ({
   maxEntries,
   maxLength,
   isDisabled,
+  parseEntries,
+  validateEntry,
+  isSameEntry = (a, b) => a === b,
+  errorMessage,
+  isLabelHidden,
   'data-cy': dataCy,
 }) => {
   const { t } = useTranslations({ en, de });
   const [draft, setDraft] = useState('');
-  const [error, setError] = useState<StringListEntryError | null>(null);
+  const [error, setError] = useState<EntryProblem | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
   const isFull = maxEntries !== undefined && values.length >= maxEntries;
@@ -71,16 +90,44 @@ export const StringListField: React.FC<StringListFieldProps> = ({
       : null;
 
   const add = () => {
-    const entry = draft.trim();
-    const problem = validateStringListEntry(entry, values, { maxEntries, maxLength });
-    if (problem) {
-      setError(problem);
+    if (isFull) {
+      setError({ code: 'limitReached' });
       return;
     }
-    onChange([...values, entry]);
+    const entries = parseEntries ? parseEntries(draft) : [draft.trim()];
+    if (entries.length === 0) entries.push('');
+    const fresh: string[] = [];
+    for (const entry of entries) {
+      // Duplicates and the limit are judged below, against the list plus the entries taken so far.
+      const code = validateStringListEntry(entry, [], { maxLength });
+      if (code) {
+        setError({ code });
+        return;
+      }
+      const message = validateEntry?.(entry);
+      if (message) {
+        setError({ message });
+        return;
+      }
+      if (![...values, ...fresh].some((known) => isSameEntry(known, entry))) fresh.push(entry);
+    }
+    if (fresh.length === 0) {
+      setError({ code: 'duplicate' });
+      return;
+    }
+    if (maxEntries !== undefined && values.length + fresh.length > maxEntries) {
+      setError({ code: 'limitReached' });
+      return;
+    }
+    onChange([...values, ...fresh]);
     setDraft('');
     setError(null);
   };
+  const errorText = error
+    ? 'message' in error
+      ? error.message
+      : t(error.code, { max: error.code === 'tooLong' ? maxLength : maxEntries })
+    : errorMessage;
 
   // Tags are keyed by position, so stored duplicates stay distinct and can be removed one at a time.
   const remove = (keys: Set<Key>) => {
@@ -100,10 +147,10 @@ export const StringListField: React.FC<StringListFieldProps> = ({
           setError(null);
         }}
         isDisabled={isDisabled}
-        isInvalid={error !== null}
+        isInvalid={Boolean(errorText)}
         validationBehavior="aria"
       >
-        <Label>{label}</Label>
+        <Label className={isLabelHidden ? 'sr-only' : undefined}>{label}</Label>
         <div
           ref={rowRef}
           className="flex gap-2"
@@ -143,7 +190,7 @@ export const StringListField: React.FC<StringListFieldProps> = ({
             {hint && <span className="block">{hint}</span>}
           </Description>
         )}
-        {error && <FieldError>{t(error, { max: error === 'tooLong' ? maxLength : maxEntries })}</FieldError>}
+        {errorText && <FieldError>{errorText}</FieldError>}
       </TextField>
       {values.length > 0 && (
         <TagGroup size="sm" aria-label={label} onRemove={isDisabled ? undefined : remove}>

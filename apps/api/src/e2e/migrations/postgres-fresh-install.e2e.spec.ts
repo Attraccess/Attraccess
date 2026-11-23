@@ -45,6 +45,7 @@ describe('Fresh PostgreSQL install (e2e)', () => {
       'SessionDurationLimits1796200000000',
       'SessionEndingSoonEmailTemplate1796200000001',
       'FormImages1796200000002',
+      'RoleNetworkActions1796200000003',
       'ResourceListVisibility1796300000000',
       'PermittedResourceIndexes1796300000001',
     ]);

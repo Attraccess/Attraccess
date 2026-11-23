@@ -19,6 +19,7 @@ import { ResourceImageService } from '../resourceImage.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { SSEController } from '../sse/sse.controller';
 import { ResourceEventsService } from '../sse/resource-events.service';
+import { NetworkRestrictionService } from '../../network-restriction/network-restriction.service';
 import { ResourceUsageController } from '../usage/sessions/resource-usage.controller';
 import { ResourceUsageService } from '../usage/sessions/resource-usage.service';
 import { USAGE_SESSION_STORE } from '../usage/usage-session-store.port';
@@ -132,6 +133,8 @@ describe('machine list visibility over HTTP (ATT-843)', () => {
         },
         { provide: RESOURCE_STORE, useValue: store },
         { provide: PreStartService, useValue: { gateHttp: jest.fn() } },
+        // Network restriction is not what this spec tests: every action is allowed.
+        { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
         { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
       ],
     })

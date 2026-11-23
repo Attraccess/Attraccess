@@ -1,3 +1,4 @@
+import { NetworkRestrictionService } from '../../../network-restriction/network-restriction.service';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { createServer } from 'node:http';
@@ -56,6 +57,7 @@ describe('waiting for a shared machine over the web API', () => {
         { provide: ResourceActivityVisibilityService, useValue: {} },
         { provide: PreStartService, useValue: { gateHttp: jest.fn().mockResolvedValue({ kind: 'proceed' }) } },
         { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
+        { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
       ],
     })
       .overrideGuard(DualAuthGuard)

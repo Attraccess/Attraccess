@@ -11,6 +11,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import usePluginState, { PluginManifestWithPlugin } from '../../../../plugins/plugin.state';
 import { ActiveSessionDisplay } from './index';
 
+const network = vi.hoisted(() => ({ restricted: new Set<string>() }));
+vi.mock('../../../../../hooks/useNetworkRestriction', () => ({
+  useNetworkRestriction: () => ({ isRestricted: (action: string) => network.restricted.has(action) }),
+}));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   ...(await (() => ({
@@ -54,7 +58,10 @@ function installContribution(contribution: PluginSlotContribution<ResourceActive
 }
 
 describe('ActiveSessionDisplay plugin slot', () => {
-  beforeEach(() => usePluginState.setState({ plugins: [] }));
+  beforeEach(() => {
+    usePluginState.setState({ plugins: [] });
+    network.restricted = new Set();
+  });
 
   it('renders the active-session contribution with resource and usage context', () => {
     const renderContribution = vi.fn(() => <div>Plugin progress</div>);
@@ -64,5 +71,20 @@ describe('ActiveSessionDisplay plugin slot', () => {
 
     expect(screen.getByText('Plugin progress')).toBeInTheDocument();
     expect(renderContribution).toHaveBeenCalledWith({ resourceId: 11, usageId: 22 });
+  });
+
+  it('keeps End visible but disabled outside the allowed network, and says why', () => {
+    network.restricted = new Set(['usage.end']);
+    render(<ActiveSessionDisplay resourceId={11} usageId={22} startTime="2026-08-27T10:00:00.000Z" />);
+
+    expect(screen.getByRole('button', { name: 'endSession' })).toBeDisabled();
+    expect(screen.getByRole('note')).toHaveTextContent('onlyLocal');
+  });
+
+  it('shows End enabled and no hint while ending is allowed from here', () => {
+    render(<ActiveSessionDisplay resourceId={11} usageId={22} startTime="2026-08-27T10:00:00.000Z" />);
+
+    expect(screen.getByRole('button', { name: 'endSession' })).toBeEnabled();
+    expect(screen.queryByRole('note')).toBeNull();
   });
 });

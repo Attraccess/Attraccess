@@ -1,8 +1,11 @@
+import { useNetworkRestriction } from '../../../hooks/useNetworkRestriction';
+import { NetworkRestrictedHint } from '../../../components/networkRestriction/NetworkRestrictedHint';
 import { Button, Link } from '@heroui/react';
 import type { DashboardWidgetRenderProps } from '@attraccess/plugins-frontend-sdk';
 import { useQueryClient } from '@tanstack/react-query';
 import { SquareIcon } from 'lucide-react';
 import { ConfirmableButton, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { NetworkRestrictedAction } from '@attraccess/application-models';
 import {
   useGetAllResources,
   useGetAllResourcesKey,
@@ -43,6 +46,7 @@ function SessionRow({
   const queryClient = useQueryClient();
   const toast = useToastMessage();
   const endOwnSession = useEndOwnSession();
+  const { isRestricted } = useNetworkRestriction();
   const endSessionErrorMessage = useEndSessionErrorMessage();
   // Shares its cache with the resource card and detail page.
   const { data: activeSession } = useResourceUsageGetActiveSession({ path: { resourceId: resource.id } });
@@ -101,6 +105,7 @@ function SessionRow({
             isIconOnly={isIconOnly}
             className={isIconOnly ? 'shrink-0' : 'shrink-0 @max-[18rem]:px-2'}
             aria-label={t('my-sessions.stopLabel', { name: resource.name })}
+            isDisabled={isRestricted(NetworkRestrictedAction.UsageEnd)}
             onPress={isPreview ? undefined : open}
             data-cy="dashboard-my-sessions-stop"
           >
@@ -142,6 +147,7 @@ export function MySessionsWidget({ size, isPreview }: Readonly<DashboardWidgetRe
           <SessionRow key={resource.id} resource={resource} size={size} isPreview={isPreview} />
         ))}
       </WidgetList>
+      <NetworkRestrictedHint actions={NetworkRestrictedAction.UsageEnd} />
       {/* A medium tile has room for its three rows only; its header links to the resources. */}
       {size !== 'medium' && <MoreLink count={(data.total ?? data.data.length) - shown.length} href="/resources" />}
     </div>

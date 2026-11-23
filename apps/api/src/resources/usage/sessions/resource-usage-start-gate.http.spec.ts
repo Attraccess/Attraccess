@@ -1,3 +1,4 @@
+import { NetworkRestrictionService } from '../../../network-restriction/network-restriction.service';
 import { CanActivate, ExecutionContext, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -42,6 +43,7 @@ describe('POST /resources/:id/usage/start through the pre-start gate', () => {
         { provide: ResourceActivityVisibilityService, useValue: {} },
         { provide: PreStartService, useValue: { gateHttp } },
         { provide: SessionEndNotifier, useValue: { applyDefault } },
+        { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
       ],
     })
       .overrideGuard(DualAuthGuard)

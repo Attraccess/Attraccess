@@ -4,6 +4,8 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { NetworkRestrictedAction } from '@attraccess/application-models';
+import { NetworkRestrictionService } from '../../network-restriction/network-restriction.service';
 import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper';
 import { ResourceUsageResponseDto } from '../usage/dtos/resource-usage-response.dto';
 import { toUsageSessionResponse, type UsageSessionResponse } from '../usage/dtos/usage-session-response';
@@ -23,6 +25,7 @@ export class SupervisionController {
     private readonly supervisionService: SupervisionService,
     private readonly supervisionLive: SupervisionLiveService,
     private readonly sse: SseInstrumentation,
+    private readonly networkRestriction: NetworkRestrictionService,
   ) {}
 
   @Post(':resourceId/usage/supervision/request')
@@ -47,6 +50,11 @@ export class SupervisionController {
     @Req() req: AuthenticatedRequest,
     @Res({ passthrough: true }) res: Response,
   ): Promise<UsageSessionResponse> {
+    await this.networkRestriction.assertAllowed(req, NetworkRestrictedAction.SupervisionRequest, resourceId);
+    // The approved request starts the session with this payload, so a takeover in it is judged as a takeover too.
+    if (dto.forceTakeOver) {
+      await this.networkRestriction.assertAllowed(req, NetworkRestrictedAction.UsageTakeover, resourceId);
+    }
     const controller = new AbortController();
     const onClose = () => {
       if (!res.writableEnded) controller.abort();
@@ -102,6 +110,11 @@ export class SupervisionController {
     @Param('requestId') requestId: string,
     @Req() req: AuthenticatedRequest,
   ): Promise<UsageSessionResponse> {
+    await this.networkRestriction.assertAllowed(
+      req,
+      NetworkRestrictedAction.SupervisionApprove,
+      this.supervisionService.pendingResourceId(requestId),
+    );
     return toUsageSessionResponse(
       await this.supervisionService.approve(
         requestId,
