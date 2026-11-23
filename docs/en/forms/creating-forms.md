@@ -32,12 +32,12 @@ Fields define what data to collect. Add them while creating the form or later:
 1. Click **Add field**
 2. Configure the field:
 
-| Setting         | Required | Description                                             |
-| --------------- | -------- | ------------------------------------------------------- |
-| **Label**       | Yes      | Field label shown to the user (e.g. "Material")         |
-| **Type**        | Yes      | **Text**, **Number**, **Yes / No** or **Single choice** |
-| **Required**    | No       | Whether the user must fill in this field                |
-| **Description** | No       | Help text displayed below the field                     |
+| Setting         | Required | Description                                                        |
+| --------------- | -------- | ------------------------------------------------------------------ |
+| **Label**       | Yes      | Field label shown to the user (e.g. "Material")                    |
+| **Type**        | Yes      | **Text**, **Number**, **Yes / No**, **Single choice** or **Image** |
+| **Required**    | No       | Whether the user must fill in this field                           |
+| **Description** | No       | Help text displayed below the field                                |
 
 3. Click **Save form**
 
@@ -66,6 +66,36 @@ When you choose **Single choice** as the field type, you need to define the avai
 
 > [!TIP]
 > Use Single choice fields instead of Text fields when you want consistent, predefined answers -- for example, a list of available materials or machine profiles.
+
+### Configuring Image Fields
+
+Use an **Image** field when users should attach photos, for example to document damage when they return a machine.
+
+1. Set the field type to **Image**
+2. Set **Max. images** (1 to 10, default 1). Users cannot add more photos than this.
+3. Mark the field as **Required** if at least one photo is needed
+
+On the web, users tap **Take photo** (opens the camera on phones, the file picker on a computer) or **Upload**. Each photo is uploaded at once and shown as a thumbnail with a button to remove it. The form cannot be submitted while a photo is still uploading.
+
+On an [Attractap](attractap/using-the-reader.md) touch reader, the reader shows a QR code. The user scans it with their phone, takes or uploads the photos there, and the reader shows how many photos have arrived ("N von M Fotos").
+
+> [!NOTE]
+> The QR code leads to the **Application URL** from your settings. It must be reachable from your users' phones, otherwise the link opens nothing.
+
+**The phone page**
+
+- It opens without signing in. Whoever holds the link can add photos to that open form, so the link is short-lived: it stops working after 15 minutes, as soon as the form on the reader ends (submitted, cancelled, signed out or another user signs in) or once the maximum number of photos has been uploaded.
+- A user who opens an expired link sees a notice to open the form on the reader again.
+- The photos become part of the submission when the user submits the form on the reader.
+
+**Older readers.** Readers with firmware that does not support photo fields skip optional **Image** fields. If a required **Image** field applies, the reader cannot complete the form and tells the user to fill it in in the web app. Attractap Lite readers (without a display) behave as before for forms.
+
+**Who can see the photos.** The user who submitted the form and users with the **Manage Resources** permission, in the web app only: thumbnails in the form's **Submissions** tab and in the usage history, click to enlarge. Photos have no public address and are not part of [flow](flows/overview.md) data. Flows only receive the photo IDs.
+
+> [!WARNING]
+> Photos may show people. Every photo is re-encoded as JPEG, turned upright, scaled down to at most 2560 px on the long side, and **all metadata, including GPS location, is removed**. The picture content itself is kept.
+
+**Storage.** Photos are stored on the server in the storage directory (`STORAGE_ROOT`, subfolder `form-images`) and are not served publicly. A photo that is never submitted is deleted after 24 hours. Submitted photos are kept as long as their submission. Photos need disk space, so plan capacity and back them up together with the storage volume.
 
 ## Editing a Form
 
@@ -100,7 +130,7 @@ When a resource is no longer in the new scope, its overrides for this form are r
 
 ## Viewing Submissions
 
-The **Submissions** tab of a form lists all its submissions, newest first, with date, user, resource and action. Expand a row to see the answers. Filter by resource to see the answers given on one resource. From a resource's **Settings** → **Forms**, **Submissions** in the **⋮** menu of a form's row opens this list already filtered to that resource.
+The **Submissions** tab of a form lists all its submissions, newest first, with date, user, resource and action. Expand a row to see the answers. Photos appear as thumbnails; click one to see it full size. Filter by resource to see the answers given on one resource. From a resource's **Settings** → **Forms**, **Submissions** in the **⋮** menu of a form's row opens this list already filtered to that resource.
 
 ## Deleting a Form
 

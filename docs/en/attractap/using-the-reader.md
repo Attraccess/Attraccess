@@ -129,6 +129,16 @@ Your organization may ask for information before a machine starts or stops, such
 
 ![End-of-use form with a required visual inspection field and Absenden button](../../_media/attractap/usage-end-form.png)
 
+### Add photos with your phone
+
+A photo field shows a QR code, the instruction **Mit dem Handy scannen, um Fotos hinzuzufügen** (Scan with your phone to add photos) and a count such as **0 von 3 Fotos**.
+
+1. Scan the QR code with your phone. The page opens without signing in.
+2. Take photos or upload them from your phone.
+3. The count on the reader updates within a few seconds. Then tap **Weiter** or **Absenden** as usual.
+
+If the field is required and no photo has arrived, the reason appears on the button. The link works for 15 minutes, until you submit or cancel the form, sign out or someone else signs in, or until the maximum number of photos is uploaded. If it has expired, open the form on the reader again. A reader with older firmware cannot show photo fields: it skips optional ones, and for a required one it asks you to complete the form in the web app.
+
 To cancel, tap the **×** in the top-right corner. You return to the list or details where you began. Cancelling a required form cancels the start or stop request; it does not complete it.
 
 ## Ask for supervision
