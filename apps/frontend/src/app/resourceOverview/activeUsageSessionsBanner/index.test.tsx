@@ -14,7 +14,12 @@ const state = vi.hoisted(() => ({
   invalidate: vi.fn(),
   refetch: vi.fn(),
   success: vi.fn(),
+  restricted: new Set<string>(),
+  onError: undefined as undefined | ((error: unknown) => void),
   onSuccess: undefined as undefined | ((data: { resourceId: number }) => void),
+}));
+vi.mock('../../../hooks/useNetworkRestriction', () => ({
+  useNetworkRestriction: () => ({ isRestricted: (action: string) => state.restricted.has(action) }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -27,6 +32,7 @@ vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 1 } }) 
 vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ success: state.success }) }));
 vi.mock('../../../utils/apiError', () => ({
   getTranslationKeyForApiError: () => ({ key: 'api.denied', errorMessage: 'Denied' }),
+  isNetworkRestrictedError: (error: { body?: { message?: string } }) => error?.body?.message === 'NETWORK_RESTRICTED',
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   useGetAllResourcesKey: 'resources',
@@ -42,8 +48,13 @@ vi.mock('@attraccess/react-query-client', () => ({
     limit === 1
       ? { data: { total: state.total }, isLoading: state.loading, refetch: state.refetch }
       : { data: { data: state.resources }, isLoading: state.listLoading },
-  useResourceUsageEndSession: (_mutationKey: unknown, { onSuccess }: { onSuccess: typeof state.onSuccess }) => {
+  useGetNetworkRestrictionStatusKey: 'network-status',
+  useResourceUsageEndSession: (
+    _mutationKey: unknown,
+    { onSuccess, onError }: { onSuccess: typeof state.onSuccess; onError: typeof state.onError },
+  ) => {
     state.onSuccess = onSuccess;
+    state.onError = onError;
     return { mutateAsync: state.end };
   },
 }));
@@ -52,6 +63,7 @@ beforeEach(() => {
   state.total = 2;
   state.loading = false;
   state.listLoading = false;
+  state.restricted = new Set();
   state.resources = [
     { id: 1, name: 'Lathe' },
     { id: 2, name: 'Saw' },
@@ -131,4 +143,15 @@ it('treats a resource where I no longer have a session as done without ending an
   expect(state.end).toHaveBeenCalledExactlyOnceWith({ path: { resourceId: 1 }, body: { usageId: 10 } });
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['active', 2] });
   expect(state.success).toHaveBeenCalledWith({ title: 'endedAll.success' });
+});
+it('keeps End all visible but disabled outside the allowed network, and says why', () => {
+  state.restricted = new Set(['usage.end']);
+  render(<ActiveUsageSessionsBanner onShowMySessions={vi.fn()} />);
+  expect(screen.getByRole('button', { name: 'endAll' })).toBeDisabled();
+  expect(screen.getByRole('note').textContent).toBe('onlyLocal');
+});
+it('asks for the network status again when ending is refused for the network', () => {
+  render(<ActiveUsageSessionsBanner onShowMySessions={vi.fn()} />);
+  state.onError?.({ body: { message: 'NETWORK_RESTRICTED' } });
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['network-status'] });
 });

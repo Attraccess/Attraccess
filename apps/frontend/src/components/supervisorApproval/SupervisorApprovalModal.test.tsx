@@ -4,6 +4,10 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SupervisorApprovalModal } from './SupervisorApprovalModal';
 
+const network = vi.hoisted(() => ({ restricted: new Set<string>() }));
+vi.mock('../../hooks/useNetworkRestriction', () => ({
+  useNetworkRestriction: () => ({ isRestricted: (action: string) => network.restricted.has(action) }),
+}));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   ...(await (() => ({
@@ -46,6 +50,15 @@ function renderModal(overrides = {}) {
 describe('SupervisorApprovalModal', () => {
   afterEach(() => {
     vi.useRealTimers();
+    network.restricted = new Set();
+  });
+
+  it('disables approve outside the allowed network but keeps reject, and says why', () => {
+    network.restricted = new Set(['supervision.approve']);
+    renderModal();
+    expect(screen.getByRole('button', { name: 'approve' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'reject' })).toBeEnabled();
+    expect(screen.getByRole('note')).toHaveTextContent('onlyLocal');
   });
 
   it('shows the requester and resource', () => {

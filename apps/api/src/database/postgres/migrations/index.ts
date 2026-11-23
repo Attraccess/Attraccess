@@ -7,6 +7,7 @@ import { AttractapDropBridgeResourceLinks1796100000001 } from './1796100000001-a
 import { SessionDurationLimits1796200000000 } from './1796200000000-session-duration-limits';
 import { SessionEndingSoonEmailTemplate1796200000001 } from './1796200000001-session-ending-soon-email-template';
 import { FormImages1796200000002 } from './1796200000002-form-images';
+import { RoleNetworkActions1796200000003 } from './1796200000003-role-network-actions';
 
 /** The released PostgreSQL migration track, in order. Later schema changes are appended here as new migrations. */
 export const postgresMigrations = [
@@ -19,4 +20,5 @@ export const postgresMigrations = [
   SessionDurationLimits1796200000000,
   SessionEndingSoonEmailTemplate1796200000001,
   FormImages1796200000002,
+  RoleNetworkActions1796200000003,
 ];

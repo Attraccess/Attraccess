@@ -1,3 +1,4 @@
+import { NetworkRestrictionService } from '../../../api/src/network-restriction/network-restriction.service';
 import { CanActivate, ExecutionContext, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -117,6 +118,7 @@ describe.each([['session' as const], ['api-token' as const]])('host start gate w
         { provide: ResourceActivityVisibilityService, useValue: {} },
         { provide: HostPreStartService, useValue: hostPreStart },
         { provide: SessionEndNotifier, useValue: {} },
+        { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
       ],
     })
       .overrideGuard(DualAuthGuard)

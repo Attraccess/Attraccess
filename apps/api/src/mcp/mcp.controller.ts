@@ -6,6 +6,7 @@ import type { Request, Response } from 'express';
 import type { AppConfigType } from '../config/app.config';
 import { SkipApiTokenRequestLimit } from '../users-and-auth/auth/api-token/api-token-request-rate-limit.interceptor';
 import { resolveIp } from '../users-and-auth/rate-limiting/login.rate-limit.guard';
+import { NetworkRestrictionService } from '../network-restriction/network-restriction.service';
 import { McpBearerGuard } from './mcp-bearer.guard';
 import { getMcpDelegation } from '../users-and-auth/strategies/mcp-delegation';
 import { McpRateLimit, McpRateLimitGuard } from './mcp-rate-limit.guard';
@@ -29,6 +30,7 @@ export class McpController {
     private readonly registry: McpToolRegistry,
     private readonly gateway: McpRestGateway,
     private readonly config: ConfigService,
+    private readonly networkRestriction: NetworkRestrictionService,
   ) {}
 
   @Post()
@@ -42,6 +44,7 @@ export class McpController {
       authorization: delegation ? undefined : req.headers.authorization,
       delegation,
       ip: resolveIp(req),
+      networkOrigin: await this.networkRestriction.originOf(req),
       userAgent: req.headers['user-agent'],
       host: req.headers.host,
     };

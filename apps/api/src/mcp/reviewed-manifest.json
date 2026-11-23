@@ -664,6 +664,31 @@
     "reason": "JSON request and response; the REST endpoint authorises every call.",
     "shape": "e198ef64"
   },
+  "getNetworkRestrictionStatus": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "ce909abd"
+  },
+  "getNetworkRestrictionSettings": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "cb3437f0"
+  },
+  "updateNetworkRestrictionSettings": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "6e952cf4"
+  },
+  "getNetworkRestrictionRoleActions": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "5bfd2d64"
+  },
+  "updateNetworkRestrictionRoleActions": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "836c93e0"
+  },
   "AuditController_meta": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",

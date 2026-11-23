@@ -21,6 +21,7 @@ import { getRateLimitDraft } from '../getRateLimitDraft';
 import { POLICY_FIELD_KEYS, POLICY_NUMBER_FIELDS } from '../policy-fields';
 import { policyValue } from '../policyValue';
 import { SecurityDrafts } from '../useSecurityDrafts';
+import { NetworkRestrictionDrafts } from '../useNetworkRestrictionDrafts';
 import { PolicyDiffModal } from './PolicyDiffModal';
 import en from '../en.json';
 import de from '../de.json';
@@ -30,9 +31,11 @@ function domainsHaveChanged(saved: string[] | undefined, draft: string[] | undef
   return draft.length !== saved.length || draft.some((domain, index) => domain !== saved[index]);
 }
 
-/** The stored values of the four groups, loaded by the section; each is `undefined` until (or unless) it arrives. */
+/** The stored values of the four policy groups (the network restriction loads its own), loaded by the section; each is `undefined` until (or unless) it arrives. */
 interface SecuritySaveBarProps {
   drafts: SecurityDrafts;
+  /** The network restriction card's edits; that group loads, saves and reports its own result. */
+  network: NetworkRestrictionDrafts;
   policy: PasswordPolicyDto | undefined;
   rateLimit: AuthRateLimitSettingsDto | undefined;
   twoFactorPolicy: TwoFactorPolicy | undefined;
@@ -40,11 +43,18 @@ interface SecuritySaveBarProps {
 }
 
 /**
- * Four backends stand behind this one bar, so Save fires only the mutations whose group is actually
+ * Five backends stand behind this one bar, so Save fires only the mutations whose group is actually
  * dirty. The password policy keeps a confirmation step in front of it — it is the one group here
  * that can make every existing password invalid at once.
  */
-export function SecuritySaveBar({ drafts, policy, rateLimit, twoFactorPolicy, savedDomains }: SecuritySaveBarProps) {
+export function SecuritySaveBar({
+  drafts,
+  network,
+  policy,
+  rateLimit,
+  twoFactorPolicy,
+  savedDomains,
+}: SecuritySaveBarProps) {
   const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
@@ -129,10 +139,13 @@ export function SecuritySaveBar({ drafts, policy, rateLimit, twoFactorPolicy, sa
   const isTwoFactorDirty = twoFactorValue !== undefined && twoFactorValue !== twoFactorPolicy;
   const isDomainsDirty = domainsHaveChanged(savedDomains, domainsDraft);
 
-  const isDirty = isRateDirty || isPolicyDirty || isTwoFactorDirty || isDomainsDirty;
-  const isSaving = isSavingPolicy || isSavingRateLimit || isSavingTwoFactor || isSavingDomains;
+  const isDirty = isRateDirty || isPolicyDirty || isTwoFactorDirty || isDomainsDirty || network.isDirty;
+  const isSaving = isSavingPolicy || isSavingRateLimit || isSavingTwoFactor || isSavingDomains || network.isSaving;
 
   const commit = () => {
+    if (network.isDirty) {
+      void network.save();
+    }
     if (isTwoFactorDirty && twoFactorValue) {
       saveTwoFactor({ body: { policy: twoFactorValue } });
     }
@@ -180,9 +193,16 @@ export function SecuritySaveBar({ drafts, policy, rateLimit, twoFactorPolicy, sa
       <SettingsSaveBar
         isDirty={isDirty}
         isSaving={isSaving}
-        isSaveDisabled={(isRateDirty && !isRateSavable) || (isPolicyDirty && !isPolicySavable)}
+        isSaveDisabled={
+          (isRateDirty && !isRateSavable) ||
+          (isPolicyDirty && !isPolicySavable) ||
+          (network.isDirty && network.isSaveDisabled)
+        }
         onSave={handleSave}
-        onDiscard={drafts.discard}
+        onDiscard={() => {
+          drafts.discard();
+          network.discard();
+        }}
       />
 
       <PolicyDiffModal

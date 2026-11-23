@@ -123,6 +123,7 @@ export { ResourceUsage } from './entities/resourceUsage.entity';
 export { NFCCard } from './entities/rfidCard.entity';
 export { NFCCardPendingChange } from './entities/nfcCardPendingChange.entity';
 export { RolePermission } from './entities/role-permission.entity';
+export { RoleNetworkAction } from './entities/role-network-action.entity';
 export { Role } from './entities/role.entity';
 export { Session } from './entities/session.entity';
 export { Setting } from './entities/setting.entity';
@@ -204,6 +205,7 @@ import { ResourceUsage } from './entities/resourceUsage.entity';
 import { NFCCard } from './entities/rfidCard.entity';
 import { NFCCardPendingChange } from './entities/nfcCardPendingChange.entity';
 import { RolePermission } from './entities/role-permission.entity';
+import { RoleNetworkAction } from './entities/role-network-action.entity';
 import { Role } from './entities/role.entity';
 import { Session } from './entities/session.entity';
 import { Setting } from './entities/setting.entity';
@@ -282,6 +284,7 @@ export const entities = {
   Permission,
   Role,
   RolePermission,
+  RoleNetworkAction,
   UserRole,
   ApiToken,
   ApiTokenPermission,

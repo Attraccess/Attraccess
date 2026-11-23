@@ -11,10 +11,11 @@ const state = vi.hoisted(() => ({
     reject: (error: unknown) => void;
   },
   toastError: vi.fn(),
+  toastApiError: vi.fn(),
 }));
 
 vi.mock('../../../../components/toastProvider', () => ({
-  useToastMessage: () => ({ error: state.toastError }),
+  useToastMessage: () => ({ error: state.toastError, apiError: state.toastApiError }),
 }));
 // The real TanStack mutation, with a request the test settles by hand.
 vi.mock('@attraccess/react-query-client', async (original) => {
@@ -87,4 +88,27 @@ it('still reports a generic error after unmount, but never a plugin confirmation
   const failure = startError(500, {});
   await act(async () => state.settle.reject(failure));
   await waitFor(() => expect(options.onError).toHaveBeenCalledWith(failure, {}));
+});
+
+it('shows the translated message for a network restriction and keeps it away from the caller error handlers', async () => {
+  const { result, options } = setup();
+  const invalidate = vi.spyOn(client, 'invalidateQueries');
+  const onCallError = vi.fn();
+  const restricted = startError(403, {
+    statusCode: 403,
+    message: 'NETWORK_RESTRICTED',
+    code: 'NETWORK_RESTRICTED',
+    action: 'usage.start',
+  });
+  act(() => result.current.start({}, onCallError));
+  await waitFor(() => expect(client.isMutating()).toBe(1));
+  await act(async () => state.settle.reject(restricted));
+  await waitFor(() =>
+    expect(state.toastApiError).toHaveBeenCalledWith(
+      expect.objectContaining({ error: restricted, baseTranslationKey: 'api' }),
+    ),
+  );
+  expect(options.onError).not.toHaveBeenCalled();
+  expect(onCallError).not.toHaveBeenCalled();
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['GetNetworkRestrictionStatus'] });
 });

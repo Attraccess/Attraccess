@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { EmailTemplateType } from '@attraccess/application-models';
+import { EmailTemplateType, NETWORK_RESTRICTION_HEADER_NAME_PATTERN } from '@attraccess/application-models';
 import { valid, validRange } from 'semver';
 import type { AuthenticationMethod } from '@attraccess/application-models';
 import { isAuthenticationMethod } from './projection';
@@ -126,6 +126,11 @@ export const SETTING_KEYS = [
   'attractap.cardWriterMode',
   'attractap.cardWriterReaders',
   'attractap.cardWriterReaderCount',
+  'networkRestriction.enabled',
+  'networkRestriction.allowedRanges',
+  'networkRestriction.ipSource',
+  'networkRestriction.headerName',
+  'networkRestriction.roleActions',
   'metrics.apiKeyConfigured',
   'metrics.slowQueryThresholdSeconds',
   ...['http', 'ws', 'cron', 'db', 'external', 'sse', 'flow'].map((key) => `metrics.toggles.${key}`),
@@ -366,12 +371,24 @@ export function projectAdministrationAuditEvent(input: AdministrationAuditInput)
   }
 }
 
+/** Audit values of the network restriction: IP ranges, a header name and role action lists, never free text. */
+function safeNetworkRestrictionValue(key: string, value: string): boolean {
+  if (key === 'networkRestriction.ipSource') return value === 'client' || value === 'header';
+  if (key === 'networkRestriction.headerName') return NETWORK_RESTRICTION_HEADER_NAME_PATTERN.test(value);
+  // A list too long for one value is recorded as what was removed and what was added; long values end in an ellipsis.
+  if (key === 'networkRestriction.allowedRanges') return /^(?:(?:removed|added): )?[0-9A-Za-z:./%_,-]*…?$/.test(value);
+  if (key === 'networkRestriction.roleActions') return /^[A-Za-z0-9_.-]+: [a-z.,]*…?$/.test(value);
+  return false;
+}
+
 function safeSettingValue(key: string, value: unknown): boolean {
   if (typeof value !== 'string') return false;
   if (key === 'app.defaultLanguage') return value === 'en' || value === 'de';
   if (key === 'resources.activityVisibility') return value === 'all' || value === 'introduced';
   if (key === 'attractap.cardWriterMode') return value === 'all' || value === 'selected';
   if (key === 'attractap.cardWriterReaders') return /^(?:\d+(?:,\d+)*)?$/.test(value);
+  if (key.startsWith('networkRestriction.') && !key.endsWith('.enabled'))
+    return safeNetworkRestrictionValue(key, value);
   if (value === '') return true;
   if (['app.url', 'app.publicInternetUrl'].includes(key)) return value === safeAuditOrigin(value);
   if (key === 'smtp.host') return value === safeAuditHost(value);

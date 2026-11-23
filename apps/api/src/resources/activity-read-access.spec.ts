@@ -1,3 +1,4 @@
+import { NetworkRestrictionService } from '../network-restriction/network-restriction.service';
 import {
   CanActivate,
   ExecutionContext,
@@ -214,6 +215,7 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
         { provide: FlowLogRecorderService, useValue: {} },
         { provide: PreStartService, useValue: { gateHttp: jest.fn() } },
         { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
+        { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
       ],
     })
       .overrideGuard(DualAuthGuard)

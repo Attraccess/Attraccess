@@ -13,12 +13,19 @@ import {
   useResourceIntroducersIsIntroducer,
   useResourceUsageEndSession,
   useMessagingContactResourceHolder,
+  ApiError,
   FormSubmissionRequestDto,
   UseResourceUsageGetActiveSessionKeyFn,
   UseResourceUsageGetHistoryKeyFn,
 } from '@attraccess/react-query-client';
+import { NetworkRestrictedAction } from '@attraccess/application-models';
+import { useNetworkRestriction } from '../../../../../hooks/useNetworkRestriction';
+import { NetworkRestrictedHint } from '../../../../../components/networkRestriction/NetworkRestrictedHint';
 import { useAuth } from '../../../../../hooks/useAuth';
 import { useToastMessage } from '../../../../../components/toastProvider';
+import { useRefreshNetworkRestrictionOnError } from '../../../../../hooks/useRefreshNetworkRestrictionOnError';
+import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
@@ -54,9 +61,16 @@ export interface OtherUserSessionDisplayProps {
 }
 
 export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayProps) {
-  const { t } = useTranslations({ en, de });
+  const { t, tExists } = useTranslations({
+    en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
+    de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
+  });
   const { hasPermission, user } = useAuth();
-  const { success, error: showError } = useToastMessage();
+  const { isRestricted } = useNetworkRestriction();
+  const takeoverRestricted = isRestricted(NetworkRestrictedAction.UsageTakeover);
+  const endRestricted = isRestricted(NetworkRestrictedAction.UsageEnd);
+  const { success, error: showError, apiError } = useToastMessage();
+  const refreshNetworkRestriction = useRefreshNetworkRestrictionOnError();
   const invalidateSessionHistory = useInvalidateSessionHistory(resourceId);
   const navigate = useNavigate();
   const [isTakeoverNotesModalOpen, setIsTakeoverNotesModalOpen] = useState(false);
@@ -113,7 +127,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
   const stopSession = useResourceUsageEndSession(undefined, {
     onSuccess: () => {
       clearFormsDraft();
-      setIsTakeoverNotesModalOpen(false);
+      setIsStopOtherUserSessionNotesModalOpen(false);
 
       invalidateSessionHistory();
 
@@ -121,6 +135,12 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
         title: t('stopOtherUserSession.successful'),
         description: t('stopOtherUserSession.successfulDescription'),
       });
+    },
+    onError: (err) => {
+      // e.g. NETWORK_RESTRICTED when the user's network changed since the controls were drawn. The notes modal stays
+      // open (the notes typed into it are cleared on confirm), and the refreshed status disables the control.
+      refreshNetworkRestriction(err);
+      apiError({ error: err as ApiError, t, tExists, baseTranslationKey: 'api' });
     },
   });
 
@@ -272,12 +292,18 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{t('takeover.available')}</p>
             <ButtonGroup className="w-full">
-              <Button variant="danger-soft" isPending={startSession.isPending} onPress={handleImmediateTakeover}>
+              <Button
+                variant="danger-soft"
+                isPending={startSession.isPending}
+                isDisabled={takeoverRestricted}
+                onPress={handleImmediateTakeover}
+              >
                 <UserX className="w-4 h-4" />
                 {t('takeover.button')}
               </Button>
               <Dropdown>
                 <DropdownTrigger
+                  isDisabled={takeoverRestricted}
                   className={`${buttonVariants({ isIconOnly: true, variant: 'danger-soft' })} inline-flex items-center justify-center`}
                 >
                   <ChevronDownIcon />
@@ -291,6 +317,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
                 </DropdownPopover>
               </Dropdown>
             </ButtonGroup>
+            <NetworkRestrictedHint actions={NetworkRestrictedAction.UsageTakeover} className="mt-2" />
           </div>
         )}
 
@@ -298,12 +325,18 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{t('stopOtherUserSession.available')}</p>
             <ButtonGroup className="w-full">
-              <Button variant="danger" isPending={stopSession.isPending} onPress={handleImmediateStopOtherUserSession}>
+              <Button
+                variant="danger"
+                isPending={stopSession.isPending}
+                isDisabled={endRestricted}
+                onPress={handleImmediateStopOtherUserSession}
+              >
                 <UserX className="w-4 h-4" />
                 {t('stopOtherUserSession.button')}
               </Button>
               <Dropdown>
                 <DropdownTrigger
+                  isDisabled={endRestricted}
                   className={`${buttonVariants({ isIconOnly: true, variant: 'danger' })} inline-flex items-center justify-center`}
                 >
                   <ChevronDownIcon />
@@ -321,6 +354,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
                 </DropdownPopover>
               </Dropdown>
             </ButtonGroup>
+            <NetworkRestrictedHint actions={NetworkRestrictedAction.UsageEnd} className="mt-2" />
           </div>
         )}
       </SessionStatusCard>

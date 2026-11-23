@@ -7,6 +7,8 @@ import { Controller, ForbiddenException, Get, Param, ParseIntPipe, Post, Query, 
 
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
+import { NetworkRestrictedAction } from '@attraccess/application-models';
+import { NetworkRestrictionService } from '../../../network-restriction/network-restriction.service';
 import { CanControlResponseDto } from '../dtos/canControl.response.dto';
 
 import { StartBlockedResponseDto } from '../dtos/startBlocked.response.dto';
@@ -39,6 +41,7 @@ export class ResourceUsageController {
     protected readonly activityVisibility: ResourceActivityVisibilityService,
     protected readonly preStart: PreStartService,
     protected readonly sessionEnd: SessionEndNotifier,
+    protected readonly networkRestriction: NetworkRestrictionService,
   ) {}
 
   @Post('lock')
@@ -65,6 +68,7 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<UsageSessionResponse> {
+    await this.networkRestriction.assertAllowed(req, NetworkRestrictedAction.DoorLock, resourceId);
     return toUsageSessionResponse(await this.resourceUsageService.lockDoor(resourceId, req.user));
   }
 
@@ -92,6 +96,11 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<UsageSessionResponse> {
+    // On an access-only door an unlock opens it, so it needs what Open needs.
+    const action = (await this.resourceUsageService.isAccessOnlyDoor(resourceId))
+      ? NetworkRestrictedAction.DoorOpen
+      : NetworkRestrictedAction.DoorUnlock;
+    await this.networkRestriction.assertAllowed(req, action, resourceId);
     return toUsageSessionResponse(await this.resourceUsageService.unlockDoor(resourceId, req.user));
   }
 
@@ -119,6 +128,7 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<UsageSessionResponse> {
+    await this.networkRestriction.assertAllowed(req, NetworkRestrictedAction.DoorUnlatch, resourceId);
     return toUsageSessionResponse(await this.resourceUsageService.unlatchDoor(resourceId, req.user));
   }
 
@@ -146,6 +156,7 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<UsageSessionResponse> {
+    await this.networkRestriction.assertAllowed(req, NetworkRestrictedAction.DoorOpen, resourceId);
     return toUsageSessionResponse(await this.resourceUsageService.openDoor(resourceId, req.user));
   }
 
@@ -267,6 +278,12 @@ export class ResourceUsageController {
     @Body() dto: StartUsageSessionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<UsageSessionResponse> {
+    // Before the plugin pre-start gate: a refused request must not trigger any side effect.
+    await this.networkRestriction.assertAllowed(
+      req,
+      dto.forceTakeOver ? NetworkRestrictedAction.UsageTakeover : NetworkRestrictedAction.UsageStart,
+      resourceId,
+    );
     // Only a browser session is "web"; API-token and MCP clients are programmatic.
     const origin =
       req.user.authenticationMethod === undefined || req.user.authenticationMethod === 'session' ? 'web' : 'api';
@@ -310,6 +327,7 @@ export class ResourceUsageController {
     @Body() dto: EndUsageSessionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<UsageSessionResponse> {
+    await this.networkRestriction.assertAllowed(req, NetworkRestrictedAction.UsageEnd, resourceId);
     const ended = await this.resourceUsageService.endSession(resourceId, req.user, dto, {
       auditOrigin: auditActorOf(req.user),
     });

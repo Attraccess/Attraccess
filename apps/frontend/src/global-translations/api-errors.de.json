@@ -251,6 +251,10 @@
     "title": "CSV-Datei ohne Daten",
     "description": "Die CSV-Datei hat keine Kopfzeile oder keine Zeilen darunter. Die erste Zeile muss die Spaltennamen enthalten, danach folgt eine Zeile pro Benutzer."
   },
+  "NETWORK_RESTRICTED": {
+    "title": "Nur aus dem lokalen Netzwerk verfügbar",
+    "description": "Diese Aktion ist nur aus dem lokalen Netzwerk verfügbar. Verbinde dich mit dem lokalen Netzwerk und versuche es erneut."
+  },
   "SESSION_DURATION_ESTIMATE_REQUIRED": {
     "title": "Dauerschätzung erforderlich",
     "description": "Diese Maschine fragt, wie lange du sie nutzen wirst. Lade die Seite neu und gib deine geschätzte Zeit an."

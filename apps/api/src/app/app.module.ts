@@ -31,6 +31,7 @@ import { BillingModule } from '../billing/billing.module';
 import { EncryptionModule } from '../encryption/encryption.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { SettingsModule } from '../settings/settings.module';
+import { NetworkRestrictionModule } from '../network-restriction/network-restriction.module';
 import { SettingsService } from '../settings/settings.service';
 import { MetricsModule } from '../metrics/metrics.module';
 import { VersionModule } from '../version/version.module';
@@ -54,6 +55,7 @@ const logger = new Logger('AppModule');
     ScheduleModule.forRoot(),
     UsersAndAuthModule,
     SettingsModule,
+    NetworkRestrictionModule,
     SecurityModule,
     DatabaseConnectionModule,
     AuditModule,
