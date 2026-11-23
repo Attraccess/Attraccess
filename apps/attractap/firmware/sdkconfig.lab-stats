@@ -1,0 +1,14 @@
+# FreeRTOS run-time stats for lab images (ATT-1276): the `debug.stats` serial topic
+# (src/serial/task_stats.cpp) prints a per-task CPU table when these are on. CMakeLists.txt
+# layers this file after sdkconfig.defaults for builds with -DATTRACTAP_TEST_HOOKS=ON (not
+# for a release secure profile). sdkconfig.debug carries the same options
+# (tools/test_check_release_build.py keeps them in step). Never in release images:
+# tools/check_release_build.py fails a build whose sdkconfig enables the stats or whose
+# image contains the `debug.stats` topic.
+CONFIG_FREERTOS_USE_TRACE_FACILITY=y
+CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS=y
+# 64-bit counters: the default 32-bit ones wrap after 71 minutes and the CPU shares turn to nonsense.
+CONFIG_FREERTOS_RUN_TIME_COUNTER_TYPE_U64=y
+CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS=y
+# Adds TaskStatus_t::xCoreID, the table's Core column (without it the column shows "-").
+CONFIG_FREERTOS_VTASKLIST_INCLUDE_COREID=y
