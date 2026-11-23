@@ -1,6 +1,7 @@
 // The demo CNC form's draft check and its image field: like the real server, a link for the QR code and the photos received so far.
 // The pretend phone adds one photo on every count poll, so the reader's live count can be watched.
 
+#ifdef DEMO_MODE
 #include "websocket.hpp"
 #include "fixtures.hpp"
 #include <ArduinoJson.h>
@@ -26,3 +27,5 @@ bool DemoWebsocket::cncFormComplete() const
     }
     return true;
 }
+
+#endif
