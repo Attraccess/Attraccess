@@ -4,6 +4,8 @@ import { AttractapController } from './attractap.controller';
 import { ResourceAttractapsController } from './resource-attractaps.controller';
 import { AttractapService } from './attractap.service';
 import { WebsocketService } from './websockets/websocket.service';
+import { ReaderRouter } from './websockets/reader-router';
+import { ReaderScreenService } from './websockets/reader-screen.service';
 import { AttractapGateway } from './websockets/websocket.gateway';
 import { AttractapNfcCardsController } from './card.controller';
 import { CardAccessService } from './card-access.service';
@@ -125,6 +127,8 @@ import { ResourceListVisibilityModule } from '../resources/visibility/resource-l
     CardOperationsService,
     CardWriterPolicyService,
     WebsocketService,
+    ReaderRouter,
+    ReaderScreenService,
     AttractapGateway,
     WebSocketEventService,
     AttractapFirmwareService,

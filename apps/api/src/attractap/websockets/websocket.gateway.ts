@@ -1,5 +1,5 @@
 import { OnEvent } from '@nestjs/event-emitter';
-import { Inject, Logger, UseInterceptors } from '@nestjs/common';
+import { Inject, Logger, Optional, UseInterceptors } from '@nestjs/common';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -42,6 +42,7 @@ import { PAIRING_SUBPROTOCOL, SESSION_SUBPROTOCOL } from '../security/session-fr
 import { readerWebSocketOptions } from './websocket-transport-options';
 import { WebsocketService } from './websocket.service';
 import { LegacyFirmwareUpdateService } from './legacy-firmware-update.service';
+import { ReaderRouter } from './reader-router';
 import { ReaderTimeZoneService } from './reader-time-zone.service';
 import { readerHeartbeat } from './websocket-reader-payloads';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
@@ -140,6 +141,15 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @Inject(ReaderSessionService)
   protected readerSessionService: ReaderSessionService;
+
+  @Optional()
+  @Inject(ReaderRouter)
+  protected readerRouter?: ReaderRouter;
+
+  /** Without Nest (unit tests) this instance is the whole cluster. */
+  protected get router(): ReaderRouter {
+    return (this.readerRouter ??= new ReaderRouter(this.websocketService));
+  }
 
   protected readonly connectedAt = new WeakMap<object, bigint>();
 
@@ -482,6 +492,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     await this.readerSessionService.accept(client as unknown as AuthenticatedWebSocket, session, (socket) => {
       this.websocketService.sockets.set(socket.id, socket);
       this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
+      // Other instances route this reader's work here from now on (ATT-1163).
+      if (socket.readerId) this.router.cluster.presence.socketConnected(socket.readerId, socket.id);
     });
   }
 
@@ -532,6 +544,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     cleanupSocketState(socket, { uiHandler: this.uiHandler, crashReportHandler: this.crashReportHandler });
     this.websocketService.sockets.delete(socket.id);
     this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
+    if (readerId) this.router.cluster.presence.socketDisconnected(readerId, socket.id);
   }
 
   protected async clientWasActive(socket: AuthenticatedWebSocket) {
