@@ -72,10 +72,10 @@ Wenn Sie **Einzelauswahl** als Feldtyp wählen, müssen Sie die verfügbaren Opt
 Verwenden Sie ein **Bild**-Feld, wenn Benutzer Fotos anhängen sollen, zum Beispiel um Schäden bei der Rückgabe einer Maschine zu dokumentieren.
 
 1. Setzen Sie den Feldtyp auf **Bild**
-2. Legen Sie **Max. Bilder** fest (1 bis 10, Standard 1). Mehr Fotos können Benutzer nicht hinzufügen.
+2. Legen Sie **Max. Bilder** fest (1 bis 10, Standard 1): Benutzer können bis zu so viele Fotos anhängen
 3. Markieren Sie das Feld als **Pflichtfeld**, wenn mindestens ein Foto nötig ist
 
-Im Web tippen Benutzer auf **Foto aufnehmen** (öffnet auf Smartphones die Kamera, am Computer die Dateiauswahl) oder **Hochladen**. Jedes Foto wird sofort hochgeladen und als Vorschaubild mit einer Schaltfläche zum Entfernen angezeigt. Solange ein Foto noch hochgeladen wird, lässt sich das Formular nicht absenden.
+Im Web tippen Benutzer auf **Foto aufnehmen** (öffnet auf Smartphones die Kamera, am Computer die Dateiauswahl) oder **Hochladen**. Jedes Foto wird sofort hochgeladen und als Vorschaubild mit einer Schaltfläche zum Entfernen angezeigt. Ein Foto über 10 MB wird vor dem Hochladen im Browser verkleinert. Solange ein Foto noch hochgeladen wird, lässt sich das Formular nicht absenden.
 
 Auf einem [Attractap](attractap/using-the-reader.md)-Touchleser zeigt das Gerät einen QR-Code. Der Benutzer scannt ihn mit dem Smartphone, nimmt die Fotos dort auf oder lädt sie hoch, und das Lesegerät zeigt, wie viele Fotos angekommen sind („N von M Fotos“).
 
@@ -84,7 +84,7 @@ Auf einem [Attractap](attractap/using-the-reader.md)-Touchleser zeigt das Gerät
 
 **Die Smartphone-Seite**
 
-- Sie öffnet sich ohne Anmeldung. Wer den Link hat, kann Fotos zu diesem offenen Formular hinzufügen. Der Link ist deshalb kurzlebig: Er funktioniert 15 Minuten lang, endet, sobald das Formular am Lesegerät beendet ist (abgesendet, abgebrochen, abgemeldet oder ein anderer Benutzer meldet sich an), und nimmt keine weiteren Fotos mehr an, sobald die maximale Anzahl hochgeladen wurde (ein entferntes Foto schafft wieder Platz).
+- Sie öffnet sich ohne Anmeldung. Wer den QR-Code am Lesegerät scannt oder fotografiert, solange der Link gilt, kann in diesem Feld Fotos hinzufügen oder entfernen. Der Link ist deshalb kurzlebig: Er funktioniert nach 15 Minuten nicht mehr, oder schon früher, wenn das Formular am Lesegerät endet (abgesendet, abgebrochen, abgemeldet oder ein anderer Benutzer meldet sich an). Sobald die maximale Anzahl hochgeladen wurde, nimmt er keine weiteren Fotos mehr an (ein entferntes Foto schafft wieder Platz).
 - Wer einen abgelaufenen Link öffnet, sieht den Hinweis, das Formular am Lesegerät erneut zu öffnen.
 - Die Fotos werden Teil der Einreichung, sobald der Benutzer das Formular am Lesegerät absendet.
 
@@ -95,7 +95,7 @@ Auf einem [Attractap](attractap/using-the-reader.md)-Touchleser zeigt das Gerät
 > [!WARNING]
 > Fotos können Personen zeigen. Jedes Foto wird als JPEG neu kodiert, aufrecht gedreht, auf höchstens 2560 px an der langen Seite verkleinert, und **alle Metadaten, auch der GPS-Standort, werden entfernt**. Der Bildinhalt selbst bleibt erhalten.
 
-**Speicher.** Fotos liegen auf dem Server im Speicherverzeichnis (`STORAGE_ROOT`, Unterordner `form-images`) und werden nicht öffentlich ausgeliefert. Ein Foto, das nie abgesendet wird, wird nach 24 Stunden gelöscht. Abgesendete Fotos bleiben so lange wie ihre Einreichung. Fotos brauchen Speicherplatz: Planen Sie die Kapazität und sichern Sie sie zusammen mit dem Speicher-Volume.
+**Speicher.** Fotos liegen auf dem Server im Speicherverzeichnis (`STORAGE_ROOT`, Unterordner `form-images`) und werden nicht öffentlich ausgeliefert. Ein Foto, das nie abgesendet wird, wird nach 24 Stunden gelöscht. Abgesendete Fotos bleiben so lange wie ihre Einreichung. Jeder Benutzer kann nur eine begrenzte Zahl von Fotos gleichzeitig haben, die noch auf das Absenden eines Formulars warten, und Uploads sind in der Häufigkeit begrenzt. Fotos brauchen Speicherplatz: Planen Sie die Kapazität und sichern Sie sie zusammen mit dem Speicher-Volume.
 
 ## Formular bearbeiten
 

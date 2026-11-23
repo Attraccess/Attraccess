@@ -129,6 +129,8 @@ Ihre Organisation kann vor dem Start oder Ende einer Nutzung Angaben abfragen, z
 
 ![Formular zum Nutzungsende mit dem Pflichtfeld Sichtprüfung und der Schaltfläche Absenden](../../_media/attractap/usage-end-form.png)
 
+Zum Abbrechen tippen Sie auf das **×** oben rechts. Sie kehren zur Liste oder zu den Details zurück, von wo aus Sie die Aktion begonnen haben. Wenn Sie ein erforderliches Formular abbrechen, wird auch die Anfrage zum Starten oder Beenden der Nutzung abgebrochen.
+
 ### Fotos mit dem Smartphone hinzufügen
 
 Ein Fotofeld zeigt einen QR-Code, den Hinweis **Mit dem Handy scannen, um Fotos hinzuzufügen** und einen Zähler wie **0 von 3 Fotos**.
@@ -137,9 +139,7 @@ Ein Fotofeld zeigt einen QR-Code, den Hinweis **Mit dem Handy scannen, um Fotos 
 2. Nehmen Sie Fotos auf oder laden Sie sie vom Smartphone hoch.
 3. Der Zähler am Leser aktualisiert sich innerhalb weniger Sekunden. Tippen Sie dann wie gewohnt auf **Weiter** oder **Absenden**.
 
-Ist das Feld erforderlich und noch kein Foto angekommen, erscheint der Grund auf der Schaltfläche. Der Link gilt 15 Minuten, bis Sie das Formular absenden oder abbrechen, sich abmelden oder sich jemand anderes anmeldet, und er nimmt keine weiteren Fotos mehr an, sobald die maximale Anzahl hochgeladen ist (ein entferntes Foto schafft wieder Platz). Ist er abgelaufen, öffnen Sie das Formular am Leser erneut. Ein Leser mit älterer Firmware kann keine Fotofelder anzeigen: Er überspringt optionale, bei einem erforderlichen bittet er Sie, das Formular in der Web-App auszufüllen.
-
-Zum Abbrechen tippen Sie auf das **×** oben rechts. Sie kehren zur Liste oder zu den Details zurück, von wo aus Sie die Aktion begonnen haben. Wenn Sie ein erforderliches Formular abbrechen, wird auch die Anfrage zum Starten oder Beenden der Nutzung abgebrochen.
+Ist das Feld erforderlich und noch kein Foto angekommen, erscheint der Grund auf der Schaltfläche. Wer den QR-Code scannt, solange der Link gilt, kann in diesem Feld Fotos hinzufügen oder entfernen. Der Link ist deshalb kurzlebig: Er funktioniert nach 15 Minuten nicht mehr, oder schon früher, wenn Sie das Formular absenden oder abbrechen, sich abmelden oder sich jemand anderes anmeldet. Sobald die maximale Anzahl hochgeladen ist, nimmt er keine weiteren Fotos mehr an (ein entferntes Foto schafft wieder Platz). Ist er abgelaufen, öffnen Sie das Formular am Leser erneut. Ein Leser mit älterer Firmware kann keine Fotofelder anzeigen: Er überspringt optionale, bei einem erforderlichen zeigt er **Formular mit Foto** und bittet Sie, das Formular in der Web-App auszufüllen.
 
 ## Eine Aufsicht anfordern
 

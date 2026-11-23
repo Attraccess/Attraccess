@@ -72,10 +72,10 @@ When you choose **Single choice** as the field type, you need to define the avai
 Use an **Image** field when users should attach photos, for example to document damage when they return a machine.
 
 1. Set the field type to **Image**
-2. Set **Max. images** (1 to 10, default 1). Users cannot add more photos than this.
+2. Set **Max. images** (1 to 10, default 1): users can attach up to this many photos
 3. Mark the field as **Required** if at least one photo is needed
 
-On the web, users tap **Take photo** (opens the camera on phones, the file picker on a computer) or **Upload**. Each photo is uploaded at once and shown as a thumbnail with a button to remove it. The form cannot be submitted while a photo is still uploading.
+On the web, users tap **Take photo** (opens the camera on phones, the file picker on a computer) or **Upload**. Each photo is uploaded at once and shown as a thumbnail with a button to remove it. A photo larger than 10 MB is scaled down in the browser before it is uploaded. The form cannot be submitted while a photo is still uploading.
 
 On an [Attractap](attractap/using-the-reader.md) touch reader, the reader shows a QR code. The user scans it with their phone, takes or uploads the photos there, and the reader shows how many photos have arrived ("N von M Fotos").
 
@@ -84,7 +84,7 @@ On an [Attractap](attractap/using-the-reader.md) touch reader, the reader shows 
 
 **The phone page**
 
-- It opens without signing in. Whoever holds the link can add photos to that open form, so the link is short-lived: it stops working after 15 minutes, as soon as the form on the reader ends (submitted, cancelled, signed out or another user signs in) and it takes no more photos once the maximum number has been uploaded (removing a photo makes room for another).
+- It opens without signing in. Anyone who scans or photographs the QR code on the reader while the link is valid can add or remove photos in that field, so the link is short-lived: it stops working after 15 minutes, or earlier when the form on the reader ends (submitted, cancelled, signed out or another user signs in). Once the maximum number has been uploaded, it takes no more photos (removing a photo makes room for another).
 - A user who opens an expired link sees a notice to open the form on the reader again.
 - The photos become part of the submission when the user submits the form on the reader.
 
@@ -95,7 +95,7 @@ On an [Attractap](attractap/using-the-reader.md) touch reader, the reader shows 
 > [!WARNING]
 > Photos may show people. Every photo is re-encoded as JPEG, turned upright, scaled down to at most 2560 px on the long side, and **all metadata, including GPS location, is removed**. The picture content itself is kept.
 
-**Storage.** Photos are stored on the server in the storage directory (`STORAGE_ROOT`, subfolder `form-images`) and are not served publicly. A photo that is never submitted is deleted after 24 hours. Submitted photos are kept as long as their submission. Photos need disk space, so plan capacity and back them up together with the storage volume.
+**Storage.** Photos are stored on the server in the storage directory (`STORAGE_ROOT`, subfolder `form-images`) and are not served publicly. A photo that is never submitted is deleted after 24 hours. Submitted photos are kept as long as their submission. Each user can only have a limited number of photos waiting for a form submission at a time, and uploads are rate limited. Photos need disk space, so plan capacity and back them up together with the storage volume.
 
 ## Editing a Form
 
