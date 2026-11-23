@@ -23,7 +23,7 @@ import pytest
 from attractap_lab import efuse, ota_images
 from attractap_lab.drivers import ESPToolDriver
 
-from conftest import PROFILE, reboot_reader
+from conftest import PROFILE, open_console, reboot_reader
 
 pytestmark = pytest.mark.skipif(PROFILE != efuse.PLAIN, reason="the conversion runs on the plain lab reader only")
 
@@ -34,19 +34,26 @@ TRANSFER_TIMEOUT = 900
 ONLINE_TIMEOUT = 180
 
 
-def read_efuse_blocks(target):
-    """Raw eFuse blocks and the summary over USB (resets the reader)."""
+def read_efuse_blocks(target, reader):
+    """Raw eFuse blocks and the summary over USB. The console gives the port up first (as in reboot_reader); the
+    read resets the reader, and the console is reopened afterwards."""
     flash = target.get_driver(ESPToolDriver, activate=False)
+    driver = target.get_driver("SerialDriver", activate=False)
+    console = reader["console"]
+    console.stop()
+    target.deactivate(driver)
     target.activate(flash)
     try:
         return efuse.parse(flash.read_efuses())
     finally:
         target.deactivate(flash)
+        open_console(target, driver)
+        console.start()
 
 
 @pytest.fixture(scope="module")
 def efuse_before(target, reader):
-    summary, blocks = read_efuse_blocks(target)
+    summary, blocks = read_efuse_blocks(target, reader)
     reboot_reader(target, reader)
     return summary, blocks
 
@@ -127,7 +134,7 @@ def test_preflight_passes_and_reads_only(api, admin, bench, reader):
     assert checks["chip"]["value"].startswith("esp32s3")
     assert all(check["ok"] for check in result["checks"]), result
     log = reader["console"].since(mark)
-    assert b"Burning" not in log and b"Writing the secure bootloader" not in log
+    assert "Burning" not in log and "Writing the secure bootloader" not in log
 
 
 def test_preflight_fails_on_a_simulated_mismatch(api, admin, bench):
@@ -170,7 +177,7 @@ def test_transfer_resumes_after_a_reset_verifies_and_the_burn_is_refused(api, ad
     assert conversion["verified"] is True
     assert status["canRetry"] is True
     log = reader["console"].since(mark)
-    assert b"Burning the Secure Boot digests" not in log
+    assert "Burning the Secure Boot digests" not in log
 
     # The reader restarts into its plain app and comes back normally; the server took the digests back.
     reader["console"].expect(r"Conversion stopped \([^)]*\); restarting", mark, 60)
@@ -199,7 +206,7 @@ def test_a_retry_can_be_cancelled_during_the_transfer(api, admin, bench, reader,
 
 def test_no_efuse_changed(target, reader, bench, efuse_before):
     _, before = efuse_before
-    summary, after = read_efuse_blocks(target)
+    summary, after = read_efuse_blocks(target, reader)
     reboot_reader(target, reader)
     assert after == before
     assert summary["KEY_PURPOSE_0"]["value"] == "USER" and summary["KEY_PURPOSE_1"]["value"] == "USER"

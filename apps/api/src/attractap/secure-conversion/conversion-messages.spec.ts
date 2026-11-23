@@ -26,6 +26,7 @@ describe('conversion message parsing', () => {
     expect(parseConversionMessage({ t: 'conversion.bootloader-written', id: 1, ok: false, sha256: '' })).toMatchObject({
       sha256: null,
     });
+    expect(parseConversionMessage({ ...preflightBody(), id: null })).toMatchObject({ id: 0 });
     expect(parseConversionMessage(preflightBody())).toMatchObject({ t: 'conversion.preflight-report', id: 3 });
   });
 

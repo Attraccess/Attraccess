@@ -156,6 +156,8 @@ function parseKeys(keys: unknown): PreflightKey[] | null {
 }
 
 function parsePreflight(body: Obj): PreflightReport | null {
+  // The standalone (admin) preflight has no conversion: the server sends id 0, the firmware answers with null.
+  if (body['id'] === null) body = { ...body, id: 0 };
   const keys = parseKeys(body['keys']);
   const jtag = body['jtag'];
   const valid =

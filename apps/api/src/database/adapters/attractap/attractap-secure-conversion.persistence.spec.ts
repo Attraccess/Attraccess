@@ -39,30 +39,32 @@ describe('secure conversion store on PostgreSQL', () => {
   it('keeps one active conversion per installation and moves states only from the expected ones', async () => {
     const at = new Date('2026-11-23T10:00:00Z');
     const first = await store.insert(conversion(1), at);
+    if (!first) throw new Error('the first conversion was refused');
     expect(first).toMatchObject({ readerId: 1, state: 'preflight', target, verified: false, bytesDone: 0 });
     await expect(store.insert(conversion(2), at)).resolves.toBeNull();
 
     // Compare and set: a transition from a state the row is not in does nothing.
-    await expect(store.update(first!.id, { state: 'digests-burned' }, ['transferring'])).resolves.toBeNull();
+    await expect(store.update(first.id, { state: 'digests-burned' }, ['transferring'])).resolves.toBeNull();
     const moved = await store.update(
-      first!.id,
+      first.id,
       { state: 'transferring', bytesTotal: 12288, preflight: [{ check: 'chip', ok: true, value: 'esp32s3 v0.2' }] },
       ['preflight'],
     );
     expect(moved).toMatchObject({ state: 'transferring', bytesTotal: 12288, preflight: [{ check: 'chip' }] });
-    await expect(store.findActive()).resolves.toMatchObject({ id: first!.id });
+    await expect(store.findActive()).resolves.toMatchObject({ id: first.id });
 
     // A terminal state ends the conversion: another one may start.
     const burnReport = { mac: 'dc:b4:d9:21:71:c8', digest0: '1'.repeat(64), digest1: '2'.repeat(64) };
     await store.update(
-      first!.id,
+      first.id,
       { state: 'failed', failedInState: 'transferring', failureReason: 'digest-mismatch', burnReport, endedAt: at },
       ['transferring'],
     );
     await expect(store.findActive()).resolves.toBeNull();
     const second = await store.insert(conversion(2), at);
-    expect(second?.readerId).toBe(2);
+    if (!second) throw new Error('the second conversion was refused');
+    expect(second.readerId).toBe(2);
     await expect(store.findLatestForReader(1)).resolves.toMatchObject({ state: 'failed', burnReport });
-    await expect(store.listActiveFor([1, 2])).resolves.toEqual([expect.objectContaining({ id: second!.id })]);
+    await expect(store.listActiveFor([1, 2])).resolves.toEqual([expect.objectContaining({ id: second.id })]);
   });
 });

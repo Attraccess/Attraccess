@@ -158,7 +158,8 @@ export class EmulatedConversionDevice {
     };
     return {
       t: 'conversion.preflight-report',
-      id,
+      // Like the firmware: the standalone preflight (id 0) is answered with id null.
+      id: id === 0 ? null : id,
       chip: 'esp32s3',
       chipRevision: 2,
       flashSize: this.faults.smallFlash ? 4 * 1024 * 1024 : 16 * 1024 * 1024,
