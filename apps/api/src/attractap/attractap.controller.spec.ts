@@ -5,6 +5,7 @@ import { AttractapController } from './attractap.controller';
 import { AttractapService } from './attractap.service';
 import { AttractapGateway } from './websockets/websocket.gateway';
 import { WebsocketService } from './websockets/websocket.service';
+import type { ResourceListVisibilityService } from '../resources/visibility/resource-list-visibility.service';
 
 describe('AttractapController', () => {
   // Instantiated directly: routing this through the Nest testing module would drag in the auth and
@@ -19,19 +20,34 @@ describe('AttractapController', () => {
     deleteReader: jest.fn(),
     recordReaderDeregistration: jest.fn().mockResolvedValue(undefined),
   };
+  // Managers see every reader unchanged; `narrowTo` switches to the permitted view with the given visible ids.
+  const listVisibility = {
+    scopeOf: jest.fn(async () => 'all'),
+    filterVisible: jest.fn(async (_user: unknown, ids: number[]) => ids),
+  };
+  const narrowTo = (visible: number[]) => {
+    listVisibility.scopeOf.mockResolvedValue('permitted');
+    listVisibility.filterVisible.mockImplementation(async (_user, ids) => ids.filter((id) => visible.includes(id)));
+  };
+  const req = { user: { id: 3 } } as never;
   const controller = new AttractapController(
     {} as AttractapGateway,
     {} as WebsocketService,
     attractapService as unknown as AttractapService,
     {} as CardAccessService,
+    listVisibility as unknown as ResourceListVisibilityService,
   );
 
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    listVisibility.scopeOf.mockResolvedValue('all');
+    listVisibility.filterVisible.mockImplementation(async (_user, ids) => ids);
+  });
 
   // ATT-816: the supervised-start popup groups readers by the resource they are attached to. The
   // relation is not eager, so omitting it here makes every reader look unattached in the response.
   it('loads the resources relation when listing readers', async () => {
-    await controller.getReaders();
+    await controller.getReaders(req);
 
     expect(attractapService.getPairedReaders).toHaveBeenCalledWith(expect.objectContaining({ withResources: true }));
   });
@@ -43,32 +59,32 @@ describe('AttractapController', () => {
     attractapService.getPairedReaders.mockResolvedValueOnce(paired);
     attractapService.getReadersToPair.mockResolvedValueOnce(revoked);
 
-    await expect(controller.getReaders()).resolves.toEqual(paired.map(toReaderDto));
+    await expect(controller.getReaders(req)).resolves.toEqual(paired.map(toReaderDto));
     await expect(controller.getReadersToPair()).resolves.toEqual(revoked.map(toReaderDto));
   });
 
   it.each(['revoked'])('does not show a %s reader by id', async (pairingState) => {
     attractapService.findReaderById.mockResolvedValueOnce({ id: 4, pairingState });
-    await expect(controller.getReaderById(4)).rejects.toThrow('not found');
+    await expect(controller.getReaderById(4, req)).rejects.toThrow('not found');
   });
 
   it('shows a paired reader by id', async () => {
     const reader = makeReader({ id: 4, pairingState: 'paired' });
     attractapService.findReaderById.mockResolvedValueOnce(reader);
-    await expect(controller.getReaderById(4)).resolves.toEqual(toReaderDto(reader));
+    await expect(controller.getReaderById(4, req)).resolves.toEqual(toReaderDto(reader));
   });
 
   // No reader response carries the credential or certificate internals, however the reader was loaded.
   it('never puts the credential internals into a reader response', async () => {
     const reader = makeReader({ id: 4, resources: [] });
     attractapService.findReaderById.mockResolvedValueOnce(reader);
-    const byId = await controller.getReaderById(4);
+    const byId = await controller.getReaderById(4, req);
     expect(Object.keys(byId)).not.toContain('apiTokenHash');
   });
 
   it('leaves the resources out of a reader that was read without them, as before', async () => {
     attractapService.getPairedReaders.mockResolvedValueOnce([makeReader({ id: 4 })]);
-    expect(Object.keys((await controller.getReaders())[0])).not.toContain('resources');
+    expect(Object.keys((await controller.getReaders(req))[0])).not.toContain('resources');
   });
 
   // A rename or a resource assignment through the API would make a reader that is not paired appear in
@@ -127,5 +143,37 @@ describe('AttractapController', () => {
     await controller.deleteReader(3, { user: { id: 7 } } as never);
 
     expect(attractapService.recordReaderDeregistration).not.toHaveBeenCalled();
+  });
+
+  describe('machine list visibility (ATT-843)', () => {
+    const linked = (id: number) => ({ id, name: `M${id}`, type: 'machine', separateUnlockAndUnlatch: null }) as never;
+
+    it('shows a narrowed viewer only visible machines, but keeps every reader for card enrollment', async () => {
+      narrowTo([1]);
+      const readers = [
+        makeReader({ id: 1, resources: [linked(1), linked(2)] }),
+        makeReader({ id: 2, resources: [linked(2)] }),
+        makeReader({ id: 3, resources: [] }),
+      ];
+      attractapService.getPairedReaders.mockResolvedValueOnce(readers);
+
+      const result = await controller.getReaders(req);
+
+      expect(result.map((reader) => reader.id)).toEqual([1, 2, 3]);
+      expect(result.map((reader) => reader.resources?.map((resource) => resource.id))).toEqual([[1], [], []]);
+    });
+
+    it('shows a reader by id without its hidden machines', async () => {
+      narrowTo([]);
+      attractapService.findReaderById.mockResolvedValueOnce(makeReader({ id: 4, resources: [linked(2)] }));
+      await expect(controller.getReaderById(4, req)).resolves.toMatchObject({ id: 4, resources: [] });
+    });
+
+    it('leaves the readers of a viewer who sees every machine alone', async () => {
+      const readers = [makeReader({ id: 2, resources: [linked(2)] }), makeReader({ id: 3, resources: [] })];
+      attractapService.getPairedReaders.mockResolvedValueOnce(readers);
+      await expect(controller.getReaders(req)).resolves.toEqual(readers.map(toReaderDto));
+      expect(listVisibility.filterVisible).not.toHaveBeenCalled();
+    });
   });
 });

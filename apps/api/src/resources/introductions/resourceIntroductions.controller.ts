@@ -11,8 +11,10 @@ import {
 import { IsResourceIntroducer } from './isIntroducer.decorator';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { UpdateResourceIntroductionDto } from './dtos/update.request.dto';
+import { ResourceListVisible } from '../visibility/resource-list-visible.interceptor';
 
 @ApiTags('Access Control')
+@ResourceListVisible()
 @Controller('resources/:resourceId/introductions')
 export class ResourceIntroductionsController {
   constructor(

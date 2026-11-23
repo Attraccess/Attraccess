@@ -1,11 +1,11 @@
 import type { DataSource } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { postgresMigrations } from './index';
-import { NfcCardType1796300000000 } from './1796300000000-nfc-card-type';
+import { NfcCardType1796300000002 } from './1796300000002-nfc-card-type';
 
 jest.setTimeout(120_000);
 
-describe('NfcCardType1796300000000 (persistence)', () => {
+describe('NfcCardType1796300000002 (persistence)', () => {
   let source: DataSource;
 
   beforeEach(async () => {
@@ -17,7 +17,7 @@ describe('NfcCardType1796300000000 (persistence)', () => {
   const run = async (direction: 'up' | 'down') => {
     const runner = source.createQueryRunner();
     try {
-      await new NfcCardType1796300000000()[direction](runner);
+      await new NfcCardType1796300000002()[direction](runner);
     } finally {
       await runner.release();
     }

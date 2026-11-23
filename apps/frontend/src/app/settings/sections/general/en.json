@@ -1,6 +1,6 @@
 {
   "title": "General",
-  "description": "The URLs this instance is reached at, its license, and who can see resource activity.",
+  "description": "The URLs this instance is reached at, its license, who can see the machine list, and who can see resource activity.",
   "loading": "Loading settings...",
   "inputs": {
     "url": {
@@ -24,6 +24,15 @@
     },
     "defaultLanguage": {
       "label": "Default system language"
+    },
+    "listVisibility": {
+      "label": "Who can see the machine list",
+      "description": "Controls who can see which machines exist. People who manage resources always see all machines. Anyone else who opens a hidden machine sees \"not found\".",
+      "authenticated": "Everyone with Read Resources",
+      "permitted-only": "Only people introduced to a machine",
+      "permittedOnlyHint": "People see only machines they are introduced to (directly or through a group), introduce or maintain, or currently use, and every machine that allows or requires supervised use, so they can ask for a supervised session. Nobody else learns that the other machines exist. This keeps the equipment list of your space from anyone who creates an account. People with Update Resources or Manage Resource Access always see all machines.",
+      "authenticatedHint": "Every signed-in account with Read Resources sees all machines. With open self-registration, anyone can create an account and read your equipment list. People with Update Resources or Manage Resource Access always see all machines.",
+      "loadFailed": "The machine list setting could not be loaded."
     },
     "activityVisibility": {
       "label": "Who can see resource activity",

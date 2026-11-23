@@ -4,6 +4,7 @@ import { AuthenticatedRequest, DualAuthGuard } from '@attraccess/plugins-backend
 import request from 'supertest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { ResourceListVisibilityService } from '../../visibility/resource-list-visibility.service';
 import { FormImageHandoffService } from './form-image-handoff.service';
 import { FormImageViewerGuard } from './form-image-viewer.guard';
 import { FormImagesController } from './form-images.controller';
@@ -49,6 +50,8 @@ describe('form image endpoints (HTTP)', () => {
         { provide: FormImagesService, useValue: services.images },
         { provide: FormImageHandoffService, useValue: services.handoffs },
         FormPhotoRateLimitGuard,
+        // The machine is visible here; the visibility rule has its own specs.
+        { provide: ResourceListVisibilityService, useValue: { canSee: async () => true } },
         { provide: DualAuthGuard, useValue: signIn },
         FormImageViewerGuard,
       ],

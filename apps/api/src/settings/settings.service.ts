@@ -29,6 +29,9 @@ import {
   RESOURCES_PARENT,
   RESOURCE_ACTIVITY_VISIBILITY_DEFAULT,
   RESOURCE_ACTIVITY_VISIBILITY_VALUES,
+  RESOURCE_LIST_VISIBILITY_DEFAULT,
+  RESOURCE_LIST_VISIBILITY_VALUES,
+  ResourceListVisibility,
   ResourceActivityVisibility,
 } from './constants';
 
@@ -405,8 +408,17 @@ export class SettingsService {
     );
   }
 
+  /** An unknown stored value falls back to the restrictive mode, unlike the activity setting. */
+  async getResourceListVisibility(): Promise<ResourceListVisibility> {
+    const stored = await this.settingsStore.getPlainSetting(RESOURCES_PARENT, RESOURCES_KEYS.listVisibility);
+    return RESOURCE_LIST_VISIBILITY_VALUES.find((value) => value === stored) ?? RESOURCE_LIST_VISIBILITY_DEFAULT;
+  }
+
   async getResourceVisibilitySettings(): Promise<ResourceVisibilitySettingsDto> {
-    return { activityVisibility: await this.getResourceActivityVisibility() };
+    return {
+      activityVisibility: await this.getResourceActivityVisibility(),
+      listVisibility: await this.getResourceListVisibility(),
+    };
   }
 
   async updateResourceVisibilitySettings(
@@ -418,6 +430,9 @@ export class SettingsService {
         RESOURCES_KEYS.activityVisibility,
         update.activityVisibility,
       );
+    }
+    if (update.listVisibility !== undefined) {
+      await this.settingsStore.setPlainSetting(RESOURCES_PARENT, RESOURCES_KEYS.listVisibility, update.listVisibility);
     }
     return this.getResourceVisibilitySettings();
   }

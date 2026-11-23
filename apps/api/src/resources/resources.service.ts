@@ -214,6 +214,7 @@ export class ResourcesService {
     ids?: number[] | number;
     onlyInUseByUserId?: number;
     onlyWithPermissionForUserId?: number;
+    permittedForUserId?: number;
     onlyInUse?: boolean;
     returnUsingUser?: boolean;
   }): Promise<PaginatedResponse<ResourceRecord>> {

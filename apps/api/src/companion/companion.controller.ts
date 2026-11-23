@@ -10,12 +10,13 @@ import {
   Param,
   ParseIntPipe,
   Patch,
+  Req,
   Res,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiParam, ApiProperty, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { Response } from 'express';
 import { CompanionService } from './companion.service';
 import { CompanionGateway } from './companion.gateway';
@@ -23,6 +24,7 @@ import { CompanionGatewayService } from './companion-gateway.service';
 import { CompanionDeviceDetailDto, CompanionDeviceDto, toCompanionDeviceDto } from './dtos/companion-device.dto';
 import { CompanionManifestDto } from './dtos/companion.dto';
 import { MetricsService } from '../metrics/metrics.service';
+import { ResourceListVisibilityService } from '../resources/visibility/resource-list-visibility.service';
 
 /** Needs validators: the global ValidationPipe whitelists, so an undecorated `name` is stripped and the update is empty. */
 export class RenameCompanionDeviceDto {
@@ -113,6 +115,7 @@ export class CompanionController {
     @Inject(CompanionService) private readonly service: CompanionService,
     @Inject(CompanionGateway) private readonly gateway: CompanionGateway,
     @Inject(CompanionGatewayService) private readonly gatewayService: CompanionGatewayService,
+    private readonly listVisibility: ResourceListVisibilityService,
   ) {}
 
   @Get()
@@ -146,11 +149,22 @@ export class CompanionController {
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({ status: 200 })
   @ApiResponse({ status: 404 })
-  async getResources(@Param('id', ParseIntPipe) id: number): Promise<Array<{ id: number; name: string }>> {
+  async getResources(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<Array<{ id: number; name: string }>> {
     const device = await this.service.findById(id);
     if (!device) throw new NotFoundException(`Companion device ${id} not found`);
 
-    return this.gatewayService.getResourcesForDevice(id);
+    // Machine list visibility (ATT-843): only the machines the caller may see.
+    const resources = await this.gatewayService.getResourcesForDevice(id);
+    const visible = new Set(
+      await this.listVisibility.filterVisible(
+        req.user,
+        resources.map((resource) => resource.id),
+      ),
+    );
+    return resources.filter((resource) => visible.has(resource.id));
   }
 
   @Patch(':id')

@@ -6,9 +6,15 @@ import { ResourceOperatingDiagnosticsController } from './resource-operating-dia
 import { ResourceOperatingDiagnosticsService } from './resource-operating-diagnostics.service';
 import { ResourceOperatingIntervalService } from './resource-operating-interval.service';
 import { ResourceMaintenanceModule } from '../maintenances/maintenance.module';
+import { ResourceListVisibilityModule } from '../visibility/resource-list-visibility.module';
 
 @Module({
-  imports: [OperatingIntervalsPersistenceModule, ResourceOperatingAttributionModule, ResourceMaintenanceModule],
+  imports: [
+    ResourceListVisibilityModule,
+    OperatingIntervalsPersistenceModule,
+    ResourceOperatingAttributionModule,
+    ResourceMaintenanceModule,
+  ],
   controllers: [ResourceOperatingAttributionController, ResourceOperatingDiagnosticsController],
   providers: [ResourceOperatingIntervalService, ResourceOperatingDiagnosticsService],
   exports: [ResourceOperatingIntervalService, ResourceOperatingAttributionModule, ResourceOperatingDiagnosticsService],

@@ -8,6 +8,7 @@ import { ResourceUsageService } from '../resources/usage/sessions/resource-usage
 import { ResourceActivityVisibilityService } from '../resources/usage/authorization/resource-activity-visibility.service';
 import { SessionEndNotifier } from '../resources/usage/pre-start/session-end-notifier.service';
 import { PreStartService } from '../resources/usage/pre-start/pre-start.service';
+import { ResourceListVisibilityService } from '../resources/visibility/resource-list-visibility.service';
 import { SupervisionController } from '../resources/supervision/supervision.controller';
 import { SupervisionService } from '../resources/supervision/supervision.service';
 import { SupervisionLiveService } from '../resources/supervision/supervision-live.service';
@@ -79,6 +80,8 @@ describe('network restriction on the resource action endpoints', () => {
           useValue: { ...sideEffects, isAccessOnlyDoor: async () => accessOnlyDoor },
         },
         { provide: ResourceActivityVisibilityService, useValue: {} },
+        // Machine list visibility (ATT-843) is not what this spec tests: every machine is visible here.
+        { provide: ResourceListVisibilityService, useValue: { canSee: async () => true } },
         { provide: PreStartService, useValue: { gateHttp: sideEffects.gateHttp } },
         { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
         { provide: SupervisionService, useValue: { ...sideEffects, pendingResourceId: () => 5 } },

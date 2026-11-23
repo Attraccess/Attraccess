@@ -21,17 +21,19 @@ import { ListResourcesDto } from './dtos/listResources.dto';
 import type { ResourceRecord } from '@attraccess/application-models';
 import { Resource, toResourceDto } from './dtos/resource.dto';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { PaginatedResponse } from '../types/response';
 import { FileUpload } from '../common/types/file-upload.types';
+import { ResourceListVisibilityService } from './visibility/resource-list-visibility.service';
 import { PaginatedResourceResponseDto } from './dtos/paginatedResourceResponse.dto';
 import { ResourceImageService } from './resourceImage.service';
 import { ResourceActivityVisibilityService } from './usage/authorization/resource-activity-visibility.service';
 import { ResourceIntroducersService } from './introducers/resourceIntroducers.service';
 import { isActiveUsage } from './usage/sessions/active-usage';
+import { ResourceListVisible } from './visibility/resource-list-visible.interceptor';
 
 const IN_USE_PAGE_SIZE = 100;
 
 @ApiTags('Resources')
+@ResourceListVisible()
 @Controller('resources')
 export class ResourcesController {
   constructor(
@@ -39,6 +41,7 @@ export class ResourcesController {
     private readonly resourceImageService: ResourceImageService,
     private readonly activityVisibility: ResourceActivityVisibilityService,
     private readonly introducers: ResourceIntroducersService,
+    private readonly listVisibility: ResourceListVisibilityService,
   ) {}
 
   private transformResource(resource: ResourceRecord): Resource {
@@ -84,7 +87,7 @@ export class ResourcesController {
   async getAll(
     @Query() query: ListResourcesDto,
     @Req() req: AuthenticatedRequest,
-  ): Promise<PaginatedResponse<Resource>> {
+  ): Promise<PaginatedResourceResponseDto> {
     let onlyWithPermissionForUserId: number | undefined;
 
     if (!req.user.effectivePermissions?.has('resources.update')) {
@@ -93,6 +96,9 @@ export class ResourcesController {
       }
     }
 
+    // Filtered in the query, so the page and its total count only the machines the caller may see.
+    const permittedForUserId = await this.listVisibility.permittedForUserId(req.user);
+
     const resources = await this.resourcesService.listResources({
       page: query.page,
       limit: query.limit,
@@ -100,9 +106,14 @@ export class ResourcesController {
       groupId: query.groupId,
       onlyInUseByUserId: query.onlyInUseByMe ? req.user.id : undefined,
       onlyWithPermissionForUserId,
+      permittedForUserId,
     });
 
-    return { ...resources, data: resources.data.map((resource) => this.transformResource(resource)) };
+    return {
+      ...resources,
+      data: resources.data.map((resource) => this.transformResource(resource)),
+      visibilityScope: permittedForUserId === undefined ? 'all' : 'permitted',
+    };
   }
 
   @Get('in-use')
@@ -119,11 +130,13 @@ export class ResourcesController {
   })
   async getAllInUse(@Req() req: AuthenticatedRequest): Promise<Resource[]> {
     // Every in-use machine, not one page: the visibility filter below would otherwise drop machines past the first page.
+    const permittedForUserId = await this.listVisibility.permittedForUserId(req.user);
     const inUse: ResourceRecord[] = [];
     for (let page = 1; ; page++) {
       const { data, total } = await this.resourcesService.listResources({
         onlyInUse: true,
         returnUsingUser: true,
+        permittedForUserId,
         page,
         limit: IN_USE_PAGE_SIZE,
       });

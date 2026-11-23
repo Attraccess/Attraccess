@@ -3,10 +3,11 @@ import { useResourceGroupsGetOne } from '@attraccess/react-query-client';
 import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { GroupDetailsForm } from './GroupDetailsForm';
 import { PeopleManagement } from '../resources/PeopleManagement';
-import { Spinner } from '@heroui/react';
+import { Alert, Spinner } from '@heroui/react';
 import en from './en.json';
 import de from './de.json';
 import { GroupIcon } from 'lucide-react';
+import { isNotFoundError } from '../../api/isNotFoundError';
 
 export function ResourceGroupEditPage() {
   const { groupId } = useParams<{ groupId: string }>();
@@ -24,11 +25,15 @@ export function ResourceGroupEditPage() {
   }
 
   if (error || !group) {
+    const notFound = !error || isNotFoundError(error);
     return (
-      <div style={{ textAlign: 'center', padding: '48px 0' }}>
-        <p style={{ color: 'red', fontWeight: '500', fontSize: '18px' }}>{t('loadError')}</p>
-        <p style={{ opacity: 0.7, marginTop: '8px' }}>{t('loadErrorDescription')}</p>
-      </div>
+      <Alert status={notFound ? 'warning' : 'danger'} className="max-w-xl mx-auto my-12">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>{t(notFound ? 'notFound' : 'loadError')}</Alert.Title>
+          <Alert.Description>{t(notFound ? 'notFoundDescription' : 'loadErrorDescription')}</Alert.Description>
+        </Alert.Content>
+      </Alert>
     );
   }
 

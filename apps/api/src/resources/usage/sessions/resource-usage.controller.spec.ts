@@ -7,6 +7,7 @@ import { ResourceUsageService } from './resource-usage.service';
 import { ResourceActivityVisibilityService } from '../authorization/resource-activity-visibility.service';
 import { PreStartService } from '../pre-start/pre-start.service';
 import { SessionEndNotifier } from '../pre-start/session-end-notifier.service';
+import { ResourceListVisibilityService } from '../../visibility/resource-list-visibility.service';
 
 // Both are required: a wiring mistake must fail module compilation, not silently skip the gate.
 const gateProviders = [
@@ -20,6 +21,10 @@ it('passes the authenticated user and both IDs to the usage details lookup', asy
   const moduleRef = await Test.createTestingModule({
     controllers: [ResourceUsageController],
     providers: [
+      {
+        provide: ResourceListVisibilityService,
+        useValue: { canSee: jest.fn(async () => true), permittedForUserId: jest.fn(async () => undefined) },
+      },
       ...gateProviders,
       { provide: ResourceUsageService, useValue: { getSessionDetails } },
       {
@@ -45,6 +50,10 @@ describe('usage history visibility', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [ResourceUsageController],
       providers: [
+        {
+          provide: ResourceListVisibilityService,
+          useValue: { canSee: jest.fn(async () => true), permittedForUserId: jest.fn(async () => undefined) },
+        },
         ...gateProviders,
         { provide: ResourceUsageService, useValue: { getResourceUsageHistory } },
         {
@@ -102,6 +111,10 @@ describe('active sessions of a machine with parallel sessions', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [ResourceUsageController],
       providers: [
+        {
+          provide: ResourceListVisibilityService,
+          useValue: { canSee: jest.fn(async () => true), permittedForUserId: jest.fn(async () => undefined) },
+        },
         ...gateProviders,
         {
           provide: ResourceUsageService,
@@ -146,6 +159,10 @@ it("runs the session-end default for the ended session's owner when a manager en
   const moduleRef = await Test.createTestingModule({
     controllers: [ResourceUsageController],
     providers: [
+      {
+        provide: ResourceListVisibilityService,
+        useValue: { canSee: jest.fn(async () => true), permittedForUserId: jest.fn(async () => undefined) },
+      },
       { provide: PreStartService, useValue: { gateHttp: jest.fn() } },
       { provide: SessionEndNotifier, useValue: { applyDefault } },
       { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
@@ -164,6 +181,10 @@ describe('start-blocked query', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [ResourceUsageController],
       providers: [
+        {
+          provide: ResourceListVisibilityService,
+          useValue: { canSee: jest.fn(async () => true), permittedForUserId: jest.fn(async () => undefined) },
+        },
         { provide: PreStartService, useValue: { gateHttp: jest.fn(), queryStartBlocked } },
         { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
         { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },

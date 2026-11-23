@@ -76,6 +76,15 @@ export class ResourceGroupsService {
       }
     }
 
+    // A narrowed viewer (machine list visibility "permitted-only") sees only groups with a machine they may see.
+    if (
+      visibility?.permittedOnly &&
+      !visibility.canUpdateResources &&
+      !(await this.store.isVisible(group.id, visibility))
+    ) {
+      throw new ResourceGroupNotFoundException({ id: searchOptions.id });
+    }
+
     return group;
   }
 

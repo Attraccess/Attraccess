@@ -19,6 +19,7 @@ import { MetricsService } from '../metrics/metrics.service';
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
 import { Observable } from 'rxjs';
 import { LicenseService } from '../license/license.service';
+import { ResourceListVisibilityService } from '../resources/visibility/resource-list-visibility.service';
 
 const mockMetricsService = {
   billingTransactionsTotal: { inc: jest.fn() },
@@ -49,6 +50,10 @@ describe('BillingModule', () => {
       moduleRef = await Test.createTestingModule({
         controllers: [BillingController],
         providers: [
+          {
+            provide: ResourceListVisibilityService,
+            useValue: { canSee: jest.fn(async () => true), permittedForUserId: jest.fn(async () => undefined) },
+          },
           BillingService,
           { provide: LiveNotificationsService, useValue: { notifyTransactionUpdate: jest.fn() } },
           {

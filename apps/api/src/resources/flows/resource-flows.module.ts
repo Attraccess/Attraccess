@@ -15,9 +15,11 @@ import { MqttModule } from '../../mqtt/mqtt.module';
 import { ResourceHealthModule } from '../health/resource-health.module';
 import { CompanionModule } from '../../companion/companion.module';
 import { ResourceOperatingIntervalModule } from '../operating-intervals/resource-operating-interval.module';
+import { ResourceListVisibilityModule } from '../visibility/resource-list-visibility.module';
 
 @Module({
   imports: [
+    ResourceListVisibilityModule,
     FlowPersistenceModule,
     MaintenancePersistenceModule,
     MqttModule,

@@ -8,6 +8,7 @@ import en from './documentationModal.en.json';
 import de from './documentationModal.de.json';
 import { useAuth } from '../../../hooks/useAuth';
 import { Markdown } from '../../../components/markdown';
+import { isNotFoundError } from '../../../api/isNotFoundError';
 
 function DocumentationViewComponent() {
   const { id } = useParams<{ id: string }>();
@@ -44,8 +45,8 @@ function DocumentationViewComponent() {
     );
   }
 
-  // Handle error state
-  if (isResourceError) {
+  // Handle error state; a 404 (missing or hidden resource) falls through to the not-found card
+  if (isResourceError && !isNotFoundError(resourceError)) {
     return (
       <Card className="max-w-xl mx-auto my-8">
         <Card.Header>
@@ -72,8 +73,8 @@ function DocumentationViewComponent() {
     );
   }
 
-  // Handle not found state
-  if (!resource) {
+  // Handle not found state; a 404 wins over cached data from before (e.g. a revoked introduction)
+  if (isNotFoundError(resourceError) || !resource) {
     return (
       <Card className="max-w-xl mx-auto my-8">
         <Card.Header>

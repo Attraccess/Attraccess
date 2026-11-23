@@ -6,6 +6,7 @@ import { SettingsModule } from '../../settings/settings.module';
 import { FormsController } from './global-forms.controller';
 import { ResourceFormsController } from './forms.controller';
 import { ResourceFormsService } from './forms.service';
+import { ResourceListVisibilityModule } from '../visibility/resource-list-visibility.module';
 import { FormImageCleanupService } from './images/form-image-cleanup.service';
 import { FormImageFileStorage } from './images/form-image-file-storage';
 import { FormImageHandoffService } from './images/form-image-handoff.service';
@@ -16,7 +17,7 @@ import { FormPhotoController } from './images/form-photo.controller';
 import { FormPhotoRateLimitGuard } from './images/form-photo-rate-limit.guard';
 
 @Module({
-  imports: [FormsPersistenceModule, SettingsModule, ConfigModule],
+  imports: [ResourceListVisibilityModule, FormsPersistenceModule, SettingsModule, ConfigModule],
   controllers: [FormsController, ResourceFormsController, FormImagesController, FormPhotoController],
   providers: [
     ResourceFormsService,

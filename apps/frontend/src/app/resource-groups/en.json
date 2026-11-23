@@ -3,5 +3,7 @@
     "subtitle": "Edit the details of the group"
   },
   "loadError": "Failed to load group",
-  "loadErrorDescription": "There was an error loading the group details. Please try refreshing the page."
+  "loadErrorDescription": "There was an error loading the group details. Please try refreshing the page.",
+  "notFound": "Group not found",
+  "notFoundDescription": "The group does not exist or you don't have permission to view it."
 }

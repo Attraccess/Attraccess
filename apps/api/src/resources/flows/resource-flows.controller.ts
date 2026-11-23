@@ -31,8 +31,10 @@ import { ResourceFlowsExecutorService } from './execution/resource-flows-executo
 
 import { ResourceFlowsService } from './resource-flows.service';
 import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-response.dto';
+import { ResourceListVisible } from '../visibility/resource-list-visible.interceptor';
 
 @ApiTags('Resource Flows')
+@ResourceListVisible()
 @Controller('resources/:resourceId/flow')
 @Auth('resources.update')
 export class ResourceFlowsController {

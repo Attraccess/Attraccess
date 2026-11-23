@@ -4,8 +4,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * UID-only cards: a card type column and an optional key. Every existing card is an `aes` card, so nothing
  * changes on upgrade. A UID-only card has no key and no key slot.
  */
-export class NfcCardType1796300000000 implements MigrationInterface {
-  name = 'NfcCardType1796300000000';
+export class NfcCardType1796300000002 implements MigrationInterface {
+  name = 'NfcCardType1796300000002';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`ALTER TABLE "nfc_card" ADD COLUMN IF NOT EXISTS "type" text NOT NULL DEFAULT 'aes'`);

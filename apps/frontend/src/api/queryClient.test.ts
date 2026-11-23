@@ -16,6 +16,10 @@ describe('queryClient retry rule', () => {
     expect(retry(0, apiError(403))).toBe(false);
   });
 
+  it('does not retry a 404', () => {
+    expect(retry(0, apiError(404))).toBe(false);
+  });
+
   it(`retries other failures up to ${DEFAULT_RETRIES} times`, () => {
     for (let failureCount = 0; failureCount < DEFAULT_RETRIES; failureCount++) {
       expect(retry(failureCount, apiError(500))).toBe(true);

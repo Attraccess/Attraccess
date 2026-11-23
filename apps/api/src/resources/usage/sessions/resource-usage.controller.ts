@@ -32,8 +32,10 @@ import { toUsageSessionResponse, type UsageSessionResponse } from '../dtos/usage
 import { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
 
 import { UpdateUsageSessionProjectDto } from '../dtos/updateUsageSessionProject.dto';
+import { ResourceListVisible } from '../../visibility/resource-list-visible.interceptor';
 
 @ApiTags('Resources')
+@ResourceListVisible()
 @Controller('resources/:resourceId/usage')
 export class ResourceUsageController {
   constructor(

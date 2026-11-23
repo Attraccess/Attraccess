@@ -123,6 +123,8 @@ export function ResourceOverview() {
     enabled: noMatchingResources,
   });
   const hasResources = unfilteredResources?.hasResources ?? false;
+  // The server narrowed the list: an empty overview then means "not introduced yet", not "no machines".
+  const isRestricted = matchingResources.some((query) => query.data?.visibilityScope === 'permitted');
   const showEmptyState = noMatchingResources && unfilteredResources !== undefined;
 
   return (
@@ -148,6 +150,7 @@ export function ResourceOverview() {
           <NoResourcesFound
             onOpenCreate={() => setCreateOpen(true)}
             hasResources={hasResources}
+            isRestricted={isRestricted}
             onClearFilterAndSearch={() => {
               setFilterByOnlyInUseByMe(false);
               setFilterByOnlyWithPermissions(false);

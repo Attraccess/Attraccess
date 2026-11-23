@@ -6,9 +6,16 @@ import { ResourceHealthNotificationListener } from './resource-health-notificati
 import { NotificationsModule } from '../../notifications/notifications.module';
 import { RbacModule } from '../../users-and-auth/rbac/rbac.module';
 import { HealthPersistenceModule } from '../../database/adapters/resources/health-persistence.module';
+import { ResourceListVisibilityModule } from '../visibility/resource-list-visibility.module';
 
 @Module({
-  imports: [HealthPersistenceModule, ResourceMaintenanceModule, NotificationsModule, RbacModule],
+  imports: [
+    ResourceListVisibilityModule,
+    HealthPersistenceModule,
+    ResourceMaintenanceModule,
+    NotificationsModule,
+    RbacModule,
+  ],
   controllers: [ResourceHealthController],
   providers: [ResourceHealthService, ResourceHealthNotificationListener],
   exports: [ResourceHealthService],

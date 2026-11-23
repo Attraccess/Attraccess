@@ -9,6 +9,7 @@ import { ResourceActivityVisibilityService } from '../authorization/resource-act
 import { SessionEndNotifier } from '../pre-start/session-end-notifier.service';
 import { PreStartService } from '../pre-start/pre-start.service';
 import { StartBlockedException, StartConfirmationRequiredException } from '../pre-start/start-confirmation.errors';
+import { ResourceListVisibilityService } from '../../visibility/resource-list-visibility.service';
 
 let principal: Record<string, unknown> = { authenticationMethod: 'session' };
 
@@ -37,6 +38,7 @@ describe('POST /resources/:id/usage/start through the pre-start gate', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [ResourceUsageController],
       providers: [
+        { provide: ResourceListVisibilityService, useValue: { canSee: jest.fn(async () => true) } },
         { provide: ResourceUsageService, useValue: { startSession, endSession } },
         { provide: ResourceActivityVisibilityService, useValue: {} },
         { provide: PreStartService, useValue: { gateHttp } },

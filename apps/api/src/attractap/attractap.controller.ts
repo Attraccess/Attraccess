@@ -37,6 +37,8 @@ import { AttractapGateway } from './websockets/websocket.gateway';
 
 import { WebsocketService } from './websockets/websocket.service';
 import { CardAccessService } from './card-access.service';
+import { ResourceListVisibilityService } from '../resources/visibility/resource-list-visibility.service';
+import type { AttractapReader } from '@attraccess/application-models';
 
 import { AttractapCrashReportDto } from './dtos/crash-report.dto';
 
@@ -61,6 +63,7 @@ export class AttractapController {
     @Inject(AttractapService)
     protected readonly attractapService: AttractapService,
     protected readonly cardAccess: CardAccessService,
+    protected readonly listVisibility: ResourceListVisibilityService,
   ) {}
 
   protected readonly logger = new Logger(AttractapController.name);
@@ -106,12 +109,33 @@ export class AttractapController {
     description: 'The list of readers',
     type: [AttractapReaderDto],
   })
-  async getReaders(): Promise<AttractapReaderDto[]> {
+  async getReaders(@Req() req: AuthenticatedRequest): Promise<AttractapReaderDto[]> {
     // `resources` is a plain ManyToMany with no eager loading, so without this the relation is
     // absent from the response entirely. Callers that group readers by resource — the supervised
     // start popup (ATT-816) — silently see every reader as unattached.
     // Readers whose pairing was removed are listed by GET /attractap/readers/to-pair, for the pairing session only.
-    return (await this.attractapService.getPairedReaders({ withResources: true })).map(toReaderDto);
+    const readers = await this.attractapService.getPairedReaders({ withResources: true });
+    return (await this.visibleReaders(req.user, readers)).map(toReaderDto);
+  }
+
+  /**
+   * Machine list visibility (ATT-843): a narrowed viewer sees only the linked machines they may see. Every reader
+   * stays listed: members pick readers to enroll their first card or to ask for supervision at, often before any
+   * introduction, and a reader without its hidden machines reveals nothing about the equipment.
+   */
+  private async visibleReaders(user: AuthenticatedRequest['user'], readers: AttractapReader[]) {
+    if ((await this.listVisibility.scopeOf(user)) === 'all') return readers;
+    const visible = new Set(
+      await this.listVisibility.filterVisible(
+        user,
+        readers.flatMap((reader) => (reader.resources ?? []).map((resource) => resource.id)),
+      ),
+    );
+    return readers.map((reader) =>
+      reader.resources
+        ? { ...reader, resources: reader.resources.filter((resource) => visible.has(resource.id)) }
+        : reader,
+    );
   }
 
   @Get('to-pair')
@@ -139,8 +163,12 @@ export class AttractapController {
     type: AttractapReaderDto,
   })
   @ApiResponse({ status: 404, description: 'Reader not found' })
-  async getReaderById(@Param('readerId', ParseIntPipe) readerId: number): Promise<AttractapReaderDto> {
-    return toReaderDto(await this.requirePairedReader(readerId));
+  async getReaderById(
+    @Param('readerId', ParseIntPipe) readerId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<AttractapReaderDto> {
+    const [reader] = await this.visibleReaders(req.user, [await this.requirePairedReader(readerId)]);
+    return toReaderDto(reader);
   }
 
   /** A reader whose pairing was removed is not visible outside the pairing session. */
