@@ -54,6 +54,11 @@ public:
   bool inDataExchange(uint8_t *send, uint8_t sendLength, uint8_t *response,
                       uint8_t *responseLength);
   bool inListPassiveTarget();
+  // Releases the inlisted target (HLTA for ISO 14443-3 cards). The card answers a new inlist again.
+  bool inRelease(uint8_t target = 0);
+  // SAK and ATQA (SENS_RES) of the target the last successful inlist found.
+  uint8_t lastSak() const { return _lastSak; }
+  uint16_t lastAtqa() const { return _lastAtqa; }
   uint8_t AsTarget();
   uint8_t getDataTarget(uint8_t *cmd, uint8_t *cmdlen);
   uint8_t setDataTarget(uint8_t *cmd, uint8_t cmdlen);
@@ -89,6 +94,8 @@ private:
   int8_t _uidLen;      // uid len
   int8_t _key[6];      // Mifare Classic key
   int8_t _inListedTag; // Tg number of inlisted tag.
+  uint8_t _lastSak = 0;  // SEL_RES of the last inlisted target
+  uint16_t _lastAtqa = 0; // SENS_RES of the last inlisted target
 
   // Low level I2C communication functions.
   void readdata(uint8_t *buff, uint8_t n);

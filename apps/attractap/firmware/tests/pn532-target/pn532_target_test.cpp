@@ -16,7 +16,12 @@ void Adafruit_PN532::readdata(uint8_t *b, uint8_t n) { for (uint8_t i = 0; i < n
 bool Adafruit_PN532::waitready(uint16_t) { return true; }
 bool Adafruit_PN532::isready() { return true; }
 bool Adafruit_PN532::readack() { return true; }
-void Adafruit_PN532::writecommand(uint8_t *cmd, uint8_t) { if (cmd[0] == 0x40) { lastTarget = cmd[1]; frame = exchangeReply; } }
+static uint8_t lastCommand = 0; static uint8_t releasedTarget = 0xEE; static uint8_t releaseStatus = 0;
+void Adafruit_PN532::writecommand(uint8_t *cmd, uint8_t) {
+  lastCommand = cmd[0];
+  if (cmd[0] == 0x40) { lastTarget = cmd[1]; frame = exchangeReply; }
+  if (cmd[0] == 0x52) { releasedTarget = cmd[1]; frame = {0, 0, 0xFF, 3, 0xFD, 0xD5, 0x53, releaseStatus, 0, 0}; }
+}
 void Adafruit_PN532::PrintHex(const byte *, const uint32_t) {}
 void Adafruit_PN532::PrintHexChar(const byte *, const uint32_t) {}
 
@@ -32,6 +37,18 @@ int main() {
   // InListPassiveTarget answer: one target, target number 1, ATQA/SAK, 7-byte UID.
   frame = {0,0,0xFF,0x0F,0xF1,0xD5,0x4B,1,1,0x00,0x44,0x20,7,0x04,1,2,3,4,5,6,0,0};
   uint8_t uid[7]; uint8_t len = 0;
+  assert(pn.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &len, 100));
+  // The card's SELECT answer is kept: the server tells UID-only cards from secure ones by the SAK.
+  if (pn.lastSak() != 0x20 || pn.lastAtqa() != 0x0044) { std::puts("SAK/ATQA of the inlisted card not kept"); return 1; }
+  frame = {0,0,0xFF,0x0C,0xF4,0xD5,0x4B,1,1,0x00,0x04,0x08,4,0x1A,0x2B,0x3C,0x4D,0,0};
+  assert(pn.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &len, 100));
+  if (len != 4 || pn.lastSak() != 0x08 || pn.lastAtqa() != 0x0004) { std::puts("MIFARE Classic SAK/ATQA wrong"); return 1; }
+  // InRelease addresses the target and reports whether the PN532 confirmed it.
+  if (!pn.inRelease() || lastCommand != 0x52 || releasedTarget != 0) { std::puts("InRelease not sent for all targets"); return 1; }
+  releaseStatus = 0x01;
+  if (pn.inRelease()) { std::puts("InRelease accepted an error status"); return 1; }
+  releaseStatus = 0;
+  frame = {0,0,0xFF,0x0F,0xF1,0xD5,0x4B,1,1,0x00,0x44,0x20,7,0x04,1,2,3,4,5,6,0,0};
   assert(pn.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &len, 100));
   uint8_t apdu[] = {0x90, 0x5A, 0, 0, 3, 0, 0, 0, 0}, answer[64]; uint8_t answerLen = 16;
   pn.inDataExchange(apdu, sizeof(apdu), answer, &answerLen);

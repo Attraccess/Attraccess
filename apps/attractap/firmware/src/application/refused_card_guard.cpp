@@ -6,7 +6,7 @@
 
 bool RefusedCardGuard::isCardVerdict(const std::string &code) {
   return code == "CARD_NOT_FOUND" || code == "CARD_NOT_ACTIVE" || code == "CARD_AUTHENTICATION_FAILED" ||
-         code == "CARD_NOT_SUPPORTED";
+         code == "CARD_NOT_SUPPORTED" || code == "UID_ONLY_CARDS_DISABLED" || code == "RANDOM_UID_NOT_SUPPORTED";
 }
 
 RefusedCardGuard::Identity RefusedCardGuard::makeIdentity(const uint8_t *uid, uint8_t uidLength) {

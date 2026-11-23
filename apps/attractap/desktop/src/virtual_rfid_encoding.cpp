@@ -76,7 +76,7 @@ bool VirtualNfc::decode(const std::string &value, Card &card)
     unsigned failAuthentication = 0;
     unsigned failWrite = 0;
     if (!readUnsigned(fields[0], version) || version != 1 || fields[1].size() / 2 > parsed.uid.size() ||
-        !readHex(fields[1], parsed.uid.data(), fields[1].size() / 2) || !readUnsigned(fields[2], type) || type > 2 ||
+        !readHex(fields[1], parsed.uid.data(), fields[1].size() / 2) || !readUnsigned(fields[2], type) || type > 3 ||
         !readUnsigned(fields[3], present) || present > 1 || !readUnsigned(fields[4], failAuthentication) ||
         failAuthentication > 1 || !readUnsigned(fields[5], failWrite) || failWrite > 1)
         return false;
