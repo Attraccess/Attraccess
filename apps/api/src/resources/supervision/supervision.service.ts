@@ -106,13 +106,22 @@ export class SupervisionService {
 
   protected async expire(requestId: string): Promise<void> {
     const request = await this.store.claim(requestId);
-    if (!request) {
-      return;
-    }
-    this.logger.debug(`Supervision request ${requestId} expired`);
+    if (request) this.expireClaimed(request);
+  }
+
+  private expireClaimed(request: StoredSupervisionRequest): void {
+    this.logger.debug(`Supervision request ${request.id} expired`);
     const error = new RequestTimeoutException('Supervision request expired before the supervisor responded');
     this.settlement.settle(request, { kind: 'failed', error, notifyReader: true });
     this.emitToEligible(request, SupervisionLiveEventType.EXPIRED);
+  }
+
+  /** Claims a request for a decision; one past its deadline (the 500 ms sweep has not reached it) expires instead. */
+  private async claimForDecision(requestId: string): Promise<StoredSupervisionRequest> {
+    const request = await orServiceUnavailable(this.store.claim(requestId));
+    if (request && Date.now() < request.expiresAt) return request;
+    if (request) this.expireClaimed(request);
+    throw new NotFoundException('Supervision request not found or already expired');
   }
 
   /** Fans a terminal (non-REQUESTED) live event out to every supervisor the request reached. */
@@ -151,10 +160,7 @@ export class SupervisionService {
     // assertMayApprove can hit the DB, which is long enough for the 30s deadline to fire underneath us.
     // Claiming only now means an expired (or rejected, or otherwise settled) request is never approved:
     // startSession below would open a real session on a physical machine nobody is waiting for.
-    const request = await orServiceUnavailable(this.store.claim(requestId));
-    if (!request) {
-      throw new NotFoundException('Supervision request not found or already expired');
-    }
+    const request = await this.claimForDecision(requestId);
 
     try {
       // The approval is a start for the requester, so the pre-start hooks apply (a confirm blocks, see PreStartService).
@@ -207,10 +213,7 @@ export class SupervisionService {
     apiTokenId?: number,
   ): Promise<SupervisionDecisionResponseDto> {
     await this.getPendingForSupervisorOrThrow(requestId, supervisor);
-    const request = await orServiceUnavailable(this.store.claim(requestId));
-    if (!request) {
-      throw new NotFoundException('Supervision request not found or already expired');
-    }
+    const request = await this.claimForDecision(requestId);
     const error = new ForbiddenException('The supervision request was rejected by the supervisor');
     this.settlement.settle(request, { kind: 'failed', error, notifyReader: true });
     void this.audit.record({

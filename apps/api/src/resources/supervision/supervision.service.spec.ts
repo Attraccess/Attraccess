@@ -152,6 +152,28 @@ describe('SupervisionService', () => {
     await expect(fixture.service.reject('does-not-exist', fixture.supervisor)).rejects.toThrow(NotFoundException);
   });
 
+  // QA finding (ATT-1163): with several instances the deadline sweep runs every 500 ms, so a request could still be
+  // approved a few hundred milliseconds after its 30 s were up. A decision past the deadline expires the request.
+  it.each(['approve', 'reject'] as const)(
+    'expires instead of deciding when %s comes after the deadline, even before the expiry ran',
+    async (decision) => {
+      jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick'] });
+      const { pending, requestId } = await fixture.createRequest();
+      // The clock passes the deadline, but no timer fires: the expiry has not run yet.
+      jest.setSystemTime(Date.now() + SupervisionService.APPROVAL_TTL_MS);
+
+      await expect(fixture.service[decision](requestId, fixture.supervisor)).rejects.toBeInstanceOf(NotFoundException);
+
+      await expect(pending).rejects.toBeInstanceOf(RequestTimeoutException);
+      expect(fixture.resourceUsageService.startSession).not.toHaveBeenCalled();
+      expect(fixture.live.emitToSupervisor).toHaveBeenCalledWith(
+        2,
+        expect.objectContaining({ type: SupervisionLiveEventType.EXPIRED, requestId }),
+      );
+      expect(await fixture.service.listPendingForSupervisor(2)).toHaveLength(0);
+    },
+  );
+
   it('propagates a failed session start to both supervisor and requester', async () => {
     fixture.resourceUsageService.startSession.mockRejectedValueOnce(new Error('resource in use'));
     const { pending, requestId } = await fixture.createRequest();
