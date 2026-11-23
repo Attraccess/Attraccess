@@ -88,16 +88,16 @@
  * Debug
  *-----------*/
 
-/*FPS/CPU overlay for on-hardware perf validation (ATT-554). Enable by using
- *the attractap-touch-v2-demo-perf variant, which defines
- *ATTRACTAP_LV_PERF_MONITOR for both the app and LVGL itself (see CMakeLists
- *ATTRACTAP_LV_PERF_MONITOR_GL).*/
+/*FPS/render/flush timing in the serial log for on-hardware perf validation (ATT-554). Enable by using
+ *-DATTRACTAP_LV_PERF_MONITOR=ON (CMake option, display variants only), which
+ *defines ATTRACTAP_LV_PERF_MONITOR for both the app and LVGL itself.*/
 #ifdef ATTRACTAP_LV_PERF_MONITOR
+    #define LV_USE_OBSERVER 1 /* LVGL v9 sysmon is built on the observer API */
     #define LV_USE_SYSMON 1
     #define LV_USE_PERF_MONITOR 1
     #define LV_USE_PERF_MONITOR_POS LV_ALIGN_BOTTOM_RIGHT
     /* Log FPS/render time to serial instead of drawing on the panel — lets us
-     * measure Bildaufbau cost without a camera (PERFORMANCE_ANALYSIS.md A-4). */
+     * measure Bildaufbau cost without a camera (ATT-554). */
     #define LV_USE_PERF_MONITOR_LOG_MODE 1
 #endif
 

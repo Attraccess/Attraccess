@@ -47,13 +47,13 @@ Paths are relative to `apps/attractap/firmware`.
 - The serial Wi-Fi scan command still blocks the main loop for up to 10 s, [ATT-1390](https://linear.app/attraccess/issue/ATT-1390).
 - WebSocket text frames above the 4096-byte client buffer are still handed on as fragments, [ATT-1389](https://linear.app/attraccess/issue/ATT-1389).
 - Some source comments are stale or point to the old report file, which never landed on `main`, [ATT-1392](https://linear.app/attraccess/issue/ATT-1392).
-- PSRAM free size is still not part of the periodic heap log, and FreeRTOS run-time stats are off. Both are tracked in [ATT-1276](https://linear.app/attraccess/issue/ATT-1276). `LOG_MEMORY_DEBUG` is only defined for UI self-test lab builds (`main/CMakeLists.txt`).
+- `LOG_MEMORY_DEBUG` is only defined for UI self-test lab builds (`main/CMakeLists.txt`). Its stack figures are covered by `debug.stats` on debug and lab builds.
 
 ## Recommendations
 
-IDs come from the August report. Impact, effort and risk are the original estimates, not measurements; "–" means the old report gave no value. Ticket links go to Linear. Work tracked in ATT-1276 is described in that ticket; check it for what has merged.
+IDs come from the August report. Impact, effort and risk are the original estimates, not measurements; "–" means the old report gave no value. Ticket links go to Linear.
 
-**Status key:** Done (a note in brackets says where it differs from the proposal), Partly done, Open, Covered by ATT-1276, Dropped.
+**Status key:** Done (a note in brackets says where it differs from the proposal), Partly done, Open, Dropped.
 
 ### Quick wins
 
@@ -68,7 +68,7 @@ IDs come from the August report. Impact, effort and risk are the original estima
 | Q7 | Wake the connect task only on a state change | Low / low / low | Open | [ATT-1391](https://linear.app/attraccess/issue/ATT-1391) |
 | Q8 | Clear up the I2C clock comment (400 kHz versus 100 kHz) | Low / trivial / low | Open | The clock is 400 kHz but the comment in `utils.hpp` still says it was reverted. [ATT-1392](https://linear.app/attraccess/issue/ATT-1392) |
 | Q9 | Gate the unconditional serial prints in the NTAG424 code | Low / low / low | Dropped | The NTAG424 code was removed from the firmware when card checks moved to the server ([#2039](https://github.com/Attraccess/Attraccess/pull/2039), ATT-1145) |
-| Q10 | Observability: run-time stats, `LOG_MEMORY_DEBUG`, PSRAM numbers in the log | High / low / none | Covered by ATT-1276 | Run-time stats, the `debug.stats` command (which also reports each task's stack high-water mark) and PSRAM in the 30 s heap log: [ATT-1276](https://linear.app/attraccess/issue/ATT-1276). `LOG_MEMORY_DEBUG` and PSRAM in the boot record are not part of it; `debug.stats` covers the stack figures `LOG_MEMORY_DEBUG` gave |
+| Q10 | Observability: run-time stats, `LOG_MEMORY_DEBUG`, PSRAM numbers in the log | High / low / none | Done (debug and lab builds; no `LOG_MEMORY_DEBUG`) | FreeRTOS run-time stats in `sdkconfig.debug` and every test-hooks lab build, the `debug.stats` command (CPU share and stack high-water mark per task) and PSRAM in the 30 s heap log, [#2290](https://github.com/Attraccess/Attraccess/pull/2290). `LOG_MEMORY_DEBUG` and PSRAM in the boot record are not part of it; `debug.stats` covers the stack figures `LOG_MEMORY_DEBUG` gave |
 
 ### Medium effort
 
@@ -78,7 +78,7 @@ IDs come from the August report. Impact, effort and risk are the original estima
 | M2 | Throttle the presence check of a held card | High / low / low | Partly done | Throttled to 250 ms ([#1693](https://github.com/Attraccess/Attraccess/pull/1693)) and reduced to one command ([#2039](https://github.com/Attraccess/Attraccess/pull/2039)). The old caveat still holds: the probe is a plain, unauthenticated command (the reader holds no card keys), so any device that answers ISO-DEP, such as a phone, keeps the card counted as present. An authenticated probe would need the server. Both this and cards that do not answer the probe: [ATT-1380](https://linear.app/attraccess/issue/ATT-1380) |
 | M3 | Remove per-pass string copies | Medium / low / low | Open | [ATT-1391](https://linear.app/attraccess/issue/ATT-1391) |
 | M4 | Keep hot screens loaded | Medium / medium / low-medium | Done | `shouldAutoUnload()` returns `false` in `src/display/screens/lockscreen/lockscreen.hpp` and `src/display/screens/init/initscreen.hpp`, [#1694](https://github.com/Attraccess/Attraccess/pull/1694) |
-| M5 | LVGL performance monitor as the baseline tool | Measurement / trivial / none | Covered by ATT-1276 | The code path exists (`ATTRACTAP_LV_PERF_MONITOR` in `lv_conf.h` and `display.cpp`), but no build option sets it yet. A build switch for it is tracked in [ATT-1276](https://linear.app/attraccess/issue/ATT-1276) |
+| M5 | LVGL performance monitor as the baseline tool | Measurement / trivial / none | Done | CMake option `-DATTRACTAP_LV_PERF_MONITOR=ON` (display variants only), [#2290](https://github.com/Attraccess/Attraccess/pull/2290). The release gate rejects images built with it |
 | M6 | Non-blocking beeps | Medium / medium / low | Done | Beeper worker task with a pattern queue in `src/beeper/beeper.cpp`, [#1695](https://github.com/Attraccess/Attraccess/pull/1695) |
 | M7 | Serial Wi-Fi scan: watchdog and shorter cap | Medium / low / low | Open | [ATT-1390](https://linear.app/attraccess/issue/ATT-1390) |
 | M8 | Cache settings in RAM | Low-medium / low / low | Done | `src/settings/settings.cpp` keeps the API config and language cached |
@@ -103,9 +103,9 @@ IDs come from the August report. Impact, effort and risk are the original estima
 Do all of this on a bench reader, not a fielded one. Nothing here is done automatically by CI.
 
 1. **Debug build.** Use the debug overlay: `idf.py -B build/dbg -DATTRACTAP_VARIANT=<variant> -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.debug" build`. It switches the compiler to `-Og` with assertions on, so absolute timings are not comparable with release builds.
-2. **LVGL performance monitor.** The code is compiled in when `ATTRACTAP_LV_PERF_MONITOR` is defined (`include/lv_conf.h`, `src/display/display.cpp`). It logs FPS and render and flush times to the serial console. No firmware CMake option sets the macro today; a build switch for it is tracked in ATT-1276 (when merged).
-3. **Run-time stats and `debug.stats`.** FreeRTOS run-time statistics, the `debug.stats` serial command and PSRAM numbers in the heap log are tracked in ATT-1276 (when merged).
-4. **Heap log.** `Websocket::loop()`, which runs on the main loop, logs internal free, largest block and minimum free heap every 30 seconds (`Websocket::logHeapStats`). The largest free block shows fragmentation; the minimum free heap is the low-water mark since boot, so it only ever falls. Compare both over 24 hours.
+2. **LVGL performance monitor.** Build with `-DATTRACTAP_LV_PERF_MONITOR=ON` (display variants only). It logs FPS and render and flush times to the serial console (`include/lv_conf.h`, `src/display/display.cpp`).
+3. **Run-time stats and `debug.stats`.** Debug builds and builds with `-DATTRACTAP_TEST_HOOKS=ON` have FreeRTOS run-time statistics. Send `CMND debug.stats` on the serial console for a per-task table of run time, CPU share, stack high-water mark and core. The counters run since boot, so take two samples and compare. The firmware README ("Task stats") describes the output.
+4. **Heap log.** `Websocket::loop()`, which runs on the main loop, logs internal free, largest block and minimum free heap, and PSRAM free and largest block, every 30 seconds (`Websocket::logHeapStats`). The largest free block shows fragmentation; the minimum free heap is the low-water mark since boot, so it only ever falls. Compare both over 24 hours.
 5. **What to compare before and after a change:** frame time with the performance monitor, touch latency while a card is polled and while one is held, tap-to-result latency, reconnect cycle time, and the internal heap minimum.
 
 ## History
