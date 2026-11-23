@@ -29,7 +29,10 @@ export function UidOnlyCardsSetting() {
   const queryClient = useQueryClient();
   const { data: settings } = useGetCardWriterSettings();
   const { mutateAsync: save, isPending } = useUpdateCardWriterSettings(undefined, {
-    onSuccess: (data) => queryClient.setQueryData(UseGetCardWriterSettingsKeyFn(), data),
+    onSuccess: (data) => {
+      queryClient.setQueryData(UseGetCardWriterSettingsKeyFn(), data);
+      toast.success({ title: t('success.title'), description: t('success.description') });
+    },
     onError: (error: Error) => toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' }),
   });
 
@@ -46,48 +49,52 @@ export function UidOnlyCardsSetting() {
       stacked
       data-testid="uid-only-cards-setting"
     >
-      <Alert status="danger">
-        <AlertContent>
-          <AlertTitle>{t('uidOnly.warningTitle')}</AlertTitle>
-          <AlertDescription>{t('uidOnly.warning')}</AlertDescription>
-        </AlertContent>
-      </Alert>
-      {enabled ? (
-        <LabeledSwitch
-          isSelected
-          isDisabled={isPending}
-          onChange={() => void update(false)}
-          data-testid="uid-only-cards-switch"
-        >
-          {t('uidOnly.switch')}
-        </LabeledSwitch>
-      ) : (
-        <ConfirmableButton
-          label={t('uidOnly.switch')}
-          status="warning"
-          isPending={isPending}
-          onConfirm={() => update(true)}
-          confirm={{
-            title: t('uidOnly.confirm.title'),
-            message: t('uidOnly.confirm.message'),
-            confirmLabel: t('uidOnly.confirm.confirm'),
-            cancelLabel: t('uidOnly.confirm.cancel'),
-            'data-cy': 'uid-only-cards-confirm-dialog',
-            confirmDataCy: 'uid-only-cards-confirm',
-          }}
-          renderActivator={(open, props) => (
-            <LabeledSwitch
-              isSelected={false}
-              isDisabled={props.isDisabled || props.isPending}
-              onChange={open}
-              data-testid="uid-only-cards-switch"
-            >
-              {props.label}
-            </LabeledSwitch>
-          )}
-        />
-      )}
-      {!enabled && <Description>{t('uidOnly.offNote')}</Description>}
+      {/* SettingsRow lays its children out in one row: stack the warning above the switch. */}
+      <div className="flex w-full flex-col gap-3">
+        <Alert status="danger">
+          <AlertContent>
+            <AlertTitle>{t('uidOnly.warningTitle')}</AlertTitle>
+            <AlertDescription>{t('uidOnly.warning')}</AlertDescription>
+          </AlertContent>
+        </Alert>
+        {enabled ? (
+          <LabeledSwitch
+            isSelected
+            isDisabled={isPending}
+            // onError already shows the failure; the rejected promise must not escape as an unhandled rejection.
+            onChange={() => update(false).catch(() => undefined)}
+            data-testid="uid-only-cards-switch"
+          >
+            {t('uidOnly.switch')}
+          </LabeledSwitch>
+        ) : (
+          <ConfirmableButton
+            label={t('uidOnly.switch')}
+            status="warning"
+            isPending={isPending}
+            onConfirm={() => update(true)}
+            confirm={{
+              title: t('uidOnly.confirm.title'),
+              message: t('uidOnly.confirm.message'),
+              confirmLabel: t('uidOnly.confirm.confirm'),
+              cancelLabel: t('uidOnly.confirm.cancel'),
+              'data-cy': 'uid-only-cards-confirm-dialog',
+              confirmDataCy: 'uid-only-cards-confirm',
+            }}
+            renderActivator={(open, props) => (
+              <LabeledSwitch
+                isSelected={false}
+                isDisabled={props.isDisabled || props.isPending}
+                onChange={open}
+                data-testid="uid-only-cards-switch"
+              >
+                {props.label}
+              </LabeledSwitch>
+            )}
+          />
+        )}
+        {!enabled && <Description>{t('uidOnly.offNote')}</Description>}
+      </div>
     </SettingsRow>
   );
 }

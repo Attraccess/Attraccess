@@ -15,9 +15,8 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   useTranslations: () => ({ t: (key: string) => key, tExists: () => false }),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ setQueryData: vi.fn() }) }));
-vi.mock('../../../../components/toastProvider', () => ({
-  useToastMessage: () => ({ success: vi.fn(), error: vi.fn(), apiError: vi.fn() }),
-}));
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), apiError: vi.fn() }));
+vi.mock('../../../../components/toastProvider', () => ({ useToastMessage: () => toast }));
 
 const save = vi.fn();
 const settings = (allowUidOnlyCards?: boolean) =>
@@ -76,6 +75,21 @@ describe('UidOnlyCardsSetting (dangerous, off by default)', () => {
 
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(save).toHaveBeenCalledWith({ body: { mode: 'selected', readerIds: [3], allowUidOnlyCards: false } });
+  });
+
+  it('tells the admin when a change was saved, and shows the API error when it was not', () => {
+    settings(false);
+    render(<UidOnlyCardsSetting />);
+    const options = vi.mocked(useUpdateCardWriterSettings).mock.calls[0][1] as {
+      onSuccess: (data: unknown) => void;
+      onError: (error: Error) => void;
+    };
+
+    options.onSuccess({ mode: 'selected', readerIds: [3], allowUidOnlyCards: true });
+    expect(toast.success).toHaveBeenCalledWith({ title: 'success.title', description: 'success.description' });
+
+    options.onError(new Error('boom'));
+    expect(toast.apiError).toHaveBeenCalled();
   });
 
   it('renders nothing before the settings are loaded', () => {

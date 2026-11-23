@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
   enrollFails: null as unknown,
   resetFails: null as unknown,
   deleteUidOnly: vi.fn(),
+  deleteUidOnlyFails: null as unknown,
   allowUidOnlyCards: false,
   settingsLoaded: true,
 }));
@@ -47,10 +48,14 @@ vi.mock('@attraccess/react-query-client', () => ({
       options.onSuccess();
     },
   }),
-  useDeleteUidOnlyCard: (_mutationKey: unknown, options: { onSuccess: () => void }) => ({
+  useDeleteUidOnlyCard: (
+    _mutationKey: unknown,
+    options: { onSuccess: () => void; onError: (error: unknown) => void },
+  ) => ({
     mutateAsync: async (data: unknown) => {
       state.deleteUidOnly(data);
-      options.onSuccess();
+      if (state.deleteUidOnlyFails) options.onError(state.deleteUidOnlyFails);
+      else options.onSuccess();
     },
   }),
   useGetCardWriterSettings: () => ({
@@ -103,6 +108,7 @@ beforeEach(() => {
   state.licensed = true;
   state.enrollFails = null;
   state.resetFails = null;
+  state.deleteUidOnlyFails = null;
   state.allowUidOnlyCards = false;
   state.settingsLoaded = true;
 });
@@ -267,4 +273,19 @@ it('deletes a UID-only card after a confirmation, without choosing a reader', as
   expect(state.deleteUidOnly).toHaveBeenCalledWith({ path: { id: 9 } });
   expect(state.reset).not.toHaveBeenCalled();
   await waitFor(() => expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['cards'] }));
+});
+
+it('shows the translated API error when a card cannot be deleted without a reader', async () => {
+  state.deleteUidOnlyFails = { message: 'Bad Request', body: { message: 'CARD_NOT_UID_ONLY' } };
+  render(
+    <MemoryRouter>
+      <RfidCardList />
+    </MemoryRouter>,
+  );
+  await userEvent.click(within(await openRowMenu('EE-FF')).getByRole('menuitem', { name: 'Delete' }));
+  await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
+  expect(state.toastError).toHaveBeenCalledWith({
+    title: 'Secure card',
+    description: 'Only UID-only cards are deleted without a reader. Reset this card through a reader.',
+  });
 });

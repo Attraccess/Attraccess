@@ -43,8 +43,7 @@
     "deleteUidOnlyModal": {
       "title": "Delete UID-only card",
       "description": "You are about to delete the UID-only RFID Card with the ID {{id}}. Nothing is written to such a card, so no reader is needed. This action cannot be undone."
-    },
-    "deleteError": "Could not delete the RFID card"
+    }
   },
   "enroll": "Enroll RFID Card",
   "enrollModal": {

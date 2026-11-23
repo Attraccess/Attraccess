@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional } from 'class-validator';
 
 export const CARD_WRITER_MODES = ['all', 'selected'] as const;
@@ -23,6 +24,8 @@ export class CardWriterSettingsDto {
       'Dangerous. Lets cards that only offer a UID and no AES authentication be enrolled and used. Such cards can be copied with cheap tools. Off when not set. Left unchanged when omitted on update.',
     required: false,
   })
+  // Strict: the global implicit conversion would turn the string "false" into true, and this switch is dangerous.
+  @Transform(({ obj, key }) => obj[key])
   @IsOptional()
   @IsBoolean()
   allowUidOnlyCards?: boolean;
