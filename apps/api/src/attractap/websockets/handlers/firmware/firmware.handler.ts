@@ -122,6 +122,7 @@ export class AttractapFirmwareHandler {
     const build = parseReportedBuild(data.payload);
     if (socket.sessionSecurity) {
       socket.sessionSecurity.secureConversion = data.payload?.capabilities?.secureConversion === true;
+      socket.sessionSecurity.conversionStopBeforeBurn = data.payload?.capabilities?.conversionStopBeforeBurn === true;
       socket.sessionSecurity.firmware = reportedFirmware(data.payload);
     }
     socket.sessionSecurity?.setBuild(build);

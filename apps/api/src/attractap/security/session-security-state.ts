@@ -39,6 +39,8 @@ export class SessionSecurityState {
   private build: ReportedBuild | null = null;
   /** The firmware announced `capabilities.secureConversion` (ATT-1208) in READER_FIRMWARE_INFO. */
   public secureConversion = false;
+  /** The firmware was built with stop-before-burn (lab/HIL only) and refuses every burn command. */
+  public conversionStopBeforeBurn = false;
   /** Firmware name, variant and version from READER_FIRMWARE_INFO; null until it arrived. */
   public firmware: { name: string; variant: string; version: string } | null = null;
   private waiters: Array<(build: ReportedBuild | null) => void> = [];

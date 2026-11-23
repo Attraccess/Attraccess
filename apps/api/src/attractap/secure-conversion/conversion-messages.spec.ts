@@ -23,6 +23,9 @@ describe('conversion message parsing', () => {
         key1Purpose: 'SECURE_BOOT_DIGEST1',
       }),
     ).toMatchObject({ mac: 'dc:b4:d9:21:71:c8', digest0: HEX });
+    expect(parseConversionMessage({ t: 'conversion.bootloader-written', id: 1, ok: false, sha256: '' })).toMatchObject({
+      sha256: null,
+    });
     expect(parseConversionMessage(preflightBody())).toMatchObject({ t: 'conversion.preflight-report', id: 3 });
   });
 

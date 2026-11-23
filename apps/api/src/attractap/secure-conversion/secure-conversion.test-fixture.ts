@@ -110,6 +110,8 @@ export interface HarnessOptions {
   hardwareTested?: boolean;
   build?: { profile: 'plain' | 'secure' | 'secure-lab'; release: boolean; variant: string };
   secureConversion?: boolean;
+  /** The firmware reports `conversionStopBeforeBurn` (lab/HIL builds). */
+  stopBeforeBurnBuild?: boolean;
 }
 
 /**
@@ -219,6 +221,7 @@ export function createConversionHarness(options: HarnessOptions = {}) {
     connection = new FakeConnection();
     state = new SessionSecurityState(1, FINGERPRINT);
     state.secureConversion = options.secureConversion ?? true;
+    state.conversionStopBeforeBurn = options.stopBeforeBurnBuild ?? false;
     state.setBuild({
       secureVersion: null,
       ...(options.build ?? { profile: device.profile, release: true, variant: 'touch-v2' }),

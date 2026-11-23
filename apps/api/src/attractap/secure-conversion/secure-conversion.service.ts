@@ -91,7 +91,7 @@ export class SecureConversionService {
     if (!session) blockers.push('reader-offline');
     else {
       if (!session.state.secureConversion) blockers.push('no-secure-conversion');
-      if (!build?.release) blockers.push('not-release-build');
+      if (!build?.release && !labStopBeforeBurn(session.state)) blockers.push('not-release-build');
       if (isDemoVariant(build?.variant ?? null)) blockers.push('demo-or-debug-variant');
       if (build?.profile !== 'plain') blockers.push('not-plain-profile');
     }
@@ -220,6 +220,15 @@ export class SecureConversionService {
   public async active(): Promise<AttractapSecureConversionRecord | null> {
     return await this.conversions.findActive();
   }
+}
+
+/**
+ * HIL on the plain lab reader (ATT-1208 decision 6): its image has test hooks, so it is not a release build. Only when
+ * the lab-only environment flag is set, and only for a reader whose firmware was built with stop-before-burn (it
+ * refuses every burn), the release-build gate is skipped. No other gate changes, and no release API sets the flag.
+ */
+export function labStopBeforeBurn(state: { conversionStopBeforeBurn: boolean }): boolean {
+  return process.env['ATTRACTAP_CONVERSION_LAB_STOP_BEFORE_BURN'] === 'true' && state.conversionStopBeforeBurn;
 }
 
 function canRetry(conversion: AttractapSecureConversionRecord): boolean {

@@ -239,7 +239,8 @@ function parseBurnRefused(body: Obj): BurnRefusedMessage | null {
 }
 
 function parseBootloaderWritten(body: Obj): BootloaderWrittenMessage | null {
-  const sha = body['sha256'] ?? null;
+  // A failed write may come without a hash (the firmware sends an empty string).
+  const sha = body['sha256'] === '' ? null : (body['sha256'] ?? null);
   if (!isId(body['id']) || !isBool(body['ok']) || (sha !== null && !isHex64(sha))) return null;
   return {
     t: 'conversion.bootloader-written',

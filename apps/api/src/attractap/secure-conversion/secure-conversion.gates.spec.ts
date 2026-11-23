@@ -49,6 +49,28 @@ describe('secure conversion gates (server side)', () => {
     await expect(h.service.start(1, 'Lab door', ADMIN)).rejects.toBeInstanceOf(ConflictException);
   });
 
+  describe('the lab-only stop-before-burn allowance (HIL on the plain lab reader)', () => {
+    const lab = {
+      build: { profile: 'plain' as const, release: false, variant: 'touch-v2' },
+      stopBeforeBurnBuild: true,
+    };
+    afterEach(() => delete process.env['ATTRACTAP_CONVERSION_LAB_STOP_BEFORE_BURN']);
+
+    it('keeps the release gate without the lab flag', async () => {
+      const h = await online(lab);
+      expect((await h.service.eligibility(1)).blockers).toEqual(['not-release-build']);
+    });
+
+    it('skips only the release gate, only for a stop-before-burn build, when the lab flag is set', async () => {
+      process.env['ATTRACTAP_CONVERSION_LAB_STOP_BEFORE_BURN'] = 'true';
+      expect((await (await online(lab)).service.eligibility(1)).blockers).toEqual([]);
+      const burningDevBuild = await online({ ...lab, stopBeforeBurnBuild: false });
+      expect((await burningDevBuild.service.eligibility(1)).blockers).toEqual(['not-release-build']);
+      const untested = await online({ ...lab, hardwareTested: false });
+      expect((await untested.service.eligibility(1)).blockers).toContain('not-hardware-tested');
+    });
+  });
+
   it('blocks an offline reader', async () => {
     const h = createConversionHarness();
     expect((await h.service.eligibility(1)).blockers).toEqual(['reader-offline']);
