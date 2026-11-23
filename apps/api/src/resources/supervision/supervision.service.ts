@@ -95,8 +95,8 @@ export class SupervisionService {
   }
 
   /** The resource of a pending request, for log lines about it; undefined once it is gone. */
-  public pendingResourceId(requestId: string): number | undefined {
-    return this.pending.get(requestId)?.resourceId;
+  public async pendingResourceId(requestId: string): Promise<number | undefined> {
+    return (await orServiceUnavailable(this.store.get(requestId)))?.resourceId;
   }
 
   /** Registered by the Attractap module at startup; see {@link ReaderSupervisionArmer}. */
@@ -138,10 +138,7 @@ export class SupervisionService {
     };
   }
 
-  /**
-   * Approves a pending request: starts the supervised session via the normal start path with the
-   * supervisor attached, then resolves the waiting requester.
-   */
+  /** Approves a pending request: starts the supervised session with the supervisor, then resolves the requester. */
   public async approve(
     requestId: string,
     supervisor: SupervisionUser,
@@ -417,10 +414,7 @@ export class SupervisionService {
     this.emitToEligible(request, SupervisionLiveEventType.RESOLVED);
   }
 
-  /**
-   * Cancels a reader request because the reader timed out, was disconnected, or the requester
-   * aborted. Dismisses the web popups; does not invoke the reader callbacks (the reader already knows).
-   */
+  /** Cancels a reader request (reader timeout, disconnect or requester abort); the reader already knows. */
   public async cancelReaderRequest(requestId: string, reason?: string): Promise<void> {
     const request = await this.settlement.claimQuietly(requestId);
     if (!request) {

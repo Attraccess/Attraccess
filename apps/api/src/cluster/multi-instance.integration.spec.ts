@@ -203,7 +203,8 @@ describe('several API instances on one Valkey', () => {
   }
 
   /** A reader websocket signed in on `instance`: every message is ACKed and recorded. */
-  function connectReader(instance: Instance, id: string) {
+  /** Resolves once Valkey lists the reader on this instance, as a real connect would before anyone routes to it. */
+  async function connectReader(instance: Instance, id: string) {
     const sent: Array<{ type: string; payload: Record<string, unknown> }> = [];
     const socket = {
       id,
@@ -224,6 +225,11 @@ describe('several API instances on one Valkey', () => {
     } as unknown as AuthenticatedWebSocket;
     instance.websockets.sockets.set(id, socket);
     instance.cluster.presence.socketConnected(READER_ID, id);
+    await waitFor(async () =>
+      (await instance.cluster.presence.holders(READER_ID)).some(
+        (holder) => holder.instanceId === instance.cluster.instanceId,
+      ),
+    );
     return { socket, sent, ofType: (type: AttractapEventType) => sent.filter((message) => message.type === type) };
   }
 
@@ -269,7 +275,7 @@ describe('several API instances on one Valkey', () => {
     it('arms the reader on A from B, joins by QR code and card on either instance, and reports live on both', async () => {
       const a = await startInstance('a');
       const b = await startInstance('b');
-      const reader = connectReader(a, 'socket-a');
+      const reader = await connectReader(a, 'socket-a');
       const liveOnA = firstValueFrom(
         a.massIntroductionLive.getIntroducerSubject(introducer.id).pipe(
           filter(
@@ -342,7 +348,7 @@ describe('several API instances on one Valkey', () => {
     it('expires exactly once cluster-wide, disarming the reader and telling the introducer on every instance', async () => {
       const a = await startInstance('a');
       const b = await startInstance('b');
-      const reader = connectReader(a, 'socket-a');
+      const reader = await connectReader(a, 'socket-a');
       const ended: string[] = [];
       for (const instance of [a, b]) {
         instance.massIntroductionLive
@@ -369,7 +375,7 @@ describe('several API instances on one Valkey', () => {
     it('marks the session DETACHED when the reader leaves on its instance', async () => {
       const a = await startInstance('a');
       const b = await startInstance('b');
-      const reader = connectReader(a, 'socket-a');
+      const reader = await connectReader(a, 'socket-a');
       const session = await b.massIntroductions.start(introducer, { resourceId: RESOURCE_ID, readerId: READER_ID });
       a.massIntroductionHandler.cancelForSocket(reader.socket);
       await waitFor(
@@ -434,7 +440,7 @@ describe('several API instances on one Valkey', () => {
     it('arms the reader on A for a requester on B, and a supervisor card at the reader approves it', async () => {
       const a = await startInstance('a');
       const b = await startInstance('b');
-      const reader = connectReader(a, 'socket-a');
+      const reader = await connectReader(a, 'socket-a');
       const pending = b.supervision.requestSupervisedSession(RESOURCE_ID, byName('requester'), { readerId: READER_ID });
       await waitFor(() => reader.ofType(AttractapEventType.SUPERVISION_START).length === 1);
 
@@ -480,7 +486,7 @@ describe('several API instances on one Valkey', () => {
     it('keeps one armed reader per requester across instances', async () => {
       const a = await startInstance('a');
       const b = await startInstance('b');
-      connectReader(a, 'socket-a');
+      await connectReader(a, 'socket-a');
       const requester = byName('requester');
       const results = await Promise.allSettled([
         a.supervision.requestSupervisedSession(RESOURCE_ID, requester, { readerId: READER_ID }),
@@ -520,7 +526,7 @@ describe('several API instances on one Valkey', () => {
     it('lets one flow arm the reader at a time, whichever instance starts it', async () => {
       const a = await startInstance('a');
       const b = await startInstance('b');
-      connectReader(a, 'socket-a');
+      await connectReader(a, 'socket-a');
       const results = await Promise.allSettled([
         b.massIntroductions.start(introducer, { resourceId: RESOURCE_ID, readerId: READER_ID }),
         a.cards.startEnrollOfNewNfcCard({ readerId: READER_ID, userId: byName('alice').id }),
@@ -539,7 +545,7 @@ describe('several API instances on one Valkey', () => {
     it('routes a card enrollment started on B to the reader on A', async () => {
       const a = await startInstance('a');
       const b = await startInstance('b');
-      const reader = connectReader(a, 'socket-a');
+      const reader = await connectReader(a, 'socket-a');
       await b.cards.startEnrollOfNewNfcCard({ readerId: READER_ID, userId: byName('alice').id });
       expect(reader.ofType(AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO)).toHaveLength(1);
       expect(reader.socket.state.enrollment?.userId).toBe(byName('alice').id);
@@ -551,7 +557,7 @@ describe('several API instances on one Valkey', () => {
     it('frees the reader and its presence when the instance holding it crashes', async () => {
       const a = await startInstance('a');
       const b = await startInstance('b');
-      connectReader(a, 'socket-a');
+      await connectReader(a, 'socket-a');
       const session = await b.massIntroductions.start(introducer, { resourceId: RESOURCE_ID, readerId: READER_ID });
       a.cluster.halt();
       const admin = new Redis(container.getMappedPort(6379), container.getHost());

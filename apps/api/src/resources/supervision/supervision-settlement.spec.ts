@@ -55,13 +55,13 @@ describe('SupervisionSettlement.recheck', () => {
   });
 
   it('expires the request itself when nobody settled it', async () => {
-    let settlement!: SupervisionSettlement;
+    const ref: { settlement?: SupervisionSettlement } = {};
     const expire = jest.fn(async () =>
-      settlement.waiters.apply('r1', { kind: 'failed', error: new RequestTimeoutException(), notifyReader: true }),
+      ref.settlement?.waiters.apply('r1', { kind: 'failed', error: new RequestTimeoutException(), notifyReader: true }),
     );
     const setup = setUp({ outcome: async () => null }, expire);
-    settlement = setup.settlement;
-    await settlement.recheck('r1', false);
+    ref.settlement = setup.settlement;
+    await setup.settlement.recheck('r1', false);
     expect(expire).toHaveBeenCalledWith('r1');
     expect(setup.reject).toHaveBeenCalledWith(expect.any(RequestTimeoutException));
   });

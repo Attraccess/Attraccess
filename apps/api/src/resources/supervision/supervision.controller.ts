@@ -113,7 +113,7 @@ export class SupervisionController {
     await this.networkRestriction.assertAllowed(
       req,
       NetworkRestrictedAction.SupervisionApprove,
-      this.supervisionService.pendingResourceId(requestId),
+      await this.supervisionService.pendingResourceId(requestId),
     );
     return toUsageSessionResponse(
       await this.supervisionService.approve(
