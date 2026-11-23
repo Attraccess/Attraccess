@@ -20,11 +20,10 @@ import { type PluginManifestInfo } from '@attraccess/plugins-backend-sdk';
 
 import { assertBundleCompatible, assertManifestCompatible } from './runtime/plugin-compatibility';
 import { assertInstallableNamespace } from './plugin-storage/storage-loader';
-import { PluginBootGuard } from './runtime/boot-guard';
+import { INTERNAL_PLUGIN_DIRECTORIES, PluginBootGuard } from './runtime/boot-guard';
+import { clearPluginRestartRequired, markPluginRestartRequired } from './runtime/restart-required';
 
 import { PluginSandboxService } from './plugin-sandbox.service';
-
-import { INTERNAL_PLUGIN_DIRECTORIES } from './runtime/boot-guard';
 
 import {
   licenseShortfall,
@@ -143,6 +142,7 @@ export class PluginService {
     getImplementationClass().loadedPlugins.clear();
     getImplementationClass().pluginLoadErrors.clear();
     getImplementationClass().licenseGate = null;
+    clearPluginRestartRequired();
     PluginBootGuard.loadFailures(getImplementationClass().PLUGIN_PATH);
     getImplementationClass().logger.log(
       `PluginService configured. Path: ${getImplementationClass().PLUGIN_PATH}, RestartByExit: ${getImplementationClass().RESTART_BY_EXIT_FLAG}`,
@@ -209,7 +209,7 @@ export class PluginService {
     setTimeout(() => this.restartApp(), 1000);
   }
 
-  public async uploadPlugin(zipFile: FileUpload, deferRestart = false) {
+  public async uploadPlugin(zipFile: FileUpload) {
     // check if file is a zip file
     if (zipFile.mimetype !== 'application/zip') {
       PluginService.logger.error(`File ${zipFile.originalname} is not a zip file`);
@@ -291,9 +291,8 @@ export class PluginService {
           throw error;
         }
 
-        // The replacement is complete once the new directory is in place.
-        // A stale backup must not prevent activating the uploaded plugin.
-        if (!deferRestart) this.requestRestart();
+        // Complete once the new directory is in place (a stale backup must not block it); applied at the restart.
+        markPluginRestartRequired();
 
         if (replacing) {
           try {

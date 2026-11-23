@@ -15,6 +15,7 @@ import { PluginBleService } from './ble/plugin-ble.service';
 import { PluginReadersService } from './readers/plugin-readers.service';
 
 import { PluginService } from './plugin.service';
+import { markPluginRestartRequired } from './runtime/restart-required';
 
 import { ResourceHealthService } from '../resources/health/resource-health.service';
 
@@ -31,7 +32,6 @@ export class PluginUninstallService {
   private static readonly logger = new Logger('PluginService');
 
   constructor(
-    private readonly pluginService: PluginService,
     private readonly ble: PluginBleService,
     private readonly readers: PluginReadersService,
     @Optional() private readonly moduleRef?: ModuleRef,
@@ -53,7 +53,7 @@ export class PluginUninstallService {
     }
   }
 
-  async deletePlugin(pluginId: string, deferRestart = false) {
+  async deletePlugin(pluginId: string) {
     // Refused plugins (SDK 1.x, unsupported engine) are listed too, so an admin can remove them.
     const plugin = PluginService.getManifestById(pluginId);
 
@@ -115,7 +115,7 @@ export class PluginUninstallService {
       );
     }
 
-    // restart app
-    if (!deferRestart) this.pluginService.requestRestart();
+    // Its files are gone; the code that runs from memory stops at the next restart.
+    markPluginRestartRequired();
   }
 }

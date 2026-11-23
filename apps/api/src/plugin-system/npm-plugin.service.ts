@@ -160,8 +160,8 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
     return this.catalog.removalPlan(name);
   }
 
-  async removeInstalled(name: string, deferRestart = false, approvedDependants: string[] = []): Promise<void> {
-    return this.catalog.removeInstalled(name, deferRestart, approvedDependants);
+  async removeInstalled(name: string, approvedDependants: string[] = []): Promise<void> {
+    return this.catalog.removeInstalled(name, approvedDependants);
   }
 
   async packageMetadata(name: string, registryId?: string): Promise<unknown> {

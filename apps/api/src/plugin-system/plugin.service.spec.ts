@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { PluginService } from './plugin.service';
+import { isPluginRestartRequired } from './runtime/restart-required';
 import { PluginBootGuard } from './runtime/boot-guard';
 import { zipFileUpload } from './__test__/make-zip';
 
@@ -375,6 +376,7 @@ describe('PluginService', () => {
       await expect(upload).rejects.toThrow(/Plugin uploaded-plugin .*"typeorm".*migrating-to-2/s);
       expect(existsSync(join(fixture.root, 'uploaded-plugin'))).toBe(false);
       expect(fixture.restartSpy).not.toHaveBeenCalled();
+      expect(isPluginRestartRequired()).toBe(false);
     });
 
     it('refuses a ZIP whose storage namespace another installed plugin has, before it moves anything', async () => {
@@ -425,17 +427,18 @@ describe('PluginService', () => {
       },
     );
 
-    it('unpacks a valid plugin, moves it into place and schedules a restart', async () => {
+    it('unpacks a valid plugin, moves it into place and marks a restart as required without restarting', async () => {
       const service = new PluginService();
       const file = zipFileUpload({ 'plugin.json': JSON.stringify(fixture.VALID_MANIFEST) });
+      expect(isPluginRestartRequired()).toBe(false);
 
       const manifest = await service.uploadPlugin(file);
 
       expect(manifest.name).toBe('uploaded-plugin');
       expect(existsSync(join(fixture.root, 'uploaded-plugin', 'plugin.json'))).toBe(true);
+      expect(isPluginRestartRequired()).toBe(true);
+      expect(setTimeout).not.toHaveBeenCalledWith(expect.any(Function), 1000);
       expect(fixture.restartSpy).not.toHaveBeenCalled();
-      fixture.flushScheduledRestart();
-      expect(fixture.restartSpy).toHaveBeenCalledTimes(1);
     });
 
     it('clears stale quarantine state for an uploaded replacement', async () => {

@@ -8,6 +8,7 @@ import { PassThrough } from 'stream';
 import { PluginController } from './plugin.controller';
 import { PluginAdministrationService } from './plugin-administration.service';
 import { PluginService } from './plugin.service';
+import { markPluginRestartRequired } from './runtime/restart-required';
 import { PluginUninstallService } from './plugin-uninstall.service';
 import { PluginModule } from './plugin.module';
 import { LoadedPluginManifest } from './plugin.manifest';
@@ -91,7 +92,46 @@ describe('PluginController', () => {
   it('reports when plugins are globally disabled', () => {
     PluginModule.configure({ DISABLE_PLUGINS: true });
 
-    expect(controller.getPluginSystemStatus()).toEqual({ disabled: true, instanceId: expect.any(String) });
+    expect(controller.getPluginSystemStatus()).toEqual({
+      disabled: true,
+      instanceId: expect.any(String),
+      restartRequired: false,
+    });
+  });
+
+  it('reports pending plugin changes until the process restarts', () => {
+    expect(controller.getPluginSystemStatus().restartRequired).toBe(false);
+
+    markPluginRestartRequired();
+
+    expect(controller.getPluginSystemStatus().restartRequired).toBe(true);
+  });
+
+  describe('restartPluginSystem', () => {
+    it('audits the request and restarts the process', async () => {
+      markPluginRestartRequired();
+
+      await expect(controller.restartPluginSystem(req)).resolves.toEqual({ ok: true });
+
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          domain: 'administration',
+          action: 'plugin.restart_requested',
+          subject: { type: 'plugin-policy', id: 1 },
+          details: { pendingChanges: 1, restartRequested: 1 },
+        }),
+      );
+      expect(service.requestRestart).toHaveBeenCalledTimes(1);
+    });
+
+    it('restarts even when no plugin change is pending', async () => {
+      await expect(controller.restartPluginSystem(req)).resolves.toEqual({ ok: true });
+
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({ details: { pendingChanges: 0, restartRequested: 1 } }),
+      );
+      expect(service.requestRestart).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('retryPlugin', () => {
@@ -355,14 +395,14 @@ describe('PluginController', () => {
     const file = { originalname: 'plugin.zip' } as FileUpload;
     service.uploadPlugin.mockResolvedValue({ name: 'uploaded' });
     await expect(controller.uploadPlugin(file, {}, req)).resolves.toEqual({ name: 'uploaded' });
-    expect(service.uploadPlugin).toHaveBeenCalledWith(file, true);
-    expect(service.requestRestart).toHaveBeenCalledTimes(1);
+    expect(service.uploadPlugin).toHaveBeenCalledWith(file);
+    expect(service.requestRestart).not.toHaveBeenCalled();
   });
 
   it('delegates non-npm plugin deletion to the plugin service', async () => {
     await controller.deletePlugin('plugin-id', req);
-    expect(service.deletePlugin).toHaveBeenCalledWith('plugin-id', true);
-    expect(service.requestRestart).toHaveBeenCalledTimes(1);
+    expect(service.deletePlugin).toHaveBeenCalledWith('plugin-id');
+    expect(service.requestRestart).not.toHaveBeenCalled();
   });
 
   it('delegates marketplace search with an optional registry', () => {
@@ -382,10 +422,10 @@ describe('PluginController', () => {
 
     await controller.deletePlugin(plugin.id, req);
 
-    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin', true);
+    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin');
     // Its health entries go like an uploaded plugin's, by the manifest's plugin name.
     expect(service.clearHealthEntries).toHaveBeenCalledWith(plugin.name);
-    expect(service.requestRestart).toHaveBeenCalledTimes(1);
+    expect(service.requestRestart).not.toHaveBeenCalled();
     expect(service.deletePlugin).not.toHaveBeenCalled();
   });
 
@@ -396,7 +436,7 @@ describe('PluginController', () => {
 
     await controller.removeInstalledPackage('@attraccess/plugin', req);
 
-    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin', true);
+    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin');
     expect(service.clearHealthEntries).toHaveBeenCalledWith('npm-runtime-name');
   });
 
@@ -405,8 +445,8 @@ describe('PluginController', () => {
 
     await controller.deletePlugin('npm-plugin-id', req);
 
-    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin', true);
-    expect(service.requestRestart).toHaveBeenCalledTimes(1);
+    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin');
+    expect(service.requestRestart).not.toHaveBeenCalled();
     expect(service.deletePlugin).not.toHaveBeenCalled();
   });
 
@@ -419,8 +459,8 @@ describe('PluginController', () => {
 
     await controller.deletePlugin(plugin.id, req);
 
-    expect(service.deletePlugin).toHaveBeenCalledWith(plugin.id, true);
-    expect(service.requestRestart).toHaveBeenCalledTimes(1);
+    expect(service.deletePlugin).toHaveBeenCalledWith(plugin.id);
+    expect(service.requestRestart).not.toHaveBeenCalled();
     expect(npmService.removeInstalled).not.toHaveBeenCalled();
   });
 });

@@ -2,6 +2,7 @@ import { registerNpmPluginDependencyLifecycleFixture } from './npm-plugin-depend
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { PluginService } from './plugin.service';
+import { isPluginRestartRequired } from './runtime/restart-required';
 import { NpmPluginService } from './npm-plugin.service';
 import { rename } from 'fs/promises';
 import { createHash } from 'crypto';
@@ -24,7 +25,8 @@ describe('npm plugin dependency lifecycle', () => {
     expect(fixture.internals.registry.download).not.toHaveBeenCalled();
     await fixture.service.install('provider', '1.0.0', undefined, undefined, plan.token);
     expect(fixture.service.listInstalled().map(({ name }) => name)).toEqual(['core', 'adapter', 'provider']);
-    expect(PluginService.prototype.requestRestart).toHaveBeenCalledTimes(1);
+    expect(PluginService.prototype.requestRestart).not.toHaveBeenCalled();
+    expect(isPluginRestartRequired()).toBe(true);
     expect(PluginService.getPlugins().find(({ name }) => name === 'provider').dependencies).toEqual([
       fixture.dep('adapter'),
     ]);
@@ -64,7 +66,8 @@ describe('npm plugin dependency lifecycle', () => {
     expect(fixture.service.listInstalled()).toEqual([]);
     await fixture.service.install('provider', '1.0.0', undefined, undefined, plan.token);
     expect(fixture.service.listInstalled().map(({ name }) => name)).toEqual(['core', 'adapter', 'provider']);
-    expect(PluginService.prototype.requestRestart).toHaveBeenCalledTimes(1);
+    expect(PluginService.prototype.requestRestart).not.toHaveBeenCalled();
+    expect(isPluginRestartRequired()).toBe(true);
     expect(readdirSync(fixture.root).some((name) => name.startsWith('.npm-staging-'))).toBe(false);
   });
 
@@ -162,6 +165,7 @@ describe('npm plugin dependency lifecycle', () => {
     expect(fixture.service.listInstalled()).toEqual([]);
     expect(PluginService.getPlugins()).toEqual([]);
     expect(PluginService.prototype.requestRestart).not.toHaveBeenCalled();
+    expect(isPluginRestartRequired()).toBe(false);
   });
 
   it('blocks incompatible upgrades and downgrades of dependencies and dependants', async () => {
@@ -208,9 +212,9 @@ describe('npm plugin dependency lifecycle', () => {
     await fixture.publish(fixture.pkg('provider', [fixture.dep('adapter')]));
     await fixture.install('provider');
     await expect(fixture.service.removeInstalled('core')).rejects.toThrow('adapter, provider');
-    await expect(fixture.service.removeInstalled('core', false, ['adapter'])).rejects.toThrow('required by');
+    await expect(fixture.service.removeInstalled('core', ['adapter'])).rejects.toThrow('required by');
     expect(fixture.service.listInstalled()).toHaveLength(3);
-    await fixture.service.removeInstalled('core', false, ['adapter', 'provider']);
+    await fixture.service.removeInstalled('core', ['adapter', 'provider']);
     expect(fixture.service.listInstalled()).toEqual([]);
     expect(PluginService.getPlugins()).toEqual([]);
   });
@@ -221,7 +225,7 @@ describe('npm plugin dependency lifecycle', () => {
     await fixture.install('provider');
     const before = fixture.service.listInstalled();
     jest.spyOn(fixture.internals.state, 'writeRecords').mockRejectedValue(new Error('state failed'));
-    await expect(fixture.service.removeInstalled('core', false, ['provider'])).rejects.toThrow('state failed');
+    await expect(fixture.service.removeInstalled('core', ['provider'])).rejects.toThrow('state failed');
     expect(fixture.service.listInstalled()).toEqual(before);
     expect(PluginService.getPlugins()).toHaveLength(2);
   });
@@ -239,7 +243,7 @@ describe('npm plugin dependency lifecycle', () => {
 
     await expect(fixture.service.updateRequestedSpec('provider', '^1')).rejects.toThrow('restarting first');
     await expect(fixture.install('independent')).rejects.toThrow('restarting first');
-    await expect(fixture.service.removeInstalled('core', false, ['provider'])).rejects.toThrow('restarting first');
+    await expect(fixture.service.removeInstalled('core', ['provider'])).rejects.toThrow('restarting first');
     expect(fixture.service.listInstalled()).toEqual(before);
     expect(PluginService.getPlugins()).toHaveLength(2);
 
