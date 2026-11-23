@@ -1,4 +1,5 @@
 import { useNetworkRestriction } from '../../../hooks/useNetworkRestriction';
+import { NetworkRestrictedHint } from '../../../components/networkRestriction/NetworkRestrictedHint';
 import { Button, Link } from '@heroui/react';
 import type { DashboardWidgetRenderProps } from '@attraccess/plugins-frontend-sdk';
 import { useQueryClient } from '@tanstack/react-query';
@@ -146,6 +147,7 @@ export function MySessionsWidget({ size, isPreview }: Readonly<DashboardWidgetRe
           <SessionRow key={resource.id} resource={resource} size={size} isPreview={isPreview} />
         ))}
       </WidgetList>
+      <NetworkRestrictedHint actions={NetworkRestrictedAction.UsageEnd} />
       {/* A medium tile has room for its three rows only; its header links to the resources. */}
       {size !== 'medium' && <MoreLink count={(data.total ?? data.data.length) - shown.length} href="/resources" />}
     </div>

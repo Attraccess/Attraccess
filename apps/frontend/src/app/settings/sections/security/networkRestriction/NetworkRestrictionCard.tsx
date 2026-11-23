@@ -148,8 +148,13 @@ export function NetworkRestrictionCard() {
       </SettingsRow>
 
       <SettingsRow stacked label={t('ranges.label')} hint={t('ranges.hint')}>
-        <TextField value={shown.rangesText} onChange={setRangesText} aria-label={t('ranges.label')}>
-          <TextArea rows={5} placeholder={NETWORK_RESTRICTION_DEFAULT_RANGES.join('\n')} data-testid="network-ranges" />
+        <TextField fullWidth value={shown.rangesText} onChange={setRangesText} aria-label={t('ranges.label')}>
+          <TextArea
+            fullWidth
+            rows={5}
+            placeholder={NETWORK_RESTRICTION_DEFAULT_RANGES.join('\n')}
+            data-testid="network-ranges"
+          />
         </TextField>
       </SettingsRow>
 
@@ -160,29 +165,29 @@ export function NetworkRestrictionCard() {
           aria-label={t('source.label')}
         >
           <Radio value={NetworkIpSource.CLIENT}>
-            <Radio.Control>
-              <Radio.Indicator />
-            </Radio.Control>
             <Radio.Content>
+              <Radio.Control>
+                <Radio.Indicator />
+              </Radio.Control>
               <Label>{t('source.client.label')}</Label>
-              <Description>{t('source.client.description')}</Description>
             </Radio.Content>
+            <Description>{t('source.client.description')}</Description>
           </Radio>
           <Radio value={NetworkIpSource.HEADER}>
-            <Radio.Control>
-              <Radio.Indicator />
-            </Radio.Control>
             <Radio.Content>
+              <Radio.Control>
+                <Radio.Indicator />
+              </Radio.Control>
               <Label>{t('source.header.label')}</Label>
-              <Description>{t('source.header.description')}</Description>
             </Radio.Content>
+            <Description>{t('source.header.description')}</Description>
           </Radio>
         </RadioGroup>
         {shown.ipSource === NetworkIpSource.HEADER && (
           <div className="flex flex-col gap-2">
-            <TextField value={shown.headerName} onChange={setHeaderName} aria-label={t('source.headerName')}>
+            <TextField fullWidth value={shown.headerName} onChange={setHeaderName} aria-label={t('source.headerName')}>
               <Label>{t('source.headerName')}</Label>
-              <Input data-testid="network-header-name" />
+              <Input fullWidth data-testid="network-header-name" />
             </TextField>
             <StatusAlert status="warning">{t('source.headerWarning')}</StatusAlert>
           </div>
