@@ -1,5 +1,5 @@
 # Security Settings
-<!-- llms-description: Security settings for session cookies and authentication, including SameSite, session configuration, card keys and rate limiting. -->
+<!-- llms-description: Security settings for session cookies and authentication, including SameSite, session configuration, card keys and rate limiting, and the network restriction. -->
 
 Attraccess provides several security-related settings for session cookies and authentication. These settings affect how users stay logged in and how the application handles cross-site requests.
 
@@ -131,6 +131,59 @@ Set the `TRUST_PROXY` environment variable to the number of trusted proxy hops b
 > Trust only as many hops as actually exist in your deployment. If `TRUST_PROXY` trusts more hops than your real proxy chain, clients can forge `X-Forwarded-For` to rotate their apparent IP and evade rate limiting entirely. When unset, Attraccess trusts no forwarding headers (safe default). Changes take effect after a restart.
 
 The same client IP is used for the limits on [Attractap reader pairing](attractap/pairing.md) requests (per address). Also make sure the proxy passes the `Sec-WebSocket-Protocol` header, which readers use to select their encrypted connection.
+
+## Network restriction
+
+The **network restriction** allows selected resource actions only from your local network. It is off by default and is configured under **Settings → Security → Network restriction**. Changes apply right away on the instance you save them on; other instances behind the same database pick them up within about a minute (the settings cache).
+
+When it is on, Attraccess decides for every HTTP request whether the caller comes from an **allowed network**. For callers outside it, the actions below are refused with HTTP `403` and the error code `NETWORK_RESTRICTED`, unless one of the caller's roles allows the action from outside. This applies to browser sessions, API tokens and MCP tool calls alike.
+
+| Action | What it covers |
+|--------|----------------|
+| Start | Start a usage session |
+| Take over | Start a session with takeover |
+| End | End a session (your own or another user's) |
+| Open door / Unlock door / Unlatch door / Lock door | The door controls of a resource |
+| Request supervision | Request a supervised start |
+| Approve supervision | Approve a supervised start request (rejecting is never restricted) |
+
+### Settings
+
+| Setting | Description |
+|---------|-------------|
+| **Enabled** | Off by default. While it is off, nothing changes. |
+| **Allowed networks** | IP addresses and CIDR ranges, IPv4 and IPv6, for example `10.0.0.0/8`, `192.168.0.0/16`, `fc00::/7`. An entry that is not valid is rejected and named. The list must not be empty while the restriction is on. IPv4-mapped IPv6 addresses (`::ffff:10.0.0.5`) are matched as IPv4. |
+| **Address source** | Where the caller's address comes from, see below. |
+| **Allowed from outside, per role** | A table with one row per role and one column per action. A checked box lets the members of that role do the action from outside the allowed network. A user may do an action if **any** of their roles allows it. New roles allow nothing from outside, and administrators are **not** exempt: tick their row as well if they should keep access. The table stays editable while the restriction is off. |
+
+The card shows the address Attraccess detects for you and whether it is inside the allowed networks. Check it before you switch the restriction on.
+
+### Address source
+
+| Source | Behaviour |
+|--------|-----------|
+| **Client address** (default) | The address Attraccess resolves for the request. Behind a reverse proxy set `TRUST_PROXY` (see [Reverse proxies and the real client IP](#reverse-proxies-and-the-real-client-ip)); without it, every request looks like it comes from the proxy, which is usually a private address, so everyone would count as local. `X-Forwarded-For` is ignored while `TRUST_PROXY` is unset. |
+| **Request header** | The address is read from a header, by default `X-Real-Ip`, which Traefik sets. If the header holds a comma-separated list, the **last** entry counts, the one your nearest proxy wrote. If the header is missing, empty or not an IP address, the caller counts as **outside**. |
+
+> [!WARNING]
+> **Header mode is only safe if Attraccess can be reached only through the proxy that overwrites the header.** If a client can reach Attraccess directly, or the proxy passes a header it received from the client on unchanged, the client can send `X-Real-Ip: 192.168.1.10` and appear to be local. Use **Client address** with `TRUST_PROXY` unless you control the network path.
+
+### Example: Traefik
+
+Either let Attraccess read the client address from the proxy, or read the header Traefik sets:
+
+| Setup | Attraccess |
+|-------|------------|
+| Client address (recommended) | Set `TRUST_PROXY=1` for the Attraccess container and choose **Client address**. |
+| Request header | Choose **Request header** with the header name `X-Real-Ip`, and make sure nothing but Traefik can reach the Attraccess port. |
+
+Add your LAN and VPN ranges to **Allowed networks**, for example `192.168.0.0/16`, and then switch the restriction on. Behind Traefik on the same Docker host the proxy itself connects from a private address; that is why the address source matters.
+
+### What is never restricted
+
+Physical readers (Attractap), plugin readers and device integrations, flows and other automations, and reservations start and end sessions as before, whatever the restriction says. Everything else, such as viewing resources, user management and settings, stays reachable from anywhere, so an administrator can always correct the configuration.
+
+A blocked attempt is written to the server log at `warn` level (user, action, resource and detected address). It is not an audit log event. Changes to the network restriction settings and to the role table are audited like other settings changes.
 
 ## Approved websites
 

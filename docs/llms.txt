@@ -139,7 +139,7 @@ The documentation pages are plain Markdown files. English pages live under https
 
 ## English: System Settings
 - [Overview](https://docs.attraccess.org/en/settings/overview.md): Administrator overview of System Settings: application settings, resource activity visibility, email and additional settings.
-- [Security](https://docs.attraccess.org/en/settings/security.md): Security settings for session cookies and authentication, including SameSite, session configuration, card keys and rate limiting.
+- [Security](https://docs.attraccess.org/en/settings/security.md): Security settings for session cookies and authentication, including SameSite, session configuration, card keys and rate limiting, and the network restriction.
 - [Audit log](https://docs.attraccess.org/en/settings/audit-log.md): How to browse, filter, inspect and export the audit log of recorded activity and control recording and retention.
 
 ## English: Developer Guide
@@ -301,7 +301,7 @@ The documentation pages are plain Markdown files. English pages live under https
 
 ## Deutsch: Systemeinstellungen
 - [Überblick](https://docs.attraccess.org/de/settings/overview.md): Administratorübersicht der Systemeinstellungen: Anwendung, Sichtbarkeit der Ressourcennutzung, E-Mail und weitere Einstellungen.
-- [Sicherheit](https://docs.attraccess.org/de/settings/security.md): Sicherheitseinstellungen für Sitzungs-Cookies und Authentifizierung: SameSite, Sitzungskonfiguration, Kartenschlüssel und Rate-Limiting.
+- [Sicherheit](https://docs.attraccess.org/de/settings/security.md): Sicherheitseinstellungen für Sitzungs-Cookies und Authentifizierung: SameSite, Sitzungskonfiguration, Kartenschlüssel und Rate-Limiting und Netzwerkbeschränkung.
 - [Audit-Protokoll](https://docs.attraccess.org/de/settings/audit-log.md): Wie Sie das Audit-Protokoll durchsuchen, filtern, prüfen und exportieren sowie Aufzeichnung und Aufbewahrung steuern.
 
 ## Deutsch: Für Entwickler

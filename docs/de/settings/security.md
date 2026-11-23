@@ -1,5 +1,5 @@
 # Sicherheitseinstellungen
-<!-- llms-description: Sicherheitseinstellungen für Sitzungs-Cookies und Authentifizierung: SameSite, Sitzungskonfiguration, Kartenschlüssel und Rate-Limiting. -->
+<!-- llms-description: Sicherheitseinstellungen für Sitzungs-Cookies und Authentifizierung: SameSite, Sitzungskonfiguration, Kartenschlüssel und Rate-Limiting und Netzwerkbeschränkung. -->
 
 Attraccess bietet verschiedene sicherheitsrelevante Einstellungen fuer Sitzungs-Cookies und Authentifizierung. Diese Einstellungen beeinflussen, wie Benutzer angemeldet bleiben und wie die Anwendung mit Cross-Site-Anfragen umgeht.
 
@@ -131,6 +131,59 @@ Setzen Sie die Umgebungsvariable `TRUST_PROXY` auf die Anzahl vertrauenswuerdige
 > Vertrauen Sie nur so vielen Hops, wie tatsaechlich existieren. Vertraut `TRUST_PROXY` mehr Hops als Ihre reale Proxy-Kette, koennen Clients `X-Forwarded-For` faelschen, ihre scheinbare IP rotieren und das Rate-Limiting umgehen. Nicht gesetzt vertraut Attraccess keinen Weiterleitungs-Headern (sicherer Standard). Aenderungen werden nach einem Neustart wirksam.
 
 Dieselbe Client-IP gilt für die Begrenzungen der Anfragen zur [Attractap-Reader-Kopplung](attractap/pairing.md) (pro Adresse). Stellen Sie außerdem sicher, dass der Proxy den Header `Sec-WebSocket-Protocol` durchreicht, über den Reader ihre verschlüsselte Verbindung wählen.
+
+## Netzwerkbeschränkung
+
+Die **Netzwerkbeschränkung** erlaubt ausgewählte Ressourcen-Aktionen nur aus deinem lokalen Netzwerk. Sie ist standardmäßig aus und wird unter **Einstellungen → Sicherheit → Netzwerkbeschränkung** eingerichtet. Änderungen gelten sofort auf der Instanz, auf der du speicherst; weitere Instanzen mit derselben Datenbank übernehmen sie innerhalb von etwa einer Minute (Cache der Einstellungen).
+
+Ist sie an, entscheidet Attraccess für jede HTTP-Anfrage, ob der Aufrufer aus einem **erlaubten Netzwerk** kommt. Für Aufrufer von außerhalb werden die folgenden Aktionen mit HTTP `403` und dem Fehlercode `NETWORK_RESTRICTED` abgelehnt, es sei denn, eine Rolle des Aufrufers erlaubt die Aktion von außerhalb. Das gilt für Browser-Sitzungen, API-Tokens und MCP-Tool-Aufrufe gleichermaßen.
+
+| Aktion | Was sie umfasst |
+|--------|-----------------|
+| Starten | Eine Nutzungssitzung starten |
+| Übernehmen | Eine Sitzung mit Übernahme starten |
+| Beenden | Eine Sitzung beenden (die eigene oder die eines anderen Nutzers) |
+| Tür öffnen / entriegeln / Falle öffnen / verriegeln | Die Türsteuerung einer Ressource |
+| Beaufsichtigung anfragen | Einen beaufsichtigten Start anfragen |
+| Beaufsichtigung bestätigen | Eine Anfrage für einen beaufsichtigten Start bestätigen (Ablehnen ist nie eingeschränkt) |
+
+### Einstellungen
+
+| Einstellung | Beschreibung |
+|-------------|--------------|
+| **Aktiviert** | Standardmäßig aus. Solange sie aus ist, ändert sich nichts. |
+| **Erlaubte Netzwerke** | IP-Adressen und CIDR-Bereiche, IPv4 und IPv6, zum Beispiel `10.0.0.0/8`, `192.168.0.0/16`, `fc00::/7`. Ein ungültiger Eintrag wird abgelehnt und genannt. Die Liste darf nicht leer sein, solange die Beschränkung an ist. IPv4-gemappte IPv6-Adressen (`::ffff:10.0.0.5`) werden als IPv4 geprüft. |
+| **Adressquelle** | Woher die Adresse des Aufrufers stammt, siehe unten. |
+| **Von außerhalb erlaubt, pro Rolle** | Eine Tabelle mit einer Zeile pro Rolle und einer Spalte pro Aktion. Ein gesetzter Haken erlaubt den Mitgliedern der Rolle die Aktion auch außerhalb des erlaubten Netzwerks. Ein Nutzer darf eine Aktion, wenn **eine** seiner Rollen sie erlaubt. Neue Rollen erlauben von außerhalb nichts, und Administratoren sind **nicht** ausgenommen: Setze auch bei ihnen Haken, wenn sie den Zugriff behalten sollen. Die Tabelle lässt sich auch bearbeiten, solange die Beschränkung aus ist. |
+
+Die Karte zeigt die Adresse, die Attraccess bei dir erkennt, und ob sie in den erlaubten Netzwerken liegt. Prüfe das, bevor du die Beschränkung einschaltest.
+
+### Adressquelle
+
+| Quelle | Verhalten |
+|--------|-----------|
+| **Client-Adresse** (Standard) | Die Adresse, die Attraccess für die Anfrage ermittelt. Hinter einem Reverse Proxy setze `TRUST_PROXY` (siehe [Reverse Proxies und die echte Client-IP](#reverse-proxies-und-die-echte-client-ip)); ohne diese Einstellung wirkt jede Anfrage, als käme sie vom Proxy, meist einer privaten Adresse, und alle gälten als lokal. `X-Forwarded-For` wird ignoriert, solange `TRUST_PROXY` nicht gesetzt ist. |
+| **Request-Header** | Die Adresse wird aus einem Header gelesen, standardmäßig `X-Real-Ip`, den Traefik setzt. Enthält der Header eine kommagetrennte Liste, zählt der **letzte** Eintrag, den dein nächster Proxy geschrieben hat. Fehlt der Header, ist er leer oder keine IP-Adresse, gilt der Aufrufer als **außerhalb**. |
+
+> [!WARNING]
+> **Der Header-Modus ist nur sicher, wenn Attraccess ausschließlich über den Proxy erreichbar ist, der den Header überschreibt.** Kann ein Client Attraccess direkt erreichen, oder reicht der Proxy einen vom Client gesendeten Header unverändert durch, kann der Client `X-Real-Ip: 192.168.1.10` senden und wirkt lokal. Nutze **Client-Adresse** mit `TRUST_PROXY`, sofern du den Netzwerkpfad nicht selbst kontrollierst.
+
+### Beispiel: Traefik
+
+Lass Attraccess entweder die Client-Adresse vom Proxy übernehmen oder den Header lesen, den Traefik setzt:
+
+| Aufbau | Attraccess |
+|--------|------------|
+| Client-Adresse (empfohlen) | `TRUST_PROXY=1` für den Attraccess-Container setzen und **Client-Adresse** wählen. |
+| Request-Header | **Request-Header** mit dem Namen `X-Real-Ip` wählen und sicherstellen, dass nur Traefik den Attraccess-Port erreicht. |
+
+Trage deine LAN- und VPN-Bereiche unter **Erlaubte Netzwerke** ein, zum Beispiel `192.168.0.0/16`, und schalte die Beschränkung dann ein. Hinter Traefik auf demselben Docker-Host verbindet sich der Proxy selbst von einer privaten Adresse; deshalb kommt es auf die Adressquelle an.
+
+### Was nie eingeschränkt wird
+
+Physische Reader (Attractap), Plugin-Reader und Geräte-Integrationen, Flows und andere Automatisierungen sowie Reservierungen starten und beenden Sitzungen wie bisher, egal was die Beschränkung sagt. Alles andere, etwa das Ansehen von Ressourcen, die Benutzerverwaltung und die Einstellungen, bleibt von überall erreichbar, damit ein Administrator die Konfiguration immer korrigieren kann.
+
+Ein blockierter Versuch steht im Server-Log auf Stufe `warn` (Nutzer, Aktion, Ressource und erkannte Adresse). Er ist kein Audit-Log-Ereignis. Änderungen an der Netzwerkbeschränkung und an der Rollentabelle werden wie andere Einstellungsänderungen im Audit-Log festgehalten.
 
 ## Freigegebene Websites
 
