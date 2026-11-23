@@ -19,6 +19,8 @@ CONFIG_SPIRAM_USE_MALLOC=y
 # stacks, FreeRTOS objects, mbedTLS on the secure profile), all of which ask for
 # MALLOC_CAP_INTERNAL or MALLOC_CAP_DMA explicitly.
 CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=1024
+# CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP is deliberately left off (ATT-1276): HIL A/B runs on a Touch V2
+# showed no internal RAM gain over the 1 KB threshold above, while PSRAM use grew by about 60 KB.
 # Run code and read-only data from PSRAM (copied there at boot) instead of
 # flash, so the cache stays enabled while NVS or OTA write the flash and the
 # RGB panel's bounce buffers keep refilling (rgb_gt911_driver.cpp).
