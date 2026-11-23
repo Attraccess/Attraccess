@@ -118,6 +118,28 @@ the reader to its normal screens. A disconnect does too. Messages for any other
 `MassIntroduction: refused session=… reason=…` and
 `MassIntroduction: ended reason=… session=…`.
 
+## Image form fields (ATT-879)
+
+A touch reader has no camera, so an `image` form field is a QR code: the phone opens the link, takes or uploads the
+photos there and the server stores them. The reader announces `capabilities.formImages: true` in its firmware info
+(touch variants with a display only; the Lite and the BLE Bridge never do). The server sends `type: "image"` fields
+only to readers that announce it, so older firmware never sees a field type it cannot render.
+
+`RESOURCE_USAGE_FORM_FIELDS` carries three extra properties for an image field (its `value` is `null`):
+
+| Property     | Meaning                                                                                  |
+| ------------ | ---------------------------------------------------------------------------------------- |
+| `handoffUrl` | The full link for the QR code. The reader only renders it and never builds a link itself |
+| `imageCount` | Photos the server holds for this attempt so far                                          |
+| `maxImages`  | The most photos the field takes                                                          |
+
+While an image field is the open page, the reader sends `RESOURCE_USAGE_FORM_GET_FIELDS` (same resource, action,
+form, offset and limit as the page) every 3 seconds. The answer updates the count, and redraws the QR code only when
+`handoffUrl` changed (a fresh link follows an expired one), without rebuilding the page. Polling stops when the page is
+left, cancelled or submitted. On Next/Submit the field is sent in `answers` with an empty string; the server fills in
+the photo ids it holds for the attempt and answers `REQUIRED_FIELD` in `RESOURCE_USAGE_FORM_PAGE_RESULT` when a
+required field has none.
+
 ## Card relay protocol (2.0.0)
 
 Firmware 2.0.0 holds no card keys and no card session state (ATT-1145). The server runs all

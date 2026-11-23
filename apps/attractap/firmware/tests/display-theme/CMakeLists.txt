@@ -80,6 +80,7 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/layout.cpp"
     "${FIRMWARE_DIR}/src/display/screens/forms/fields.cpp"
     "${FIRMWARE_DIR}/src/display/screens/forms/editor.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/forms/imageField.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsUiSlots.cpp"
     "${FIRMWARE_DIR}/src/display/ui/ui_builder.cpp"
     "${FIRMWARE_DIR}/src/display/ui/ui_slot_cache.cpp"

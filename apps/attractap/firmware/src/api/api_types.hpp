@@ -186,6 +186,7 @@ enum class ResourceUsageFormFieldType : uint8_t
         NUMBER,
         BOOLEAN,
         SELECT,
+        IMAGE, // photos are added on the user's phone: the reader only shows a QR code and a count
     };
 
 struct ResourceUsageFormFieldOptions
@@ -222,6 +223,10 @@ struct ResourceUsageFormField
         ResourceUsageFormFieldOptions options;
         bool hasValue = false;
         std::string value;
+        // IMAGE fields only: the page the QR code opens on the phone, and the photos added so far.
+        std::string handoffUrl;
+        uint16_t imageCount = 0;
+        uint16_t maxImages = 1;
     };
 
 struct ResourceUsageFormMeta

@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include "../state/language.hpp"
-#include "messages.catalog.bt-setup.hpp"
+#include "messages.catalog.form-images.hpp"
 
 // Firmware-owned text is identified independently of its displayed wording.
 namespace FirmwareI18n {
@@ -19,11 +19,13 @@ inline const char *messageText(Message id, const std::string &locale) {
     constexpr size_t cardRelayEnd = mainEntries + sizeof(cardRelayCatalog) / sizeof(cardRelayCatalog[0]);
     constexpr size_t networkStatusEnd = cardRelayEnd + sizeof(networkStatusCatalog) / sizeof(networkStatusCatalog[0]);
     constexpr size_t sessionUsersEnd = networkStatusEnd + sizeof(sessionUsersCatalog) / sizeof(sessionUsersCatalog[0]);
+    constexpr size_t btSetupEnd = sessionUsersEnd + sizeof(btSetupCatalog) / sizeof(btSetupCatalog[0]);
     const auto &entry = index < mainEntries        ? catalog[index]
                         : index < cardRelayEnd     ? cardRelayCatalog[index - mainEntries]
                         : index < networkStatusEnd ? networkStatusCatalog[index - cardRelayEnd]
                         : index < sessionUsersEnd  ? sessionUsersCatalog[index - networkStatusEnd]
-                                                   : btSetupCatalog[index - sessionUsersEnd];
+                        : index < btSetupEnd       ? btSetupCatalog[index - sessionUsersEnd]
+                                                   : formImagesCatalog[index - btSetupEnd];
     return Language::text(entry.en, entry.de, locale);
 }
 

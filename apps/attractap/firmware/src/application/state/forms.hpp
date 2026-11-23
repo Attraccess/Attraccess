@@ -109,6 +109,13 @@ uint32_t formCacheTick = 0;
 bool awaitingFieldRender = false;
 #endif
 
+// The open page is an image field: its count is re-requested while the user adds photos on the phone (ATT-879).
+#if defined(HAS_LVGL_DISPLAY)
+static constexpr uint32_t FORM_IMAGE_POLL_MS = 3000;
+bool formImagePolling = false;
+uint32_t formImagePollAt = 0;
+#endif
+
 #if defined(HAS_LVGL_DISPLAY)
 uint32_t usageStatsResourceId = 0;
 #endif

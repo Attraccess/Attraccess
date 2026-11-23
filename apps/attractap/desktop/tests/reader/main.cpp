@@ -29,6 +29,7 @@ void runJourney(ReaderWorkflow &workflow, bool timeKnown)
     workflow.testScreenOwnedUi();
     workflow.testButtonErrors();
     workflow.testFormErrors();
+    workflow.testFormImageField();
     workflow.testTransientRouting();
     workflow.testParallelSessions();
     workflow.testRefusedCardSuppression();

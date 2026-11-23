@@ -89,6 +89,7 @@ void DemoWebsocket::handleStartSession(uint32_t resourceId, uint32_t projectId, 
     session.startEpoch = time(nullptr);
     sessions.push_back(session);
     _cncDraft.clear();
+    _cncImageCount = 0;
 
     respondActionSuccess("START_RESOURCE_USAGE_SESSION");
     respondResourceList();

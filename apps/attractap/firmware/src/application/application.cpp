@@ -153,7 +153,7 @@ void Application::loop() {
   // rendering runs on LvglTask, so serialize with lv_lock (recursive).
   lv_lock();
   this->processState();
-  this->pollUsageStats();
+  this->pollUsageStats(); this->pollFormImageCount();
   lv_unlock();
 #else
   this->processState();

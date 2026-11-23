@@ -55,6 +55,10 @@ void API::sendFirmwareInfo()
                           traits, uiCaps, sizeof uiCaps);
     // This reader relays card APDUs to the server and holds no card keys (firmware 2.0.0+).
     if (traits.hasNfc) event["data"]["payload"]["capabilities"]["cardRelay"] = true;
+#ifdef HAS_LVGL_DISPLAY
+    // This reader renders image form fields as a QR code for the phone (ATT-879). Readers without a display never get them.
+    event["data"]["payload"]["capabilities"]["formImages"] = true;
+#endif
     // Plugin BLE proxy, protocol v1 (ATT-1033). Builds without it send no `ble`: the API answers READER_UNSUPPORTED.
     char bleCaps[ble::CAPABILITY_SCRATCH];
     if (BleProxy::supported())

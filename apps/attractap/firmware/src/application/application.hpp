@@ -179,6 +179,7 @@ private:
     void handleFormPageBack();
     void handleFormsCancel();
     void pollUsageStats();
+    void pollFormImageCount();
     void requestCurrentFormField();
     void advanceFormCursor();
     void retreatFormCursor();
