@@ -107,7 +107,19 @@ describe('FormImageHandoffService', () => {
       await handoffs.upload(token, await jpegUpload());
 
       await expect(handoffs.upload(token, await jpegUpload())).rejects.toBeInstanceOf(GoneException);
-      await expect(handoffs.page(token)).rejects.toBeInstanceOf(GoneException);
+    });
+
+    it('still shows and removes its photos once used up, and a removed photo makes room for another', async () => {
+      const { handoffs } = createImageServices();
+      const { token } = await handoffs.openForReader(handoffKey, FIELD_OPTIONS);
+      const first = await handoffs.upload(token, await jpegUpload());
+      await handoffs.upload(token, await jpegUpload());
+
+      await expect(handoffs.page(token)).resolves.toMatchObject({ uploadsRemaining: 0 });
+      await handoffs.removeImage(token, first.id);
+
+      await expect(handoffs.page(token)).resolves.toMatchObject({ uploadsRemaining: 1 });
+      await expect(handoffs.upload(token, await jpegUpload())).resolves.toBeDefined();
     });
 
     it.each(['', 'short', 'x'.repeat(200), '../../etc/passwd', 'not-a-real-token-but-long-enough!'])(

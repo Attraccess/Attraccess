@@ -170,12 +170,13 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   protected onReaderSessionEnded(
     socket: AuthenticatedWebSocket,
     reason: CardConversationFailure = 'READER_SESSION_ENDED',
+    readerId: number | null = socket.readerId,
   ) {
     this.cardConversations.abort(socket, reason);
     this.cardHandler.clearVerifiedUser(socket);
     if (reason === 'READER_SESSION_ENDED') this.uiHandler.endCardSession(socket);
     forgetReaderFormState(socket);
-    this.formsHandler.endReaderAttempts(socket);
+    this.formsHandler.endReaderAttempts(socket, readerId);
     if (socket.state.supervisionFlow && !socket.state.supervisionFlow.webInitiated) {
       this.supervisionHandler.cancelForSocket(socket);
     }
@@ -194,7 +195,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     if (!socket.state) return;
     // Plugin BLE sessions and pending calls are bound to this connection's reader identity.
     this.readerBleDriver.socketClosed(socket);
-    this.onReaderSessionEnded(socket, reason);
+    this.onReaderSessionEnded(socket, reason, readerId);
     if (socket.state.supervisionFlow) this.supervisionHandler.cancelForSocket(socket);
     if (socket.state.massIntroductionFlow) this.massIntroductionHandler.cancelForSocket(socket, readerId);
     socket.state.enrollment = null;

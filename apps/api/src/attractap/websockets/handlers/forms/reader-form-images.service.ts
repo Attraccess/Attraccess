@@ -22,6 +22,8 @@ const isImage = (field: Pick<FormFieldResponseDto, 'type'>) => field.type === Fo
 @Injectable()
 export class ReaderFormImages {
   private readonly logger = new Logger(ReaderFormImages.name);
+  /** The latest `describeField` call per reader and field; the next one waits for it. */
+  private readonly lanes = new Map<string, Promise<unknown>>();
 
   @Inject(FormImageHandoffService)
   private handoffs: FormImageHandoffService;
@@ -63,35 +65,55 @@ export class ReaderFormImages {
   ): Promise<{ handoffUrl: string; imageCount: number; maxImages: number } | null> {
     const userId = socket.state.verifiedUserId;
     if (socket.readerId == null || userId == null) return null;
+    const readerId = socket.readerId;
     const key = this.key(where.resourceId, where.action, where.formId, field.id);
-    const view = await this.handoffs.openForReader(
-      { readerId: socket.readerId, userId, ...where, fieldId: field.id },
-      field.options,
-      socket.state.formHandoffs?.[key],
-    );
-    socket.state.formHandoffs ??= {};
-    socket.state.formHandoffs[key] = { handoffId: view.handoffId, token: view.token };
-    return { handoffUrl: view.handoffUrl, imageCount: view.imageCount, maxImages: view.maxImages };
+    // One call at a time per reader and field: the firmware's prefetch, render and 3 s poll can overlap, and two
+    // calls that both find no usable link would each create one, leaving the phone on a link the reader does not show.
+    const lane = `${readerId}:${key}`;
+    const previous = this.lanes.get(lane) ?? Promise.resolve();
+    const run = previous.catch(() => undefined).then(async () => {
+      const view = await this.handoffs.openForReader(
+        { readerId, userId, ...where, fieldId: field.id },
+        field.options,
+        socket.state.formHandoffs?.[key],
+      );
+      socket.state.formHandoffs ??= {};
+      socket.state.formHandoffs[key] = { handoffId: view.handoffId, token: view.token };
+      return { handoffUrl: view.handoffUrl, imageCount: view.imageCount, maxImages: view.maxImages };
+    });
+    this.lanes.set(lane, run);
+    try {
+      return await run;
+    } finally {
+      if (this.lanes.get(lane) === run) this.lanes.delete(lane);
+    }
   }
 
   /**
-   * The answers of a page with each image field answered by the images the handoff holds: the reader sends no ids,
-   * the server knows them. An image field the reader showed but left out of the page counts as empty.
+   * The answers of a page with each image field of that page answered by the images the handoff holds: the reader
+   * sends no ids, the server knows them. An image field on the page that the reader left out counts as empty. An image
+   * field on another page is left alone (its handoff may exist only because the reader prefetched that page), or its
+   * required error would block a page that does not show it.
    */
   async fillAnswers(
     socket: AuthenticatedWebSocket,
     where: { resourceId: number; action: ResourceFormAction; formId: number },
     form: FormResponseDto | undefined,
     answers: { fieldId: number; value: FormFieldAnswerValue }[],
+    offset: number,
   ): Promise<{ fieldId: number; value: FormFieldAnswerValue }[]> {
     const imageFields = form?.fields.filter(isImage) ?? [];
     if (!imageFields.length) return answers;
+    // The reader shows one field per page, in position order (the field window of `getFieldsWindow`).
+    const pageFieldId = (await this.supports(socket))
+      ? [...(form?.fields ?? [])].sort((a, b) => a.position - b.position)[Math.max(0, offset)]?.id
+      : undefined;
     const filled = answers.filter((answer) => !imageFields.some((field) => field.id === answer.fieldId));
     for (const field of imageFields) {
       const key = this.key(where.resourceId, where.action, where.formId, field.id);
       const handoff = socket.state.formHandoffs?.[key];
       const sent = answers.some((answer) => answer.fieldId === field.id);
-      if (!handoff && !sent) continue;
+      if (!sent && (!handoff || field.id !== pageFieldId)) continue;
       const ids = handoff ? await this.handoffs.imageIds(handoff.handoffId) : [];
       filled.push({ fieldId: field.id, value: ids.length ? JSON.stringify(ids) : '' });
     }
@@ -131,10 +153,11 @@ export class ReaderFormImages {
   }
 
   /** The reader's login ended or changed: every link of the reader stops working. */
-  endAllForReader(socket: Pick<AuthenticatedWebSocket, 'readerId'>): void {
-    if (socket.readerId == null) return;
-    void this.handoffs.endForReader(socket.readerId).catch((error) => {
-      this.logger.warn(`Could not end the photo links of reader ${socket.readerId}: ${(error as Error).message}`);
+  endAllForReader(socket: Pick<AuthenticatedWebSocket, 'readerId'>, readerId = socket.readerId): void {
+    // A disconnect clears `socket.readerId` first, so it names the reader itself.
+    if (readerId == null) return;
+    void this.handoffs.endForReader(readerId).catch((error) => {
+      this.logger.warn(`Could not end the photo links of reader ${readerId}: ${(error as Error).message}`);
     });
   }
 }

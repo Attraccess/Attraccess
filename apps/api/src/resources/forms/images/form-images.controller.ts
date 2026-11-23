@@ -1,13 +1,13 @@
 import {
   Controller,
   Get,
-  Header,
   Param,
   ParseIntPipe,
   ParseUUIDPipe,
   Post,
   Query,
   Req,
+  Res,
   StreamableFile,
   UploadedFile,
   UseGuards,
@@ -23,6 +23,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { Auth, type AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import type { FileUpload } from '../../../common/types/file-upload.types';
 import { FormImageDto, FormImageUploadQueryDto } from './form-image.dto';
@@ -66,8 +67,6 @@ export class FormImagesController {
   @Get('forms/images/:imageId')
   @UseGuards(FormImageViewerGuard)
   @ApiBearerAuth()
-  @Header('Cache-Control', 'private, max-age=3600')
-  @Header('X-Content-Type-Options', 'nosniff')
   @ApiOperation({
     summary: 'Get a form image',
     description:
@@ -85,11 +84,14 @@ export class FormImagesController {
   async get(
     @Param('imageId', ParseUUIDPipe) imageId: string,
     @Req() req: AuthenticatedRequest,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
     const { stream, image } = await this.images.openForViewer(imageId, {
       id: req.user.id,
       mayViewAll: req.user.effectivePermissions?.has('resources.update') === true,
     });
+    // Only an image that is served is cached; a 404 must not stick in the browser for an hour.
+    res.set({ 'Cache-Control': 'private, max-age=3600', 'X-Content-Type-Options': 'nosniff' });
     return new StreamableFile(stream, { type: image.mimeType, length: image.size });
   }
 }

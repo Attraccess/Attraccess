@@ -63,8 +63,8 @@ export class AttractapFormsHandler {
   }
 
   /** The reader's login ended or changed: the phone links of its image fields stop working (ATT-879). */
-  public endReaderAttempts(socket: AuthenticatedWebSocket): void {
-    this.readerImages.endAllForReader(socket);
+  public endReaderAttempts(socket: AuthenticatedWebSocket, readerId = socket.readerId): void {
+    this.readerImages.endAllForReader(socket, readerId);
   }
 
   public handleResourceUsageFormCancel(socket: AuthenticatedWebSocket, data: AttractapEvent['data']): void {
@@ -220,7 +220,7 @@ export class AttractapFormsHandler {
       (item) => item.id === formId,
     );
     // The reader sends no image ids: the answer of an image field is what the phone handoff holds.
-    const filled = await this.readerImages.fillAnswers(socket, where, form, answers);
+    const filled = await this.readerImages.fillAnswers(socket, where, form, answers, offset);
     const checked = await this.resourceFormsService.validatePageAnswers(resourceId, action, formId, filled, userId);
     // Saved only for the user who answered; if the login changed meanwhile, the reader must not be
     // told the page was accepted (START would then miss the answers).

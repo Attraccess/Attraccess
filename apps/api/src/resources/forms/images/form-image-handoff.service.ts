@@ -122,10 +122,13 @@ export class FormImageHandoffService {
 
   // --- phone side, by token -----------------------------------------------------------------------------------------
 
-  /** The open handoff of a token; an unknown, expired, ended or used-up link is gone (410). */
+  /**
+   * The open handoff of a token; an unknown, expired or ended link is gone (410). A used-up link still shows and
+   * removes its photos, so the phone page keeps its thumbnails and a photo can be swapped; only `upload` refuses it.
+   */
   async resolve(token: string, now = new Date()): Promise<FormImageHandoffRecord> {
     const handoff = TOKEN_PATTERN.test(token) ? await this.store.findHandoffByTokenHash(hashToken(token)) : null;
-    if (!handoff || handoff.endedAt || handoff.expiresAt <= now || handoff.uploadCount >= handoff.maxImages) {
+    if (!handoff || handoff.endedAt || handoff.expiresAt <= now) {
       throw new FormPhotoLinkExpiredException();
     }
     return handoff;
@@ -156,6 +159,7 @@ export class FormImageHandoffService {
 
   async upload(token: string, file: FileUpload | undefined): Promise<FormImageDto> {
     const handoff = await this.resolve(token);
+    if (handoff.uploadCount >= handoff.maxImages) throw new FormPhotoLinkExpiredException();
     const { field } = await this.resolveField(handoff);
     if (field.type !== FormFieldType.IMAGE) throw new FormPhotoLinkExpiredException();
     if (!(await this.store.reserveHandoffUpload(handoff.id, new Date()))) throw new FormPhotoLinkExpiredException();
@@ -188,7 +192,10 @@ export class FormImageHandoffService {
   }
 
   async removeImage(token: string, imageId: string): Promise<void> {
-    const image = await this.imageOf(await this.resolve(token), imageId);
+    const handoff = await this.resolve(token);
+    const image = await this.imageOf(handoff, imageId);
     await this.images.remove(image);
+    // A removed photo makes room for another one, so the field never ends up with fewer photos than it needs.
+    await this.store.releaseHandoffUpload(handoff.id);
   }
 }
