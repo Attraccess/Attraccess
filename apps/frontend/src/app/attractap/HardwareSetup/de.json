@@ -22,6 +22,10 @@
         "title": "Bluetooth-Einrichtung ist in diesem Browser nicht verfügbar",
         "description": "Die Einrichtung per Bluetooth braucht Web Bluetooth, das Chrome und Edge auf dem Computer und Chrome unter Android (über HTTPS) bieten. Öffne die Seite dort oder verbinde das Gerät per USB; auch das braucht Chrome oder Edge auf einem Computer."
       },
+      "blocked": {
+        "title": "Bluetooth ist für diese Seite blockiert",
+        "description": "Der Browser hat seine Geräteliste nicht geöffnet, weil Bluetooth für diese Seite blockiert ist. Klicke auf das Symbol links neben der Adresse, öffne die Website-Einstellungen und stelle Bluetooth (bzw. Bluetooth-Geräte) auf Zulassen. Lade die Seite dann neu und versuche es erneut. Fehlt diese Einstellung, prüfe in den Browser-Einstellungen (Datenschutz und Sicherheit → Website-Einstellungen), ob Websites nach Bluetooth-Geräten fragen dürfen und ob deine Organisation Web Bluetooth blockiert. In Brave ist Web Bluetooth standardmäßig aus: Öffne brave://flags/#brave-web-bluetooth-api, stelle Web Bluetooth API auf Enabled und starte den Browser neu. Oder richte das Gerät per USB ein."
+      },
       "failed": {
         "title": "Bluetooth-Verbindung fehlgeschlagen",
         "description": "Prüfe, ob die Bluetooth-Einrichtung des Geräts noch offen ist (sie schließt nach 10 Minuten), und halte es nah an diesen Computer oder dieses Telefon. Fragt dein Computer nach einer Bluetooth-Kopplung, bestätige sie. Wähle in der Liste des Browsers das richtige Gerät (ein Attractap Touch zeigt seinen Namen auf dem Display) und versuche es erneut. Klappt es weiterhin nicht, richte es per USB ein."
