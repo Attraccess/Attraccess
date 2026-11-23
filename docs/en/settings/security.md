@@ -140,23 +140,25 @@ When it is on, Attraccess decides for every HTTP request whether the caller come
 
 | Action | What it covers |
 |--------|----------------|
-| Start | Start a usage session |
-| Take over | Start a session with takeover |
-| End | End a session (your own or another user's) |
+| Start session | Start a usage session |
+| Take over session | Start a session with takeover |
+| End session | End a session (your own or another user's) |
 | Open door / Unlock door / Unlatch door / Lock door | The door controls of a resource |
 | Request supervision | Request a supervised start |
 | Approve supervision | Approve a supervised start request (rejecting is never restricted) |
+
+A supervised request that takes over another user's session needs both **Request supervision** and **Take over session**.
 
 ### Settings
 
 | Setting | Description |
 |---------|-------------|
-| **Enabled** | Off by default. While it is off, nothing changes. |
+| **Restrict actions to the local network** | Off by default. While it is off, nothing changes. |
 | **Allowed networks** | IP addresses and CIDR ranges, IPv4 and IPv6, for example `10.0.0.0/8`, `192.168.0.0/16`, `fc00::/7`. An entry that is not valid is rejected and named. The list must not be empty while the restriction is on. IPv4-mapped IPv6 addresses (`::ffff:10.0.0.5`) are matched as IPv4. |
 | **Address source** | Where the caller's address comes from, see below. |
 | **Allowed from outside, per role** | A table with one row per role and one column per action. A checked box lets the members of that role do the action from outside the allowed network. A user may do an action if **any** of their roles allows it. New roles allow nothing from outside, and administrators are **not** exempt: tick their row as well if they should keep access. The table stays editable while the restriction is off. |
 
-The card shows the address Attraccess detects for you and whether it is inside the allowed networks. Check it before you switch the restriction on.
+The card shows the address Attraccess detects for you and whether it is inside the allowed networks with the saved settings. Check it before you switch the restriction on. Like the other security settings, the card is saved and discarded through the shared bar at the bottom of the page.
 
 ### Address source
 

@@ -1,3 +1,4 @@
+import { cn } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { NetworkRestrictedAction } from '@attraccess/application-models';
 import { useNetworkRestriction } from '../../hooks/useNetworkRestriction';
@@ -7,6 +8,7 @@ import de from './translations/de.json';
 interface NetworkRestrictedHintProps {
   /** The hint shows while the user may not do any of these actions from their current network. */
   actions: NetworkRestrictedAction | NetworkRestrictedAction[];
+  /** Added to the default small muted text, e.g. spacing. */
   className?: string;
 }
 
@@ -17,7 +19,7 @@ export function NetworkRestrictedHint({ actions, className }: Readonly<NetworkRe
   const list = Array.isArray(actions) ? actions : [actions];
   if (!list.some(isRestricted)) return null;
   return (
-    <p className={className ?? 'text-xs text-muted'} role="note" data-cy="network-restricted-hint">
+    <p className={cn('text-xs text-muted', className)} role="note" data-cy="network-restricted-hint">
       {t('onlyLocal')}
     </p>
   );

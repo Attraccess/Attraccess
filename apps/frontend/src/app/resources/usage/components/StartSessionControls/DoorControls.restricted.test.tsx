@@ -30,6 +30,13 @@ describe('DoorControls outside the allowed network', () => {
     expect(screen.getByRole('note')).toBeInTheDocument();
   });
 
+  it('does not explain an Unlatch button that is not shown', () => {
+    state.restricted = new Set([NetworkRestrictedAction.DoorUnlatch]);
+    render(<DoorControls {...handlers} {...pending} />);
+    expect(screen.queryByRole('button', { name: 'Unlatch' })).toBeNull();
+    expect(screen.queryByRole('note')).toBeNull();
+  });
+
   it('shows no hint and enabled buttons while nothing is restricted', () => {
     state.restricted = new Set();
     render(<DoorControls {...handlers} {...pending} />);

@@ -37,7 +37,10 @@ export function NetworkRestrictionRoleTable({
       <TableScrollContainer>
         <TableContent aria-label={t('roles.ariaLabel')} data-testid="network-restriction-role-table">
           <TableHeader>
-            <TableColumn isRowHeader>{t('roles.role')}</TableColumn>
+            {/* The role column stays put while the action columns scroll sideways on narrow screens. */}
+            <TableColumn isRowHeader className="sticky left-0 z-10 bg-surface-secondary">
+              {t('roles.role')}
+            </TableColumn>
             {actions.map((action) => (
               <TableColumn key={action} id={action} className="text-center">
                 {t(`actions.${action}`)}
@@ -47,7 +50,7 @@ export function NetworkRestrictionRoleTable({
           <TableBody items={roles} dependencies={[t, value]}>
             {(role) => (
               <TableRow key={role.roleId} id={role.roleId} data-cy={`network-restriction-role-${role.key}`}>
-                <TableCell>{roleName(role)}</TableCell>
+                <TableCell className="sticky left-0 z-10 bg-surface">{roleName(role)}</TableCell>
                 {actions.map((action) => (
                   <TableCell key={action} className="text-center">
                     <Checkbox

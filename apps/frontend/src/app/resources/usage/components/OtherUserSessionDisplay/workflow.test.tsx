@@ -41,20 +41,22 @@ const state = vi.hoisted(() => ({
   forms: vi.fn(),
   success: vi.fn(),
   error: vi.fn(),
+  apiError: vi.fn(),
   invalidate: vi.fn(),
+  restricted: new Set<string>(),
   callbacks: {} as Record<
     string,
     { onSuccess: (data: { conversationId: number }) => void; onError?: (error: Error) => void }
   >,
 }));
 vi.mock('../../../../../hooks/useNetworkRestriction', () => ({
-  useNetworkRestriction: () => ({ isRestricted: () => false }),
+  useNetworkRestriction: () => ({ isRestricted: (action: string) => state.restricted.has(action) }),
 }));
 vi.mock('../../../../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 1 }, hasPermission: () => state.update }),
 }));
 vi.mock('../../../../../components/toastProvider', () => ({
-  useToastMessage: () => ({ success: state.success, error: state.error }),
+  useToastMessage: () => ({ success: state.success, error: state.error, apiError: state.apiError }),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('@attraccess/react-query-client', async (original) => ({
@@ -86,6 +88,7 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
   useResourceUsageStartBlockedKey: 'start-blocked',
   UseResourceUsageGetActiveSessionKeyFn: (params: unknown) => ['active', params],
   UseResourceUsageGetHistoryKeyFn: (params: unknown) => ['history', params],
+  useGetNetworkRestrictionStatusKey: 'network-status',
 }));
 vi.mock('../../../forms/hooks/useResourceFormsSubmission', () => ({
   useResourceFormsSubmission: () => ({ requestForms: state.forms, modal: null, clearFormsDraft: vi.fn() }),
@@ -114,6 +117,7 @@ beforeEach(() => {
   state.introducer = false;
   state.canControl = false;
   state.allowTakeover = true;
+  state.restricted = new Set();
   state.forms.mockReset().mockResolvedValue([{ formId: 7, data: { ack: true } }]);
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
@@ -302,4 +306,23 @@ it('closes the takeover notes modal when the plugin confirmation or block notice
     state.callbacks.start.onError?.(startError(409, { code: 'CONFIRMATION_REQUIRED', stepId: 's1', confirmation })),
   );
   expect(screen.queryByText('Confirm notes')).toBeNull();
+});
+it('keeps takeover and stop visible but disabled outside the allowed network, and says why', () => {
+  state.restricted = new Set(['usage.takeover', 'usage.end']);
+  mount();
+  expect(screen.getByRole('button', { name: 'Takeover Resource' }).hasAttribute('disabled')).toBe(true);
+  expect(screen.getByRole('button', { name: 'Stop Other User Session' }).hasAttribute('disabled')).toBe(true);
+  const notes = screen.getAllByRole('note');
+  expect(notes).toHaveLength(2);
+  expect(notes[0].textContent).toBe('Only available from the local network.');
+});
+it('shows the translated refusal when stopping fails outside the network, and asks for the status again', async () => {
+  mount();
+  fireEvent.click(screen.getByRole('button', { name: 'Stop Other User Session' }));
+  await waitFor(() => expect(state.end).toHaveBeenCalled());
+  const refusal = { status: 403, body: { message: 'NETWORK_RESTRICTED', code: 'NETWORK_RESTRICTED' } };
+  act(() => state.callbacks.end.onError?.(refusal as unknown as Error));
+  expect(state.apiError).toHaveBeenCalledWith(expect.objectContaining({ error: refusal, baseTranslationKey: 'api' }));
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['network-status'] });
+  expect(state.success).not.toHaveBeenCalled();
 });

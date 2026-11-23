@@ -4,17 +4,20 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SupervisedStartModal } from './index';
 
-const { requestMutate, apiErrorToast, ApiErrorMock, candidates } = vi.hoisted(() => {
+const { requestMutate, apiErrorToast, invalidate, ApiErrorMock, candidates } = vi.hoisted(() => {
   class ApiErrorMock extends Error {
     status: number;
-    constructor(status: number) {
+    body: unknown;
+    constructor(status: number, body?: unknown) {
       super('api error');
       this.status = status;
+      this.body = body;
     }
   }
   return {
     requestMutate: vi.fn(),
     apiErrorToast: vi.fn(),
+    invalidate: vi.fn(),
     ApiErrorMock,
     candidates: {
       value: [
@@ -34,6 +37,8 @@ vi.mock('../../../../../components/toastProvider', () => ({
   useToastMessage: () => ({ apiError: apiErrorToast }),
 }));
 
+vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: invalidate }) }));
+
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   ...(await (() => ({
@@ -44,6 +49,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 
 vi.mock('@attraccess/react-query-client', () => ({
   ApiError: ApiErrorMock,
+  useGetNetworkRestrictionStatusKey: 'network-status',
   ResourceIntroducerType: { INTRODUCER: 'introducer', MAINTAINER: 'maintainer' },
   useResourceIntroducersGetNames: () => ({
     isLoading: false,
@@ -158,6 +164,17 @@ describe('SupervisedStartModal', () => {
 
     act(() => getLastCallbacks().onError(new ApiErrorMock(403)));
     expect(screen.getByText('rejected.description')).toBeInTheDocument();
+  });
+
+  it('treats a network restriction refusal as an error of the request, not a rejection', async () => {
+    renderModal();
+    await userEvent.click(screen.getByText('alice'));
+
+    const refusal = new ApiErrorMock(403, { message: 'NETWORK_RESTRICTED', code: 'NETWORK_RESTRICTED' });
+    act(() => getLastCallbacks().onError(refusal));
+    expect(screen.queryByText('rejected.description')).not.toBeInTheDocument();
+    expect(apiErrorToast).toHaveBeenCalledWith(expect.objectContaining({ error: refusal, baseTranslationKey: 'api' }));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['network-status'] });
   });
 
   it('calls onApproved when the supervisor approves', async () => {

@@ -4,9 +4,10 @@
   "loading": "Loading network restriction…",
   "loadFailed": "The network restriction settings could not be loaded. Reload the page to try again.",
   "detected": {
-    "inside": "Your address {{address}} is inside the allowed network.",
-    "outside": "Your address {{address}} is outside the allowed network. Check the ranges and the address source before you switch the restriction on, otherwise your own role needs the actions below.",
-    "unknown": "Your address could not be determined with the current address source, so you count as outside the allowed network."
+    "inside": "With the saved settings, your address {{address}} is inside the allowed network.",
+    "outside": "With the saved settings, your address {{address}} is outside the allowed network. Check the ranges and the address source before you switch the restriction on, or allow the actions you need for one of your roles below.",
+    "noRanges": "Your address is {{address}}. No allowed networks are saved yet.",
+    "unknown": "With the saved address source, your address could not be determined, so you count as outside the allowed network."
   },
   "enabled": {
     "label": "Restrict actions to the local network",
@@ -14,10 +15,11 @@
   },
   "ranges": {
     "label": "Allowed networks",
-    "hint": "IP addresses and CIDR ranges (IPv4 and IPv6), one per line. At least one is required while the restriction is on."
+    "hint": "IP addresses and CIDR ranges (IPv4 and IPv6), one per line. At least one is required while the restriction is on.",
+    "required": "Enter at least one allowed network while the restriction is on."
   },
   "source": {
-    "label": "Where the address comes from",
+    "label": "Address source",
     "hint": "Behind a reverse proxy, set TRUST_PROXY (client address) or let the proxy send a header.",
     "client": {
       "label": "Client address",
@@ -35,13 +37,14 @@
     "hint": "Members of a role may do the checked actions from outside the allowed network. A user may do an action if any of their roles allows it. Admins are not exempt.",
     "ariaLabel": "Actions each role may do from outside the allowed network",
     "role": "Role",
-    "allow": "Allow {{action}} from outside for {{role}}"
+    "allow": "Allow {{action}} from outside for {{role}}",
+    "loadFailed": "The roles could not be loaded. Reload the page to try again."
   },
   "actions": {
     "usage": {
-      "start": "Start",
-      "takeover": "Take over",
-      "end": "End"
+      "start": "Start session",
+      "takeover": "Take over session",
+      "end": "End session"
     },
     "door": {
       "open": "Open door",
@@ -57,5 +60,8 @@
   "saved": {
     "title": "Network restriction saved",
     "description": "The change applies right away."
+  },
+  "error": {
+    "title": "Network restriction not saved"
   }
 }

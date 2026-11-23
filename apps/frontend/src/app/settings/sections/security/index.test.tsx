@@ -22,6 +22,14 @@ const feedback = vi.hoisted(() => ({
   error: vi.fn(),
 }));
 vi.mock('./networkRestriction/NetworkRestrictionCard', () => ({ NetworkRestrictionCard: () => null }));
+const network = vi.hoisted(() => ({
+  isDirty: false,
+  isSaving: false,
+  isSaveDisabled: false,
+  save: vi.fn(() => Promise.resolve()),
+  discard: vi.fn(),
+}));
+vi.mock('./useNetworkRestrictionDrafts', () => ({ useNetworkRestrictionDrafts: () => network }));
 vi.mock('@attraccess/react-query-client', () => ({
   TwoFactorPolicy: { OPTIONAL: 'optional', REQUIRED_FOR_PRIVILEGED: 'privileged', REQUIRED_FOR_ALL: 'all' },
   PasswordPolicyRole: { ADMIN: 'admin' },
@@ -93,6 +101,8 @@ const idle = (mutate: unknown) => ({ mutate, isPending: false });
 describe('SecuritySection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    network.isDirty = false;
+    network.isSaveDisabled = false;
     vi.mocked(useGetAdminPasswordPolicy).mockReturnValue({
       data: POLICY,
       isLoading: false,
@@ -426,5 +436,25 @@ describe('SecuritySection', () => {
       act(() => options.onError());
       expect(feedback.error).toHaveBeenLastCalledWith(expect.objectContaining({ title: errorTitle }));
     }
+  });
+  it('saves and discards the network restriction through the one save bar', async () => {
+    // The card has no bar of its own: two sticky bars would stack, each discarding only half the edits.
+    network.isDirty = true;
+    const { container } = render(<SecuritySection />);
+    expect(container.querySelectorAll('[data-slot="settings-save-bar"]')).toHaveLength(1);
+
+    await userEvent.click(saveButton());
+    expect(network.save).toHaveBeenCalledTimes(1);
+    expect(saveRateLimit).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.discard' }));
+    expect(network.discard).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks Save while the network restriction is switched on without a range', () => {
+    network.isDirty = true;
+    network.isSaveDisabled = true;
+    render(<SecuritySection />);
+    expect(saveButton()).toBeDisabled();
   });
 });

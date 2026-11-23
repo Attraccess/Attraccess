@@ -1,5 +1,6 @@
 import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 import { ApiError } from '@attraccess/react-query-client';
+import { NETWORK_RESTRICTED_ERROR_CODE } from '@attraccess/application-models';
 
 export interface Props {
   error: ApiError | Error;
@@ -17,7 +18,7 @@ export function getApiErrorMessage(error: ApiError | Error): string {
 /** A 403 for an action the user's network does not allow (the server's NETWORK_RESTRICTED error code). */
 export function isNetworkRestrictedError(error: unknown): boolean {
   const body = (error as ApiError | undefined)?.body as { code?: string; message?: unknown } | undefined;
-  return body?.code === 'NETWORK_RESTRICTED' || body?.message === 'NETWORK_RESTRICTED';
+  return body?.code === NETWORK_RESTRICTED_ERROR_CODE || body?.message === NETWORK_RESTRICTED_ERROR_CODE;
 }
 
 export function getTranslationKeyForApiError(props: Props) {

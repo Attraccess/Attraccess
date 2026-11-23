@@ -4,9 +4,10 @@
   "loading": "Netzwerkbeschränkung wird geladen…",
   "loadFailed": "Die Einstellungen der Netzwerkbeschränkung konnten nicht geladen werden. Lade die Seite neu und versuche es erneut.",
   "detected": {
-    "inside": "Deine Adresse {{address}} liegt im erlaubten Netzwerk.",
-    "outside": "Deine Adresse {{address}} liegt außerhalb des erlaubten Netzwerks. Prüfe die Bereiche und die Adressquelle, bevor du die Beschränkung einschaltest, sonst braucht deine eigene Rolle die Aktionen unten.",
-    "unknown": "Deine Adresse konnte mit der aktuellen Adressquelle nicht ermittelt werden, daher giltst du als außerhalb des erlaubten Netzwerks."
+    "inside": "Mit den gespeicherten Einstellungen liegt deine Adresse {{address}} im erlaubten Netzwerk.",
+    "outside": "Mit den gespeicherten Einstellungen liegt deine Adresse {{address}} außerhalb des erlaubten Netzwerks. Prüfe die Bereiche und die Adressquelle, bevor du die Beschränkung einschaltest, oder erlaube die Aktionen, die du brauchst, unten für eine deiner Rollen.",
+    "noRanges": "Deine Adresse ist {{address}}. Es sind noch keine erlaubten Netzwerke gespeichert.",
+    "unknown": "Mit der gespeicherten Adressquelle konnte deine Adresse nicht ermittelt werden, daher giltst du als außerhalb des erlaubten Netzwerks."
   },
   "enabled": {
     "label": "Aktionen auf das lokale Netzwerk beschränken",
@@ -14,10 +15,11 @@
   },
   "ranges": {
     "label": "Erlaubte Netzwerke",
-    "hint": "IP-Adressen und CIDR-Bereiche (IPv4 und IPv6), einer pro Zeile. Solange die Beschränkung an ist, ist mindestens einer nötig."
+    "hint": "IP-Adressen und CIDR-Bereiche (IPv4 und IPv6), einer pro Zeile. Solange die Beschränkung an ist, ist mindestens einer nötig.",
+    "required": "Gib mindestens ein erlaubtes Netzwerk an, solange die Beschränkung an ist."
   },
   "source": {
-    "label": "Woher die Adresse kommt",
+    "label": "Adressquelle",
     "hint": "Hinter einem Reverse Proxy setze TRUST_PROXY (Client-Adresse) oder lass den Proxy einen Header senden.",
     "client": {
       "label": "Client-Adresse",
@@ -35,27 +37,31 @@
     "hint": "Mitglieder einer Rolle dürfen die angehakten Aktionen auch außerhalb des erlaubten Netzwerks ausführen. Ein Nutzer darf eine Aktion, wenn eine seiner Rollen sie erlaubt. Admins sind nicht ausgenommen.",
     "ariaLabel": "Aktionen, die jede Rolle von außerhalb des erlaubten Netzwerks ausführen darf",
     "role": "Rolle",
-    "allow": "{{action}} von außerhalb für {{role}} erlauben"
+    "allow": "{{action}} von außerhalb für {{role}} erlauben",
+    "loadFailed": "Die Rollen konnten nicht geladen werden. Lade die Seite neu und versuche es erneut."
   },
   "actions": {
     "usage": {
-      "start": "Starten",
-      "takeover": "Übernehmen",
-      "end": "Beenden"
+      "start": "Sitzung starten",
+      "takeover": "Sitzung übernehmen",
+      "end": "Sitzung beenden"
     },
     "door": {
       "open": "Tür öffnen",
-      "unlock": "Tür entriegeln",
+      "unlock": "Tür aufschließen",
       "unlatch": "Falle öffnen",
-      "lock": "Tür verriegeln"
+      "lock": "Tür abschließen"
     },
     "supervision": {
       "request": "Beaufsichtigung anfragen",
-      "approve": "Beaufsichtigung bestätigen"
+      "approve": "Beaufsichtigung genehmigen"
     }
   },
   "saved": {
     "title": "Netzwerkbeschränkung gespeichert",
     "description": "Die Änderung gilt sofort."
+  },
+  "error": {
+    "title": "Netzwerkbeschränkung nicht gespeichert"
   }
 }

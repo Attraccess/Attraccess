@@ -25,6 +25,7 @@ import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceForm
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
+import { useRefreshNetworkRestrictionOnError } from '../../../../../hooks/useRefreshNetworkRestrictionOnError';
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { getTranslationKeyForApiError } from '../../../../../utils/apiError';
@@ -69,6 +70,7 @@ export function StartSessionControls(
   });
   const queryClient = useQueryClient();
   const toast = useToastMessage();
+  const refreshNetworkRestriction = useRefreshNetworkRestrictionOnError();
 
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [isInsufficientBalance, setIsInsufficientBalance] = useState(false);
@@ -121,6 +123,7 @@ export function StartSessionControls(
 
   const onStartError = useCallback(
     (error: ApiError) => {
+      refreshNetworkRestriction(error);
       if (!resource) {
         return;
       }
@@ -143,7 +146,7 @@ export function StartSessionControls(
         baseTranslationKey: 'api',
       });
     },
-    [t, toast, resource, tExists],
+    [t, toast, resource, tExists, refreshNetworkRestriction],
   );
 
   const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(resourceId);

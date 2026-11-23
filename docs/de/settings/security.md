@@ -1,5 +1,5 @@
 # Sicherheitseinstellungen
-<!-- llms-description: Sicherheitseinstellungen für Sitzungs-Cookies und Authentifizierung: SameSite, Sitzungskonfiguration, Kartenschlüssel und Rate-Limiting und Netzwerkbeschränkung. -->
+<!-- llms-description: Sicherheitseinstellungen für Sitzungs-Cookies und Authentifizierung: SameSite, Sitzungskonfiguration, Kartenschlüssel, Rate-Limiting und Netzwerkbeschränkung. -->
 
 Attraccess bietet verschiedene sicherheitsrelevante Einstellungen fuer Sitzungs-Cookies und Authentifizierung. Diese Einstellungen beeinflussen, wie Benutzer angemeldet bleiben und wie die Anwendung mit Cross-Site-Anfragen umgeht.
 
@@ -140,23 +140,25 @@ Ist sie an, entscheidet Attraccess für jede HTTP-Anfrage, ob der Aufrufer aus e
 
 | Aktion | Was sie umfasst |
 |--------|-----------------|
-| Starten | Eine Nutzungssitzung starten |
-| Übernehmen | Eine Sitzung mit Übernahme starten |
-| Beenden | Eine Sitzung beenden (die eigene oder die eines anderen Nutzers) |
-| Tür öffnen / entriegeln / Falle öffnen / verriegeln | Die Türsteuerung einer Ressource |
+| Sitzung starten | Eine Nutzungssitzung starten |
+| Sitzung übernehmen | Eine Sitzung mit Übernahme starten |
+| Sitzung beenden | Eine Sitzung beenden (die eigene oder die eines anderen Nutzers) |
+| Tür öffnen / Tür aufschließen / Falle öffnen / Tür abschließen | Die Türsteuerung einer Ressource |
 | Beaufsichtigung anfragen | Einen beaufsichtigten Start anfragen |
-| Beaufsichtigung bestätigen | Eine Anfrage für einen beaufsichtigten Start bestätigen (Ablehnen ist nie eingeschränkt) |
+| Beaufsichtigung genehmigen | Eine Anfrage für einen beaufsichtigten Start genehmigen (Ablehnen ist nie eingeschränkt) |
+
+Eine beaufsichtigte Anfrage, die die Sitzung eines anderen Nutzers übernimmt, braucht sowohl **Beaufsichtigung anfragen** als auch **Sitzung übernehmen**.
 
 ### Einstellungen
 
 | Einstellung | Beschreibung |
 |-------------|--------------|
-| **Aktiviert** | Standardmäßig aus. Solange sie aus ist, ändert sich nichts. |
+| **Aktionen auf das lokale Netzwerk beschränken** | Standardmäßig aus. Solange sie aus ist, ändert sich nichts. |
 | **Erlaubte Netzwerke** | IP-Adressen und CIDR-Bereiche, IPv4 und IPv6, zum Beispiel `10.0.0.0/8`, `192.168.0.0/16`, `fc00::/7`. Ein ungültiger Eintrag wird abgelehnt und genannt. Die Liste darf nicht leer sein, solange die Beschränkung an ist. IPv4-gemappte IPv6-Adressen (`::ffff:10.0.0.5`) werden als IPv4 geprüft. |
 | **Adressquelle** | Woher die Adresse des Aufrufers stammt, siehe unten. |
 | **Von außerhalb erlaubt, pro Rolle** | Eine Tabelle mit einer Zeile pro Rolle und einer Spalte pro Aktion. Ein gesetzter Haken erlaubt den Mitgliedern der Rolle die Aktion auch außerhalb des erlaubten Netzwerks. Ein Nutzer darf eine Aktion, wenn **eine** seiner Rollen sie erlaubt. Neue Rollen erlauben von außerhalb nichts, und Administratoren sind **nicht** ausgenommen: Setzen Sie auch bei ihnen Haken, wenn sie den Zugriff behalten sollen. Die Tabelle lässt sich auch bearbeiten, solange die Beschränkung aus ist. |
 
-Die Karte zeigt die Adresse, die Attraccess bei Ihnen erkennt, und ob sie in den erlaubten Netzwerken liegt. Prüfen Sie das, bevor Sie die Beschränkung einschalten.
+Die Karte zeigt die Adresse, die Attraccess bei Ihnen erkennt, und ob sie mit den gespeicherten Einstellungen in den erlaubten Netzwerken liegt. Prüfen Sie das, bevor Sie die Beschränkung einschalten. Gespeichert und verworfen wird die Karte wie die anderen Sicherheitseinstellungen über die gemeinsame Leiste am unteren Rand.
 
 ### Adressquelle
 

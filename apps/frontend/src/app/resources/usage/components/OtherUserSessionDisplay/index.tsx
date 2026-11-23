@@ -13,6 +13,7 @@ import {
   useResourceIntroducersIsIntroducer,
   useResourceUsageEndSession,
   useMessagingContactResourceHolder,
+  ApiError,
   FormSubmissionRequestDto,
   UseResourceUsageGetActiveSessionKeyFn,
   UseResourceUsageGetHistoryKeyFn,
@@ -22,6 +23,9 @@ import { useNetworkRestriction } from '../../../../../hooks/useNetworkRestrictio
 import { NetworkRestrictedHint } from '../../../../../components/networkRestriction/NetworkRestrictedHint';
 import { useAuth } from '../../../../../hooks/useAuth';
 import { useToastMessage } from '../../../../../components/toastProvider';
+import { useRefreshNetworkRestrictionOnError } from '../../../../../hooks/useRefreshNetworkRestrictionOnError';
+import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
@@ -55,12 +59,16 @@ export interface OtherUserSessionDisplayProps {
 }
 
 export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayProps) {
-  const { t } = useTranslations({ en, de });
+  const { t, tExists } = useTranslations({
+    en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
+    de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
+  });
   const { hasPermission, user } = useAuth();
   const { isRestricted } = useNetworkRestriction();
   const takeoverRestricted = isRestricted(NetworkRestrictedAction.UsageTakeover);
   const endRestricted = isRestricted(NetworkRestrictedAction.UsageEnd);
-  const { success, error: showError } = useToastMessage();
+  const { success, error: showError, apiError } = useToastMessage();
+  const refreshNetworkRestriction = useRefreshNetworkRestrictionOnError();
   const invalidateSessionHistory = useInvalidateSessionHistory(resourceId);
   const navigate = useNavigate();
   const [isTakeoverNotesModalOpen, setIsTakeoverNotesModalOpen] = useState(false);
@@ -116,7 +124,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
   const stopSession = useResourceUsageEndSession(undefined, {
     onSuccess: () => {
       clearFormsDraft();
-      setIsTakeoverNotesModalOpen(false);
+      setIsStopOtherUserSessionNotesModalOpen(false);
 
       invalidateSessionHistory();
 
@@ -124,6 +132,12 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
         title: t('stopOtherUserSession.successful'),
         description: t('stopOtherUserSession.successfulDescription'),
       });
+    },
+    onError: (err) => {
+      // e.g. NETWORK_RESTRICTED when the user's network changed since the controls were drawn. The notes modal stays
+      // open (the notes typed into it are cleared on confirm), and the refreshed status disables the control.
+      refreshNetworkRestriction(err);
+      apiError({ error: err as ApiError, t, tExists, baseTranslationKey: 'api' });
     },
   });
 
@@ -283,10 +297,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
                 </DropdownPopover>
               </Dropdown>
             </ButtonGroup>
-            <NetworkRestrictedHint
-              actions={NetworkRestrictedAction.UsageTakeover}
-              className="mt-2 text-xs text-muted"
-            />
+            <NetworkRestrictedHint actions={NetworkRestrictedAction.UsageTakeover} className="mt-2" />
           </div>
         )}
 
@@ -323,7 +334,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
                 </DropdownPopover>
               </Dropdown>
             </ButtonGroup>
-            <NetworkRestrictedHint actions={NetworkRestrictedAction.UsageEnd} className="mt-2 text-xs text-muted" />
+            <NetworkRestrictedHint actions={NetworkRestrictedAction.UsageEnd} className="mt-2" />
           </div>
         )}
       </SessionStatusCard>

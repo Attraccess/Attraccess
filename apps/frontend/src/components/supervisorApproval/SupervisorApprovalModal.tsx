@@ -98,10 +98,7 @@ export function SupervisorApprovalModal({
                 <Spinner color="accent" size="sm" />
                 <Description className="tabular-nums">{t('countdown', { seconds: secondsLeft })}</Description>
               </div>
-              <NetworkRestrictedHint
-                actions={NetworkRestrictedAction.SupervisionApprove}
-                className="text-center text-xs text-muted"
-              />
+              <NetworkRestrictedHint actions={NetworkRestrictedAction.SupervisionApprove} className="text-center" />
             </div>
           </ModalBody>
 

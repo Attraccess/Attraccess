@@ -301,7 +301,7 @@ The documentation pages are plain Markdown files. English pages live under https
 
 ## Deutsch: Systemeinstellungen
 - [Überblick](https://docs.attraccess.org/de/settings/overview.md): Administratorübersicht der Systemeinstellungen: Anwendung, Sichtbarkeit der Ressourcennutzung, E-Mail und weitere Einstellungen.
-- [Sicherheit](https://docs.attraccess.org/de/settings/security.md): Sicherheitseinstellungen für Sitzungs-Cookies und Authentifizierung: SameSite, Sitzungskonfiguration, Kartenschlüssel und Rate-Limiting und Netzwerkbeschränkung.
+- [Sicherheit](https://docs.attraccess.org/de/settings/security.md): Sicherheitseinstellungen für Sitzungs-Cookies und Authentifizierung: SameSite, Sitzungskonfiguration, Kartenschlüssel, Rate-Limiting und Netzwerkbeschränkung.
 - [Audit-Protokoll](https://docs.attraccess.org/de/settings/audit-log.md): Wie Sie das Audit-Protokoll durchsuchen, filtern, prüfen und exportieren sowie Aufzeichnung und Aufbewahrung steuern.
 
 ## Deutsch: Für Entwickler

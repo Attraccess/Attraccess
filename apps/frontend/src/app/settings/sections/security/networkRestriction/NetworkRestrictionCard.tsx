@@ -1,129 +1,39 @@
-import { useMemo, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { Description, Input, Label, Radio, RadioGroup, Spinner, TextArea, TextField } from '@heroui/react';
+import { Description, FieldError, Input, Label, Radio, RadioGroup, Spinner, TextArea, TextField } from '@heroui/react';
 import { LabeledSwitch, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  ApiError,
-  NetworkIpSource,
-  NetworkRestrictedAction,
-  UseGetNetworkRestrictionRoleActionsKeyFn,
-  UseGetNetworkRestrictionSettingsKeyFn,
-  useGetNetworkRestrictionRoleActions,
-  useGetNetworkRestrictionSettings,
-  useGetNetworkRestrictionStatusKey,
-  useUpdateNetworkRestrictionRoleActions,
-  useUpdateNetworkRestrictionSettings,
-} from '@attraccess/react-query-client';
+import { NetworkIpSource, NetworkRestrictionSettingsDto } from '@attraccess/react-query-client';
 import { NETWORK_RESTRICTION_DEFAULT_RANGES } from '@attraccess/application-models';
 import { SettingsRow } from '../../../components/SettingsRow';
-import { SettingsSaveBar } from '../../../components/SettingsSaveBar';
-import { useToastMessage } from '../../../../../components/toastProvider';
-import { getApiErrorMessage } from '../../../../../utils/apiError';
 import { SubHeading } from '../components/SubHeading';
+import { NetworkRestrictionDrafts } from '../useNetworkRestrictionDrafts';
 import { NetworkRestrictionRoleTable } from './NetworkRestrictionRoleTable';
 import en from './en.json';
 import de from './de.json';
 
-const splitRanges = (text: string) => text.split(/[\s,;]+/).filter(Boolean);
+interface NetworkRestrictionCardProps {
+  drafts: NetworkRestrictionDrafts;
+}
+
+/** The alert about the admin's own address, judged with the saved settings. Neutral until the restriction is on. */
+function detectedAlert(settings: NetworkRestrictionSettingsDto) {
+  const isActive = settings.enabled && settings.allowedRanges.length > 0;
+  if (settings.detectedAddress === null) {
+    return { status: isActive ? 'warning' : 'default', key: 'detected.unknown' } as const;
+  }
+  if (settings.allowedRanges.length === 0) return { status: 'default', key: 'detected.noRanges' } as const;
+  if (settings.detectedInside) return { status: isActive ? 'success' : 'default', key: 'detected.inside' } as const;
+  return { status: isActive ? 'warning' : 'default', key: 'detected.outside' } as const;
+}
 
 /**
  * Settings → Security → Network restriction. Roles that may do an action from outside the allowed network are set
  * here too, and stay editable while the restriction is off, so the table can be prepared before switching it on.
+ * Saving and discarding go through the section's single save bar.
  */
-export function NetworkRestrictionCard() {
+export function NetworkRestrictionCard({ drafts }: Readonly<NetworkRestrictionCardProps>) {
   const { t } = useTranslations({ en, de });
-  const toast = useToastMessage();
-  const queryClient = useQueryClient();
-  const { data: settings, isLoading: settingsLoading } = useGetNetworkRestrictionSettings();
-  const { data: matrix } = useGetNetworkRestrictionRoleActions();
-  const updateSettings = useUpdateNetworkRestrictionSettings();
-  const updateRoleActions = useUpdateNetworkRestrictionRoleActions();
+  const { settings, matrix, shown, error } = drafts;
 
-  const [enabled, setEnabled] = useState<boolean | undefined>();
-  const [rangesText, setRangesText] = useState<string | undefined>();
-  const [ipSource, setIpSource] = useState<NetworkIpSource | undefined>();
-  const [headerName, setHeaderName] = useState<string | undefined>();
-  const [roleDraft, setRoleDraft] = useState<Record<number, NetworkRestrictedAction[]>>({});
-  const [error, setError] = useState<string | null>(null);
-
-  const shown = useMemo(
-    () => ({
-      enabled: enabled ?? settings?.enabled ?? false,
-      rangesText: rangesText ?? (settings?.allowedRanges ?? []).join('\n'),
-      ipSource: ipSource ?? settings?.ipSource ?? NetworkIpSource.CLIENT,
-      headerName: headerName ?? settings?.headerName ?? 'X-Real-Ip',
-    }),
-    [enabled, rangesText, ipSource, headerName, settings],
-  );
-
-  const settingsDirty =
-    settings !== undefined &&
-    (shown.enabled !== settings.enabled ||
-      splitRanges(shown.rangesText).join(',') !== settings.allowedRanges.join(',') ||
-      shown.ipSource !== settings.ipSource ||
-      shown.headerName !== settings.headerName);
-  const rolesDirty = Object.keys(roleDraft).length > 0;
-
-  const discard = () => {
-    setEnabled(undefined);
-    setRangesText(undefined);
-    setIpSource(undefined);
-    setHeaderName(undefined);
-    setRoleDraft({});
-    setError(null);
-  };
-
-  const toggleRoleAction = (roleId: number, action: NetworkRestrictedAction, allowed: boolean) => {
-    const saved = matrix?.roles.find((role) => role.roleId === roleId)?.actions ?? [];
-    const current = roleDraft[roleId] ?? saved;
-    const next = allowed ? [...new Set([...current, action])] : current.filter((entry) => entry !== action);
-    const unchanged = next.length === saved.length && next.every((entry) => saved.includes(entry));
-    setRoleDraft((draft) => {
-      const { [roleId]: _removed, ...rest } = draft;
-      return unchanged ? rest : { ...rest, [roleId]: next };
-    });
-  };
-
-  const toggleEnabled = (next: boolean) => {
-    setEnabled(next);
-    // Suggest the private ranges when switching on with an empty list; the admin can edit them before saving.
-    if (next && splitRanges(shown.rangesText).length === 0)
-      setRangesText(NETWORK_RESTRICTION_DEFAULT_RANGES.join('\n'));
-  };
-
-  const save = async () => {
-    setError(null);
-    try {
-      if (settingsDirty) {
-        await updateSettings.mutateAsync({
-          body: {
-            enabled: shown.enabled,
-            allowedRanges: splitRanges(shown.rangesText),
-            ipSource: shown.ipSource,
-            headerName: shown.headerName,
-          },
-        });
-      }
-      if (rolesDirty) {
-        await updateRoleActions.mutateAsync({
-          body: { roles: Object.entries(roleDraft).map(([roleId, actions]) => ({ roleId: Number(roleId), actions })) },
-        });
-      }
-    } catch (failure) {
-      // A bad range or an empty list is a 400 that names the offending value.
-      setError(getApiErrorMessage(failure as ApiError));
-      return;
-    }
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: UseGetNetworkRestrictionSettingsKeyFn() }),
-      queryClient.invalidateQueries({ queryKey: UseGetNetworkRestrictionRoleActionsKeyFn() }),
-      queryClient.invalidateQueries({ queryKey: [useGetNetworkRestrictionStatusKey] }),
-    ]);
-    discard();
-    toast.success({ title: t('saved.title'), description: t('saved.description') });
-  };
-
-  if (settingsLoading) {
+  if (drafts.isSettingsLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted">
         <Spinner size="sm" />
@@ -133,92 +43,114 @@ export function NetworkRestrictionCard() {
   }
   if (!settings) return <StatusAlert status="danger">{t('loadFailed')}</StatusAlert>;
 
+  const detected = detectedAlert(settings);
+  const settingsError = error?.group === 'settings' ? error.message : null;
+  const rangesError = drafts.isRangesMissing ? t('ranges.required') : null;
+
+  let roleTable = <Spinner size="sm" />;
+  if (matrix) {
+    roleTable = (
+      <NetworkRestrictionRoleTable
+        roles={matrix.roles}
+        actions={matrix.actions}
+        value={drafts.roleDraft}
+        onToggle={drafts.toggleRoleAction}
+      />
+    );
+  } else if (drafts.isMatrixError) {
+    roleTable = <StatusAlert status="danger">{t('roles.loadFailed')}</StatusAlert>;
+  }
+
   return (
     <section className="flex flex-col gap-4" data-testid="network-restriction-card">
       <SubHeading title={t('heading')} description={t('description')} />
 
-      <StatusAlert status={settings.detectedInside ? 'success' : 'warning'}>
-        {settings.detectedAddress === null
-          ? t('detected.unknown')
-          : t(settings.detectedInside ? 'detected.inside' : 'detected.outside', { address: settings.detectedAddress })}
-      </StatusAlert>
+      <StatusAlert status={detected.status}>{t(detected.key, { address: settings.detectedAddress ?? '' })}</StatusAlert>
 
-      <SettingsRow label={t('enabled.label')} hint={t('enabled.hint')}>
-        <LabeledSwitch aria-label={t('enabled.label')} isSelected={shown.enabled} onChange={toggleEnabled} />
-      </SettingsRow>
+      <div className="flex flex-col">
+        <SettingsRow label={t('enabled.label')} hint={t('enabled.hint')}>
+          <LabeledSwitch aria-label={t('enabled.label')} isSelected={shown.enabled} onChange={drafts.toggleEnabled} />
+        </SettingsRow>
 
-      <SettingsRow stacked label={t('ranges.label')} hint={t('ranges.hint')}>
-        <TextField fullWidth value={shown.rangesText} onChange={setRangesText} aria-label={t('ranges.label')}>
-          <TextArea
+        <SettingsRow stacked label={t('ranges.label')} hint={t('ranges.hint')}>
+          <TextField
             fullWidth
-            rows={5}
-            placeholder={NETWORK_RESTRICTION_DEFAULT_RANGES.join('\n')}
-            data-testid="network-ranges"
-          />
-        </TextField>
-      </SettingsRow>
+            value={shown.rangesText}
+            onChange={drafts.setRangesText}
+            isInvalid={rangesError !== null}
+            aria-label={t('ranges.label')}
+          >
+            <TextArea
+              fullWidth
+              rows={5}
+              placeholder={NETWORK_RESTRICTION_DEFAULT_RANGES.join('\n')}
+              data-testid="network-ranges"
+            />
+            {rangesError !== null && <FieldError>{rangesError}</FieldError>}
+          </TextField>
+        </SettingsRow>
 
-      <SettingsRow stacked label={t('source.label')} hint={t('source.hint')}>
-        <RadioGroup
-          value={shown.ipSource}
-          onChange={(next) => setIpSource(next as NetworkIpSource)}
-          aria-label={t('source.label')}
-        >
-          <Radio value={NetworkIpSource.CLIENT}>
-            <Radio.Content>
-              <Radio.Control>
-                <Radio.Indicator />
-              </Radio.Control>
-              <Label>{t('source.client.label')}</Label>
-            </Radio.Content>
-            <Description>{t('source.client.description')}</Description>
-          </Radio>
-          <Radio value={NetworkIpSource.HEADER}>
-            <Radio.Content>
-              <Radio.Control>
-                <Radio.Indicator />
-              </Radio.Control>
-              <Label>{t('source.header.label')}</Label>
-            </Radio.Content>
-            <Description>{t('source.header.description')}</Description>
-          </Radio>
-        </RadioGroup>
-        {shown.ipSource === NetworkIpSource.HEADER && (
-          <div className="flex flex-col gap-2">
-            <TextField fullWidth value={shown.headerName} onChange={setHeaderName} aria-label={t('source.headerName')}>
-              <Label>{t('source.headerName')}</Label>
-              <Input fullWidth data-testid="network-header-name" />
-            </TextField>
-            <StatusAlert status="warning">{t('source.headerWarning')}</StatusAlert>
+        <SettingsRow stacked label={t('source.label')} hint={t('source.hint')}>
+          <div className="flex w-full flex-col gap-2">
+            <RadioGroup
+              value={shown.ipSource}
+              onChange={(next) => drafts.setIpSource(next as NetworkIpSource)}
+              aria-label={t('source.label')}
+            >
+              <Radio value={NetworkIpSource.CLIENT}>
+                <Radio.Content>
+                  <Radio.Control>
+                    <Radio.Indicator />
+                  </Radio.Control>
+                  <Label>{t('source.client.label')}</Label>
+                </Radio.Content>
+                <Description>{t('source.client.description')}</Description>
+              </Radio>
+              <Radio value={NetworkIpSource.HEADER}>
+                <Radio.Content>
+                  <Radio.Control>
+                    <Radio.Indicator />
+                  </Radio.Control>
+                  <Label>{t('source.header.label')}</Label>
+                </Radio.Content>
+                <Description>{t('source.header.description')}</Description>
+              </Radio>
+            </RadioGroup>
+            {shown.ipSource === NetworkIpSource.HEADER && (
+              <div className="flex flex-col gap-2">
+                <TextField
+                  fullWidth
+                  value={shown.headerName}
+                  onChange={drafts.setHeaderName}
+                  aria-label={t('source.headerName')}
+                >
+                  <Label>{t('source.headerName')}</Label>
+                  <Input fullWidth data-testid="network-header-name" />
+                </TextField>
+                <StatusAlert status="warning">{t('source.headerWarning')}</StatusAlert>
+              </div>
+            )}
           </div>
+        </SettingsRow>
+
+        {/* A rejected range or header name, below both rows it can come from; the server names the offending value. */}
+        {settingsError !== null && (
+          <StatusAlert status="danger" data-cy="network-restriction-error">
+            {settingsError}
+          </StatusAlert>
         )}
-      </SettingsRow>
 
-      <SettingsRow stacked label={t('roles.label')} hint={t('roles.hint')}>
-        {matrix ? (
-          <NetworkRestrictionRoleTable
-            roles={matrix.roles}
-            actions={matrix.actions}
-            value={roleDraft}
-            onToggle={toggleRoleAction}
-          />
-        ) : (
-          <Spinner size="sm" />
-        )}
-      </SettingsRow>
-
-      {error !== null && (
-        <StatusAlert status="danger" data-cy="network-restriction-error">
-          {error}
-        </StatusAlert>
-      )}
-
-      <SettingsSaveBar
-        isDirty={settingsDirty || rolesDirty}
-        isSaving={updateSettings.isPending || updateRoleActions.isPending}
-        onSave={() => void save()}
-        onDiscard={discard}
-      />
+        <SettingsRow stacked label={t('roles.label')} hint={t('roles.hint')}>
+          <div className="flex w-full min-w-0 flex-col gap-2">
+            {roleTable}
+            {error?.group === 'roles' && (
+              <StatusAlert status="danger" data-cy="network-restriction-roles-error">
+                {error.message}
+              </StatusAlert>
+            )}
+          </div>
+        </SettingsRow>
+      </div>
     </section>
   );
 }

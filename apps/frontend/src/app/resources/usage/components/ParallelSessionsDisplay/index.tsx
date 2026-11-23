@@ -18,6 +18,7 @@ import { SessionNotesModal, SessionModalMode } from '../SessionNotesModal';
 import { useInvalidateSessionHistory } from '../OtherUserSessionDisplay';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
 import { useToastMessage } from '../../../../../components/toastProvider';
+import { useRefreshNetworkRestrictionOnError } from '../../../../../hooks/useRefreshNetworkRestrictionOnError';
 import { useCanEndOtherSessions } from '../../hooks/useCanEndOtherSessions';
 import en from './translations/en.json';
 import de from './translations/de.json';
@@ -47,6 +48,7 @@ export function ParallelSessionsDisplay({
   const { isRestricted } = useNetworkRestriction();
   const endRestricted = isRestricted(NetworkRestrictedAction.UsageEnd);
   const { success, error: showError, apiError } = useToastMessage();
+  const refreshNetworkRestriction = useRefreshNetworkRestrictionOnError();
   const invalidateSessionHistory = useInvalidateSessionHistory(resourceId);
   const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(resourceId);
   const [usageToEnd, setUsageToEnd] = useState<ResourceUsage | null>(null);
@@ -61,6 +63,7 @@ export function ParallelSessionsDisplay({
       success({ title: t('endSession.successful'), description: t('endSession.successfulDescription') });
     },
     onError: (err) => {
+      refreshNetworkRestriction(err);
       apiError({ error: err as ApiError, t, tExists, baseTranslationKey: 'api' });
     },
   });

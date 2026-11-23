@@ -194,7 +194,7 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
               {t('endAll')}
             </Button>
           </div>
-          <NetworkRestrictedHint actions={NetworkRestrictedAction.UsageEnd} className="mt-2 text-xs" />
+          <NetworkRestrictedHint actions={NetworkRestrictedAction.UsageEnd} className="mt-2" />
         </AlertContent>
       </Alert>
 

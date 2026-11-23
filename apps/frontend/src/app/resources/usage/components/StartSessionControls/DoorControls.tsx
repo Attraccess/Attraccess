@@ -53,6 +53,10 @@ export function DoorControls({
       </div>
     );
   }
+  const showUnlatch = Boolean(separateUnlockAndUnlatch && onUnlatch);
+  // The hint only explains buttons that are on screen.
+  const hintActions = [NetworkRestrictedAction.DoorLock, NetworkRestrictedAction.DoorUnlock];
+  if (showUnlatch) hintActions.push(NetworkRestrictedAction.DoorUnlatch);
   return (
     <div className="space-y-2">
       <div className="flex flex-row flex-wrap gap-2 w-full justify-between">
@@ -76,7 +80,7 @@ export function DoorControls({
           <LockIcon className="w-4 h-4" />
           {t('door.unlock')}
         </Button>
-        {separateUnlockAndUnlatch && onUnlatch && (
+        {showUnlatch && (
           <Button
             variant="secondary"
             className="flex-1"
@@ -89,13 +93,7 @@ export function DoorControls({
           </Button>
         )}
       </div>
-      <NetworkRestrictedHint
-        actions={[
-          NetworkRestrictedAction.DoorLock,
-          NetworkRestrictedAction.DoorUnlock,
-          NetworkRestrictedAction.DoorUnlatch,
-        ]}
-      />
+      <NetworkRestrictedHint actions={hintActions} />
     </div>
   );
 }
