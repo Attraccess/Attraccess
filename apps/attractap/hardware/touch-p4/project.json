@@ -66,9 +66,27 @@
         "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh check-footprints"
       }
     },
+    "simulate": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "parallelism": false,
+      "inputs": ["{projectRoot}/kicad/**/*", "{projectRoot}/tools/**/*", "{projectRoot}/sim/**/*", "{projectRoot}/scripts/bootstrap/**/*"],
+      "outputs": ["{projectRoot}/fab/reports/simulation.txt"],
+      "options": {
+        "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh simulate"
+      }
+    },
+    "simulate-antenna": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "parallelism": false,
+      "options": {
+        "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh simulate-antenna"
+      }
+    },
     "check": {
       "executor": "nx:noop",
-      "dependsOn": ["test", "erc", "check-netlist", "drc", "check-package"]
+      "dependsOn": ["test", "erc", "check-netlist", "drc", "simulate", "check-package"]
     },
     "build": {
       "executor": "nx:run-commands",

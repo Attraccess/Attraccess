@@ -6,8 +6,10 @@ plus PN532 module of the current readers with one board.
 > **Status: revision A design, not yet built.** Nobody has assembled or measured
 > this board. It has been checked against the datasheets of its parts, against
 > JLCPCB's manufacturing limits and JLCPCB's part library, and against a set of
-> layout rules; what those checks found and changed, and what they could not
-> settle, is in [docs/design-notes.md](docs/design-notes.md#design-review). Expect a bring-up
+> layout rules, and its power input, NFC antenna and fast signals have been
+> simulated from the routed copper; what those checks found and changed, and
+> what they could not settle, is in
+> [docs/design-notes.md](docs/design-notes.md#design-review). Expect a bring-up
 > round (see [docs/bring-up.md](docs/bring-up.md)). CE marking needs lab tests on
 > the finished product (see [docs/compliance.md](docs/compliance.md)).
 
@@ -43,6 +45,7 @@ kicad/                      KiCad 10 project. This is the source of truth.
   lib/attractap.kicad_sym, lib/attractap.pretty/   project symbols and footprints
   sym-lib-table, fp-lib-table             register the project library
 scripts/export_fab.py       Gerbers, drill, BOM and placement files for JLCPCB
+sim/                        field and circuit simulations of the routed board (sim/README.md)
 scripts/bootstrap/          the generator that produced revision A (see below)
 docs/                       design notes, pin map, bring-up plan, compliance checklist
 case/                       3D-printable case: design, print files, installation manual (case/README.md)
@@ -86,11 +89,14 @@ The board is the Nx project `attractap-touch-p4-pcb`. Every operation is a targe
 | `pnpm nx run attractap-touch-p4-pcb:erc` | Electrical rules check of the schematic. |
 | `pnpm nx run attractap-touch-p4-pcb:check-netlist` | Schematic against the circuit description; devices and addresses on each I2C bus. |
 | `pnpm nx run attractap-touch-p4-pcb:drc` | Design rules check of the board, including schematic parity. |
+| `pnpm nx run attractap-touch-p4-pcb:simulate` | Simulates the routed board and compares the results with the limits of the parts: NFC loop, matching and field, live plug-in at the DC input, power-up, reflections and timing on the fast lines, voltage drop on the supply tracks, PoE isolation distances, heat in the closed case, the dock magnet. Needs ngspice. See [sim/README.md](sim/README.md). |
+| `pnpm nx run attractap-touch-p4-pcb:simulate-antenna` | Full-wave model of the Wi-Fi antenna on the board, with the display and with a metal wall behind the reader. Needs openEMS; not part of `check`. |
 | `pnpm nx run attractap-touch-p4-pcb:build` | Manufacturing files into `fab/`, with the JLCPCB upload package in `fab/jlcpcb/`. Runs `erc` and `drc` first. |
 | `pnpm nx run attractap-touch-p4-pcb:render` | `fab/render-top.png` and `fab/render-bottom.png`. |
 
 Reports go to `fab/reports/`. The targets find KiCad on the PATH, in the macOS app bundle or, on
-NixOS, in nixpkgs; set `KICAD_CLI` and `KICAD_PYTHON` to use another installation. They run KiCad
+NixOS, in nixpkgs; set `KICAD_CLI` and `KICAD_PYTHON` to use another installation. `simulate` takes
+ngspice from the PATH or from nixpkgs (`NGSPICE` names another one). They run KiCad
 with a configuration of their own under `.tools/kicad`, so they do not depend on your KiCad settings.
 The targets `generate-library`, `generate-schematic`, `place`, `route` and `route-finish` rebuild the
 project from the circuit description and overwrite the KiCad files; see
@@ -128,7 +134,7 @@ What the board needs, for the order form:
 | Outline tolerance | the regular +/-0.2 mm is enough |
 | Surface finish | ENIG (18 USD on 5 boards, 45 USD on 100). Not the free OSP, which the form selects for six layers: it is as flat, but JLCPCB excludes it for contact areas, and the four ground pads for the display's metal back and the 15 test points would stay bare copper ([more](docs/design-notes.md#cost)) |
 | Impedance control | not needed |
-| Assembly | top side only: 208 parts in 71 lines (Wi-Fi version), 243 parts in 81 lines (Ethernet/PoE version) |
+| Assembly | top side only: 208 parts in 72 lines (Wi-Fi version), 243 parts in 82 lines (Ethernet/PoE version) |
 | Through-hole parts | DC jack J102, DC terminal J103 (two pins in a four-hole footprint, see below), and on the Ethernet/PoE version the jack J401 |
 | Not assembled by JLCPCB | the display panel (taped on, flex plugged into J601) |
 | Serial number on the board | option "Mark on PCB": number only, position specified. JLCPCB then prints a number that is different on every board into the white field beside `S/N` on the component side: a solid silkscreen rectangle of 10 x 2 mm, which is what it looks for. Without the option the field stays white, to write on. (JLCPCB no longer prints an order number; the text `JLCJLCJLCJLC` that used to mark its place is gone from the board.) |

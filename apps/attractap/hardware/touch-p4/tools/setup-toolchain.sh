@@ -28,4 +28,11 @@ elif command -v nix >/dev/null 2>&1; then
 else
     echo "Java 25 or newer is missing; it is only needed for the route target." >&2
 fi
+if command -v ngspice >/dev/null 2>&1; then
+    echo "ngspice: $(command -v ngspice)"
+elif command -v nix >/dev/null 2>&1; then
+    echo "ngspice: taken from nixpkgs when the simulate target runs"
+else
+    echo "ngspice is missing; the simulate target (part of check) needs it." >&2
+fi
 echo "Board tools ready."

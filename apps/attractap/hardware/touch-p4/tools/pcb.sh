@@ -2,6 +2,22 @@
 # Every operation on the Touch P4 board, as the Nx targets of this project run them.
 # Usage: tools/pcb.sh <command>      (see the case statement below, or the README)
 set -eo pipefail
+
+# Full-wave model of the Wi-Fi antenna on the board (sim/wifi_antenna.py). It needs a Python with openEMS,
+# which OPENEMS_PYTHON names (Debian and Ubuntu: the package python3-openems), and no KiCad: so it runs
+# before KiCad is looked for.
+if [[ "${1:-}" == simulate-antenna ]]; then
+    shift
+    root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    py="${OPENEMS_PYTHON:-python3}"
+    "$py" -c 'import openEMS, CSXCAD' 2>/dev/null || {
+        echo "pcb.sh: '$py' has no openEMS. Set OPENEMS_PYTHON to a Python that can import openEMS and CSXCAD." >&2; exit 1; }
+    mkdir -p "$root/fab/reports"
+    cd "$root/sim"
+    "$py" -u wifi_antenna.py "$@" | grep --line-buffered -E '^(case|reference|board|display|display_floating|in_case|metal_wall) ' | tee "$root/fab/reports/wifi-antenna.txt"
+    exit "${PIPESTATUS[0]}"
+fi
+
 . "$(dirname "${BASH_SOURCE[0]}")/kicad-env.sh"
 
 KICAD_DIR="$PCB_ROOT/kicad"
@@ -92,6 +108,25 @@ finish_routing() {
 
 export_fab() { (cd "$PCB_ROOT/scripts" && "${KICAD_PYTHON:-python3}" export_fab.py); }
 
+# ngspice for the circuit simulations: NGSPICE, the PATH, or nixpkgs.
+ngspice_bin() {
+    if [[ -n "${NGSPICE:-}" ]]; then echo "$NGSPICE"
+    elif command -v ngspice >/dev/null 2>&1; then command -v ngspice
+    elif command -v nix >/dev/null 2>&1; then echo "$(nix build --no-link --print-out-paths nixpkgs#ngspice)/bin/ngspice"
+    else echo "pcb.sh: ngspice is missing. Install it or set NGSPICE." >&2; return 1
+    fi
+}
+
+# Field and circuit simulations on the routed board (sim/README.md). The board is read with KiCad's
+# Python; the simulations need numpy only, so they run with it as well (SIM_PYTHON names another one).
+simulate() {
+    mkdir -p "$REPORTS"
+    local spice; spice="$(ngspice_bin)"
+    (cd "$PCB_ROOT/sim" && kicad_python dump_board.py "$PCB" "$REPORTS/board.json" >/dev/null)
+    (cd "$PCB_ROOT/sim" && NGSPICE="$spice" "${SIM_PYTHON:-$KICAD_PYTHON}" -u run.py "$REPORTS/board.json" | tee "$REPORTS/simulation.txt"
+     exit "${PIPESTATUS[0]}")
+}
+
 # Every footprint against JLCPCB's library footprint of its part number. Needs the internet.
 check_footprints() { (cd "$PCB_ROOT/scripts" && kicad_python check_jlc_footprints.py); }
 
@@ -117,6 +152,7 @@ case "${1:-}" in
     export) export_fab ;;
     check-package) check_package ;;
     check-footprints) check_footprints ;;
+    simulate) simulate ;;
     render) render ;;
     # The three generator steps overwrite the KiCad files. See scripts/bootstrap/README.md.
     generate-library) shift; bootstrap make_lib.py "$@" ;;
@@ -124,6 +160,6 @@ case "${1:-}" in
     place) bootstrap build_pcb.py place && bootstrap check_overlap.py ;;
     route) autoroute && finish_routing ;;
     route-finish) finish_routing ;;
-    *) echo "Usage: $0 erc|drc|check-netlist|check-package|check-footprints|export|render|generate-library <dir>|generate-schematic|place|route|route-finish" >&2
+    *) echo "Usage: $0 erc|drc|check-netlist|check-package|check-footprints|simulate|simulate-antenna|export|render|generate-library <dir>|generate-schematic|place|route|route-finish" >&2
        exit 1 ;;
 esac

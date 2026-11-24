@@ -1,0 +1,54 @@
+* Power-up from USB: plug, 5 V rail, 3.3 V converter, reset of the MCU.
+* The converter is behavioural: under-voltage lockout (3.5 V rising, 3.2 V falling), soft start of 4 ms,
+* output = the smaller of the ramp and the input less 0.25 V, input current = output power / 0.9.
+.param vusb=5.0
+.param rcable=0.25
+.param iload=0.45
+Vusb src 0 PWL(0 0 10u {vusb})
+Rcab src c1 {rcable}
+Lcab c1 vbus 1u
+D101 0 vbus TVS5
+.model TVS5 D(IS=1u BV=6.4 IBV=1m RS=0.2)
+Rf101 vbus vbusf 0.08
+* FB101: 600 ohm at 100 MHz, 0.1 ohm DC
+Lfb vbusf fb1 1u
+Rfbp vbusf fb1 600
+Rfbs fb1 usb5 0.1
+C101 usb5 0 6u
+R104 usb5 0 4.7k
+D102 usb5 v5 SS34
+.model SS34 D(IS=5u RS=0.04 N=1.1 CJO=300p BV=45 IBV=1m)
+* 5 V rail: 22u + 10u + 22u (LEDs) + 10u (backlight) + 10u (PN532); at 4.6 V they keep about 60 %
+C5 v5 0 45u
+Rc5 v5 0 20k
+* U103, AP63203
+Bena ena 0 V = v(v5) > 3.5 ? 1 : (v(v5) < 3.2 ? 0 : v(enl))
+Rlat ena enl 1k
+Clat enl 0 1n
+Bss ss 0 I = v(enl) > 0.5 ? -1u*(v(ss) < 1 ? 1 : 0) : 1m*v(ss)
+Css ss 0 4n
+Rss ss 0 1g
+Bout v33i 0 V = min(3.3*v(ss), max(v(v5) - 0.25, 0))
+Vmeas v33i v33m 0
+Rout v33m v33 0.02
+C33 v33 0 60u
+* load: resistive until the MCU leaves reset, then the current of a running board
+Bload v33 0 I = v(v33)/60 + (v(chip_pu) > 2.3 ? {iload} : 0)
+Bin v5 0 I = v(enl) > 0.5 ? v(v33)*i(Vmeas)/(0.9*max(v(v5),1)) : 0
+* reset: R211 and C240
+R211 v33 chip_pu 10k
+C240 chip_pu 0 1u
+.tran 2u 60m uic
+.control
+set noaskquit
+run
+meas tran t_rail_ok when v(v33)=3.135 rise=1
+meas tran t_reset_ends when v(chip_pu)=0.825 rise=1
+meas tran t_reset_high when v(chip_pu)=2.475 rise=1
+meas tran reset_at_rail_ok find v(chip_pu) when v(v33)=3.135 rise=1
+meas tran i_inrush max i(lcab)
+meas tran v5_running min v(v5) from=30m to=60m
+meas tran v33_running min v(v33) from=30m to=60m
+quit
+.endc
+.end

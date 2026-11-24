@@ -120,6 +120,16 @@ class GeometryTest(unittest.TestCase):
         holder = math.hypot(ex - geometry.HALL[0], ey - geometry.HALL[1]) - geometry.MAGNET_RING_R
         self.assertGreater(holder, spot)
 
+    def test_bare_mounting_hole_is_the_one_in_the_gap_around_the_nfc_loop(self):
+        # board_setup.py keeps the copper around the loop open between the loop's right edge and the Ethernet
+        # cut-away, 2 mm above to 0.5 mm below the loop's centre. The screw that stands there must find no
+        # copper under its head: on both sides of the gap it would close the copper into a shorted turn.
+        hx, hy = geometry.NFC_GAP_HOLE
+        ax, ay = geometry.ANT_C
+        self.assertIn(geometry.NFC_GAP_HOLE, geometry.MOUNT_HOLES)
+        self.assertTrue(ax + geometry.ANT_W / 2 - 1.0 < hx < geometry.NOTCH_X)
+        self.assertTrue(ay - 2.0 - geometry.MOUNT_KEEPOUT_R < hy < ay + 0.5 + geometry.MOUNT_KEEPOUT_R)
+
     def test_stack_up_matches_the_layer_count(self):
         # one dielectric between every two copper layers, and a board of 1.6 mm (JLCPCB: +-10 %)
         layers = geometry.COPPER_LAYERS

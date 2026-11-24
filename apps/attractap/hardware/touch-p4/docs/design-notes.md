@@ -122,9 +122,10 @@ new display section, not a part swap.
 - Wi-Fi antenna: keep metal and the display away from the top 7 mm strip. The
   board has no copper there over a width of 44 mm and is cut away under the
   antenna itself. Espressif asks for 15 mm without metal around the antenna;
-  the display's metal back is 7 mm away and one mounting screw 11 mm. Expect
-  less range than on a development board. The version with an external antenna
-  does not depend on this.
+  the display's metal back is 7 mm away and one mounting screw 11 mm. A
+  full-wave model of the board with the display and the case finds no loss
+  from that (see "Simulation"): the display's back lies over the board's own
+  ground. The version with an external antenna does not depend on this.
 - Both bottom corners of the board are cut away. The Ethernet jack opens
   downwards into the one on the right (16.5 x 51 mm), the DC jack into the
   one in the other corner (12 x 36 mm). Plugs and cables stay inside the board
@@ -172,7 +173,9 @@ new display section, not a part swap.
 - External Wi-Fi antenna: the MINI-1U module has a U.FL connector on top.
   Plan a place for the antenna or a bulkhead connector and for the pigtail.
 - No tracks run on the outer layers within 3.3 mm of a mounting hole centre,
-  so a screw head or standoff up to 6.6 mm across is safe.
+  so a screw head or standoff up to 6.6 mm across is safe. At the hole beside
+  the NFC loop there is no copper pour either on the outer layers: that hole
+  stands in the gap of the copper around the loop (see "NFC").
 - Buzzer BZ701 fires sideways, along the board towards its lower edge (its
   sound port is on the side of the part that faces the level shifter U701).
   Leave an opening or a slot in the housing near it.
@@ -342,58 +345,87 @@ sides are safe to touch.
 ## NFC
 
 - Loop: 4 turns, 35 x 37 mm, 0.5 mm track, 0.9 mm pitch, on the display side.
-  Calculated from the track geometry it has 1.28 uH in free air. The copper
-  around it, the display, one mounting screw 3 mm beside it, the DC terminal
-  6 mm away and, on the lan version, the Ethernet plug and cable 8 mm beside
-  its right edge all lower that. Expect 1.1 to 1.25 uH.
+  Simulated from the board's copper (`sim/nfc_loop.py`), at 13.56 MHz:
+
+  | | Inductance | Resistance |
+  |---|---|---|
+  | in free air | 1.27 uH | 1.20 ohm |
+  | on the board, wall of wood or stone | 1.25 uH | 1.23 ohm |
+  | on the board, metal wall 18 mm behind the loop | 1.20 uH | 1.24 ohm |
+
+  The pours around the loop take 2 %, because they are open on one side (see
+  the end of this section); the display's metal back takes nothing that
+  counts. The loop also has about 2.4 pF of its own (between its turns, to the
+  copper around it, pads and feed tracks), which acts like 2.5 % more
+  inductance. Not in the simulation: the DC terminal 6 mm away and, on the lan
+  version, the Ethernet plug and cable 8 mm beside the loop's right edge. They
+  lower the inductance a little, and so does a card or a phone in the field.
 - Damping: 1.5 ohm in each leg, giving a quality factor of about 25.
 - EMC filter: 560 nH and 220 pF per side (corner at 14.3 MHz).
-- Matching: series 39 pF, parallel 180 pF + 18 pF. These are not the values
+- Matching: series 39 pF, parallel 180 pF + 10 pF. These are not the values
   for the best match at one inductance. They are chosen so that the
-  transmitter stays inside its limit wherever the real loop lands:
+  transmitter and the receiver input stay inside their limits for the loop on
+  either kind of wall, with room below for what a card or a phone takes off:
 
-  | Loop | Load between TX1 and TX2 | Transmitter supply current |
-  |---|---|---|
-  | 1.00 uH | 4 + 16j ohm | about 73 mA |
-  | 1.10 uH | 13 + 26j ohm | about 45 mA |
-  | 1.20 uH | 58 - 7j ohm | about 37 mA |
-  | 1.30 uH | 10 - 19j ohm | about 64 mA |
+  | Loop | Load between TX1 and TX2 | Transmitter supply current | Receiver input |
+  |---|---|---|---|
+  | 1.00 uH | 5 + 15j ohm | about 79 mA | 3.1 Vpp |
+  | 1.10 uH | 12 + 24j ohm | about 49 mA | 1.8 Vpp |
+  | 1.20 uH | 59 + 13j ohm | about 35 mA | 1.2 Vpp |
+  | 1.25 uH | 36 - 26j ohm | about 41 mA | 1.9 Vpp |
+  | 1.30 uH | 15 - 22j ohm | about 56 mA | 2.9 Vpp |
 
-  The PN532 allows 100 mA (60 mA typical, 150 mA absolute). The values first
-  fitted (27 pF, 150 pF + 22 pF) were calculated for a larger loop of 1.35 to
-  1.4 uH; with 1.2 uH they would have drawn about 140 mA. The currents are
-  calculated with a simple model (driver 4 ohm per side, coil 1 ohm), not
-  measured.
+  The PN532 allows 100 mA in the transmitter (60 mA typical, 150 mA is its
+  limiting value) and 4 Vpp at the receiver input (its analog supply plus 1 V).
+  Two sets of values came before these. The first (27 pF, 150 pF + 22 pF) was
+  calculated for a larger loop of 1.35 to 1.4 uH; with 1.2 uH it would have
+  drawn about 140 mA. The second (parallel 180 pF + 18 pF, receive divider
+  2.7 k) was calculated for 1.2 uH and without the loop's own capacitance.
+  With the simulated loop of 1.25 uH it gives 57 mA and 3.8 Vpp, and with the
+  parts' tolerance 45 boards in a hundred are above the receiver's limit and
+  five above 100 mA. The figures come from a model (`sim/nfc_match.py`: driver
+  4 ohm per side, 2 to 5 ohm over the spread; transmitter supply 3.0 V, 2.7 to
+  3.4 V; filter inductor 1 ohm), not from a measurement. A time-domain run
+  with the square wave of the real bridge (`sim/nfc_tx.cir`) gives the same
+  current.
 
   The table is for exact part values. The capacitors and the two filter
   inductors are 5 % parts, and the filter's corner (14.3 MHz) lies close to
   the carrier, so their spread moves the result as much as another loop does:
 
-  | Parts within | Transmitter current stays below 100 mA for loops of |
+  | Parts within 5 % | Transmitter current stays below 100 mA for loops of |
   |---|---|
-  | exact values | 0.91 to 1.36 uH |
-  | 2 % | 1.02 to 1.29 uH |
-  | 5 % (the parts fitted) | 1.12 to 1.22 uH |
+  | exact values | 0.93 to 1.39 uH |
+  | spread evenly: fewer than one board in a hundred above | 1.08 to 1.27 uH |
+  | every part at its worst end at once | 1.12 to 1.25 uH |
 
-  The last two rows take every part at its worst end at once. With parts
-  spread evenly over 5 %, no board is above 100 mA for a loop of 1.1 to 1.2 uH;
-  at 1.05 or 1.25 uH one or two in a hundred are, at 1.0 or 1.3 uH one in
-  seven (up to 190 mA; the chip's limit is 150 mA). So measure the loop before
-  the field is switched on, and the current when it first is (bring-up plan).
-- The damping resistors carry the loop's current: 25 to 40 mW each with these
-  values, and at most 97 mW with every part at its worst (they are rated
-  0.1 W).
-- Receive path: 2.7 k, 1 nF, 1 k to VMID as in the NXP reference.
+  The receiver input stays below 4 Vpp on 99 boards in a hundred for loops of
+  1.06 to 1.26 uH. Further out it gets worse quickly: at 1.0 uH one board in
+  five is above 100 mA, at 1.3 uH one in twenty (up to 210 mA; the chip's
+  limit is 150 mA). So measure the loop before the field is switched on, and
+  the current when it first is (bring-up plan).
+- The damping resistors carry the loop's current: 20 to 35 mW each with these
+  values, and at most 75 mW with any spread of the parts for loops up to
+  1.25 uH (they are rated 0.1 W).
+- Receive path: 3.9 k, 1 nF, 1 k to VMID. NXP's reference has 2.7 k there; with
+  it the input saw 3.8 Vpp at 1.25 uH. With 3.9 k it sees 1.2 to 1.9 Vpp for
+  loops of 1.2 to 1.25 uH, well above the 0.5 Vpp it needs.
 
 These are starting values. Measure the loop first, then tune C513/C517,
-C514/C515/C518/C519 and R504/R505 with a network analyser on an assembled unit
-with the display fitted, and check the read range with the cards in use. The
-two assembly versions differ here: a shielded plug and its cable lie next to
-the loop, so tune the lan version on its own, with the cable plugged in.
+C514/C515/C518/C519, R504/R505 and R506 with a network analyser on an assembled
+unit with the display fitted, and check the read range with the cards in use.
+The two assembly versions differ here: a shielded plug and its cable lie next
+to the loop, so tune the lan version on its own, with the cable plugged in.
 
 Copper around the loop is open at one place (a 2.5 mm gap in all layers on the
 side towards the Ethernet cut-away). A closed ring of copper around the loop
-would act as a shorted turn.
+would act as a shorted turn: simulated, metal across that gap turns the loop's
+1.25 uH into 1.03 uH and its 1.23 ohm into 1.36 ohm. One of the four mounting
+screws stands in the gap. So the outer layers carry no copper within 3.3 mm of
+that hole: neither the screw's head on the component side nor the insert under
+the board can join the two ends of the copper, even where they cut through the
+solder mask. (Up to 24 November 2026 the pours ran under both, on both sides
+of the gap.)
 
 ## Ethernet
 
@@ -428,6 +460,52 @@ same way.
 The 25 MHz crystal (ESR up to 50 ohm) is above what the PHY datasheet allows
 (40 ohm). Typical parts are far below both. If a board ever fails to bring up
 the Ethernet clock in the cold, look here first.
+
+## Wi-Fi and Bluetooth: the ESP32-C6 behind the ESP32-P4
+
+The P4 has no radio. The C6 module runs Espressif's esp-hosted firmware and is
+the P4's Wi-Fi adapter and Bluetooth controller over SDIO. This pairing has a
+reputation for trouble. On 24 November 2026 the reports in Espressif's
+esp-hosted tracker and in the trackers of ESPHome and Arduino were read for
+what caused them, and each cause was held against this board.
+
+What Espressif asks of the hardware
+([getting started](https://github.com/espressif/esp-hosted-mcu/blob/main/docs/getting-started-mcu.md#1-sdio)),
+and what the board has:
+
+| Asked for | Here |
+|---|---|
+| The C6's fixed SDIO pins (CLK 19, CMD 18, D0 to D3 20 to 23) | as asked |
+| On the P4 the pins of slot 0, which are wired straight to the SDIO unit, for the best timing; slot 1 goes through the pin matrix | slot 0 (GPIO39 to 44). Most boards with this pair, Espressif's included, use slot 1, because their slot 0 holds the SD card |
+| 51 k pull-ups on CMD and D0 to D3 | R305 to R309, 51 k |
+| A reset line from the host to the module's EN pin | GPIO45 through 1 k (R302) to EN, which has 10 k and 1 uF. esp-hosted's 10 ms pulse takes EN to 0.3 V and holds it below its threshold for 8.4 ms |
+| Short tracks of equal length, clock matched to data first; series termination where needed | 37 to 46 mm, clock 39 mm with 22 ohm at the P4. Simulated: clock and data arrive within 0.2 ns of each other, and clock out plus data back take 1.1 ns of the 25 ns that one clock period at 40 MHz has |
+| A supply at the module that does not dip | 22 uF and 100 nF at the module, from the 3.3 V plane of the 2 A converter |
+
+The reports, by cause:
+
+| Report | Cause | Here |
+|---|---|---|
+| Wi-Fi does not associate, `Dropping packet(s) from stream`, restart loops ([ESPHome 10956](https://github.com/esphome/esphome/issues/10956), [esp-hosted 151](https://github.com/espressif/esp-hosted-mcu/issues/151)) | The C6 ran another esp-hosted version than the P4. Bought boards come with an old one, or none | The module comes empty. We flash it, through its test points, and keep both sides on one version |
+| `send_op_cond returned 0x107`, `card init failed` at start ([esp-hosted 127](https://github.com/espressif/esp-hosted-mcu/issues/127), [Arduino 11404](https://github.com/espressif/arduino-esp32/issues/11404)) | The C6 was held in reset by the wrong reset polarity in the configuration, was not powered (its supply switched by an IO expander), or had no firmware | The module's supply is not switched. The polarity is a firmware setting ([firmware-port.md](firmware-port.md)) |
+| `Unrecoverable host sdio state` (0x107) after minutes or hours ([esp-hosted 167](https://github.com/espressif/esp-hosted-mcu/issues/167), [121](https://github.com/espressif/esp-hosted-mcu/issues/121)) | By Espressif's analysis of 18 November 2026, three things: a display library that called the chip's ROM cache functions while SDIO was busy; a fault in esp-hosted 3.0.9, fixed in 3.1.0; and on one custom board something not found yet, where Espressif asked about noise on the pins that share the SDIO pins' supply and about the module's 3.3 V | Firmware, for the first two. On the third: the SDIO pins' supply group (GPIO39 to 48) also carries the module's reset, the buzzer signal and the LED data line here, all of them slow signals into high impedances, and no power stage |
+| CRC errors (0x109) under load on a custom board ([esp-hosted 167](https://github.com/espressif/esp-hosted-mcu/issues/167)) | Not settled. Espressif reads it as the timing margin between the two chips, which depends on track length and load: its own board shows none at 50 MHz with the C6's default clock edges and many with the other edges. The reporter found no host timing that cured it and suspects the C6's SDIO unit | The board's share of the timing is 1.1 ns (see above). Stay with the default edges |
+| Downloads stall after about 100 kB ([esp-hosted 184](https://github.com/espressif/esp-hosted-mcu/issues/184)) | The access point: gone with other access points, and on one Wi-Fi 6 network gone when the C6 was kept from 802.11ax | Firmware |
+| Double free in the SDIO receive task ([esp-hosted 210](https://github.com/espressif/esp-hosted-mcu/issues/210)) | `esp_wifi_remote` older than the esp-hosted it was built with | Firmware |
+| The C6's firmware cannot be updated over SDIO any more ([esp-hosted 143](https://github.com/espressif/esp-hosted-mcu/issues/143)) | Co-processor firmware 2.1 to 2.8 flashed first: its boot loader does not start later images | Firmware: the first image flashed is a newer one. The test points remain as a way back |
+| Bluetooth scan goes silent after 90 s ([esp-hosted 180](https://github.com/espressif/esp-hosted-mcu/issues/180)) | The board had the module without an antenna of its own (MINI-1U) and no antenna plugged in | The version with the external antenna must not be run without one |
+| Bluetooth: connecting as central never completes for some devices ([esp-hosted 204](https://github.com/espressif/esp-hosted-mcu/issues/204)) | A fault on the host side. A patch posted in the report in July 2026 cured it for the reporter; the report was still open in November 2026 | Firmware. It matters: the reader's Bluetooth proxy is a central that scans and connects |
+| "The early board had wrong crystal capacitors and a fault in the radio part" (a comment on [esp-hosted 155](https://github.com/espressif/esp-hosted-mcu/issues/155)) | A board with a bare C6 chip | Certified module with its own crystal and antenna match |
+
+None of the causes that were found is in the circuit or the layout of this
+board. Nearly all are firmware versions and settings, which
+[firmware-port.md](firmware-port.md) lists, and two are in the assembly (an
+empty module, a missing antenna). Two reports from custom boards are not
+settled, though: the timeouts whose cause Espressif has not found, and the CRC
+errors it puts down to timing margin. A board of our own can have a fault of
+that kind too, and no report can rule it out for a board nobody has built. So
+the bring-up plan runs esp-hosted's raw throughput test on the link before
+anything else is put on it.
 
 ## Tamper detection
 
@@ -740,8 +818,8 @@ at every quantity. With a two-layer carrier they cost more on 5 boards and
 0.08 USD less per reader on 100, before the connector pair between the boards
 and the second assembly order.
 
-Once per order JLCPCB adds 3 USD for every extended part line (39 lines on the
-Wi-Fi version, 44 on the Ethernet/PoE version by its catalogue of 22 November
+Once per order JLCPCB adds 3 USD for every extended part line (38 lines on the
+Wi-Fi version, 43 on the Ethernet/PoE version by its catalogue of 22 November
 2026, preferred parts not counted), the setup and stencil fees, the bare
 boards and shipping. On five boards the extended-part fees alone are 23 to
 26 USD per board, so a small prototype order costs far more per board than the
@@ -765,12 +843,14 @@ Where a part has an equivalent in JLCPCB's basic or preferred list, the design
 uses that one (the TVS diodes, 1 uF / 50 V, and 510 k instead of 499 k in the
 core converter's divider, where only the ratio counts). The one exception is
 the three capacitors of the DC input: the basic 10 uF / 50 V part fits their
-pads and is the wrong part there (see "Power"). The six other extended
-passives (39 pF, 180 pF and 220 pF of the NFC matching, 1.5 ohm,
-2.7 k and 6.19 k) have no basic or preferred part of the same value: the
-parts with these values in the series the basic parts come from are extended
-parts as well (looked up on 22 November 2026). Four of the six (39 pF, 180 pF,
-1.5 ohm, 2.7 k) are tuning values that the first boards will change anyway.
+pads and is the wrong part there (see "Power"). The five other extended
+passives (39 pF, 180 pF and 220 pF of the NFC matching, 1.5 ohm and 6.19 k)
+have no basic or preferred part of the same value: the parts with these values
+in the series the basic parts come from are extended parts as well (looked up
+on 22 November 2026). Three of the five (39 pF, 180 pF, 1.5 ohm) are tuning
+values that the first boards will change anyway. The 10 pF of the matching is
+a basic part and the 3.9 k of the receive divider a preferred one (looked up
+on 24 November 2026).
 
 ## Sourcing risks
 
@@ -803,7 +883,7 @@ display and the connectors. Nothing was built or measured.
 | Buzzer: both coil pads were on one net, the transistor switched two pads that only hold the part. It would have stayed silent. | Coil pads 1 and 2 on the two nets, pads 3 and 4 unconnected. |
 | Ethernet jack behind the display: its pins stand at least 1.45 mm out of the display side, and the notes asked for the display within 1 mm of the board. | The jack stays (moving it below the display would cost 19 mm of plug room, and the case would have to grow by that). Instead the display distance is set from both sides: 1.5 mm, 2.0 at most for the flex, with the jack's pins clipped to 1 mm and polyimide tape on that corner of the LCD. The two 48 V pins are beside the metal back, not behind it. |
 | Placement angle of four parts differed from JLCPCB's library: the PN532 (second source), the transistor and the resistor arrays (KiCad's footprints), later the new level shifter. The PN532 would have been placed a quarter turn off. | The export corrects these angles. New target `check-footprints`. |
-| NFC matching was calculated for a larger loop: about 140 mA transmitter current with the loop on the board, limit 100 mA. | Values that stay below 90 mA for any loop between 1.0 and 1.3 uH when every part has its exact value (with the parts' tolerance: 1.12 to 1.22 uH, see "NFC"). |
+| NFC matching was calculated for a larger loop: about 140 mA transmitter current with the loop on the board, limit 100 mA. | Values that stay below 90 mA for any loop between 1.0 and 1.3 uH when every part has its exact value (with the parts' tolerance: 1.12 to 1.22 uH). Changed once more after the simulation, see below. |
 | 48 V parts and tracks directly at the rear wall of the jack's metal shell (0.1 to 0.3 mm), and the centre-tap capacitors as well. | Parts moved 2 mm away, 48 V nets under the shell on the inner layer, Ethernet pairs on the back layer. |
 | Copper pour under the PoE module where its isolation barrier lies. | No copper there on any layer. |
 | DC input without a filter: the converter's ripple would go out on the supply cable. | Pi filter C117, L103. |
@@ -886,7 +966,7 @@ inductors and crystals. Nothing was built or measured.
 | Finding | Change |
 |---|---|
 | PN532: its footprint had solder paste over the whole exposed pad and one more opening on each of the four thermal vias in it, on both sides of the board. The solder would have run into the four holes, and the order would have carried a paste layer for the side without parts. | Eight paste windows around the vias, none on a hole, on the component side only. A test now reads the footprint library for paste on plated holes. |
-| NFC matching: these notes called the fitted values safe for any loop from 1.0 to 1.3 uH. That holds for exact part values; with the 5 % parts fitted it holds from 1.12 to 1.22 uH. | No part changed: the values are right for the loop expected (1.2 uH), and they get tuned. The limits are in "NFC" and in the bring-up plan now. |
+| NFC matching: these notes called the fitted values safe for any loop from 1.0 to 1.3 uH. That holds for exact part values; with the 5 % parts fitted it holds from 1.12 to 1.22 uH. | No part changed then: the values were right for the loop expected (1.2 uH). The simulation below found a larger loop and changed them. |
 | Plugging in a live 24 V supply: these notes said the TVS keeps the converter's input below 40 V. That rested on a current of 11 A at most. The three input capacitors (10 uF / 50 V) keep 1.35 uF each at 24 V by their maker's curve, and simulated with that curve the input reached 41 to 45 V, with up to 19 A in the TVS, for 3 to 10 m of ordinary installation wire. | C112, C113 and C117 are 2.2 uF / 100 V X7R in the same size: 38 V at most. Figures and what it costs in "Power". |
 | USB port while another supply runs the board: the bleed resistor holds the unplugged port below what a USB-C host accepts only as long as the OR-ing diode leaks no more than the typical one at 75 °C. | No part changed. Figures in "Power", a check with the reader warm in the bring-up plan. |
 
@@ -964,6 +1044,140 @@ Looked at and left as they are:
   a diode to measure each at; a test point each would need room near the MCU
   that the board does not have.
 
+### Simulation
+
+On 24 November 2026 the routed board was simulated where a simulation can
+answer. The copper is read out of the board file and the part values out of
+the circuit description, so the figures are for this layout, not for a
+textbook one. The scripts are in `sim/` and run as the `simulate` target, which
+fails when a limit of a part is missed; [sim/README.md](../sim/README.md) says
+what each one models. Two field solvers were written for it (inductance and
+field of tracks and copper areas; impedance of a track in the layer stack).
+Both are checked against closed-form results on every run. The circuits run in
+ngspice, and the Wi-Fi antenna in openEMS, a full-wave solver (the
+`simulate-antenna` target). Nothing was built or measured.
+
+| Finding | Change |
+|---|---|
+| NFC loop: 1.25 uH on the board and 1.20 uH on a metal wall, where these notes expected 1.1 to 1.25 uH. The pours around the loop are open on one side and take only 2 %. Together with the loop's own 2.4 pF that put the fitted matching, calculated for 1.2 uH, at the edge of its range: 3.8 Vpp at the receiver input against a limit of 4 Vpp, above it on 45 boards in a hundred with the parts' tolerance, and the transmitter above 100 mA on five. | Parallel capacitors C515 and C519 10 pF instead of 18 pF, receive divider R506 3.9 k instead of 2.7 k: 41 mA and 1.9 Vpp at 1.25 uH, 35 mA and 1.2 Vpp at 1.20 uH, and no board in a hundred outside either limit. Figures in "NFC". |
+| The mounting screw beside the NFC loop stands in the gap that keeps the copper around the loop from being a shorted turn. The ground pours ran under its head and under the insert on the other side, on both sides of the gap, with only solder mask in between. Metal across the gap takes the loop from 1.25 to 1.03 uH. | No copper pour on the outer layers within 3.3 mm of that hole. |
+
+The board was built again by the generator for these two changes. Every track
+and via is where it was; three part values and 16 mm2 of pour on each outer
+layer differ.
+
+Simulated and found right:
+
+- DC input, a live 24 V supply plugged in: 35 to 38 V at the converter for
+  the cables of the table in "Power" (38.1 V and 8.6 A in the TVS with 5 m of
+  1.5 mm2), 39.9 V from a 26.4 V supply. This second, independent model agrees
+  with that table within 1.5 V. The filter capacitor in front of the inductor
+  (C117) sees more, up to 43 V; it is a 100 V part.
+- Power-up from USB: the 3.3 V rail is up after 3.8 ms. The MCU's reset input
+  is at 0.53 V then and passes 0.83 V, the highest level it still takes for
+  low, 1.1 ms later; the chip asks for 50 us. On a weak port (4.5 V behind
+  0.5 ohm) the 5 V rail runs at 3.8 V, the least the 3.3 V converter works
+  from: enough, with nothing to spare. Plugging in draws 7.5 A for some
+  microseconds, into about 50 uF where the USB standard allows a device 10 uF.
+  Ports stand that; it is one more reason why this is a service port.
+- Track impedance on this layer stack, 0.15 mm track with the ground fill
+  beside it: 49 ohm on the outer layers, 46 ohm on In2 (5.7 and 7.0 ps/mm).
+- Reflections on the fast lines, with the routed lengths. The lines with a
+  series resistor (RMII clock and receive lines, SDIO clock, display clock)
+  show none. The lines without one (RMII transmit, SDIO data and command, 40
+  to 48 mm) overshoot by 0.13 V at the MCU's default drive strength, and by
+  0.6 to 0.8 V at the strongest, where the level then swings back to 3.0 V.
+  The firmware must leave these pins at the default strength or below
+  ([firmware-port.md](firmware-port.md)).
+- Supply tracks with everything on at once, 1.5 A on the 5 V rail: 0.13 V lost
+  at most, at the far LED row, and no track of the outer layers carries more
+  than the current for a 20 K rise. The USB input's 1.5 A runs through 13 mm
+  of inner layer 0.62 mm wide, more than the rule for a free inner track
+  allows; this one lies 0.1 mm from a plane that takes its 70 mW.
+- SDIO link to the Wi-Fi module: the clock arrives 0.6 ns after it leaves
+  the MCU, the data lines 0.4 ns, so they stay within 0.2 ns of each other;
+  clock out and data back take 1.1 ns. After a module that answers within the
+  14 ns of the SD standard that leaves the MCU 9.9 ns at 40 MHz and 4.9 ns at
+  50 MHz. The board is not what limits this link (see "Wi-Fi and Bluetooth").
+- Wi-Fi antenna, in a full-wave model (`sim/wifi_antenna.py`). The module's
+  antenna is not published, so a stand-in of the same size and kind was tuned
+  on a small evaluation board and then put on this board unchanged:
+
+  | Case | Resonance | Bandwidth at -6 dB | Radiated of the power fed in, channel 1 / 7 / 13 | Of that towards the room |
+  |---|---|---|---|---|
+  | on an evaluation board of 40 x 55 mm | 2.422 GHz | 104 MHz | -5.3 / -5.4 / -5.7 dB | 47 % |
+  | on this board | 2.394 GHz | 164 MHz | -2.1 / -2.4 / -2.8 dB | 48 % |
+  | with the display, on its four ground pads | 2.394 GHz | 156 MHz | -2.1 / -2.4 / -2.9 dB | 48 % |
+  | with the display, not grounded | 2.394 GHz | 160 MHz | the same within 0.1 dB | 48 % |
+  | in the printed case | 2.364 GHz | 174 MHz | -2.2 / -2.6 / -3.2 dB | 47 % |
+  | in the case, metal wall 16 mm behind | 2.372 GHz | 188 MHz | -3.9 / -4.6 / -5.5 dB | 78 % |
+
+  The display's metal back changes nothing: it lies over the board's own
+  ground, and the gap between the two has no resonance in the band. The board
+  does not cost anything either; with its large ground the stand-in radiates
+  3 dB more than on the small evaluation board. Board and case together pull
+  the resonance down by 58 MHz; the case's share of that costs 0.2 dB in the
+  middle of the band and 0.4 dB at the top channel. A metal wall takes 2 dB of the radiated
+  power and sends most of the rest forward: towards the room it comes to the
+  same. So the model does not bear out the "less range than a development
+  board" that these notes expected from the 7 mm between antenna and display.
+  The absolute figures are the stand-in's, not the module's.
+- Supply impedance at the MCU, the board without the chip's package: above
+  30 MHz the core rail looks like 1.1 nH (2.4 nH for one pin alone), a pin of
+  the 3.3 V rail like 1.2 nH. That is about what a package of this kind adds
+  per pin itself, so the capacitors' distance (see below) does not stand out.
+- NFC field, averaged over a card held parallel to the reader: 4.1 A/m at a
+  card that lies on the case, 3.3 A/m with the reader on a metal wall. ISO/IEC
+  14443 wants 1.5 to 7.5 A/m at the card. The field falls to 1.5 A/m 19 mm in
+  front of the case (15 mm on a metal wall): up to there a card that needs
+  the standard's full minimum is powered. Most cards need less and are
+  powered further out; whether the reader still hears their answer there is
+  not in the model. More range, if the first board wants it: the transmitter
+  runs at 41 mA of its 100 mA, so the matching has room (bring-up plan).
+- PoE isolation: the shortest way from 48 V copper to any other copper is
+  2.01 mm along a layer and 2.02 mm through the board, at the jack's pin 10 on
+  every layer; nowhere does 48 V copper lie over or under other copper. In air
+  2.0 mm stand a peak of 3.0 kV (IEC 60664-1); the 1500 V RMS test reaches
+  2.1 kV. Not in this figure, because they are inside parts: the 1.8 mm
+  between the pads of C102, the PoE module's own barrier, and the 0.5 mm
+  between the jack's pin 9 and the display's metal back, which the polyimide
+  tape has to hold (see "PoE isolation").
+- Heat in the closed case, estimated within 40 % (textbook figures for still
+  air, rise over the room):
+
+  | Supply | Typical use | Board | Warmest spot | Display | Everything on for a long time: board, LED rows |
+  |---|---|---|---|---|---|
+  | USB | 2.6 W | +23 K | +33 K | +17 K | +42 K, +70 K |
+  | DC, 12 V | 3.0 W | +26 K | +37 K | +19 K | +48 K, +75 K |
+  | PoE | 3.6 W | +31 K | +40 K | +23 K | +55 K, +82 K |
+
+  In a room of 25 °C typical use is far from every limit. In a room of 40 °C
+  on PoE the estimate puts the display at 63 °C (limit 70 °C), the Wi-Fi
+  module at 79 °C (85 °C) and the air around the PoE module at 71 °C (85 °C):
+  inside the limits, by less than the estimate is exact. The DC input's fuse
+  then holds 0.66 A against 0.28 A drawn. Everything on at once for a long
+  time is beyond what the case can shed: the LED rows, on narrow copper
+  between the cut-outs, get 70 to 80 K warmer than the room. The firmware
+  limits the LEDs and watches the chip's temperature
+  ([firmware-port.md](firmware-port.md)).
+- Hall switch: 22 mT from the dock's magnet at the switch, 10.3 mm from its
+  face, and still 16 mT with the weakest magnet, 4 mm off its axis and 40 K
+  warmer; the switch needs 4.8 mT. Lifted off, it may switch after 9 mm and
+  has switched for certain after 33 mm.
+- Read again for the limits used: the PN532 data sheet (transmitter current,
+  driver resistance, receiver input) and the LED's (its drawing shows the lens
+  side; mounted upside down the pads are its mirror image, which is what the
+  board has). All 82 footprints against JLCPCB's library after the change of
+  the three part numbers: no problem.
+
+What this does not say: whether pins and footprints are right (that is what
+the reviews above are for), whether the flex of the display that gets bought
+reaches (its length is a figure from a drawing; no model makes it more
+certain), whether the reader hears a card at the edge of its field, how the
+board does in an EMC test, whether the second-source PN532 behaves like the
+original, and anything about firmware. The models use the makers' typical
+figures. The list below stands, shorter in some points and with one more.
+
 ### Open: cannot be settled on paper
 
 - **The display flex and the jack's pins.** They pull in opposite directions:
@@ -979,21 +1193,37 @@ Looked at and left as they are:
 - **Decoupling at the MCU.** Of its 21 supply pins 7 have their nearest
   capacitor more than 5 mm away (6.7 mm at most) and 5 within 3 mm; Espressif
   asks for one at each pin. They connect through vias into the planes, which
-  are unbroken now. The space next to the pins is taken by the signals that
+  are unbroken now. Simulated, the board's share of the way from a pin to its
+  capacitors is 1.2 to 2.4 nH, about what the package adds itself. The space next to the pins is taken by the signals that
   leave the 0.35 mm pitch pad row, and the back of the board is under the
   display. If the MCU proves unstable at full clock speed, this is the first
   suspect, and it needs a new layout to change.
 - **NFC range and tuning**, the second-source PN532, and the effect of the
   Ethernet plug and cable next to the loop on the lan version. The loop's
-  inductance is calculated (1.28 uH in free air, 1.1 to 1.25 uH expected on
-  the board); only between 1.12 and 1.22 uH is every board sure to stay
-  inside the transmitter's limit with the values fitted.
-- **Wi-Fi range** with the antenna 7 mm from the display's metal back.
+  inductance is simulated (1.25 uH on the board, 1.20 uH on a metal wall), not
+  measured. With the values fitted every board is sure to stay inside the
+  transmitter's limit between 1.12 and 1.25 uH, and 99 in a hundred between
+  1.08 and 1.27 uH. The field is simulated too: it powers a card up to 19 mm
+  in front of the case (15 mm on a metal wall). What no model here says is
+  how well the reader hears the card.
+- **Wi-Fi range.** The model finds no loss from the display's metal back
+  7 mm from the antenna, and 0.2 to 0.4 dB from the case. It was made with a
+  stand-in for the module's antenna, so compare the first reader with a
+  current one (bring-up plan).
 - **Isolation of the PoE side** under a 1500 V test (see "PoE isolation").
+  The board's copper keeps 2.0 mm everywhere, measured on the routed board,
+  which is enough in air for that test. What a test has to show is what lies
+  inside parts and in the assembly: the module, C102, and the tape between
+  the jack's pin 9 and the display.
+- **Heat.** The estimate above has the reader inside its limits in typical
+  use, with little to spare on PoE in a room of 40 °C. Measure it: closed
+  case, on the wall, after an hour (bring-up plan). If it is warmer than
+  estimated, the LEDs and the backlight are what the firmware can take back.
 - **Tamper sensors.** What the proximity sensor reads on the dock and off it,
   with docks of the colours in use, and whether light on the case moves that
   reading. Whether the hall switch turns on and lets go at the distances
-  calculated, whether the dock's magnet changes the buzzer's sound, and which
+  calculated (simulated again: on for certain on the dock, off after 9 to
+  33 mm of lift), whether the dock's magnet changes the buzzer's sound, and which
   accelerometer thresholds tell a knock from a door closing.
 - **Hot-plugging a 24 V supply.** By simulation the converter's input peaks
   at 29 to 38 V, against its limit of 40 V (see "Power"). That is 2 V of

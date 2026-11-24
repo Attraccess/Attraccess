@@ -99,6 +99,10 @@ def nfc(d):
     d.R('2.2k', '+3V3', 'NFC_SDA')
     d.R('10k', 'NFC_RST', 'GND', desc='holds the PN532 in power-down while the MCU is in reset')
     # RF: EMC filter, matching, damping. Starting values, to be tuned on the assembled unit with a VNA.
+    # The parallel capacitance (180 pF + 10 pF) is set for the loop as simulated from the board's copper
+    # (sim/nfc_loop.py): 1.25 uH on a wall of wood or stone, 1.20 uH on a metal one, with about 2 pF of its
+    # own. With 180 pF + 18 pF, calculated for 1.2 uH without that capacitance, the receiver input was
+    # above its limit on four boards in ten and the transmitter above 100 mA on one in 25.
     d.group('Transmit path: EMC filter and antenna matching')
     for side in ('1', '2'):
         tx, f, m, a = 'NFC_TX' + side, 'NFC_F' + side, 'NFC_M' + side, 'NFC_ANT' + side
@@ -107,10 +111,12 @@ def nfc(d):
         d.C('220p', f, desc='EMC filter C0')
         d.C('39p', f, m, desc='matching C1 (tune)')
         d.C('180p', m, desc='matching C2 (tune)')
-        d.C('18p', m, desc='matching C2, second part (tune)')
+        d.C('10p', m, desc='matching C2, second part (tune)')
         d.R('1.5R', m, a, size='0603', desc='damping Rq (tune)')
     d.group('Receive path')
-    d.R('2.7k', 'NFC_F2', 'NFC_RXC', desc='receive divider R2 (tune)')
+    # 3.9 k and 1 k leave 1.2 to 2.4 Vpp at RX for a loop of 1.15 to 1.27 uH. The input takes AVDD + 1 V
+    # (4 Vpp); with the 2.7 k of NXP's reference circuit it saw 3.7 Vpp at 1.25 uH.
+    d.R('3.9k', 'NFC_F2', 'NFC_RXC', desc='receive divider R2 (tune)')
     d.C('1n', 'NFC_RXC', 'NFC_RX')
     d.R('1k', 'NFC_RX', 'NFC_VMID')
     d.C('100n', 'NFC_VMID')

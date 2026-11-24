@@ -121,8 +121,9 @@ def zones(B):
     for hx, hy in G.MOUNT_HOLES:
         octagon = [(hx + rr * math.cos(math.pi / 8 + i * math.pi / 4), hy + rr * math.sin(math.pi / 8 + i * math.pi / 4))
                    for i in range(8)]
-        B.keepout(octagon, (F, B_), 'mounting hole: no tracks under the screw head', pours=False, tracks=True,
-                  vias=True)
+        bare = (hx, hy) == G.NFC_GAP_HOLE
+        B.keepout(octagon, (F, B_), 'mounting hole: no %s under the screw head' % ('copper' if bare else 'tracks'),
+                  pours=bare, tracks=True, vias=True)
     # The jack's LED supply pins go solid into the 3.3 V plane. With thermal spokes such a pin can end
     # up on a single spoke where signal tracks on that layer pass it.
     for pad in B.fp['J401'].Pads():

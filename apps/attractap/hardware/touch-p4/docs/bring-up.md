@@ -21,7 +21,8 @@ when a step fails. Use a current-limited bench supply for the first power-up.
    (38 in stock, falling). The list of short lines is under "Sourcing risks"
    in the design notes.
 4. Run the `check` and `check-footprints` targets (README) and look at the
-   Gerbers in a viewer.
+   Gerbers in a viewer. `check` includes the simulations; their report is
+   `fab/reports/simulation.txt`.
 5. When the bare boards arrive before assembly: drop an LED into one of its
    windows. It must go in without force.
 
@@ -89,10 +90,25 @@ Rails without a test point of their own, and where to measure them:
 ## Wi-Fi co-processor
 
 1. Flash the esp-hosted co-processor firmware into the C6 through its test
-   points (C6_TX, C6_RX, C6_EN, C6_BOOT held low at reset).
+   points (C6_TX, C6_RX, C6_EN, C6_BOOT held low at reset). Take the same
+   release as the P4's esp-hosted component, 3.1.0 or newer.
 2. Run the esp-hosted host example on the P4 with SDMMC slot 0 and reset GPIO
-   45. Expect the "INIT event from ESP32 peripheral" log line.
-3. Scan and connect to an access point. Note RSSI next to a current reader.
+   45, at 20 MHz first. Expect the "INIT event from ESP32 peripheral" log
+   line and no version warning. If the P4 reports `send_op_cond returned
+   0x107`, look at the reset first: EN of the module (test point C6_EN) must
+   end high.
+3. Before Wi-Fi is used, run esp-hosted's raw throughput test in both
+   directions at 40 MHz for ten minutes, with the display running: no CRC
+   error (`0x109`) and no timeout (`0x107`). This tests the SDIO link alone.
+   Errors here are the board (timing, supply of the module) and are not cured
+   by firmware above the link; note at which clock they stop.
+4. Scan and connect to an access point. Note RSSI next to a current reader,
+   in the closed case, on channels 1 and 13 if the access point allows it.
+   Expected from the antenna model: no worse than the current reader; the
+   case pulls the antenna's resonance down, which shows at the top channels
+   first. Download a few megabytes, on a Wi-Fi 6 access point as well.
+5. Bluetooth with Wi-Fi connected: scan for ten minutes (the reports must
+   keep coming), then connect to the devices the plugins use.
 
 ## Display and touch
 
@@ -110,22 +126,56 @@ Rails without a test point of their own, and where to measure them:
    (IC 0x32, version 1.6). If it does not, fit the NXP part.
 2. Before the field is switched on for the first time, measure the loop: with
    the display fitted, an LCR meter or network analyser across R504/R505 on the
-   antenna side (remove both resistors for that). The fitted matching values
-   are safe for 1.12 to 1.22 uH whatever the tolerance of the parts on this
-   board. From 1.0 to 1.3 uH they are safe for parts of exact value, and about
-   one board in seven can draw more than 100 mA at either end: there, switch
-   the field on for a second at most the first time and read the current
-   (next step) before leaving it on. Outside 1.0 to 1.3 uH change the values
-   first.
+   antenna side (remove both resistors for that). Expected by simulation:
+   1.25 uH with the reader on the bench or on a wall of wood or stone, 1.20 uH
+   on a metal plate. The fitted matching values are safe for 1.12 to 1.25 uH
+   whatever the tolerance of the parts on this board, and from 0.93 to 1.39 uH
+   for parts of exact value. Between those, switch the field on for a second
+   at most the first time and read the current (next step) before leaving it
+   on: at 1.0 uH one board in five draws more than 100 mA, at 1.3 uH one in
+   twenty. Outside 0.93 to 1.39 uH change the values first.
 3. Switch the field on and measure the transmitter current: the voltage across
    FB503 (0.15 ohm) or the rise of the 5 V current. It must stay below 100 mA
-   (expected 35 to 50 mA when the loop is near 1.2 uH).
-4. Tune the antenna with a network analyser between the EMC filter and the
+   (expected 35 to 45 mA for a loop of 1.20 to 1.25 uH). Hold a phone and a
+   card to the reader and watch it: they lower the loop's inductance, and the
+   current must stay below 100 mA with them as well.
+4. Measure the voltage at the receiver input with a probe of 10 pF or less at
+   the pad of R507 that is not on C521 (VMID): expected 1.2 to 1.9 Vpp, and
+   it must stay below 4 Vpp, also with a card or a phone in the field. If it
+   is higher, fit a larger R506 (3.9 k now).
+5. Tune the antenna with a network analyser between the EMC filter and the
    matching network (see design notes). Record the final values of C513 to
-   C519, R504, R505 in the circuit description. Tune the Ethernet version on
+   C519, R504, R505 and R506 in the circuit description. Tune the Ethernet version on
    its own, with the cable plugged in: plug and cable lie next to the loop.
-5. Measure read distance with the cards and tags in use (DESFire, NTAG 424),
-   with display on, LEDs on and Wi-Fi transmitting.
+6. Measure read distance with the cards and tags in use (DESFire, NTAG 424),
+   with display on, LEDs on and Wi-Fi transmitting. Do it on the bench and
+   with the reader on a metal plate: the plate lowers the loop's inductance by
+   0.05 uH. Expected by simulation: the field is strong enough for any
+   standard card up to 19 mm in front of the case, 15 mm on the metal plate;
+   most cards read further. If the range is short although the loop and the
+   current are as expected, the transmitter has room: it runs at about 40 mA
+   of its 100 mA. A match closer to 40 ohm, or 1.0 ohm for R504 and R505,
+   raises the loop current; check the current, the receiver input and the
+   field at a card on the case (7.5 A/m at most) again after that.
+
+## Heat
+
+The reader is a closed plastic case. The estimate in the design notes
+("Simulation") puts the board 23 to 31 K above the room in typical use,
+depending on the supply, and is good to 40 % at best.
+
+1. Closed case on a wall, firmware in its normal state (display on, Wi-Fi
+   connected, NFC polling, LEDs at their idle level), each supply in turn.
+   After an hour read the chip's temperature sensor and measure the front of
+   the display and, through the bottom notch, the air inside.
+   Expected: chip 30 to 40 K above the room, display front 15 to 25 K.
+2. The same with all LEDs at their brightest steady level and the backlight
+   at full. The LED rows are the warmest place then; a thermocouple beside
+   D702 and D707. Set the firmware's LED limit from this.
+3. On PoE: the module U102 after an hour (it stands in air that is as warm as
+   the board).
+4. If the reader will be used in rooms above 30 °C, repeat step 1 in a warm
+   box at that temperature. The display is specified to 70 °C.
 
 ## Ethernet and PoE (lan version)
 

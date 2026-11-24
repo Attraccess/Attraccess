@@ -88,6 +88,10 @@ JACK_REAR_CLEAR_Y = 70.0
 POE_ROUTER_KEEPOUT = [(77.95, 35.0, 86.0, 71.4), (79.0, 30.6, 86.0, 35.0), (79.6, 71.4, 86.0, 78.6)]
 
 MOUNT_HOLES = ((4.0, 3.5), (82.0, 3.5), (17.9, 139.4), (66.3, 117.0))
+# The last one stands in the gap of the copper around the NFC loop. Under its screw head and the insert
+# on the other side the outer layers carry no copper: metal that cuts through the solder mask on both
+# sides of the gap would close that copper into a shorted turn (simulated: 1.25 uH become 1.03 uH).
+NFC_GAP_HOLE = MOUNT_HOLES[3]
 # Hall switch U703 that senses the magnet in the dock: the magnet sits in front of this point, on the
 # component side. Free board area away from the buzzer (15 mm) and the inductors (22 mm and more).
 HALL = (12.5, 38.2)

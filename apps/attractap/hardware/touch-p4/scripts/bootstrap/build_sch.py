@@ -73,7 +73,8 @@ NOTES = {
     'nfc': [
         'I2C address 0x24. I0 high / I1 low selects I2C. VBAT runs from 5 V, PVDD (interface) from 3.3 V.',
         'C513/C517 (series), C514/C518 + C515/C519 (parallel) and R504/R505 are calculated starting values',
-        'for a loop of 1.0 to 1.3 uH: the transmitter current stays below 90 mA anywhere in that range.',
+        'for the loop as simulated from the copper: 1.25 uH, or 1.20 uH on a metal wall. With parts of 5 %',
+        'the transmitter stays below 100 mA for a loop of 1.10 to 1.25 uH (sim/, docs/design-notes.md).',
         'Tune them on an assembled unit with the display fitted, using a network analyser (about 40 ohm at TX).',
     ],
     'display': [
