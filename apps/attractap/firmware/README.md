@@ -31,6 +31,13 @@ SNTP synchronization. Trusted offline demo presets use their separate path.
 Each variant file sets the compile definitions (pins, feature flags, firmware
 name) and the source subtrees excluded for that hardware.
 
+The Attractap Touch P4 board (ESP32-P4 with an ESP32-C6 for Wi-Fi and Bluetooth,
+[`../hardware/touch-p4`](../hardware/touch-p4/README.md)) has no variant yet. Whoever adds one:
+[`../hardware/touch-p4/docs/firmware-port.md`](../hardware/touch-p4/docs/firmware-port.md) has the
+pin map and, at its top, a short list of what the firmware must get right on that board (settings
+of the Wi-Fi co-processor, drive strengths, limits for LEDs and buzzer, resets the board leaves to
+the firmware).
+
 The `*-park` variants (`attractap-touch-park`, `attractap-touch-v2-park`,
 `attractap-lite-ethernet-park`) build `park/` instead of the reader app: the
 [hardware lab](../../attractap-lab/README.md) janitor flashes them between lab sessions to
