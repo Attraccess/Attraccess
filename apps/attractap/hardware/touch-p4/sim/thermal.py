@@ -33,9 +33,10 @@ SUPPLY = {
 # own body, not to the board: it warms the inside of the case as a whole, like the display does.
 INTO_THE_AIR = {'USB': (DISPLAY_W, DISPLAY_W), 'DC, 12 V': (DISPLAY_W, DISPLAY_W), 'PoE': (DISPLAY_W + 0.68, DISPLAY_W + 1.20)}
 MODULE_AIR_MAX = 85         # degC of the air around the PoE module, from its data sheet
-# K/W from the part's inside to the board under it, and what its inside stands (degC)
+# K/W from the part's inside to the board under it, and what its inside stands (degC). U301 is the
+# ESP32-C6-MINI-1U-H4, the version of the module for 105 degC around it (the -N4 is for 85 degC).
 JUNCTION = {'U201': (8, 105), 'U103': (40, 125), 'U104': (40, 125), 'D102': (20, 125), 'D104': (20, 125), 'D107': (20, 125),
-            'U102': (10, 85), 'U301': (15, 85), 'U501': (10, 125)}
+            'U102': (10, 85), 'U301': (15, 105), 'U501': (10, 125)}
 DISPLAY_MAX = 70            # degC the panel is specified for when it works
 # hold current of the DC input's fuse (1.1 A at 25 degC) against its own temperature, from its data sheet
 FUSE_DERATING = ((25, 1.00), (40, 0.87), (50, 0.79), (60, 0.70), (70, 0.61), (85, 0.48))

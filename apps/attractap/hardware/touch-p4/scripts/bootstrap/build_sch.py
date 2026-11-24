@@ -31,7 +31,7 @@ SHEETS = [
     ('power', 'Power', 'Power input', 'USB-C, DC and PoE inputs, supply OR-ing, 3.3 V buck converter'),
     ('mcu', 'MCU', 'MCU', 'ESP32-P4 GPIO map, flash, crystal, reset and boot straps, USB'),
     ('mcu_power', 'MCU_Power', 'MCU power', 'ESP32-P4 supply pins, decoupling, 1.1 V core converter'),
-    ('wifi', 'WiFi', 'Wi-Fi', 'ESP32-C6-MINI-1 co-processor (esp-hosted over SDIO)'),
+    ('wifi', 'WiFi', 'Wi-Fi', 'ESP32-C6-MINI-1U co-processor (esp-hosted over SDIO)'),
     ('eth', 'Ethernet', 'Ethernet', 'IP101GRI RMII PHY, RJ45 with magnetics and PoE rectifiers (LAN version only)'),
     ('nfc', 'NFC', 'NFC', 'PN532 reader, EMC filter, antenna matching, PCB loop antenna'),
     ('display', 'Display', 'Display', '40-pin panel connector, backlight driver, IO expander'),

@@ -1054,11 +1054,11 @@
 		)
 		(instances (project "attractap-touch-p4" (path "/c397a859-95c6-54a3-93b8-1e7535e299df" (page "5"))))
 	)
-	(text "ESP32-C6-MINI-1 co-processor (esp-hosted over SDIO)"
+	(text "ESP32-C6-MINI-1U co-processor (esp-hosted over SDIO)"
 		(exclude_from_sim no)
 		(at 34.29 218.56 0)
 		(effects (font (size 1 1)) (justify left bottom))
-		(uuid "52762fff-c44f-59a0-996b-0dbf9aa0b5a7")
+		(uuid "b97b80e0-77fd-5a3f-8075-1c8dd5bd8617")
 	)
 	(wire
 		(pts (xy 34.29 232.41) (xy 31.75 232.41))

@@ -6,15 +6,12 @@ Output:
   fab/jlcpcb/                      what goes to JLCPCB (committed, so an order can be traced)
     attractap-touch-p4-gerbers.zip   Gerber and drill files, for the PCB order
     bom-<variant>.csv                Comment, Designator, Footprint, LCSC Part #, Manufacturer Part
-    bom-<variant>-external-antenna.csv   the same with the Wi-Fi module that has an antenna connector
     cpl-<variant>.csv                Designator, Mid X, Mid Y, Layer, Rotation
   fab/gerbers/                     the files inside the zip, for a Gerber viewer
   fab/schematic.pdf, fab/board-front.pdf, fab/board-back.pdf
 
 Variants: a schematic symbol with the field ``Variant = lan`` is only fitted on the
-Ethernet/PoE version. Symbols marked DNP are never fitted. A symbol with the fields
-``Alt_MPN`` / ``Alt_LCSC`` has a second part that fits the same footprint; it replaces the
-normal part in bom-<variant>-external-antenna.csv.
+Ethernet/PoE version. Symbols marked DNP are never fitted.
 
 The package does not change when the design has not: creation dates are taken out of the
 Gerber and drill files and the zip has fixed time stamps.
@@ -108,7 +105,7 @@ def main():
     pos = os.path.join(FAB, 'positions.csv')
     run('pcb', 'export', 'pos', '--format', 'csv', '--units', 'mm', '--side', 'both', '-o', pos, pcb)
     parts = os.path.join(FAB, 'parts.csv')
-    fields = 'Reference,Value,Footprint,LCSC,MPN,Variant,Alt_MPN,Alt_LCSC'
+    fields = 'Reference,Value,Footprint,LCSC,MPN,Variant'
     run('sch', 'export', 'bom', '--fields', fields, '--labels', fields, '--exclude-dnp', '-o', parts, sch)
     run('sch', 'export', 'pdf', '-o', os.path.join(FAB, 'schematic.pdf'), sch)
     run('pcb', 'export', 'pdf', '--layers', 'F.Cu,F.SilkS,F.Fab,Edge.Cuts,Dwgs.User', '--mode-single',
@@ -123,24 +120,19 @@ def main():
         print('WARNING: no LCSC number on', ', '.join(missing))
     for variant, tags in VARIANTS.items():
         fitted = [r for r in rows if r['Variant'] in tags]
-        for name, alt in (('bom-%s.csv' % variant, False), ('bom-%s-external-antenna.csv' % variant, True)):
-            # One line per LCSC part: JLCPCB warns when two lines name the same part (the RESET and
-            # BOOT buttons are one part with two values). The values become the comment.
-            groups = {}
-            for r in fitted:
-                swap = alt and r.get('Alt_LCSC')
-                key = (r['Footprint'].split(':')[-1], r['Alt_LCSC'] if swap else r['LCSC'],
-                       r['Alt_MPN'] if swap else r['MPN'])
-                values, refs = groups.setdefault(key, ([], []))
-                value = r['Alt_MPN'] if swap else r['Value']
-                if value not in values:
-                    values.append(value)
-                refs.append(r['Reference'])
-            with open(os.path.join(jlc, name), 'w', newline='') as f:
-                w = csv.writer(f)
-                w.writerow(['Comment', 'Designator', 'Footprint', 'LCSC Part #', 'Manufacturer Part'])
-                for (fp, lcsc, mpn), (values, refs) in sorted(groups.items(), key=lambda kv: kv[1][1][0]):
-                    w.writerow([' / '.join(values), ','.join(refs), fp, lcsc, mpn])
+        # One line per LCSC part: JLCPCB warns when two lines name the same part (the RESET and
+        # BOOT buttons are one part with two values). The values become the comment.
+        groups = {}
+        for r in fitted:
+            values, refs = groups.setdefault((r['Footprint'].split(':')[-1], r['LCSC'], r['MPN']), ([], []))
+            if r['Value'] not in values:
+                values.append(r['Value'])
+            refs.append(r['Reference'])
+        with open(os.path.join(jlc, 'bom-%s.csv' % variant), 'w', newline='') as f:
+            w = csv.writer(f)
+            w.writerow(['Comment', 'Designator', 'Footprint', 'LCSC Part #', 'Manufacturer Part'])
+            for (fp, lcsc, mpn), (values, refs) in sorted(groups.items(), key=lambda kv: kv[1][1][0]):
+                w.writerow([' / '.join(values), ','.join(refs), fp, lcsc, mpn])
         with open(os.path.join(jlc, 'cpl-%s.csv' % variant), 'w', newline='') as f:
             w = csv.writer(f)
             w.writerow(['Designator', 'Mid X', 'Mid Y', 'Layer', 'Rotation'])

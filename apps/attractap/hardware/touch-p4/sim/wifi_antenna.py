@@ -1,5 +1,9 @@
 """Wi-Fi antenna of the ESP32-C6-MINI-1 on the Touch P4 board: full-wave model (openEMS, FDTD).
 
+The board has the MINI-1U now, the module with an antenna connector, so this model describes no reader
+that is built any more. It is kept for the question it answered: what the display, the case and a metal
+wall do to a module antenna at this place, where the board still has the strip without copper and the cut.
+
 The module's antenna is a meandered inverted-F on its own little board; its exact shape is not
 published. A stand-in of the same size and kind is first put on a small evaluation board, then on this
 board unchanged: with the cut under it, with the display's metal back (on its four ground pads, and

@@ -18,7 +18,7 @@ plus PN532 module of the current readers with one board.
 | Function | Part | Notes |
 |---|---|---|
 | MCU | ESP32-P4NRW32X (chip, QFN-104) | 400 MHz dual core, 32 MB PSRAM in package, 16 MB flash |
-| Wi-Fi 6 / Bluetooth LE | ESP32-C6-MINI-1-N4 module | radio co-processor, esp-hosted over SDIO; module has CE/RED certificates. PCB antenna, or an external antenna with the MINI-1U module on the same pads |
+| Wi-Fi 6 / Bluetooth LE | ESP32-C6-MINI-1U-H4 module | radio co-processor, esp-hosted over SDIO; module has CE/RED certificates. No antenna of its own: one is plugged into the module's connector (W.FL / MHF III, not U.FL), an adhesive antenna inside the case or one on an SMA bulkhead |
 | Display | 4.0" 480x480 panel, ST7701S + GT911 | same panel type as today, 40-pin flex, RGB565 |
 | NFC | PN532 + PCB loop antenna | same chip and I2C protocol as today |
 | Ethernet (LAN version) | IP101GRI PHY + HY931147C jack | 10/100, RMII |
@@ -32,9 +32,11 @@ Two assembly versions come from the same PCB:
 - **wifi**: everything except the parts whose `Variant` field is `lan`.
 - **lan**: all parts (Ethernet, PoE and Wi-Fi).
 
-Either version can be built for an external Wi-Fi antenna: the ESP32-C6-MINI-1U (U.FL
-connector, no PCB antenna) fits the pads of U301. Its part number is in the `Alt_MPN` and
-`Alt_LCSC` fields of U301.
+The Wi-Fi module (ESP32-C6-MINI-1U) has no antenna of its own. Each build gets one of two,
+plugged into the connector on the module: an adhesive antenna inside the case, or an antenna
+on an SMA bulkhead with a pigtail. Neither is chosen yet, neither is in the parts lists, and
+the case has no place for them yet: see "Wi-Fi antenna" in the
+[design notes](docs/design-notes.md#wi-fi-antenna).
 
 ## Folder layout
 
@@ -90,7 +92,7 @@ The board is the Nx project `attractap-touch-p4-pcb`. Every operation is a targe
 | `pnpm nx run attractap-touch-p4-pcb:check-netlist` | Schematic against the circuit description; devices and addresses on each I2C bus. |
 | `pnpm nx run attractap-touch-p4-pcb:drc` | Design rules check of the board, including schematic parity. |
 | `pnpm nx run attractap-touch-p4-pcb:simulate` | Simulates the routed board and compares the results with the limits of the parts: NFC loop, matching and field, live plug-in at the DC input, power-up, reflections and timing on the fast lines, voltage drop on the supply tracks, PoE isolation distances, heat in the closed case, the dock magnet. Needs ngspice. See [sim/README.md](sim/README.md). |
-| `pnpm nx run attractap-touch-p4-pcb:simulate-antenna` | Full-wave model of the Wi-Fi antenna on the board, with the display and with a metal wall behind the reader. Needs openEMS; not part of `check`. |
+| `pnpm nx run attractap-touch-p4-pcb:simulate-antenna` | Full-wave model of a module with PCB antenna on the board, with the display and with a metal wall behind the reader. That module (ESP32-C6-MINI-1) is not fitted any more; the model is kept for the question it answered. Needs openEMS; not part of `check`. |
 | `pnpm nx run attractap-touch-p4-pcb:build` | Manufacturing files into `fab/`, with the JLCPCB upload package in `fab/jlcpcb/`. Runs `erc` and `drc` first. |
 | `pnpm nx run attractap-touch-p4-pcb:render` | `fab/render-top.png` and `fab/render-bottom.png`. |
 
@@ -114,7 +116,6 @@ can be found again; `check` fails when it does not match the board.
 | `attractap-touch-p4-gerbers.zip` | The PCB order: Gerber and drill files. |
 | `bom-lan.csv`, `cpl-lan.csv` | Assembly of the Ethernet/PoE version: parts list and positions. |
 | `bom-wifi.csv`, `cpl-wifi.csv` | Assembly of the Wi-Fi version. |
-| `bom-*-external-antenna.csv` | The same parts lists with the Wi-Fi module that has an antenna connector. |
 
 `fab/board-front.pdf` (not in git) is the assembly drawing with the reference designators; the
 silkscreen has none. What the silkscreen does carry is described in the
@@ -130,7 +131,7 @@ What the board needs, for the order form:
 | Smallest via | 0.45 mm pad with 0.2 mm hole (about one via in six; most have a 0.5 mm pad). No extra charge: by the order form's note on "Min via hole size/diameter", a 0.2 mm hole is free on boards with inner layers when the via is 0.45 mm wide or more. Leave that option at "0.3mm/(0.4/0.45mm)"; the smaller choices are for smaller pads and cost 39 USD and more |
 | Vias | "Epoxy Filled & Capped", the order form's choice for six layers, at no charge. The form offers no solder mask cover ("Tented") for boards with inner layers. No via hole lies under solder paste |
 | Solder mask | green. The mask webs between the MCU's pins are 0.1 mm wide, JLCPCB's limit for green; other colours need wider webs |
-| Milled openings | flex slot 3 mm wide, eight LED windows 3.4 x 3.0 mm with relieved corners, a cut 14.2 x 5.65 mm in the top edge under the Wi-Fi antenna, two cut-away corners, plated slots at the DC jack and USB-C |
+| Milled openings | flex slot 3 mm wide, eight LED windows 3.4 x 3.0 mm with relieved corners, a cut 14.2 x 5.65 mm in the top edge (made for a module with PCB antenna), two cut-away corners, plated slots at the DC jack and USB-C |
 | Outline tolerance | the regular +/-0.2 mm is enough |
 | Surface finish | ENIG (18 USD on 5 boards, 45 USD on 100). Not the free OSP, which the form selects for six layers: it is as flat, but JLCPCB excludes it for contact areas, and the four ground pads for the display's metal back and the 15 test points would stay bare copper ([more](docs/design-notes.md#cost)) |
 | Impedance control | not needed |

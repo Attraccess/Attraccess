@@ -32,6 +32,17 @@ TOLERANCE = 0.3                   # mm between a library pad and the board pad o
 # Four equal resistors without polarity: KiCad numbers the pads round the part one way, the library the
 # other way. Only the positions of the pads are compared.
 ANY_PAD = {'Resistor_SMD:R_Array_Convex_4x0402'}
+# (footprint, LCSC number) -> (library pad number -> pad number on the board, tolerance in mm): the
+# library draws the part's ground pads in another way than the footprint does.
+# The Wi-Fi module: the footprint is the library's for the ESP32-C6-MINI-1 (C5736265), nine ground pads
+# numbered 49 at a pitch of 1.8 mm. The library's footprint for the MINI-1U numbers them 49 and 54 to 61
+# and draws them at 1.975 mm. The datasheet has one land pattern for both modules, with 2.05 mm (v1.5,
+# figures 11-1 and 11-2); the pads are 1.45 mm wide, so all three overlap by more than a millimetre.
+# Pins 1 to 48 and the corner pads 50 to 53 are compared by number as for every other part.
+GROUND_PADS = {
+    ('attractap:WIFIM-SMD_61P-L16.6-W13.2-P0.80-ESP32-C6-MINI-1-N4', 'C20627095'):
+        ({str(n): '49' for n in range(54, 62)}, 0.35),
+}
 
 
 def library_pads(code):
@@ -111,9 +122,10 @@ def main():
                 for p in fp.Pads() if p.GetNumber()]
         if name in ANY_PAD:
             pads, lib = [('', x, y) for _n, x, y in pads], [('', x, y) for _n, x, y in lib]
-        angle, worst = fit(pads, lib)
+        renumber, tolerance = GROUND_PADS.get((name, code), ({}, TOLERANCE))
+        angle, worst = fit(pads, [(renumber.get(n, n), x, y) for n, x, y in lib])
         listed = JLC_ROTATION.get((name, code), 0)
-        if worst > TOLERANCE:
+        if worst > tolerance:
             verdict = 'PADS DO NOT MATCH (%.2f mm off)' % worst
         elif angle != listed % 360:
             verdict = 'TURNED BY %d, export_fab.JLC_ROTATION has %d' % (angle, listed)

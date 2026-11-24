@@ -6,7 +6,7 @@ Why the board looks the way it does, and what is still an assumption.
 
 | Topic | Decision | Reason |
 |---|---|---|
-| MCU | ESP32-P4NRW32X chip + ESP32-C6-MINI-1 | Chosen for display performance. The P4 has no radio, so Wi-Fi runs on a certified C6 module over SDIO. |
+| MCU | ESP32-P4NRW32X chip + ESP32-C6-MINI-1U | Chosen for display performance. The P4 has no radio, so Wi-Fi runs on a certified C6 module over SDIO. |
 | Display | commodity 4.0" 480x480 RGB panel (ST7701S, GT911) | Size and resolution of today's readers; the MIPI versions of this size cost several times more. |
 | NFC | PN532 on board | Keeps the firmware's NFC stack unchanged. |
 | NFC position | separate zone below the display | The LCD's metal back shields 13.56 MHz; an antenna behind the screen does not work. |
@@ -17,7 +17,7 @@ Why the board looks the way it does, and what is still an assumption.
 | Ethernet jack | behind the lower right corner of the display, 51 mm above the lower board edge | A plug with its boot and the cable's bend into the wall need 49 mm below the jack, inside the case. The price: the jack's pins stand out of the display side behind the display. The display sits 1.5 to 2 mm off the board and the pins are clipped (see "Display mounting and flex"). Below the display the jack would need a case 19 mm longer. |
 | USB-C | service port at the board edge next to the MCU | Only used for flashing and debugging, never offered to users. |
 | Tamper detection | an accelerometer, an infrared proximity sensor that looks at the dock's plate, and a hall switch facing a magnet in the dock | The accelerometer notices knocks, tilting and tearing off. The proximity sensor says that the reader has left its dock, and its light path lies inside the closed case, out of reach. The hall switch says the same in a second, simpler way, but a magnet held to the case fools it. All three are read over I2C, because the MCU's four free pins are blocked by capacitors at the pad row. |
-| Wi-Fi antenna | PCB antenna of the module, or external antenna | The ESP32-C6-MINI-1U (U.FL connector) fits the same pads. |
+| Wi-Fi antenna | external, chosen per build: an adhesive antenna inside the case, or an antenna on an SMA bulkhead | Decided on 24 November 2026. Every board gets the ESP32-C6-MINI-1U, the module with an antenna connector; the MINI-1 with PCB antenna is dropped. See "Wi-Fi antenna". |
 | Assembly | all parts on one side | The display is taped to the other side; cheaper assembly. |
 | Layers | six: signals on both outer layers and one inner layer, each next to a plane of its own | Two signal layers are not enough around the MCU. On four layers the third one shared its layer with the 3.3 V pour and cut it apart, so the fast buses had no unbroken plane to return on (see [Review against layout rules](#review-against-layout-rules)). |
 
@@ -34,8 +34,8 @@ board, x right, y down, millimetres. The user looks at the other side.
 | Item | Position |
 |---|---|
 | Board | 86 x 143.5, corner radius 2, both bottom corners cut away |
-| Strip above the display | y 0 to 7: Wi-Fi antenna, two mounting holes |
-| Cut under the Wi-Fi antenna | x 14.9 to 29.1, y 0 to 5.65: the module's antenna stands free over it |
+| Strip above the display | y 0 to 7: Wi-Fi module, two mounting holes |
+| Cut in the top edge at the Wi-Fi module | x 14.9 to 29.1, y 0 to 5.65: made for the PCB antenna of the MINI-1. The MINI-1U is 4.1 mm shorter at that end; revision A keeps the cut |
 | Display cover lens (84.3 x 84.3) | x 0.85 to 85.15, y 7.0 to 91.3 |
 | LCD module (metal back) | x 5.6 to 80.4, y 12.8 to 89.4 |
 | Flex slot | x 11.5 to 62.0, y 89.5 to 92.5 |
@@ -119,13 +119,12 @@ new display section, not a part swap.
 
 ### Enclosure hints
 
-- Wi-Fi antenna: keep metal and the display away from the top 7 mm strip. The
-  board has no copper there over a width of 44 mm and is cut away under the
-  antenna itself. Espressif asks for 15 mm without metal around the antenna;
-  the display's metal back is 7 mm away and one mounting screw 11 mm. A
-  full-wave model of the board with the display and the case finds no loss
-  from that (see "Simulation"): the display's back lies over the board's own
-  ground. The version with an external antenna does not depend on this.
+- Wi-Fi antenna: the module has none of its own. The case needs a place for
+  an adhesive antenna, or a hole for an SMA bulkhead, and a path for the
+  cable from the connector on top of the module; it has neither yet (see
+  "Wi-Fi antenna"). The strip without copper along the top edge (44 mm wide)
+  and the cut in the board were made for a module with PCB antenna and stay
+  on revision A.
 - Both bottom corners of the board are cut away. The Ethernet jack opens
   downwards into the one on the right (16.5 x 51 mm), the DC jack into the
   one in the other corner (12 x 36 mm). Plugs and cables stay inside the board
@@ -170,8 +169,9 @@ new display section, not a part swap.
   housing, so that pushing the plug in does not bend it.
 - USB-C is on the side edge behind the display. It needs no opening in the
   housing if flashing is done before assembly.
-- External Wi-Fi antenna: the MINI-1U module has a U.FL connector on top.
-  Plan a place for the antenna or a bulkhead connector and for the pigtail.
+- The antenna connector on top of the module is not a U.FL: it is the
+  smaller third-generation kind (Hirose W.FL, I-PEX MHF III, Amphenol AMMC).
+  A U.FL pigtail does not fit.
 - No tracks run on the outer layers within 3.3 mm of a mounting hole centre,
   so a screw head or standoff up to 6.6 mm across is safe. At the hole beside
   the NFC loop there is no copper pour either on the outer layers: that hole
@@ -461,6 +461,54 @@ The 25 MHz crystal (ESR up to 50 ohm) is above what the PHY datasheet allows
 (40 ohm). Typical parts are far below both. If a board ever fails to bring up
 the Ethernet clock in the cold, look here first.
 
+## Wi-Fi antenna
+
+Decided on 24 November 2026: every board gets the ESP32-C6-MINI-1U, the
+module with a connector and no antenna of its own, and the antenna is chosen
+per build:
+
+- an adhesive antenna inside the case, or
+- an antenna on an SMA bulkhead in the case wall, with a pigtail to the module.
+
+Neither antenna is chosen yet. What is settled, from the module's datasheet
+(v1.5, section 10.2):
+
+- The connector is of the third generation: Hirose W.FL, I-PEX MHF III or
+  Amphenol AMMC. It is not a U.FL; the pigtail has to match.
+- The antenna: 2.4 GHz, 50 ohm, and a gain of 2.33 dBi at most, which is the
+  gain of the antenna the module was certified with (a monopole, Espressif's
+  material code TFPD08H10060011). With an antenna "of a different type or
+  gain, additional testing, such as EMC, may be required": see the
+  [compliance checklist](compliance.md).
+- The module ships without an antenna.
+
+The part is the ESP32-C6-MINI-1U-H4 (C20627095, to 105 C), not the -N4 (to
+85 C): JLCPCB had 3364 of the -H4 and none of the -N4 on 24 November 2026, it
+costs about 0.25 USD more than the module with PCB antenna, and the thermal
+estimate has the module at 79 C in a room of 40 C on PoE.
+
+Nothing changed on the board. The datasheet gives one land pattern for both
+modules (figures 11-1 and 11-2): the MINI-1U is the MINI-1 without the 4.1 mm
+that carry the antenna. Symbol and footprint of U301 keep the MINI-1's names,
+and the footprint's outline shows the longer module. JLCPCB's library draws
+the nine ground pads of the two modules differently (pitch 1.8 mm for the
+MINI-1, which is this footprint, 1.975 mm for the MINI-1U; the datasheet has
+2.05 mm). The pads are 1.45 mm wide and overlap in every case;
+`check-footprints` knows the difference.
+
+Open:
+
+- Both antennas, and the pigtail for the bulkhead: models, where to buy them,
+  who fits them. JLCPCB does not assemble them; they are not in the parts
+  lists.
+- The case: a place for the adhesive antenna, a hole for the bulkhead, and a
+  path for the cable from the module, which sits on the board's back at the
+  top edge. Not drawn yet. Keep the antenna away from the display's metal
+  back and from a metal wall behind the reader.
+- The height of the plug on the module and the bend of the cable behind the
+  board: not checked against the case.
+- Range with either antenna: not modelled, to be measured (bring-up plan).
+
 ## Wi-Fi and Bluetooth: the ESP32-C6 behind the ESP32-P4
 
 The P4 has no radio. The C6 module runs Espressif's esp-hosted firmware and is
@@ -493,7 +541,7 @@ The reports, by cause:
 | Downloads stall after about 100 kB ([esp-hosted 184](https://github.com/espressif/esp-hosted-mcu/issues/184)) | The access point: gone with other access points, and on one Wi-Fi 6 network gone when the C6 was kept from 802.11ax | Firmware |
 | Double free in the SDIO receive task ([esp-hosted 210](https://github.com/espressif/esp-hosted-mcu/issues/210)) | `esp_wifi_remote` older than the esp-hosted it was built with | Firmware |
 | The C6's firmware cannot be updated over SDIO any more ([esp-hosted 143](https://github.com/espressif/esp-hosted-mcu/issues/143)) | Co-processor firmware 2.1 to 2.8 flashed first: its boot loader does not start later images | Firmware: the first image flashed is a newer one. The test points remain as a way back |
-| Bluetooth scan goes silent after 90 s ([esp-hosted 180](https://github.com/espressif/esp-hosted-mcu/issues/180)) | The board had the module without an antenna of its own (MINI-1U) and no antenna plugged in | The version with the external antenna must not be run without one |
+| Bluetooth scan goes silent after 90 s ([esp-hosted 180](https://github.com/espressif/esp-hosted-mcu/issues/180)) | The board had the module without an antenna of its own (MINI-1U) and no antenna plugged in | That is this board's module: plug the antenna in before the board is powered (bring-up plan) |
 | Bluetooth: connecting as central never completes for some devices ([esp-hosted 204](https://github.com/espressif/esp-hosted-mcu/issues/204)) | A fault on the host side. A patch posted in the report in July 2026 cured it for the reporter; the report was still open in November 2026 | Firmware. It matters: the reader's Bluetooth proxy is a central that scans and connects |
 | "The early board had wrong crystal capacitors and a fault in the radio part" (a comment on [esp-hosted 155](https://github.com/espressif/esp-hosted-mcu/issues/155)) | A board with a bare C6 chip | Certified module with its own crystal and antenna match |
 
@@ -826,8 +874,14 @@ boards and shipping. On five boards the extended-part fees alone are 23 to
 table shows.
 
 The largest lines are the ESP32-P4 (6.15), the PN532 (5.89), the Wi-Fi module
-(4.09) and the flash (2.26); on the Ethernet/PoE version also the PoE module
+(4.19) and the flash (2.26); on the Ethernet/PoE version also the PoE module
 (6.70), the jack (2.60) and the PHY (1.03).
+
+The Wi-Fi module with antenna connector (ESP32-C6-MINI-1U-H4) costs 0.21 to
+0.27 USD more than the module with PCB antenna that the table was made with
+(4.19 against 3.98 for one, 3.49 against 3.22 from 30 pieces, JLCPCB on
+24 November 2026). The antenna, and the pigtail for one on a bulkhead, come
+on top; they are not chosen and not in JLCPCB's assembly.
 
 Savings that were looked at and not taken:
 
@@ -867,6 +921,8 @@ pieces.
 | DC jack PJ-002A (J102), inductor CKCSA252012-2.2uH/M (L103, L201, two per board) | 1022 and 1171 in stock: enough for a first order, low for a series. |
 | Inductor CKCSA4020-6.8uH/M (L102) | 2228 in stock, but JLCPCB's library has no footprint for this part number, so `check-footprints` cannot compare it. It is the body of L101 (same series, same footprint, which does compare), has two pads and no polarity. Look at it in the placement preview. |
 | Display panel | Commodity part without a guaranteed part number. Agree on a fixed type with the supplier. |
+| ESP32-C6-MINI-1U-H4 (U301, Wi-Fi module) | 3364 in stock on 24 November 2026. The -N4 of the same module (C7558096, to 85 C) had none. |
+| Wi-Fi antenna, pigtail | Not chosen, and not parts JLCPCB assembles: bought and fitted by hand. The pigtail's plug must be a W.FL / MHF III. |
 
 ## Design review
 
@@ -1099,9 +1155,12 @@ Simulated and found right:
   clock out and data back take 1.1 ns. After a module that answers within the
   14 ns of the SD standard that leaves the MCU 9.9 ns at 40 MHz and 4.9 ns at
   50 MHz. The board is not what limits this link (see "Wi-Fi and Bluetooth").
-- Wi-Fi antenna, in a full-wave model (`sim/wifi_antenna.py`). The module's
-  antenna is not published, so a stand-in of the same size and kind was tuned
-  on a small evaluation board and then put on this board unchanged:
+- Wi-Fi antenna, in a full-wave model (`sim/wifi_antenna.py`). This is the
+  PCB antenna of the ESP32-C6-MINI-1, which the board had when it was
+  simulated and has no more (see "Wi-Fi antenna"); the result stays here
+  because the strip and the cut it was made for are still on the board. The
+  module's antenna is not published, so a stand-in of the same size and kind
+  was tuned on a small evaluation board and then put on this board unchanged:
 
   | Case | Resonance | Bandwidth at -6 dB | Radiated of the power fed in, channel 1 / 7 / 13 | Of that towards the room |
   |---|---|---|---|---|
@@ -1153,9 +1212,11 @@ Simulated and found right:
 
   In a room of 25 °C typical use is far from every limit. In a room of 40 °C
   on PoE the estimate puts the display at 63 °C (limit 70 °C), the Wi-Fi
-  module at 79 °C (85 °C) and the air around the PoE module at 71 °C (85 °C):
-  inside the limits, by less than the estimate is exact. The DC input's fuse
-  then holds 0.66 A against 0.28 A drawn. Everything on at once for a long
+  module at 79 °C (105 °C for the -H4 that is fitted; the -N4 stands 85 °C)
+  and the air around the PoE module at 71 °C (85 °C): inside the limits, for
+  the display and the PoE module by less than the estimate is exact. The DC
+  input's fuse then holds 0.66 A against 0.28 A drawn. Everything on at once
+  for a long
   time is beyond what the case can shed: the LED rows, on narrow copper
   between the cut-outs, get 70 to 80 K warmer than the room. The firmware
   limits the LEDs and watches the chip's temperature
@@ -1206,10 +1267,11 @@ figures. The list below stands, shorter in some points and with one more.
   1.08 and 1.27 uH. The field is simulated too: it powers a card up to 19 mm
   in front of the case (15 mm on a metal wall). What no model here says is
   how well the reader hears the card.
-- **Wi-Fi range.** The model finds no loss from the display's metal back
-  7 mm from the antenna, and 0.2 to 0.4 dB from the case. It was made with a
-  stand-in for the module's antenna, so compare the first reader with a
-  current one (bring-up plan).
+- **Wi-Fi antenna and range.** Neither antenna is chosen, the case has no
+  place for one, and the cable's path from the module is not drawn (see
+  "Wi-Fi antenna"). The antenna model above was made for the module with PCB
+  antenna and says nothing about an adhesive antenna in the case or one on a
+  bulkhead. Compare the first reader with a current one (bring-up plan).
 - **Isolation of the PoE side** under a 1500 V test (see "PoE isolation").
   The board's copper keeps 2.0 mm everywhere, measured on the routed board,
   which is enough in air for that test. What a test has to show is what lies

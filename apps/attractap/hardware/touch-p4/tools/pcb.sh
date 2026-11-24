@@ -3,7 +3,8 @@
 # Usage: tools/pcb.sh <command>      (see the case statement below, or the README)
 set -eo pipefail
 
-# Full-wave model of the Wi-Fi antenna on the board (sim/wifi_antenna.py). It needs a Python with openEMS,
+# Full-wave model of a module with PCB antenna on the board (sim/wifi_antenna.py; the module fitted now has
+# an antenna connector instead). It needs a Python with openEMS,
 # which OPENEMS_PYTHON names (Debian and Ubuntu: the package python3-openems), and no KiCad: so it runs
 # before KiCad is looked for.
 if [[ "${1:-}" == simulate-antenna ]]; then

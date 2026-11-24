@@ -263,7 +263,7 @@ def mcu(d):
 
 
 def wifi(d):
-    """Wi-Fi / Bluetooth co-processor: ESP32-C6-MINI-1 (esp-hosted over SDIO)."""
+    """Wi-Fi / Bluetooth co-processor: ESP32-C6-MINI-1U (esp-hosted over SDIO)."""
     d.begin('wifi', 300)
     c6 = {
         '3V3': '+3V3', 'GND': 'GND', 'EN': 'C6_EN',
@@ -272,12 +272,18 @@ def wifi(d):
     }
     c6_nc = ('NC', 'IO2', 'IO3', 'IO4', 'IO5', 'IO0', 'IO1', 'IO6', 'IO7', 'IO12', 'IO13', 'IO14', 'IO15')
     d.group('ESP32-C6 module')
-    d.add('U', 'ESP32-C6-MINI-1-N4', 'attractap:ESP32-C6-MINI-1-N4',
+    # The module without an antenna of its own: the antenna is chosen per build, an adhesive one inside
+    # the case or one on an SMA bulkhead, and plugs into the connector on the module. Symbol and footprint
+    # are those of the MINI-1 with PCB antenna: the datasheet gives one land pattern for both (figures
+    # 11-1 and 11-2), the MINI-1U is the same module without the 4.1 mm of antenna. The -H4 (to 105 C) and
+    # not the -N4 (to 85 C): JLCPCB had 3364 of it and none of the -N4 on 24 November 2026, and the
+    # thermal estimate has the module at 79 C in a room of 40 C.
+    d.add('U', 'ESP32-C6-MINI-1U-H4', 'attractap:ESP32-C6-MINI-1-N4',
           'attractap:WIFIM-SMD_61P-L16.6-W13.2-P0.80-ESP32-C6-MINI-1-N4',
           {'@' + k: v for k, v in c6.items()}, nc=tuple('@' + n for n in c6_nc),
-          lcsc='C5736265', mpn='ESP32-C6-MINI-1-N4',
-          desc='Wi-Fi 6 / BLE module with PCB antenna. For an external antenna fit the MINI-1U instead (same pads)',
-          extra={'Alt_MPN': 'ESP32-C6-MINI-1U-H4', 'Alt_LCSC': 'C20627095'})
+          lcsc='C20627095', mpn='ESP32-C6-MINI-1U-H4',
+          desc='Wi-Fi 6 / BLE module with a connector for an external antenna (W.FL / MHF III); '
+               'antenna per build: adhesive inside the case or on an SMA bulkhead')
     d.C('22u', '+3V3', size='0805')
     d.C('100n', '+3V3')
     d.group('Enable and boot')

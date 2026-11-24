@@ -80,11 +80,12 @@ them; the DC and Ethernet cables next to it do.
 
 ## What the certified Wi-Fi module saves
 
-The ESP32-C6-MINI-1 has an EU-type examination certificate (Sporton, notified
-body 2907, SN23C0148 of 28 September 2023); the MINI-1U with antenna connector
-has its own (SN24C0053 of 6 March 2024). They cover safety, EMC and radio,
-not cybersecurity. Espressif publishes the certificates only: ask for the
-test reports before asking labs for quotes.
+The reader uses the ESP32-C6-MINI-1U, the module with an antenna connector.
+It has an EU-type examination certificate (Sporton, notified body 2907,
+SN24C0053 of 6 March 2024); the MINI-1 with PCB antenna, which the board had
+before, has its own (SN23C0148 of 28 September 2023). They cover safety, EMC
+and radio, not cybersecurity. Espressif publishes the certificates only: ask
+for the test reports before asking labs for quotes.
 
 The certificates do not transfer to the reader. In practice (ETSI EG 203 367)
 the lab reuses the module's conducted radio results if the module is used as
@@ -104,16 +105,23 @@ Points to watch:
   this before it quotes.
 - The module is certified up to 19.8 dBm against a limit of 20 dBm. Keep the
   transmit power a firmware setting.
-- The MINI-1U may be used with an antenna of at most 2.33 dBi gain (module
-  datasheet, section 10.2). It is a second radio configuration in the test
-  plan. One fixed, named antenna sold with the reader is the cheap route; an
-  antenna the user can swap needs a list of permitted antennas in the manual.
-- The board follows Espressif's placement rules as far as it can: no copper
-  for 44 mm along the board edge at the antenna, and the board cut away under
-  it. The display's metal back is 7 mm from the antenna where Espressif asks
-  for 15 mm. A full-wave model with a stand-in antenna finds no loss from
-  that ([design-notes.md](design-notes.md#simulation)). It is a model: the
-  lab's radiated measurement is what counts.
+- The antenna is not part of the module. The module's datasheet (v1.5,
+  section 10.2) asks for 2.4 GHz, 50 ohm and a gain of 2.33 dBi at most, the
+  gain of the antenna used for certification, a monopole. For an antenna "of
+  a different type or gain, additional testing, such as EMC, may be required
+  beyond the existing antenna test reports". An adhesive antenna is often
+  another type: ask the lab what it reuses.
+- Two antenna configurations are planned, and each one that is sold is a
+  radio configuration in the test plan:
+  - an adhesive antenna inside the case. It is fixed and out of reach: one
+    named antenna, tested with the reader.
+  - an antenna on an SMA bulkhead. The user can unscrew it, so the manual
+    must name the permitted antenna or antennas, and the declaration covers
+    only those.
+- Neither antenna is chosen, and the case has no place for one yet
+  ([design-notes.md](design-notes.md#wi-fi-antenna)). Where the antenna sits
+  in the case decides the radiated results, not the board: keep it away from
+  the display's metal back and from the cables.
 
 ## Cybersecurity
 
@@ -297,7 +305,7 @@ A terminal for wires "from an existing installation" means cables longer than
 
 | Topic | Measure on the board |
 |---|---|
-| Wi-Fi antenna | Module at the board edge above the display. No copper on any layer for 44 mm along the edge; the board is cut away under the antenna. |
+| Wi-Fi antenna | None on the board: the module has a connector, and the antenna sits in or on the case. The strip without copper along the top edge (44 mm) and the cut in the board were made for a module with PCB antenna and remain on revision A. |
 | Return paths | Six layers. Ground planes on In1 and In4 and a 3.3 V plane on In3, each in one piece and without tracks. Signals run on the two outer layers and on In2, with ground filled in between: every signal layer lies next to a plane that no track cuts. |
 | Switching regulators | AP63203 and AP63205 with spread spectrum; small loops, input and output capacitors next to the ICs. |
 | DC input | Self-resetting fuse, reverse-polarity diode, pi filter (2.2 uF, 2.2 uH, 2 x 2.2 uF; 100 V capacitors that keep 1.5 uF each at 24 V) and TVS before the converter. The converter sits away from the NFC antenna, and the DC run does not go around the NFC loop. |
@@ -348,6 +356,8 @@ that shows on the display whether the reader still works.
   thickness. Whether it has to be flame-retardant is settled by the lab's
   fault test (see "Enclosure plastic").
 - The limit for the DC supply in the manual and on the label: 15 W or 100 W.
+- The Wi-Fi antenna or antennas: model and gain (2.33 dBi at most), and for
+  one on an SMA connector its name in the manual.
 - Supply in the box or not. If so, it is part of the tested product.
 - Allowed cable lengths for the DC input and for Ethernet, and no outdoor
   cabling. They decide which port tests apply.
@@ -364,8 +374,8 @@ that shows on the display whether the reader still works.
 ## Test lab
 
 Ask two or three accredited labs for a quote and name the exact configuration:
-ESP32-C6-MINI-1 module (and the MINI-1U with the chosen external antenna, if
-that version is sold), NFC reader with PCB antenna, Ethernet with PoE, DC
+ESP32-C6-MINI-1U module with each antenna that will be sold (inside the case,
+on an SMA bulkhead), NFC reader with PCB antenna, Ethernet with PoE, DC
 supply, both assembly versions. Testing the Ethernet version with Wi-Fi fitted
 usually covers the Wi-Fi version as the simpler case; the lab decides. Send
 with the request: block diagram, list of ports with cable type and length,

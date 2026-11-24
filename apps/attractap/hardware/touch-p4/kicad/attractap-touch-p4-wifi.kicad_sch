@@ -8,7 +8,7 @@
 		(title "Attractap Touch P4: Wi-Fi")
 		(rev "A")
 		(company "Attraccess")
-		(comment 1 "ESP32-C6-MINI-1 co-processor (esp-hosted over SDIO)")
+		(comment 1 "ESP32-C6-MINI-1U co-processor (esp-hosted over SDIO)")
 	)
 	(lib_symbols
 		(symbol "attractap:ESP32-C6-MINI-1-N4"
@@ -735,11 +735,11 @@
 		(effects (font (size 4 4) (bold yes)) (justify left bottom))
 		(uuid "6a566f95-317a-5445-8625-b2a729d47d93")
 	)
-	(text "ESP32-C6-MINI-1 co-processor (esp-hosted over SDIO)"
+	(text "ESP32-C6-MINI-1U co-processor (esp-hosted over SDIO)"
 		(exclude_from_sim no)
 		(at 12 21 0)
 		(effects (font (size 2 2)) (justify left bottom))
-		(uuid "b672aac5-8a40-5e7d-a842-c331ad1437be")
+		(uuid "effb2ed6-1bf3-592b-a2f0-5517043d5650")
 	)
 	(text "The C6 runs the esp-hosted co-processor firmware. First flash through the C6 test points"
 		(exclude_from_sim no)
@@ -782,20 +782,18 @@
 		(dnp no)
 		(uuid "fc011604-bd21-56b4-9a07-39381a408d4b")
 		(property "Reference" "U301" (at 41.91 51.78 0) (effects (font (size 1.27 1.27))))
-		(property "Value" "ESP32-C6-MINI-1-N4" (at 41.91 53.68 0) (effects (font (size 1.27 1.27))))
+		(property "Value" "ESP32-C6-MINI-1U-H4" (at 41.91 53.68 0) (effects (font (size 1.27 1.27))))
 		(property "Footprint" "attractap:WIFIM-SMD_61P-L16.6-W13.2-P0.80-ESP32-C6-MINI-1-N4"
 			(at 41.91 88.9 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
 		(property "Datasheet" "" (at 41.91 88.9 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Description" "Wi-Fi 6 / BLE module with PCB antenna. For an external antenna fit the MINI-1U instead (same pads)"
+		(property "Description" "Wi-Fi 6 / BLE module with a connector for an external antenna (W.FL / MHF III); antenna per build: adhesive inside the case or on an SMA bulkhead"
 			(at 41.91 88.9 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "LCSC" "C5736265" (at 41.91 88.9 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "MPN" "ESP32-C6-MINI-1-N4" (at 41.91 88.9 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Alt_LCSC" "C20627095" (at 41.91 88.9 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Alt_MPN" "ESP32-C6-MINI-1U-H4"
+		(property "LCSC" "C20627095" (at 41.91 88.9 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "MPN" "ESP32-C6-MINI-1U-H4"
 			(at 41.91 88.9 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)

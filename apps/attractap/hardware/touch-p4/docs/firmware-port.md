@@ -16,7 +16,7 @@ measured on hardware yet.
 |---|---|---|---|
 | 1 | Never leave the buzzer pin (GPIO46) high; stop the tone in every error path | 180 mA of direct current through the coil, twice its rating, and its resistor overloaded | 7 |
 | 2 | All eight LEDs: white at 70 % at most, and that only for seconds. Steady light at 30 % or less | The LED rows sit on narrow copper between the board's cut-outs. Estimated: steady white at 70 % makes them 30 K warmer than the rest of the board, which is 25 to 30 K above the room already | 8, 14 |
-| 3 | Read the chip's temperature sensor and dim backlight and LEDs when it passes about 80 °C | In a room of 40 °C on PoE the estimate puts the display at 63 °C (its limit: 70 °C) and the Wi-Fi module at 79 °C (85 °C), which is closer than the estimate is exact | 14 |
+| 3 | Read the chip's temperature sensor and dim backlight and LEDs when it passes about 80 °C | In a room of 40 °C on PoE the estimate puts the display at 63 °C (its limit: 70 °C) and the air around the PoE module at 71 °C (85 °C), which is closer than the estimate is exact. The Wi-Fi module reaches 79 °C and is the version for 105 °C | 14 |
 | 4 | Pulse the Ethernet PHY's reset through the IO expander before the EMAC starts | The PHY has no reset circuit; it may come up with the wrong address or without its clock | 5 |
 | 5 | esp-hosted: board "none", SDMMC slot 0, reset GPIO 45, and the reset line must end high | The defaults are those of Espressif's board (slot 1, GPIO54). With the wrong reset setting the C6 stays in reset: `send_op_cond returned 0x107` | 4 |
 | 6 | The same esp-hosted release on the P4 and in the C6, 3.1.0 or newer, and `esp_wifi_remote` pinned to match | Wi-Fi that does not associate, dropped packets, a link that dies and does not come back, a double free | 4 |
@@ -207,8 +207,10 @@ The board has three sensors for this and the firmware does not use them yet.
    co-processor firmware:
    first flash through the C6 test points (C6_TX, C6_RX, C6_EN, C6_BOOT),
    later updates over the SDIO link from the P4. The C6 firmware version has to
-   be tracked together with the reader firmware. Boards built with the
-   MINI-1U module (external antenna) need no firmware change.
+   be tracked together with the reader firmware. The module is the MINI-1U,
+   whose antenna is plugged in: nothing in the firmware depends on that, but
+   a board without its antenna must not be used to judge the radio (a
+   Bluetooth scan that goes silent was traced to exactly that).
 
    This pair has a record of problems, nearly all of them in firmware
    versions and settings. What the reports came down to is in the

@@ -89,6 +89,10 @@ Rails without a test point of their own, and where to measure them:
 
 ## Wi-Fi co-processor
 
+The module has no antenna of its own. Plug one into the connector on top of
+it before the board is powered, for every step below: the plug is a W.FL /
+MHF III, not a U.FL.
+
 1. Flash the esp-hosted co-processor firmware into the C6 through its test
    points (C6_TX, C6_RX, C6_EN, C6_BOOT held low at reset). Take the same
    release as the P4's esp-hosted component, 3.1.0 or newer.
@@ -103,10 +107,11 @@ Rails without a test point of their own, and where to measure them:
    Errors here are the board (timing, supply of the module) and are not cured
    by firmware above the link; note at which clock they stop.
 4. Scan and connect to an access point. Note RSSI next to a current reader,
-   in the closed case, on channels 1 and 13 if the access point allows it.
-   Expected from the antenna model: no worse than the current reader; the
-   case pulls the antenna's resonance down, which shows at the top channels
-   first. Download a few megabytes, on a Wi-Fi 6 access point as well.
+   in the closed case, on channels 1 and 13 if the access point allows it,
+   with each antenna that is a candidate and at the place in the case it is
+   meant for. Nothing is modelled for these antennas: the current reader is
+   the reference. Download a few megabytes, on a Wi-Fi 6 access point as
+   well.
 5. Bluetooth with Wi-Fi connected: scan for ten minutes (the reports must
    keep coming), then connect to the devices the plugins use.
 

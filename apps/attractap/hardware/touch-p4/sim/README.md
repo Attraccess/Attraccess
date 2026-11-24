@@ -47,6 +47,12 @@ KiCad), `board.py` reads it, `spice.py` runs ngspice, `run.py` runs everything.
 pnpm nx run attractap-touch-p4-pcb:simulate-antenna      # about a quarter of an hour
 ```
 
+The board has the ESP32-C6-MINI-1U now, the module with an antenna connector and no antenna of its own.
+This model is of the module with PCB antenna (MINI-1) that the board had before, so it describes no
+reader that is built any more. It is kept for the question it answered: what the display, the case and
+a metal wall do to a module antenna at this place. Nothing here models the antennas that are plugged
+in now.
+
 `wifi_antenna.py` is a full-wave model (FDTD, [openEMS](https://www.openems.de/)) of the Wi-Fi module's
 antenna on this board. The module's antenna is a meandered inverted-F on the module's own board, and
 its exact shape is not published. So the model uses a stand-in of the same size and kind, tunes it on a
