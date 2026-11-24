@@ -8,8 +8,11 @@ does for it, and what is still open.
 It is a working checklist with the state of November 2026, not legal advice.
 The legal texts and the lists of harmonised standards were read at their
 sources (links at the end). Standards that are not free to read (EN 18031,
-EN IEC 62368-1, EN 55032, EN 55035) were not; what this page says about their
-content is marked "confirm with the lab".
+EN 55032, EN 55035 and the current editions of EN IEC 62368-1) were not; what
+this page says about their content is marked "confirm with the lab". The
+exception is the fire clause of EN 62368-1: it was read in the 2014 edition,
+with UL's published answers on the 2018 edition and two published test reports
+(see "Enclosure plastic").
 
 ## Will it be easy?
 
@@ -32,11 +35,6 @@ Cybersecurity is the hard part, and it does not depend on the board:
 4. **What exactly is sold.** Enclosure material, a supply in the box or not,
    allowed cable lengths, business customers only or private buyers too, and
    the number of versions each add or remove tests.
-
-An estimate, not a quote: 15,000 to 30,000 EUR of lab fees for both versions
-with the cybersecurity assessment done in-house, and three to six months from
-the first booking to a signed declaration. No accredited German lab publishes
-prices; ask two or three.
 
 ## Which rules apply
 
@@ -113,7 +111,9 @@ Points to watch:
 - The board follows Espressif's placement rules as far as it can: no copper
   for 44 mm along the board edge at the antenna, and the board cut away under
   it. The display's metal back is 7 mm from the antenna where Espressif asks
-  for 15 mm.
+  for 15 mm. A full-wave model with a stand-in antenna finds no loss from
+  that ([design-notes.md](design-notes.md#simulation)). It is a model: the
+  lab's radiated measurement is what counts.
 
 ## Cybersecurity
 
@@ -157,18 +157,22 @@ written procedure for the 24-hour report. The reporting duty applies already.
 
 ## Safety
 
-- Every supply of the reader is below 60 V DC, which may be touched: PoE, the
-  12 to 24 V input, USB. No insulation against electric shock is needed
-  anywhere in it. The work is fire protection, heating, mechanics and marking.
-  (Class limits: confirm with the lab.)
-- Keep the supplies limited. State in the manual and on the label that the DC
-  input must come from a supply with limited power (the lab knows the wording
-  its edition of the standard wants). The board has a self-resetting fuse of
-  1.1 A at the DC input and of 2 A at USB.
-- Enclosure: a plastic with a documented flammability rating, UL 94 V-1 or
-  better. A 3D-printed housing from filament without a rating is where small
-  manufacturers usually stumble. Get the material's data sheet.
-- PCB: FR-4 rated V-0 with a UL mark. Ask JLCPCB for it.
+- Every supply of the reader is below 60 V DC: PoE, the 12 to 24 V input, USB.
+  That is the limit below which a voltage may be touched (EN 62368-1:2014,
+  table 4), and both published test reports named below class a PoE input
+  that way. No insulation against electric shock is needed anywhere in the
+  reader. The work is fire protection, heating, mechanics and marking.
+- Limit the supplies in writing. The manual and the label must say that the DC
+  input may only be connected to a supply limited to 100 W, or better to 15 W
+  (the lab knows the wording its edition of the standard wants). Without a
+  stated limit the lab counts the input as unlimited, and then the whole case
+  must be flame-retardant. The board has a self-resetting fuse of 1.1 A at the
+  DC input and of 2 A at USB.
+- Enclosure: a plastic whose data sheet states HB at least. Flame-retardant
+  plastic is needed only where the lab finds a part that could ignite. See
+  "Enclosure plastic" below.
+- PCB: FR-4 rated V-0 with a UL mark; the standard asks for V-1 or better
+  (clause 6.4.5.2). Ask JLCPCB for it.
 - A supply sold with the reader becomes part of the tested product. Buy one
   with its own report.
 - The proximity sensor (U704) sends infrared light of 940 nm from an LED,
@@ -182,6 +186,97 @@ written procedure for the 24-hour report. The reporting duty applies already.
   lab testing for CE may not test it; customers expect it. What the board does
   for it, and where it is weak, is in
   [design-notes.md](design-notes.md#poe-isolation).
+
+### Enclosure plastic
+
+The first version of this page asked for "UL 94 V-1 or better" for the whole
+case. That is stricter than the standard. Checked on 24 November 2026 against
+clause 6 of EN 62368-1 in the 2014 edition, UL's published answers on the 2018
+edition and two published test reports of PoE devices. The 2018 and 2023
+editions themselves were not read, and labs report to those: the lab has the
+last word.
+
+What the case plastic must be depends on the power a circuit can get from its
+supply into a fault, not on what the reader uses:
+
+| Power a circuit can get | Class | Case plastic |
+|---|---|---|
+| up to 15 W, three seconds into the fault | PS1 | HB, the lowest flammability class, shown by the material's data sheet (clause 6.3.1; the standard names it HB75 below 3 mm of wall and HB40 from 3 mm). Nothing more: no part of such a circuit counts as able to ignite. |
+| up to 100 W | PS2 | HB, and no fire enclosure. If a part of the circuit counts as a potential ignition source, plastic closer than 13 mm beside it or 50 mm above it must be V-1, or pass a flame test (annex S), or lie behind a barrier of metal or V-1 material (clauses 6.4.5 and 6.4.7). |
+| more, or a supply without a stated limit | PS3 | A fire enclosure: the whole case V-1 or better (clauses 6.4.6 and 6.4.8). |
+
+A potential ignition source is
+
+- a part that dissipates more than 15 W, in normal use or 30 seconds after a
+  single fault (clause 6.2.3.2). The 2014 edition counted the power available
+  to the part, which made nearly every part of a PS2 circuit one. The 2018
+  edition counts what the part itself dissipates (UL).
+- a contact or joint that can open at more than 50 V, if that voltage times
+  the current is more than 15 (clause 6.2.3.1).
+
+UL's answer to "could the product's polymeric enclosure be flame rated HB"
+when its supply is power-limited: "If the proper PIS separation distances are
+maintained, an HB rated casing may be fine. If not, a casing material with a
+V-1 or V-0 rating typically would be required."
+
+The reader's three inputs:
+
+| Input | Power it can get | Class | Potential ignition source |
+|---|---|---|---|
+| USB-C | 15 W: the board asks for 5 V only, and a port gives 3 A at most. Behind the 2 A fuse 12.5 W, by the standard's rule of 125 % of a fuse's rating (clause 6.2.2.2). | PS1 | none |
+| PoE (LAN version) | More than 15 W. A lab measured 33.6 W at the port of a comparable device. | PS2 | The voltage is above 50 V, but volts times amps is the power the reader takes from the port: 3 to 9 W against the threshold of 15. Whether a fault makes the PoE module or the parts before it dissipate more than 15 W is for the lab's fault test. |
+| 12 to 24 V terminal | Behind the 1.1 A fuse 33 W at 24 V. Before the fuse, what the supply gives. | PS2 with a supply limited to 100 W, PS1 with one limited to 15 W, PS3 without a limit | Below 50 V, so only the 15 W rule applies. The fault test decides. |
+
+The reader takes about 2.5 W, 4.5 W at peak and 7 W with everything on at once
+(estimates, [design-notes.md](design-notes.md#power)). Two published reports
+show both outcomes for a PoE device:
+
+- FLIR A50/A70 camera, PoE, 8.1 W (CTC advanced, Saarbrücken, 2021): the PoE
+  port is PS2. 56 V x 0.125 A = 7.0, so no arcing ignition source, and none
+  after the fault test either. Its case is metal all the same, because its
+  second input, an external supply of 18 to 56 V, measured above 100 W: PS3.
+- Airtame PoE adapter with a 5 V, 2 A output (EKTOS, Copenhagen, 2018): 57 V x
+  0.28 A = 15.9, and 16.5 W in three parts. The lab found ignition sources at
+  the jack, the rectifiers and the protection diodes. Its case is 5VB plastic
+  and counts as fire enclosure.
+
+What follows for the reader:
+
+1. A data sheet that states the flammability class at the wall thickness is
+   needed in every case, also for HB. A class on a data sheet comes from
+   standard test bars and need not hold for a printed part. Where the class
+   matters (V-1 or V-0), a flame test on the printed part settles it (annex S).
+2. The limit for the DC supply in the manual and on the label decides the
+   class of that input. A limit of 15 W takes the input out of the question,
+   and the reader does not need more.
+3. Ask the lab before the test how it settles ignition sources: by measurement
+   and fault test, as in the FLIR report, or by assumption. A manufacturer may
+   also declare one to save the measurement (UL calls that common practice);
+   for this reader that would cost the HB case.
+4. If the lab finds one at the PoE module or the DC input: print the case, or
+   the part of it near that spot, from a filament rated V-0 at the wall
+   thickness, or put a sheet of metal or V-1 material between the spot and the
+   plastic. Distance alone will hardly do in a flat case: the dock plate lies
+   14 mm behind the board, and the zone reaches 50 mm upwards.
+
+Not done on the board: a fuse small enough to make the DC input PS1 by itself.
+By the 125 % rule that is 0.5 A at 24 V. The reader takes 0.45 A at 12 V at
+peak, and a fuse of this kind holds two thirds of its rating in a warm case
+(the 1.1 A one: 0.7 A at 60 °C). So it would do for 24 V only. An electronic
+current limiter would do for both voltages; that is a change to the board.
+
+Filaments looked at on 24 November 2026:
+
+| Filament | What its maker states |
+|---|---|
+| Filament Unger ABS+ | No flammability class and no RoHS or REACH statement on the material guide, the FAQ or the downloads page. Data sheets are published for PLA+, PETG and PA12 CF15, none for ABS+. The product pages could not be read. Ask for the data sheet. ABS without flame retardant is usually HB; that is not from their data. |
+| FormFutura ABSpro Flame Retardant | "engineered to meet the UL 94 V-0 flammability standards"; a blend of polycarbonate and ABS, RoHS and REACH stated. The sheet names no thickness for the class. |
+| BASF Ultrafuse PC/ABS FR Black | V-0 at 1.5 mm and 3.0 mm |
+| ROSA "ABS FR V0" | HB at 1.5 mm and 3.0 mm, in spite of its name: read the sheet, not the product name. |
+
+ABS suits the reader otherwise: Filament Unger gives about 95 °C for theirs,
+and the warmest part reaches 79 °C in a room of 40 °C (estimate,
+[design-notes.md](design-notes.md#simulation)).
 
 ## Tests on the ports
 
@@ -203,7 +298,7 @@ A terminal for wires "from an existing installation" means cables longer than
 | Topic | Measure on the board |
 |---|---|
 | Wi-Fi antenna | Module at the board edge above the display. No copper on any layer for 44 mm along the edge; the board is cut away under the antenna. |
-| Return paths | Solid ground plane on layer 2 under all signals. Layer 3 is a 3.3 V pour that also carries signal tracks; it is kept free of tracks under the MCU. |
+| Return paths | Six layers. Ground planes on In1 and In4 and a 3.3 V plane on In3, each in one piece and without tracks. Signals run on the two outer layers and on In2, with ground filled in between: every signal layer lies next to a plane that no track cuts. |
 | Switching regulators | AP63203 and AP63205 with spread spectrum; small loops, input and output capacitors next to the ICs. |
 | DC input | Self-resetting fuse, reverse-polarity diode, pi filter (2.2 uF, 2.2 uH, 2 x 2.2 uF; 100 V capacitors that keep 1.5 uF each at 24 V) and TVS before the converter. The converter sits away from the NFC antenna, and the DC run does not go around the NFC loop. |
 | Display bus | 33 ohm series resistors on all RGB and sync lines; reduce GPIO drive strength in firmware if needed. |
@@ -217,7 +312,9 @@ A terminal for wires "from an existing installation" means cables longer than
 
 ## Where the board may still fail in the lab
 
-Measure these before the lab does. Most important first.
+Measure these before the lab does. Most important first. The simulations in
+`sim/` cover none of it: they check signals, supplies, heat and the two
+antennas, not emissions and not discharges.
 
 1. **NFC harmonics on the cables.** One filter stage, unshielded coils, and
    both cables leave the housing beside the loop. Measure the harmonics with
@@ -237,9 +334,6 @@ Measure these before the lab does. Most important first.
 4. **Common-mode noise on the cables.** The DC filter works between the two
    wires only, and the PoE input has beads but no common-mode choke. A clip-on
    ferrite on the cable is the first remedy; a choke needs a new board.
-5. **Layer 3.** It mixes the 3.3 V pour with signals, and the routing is
-   automatic. Radiated emission above 100 MHz would point here. It needs a
-   new layout to change.
 
 Useful before the lab: a line impedance network and a spectrum analyser for
 the DC input, near-field probes, an ESD gun, and half a day in a pre-compliance
@@ -250,7 +344,10 @@ that shows on the display whether the reader still works.
 
 ## Open points for the product
 
-- Enclosure material and its flammability rating.
+- Enclosure material, with a data sheet that states HB at least at the wall
+  thickness. Whether it has to be flame-retardant is settled by the lab's
+  fault test (see "Enclosure plastic").
+- The limit for the DC supply in the manual and on the label: 15 W or 100 W.
 - Supply in the box or not. If so, it is part of the tested product.
 - Allowed cable lengths for the DC input and for Ethernet, and no outdoor
   cabling. They decide which port tests apply.
@@ -290,3 +387,9 @@ safety-relevant parts (PoE module, fuses, enclosure material, PCB).
 - Packaging register: <https://www.verpackungsregister.org/ich-moechte-wissen-was-seit-dem-12-august-2026-gilt>
 - Data Act: <https://eur-lex.europa.eu/eli/reg/2023/2854/oj>
 - Product liability directive: <https://eur-lex.europa.eu/eli/dir/2024/2853/oj>
+- EN 62368-1:2014, clauses 5.2 (table 4) and 6.2 to 6.4: read in a copy of the BS EN edition. The standard is sold, not published; no link.
+- UL Solutions, questions and answers on IEC 62368-1 (enclosure rated HB, fire enclosure for PS2 circuits, resistive ignition sources in the 2018 edition): <https://www.ul.com/resources/iec-62368-1-ask-engineers-question-and-answer-page>
+- Test report FLIR A50/A70, CTC advanced 60429496-001: <https://support.flir.com/CertDownload/Assets/FLIR%20A50%20and%20A70%20series/IEC%2062368-1%20TEST%20REPORT.pdf>
+- Test report Airtame AT-PoE, EKTOS P18-0060-1: <https://www.northamber.com/storage/uploads/Product%20Safety/Airtame/EU%20Safety%20Test%20Report%20(LVD)%20PoE%20_P18-0060-1_IEC62368-1.pdf>
+- Filament Unger: <https://filament-unger.de/pages/material-guide>, <https://filament-unger.de/pages/downloads>
+- Flame-retardant filaments, data sheets: FormFutura <https://cdn.shopify.com/s/files/1/0622/4181/files/ABSpro_Flame_Retardant_-_TDS_-_Formfutura.pdf>, BASF <https://cdn.shopify.com/s/files/1/0264/8791/4555/files/Ultrafuse_PC-ABS_FR_Black_TDS_DE_v1.1.pdf>, ROSA <https://www.lemona.lt/Files/Instrukcijos/TI/En/Pdf/TDS-ROSA-ABS-EN.pdf>

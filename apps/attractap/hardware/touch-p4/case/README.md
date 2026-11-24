@@ -32,7 +32,7 @@ The [installation manual](manual/README.md) ([PDF](manual/attractap-installation
 
 ## Printing
 
-The case is designed for ABS+ on a filament printer. Every part has one flat face to lie on and is meant to print without supports; none has been sliced yet, so that is unconfirmed. Each 3MF already lies on its print face.
+The case is designed for ABS+ on a filament printer. Every part has one flat face to lie on and is meant to print without supports; none has been sliced yet, so that is unconfirmed. Each 3MF already lies on its print face. For a reader that is sold, the filament needs a data sheet that states its flammability class; whether plain ABS+ is enough is in the [compliance checklist](../docs/compliance.md#enclosure-plastic).
 
 | Part | File in `cad/` | Qty | Colour | Lies on |
 | --- | --- | --- | --- | --- |
