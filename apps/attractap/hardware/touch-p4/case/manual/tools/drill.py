@@ -43,7 +43,12 @@ rect(-47.4, -109.25, 47.4, 57.05, 6, fill="none", stroke=blue, stroke_width=2.4,
 rect(-46.6, -108.45, 46.6, 56.25, 5.2, fill=plate, stroke=ink, stroke_width=3)
 rect(-31, 46.5, 31, 54.35, 0.6, fill="#E3E0D8", stroke=ink, stroke_width=2.2)            # cleat
 rect(-27, -106.45, 27, -102.85, 0.4, fill="#E3E0D8", stroke=ink, stroke_width=2.2)       # tongue
-rect(-42, -97, 22, -52, 4, fill=paper, stroke=ink, stroke_width=2.6)                     # cable opening
+rect(-42, -97, 22, -54, 4, fill=paper, stroke=ink, stroke_width=2.6)                     # cable opening
+# under the Ethernet jack and the PoE module: recesses 0.8 mm deep, and a window through the plate for the jack's
+# two shield springs
+rect(-42.6, -44.45, -25.0, -21.25, 0.5, fill="#EDEBE5", stroke=ink, stroke_width=1.6, stroke_dasharray="6 5")
+rect(-41.5, -7.85, -25.5, 15.35, 0.5, fill="#EDEBE5", stroke=ink, stroke_width=1.6, stroke_dasharray="6 5")
+rect(-38.57, -42.87, -29.03, -35.97, 0.5, fill=paper, stroke=ink, stroke_width=2.2)
 # recommended hole for a cable that comes out of the wall: below the Ethernet plug, level with the fifth screw
 HX, HY, HR = -32.0, -88.0, 10.0
 o.append(f'<circle cx="{X(HX):.1f}" cy="{Y(HY):.1f}" r="{HR * S:.1f}" fill="#DCE0E5" stroke="{ink}" stroke-width="2.6" stroke-dasharray="9 7"/>')
@@ -51,7 +56,7 @@ for (a, b, c, d) in [(HX - 3, HY, HX + 3, HY), (HX, HY - 3, HX, HY + 3)]: line(a
 line(HX + 3, HY, 34 - 4.3, HY, stroke=soft, stroke_width=1.6, stroke_dasharray="18 6 3 6")
 for cx in (-33.8, 36.8):                                                                  # break-off tabs
     rect(cx - 3.8, -108.45, cx + 3.8, -106.95, 0.3, fill=blue, stroke=ink, stroke_width=1.6)
-for (hx, hy) in [(30, 36), (-30, 36), (30, -40), (-30, -40), (34, -88)]:
+for (hx, hy) in [(30, 36), (-30, 36), (30, -48.5), (-30, -48.5), (34, -88)]:
     o.append(f'<circle cx="{X(hx):.1f}" cy="{Y(hy):.1f}" r="{4.3 * S:.1f}" fill="#E3E0D8" stroke="{ink}" stroke-width="2"/>')
     o.append(f'<circle cx="{X(hx):.1f}" cy="{Y(hy):.1f}" r="{2.25 * S:.1f}" fill="{paper}" stroke="{ink}" stroke-width="2.4"/>')
 # centre line and display centre
@@ -60,23 +65,25 @@ for (a, b, c, d) in [(-5, 0, 5, 0), (0, -5, 0, 5)]: line(a, b, c, d, stroke=ink,
 o.append(f'<circle cx="{X(0):.1f}" cy="{Y(0):.1f}" r="{2.2 * S:.1f}" fill="none" stroke="{ink}" stroke-width="2"/>')
 # dimensions
 dim_h(-30, 30, 66, 36, "60")
-dim_h(-30, 30, -28, -40, "60")
+dim_h(-30, 30, -58, -48.5, "60")
 dim_h(0, 34, -116.5, -88, "34")
 dim_h(-46.6, 46.6, -137, -108.45, "93.2")
 dim_v(56.25, 36, 60, 30, "20.3")
-dim_v(36, -40, 60, 30, "76")
-dim_v(-40, -88, 60, 34, "48")
+dim_v(36, -48.5, 60, 30, "84.5")
+dim_v(-48.5, -88, 60, 34, "39.5")
 dim_v(56.25, -108.45, 84, 46.6, "164.7")
 dim_v(36, 0, -60, -30, "36", side=-1)
-dim_h(HX, 0, -62, HY + 3, "32")
+dim_h(HX, 0, -76, HY + 3, "32")
 # callouts
 lead(-20, 50.4, -330, -70, "Cleat, at the top", "end")
 lead(0, 0, -390, 40, "Middle of the display", "end")
-lead(-42, -60, -210, 10, "Cable opening\n64 × 45", "end")
+lead(-42, -60, -210, 10, "Cable opening\n64 × 43", "end")
 lead(HX - 7.4, HY - 6.7, -190, 24, "Hole for a cable\nfrom the wall, Ø 20", "end")
 lead(-33.8, -107.7, -240, 60, "Break-off tab,\nEthernet", "end")
 lead(36.8, -107.7, 150, 150, "Break-off tab,\npower", "start")
 lead(-12, -104.6, -150, 118, "Tongue", "end")
+lead(-42.6, -26, -150, -40, "Recess and window\nunder the Ethernet jack", "end")
+lead(-25.5, 12, 70, -75, "Recess under the\nPoE module", "start")
 lead(-47.4, 20, -180, -60, "Outline of\nthe reader", "end")
 text(40, H - 34, "Dock seen from the front · mm · screw holes 4.5 mm, countersunk to 8.6 mm", 26, anchor="start", weight="500", fill=soft, px=True)
 o.append('</g></svg>')

@@ -91,7 +91,7 @@ The drawing is not to scale on screen. Use the printed dock itself as the drilli
 1. Hold the dock on the wall with the angled cleat at the top and level it. The middle of the display ends up 36 mm below the upper pair of holes.
 2. Mark the holes. Use both upper holes and at least one lower hole.
 3. Drill and plug. On a flush-mount box, the lower pair matches the box's 60 mm screw spacing; read the note on boxes under "Where the cables run behind the reader" first.
-4. Screw the dock on. Every screw head must sit flush with the plate or below it. The Ethernet jack clears the plate by only 0.4 mm.
+4. Screw the dock on. Every screw head must sit flush with the plate or below it. Keep the two shallow recesses on the left of the plate free, and the small window in the lower one: the Ethernet jack and the PoE module stand over them, and the jack's two shield springs reach into the window.
 
 ## Connect, hang and lock the reader
 

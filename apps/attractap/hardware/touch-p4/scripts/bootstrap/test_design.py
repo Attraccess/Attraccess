@@ -233,6 +233,9 @@ class GeometryTest(unittest.TestCase):
         spot = geometry.DOCK_PLATE * math.tan(math.radians(geometry.PROX_BEAM_DEG))
         holder = math.hypot(ex - geometry.HALL[0], ey - geometry.HALL[1]) - geometry.MAGNET_RING_R
         self.assertGreater(holder, spot)
+        # and before the plate's openings under the Ethernet jack and the PoE module
+        for x1, y1, x2, y2 in geometry.DOCK_OPENINGS:
+            self.assertGreater(math.hypot(max(x1 - ex, 0, ex - x2), max(y1 - ey, 0, ey - y2)), spot)
 
     def test_bare_mounting_hole_is_the_one_in_the_gap_around_the_nfc_loop(self):
         # board_setup.py keeps the copper around the loop open between the loop's right edge and the Ethernet

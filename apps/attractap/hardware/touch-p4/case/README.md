@@ -11,7 +11,7 @@ A 3D-printable case for the [Attractap Touch P4 board](../README.md), revision A
 ## How it works
 
 - **Cap**: the front shell. It carries the display, flush with the front, and the board. Eight light windows for the status LEDs, the Attraccess wordmark and a tap ring over the NFC antenna.
-- **Dock**: the back plate. It is screwed to the wall (five holes; the lower pair matches the 60 mm spacing of a flush-mount box) or onto the stand. The board senses the dock in two ways, so the reader knows when it is taken off: a proximity sensor measures the infrared light that the dock's plain inner face reflects, and a hall switch senses a 10 x 3 mm magnet held in a ring on that face.
+- **Dock**: the back plate. It is screwed to the wall (five holes; the lower pair matches the 60 mm spacing of a flush-mount box) or onto the stand. Under the Ethernet jack and the PoE module the plate has shallow recesses, and a window through it for the jack's two shield springs, so both parts keep at least 0.5 mm at their tallest. The board senses the dock in two ways, so the reader knows when it is taken off: a proximity sensor measures the infrared light that the dock's plain inner face reflects, and a hall switch senses a 10 x 3 mm magnet held in a ring on that face.
 - **Stand**: a hollow wedge for the desk. The reader leans back 35°.
 - The cap hooks onto a 45° cleat at the top of the dock, swings shut and is locked by two M3 screws from below. Plugs and cables end up enclosed between cap and dock.
 - A cable either disappears into the wall behind the dock or leaves through a notch at the bottom, where a cable tie on a saddle inside the cap takes the pull off the jack.

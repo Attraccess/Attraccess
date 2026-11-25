@@ -113,6 +113,9 @@ PROX = (21.6, 52.4)
 PROX_EMITTER_DY, PROX_DETECTOR_DY = -1.15, 1.45
 PROX_BEAM_DEG = 30                          # the emitter's light ends about 30 degrees off its axis
 DOCK_PLATE = 13.9                           # component side to the dock's plate, from the case design
+# Where the dock's plate is cut back (board coordinates, from the case design): recesses 0.8 mm deep under the
+# Ethernet jack and the PoE module, and a window through the plate for the jack's two shield springs
+DOCK_OPENINGS = ((68.0, 70.4, 85.6, 93.6), (68.5, 33.8, 84.5, 57.0))
 MOUNT_KEEPOUT_R = 3.3                       # screw head / standoff: no tracks on the outer layers
 
 # The 3.3 V plane covers the display area and reaches the NFC parts left of the antenna: (x, y) corner

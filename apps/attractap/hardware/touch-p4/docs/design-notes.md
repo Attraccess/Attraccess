@@ -1835,8 +1835,8 @@ module. Heights are the makers' where they give one.
 
 | Part | Height above the board | Nearest case part | Gap |
 |---|---|---|---|
-| J401 RJ45 | body 13.95 max; shield springs at the mouth 15.21 ± 0.50 (HanRun HY931147C REV.A/1, side view) | dock plate, 13.9 mm from the board (`cav`; the case assumed 13.5 mm) | **springs 1.3 mm into the plate (nominal), up to 1.8 mm; body 0.1 mm, −0.05 mm at its maximum** |
-| U102 DP9900M | 13.35 ± 0.5 (SDAPO datasheet 4.1) | dock plate | 0.55 mm, 0.05 mm at the maximum (the case assumed 10 mm) |
+| J401 RJ45 | body 13.95 max; shield springs at the mouth 15.21 ± 0.50 (HanRun HY931147C REV.A/1, side view) | dock plate, 13.9 mm from the board (`cav`), with a recess 0.8 mm deep under the jack and a window through it under the two springs | body 0.90 mm to the recess, 0.70 mm at its maximum; springs 1.70 mm to the wall behind the window, 1.14 mm at their maximum, 1.0 mm to the window's sides |
+| U102 DP9900M | 13.35 ± 0.5 (SDAPO datasheet 4.1) | dock plate, with a recess 0.8 mm deep under the module | 1.35 mm, 0.80 mm at the maximum |
 | J103 WAGO 250-202 | 13.2 (model) | dock plate | 0.70 mm |
 | J102, J103 pins | 1.95 mm out of the display side | cap front wall | 0.44 mm |
 | J401 pins | 1.45 mm out of the display side, unclipped | LCD module, 1.5 mm off the board | 0.1 mm; 0.5 mm clipped to 1 mm as the manual says |
@@ -1852,12 +1852,24 @@ the flex tail's way to J601 (x 32.5 to 55.5); the fold itself is in the slot at
 y 89.5 to 92.5, 22 mm away. The build stops if a part taller than a small passive
 reaches into the flex area (`placement.check_flex_area`).
 
-The jack does not fit the case as drawn. Fix it in the case, not on the board: an
-opening in the dock plate under J401 (case X −42.5 to −25, Y −44 to −21.5; it leaves
-1.2 mm to the wall behind), or a case 2.4 mm deeper (`cav` 16.3 mm), which also moves
-the dock plate away from the proximity sensor and the magnet away from the hall
-switch, both simulated at today's distances. The opening is the smaller change. It
-belongs with the antenna's place in the case, the next change to the case design.
+The dock's plate under the jack and the PoE module (25 November 2026). As first
+drawn, the jack's two shield springs reached 1.3 mm into the plate and the module
+stood 0.55 mm off it. Measured on the parts' models in the case: of the jack only
+the two springs, 1.9 mm wide each at the jack's mouth, come closer than 13.9 mm to
+the board; its body and the rest of the shield stay at 13.75 mm, the module at
+13.3 mm. The plate now has a recess 0.8 mm deep under each part (1 mm wider than
+the part all round) and, under the two springs, a window through the plate
+(9.5 x 6.9 mm), so at the makers' maximum heights every part keeps at least
+0.70 mm (table above). The lower pair of wall screws, the one that matches a
+flush-mount box, stood under the springs; it moved 8.5 mm down, and the cable
+opening below it lost 2 mm at its top edge to keep a web around the screws'
+countersinks. The plate stays 2.2 mm thick in the recesses, prints without
+supports on its back, and lies flat on the wall or the stand. The openings stand
+47 mm from the proximity sensor's axis, whose light on the plate ends 8 mm from
+it (`geometry.DOCK_OPENINGS`; a test checks the distance), and 56 mm from the
+magnet's axis: the sensor's reading on the dock and the hall switch's
+field (`sim/dock.py`: 22 mT, 16 mT at worst) are unchanged. The drilling template
+in the installation manual shows the new screw positions and the openings.
 
 Three of the converted models were placed off their pads by easyeda2kicad: the DC
 jack by 8 mm, the USB-C receptacle by 2.2 mm and the display connector by 2.6 mm.
