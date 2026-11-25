@@ -129,7 +129,8 @@ def build():
 # finish_route.py routes them. Of its other tracks, those that come too close to a pad of one of the
 # parts below are removed and routed again. Empty both when a new autorouter result is committed.
 STALE_NETS = {'USB_DP', 'USB_DN', 'BUZ_P', 'BUZ_N', 'ETH_CT_RX', 'ETH_CT_TX', 'ETH_SHIELD', '+5V_POE', '+5V_USB', '+5V_DC', 'BUCK_SW', 'BUCK_EN',
-              'DC_EN', 'BUCK_BST', 'BL_PWM', 'VDC_F', 'VDC_IN', 'VDC_R', 'VDDO_3', 'VDDO_4', 'UART0_RX'}
+              'DC_EN', 'BUCK_BST', 'BL_PWM', 'VDC_F', 'VDC_IN', 'VDC_R', 'VDDO_3', 'VDDO_4', 'UART0_RX',
+              'XTAL_P', 'XTAL_N'}
 STALE_PARTS = {'R104', 'R105', 'R705', 'L103', 'C117', 'D106', 'D103', 'FB102', 'FB103', 'C408', 'C409',
                'U702', 'U703', 'C711', 'C712', 'C713', 'R706', 'TP814',
                'U704', 'C714', 'C715', 'R707', 'TP815',
@@ -139,7 +140,9 @@ STALE_PARTS = {'R104', 'R105', 'R705', 'L103', 'C117', 'D106', 'D103', 'FB102', 
                'R113', 'C120', 'U103', 'R111', 'R112', 'C108', 'L101', 'U204', 'C241', 'FID804', 'FID805',
                'D107', 'C109', 'C301', 'R116', 'R117', 'R118', 'R119',
                # review stage 3, second part: decoupling at the MCU's upper left corner, the DC input's TVS
-               'C208', 'C209', 'F102', 'D101'}
+               'C208', 'C209', 'F102', 'D101',
+               # review stage 3, third part: the 2.0 x 1.6 mm crystal and its load capacitors
+               'Y201', 'C238', 'C239'}
 STALE_PARTS |= {'TP%d' % n for n in range(816, 831)}
 
 

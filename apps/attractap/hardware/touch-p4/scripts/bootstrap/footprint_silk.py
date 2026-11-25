@@ -23,7 +23,6 @@ SILK_KEEP_IN = {
     # crystal of this kind fits its pads only one way or turned half round, which is the same: no silk.
     # A ferrite or an inductor has no polarity. The diode keeps its symbol, the SOT-23-6 its pin 1 dot.
     'CRYSTAL-SMD_4P-L3.2-W2.5-BL': (0, 0, 0, 0),
-    'CRYSTAL-SMD_4P-L3.2-W2.5-BL-2': (0, 0, 0, 0),
     'L0805': (-1.6, -99, 1.6, 99),
     'IND-SMD_L3.0-W3.0_SWPA3010S': (-99, -1.5, 99, 1.5),
     'SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR': (-99, -1.4, 99, 1.4),

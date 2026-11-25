@@ -38,18 +38,16 @@ def system(cv, P_, x, y):
 
 
 def crystal(cv, P_, x, y):
-    """40 MHz crystal: 0 ohm links at the pins (EMC tuning), crystal, load capacitors."""
+    """40 MHz crystal: straight on the pins, load capacitors at its two ends."""
     cv.begin('40 MHz crystal')
     yp, yn = y, y + 12.7
-    for net, yy, r in (('XTAL_P', yp, 'R209'), ('XTAL_N', yn, 'R210')):
+    for net, yy in (('XTAL_P', yp), ('XTAL_N', yn)):
         cv.label(net, x, yy, 'L')
-        cv.inline(P_[r], x + 7.62, yy)
-        cv.wire((x, yy), r + '.1')
     yc = (yp + yn) / 2
     xc = x + 22.86
     cv.put(P_['Y201'], xc, yc, 270, fields='r')
-    cv.wire('R209.2', (xc, yp), 'Y201.1')
-    cv.wire('R210.2', (xc, yn), 'Y201.3')
+    cv.wire((x, yp), (xc, yp), 'Y201.1')
+    cv.wire((x, yn), (xc, yn), 'Y201.3')
     cv.wire((xc, yp), (xc + 33.02, yp))
     cv.hang(P_['C238'], xc + 33.02, yp, gap=P)
     cv.wire((xc, yn), (xc + 5.08, yn))

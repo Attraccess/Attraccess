@@ -80,8 +80,9 @@ PARTS = {
                'XHXDZ SMD8530-16 ohm (C49246948): check which pad is +'),
     'C318884': ('XKB Connection', 'Tactile switch 5.1 x 5.1 mm, SMD, 1.5 mm actuator', '',
                 EQUIVALENT),
-    'C255943': ('Epson', 'Crystal 40 MHz, 9 pF load, +-10 ppm, ESR 40 ohm, 3.2 x 2.5 mm', '',
-                'Tai-Saw TZ0308D (C379787): 9 pF, +-10 ppm, ESR 30 ohm'),
+    'C2689435': ('Hosonic', 'Crystal 40 MHz, 9 pF load, +-10 ppm at 25 C, +-10 ppm -30 to 85 C, ESR 40 ohm, '
+                 '2.0 x 1.6 mm', '',
+                 'Tai-Saw TZ1269D (C501798): 9 pF, +-5 ppm at 25 C, +-15 ppm -40 to 85 C, ESR 40 ohm, same pads'),
     'C9006': ('YXC', 'Crystal 25 MHz, 12 pF load, +-10 ppm, 3.2 x 2.5 mm', '',
               'Epson X1E0000210139 (C91750): 12 pF, +-10 ppm, ESR 40 ohm'),
     'C113669': ('YXC', 'Crystal 27.12 MHz, 12 pF load, +-10 ppm, 3.2 x 2.5 mm', '',

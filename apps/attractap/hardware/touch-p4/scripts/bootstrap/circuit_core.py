@@ -272,15 +272,16 @@ def mcu(d):
     d.R('10k', 'VDD_FLASH', 'FLASH_CS')
     d.R('0R', 'FLASH_CK_M', 'FLASH_CK', desc='EMC tuning')
 
-    # 40 MHz crystal
+    # 40 MHz crystal, 2.0 x 1.6 mm, straight on the pins (Espressif: 40 MHz, +-10 ppm; load capacitors from
+    # CL = C1 C2 / (C1 + C2) + Cstray: 2 x (9 pF - 3 pF) = 12 pF). R209 and R210, the 0 ohm links that sat
+    # between the pins and the crystal, are gone; their designators stay unused.
     d.group('40 MHz crystal')
-    d.add('Y', '40MHz 9pF 10ppm', 'Device:Crystal_GND24', 'attractap:CRYSTAL-SMD_4P-L3.2-W2.5-BL-2', {
-        '1': 'XTAL_P_X', '3': 'XTAL_N_X', '2': 'GND', '4': 'GND',
-    }, lcsc='C255943', mpn='X1E000021017700')
-    d.R('0R', 'XTAL_P', 'XTAL_P_X')
-    d.R('0R', 'XTAL_N', 'XTAL_N_X')
-    d.C('12p', 'XTAL_P_X')
-    d.C('12p', 'XTAL_N_X')
+    d.add('Y', '40MHz 9pF 10ppm', 'Device:Crystal_GND24', 'Crystal:Crystal_SMD_2016-4Pin_2.0x1.6mm', {
+        '1': 'XTAL_P', '3': 'XTAL_N', '2': 'GND', '4': 'GND',
+    }, lcsc='C2689435', mpn='E1SB40E00001AE')
+    d.ref('R'), d.ref('R')
+    d.C('12p', 'XTAL_P')
+    d.C('12p', 'XTAL_N')
 
     # reset, boot, straps
     d.group('Reset, boot and straps')

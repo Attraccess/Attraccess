@@ -111,15 +111,7 @@ def mcu_escape(B):
     # (0.2 mm: as wide as the pad, which keeps 0.15 mm to the neighbouring pads 0.35 mm away)
     for num, cap, wd in ((91, 'C222', 0.2), (96, 'C206', 0.2)):
         B.track(dog(p(cap, '1'), p('U201', num), 'd'), net(num), wd)
-    # crystal
-    c239, y3, y1, r209b = p('C239', '1'), p('Y201', '3'), p('Y201', '1'), p('R209', '2')
-    B.track(dog(p('U201', 99), p('R210', '1')), net(99), w)
-    B.track(dog(p('R210', '2'), c239), 'XTAL_N_X', w)
-    B.track(dog(c239, y3, 'd'), 'XTAL_N_X', w)
-    xp, r209a = p('U201', 100), p('R209', '1')
-    B.track([xp, (xp[0] - 0.75, xp[1])] + dog((xp[0] - 0.75, xp[1]), r209a, 'd')[1:], net(100), w)
-    B.track(dog(r209b, y1), 'XTAL_P_X', w)
-    B.track(dog(p('C238', '1'), y1), 'XTAL_P_X', w)
+    crystal(B)
     # VDD_BAT and reset fan out downwards in pin order
     c214, r201 = p('C214', '1'), p('R201', '2')
     B.track(dog(p('U201', 102), c214), net(102), 0.2)
@@ -155,6 +147,31 @@ def mcu_escape(B):
         B.via(x, y + dy, net)
     B.track(dog(p('U202', '4'), p('C232', '1')), '+3V3', 0.25)
     B.track(dog(p('U301', '3'), p('C302', '1')), '+3V3', 0.25)
+
+
+def crystal(B):
+    """The 40 MHz crystal (placement.py turns it 45 degrees). Each line runs straight from its pin, then at
+    45 degrees past the crystal's ground pad 2 (XTAL_N above it, XTAL_P below it) to its crystal pad, and
+    on to its load capacitor. No vias on the two lines (Espressif's layout guide). Pads 2 and 4 have a ground
+    via in the pad (filled and capped): pad 2 lies between the two lines, where the ground fill cannot reach
+    it, and pad 4 takes the load capacitors' ground."""
+    p = B.pad
+    w, clear = 0.15, 0.25                                # track; centre line to the pad's corner
+    xn, xp = p('U201', 99), p('U201', 100)
+    y1, y2, y3, y4 = (p('Y201', n) for n in '1234')
+    # pad 2 (0.9 x 0.8 mm, turned 45 degrees) reaches 0.64 mm from its centre along the 45 degree lines
+    reach = 0.636 + clear * math.sqrt(2)
+    k = y2[1] - y2[0] - reach                           # XTAL_N: the line y = x + k above pad 2
+    t = (y3[1] - y3[0] - k) / 2                         # foot of pad 3's centre on that line
+    B.track([xn, (xn[1] - k, xn[1]), (y3[0] + t, y3[1] - t), y3], 'XTAL_N', w)
+    B.track(dog(y3, p('C239', '1'), 'd'), 'XTAL_N', w)
+    k = y2[0] + y2[1] + reach                           # XTAL_P: the line y = -x + k below pad 2
+    B.track([xp, (k - xp[1], xp[1]), (k - y1[1], y1[1]), y1], 'XTAL_P', w)
+    B.track(dog(y1, p('C238', '1'), 'd'), 'XTAL_P', w)
+    for c in ('C239', 'C238'):
+        B.track(dog(y4, p(c, '2'), 'd'), 'GND', 0.25)
+    for pad in (y2, y4):
+        B.via(*pad, 'GND')
 
 
 def flash_routes(B):

@@ -91,12 +91,14 @@ def place(B):
     m('C222', -6.7, -0.35, 180)    # VDD_HP_3 (pin 91)
     m('C206', -6.5, 1.93, 180)     # VDD_IO_6 (pin 96)
     m('R304', -10.7, -2.625, 180)   # SDIO clock source termination, at the end of the bus
-    # 40 MHz crystal, below the bus
-    m('R210', -8.5, 2.625, 180)     # XTAL_N
-    m('R209', -10.7, 3.35, 180)    # XTAL_P
-    m('Y201', -13.9, 3.35, 0)
-    m('C239', -11.6, 1.87, 90)    # XTAL_N side
-    m('C238', -16.7, 4.2, 180)     # XTAL_P side
+    # 40 MHz crystal, 2.0 x 1.6 mm, turned 45 degrees: pad 3 (XTAL_N) faces the upper pin, pad 1 (XTAL_P) the
+    # lower one, and the two lines pass either side of ground pad 2 (routes_mcu.crystal). The NFC lines' vias
+    # above and the VDD_BAT parts below fix the spot; the body stands 4.75 mm from the package edge (Espressif's
+    # layout guide asks for 4.5 mm at least). The load capacitors at the far ends of the lines, their ground
+    # pads beside the crystal's ground pad 4.
+    m('Y201', -11.02, 2.78, 45)
+    m('C239', -12.75, 1.2, 270)    # XTAL_N, pad 1 above
+    m('C238', -13.0, 4.4, 90)      # XTAL_P, pad 1 below
     # bottom-left corner: VDD_BAT, reset
     m('C214', -7.9, 5.0, 270)
     m('R201', -9.6, 4.6, 0)

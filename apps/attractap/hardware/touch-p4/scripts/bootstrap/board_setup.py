@@ -125,6 +125,11 @@ def zones(B):
     else:
         B.keepout(rect(cx - 5.6, cy - 5.6, cx + 7.0, cy + 7.0), (IN2,), 'MCU: 3.3 V pour stays whole, no tracks',
                   pours=False, tracks=True)
+    # no tracks under the 40 MHz crystal on the other layers (Espressif's layout guide), its courtyard as the area
+    cy = B.fp['Y201'].GetCourtyard(pcbnew.F_CrtYd).Outline(0)
+    inner = (IN1, IN2, IN3, IN4) if G.COPPER_LAYERS == 6 else (IN1, IN2)
+    B.keepout([unV(cy.CPoint(k)) for k in range(cy.PointCount())], inner + (B_,), 'crystal: no tracks under it',
+              pours=False, tracks=True)
     rr = G.MOUNT_KEEPOUT_R / math.cos(math.pi / 8)
     for hx, hy in G.MOUNT_HOLES:
         octagon = [(hx + rr * math.cos(math.pi / 8 + i * math.pi / 4), hy + rr * math.sin(math.pi / 8 + i * math.pi / 4))
