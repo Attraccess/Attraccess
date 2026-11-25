@@ -60,9 +60,9 @@ def place(B):
     m('L201', -8.3, -10.6, 90)
     m('C234', -8.8, -13.9, 0)      # 22u output
     m('C235', -5.2, -13.9, 0)      # 22u output
-    m('R204', -11.9, -5.65, 0)     # 510k VDD_HP - FB
+    m('R204', -11.9, -5.65, 0)     # 499k VDD_HP - FB
     m('C236', -11.9, -4.65, 0)     # 22p feed-forward
-    m('R205', -9.7, -4.65, 0)      # 510k FB - GND
+    m('R205', -9.7, -4.65, 0)      # 499k FB - GND
 
     # USB PHY supply (right edge, upper part: neighbours there are unused MIPI pins)
     m('R202', 7.0, -3.6, 0)
@@ -206,7 +206,7 @@ def place(B):
     put('D103', 82.6, 62.0, 90)    # PoE TVS, cathode at the bottom
     put('FB102', 81.24, 67.15, 90)  # straight above jack pin 9
     put('FB103', 83.9, 67.15, 90)
-    put('C102', 80.6, 32.4, 180)   # 1 nF / 2 kV across the barrier
+    put('C102', 81.2, 32.4, 180)   # 1 nF Y2 across the barrier, 48 V pad on the right
     put('C103', 72.6, 30.7, 0)     # 100u PoE output (+ pad above the module output pins)
     put('C104', 72.6, 25.4, 0)
     put('D104', 64.4, 31.4, 0)     # PoE OR diode, +5V on the left
@@ -241,8 +241,8 @@ def place(B):
     put('C409', 74.89, yj - 4.06, 90)  # TX centre tap, above jack pin 4
     put('R411', 64.6, 83.6, 90)
     put('R412', 66.2, 83.6, 90)
-    put('C410', 66.6, 76.6, 90)        # shield to ground
-    put('R413', 64.2, 76.6, 90)
+    put('C410', 66.6, 76.6, 90)        # shield to ground, 1 nF 3 kV
+    put('R413', 63.9, 76.6, 90)
 
     # ================================================= NFC (tongue, left margin)
     put('ANT501', G.ANT_C[0], G.ANT_C[1], 0)

@@ -73,7 +73,12 @@ C6_NOTCH = (14.9, 29.1, 5.65)
 # PoE primary side (48 V, isolated from everything else): no secondary copper in here, on any layer. The
 # second rectangle ends 2.1 mm above the 48 V pad of C102: the pours of the other layers lie above and
 # below that pad, and the clearance rule only looks at copper against copper on one layer.
-POE_PRIMARY = [(77.9, 35.0, 86.0, 78.0), (79.0, 29.4, 86.0, 35.0)]
+POE_PRIMARY = [(77.9, 35.0, 86.0, 78.0), (79.0, 28.8, 86.0, 35.0)]
+# The barrier capacitor C102 is a Y2 safety capacitor in the 2211 case (Murata GA352, 5.7 x 2.8 mm, at
+# least 4.0 mm between its terminations). Its land pattern keeps the 4.5 mm gap of Murata's test board:
+# pads 1.2 x 3.0 mm, centres 2.85 mm either side of the part's origin.
+BARRIER_CAP_PAD = (1.2, 3.0)
+BARRIER_CAP_PAD_X = 2.85
 # Under the PoE module the isolation barrier does not run at the pin row but under the module body:
 # 2.3 mm from the output pin row at the pin 1/2 end, 5.3 mm at the pin 3/4 end (Silvertel Ag9900
 # datasheet, figure 23). No copper from that line to the 48 V pins. Corner points, clockwise.

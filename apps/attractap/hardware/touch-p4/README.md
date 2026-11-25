@@ -69,9 +69,15 @@ The root sheet is a block diagram. Each block is one sheet:
 | UI | LEDs, level shifter, buzzer |
 | Mechanical | mounting holes, fiducials |
 
-Inside a sheet the parts sit in framed, titled groups. Nets that stay on a sheet
-use local labels. Nets that cross sheets use hierarchical labels and appear as
-pins on the root sheet. `GND`, `+3V3` and `+5V` are power symbols.
+Inside a sheet the parts sit in framed, titled blocks, one per function, drawn
+as a circuit: wires inside a block, reading from left to right, supplies up and
+ground down. Labels join the blocks and carry buses; nets that cross sheets use
+hierarchical labels and appear as pins on the root sheet. `GND`, `+3V3` and
+`+5V` are power symbols. Capacitors show their voltage and dielectric,
+resistors their tolerance where it matters. Each sheet is on the smallest paper
+that holds it (A4 or A3) and has the date and revision in its title block; the
+root sheet has the revision history. How the sheets are drawn:
+[scripts/bootstrap/README.md](scripts/bootstrap/README.md#schematic-drawing).
 
 ## Working on the design
 

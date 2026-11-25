@@ -282,7 +282,7 @@ def write_project(names):
         '(version 1)\n'
         '(rule "PoE isolation"\n'
         '  (condition "A.NetClass == \'PoE\' && B.NetClass != \'PoE\' && B.NetName != \'\''
-        ' && B.NetName != \'unconnected-*\' && !B.memberOfFootprint(\'C102\')")\n'
+        ' && B.NetName != \'unconnected-*\'")\n'
         '  (constraint clearance (min 2mm)))\n'
         '# the USB-C receptacle has 0.1 mm between its own VBUS and GND pads\n'
         '(rule "USB-C pad spacing"\n'

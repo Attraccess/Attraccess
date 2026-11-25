@@ -11,6 +11,7 @@ import sys
 
 from sexpr import Sym, dumps, find, first, loads
 import design as design_mod
+from lib_symbols import write_derived
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LIB = os.path.normpath(os.path.join(HERE, '..', '..', 'kicad', 'lib'))
@@ -139,6 +140,40 @@ def multi_unit_symbol(name, src_symbol, units, footprint, lcsc, half_width=15.24
     missing = set(number) - used
     assert not missing, missing
     return sym
+
+
+def y2_footprint():
+    """The Y2 barrier capacitor (2211 case) with the 4.5 mm pad gap of Murata's test board."""
+    S = Sym
+    (w, h), px = geometry.BARRIER_CAP_PAD, geometry.BARRIER_CAP_PAD_X
+    name = 'C_2211_5728Metric_Y2'
+
+    def line(x1, y1, x2, y2, layer, width):
+        return [S('fp_line'), [S('start'), x1, y1], [S('end'), x2, y2],
+                [S('stroke'), [S('width'), width], [S('type'), S('solid')]], [S('layer'), layer]]
+    fp = [S('footprint'), name, [S('version'), 20240108], [S('generator'), 'attractap_make_lib'], [S('layer'), 'F.Cu'],
+          [S('descr'), 'Safety capacitor 2211 (5.7 x 2.8 mm), X1/Y2; 4.5 mm between the pads (Murata GA352 test board)'],
+          [S('tags'), 'capacitor Y2 safety 2211'],
+          [S('property'), 'Reference', 'REF**', [S('at'), 0, -2.6, 0], [S('layer'), 'F.SilkS'],
+           [S('effects'), [S('font'), [S('size'), 1, 1], [S('thickness'), 0.15]]]],
+          [S('property'), 'Value', name, [S('at'), 0, 2.6, 0], [S('layer'), 'F.Fab'],
+           [S('effects'), [S('font'), [S('size'), 1, 1], [S('thickness'), 0.15]]]],
+          [S('attr'), S('smd')]]
+    bx, by = 2.85, 1.4
+    for a, b in (((-bx, -by), (bx, -by)), ((bx, -by), (bx, by)), ((bx, by), (-bx, by)), ((-bx, by), (-bx, -by))):
+        fp.append(line(a[0], a[1], b[0], b[1], 'F.Fab', 0.1))
+    cx, cy = px + w / 2 + 0.25, h / 2 + 0.25
+    for a, b in (((-cx, -cy), (cx, -cy)), ((cx, -cy), (cx, cy)), ((cx, cy), (-cx, cy)), ((-cx, cy), (-cx, -cy))):
+        fp.append(line(a[0], a[1], b[0], b[1], 'F.CrtYd', 0.05))
+    sx = px - w / 2 - 0.4                         # silkscreen between the pads only, off the copper
+    fp.append(line(-sx, -by - 0.12, sx, -by - 0.12, 'F.SilkS', 0.12))
+    fp.append(line(-sx, by + 0.12, sx, by + 0.12, 'F.SilkS', 0.12))
+    fp.append([S('fp_text'), S('user'), '${REFERENCE}', [S('at'), 0, 0, 0], [S('layer'), 'F.Fab'],
+               [S('effects'), [S('font'), [S('size'), 0.8, 0.8], [S('thickness'), 0.12]]]])
+    for num, x in (('1', -px), ('2', px)):
+        fp.append([S('pad'), num, S('smd'), S('roundrect'), [S('at'), x, 0], [S('size'), w, h],
+                   [S('layers'), 'F.Cu', 'F.Paste', 'F.Mask'], [S('roundrect_rratio'), 0.2]])
+    return name, dumps(fp) + '\n'
 
 
 # The DC terminal footprint is the one of the WAGO 2601 lever terminal: four holes, two per pole. The
@@ -318,6 +353,9 @@ def refit():
             print('updated', file)
     open(os.path.join(folder, LED_NAME + '.kicad_mod'), 'w', encoding='utf-8').write(led_footprint())
     print('wrote', LED_NAME)
+    name, text = y2_footprint()
+    open(os.path.join(folder, name + '.kicad_mod'), 'w', encoding='utf-8').write(text)
+    write_derived()
 
 
 def main(src):
@@ -333,6 +371,9 @@ def main(src):
         if name == LED_NAME:
             open(dst, 'w', encoding='utf-8').write(led_footprint())
             continue
+        if name == y2_footprint()[0]:
+            open(dst, 'w', encoding='utf-8').write(y2_footprint()[1])
+            continue
         text = open(os.path.join(src, 'lcsc.pretty', name + '.kicad_mod'), encoding='utf-8').read()
         # 3D models are not shipped in the repository
         text = re.sub(r'\n\s*\(model [^\n]*\n(?:[^\n]*\n)*?\s*\)\n(?=\))', '\n', text)
@@ -342,6 +383,8 @@ def main(src):
     have = {s[1]: s for s in find(lib, 'symbol')}
     out = [Sym('kicad_symbol_lib')] + [i for i in lib[1:] if not (isinstance(i, list) and i[0] == 'symbol')]
     for name in syms:
+        if name not in have:            # drawn by derived_symbols() below
+            continue
         s = have[name]
         if name == 'ESP32-P4NRW32X':
             s = multi_unit_symbol(name, s, P4_UNITS, NICK + ':QFN-104_L10.0-W10.0-P0.35-TL-EP7.5', 'C54540373')
@@ -359,6 +402,7 @@ def main(src):
     for kind in ('unspecified', 'power_in', 'power_out', 'input', 'output', 'bidirectional'):
         text = text.replace('(pin %s ' % kind, '(pin passive ')
     open(os.path.join(LIB, NICK + '.kicad_sym'), 'w', encoding='utf-8').write(text)
+    write_derived()
     proj = os.path.dirname(LIB)
     open(os.path.join(proj, 'sym-lib-table'), 'w').write(
         '(sym_lib_table\n  (version 7)\n  (lib (name "%s")(type "KiCad")(uri "${KIPRJMOD}/lib/%s.kicad_sym")'

@@ -312,8 +312,11 @@ copper is poured there on any layer, and the PoE net class keeps 2 mm from every
 other net. That rule compares copper on one layer only; from layer to layer the
 keep-out areas do its job: no pour on any layer comes closer than 2 mm to 48 V
 copper (below C102's 48 V pad the inner pours used to end 0.9 mm from it).
-C102 (1 nF, 2 kV) bridges the barrier for EMC, C410/R413 tie the jack shield to
-ground.
+C102 bridges the barrier for EMC: a certified X1/Y2 safety capacitor (Murata
+GA352QR7GF102KW01L, 1 nF, 250 V AC, proof-tested at 2000 V AC for 60 s by its
+maker) in the 2211 case, on a land pattern with 4.5 mm between its pads. C410
+(1 nF, 3 kV, Fenghua 1808B102K302NT) and R413 tie the jack shield to ground;
+both of them are on the secondary side.
 
 Three places need more than the 2 mm rule, which only looks at copper against
 copper on one layer:
@@ -336,9 +339,12 @@ copper on one layer:
 The 2 mm figure is a design choice, not a certified creepage distance.
 Silvertel asks for 3 mm between the two sides of the barrier; the board has
 2.0 mm and more. The jack itself has 2.3 mm between its PoE pins and its signal
-pins. IEEE 802.3 wants the port to stand 1500 V RMS against everything that
-can be touched; C102 and C410 are 2 kV DC parts, which is below the peak of
-that test (2.1 kV). Test the isolation on an assembled unit before the lab
+pins. IEEE 802.3 (§33.4.1) has the powered device stand one of: 1500 V RMS
+for 60 s, 2250 V DC for 60 s, or ten 1500 V impulses of 10/700 µs (TI
+application report SLUA818; IEEE interpretation interp-3-0704). Until the
+industry review C102 and C410 were 2 kV DC parts, below the 2.1 kV peak of the
+first test and below the second. The Y2 part's 2000 V AC proof test (2.8 kV
+peak) covers all three. Test the isolation on an assembled unit before the lab
 does, and ask the lab whether it tests it at all: for the safety standard both
 sides are safe to touch.
 
@@ -894,8 +900,9 @@ Savings that were looked at and not taken:
 | USB protection SRV05-4-P-T7 (C85364, a preferred part) instead of the USBLC6-2SC6 | 3 USD per order (one extended line less) | Same package, and the board's wiring suits it: it has four lines where the USBLC6 has two, and each USB line already goes to two pins. But it is another maker's part at the one connector an ESD test will hit, and its angle in JLCPCB's library is unchecked. |
 
 Where a part has an equivalent in JLCPCB's basic or preferred list, the design
-uses that one (the TVS diodes, 1 uF / 50 V, and 510 k instead of 499 k in the
-core converter's divider, where only the ratio counts). The one exception is
+uses that one (the TVS diodes, 1 uF / 50 V). The core converter's divider is
+the 499 k that Espressif's checklist demands, an extended part like the 510 k
+that was fitted before. The one exception is
 the three capacitors of the DC input: the basic 10 uF / 50 V part fits their
 pads and is the wrong part there (see "Power"). The five other extended
 passives (39 pF, 180 pF and 220 pF of the NFC matching, 1.5 ohm and 6.19 k)
@@ -1083,13 +1090,9 @@ Checked and found right, beyond what the first review lists:
 
 Looked at and left as they are:
 
-- The core converter's divider has 510 k twice where Espressif's guidelines
-  say 499 k "must be populated". The ratio, which sets the voltage while the
-  chip leaves its feedback pin alone (1.2 V), is the same. How the chip moves
-  the voltage through that pin is not documented. If it feeds a current into
-  the divider's tap, each step it makes is 2 % larger with 510 k: 2 mV on
-  the way from 1.2 to 1.1 V. Fit 499 k (an extended part) if the core voltage
-  on the first board is off.
+- The core converter's divider had 510 k twice where Espressif's guidelines
+  say 499 k "must be populated". Changed to 499 k in the industry review
+  (see "Industry review" below).
 - The 100 k from the converter's enable input to ground is not in Espressif's
   circuit. It only matters while the chip does not drive the pin.
 - The SDIO lines have a series resistor in the clock only. The guidelines ask
@@ -1197,8 +1200,9 @@ Simulated and found right:
   2.01 mm along a layer and 2.02 mm through the board, at the jack's pin 10 on
   every layer; nowhere does 48 V copper lie over or under other copper. In air
   2.0 mm stand a peak of 3.0 kV (IEC 60664-1); the 1500 V RMS test reaches
-  2.1 kV. Not in this figure, because they are inside parts: the 1.8 mm
-  between the pads of C102, the PoE module's own barrier, and the 0.5 mm
+  2.1 kV. Not in this figure, because they are inside parts: the 4.5 mm
+  between the pads of C102 (1.8 mm until the industry review), the PoE
+  module's own barrier, and the 0.5 mm
   between the jack's pin 9 and the display's metal back, which the polyimide
   tape has to hold (see "PoE isolation").
 - Heat in the closed case, estimated within 40 % (textbook figures for still
@@ -1238,6 +1242,24 @@ certain), whether the reader hears a card at the edge of its field, how the
 board does in an EMC test, whether the second-source PN532 behaves like the
 original, and anything about firmware. The models use the makers' typical
 figures. The list below stands, shorter in some points and with one more.
+
+### Industry review
+
+In November 2026 the design was graded against industry practice: schematic
+readability, parts and parts list, layout, fabrication and assembly documents,
+EMC and safety, verification. ERC and DRC were run, every sheet was rendered and
+read, and the claims below were checked against their primary sources. The changes
+are made in the generator, which stays the source of truth (see
+[release.md](release.md)).
+
+| Finding | Change |
+|---|---|
+| Core converter: two 510 k in the feedback divider. Espressif's hardware design guidelines (v2.0, schematic checklist, chip revision v3.0 and later): "The two 499 kΩ feedback resistors and one 22 pF feedforward capacitor must be populated". | R204 and R205 499 k 1 % (UNI-ROYAL 0402WGF4993TCE, C25793). |
+| C102 (across the PoE barrier) and C410 (shield to ground) were 1 nF / 2 kV parts. IEEE 802.3 §33.4.1 has the powered device stand 1500 V RMS for 60 s, or 2250 V DC for 60 s, or ten 1500 V 10/700 µs impulses (TI SLUA818; IEEE interpretation interp-3-0704). 2 kV is below the 2.1 kV peak of the first and below the second. | C102: certified X1/Y2 capacitor, Murata GA352QR7GF102KW01L (C91599), 2211 case, proof-tested at 2000 V AC for 60 s (2.8 kV peak), on a land pattern with 4.5 mm between the pads (Murata's test board). C410: 1 nF / 3 kV, Fenghua 1808B102K302NT (C967608). No 1 nF part of 3 kV or more is stocked in 1206 (checked at JLCPCB and LCSC on 25 November 2026). The PoE clearance rule no longer exempts C102. |
+| Schematic: every part stood alone, joined to the rest only by labels; text overlapped in several places (U103's value over its pins, the jack's text over its pins, the PHY's top labels, a group title over another, the USB-C pin numbers over the pin names, the NFC antenna cut by the sheet frame). | Redrawn by a new generator (`scripts/bootstrap/sch_*.py`): wired blocks that read from left to right, supplies up and ground down, labels only between blocks and for buses. An overlap lint fails the build unless it finds nothing. KiCad's netlist of the redrawn sheets matches the circuit description pin by pin. |
+| Symbols: D101, D103, D106 drawn as Zener diodes; U702 drawn as LIS2DE12, U703 as DRV5033, U701 as 74AHCT1G125, U104 as AP63203, U301 as MINI-1-N4. | Unidirectional TVS symbols; every symbol named after the fitted part (`make_lib.derived_symbols()`). |
+| Capacitor values without voltage and dielectric. | Every capacitor shows its rating (for example `16V X7R`), the resistors whose tolerance matters (feedback divider, current sense, NFC tuning, PHY bias) theirs; the rating comes with the part number from the maker's code. |
+| Title blocks without date; no revision history. | Date, drawn by, checked by, and the revision history on the root sheet. |
 
 ### Open: cannot be settled on paper
 

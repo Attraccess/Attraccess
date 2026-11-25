@@ -94,7 +94,7 @@ class Board:
         fp.SetValue(part.value)
         fp.SetPosition(V(x, y))
         fp.SetOrientationDegrees(rot)
-        for key, val in [('LCSC', part.lcsc), ('MPN', part.mpn), ('Variant', part.variant),
+        for key, val in [('LCSC', part.lcsc), ('MPN', part.mpn), ('Manufacturer', part.mfr), ('Variant', part.variant),
                          ('Description', part.desc)] + sorted(part.extra.items()):
             if val or key == 'Description':
                 fp.SetField(key, val)

@@ -148,7 +148,8 @@ class GeometryTest(unittest.TestCase):
                                        'row': lambda *a: None})())
         x, y, rot = placed['C102']
         self.assertEqual(rot, 180)
-        pad = (x + 1.475 - 0.575, y - 0.9, x + 1.475 + 0.575, y + 0.9)        # 1206 pad: 1.15 x 1.8 mm
+        (w, h), px = geometry.BARRIER_CAP_PAD, geometry.BARRIER_CAP_PAD_X
+        pad = (x + px - w / 2, y - h / 2, x + px + w / 2, y + h / 2)
         x1, y1, x2, y2 = geometry.POE_PRIMARY[1]
         self.assertLessEqual(y1, pad[1] - 2.0)
         self.assertLessEqual(x1, pad[0] - 2.0)

@@ -12,8 +12,10 @@ edited by hand, treat the KiCad files as the source of truth and do not run
 | `design.py` | The circuit description: part model, part numbers of the passives, and `build()`. |
 | `circuit_core.py`, `circuit_io.py` | Every part, sheet by sheet, with value, footprint, LCSC number, variant, group and the net on each pin. |
 | `libs.py` | Reads symbol and footprint libraries, checks every part against both. |
-| `make_lib.py` | Builds `kicad/lib/` from LCSC/EasyEDA conversions, generates the NFC antenna footprint and the three-unit ESP32-P4 symbol, and windows the solder paste on the exposed pads of the ESP32-P4, the Ethernet PHY and the PN532. `--refit` applies its repairs again to the footprints already in `kicad/lib/`. |
-| `build_sch.py` | Writes the hierarchical schematic (root + one sheet per block). |
+| `make_lib.py` | Builds `kicad/lib/` from LCSC/EasyEDA conversions, generates the NFC antenna footprint and the three-unit ESP32-P4 symbol, and windows the solder paste on the exposed pads of the ESP32-P4, the Ethernet PHY and the PN532. `derived_symbols()` draws the symbols that the converter or KiCad's library got wrong or named after another part (see "Schematic drawing"). `--refit` applies its repairs and the derived symbols again to the library that is in the project. |
+| `build_sch.py` | Writes the hierarchical schematic (root + one sheet per block), with title blocks and the revision history. Fails when the overlap lint finds anything. |
+| `sch_power.py`, `sch_mcu.py`, `sch_periph.py`, `sch_io.py` | The drawing of each sheet: where every part of a functional block goes and the wires between them (see "Schematic drawing" below). `sch_layouts.py` maps the sheets to them and picks the smallest paper that holds a sheet. |
+| `sch_draw.py`, `sch_finish.py` | The drawing engine: symbols, wires, labels and power symbols; closing the pins a layout leaves open; the connectivity check and the overlap lint. |
 | `geometry.py` | Board outline, display position, slot, antenna and LED positions. |
 | `placement.py` | Position and rotation of every part. |
 | `build_pcb.py` | Builds the board (`place`), exports and imports the autorouter exchange files (`dsn`, `ses`), fills the zones (`finish`). |
@@ -28,6 +30,38 @@ edited by hand, treat the KiCad files as the source of truth and do not run
 | `check_overlap.py` | Reports overlapping part bodies. |
 | `check_netlist.py` | Compares a netlist exported by KiCad with `design.py`. Lists the devices and addresses on each I2C bus and fails on an address clash. |
 | `sexpr.py` | Small reader/writer for KiCad's file format. |
+
+## Schematic drawing
+
+Each sheet is drawn by a layout function, block by block. A block is a function of the circuit (the
+USB input, the core converter, the NFC transmit path); its parts are placed by hand and joined by wires
+that read from left to right, supplies point up and ground points down. Labels join blocks to each
+other and carry buses (the RGB bus, RMII, SDIO, the flash bus); they are not used inside a block.
+
+`sch_finish.finish()` closes what a layout leaves open: supply pins get a power symbol (pins next to
+each other share one), other pins a short wire with a label, unused pins a no-connect flag, and a net
+that is wired completely inside a block gets its name on one of its wires, so the schematic keeps the
+net names of the circuit description. Then:
+
+- `check()` raises when a wire, pin or label would join two nets. It treats as joined whatever KiCad
+  might join (a pin or a wire end on another wire), so it is stricter than KiCad. Pins that a symbol
+  joins inside the part (`jumper_pin_groups`, the USB ESD part's pass-through pins) count as joined.
+- `lint()` reports text on text, text on a symbol or a wire, symbols on symbols and block frames on
+  each other, from the size of KiCad's font. `build_sch.py` fails unless it reports nothing.
+
+The netlist the schematic gives is checked against `design.py` pin by pin (`check-netlist`); that
+check, not the drawing, decides that the circuit is right.
+
+Symbols drawn in `make_lib.derived_symbols()` instead of taken as converted:
+
+- named after the fitted part where the board used another part's symbol: AP63205WU-7 (was drawn as
+  the AP63203), SN74LV1T125DBVR (74AHCT1G125), LIS2DH12TR (KiCad's LIS2DE12, same pins), DRV5032FADBZR
+  (KiCad's DRV5033), ESP32-C6-MINI-1U-H4 (MINI-1-N4), PN5321A3HN; the TVS diodes use the unidirectional
+  TVS symbol (`Diode:SMAJ5.0A`, `Diode:SMAJ58A`, `SMBJ26A` drawn after KiCad's SM6T);
+- redrawn for reading: the USB-C receptacle and the USB ESD part (pin numbers no longer over the pin
+  names; the ESD part's pass-through pins are a jumper group), the PoE module (input left), the RJ45 jack
+  (pin names from the jack's function), the converters (input left, switch node right), the LED, the
+  buzzer and the PN532 (host left, radio right, supplies up, grounds down).
 
 ## Requirements
 

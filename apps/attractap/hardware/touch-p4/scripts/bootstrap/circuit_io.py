@@ -22,7 +22,7 @@ def eth(d):
     d.C('100n', 'PHY_3V3', desc='VDDIO', **V)
     d.C('10u', 'PHY_REG', size='0603', **V)
     d.C('100n', 'PHY_REG', **V)
-    d.R('6.19k', 'PHY_ISET', 'GND', **V)
+    d.R('6.19k', 'PHY_ISET', 'GND', show=True, **V)
     d.group('25 MHz crystal')
     d.add('Y', '25MHz 12pF', 'Device:Crystal_GND24', 'attractap:CRYSTAL-SMD_4P-L3.2-W2.5-BL', {
         '1': 'PHY_X1', '3': 'PHY_X2', '2': 'GND', '4': 'GND',
@@ -54,7 +54,7 @@ def eth(d):
     d.C('100n', 'ETH_CT_TX', **V)
     d.R('1k', 'ETH_LED_Y_K', 'PHY_LED0', desc='yellow: link/activity', **V)
     d.R('1k', 'ETH_LED_G_K', 'GND', desc='green: 100M link', **V)
-    d.C('1n/2kV', 'ETH_SHIELD', 'GND', size='1206', **V)
+    d.C('1n', 'ETH_SHIELD', 'GND', size='1808', desc='shield to ground, 3 kV', **V)
     d.R('1M', 'ETH_SHIELD', 'GND', size='1206', **V)
 
 
@@ -71,7 +71,7 @@ def nfc(d):
     pn_nc = ('LOADMOD', 'AUX1', 'AUX2', 'P35', 'N.C.', 'P30/UART_RX', 'RSTOUT_N', 'MISO/P71', 'SCK/P72',
              'P31/UART_TX', 'P32_INT0', 'P33_INT1', 'P34/SIC_CLK', 'SIGOUT', 'SIGIN', 'SVDD')
     d.group('PN532')
-    d.add('U', 'PN5321A3HN/C106', 'attractap:PN5321A3HN_C106,55', 'attractap:QFN-40_L6.0-W6.0-P0.50-BL-EP',
+    d.add('U', 'PN5321A3HN/C106', 'attractap:PN5321A3HN', 'attractap:QFN-40_L6.0-W6.0-P0.50-BL-EP',
           {'@' + k: v for k, v in pn.items()}, nc=tuple('@' + n for n in pn_nc),
           lcsc='C53457895', mpn='PN5321A3HN (Tokmas)',
           desc='NFC reader IC (PN532). Tokmas part with the pinout of the NXP original (C28925), half the price')
@@ -108,17 +108,17 @@ def nfc(d):
         tx, f, m, a = 'NFC_TX' + side, 'NFC_F' + side, 'NFC_M' + side, 'NFC_ANT' + side
         d.add('L', '560nH', 'Device:L', 'attractap:IND-SMD_L1.6-W0.8-1', {'1': tx, '2': f},
               lcsc='C91630', mpn='LQW18CNR56J00D', desc='EMC filter L0')
-        d.C('220p', f, desc='EMC filter C0')
-        d.C('39p', f, m, desc='matching C1 (tune)')
-        d.C('180p', m, desc='matching C2 (tune)')
-        d.C('10p', m, desc='matching C2, second part (tune)')
-        d.R('1.5R', m, a, size='0603', desc='damping Rq (tune)')
+        d.C('220p', f, desc='C0 (EMC filter)')
+        d.C('39p', f, m, desc='C1 (tune)')
+        d.C('180p', m, desc='C2 (tune)')
+        d.C('10p', m, desc='C2b (tune)')
+        d.R('1.5R', m, a, size='0603', show=True, desc='damping Rq (tune)')
     d.group('Receive path')
     # 3.9 k and 1 k leave 1.2 to 2.4 Vpp at RX for a loop of 1.15 to 1.27 uH. The input takes AVDD + 1 V
     # (4 Vpp); with the 2.7 k of NXP's reference circuit it saw 3.7 Vpp at 1.25 uH.
-    d.R('3.9k', 'NFC_F2', 'NFC_RXC', desc='receive divider R2 (tune)')
+    d.R('3.9k', 'NFC_F2', 'NFC_RXC', show=True, desc='receive divider R2 (tune)')
     d.C('1n', 'NFC_RXC', 'NFC_RX')
-    d.R('1k', 'NFC_RX', 'NFC_VMID')
+    d.R('1k', 'NFC_RX', 'NFC_VMID', show=True)
     d.C('100n', 'NFC_VMID')
     d.group('Antenna')
     d.add('ANT', 'NFC loop 4T', 'Device:Antenna_Loop', 'attractap:NFC_Antenna_4T',
@@ -178,7 +178,7 @@ def display(d):
           lcsc='C8598', mpn='B5819W')
     d.C('1u/50V', 'BL_A', size='0603')
     d.C('1u/50V', 'BL_A', size='0603')
-    d.R('5.1R', 'BL_K', 'GND', size='0603', desc='LED current sense: 0.2 V / 5.1 R = 39 mA')
+    d.R('5.1R', 'BL_K', 'GND', size='0603', show=True, desc='LED current sense: 0.2 V / 5.1 R = 39 mA')
     d.R('10k', 'BL_PWM', 'GND', desc='backlight off while the MCU is in reset')
     # IO expander for the signals that are only used while the panel is initialised
     d.group('IO expander')
@@ -195,7 +195,7 @@ def ui(d):
     d.group('LED data level shifter')
     # 74LV1T125: same pinout as the 74AHCT1G125, but specified from 1.6 V supply. The 5 V rail sits one
     # diode drop below its source and can be under the 4.5 V an AHCT part asks for.
-    d.add('U', '74LV1T125', 'attractap:SN74AHCT1G125DBVR', 'attractap:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR', {
+    d.add('U', '74LV1T125', 'attractap:SN74LV1T125DBVR', 'attractap:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR', {
         '1': 'GND', '2': 'LED_DATA', '3': 'GND', '4': 'LED_DATA_5V', '5': '+5V',
     }, lcsc='C473338', mpn='SN74LV1T125DBVR', desc='3.3 V to 5 V level shifter for the LED data line')
     d.C('100n', '+5V', desc='level shifter')
@@ -207,7 +207,7 @@ def ui(d):
         nets = {'1': 'GND', '2': 'LED_D%d' % i, '3': '+5V'}
         if i + 1 < n_led:
             nets['4'] = 'LED_D%d' % (i + 1)
-        d.add('D', 'SK6812MINI-E', 'attractap:SK6812MINI-E_C5149201',
+        d.add('D', 'SK6812MINI-E', 'attractap:SK6812MINI-E',
               'attractap:LED_SK6812MINI-E_ReverseMount_Clear', nets, nc=() if i + 1 < n_led else ('4',),
               lcsc='C5149201', mpn='SK6812MINI-E', desc='RGB LED, reverse mount')
         d.C('100n', '+5V', desc='LED %d' % (i + 1))
@@ -218,7 +218,8 @@ def ui(d):
         '1': 'BUZ_P', '2': 'BUZ_N',
     }, nc=('3', '4'), lcsc='C94599', mpn='MLT-8530', desc='Electromagnetic buzzer 2.7 kHz, 16 ohm')
     # 0.16 W at a 50 % tone: a 0.25 W part in the 0603 size (an ordinary 0603 is rated 0.1 W)
-    d.R('10R', '+5V', 'BUZ_P', size='0603', lcsc='C253327', mpn='ESR03EZPJ100', desc='buzzer current limit, 0.25 W type')
+    d.R('10R', '+5V', 'BUZ_P', size='0603', lcsc='C253327', mfr='ROHM', mpn='ESR03EZPJ100',
+        rating='5% 0.25W', show=True, desc='buzzer current limit, 0.25 W type')
     d.add('D', '1N4148W', 'Device:D', 'attractap:SOD-123F_L2.7-W1.6-LS3.8-RD', {'1': 'BUZ_P', '2': 'BUZ_N'},
           lcsc='C81598', mpn='1N4148W', desc='flyback diode')
     d.add('Q', 'AO3400A', 'Transistor_FET:AO3400A', 'Package_TO_SOT_SMD:SOT-23', {
@@ -234,7 +235,7 @@ def ui(d):
     d.group('Tamper detection')
     # Accelerometer: knocks, tilting, the reader being torn off. On the touch bus; SA0 high gives
     # address 0x19. The firmware reads its latched events over I2C; INT1 is on a test point.
-    d.add('U', 'LIS2DH12TR', 'Sensor_Motion:LIS2DE12', 'Package_LGA:LGA-12_2x2mm_P0.5mm', {
+    d.add('U', 'LIS2DH12TR', 'attractap:LIS2DH12TR', 'Package_LGA:LGA-12_2x2mm_P0.5mm', {
         '1': 'I2C0_SCL', '2': '+3V3', '3': 'ACC_SA0', '4': 'I2C0_SDA', '5': 'GND', '6': 'GND', '7': 'GND', '8': 'GND',
         '9': '+3V3', '10': '+3V3', '12': 'ACC_INT',
     }, nc=('11',), lcsc='C110926', mpn='LIS2DH12TR', desc='Accelerometer, I2C address 0x19')
@@ -244,7 +245,7 @@ def ui(d):
     d.R('10k', '+3V3', 'ACC_SA0', desc='accelerometer address: SA0 high')
     # Hall switch: its output is low while the magnet in the dock is in front of it (more than 4.8 mT),
     # high when the reader is off the dock (less than 0.5 mT). Read through the IO expander.
-    d.add('U', 'DRV5032FA', 'Sensor_Magnetic:DRV5033FAxDBZ', 'Package_TO_SOT_SMD:SOT-23',
+    d.add('U', 'DRV5032FA', 'attractap:DRV5032FADBZR', 'Package_TO_SOT_SMD:SOT-23',
           {'1': '+3V3', '2': 'DOCK_N', '3': 'GND'},
           lcsc='C140921', mpn='DRV5032FADBZR', desc='Hall switch: output low with the dock magnet present')
     d.C('100n', '+3V3', desc='hall switch')

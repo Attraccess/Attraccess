@@ -20,7 +20,7 @@ def power(d):
     d.R('5.1k', 'USB_CC2', 'GND')
     d.add('F', '2A PTC', 'Device:Polyfuse', 'attractap:F1812', {'1': 'VBUS', '2': 'VBUS_F'},
           lcsc='C89650', mpn='MF-MSMF200L-2', desc='Resettable fuse 2 A hold')
-    d.add('D', 'SMAJ5.0A', 'Device:D_Zener', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': 'VBUS_F', '2': 'GND'},
+    d.add('D', 'SMAJ5.0A', 'Diode:SMAJ5.0A', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': 'VBUS_F', '2': 'GND'},
           lcsc='C19077523', mpn='SMAJ5.0A', desc='TVS, USB supply')
     d.add('U', 'USBLC6-2SC6', 'attractap:USBLC6-2SC6', 'attractap:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL', {
         '1': 'USB_DN', '6': 'USB_DN', '3': 'USB_DP', '4': 'USB_DP', '2': 'GND', '5': 'VBUS_F',
@@ -38,14 +38,14 @@ def power(d):
     d.group('PoE input (LAN version)')
     d.FB('POE_VP', 'POE_VPF', big=True, variant='lan')
     d.FB('POE_VN', 'POE_VNF', big=True, variant='lan')
-    d.add('D', 'SMAJ58A', 'Device:D_Zener', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': 'POE_VPF', '2': 'POE_VNF'},
+    d.add('D', 'SMAJ58A', 'Diode:SMAJ58A', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': 'POE_VPF', '2': 'POE_VNF'},
           lcsc='C19077554', mpn='SMAJ58A', variant='lan', desc='TVS, PoE input')
     d.add('U', 'DP9900M-5V', 'attractap:DP9900M-5V', 'attractap:PWRM-SMD_DP9900M-5V', {
         '5': 'POE_VPF', '6': 'POE_VPF', '7': 'POE_VNF', '8': 'POE_VNF',
         '1': '+5V_POE', '2': '+5V_POE', '3': 'GND',
     }, nc=('4',), lcsc='C5380106', mpn='DP9900M-5V', variant='lan',
         desc='Isolated 802.3af PD module 5 V 9 W (pin compatible: Silvertel Ag9905M)')
-    d.C('1n/2kV', 'POE_VNF', 'GND', size='1206', variant='lan', desc='EMC capacitor across the isolation barrier')
+    d.C('1n', 'POE_VNF', 'GND', size='2211', variant='lan', desc='Y2 safety capacitor across the isolation barrier')
     d.add('C', '100u/16V', 'Device:C_Polarized', 'Capacitor_SMD:CP_Elec_6.3x5.4', {'1': '+5V_POE', '2': 'GND'},
           lcsc='C7469977', mpn='FVH016ADA101M0654', variant='lan', desc='PoE module output capacitor')
     d.C('10u/25V', '+5V_POE', size='0805', variant='lan')
@@ -72,10 +72,10 @@ def power(d):
     # a barrel jack for a plug-in supply and a spring terminal for bare wires. The terminal footprint
     # takes two WAGO parts: 250-202 (push-button, fitted) or 2601-3102 (lever, C20252913, 13 times the price).
     d.group('DC input (12 to 24 V)')
-    d.add('J', 'DC jack 5.5/2.1', 'attractap:PJ-002A', 'attractap:DC-IN-TH_PJ-002A',
+    d.add('J', 'DC jack 5.5/2.1', 'Connector:Barrel_Jack_Switch', 'attractap:DC-IN-TH_PJ-002A',
           {'1': 'VDC_IN', '2': 'GND', '3': 'GND'}, lcsc='C3096082', mpn='PJ-002A',
           desc='DC jack 5.5 x 2.1 mm, centre pin positive, rated 24 V')
-    d.add('J', 'DC terminal', 'attractap:2601-3102', 'attractap:CONN-TH_4P-P3.5-2601-3102',
+    d.add('J', 'DC terminal', 'Connector:Screw_Terminal_01x02', 'attractap:CONN-TH_4P-P3.5-2601-3102',
           {'1': 'VDC_IN', '2': 'GND'}, lcsc='C2765061', mpn='250-202',
           desc='WAGO push-button terminal for bare wires up to 1.5 mm2, in the two diagonal holes: '
                'left pole = +, right pole = -')
@@ -92,19 +92,19 @@ def power(d):
     # lost where it counts. But a capacitor that is large at 5 V and small at 24 V makes the input swing
     # far above the supply when a live supply is plugged in: 45 V at the converter with 5 m of 1.5 mm2
     # wire, against its limit of 40 V. With these it is 37.5 V (docs/design-notes.md, "Power").
-    d.C(DC_INPUT_CAP, 'VDC_R', size='1206', ref='C117', mpn='CL31B225KCHSNNE',
+    d.C(DC_INPUT_CAP, 'VDC_R', size='1206', ref='C117',
         desc='DC input filter, connector side. 100 V X7R: keeps 1.5 uF at 24 V')
     d.add('L', '2.2uH 2.3A', 'Device:L', 'attractap:IND-SMD_L2.5-W2.0_CKCSA252012', {'1': 'VDC_R', '2': 'VDC'},
           ref='L103', lcsc='C354540', mpn='CKCSA252012-2.2uH/M', desc='DC input filter')
     # 600 W part with 26 V stand-off: it starts to conduct at 28.9 to 31.9 V and holds the input below
     # the converter's 40 V limit up to a peak current of 11 A (42.1 V at its rated 14.3 A). The smaller
     # SMAJ28A fitted before crossed 40 V at 4.5 A.
-    d.add('D', 'SMBJ26A', 'Device:D_Zener', 'Diode_SMD:D_SMB', {'1': 'VDC', '2': 'GND'},
+    d.add('D', 'SMBJ26A', 'attractap:SMBJ26A', 'Diode_SMD:D_SMB', {'1': 'VDC', '2': 'GND'},
           lcsc='C315992', mpn='SMBJ26A', desc='TVS, DC input (stand-off 26 V, conducts from 28.9 V; U104 stands 40 V for 0.4 s)')
     for _ in range(2):
-        d.C(DC_INPUT_CAP, 'VDC', size='1206', mpn='CL31B225KCHSNNE',
+        d.C(DC_INPUT_CAP, 'VDC', size='1206',
             desc='converter input. 100 V X7R: keeps 1.5 uF at 24 V')
-    d.add('U', 'AP63205WU-7', 'attractap:AP63203WU-7', 'attractap:TSOT-26_L2.9-W1.6-P0.95-LS2.8-BL', {
+    d.add('U', 'AP63205WU-7', 'attractap:AP63205WU-7', 'attractap:TSOT-26_L2.9-W1.6-P0.95-LS2.8-BL', {
         '3': 'VDC', '2': 'DC_EN', '4': 'GND', '5': 'DC_SW', '6': 'DC_BST', '1': '+5V_DC',
     }, lcsc='C2071056', mpn='AP63205WU-7', desc='5 V 2 A buck for the DC input (same family as U103)')
     d.R('100k', 'VDC', 'DC_EN')
@@ -215,9 +215,10 @@ def mcu(d):
           lcsc='C354540', mpn='CKCSA252012-2.2uH/M')
     d.C('22u', 'VDD_HP', size='0805')
     d.C('22u', 'VDD_HP', size='0805')
-    d.R('510k', 'VDD_HP', 'FB_DCDC')
+    # 499 k twice and 22 pF: Espressif's checklist says they "must be populated" for chip revision v3.x
+    d.R('499k', 'VDD_HP', 'FB_DCDC', show=True)
     d.C('22p', 'VDD_HP', 'FB_DCDC')
-    d.R('510k', 'FB_DCDC', 'GND')
+    d.R('499k', 'FB_DCDC', 'GND', show=True)
     d.R('100k', 'EN_DCDC', 'GND', desc='keeps the converter off while the chip is in reset')
 
     # flash
@@ -278,7 +279,7 @@ def wifi(d):
     # 11-1 and 11-2), the MINI-1U is the same module without the 4.1 mm of antenna. The -H4 (to 105 C) and
     # not the -N4 (to 85 C): JLCPCB had 3364 of it and none of the -N4 on 24 November 2026, and the
     # thermal estimate has the module at 79 C in a room of 40 C.
-    d.add('U', 'ESP32-C6-MINI-1U-H4', 'attractap:ESP32-C6-MINI-1-N4',
+    d.add('U', 'ESP32-C6-MINI-1U-H4', 'attractap:ESP32-C6-MINI-1U-H4',
           'attractap:WIFIM-SMD_61P-L16.6-W13.2-P0.80-ESP32-C6-MINI-1-N4',
           {'@' + k: v for k, v in c6.items()}, nc=tuple('@' + n for n in c6_nc),
           lcsc='C20627095', mpn='ESP32-C6-MINI-1U-H4',
