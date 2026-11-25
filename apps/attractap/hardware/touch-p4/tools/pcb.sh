@@ -105,9 +105,15 @@ finish_routing() {
     bootstrap post_route.py --fix
     bootstrap build_pcb.py finish
     drc
+    stamp board
 }
 
 export_fab() { (cd "$PCB_ROOT/scripts" && "${KICAD_PYTHON:-python3}" export_fab.py); }
+
+# The generator is the master (docs/release.md): each generator step records what it wrote, and
+# check-source fails when a KiCad file differs from that or the generator changed since.
+stamp() { (cd "$PCB_ROOT/scripts" && "${KICAD_PYTHON:-python3}" check_source.py --stamp "$1"); }
+check_source() { (cd "$PCB_ROOT/scripts" && "${KICAD_PYTHON:-python3}" check_source.py); }
 
 # ngspice for the circuit simulations: NGSPICE, the PATH, or nixpkgs.
 ngspice_bin() {
@@ -157,10 +163,11 @@ case "${1:-}" in
     render) render ;;
     # The three generator steps overwrite the KiCad files. See scripts/bootstrap/README.md.
     generate-library) shift; bootstrap make_lib.py "$@" ;;
-    generate-schematic) bootstrap build_sch.py && erc && check_netlist ;;
+    check-source) check_source ;;
+    generate-schematic) bootstrap build_sch.py && erc && check_netlist && stamp schematic ;;
     place) bootstrap build_pcb.py place && bootstrap check_overlap.py ;;
     route) autoroute && finish_routing ;;
     route-finish) finish_routing ;;
-    *) echo "Usage: $0 erc|drc|check-netlist|check-package|check-footprints|simulate|simulate-antenna|export|render|generate-library <dir>|generate-schematic|place|route|route-finish" >&2
+    *) echo "Usage: $0 erc|drc|check-netlist|check-package|check-source|check-footprints|simulate|simulate-antenna|export|render|generate-library <dir>|generate-schematic|place|route|route-finish" >&2
        exit 1 ;;
 esac

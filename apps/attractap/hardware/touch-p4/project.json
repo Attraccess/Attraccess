@@ -58,6 +58,14 @@
         "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh check-package"
       }
     },
+    "check-source": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["{projectRoot}/kicad/**/*", "{projectRoot}/scripts/**/*"],
+      "options": {
+        "command": "python3 -I apps/attractap/hardware/touch-p4/scripts/check_source.py"
+      }
+    },
     "check-footprints": {
       "executor": "nx:run-commands",
       "cache": false,
@@ -86,7 +94,7 @@
     },
     "check": {
       "executor": "nx:noop",
-      "dependsOn": ["test", "erc", "check-netlist", "drc", "simulate", "check-package"]
+      "dependsOn": ["test", "check-source", "erc", "check-netlist", "drc", "simulate", "check-package"]
     },
     "build": {
       "executor": "nx:run-commands",

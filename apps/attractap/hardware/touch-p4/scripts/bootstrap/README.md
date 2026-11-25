@@ -1,11 +1,14 @@
-# Bootstrap generator for revision A
+# The generator
 
-These scripts produced the first version of the KiCad project from one circuit
-description. They are kept so that revision A can be reproduced and audited.
+These scripts build the KiCad project from one circuit description. They are the
+master: every change to the circuit, the schematic or the board is made here and
+the KiCad files are regenerated (`tools/pcb.sh generate-library | generate-schematic
+| place | route-finish`). The KiCad files are not edited by hand.
 
-**They overwrite the schematic and the board.** Once the KiCad project has been
-edited by hand, treat the KiCad files as the source of truth and do not run
-`build_sch.py` or `build_pcb.py place` again.
+**They overwrite the schematic and the board.** Each step records what it wrote in
+`kicad/generated-from.json`; `scripts/check_source.py` (the `check-source` target)
+fails when a KiCad file differs from that, or when the generator changed after the
+files were written. Comments and docstrings do not count as a change.
 
 | File | Purpose |
 |---|---|
