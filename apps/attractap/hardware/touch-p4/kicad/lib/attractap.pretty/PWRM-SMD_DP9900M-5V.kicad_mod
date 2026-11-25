@@ -41,4 +41,9 @@
 	(fp_line (start -10.59 -7.50) (end 10.60 -7.50) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 10.60 -7.50) (end 10.60 7.50) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 10.60 7.50) (end -10.59 7.50) (layer F.CrtYd) (width 0.05))
+	(model "${KIPRJMOD}/lib/attractap.3dshapes/PWRM-SMD_DP9900M-5V.stpz"
+		(offset (xyz 0 0 0))
+		(scale (xyz 1 1 1))
+		(rotate (xyz 0 0 0))
+	)
 )

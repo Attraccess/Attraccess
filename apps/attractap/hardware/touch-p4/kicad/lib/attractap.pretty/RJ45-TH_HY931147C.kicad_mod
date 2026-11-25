@@ -128,4 +128,9 @@
 	(fp_line (start -13.32 -8.05) (end 8.28 -8.05) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 8.28 -8.05) (end 8.28 8.05) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 8.28 8.05) (end -13.32 8.05) (layer F.CrtYd) (width 0.05))
+	(model "${KIPRJMOD}/lib/attractap.3dshapes/RJ45-TH_HY931147C.stpz"
+		(offset (xyz -2.3 0 7.03))
+		(scale (xyz 1 1 1))
+		(rotate (xyz 0 0 0))
+	)
 )

@@ -173,6 +173,7 @@ def y2_footprint():
     for num, x in (('1', -px), ('2', px)):
         fp.append([S('pad'), num, S('smd'), S('roundrect'), [S('at'), x, 0], [S('size'), w, h],
                    [S('layers'), 'F.Cu', 'F.Paste', 'F.Mask'], [S('roundrect_rratio'), 0.2]])
+    attach_model(fp, name)
     return name, dumps(fp) + '\n'
 
 
@@ -272,6 +273,52 @@ def proximity_sensor_outline(tree):
                      [S('width'), 0.1]])
 
 
+def usb_c_power_pads(tree):
+    """The converter drew the four 0.6 mm power pads of the USB-C receptacle as polygons with a 0.1 mm
+    outline, which KiCad makes 0.7 x 1.4 mm: 0.10 mm from VBUS to GND where HRO's drawing has 0.20 mm.
+    Plain 0.6 x 1.3 mm pads at the same centres, as the drawing has them."""
+    for pad in find(tree, 'pad'):
+        if pad[3] == 'custom' and str(pad[1]) in ('A1B12', 'B1A12', 'A4B9', 'B4A9'):
+            at, layers = first(pad, 'at'), first(pad, 'layers')
+            pad[:] = [Sym('pad'), pad[1], Sym('smd'), Sym('rect'), at, [Sym('size'), 0.6, 1.3], layers]
+
+
+def c6_ground_pads(tree):
+    """The module's nine ground pads: 1.45 mm at a pitch of 1.975 mm, centred on the module (datasheet
+    v1.5, figures 11-1 and 11-2). The converted footprint had 1.80 mm and the block 0.05 mm off."""
+    for pad in find(tree, 'pad'):
+        size = first(pad, 'size')
+        if str(pad[1]) == '49' and size and abs(float(size[1]) - 1.45) < 0.01:
+            at = first(pad, 'at')
+            ix, iy = round((float(at[1]) - 0.02) / 1.8), round((float(at[2]) + 0.05) / 1.8)
+            if abs(float(at[1]) - ix * 1.975) > 0.001 and abs(float(at[1]) - ix * 1.8 - 0.02) < 0.01:
+                at[1], at[2] = round(ix * 1.975, 3), round(iy * 1.975, 3)
+
+
+def fpc_signal_pads(tree):
+    """Hirose's mounting pattern for the FH12 has 0.30 mm signal pads; the converter took the 0.25 mm of
+    the stencil opening. Copper 0.30 mm, paste 0.25 mm."""
+    for pad in find(tree, 'pad'):
+        size = first(pad, 'size')
+        if str(pad[1]).isdigit() and int(pad[1]) <= 40 and size and abs(float(size[2]) - 0.25) < 0.001:
+            size[2] = 0.3
+            pad.append([Sym('solder_paste_margin'), -0.025])
+
+
+MODEL_DIR = '${KIPRJMOD}/lib/attractap.3dshapes/'
+
+
+def attach_model(tree, name):
+    """The footprint's 3D model from kicad/lib/attractap.3dshapes, placed as lib_models.MODELS says."""
+    import lib_models
+    if name not in lib_models.MODELS:
+        return
+    _src, off, rot = lib_models.MODELS[name]
+    tree[:] = [i for i in tree if not (isinstance(i, list) and i and i[0] == 'model')]
+    tree.append([Sym('model'), MODEL_DIR + name + '.stpz', [Sym('offset'), [Sym('xyz')] + list(off)],
+                 [Sym('scale'), [Sym('xyz'), 1, 1, 1]], [Sym('rotate'), [Sym('xyz')] + list(rot)]])
+
+
 def fix_footprint(name, text, fresh=True):
     """Repair two habits of the converter: mechanical holes as plated pads, thermal vias without a number.
     fresh=False: the footprint comes from the project library and has the outline fixes already."""
@@ -280,6 +327,13 @@ def fix_footprint(name, text, fresh=True):
         fits_wago_250(tree)
     if fresh and name == 'SENSORS-SMD_VCNL4040M3OE':
         proximity_sensor_outline(tree)
+    if name.startswith('USB-C_SMD-TYPE-C-31-M-12'):
+        usb_c_power_pads(tree)
+    if name.startswith('WIFIM-SMD_61P'):
+        c6_ground_pads(tree)
+    if name.startswith('FPC-SMD_FH12-40S'):
+        fpc_signal_pads(tree)
+    attach_model(tree, name)
     if name.startswith('QFN-104'):
         paste_windows(tree, P4_PASTE_WINDOW, P4_PASTE_PITCH)
     if name.startswith('QFN-32'):
@@ -327,6 +381,7 @@ def led_footprint():
     text = open(os.path.join(lib, LED_SOURCE[0] + '.pretty', LED_SOURCE[1] + '.kicad_mod'), encoding='utf-8').read()
     tree = loads(text)
     tree[1] = LED_NAME
+    attach_model(tree, LED_NAME)
     for pad in find(tree, 'pad'):
         at, size = first(pad, 'at'), first(pad, 'size')
         x = float(at[1])
@@ -346,6 +401,8 @@ def refit():
             new = antenna_footprint()
         elif name == LED_NAME:
             continue
+        elif name == y2_footprint()[0]:
+            new = y2_footprint()[1]
         else:
             new = fix_footprint(name, open(path, encoding='utf-8').read(), fresh=False)
         if new != open(path, encoding='utf-8').read():

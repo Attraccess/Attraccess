@@ -2,7 +2,3 @@
 (rule "PoE isolation"
   (condition "A.NetClass == 'PoE' && B.NetClass != 'PoE' && B.NetName != '' && B.NetName != 'unconnected-*'")
   (constraint clearance (min 2mm)))
-# the USB-C receptacle has 0.1 mm between its own VBUS and GND pads
-(rule "USB-C pad spacing"
-  (condition "A.memberOfFootprint('J101') && B.memberOfFootprint('J101')")
-  (constraint clearance (min 0.09mm)))

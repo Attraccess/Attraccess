@@ -66,4 +66,9 @@
 	(pad "" smd rect (at -0.75 0.75) (size 1 1) (layers F.Paste))
 	(pad "" smd rect (at 0.75 -0.75) (size 1 1) (layers F.Paste))
 	(pad "" smd rect (at 0.75 0.75) (size 1 1) (layers F.Paste))
+	(model "${KIPRJMOD}/lib/attractap.3dshapes/QFN-32_L4.0-W4.0-P0.40-BL-EP2.7.stpz"
+		(offset (xyz 0 0 0))
+		(scale (xyz 1 1 1))
+		(rotate (xyz 0 0 0))
+	)
 )

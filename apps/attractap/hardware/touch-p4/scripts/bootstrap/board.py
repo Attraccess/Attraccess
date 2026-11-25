@@ -90,6 +90,14 @@ class Board:
         if fp is None:
             raise SystemExit('footprint not found: ' + part.fp)
         fp.SetFPID(pcbnew.LIB_ID(part.fp.split(':')[0], name))
+        # KiCad's own footprints point at its 3D library; the project keeps copies of those models
+        # (iterating over Models() yields copies: write through the index)
+        models = fp.Models()
+        for i in range(len(models)):
+            name = models[i].m_Filename
+            base = name.replace('\\', '/').split('/')[-1].rsplit('.', 1)[0]
+            if name.startswith('${KICAD') and os.path.exists(os.path.join(PROJECT, 'lib', 'attractap.3dshapes', base + '.stpz')):
+                models[i].m_Filename = '${KIPRJMOD}/lib/attractap.3dshapes/' + base + '.stpz'
         fp.SetReference(ref)
         fp.SetValue(part.value)
         fp.SetPosition(V(x, y))

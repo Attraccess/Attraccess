@@ -51,4 +51,9 @@
 		(fill solid)
 		(layer "F.SilkS")
 	)
+	(model "${KIPRJMOD}/lib/attractap.3dshapes/SOD-123F_L2.7-W1.6-LS3.8-RD.stpz"
+		(offset (xyz 0 0 0))
+		(scale (xyz 1 1 1))
+		(rotate (xyz 0 0 0))
+	)
 )

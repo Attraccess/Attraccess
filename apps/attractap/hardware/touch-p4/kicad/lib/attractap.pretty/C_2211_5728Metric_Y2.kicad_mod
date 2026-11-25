@@ -42,4 +42,9 @@
 		(layers "F.Cu" "F.Paste" "F.Mask")
 		(roundrect_rratio 0.2)
 	)
+	(model "${KIPRJMOD}/lib/attractap.3dshapes/C_2211_5728Metric_Y2.stpz"
+		(offset (xyz 0 0 0.75))
+		(scale (xyz 1 1 1))
+		(rotate (xyz 0 0 0))
+	)
 )

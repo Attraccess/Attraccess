@@ -25,4 +25,9 @@
 	(fp_line (start -2.28 -1.62) (end 2.28 -1.62) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 2.28 -1.62) (end 2.28 1.62) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 2.28 1.62) (end -2.28 1.62) (layer F.CrtYd) (width 0.05))
+	(model "${KIPRJMOD}/lib/attractap.3dshapes/F1812.stpz"
+		(offset (xyz 0 0 0))
+		(scale (xyz 1 1 1))
+		(rotate (xyz 0 0 0))
+	)
 )

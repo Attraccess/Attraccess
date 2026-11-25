@@ -35,4 +35,9 @@
 	(fp_line (start -4.25 -4.25) (end 4.25 -4.25) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 4.25 -4.25) (end 4.25 4.25) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 4.25 4.25) (end -4.25 4.25) (layer F.CrtYd) (width 0.05))
+	(model "${KIPRJMOD}/lib/attractap.3dshapes/BUZ-SMD_4P-L8.5-W8.5-P8.50-BR.stpz"
+		(offset (xyz 0 0 0))
+		(scale (xyz 1 1 1))
+		(rotate (xyz 0 0 0))
+	)
 )

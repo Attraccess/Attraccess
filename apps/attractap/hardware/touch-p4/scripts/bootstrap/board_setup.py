@@ -242,8 +242,8 @@ NETCLASSES = [
     # DC input, up to 28 V
     ('DCIN', 0.25, 0.6, 0.8, 0.4, ['VDC_IN', 'VDC_F', 'VDC_R', 'VDC', 'DC_SW']),
     ('DCSig', 0.2, 0.25, 0.6, 0.3, ['DC_EN', 'DC_BST']),
-    # the USB-C connector has 0.1 mm between its VBUS and GND pads
-    ('VBUS', 0.1, 0.6, 0.8, 0.4, ['VBUS']),
+    # the USB-C connector has 0.2 mm between its VBUS and GND pads (HRO's drawing)
+    ('VBUS', 0.127, 0.6, 0.8, 0.4, ['VBUS']),
     # 48 V side of the PoE module. The 2 mm isolation to all other nets is a custom rule (.kicad_dru)
     ('PoE', 0.3, 0.6, 0.8, 0.4, ['POE_VP', 'POE_VN', 'POE_VPF', 'POE_VNF']),
     ('NFC_RF', 0.127, 0.3, 0.6, 0.3, ['NFC_TX1', 'NFC_TX2', 'NFC_F1', 'NFC_F2', 'NFC_M1', 'NFC_M2', 'NFC_ANT1',
@@ -283,8 +283,4 @@ def write_project(names):
         '(rule "PoE isolation"\n'
         '  (condition "A.NetClass == \'PoE\' && B.NetClass != \'PoE\' && B.NetName != \'\''
         ' && B.NetName != \'unconnected-*\'")\n'
-        '  (constraint clearance (min 2mm)))\n'
-        '# the USB-C receptacle has 0.1 mm between its own VBUS and GND pads\n'
-        '(rule "USB-C pad spacing"\n'
-        '  (condition "A.memberOfFootprint(\'J101\') && B.memberOfFootprint(\'J101\')")\n'
-        '  (constraint clearance (min 0.09mm)))\n')
+        '  (constraint clearance (min 2mm)))\n')

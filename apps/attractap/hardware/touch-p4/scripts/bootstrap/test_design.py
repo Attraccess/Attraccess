@@ -28,6 +28,43 @@ class DesignTest(unittest.TestCase):
                    if not p.dnp and not p.ref.startswith(design.NOT_FITTED) and not p.lcsc]
         self.assertEqual(missing, [])
 
+    def test_fitted_parts_have_parts_list_data(self):
+        """manufacturer, part number, description and alternate on every line of the parts lists"""
+        fitted = [p for p in self.d.parts.values() if p.lcsc and not p.dnp]
+        missing = [p.ref for p in fitted if not (p.mfr and p.mpn and p.extra.get('BOM description')
+                                                 and p.extra.get('Alternate'))]
+        self.assertEqual(missing, [])
+        ics = [p.ref for p in fitted if p.ref[0] == 'U' and not p.extra.get('Lifecycle')]
+        self.assertEqual(ics, [])
+
+    def test_every_footprint_with_a_body_has_a_3d_model(self):
+        import lib_models
+        folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'kicad', 'lib',
+                              'attractap.3dshapes')
+        names = {p.fp.split(':')[1] for p in self.d.parts.values() if p.lcsc}
+        names.discard('NFC_Antenna_4T')                                  # copper only
+        self.assertEqual(sorted(n for n in names if n not in lib_models.MODELS
+                                or not os.path.exists(os.path.join(folder, n + '.stpz'))), [])
+
+    def test_converted_3d_models_sit_on_their_pads(self):
+        """pins in the holes, terminals on the pads (the converter misplaces some models)"""
+        import lib_models
+        import model_fit
+        lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'kicad', 'lib')
+        bad = []
+        for name, (src, off, rot) in lib_models.MODELS.items():
+            if not src.startswith('EasyEDA'):
+                continue
+            verts = model_fit.step_vertices(os.path.join(lib, 'attractap.3dshapes', name + '.stpz'))
+            with open(os.path.join(lib, 'attractap.pretty', name + '.kicad_mod'), encoding='utf-8') as f:
+                rects = model_fit.pad_rects(f.read())
+            pv = model_fit.placed(verts, off, rot)
+            fit = model_fit.score([(x, y) for x, y, z in pv if z < -model_fit.PIN_DEPTH],
+                                  [(x, y) for x, y, z in pv if abs(z) < model_fit.BOTTOM], rects)
+            if fit < model_fit.GOOD:
+                bad.append((name, round(fit, 2)))
+        self.assertEqual(bad, [])
+
     def test_variants(self):
         self.assertEqual({p.variant for p in self.d.parts.values()}, {'', 'lan'})
         # the Wi-Fi version must work without the lan parts: none of them may sit on a supply path

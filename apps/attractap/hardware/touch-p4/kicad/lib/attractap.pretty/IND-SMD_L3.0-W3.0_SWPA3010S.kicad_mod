@@ -24,4 +24,9 @@
 	(fp_line (start 1.50 -1.50) (end 1.50 1.50) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 1.50 1.50) (end -1.50 1.50) (layer F.CrtYd) (width 0.05))
 	(fp_line (start -1.50 1.50) (end -1.50 -1.50) (layer F.CrtYd) (width 0.05))
+	(model "${KIPRJMOD}/lib/attractap.3dshapes/IND-SMD_L3.0-W3.0_SWPA3010S.stpz"
+		(offset (xyz 0 0 0))
+		(scale (xyz 1 1 1))
+		(rotate (xyz 0 0 0))
+	)
 )

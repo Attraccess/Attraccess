@@ -81,6 +81,11 @@ Symbols drawn in `make_lib.derived_symbols()` instead of taken as converted:
 easyeda2kicad --lcsc_id C54540373 C5736265 ... --full --output /tmp/lcsc/lcsc
 pnpm nx run attractap-touch-p4-pcb:generate-library -- /tmp/lcsc
 
+# 1b. 3D models: fetch once into a cache folder (EasyEDA conversions, KiCad packages3D), store them
+#     in kicad/lib/attractap.3dshapes and write lib_models.py; then attach them to the footprints
+python3 scripts/bootstrap/collect_models.py /tmp/models --fetch
+pnpm nx run attractap-touch-p4-pcb:generate-library -- --refit
+
 # 2. schematic from the circuit description, then ERC and the netlist check
 pnpm nx run attractap-touch-p4-pcb:generate-schematic
 

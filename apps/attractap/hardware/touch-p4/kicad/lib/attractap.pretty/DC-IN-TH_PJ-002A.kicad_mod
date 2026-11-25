@@ -44,4 +44,9 @@
 	(fp_line (start -10.70 -6.85) (end 3.70 -6.85) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 3.70 -6.85) (end 3.70 2.15) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 3.70 2.15) (end -10.70 2.15) (layer F.CrtYd) (width 0.05))
+	(model "${KIPRJMOD}/lib/attractap.3dshapes/DC-IN-TH_PJ-002A.stpz"
+		(offset (xyz -3.5 2.358 6.5))
+		(scale (xyz 1 1 1))
+		(rotate (xyz 0 0 180))
+	)
 )

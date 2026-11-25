@@ -30,4 +30,9 @@
 	(fp_line (start 1.46 -0.81) (end 1.46 0.81) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 1.46 0.81) (end -1.46 0.81) (layer F.CrtYd) (width 0.05))
 	(fp_line (start -1.46 0.81) (end -1.46 -0.81) (layer F.CrtYd) (width 0.05))
+	(model "${KIPRJMOD}/lib/attractap.3dshapes/SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL.stpz"
+		(offset (xyz 0 0 0.05))
+		(scale (xyz 1 1 1))
+		(rotate (xyz 0 0 270))
+	)
 )
