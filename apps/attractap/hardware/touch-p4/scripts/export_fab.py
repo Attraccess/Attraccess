@@ -5,8 +5,13 @@ Reads only the KiCad files, so it keeps working after the project is edited in K
 Output:
   fab/jlcpcb/                      what goes to JLCPCB (committed, so an order can be traced)
     attractap-touch-p4-gerbers.zip   Gerber and drill files, for the PCB order
-    bom-<variant>.csv                Comment, Designator, Footprint, LCSC Part #, Manufacturer Part
+    attractap-touch-p4-fab.pdf       fabrication drawing: outline, stack-up, drill table, notes
+    attractap-touch-p4.ipc           IPC-D-356 netlist, for the fab's electrical test
+    bom-<variant>.csv                assembly parts list: Comment, Designator, Footprint, LCSC Part #, then
+                                     Manufacturer, Manufacturer Part, Description, Alternate, Lifecycle
     cpl-<variant>.csv                Designator, Mid X, Mid Y, Layer, Rotation
+    parts-list-<variant>.csv         everything to buy for a reader: the assembly list plus the parts that
+                                     JLCPCB does not fit (display panel, Wi-Fi antenna)
   fab/gerbers/                     the files inside the zip, for a Gerber viewer
   fab/schematic.pdf, fab/board-front.pdf, fab/board-back.pdf
 
@@ -25,6 +30,9 @@ import shutil
 import subprocess
 import sys
 import zipfile
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bootstrap'))
+import parts_info  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT = os.path.normpath(os.path.join(HERE, '..', 'kicad'))
@@ -102,10 +110,18 @@ def main():
     shutil.rmtree(jlc, ignore_errors=True)
     os.makedirs(jlc)
     zip_gerbers(gerbers, os.path.join(jlc, NAME + '-gerbers.zip'))
+    # IPC-D-356 netlist for the fab's electrical test, without its creation date
+    ipc = os.path.join(jlc, NAME + '.ipc')
+    run('pcb', 'export', 'ipcd356', '-o', ipc, pcb)
+    text = open(ipc, encoding='utf-8').read()
+    open(ipc, 'w', encoding='utf-8').write(re.sub(r'^C  .*(Date|DATE|date).*\n', '', text, flags=re.M))
+    # fabrication drawing (fab_drawing.py reads the board with pcbnew)
+    subprocess.run([sys.executable, os.path.join(HERE, 'fab_drawing.py'), pcb, os.path.join(jlc, NAME + '-fab.pdf')],
+                   check=True)
     pos = os.path.join(FAB, 'positions.csv')
     run('pcb', 'export', 'pos', '--format', 'csv', '--units', 'mm', '--side', 'both', '-o', pos, pcb)
     parts = os.path.join(FAB, 'parts.csv')
-    fields = 'Reference,Value,Footprint,LCSC,MPN,Variant'
+    fields = 'Reference,Value,Footprint,LCSC,MPN,Variant,Manufacturer,BOM description,Alternate,Lifecycle'
     run('sch', 'export', 'bom', '--fields', fields, '--labels', fields, '--exclude-dnp', '-o', parts, sch)
     run('sch', 'export', 'pdf', '-o', os.path.join(FAB, 'schematic.pdf'), sch)
     run('pcb', 'export', 'pdf', '--layers', 'F.Cu,F.SilkS,F.Fab,Edge.Cuts,Dwgs.User', '--mode-single',
@@ -124,15 +140,28 @@ def main():
         # BOOT buttons are one part with two values). The values become the comment.
         groups = {}
         for r in fitted:
-            values, refs = groups.setdefault((r['Footprint'].split(':')[-1], r['LCSC'], r['MPN']), ([], []))
+            values, refs, row = groups.setdefault((r['Footprint'].split(':')[-1], r['LCSC'], r['MPN']), ([], [], r))
             if r['Value'] not in values:
                 values.append(r['Value'])
             refs.append(r['Reference'])
+        header = ['Comment', 'Designator', 'Footprint', 'LCSC Part #', 'Manufacturer', 'Manufacturer Part',
+                  'Description', 'Alternate', 'Lifecycle']
+        lines = []
+        for (fp, lcsc, mpn), (values, refs, row) in sorted(groups.items(), key=lambda kv: kv[1][1][0]):
+            lines.append([' / '.join(values), ','.join(refs), fp, lcsc, row['Manufacturer'], mpn,
+                          row['BOM description'], row['Alternate'], row['Lifecycle']])
         with open(os.path.join(jlc, 'bom-%s.csv' % variant), 'w', newline='') as f:
             w = csv.writer(f)
-            w.writerow(['Comment', 'Designator', 'Footprint', 'LCSC Part #', 'Manufacturer Part'])
-            for (fp, lcsc, mpn), (values, refs) in sorted(groups.items(), key=lambda kv: kv[1][1][0]):
-                w.writerow([' / '.join(values), ','.join(refs), fp, lcsc, mpn])
+            w.writerow(header)
+            w.writerows(lines)
+        with open(os.path.join(jlc, 'parts-list-%s.csv' % variant), 'w', newline='') as f:
+            w = csv.writer(f)
+            w.writerow(['Quantity'] + header + ['Assembled by'])
+            for line in lines:
+                w.writerow([len(line[1].split(','))] + line + ['JLCPCB'])
+            for variants, qty, item, mfr, mpn, desc, alt in parts_info.NOT_ASSEMBLED:
+                if variant in variants:
+                    w.writerow([qty, item, '', '', '', mfr, mpn, desc, alt, '', 'by hand'])
         with open(os.path.join(jlc, 'cpl-%s.csv' % variant), 'w', newline='') as f:
             w = csv.writer(f)
             w.writerow(['Designator', 'Mid X', 'Mid Y', 'Layer', 'Rotation'])

@@ -13,6 +13,7 @@ from collections import OrderedDict
 
 import circuit_core
 import circuit_io
+import parts_info
 
 STD_FP = {
     'R0402': 'Resistor_SMD:R_0402_1005Metric',
@@ -148,6 +149,14 @@ class Design:
         sheet = kw.pop('sheet', None) or self.sheet
         kw.setdefault('group', self.grp)
         p = Part(ref, value, sym, fp, nets, sheet, **kw)
+        known = parts_info.info(p.lcsc)
+        if known:
+            mfr, desc, lifecycle, alternate = known
+            p.mfr = p.mfr or mfr
+            p.extra.setdefault('BOM description', desc)
+            if lifecycle:
+                p.extra.setdefault('Lifecycle', lifecycle)
+            p.extra.setdefault('Alternate', alternate)
         self.parts[ref] = p
         return p
 
@@ -164,6 +173,7 @@ class Design:
         # a value that names its voltage already (10u/25V) shows only the dielectric beside it
         extra['Rating'] = rating.split()[-1] if kind == 'C' and '/' in value else rating
         extra['BOM description'] = passive_desc(kind, value, size, rating)
+        extra['Alternate'] = parts_info.EQUIVALENT
         part = dict(lcsc=lcsc, mfr=mfr, mpn=mpn, extra=extra)
         part.update(kw)
         return part, show
