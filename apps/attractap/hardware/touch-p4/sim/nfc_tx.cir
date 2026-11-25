@@ -1,0 +1,50 @@
+* PN532 transmitter into the EMC filter, the matching network and the loop, in the time domain: the
+* bridge switches a square wave, so all harmonics are there. Checks the formula of nfc_match.py.
+.param la=1.25u
+.param ra=1.24
+.param ca=2.4p
+.param tvdd=3.0
+.param rdrv=4
+.param l0=560n
+.param c0=220p
+.param c1=39p
+.param c2=190p
+.param rq=1.5
+.param r2=3.9k
+.param r1=1k
+.param per=73.746313n
+V1 s1 0 PULSE(0 {tvdd} 0 1n 1n {per/2-1n} {per})
+V2 s2 0 PULSE({tvdd} 0 0 1n 1n {per/2-1n} {per})
+R1 s1 tx1 {rdrv}
+R2 s2 tx2 {rdrv}
+L501 tx1 f1a {l0}
+Rl1 f1a f1 1
+L502 tx2 f2a {l0}
+Rl2 f2a f2 1
+C0a f1 0 {c0}
+C0b f2 0 {c0}
+C1a f1 m1 {c1}
+C1b f2 m2 {c1}
+C2a m1 0 {c2}
+C2b m2 0 {c2}
+Rq1 m1 a1 {rq}
+Rq2 m2 a2 {rq}
+La a1 ax {la}
+Ra ax a2 {ra}
+Ca a1 a2 {ca}
+R506 f2 rxc {r2}
+C520 rxc rx 1n
+R507 rx vmid {r1}
+Vmid vmid 0 1.5
+.tran 0.5n 60u 50u 0.5n
+.control
+set noaskquit
+run
+let psup = v(s1)*(-i(v1)) + v(s2)*(-i(v2))
+meas tran p_supply avg psup from=50u to=59.882u
+meas tran rx_max max v(rx) from=50u to=60u
+meas tran rx_min min v(rx) from=50u to=60u
+meas tran i_loop max i(la) from=50u to=60u
+quit
+.endc
+.end

@@ -1,0 +1,71 @@
+* Changing supplies while the board runs: USB (eFuse U105), DC converter (ideal diode U107/Q102) and PoE
+* module (ideal diode U106/Q101) into the +5V rail, the 3.3 V converter behind it, the supervisor's
+* threshold on +3V3. Each source is on between its t_on and t_off.
+* Sources: USB 5.0 V behind 0.25 ohm of cable and 0.18 ohm of fuse and ferrite; the DC converter's
+* output (AP63205: 5.0 V, it cannot sink current; with its input gone it stops); the PoE module (5.0 V,
+* cannot sink). Each with its output capacitors and, for USB and DC, the 4.7 k bleed resistor.
+* Ideal diode (LM74700-Q1 + IRLML0030): conducts forward with 20 mV regulated and 30 mOhm (gate at 8 V
+* or more), blocks reverse current within 0.45 us; the MOSFET's body diode conducts while the controller
+* is below its 3.9 V start; the controller's cathode pin takes 2 uA back.
+* eFuse (TPS259470A): 28 mOhm forward, regulates 17 mV at light load; blocks once IN - OUT < -29 mV
+* (within 1 us) and conducts again only when IN - OUT > 104 mV, 50 us later; 2 A limit; 5 uA back into
+* VBUS while blocked; on above 4.32 V, off below 3.92 V (its UVLO divider).
+.param tusb_on=0
+.param tusb_off=1
+.param tdc_on=1
+.param tdc_off=1
+.param tpoe_on=1
+.param tpoe_off=1
+.param vusb=5.0
+.param vdc=5.0
+.param vpoe=5.0
+.param i5=0.9
+.param i33=0.6
+* USB
+Busb src_u 0 V = (time > {tusb_on} && time < {tusb_off}) ? {vusb} : 0
+Rusb src_u usb5 0.43
+C101 usb5 0 6u
+R104 usb5 0 4.7k
+* DC converter output
+Bdc 0 dc5 I = (time > {tdc_on} && time < {tdc_off}) ? 20*tanh(max({vdc} - v(dc5), 0)/0.03/20) : 0
+Cdc dc5 0 30u
+R105 dc5 0 4.7k
+* PoE module output
+Bpoe 0 poe5 I = (time > {tpoe_on} && time < {tpoe_off}) ? 20*tanh(max({vpoe} - v(poe5), 0)/0.05/20) : 0
+Cpoe poe5 0 66u
+Rpoe poe5 0 100k
+* ideal diodes: forward 20 mV + 30 mOhm when the controller runs, body diode otherwise, 2 uA back
+Bid1 dc5 v5 I = (v(dc5) > 3.9 ? (v(dc5)-v(v5)-0.02 + sqrt((v(dc5)-v(v5)-0.02)^2 + 1e-8))/0.06 : 0) + 1e-12*(exp(min(v(dc5)-v(v5), 1.2)/0.035)-1) - 2u*(v(v5) > v(dc5) ? 1 : 0)
+Bid2 poe5 v5 I = (v(poe5) > 3.9 ? (v(poe5)-v(v5)-0.02 + sqrt((v(poe5)-v(v5)-0.02)^2 + 1e-8))/0.06 : 0) + 1e-12*(exp(min(v(poe5)-v(v5), 1.2)/0.035)-1) - 2u*(v(v5) > v(poe5) ? 1 : 0)
+* eFuse reverse current blocking: blk = 1 while blocked
+Btgt tgt 0 V = (v(usb5)-v(v5) < -0.029) ? 1 : ((v(usb5)-v(v5) > 0.104) ? 0 : (v(blk) > 0.5 ? 1 : 0))
+Bblk 0 blk I = v(tgt) > v(blk) ? 1u*(v(tgt)-v(blk))/1u : 1u*(v(tgt)-v(blk))/50u
+Cblk blk 0 1u
+Buv uvr 0 V = v(usb5) > 4.32 ? 1 : (v(usb5) < 3.92 ? 0 : v(uvl))
+Ruv uvr uvl 1k
+Cuv uvl 0 1n
+Bef usb5 v5 I = (v(uvl) > 0.5 ? 1 : 0) * (1 - v(blk)) * 2*tanh((v(usb5)-v(v5)-0.017)/0.028/2) - 5u*(v(blk) > 0.5 ? 1 : 0)
+* +5V rail: its capacitors and loads (LEDs, backlight, PN532, buzzer: constant current) and the 3.3 V
+* converter (constant power)
+C5 v5 0 45u
+Bl5 v5 0 I = v(v5) > 1 ? {i5} : {i5}*v(v5)
+Bin v5 0 I = v(v5) > 2.45 ? v(v33)*{i33}/(0.9*max(v(v5),2.45)) : 0
+* 3.3 V converter: 3.3 V, or the input less 0.15 V in dropout
+Bout v33i 0 V = v(v5) > 2.45 ? min(3.3, v(v5) - 0.15) : 0
+Rout v33i v33 0.02
+C33 v33 0 60u
+Bl33 v33 0 I = {i33} * min(1, v(v33)/3)
+.ic v(v5)=0 v(v33)=0 v(blk)=0 v(usb5)=0 v(dc5)=0 v(poe5)=0
+.option method=gear
+.tran 2u 12m uic
+.control
+set noaskquit
+run
+meas tran v5_min min v(v5) from=1m to=12m
+meas tran v33_min min v(v33) from=1m to=12m
+meas tran v5_end find v(v5) at=11.9m
+meas tran usb_back max v(usb5) from=1m to=12m
+meas tran dc_back max v(dc5) from=1m to=12m
+quit
+.endc
+.end
