@@ -130,6 +130,10 @@ def place(B):
     f('C604', -12.2, -3.8, 90)
     f('R601', -13.8, -3.6, 90)     # I2C0 pull-ups
     f('R602', -14.9, -3.6, 90)
+    # ESD protection of the touch lines: left of the connector and its mounting tab, outside the area the
+    # folded flex covers
+    put('U603', 28.6, 68.4, 0)
+    put('U604', 30.2, 74.2, 0)
     # IO expander: P0..P3 (LCD_CS, SCK, SDA, RST) on its left side, towards the connector
     put('U602', 57.4, 59.6, 0)
     put('C608', 59.6, 56.2, 0)

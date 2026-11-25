@@ -21,6 +21,8 @@ I2C_ADDRESS = {
     'VCNL4040M3OE': lambda net: (0x60,),            # fixed
 }
 I2C_STRAPS = {'TCA9554PWR': '123'}                  # address pins: each must be tied to GND or +3V3
+# Parts on a bus that do not answer on it: ESD diode arrays
+I2C_SILENT = {'USBLC6-2SC6'}
 
 
 def i2c_buses(got, values):
@@ -30,8 +32,8 @@ def i2c_buses(got, values):
         used, line = {}, []
         for ref in sorted({r for (r, _pin), n in got.items() if n == scl}):
             value = values[ref]
-            if value == I2C_MASTER or ref.rstrip('0123456789') in ('R', 'TP'):
-                continue                              # the master, pull-ups, test points
+            if value == I2C_MASTER or value in I2C_SILENT or ref.rstrip('0123456789') in ('R', 'TP'):
+                continue                              # the master, ESD arrays, pull-ups, test points
             if value not in I2C_ADDRESS:
                 errs += 1
                 print('I2C      %s (%s) is on %s but has no entry in I2C_ADDRESS' % (ref, value, scl))

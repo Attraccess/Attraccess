@@ -148,7 +148,9 @@ STALE_PARTS = {'R104', 'R105', 'R705', 'L103', 'C117', 'D106', 'D103', 'FB102', 
                # review stage 3, second part: decoupling at the MCU's upper left corner, the DC input's TVS
                'C208', 'C209', 'F102', 'D101',
                # review stage 3, third part: the 2.0 x 1.6 mm crystal and its load capacitors
-               'Y201', 'C238', 'C239'}
+               'Y201', 'C238', 'C239',
+               # review stage 4: ESD protection of the touch lines
+               'U603', 'U604'}
 STALE_PARTS |= {'TP%d' % n for n in range(816, 831)}
 
 

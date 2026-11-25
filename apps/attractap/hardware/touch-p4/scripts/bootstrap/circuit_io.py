@@ -149,6 +149,12 @@ def display(d):
     d.C('100n', '+3V3', desc='touch VCI')
     d.R('2.2k', '+3V3', 'I2C0_SCL')
     d.R('2.2k', '+3V3', 'I2C0_SDA')
+    # ESD: the touch lines come from the panel's flex, which lies behind the gap round the glass, and go
+    # straight to MCU pins. The USB-C port's part, on 3.3 V (design notes, "ESD per port").
+    for ref, a, b in (('U603', 'TP_RST', 'I2C0_SCL'), ('U604', 'I2C0_SDA', 'TP_INT')):
+        d.add('U', 'USBLC6-2SC6', 'attractap:USBLC6-2SC6', 'attractap:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL', {
+            '1': a, '6': a, '3': b, '4': b, '2': 'GND', '5': '+3V3',
+        }, ref=ref, lcsc='C7519', mpn='USBLC6-2SC6', desc='ESD protection, touch lines at the panel connector')
     # 33 ohm series arrays close to the MCU (edge-rate control for EMC)
     d.group('Series resistors on the RGB bus')
     rn = [

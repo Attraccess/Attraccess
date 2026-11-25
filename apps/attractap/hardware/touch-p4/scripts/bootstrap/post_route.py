@@ -462,7 +462,8 @@ def fix(path):
                 board.Add(t)
                 keep.add((a, b))
             pcbnew.SaveBoard(path, board)
-            del board
+            # no proxy of this board's items may outlive it: SWIG could hand one back for the next board
+            del t, board
             stubs = []
             rep = drc(path, report)
         stubs, opens_before = [], len(rep.get('unconnected_items', []))
@@ -516,7 +517,7 @@ def fix(path):
                 print('  not from this script:', line)
             json.dump(state, open(STATE, 'w'))
             return 1
-        del board
+        del by_id, pads, board
     json.dump(state, open(STATE, 'w'))
     print('still not clean after 8 rounds')
     return 1

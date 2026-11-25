@@ -135,6 +135,9 @@ def panel(cv, P_, x, y):
         cv.label(net, x - 104.14, yy, 'L')
         cv.wire((x - 104.14, yy), (xr, yy))
         cv.stand(P_[r], xr, yy, fields='r')
+    # ESD protection of the touch lines (pins close by labels)
+    for k, ref in enumerate(('U603', 'U604')):
+        cv.put(P_[ref], x - 60.96, y + 55.88 + 38.1 * k, fields={'Reference': (7.62, -10.92), 'Value': (7.62, -9.22)})
 
 
 def series(cv, P_, x, y):
