@@ -1,16 +1,20 @@
-* DC input: a live supply is plugged in. Cable - fuse F102 - D105 - C117 - L103 - C112, C113, TVS D106.
-* The supply has no resistance of its own. The ceramic capacitors lose capacitance with voltage:
-* C(V) = C0 / (1 + (V/V0)^2), fitted to the maker's curve of the 2.2 uF / 100 V X7R part
-* (2.2, 2.0, 1.53, 1.02 uF at 5, 12, 24, 40 V). The TVS is at the upper end of its breakdown range
-* (31.9 V; 42.1 V at 14.3 A). The converter is still off: it only starts after its soft start.
+* DC input: a live supply is plugged in. Cable - fuse F102 - D105 - C117 with the electrolytic C120 - L103
+* - C112, C113, TVS D106. The supply has no resistance of its own. The ceramic capacitors lose capacitance
+* with voltage: C(V) = C0 / (1 + (V/V0)^2), fitted to the maker's curve of the 2.2 uF / 100 V X7R part
+* (2.2, 2.0, 1.53, 1.02 uF at 5, 12, 24, 40 V). C120 is 47 uF less its 20 % tolerance, with its ESR and
+* ESL; what damps the cable's inductance is its ESR. The TVS (SMBJ28A) is at the upper end of its
+* breakdown range (34.4 V; 45.4 V at 13.2 A). The converter is still off: it starts after its soft start.
 .param vsup=24
 .param lcab=3.45u
 .param rcab=0.119
 .param rfuse=0.05
 .param c0=2.2u
 .param v0=36.26
-.param vbr=31.9
-.param rtvs=0.713
+.param vbr=34.4
+.param rtvs=0.833
+.param cbulk=37.6u
+.param esr=0.3
+.param esl=8n
 V1 src 0 PWL(0 0 20n {vsup})
 Lcab src n1 {lcab}
 Rcab n1 n2 {rcab + rfuse}
@@ -18,6 +22,9 @@ D105 n2 vdcr SS34
 .model SS34 D(IS=5u RS=0.04 N=1.1 CJO=300p M=0.4 BV=45 IBV=1m)
 R117 vdcr c117 5m
 Xc117 c117 0 mlcc k=1
+L120 vdcr e120 {esl}
+R120 e120 f120 {esr}
+C120 f120 0 {cbulk}
 L103 vdcr l103 2.2u
 R103 l103 vdc 0.10
 R112 vdc c112 2.5m

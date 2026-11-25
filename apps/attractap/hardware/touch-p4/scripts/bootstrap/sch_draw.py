@@ -166,11 +166,13 @@ class Unit:
     """One placed symbol unit: its pins on the sheet and the box its drawing takes."""
 
     def __init__(self, part, unit, x, y, angle, sym, mirror=False):
-        """mirror: flipped left to right (KiCad's "mirror y"), then turned by angle."""
+        """mirror: flipped left to right (KiCad's "mirror y"), then turned by angle. KiCad turns a mirrored
+        symbol the other way round: (at x y 90)(mirror y) shows as the flipped symbol turned by 270."""
         self.part, self.unit, self.x, self.y, self.angle, self.mirror = part, unit, x, y, angle, mirror
         self.pins = {}
         self.pin_lines = []                        # the drawn pin lines: (x1, y1, x2, y2)
         m = -1 if mirror else 1
+        angle = (-angle) % 360 if mirror else angle
         for num, name, px, py, pang, plen, u in libs.symbol_pins(sym):
             if u not in (0, unit) and len({p[6] for p in libs.symbol_pins(sym)}) > 1:
                 continue
@@ -354,6 +356,14 @@ class Canvas:
         else:
             self.label(net, ex, ey, side)
         return ex, ey
+
+    def tag(self, net, x, y, side='U', length=5.08):
+        """A short stub from a point on a wire with a label at its end: for a net that also goes to
+        another sheet (a test point) where the drawing has no free wire end."""
+        dx, dy = DIR[side]
+        ex, ey = snap(x + dx * length), snap(y + dy * length)
+        self.wire((x, y), (ex, ey))
+        self.label(net, ex, ey, side)
 
     def flag(self, net, x, y):
         """A PWR_FLAG at x, y on a short wire down to a power symbol of the net."""

@@ -50,6 +50,14 @@ PASSIVES = {
     ('R', '100k', '0402'): ('C25741', UR, '0402WGF1003TCE', R0402),
     # Espressif's checklist for chip revision v3.x: the two 499 k of the core converter's divider "must be
     # populated" (ESP32-P4 Hardware Design Guidelines v2.0)
+    ('R', '15k', '0402'): ('C25756', 'UNI-ROYAL (Uniroyal Elec)', '0402WGF1502TCE', '1% 62.5mW'),
+    ('R', '22.1k', '0402'): ('C43473', 'UNI-ROYAL (Uniroyal Elec)', '0402WGF2212TCE', '1% 62.5mW'),
+    ('R', '33.2k', '0402'): ('C122548', 'UNI-ROYAL (Uniroyal Elec)', '0402WGF3322TCE', '1% 62.5mW'),
+    ('R', '97.6k', '0402'): ('C62742', 'UNI-ROYAL (Uniroyal Elec)', '0402WGF9762TCE', '1% 62.5mW'),
+    ('R', '340k', '0402'): ('C423187', 'UNI-ROYAL (Uniroyal Elec)', '0402WGF3403TCE', '1% 62.5mW'),
+    ('R', '1.65k', '0402'): ('C25869', 'UNI-ROYAL (Uniroyal Elec)', '0402WGF1651TCE', '1% 62.5mW'),
+    ('C', '2.2n', '0402'): ('C84703', 'Samsung Electro-Mechanics', 'CL05B222KB5NNNC', '50V X7R'),
+    ('C', '100n/50V', '0402'): ('C307331', 'Samsung Electro-Mechanics', 'CL05B104KB54PNC', '50V X7R'),
     ('R', '499k', '0402'): ('C25793', UR, '0402WGF4993TCE', R0402),
     ('R', '1.5R', '0603'): ('C22769', UR, '0603WAF150KT5E', R0603),
     ('R', '5.1R', '0603'): ('C25197', UR, '0603WAF510KT5E', R0603),
@@ -197,9 +205,9 @@ class Design:
         return self.add('FB', '600R@100MHz', 'Device:FerriteBead', 'attractap:L0603',
                         {'1': a, '2': b}, lcsc='C85833', mpn='BLM18KG601SN1D', **kw)
 
-    def TP(self, net, label, sheet=None, group='Test points'):
-        return self.add('TP', label, 'Connector:TestPoint', 'TestPoint:TestPoint_Pad_D1.5mm', {'1': net},
-                        sheet=sheet, group=group)
+    def TP(self, net, label, sheet=None, group='Test points', small=False):
+        fp = 'TestPoint:TestPoint_Pad_D1.0mm' if small else 'TestPoint:TestPoint_Pad_D1.5mm'
+        return self.add('TP', label, 'Connector:TestPoint', fp, {'1': net}, sheet=sheet, group=group)
 
 
 def build():

@@ -118,10 +118,6 @@ def derived_symbols(lib):
             left=[('5', 'VIN+'), ('6', 'VIN+'), ('7', 'VIN-'), ('8', 'VIN-')],
             right=[('1', '+VDC'), ('2', '+VDC'), ('3', '-VDC'), ('4', 'ADJ')], width=20.32),
         # input on the left, switch node and feedback on the right, ground at the bottom
-        'AP63203WU-7': box_symbol(
-            'AP63203WU-7', 'U', fp + 'TSOT-26_L2.9-W1.6-P0.95-LS2.8-BL', '3.3 V 2 A synchronous buck, 3.8 to 32 V in',
-            left=[('3', 'VIN'), ('2', 'EN')], right=[('6', 'BST'), ('5', 'SW'), ('1', 'FB')], bottom=[('4', 'GND')],
-            width=12.7, datasheet='https://www.diodes.com/assets/Datasheets/AP63200-AP63201-AP63203-AP63205.pdf'),
         'AP63205WU-7': box_symbol(
             'AP63205WU-7', 'U', fp + 'TSOT-26_L2.9-W1.6-P0.95-LS2.8-BL', '5 V 2 A synchronous buck, 3.8 to 32 V in',
             left=[('3', 'VIN'), ('2', 'EN')], right=[('6', 'BST'), ('5', 'SW'), ('1', 'FB')], bottom=[('4', 'GND')],
@@ -199,9 +195,29 @@ def derived_symbols(lib):
         'DRV5032FADBZR': renamed(libs.symbol('Sensor_Magnetic:DRV5033FAxDBZ'), 'DRV5032FADBZR',
                                  'Low-power omnipolar Hall switch, push-pull, SOT-23', pin_names={'1': 'VDD'},
                                  datasheet='https://www.ti.com/lit/ds/symlink/drv5032.pdf'),
-        'SMBJ26A': renamed(libs.symbol('Diode:SM6T6V8A'), 'SMBJ26A',
-                           '600 W unidirectional TVS diode, 26 V stand-off, SMB (DO-214AA)',
+        'SMBJ28A': renamed(libs.symbol('Diode:SM6T6V8A'), 'SMBJ28A',
+                           '600 W unidirectional TVS diode, 28 V stand-off, SMB (DO-214AA)',
                            pin_names={'1': 'K', '2': 'A'}, footprint='Diode_SMD:D_SMB', datasheet=''),
+        # ideal diode: the input (anode) on the left, the output (cathode) and the gate drive on the right
+        'LM74700QDBVRQ1': box_symbol(
+            'LM74700QDBVRQ1', 'U', fp + 'SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL',
+            'Ideal diode controller for an N-channel MOSFET, 3.2 to 65 V, SOT-23-6',
+            left=[None, None, ('6', 'ANODE'), None, ('3', 'EN'), None],
+            right=[None, None, ('4', 'CATHODE'), None, None, None],
+            top=[('1', 'VCAP'), None, ('5', 'GATE')], bottom=[('2', 'GND')], width=22.86,
+            datasheet='https://www.ti.com/lit/ds/symlink/lm74700-q1.pdf'),
+        # eFuse: power path left to right, settings below
+        'TPS259470ARPWR': box_symbol(
+            'TPS259470ARPWR', 'U', fp + 'VQFN-10_L2.0-W2.0-P0.45-TL',
+            'eFuse 2.7 to 23 V, 5.5 A, reverse current blocking, adjustable UVLO/OVLO, slew rate and current limit',
+            left=[('5', 'IN'), None, None, None, ('1', 'EN/UVLO'), None, None, ('2', 'OVLO'), None, None, None],
+            right=[('6', 'OUT'), None, None, None, ('3', 'AUXOFF'), None, None, ('4', '~{FLT}'), None, None, None],
+            bottom=[('7', 'DVDT'), None, ('9', 'ILM'), None, ('10', 'ITIMER'), None, ('8', 'GND')], width=25.4,
+            datasheet='https://www.ti.com/lit/ds/symlink/tps25947.pdf'),
+        'TLV803SDBZR': box_symbol(
+            'TLV803SDBZR', 'U', 'Package_TO_SOT_SMD:SOT-23', 'Voltage supervisor 2.93 V, 200 ms, open-drain reset',
+            left=[('3', 'VDD'), None, None], right=[('2', '~{RESET}'), None, None], bottom=[('1', 'GND')], width=22.86,
+            datasheet='https://www.ti.com/lit/ds/symlink/tlv803.pdf'),
     }
     return out
 

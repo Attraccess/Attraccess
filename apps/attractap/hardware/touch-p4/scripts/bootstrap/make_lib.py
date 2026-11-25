@@ -305,6 +305,41 @@ def fpc_signal_pads(tree):
             pad.append([Sym('solder_paste_margin'), -0.025])
 
 
+def custom_pad_strokes(tree):
+    """The converter draws L-shaped pads (the TPS259470A's corner pins) as polygons with a 0.1 mm
+    outline, which adds 0.05 mm of copper all round. The polygon is the land TI draws: no outline."""
+    for pad in find(tree, 'pad'):
+        if pad[3] == 'custom':
+            for poly in find(first(pad, 'primitives') or [], 'gr_poly'):
+                w = first(poly, 'width')
+                if w:
+                    w[1] = 0
+
+
+# ESP32-P4 signal pads as in Espressif's KiCad footprint (espressif/kicad-libraries, ESP32-P4.kicad_mod):
+# 0.20 x 0.65 mm from 4.55 to 5.20 mm off the centre. The converted pads were 0.15 mm wide and 0.125 mm
+# further out. At the 0.35 mm pitch 0.15 mm stays between two pads; a solder mask margin of 0.025 mm
+# leaves a mask web of 0.10 mm, JLCPCB's smallest.
+P4_PAD = (0.65, 0.20, 4.875, 0.025)
+
+
+def p4_signal_pads(tree):
+    import math
+    length, width, centre, mask = P4_PAD
+    for pad in find(tree, 'pad'):
+        if not str(pad[1]).isdigit() or not 1 <= int(pad[1]) <= 104:
+            continue
+        at, size = first(pad, 'at'), first(pad, 'size')
+        x, y = float(at[1]), float(at[2])
+        if abs(abs(x) - 5.0) < 0.01:
+            at[1] = math.copysign(centre, x)
+        elif abs(abs(y) - 5.0) < 0.01:
+            at[2] = math.copysign(centre, y)
+        size[1], size[2] = length, width
+        if not first(pad, 'solder_mask_margin'):
+            pad.append([Sym('solder_mask_margin'), mask])
+
+
 MODEL_DIR = '${KIPRJMOD}/lib/attractap.3dshapes/'
 
 
@@ -333,6 +368,10 @@ def fix_footprint(name, text, fresh=True):
         c6_ground_pads(tree)
     if name.startswith('FPC-SMD_FH12-40S'):
         fpc_signal_pads(tree)
+    if name.startswith('VQFN-10_L2.0-W2.0'):
+        custom_pad_strokes(tree)
+    if name.startswith('QFN-104'):
+        p4_signal_pads(tree)
     attach_model(tree, name)
     if name.startswith('QFN-104'):
         paste_windows(tree, P4_PASTE_WINDOW, P4_PASTE_PITCH)

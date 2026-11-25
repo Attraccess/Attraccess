@@ -87,6 +87,12 @@ def reset(cv, P_, x, y):
     cv.wire((x + 43.18, y), (x + 43.18, y + 7.62), sw.pin('1'))
     cv.wire((x + 5.08, y), (x + 55.88, y))
     cv.label('CHIP_PU', x + 55.88, y, 'R')
+    # supervisor: its open-drain output pulls CHIP_PU low with the button
+    u = cv.put_at(P_['U204'], '2', x + 38.1, y + 22.86, fields='a')
+    cv.wire(u.pin('2'), (x + 43.18, y + 22.86), (x + 43.18, y + 7.62))
+    vx, vy = cv.out('U204.3')
+    cv.hang(P_['C241'], vx - 5.08, vy, fields='l')
+    cv.wire((vx - 5.08, vy), (vx, vy))
 
 
 def straps(cv, P_, x, y):

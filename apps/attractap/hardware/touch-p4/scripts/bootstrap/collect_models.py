@@ -63,9 +63,9 @@ def footprints():
 
 def fetch(cache, fps):
     for fp, lcsc in sorted(fps.items()):
-        if fp in NO_MODEL or fp in ENVELOPE:
-            continue
         lib, name = fp.split(':')
+        if fp in NO_MODEL or fp in ENVELOPE or not lcsc and lib != 'attractap':
+            continue
         if lib != 'attractap' or fp in KICAD_MODEL:
             lib, name = KICAD_MODEL.get(fp, fp).split(':')
             dst = os.path.join(cache, 'kicad', name + '.step')

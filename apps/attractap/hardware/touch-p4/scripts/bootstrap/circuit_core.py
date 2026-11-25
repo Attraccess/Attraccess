@@ -4,6 +4,9 @@ Each function adds the parts of one schematic sheet to the design (see design.py
 
 
 DC_INPUT_CAP = '2.2u/100V'      # C112, C113, C117; why this value: see power()
+BUCK_L = ('C98361', 'WPN4020H2R2MT')      # Sunlord 2.2 uH, 4 x 4 mm, Isat 6.1 A (L101)
+DC_BULK = ('C251040', 'UCD1H470MCL1GS')     # Nichicon 47 uF / 50 V, 6.3 x 7.7 mm, 0.66 ohm at 100 kHz (C120)
+DC_TVS = ('C178227', 'SMBJ28A')     # Littelfuse, D106
 
 
 def power(d):
@@ -26,20 +29,31 @@ def power(d):
         '1': 'USB_DN', '6': 'USB_DN', '3': 'USB_DP', '4': 'USB_DP', '2': 'GND', '5': 'VBUS_F',
     }, lcsc='C7519', mpn='USBLC6-2SC6', desc='USB ESD protection')
     d.FB('VBUS_F', '+5V_USB', big=True)
+    # What VBUS sees when the plug goes in: this capacitor (at most 10 uF, USB 2.0 7.2.4.1); the eFuse
+    # behind it charges the rest of the board slowly.
     d.C('10u/25V', '+5V_USB', size='0805')
-    # The OR-ing diode leaks a little of the 5 V rail back to this net when another source powers the
-    # board. Without a load the unplugged connector's VBUS would float at several volts, and a USB-C
-    # host only switches its supply on when it finds VBUS at 0 V.
+    # The eFuse blocks current from the 5 V rail back into VBUS (also when it is on), but leaks a few
+    # microamps while VBUS is unpowered. Without a load the unplugged connector's VBUS would float, and a
+    # USB-C host only switches its supply on when it finds VBUS at 0 V.
     d.R('4.7k', '+5V_USB', 'GND', ref='R104', desc='bleed: keeps VBUS at 0 V while another source powers the board')
-    d.add('D', 'SS34', 'Device:D_Schottky', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': '+5V', '2': '+5V_USB'},
-          lcsc='C8678', mpn='SS34', desc='Supply OR-ing, USB')
+    # eFuse with true reverse current blocking: slew-limited start (inrush), 2 A limit, UVLO 4.3 V and
+    # OVLO 5.8 V set by one divider; EN/UVLO and OVLO stand 6.5 V, which the divider keeps up to 23 V in.
+    d.add('U', 'TPS259470ARPWR', 'attractap:TPS259470ARPWR', 'attractap:VQFN-10_L2.0-W2.0-P0.45-TL', {
+        '5': '+5V_USB', '6': '+5V', '1': 'USB_EN', '2': 'USB_OV', '7': 'USB_DVDT', '9': 'USB_ILM', '8': 'GND',
+    }, nc=('3', '4', '10'), ref='U105', lcsc='C3662799', mpn='TPS259470ARPWR',
+        desc='USB input eFuse: soft start, current limit, no current back into VBUS')
+    d.R('340k', '+5V_USB', 'USB_EN', ref='R107', show=True, desc='UVLO 4.32 V rising')
+    d.R('33.2k', 'USB_EN', 'USB_OV', ref='R108', show=True)
+    d.R('97.6k', 'USB_OV', 'GND', ref='R109', show=True, desc='OVLO 5.79 V rising')
+    d.R('1.65k', 'USB_ILM', 'GND', ref='R110', show=True, desc='current limit 1.8 to 2.2 A')
+    d.C('2.2n', 'USB_DVDT', ref='C118', desc='output slew rate 0.9 V/ms')
 
     # PoE powered-device supply (isolated module). The jack contains the bridge rectifiers.
     d.group('PoE input (LAN version)')
     d.FB('POE_VP', 'POE_VPF', big=True, variant='lan')
     d.FB('POE_VN', 'POE_VNF', big=True, variant='lan')
     d.add('D', 'SMAJ58A', 'Diode:SMAJ58A', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': 'POE_VPF', '2': 'POE_VNF'},
-          lcsc='C19077554', mpn='SMAJ58A', variant='lan', desc='TVS, PoE input')
+          ref='D103', lcsc='C19077554', mpn='SMAJ58A', variant='lan', desc='TVS, PoE input')
     d.add('U', 'DP9900M-5V', 'attractap:DP9900M-5V', 'attractap:PWRM-SMD_DP9900M-5V', {
         '5': 'POE_VPF', '6': 'POE_VPF', '7': 'POE_VNF', '8': 'POE_VNF',
         '1': '+5V_POE', '2': '+5V_POE', '3': 'GND',
@@ -49,24 +63,25 @@ def power(d):
     d.add('C', '100u/16V', 'Device:C_Polarized', 'Capacitor_SMD:CP_Elec_6.3x5.4', {'1': '+5V_POE', '2': 'GND'},
           lcsc='C7469977', mpn='FVH016ADA101M0654', variant='lan', desc='PoE module output capacitor')
     d.C('10u/25V', '+5V_POE', size='0805', variant='lan')
-    d.add('D', 'SS34', 'Device:D_Schottky', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': '+5V', '2': '+5V_POE'},
-          lcsc='C8678', mpn='SS34', variant='lan', desc='Supply OR-ing, PoE')
+    ideal_diode(d, '+5V_POE', 'POE', 'U106', 'Q101', 'C119', variant='lan')
 
     # 5 V system rail and 3.3 V buck
     d.group('5 V rail and 3.3 V buck converter')
     d.C('22u', '+5V', size='0805')
     d.C('10u/25V', '+5V', size='0805')
     d.C('100n', '+5V')
-    d.add('U', 'AP63203WU-7', 'attractap:AP63203WU-7', 'attractap:TSOT-26_L2.9-W1.6-P0.95-LS2.8-BL', {
-        '3': '+5V', '2': 'BUCK_EN', '4': 'GND', '5': 'BUCK_SW', '6': 'BUCK_BST', '1': '+3V3',
-    }, lcsc='C780769', mpn='AP63203WU-7', desc='3.3 V 2 A buck, spread spectrum')
+    d.add('U', 'TLV62569DBVR', 'attractap:TLV62569DBVR', 'attractap:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR', {
+        '4': '+5V', '1': 'BUCK_EN', '2': 'GND', '3': 'BUCK_SW', '5': 'BUCK_FB',
+    }, lcsc='C141836', mpn='TLV62569DBVR', desc='3.3 V 2 A buck from the 5 V rail (second source SGM61020)')
     d.R('100k', '+5V', 'BUCK_EN', ref='R106')
-    d.C('100n', 'BUCK_BST', 'BUCK_SW')
-    d.add('L', '4.7uH 4A', 'Device:L', 'attractap:IND-SMD_L4.0-W4.0', {'1': 'BUCK_SW', '2': '+3V3'},
-          lcsc='C354583', mpn='CKCSA4020-4.7uH/M')
+    d.C('22p', '+3V3', 'BUCK_FB', desc='feed-forward, zero at 72 kHz')
+    d.add('L', '2.2uH 4.3A', 'Device:L', 'attractap:IND-SMD_L4.0-W4.0', {'1': 'BUCK_SW', '2': '+3V3'},
+          lcsc=BUCK_L[0], mpn=BUCK_L[1])
     d.C('22u', '+3V3', size='0805')
     d.C('22u', '+3V3', size='0805')
     d.C('100n', '+3V3')
+    d.R('100k', '+3V3', 'BUCK_FB', ref='R111', show=True)
+    d.R('22.1k', 'BUCK_FB', 'GND', ref='R112', show=True, desc='3.315 V')
 
     # DC input for 12 V / 24 V supplies with its own 5 V converter. Two connectors in parallel:
     # a barrel jack for a plug-in supply and a spring terminal for bare wires. The terminal footprint
@@ -82,41 +97,53 @@ def power(d):
     d.add('F', '1.1A PTC 33V', 'Device:Polyfuse', 'attractap:F1812', {'1': 'VDC_IN', '2': 'VDC_F'},
           lcsc='C21000', mpn='SMD1812P110TF/33', desc='Resettable fuse 1.1 A hold, 33 V')
     d.add('D', 'SS34', 'Device:D_Schottky', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': 'VDC_R', '2': 'VDC_F'},
-          lcsc='C8678', mpn='SS34', desc='Reverse polarity protection')
+          ref='D105', lcsc='C8678', mpn='SS34', desc='Reverse polarity protection')
     # Input filter: without it the converter's 1.1 MHz ripple current runs straight out on the supply
-    # cable (conducted emission). C117 - L103 - C112/C113 form a pi filter; the TVS sits behind the
-    # inductor, at the converter, and so also clamps what the filter rings up to when a live supply
-    # is plugged in.
-    # The three input capacitors are 2.2 uF / 100 V X7R, not the 10 uF / 50 V X5R of the same size. By
-    # the maker's curves the 10 uF part keeps 1.35 uF at 24 V and the 2.2 uF part 1.53 uF, so nothing is
-    # lost where it counts. But a capacitor that is large at 5 V and small at 24 V makes the input swing
-    # far above the supply when a live supply is plugged in: 45 V at the converter with 5 m of 1.5 mm2
-    # wire, against its limit of 40 V. With these it is 37.5 V (docs/design-notes.md, "Power").
+    # cable (conducted emission). C117 - L103 - C112/C113 form a pi filter. The electrolytic C120 damps
+    # the cable's inductance with the ceramics when a live supply is plugged in: without it the input
+    # rang up to 38 V (24 V) and 40 V (26.4 V) at the converter, whose limit is 40 V for 0.4 s.
+    # Ceramics of 2.2 uF / 100 V: they keep their capacitance at 24 V (docs/design-notes.md, "Power").
     d.C(DC_INPUT_CAP, 'VDC_R', size='1206', ref='C117',
         desc='DC input filter, connector side. 100 V X7R: keeps 1.5 uF at 24 V')
+    d.add('C', '47u/50V', 'Device:C_Polarized', 'Capacitor_SMD:CP_Elec_6.3x7.7', {'1': 'VDC_R', '2': 'GND'},
+          ref='C120', lcsc=DC_BULK[0], mpn=DC_BULK[1], desc='damps the input when a live supply is plugged in')
     d.add('L', '2.2uH 2.3A', 'Device:L', 'attractap:IND-SMD_L2.5-W2.0_CKCSA252012', {'1': 'VDC_R', '2': 'VDC'},
           ref='L103', lcsc='C354540', mpn='CKCSA252012-2.2uH/M', desc='DC input filter')
-    # 600 W part with 26 V stand-off: it starts to conduct at 28.9 to 31.9 V and holds the input below
-    # the converter's 40 V limit up to a peak current of 11 A (42.1 V at its rated 14.3 A). The smaller
-    # SMAJ28A fitted before crossed 40 V at 4.5 A.
-    d.add('D', 'SMBJ26A', 'attractap:SMBJ26A', 'Diode_SMD:D_SMB', {'1': 'VDC', '2': 'GND'},
-          lcsc='C315992', mpn='SMBJ26A', desc='TVS, DC input (stand-off 26 V, conducts from 28.9 V; U104 stands 40 V for 0.4 s)')
+    # Stand-off 28 V: above the highest input it takes continuously (24 V + 10 % = 26.4 V, up to 28 V);
+    # it conducts from 31.1 V. Surges and ESD only: plugging in a live supply is damped by C120.
+    d.add('D', 'SMBJ28A', 'attractap:SMBJ28A', 'Diode_SMD:D_SMB', {'1': 'VDC', '2': 'GND'},
+          ref='D106', lcsc=DC_TVS[0], mpn=DC_TVS[1],
+          desc='TVS, DC input (stand-off 28 V, conducts from 31.1 V; U104 stands 40 V for 0.4 s)')
     for _ in range(2):
         d.C(DC_INPUT_CAP, 'VDC', size='1206',
             desc='converter input. 100 V X7R: keeps 1.5 uF at 24 V')
     d.add('U', 'AP63205WU-7', 'attractap:AP63205WU-7', 'attractap:TSOT-26_L2.9-W1.6-P0.95-LS2.8-BL', {
         '3': 'VDC', '2': 'DC_EN', '4': 'GND', '5': 'DC_SW', '6': 'DC_BST', '1': '+5V_DC',
-    }, lcsc='C2071056', mpn='AP63205WU-7', desc='5 V 2 A buck for the DC input (same family as U103)')
-    d.R('100k', 'VDC', 'DC_EN')
+    }, lcsc='C2071056', mpn='AP63205WU-7', desc='5 V 2 A buck for the DC input')
+    # EN divider: the converter starts between 8.5 and 9.4 V and stops between 7.4 and 8.4 V (1 % parts,
+    # the datasheet's thresholds and pull-up currents); EN stays at 5.3 V with 40 V on VDC (EN stands 35 V).
+    d.R('100k', 'VDC', 'DC_EN', ref='R103', show=True)
+    d.R('15k', 'DC_EN', 'GND', ref='R113', show=True, desc='starts at 8.5 to 9.4 V')
     d.C('100n', 'DC_BST', 'DC_SW')
     d.add('L', '6.8uH 2.4A', 'Device:L', 'attractap:IND-SMD_L4.0-W4.0', {'1': 'DC_SW', '2': '+5V_DC'},
           lcsc='C5291940', mpn='CKCSA4020-6.8uH/M')
     d.C('22u', '+5V_DC', size='0805')
     d.C('22u', '+5V_DC', size='0805')
-    # as R104: the leakage of D107 must not lift this net (and through the converter its input and EN)
+    # as R104: the ideal diode leaks a few microamps back; they must not lift this net
     d.R('4.7k', '+5V_DC', 'GND', ref='R105', desc='bleed: keeps the unpowered converter output at 0 V')
-    d.add('D', 'SS34', 'Device:D_Schottky', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': '+5V', '2': '+5V_DC'},
-          lcsc='C8678', mpn='SS34', desc='Supply OR-ing, DC input')
+    ideal_diode(d, '+5V_DC', 'DC', 'U107', 'Q102', 'C121')
+
+
+def ideal_diode(d, src, name, ic, fet, cap, **kw):
+    """LM74700-Q1 with an N-channel MOSFET from a 5 V source to the +5V rail: about 20 mV forward drop,
+    no current back into the source. The charge pump holds the gate 10.8 to 13.9 V above the source."""
+    d.add('U', 'LM74700QDBVRQ1', 'attractap:LM74700QDBVRQ1', 'attractap:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL', {
+        '6': src, '4': '+5V', '5': name + '_GATE', '1': name + '_VCAP', '3': src, '2': 'GND',
+    }, ref=ic, lcsc='C2941042', mpn='LM74700QDBVRQ1', desc='ideal diode controller, %s input' % name, **kw)
+    d.add('Q', 'IRLML0030', 'Transistor_FET:IRLML0030', 'Package_TO_SOT_SMD:SOT-23', {
+        '1': name + '_GATE', '2': src, '3': '+5V',
+    }, ref=fet, lcsc='C67272', mpn='IRLML0030TRPBF', desc='ideal diode switch, %s input' % name, **kw)
+    d.C('100n/50V', src, name + '_VCAP', ref=cap, desc='charge pump, up to 14 V', **kw)
 
 
 # ESP32-P4 GPIO number -> net. silk.py prints part of this map on the board.
@@ -245,6 +272,13 @@ def mcu(d):
     d.group('Reset, boot and straps')
     d.R('10k', '+3V3', 'CHIP_PU')
     d.C('1u', 'CHIP_PU')
+    # Supervisor: holds CHIP_PU low while +3V3 is below 2.93 V and 200 ms after it rose, so the chip
+    # also resets cleanly when the rail sags while the board changes supplies (Espressif asks for a
+    # supervisor or an RC; the RC stays for the button).
+    d.add('U', 'TLV803SDBZR', 'attractap:TLV803SDBZR', 'Package_TO_SOT_SMD:SOT-23',
+          {'1': 'GND', '2': 'CHIP_PU', '3': '+3V3'}, ref='U204', lcsc='C132016', mpn='TLV803SDBZR',
+          desc='supervisor on CHIP_PU, 2.93 V')
+    d.C('100n', '+3V3', ref='C241', desc='supervisor supply (the datasheet asks for 0.1 uF)')
     d.add('SW', 'RESET', 'Switch:SW_Push_Dual', 'attractap:SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5',
           {'1': 'CHIP_PU', '4': 'GND'}, nc=('2', '3'), lcsc='C318884', mpn='TS-1187A-B-A-B')
     d.add('SW', 'BOOT', 'Switch:SW_Push_Dual', 'attractap:SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5',

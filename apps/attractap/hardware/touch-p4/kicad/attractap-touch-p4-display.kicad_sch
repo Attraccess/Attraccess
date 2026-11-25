@@ -1585,7 +1585,7 @@
 			(at 194.31 69.85 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "Alternate" "equivalent part of the same value, rating and package"
+		(property "Alternate" "MCC B5819W-TP (C84354): same ratings"
 			(at 194.31 69.85 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -1713,7 +1713,7 @@
 		(property "LCSC" "C45403" (at 163.83 57.15 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "MPN" "SWPA3015S100MT" (at 163.83 57.15 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Manufacturer" "Sunlord" (at 163.83 57.15 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Alternate" "equivalent part of the same value, rating and package"
+		(property "Alternate" "TDK VLS3015CX-100M-1 (C2044430): saturation 0.92 A, rated 1.17 A"
 			(at 163.83 57.15 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -3042,10 +3042,11 @@
 		(effects (font (size 1.27 1.27)) (justify right))
 		(uuid "09a415d7-0db6-5019-869a-259ea3d2165d")
 	)
-	(label "BL_A"
+	(hierarchical_label "BL_A"
+		(shape passive)
 		(at 237.49 69.85 0)
-		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "b9eb300b-f149-5a95-b67e-baa03e135847")
+		(effects (font (size 1.27 1.27)) (justify left))
+		(uuid "631f3933-a5c8-5076-b7fe-765dcb7513c4")
 	)
 	(label "BL_K"
 		(at 191.77 90.17 0)
@@ -3207,10 +3208,11 @@
 		(effects (font (size 1.27 1.27)) (justify right bottom))
 		(uuid "5287cd30-c7f3-5354-bbcf-0f7e1d843167")
 	)
-	(label "BL_A"
+	(hierarchical_label "BL_A"
+		(shape passive)
 		(at 363.22 163.83 180)
-		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "fbe9529a-9b85-5fca-9e29-563acdf7df3b")
+		(effects (font (size 1.27 1.27)) (justify right))
+		(uuid "b12167ca-57b9-5f08-b338-405eb7d9e167")
 	)
 	(hierarchical_label "LCD_R2_M"
 		(shape passive)
@@ -4155,7 +4157,7 @@
 	)
 	(rectangle
 		(start 115.57 46.99)
-		(end 245.11 104.14)
+		(end 246.38 104.14)
 		(stroke (width 0.15) (type dash))
 		(fill (type none))
 		(uuid "4952215a-baf2-5ca8-be64-b5281df9294f")

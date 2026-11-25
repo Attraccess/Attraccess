@@ -2789,11 +2789,11 @@
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
 		(property "Manufacturer" "CENKER" (at 227.33 184.15 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Alternate" "equivalent part of the same value, rating and package"
+		(property "Alternate" "Sunlord WPN252012H2R2MT (C98350): same ratings"
 			(at 227.33 184.15 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "BOM description" "Power inductor 2.2 uH 20 %, saturation 2.3 A, rated 1.9 A, 2.5 x 2.0 x 1.25 mm"
+		(property "BOM description" "Power inductor 2.2 uH 20 %, saturation 2.6 A, rated 1.9 A, 2.5 x 2.0 x 1.25 mm"
 			(at 227.33 184.15 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)

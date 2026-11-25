@@ -2009,11 +2009,11 @@
 		(property "LCSC" "C85833" (at 152.4 69.85 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "MPN" "BLM18KG601SN1D" (at 152.4 69.85 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Manufacturer" "Murata" (at 152.4 69.85 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Alternate" "equivalent part of the same value, rating and package"
+		(property "Alternate" "Sunlord UPZ1608U601-1R3TF (C97000): 600 ohm, 1.3 A, 0.15 ohm"
 			(at 152.4 69.85 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "BOM description" "Ferrite bead 600 ohm at 100 MHz, 1.3 A, 0603"
+		(property "BOM description" "Ferrite bead 600 ohm at 100 MHz, 1.3 A, 0.15 ohm, 0603"
 			(at 152.4 69.85 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -2048,11 +2048,11 @@
 		(property "LCSC" "C85833" (at 184.15 92.71 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "MPN" "BLM18KG601SN1D" (at 184.15 92.71 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Manufacturer" "Murata" (at 184.15 92.71 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Alternate" "equivalent part of the same value, rating and package"
+		(property "Alternate" "Sunlord UPZ1608U601-1R3TF (C97000): 600 ohm, 1.3 A, 0.15 ohm"
 			(at 184.15 92.71 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "BOM description" "Ferrite bead 600 ohm at 100 MHz, 1.3 A, 0603"
+		(property "BOM description" "Ferrite bead 600 ohm at 100 MHz, 1.3 A, 0.15 ohm, 0603"
 			(at 184.15 92.71 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -2087,11 +2087,11 @@
 		(property "LCSC" "C85833" (at 151.13 115.57 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "MPN" "BLM18KG601SN1D" (at 151.13 115.57 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Manufacturer" "Murata" (at 151.13 115.57 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Alternate" "equivalent part of the same value, rating and package"
+		(property "Alternate" "Sunlord UPZ1608U601-1R3TF (C97000): 600 ohm, 1.3 A, 0.15 ohm"
 			(at 151.13 115.57 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "BOM description" "Ferrite bead 600 ohm at 100 MHz, 1.3 A, 0603"
+		(property "BOM description" "Ferrite bead 600 ohm at 100 MHz, 1.3 A, 0.15 ohm, 0603"
 			(at 151.13 115.57 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -2129,7 +2129,7 @@
 		(property "LCSC" "C91630" (at 58.42 260.35 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "MPN" "LQW18CNR56J00D" (at 58.42 260.35 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Manufacturer" "Murata" (at 58.42 260.35 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Alternate" "equivalent part of the same value, rating and package"
+		(property "Alternate" "Chilisin BWLS00161109R56J00 (C6473441): 560 nH 5 %, Q 17, body 0.3 mm wider"
 			(at 58.42 260.35 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -2171,7 +2171,7 @@
 		(property "LCSC" "C91630" (at 58.42 232.41 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "MPN" "LQW18CNR56J00D" (at 58.42 232.41 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Manufacturer" "Murata" (at 58.42 232.41 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Alternate" "equivalent part of the same value, rating and package"
+		(property "Alternate" "Chilisin BWLS00161109R56J00 (C6473441): 560 nH 5 %, Q 17, body 0.3 mm wider"
 			(at 58.42 232.41 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -2611,11 +2611,11 @@
 		(property "LCSC" "C113669" (at 152.4 157.48 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "MPN" "X32252712MOB4SI" (at 152.4 157.48 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Manufacturer" "YXC" (at 152.4 157.48 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Alternate" "equivalent part of the same value, rating and package"
+		(property "Alternate" "Epson X1E0000210860 (C255927): 12 pF, +-10 ppm, ESR 40 ohm"
 			(at 152.4 157.48 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "BOM description" "Crystal 27.12 MHz, 12 pF load, 3.2 x 2.5 mm"
+		(property "BOM description" "Crystal 27.12 MHz, 12 pF load, +-10 ppm, 3.2 x 2.5 mm"
 			(at 152.4 157.48 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -3354,25 +3354,29 @@
 		(effects (font (size 1.27 1.27)) (justify left bottom))
 		(uuid "c01a2be1-d150-5b4f-a336-a6caf40a4cdc")
 	)
-	(label "NFC_DVDD"
+	(hierarchical_label "NFC_DVDD"
+		(shape passive)
 		(at 139.7 92.71 180)
-		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "81006fed-0f6f-546d-8739-ef9bdc821ae0")
+		(effects (font (size 1.27 1.27)) (justify right))
+		(uuid "12106d8f-4b33-56ea-93d7-55dc4e6f5d80")
 	)
-	(label "NFC_AVDD"
+	(hierarchical_label "NFC_AVDD"
+		(shape passive)
 		(at 228.6 92.71 0)
-		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "e9aeb2ca-53fd-5e3c-90a8-a2aaf3dc516c")
+		(effects (font (size 1.27 1.27)) (justify left))
+		(uuid "8fd1a044-292a-5ddc-9589-31dd515e6a2a")
 	)
-	(label "NFC_DVDD"
+	(hierarchical_label "NFC_DVDD"
+		(shape passive)
 		(at 139.7 115.57 180)
-		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "bd11495d-d389-5d3c-96c8-7681fc0b0e8d")
+		(effects (font (size 1.27 1.27)) (justify right))
+		(uuid "ccedb793-ec4a-582c-8007-e4cbecf1ee0a")
 	)
-	(label "NFC_TVDD"
+	(hierarchical_label "NFC_TVDD"
+		(shape passive)
 		(at 195.58 115.57 0)
-		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "7cb75cbf-841f-575f-8ec4-caf043766ac3")
+		(effects (font (size 1.27 1.27)) (justify left))
+		(uuid "c0cf1190-43be-593e-a0e4-35c90c731d93")
 	)
 	(label "NFC_X1"
 		(at 139.7 151.13 180)
@@ -3446,10 +3450,11 @@
 		(effects (font (size 1.27 1.27)) (justify right))
 		(uuid "8a3ee106-ab31-5a9f-b688-31164f8524d0")
 	)
-	(label "NFC_DVDD"
+	(hierarchical_label "NFC_DVDD"
+		(shape passive)
 		(at 26.67 95.25 180)
-		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "77b44cc6-bf4d-5bc0-80ce-d83febddfbb1")
+		(effects (font (size 1.27 1.27)) (justify right))
+		(uuid "9d48384d-91b3-5a92-a7ef-a3107b0ff7e2")
 	)
 	(label "NFC_X1"
 		(at 26.67 105.41 180)
@@ -3466,10 +3471,11 @@
 		(effects (font (size 1.27 1.27)) (justify left bottom))
 		(uuid "b61bbc7f-f954-582e-ac77-8df947c1d8b3")
 	)
-	(label "NFC_TVDD"
+	(hierarchical_label "NFC_TVDD"
+		(shape passive)
 		(at 105.41 85.09 0)
-		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "d94994f6-0b01-5c66-80e6-3b7f10d2e2c4")
+		(effects (font (size 1.27 1.27)) (justify left))
+		(uuid "cce61d82-1853-5b33-8afd-4fe550d6cf4c")
 	)
 	(label "NFC_TX2"
 		(at 105.41 87.63 0)
@@ -3486,20 +3492,22 @@
 		(effects (font (size 1.27 1.27)) (justify left bottom))
 		(uuid "5fab400e-fb4e-505a-b0bb-6227855b861e")
 	)
-	(label "NFC_AVDD"
+	(hierarchical_label "NFC_AVDD"
+		(shape passive)
 		(at 105.41 97.79 0)
-		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "aae04d56-e6f3-52a3-ad94-80cbc6a21bf3")
+		(effects (font (size 1.27 1.27)) (justify left))
+		(uuid "d10b85a2-1e74-5291-94f9-a24e4d96e7e0")
 	)
 	(label "NFC_VBAT"
 		(at 60.96 72.39 90)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
 		(uuid "e485b0d9-40f8-5793-a074-70958485bedb")
 	)
-	(label "NFC_DVDD"
+	(hierarchical_label "NFC_DVDD"
+		(shape passive)
 		(at 68.58 72.39 90)
-		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "f71a9433-2deb-53f0-9825-1b309743982c")
+		(effects (font (size 1.27 1.27)) (justify left))
+		(uuid "08b036fa-e555-5982-ba6f-796406f2bac5")
 	)
 	(label "NFC_F2"
 		(at 63.5 232.41 0)
@@ -4201,15 +4209,15 @@
 	)
 	(text "PN532"
 		(exclude_from_sim no)
-		(at 15.24 58.01 0)
+		(at 13.97 58.01 0)
 		(effects (font (size 2 2) (bold yes)) (justify left bottom))
-		(uuid "7bc8f58c-1347-5e58-bcb2-7dc3c0227773")
+		(uuid "d035075c-324e-5038-86d5-53b3ce68d0cb")
 	)
 	(text "Supplies"
 		(exclude_from_sim no)
-		(at 128.27 60.55 0)
+		(at 127 60.55 0)
 		(effects (font (size 2 2) (bold yes)) (justify left bottom))
-		(uuid "954e0e13-83d7-5525-b1ec-74ea16f1bf6d")
+		(uuid "b7f73285-4c94-57da-bea3-dc4261f7b2cd")
 	)
 	(text "27.12 MHz crystal"
 		(exclude_from_sim no)
@@ -4230,18 +4238,18 @@
 		(uuid "5432b4be-66de-55ac-a929-78d960bdf392")
 	)
 	(rectangle
-		(start 13.97 54.61)
-		(end 118.11 162.56)
+		(start 12.7 54.61)
+		(end 119.38 162.56)
 		(stroke (width 0.15) (type dash))
 		(fill (type none))
-		(uuid "242ed2b4-dd80-538c-a136-26f13ca6d4b5")
+		(uuid "bf52bdf0-605e-5e36-bc2b-3709c0067134")
 	)
 	(rectangle
-		(start 127 57.15)
+		(start 125.73 57.15)
 		(end 257.81 132.08)
 		(stroke (width 0.15) (type dash))
 		(fill (type none))
-		(uuid "2809b35d-a56e-5231-82ff-948db6ecb55e")
+		(uuid "a8d543ea-7315-53c9-91c3-8a59fed163fb")
 	)
 	(rectangle
 		(start 129.54 143.51)

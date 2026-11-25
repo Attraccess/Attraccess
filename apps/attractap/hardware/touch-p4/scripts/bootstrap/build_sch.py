@@ -39,9 +39,12 @@ SHEETS = [
 NOTES = {
     'power': [
         'Supply: USB-C 5 V, DC 12 to 24 V (barrel jack or spring terminal) or PoE (802.3af, isolated module).',
-        'All three end on the +5V rail through Schottky diodes, so any combination may be connected.',
-        'R104 / R105 take up the leakage of those diodes, so an unpowered input stays at 0 V.',
-        'DC input: C117 - L103 - C112/C113 filter the converter ripple off the supply cable; D106 clamps behind L103.',
+        'All three end on the +5V rail through blocking switches (U105 eFuse; U106/Q101, U107/Q102 ideal diodes),',
+        'so any combination may be connected: the highest one feeds the board, none feeds another back.',
+        'R104 / R105 take up the switches\' leakage (microamps), so an unpowered input stays at 0 V.',
+        'USB: U105 starts the rail at 0.9 V/ms (C118), limits at 2 A (R110), off below 3.9 V and above 5.8 V.',
+        'DC input: C117 - L103 - C112/C113 filter the converter ripple off the supply cable; C120 damps a live',
+        'plug-in; D106 clamps surges behind L103. U104 starts at 8.5 to 9.4 V (R103/R113).',
         'Do not add capacitance across the PoE input (POE_VPF / POE_VNF): it would break PoE detection.',
         'The PoE module needs a minimum load: 100 mA (DP9900M) or 200 mA (Ag9905M).',
     ],

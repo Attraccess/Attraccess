@@ -278,6 +278,16 @@ def mech(d):
         ('ACC_INT', 'ACC_INT', 'ui'), ('PROX_INT', 'PROX_INT', 'ui'),
     ):
         d.TP(net, label, sheet=sheet)
+    # every supply rail, both I2C buses and the RMII clock (1 mm pads), drawn together on this sheet
+    for net, label, _sheet in (
+        ('VDC', 'VDC', 'power'), ('+5V_DC', '5V_DC', 'power'), ('+5V_USB', '5V_USB', 'power'),
+        ('+5V_POE', '5V_POE', 'power'), ('VDD_FLASH', 'VDD_FLASH', 'mcu_power'),
+        ('NFC_TVDD', 'TVDD', 'nfc'), ('NFC_AVDD', 'AVDD', 'nfc'), ('NFC_DVDD', 'DVDD', 'nfc'),
+        ('BL_A', 'BL_A', 'display'), ('I2C0_SDA', 'SDA', 'display'), ('I2C0_SCL', 'SCL', 'display'),
+        ('NFC_SDA', 'NFC_SDA', 'nfc'), ('NFC_SCL', 'NFC_SCL', 'nfc'), ('RMII_REF_CLK', 'REF_CLK', 'eth'),
+        ('PHY_3V3', 'PHY_3V3', 'eth'),
+    ):
+        d.TP(net, label, sheet='mech', small=True)
     d.group('Mounting holes')
     for i in range(4):
         d.add('H', 'M3', 'Mechanical:MountingHole', 'MountingHole:MountingHole_3.2mm_M3', {})

@@ -96,27 +96,51 @@ def nfc(board):
 
 
 def dc_input():
-    print('DC input: a live supply is plugged in (converter limit 40 V, TVS at the top of its range)')
+    print('DC input: a live supply is plugged in (converter limit 40 V for 0.4 s; target 5 V below it, TVS at '
+          'the top of its range, C120 at -20 %)')
     cables = (('1.5 m of 2 x 0.35 mm2', 1.1e-6, 0.15), ('3 m of 2 x 0.75 mm2', 2.25e-6, 0.142),
               ('5 m of 2 x 1.5 mm2', 3.45e-6, 0.119), ('10 m of 2 x 1.5 mm2', 6.9e-6, 0.237))
-    for name, l, r in cables:
-        m = spice.run('dc_hotplug.cir', lcab=l, rcab=r)
-        check(m['v_converter'] < 40, '24 V, %s: %.1f V at the converter, %.1f V at C117, %.1f A in the TVS'
-              % (name, m['v_converter'], m['v_c117'], m['i_tvs']))
-    for volt in (12, 26.4, 28):
-        m = spice.run('dc_hotplug.cir', vsup=volt)
-        print('        %.1f V, 5 m of 2 x 1.5 mm2: %.1f V at the converter' % (volt, m['v_converter']))
+    for volt in (24, 26.4):
+        for name, l, r in cables:
+            peak = max(spice.run('dc_hotplug.cir', vsup=volt, lcab=l, rcab=r, esr=e)['v_converter']
+                       for e in (0.1, 0.8))
+            check(peak < 35, '%.1f V, %s: %.1f V at the converter at most (C120 with 0.1 or 0.8 ohm ESR)'
+                  % (volt, name, peak))
+    m = spice.run('dc_hotplug.cir', vsup=28, esr=0.1)
+    print('        28.0 V, 5 m of 2 x 1.5 mm2: %.1f V at the converter, %.1f A in the TVS' % (m['v_converter'], m['i_tvs']))
 
 
 def power_up():
-    print('Power-up from USB (reset must stay low until the 3.3 V rail has been steady for 50 us)')
+    print('Power-up from USB through the eFuse (reset must stay low until the 3.3 V rail has been steady for 50 us)')
     for volt, cable, load in ((5.0, 0.25, 0.45), (4.5, 0.5, 0.45), (5.0, 0.25, 1.1)):
         m = spice.run('powerup.cir', vusb=volt, rcable=cable, iload=load)
         wait = m['t_reset_ends'] - m['t_rail_ok']
         check(m['reset_at_rail_ok'] < 0.25 * 3.3 and wait > 50e-6 and m['v5_running'] > 3.8 and m['v33_running'] > 3.2,
-              '%.1f V behind %.2f ohm, %.2f A at 3.3 V: rail up after %.1f ms, reset released %.1f ms later, running at %.2f V on the 5 V rail'
+              '%.1f V behind %.2f ohm, %.2f A at 3.3 V: rail up after %.1f ms, reset released %.1f ms later '
+              '(supervisor delay shortened to 2 ms; the part has 120 to 280 ms), running at %.2f V on the 5 V rail'
               % (volt, cable, load, m['t_rail_ok'] * 1e3, wait * 1e3, m['v5_running']))
-    print('        inrush from a stiff 5 V source: %.1f A for some microseconds' % m['i_inrush'])
+    m = spice.run('powerup.cir')
+    check(m['i_slew'] < 0.1, 'USB attach: %.1f A for microseconds into C101 (10 uF, what USB 2.0 7.2.4.1 allows '
+          'at attach), then %.0f mA while the eFuse ramps the 5 V rail at 0.91 V/ms' % (m['i_inrush'], m['i_slew'] * 1e3))
+
+
+def supply_switch():
+    print('Changing supplies while the board runs (supervisor resets below 2.87 to 2.99 V; 0.9 A on +5V, '
+          '0.6 A on +3V3)')
+    cases = (('DC, USB plugged in, DC pulled', dict(tdc_on=0, tdc_off=6e-3, tusb_on=2e-3)),
+             ('USB at 4.75 V, DC at 5.05 V plugged in and pulled', dict(tusb_on=1e-4, tdc_on=2e-3, tdc_off=6e-3,
+                                                                       vusb=4.75, vdc=5.05)),
+             ('PoE, DC plugged in, PoE pulled', dict(tpoe_on=0, tdc_on=2e-3, tpoe_off=6e-3)),
+             ('PoE and USB at 4.75 V, PoE pulled', dict(tpoe_on=0, tusb_on=1e-4, tpoe_off=6e-3, vusb=4.75)))
+    for name, kw in cases:
+        m = spice.run('switchover.cir', **kw)
+        check(m['v33_min'] > 2.99, '%s: +5V at least %.2f V, +3V3 at least %.2f V'
+              % (name, m['v5_min'], m['v33_min']))
+    m = spice.run('switchover.cir', tdc_on=0, tusb_on=1)
+    check(m['usb_back'] < 0.8, 'running on DC, USB unplugged: VBUS at %.0f mV (a USB-C host wants below 0.8 V)'
+          % (m['usb_back'] * 1e3))
+    m = spice.run('switchover.cir', tusb_on=1e-4)
+    check(m['dc_back'] < 0.5, 'running on USB: the DC converter\'s output at %.0f mV' % (m['dc_back'] * 1e3))
 
 
 def signals(board):
@@ -234,6 +258,7 @@ if __name__ == '__main__':
     nfc(board)
     dc_input()
     power_up()
+    supply_switch()
     signals(board)
     wifi_link(board)
     supply_tracks(board)

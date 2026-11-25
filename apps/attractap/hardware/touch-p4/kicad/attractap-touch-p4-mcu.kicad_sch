@@ -1229,69 +1229,54 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "power:GND"
-			(power global)
-			(pin_numbers (hide yes))
-			(pin_names (offset 0) (hide yes))
+		(symbol "attractap:TLV803SDBZR"
+			(pin_names (offset 1.016))
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
-			(in_pos_files yes)
-			(duplicate_pin_numbers_are_jumpers no)
-			(property "Reference" "#PWR"
-				(at 0 -6.35 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects (font (size 1.27 1.27)))
+			(property "Reference" "U" (at -11.43 6.35 0) (effects (font (size 1.27 1.27)) (justify left)))
+			(property "Value" "TLV803SDBZR"
+				(at -11.43 -6.35 0)
+				(effects (font (size 1.27 1.27)) (justify left))
 			)
-			(property "Value" "GND"
-				(at 0 -3.81 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects (font (size 1.27 1.27)))
-			)
-			(property "Footprint" ""
+			(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
 				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects (font (size 1.27 1.27)))
+				(effects (font (size 1.27 1.27)) (hide yes))
 			)
-			(property "Datasheet" ""
+			(property "Datasheet" "https://www.ti.com/lit/ds/symlink/tlv803.pdf"
 				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects (font (size 1.27 1.27)))
+				(effects (font (size 1.27 1.27)) (hide yes))
 			)
-			(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(property "Description" "Voltage supervisor 2.93 V, 200 ms, open-drain reset"
 				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects (font (size 1.27 1.27)))
+				(effects (font (size 1.27 1.27)) (hide yes))
 			)
-			(property "ki_keywords" "global power"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects (font (size 1.27 1.27)))
-			)
-			(symbol "GND_0_1"
-				(polyline
-					(pts (xy 0 0) (xy 0 -1.27) (xy 1.27 -1.27) (xy 0 -2.54) (xy -1.27 -1.27) (xy 0 -1.27))
-					(stroke (width 0) (type default))
-					(fill (type none))
+			(symbol "TLV803SDBZR_0_1"
+				(rectangle
+					(start -11.43 5.08)
+					(end 11.43 -5.08)
+					(stroke (width 0.254) (type default))
+					(fill (type background))
 				)
 			)
-			(symbol "GND_1_1"
-				(pin power_in line
-					(at 0 0 270)
-					(length 0)
-					(name "" (effects (font (size 1.27 1.27))))
-					(number "1" (effects (font (size 1.27 1.27))))
+			(symbol "TLV803SDBZR_1_1"
+				(pin passive line
+					(at -16.51 2.54 0)
+					(length 5.08)
+					(name "VDD" (effects (font (size 1.27 1.27))))
+					(number "3" (effects (font (size 1 1))))
+				)
+				(pin passive line
+					(at 16.51 2.54 180)
+					(length 5.08)
+					(name "~{RESET}" (effects (font (size 1.27 1.27))))
+					(number "2" (effects (font (size 1 1))))
+				)
+				(pin passive line
+					(at 0 -10.16 90)
+					(length 5.08)
+					(name "GND" (effects (font (size 1.27 1.27))))
+					(number "1" (effects (font (size 1 1))))
 				)
 			)
 			(embedded_fonts no)
@@ -1354,6 +1339,73 @@
 			(symbol "+3V3_1_1"
 				(pin power_in line
 					(at 0 0 90)
+					(length 0)
+					(name "" (effects (font (size 1.27 1.27))))
+					(number "1" (effects (font (size 1.27 1.27))))
+				)
+			)
+			(embedded_fonts no)
+		)
+		(symbol "power:GND"
+			(power global)
+			(pin_numbers (hide yes))
+			(pin_names (offset 0) (hide yes))
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "#PWR"
+				(at 0 -6.35 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "Value" "GND"
+				(at 0 -3.81 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "ki_keywords" "global power"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects (font (size 1.27 1.27)))
+			)
+			(symbol "GND_0_1"
+				(polyline
+					(pts (xy 0 0) (xy 0 -1.27) (xy 1.27 -1.27) (xy 0 -2.54) (xy -1.27 -1.27) (xy 0 -1.27))
+					(stroke (width 0) (type default))
+					(fill (type none))
+				)
+			)
+			(symbol "GND_1_1"
+				(pin power_in line
+					(at 0 0 270)
 					(length 0)
 					(name "" (effects (font (size 1.27 1.27))))
 					(number "1" (effects (font (size 1.27 1.27))))
@@ -1532,6 +1584,52 @@
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
 					(reference "C240")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:C")
+		(at 198.12 223.52 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "6a3ef804-1622-5ac0-a86d-b85b5a13d494")
+		(property "Reference" "C241" (at 192.748 221.82 0) (effects (font (size 1.27 1.27))))
+		(property "Value" "100n" (at 192.748 223.52 0) (effects (font (size 1.27 1.27))))
+		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
+			(at 198.12 223.52 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "Datasheet" "" (at 198.12 223.52 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Description" "supervisor supply (the datasheet asks for 0.1 uF)"
+			(at 198.12 223.52 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "LCSC" "C1525" (at 198.12 223.52 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "MPN" "CL05B104KO5NNNC" (at 198.12 223.52 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 198.12 223.52 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "Alternate" "equivalent part of the same value, rating and package"
+			(at 198.12 223.52 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "BOM description" "MLCC 100nF 16V X7R 10% 0402"
+			(at 198.12 223.52 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "Rating" "16V X7R" (at 190.843 225.22 0) (effects (font (size 1.27 1.27))))
+		(pin "1" (uuid "7dbb1c3e-f268-5012-b965-7c463acb95b3"))
+		(pin "2" (uuid "9b89e3d7-f755-5af2-a43a-4a87fc2cc03a"))
+		(instances
+			(project "attractap-touch-p4"
+				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
+					(reference "C241")
 					(unit 1)
 				)
 			)
@@ -2448,6 +2546,56 @@
 		)
 	)
 	(symbol
+		(lib_id "attractap:TLV803SDBZR")
+		(at 222.25 219.71 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "e772eacc-bdbf-5e12-ad1e-a9e7f2d38435")
+		(property "Reference" "U204" (at 222.25 211.73 0) (effects (font (size 1.27 1.27))))
+		(property "Value" "TLV803SDBZR" (at 222.25 213.43 0) (effects (font (size 1.27 1.27))))
+		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
+			(at 222.25 219.71 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "Datasheet" "" (at 222.25 219.71 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Description" "supervisor on CHIP_PU, 2.93 V"
+			(at 222.25 219.71 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "LCSC" "C132016" (at 222.25 219.71 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "MPN" "TLV803SDBZR" (at 222.25 219.71 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Manufacturer" "Texas Instruments"
+			(at 222.25 219.71 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "Alternate" "3PEAK TPV803S-3STR (C2842356): 2.85 to 3.00 V, 140 to 280 ms"
+			(at 222.25 219.71 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "BOM description" "Voltage supervisor 2.93 V, 200 ms, open-drain active-low reset, SOT-23"
+			(at 222.25 219.71 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "Lifecycle" "ACTIVE (ti.com)"
+			(at 222.25 219.71 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(pin "3" (uuid "300212e1-e144-5f9f-9525-ff8cb12862b4"))
+		(pin "2" (uuid "b4bafbb5-192a-5bf1-a948-6b828e6ffade"))
+		(pin "1" (uuid "08daf392-b73f-598b-928d-5e89a46774e7"))
+		(instances
+			(project "attractap-touch-p4"
+				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
+					(reference "U204")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:Crystal_GND24")
 		(at 309.88 76.2 270)
 		(unit 1)
@@ -2467,11 +2615,11 @@
 		(property "LCSC" "C255943" (at 309.88 76.2 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "MPN" "X1E000021017700" (at 309.88 76.2 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Manufacturer" "Epson" (at 309.88 76.2 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Alternate" "equivalent part of the same value, rating and package"
+		(property "Alternate" "Tai-Saw TZ0308D (C379787): 9 pF, +-10 ppm, ESR 30 ohm"
 			(at 309.88 76.2 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "BOM description" "Crystal 40 MHz, 9 pF load, +-10 ppm, 3.2 x 2.5 mm"
+		(property "BOM description" "Crystal 40 MHz, 9 pF load, +-10 ppm, ESR 40 ohm, 3.2 x 2.5 mm"
 			(at 309.88 76.2 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -2697,6 +2845,31 @@
 		(pts (xy 243.84 194.31) (xy 256.54 194.31))
 		(stroke (width 0) (type default))
 		(uuid "03b6e338-b1df-5d67-9445-5e7fcb8c108e")
+	)
+	(wire
+		(pts (xy 238.76 217.17) (xy 243.84 217.17))
+		(stroke (width 0) (type default))
+		(uuid "e812dd66-5c0a-5671-9991-cffbcfa2017d")
+	)
+	(wire
+		(pts (xy 243.84 217.17) (xy 243.84 201.93))
+		(stroke (width 0) (type default))
+		(uuid "5ca6e24d-01a8-5990-abb7-b25b51638f21")
+	)
+	(wire
+		(pts (xy 205.74 217.17) (xy 203.2 217.17))
+		(stroke (width 0) (type default))
+		(uuid "aba6d42c-f795-5c25-8917-6f0d970ae080")
+	)
+	(wire
+		(pts (xy 198.12 217.17) (xy 198.12 219.71))
+		(stroke (width 0) (type default))
+		(uuid "00e5fd99-fd94-585f-9c5e-3aa079f410e2")
+	)
+	(wire
+		(pts (xy 198.12 217.17) (xy 203.2 217.17))
+		(stroke (width 0) (type default))
+		(uuid "937a601c-3f8f-58fd-bc8e-10de55ce8d9a")
 	)
 	(wire
 		(pts (xy 294.64 194.31) (xy 294.64 191.77))
@@ -3119,6 +3292,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "e7fb67e1-b3a3-5494-a964-3bdd5db073e8")
+	)
+	(junction
+		(at 243.84 201.93)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "ca667c1c-0ec8-5ed9-95c0-79e1c7c2256c")
 	)
 	(junction
 		(at 294.64 194.31)
@@ -3653,6 +3832,29 @@
 		(uuid "fa1f398e-2c68-51eb-90eb-baead799871f")
 	)
 	(symbol
+		(lib_id "power:+3V3")
+		(at 203.2 217.17 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "011e472a-8bc4-5217-9726-aef905e7940d")
+		(property "Reference" "#PWR3001" (at 203.2 217.17 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Value" "+3V3" (at 203.2 213.57 0) (effects (font (size 1 1))))
+		(property "Footprint" "" (at 203.2 217.17 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Datasheet" "" (at 203.2 217.17 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(pin "1" (uuid "4dc35e90-2023-5757-af17-6f5a924ed21e"))
+		(instances
+			(project "attractap-touch-p4"
+				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
+					(reference "#PWR3001")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 373.38 139.7 0)
 		(unit 1)
@@ -3660,16 +3862,16 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "011e472a-8bc4-5217-9726-aef905e7940d")
-		(property "Reference" "#PWR3001" (at 373.38 139.7 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "97c236c0-03c4-5406-b14f-88f23686c58e")
+		(property "Reference" "#PWR3002" (at 373.38 139.7 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "GND" (at 373.38 143.3 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 373.38 139.7 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 373.38 139.7 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "4dc35e90-2023-5757-af17-6f5a924ed21e"))
+		(pin "1" (uuid "66f8cf02-e5e2-5d2b-a9c9-aa7cd16e9a89"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
-					(reference "#PWR3001")
+					(reference "#PWR3002")
 					(unit 1)
 				)
 			)
@@ -3683,16 +3885,16 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "97c236c0-03c4-5406-b14f-88f23686c58e")
-		(property "Reference" "#PWR3002" (at 342.9 80.01 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "109b7301-efaa-5efd-815a-eabdce709c1a")
+		(property "Reference" "#PWR3003" (at 342.9 80.01 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "GND" (at 342.9 83.61 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 342.9 80.01 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 342.9 80.01 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "66f8cf02-e5e2-5d2b-a9c9-aa7cd16e9a89"))
+		(pin "1" (uuid "4e410841-6b57-55d0-96ae-2ffd9a75399e"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
-					(reference "#PWR3002")
+					(reference "#PWR3003")
 					(unit 1)
 				)
 			)
@@ -3706,16 +3908,16 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "109b7301-efaa-5efd-815a-eabdce709c1a")
-		(property "Reference" "#PWR3003" (at 314.96 92.71 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "7305f7c8-7b58-5037-be26-353062bd54a9")
+		(property "Reference" "#PWR3004" (at 314.96 92.71 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "GND" (at 314.96 96.31 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 314.96 92.71 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 314.96 92.71 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "4e410841-6b57-55d0-96ae-2ffd9a75399e"))
+		(pin "1" (uuid "fe305963-0ae9-5a63-98ed-72eef1d1862a"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
-					(reference "#PWR3003")
+					(reference "#PWR3004")
 					(unit 1)
 				)
 			)
@@ -3729,16 +3931,39 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "7305f7c8-7b58-5037-be26-353062bd54a9")
-		(property "Reference" "#PWR3004" (at 226.06 204.47 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "230d5910-b3d6-564b-a4bd-202bab098da1")
+		(property "Reference" "#PWR3005" (at 226.06 204.47 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "GND" (at 226.06 208.07 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 226.06 204.47 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 226.06 204.47 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "fe305963-0ae9-5a63-98ed-72eef1d1862a"))
+		(pin "1" (uuid "bb22e290-8191-5c45-b0be-0df077849b79"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
-					(reference "#PWR3004")
+					(reference "#PWR3005")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 198.12 227.33 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "b66188cb-b101-560c-aa7f-41419d4a31a4")
+		(property "Reference" "#PWR3006" (at 198.12 227.33 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Value" "GND" (at 198.12 230.93 0) (effects (font (size 1 1))))
+		(property "Footprint" "" (at 198.12 227.33 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Datasheet" "" (at 198.12 227.33 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(pin "1" (uuid "2c0fe525-631c-51d2-b777-746095d914b9"))
+		(instances
+			(project "attractap-touch-p4"
+				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
+					(reference "#PWR3006")
 					(unit 1)
 				)
 			)
@@ -3752,16 +3977,16 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "230d5910-b3d6-564b-a4bd-202bab098da1")
-		(property "Reference" "#PWR3005" (at 215.9 184.15 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "4ea490f5-df3a-5b57-b55f-e658f202edf0")
+		(property "Reference" "#PWR3007" (at 215.9 184.15 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "+3V3" (at 215.9 180.55 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 215.9 184.15 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 215.9 184.15 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "bb22e290-8191-5c45-b0be-0df077849b79"))
+		(pin "1" (uuid "2f076d45-7938-53e2-a7c1-a24880cfd69d"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
-					(reference "#PWR3005")
+					(reference "#PWR3007")
 					(unit 1)
 				)
 			)
@@ -3775,16 +4000,16 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "b66188cb-b101-560c-aa7f-41419d4a31a4")
-		(property "Reference" "#PWR3006" (at 294.64 184.15 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "3eb4b525-27e7-509f-9bdd-4c13d8d2dc78")
+		(property "Reference" "#PWR3008" (at 294.64 184.15 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "+3V3" (at 294.64 180.55 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 294.64 184.15 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 294.64 184.15 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "2c0fe525-631c-51d2-b777-746095d914b9"))
+		(pin "1" (uuid "3fcff75a-9ffe-5480-874a-dd0408cc04ea"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
-					(reference "#PWR3006")
+					(reference "#PWR3008")
 					(unit 1)
 				)
 			)
@@ -3798,16 +4023,16 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "4ea490f5-df3a-5b57-b55f-e658f202edf0")
-		(property "Reference" "#PWR3007" (at 294.64 209.55 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "39a93482-cc87-5983-a3f2-a1948ea81e35")
+		(property "Reference" "#PWR3009" (at 294.64 209.55 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "+3V3" (at 294.64 205.95 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 294.64 209.55 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 294.64 209.55 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "2f076d45-7938-53e2-a7c1-a24880cfd69d"))
+		(pin "1" (uuid "36e7e479-2ade-5ec3-af53-28d7a1178a81"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
-					(reference "#PWR3007")
+					(reference "#PWR3009")
 					(unit 1)
 				)
 			)
@@ -3821,16 +4046,16 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "3eb4b525-27e7-509f-9bdd-4c13d8d2dc78")
-		(property "Reference" "#PWR3008" (at 294.64 229.87 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "c964d172-4e63-5f72-977f-b01277f8765e")
+		(property "Reference" "#PWR3010" (at 294.64 229.87 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "+3V3" (at 294.64 226.27 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 294.64 229.87 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 294.64 229.87 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "3fcff75a-9ffe-5480-874a-dd0408cc04ea"))
+		(pin "1" (uuid "ec061ed2-60c6-59e4-a6a3-1636bca26341"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
-					(reference "#PWR3008")
+					(reference "#PWR3010")
 					(unit 1)
 				)
 			)
@@ -3844,16 +4069,16 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "39a93482-cc87-5983-a3f2-a1948ea81e35")
-		(property "Reference" "#PWR3009" (at 259.08 207.01 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "ac190042-fb23-52d2-a431-a9ca3c62a73d")
+		(property "Reference" "#PWR3011" (at 259.08 207.01 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "GND" (at 259.08 210.61 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 259.08 207.01 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 259.08 207.01 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "36e7e479-2ade-5ec3-af53-28d7a1178a81"))
+		(pin "1" (uuid "863ab0d9-86ef-54e1-ab04-a6ef8ac11dd0"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
-					(reference "#PWR3009")
+					(reference "#PWR3011")
 					(unit 1)
 				)
 			)
@@ -3867,16 +4092,16 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "c964d172-4e63-5f72-977f-b01277f8765e")
-		(property "Reference" "#PWR3010" (at 340.36 207.01 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "bf42ece4-d5a1-520e-b65d-cd25c507c5ef")
+		(property "Reference" "#PWR3012" (at 340.36 207.01 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "GND" (at 340.36 210.61 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 340.36 207.01 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 340.36 207.01 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "ec061ed2-60c6-59e4-a6a3-1636bca26341"))
+		(pin "1" (uuid "3a54464a-c3ec-57c8-8fe1-3c0c8cc81bf4"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
-					(reference "#PWR3010")
+					(reference "#PWR3012")
 					(unit 1)
 				)
 			)
@@ -3890,16 +4115,39 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "ac190042-fb23-52d2-a431-a9ca3c62a73d")
-		(property "Reference" "#PWR3011" (at 302.26 137.16 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "a4f78cb8-eaa9-5609-9885-fbb73e21e756")
+		(property "Reference" "#PWR3013" (at 302.26 137.16 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "GND" (at 302.26 140.76 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 302.26 137.16 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 302.26 137.16 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "863ab0d9-86ef-54e1-ab04-a6ef8ac11dd0"))
+		(pin "1" (uuid "72d5334e-5ec7-56c3-a87e-a0fdbf156eac"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
-					(reference "#PWR3011")
+					(reference "#PWR3013")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 222.25 229.87 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "12229d6e-502b-522a-b500-2362920f8b67")
+		(property "Reference" "#PWR3014" (at 222.25 229.87 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Value" "GND" (at 222.25 233.47 0) (effects (font (size 1 1))))
+		(property "Footprint" "" (at 222.25 229.87 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Datasheet" "" (at 222.25 229.87 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(pin "1" (uuid "be84b4f3-0d2b-5279-b63b-abcd3a30b15a"))
+		(instances
+			(project "attractap-touch-p4"
+				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
+					(reference "#PWR3014")
 					(unit 1)
 				)
 			)
@@ -3913,16 +4161,16 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "bf42ece4-d5a1-520e-b65d-cd25c507c5ef")
-		(property "Reference" "#PWR3012" (at 302.26 76.2 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "7d25a08b-8d91-5a91-9a04-c300fa737b22")
+		(property "Reference" "#PWR3015" (at 302.26 76.2 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "GND" (at 302.26 79.8 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 302.26 76.2 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 302.26 76.2 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "3a54464a-c3ec-57c8-8fe1-3c0c8cc81bf4"))
+		(pin "1" (uuid "986cb5f0-b3fa-52bc-92ab-793fd316abd7"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
-					(reference "#PWR3012")
+					(reference "#PWR3015")
 					(unit 1)
 				)
 			)
@@ -3990,9 +4238,9 @@
 	)
 	(text "Reset"
 		(exclude_from_sim no)
-		(at 204.47 177.39 0)
+		(at 185.42 177.39 0)
 		(effects (font (size 2 2) (bold yes)) (justify left bottom))
-		(uuid "c33e4b17-b4fc-542e-9461-b8556065a224")
+		(uuid "1fa21fa2-81c0-52ae-9cdb-83bbc9828fd5")
 	)
 	(text "Boot and straps"
 		(exclude_from_sim no)
@@ -4029,11 +4277,11 @@
 		(uuid "a91e6824-cd04-5395-a82b-9d32e6d7b96c")
 	)
 	(rectangle
-		(start 203.2 173.99)
-		(end 267.97 214.63)
+		(start 184.15 173.99)
+		(end 267.97 236.22)
 		(stroke (width 0.15) (type dash))
 		(fill (type none))
-		(uuid "23ca40ca-0f33-5db7-a0e5-faf30eea0635")
+		(uuid "29e9baad-2a25-5049-913c-158e1b4300fd")
 	)
 	(rectangle
 		(start 271.78 173.99)

@@ -2262,11 +2262,11 @@
 			(at 325.12 92.71 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "Alternate" "equivalent part of the same value, rating and package"
+		(property "Alternate" "Vishay 1N4148W-HE3-08 (C117823): same ratings"
 			(at 325.12 92.71 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "BOM description" "Switching diode 100 V 150 mA, SOD-123F"
+		(property "BOM description" "Switching diode 100 V 150 mA, SOD-123"
 			(at 325.12 92.71 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)

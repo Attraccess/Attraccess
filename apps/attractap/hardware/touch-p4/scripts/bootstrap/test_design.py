@@ -87,10 +87,19 @@ class DesignTest(unittest.TestCase):
         self.assertEqual(buzzer.nets, {'1': 'BUZ_P', '2': 'BUZ_N'})
         self.assertEqual(buzzer.nc, {'3', '4'})
 
-    def test_diodes_point_from_their_source_to_the_5v_rail(self):
-        # KiCad's diode symbols: pin 1 = cathode
-        for ref, source in (('D102', '+5V_USB'), ('D104', '+5V_POE'), ('D107', '+5V_DC')):
-            self.assertEqual(self.d.parts[ref].nets, {'1': '+5V', '2': source})
+    def test_each_source_reaches_the_5v_rail_through_a_blocking_switch(self):
+        # ideal diodes: controller anode and MOSFET source on the input, cathode and drain on +5V
+        for ic, fet, source in (('U106', 'Q101', '+5V_POE'), ('U107', 'Q102', '+5V_DC')):
+            ctl, q = self.d.parts[ic].nets, self.d.parts[fet].nets
+            self.assertEqual((ctl['6'], ctl['3'], ctl['4']), (source, source, '+5V'))
+            self.assertEqual((q['2'], q['3'], q['1']), (source, '+5V', ctl['5']))
+        # the USB eFuse: IN on the connector side, OUT on the rail
+        self.assertEqual((self.d.parts['U105'].nets['5'], self.d.parts['U105'].nets['6']), ('+5V_USB', '+5V'))
+        # nothing else joins a source to the rail
+        for ref, p in self.d.parts.items():
+            nets = set(p.nets.values())
+            if '+5V' in nets and nets & {'+5V_USB', '+5V_POE', '+5V_DC'}:
+                self.assertIn(ref, ('U105', 'U106', 'U107', 'Q101', 'Q102'), ref)
 
     def test_dc_input_capacitors_keep_their_capacitance_at_24_v(self):
         # The 10 uF / 50 V X5R part of this size (a basic part, so tempting) keeps 1.35 uF at 24 V. Large at

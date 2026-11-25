@@ -43,8 +43,8 @@
 		(layer "F.SilkS")
 	)
 	(model "${KIPRJMOD}/lib/attractap.3dshapes/TSOT-26_L2.9-W1.6-P0.95-LS2.8-BL.stpz"
-		(offset (xyz 0 0 0.62))
+		(offset (xyz 0 0 -0.05))
 		(scale (xyz 1 1 1))
-		(rotate (xyz 0 0 0))
+		(rotate (xyz 0 0 270))
 	)
 )
