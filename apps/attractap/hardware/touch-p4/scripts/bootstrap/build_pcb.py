@@ -85,7 +85,13 @@ def build():
     bad = check_silk(S)
     if bad:
         raise SystemExit('silkscreen: ' + '; '.join('"%s" %s' % item for item in bad))
-    print('reference designators on the silkscreen: %d, on the assembly drawing only: %d' % (S.refdes[0], len(S.refdes[1])))
+    placed, missing, leaders = S.refdes
+    print('reference designators on the silkscreen: %d (%d with a leader line), on the assembly drawing only: %d'
+          % (placed, leaders, len(missing)))
+    from silk_refdes import required
+    lost = [r for r in missing if required(r)]
+    if lost:
+        raise SystemExit('silkscreen: no room for the designators of ' + ' '.join(sorted(lost)))
     display_ground_pads(board)
     zones(B)
     relieve_small_parts(B)

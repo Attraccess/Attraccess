@@ -320,6 +320,21 @@ class FootprintLibraryTest(unittest.TestCase):
         self.assertTrue(0.45 < covered < 0.75, covered)
 
 
+class SilkscreenTest(unittest.TestCase):
+    """The routed board in kicad/: every part a technician looks for carries its designator on the silkscreen."""
+
+    def test_every_required_part_has_a_silkscreen_designator(self):
+        import re
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'kicad', 'attractap-touch-p4.kicad_pcb')
+        text = open(path).read()
+        refs = re.findall(r'\n\t\(footprint "[^"]+"\n\t\t\(layer "F\.Cu"\)(?:\n\t\t\(.*)*?\n\t\t\(property "Reference" "([^"]+)"', text)
+        silk = set(re.findall(r'\n\t\(gr_text "([^"]+)"\n\t\t\(at [^)]*\)\n\t\t\(layer "F\.SilkS"\)', text))
+        self.assertGreater(len(refs), 250)
+        need = [r for r in refs if re.match(r'[A-Z]+', r).group(0) in design.SILK_REQUIRED]
+        self.assertGreater(len(need), 60)
+        self.assertEqual([r for r in need if r not in silk], [])
+
+
 class I2cBusTest(unittest.TestCase):
     """The address check must catch what happened on an earlier reader: two devices at 0x24."""
 

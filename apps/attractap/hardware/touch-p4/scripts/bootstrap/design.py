@@ -104,6 +104,8 @@ def passive_desc(kind, value, size, rating):
 
 
 NOT_FITTED = ('TP', 'H', 'FID', 'ANT')     # bare copper and holes: nothing to buy or place
+# Parts a technician looks for: each must carry its designator on the silkscreen (silk_refdes.py, test_design.py)
+SILK_REQUIRED = ('U', 'Y', 'L', 'FB', 'D', 'Q', 'J', 'SW', 'F', 'RN', 'BZ')
 
 
 class Part:

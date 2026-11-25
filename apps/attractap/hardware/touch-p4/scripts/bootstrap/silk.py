@@ -33,7 +33,7 @@ TEST_POINTS = {
     'TP814': ('INT', 'l'), 'TP815': ('INT', 'l'),
     # the supply and bus test points of review stage 3: the net, short
     'TP816': ('VDC', 'l'), 'TP817': ('5V_DC', 'r'), 'TP818': ('5V_USB', 'l'), 'TP819': ('5V_POE', 'r'),
-    'TP820': ('VDD_FLASH', 'b'), 'TP821': ('TVDD', 'r'), 'TP822': ('AVDD', 'l'), 'TP823': ('DVDD', 'r'),
+    'TP820': ('VDD_FLASH', 'b'), 'TP821': ('TVDD', 'r'), 'TP822': ('AVDD', 'r'), 'TP823': ('DVDD', 'r'),
     'TP824': ('BL_A', 'r'), 'TP825': ('SDA', 'r'), 'TP826': ('SCL', 'r'), 'TP827': ('NFC_SDA', 'r'),
     'TP828': ('NFC_SCL', 'r'), 'TP829': ('REF_CLK', 'r'), 'TP830': ('PHY_3V3', 'r'),
 }
@@ -364,6 +364,14 @@ def touches(g, rect, margin):
     return t0 <= t1
 
 
+def cutouts():
+    """The board's notches, pocket, slot and LED windows as boxes (x1, y1, x2, y2)."""
+    w, h = G.LED_CUTOUT
+    holes = [(G.NOTCH_X, G.NOTCH_Y, G.BOARD_W, G.BOARD_H), (0, G.POCKET_Y, G.POCKET_X, G.BOARD_H), G.SLOT,
+             (G.C6_NOTCH[0], 0, G.C6_NOTCH[1], G.C6_NOTCH[2])]
+    return holes + [(x - w / 2, y - h / 2, x + w / 2, y + h / 2) for y in (G.LED_Y_TOP, G.LED_Y_BOT) for x in G.LED_X]
+
+
 def check(S, only=None, lines=()):
     """Texts that lie on a pad of their side, on another text, or off the board: [(text, reason)]. only: look
     at that one text alone; lines: footprint silkscreen it must not touch either."""
@@ -376,10 +384,7 @@ def check(S, only=None, lines=()):
     def overlap(a, c):
         return a[0] < c[2] and c[0] < a[2] and a[1] < c[3] and c[1] < a[3]
 
-    w, h = G.LED_CUTOUT
-    holes = [(G.NOTCH_X, G.NOTCH_Y, G.BOARD_W, G.BOARD_H), (0, G.POCKET_Y, G.POCKET_X, G.BOARD_H), G.SLOT,
-             (G.C6_NOTCH[0], 0, G.C6_NOTCH[1], G.C6_NOTCH[2])]
-    holes += [(x - w / 2, y - h / 2, x + w / 2, y + h / 2) for y in (G.LED_Y_TOP, G.LED_Y_BOT) for x in G.LED_X]
+    holes = cutouts()
     pads = {FRONT: [], BACK: []}
     for fp in S.b.GetFootprints():
         for pad in fp.Pads():
