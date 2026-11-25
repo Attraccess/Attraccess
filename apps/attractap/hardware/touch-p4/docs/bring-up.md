@@ -16,9 +16,8 @@ when a step fails. Use a current-limited bench supply for the first power-up.
 2. Have an electronics engineer look at the open points listed under "Design
    review" in the design notes.
 3. Check that JLCPCB (or the chosen assembler) can supply every BOM line, in
-   particular the ESP32-P4NRW32X and the AP63203WU-7 (none and two in stock on
-   22 November 2026), and for the Ethernet version the PoE module DP9900M-5V
-   (38 in stock, falling). The list of short lines is under "Sourcing risks"
+   particular the ESP32-P4NRW32X (none in stock on 22 November 2026), and for
+   the Ethernet version the PoE module DP9900M-5V (38 in stock, falling). The list of short lines is under "Sourcing risks"
    in the design notes.
 4. Run the `check` and `check-footprints` targets (README) and look at the
    Gerbers in a viewer. `check` includes the simulations; their report is
@@ -28,54 +27,84 @@ when a step fails. Use a current-limited bench supply for the first power-up.
 
 ## Power, without display
 
-1. Visual check: orientation of U201 (pin 1), U301, J601, the diodes D101 to
-   D107, C103, the LEDs.
-2. Resistance from `5V`, `3V3` and `VDD_HP` test points to ground: no short.
+1. Visual check: orientation of U201 (pin 1), U301, J601, U105 to U107, U204,
+   Q101, Q102, the diodes D101, D103, D105 and D106, C103, C120, the LEDs.
+2. Resistance from the `5V`, `3V3`, `VDD_HP`, `5V_USB`, `VDC` and `5V_DC` test
+   points to ground: no short.
 3. Feed 5 V into USB-C with the supply limited to 200 mA.
-   - `5V` test point: about 4.6 V.
+   - `5V` test point: about 5 V. The eFuse U105 loses a few millivolts; there
+     is no diode drop any more.
    - `3V3`: 3.3 V +/- 3 %.
+   - `EN`: rises 120 to 280 ms after `3V3`. The supervisor U204 holds the
+     MCU's CHIP_PU low until then.
    - `VDD_HP`: about 1.1 V, also without firmware. The chip makes it with an
      internal regulator until firmware switches the converter U202 on (its
      enable signal EN_DCDC is 0 V without firmware and in download mode). 0 V
      at `VDD_HP` means a fault: a short on the rail, no 3.3 V at the chip, or
      the chip held in reset.
 4. Current without firmware: a few tens of mA. Raise the limit to 1 A.
-5. DC terminal, USB unplugged: feed 12 V limited to 200 mA (`+` and `-` are
-   printed next to the terminal). `5V` test point: about 4.6 V. Repeat at
+5. Overvoltage cut-off of the eFuse, still on USB-C: raise the supply slowly
+   from 5 V. `5V` must drop to 0 V between 5.53 and 5.74 V while `5V_USB`
+   follows the supply. Lower it again: `5V` comes back below 5.03 to 5.23 V.
+   Stop at 6 V; the TVS D101 starts to conduct a little above that.
+6. DC terminal, USB unplugged: feed 12 V limited to 200 mA (`+` and `-` are
+   printed next to the terminal). `5V` test point: about 5.0 V. Repeat at
    24 V.
-6. DC jack: check with a meter that the centre pin of the jack is the `+` of
+7. DC jack: check with a meter that the centre pin of the jack is the `+` of
    the terminal before the first use. Then feed 12 V through a plug.
-7. DC input with reversed polarity: no current flows and nothing gets warm.
-8. Plug a 24 V supply in live a few times with an oscilloscope at the cathode
-   of D106 (the TVS): the peak must stay below 40 V. It lasts about 10
-   microseconds, so trigger on the edge at 30 V. Expected by simulation: 29 to
-   34 V with a plug-in supply, up to 38 V with a few metres of thick wire to a
-   bench or DIN rail supply. Do it once that way (5 m of 1.5 mm2 wire in the
+8. DC input with reversed polarity: no current flows and nothing gets warm.
+9. Plug a 24 V supply in live a few times with an oscilloscope at the `VDC`
+   test point (the converter's input, where the TVS D106 sits): the peak must
+   stay below 40 V. Trigger on the rising edge at 30 V. Expected by
+   simulation: below 35 V, also from a 26.4 V supply; the electrolytic C120
+   damps the swing (design notes, "Power"). Do it once with a few metres of
+   thick wire to a bench or DIN rail supply (5 m of 1.5 mm2 wire in the
    terminal), which is the worst case: thick wire has little resistance to
    damp the swing, and very short wire too little inductance to make one. If
-   the peak is above 40 V, check that C112, C113 and C117 are the 100 V parts
-   (2.2 uF); with 10 uF / 50 V parts in their place it reaches 45 V.
-9. With the board running from the DC input, measure the unplugged USB-C
-   connector's VBUS (at F101): below 0.5 V. Then plug it into a USB-C port of a
-   computer: the port must come up. Repeat both after the reader has run for
-   half an hour in its case: the leakage of D102 that lifts VBUS grows about
-   tenfold from 50 to 75 °C. Above 0.8 V a USB-C port stays off; fit 1 k for
-   R104 then.
+   the peak is higher than expected, check that C120 is fitted and that C112,
+   C113 and C117 are the 100 V parts (2.2 uF).
+10. Changing supplies: with DC and USB both connected, pull the DC plug and
+    plug it in again, then the same with USB. The board keeps running. By
+    simulation `3V3` stays above 2.99 V, the highest level at which the
+    supervisor may reset the MCU.
+11. With the board running from the DC input, measure the unplugged USB-C
+    connector's VBUS (at F101): below 0.5 V. Then plug it into a USB-C port of
+    a computer: the port must come up. Repeat both after the reader has run
+    for half an hour in its case. The eFuse U105 blocks the 5 V rail from VBUS
+    but leaks a few microamps back, which R104 has to hold near 0 V. Above
+    0.8 V a USB-C port stays off; fit 1 k for R104 then.
+12. Load step on the 3.3 V rail, fed from USB with the limit at 1.5 A: an
+    electronic load on the `3V3` and `GND` test points that steps between 0.1
+    and 1 A, and the oscilloscope on `3V3` (AC coupled, ground spring at the
+    test point). Look at the ringing after each step. Then remove the
+    feed-forward capacitor C108 (12 pF) and repeat. The rail's capacitors come
+    to about 49 uF effective, at the upper end of what TI has proven stable
+    for this converter (design notes, "Power"), and the ringing shows how much
+    phase margin is left (the method of TI's application report SLVA289).
+    Keep the version that settles faster with less overshoot, and record it
+    in the circuit description.
+13. Surge at the DC input, if a surge generator is available (a test lab
+    offers it): the line-to-earth test of EN 50130-4 through 42 ohm, both
+    polarities, with the board running from 12 V and from 24 V. The board
+    must run on afterwards, and D105, D106 and D107 must be undamaged. The
+    simulated case (1 kV) and the protection are in the design notes,
+    "Power".
 
-Rails without a test point of their own, and where to measure them:
+Other rails, and where to measure them. The small test points carry the
+rail's name:
 
 | Rail | Expected | Measure at |
 |---|---|---|
-| USB input behind fuse and ferrite | 5 V | anode of D102 |
-| DC input at the converter | the supply's voltage less 0.5 V | cathode of D106 |
-| DC converter output | 5.0 V | L102, on the side of C115 |
-| PoE module output | 5.0 V | the `+` pad of C103 |
-| Flash supply (from the MCU) | 3.3 V | pin 8 of the flash U203 |
+| USB input behind fuse and ferrite | 5 V | `5V_USB` |
+| DC input at the converter | the supply's voltage less 0.5 to 0.7 V | `VDC` |
+| DC converter output | 5.0 V | `5V_DC` |
+| PoE module output | 5.0 V | `5V_POE` |
+| Flash supply (from the MCU) | 3.3 V | `VDD_FLASH` |
 | PSRAM supply (from the MCU) | 0 V without firmware, 1.9 V with | C226 (0402, next to the MCU) |
-| PN532 supply | about 4.6 V | C501 |
-| PN532 regulator output | 3.0 V once NFC_RST is high | C503 |
-| PHY supply and its 1.1 V regulator | 3.3 V and 1.1 V | C401 and C404 |
-| Backlight anode | 11 to 13 V when lit, about the voltage of the 5 V rail when off | C606 |
+| PN532 supply | about 5 V | C501 |
+| PN532 regulator output | 3.0 V once NFC_RST is high | `DVDD` (`AVDD` and `TVDD` behind their ferrites) |
+| PHY supply and its 1.1 V regulator | 3.3 V and 1.1 V | `PHY_3V3` and C404 |
+| Backlight anode | 11 to 13 V when lit, about the voltage of the 5 V rail when off | `BL_A` |
 
 ## MCU
 
@@ -119,10 +148,15 @@ MHF III, not a U.FL.
 
 1. Fit the display. Initialise the IO expander (0x20), pulse LCD_RST, send the
    ST7701 init sequence over the expander pins, start the RGB panel.
-2. Backlight: PWM on GPIO26. Measure about 0.2 V across R603 at full duty
+2. The panel's 3.3 V current, backlight off, on a 5 V bench supply at USB-C:
+   note the input current before the panel is plugged in and with it running.
+   The difference times 1.4 is about the panel's current at 3.3 V (it also
+   holds what the MCU draws more for the RGB bus, so it is an upper bound).
+   The power budget assumes 60 mA (design notes, "Power").
+3. Backlight: PWM on GPIO26. Measure about 0.2 V across R603 at full duty
    (39 mA).
-3. Touch: GT911 answers on I2C0. Check orientation of the coordinates.
-4. Look for tearing or drift with Wi-Fi active.
+4. Touch: GT911 answers on I2C0. Check orientation of the coordinates.
+5. Look for tearing or drift with Wi-Fi active.
 
 ## NFC
 
@@ -176,7 +210,8 @@ depending on the supply, and is good to 40 % at best.
    Expected: chip 30 to 40 K above the room, display front 15 to 25 K.
 2. The same with all LEDs at their brightest steady level and the backlight
    at full. The LED rows are the warmest place then; a thermocouple beside
-   D702 and D707. Set the firmware's LED limit from this.
+   D702 and D707. Set the firmware's LED limit from this; the power budget
+   keeps it below 100 mA for all LEDs together in any case.
 3. On PoE: the module U102 after an hour (it stands in air that is as warm as
    the board).
 4. If the reader will be used in rooms above 30 °C, repeat step 1 in a warm
@@ -211,10 +246,17 @@ depending on the supply, and is good to 40 % at best.
 1. Hold the MCU in reset: all LEDs stay dark. Then light each LED in turn:
    order and colours. Do not run all eight at full white: the LED's datasheet
    allows 70 % for white.
-2. Beep at 2.7 kHz: loud enough in the workshop, no audible noise on the
-   display or NFC performance loss while beeping. The sound leaves the buzzer
+2. The firmware's LED limit: the power budget relies on the LEDs drawing
+   below 100 mA together, all channels of all eight LEDs counted (design
+   notes, "Power"). Set the brightest pattern the firmware allows and measure
+   the rise of the 5 V current against all LEDs dark: below 100 mA.
+3. Beep at 2.7 kHz: loud enough in the workshop, no audible noise and no
+   disturbance on the display while beeping. The sound leaves the buzzer
    on its side that faces the lower board edge. Never leave the buzzer pin
    high: the coil and its resistor are made for a tone, not for direct current.
+4. The firmware beeps only while the NFC field is off; the power budget relies
+   on that too. Ask for a beep while the reader polls for cards: the
+   transmitter current (NFC, step 3) must be gone while the buzzer sounds.
 
 ## Tamper sensors
 

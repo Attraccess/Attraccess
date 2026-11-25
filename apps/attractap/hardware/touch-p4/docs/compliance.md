@@ -175,7 +175,8 @@ written procedure for the 24-hour report. The reporting duty applies already.
   (the lab knows the wording its edition of the standard wants). Without a
   stated limit the lab counts the input as unlimited, and then the whole case
   must be flame-retardant. The board has a self-resetting fuse of 1.1 A at the
-  DC input and of 2 A at USB.
+  DC input and of 2 A at USB; at USB the eFuse also limits the current to 1.8
+  to 2.2 A.
 - Enclosure: a plastic whose data sheet states HB at least. Flame-retardant
   plastic is needed only where the lab finds a part that could ignite. See
   "Enclosure plastic" below.
@@ -235,8 +236,10 @@ The reader's three inputs:
 | PoE (LAN version) | More than 15 W. A lab measured 33.6 W at the port of a comparable device. | PS2 | The voltage is above 50 V, but volts times amps is the power the reader takes from the port: 3 to 9 W against the threshold of 15. Whether a fault makes the PoE module or the parts before it dissipate more than 15 W is for the lab's fault test. |
 | 12 to 24 V terminal | Behind the 1.1 A fuse 33 W at 24 V. Before the fuse, what the supply gives. | PS2 with a supply limited to 100 W, PS1 with one limited to 15 W, PS3 without a limit | Below 50 V, so only the 15 W rule applies. The fault test decides. |
 
-The reader takes about 2.5 W, 4.5 W at peak and 7 W with everything on at once
-(estimates, [design-notes.md](design-notes.md#power)). Two published reports
+The reader takes about 2.5 W in normal use (estimate), at most 4.5 W (0.90 A
+at 5 V: the makers' highest consumption figures, with the firmware's limit on
+the LEDs) and 8.3 W if every load drew what its maker asks the supply to
+deliver, all at once (1.65 A; [design-notes.md](design-notes.md#power-budget)). Two published reports
 show both outcomes for a PoE device:
 
 - FLIR A50/A70 camera, PoE, 8.1 W (CTC advanced, Saarbrücken, 2021): the PoE
@@ -301,20 +304,28 @@ From EN 301 489-1, which was read:
 A terminal for wires "from an existing installation" means cables longer than
 3 m: plan for the DC port tests.
 
+Surge on the DC input. EN 301 489-1, the route the RED takes, asks no surge
+test on DC power ports. On this reader only the Ethernet port gets one, 0.5 kV
+line to ground, when its cable may be longer than 30 m indoors. Access control
+has an EMC product standard of its own, EN 50130-4. It asks for line-to-earth
+surges through 42 ohm on extra-low-voltage DC lines as well (not read for this
+page: confirm with the lab). The DC input is protected and simulated for that
+test; the details are in [design-notes.md](design-notes.md#power), "Power".
+
 ## What the board design does
 
 | Topic | Measure on the board |
 |---|---|
 | Wi-Fi antenna | None on the board: the module has a connector, and the antenna sits in or on the case. The strip without copper along the top edge (44 mm) and the cut in the board were made for a module with PCB antenna and remain on revision A. |
 | Return paths | Six layers. Ground planes on In1 and In4 and a 3.3 V plane on In3, each in one piece and without tracks. Signals run on the two outer layers and on In2, with ground filled in between: every signal layer lies next to a plane that no track cuts. |
-| Switching regulators | AP63203 and AP63205 with spread spectrum; small loops, input and output capacitors next to the ICs. |
-| DC input | Self-resetting fuse, reverse-polarity diode, pi filter (2.2 uF, 2.2 uH, 2 x 2.2 uF; 100 V capacitors that keep 1.5 uF each at 24 V) and TVS before the converter. The converter sits away from the NFC antenna, and the DC run does not go around the NFC loop. |
+| Switching regulators | AP63205 at the DC input, with spread spectrum. Two TLV62569 for 3.3 V and the core, at 1.5 MHz without spread spectrum. Small loops, input and output capacitors next to the ICs. |
+| DC input | Self-resetting fuse, a bidirectional TVS behind it at the connector, reverse-polarity diode, pi filter (2.2 uF, 2.2 uH, 2 x 2.2 uF; 100 V capacitors that keep 1.5 uF each at 24 V), a 47 uF electrolytic that damps the filter when a supply is plugged in live, and a TVS before the converter. The converter sits away from the NFC antenna, and the DC run does not go around the NFC loop. |
 | Display bus | 33 ohm series resistors on all RGB and sync lines; reduce GPIO drive strength in firmware if needed. |
 | Clocks | Series resistors on the 50 MHz RMII clock, the SDIO clock and the flash clock. |
 | USB | TVS and ESD array at the connector, fuse, ferrite bead in the supply. |
 | Ethernet / PoE | Isolated PD module, 48 V side in its own area with 2 mm clearance and no copper under the module's isolation barrier, ferrite beads and TVS at the PoE input, capacitor across the barrier, RC from jack shield to ground. The Ethernet pairs pass under the jack's shell on the back layer, the 48 V nets on the inner layer. |
 | NFC | Low-pass (560 nH / 220 pF) between transmitter and antenna, damping resistors, no closed copper ring around the loop. |
-| Supply faults | USB, DC and PoE are diode-ORed, so no source feeds another; bleed resistors keep unpowered inputs at 0 V. |
+| Supply faults | USB feeds the 5 V rail through an eFuse (soft start, current limit, cut-off above 5.53 to 5.74 V), DC and PoE through ideal diodes. All three block reverse current, so no source feeds another; bleed resistors keep unpowered inputs at 0 V. |
 | LEDs | Capacitor at each LED, series resistor and pull-down in the data line. |
 | Mounting | No tracks under screw heads on the outer layers. |
 

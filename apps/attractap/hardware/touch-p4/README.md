@@ -23,7 +23,7 @@ plus PN532 module of the current readers with one board.
 | NFC | PN532 + PCB loop antenna | same chip and I2C protocol as today |
 | Ethernet (LAN version) | IP101GRI PHY + HY931147C jack | 10/100, RMII |
 | PoE (LAN version) | DP9900M-5V isolated module | 802.3af; footprint also takes a Silvertel Ag9905M |
-| Power | DC 12 to 24 V (barrel jack or WAGO push-button terminal), PoE, or USB-C 5 V | each source feeds the 5 V rail through its own diode; 3.3 V buck AP63203. The DC input has a filter towards the supply cable and stands 28 V at most. USB-C is the service port for flashing and debugging |
+| Power | DC 12 to 24 V (barrel jack or WAGO push-button terminal), PoE, or USB-C 5 V | each source feeds the 5 V rail through a switch that blocks reverse current: an eFuse (TPS259470A) for USB, ideal diodes (LM74700-Q1 with a MOSFET) for DC and PoE. 3.3 V buck TLV62569; a supervisor (TLV803S) holds the MCU in reset until 3.3 V is up. The DC input has a TVS at the connector, a damped filter towards the supply cable and stands 28 V at most. USB-C is the service port for flashing and debugging |
 | Feedback | 8 RGB LEDs (SK6812MINI-E), buzzer | LEDs shine through the board above and below the NFC area |
 | Tamper detection | LIS2DH12 accelerometer, VCNL4040 proximity sensor, DRV5032 hall switch | knocks, tilting, and the reader leaving its dock: the proximity sensor measures the infrared light the dock's plate reflects inside the closed case, the hall switch senses a magnet in the dock. Hardware only so far; the firmware does not read them yet |
 
@@ -59,8 +59,8 @@ The root sheet is a block diagram. Each block is one sheet:
 
 | Sheet | Content |
 |---|---|
-| Power | USB-C input, DC input (jack and terminal) with its 5 V converter, PoE input, supply OR-ing, 3.3 V buck |
-| MCU | ESP32-P4 GPIO and system units, flash, crystal, reset/boot, USB |
+| Power | USB-C input with its eFuse, DC input (jack and terminal) with its 5 V converter, PoE input, ideal diodes onto the 5 V rail, 3.3 V buck |
+| MCU | ESP32-P4 GPIO and system units, flash, crystal, reset supervisor and buttons, boot, USB |
 | MCU_Power | ESP32-P4 supply unit, decoupling, 1.1 V core converter |
 | WiFi | ESP32-C6 module, SDIO |
 | Ethernet | PHY, crystal, straps, jack (LAN version only) |
@@ -142,9 +142,9 @@ What the board needs, for the order form:
 | Solder mask | green. The mask webs between the MCU's pins are 0.1 mm wide, JLCPCB's limit for green; other colours need wider webs |
 | Milled openings | flex slot 3 mm wide, eight LED windows 3.4 x 3.0 mm with relieved corners, a cut 14.2 x 5.65 mm in the top edge (made for a module with PCB antenna), two cut-away corners, plated slots at the DC jack and USB-C |
 | Outline tolerance | the regular +/-0.2 mm is enough |
-| Surface finish | ENIG (18 USD on 5 boards, 45 USD on 100). Not the free OSP, which the form selects for six layers: it is as flat, but JLCPCB excludes it for contact areas, and the four ground pads for the display's metal back and the 15 test points would stay bare copper ([more](docs/design-notes.md#cost)) |
+| Surface finish | ENIG (18 USD on 5 boards, 45 USD on 100). Not the free OSP, which the form selects for six layers: it is as flat, but JLCPCB excludes it for contact areas, and the four ground pads for the display's metal back and the 30 test points would stay bare copper ([more](docs/design-notes.md#cost)) |
 | Impedance control | not needed |
-| Assembly | top side only: 208 parts in 72 lines (Wi-Fi version), 243 parts in 82 lines (Ethernet/PoE version) |
+| Assembly | top side only: 221 parts in 85 lines (Wi-Fi version), 258 parts in 96 lines (Ethernet/PoE version) |
 | Through-hole parts | DC jack J102, DC terminal J103 (two pins in a four-hole footprint, see below), and on the Ethernet/PoE version the jack J401 |
 | Not assembled by JLCPCB | the display panel (taped on, flex plugged into J601) |
 | Serial number on the board | option "Mark on PCB": number only, position specified. JLCPCB then prints a number that is different on every board into the white field beside `S/N` on the component side: a solid silkscreen rectangle of 10 x 2 mm, which is what it looks for. Without the option the field stays white, to write on. (JLCPCB no longer prints an order number; the text `JLCJLCJLCJLC` that used to mark its place is gone from the board.) |
@@ -156,9 +156,10 @@ parts JLCPCB does not stock: [docs/parts.md](docs/parts.md).
 Check before paying:
 
 - Stock. JLCPCB's parts list shows what it does not have. On 22 November 2026 it had no ESP32-P4
-  (U201) and two pieces of the 3.3 V converter AP63203WU-7 (U103); both have to be ordered in
-  through JLCPCB's parts sourcing before the assembly order. Of the PoE module (U102, Ethernet
-  version) it had 38, ten fewer than two days before. See the sourcing risks in
+  (U201); it has to be ordered in through JLCPCB's parts sourcing before the assembly order. Of
+  the PoE module (U102, Ethernet version) it had 38, ten fewer than two days before. The 3.3 V
+  converter U103 is now the TLV62569 of the core converter (490416 in stock on 25 November 2026);
+  the AP63203WU-7 fitted before had run out. See the sourcing risks in
   [docs/design-notes.md](docs/design-notes.md).
 - DC terminal J103. The WAGO 250-202 has two pins and the footprint four holes (it also takes the
   WAGO 2601-3102 lever terminal). Write in the order remark: pins in the upper left and the lower
@@ -169,8 +170,9 @@ Check before paying:
   `check-footprints` compares every part with JLCPCB's library, except the inductor L102, for whose
   part number the library has no footprint (two pads, no polarity). Still look at every polarised part
   in JLCPCB's placement preview, in particular the PoE module U102 (its pads are the same when it is
-  turned by 180 degrees), the diodes D101 to D107 (D106, the TVS of the DC input, has its cathode on
-  the left, towards the board edge), C103, the LEDs and the ICs.
+  turned by 180 degrees), the diodes D101, D103, D105 and D106 (D106, the TVS at the DC converter,
+  has its cathode on the left, towards the board edge; D107 is bidirectional), the electrolytic
+  capacitors C103 and C120, the MOSFETs Q101 and Q102, the LEDs and the ICs.
 
 ### Parts and library
 

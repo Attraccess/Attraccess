@@ -12,7 +12,7 @@ Why the board looks the way it does, and what is still an assumption.
 | NFC position | separate zone below the display | The LCD's metal back shields 13.56 MHz; an antenna behind the screen does not work. |
 | LAN/PoE | same PCB, parts not fitted on the wifi version | One design to maintain and certify. |
 | PoE | ready-made isolated module | No transformer design; the footprint takes SDAPO DP9900M-5V or Silvertel Ag9905M. |
-| Supply | DC 12 to 24 V, PoE or USB-C, each through its own Schottky diode onto one 5 V rail | Any combination may be connected; no source feeds another. |
+| Supply | DC 12 to 24 V, PoE or USB-C, each through a switch that blocks reverse current (eFuse for USB, ideal diodes for DC and PoE) onto one 5 V rail | Any combination may be connected; no source feeds another. The switches drop almost nothing, so the 5 V rail follows its source. |
 | DC connectors | barrel jack (5.5 / 2.1 mm) and WAGO 250 push-button terminal in parallel | Plug-in supplies and bare wires from an existing installation both work. The terminal footprint also takes the WAGO 2601 lever terminal, which costs 13 times as much. |
 | Ethernet jack | behind the lower right corner of the display, 51 mm above the lower board edge | A plug with its boot and the cable's bend into the wall need 49 mm below the jack, inside the case. The price: the jack's pins stand out of the display side behind the display. The display sits 1.5 to 2 mm off the board and the pins are clipped (see "Display mounting and flex"). Below the display the jack would need a case 19 mm longer. |
 | USB-C | service port at the board edge next to the MCU | Only used for flashing and debugging, never offered to users. |
@@ -195,112 +195,270 @@ new display section, not a part swap.
 
 | Rail | Source | Loads |
 |---|---|---|
-| +5V | USB-C (PTC fuse, TVS, ferrite, Schottky), DC converter (Schottky) or PoE module (Schottky) | 3.3 V buck, backlight, LEDs, buzzer, PN532 |
-| +5V_DC | AP63205 buck, 2 A, from the DC connectors (PTC fuse, reverse-polarity diode, input filter, TVS) | feeds +5V |
-| +3V3 | AP63203 buck, 2 A | P4, C6, PHY, flash, panel logic |
-| VDD_HP 1.1 V | TLV62569 controlled by the P4 | P4 core |
+| +5V | USB-C through the eFuse U105; the DC converter through the ideal diode U107/Q102; the PoE module through the ideal diode U106/Q101 | 3.3 V converter, backlight, LEDs, buzzer, PN532 |
+| +5V_DC | AP63205 buck, 2 A, from the DC connectors (PTC fuse, TVS at the connector, reverse-polarity diode, damped input filter, TVS at the converter) | feeds +5V |
+| +3V3 | TLV62569 buck U103, 2 A, from +5V | P4, C6, PHY, sensors, panel logic, the core converter U202 |
+| VDD_HP 1.1 V | TLV62569 U202 from +3V3, controlled by the P4 | P4 core |
 | P4 internal LDOs | VDDO_FLASH 3.3 V, VDDO_PSRAM 1.9 V | flash, in-package PSRAM |
 
-Estimated consumption (not measured): about 2.5 W typical, 4.5 W peak with
-backlight at full, Wi-Fi transmitting and all LEDs white. The PoE module gives
-9 W, USB-C is fused at 2 A and the DC input at 1.1 A (about 0.45 A at 12 V and
-0.2 A at 24 V at peak load).
+Each source reaches the 5 V rail through a switch that blocks current in the
+other direction. With two or more connected the highest one feeds the board;
+none feeds another, and an unplugged connector stays at 0 V.
 
-Notes:
+### Power budget
 
-- After the OR diode the 5 V rail is about 4.6 V. That is intended: the LEDs'
-  data threshold scales with their supply.
+Worst case per load, from the makers' figures. "Sizing" is what the maker asks
+the supply to deliver; "maximum" is the highest consumption the maker states.
+
+3.3 V rail (TLV62569 U103, 2 A; current limit at least 3 A):
+
+| Load | Sizing (A) | Maximum (A) | Source |
+|---|---|---|---|
+| ESP32-P4, I/O, flash, PSRAM | 0.380 | 0.200 | HDG v2.0 1.3.2: "minimum operating supply current ... 380 mA (including flash and PSRAM)"; datasheet v0.7 table 5-7: 150 mA at 400 MHz, dual core, all peripheral clocks on, "higher when accessing flash/PSRAM": 50 mA added (W25Q128JV: 25 mA at most) |
+| ESP32-P4 core through U202 | 0.196 | (in the line above) | datasheet table 5-2: the core supply must deliver 0.5 A at 1.1 V; through U202 at 85 % that is 0.196 A at 3.3 V |
+| ESP32-C6-MINI-1U | 0.382 | 0.382 | datasheet v1.5 table 6-4: 802.11b at 20.5 dBm, 100 % duty |
+| IP101GRI PHY | 0.045 | 0.045 | datasheet R05: below 0.15 W at 100BASE-TX full duplex |
+| VCNL4040 emitter | 0.200 | 0.005 (average) | datasheet rev. 2.0: 200 mA pulses at 1/40 duty or less |
+| Display panel logic and touch | 0.060 | 0.060 | allowance: the panel's data gives no current; ST7701S and GT911 typically draw tens of mA together. Measured at bring-up |
+| Jack LEDs (2 x 1.3 mA), accelerometer, hall switch, IO expander, pull-ups, supervisor | 0.010 | 0.010 | 1 k LED resistors; LIS2DH12 185 uA, DRV5032 2.7 mA peak, TCA9554 0.6 mA |
+| **Total** | **1.27** | **0.70** | |
+| Headroom to 2 A | **36 %** | 65 % | |
+
+5 V rail, with the 3.3 V converter at 88 % efficiency and the rail at its lowest
+(4.75 V):
+
+| Load | Sizing (A) | Maximum (A) | Source |
+|---|---|---|---|
+| 3.3 V converter | 1.00 | 0.55 | the table above |
+| Backlight (4S2P, 39 mA, through AP3032) | 0.13 | 0.13 | 13 V at 39 mA, 85 % |
+| 8 SK6812MINI-E | 0.30 | 0.10 (firmware limit) | 12 mA per colour (spec C5149201); the firmware keeps the sum of all channels below 100 mA |
+| PN532 | 0.12 | 0.12 | transmitter 100 mA (the matching keeps it below 60 mA, see "NFC") plus 20 mA |
+| Buzzer | 0.10 | 0 while the NFC field is on | MLT-8530: 95 mA at 5 Vo-p; the firmware beeps after the field is off |
+| Level shifter, bleed resistors | 0.003 | 0.003 | |
+| **Total** | **1.65** | **0.90** | |
+
+| Source | Rating | Headroom at the maximum | Headroom at the sizing figures |
+|---|---|---|---|
+| USB-C (eFuse current limit) | 1.8 A minimum (R110 1.65 k) | 50 % | 8 % |
+| DC converter AP63205 | 2 A | 55 % | 17 % |
+| PoE module DP9905M | 1.8 A up to 70 C (9 W), 1.2 A at 85 C (6 W) | 50 % (25 % at 85 C) | 8 % |
+
+The 3.3 V converter is sized for the makers' supply figures with 36 % to
+spare. Each 5 V source has at least 30 % to spare at the highest consumption
+the makers state, with the two firmware limits in the table (LED current,
+buzzer and NFC field not at once). If all loads drew their supply-sizing
+figures at the same time, the eFuse would limit the USB current and the PoE
+module would run at its rating; neither is damaged. A PoE module in a case
+above 70 C has less: the reader is specified for indoor use (40 C).
+
+USB-C is a service port: the board draws up to 1 A from it without asking what
+the port can give. Use a port or supply that delivers that.
+
+### The 5 V rail's ceiling
+
+The ideal diodes and the eFuse drop millivolts, so the 5 V rail follows its
+source. What each source gives at most, and what each 5 V load takes:
+
+| Source | Highest output | Reference |
+|---|---|---|
+| USB-C, a compliant source | 5.5 V | vSafe5V, USB PD R3.3 table 4.9 (4.75 to 5.5 V); USB 2.0 with the VBUS Max Limit ECN: 5.5 V |
+| USB-C, a faulty source | 5.53 to 5.74 V, then the eFuse opens | OVLO below |
+| DC converter AP63205 | 5.05 V (CCM), about 5.2 V in PFM at light load | DS41326 rev 3-2: 4.95 / 5.00 / 5.05 V; figures 6 and 7 (typical) |
+| PoE module DP9905M | 5.25 V, about 5.5 V for a moment at a load step | datasheet: 4.75 / 5 / 5.25 V; load step 50 - 100 - 50 %: +276 mV (typical scope shot) |
+
+| Load | Recommended maximum | Absolute maximum |
+|---|---|---|
+| TLV62569 VIN (3.3 V converter) | 5.5 V | 6.0 V (SLVSDG1C 6.1, 6.3) |
+| PN532 VBAT | 5.5 V | 6.0 V (PN532/C1 rev 3.6, tables 290 and 291) |
+| SK6812MINI-E VDD | 5.5 V | 5.5 V "limit parameter"; no other figure (spec SK6812MINI-E-012 rev B, 7 and 9) |
+| SN74LV1T125 VCC | 5.5 V | 7.0 V (SCLS745D 6.1, 6.3) |
+| AP3032 VIN (backlight) | 9 V | 20 V |
+| Buzzer MLT-8530 | 4.5 Vo-p | not stated; with R705 10 ohm in series the coil (16 ohm +- 3) sees at most 3.8 Vo-p at 5.74 V |
+| LM74700 CATHODE, TPS25947 OUT | 60 V, 23 V | 75 V, 28 V |
+
+The eFuse's divider (R107 330 k, R108 29.4 k, R109 97.6 k, all 0.1 %) sets
+the lockouts. The thresholds of the TPS259470A are 1.183 to 1.223 V rising (UVLO
+and OVLO alike) and 1.076 to 1.116 V falling (SLVSFC9C 6.5):
+
+| | Nominal | Range (thresholds and 0.1 % resistors) |
+|---|---|---|
+| UVLO, rising | 4.32 V | 4.25 to 4.41 V |
+| OVLO, rising | 5.62 V | 5.53 to 5.74 V |
+| OVLO, falling (on again) | 5.14 V | 5.03 to 5.23 V |
+
+So every compliant USB source gets through, and a faulty one is cut off before
+the TLV62569 and the PN532 reach their 6.0 V. With 1 % resistors the window
+would be 5.45 to 5.82 V: it could cut off a compliant source. At 23 V on VBUS
+the divider puts 6.39 V on EN/UVLO and 4.91 V on OVLO, below the 6.5 V both
+pins stand. The OVLO opens the eFuse within 1.2 us (tOVLO).
+
+With every compliant source and with the DC converter, every 5 V load stays
+within its recommended range. Two cases come close:
+
+- The LEDs' 5.5 V is also their limit. They reach it only with a USB source at
+  the top of vSafe5V and no load on the cable; the board's own current drops at
+  least 40 mV in cable, fuse and ferrite. A faulty USB source between 5.53 and
+  5.74 V would put up to 4 % more on the LEDs until it is unplugged.
+- The PoE module's step response (typical, +276 mV) can lift the rail to about
+  5.5 V for a few hundred microseconds when the load falls.
+
+### Sources onto the 5 V rail
+
+- USB: eFuse U105, TPS259470ARPWR. Slew rate 0.91 V/ms (C118 2.2 nF), current
+  limit 1.8 to 2.2 A (R110 1.65 k), the lockouts above. It blocks current back
+  into VBUS when off and when on: once OUT is 29 mV above IN it opens within
+  1 us and closes again only when IN is 104 mV above OUT (50 us later). Pin
+  functions, TI SLVSFC9C table 5-1 (pages 5 and 6): 1 EN/UVLO ("Do not leave
+  floating"), 2 OVLO ("Do not leave floating"), 3 AUXOFF (TPS259470x: open
+  drain output), 4 FLT (TPS259470x: open drain fault output), 5 IN, 6 OUT,
+  7 DVDT, 8 GND, 9 ILM ("Do not leave floating"), 10 ITIMER ("Leave this pin
+  open for fastest response to overcurrent events"). Pins 3, 4 and 10 are not
+  connected; `test_new_ics_follow_their_makers_pin_tables` checks the symbol
+  against the table and that only these three are open.
+- DC and PoE: ideal diode controller LM74700-Q1 with an IRLML0030 each. The
+  controller holds 20 mV across the MOSFET and turns it off within 0.45 us when
+  the current reverses. Its charge pump keeps the gate 10.8 to 13.9 V above the
+  source (SNOSD17G 6.5; at least 8 V at 3.2 V in), below the 15 V GATE-to-ANODE
+  limit and the MOSFET's 20 V. The IRLML0030 has 27 mOhm at 10 V and 40 mOhm at
+  4.5 V at most (25 C); at 8 V and a hot junction about 45 mOhm. At 2 A, the most
+  either source gives, that is 0.18 W: 18 C above the board with the maker's
+  100 C/W. At the 5 V rail's maximum of 0.90 A it is 0.04 W.
+- Bleed resistors R104 (USB) and R105 (DC converter output), 4.7 k. With USB
+  unplugged the eFuse leaks 4.86 uA (typical; IREVLKG(OFF), SLVSFC9C 6.5) from
+  the rail back into VBUS, the ideal diode's cathode takes 2 uA from the rail
+  (LM74700, typical): 23 mV and 9 mV across 4.7 k, where a USB-C host accepts
+  0.8 V and the DC converter would start from its output at volts. Both
+  figures are typical only; 4.7 k leaves a factor of 30 for VBUS. Each
+  resistor costs 1 mA while its source is on.
+- Simulated (`sim/powerup.cir`, `sim/switchover.cir`): USB plugged in at 5.0 V
+  behind 0.25 ohm and at 4.5 V behind 0.5 ohm: the 3.3 V rail is up 5.0 ms
+  after the plug and the reset ends 4.7 ms later (the model shortens the
+  supervisor's delay to 2 ms; the part has 120 to 280 ms); the 5 V rail runs at
+  4.82 and 4.19 V. At the plug 3.8 A flow for microseconds into C101 (10 uF, what
+  USB 2.0 7.2.4.1 allows at attach), then 42 mA while the eFuse ramps the rail
+  at 0.91 V/ms. Changing supplies with 0.9 A on +5V and 0.6 A on +3V3 (DC to
+  USB; USB at 4.75 V with DC at 5.05 V plugged in and pulled; PoE to DC; PoE and
+  USB, PoE pulled): +3V3 stays at 3.13 V or above, over the supervisor's 2.99 V.
+  Running on DC with USB unplugged, VBUS stays at 0 mV; running on USB, the DC
+  converter's output at 1 mV. The eFuse's reverse blocking (29 mV, 50 us
+  re-enable) and R104 are in the model.
+
+### 3.3 V converter
+
+TLV62569 (SLVSDG1C) with 2.2 uH (Sunlord WPN4020H2R2MT, 4.3 A saturation) and
+R111 100 k / R112 22.1 k: 3.315 V.
+
+- Output capacitance. TI's table 4 proves 2.2 uH with 10, 22 and 2 x 22 uF for
+  outputs from 1.8 V, effective capacitance +20 / -50 %; 10 uF is TI's
+  recommended value, and 8.2.2.5 names 10 to 47 uF. TI's engineer on E2E
+  (thread 980956) takes the largest proven value plus 20 % as the limit:
+  52.8 uF effective. Every capacitor on the 3.3 V rail counts, also the PHY's
+  behind its ferrite. With Samsung's DC-bias data at 3.3 V (22 uF 0805
+  CL21A226MAQNNNE: 13.69 uF; 10 uF 0603 CL10A106KP8NNNC: 4.46 uF) the rail
+  had about 76 uF effective. Now: 10 uF at the converter (C109; the second
+  22 uF is gone), 10 uF instead of 22 uF at the Wi-Fi module (C301; Espressif's
+  typical circuit shows 22 uF, the converter and the plane carry its bursts),
+  4.7 uF at the proximity sensor's emitter (C715; Vishay asks 2.2 uF). That
+  is 49 uF counting the capacitors without data at their full value; the test
+  `test_3v3_converter_output_capacitance_is_in_tis_table` adds it up.
+- Feed-forward capacitor C108 12 pF across R111: a zero at 133 kHz. TI
+  recommends 6.8 pF with 200 k (zero at 117 kHz). The loop crossover is not
+  published; SLVA289 places the zero near it. Bring-up measures the load step
+  (0.1 to 1 A) with and without C108.
+- Current: 1.27 A at the sizing figures, 36 % below its 2 A (table above);
+  the current limit is 3 A at least (DBV package).
+- Layout (TI 10.2): turned so that VIN and FB face left and SW faces the
+  inductor. C107 100 nF straight above VIN, C106 10 uF beside it; their ground
+  vias and one under the converter close the input loop through the ground
+  plane 0.2 mm below. SW reaches the inductor's pad after 1.1 mm of 0.6 mm track. The divider sits
+  below FB, on the side away from SW, and senses the 3.3 V plane through its
+  own via.
+- The supervisor U204 (TLV803S, 2.93 V) holds the P4 in reset until the rail
+  has been above its threshold for 120 to 280 ms, and resets it when the rail
+  falls below that.
+
+### DC input
+
+Meant for 12 V or 24 V supplies; 28 V is the most it stands continuously. The
+jack is rated 24 V. The converter (AP63205) works up to 32 V, stands 35 V
+continuously and 40 V for 0.4 s.
+
+From the connectors: PTC fuse F102 (1.1 A hold), TVS D107 (SMBJ28CA,
+bidirectional), reverse-polarity diode D105 (SS310, 100 V), C117 2.2 uF and
+the electrolytic C120 47 uF, filter inductor L103, TVS D106 (SMBJ28A) and the
+converter's C112/C113. Both TVS stand off 28 V and conduct from 31.1 to 34.4 V.
+A reversed supply stays below D107's stand-off and D105 blocks it.
+
+- Plugging in a live supply. The cable's inductance and the input capacitors
+  ring; C120's ESR damps it. Simulated (`sim/dc_hotplug.cir`): at 24 V the converter sees at most
+  31.0 V (1.5 m of thin cable), 27.6 to 29.1 V with thicker and longer cables;
+  at 26.4 V (24 V + 10 %) 34.7 V at most; at 28 V 32.6 V, with no current in
+  the TVS. C120's ESR 0.1 to 0.8 ohm, the TVS at the top of its range. Without
+  C120 the same cases reached 38 V.
+- Surges. Which test applies:
+  - The board has radios, so the RED applies and with it EN 301 489-1 V2.2.3:
+    its table 2 and 9.8 ask for surges on AC mains and wired network ports only.
+    A DC power port gets none.
+  - EN 55035 does not apply (EN 301 489 takes precedence, its clause 1), and it
+    would test a DC port fed by a dedicated adapter on the adapter's AC side
+    (3.1.12).
+  - EN 61000-6-1 does not apply: it is for products without a product or
+    product-family standard (its clause 1), and access control has one,
+    EN 50130-4.
+  - EN 50130-4:2011, clause 13, is what access-control customers expect. On
+    extra-low-voltage DC lines it applies the slow high-energy surge line to
+    earth only, through 42 ohm (2 ohm generator, 40 ohm). The 1995 edition's
+    levels are 0.5 and 1 kV; the 2011 levels are to be read from the purchased
+    standard before the lab.
+  - The PoE/Ethernet port is a wired network port: 0.5 kV line to ground when
+    its cable may be longer than 30 m indoors (EN 301 489-1 9.8.2.2).
+
+  Simulated (`sim/dc_surge.cir`): 1.2/50 us, +-1 kV behind 42 ohm, applied
+  across the input instead of line to earth (the board has no earth, so in the
+  real test far less of it flows through the input), the supply connected
+  through the coupling network's 1.5 mH, both TVS at the top of their breakdown
+  range with the slope of their 10/1000 us rating, C120 at -20 % with low and
+  high ESR, L103 unsaturated and saturated: 
+
+  | Supply | +1 kV: converter, D105 reverse | -1 kV: converter, D105 reverse, input TVS |
+  |---|---|---|
+  | 12 V | 35.8 V, 40 V | 34.7 V, 62 V, 21.5 A |
+  | 24 V | 38.6 V, 26 V | 35.5 V, 72 V, 21.8 A |
+  | 26.4 V | 39.3 V, 22 V | 35.6 V, 74 V, 21.8 A |
+  | 28 V | 39.6 V, 19 V | 35.7 V, 75 V, 21.8 A |
+
+  The converter stays below its 40 V (0.4 s), D105 below its 100 V; the input
+  TVS takes up to 22 A of an 8/20 us pulse, where ST gives 68 A at 59 V for the
+  same part. The converter's input dips after the surge (to 4 V at 12 V, to
+  17 V at 24 V): the coupling network's 1.5 mH rings with C120, undamped by
+  the converter, which draws constant power. A test lab's network can do the
+  same; the board then restarts. Supply cables have microhenries, not
+  millihenries, and do not ring this way.
+
+  Before, with the SS34 and no TVS at the connector, the converter saw 40.6 V
+  at 28 V supply, and a negative surge drove D105 into breakdown with 22 A. A
+  line-to-line surge of 0.5 kV behind 2 ohm (IEC 61000-4-5's test for power
+  ports, which no standard for this board asks of a DC port) drives some 200 A:
+  that would need a converter rated for 60 V and a larger TVS.
+- Input filter: C117, L103 and C112/C113 form a pi filter, so the converter's
+  1.1 MHz ripple current does not run out on the supply cable. It takes 40 to
+  50 dB off at 1.1 MHz (calculated, not measured). It has no common-mode
+  choke: if the lab finds emissions from the cable above 30 MHz, a clip-on
+  ferrite at the cable is the first remedy. The ceramic capacitors are 2.2 uF /
+  100 V X7R: they keep 2.0 uF at 12 V and 1.5 uF at 24 V, where a 10 uF / 50 V
+  part keeps 3.4 and 1.35 uF and lets the input ring higher.
+- The DC converter sits in the left column behind the display, right above the
+  two DC connectors, away from the NFC loop.
+
+Other notes:
+
 - Nothing but the TVS may sit across the PoE input. Extra capacitance there
   breaks the PoE detection signature.
-- The PoE module needs a minimum load (100 mA DP9900M, 200 mA Ag9905M). With the
+- The PoE module needs a minimum load (100 mA DP9905M, 200 mA Ag9905M). With the
   backlight on the board draws more than that. A deep-sleep mode would need a
-  dummy load.
-- DC input: meant for 12 V or 24 V supplies; 28 V is the most it stands
-  continuously. The jack is rated 24 V. The converter (AP63205) works up to
-  32 V, stands 35 V continuously and 40 V for 0.4 s. The TVS is an SMBJ26A
-  (600 W): it starts to conduct between 28.9 and 31.9 V and, by its
-  datasheet's figures, keeps the input below 40 V up to a peak current of
-  11 A (42.1 V at its rated 14.3 A). A live 24 V supply being plugged in
-  puts up to 8 A through it (next point). The smaller SMAJ28A fitted first
-  reached 40 V at 4.5 A. The TVS cannot hold a lasting overvoltage, and a
-  surge from a long supply line can still exceed 40 V: holding that needs a
-  converter rated for 60 V. Reversed polarity does no harm (series diode
-  D105). The inductor L102 is rated for 25 V across it, which is reached at
-  30 V input.
-- Plugging in a live supply. The supply's cable and the three input capacitors
-  (C117, C112, C113) form a resonant circuit, and what damps it is only the
-  resistance of cable and fuse; the fuse has 0.05 to 0.25 ohm. A ceramic
-  capacitor loses capacitance as the voltage rises. One that is large while it
-  charges and small once it is charged makes the input swing far above the
-  supply: the charging current still flows when most of the capacitance is
-  gone. The capacitors fitted first, 10 uF / 50 V, are of that kind; the ones
-  fitted now, 2.2 uF / 100 V in the same size, are not. Their makers' curves:
-
-  | Capacitance at | 5 V | 12 V | 24 V | 40 V |
-  |---|---|---|---|---|
-  | 10 uF / 50 V X5R (CL31A106KBHNNNE) | 7.3 uF | 3.4 uF | 1.35 uF | 0.63 uF |
-  | 2.2 uF / 100 V X7R (CL31B225KCHSNNE) | 2.2 uF | 2.0 uF | 1.53 uF | 1.02 uF |
-
-  Simulated with these curves: the peak at the converter, whose limit is 40 V,
-  when a 24 V supply without resistance of its own is plugged in, with the TVS
-  at its upper limit:
-
-  | Cable to the supply | 10 uF / 50 V, fuse 0.05 ohm | 2.2 uF / 100 V, fuse 0.05 ohm | 0.12 ohm | 0.25 ohm |
-  |---|---|---|---|---|
-  | 1.5 m, 2 x 0.35 mm2 (plug-in supply) | 38 V | 34 V | 32 V | 29 V |
-  | 3 m, 2 x 0.75 mm2 | 43 V | 36 V | 35 V | 33 V |
-  | 5 m, 2 x 0.75 mm2 | 41 V | 36 V | 35 V | 33 V |
-  | 5 m, 2 x 1.5 mm2 | 45 V | 38 V | 36 V | 34 V |
-  | 10 m, 2 x 1.5 mm2 | 43 V | 37 V | 36 V | 35 V |
-  | 20 m, 2 x 1.5 mm2 | 39 V | 36 V | 35 V | 34 V |
-
-  With the first capacitors the input was above 40 V for 2 to 3 microseconds
-  in four of the six rows, with up to 19 A in the TVS. Now it stays at 38 V
-  or below and the TVS carries 8 A at most; the capacitors' tolerance of 10 %
-  moves that by 0.3 V. A supply of 26.4 V (24 V plus 10 %) gives up to
-  39.5 V. One of 28 V gives 41 V with 5 m of thick wire: 28 V is what the
-  input stands continuously, not what may be plugged in live. A 12 V supply
-  stays below 23 V with either capacitor. Not simulated: contact bounce. The
-  curves are the makers' typical ones.
-
-  What the change costs: at 12 V the converter has 3.9 uF at its input instead
-  of 6.8 uF (at 24 V 3.1 uF instead of 2.7 uF). That is 85 mV of ripple at
-  1.5 A, and the input filter stays stable with the converter as a load of
-  constant power, simulated for cables up to 20 m. The converter's datasheet
-  names 10 uF; one 10 uF / 50 V part of this size is the 3.4 and 1.35 uF of
-  the first table. The part is not a basic one at JLCPCB (3 USD per order).
-  An electrolytic capacitor of 47 uF across C117 would end the swing
-  altogether (25 V); the board has no place for one.
-- DC input filter: C117 (2.2 uF), L103 (2.2 uH) and the converter's own input
-  capacitors C112/C113 (2.2 uF each) form a pi filter. Without it the converter's 1.1 MHz
-  ripple current would run straight out on the supply cable; conducted
-  emission on that cable is measured when it may be longer than 3 m. The
-  filter takes 40 to 50 dB off at 1.1 MHz (calculated, not measured). It has no
-  common-mode choke: if the lab finds emissions from the cable above 30 MHz, a
-  clip-on ferrite at the cable is the first remedy. The TVS sits behind the
-  inductor, at the converter, so it also clamps what the filter rings up to
-  when a supply is plugged in live. The capacitors keep 2.0 uF each at 12 V
-  and 1.5 uF at 24 V (see above); the figure is for these values.
-- Bleed resistors: R104 (USB) and R105 (DC converter output), 4.7 k each. The
-  OR-ing diodes leak up to 0.1 mA when hot. Without a load that lifts the
-  unpowered input to several volts: a USB-C host then does not switch its
-  supply on (it wants to see 0 V first), and the DC converter gets a supply
-  through its own output. Each resistor costs 1 mA while its source is on.
-  The diode's datasheet shows typical curves only: 1 uA at 25 °C, 0.1 mA at
-  75 °C and 0.5 mA at 100 °C, which is 0.005, 0.5 and 2.4 V across 4.7 k. A
-  USB-C host accepts up to 0.8 V. That is enough for a reader at room
-  temperature and has no margin for a hot one or for a diode that leaks more
-  than the typical one; 1 k in place of R104 gives five times the margin for
-  5 mA.
-- With two supplies connected the higher one feeds the board. A PoE module
-  that is connected but carries no load runs below its minimum load: it may
-  whistle, and the switch may turn the port off and on. Nothing is damaged.
-- USB-C is a service port: the board draws up to about 1 A from it without
-  asking what the port can give. Use a port or supply that delivers that.
-- The DC converter, with fuse, diode and TVS, sits in the left column behind
-  the display, right above the two DC connectors. A switching converter next
-  to the NFC loop can cost read range, so it is not on the NFC part of the
-  board.
+  dummy load. A PoE module that is connected but carries no load because
+  another source is higher may whistle, and the switch may turn the port off and
+  on. Nothing is damaged.
 - The firmware cannot tell which source powers the board. That was left out on
   purpose; a divider to a spare GPIO would add it.
 - The core converter must be a TLV62569DBVR. Espressif lists the part numbers
@@ -536,7 +694,7 @@ and what the board has:
 | 51 k pull-ups on CMD and D0 to D3 | R305 to R309, 51 k |
 | A reset line from the host to the module's EN pin | GPIO45 through 1 k (R302) to EN, which has 10 k and 1 uF. esp-hosted's 10 ms pulse takes EN to 0.3 V and holds it below its threshold for 8.4 ms |
 | Short tracks of equal length, clock matched to data first; series termination where needed | 37 to 46 mm, clock 39 mm with 22 ohm at the P4. Simulated: clock and data arrive within 0.2 ns of each other, and clock out plus data back take 1.1 ns of the 25 ns that one clock period at 40 MHz has |
-| A supply at the module that does not dip | 22 uF and 100 nF at the module, from the 3.3 V plane of the 2 A converter |
+| A supply at the module that does not dip | 10 uF and 100 nF at the module, from the 3.3 V plane of the 2 A converter. Espressif's typical circuit has 22 uF; 10 uF keeps the 3.3 V converter inside the output capacitance TI has proven (see "Power") |
 
 The reports, by cause:
 
@@ -861,7 +1019,7 @@ offers at no charge and selects for six layers unless told otherwise, is as
 flat as ENIG and takes the 0.35 mm pitch MCU as well. But it protects copper
 only until it is soldered, and JLCPCB excludes it for contact areas. The board
 has them: the four bare ground pads for the display's metal back, on the side
-without parts, where assembly cannot tin them, and the 15 test points, four of
+without parts, where assembly cannot tin them, and the 30 test points, four of
 which carry the first flash of the Wi-Fi module. Bare boards with OSP also keep
 for three months only, and about a week once unpacked. The board stays with
 ENIG.
@@ -874,12 +1032,12 @@ at every quantity. With a two-layer carrier they cost more on 5 boards and
 0.08 USD less per reader on 100, before the connector pair between the boards
 and the second assembly order.
 
-Once per order JLCPCB adds 3 USD for every extended part line (38 lines on the
-Wi-Fi version, 43 on the Ethernet/PoE version by its catalogue of 22 November
-2026, preferred parts not counted), the setup and stencil fees, the bare
-boards and shipping. On five boards the extended-part fees alone are 23 to
-26 USD per board, so a small prototype order costs far more per board than the
-table shows.
+Once per order JLCPCB adds 3 USD for every extended part line (50 lines on the
+Wi-Fi version, 57 on the Ethernet/PoE version by its catalogue of 25 November
+2026, with the power path of review stage 3; preferred parts not counted), the
+setup and stencil fees, the bare boards and shipping. On five boards the
+extended-part fees alone are 30 to 34 USD per board, so a small prototype order
+costs far more per board than the table shows.
 
 The largest lines are the ESP32-P4 (6.15), the PN532 (5.89), the Wi-Fi module
 (4.19) and the flash (2.26); on the Ethernet/PoE version also the PoE module
@@ -902,7 +1060,8 @@ Savings that were looked at and not taken:
 | USB protection SRV05-4-P-T7 (C85364, a preferred part) instead of the USBLC6-2SC6 | 3 USD per order (one extended line less) | Same package, and the board's wiring suits it: it has four lines where the USBLC6 has two, and each USB line already goes to two pins. But it is another maker's part at the one connector an ESD test will hit, and its angle in JLCPCB's library is unchecked. |
 
 Where a part has an equivalent in JLCPCB's basic or preferred list, the design
-uses that one (the TVS diodes, 1 uF / 50 V). The core converter's divider is
+uses that one (the TVS diodes of USB and PoE, the DC input's reverse-polarity
+diode, 1 uF / 50 V). The core converter's divider is
 the 499 k that Espressif's checklist demands, an extended part like the 510 k
 that was fitted before. The one exception is
 the three capacitors of the DC input: the basic 10 uF / 50 V part fits their
@@ -915,6 +1074,14 @@ values that the first boards will change anyway. The 10 pF of the matching is
 a basic part and the 3.9 k of the receive divider a preferred one (looked up
 on 24 November 2026).
 
+The power path of review stage 3 brought extended lines of its own: the eFuse,
+the ideal-diode controller and its MOSFET, the supervisor, the two TVS of the
+DC input (SMBJ28A, SMBJ28CA), the 47 uF electrolytic, the three 0.1 %
+thin-film resistors of the eFuse's divider, and 1.65 k, 22.1 k and 2.2 nF
+(looked up on 25 November 2026). Whether a basic part of the same value
+exists for the last three was not looked up. The 3.3 V converter adds no line:
+it is the part of the core converter.
+
 ## Sourcing risks
 
 Stock figures are JLCPCB's of 22 November 2026. Every line of both parts
@@ -924,14 +1091,17 @@ pieces.
 | Part | Risk |
 |---|---|
 | ESP32-P4NRW32X | No stock at JLCPCB or LCSC. Has to be ordered in before assembly. Use the X part (silicon v3.x); the part without X is end of life. |
-| AP63203WU-7 (U103, 3.3 V converter) | Two pieces in stock, none at LCSC. A common part elsewhere; order it in. The adjustable types of the family do not fit: this one has its divider inside. |
 | PN532 | Fitted is the Tokmas PN5321A3HN (C53457895, about 6 USD, 123 in stock): same package and pinout as the NXP part, but its datasheet says nothing about the firmware inside, and it is not yet proven with ours. If it misbehaves, the NXP original (C28925, about 13 USD, none in stock) fits the same pads. JLCPCB's library draws the two parts a quarter turn apart: the placement file corrects the angle for the Tokmas part and for no other, so run `check-footprints` after changing the part number. NXP steers new designs to the PN7160. |
 | DP9900M-5V | 38 in stock, ten fewer than two days before. Of the Silvertel Ag9905 only the types Ag9905-M and Ag9905-MT fit the footprint; the Ag9905-MTB and -LPB that Silvertel prefers have five pins in another order. JLCPCB lists no Ag9905. |
 | DC jack PJ-002A (J102), inductor CKCSA252012-2.2uH/M (L103, L201, two per board) | 1022 and 1171 in stock: enough for a first order, low for a series. |
-| Inductor CKCSA4020-6.8uH/M (L102) | 2228 in stock, but JLCPCB's library has no footprint for this part number, so `check-footprints` cannot compare it. It is the body of L101 (same series, same footprint, which does compare), has two pads and no polarity. Look at it in the placement preview. |
+| Inductor CKCSA4020-6.8uH/M (L102) | 2228 in stock, but JLCPCB's library has no footprint for this part number, so `check-footprints` cannot compare it. It shares its 4 x 4 mm footprint with L101, has two pads and no polarity. Look at it in the placement preview. |
 | Display panel | Commodity part without a guaranteed part number. Agree on a fixed type with the supplier. |
 | ESP32-C6-MINI-1U-H4 (U301, Wi-Fi module) | 3364 in stock on 24 November 2026. The -N4 of the same module (C7558096, to 85 C) had none. |
 | Wi-Fi antenna, pigtail | Not chosen, and not parts JLCPCB assembles: bought and fitted by hand. The pigtail's plug must be a W.FL / MHF III. |
+
+The 3.3 V converter U103 was an AP63203WU-7, of which JLCPCB had two pieces and
+LCSC none. It is now a TLV62569DBVR, the part of the core converter U202, with
+490416 in stock on 25 November 2026.
 
 ## Design review
 
@@ -952,7 +1122,7 @@ display and the connectors. Nothing was built or measured.
 | 48 V parts and tracks directly at the rear wall of the jack's metal shell (0.1 to 0.3 mm), and the centre-tap capacitors as well. | Parts moved 2 mm away, 48 V nets under the shell on the inner layer, Ethernet pairs on the back layer. |
 | Copper pour under the PoE module where its isolation barrier lies. | No copper there on any layer. |
 | DC input without a filter: the converter's ripple would go out on the supply cable. | Pi filter C117, L103. |
-| Unpowered inputs float up through the leakage of the OR-ing diodes; a USB-C host may then not power the port. | Bleed resistors R104, R105. |
+| Unpowered inputs float up through the leakage of the OR-ing diodes; a USB-C host may then not power the port. | Bleed resistors R104, R105. (The diodes since replaced, see "Power"; the resistors stay.) |
 | Buzzer resistor: 0.16 W in a 0.1 W part. | 0.25 W part of the same size. |
 | Level shifter 74AHCT1G125 is specified from 4.5 V; the 5 V rail can be lower. | 74LV1T125 (1.6 to 5.5 V), same pads. |
 | LED data line floats while the MCU is in reset. | Pull-down R705. |
@@ -999,7 +1169,7 @@ after; it does not look at any of this.
 | Vias under solder paste: 9 of 25 in the MCU's exposed pad, all in the PHY's and the Wi-Fi module's ground pads, one in a capacitor pad. | None now. |
 | The four inductor footprints were marked as through-hole parts. A placement export for surface-mount parts only would have left them out (this project's export did not). | Marked as surface-mount. |
 | LED pads 0.25 mm from the milled windows, with an outline tolerance of 0.2 mm. | Pads 0.1 mm shorter: 0.3 mm and more. |
-| TVS of the DC input: 45 V at its rated current against the converter's 40 V. | SMBJ26A, see "Power". |
+| TVS of the DC input: 45 V at its rated current against the converter's 40 V. | SMBJ26A (since replaced by an SMBJ28A, see "Power"). |
 | Silkscreen text of 0.9 mm; the marker `JLCJLCJLCJLC` for an order number that JLCPCB stopped printing in May 2026. | Text 1.0 mm; a field for JLCPCB's serial number. |
 | No stack-up in the board file. Part counts and bus lengths in these documents were out of date. | Added and corrected. |
 
@@ -1029,8 +1199,8 @@ inductors and crystals. Nothing was built or measured.
 |---|---|
 | PN532: its footprint had solder paste over the whole exposed pad and one more opening on each of the four thermal vias in it, on both sides of the board. The solder would have run into the four holes, and the order would have carried a paste layer for the side without parts. | Eight paste windows around the vias, none on a hole, on the component side only. A test now reads the footprint library for paste on plated holes. |
 | NFC matching: these notes called the fitted values safe for any loop from 1.0 to 1.3 uH. That holds for exact part values; with the 5 % parts fitted it holds from 1.12 to 1.22 uH. | No part changed then: the values were right for the loop expected (1.2 uH). The simulation below found a larger loop and changed them. |
-| Plugging in a live 24 V supply: these notes said the TVS keeps the converter's input below 40 V. That rested on a current of 11 A at most. The three input capacitors (10 uF / 50 V) keep 1.35 uF each at 24 V by their maker's curve, and simulated with that curve the input reached 41 to 45 V, with up to 19 A in the TVS, for 3 to 10 m of ordinary installation wire. | C112, C113 and C117 are 2.2 uF / 100 V X7R in the same size: 38 V at most. Figures and what it costs in "Power". |
-| USB port while another supply runs the board: the bleed resistor holds the unplugged port below what a USB-C host accepts only as long as the OR-ing diode leaks no more than the typical one at 75 °C. | No part changed. Figures in "Power", a check with the reader warm in the bring-up plan. |
+| Plugging in a live 24 V supply: these notes said the TVS keeps the converter's input below 40 V. That rested on a current of 11 A at most. The three input capacitors (10 uF / 50 V) keep 1.35 uF each at 24 V by their maker's curve, and simulated with that curve the input reached 41 to 45 V, with up to 19 A in the TVS, for 3 to 10 m of ordinary installation wire. | C112, C113 and C117 are 2.2 uF / 100 V X7R in the same size: 38 V at most. Figures and what it costs in "Power". (The 47 uF electrolytic C120 since added, see "Power".) |
+| USB port while another supply runs the board: the bleed resistor holds the unplugged port below what a USB-C host accepts only as long as the OR-ing diode leaks no more than the typical one at 75 °C. | No part changed. Figures in "Power", a check with the reader warm in the bring-up plan. (The OR-ing diode since replaced by the eFuse U105, see "Power".) |
 
 Checked and found right, beyond what the first review lists:
 
@@ -1070,8 +1240,9 @@ Checked and found right, beyond what the first review lists:
   around them.
 - Currents. With everything on at once (which the firmware never does) the
   5 V rail carries 1.5 A, 7 W: the 3.3 V converter then delivers 1.1 A of its
-  2 A, the DC converter 1.5 A of 2 A, an OR-ing diode dissipates 0.6 W and the
-  PoE module is below its 9 W. The DC input then draws 0.75 A at 12 V. Its fuse
+  2 A, the DC converter 1.5 A of 2 A, and the PoE module is below its 9 W. The
+  OR-ing diode fitted then dissipated 0.6 W. The ideal diodes that replace it
+  (see "Power") dissipate about 0.04 W in each IRLML0030 at 0.9 A. The DC input then draws 0.75 A at 12 V. Its fuse
   holds 1.1 A at 25 °C and 0.7 A at 60 °C, so it is the tightest part of the
   chain: fine for the 4.5 W peak these notes assume (0.5 A), no margin for
   7 W in a warm case.
@@ -1079,7 +1250,8 @@ Checked and found right, beyond what the first review lists:
   4 ms; the reset pins of the MCU and of the Wi-Fi module follow 14 ms later;
   the core runs from the chip's own regulator until the firmware switches the
   converter on. Backlight, LEDs, buzzer and PN532 are held off by resistors
-  until then.
+  until then. (Since changed: the 3.3 V converter is a TLV62569 and the
+  supervisor U204 holds the MCU in reset for 120 to 280 ms, see "Power".)
 - Pin map: no GPIO is used twice, the four USB pads are respected (GPIO26, the
   backlight, is one of them; Espressif's board uses it for its backlight too),
   the Ethernet signals are on pins the MAC can reach without the GPIO matrix.
@@ -1100,7 +1272,8 @@ Looked at and left as they are:
   PSRAM), the PN532's 3.0 V, the PHY's 1.1 V, the outputs of the DC converter
   and of the PoE module, the backlight. The bring-up plan names a capacitor or
   a diode to measure each at; a test point each would need room near the MCU
-  that the board does not have.
+  that the board does not have. (Since review stage 3 all of them but the
+  PSRAM supply and the PHY's 1.1 V have a small test point.)
 
 ### Simulation
 
@@ -1130,14 +1303,17 @@ Simulated and found right:
   the cables of the table in "Power" (38.1 V and 8.6 A in the TVS with 5 m of
   1.5 mm2), 39.9 V from a 26.4 V supply. This second, independent model agrees
   with that table within 1.5 V. The filter capacitor in front of the inductor
-  (C117) sees more, up to 43 V; it is a 100 V part.
+  (C117) sees more, up to 43 V; it is a 100 V part. (Since then the 47 uF
+  electrolytic C120 damps the input, see "Power".)
 - Power-up from USB: the 3.3 V rail is up after 3.8 ms. The MCU's reset input
   is at 0.53 V then and passes 0.83 V, the highest level it still takes for
   low, 1.1 ms later; the chip asks for 50 us. On a weak port (4.5 V behind
   0.5 ohm) the 5 V rail runs at 3.8 V, the least the 3.3 V converter works
   from: enough, with nothing to spare. Plugging in draws 7.5 A for some
   microseconds, into about 50 uF where the USB standard allows a device 10 uF.
-  Ports stand that; it is one more reason why this is a service port.
+  Ports stand that; it is one more reason why this is a service port. (Since
+  changed: the eFuse U105 ramps the 5 V rail, and at plug-in the port sees
+  C101's 10 uF only, see "Power".)
 - Track impedance on this layer stack, 0.15 mm track with the ground fill
   beside it: 49 ohm on the outer layers, 46 ohm on In2 (5.7 and 7.0 ps/mm).
 - Reflections on the fast lines, with the routed lengths. The lines with a
@@ -1263,6 +1439,12 @@ are made in the generator, which stays the source of truth (see
 | Parts lists with LCSC number and value only. | Every line carries manufacturer, part number, a full description (with rating and tolerance), an alternate and, for ICs and modules, the maker's lifecycle status (`scripts/bootstrap/parts_info.py`; [parts.md](parts.md) lists the sources). The display and the Wi-Fi antenna, which JLCPCB does not assemble, are in the parts lists too. A test fails when a fitted part lacks these data. |
 | No fabrication drawing, no netlist for the bare-board test. | `fab/jlcpcb/attractap-touch-p4-fab.pdf` (outline, dimensions, holes and cut-outs, stack-up, drill table, material, finish, IPC class, via fill) and `attractap-touch-p4.ipc` (IPC-D-356), both written by `export`. |
 | 3D models for the display connector only. | A model for every footprint with a body (`kicad/lib/attractap.3dshapes/`, `scripts/bootstrap/collect_models.py`); a test fails when one is missing. |
+| Supply OR-ing with three Schottky diodes: the 5 V rail sat at about 4.6 V, the diodes leaked back into an unplugged USB port when warm, and nothing limited the USB inrush. | USB through an eFuse (TPS259470A: soft start, 2 A limit, reverse blocking, lockouts), DC and PoE through ideal diodes (LM74700-Q1 with IRLML0030); see "Power". |
+| 3.3 V converter AP63203: no stock at LCSC or JLCPCB. | TLV62569 (the core converter's part), laid out as TI shows. |
+| The 5 V rail now follows its source; its ceiling was not stated against what the 5 V loads stand. | Table in "The 5 V rail's ceiling"; the eFuse's OVLO with a 0.1 % divider opens between 5.53 and 5.74 V. |
+| DC input: the TVS clamps 45 V at its rated current against the converter's 40 V; which surge test applies was not stated. | Standards worked out (EN 301 489-1: none on DC power ports; EN 50130-4: line to earth through 42 ohm); a bidirectional TVS at the connector and a 100 V reverse-polarity diode; `sim/dc_surge.cir`: 39.6 V at most at the converter. |
+| 3.3 V rail: about 76 uF effective at 3.3 V on a converter that TI has proven up to 52.8 uF. | About 49 uF: one 10 uF at the converter, 10 uF at the Wi-Fi module, 4.7 uF at the proximity emitter; a test adds it up. |
+| DRC run with lowered severities (50 warnings at KiCad's defaults). | KiCad's default severities, no rule switched off or lowered: 0 errors, 0 warnings, 0 unconnected. Silkscreen cut back from pads and board edges in the generator; fiducials with a copper keep-out; 3 mm PoE spacing everywhere. |
 
 #### Land patterns against the makers' drawings
 
@@ -1276,7 +1458,8 @@ order or hole position is a defect.
 
 | Part | Document | Result | Change |
 |---|---|---|---|
-| U201 ESP32-P4 (QFN-104, 0.35 mm) | Datasheet v0.7 fig. 6-1 (package); Espressif's KiCad footprint `ESP32-P4.kicad_mod` (espressif/kicad-libraries, 2025-10-07), as neither datasheet nor guidelines give a land pattern | Pitch, count, pin 1 and numbering match (worst 0.005 mm). Pads 0.15 x 0.65 mm, 0.125 mm further out than Espressif's 0.20 x 0.65 mm | Rework to Espressif's pads with the layout (stage 3 of this review) |
+| U201 ESP32-P4 (QFN-104, 0.35 mm) | Datasheet v0.7 fig. 6-1 (package); Espressif's KiCad footprint `ESP32-P4.kicad_mod` (espressif/kicad-libraries, 2025-10-07), as neither datasheet nor guidelines give a land pattern | Pitch, count, pin 1 and numbering match (worst 0.005 mm). The converted pads were 0.15 x 0.65 mm, 0.125 mm further out than Espressif's 0.20 x 0.65 mm, and stored partly turned, partly with width and length swapped | Espressif's 0.20 x 0.65 mm from 4.55 to 5.20 mm off the centre, mask margin 0.025 mm (web 0.10 mm). The eight corner pads end 0.02 mm earlier on the inside: 0.14 mm across each corner, where Espressif's pattern has 0.113 mm (`make_lib.p4_signal_pads`) |
+| U105 TPS259470A (VQFN-10 RPW, 2 x 2 mm) | TI SLVSFC9C, RPW0010A package and example board layout | The converted pads are TI's polygons, drawn with a 0.1 mm outline that adds 0.05 mm of copper all round | Outline removed: the copper is TI's land (`make_lib.custom_pad_strokes`) |
 | U301 ESP32-C6-MINI-1U | Datasheet v1.5 figs. 11-1, 11-2 | Pitch 0.80, pads 0.40 x 0.80, column and row spacing 11.80 / 9.80, corner pads and numbering match. Ground pads at 1.80 mm pitch and 0.05 mm off centre, against 1.975 mm | Ground pads moved to 1.975 mm, centred (`make_lib.c6_ground_pads`) |
 | J101 USB-C TYPE-C-31-M-12 | HRO drawing 2020-12-08 | Pitch, pin order, signal pads, locating holes and shell slot positions match. **The four power pads were polygons with a 0.1 mm outline: 0.70 x 1.40 mm in copper, 0.10 mm from VBUS to GND** where the drawing has 0.20 mm. Pads 0.19 mm further back than drawn and shell slots 0.2 mm wider: acceptable | Power pads 0.6 x 1.3 mm (`make_lib.usb_c_power_pads`); the DRC exception that allowed 0.09 mm at J101 is gone |
 | J102 PJ-002A | Same Sky datasheet rev 1.05 | Terminal positions, slots and orientation match | none |
@@ -1365,12 +1548,20 @@ a test fails when a model's pins miss the holes or its terminals the pads.
   calculated (simulated again: on for certain on the dock, off after 9 to
   33 mm of lift), whether the dock's magnet changes the buzzer's sound, and which
   accelerometer thresholds tell a knock from a door closing.
-- **Hot-plugging a 24 V supply.** By simulation the converter's input peaks
-  at 29 to 38 V, against its limit of 40 V (see "Power"). That is 2 V of
-  margin from a model, so measure it on the first board, with a few metres of
-  thick wire to a stiff supply. If it comes out higher: a 47 uF / 50 V
-  electrolytic capacitor across C117 ends the swing, and has to be wired on,
-  because the board has no place for one.
-- **The USB port on a warm reader that runs from another supply.** Whether a
-  USB-C host switches its supply on depends on the leakage of one diode
-  (D102) when it is warm (see the bleed resistors in "Power").
+- **Hot-plugging a 24 V supply.** By simulation the converter's input stays
+  below 35 V, against its limit of 40 V, now that the 47 uF electrolytic C120
+  damps the input (see "Power"). The figure is from a model, so measure it on
+  the first board, with a few metres of thick wire to a stiff supply
+  (bring-up plan).
+- **The USB port on a warm reader that runs from another supply.** R104 holds
+  the unplugged port's VBUS near 0 V against the few microamps the eFuse U105
+  leaks back (see "Power"). Check on the first board, warm, that a USB-C host
+  still switches its supply on (bring-up plan).
+- **The 3.3 V converter's stability.** The rail's capacitors come to about
+  49 uF effective, at the upper end of what TI has proven stable for the
+  TLV62569 (see "Power"). A load step on the first board, with and without
+  the feed-forward capacitor C108, shows the margin (bring-up plan).
+- **What the power budget assumes.** It relies on the firmware keeping the
+  LEDs below 100 mA together and beeping only while the NFC field is off, and
+  it assumes 60 mA for the display panel's 3.3 V supply (see "Power"). Measure
+  the panel and check both firmware limits on the first board (bring-up plan).

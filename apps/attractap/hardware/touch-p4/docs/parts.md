@@ -21,8 +21,10 @@ signal.
 | IC Plus IP101GRI | U401 | not stated (listed on the maker's site) | [icplus.com.tw](https://www.icplus.com.tw/products/1?locale=en) |
 | Tokmas PN5321A3HN | U501 | not stated | none found |
 | NXP PN5321A3HN/C106 (alternate of U501) | | **Not Recommended for New Designs**; NXP points to the PN7160 | [nxp.com](https://www.nxp.com/products/PN5321A3HN) |
-| TI TLV62569DBVR | U202 | ACTIVE | [ti.com](https://www.ti.com/product/TLV62569/part-details/TLV62569DBVR) |
-| Diodes AP63203WU-7 | U103 | Active; **no stock** at LCSC or JLCPCB | [DigiKey](https://www.digikey.com/en/products/result?keywords=AP63203WU-7) |
+| TI TLV62569DBVR | U103, U202 | ACTIVE | [ti.com](https://www.ti.com/product/TLV62569/part-details/TLV62569DBVR) |
+| TI TPS259470ARPWR | U105 | ACTIVE | [ti.com](https://www.ti.com/product/TPS25947/part-details/TPS259470ARPWR) |
+| TI LM74700QDBVRQ1 | U106, U107 | ACTIVE | [ti.com](https://www.ti.com/product/LM74700-Q1/part-details/LM74700QDBVRQ1) |
+| TI TLV803SDBZR | U204 | ACTIVE | [ti.com](https://www.ti.com/product/TLV803) |
 | Diodes AP63205WU-7 | U104 | Active | [DigiKey](https://www.digikey.com/en/products/result?keywords=AP63205WU-7) |
 | Diodes AP3032KTR-G1 | U601 | Active | [DigiKey](https://www.digikey.com/en/products/result?keywords=AP3032KTR-G1) |
 | TI TCA9554PWR | U602 | ACTIVE | [ti.com](https://www.ti.com/product/TCA9554/part-details/TCA9554PWR) |
@@ -34,6 +36,7 @@ signal.
 | SDAPO DP9900M-5V | U102 | not stated (listed as a current product) | [sdapo.com](https://www.sdapo.com/show/102.html) |
 | Silvertel Ag9905M (alternate of U102) | | not marked NRND; filed under "Extended Range" | [silvertel.com](https://silvertel.com/Ag9900/) |
 | AOS AO3400A | Q701 | Full Production | [aosmd.com](https://aosmd.com/products/mosfets/low-voltage-mosfets-12v-30v/ao3400a) |
+| Infineon IRLML0030TRPBF | Q101, Q102 | Active | [DigiKey](https://www.digikey.com/en/products/result?keywords=IRLML0030TRPBF) |
 | HanRun HY931147C | J401 | not stated | none found |
 | Hirose FH12-40S-0.5SH(55) | J601 | Active | [DigiKey](https://www.digikey.com/en/products/result?keywords=FH12-40S-0.5SH(55)) |
 | HRO TYPE-C-31-M-12 | J101 | not stated | none found |
@@ -54,7 +57,15 @@ Stock is LCSC / JLCPCB on 25 November 2026.
 | Winbond W25Q128JVSIQ (C97521) | GigaDevice GD25Q128ESIGR (C2928891) | 19953 / 20899 | Same SOP-8 208 mil pin table; ESP-IDF enables its quad mode |
 | IC Plus IP101GRI (C703537) | the same part, LCSC C910373 | 720 / 720 | Not the IP101GRR, which is the commercial-temperature part |
 | Tokmas PN5321A3HN (C53457895) | NXP PN5321A3HN/C106 (C28925) | 324 / 490 | Mutual alternates: Tokmas copies NXP's pin table. Check the firmware version and the antenna tuning on the first board |
-| TI TLV62569DBVR (C141836) | SGMICRO SGM61020XN5G/TR (C5153643) | 2930 / 2977 | Same SOT-23-5 pins, 0.6 V reference, 2 A: the divider stays |
+| TI TLV62569DBVR (C141836) | SGMICRO SGM61020XN5G/TR (C5153643) | 2930 / 2977 | For U103 only. Same SOT-23-5 pins, 0.6 V reference, 2 A: the divider stays. The core converter U202 must stay the TLV62569 (design notes, "Power") |
+| TI LM74700QDBVRQ1 (C2941042) | Maxinmicro MX74700T (C22468156) | 47392 / 48337 | Same pins; 300 uA instead of 80 uA, not automotive-qualified |
+| TI TLV803SDBZR (C132016) | 3PEAK TPV803S-3STR (C2842356) | 9260 / 9265 | Same pins; resets at 2.85 to 3.00 V, holds the reset 140 to 280 ms |
+| Infineon IRLML0030TRPBF (C67272) | Diodes DMN3023L-7 (C443825) | 6560 / 6902 | Same SOT-23 pins; 25 mOhm at 10 V, +-20 V gate |
+| Littelfuse SMBJ28CA (C151259) | MDD SMBJ28CA (C115825) | 40020 / 40023 | Same ratings |
+| R+O SS310 (C7420364) | MDD SS310 (C15874) | 240900 / 240870 | 100 V 3 A, 0.85 V at 3 A; junction rated 125 C instead of 150 C |
+| YAGEO RT0603BRD07330KL, 330 k 0.1 % (C861327) | Uniroyal TC0325B3303T5F (C2989388) | 3100 / 3620 | Same ratings |
+| YAGEO RT0402BRD0729K4L, 29.4 k 0.1 % (C852690) | Panasonic ERA-2AEB2942X (C2074881) | 0 / 0 | Same ratings. FH TD03G2942BT (C667085, 1160 / 1174) has the value and tolerance but is 0603 |
+| YAGEO RT0402BRD0797K6L, 97.6 k 0.1 % (C852964) | Viking ARG02BTC9762 (C2686423) | 9700 / 9732 | Same ratings |
 | Diodes AP63205WU-7 (C2071056) | SCT SCT2325TVBR (C509064) | 2272 / 2272 | Same pins, fixed 5 V; SCT's examples use 6.8 to 10 uH |
 | Diodes AP3032KTR-G1 (C264086) | MSKSEMI MSAP3032KTR-G1 (C49208388) | 2505 / 2539 | Same pins and 0.2 V feedback; 1.2 MHz, PWM dimming 20 kHz to 1 MHz |
 | TI TCA9554PWR (C477924) | NXP PCA9554PW,118 (C17230) | 18272 / 18272 | Same address range 0x20 to 0x27; not the PCA9554A |
@@ -73,9 +84,12 @@ Stock is LCSC / JLCPCB on 25 November 2026.
 No alternate was found for the IP101GRI from another maker, the LIS2DH12TR (the
 SC7A20H looks similar but has another pin order and would put VDD on a ground pad;
 ST's IIS2DHTR fits, one piece in stock), the VCNL4040, the HY931147C (its PoE
-bridges are unusual), the FH12-40S (no identical land pattern) and the WAGO 250-202.
-The passives and the small discretes (diodes, ferrites, crystals, fuses, inductors)
-take any part of the same value, rating and package; the parts lists say so.
+bridges are unusual), the FH12-40S (no identical land pattern), the WAGO 250-202 and
+the eFuse TPS259470A (TI's TPS259470LRPWR has the same pins but latches off after a
+fault, and none was in stock). The parts lists name an alternate for the other small
+discretes (diodes, ferrites, crystals, fuses, inductors, electrolytic capacitors);
+the plain resistors and capacitors take any part of the same value, rating and
+package.
 
 ST's LIS2DE12TR (C155639) was checked as a stand-in for the accelerometer U702: same
 LGA-12 pins, same I2C address and the same WHO_AM_I value (0x33), but it gives 8-bit
@@ -91,9 +105,10 @@ not listed as an approved alternate.
   holds the parts for the order) or send a consignment to JLCPCB. Expect several
   weeks; order 10 % more than the boards plus 5 pieces for rework, and keep the
   spares. Make sure the order says NRW32X: the variants without X are end of life.
-- **AP63203WU-7 (U103)**: 0 at JLCPCB and LCSC, no stocked drop-in. It is replaced
-  in this review by a stocked converter that has a second source (see the design
-  notes, "Power").
+- **3.3 V converter (U103)**: the AP63203WU-7 fitted first had none at JLCPCB and
+  LCSC and no stocked drop-in. U103 is now a TI TLV62569DBVR (C141836), the same
+  part as the core converter U202: one parts line for both, 490416 at JLCPCB, and
+  the SGM61020 as second source for U103 (see the design notes, "Power").
 - **ESP32-C6-MINI-1U-H4 (U301)**: in stock (1851 / 3302). The -N4 is the fallback
   if the -H4 runs out, at the cost of its 85 C rating (the thermal estimate has the
   module at 79 C in a room of 40 C).
