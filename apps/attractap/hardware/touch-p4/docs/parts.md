@@ -32,7 +32,7 @@ signal.
 | ST LIS2DH12TR | U702 | Active | [DigiKey](https://www.digikey.com/en/products/result?keywords=LIS2DH12TR) |
 | TI DRV5032FADBZR | U703 | ACTIVE | [ti.com](https://www.ti.com/product/DRV5032/part-details/DRV5032FADBZR) |
 | Vishay VCNL4040M3OE | U704 | Active. The -H3 suffix is obsolete: do not order it | [DigiKey](https://www.digikey.com/en/products/detail/vishay-semiconductor-opto-division/VCNL4040M3OE/5171283) |
-| ST USBLC6-2SC6 | U101 | Active | [DigiKey](https://www.digikey.com/en/products/detail/stmicroelectronics/USBLC6-2SC6/1040559) |
+| ST USBLC6-2SC6 | U101, U603, U604 | Active | [DigiKey](https://www.digikey.com/en/products/detail/stmicroelectronics/USBLC6-2SC6/1040559) |
 | SDAPO DP9900M-5V | U102 | not stated (listed as a current product) | [sdapo.com](https://www.sdapo.com/show/102.html) |
 | Silvertel Ag9905M (alternate of U102) | | not marked NRND; filed under "Extended Range" | [silvertel.com](https://silvertel.com/Ag9900/) |
 | AOS AO3400A | Q701 | Full Production | [aosmd.com](https://aosmd.com/products/mosfets/low-voltage-mosfets-12v-30v/ao3400a) |

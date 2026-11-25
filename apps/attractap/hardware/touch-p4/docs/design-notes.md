@@ -26,6 +26,34 @@ with Wi-Fi 6 and Ethernet MAC, but not yet in stock and only preview support in
 ESP-IDF), Waveshare ESP32-P4 module (no radio certificates), ESP32-S3 (no speed
 gain).
 
+ESP32-C5 instead of the C6, for Wi-Fi 6 on 2.4 and 5 GHz (looked at on 25
+November 2026, kept for revision B). The price would allow it: at 100 pieces
+the ESP32-C5-MINI-1U-N4-V1.2 (C56362765, 538 in stock) costs 3.67 USD against
+3.20 USD for the C6-MINI-1U-H4, and with a stocked dual-band antenna
+(MyAntenna AIWF003, C53286277, 0.39 USD) at most 0.85 USD more per board; the
+ESP32-C5-WROOM-1U-N8R8-V1.2 (C54951858, 872 in stock) with the AIWF039
+(C56125970) at most 1.22 USD more. esp-hosted supports the C5 as an SDIO
+co-processor with an ESP32-P4 (since May 2025; release 3.1.0), on IO7 to IO10
+and IO13/IO14 with the same 51 kohm pull-ups. What stops it on revision A:
+
+- The MINI-1U has no published radio certificate: Espressif's documentation
+  lists none for it (only for the MINI-1, with its internal antenna), and the
+  FCC lists no ID. The compliance plan rests on reusing the module's EU-type
+  examination certificate and reports, with a C5 now also for EN 301 893.
+- The C5 modules are rated to 85 °C. The heat estimate puts the module at
+  79 °C in a room of 40 °C (+-40 %); the fitted C6-H4 is rated to 105 °C.
+- The WROOM-1U is certified (EU-type examination certificate SN25C0297,
+  notified body 2907; FCC 2AC7Z-ESPC5WROOMU) but measures 18 x 21.2 x 3.3 mm,
+  so the board's upper left corner would have to be laid out again, with the
+  same 85 °C limit.
+
+For revision B: check whether Espressif has published the MINI-1U's CE
+certificate; then the change is Espressif's footprint (15.4 x 15.4 mm), SDIO
+on the C5's pins, the boot test point on IO28, an MHF4 dual-band antenna
+(the MINI-1U has the fourth-generation connector), a firmware-fixed EU country
+code, the indoor-use note for 5250 to 5350 MHz and EN 301 893 in the test
+plan.
+
 ## Mechanics
 
 Coordinates: KiCad top view of the component side, origin top-left of the
@@ -657,8 +685,13 @@ per build:
 - an adhesive antenna inside the case, or
 - an antenna on an SMA bulkhead in the case wall, with a pigtail to the module.
 
-Neither antenna is chosen yet. What is settled, from the module's datasheet
-(v1.5, section 10.2):
+The antennas, decided with the review on 25 November 2026: the certified
+one, Shanghai Deman TFPD08H10060011 (a sleeve monopole of 2.33 dBi, MHF III,
+bought through Espressif or Deman), and as fallback the Taoglas GW.26.0111
+(2.24 dBi) on the CAB.A02 SMA bulkhead cable. Both are in the parts lists;
+sourcing in [parts.md](parts.md), what the fallback means for the FCC and
+the RED in the [compliance checklist](compliance.md#what-the-certified-wi-fi-module-saves).
+From the module's datasheet (v1.5, section 10.2):
 
 - The connector is of the third generation: Hirose W.FL, I-PEX MHF III or
   Amphenol AMMC. It is not a U.FL; the pigtail has to match.
@@ -668,6 +701,20 @@ Neither antenna is chosen yet. What is settled, from the module's datasheet
   gain, additional testing, such as EMC, may be required": see the
   [compliance checklist](compliance.md).
 - The module ships without an antenna.
+
+Its place in the case (`case/cad/attractap-touch-case.sc`, bodies "Wi-Fi
+antenna bay (ref)" and "Wi-Fi antenna cable (ref)"): a bay 40 x 10 x 4 mm
+inside the cap's top wall, over the board's copper-free strip at the top
+edge, so the antenna sees no copper within 6 mm on the board side; above the
+dock's cleat (1.0 mm), 0.45 mm beyond the board edge, clear of the cap. The
+cable leaves the module's connector straight towards the top edge, 2.4 mm
+below the board in the space in front of the dock, and enters the bay 8 mm
+further on; any length from 10 mm up fits. The certified antenna's
+specification gives 100 x 5.2 mm and no drawing: as a rigid part it does not
+fit the case, which has 88 mm across inside. The bulkhead of the fallback does
+not fit in the cap's top wall either: behind a 2.4 mm wall a typical SMA
+bulkhead jack reaches about 11 mm into the case, into the board's upper mounting boss or onto the
+board. Both are recorded under "Accepted deviations".
 
 The part is the ESP32-C6-MINI-1U-H4 (C20627095, to 105 C), not the -N4 (to
 85 C): JLCPCB had 3364 of the -H4 and none of the -N4 on 24 November 2026, it
@@ -685,16 +732,10 @@ MINI-1, which is this footprint, 1.975 mm for the MINI-1U; the datasheet has
 
 Open:
 
-- Both antennas, and the pigtail for the bulkhead: models, where to buy them,
-  who fits them. JLCPCB does not assemble them; they are not in the parts
-  lists.
-- The case: a place for the adhesive antenna, a hole for the bulkhead, and a
-  path for the cable from the module, which sits on the board's back at the
-  top edge. Not drawn yet. Keep the antenna away from the display's metal
-  back and from a metal wall behind the reader.
-- The height of the plug on the module and the bend of the cable behind the
-  board: not checked against the case.
-- Range with either antenna: not modelled, to be measured (bring-up plan).
+- The certified antenna's drawing and a sample, from Espressif or Deman,
+  before the case is printed (parts.md).
+- Range with the antenna in the bay: not modelled, to be measured (bring-up
+  plan).
 
 ## Wi-Fi and Bluetooth: the ESP32-C6 behind the ESP32-P4
 
@@ -807,6 +848,39 @@ does not read them yet; this is what it will find.
 - The MCU's free pins (GPIO27, 48, 53, 54) could not be used: capacitors sit
   in front of three of them at the pad row and the fourth is boxed in by the
   Ethernet signals. That is why the hall switch goes through the IO expander.
+
+## ESD per port
+
+The target is EN 301 489-1 V2.2.3 clause 9.3.2, which parts 3 (NFC) and 17
+(Wi-Fi) apply to the enclosure: "The test severity level for contact discharge
+shall be ±4 kV and for air discharge ±8 kV", applied "to all exposed surfaces
+of the EUT except where the user documentation specifically indicates a
+requirement for appropriate protective measures". Criterion B (EN 301 489-17
+clause 6.4): the reader may reset, but must recover by itself. Cable ports get
+transients and surge, not ESD (EN 301 489-1 table 2). EN 55035 defers to the
+EN 301 489 series for radio equipment (its common modification 1). IEC
+61000-4-2 clause 8.3.2 leaves out points reached only in service, if the
+manual gives ESD measures, and the contacts inside a metal connector shell.
+Ratings below are from the makers' datasheets.
+
+| Port | What can be touched | Target | Protection, rating | Margin |
+|---|---|---|---|---|
+| USB-C, shell and pins | nothing in use: reached only with the reader off the dock (service) | left out as service (the manual's ESD measure); otherwise 4 kV contact on the shell | shell to ground; D+/D- U101 USBLC6-2SC6, "IEC 61000-4-2 level 4: 15 kV (air discharge), 8 kV (contact discharge)" (ST); VBUS D101 SMAJ5.0A, 30 kV air and contact | 2x and more |
+| DC jack and terminal | inside the case; air at the cable notch | 8 kV air at the notch | D107 SMBJ28CA at the connector, 30 kV air and contact (Littelfuse), then 2.2 uF + 47 uF | 3.75x |
+| Ethernet and PoE | inside the case; plug enclosed | coupling-plane discharges only | jack magnetics 1500 V RMS (HanRun), PHY rated 12 kV contact (IP101G); PoE side D103 SMAJ58A and the 1500 V isolated module; shield through C410 1 nF / 3 kV | isolated |
+| Display glass, face | 0.55 mm glass | 8 kV air | the arc stops on the glass | no gap |
+| Display glass edges, flex behind them | the 0.25 mm seam round the glass; the flex leaves the display at the lower edge | 8 kV air | touch lines (TP_INT, TP_RST, I2C0 SDA and SCL): U603, U604 USBLC6-2SC6 at the connector (added in review stage 4); the display's metal back tied to ground through conductive gaskets on the four bare pads; tape over the flex (installation manual) | parts rated 15 kV air |
+| NFC area | solid 2.4 mm front wall | 8 kV air | no opening; the loop is shunted to ground by its matching network | no gap |
+| LED windows, buzzer holes, lock screws, seams | diffusers in eight windows, holes near the buzzer, two floating M3 screws from below | 8 kV air; 4 kV contact on the screws | none on the board: SK6812MINI-E rated 2 kV HBM, buzzer and its FET without a figure, screws float | not shown by datasheets: accepted deviation below |
+| Wi-Fi antenna | inside the case, behind a seam | 8 kV air at the seam | the RF line has no ESD part (the module leaves its ESD diode unfitted, datasheet fig. 8-2); the bay keeps the antenna 4 mm behind the cap's top wall | not shown; the bulkhead fallback would need an ESD warning label at the connector |
+| Buttons and test points | on the board, in service only | left out as service | CHIP_PU 10 k + 1 uF + supervisor; BOOT behind 1 k | service |
+
+Sources: ETSI EN 301 489-1 V2.2.3 (2019-11) clauses 6.2, 7.2, 9.3; EN 301 489-17
+V3.3.1 clause 6.4; IEC 61000-4-2 Ed. 2.0 clause 8.3.2; EN 55035:2017 common
+modification 1; ST USBLC6-2SC6 datasheet rev. 5 p. 1; R+O SMAJ datasheet rev.
+2.2 p. 1; Littelfuse SMBJ datasheet (07/04/25) p. 1; HanRun HY931147C REV.A/1;
+IC Plus IP101G datasheet R01 clause 7.1; OPSCO SK6812MINI-E spec B/2;
+Espressif ESP32-C6-MINI-1U datasheet v1.5 fig. 8-2.
 
 ## Layout rules used
 
@@ -1431,6 +1505,46 @@ do. Everything else in the review meets its target.
   (bring-up plan).
 - **Later revision.** None needed unless the first boards show bridges.
 
+### Wi-Fi antenna in the case (review item 9.3)
+
+- **Target.** An antenna from the module's certified list in both parts
+  lists, a place for it in the case and its cable's route drawn.
+- **Reached.** The certified Deman TFPD08H10060011 and the Taoglas fallback
+  are in both parts lists, with how to buy them. The case has a bay for an
+  antenna inside its top wall, 40 x 10 x 4 mm over the board's copper-free top
+  edge, and the cable's route from the module's connector to it.
+- **Why.** Deman publishes no drawing of the certified antenna; its
+  specification, filed with the FCC, gives "100 x 5.2" mm. As a rigid part that
+  does not fit inside the case (88 mm across); the cable may be part of the
+  100 mm. The fallback's SMA bulkhead does not fit the top wall either (about
+  11 mm of jack inside, onto the board's upper boss or the board), and it is out
+  of stock until 2027 at Digi-Key.
+- **Mitigation.** Ask Espressif or Deman for the drawing and samples before
+  the case is printed (parts.md). An antenna that fits the bay and is not the
+  certified one needs the lab's re-assessment in the EU and is not for a US
+  version (compliance.md). Range is measured against a current reader at
+  bring-up.
+- **Later revision.** With the drawing: the bay sized to the antenna, or a
+  side-wall bulkhead with the board's upper boss moved; or the ESP32-C5
+  (see "Decisions").
+
+### ESD at the LED windows, the buzzer and the lock screws (review item 9.1)
+
+- **Target.** Every port and surface reaches the ESD test level (4 kV contact,
+  8 kV air, criterion B), shown by the protecting part's rating.
+- **Reached.** Every cable port, the display's edges and flex, the NFC area and
+  the glass: table in "ESD per port". Not shown: the LED windows (the
+  SK6812MINI-E is rated 2 kV HBM, a handling figure), the buzzer holes (no
+  rating for the buzzer or its FET) and the two floating lock screws.
+- **Why.** A diode on each of the eight LEDs, the buzzer and the screws is not
+  practical on this board; what decides these is the air and surface path
+  through the case, which no datasheet gives.
+- **Mitigation.** An ESD pre-test on the first readers before the lab: 8 kV air
+  on every LED window, the buzzer holes, the seams and the glass edges, 4 kV
+  contact on the lock screws (bring-up plan).
+- **Later revision.** If the pre-test fails: diffusers with a flange that
+  closes the seam, buzzer holes offset from the port, nylon lock screws.
+
 ### Designators of the small passives (review item 7.6)
 
 - **Target.** Every part's designator on the silkscreen; where a few cannot
@@ -1438,7 +1552,7 @@ do. Everything else in the review meets its target.
 - **Reached.** Every IC, crystal, inductor, bead, diode, transistor, connector,
   switch, fuse, array and the buzzer carries its designator (23 of them with a
   leader line; a test fails if one is missing). Of the 0402 and 0603 passives,
-  111 around the MCU, the PHY and the NFC chip carry none.
+  114 around the MCU, the PHY and the NFC chip carry none.
 - **Why.** At 1.0 mm text, JLCPCB's smallest, there is no room for them
   between the parts without covering pads.
 - **Mitigation.** The assembly drawing (fab/jlcpcb/*-assembly.pdf) shows every
@@ -1904,11 +2018,11 @@ a test fails when a model's pins miss the holes or its terminals the pads.
   1.08 and 1.27 uH. The field is simulated too: it powers a card up to 19 mm
   in front of the case (15 mm on a metal wall). What no model here says is
   how well the reader hears the card.
-- **Wi-Fi antenna and range.** Neither antenna is chosen, the case has no
-  place for one, and the cable's path from the module is not drawn (see
-  "Wi-Fi antenna"). The antenna model above was made for the module with PCB
-  antenna and says nothing about an adhesive antenna in the case or one on a
-  bulkhead. Compare the first reader with a current one (bring-up plan).
+- **Wi-Fi antenna and range.** The antennas are chosen and the case has a
+  bay for one, with the cable's way drawn (see "Wi-Fi antenna"); whether the
+  certified antenna fits it waits for its drawing. The antenna model above was
+  made for the module with PCB antenna and says nothing about an antenna in
+  the bay. Compare the first reader with a current one (bring-up plan).
 - **Isolation of the PoE side** under a 1500 V test (see "PoE isolation").
   The board's copper keeps 2.0 mm everywhere, measured on the routed board,
   which is enough in air for that test. What a test has to show is what lies

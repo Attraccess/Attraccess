@@ -34,11 +34,11 @@ Two assembly versions come from the same PCB:
 - **wifi**: everything except the parts whose `Variant` field is `lan`.
 - **lan**: all parts (Ethernet, PoE and Wi-Fi).
 
-The Wi-Fi module (ESP32-C6-MINI-1U) has no antenna of its own. Each build gets one of two,
-plugged into the connector on the module: an adhesive antenna inside the case, or an antenna
-on an SMA bulkhead with a pigtail. Neither is chosen yet, neither is in the parts lists, and
-the case has no place for them yet: see "Wi-Fi antenna" in the
-[design notes](docs/design-notes.md#wi-fi-antenna).
+The Wi-Fi module (ESP32-C6-MINI-1U) has no antenna of its own. The antenna it was certified
+with (Shanghai Deman TFPD08H10060011, bought through Espressif or Deman) plugs into the
+module's connector and lies in a bay at the top of the case; the fallback is a Taoglas
+GW.26.0111 on an SMA bulkhead cable. Both are in the parts lists: see "Wi-Fi antenna" in the
+[design notes](docs/design-notes.md#wi-fi-antenna), and its accepted deviation.
 
 ## Folder layout
 

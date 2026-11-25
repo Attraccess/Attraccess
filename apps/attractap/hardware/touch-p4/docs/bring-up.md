@@ -317,7 +317,13 @@ depending on the supply, and is good to 40 % at best.
 ## Before the test lab
 
 1. Soak test: 24 hours in the enclosure with normal use pattern.
-2. ESD pre-check if a gun is available: contact discharge to USB shell, jack
-   shield and enclosure screws.
+2. ESD pre-test before the lab, on a closed reader on its dock, running with
+   the display, Wi-Fi and NFC active (ESD gun, IEC 61000-4-2 set-up): 8 kV air
+   on the glass edges all round, every LED window, the buzzer holes, the seams
+   and the cable notches; 4 kV contact on the two lock screws. Ten discharges
+   of each polarity per point. The reader may reset but must recover by
+   itself, with touch, Wi-Fi and NFC working afterwards (criterion B). These
+   are the points the design could not show from datasheets (design notes,
+   "ESD per port" and "Accepted deviations").
 3. Pre-scan radiated emissions with display running and Ethernet active, if a
    near-field probe or pre-compliance chamber is available.

@@ -31,7 +31,8 @@ One reader needs five printed parts for the wall, six for the desk. The print fi
 | M3 × 4 pan head screw | 4 | PCB to cap |
 | M3 × 8 countersunk screw, ideally Torx with pin | 2 | Lock screws, from below |
 | Double-sided tape, 0.3 mm thick | 3 strips | Display glass to frame |
-| Polyimide tape (Kapton), 25 mm wide | 30 mm | Back of the display, over the Ethernet jack's solder pins (Ethernet version) |
+| Polyimide tape (Kapton), 25 mm wide | 30 mm, plus 80 mm | Back of the display, over the Ethernet jack's solder pins (Ethernet version); over the display's flex where it leaves the display |
+| Conductive gasket, fabric over foam, 5 × 5 mm, about 2 mm thick, self-adhesive | 2 to 4 | On the bare square ground pads on the PCB's display side, against the display's metal back. It ties the metal back to ground, which the reader needs to pass the static-discharge test |
 | Neodymium disc magnet, 10 mm across, 3 mm thick | 1 | Ring on the dock's inner face. The reader senses it and knows when it is taken off the dock |
 | Countersunk wall screw, 4 mm shank, head up to 8.6 mm, with plugs | 3 to 5 | Dock to wall |
 | Cable tie, 2.5 mm wide, about 100 mm long | 1 per cable | Strain relief, only for a cable that leaves through the bottom notch or on the desk stand |
@@ -71,11 +72,13 @@ Everything is shown lifted out of the cap in the order it goes in, lowest first.
 2. Ethernet version only: lay the display glass-down, flex cable toward you. Stick a 25 × 30 mm piece of polyimide tape onto the metal back in the corner at the lower right, flush with the lower edge, and fold 2 mm of it round the right side edge of the metal. That is the corner that will lie over the clipped pins; two of them carry 48 V.
 3. Stick 0.3 mm double-sided tape onto the raised rim of the display frame: one strip each on the left, right and top. The fourth side is open for the display's flex cable.
 4. Lay the display glass-down on a clean cloth. Place the frame onto the back of the glass, rim down, with the open side over the flex cable. Line the frame up with the glass edges and press along the three strips.
-5. Lower display and frame into the cap so the glass drops into the window. Turn the cap over once and check that the glass sits flush with an even gap all round.
-6. Hold the PCB with its components facing you and the Ethernet jack toward the bottom of the cap. Thread the display flex through the slot in the PCB, then lower the PCB onto the four bosses. The flex turns round the edge of the slot; its stiff parts must end up flat on the component side, not in the turn.
-7. Plug the flex into its connector on the PCB and close the latch.
-8. Fasten the PCB with the four M3 × 4 screws. Hand-tight is enough; the inserts sit in plastic.
-9. Power the board over USB-C and check display, touch, LEDs and buzzer before the reader goes on the wall. USB-C, reset and boot are only reachable while the reader is off the dock.
+5. Lay a strip of polyimide tape across the flex where it leaves the display, over the frame's open side, and fold its ends onto the frame. It covers the flex's traces behind the gap round the glass, where a static discharge on the glass edge would otherwise land on them.
+6. Lower display and frame into the cap so the glass drops into the window. Turn the cap over once and check that the glass sits flush with an even gap all round.
+7. Stick a conductive gasket onto at least two of the four bare square pads on the PCB's side without components (the gold squares behind where the display will lie), the one near the flex connector among them. The gaskets press against the display's metal back when the PCB goes in.
+8. Hold the PCB with its components facing you and the Ethernet jack toward the bottom of the cap. Thread the display flex through the slot in the PCB, then lower the PCB onto the four bosses. The flex turns round the edge of the slot; its stiff parts must end up flat on the component side, not in the turn.
+9. Plug the flex into its connector on the PCB and close the latch.
+10. Fasten the PCB with the four M3 × 4 screws. Hand-tight is enough; the inserts sit in plastic.
+11. Power the board over USB-C and check display, touch, LEDs and buzzer before the reader goes on the wall. USB-C, reset and boot are only reachable while the reader is off the dock.
 
 ## Mount the dock on a wall
 
@@ -180,7 +183,7 @@ The stand turned over. The cable from the reader is tied to one fin and leaves t
 
 ## Opening it again for service
 
-Two screws release the reader; four more release the PCB.
+Two screws release the reader; four more release the PCB. USB-C, the reset and boot buttons and the test points are only for service, and they are not protected against static discharge the way the outside of the reader is: touch a grounded metal part (or wear a wrist strap) before you plug in USB-C or press a button, and hold the PCB by its edges.
 
 1. Remove the two lock screws from below.
 2. Swing the reader's bottom about 20 mm away from the wall, then lift the reader 6 mm off the cleat.
