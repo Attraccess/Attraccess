@@ -79,7 +79,7 @@ class DesignTest(unittest.TestCase):
             'LM74700QDBVRQ1': {'1': 'VCAP', '2': 'GND', '3': 'EN', '4': 'CATHODE', '5': 'GATE', '6': 'ANODE'},
             'TLV803SDBZR': {'1': 'GND', '2': '~{RESET}', '3': 'VDD'},
             # ESP32-C5-MINI-1 datasheet v1.4, table 3-1
-            'ESP32-C5-MINI-1-N4': dict(
+            'ESP32-C5-MINI-1-N4-V1.2': dict(
                 [(str(n), 'GND') for n in (1, 2, 42, 43, 46, 47, 48) + tuple(range(50, 66))]
                 + [(str(n), 'NC') for n in (5, 11, 12, 13, 14, 15, 18, 25, 27, 28, 29, 30, 36, 37, 38, 41, 44, 49)]
                 + [('3', '3V3'), ('4', 'IO28'), ('6', 'IO2'), ('7', 'IO3'), ('8', 'IO4'), ('9', 'IO5'), ('10', 'IO6'),

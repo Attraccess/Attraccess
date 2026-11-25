@@ -123,9 +123,9 @@ def derived_symbols(lib):
             left=[('3', 'VIN'), ('2', 'EN')], right=[('6', 'BST'), ('5', 'SW'), ('1', 'FB')], bottom=[('4', 'GND')],
             width=12.7, datasheet='https://www.diodes.com/assets/Datasheets/AP63200-AP63201-AP63203-AP63205.pdf'),
         # the Wi-Fi module with its own PCB antenna; pins from the datasheet (v1.4, table 3-1)
-        'ESP32-C5-MINI-1-N4': box_symbol(
-            'ESP32-C5-MINI-1-N4', 'U', fp + 'CONN-SMD_ESP32-C5-MINI-1-N4',
-            'ESP32-C5 module, Wi-Fi 6 2.4 and 5 GHz / BLE 5 / 802.15.4, 4 MB flash, PCB antenna, -40 to 85 C',
+        'ESP32-C5-MINI-1-N4-V1.2': box_symbol(
+            'ESP32-C5-MINI-1-N4-V1.2', 'U', fp + 'CONN-SMD_ESP32-C5-MINI-1-N4',
+            'ESP32-C5 module, Wi-Fi 6 2.4 and 5 GHz / BLE 5 / 802.15.4, 4 MB flash, PCB antenna, chip revision v1.2, -40 to 85 C',
             left=[('3', '3V3'), None, ('45', 'EN'), ('4', 'IO28'), ('35', 'IO27'), ('34', 'IO26'), None,
                   ('39', 'TX0'), ('40', 'RX0'), None]
                  + [(n, 'GND') for n in ['1', '2', '42', '43', '46', '47', '48'] + [str(k) for k in range(50, 66)]],

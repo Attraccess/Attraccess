@@ -342,13 +342,13 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "attractap:ESP32-C5-MINI-1-N4"
+		(symbol "attractap:ESP32-C5-MINI-1-N4-V1.2"
 			(pin_names (offset 1.016))
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
 			(property "Reference" "U" (at -10.16 49.53 0) (effects (font (size 1.27 1.27)) (justify left)))
-			(property "Value" "ESP32-C5-MINI-1-N4"
+			(property "Value" "ESP32-C5-MINI-1-N4-V1.2"
 				(at -10.16 -49.53 0)
 				(effects (font (size 1.27 1.27)) (justify left))
 			)
@@ -360,11 +360,11 @@
 				(at 0 0 0)
 				(effects (font (size 1.27 1.27)) (hide yes))
 			)
-			(property "Description" "ESP32-C5 module, Wi-Fi 6 2.4 and 5 GHz / BLE 5 / 802.15.4, 4 MB flash, PCB antenna, -40 to 85 C"
+			(property "Description" "ESP32-C5 module, Wi-Fi 6 2.4 and 5 GHz / BLE 5 / 802.15.4, 4 MB flash, PCB antenna, chip revision v1.2, -40 to 85 C"
 				(at 0 0 0)
 				(effects (font (size 1.27 1.27)) (hide yes))
 			)
-			(symbol "ESP32-C5-MINI-1-N4_0_1"
+			(symbol "ESP32-C5-MINI-1-N4-V1.2_0_1"
 				(rectangle
 					(start -10.16 48.26)
 					(end 10.16 -48.26)
@@ -372,7 +372,7 @@
 					(fill (type background))
 				)
 			)
-			(symbol "ESP32-C5-MINI-1-N4_1_1"
+			(symbol "ESP32-C5-MINI-1-N4-V1.2_1_1"
 				(pin passive line
 					(at -15.24 45.72 0)
 					(length 5.08)
@@ -1934,7 +1934,7 @@
 		)
 	)
 	(symbol
-		(lib_id "attractap:ESP32-C5-MINI-1-N4")
+		(lib_id "attractap:ESP32-C5-MINI-1-N4-V1.2")
 		(at 96.52 129.54 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -1943,7 +1943,7 @@
 		(dnp no)
 		(uuid "fc011604-bd21-56b4-9a07-39381a408d4b")
 		(property "Reference" "U301" (at 96.52 78.38 0) (effects (font (size 1.27 1.27))))
-		(property "Value" "ESP32-C5-MINI-1-N4" (at 96.52 80.08 0) (effects (font (size 1.27 1.27))))
+		(property "Value" "ESP32-C5-MINI-1-N4-V1.2" (at 96.52 80.08 0) (effects (font (size 1.27 1.27))))
 		(property "Footprint" "attractap:CONN-SMD_ESP32-C5-MINI-1-N4"
 			(at 96.52 129.54 0)
 			(effects (font (size 1.27 1.27)) (hide yes))

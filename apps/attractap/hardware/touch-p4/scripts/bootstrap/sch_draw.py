@@ -224,6 +224,7 @@ class Canvas:
         self.owner = {'wire': [], 'label': [], 'power': []}
         self.flags = []                            # PWR_FLAG symbols: (net, x, y)
         self.owned_texts = []                      # notes inside a block: (text item, block)
+        self.frame_titles = []                     # the title text of each block frame
 
     def begin(self, title):
         self.block = title
@@ -381,6 +382,7 @@ class Canvas:
     def frame(self, title, x1, y1, x2, y2):
         self.frames.append((x1, y1, x2, y2))
         self.text(title, x1 + 1.5, y1 + 3.4, 2.0, bold=True, own=False)
+        self.frame_titles.append(self.texts[-1])
 
     def _pin_side(self, spec):
         ref, num = spec.split('.', 1)

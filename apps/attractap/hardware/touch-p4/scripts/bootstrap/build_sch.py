@@ -224,7 +224,8 @@ def main():
     scope = {n: ('power' if n in POWER else 'hier' if len(s) > 1 else 'local') for n, s in net_sheets.items()}
     by_ref = d.parts
     root_items, root_lib = [], {}
-    rx, ry = 34.0, 66.0
+    root_boxes = []                                 # (what, box) of everything on the root, for root_lint()
+    rx, ry = 34.0, ROOT_SHEETS_Y
     findings = 0
     for i, (key, name, title, subtitle) in enumerate(SHEETS):
         page = str(i + 2)
@@ -273,8 +274,12 @@ def main():
         w = 76.2
         h = snap(max(half, 3) * 2.54 + 7.62)
         if ry + h > 262.0:
-            rx, ry = rx + w + 60.0, 66.0
+            rx, ry = rx + w + 60.0, ROOT_SHEETS_Y
         x, y = snap(rx), snap(ry)
+        root_boxes += [('sheet %s' % name, (x, y, x + w, y + h)),
+                       ('sheet name %s' % name, sch_draw.text_box(name, x, y - 0.7 - 1.25, 2.0, 'left')),
+                       ('sheet file %s' % name, sch_draw.text_box(fn, x, y + h + 0.6 + 0.8, 1.27, 'left')),
+                       ('sheet note %s' % name, sch_draw.text_box(subtitle, x, y + h + 5.2 - 0.6, 1.0, 'left'))]
         item = [S('sheet'), [S('at'), x, y], [S('size'), w, h], [S('exclude_from_sim'), S('no')],
                 [S('in_bom'), S('yes')], [S('on_board'), S('yes')], [S('dnp'), S('no')],
                 [S('stroke'), [S('width'), 0.1524], [S('type'), S('solid')]],
@@ -294,17 +299,50 @@ def main():
             ang, just = (180, 'right') if left else (0, 'left')
             root_items.append([S('label'), net, [S('at'), ex, py, ang], sch_draw.font(justify=just + ' bottom'),
                                [S('uuid'), uid('root', 'local', net, str(ex), str(py))]])
+            # the pin's name inside the sheet symbol, the label above the stub outside it
+            inside = (px + 0.5, 'left') if left else (px - 0.5, 'right')
+            root_boxes += [('pin %s of %s' % (net, name), sch_draw.text_box(net, inside[0], py, 1.27, inside[1])),
+                           ('label %s' % net, sch_draw.text_box(net, ex, py - 1.0, 1.27, just))]
         item.append([S('instances'), [S('project'), NAME, [S('path'), '/' + root_uuid, [S('page'), page]]]])
         root_items.append(item)
         root_items.append(root_text(subtitle, x, y + h + 5.2, 1.0))
         ry += h + 14.0
-    root_items += root_header()
+    header = root_header()
+    root_items += header
+    for item in header:
+        size = item[4][1][1][1]
+        root_boxes.append(('text %r' % item[1][:30], sch_draw.text_box(item[1], item[3][1], item[3][2] - size * 0.6, size, 'left')))
+    problems = root_lint(root_boxes)
+    for f in problems:
+        print('  lint root: %s' % f)
+    findings += len(problems)
     write_sheet(NAME + '.kicad_sch', root_uuid, 'A3', 'Overview',
                 'NFC access reader: ESP32-P4, Wi-Fi 6, Ethernet / PoE option', root_lib, root_items,
                 extra=[[S('sheet_instances'), [S('path'), '/', [S('page'), '1']]], [S('embedded_fonts'), S('no')]])
     print('wrote root + %d sheets, %d parts, %d lint findings' % (len(SHEETS), len(d.parts), findings))
     if findings:
         raise SystemExit('the schematic has overlapping text or symbols (see the lint lines above)')
+
+
+def root_lint(boxes):
+    """Findings on the root sheet: a free text (the header, the revision history, a sheet's note) on anything
+    else, a sheet's name, file or pins on another sheet symbol, and labels on each other."""
+    found = []
+    for i, (o1, b1) in enumerate(boxes):
+        for o2, b2 in boxes[i + 1:]:
+            if not sch_draw.overlap(b1, b2, 0.2):
+                continue
+            free = o1.startswith(('text ', 'sheet note ')) or o2.startswith(('text ', 'sheet note '))
+            sheet_of = lambda o: o.split(' ', 2)[-1] if o.startswith('sheet') else o.rsplit(' of ', 1)[-1]
+            own = sheet_of(o1) == sheet_of(o2) and not free         # a sheet's pins lie inside its own box
+            if not own:
+                found.append('%s on %s' % (o1, o2))
+    return found
+
+
+# The revision history on the root sheet grows with every revision: the sheet symbols start below it.
+HISTORY_Y, HISTORY_PITCH = 51.0, 2.4
+ROOT_SHEETS_Y = snap(HISTORY_Y + HISTORY_PITCH * (len(HISTORY) - 1) + 8.0)
 
 
 def root_text(s, x, y, size, bold=False):
@@ -322,7 +360,7 @@ def root_header():
                      'equal names are connected. GND, +3V3 and +5V are global.', 15, 40, 2.0),
            root_text('Revision history (revision A, not built yet)', 15, 47, 1.8, bold=True)]
     for k, (date, change) in enumerate(HISTORY):
-        out.append(root_text('A   %s   %s' % (date, change), 15, 51 + k * 2.4, 1.4))
+        out.append(root_text('A   %s   %s' % (date, change), 15, HISTORY_Y + k * HISTORY_PITCH, 1.4))
     return out
 
 

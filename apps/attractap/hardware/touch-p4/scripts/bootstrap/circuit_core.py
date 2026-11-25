@@ -331,7 +331,7 @@ def wifi(d):
     # examination certificate 44024-05-2026-260268 (Eurofins, notified body 0980) for the module with this
     # antenna; FCC ID 2AC7Z-ESPC5MINI1. Rated for 85 C of air around it: see the heat estimate in
     # docs/design-notes.md. The -N4: 4 MB flash holds esp-hosted's two update images; no PSRAM needed.
-    d.add('U', 'ESP32-C5-MINI-1-N4', 'attractap:ESP32-C5-MINI-1-N4', 'attractap:CONN-SMD_ESP32-C5-MINI-1-N4',
+    d.add('U', 'ESP32-C5-MINI-1-N4-V1.2', 'attractap:ESP32-C5-MINI-1-N4-V1.2', 'attractap:CONN-SMD_ESP32-C5-MINI-1-N4',
           {'@' + k: v for k, v in c5.items()}, nc=tuple('@' + n for n in c5_nc),
           lcsc='C54951860', mpn='ESP32-C5-MINI-1-N4-V1.2',
           desc='Wi-Fi 6 (2.4 and 5 GHz) / BLE 5 / 802.15.4 module with PCB antenna, 4 MB flash')

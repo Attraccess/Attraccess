@@ -383,6 +383,16 @@ def lint(cv):
         for f2 in cv.frames[i + 1:]:
             if overlap(f1, f2):
                 found.append('block frame %s on %s' % (f1, f2))
+    # the sheet's free texts (title, subtitle, notes) stay clear of every block frame
+    owned = {item for item, _blk in cv.owned_texts}
+    for item in cv.texts:
+        if item in owned or item in cv.frame_titles:
+            continue
+        s, x, y, size, _b, just = item
+        b1 = text_box(s, x, y - size * 0.5, size, just)
+        for f in cv.frames:
+            if overlap(b1, f, GAP):
+                found.append('text %r on block frame %s' % (s[:30], f))
     return found
 
 
