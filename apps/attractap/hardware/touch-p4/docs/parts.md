@@ -77,6 +77,13 @@ bridges are unusual), the FH12-40S (no identical land pattern) and the WAGO 250-
 The passives and the small discretes (diodes, ferrites, crystals, fuses, inductors)
 take any part of the same value, rating and package; the parts lists say so.
 
+ST's LIS2DE12TR (C155639) was checked as a stand-in for the accelerometer U702: same
+LGA-12 pins, same I2C address and the same WHO_AM_I value (0x33), but it gives 8-bit
+data only (the high bytes OUT_X_H, OUT_Y_H, OUT_Z_H; 15.6 mg per digit at ±2 g). It
+fits the board unchanged; the firmware would have to read 8-bit data, which is
+enough for the tamper detection. One piece in stock, so it is no sourcing fix and is
+not listed as an approved alternate.
+
 ## Sourcing plan for the parts JLCPCB does not stock
 
 - **ESP32-P4NRW32X (U201)**: 0 at JLCPCB and LCSC. Espressif is the only maker.
