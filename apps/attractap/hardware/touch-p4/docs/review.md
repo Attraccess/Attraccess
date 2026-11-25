@@ -192,6 +192,7 @@ These items are at A− but are also listed as deviations:
 | 25 Nov | **Parts on the top side only** (user) | A second assembly side would raise the cost too much; MCU decoupling becomes a deviation |
 | 25 Nov | **Infeasible or costly targets become accepted deviations** (user) | Cost before a uniform grade |
 | 25 Nov | **Wi-Fi: ESP32-C5 with its own PCB antenna, the larger ESP32-C5-WROOM-1** (user) | Dual-band Wi-Fi 6; internal antenna accepted; the external-antenna variants lacked a certificate or did not fit; see below |
+| 25 Nov | **Wi-Fi: the ESP32-C5-MINI-1-N4-V1.2 instead of the WROOM-1** (user) | No WROOM-1 variant in stock at JLCPCB or LCSC; the MINI-1 is certified (EU-type examination certificate 44024-05-2026-260268) and stocked; see below |
 
 ### The Wi-Fi module
 
@@ -212,8 +213,16 @@ What was found on 25 November 2026:
   being checked when the switch was handed over. It has to be settled with the
   C5's own power figures.
 
+When the switch began, later the same day, JLCPCB and LCSC had no ESP32-C5-WROOM-1
+of any variant in stock, although the module is certified (EU-type examination
+certificate SN25C0185, FCC 2AC7Z-ESPC5WROOM1). The user then chose the
+**ESP32-C5-MINI-1-N4-V1.2**: 614 in stock, 3.36 USD at 100 pieces. What was
+checked for it is in
+[design-notes.md, "Wi-Fi module: ESP32-C5-MINI-1"](design-notes.md#wi-fi-module-esp32-c5-mini-1).
+
 An unfinished switch to the C5-MINI-1 exists as a local, unpushed reference
-commit on the branch `t3/attractap-touch-p4-c5-mini1-wip`. It was not checked.
+commit on the branch `t3/attractap-touch-p4-c5-mini1-wip`. It was used as a lead
+only.
 
 ## What the review itself caught
 

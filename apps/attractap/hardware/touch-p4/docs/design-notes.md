@@ -26,33 +26,124 @@ with Wi-Fi 6 and Ethernet MAC, but not yet in stock and only preview support in
 ESP-IDF), Waveshare ESP32-P4 module (no radio certificates), ESP32-S3 (no speed
 gain).
 
-ESP32-C5 instead of the C6, for Wi-Fi 6 on 2.4 and 5 GHz (looked at on 25
-November 2026, kept for revision B). The price would allow it: at 100 pieces
-the ESP32-C5-MINI-1U-N4-V1.2 (C56362765, 538 in stock) costs 3.67 USD against
-3.20 USD for the C6-MINI-1U-H4, and with a stocked dual-band antenna
-(MyAntenna AIWF003, C53286277, 0.39 USD) at most 0.85 USD more per board; the
-ESP32-C5-WROOM-1U-N8R8-V1.2 (C54951858, 872 in stock) with the AIWF039
-(C56125970) at most 1.22 USD more. esp-hosted supports the C5 as an SDIO
-co-processor with an ESP32-P4 (since May 2025; release 3.1.0), on IO7 to IO10
-and IO13/IO14 with the same 51 kohm pull-ups. What stops it on revision A:
+### Wi-Fi module: ESP32-C5-MINI-1
 
-- The MINI-1U has no published radio certificate: Espressif's documentation
-  lists none for it (only for the MINI-1, with its internal antenna), and the
-  FCC lists no ID. The compliance plan rests on reusing the module's EU-type
-  examination certificate and reports, with a C5 now also for EN 301 893.
-- The C5 modules are rated to 85 °C. The heat estimate puts the module at
-  79 °C in a room of 40 °C (+-40 %); the fitted C6-H4 is rated to 105 °C.
-- The WROOM-1U is certified (EU-type examination certificate SN25C0297,
-  notified body 2907; FCC 2AC7Z-ESPC5WROOMU) but measures 18 x 21.2 x 3.3 mm,
-  so the board's upper left corner would have to be laid out again, with the
-  same 85 °C limit.
+Decided by the user on 25 November 2026: the ESP32-C5 instead of the C6, for
+Wi-Fi 6 on 2.4 and 5 GHz, with the module's own PCB antenna. The user's rule:
+at most about 2 USD more per board at 100 pieces than the C6 module with its
+antenna, and stocked. The first choice was the larger ESP32-C5-WROOM-1; it
+was dropped the same day because no variant of it was in stock (below), and
+the user chose the ESP32-C5-MINI-1-N4-V1.2.
 
-For revision B: check whether Espressif has published the MINI-1U's CE
-certificate; then the change is Espressif's footprint (15.4 x 15.4 mm), SDIO
-on the C5's pins, the boot test point on IO28, an MHF4 dual-band antenna
-(the MINI-1U has the fourth-generation connector), a firmware-fixed EU country
-code, the indoor-use note for 5250 to 5350 MHz and EN 301 893 in the test
-plan.
+| | ESP32-C5-MINI-1-N4-V1.2 (fitted) | ESP32-C5-WROOM-1 (first choice) | ESP32-C6-MINI-1U-H4 (before) |
+|---|---|---|---|
+| JLCPCB / LCSC | C54951860: 614 in stock, 3.36 USD at 100 (LCSC 3.38) | every variant (-N4, -N4-V1.2, -N8R8, -N8R8-V1.2, -N16R4, -N16R8, -N16R8-V1.2) 0 at JLCPCB and LCSC; -N4 3.65 USD at 200 | C20627095: 3248 in stock, 3.20 USD at 100, plus an antenna and its cable |
+| Size | 15.4 x 21.3 x 2.4 mm | 18.0 x 27.5 x 3.3 mm | 13.2 x 12.5 mm (16.6 with antenna) |
+| Antenna | PCB antenna, 2.4 and 5 GHz | PCB antenna | none: connector |
+| EU-type examination certificate | 44024-05-2026-260268, Eurofins (notified body 0980), 27 May 2026, model ESP32-C5-MINI-1 with its internal antenna; EN 300 328 V2.2.2, EN 301 893 V2.2.1, EN 301 489-1 V2.2.3, EN 301 489-17 V3.3.1, EN 55032, EN 62368-1, EN 50665, EN 62311 | SN25C0185, Sporton (2907), 2 July 2025; EN 301 893 V2.1.1, EN 300 440 V2.2.1 | SN24C0053, Sporton (2907) |
+| FCC | 2AC7Z-ESPC5MINI1 (part 15E granted 28 May 2026, single modular) | 2AC7Z-ESPC5WROOM1 | 2AC7Z-ESPC6MINIU |
+| Rated | -40 to 85 °C ambient, "the environment immediately outside the Espressif module" (datasheet v1.4, table 1-1 note 3, table 6-2) | the same | -40 to 105 °C |
+
+Stock and prices were read from JLCPCB's parts library and LCSC's product
+pages on 25 November 2026. The module costs 0.16 USD more than the C6 module,
+and the antenna, which was never priced (the certified one had to be quoted
+by Espressif or Deman), and its cable are no longer needed. The radio's own
+3.3 V converter (below) adds about 0.22 USD of parts that are already on the
+board, so no new lines in the parts list. In all, about 0.4 USD more on the
+assembled board and the antenna less: inside the user's 2 USD.
+
+Why this variant:
+
+- 4 MB flash and no PSRAM: esp-hosted's own partition table for a 4 MB
+  co-processor holds two 1.75 MB images for updates over SDIO
+  (`partitions_eh_cp_ota_4m.csv`, esp-hosted-mcu 3.1.0); the co-processor
+  needs no PSRAM. The -N8R2 (8 MB, 2 MB PSRAM) is not at JLCPCB.
+- The chip inside is the ESP32-C5HF4, revision v1.0 or v1.2 (chip datasheet
+  v1.5, table 1-1). The SDIO slave works from revision v1.0 on, "not supported
+  by chip revision v0.0 and v0.1" (module datasheet v1.4, 5.2.1.13).
+
+esp-hosted: esp-hosted-mcu 3.1.0 (ESP-IDF 5.5 or later) lists the ESP32-C5
+as an SDIO co-processor and the ESP32-P4 as its host, on the C5's fixed pins
+CLK 9, CMD 10, D0 8, D1 7, D2 14, D3 13, reset into its EN, with "external
+51 kOhm pull-ups on CMD, DAT0-DAT3" ([getting started](https://github.com/espressif/esp-hosted-mcu/blob/v3.1.0/docs/getting-started-mcu.md#1-sdio),
+co-processor connections). Those are module pins 21, 22, 20, 19, 24 and 23,
+all on the module's lower edge, the side that faces the MCU.
+
+Strapping pins (module datasheet v1.4, chapter 4; HDG 1.3.9):
+
+| Pin | Strap | Default | Here |
+|---|---|---|---|
+| GPIO28 (pin 4) | boot mode: 1 = boot from flash; 0 with GPIO27 = 1 = download over UART0 | internal pull-up | 10 k pull-up, as the HDG recommends ("place a pull-up resistor at the GPIO28 pin"; no capacitor fitted). The boot test point: held to ground at reset for the first flashing |
+| GPIO27 (pin 35) | boot mode, ROM messages on UART0 | internal pull-up | open: nothing may pull it low |
+| GPIO26 (pin 34) | boot mode (only with GPIO27 and GPIO28 low) | floating | open |
+| GPIO25 (pin 33), MTDI = GPIO3 (pin 7) | SDIO sampling and driving edges at reset | floating | open, as the C6's were. The slave driver sets the edges in its configuration (ESP-IDF `sdio_slave_config_t.timing`); esp-hosted's `EH_TRANSPORT_CP_SDIO_TIMING` defaults to sending and sampling on the rising edge. Stay with that default |
+| GPIO7 (pin 19) = SDIO D1 | JTAG source, only once the eFuse JTAG_SEL_ENABLE is burnt | no pull (the pin needs a defined level) | the 51 k SDIO pull-up holds it high. Firmware rule: never burn JTAG_SEL_ENABLE |
+| MTMS = GPIO2 (pin 6) | listed as a strapping pin, floating | floating | open |
+
+The straps are read in the 3 ms after EN rises (tH). The P4 drives none of
+these pins then: at power-up it is held in reset for 120 to 280 ms after the
+3.3 V rail, and later esp-hosted resets the module before it starts the SDIO
+host, whose data lines are inputs outside a transfer.
+
+SDIO D2 and D3 are the C5's USB D+ and D- (GPIO14, GPIO13). With 4-bit SDIO
+on them its USB Serial/JTAG cannot be used, so UART0 (TX0 pin 39 = GPIO11,
+which has 499 ohm in series inside the module, RX0 pin 40 = GPIO12), GPIO28,
+EN and ground on test points are the only wired way to flash and recover the
+module. They get net labels on the silkscreen; the C6_* nets become C5_*.
+
+Power. The C5-MINI-1 draws 426 mA at most (802.11a at 16.5 dBm, 100 % duty;
+338 mA at 2.4 GHz; datasheet v1.4, tables 6-4 and 6-5), and Espressif asks
+the supply for "no less than 600 mA" (HDG 1.3.2; datasheet table 6-2:
+IVDD 0.6 A). With 0.6 A in place of the C6's 0.382 A the shared 3.3 V
+converter would carry 1.49 A at the sizing figures, 25.6 % below its 2 A,
+short of the 30 % target. The module also carries its own capacitors on its
+3.3 V pin (datasheet figure 8-1): three of 10 uF (C6, C21, C29), three of
+1 uF (C19, C20, C26), four of 100 nF and one of 10 nF, 33.4 uF at their
+values, all of it on the rail of the converter that feeds the module. The
+3.3 V rail already counts 48.9 uF against the 52.8 uF that TI's table allows
+the TLV62569 (see "3.3 V converter"). So the module gets a converter of its
+own: a second TLV62569 from the 5 V rail, with the same inductor, divider and
+feed-forward capacitor as U103, and Espressif's 22 uF and 100 nF at the
+module's pin (datasheet figure 9-1). On that rail: 22 uF (13.7 uF at 3.3 V)
++ 0.1 uF + the module's 33.4 uF = 47.2 uF, inside 52.8 uF without derating
+the module's capacitors. U103 then carries 0.89 A at the sizing figures
+(55 % headroom) and the radio's converter 0.6 A (70 %).
+
+Heat, first look, before the layout changes. What the 85 °C rating limits is
+the air right outside the module, not its inside, so the old figure of 79 °C
+(40 °C room + the board under the C6 + 15 K/W x 0.30 W, the module's inside)
+cannot be held against it. The heat model (`sim/thermal.py`) has no air node.
+It gives two bounds for that air: below, the air in the cavity between board
+and dock plate, taken as the mean of the board and the dock plate's inner face
+(that face runs at 0.47 times the board's rise in the model's chain of
+surfaces); above, the board beside the module, from which the module and its
+neighbours warm the air next to it. The C5's losses: 0.40 W in typical use (connected, receiving
+at 5 GHz, 110 mA, with little sending), 0.88 W at half the time sending at
+5 GHz, 1.36 W sending all the time (1.41 W in, 45 mW radiated). On the
+committed board, in a room of 40 °C, with PoE (the warmest supply):
+
+| Case | Board beside the module | Air in the cavity | Module inside |
+|---|---|---|---|
+| typical use, module 0.40 W | 75 °C | 63 °C | 81 °C |
+| typical use, module sending half the time (0.88 W) | 87 °C | 66 °C | 100 °C |
+| everything on within the firmware limits (LEDs at 100 mA, no beep with NFC), module 0.88 W | 100 °C | 76 °C | 113 °C |
+
+In typical use the module's air stays below 85 °C by 10 K at the upper bound
+(the estimate is +-40 %). Sending for a long time does not: the radio's
+average loss has to be limited by the firmware (a transmit duty limit), to
+be sized with the heat model of the final layout. The model is run again
+with the new converter and the module's place.
+
+Placement, first look. The MINI-1 is 2.2 mm wider and 4.7 mm longer than the
+C6-MINI-1U footprint. It fits the old place at the top left, its antenna
+over the cut in the top edge widened to 16.4 mm. Espressif's guide
+(HDG 1.4.7, figures 22 and 23) recommends a board corner with the antenna's
+ground point at the board edge, the antenna beyond the edge or over a cut on
+both sides and below it, and 15 mm of free space round it inside the housing.
+On this board the corner that fits that orientation is the top right one,
+where USB-C, its eFuse path and a mounting hole sit; the case leaves 1.5 to
+2.3 mm to its walls. What stays short is quantified with the full-wave model
+at 2.4 and 5 GHz and recorded under "Accepted deviations".
 
 ## Mechanics
 
