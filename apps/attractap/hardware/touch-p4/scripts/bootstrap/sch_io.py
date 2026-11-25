@@ -179,9 +179,9 @@ def expander(cv, P_, x, y):
     cv.begin('IO expander (I2C 0x20)')
     u = cv.put(P_['U602'], x, y + 12.7)
     vcc = u.pin('16')
-    cv.wire(vcc, (vcc[0] + 25.4, vcc[1]))
-    cv.hang(P_['C608'], vcc[0] + 17.78, vcc[1])
-    cv.power('+3V3', vcc[0] + 25.4, vcc[1])
+    cv.wire(vcc, (vcc[0] + 33.02, vcc[1]))
+    cv.hang(P_['C608'], vcc[0] + 27.94, vcc[1])      # beyond the labels of the inputs below
+    cv.power('+3V3', vcc[0] + 33.02, vcc[1])
 
 
 # ---- UI ----------------------------------------------------------------------------------------------

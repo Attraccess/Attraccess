@@ -214,8 +214,25 @@ def rail(cv, P_, x0, y0):
     cv.put(P_['TP802'], xo - 5.08, sw[1], fields='tp')
 
 
+def sources(cv, P_, x, y):
+    """What the firmware reads to limit the load: whether the DC converter and the PoE module are on (dividers
+    to the IO expander). Neither on means USB alone."""
+    cv.begin('Source detection for the firmware')
+    for i, (src, top, low) in enumerate((('+5V_DC', 'R116', 'R117'), ('+5V_POE', 'R118', 'R119'))):
+        net = P_[top].nets['1']
+        xx = x + i * 30.48
+        cv.label(src, xx, y, 'L')
+        u = cv.hang(P_[top], xx + 5.08, y, angle=180)
+        node = max(u.pins.values(), key=lambda p: p[1])[:2]
+        cv.wire((xx, y), (xx + 5.08, y))
+        cv.hang(P_[low], node[0], node[1], gap=0)
+        cv.wire(node, (node[0] + 7.62, node[1]))
+        cv.label(net, node[0] + 7.62, node[1], 'R')
+
+
 def power(cv, P_, top):
     usb(cv, P_, 25.4, top + 22.86)
+    sources(cv, P_, 256.54, top + 33.02)
     rail(cv, P_, 25.4, top + 96.52)
     dc_input(cv, P_, 38.1, top + 167.64)
     poe(cv, P_, 38.1, top + 248.92)

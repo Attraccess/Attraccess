@@ -185,8 +185,15 @@ def display(d):
     d.add('U', 'TCA9554PWR', 'attractap:TCA9554PWR', 'attractap:TSSOP-16_L5.0-W4.4-P0.65-LS6.4-TL', {
         '1': 'GND', '2': 'GND', '3': 'GND', '8': 'GND', '16': '+3V3', '14': 'I2C0_SCL', '15': 'I2C0_SDA',
         '4': 'LCD_CS', '5': 'LCD_SCK', '6': 'LCD_SDA', '7': 'LCD_RST', '9': 'ETH_RST_N', '11': 'DOCK_N',
-    }, nc=('10', '12', '13'), lcsc='C477924', mpn='TCA9554PWR', desc='IO expander, I2C address 0x20')
+        '10': 'DC_PRESENT', '12': 'POE_PRESENT',
+    }, nc=('13',), lcsc='C477924', mpn='TCA9554PWR', desc='IO expander, I2C address 0x20')
     d.C('100n', '+3V3', desc='IO expander')
+    # Which sources are there, for the firmware's current limits: each source's 5 V before its ideal diode,
+    # divided to 3.1 to 3.6 V (4.75 to 5.5 V in; the expander's inputs stand 5.5 V, high from 0.7 VCC)
+    # (drawn on the power sheet, "Source detection for the firmware")
+    for src, net, top, low in (('+5V_DC', 'DC_PRESENT', 'R116', 'R117'), ('+5V_POE', 'POE_PRESENT', 'R118', 'R119')):
+        d.R('51k', net, src, ref=top, sheet='power', desc='%s present' % src.split('_')[1])
+        d.R('100k', net, 'GND', ref=low, sheet='power')
 
 
 def ui(d):
