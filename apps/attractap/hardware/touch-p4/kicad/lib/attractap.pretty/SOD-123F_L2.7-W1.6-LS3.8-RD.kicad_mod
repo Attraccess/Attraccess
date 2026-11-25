@@ -26,30 +26,6 @@
 	(fp_line (start -1.35 -0.80) (end 1.35 -0.80) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 1.35 -0.80) (end 1.35 0.80) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 1.35 0.80) (end -1.35 0.80) (layer F.CrtYd) (width 0.05))
-	(fp_poly
-		(pts
-			(xy -1.299947 -1.002309)
-			(xy -1.299947 -0.682320)
-			(xy -1.604747 -0.682320)
-			(xy -1.604747 -1.002309)
-			(xy -1.299947 -1.002309)
-		)
-		(stroke (width 0) (type solid))
-		(fill solid)
-		(layer "F.SilkS")
-	)
-	(fp_poly
-		(pts
-			(xy -1.299947 1.002513)
-			(xy -1.299947 0.682523)
-			(xy -1.604747 0.682523)
-			(xy -1.604747 1.002513)
-			(xy -1.299947 1.002513)
-		)
-		(stroke (width 0) (type solid))
-		(fill solid)
-		(layer "F.SilkS")
-	)
 	(model "${KIPRJMOD}/lib/attractap.3dshapes/SOD-123F_L2.7-W1.6-LS3.8-RD.stpz"
 		(offset (xyz 0 0 0))
 		(scale (xyz 1 1 1))

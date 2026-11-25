@@ -45,10 +45,10 @@ Quantity,Comment,Designator,Footprint,LCSC Part #,Manufacturer,Manufacturer Part
 2,2.2uH 2.3A,"L103,L201",IND-SMD_L2.5-W2.0_CKCSA252012,C354540,CENKER,CKCSA252012-2.2uH/M,"Power inductor 2.2 uH 20 %, saturation 2.6 A, rated 1.9 A, 2.5 x 2.0 x 1.25 mm",Sunlord WPN252012H2R2MT (C98350): same ratings,,JLCPCB
 2,560nH,"L501,L502",IND-SMD_L1.6-W0.8-1,C91630,Murata,LQW18CNR56J00D,"Wire-wound inductor 560 nH 5 %, 450 mA, 0603","Chilisin BWLS00161109R56J00 (C6473441): 560 nH 5 %, Q 17, body 0.3 mm wider",,JLCPCB
 1,10uH,L601,IND-SMD_L3.0-W3.0_SWPA3010S,C45403,Sunlord,SWPA3015S100MT,"Power inductor 10 uH 20 %, saturation 0.72 A, rated 0.77 A, 3 x 3 x 1.5 mm","TDK VLS3015CX-100M-1 (C2044430): saturation 0.92 A, rated 1.17 A",,JLCPCB
-2,IRLML0030,"Q101,Q102",SOT-23,C67272,Infineon,IRLML0030TRPBF,"N-channel MOSFET 30 V 5.3 A, 27 mOhm at 10 V, 40 mOhm at 4.5 V, +-20 V gate, SOT-23","Diodes DMN3023L-7 (C443825): 25 mOhm at 10 V, +-20 V gate, same pins",,JLCPCB
+2,IRLML0030,"Q101,Q102",SOT-23,C67272,Infineon,IRLML0030TRPBF,"N-channel MOSFET 30 V 5.3 A, 27 mOhm at 10 V, 40 mOhm at 4.5 V, +-20 V gate, SOT-23","Diodes DMN3023L-7 (C443825): 25 mOhm at 10 V, +-20 V gate, same pins",Active (DigiKey part status),JLCPCB
 1,AO3400A,Q701,SOT-23,C20917,Alpha & Omega,AO3400A,"N-channel MOSFET 30 V 5.7 A, SOT-23",UMW AO3400A (C347475),Full Production (aosmd.com),JLCPCB
 7,5.1k,"R101,R102,R402,R403,R404,R405,R406",R_0402_1005Metric,C25905,UNI-ROYAL (Uniroyal Elec),0402WGF5101TCE,Thick-film resistor 5.1k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",,JLCPCB
-6,100k,"R103,R106,R111,R206,R704,R705",R_0402_1005Metric,C25741,UNI-ROYAL (Uniroyal Elec),0402WGF1003TCE,Thick-film resistor 100k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",,JLCPCB
+8,100k,"R103,R106,R111,R117,R119,R206,R704,R705",R_0402_1005Metric,C25741,UNI-ROYAL (Uniroyal Elec),0402WGF1003TCE,Thick-film resistor 100k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",,JLCPCB
 2,4.7k,"R104,R105",R_0402_1005Metric,C25900,UNI-ROYAL (Uniroyal Elec),0402WGF4701TCE,Thick-film resistor 4.7k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",,JLCPCB
 1,330k,R107,R_0603_1608Metric,C861327,YAGEO,RT0603BRD07330KL,Thin-film resistor 330k 0.1% 25ppm 0603,"equivalent part of the same value, rating and package",,JLCPCB
 1,29.4k,R108,R_0402_1005Metric,C852690,YAGEO,RT0402BRD0729K4L,Thin-film resistor 29.4k 0.1% 25ppm 0402,"equivalent part of the same value, rating and package",,JLCPCB
@@ -56,13 +56,13 @@ Quantity,Comment,Designator,Footprint,LCSC Part #,Manufacturer,Manufacturer Part
 1,1.65k,R110,R_0402_1005Metric,C25869,UNI-ROYAL (Uniroyal Elec),0402WGF1651TCE,Thick-film resistor 1.65k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",,JLCPCB
 1,22.1k,R112,R_0402_1005Metric,C43473,UNI-ROYAL (Uniroyal Elec),0402WGF2212TCE,Thick-film resistor 22.1k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",,JLCPCB
 1,15k,R113,R_0402_1005Metric,C25756,UNI-ROYAL (Uniroyal Elec),0402WGF1502TCE,Thick-film resistor 15k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",,JLCPCB
+7,51k,"R116,R118,R305,R306,R307,R308,R309",R_0402_1005Metric,C25794,UNI-ROYAL (Uniroyal Elec),0402WGF5102TCE,Thick-film resistor 51k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",,JLCPCB
 6,0R,"R201,R202,R203,R208,R209,R210",R_0402_1005Metric,C17168,UNI-ROYAL (Uniroyal Elec),0402WGF0000TCE,Thick-film jumper 0R 62.5mW 0402,"equivalent part of the same value, rating and package",,JLCPCB
 2,499k,"R204,R205",R_0402_1005Metric,C25793,UNI-ROYAL (Uniroyal Elec),0402WGF4993TCE,Thick-film resistor 499k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",,JLCPCB
 10,10k,"R207,R211,R212,R213,R301,R303,R503,R604,R706,R707",R_0402_1005Metric,C25744,UNI-ROYAL (Uniroyal Elec),0402WGF1002TCE,Thick-film resistor 10k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",,JLCPCB
 1,1.5k,R214,R_0402_1005Metric,C25867,UNI-ROYAL (Uniroyal Elec),0402WGF1501TCE,Thick-film resistor 1.5k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",,JLCPCB
 3,22R,"R215,R216,R304",R_0402_1005Metric,C25092,UNI-ROYAL (Uniroyal Elec),0402WGF220JTCE,Thick-film resistor 22 1% 62.5mW 0402,"equivalent part of the same value, rating and package",,JLCPCB
 5,1k,"R217,R302,R411,R412,R507",R_0402_1005Metric,C11702,UNI-ROYAL (Uniroyal Elec),0402WGF1001TCE,Thick-film resistor 1k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",,JLCPCB
-5,51k,"R305,R306,R307,R308,R309",R_0402_1005Metric,C25794,UNI-ROYAL (Uniroyal Elec),0402WGF5102TCE,Thick-film resistor 51k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",,JLCPCB
 1,6.19k,R401,R_0402_1005Metric,C25914,UNI-ROYAL (Uniroyal Elec),0402WGF6191TCE,Thick-film resistor 6.19k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",,JLCPCB
 4,33R,"R407,R408,R409,R410",R_0402_1005Metric,C25105,UNI-ROYAL (Uniroyal Elec),0402WGF330JTCE,Thick-film resistor 33 1% 62.5mW 0402,"equivalent part of the same value, rating and package",,JLCPCB
 1,1M,R413,R_1206_3216Metric,C17927,UNI-ROYAL (Uniroyal Elec),1206W4F1004T5E,Thick-film resistor 1M 1% 0.25W 1206,"equivalent part of the same value, rating and package",,JLCPCB

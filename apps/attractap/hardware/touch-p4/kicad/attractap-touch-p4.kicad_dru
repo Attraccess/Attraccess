@@ -2,3 +2,6 @@
 (rule "PoE isolation"
   (condition "A.NetClass == 'PoE' && B.NetClass != 'PoE' && B.NetName != '' && B.NetName != 'unconnected-*' && !(A.memberOfFootprint('J401') && B.memberOfFootprint('J401'))")
   (constraint clearance (min 3mm)))
+(rule "part hole to via hole"
+  (condition "(A.Type == 'Pad' && B.Type == 'Via') || (A.Type == 'Via' && B.Type == 'Pad')")
+  (constraint hole_to_hole (min 0.45mm)))

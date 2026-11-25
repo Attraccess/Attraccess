@@ -31,7 +31,7 @@
 	(fp_line (start 1.35 0.80) (end -1.35 0.80) (layer F.CrtYd) (width 0.05))
 	(fp_poly
 		(pts (xy 0.406400 0.406400) (xy 0.406400 -0.406400) (xy -0.177800 0.000000) (xy 0.406400 0.406400))
-		(stroke (width 0) (type solid))
+		(stroke (width 0.15) (type solid))
 		(fill solid)
 		(layer "F.SilkS")
 	)
