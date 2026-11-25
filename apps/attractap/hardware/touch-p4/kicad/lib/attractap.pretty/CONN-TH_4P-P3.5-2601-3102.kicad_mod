@@ -52,7 +52,6 @@
 		(layers *.Cu *.Mask)
 		(drill 1.199998)
 	)
-	(fp_circle (center -4.25 7.97) (end -4.22 7.97) (layer F.SilkS) (width 0.06))
 	(fp_line (start -5.25 7.97) (end -5.25 -4.78) (layer F.CrtYd) (width 0.05))
 	(fp_line (start -5.25 -4.78) (end 4.25 -4.78) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 4.25 -4.78) (end 4.25 7.97) (layer F.CrtYd) (width 0.05))

@@ -1,4 +1,4 @@
 (version 1)
 (rule "PoE isolation"
-  (condition "A.NetClass == 'PoE' && B.NetClass != 'PoE' && B.NetName != '' && B.NetName != 'unconnected-*'")
-  (constraint clearance (min 2mm)))
+  (condition "A.NetClass == 'PoE' && B.NetClass != 'PoE' && B.NetName != '' && B.NetName != 'unconnected-*' && !(A.memberOfFootprint('J401') && B.memberOfFootprint('J401'))")
+  (constraint clearance (min 3mm)))

@@ -100,8 +100,8 @@
         "item_on_disabled_layer": "error",
         "items_not_allowed": "error",
         "length_out_of_range": "error",
-        "lib_footprint_issues": "ignore",
-        "lib_footprint_mismatch": "ignore",
+        "lib_footprint_issues": "warning",
+        "lib_footprint_mismatch": "warning",
         "malformed_courtyard": "error",
         "microvia_drill_out_of_range": "error",
         "mirrored_text_on_front_layer": "warning",
@@ -114,9 +114,9 @@
         "padstack": "warning",
         "pth_inside_courtyard": "error",
         "shorting_items": "error",
-        "silk_edge_clearance": "ignore",
-        "silk_over_copper": "ignore",
-        "silk_overlap": "ignore",
+        "silk_edge_clearance": "warning",
+        "silk_over_copper": "warning",
+        "silk_overlap": "warning",
         "skew_out_of_range": "error",
         "solder_mask_bridge": "error",
         "starved_thermal": "error",
@@ -503,7 +503,7 @@
       },
       {
         "netclass": "Power",
-        "pattern": "/Ethernet/PHY_3V3"
+        "pattern": "/PHY_3V3"
       },
       {
         "netclass": "Power",
@@ -515,15 +515,15 @@
       },
       {
         "netclass": "Power",
-        "pattern": "/NFC/NFC_TVDD"
+        "pattern": "/NFC_TVDD"
       },
       {
         "netclass": "Power",
-        "pattern": "/NFC/NFC_AVDD"
+        "pattern": "/NFC_AVDD"
       },
       {
         "netclass": "Power",
-        "pattern": "/NFC/NFC_DVDD"
+        "pattern": "/NFC_DVDD"
       },
       {
         "netclass": "Power",
@@ -531,7 +531,7 @@
       },
       {
         "netclass": "Power",
-        "pattern": "/Display/BL_A"
+        "pattern": "/BL_A"
       },
       {
         "netclass": "Power",
@@ -551,15 +551,15 @@
       },
       {
         "netclass": "Power5V",
-        "pattern": "/Power/+5V_USB"
+        "pattern": "/+5V_USB"
       },
       {
         "netclass": "Power5V",
-        "pattern": "/Power/+5V_POE"
+        "pattern": "/+5V_POE"
       },
       {
         "netclass": "Power5V",
-        "pattern": "/Power/+5V_DC"
+        "pattern": "/+5V_DC"
       },
       {
         "netclass": "Power5V",
@@ -583,7 +583,7 @@
       },
       {
         "netclass": "DCIN",
-        "pattern": "/Power/VDC"
+        "pattern": "/VDC"
       },
       {
         "netclass": "DCIN",

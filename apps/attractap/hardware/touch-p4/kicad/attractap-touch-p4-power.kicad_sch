@@ -1188,6 +1188,95 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "attractap:SMBJ28CA"
+			(pin_numbers (hide yes))
+			(pin_names (offset 1.016) (hide yes))
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "D"
+				(at 0 2.54 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "Value" "SMBJ28CA"
+				(at 0 -2.54 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "Footprint" "Diode_SMD:D_SMB"
+				(at 0 -5.08 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "Description" "600 W bidirectional TVS diode, 28 V stand-off, SMB (DO-214AA)"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "ki_keywords" "bidirectional diode TVS voltage suppressor"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "ki_fp_filters" "D*SMA*"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects (font (size 1.27 1.27)))
+			)
+			(symbol "SMBJ28CA_0_1"
+				(polyline
+					(pts (xy -2.54 -1.27) (xy 0 0) (xy -2.54 1.27) (xy -2.54 -1.27))
+					(stroke (width 0.2032) (type default))
+					(fill (type none))
+				)
+				(polyline
+					(pts (xy 0.508 1.27) (xy 0 1.27) (xy 0 -1.27) (xy -0.508 -1.27))
+					(stroke (width 0.2032) (type default))
+					(fill (type none))
+				)
+				(polyline (pts (xy 1.27 0) (xy -1.27 0)) (stroke (width 0) (type default)) (fill (type none)))
+				(polyline
+					(pts (xy 2.54 1.27) (xy 2.54 -1.27) (xy 0 0) (xy 2.54 1.27))
+					(stroke (width 0.2032) (type default))
+					(fill (type none))
+				)
+			)
+			(symbol "SMBJ28CA_1_1"
+				(pin passive line
+					(at -3.81 0 0)
+					(length 2.54)
+					(name "A1" (effects (font (size 1.27 1.27))))
+					(number "1" (effects (font (size 1.27 1.27))))
+				)
+				(pin passive line
+					(at 3.81 0 180)
+					(length 2.54)
+					(name "A2" (effects (font (size 1.27 1.27))))
+					(number "2" (effects (font (size 1.27 1.27))))
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "Device:D_Schottky"
 			(pin_numbers (hide yes))
 			(pin_names (offset 1.016) (hide yes))
@@ -2465,18 +2554,18 @@
 		(dnp no)
 		(uuid "b9c33115-63d0-56d2-a3f9-80175a15513b")
 		(property "Reference" "C108" (at 189.522 162.13 0) (effects (font (size 1.27 1.27))))
-		(property "Value" "22p" (at 188.887 163.83 0) (effects (font (size 1.27 1.27))))
+		(property "Value" "12p" (at 188.887 163.83 0) (effects (font (size 1.27 1.27))))
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at 184.15 163.83 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
 		(property "Datasheet" "" (at 184.15 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Description" "feed-forward, zero at 72 kHz"
+		(property "Description" "feed-forward, zero at 133 kHz (TI: optional, 117 kHz in its example)"
 			(at 184.15 163.83 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "LCSC" "C1555" (at 184.15 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "MPN" "0402CG220J500NT" (at 184.15 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "LCSC" "C1547" (at 184.15 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "MPN" "0402CG120J500NT" (at 184.15 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Manufacturer" "Fenghua (FH)"
 			(at 184.15 163.83 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
@@ -2485,7 +2574,7 @@
 			(at 184.15 163.83 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "BOM description" "MLCC 22pF 50V C0G 5% 0402"
+		(property "BOM description" "MLCC 12pF 50V C0G 5% 0402"
 			(at 184.15 163.83 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -2511,15 +2600,18 @@
 		(dnp no)
 		(uuid "e7f097e4-cf81-5125-b9f4-af7c675a2e68")
 		(property "Reference" "C109" (at 204.762 162.13 0) (effects (font (size 1.27 1.27))))
-		(property "Value" "22u" (at 204.127 163.83 0) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
+		(property "Value" "10u" (at 204.127 163.83 0) (effects (font (size 1.27 1.27))))
+		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 199.39 163.83 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
 		(property "Datasheet" "" (at 199.39 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Description" "" (at 199.39 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "LCSC" "C45783" (at 199.39 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "MPN" "CL21A226MAQNNNE" (at 199.39 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Description" "3.3 V converter output"
+			(at 199.39 163.83 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "LCSC" "C19702" (at 199.39 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "MPN" "CL10A106KP8NNNC" (at 199.39 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Manufacturer" "Samsung Electro-Mechanics"
 			(at 199.39 163.83 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
@@ -2528,11 +2620,11 @@
 			(at 199.39 163.83 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "BOM description" "MLCC 22uF 25V X5R 20% 0805"
+		(property "BOM description" "MLCC 10uF 10V X5R 10% 0603"
 			(at 199.39 163.83 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "Rating" "25V X5R" (at 206.667 165.53 0) (effects (font (size 1.27 1.27))))
+		(property "Rating" "10V X5R" (at 206.667 165.53 0) (effects (font (size 1.27 1.27))))
 		(pin "1" (uuid "1932f0b3-0145-5d29-9425-31a6fecc8a5a"))
 		(pin "2" (uuid "0f49aa54-6ebb-5445-8b2c-73b8b7ebc653"))
 		(instances
@@ -2552,73 +2644,30 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "7ac469c7-061c-52be-af82-ea003458f749")
-		(property "Reference" "C110" (at 221.272 162.13 0) (effects (font (size 1.27 1.27))))
-		(property "Value" "22u" (at 220.637 163.83 0) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
+		(uuid "62cfc564-19cd-53a9-a695-61ab44da2126")
+		(property "Reference" "C111" (at 221.272 162.13 0) (effects (font (size 1.27 1.27))))
+		(property "Value" "100n" (at 221.272 163.83 0) (effects (font (size 1.27 1.27))))
+		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
 			(at 215.9 163.83 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
 		(property "Datasheet" "" (at 215.9 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Description" "" (at 215.9 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "LCSC" "C45783" (at 215.9 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "MPN" "CL21A226MAQNNNE" (at 215.9 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "LCSC" "C1525" (at 215.9 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "MPN" "CL05B104KO5NNNC" (at 215.9 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Manufacturer" "Samsung Electro-Mechanics"
 			(at 215.9 163.83 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
 		(property "Alternate" "equivalent part of the same value, rating and package"
 			(at 215.9 163.83 0)
-			(effects (font (size 1.27 1.27)) (hide yes))
-		)
-		(property "BOM description" "MLCC 22uF 25V X5R 20% 0805"
-			(at 215.9 163.83 0)
-			(effects (font (size 1.27 1.27)) (hide yes))
-		)
-		(property "Rating" "25V X5R" (at 223.177 165.53 0) (effects (font (size 1.27 1.27))))
-		(pin "1" (uuid "7a616be0-2a14-52d6-9072-7501663aa8ac"))
-		(pin "2" (uuid "6c36915b-33b5-538e-bbe0-84eaa29d04e6"))
-		(instances
-			(project "attractap-touch-p4"
-				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/171e73d6-f310-5ee1-9cac-7bcb35e91478"
-					(reference "C110")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:C")
-		(at 232.41 163.83 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "62cfc564-19cd-53a9-a695-61ab44da2126")
-		(property "Reference" "C111" (at 237.782 162.13 0) (effects (font (size 1.27 1.27))))
-		(property "Value" "100n" (at 237.782 163.83 0) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
-			(at 232.41 163.83 0)
-			(effects (font (size 1.27 1.27)) (hide yes))
-		)
-		(property "Datasheet" "" (at 232.41 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Description" "" (at 232.41 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "LCSC" "C1525" (at 232.41 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "MPN" "CL05B104KO5NNNC" (at 232.41 163.83 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 232.41 163.83 0)
-			(effects (font (size 1.27 1.27)) (hide yes))
-		)
-		(property "Alternate" "equivalent part of the same value, rating and package"
-			(at 232.41 163.83 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
 		(property "BOM description" "MLCC 100nF 16V X7R 10% 0402"
-			(at 232.41 163.83 0)
+			(at 215.9 163.83 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "Rating" "16V X7R" (at 239.687 165.53 0) (effects (font (size 1.27 1.27))))
+		(property "Rating" "16V X7R" (at 223.177 165.53 0) (effects (font (size 1.27 1.27))))
 		(pin "1" (uuid "a03293e2-a679-5d3a-948f-e629a4f3a850"))
 		(pin "2" (uuid "a45c1e27-0787-5d88-9a76-eafcd6afc851"))
 		(instances
@@ -3182,27 +3231,27 @@
 		(dnp no)
 		(uuid "b9115cc6-78b0-558a-b0bf-c7ae12504086")
 		(property "Reference" "D105" (at 89.218 224.43 0) (effects (font (size 1.27 1.27))))
-		(property "Value" "SS34" (at 89.218 226.13 0) (effects (font (size 1.27 1.27))))
+		(property "Value" "SS310" (at 89.218 226.13 0) (effects (font (size 1.27 1.27))))
 		(property "Footprint" "attractap:SMA_L4.3-W2.6-LS5.2-RD"
 			(at 88.9 228.6 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
 		(property "Datasheet" "" (at 88.9 228.6 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Description" "Reverse polarity protection"
+		(property "Description" "Reverse polarity protection, 100 V"
 			(at 88.9 228.6 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "LCSC" "C8678" (at 88.9 228.6 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "MPN" "SS34" (at 88.9 228.6 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Manufacturer" "MDD (Microdiode)"
+		(property "LCSC" "C7420364" (at 88.9 228.6 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "MPN" "SS310" (at 88.9 228.6 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Manufacturer" "R+O (Hongjiacheng)"
 			(at 88.9 228.6 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "Alternate" "Diodes Inc B340A-13-F (C85098): 40 V 3 A, 0.35 V at 0.5 A"
+		(property "Alternate" "MDD SS310 (C15874): 100 V 3 A, 0.85 V at 3 A, Tj 125 C"
 			(at 88.9 228.6 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "BOM description" "Schottky diode 40 V 3 A, SMA"
+		(property "BOM description" "Schottky diode 100 V 3 A, 0.85 V at 3 A, Tj 150 C, SMA"
 			(at 88.9 228.6 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -3257,6 +3306,51 @@
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/171e73d6-f310-5ee1-9cac-7bcb35e91478"
 					(reference "D106")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "attractap:SMBJ28CA")
+		(at 81.28 234.95 270)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "60f1ed41-0bda-539c-9912-7a4e085c8b80")
+		(property "Reference" "D107" (at 85.89 234.1 270) (effects (font (size 1.27 1.27))))
+		(property "Value" "SMBJ28CA" (at 88.43 235.8 270) (effects (font (size 1.27 1.27))))
+		(property "Footprint" "Diode_SMD:D_SMB"
+			(at 81.28 234.95 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "Datasheet" "" (at 81.28 234.95 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Description" "TVS, DC input at the connector, bidirectional (stand-off 28 V, conducts from 31.1 V)"
+			(at 81.28 234.95 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "LCSC" "C151259" (at 81.28 234.95 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "MPN" "SMBJ28CA" (at 81.28 234.95 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Manufacturer" "Littelfuse"
+			(at 81.28 234.95 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "Alternate" "MDD SMBJ28CA (C115825): same ratings"
+			(at 81.28 234.95 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "BOM description" "TVS diode, bidirectional, 600 W, 28 V stand-off, 31.1 to 34.4 V breakdown, 45.4 V at 13.3 A, SMB"
+			(at 81.28 234.95 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(pin "1" (uuid "46d4ad00-63f2-58e8-b9c6-30aae9692058"))
+		(pin "2" (uuid "543382a8-d6c9-549b-8bc8-51f02538d1ef"))
+		(instances
+			(project "attractap-touch-p4"
+				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/171e73d6-f310-5ee1-9cac-7bcb35e91478"
+					(reference "D107")
 					(unit 1)
 				)
 			)
@@ -4119,9 +4213,9 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "995af4ef-6b58-5d1d-a10a-30668813e55d")
-		(property "Reference" "R107" (at 169.634 88.47 0) (effects (font (size 1.27 1.27))))
-		(property "Value" "340k" (at 169.634 90.17 0) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
+		(property "Reference" "R107" (at 178.33 86.77 0) (effects (font (size 1.27 1.27))))
+		(property "Value" "330k" (at 178.33 88.47 0) (effects (font (size 1.27 1.27))))
+		(property "Footprint" "Resistor_SMD:R_0603_1608Metric"
 			(at 173.99 90.17 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -4130,21 +4224,18 @@
 			(at 173.99 90.17 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "LCSC" "C423187" (at 173.99 90.17 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "MPN" "0402WGF3403TCE" (at 173.99 90.17 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Manufacturer" "UNI-ROYAL (Uniroyal Elec)"
-			(at 173.99 90.17 0)
-			(effects (font (size 1.27 1.27)) (hide yes))
-		)
+		(property "LCSC" "C861327" (at 173.99 90.17 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "MPN" "RT0603BRD07330KL" (at 173.99 90.17 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Manufacturer" "YAGEO" (at 173.99 90.17 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Alternate" "equivalent part of the same value, rating and package"
 			(at 173.99 90.17 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "BOM description" "Thick-film resistor 340k 1% 62.5mW 0402"
+		(property "BOM description" "Thin-film resistor 330k 0.1% 25ppm 0603"
 			(at 173.99 90.17 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "Rating" "1% 62.5mW" (at 166.459 91.87 0) (effects (font (size 1.27 1.27))))
+		(property "Rating" "0.1% 25ppm" (at 182.14 90.17 0) (effects (font (size 1.27 1.27))))
 		(pin "1" (uuid "d0a9d51c-3311-5a33-a92b-b01d0074801d"))
 		(pin "2" (uuid "5dec82b8-d8e6-57bf-9cf1-01fae25f6b45"))
 		(instances
@@ -4166,28 +4257,25 @@
 		(dnp no)
 		(uuid "3c143e2e-1c9b-5286-9de7-75d28e62fdc6")
 		(property "Reference" "R108" (at 169.634 96.09 0) (effects (font (size 1.27 1.27))))
-		(property "Value" "33.2k" (at 168.999 97.79 0) (effects (font (size 1.27 1.27))))
+		(property "Value" "29.4k" (at 168.999 97.79 0) (effects (font (size 1.27 1.27))))
 		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
 			(at 173.99 97.79 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
 		(property "Datasheet" "" (at 173.99 97.79 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Description" "" (at 173.99 97.79 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "LCSC" "C122548" (at 173.99 97.79 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "MPN" "0402WGF3322TCE" (at 173.99 97.79 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Manufacturer" "UNI-ROYAL (Uniroyal Elec)"
-			(at 173.99 97.79 0)
-			(effects (font (size 1.27 1.27)) (hide yes))
-		)
+		(property "LCSC" "C852690" (at 173.99 97.79 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "MPN" "RT0402BRD0729K4L" (at 173.99 97.79 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Manufacturer" "YAGEO" (at 173.99 97.79 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Alternate" "equivalent part of the same value, rating and package"
 			(at 173.99 97.79 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "BOM description" "Thick-film resistor 33.2k 1% 62.5mW 0402"
+		(property "BOM description" "Thin-film resistor 29.4k 0.1% 25ppm 0402"
 			(at 173.99 97.79 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "Rating" "1% 62.5mW" (at 166.459 99.49 0) (effects (font (size 1.27 1.27))))
+		(property "Rating" "0.1% 25ppm" (at 165.824 99.49 0) (effects (font (size 1.27 1.27))))
 		(pin "1" (uuid "a4a5a752-e396-551d-b681-9c44860bc006"))
 		(pin "2" (uuid "0d0a139b-0dbd-56b2-a0c0-9ce35ead89ce"))
 		(instances
@@ -4215,25 +4303,25 @@
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
 		(property "Datasheet" "" (at 173.99 105.41 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Description" "OVLO 5.79 V rising"
+		(property "Description" "OVLO 5.62 V rising"
 			(at 173.99 105.41 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "LCSC" "C62742" (at 173.99 105.41 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "MPN" "0402WGF9762TCE" (at 173.99 105.41 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Manufacturer" "UNI-ROYAL (Uniroyal Elec)"
+		(property "LCSC" "C852964" (at 173.99 105.41 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "MPN" "RT0402BRD0797K6L"
 			(at 173.99 105.41 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
+		(property "Manufacturer" "YAGEO" (at 173.99 105.41 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Alternate" "equivalent part of the same value, rating and package"
 			(at 173.99 105.41 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "BOM description" "Thick-film resistor 97.6k 1% 62.5mW 0402"
+		(property "BOM description" "Thin-film resistor 97.6k 0.1% 25ppm 0402"
 			(at 173.99 105.41 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "Rating" "1% 62.5mW" (at 166.459 107.11 0) (effects (font (size 1.27 1.27))))
+		(property "Rating" "0.1% 25ppm" (at 165.824 107.11 0) (effects (font (size 1.27 1.27))))
 		(pin "1" (uuid "e6c7d077-e596-51b6-a38e-1f86f6141250"))
 		(pin "2" (uuid "4d78b438-720d-5446-a95e-d7ff666914ba"))
 		(instances
@@ -4452,21 +4540,21 @@
 	)
 	(symbol
 		(lib_id "Connector:TestPoint")
-		(at 243.84 157.48 0)
+		(at 227.33 157.48 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
 		(dnp no)
 		(uuid "8938dc82-322a-55b7-9364-328f56654404")
-		(property "Reference" "TP802" (at 248.677 154.08 0) (effects (font (size 1.27 1.27))))
-		(property "Value" "3V3" (at 247.407 155.78 0) (effects (font (size 1.27 1.27))))
+		(property "Reference" "TP802" (at 232.167 154.08 0) (effects (font (size 1.27 1.27))))
+		(property "Value" "3V3" (at 230.897 155.78 0) (effects (font (size 1.27 1.27))))
 		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
-			(at 243.84 157.48 0)
+			(at 227.33 157.48 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "Datasheet" "" (at 243.84 157.48 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Description" "" (at 243.84 157.48 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Datasheet" "" (at 227.33 157.48 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Description" "" (at 227.33 157.48 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(pin "1" (uuid "82234c35-b270-5361-8122-a030a300ad07"))
 		(instances
 			(project "attractap-touch-p4"
@@ -5217,11 +5305,6 @@
 		(uuid "2ff4b7c8-055b-55d9-8ce3-04326dca19c1")
 	)
 	(wire
-		(pts (xy 232.41 157.48) (xy 232.41 160.02))
-		(stroke (width 0) (type default))
-		(uuid "4d73b363-c5fb-5663-ac48-d429c06f1f56")
-	)
-	(wire
 		(pts (xy 157.48 157.48) (xy 166.37 157.48))
 		(stroke (width 0) (type default))
 		(uuid "f24a0deb-e63c-5909-9345-19afbdfce479")
@@ -5242,19 +5325,14 @@
 		(uuid "715421d6-f40f-5417-ad0c-d0c0bcf8f30c")
 	)
 	(wire
-		(pts (xy 215.9 157.48) (xy 232.41 157.48))
+		(pts (xy 215.9 157.48) (xy 227.33 157.48))
 		(stroke (width 0) (type default))
-		(uuid "d37913e3-4991-5880-97b8-5fb4cc064183")
+		(uuid "52eeb35c-50c6-54ec-94c2-3f064d60b8cc")
 	)
 	(wire
-		(pts (xy 232.41 157.48) (xy 243.84 157.48))
+		(pts (xy 227.33 157.48) (xy 242.57 157.48))
 		(stroke (width 0) (type default))
-		(uuid "429a3591-a0f2-5c63-9887-33057f070247")
-	)
-	(wire
-		(pts (xy 243.84 157.48) (xy 259.08 157.48))
-		(stroke (width 0) (type default))
-		(uuid "2a7a39dc-228a-58ee-ad08-76543a1f71cc")
+		(uuid "49733f72-1962-59ee-9cf1-1a8e113acda6")
 	)
 	(wire
 		(pts (xy 53.34 243.84) (xy 60.96 243.84))
@@ -5270,6 +5348,11 @@
 		(pts (xy 60.96 229.87) (xy 60.96 228.6))
 		(stroke (width 0) (type default))
 		(uuid "96a69249-77f2-5c0d-bb89-7d38ed3a6c21")
+	)
+	(wire
+		(pts (xy 81.28 228.6) (xy 81.28 231.14))
+		(stroke (width 0) (type default))
+		(uuid "c2957424-f42a-58b3-89fe-f99961545e7a")
 	)
 	(wire
 		(pts (xy 96.52 228.6) (xy 96.52 231.14))
@@ -5507,9 +5590,14 @@
 		(uuid "327bc8d3-8a7b-5640-9537-9991e08e8672")
 	)
 	(wire
-		(pts (xy 77.47 228.6) (xy 85.09 228.6))
+		(pts (xy 77.47 228.6) (xy 81.28 228.6))
 		(stroke (width 0) (type default))
-		(uuid "38719244-a206-5349-8011-4735c96c2a86")
+		(uuid "4baf6c15-8280-55e4-a722-6c47b3515035")
+	)
+	(wire
+		(pts (xy 81.28 228.6) (xy 85.09 228.6))
+		(stroke (width 0) (type default))
+		(uuid "084fb21e-5a5e-530b-b451-e1ee54f60aac")
 	)
 	(wire
 		(pts (xy 92.71 228.6) (xy 93.98 228.6))
@@ -5994,6 +6082,12 @@
 		(uuid "113767d3-d1bc-5879-b0c3-f8882adbe063")
 	)
 	(junction
+		(at 81.28 228.6)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "3573337b-1acd-5f74-bfc4-f24a69815c1d")
+	)
+	(junction
 		(at 83.82 309.88)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -6228,28 +6322,22 @@
 		(uuid "ae438d5a-3916-5f7e-9cd8-31df2cf62294")
 	)
 	(junction
+		(at 227.33 157.48)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "1ca1c079-0d86-5df1-923d-20ccf5eb9547")
+	)
+	(junction
 		(at 228.6 223.52)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "6240c066-905c-59cf-b591-878d4dfcdd47")
 	)
 	(junction
-		(at 232.41 157.48)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "774e044b-10b3-5c1f-9101-1ac2caf4692a")
-	)
-	(junction
 		(at 240.03 231.14)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "8daec180-b5b4-51ba-8e33-af13c9a5e8d4")
-	)
-	(junction
-		(at 243.84 157.48)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "fbb8526f-a0e8-5b55-9d82-62f347a58d82")
 	)
 	(junction
 		(at 269.24 231.14)
@@ -6528,17 +6616,17 @@
 	)
 	(symbol
 		(lib_id "power:+3V3")
-		(at 259.08 157.48 0)
+		(at 242.57 157.48 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
 		(uuid "740d1fb7-f280-5dec-81b7-2b5e5c2c4e2b")
-		(property "Reference" "#PWR2003" (at 259.08 157.48 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Value" "+3V3" (at 259.08 153.88 0) (effects (font (size 1 1))))
-		(property "Footprint" "" (at 259.08 157.48 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Datasheet" "" (at 259.08 157.48 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Reference" "#PWR2003" (at 242.57 157.48 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Value" "+3V3" (at 242.57 153.88 0) (effects (font (size 1 1))))
+		(property "Footprint" "" (at 242.57 157.48 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Datasheet" "" (at 242.57 157.48 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(pin "1" (uuid "2f7718e4-4f23-5f00-a4c2-ed297cfdd84f"))
 		(instances
 			(project "attractap-touch-p4"
@@ -6873,45 +6961,22 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 232.41 167.64 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "03158d58-7453-597c-b6e1-a84db2ec0f0d")
-		(property "Reference" "#PWR2018" (at 232.41 167.64 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Value" "GND" (at 232.41 171.24 0) (effects (font (size 1 1))))
-		(property "Footprint" "" (at 232.41 167.64 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Datasheet" "" (at 232.41 167.64 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "353b17ae-c144-5c25-ab51-2e202bad65ea"))
-		(instances
-			(project "attractap-touch-p4"
-				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/171e73d6-f310-5ee1-9cac-7bcb35e91478"
-					(reference "#PWR2018")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
 		(at 152.4 238.76 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "6aca58f9-df3c-5971-b78f-124c602f0dc6")
-		(property "Reference" "#PWR2019" (at 152.4 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "03158d58-7453-597c-b6e1-a84db2ec0f0d")
+		(property "Reference" "#PWR2018" (at 152.4 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "GND" (at 152.4 242.36 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 152.4 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 152.4 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "2154066a-5a7e-59da-9050-178a98fbfed3"))
+		(pin "1" (uuid "353b17ae-c144-5c25-ab51-2e202bad65ea"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/171e73d6-f310-5ee1-9cac-7bcb35e91478"
-					(reference "#PWR2019")
+					(reference "#PWR2018")
 					(unit 1)
 				)
 			)
@@ -6925,16 +6990,16 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "51ede6cb-ed73-5146-b9a1-0d9cc06de1e8")
-		(property "Reference" "#PWR2020" (at 170.18 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "6aca58f9-df3c-5971-b78f-124c602f0dc6")
+		(property "Reference" "#PWR2019" (at 170.18 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "GND" (at 170.18 242.36 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 170.18 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 170.18 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "6b89ac33-38ce-5201-a6e3-7b4c69a4cdc9"))
+		(pin "1" (uuid "2154066a-5a7e-59da-9050-178a98fbfed3"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/171e73d6-f310-5ee1-9cac-7bcb35e91478"
-					(reference "#PWR2020")
+					(reference "#PWR2019")
 					(unit 1)
 				)
 			)
@@ -6948,16 +7013,16 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "da9878f7-57ae-5a27-a7bd-5efeeeedc606")
-		(property "Reference" "#PWR2021" (at 276.86 241.3 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "51ede6cb-ed73-5146-b9a1-0d9cc06de1e8")
+		(property "Reference" "#PWR2020" (at 276.86 241.3 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "GND" (at 276.86 244.9 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 276.86 241.3 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 276.86 241.3 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "57aa82cf-4884-5bae-ad2c-6ec59d4f3005"))
+		(pin "1" (uuid "6b89ac33-38ce-5201-a6e3-7b4c69a4cdc9"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/171e73d6-f310-5ee1-9cac-7bcb35e91478"
-					(reference "#PWR2021")
+					(reference "#PWR2020")
 					(unit 1)
 				)
 			)
@@ -6971,16 +7036,16 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "6cfed3e2-d562-598f-be2c-d7df70aad467")
-		(property "Reference" "#PWR2022" (at 293.37 241.3 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "da9878f7-57ae-5a27-a7bd-5efeeeedc606")
+		(property "Reference" "#PWR2021" (at 293.37 241.3 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "GND" (at 293.37 244.9 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 293.37 241.3 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 293.37 241.3 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "1491dfb0-a880-578e-ad10-ac76469d7c64"))
+		(pin "1" (uuid "57aa82cf-4884-5bae-ad2c-6ec59d4f3005"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/171e73d6-f310-5ee1-9cac-7bcb35e91478"
-					(reference "#PWR2022")
+					(reference "#PWR2021")
 					(unit 1)
 				)
 			)
@@ -6994,16 +7059,16 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "ca4af71d-aff9-51bd-877f-6f3162f96393")
-		(property "Reference" "#PWR2023" (at 96.52 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "6cfed3e2-d562-598f-be2c-d7df70aad467")
+		(property "Reference" "#PWR2022" (at 96.52 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "GND" (at 96.52 242.36 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 96.52 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 96.52 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "f5fcd13f-5698-5870-8a00-e9941d2718c0"))
+		(pin "1" (uuid "1491dfb0-a880-578e-ad10-ac76469d7c64"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/171e73d6-f310-5ee1-9cac-7bcb35e91478"
-					(reference "#PWR2023")
+					(reference "#PWR2022")
 					(unit 1)
 				)
 			)
@@ -7017,16 +7082,16 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "7cb0c894-cc46-5775-a342-e2d6e9f933f8")
-		(property "Reference" "#PWR2024" (at 199.39 137.16 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "ca4af71d-aff9-51bd-877f-6f3162f96393")
+		(property "Reference" "#PWR2023" (at 199.39 137.16 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "GND" (at 199.39 140.76 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 199.39 137.16 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 199.39 137.16 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "c64030a4-0a45-544c-9a0a-97fbd5a38b0e"))
+		(pin "1" (uuid "f5fcd13f-5698-5870-8a00-e9941d2718c0"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/171e73d6-f310-5ee1-9cac-7bcb35e91478"
-					(reference "#PWR2024")
+					(reference "#PWR2023")
 					(unit 1)
 				)
 			)
@@ -7040,16 +7105,16 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "99f8f3b8-03fa-5c1f-9a0e-3885d52ecf35")
-		(property "Reference" "#PWR2025" (at 114.3 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "7cb0c894-cc46-5775-a342-e2d6e9f933f8")
+		(property "Reference" "#PWR2024" (at 114.3 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "GND" (at 114.3 242.36 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 114.3 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 114.3 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "69ecd494-566f-5dcd-8fd3-942c87ee1e54"))
+		(pin "1" (uuid "c64030a4-0a45-544c-9a0a-97fbd5a38b0e"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/171e73d6-f310-5ee1-9cac-7bcb35e91478"
-					(reference "#PWR2025")
+					(reference "#PWR2024")
 					(unit 1)
 				)
 			)
@@ -7063,16 +7128,16 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "60ac2a9c-51fa-5114-b7f0-5a8b350a8490")
-		(property "Reference" "#PWR2026" (at 107.95 93.98 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "99f8f3b8-03fa-5c1f-9a0e-3885d52ecf35")
+		(property "Reference" "#PWR2025" (at 107.95 93.98 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "GND" (at 107.95 97.58 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 107.95 93.98 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 107.95 93.98 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "c88a4b5a-f3cf-5e2c-904c-524c16701b9e"))
+		(pin "1" (uuid "69ecd494-566f-5dcd-8fd3-942c87ee1e54"))
 		(instances
 			(project "attractap-touch-p4"
 				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/171e73d6-f310-5ee1-9cac-7bcb35e91478"
-					(reference "#PWR2026")
+					(reference "#PWR2025")
 					(unit 1)
 				)
 			)
@@ -7086,11 +7151,34 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "fb248af2-a853-57bf-8003-21b1d1f0e242")
-		(property "Reference" "#PWR2027" (at 137.16 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(uuid "60ac2a9c-51fa-5114-b7f0-5a8b350a8490")
+		(property "Reference" "#PWR2026" (at 137.16 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Value" "GND" (at 137.16 242.36 0) (effects (font (size 1 1))))
 		(property "Footprint" "" (at 137.16 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Datasheet" "" (at 137.16 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(pin "1" (uuid "c88a4b5a-f3cf-5e2c-904c-524c16701b9e"))
+		(instances
+			(project "attractap-touch-p4"
+				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/171e73d6-f310-5ee1-9cac-7bcb35e91478"
+					(reference "#PWR2026")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 81.28 238.76 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "fb248af2-a853-57bf-8003-21b1d1f0e242")
+		(property "Reference" "#PWR2027" (at 81.28 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Value" "GND" (at 81.28 242.36 0) (effects (font (size 1 1))))
+		(property "Footprint" "" (at 81.28 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Datasheet" "" (at 81.28 238.76 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(pin "1" (uuid "17bd52f6-9929-58d4-a7bf-70d3c5568a0f"))
 		(instances
 			(project "attractap-touch-p4"
@@ -7678,7 +7766,7 @@
 	)
 	(rectangle
 		(start 21.59 144.78)
-		(end 262.89 184.15)
+		(end 246.38 184.15)
 		(stroke (width 0.15) (type dash))
 		(fill (type none))
 		(uuid "eb412490-306c-59e0-ae87-1243a074443f")

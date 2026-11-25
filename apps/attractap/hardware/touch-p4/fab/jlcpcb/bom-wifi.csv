@@ -1,15 +1,18 @@
 Comment,Designator,Footprint,LCSC Part #,Manufacturer,Manufacturer Part,Description,Alternate,Lifecycle
 MLT-8530,BZ701,BUZ-SMD_4P-L8.5-W8.5-P8.50-BR,C94599,Huaneng,MLT-8530,"Magnetic buzzer 2.7 kHz, 16 ohm, 8.5 x 8.5 mm, SMD",XHXDZ SMD8530-16 ohm (C49246948): check which pad is +,not stated by the maker
 10u/25V,"C101,C106,C605",C_0805_2012Metric,C15850,Samsung Electro-Mechanics,CL21A106KAYNNNE,MLCC 10uF 25V X5R 10% 0805,"equivalent part of the same value, rating and package",
-22u,"C105,C109,C110,C115,C116,C234,C235,C301,C702",C_0805_2012Metric,C45783,Samsung Electro-Mechanics,CL21A226MAQNNNE,MLCC 22uF 25V X5R 20% 0805,"equivalent part of the same value, rating and package",
-100n,"C107,C108,C111,C114,C202,C203,C204,C205,C206,C209,C211,C212,C214,C216,C219,C220,C221,C222,C225,C228,C229,C233,C237,C302,C502,C504,C506,C508,C509,C521,C602,C604,C608,C701,C703,C704,C705,C706,C707,C708,C709,C710,C711,C713,C714",C_0402_1005Metric,C1525,Samsung Electro-Mechanics,CL05B104KO5NNNC,MLCC 100nF 16V X7R 10% 0402,"equivalent part of the same value, rating and package",
+22u,"C105,C115,C116,C234,C235,C702",C_0805_2012Metric,C45783,Samsung Electro-Mechanics,CL21A226MAQNNNE,MLCC 22uF 25V X5R 20% 0805,"equivalent part of the same value, rating and package",
+100n,"C107,C111,C114,C202,C203,C204,C205,C206,C209,C211,C212,C214,C216,C219,C220,C221,C222,C225,C228,C229,C233,C237,C241,C302,C502,C504,C506,C508,C509,C521,C602,C604,C608,C701,C703,C704,C705,C706,C707,C708,C709,C710,C711,C713,C714",C_0402_1005Metric,C1525,Samsung Electro-Mechanics,CL05B104KO5NNNC,MLCC 100nF 16V X7R 10% 0402,"equivalent part of the same value, rating and package",
+12p,"C108,C238,C239",C_0402_1005Metric,C1547,Fenghua (FH),0402CG120J500NT,MLCC 12pF 50V C0G 5% 0402,"equivalent part of the same value, rating and package",
+10u,"C109,C201,C207,C208,C210,C213,C218,C232,C301,C501,C503,C712",C_0603_1608Metric,C19702,Samsung Electro-Mechanics,CL10A106KP8NNNC,MLCC 10uF 10V X5R 10% 0603,"equivalent part of the same value, rating and package",
 2.2u/100V,"C112,C113,C117",C_1206_3216Metric,C170101,Samsung Electro-Mechanics,CL31B225KCHSNNE,MLCC 2.2uF 100V X7R 10% 1206,"equivalent part of the same value, rating and package",
-10u,"C201,C207,C208,C210,C213,C218,C232,C501,C503,C712,C715",C_0603_1608Metric,C19702,Samsung Electro-Mechanics,CL10A106KP8NNNC,MLCC 10uF 10V X5R 10% 0603,"equivalent part of the same value, rating and package",
-4.7u,"C215,C507",C_0603_1608Metric,C19666,Samsung Electro-Mechanics,CL10A475KO8NNNC,MLCC 4.7uF 16V X5R 10% 0603,"equivalent part of the same value, rating and package",
+2.2n,C118,C_0402_1005Metric,C84703,Samsung Electro-Mechanics,CL05B222KB5NNNC,MLCC 2.2nF 50V X7R 10% 0402,"equivalent part of the same value, rating and package",
+47u/50V,C120,CP_Elec_6.3x7.7,C251040,Nichicon,UCD1H470MCL1GS,"Aluminium electrolytic 47 uF 50 V 20 %, 6.3 x 7.7 mm, 0.66 ohm at 100 kHz, 105 C",ROQANG RVT1H470M0607 (C72523) or Lelon VZH470M1HTR-0607 (C164078),
+100n/50V,C121,C_0402_1005Metric,C307331,Samsung Electro-Mechanics,CL05B104KB54PNC,MLCC 100nF 50V X7R 10% 0402,"equivalent part of the same value, rating and package",
+4.7u,"C215,C507,C715",C_0603_1608Metric,C19666,Samsung Electro-Mechanics,CL10A475KO8NNNC,MLCC 4.7uF 16V X5R 10% 0603,"equivalent part of the same value, rating and package",
 10n,C217,C_0402_1005Metric,C15195,Samsung Electro-Mechanics,CL05B103KB5NNNC,MLCC 10nF 50V X7R 10% 0402,"equivalent part of the same value, rating and package",
 1u,"C223,C224,C226,C227,C230,C231,C240,C303,C505,C601,C603",C_0402_1005Metric,C52923,Samsung Electro-Mechanics,CL05A105KA5NQNC,MLCC 1uF 25V X5R 10% 0402,"equivalent part of the same value, rating and package",
 22p,C236,C_0402_1005Metric,C1555,Fenghua (FH),0402CG220J500NT,MLCC 22pF 50V C0G 5% 0402,"equivalent part of the same value, rating and package",
-12p,"C238,C239",C_0402_1005Metric,C1547,Fenghua (FH),0402CG120J500NT,MLCC 12pF 50V C0G 5% 0402,"equivalent part of the same value, rating and package",
 18p,"C510,C511",C_0402_1005Metric,C1549,Fenghua (FH),0402CG180J500NT,MLCC 18pF 50V C0G 5% 0402,"equivalent part of the same value, rating and package",
 220p,"C512,C516",C_0402_1005Metric,C71693,Murata,GRM1555C1H221JA01D,MLCC 220pF 50V C0G 5% 0402,"equivalent part of the same value, rating and package",
 39p,"C513,C517",C_0402_1005Metric,C106223,YAGEO,CC0402JRNPO9BN390,MLCC 39pF 50V C0G 5% 0402,"equivalent part of the same value, rating and package",
@@ -17,29 +20,37 @@ MLT-8530,BZ701,BUZ-SMD_4P-L8.5-W8.5-P8.50-BR,C94599,Huaneng,MLT-8530,"Magnetic b
 10p,"C515,C519",C_0402_1005Metric,C32949,Samsung Electro-Mechanics,CL05C100JB5NNNC,MLCC 10pF 50V C0G 5% 0402,"equivalent part of the same value, rating and package",
 1n,C520,C_0402_1005Metric,C1523,Fenghua (FH),0402B102K500NT,MLCC 1nF 50V X7R 10% 0402,"equivalent part of the same value, rating and package",
 1u/50V,"C606,C607",C_0603_1608Metric,C15849,Samsung Electro-Mechanics,CL10A105KB8NNNC,MLCC 1uF 50V X5R 10% 0603,"equivalent part of the same value, rating and package",
-SMAJ5.0A,D101,SMA_L4.3-W2.6-LS5.2-RD,C19077523,R+O (Hongjiacheng),SMAJ5.0A,"TVS diode, unidirectional, 400 W, 5 V stand-off, SMA","equivalent part of the same value, rating and package",
-SS34,"D102,D105,D107",SMA_L4.3-W2.6-LS5.2-RD,C8678,MDD (Microdiode),SS34,"Schottky diode 40 V 3 A, SMA","equivalent part of the same value, rating and package",
-SMBJ26A,D106,D_SMB,C315992,Littelfuse,SMBJ26A,"TVS diode, unidirectional, 600 W, 26 V stand-off, SMB","equivalent part of the same value, rating and package",
-B5819W,D601,SOD-123_L2.7-W1.6-LS3.7-RD-1,C8598,CJ (Changjiang),B5819W,"Schottky diode 40 V 1 A, SOD-123","equivalent part of the same value, rating and package",
+SMAJ5.0A,D101,SMA_L4.3-W2.6-LS5.2-RD,C19077523,R+O (Hongjiacheng),SMAJ5.0A,"TVS diode, unidirectional, 400 W, 5 V stand-off, 9.2 V at 43.5 A, SMA",Littelfuse SMAJ5.0A (C83329): same ratings,
+SS310,D105,SMA_L4.3-W2.6-LS5.2-RD,C7420364,R+O (Hongjiacheng),SS310,"Schottky diode 100 V 3 A, 0.85 V at 3 A, Tj 150 C, SMA","MDD SS310 (C15874): 100 V 3 A, 0.85 V at 3 A, Tj 125 C",
+SMBJ28A,D106,D_SMB,C178227,Littelfuse,SMBJ28A,"TVS diode, unidirectional, 600 W, 28 V stand-off, 31.1 to 34.4 V breakdown, 45.4 V at 13.3 A, SMB",Vishay SMBJ28A-E3/52 (C553979): same ratings,
+SMBJ28CA,D107,D_SMB,C151259,Littelfuse,SMBJ28CA,"TVS diode, bidirectional, 600 W, 28 V stand-off, 31.1 to 34.4 V breakdown, 45.4 V at 13.3 A, SMB",MDD SMBJ28CA (C115825): same ratings,
+B5819W,D601,SOD-123_L2.7-W1.6-LS3.7-RD-1,C8598,CJ (Changjiang),B5819W,"Schottky diode 40 V 1 A, SOD-123",MCC B5819W-TP (C84354): same ratings,
 SK6812MINI-E,"D701,D702,D703,D704,D705,D706,D707,D708",LED_SK6812MINI-E_ReverseMount_Clear,C5149201,OPSCO,SK6812MINI-E,"RGB LED with integrated driver, reverse mount, 3.2 x 2.8 mm",OPSCO SK6812MINI-EA (C5378731),not stated by the maker
-1N4148W,D709,SOD-123F_L2.7-W1.6-LS3.8-RD,C81598,ST (Shenzhen Xianke),1N4148W,"Switching diode 100 V 150 mA, SOD-123F","equivalent part of the same value, rating and package",
-2A PTC,F101,F1812,C89650,Bourns,MF-MSMF200L-2,"PTC resettable fuse, 2 A hold, 6 V, 1812","equivalent part of the same value, rating and package",
-1.1A PTC 33V,F102,F1812,C21000,RUILON,SMD1812P110TF/33,"PTC resettable fuse, 1.1 A hold, 33 V, 1812","equivalent part of the same value, rating and package",
-600R@100MHz 2A,FB101,L0805,C21519,TDK,MPZ2012S601AT000,"Ferrite bead 600 ohm at 100 MHz, 2 A, 0805","equivalent part of the same value, rating and package",
-600R@100MHz,"FB501,FB502,FB503",L0603,C85833,Murata,BLM18KG601SN1D,"Ferrite bead 600 ohm at 100 MHz, 1.3 A, 0603","equivalent part of the same value, rating and package",
+1N4148W,D709,SOD-123F_L2.7-W1.6-LS3.8-RD,C81598,ST (Shenzhen Xianke),1N4148W,"Switching diode 100 V 150 mA, SOD-123",Vishay 1N4148W-HE3-08 (C117823): same ratings,
+2A PTC,F101,F1812,C89650,Bourns,MF-MSMF200L-2,"PTC resettable fuse, 2 A hold, 4 A trip, 8 V, 1812","Littelfuse 1812L200/16DR (C439873): trips at 3.5 A, 16 V, taller",
+1.1A PTC 33V,F102,F1812,C21000,RUILON,SMD1812P110TF/33,"PTC resettable fuse, 1.1 A hold, 2.2 A trip, 33 V, 1812","Littelfuse 1812L110/33MR (C142747): trips at 1.95 A, 33 V, 20 A maximum fault current",
+600R@100MHz 2A,FB101,L0805,C21519,TDK,MPZ2012S601AT000,"Ferrite bead 600 ohm at 100 MHz, 2 A, 0.1 ohm, 0805","Sunlord UPZ2012E601-2R0TF (C98308): 600 ohm, 2 A, 0.09 ohm, similar curve",
+600R@100MHz,"FB501,FB502,FB503",L0603,C85833,Murata,BLM18KG601SN1D,"Ferrite bead 600 ohm at 100 MHz, 1.3 A, 0.15 ohm, 0603","Sunlord UPZ1608U601-1R3TF (C97000): 600 ohm, 1.3 A, 0.15 ohm",
 USB-C,J101,USB-C_SMD-TYPE-C-31-M-12_1,C165948,Korean Hroparts Elec (HRO),TYPE-C-31-M-12,"USB-C receptacle, USB 2.0, 16 pins, SMD with shell pins",HRO TYPE-C-31-M-12A (C5337088),not stated by the maker
 DC jack 5.5/2.1,J102,DC-IN-TH_PJ-002A,C3096082,Same Sky (CUI Devices),PJ-002A,"DC power jack 5.5 x 2.1 mm, through hole, 24 V",Same Sky PJ-002AH (C2961147),Active (DigiKey part status)
 DC terminal,J103,CONN-TH_4P-P3.5-2601-3102,C2765061,WAGO,250-202,"PCB terminal block, push-button, 2 poles, 3.5 mm, wires 0.2 to 1.5 mm2",WAGO 2601-3102 lever terminal (C20252913) in the same holes,Active (DigiKey part status)
 LCD 40P 0.5mm,J601,FPC-SMD_FH12-40S-0.5SH-55,C202114,Hirose,FH12-40S-0.5SH(55),"FPC connector, 40 pins, 0.5 mm, bottom contact, flip lock",none with the same land pattern,Active (DigiKey part status)
-4.7uH 4A,L101,IND-SMD_L4.0-W4.0,C354583,CENKER,CKCSA4020-4.7uH/M,"Power inductor 4.7 uH 20 %, saturation 4.0 A, rated 2.85 A, 4 x 4 x 2 mm","equivalent part of the same value, rating and package",
-6.8uH 2.4A,L102,IND-SMD_L4.0-W4.0,C5291940,CENKER,CKCSA4020-6.8uH/M,"Power inductor 6.8 uH 20 %, saturation 3.0 A, rated 2.4 A, 4 x 4 x 2 mm","equivalent part of the same value, rating and package",
-2.2uH 2.3A,"L103,L201",IND-SMD_L2.5-W2.0_CKCSA252012,C354540,CENKER,CKCSA252012-2.2uH/M,"Power inductor 2.2 uH 20 %, saturation 2.3 A, rated 1.9 A, 2.5 x 2.0 x 1.25 mm","equivalent part of the same value, rating and package",
-560nH,"L501,L502",IND-SMD_L1.6-W0.8-1,C91630,Murata,LQW18CNR56J00D,"Wire-wound inductor 560 nH 5 %, 450 mA, 0603","equivalent part of the same value, rating and package",
-10uH,L601,IND-SMD_L3.0-W3.0_SWPA3010S,C45403,Sunlord,SWPA3015S100MT,"Power inductor 10 uH 20 %, saturation 0.72 A, rated 0.77 A, 3 x 3 x 1.5 mm","equivalent part of the same value, rating and package",
+2.2uH 4.3A,L101,IND-SMD_L4.0-W4.0,C98361,Sunlord,WPN4020H2R2MT,"Power inductor 2.2 uH 20 %, saturation 6.1 A, rated 4.3 A, 48 mOhm, 4 x 4 x 2 mm",CENKER CKCSA4020-2.2uH/M (C5291938): same ratings,
+6.8uH 2.4A,L102,IND-SMD_L4.0-W4.0,C5291940,CENKER,CKCSA4020-6.8uH/M,"Power inductor 6.8 uH 20 %, saturation 3.0 A, rated 2.4 A, 4 x 4 x 2 mm",Sunlord WPN4020H6R8MT (C97036): same ratings,
+2.2uH 2.3A,"L103,L201",IND-SMD_L2.5-W2.0_CKCSA252012,C354540,CENKER,CKCSA252012-2.2uH/M,"Power inductor 2.2 uH 20 %, saturation 2.6 A, rated 1.9 A, 2.5 x 2.0 x 1.25 mm",Sunlord WPN252012H2R2MT (C98350): same ratings,
+560nH,"L501,L502",IND-SMD_L1.6-W0.8-1,C91630,Murata,LQW18CNR56J00D,"Wire-wound inductor 560 nH 5 %, 450 mA, 0603","Chilisin BWLS00161109R56J00 (C6473441): 560 nH 5 %, Q 17, body 0.3 mm wider",
+10uH,L601,IND-SMD_L3.0-W3.0_SWPA3010S,C45403,Sunlord,SWPA3015S100MT,"Power inductor 10 uH 20 %, saturation 0.72 A, rated 0.77 A, 3 x 3 x 1.5 mm","TDK VLS3015CX-100M-1 (C2044430): saturation 0.92 A, rated 1.17 A",
+IRLML0030,Q102,SOT-23,C67272,Infineon,IRLML0030TRPBF,"N-channel MOSFET 30 V 5.3 A, 27 mOhm at 10 V, 40 mOhm at 4.5 V, +-20 V gate, SOT-23","Diodes DMN3023L-7 (C443825): 25 mOhm at 10 V, +-20 V gate, same pins",
 AO3400A,Q701,SOT-23,C20917,Alpha & Omega,AO3400A,"N-channel MOSFET 30 V 5.7 A, SOT-23",UMW AO3400A (C347475),Full Production (aosmd.com)
 5.1k,"R101,R102",R_0402_1005Metric,C25905,UNI-ROYAL (Uniroyal Elec),0402WGF5101TCE,Thick-film resistor 5.1k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",
-100k,"R103,R106,R206,R704,R705",R_0402_1005Metric,C25741,UNI-ROYAL (Uniroyal Elec),0402WGF1003TCE,Thick-film resistor 100k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",
+100k,"R103,R106,R111,R206,R704,R705",R_0402_1005Metric,C25741,UNI-ROYAL (Uniroyal Elec),0402WGF1003TCE,Thick-film resistor 100k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",
 4.7k,"R104,R105",R_0402_1005Metric,C25900,UNI-ROYAL (Uniroyal Elec),0402WGF4701TCE,Thick-film resistor 4.7k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",
+330k,R107,R_0603_1608Metric,C861327,YAGEO,RT0603BRD07330KL,Thin-film resistor 330k 0.1% 25ppm 0603,"equivalent part of the same value, rating and package",
+29.4k,R108,R_0402_1005Metric,C852690,YAGEO,RT0402BRD0729K4L,Thin-film resistor 29.4k 0.1% 25ppm 0402,"equivalent part of the same value, rating and package",
+97.6k,R109,R_0402_1005Metric,C852964,YAGEO,RT0402BRD0797K6L,Thin-film resistor 97.6k 0.1% 25ppm 0402,"equivalent part of the same value, rating and package",
+1.65k,R110,R_0402_1005Metric,C25869,UNI-ROYAL (Uniroyal Elec),0402WGF1651TCE,Thick-film resistor 1.65k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",
+22.1k,R112,R_0402_1005Metric,C43473,UNI-ROYAL (Uniroyal Elec),0402WGF2212TCE,Thick-film resistor 22.1k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",
+15k,R113,R_0402_1005Metric,C25756,UNI-ROYAL (Uniroyal Elec),0402WGF1502TCE,Thick-film resistor 15k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",
 0R,"R201,R202,R203,R208,R209,R210",R_0402_1005Metric,C17168,UNI-ROYAL (Uniroyal Elec),0402WGF0000TCE,Thick-film jumper 0R 62.5mW 0402,"equivalent part of the same value, rating and package",
 499k,"R204,R205",R_0402_1005Metric,C25793,UNI-ROYAL (Uniroyal Elec),0402WGF4993TCE,Thick-film resistor 499k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",
 10k,"R207,R211,R212,R213,R301,R303,R503,R604,R706,R707",R_0402_1005Metric,C25744,UNI-ROYAL (Uniroyal Elec),0402WGF1002TCE,Thick-film resistor 10k 1% 62.5mW 0402,"equivalent part of the same value, rating and package",
@@ -56,11 +67,13 @@ AO3400A,Q701,SOT-23,C20917,Alpha & Omega,AO3400A,"N-channel MOSFET 30 V 5.7 A, S
 33R x4,"RN601,RN602,RN603,RN604,RN605",R_Array_Convex_4x0402,C25501,UNI-ROYAL (Uniroyal Elec),4D02WGJ0330TCE,"Resistor array 4 x 33 ohm 5 % 62.5 mW, 4 x 0402 convex","equivalent part of the same value, rating and package",
 RESET / BOOT,"SW201,SW202",SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5,C318884,XKB Connection,TS-1187A-B-A-B,"Tactile switch 5.1 x 5.1 mm, SMD, 1.5 mm actuator","equivalent part of the same value, rating and package",
 USBLC6-2SC6,U101,SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL,C7519,STMicroelectronics,USBLC6-2SC6,"ESD protection, two USB lines and VBUS, SOT-23-6",STMicroelectronics USBLC6-2SC6Y (C2969755),Active (DigiKey part status)
-AP63203WU-7,U103,TSOT-26_L2.9-W1.6-P0.95-LS2.8-BL,C780769,Diodes Inc.,AP63203WU-7,"3.3 V 2 A synchronous buck, 3.8 to 32 V in, TSOT-26","none stocked (SCT SCT2323TVBR, C509063, pin-compatible, no stock)",Active (DigiKey part status)
+TLV62569DBVR,"U103,U202",SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR,C141836,Texas Instruments,TLV62569DBVR,"2 A synchronous buck, 2.5 to 5.5 V in, 0.6 V reference, SOT-23-5",SGMICRO SGM61020XN5G/TR (C5153643),ACTIVE (ti.com)
 AP63205WU-7,U104,TSOT-26_L2.9-W1.6-P0.95-LS2.8-BL,C2071056,Diodes Inc.,AP63205WU-7,"5 V 2 A synchronous buck, 3.8 to 32 V in, TSOT-26","SCT SCT2325TVBR (C509064): fixed 5 V, check the inductor value",Active (DigiKey part status)
+TPS259470ARPWR,U105,VQFN-10_L2.0-W2.0-P0.45-TL,C3662799,Texas Instruments,TPS259470ARPWR,"eFuse 2.7 to 23 V 5.5 A, 28 mOhm, true reverse current blocking, adjustable UVLO and OVLO, VQFN-10 2 x 2 mm","none stocked (TPS259470LRPWR, latch-off, has the same pins: no stock)",ACTIVE (ti.com)
+LM74700QDBVRQ1,U107,SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL,C2941042,Texas Instruments,LM74700QDBVRQ1,"Ideal diode controller for an N-channel MOSFET, 3.2 to 65 V, 80 uA, AEC-Q100, SOT-23-6","Maxinmicro MX74700T (C22468156): same pins, 300 uA, not automotive-qualified",ACTIVE (ti.com)
 ESP32-P4NRW32X,U201,QFN-104_L10.0-W10.0-P0.35-TL-EP7.5,C54540373,Espressif,ESP32-P4NRW32X,"MCU ESP32-P4, dual-core RISC-V 400 MHz, 32 MB PSRAM in package, chip revision v3.x, QFN-104 10 x 10 mm","Espressif ESP32-P4NRW16X (JLCPCB C55820335): 16 MB PSRAM, firmware must fit; no stock",Mass Production (products.espressif.com)
-TLV62569DBVR,U202,SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR,C141836,Texas Instruments,TLV62569DBVR,"2 A synchronous buck, 2.5 to 5.5 V in, 0.6 V reference, SOT-23-5",SGMICRO SGM61020XN5G/TR (C5153643),ACTIVE (ti.com)
 W25Q128JVSIQ,U203,SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL,C97521,Winbond,W25Q128JVSIQ,"128 Mbit QSPI NOR flash, SOIC-8 208 mil",GigaDevice GD25Q128ESIGR (C2928891),Active (DigiKey part status)
+TLV803SDBZR,U204,SOT-23,C132016,Texas Instruments,TLV803SDBZR,"Voltage supervisor 2.93 V, 200 ms, open-drain active-low reset, SOT-23","3PEAK TPV803S-3STR (C2842356): 2.85 to 3.00 V, 140 to 280 ms",ACTIVE (ti.com)
 ESP32-C6-MINI-1U-H4,U301,WIFIM-SMD_61P-L16.6-W13.2-P0.80-ESP32-C6-MINI-1-N4,C20627095,Espressif,ESP32-C6-MINI-1U-H4,"Wi-Fi 6 / BLE 5 / 802.15.4 module ESP32-C6, 4 MB flash, MHF III antenna connector, -40 to 105 C",Espressif ESP32-C6-MINI-1U-N4 (C7558096): -40 to 85 C; no stock,Mass Production (products.espressif.com)
 PN5321A3HN/C106,U501,QFN-40_L6.0-W6.0-P0.50-BL-EP,C53457895,Tokmas,PN5321A3HN (Tokmas),"NFC reader IC, pin-compatible with NXP PN532, QFN-40 6 x 6 mm",NXP PN5321A3HN/C106 (C28925): NRND at NXP,not stated by the maker
 AP3032KTR-G1,U601,SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BR,C264086,Diodes Inc.,AP3032KTR-G1,"White LED boost driver, 1 MHz, overvoltage protection, SOT-23-6","MSKSEMI MSAP3032KTR-G1 (C49208388): 1.2 MHz, PWM dimming 20 kHz to 1 MHz",Active (DigiKey part status)
@@ -69,5 +82,5 @@ TCA9554PWR,U602,TSSOP-16_L5.0-W4.4-P0.65-LS6.4-TL,C477924,Texas Instruments,TCA9
 LIS2DH12TR,U702,LGA-12_2x2mm_P0.5mm,C110926,STMicroelectronics,LIS2DH12TR,"3-axis accelerometer, I2C/SPI, 12-bit, LGA-12 2 x 2 mm","none stocked found (STMicroelectronics IIS2DHTR, C2655071: 1 piece)",Active (DigiKey part status)
 DRV5032FA,U703,SOT-23,C140921,Texas Instruments,DRV5032FADBZR,"Omnipolar Hall switch, 4.8 mT, push-pull, 20 Hz, SOT-23",Texas Instruments DRV5032FBDBZR (C2655033): samples at 5 Hz,ACTIVE (ti.com)
 VCNL4040M3OE,U704,SENSORS-SMD_VCNL4040M3OE,C142526,Vishay,VCNL4040M3OE,"Proximity and ambient light sensor, I2C, 0x60",none,Active (DigiKey part status) (not the -H3 suffix)
-40MHz 9pF 10ppm,Y201,CRYSTAL-SMD_4P-L3.2-W2.5-BL-2,C255943,Epson,X1E000021017700,"Crystal 40 MHz, 9 pF load, +-10 ppm, 3.2 x 2.5 mm","equivalent part of the same value, rating and package",
-27.12MHz 12pF,Y501,CRYSTAL-SMD_4P-L3.2-W2.5-BL,C113669,YXC,X32252712MOB4SI,"Crystal 27.12 MHz, 12 pF load, 3.2 x 2.5 mm","equivalent part of the same value, rating and package",
+40MHz 9pF 10ppm,Y201,CRYSTAL-SMD_4P-L3.2-W2.5-BL-2,C255943,Epson,X1E000021017700,"Crystal 40 MHz, 9 pF load, +-10 ppm, ESR 40 ohm, 3.2 x 2.5 mm","Tai-Saw TZ0308D (C379787): 9 pF, +-10 ppm, ESR 30 ohm",
+27.12MHz 12pF,Y501,CRYSTAL-SMD_4P-L3.2-W2.5-BL,C113669,YXC,X32252712MOB4SI,"Crystal 27.12 MHz, 12 pF load, +-10 ppm, 3.2 x 2.5 mm","Epson X1E0000210860 (C255927): 12 pF, +-10 ppm, ESR 40 ohm",

@@ -1816,7 +1816,7 @@
 		(dnp no)
 		(uuid "cd671a06-534d-50fd-aa38-81a8376b4de7")
 		(property "Reference" "C715" (at 217.462 195.15 0) (effects (font (size 1.27 1.27))))
-		(property "Value" "10u" (at 216.827 196.85 0) (effects (font (size 1.27 1.27))))
+		(property "Value" "4.7u" (at 217.462 196.85 0) (effects (font (size 1.27 1.27))))
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 212.09 196.85 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
@@ -1826,8 +1826,8 @@
 			(at 212.09 196.85 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "LCSC" "C19702" (at 212.09 196.85 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "MPN" "CL10A106KP8NNNC" (at 212.09 196.85 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "LCSC" "C19666" (at 212.09 196.85 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "MPN" "CL10A475KO8NNNC" (at 212.09 196.85 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Manufacturer" "Samsung Electro-Mechanics"
 			(at 212.09 196.85 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
@@ -1836,11 +1836,11 @@
 			(at 212.09 196.85 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "BOM description" "MLCC 10uF 10V X5R 10% 0603"
+		(property "BOM description" "MLCC 4.7uF 16V X5R 10% 0603"
 			(at 212.09 196.85 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "Rating" "10V X5R" (at 219.367 198.55 0) (effects (font (size 1.27 1.27))))
+		(property "Rating" "16V X5R" (at 219.367 198.55 0) (effects (font (size 1.27 1.27))))
 		(pin "1" (uuid "97689971-5806-5b91-b6a3-9b404d25d09f"))
 		(pin "2" (uuid "c65db322-0913-52c4-b505-b27052d78125"))
 		(instances

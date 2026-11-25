@@ -740,15 +740,18 @@
 		(dnp no)
 		(uuid "cb94a94f-06de-5d9e-855e-f62b825c370d")
 		(property "Reference" "C301" (at 48.552 61.8 0) (effects (font (size 1.27 1.27))))
-		(property "Value" "22u" (at 47.917 63.5 0) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
+		(property "Value" "10u" (at 47.917 63.5 0) (effects (font (size 1.27 1.27))))
+		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
 			(at 43.18 63.5 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
 		(property "Datasheet" "" (at 43.18 63.5 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Description" "" (at 43.18 63.5 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "LCSC" "C45783" (at 43.18 63.5 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "MPN" "CL21A226MAQNNNE" (at 43.18 63.5 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Description" "Wi-Fi module supply"
+			(at 43.18 63.5 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "LCSC" "C19702" (at 43.18 63.5 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "MPN" "CL10A106KP8NNNC" (at 43.18 63.5 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Manufacturer" "Samsung Electro-Mechanics"
 			(at 43.18 63.5 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
@@ -757,11 +760,11 @@
 			(at 43.18 63.5 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "BOM description" "MLCC 22uF 25V X5R 20% 0805"
+		(property "BOM description" "MLCC 10uF 10V X5R 10% 0603"
 			(at 43.18 63.5 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "Rating" "25V X5R" (at 50.457 65.2 0) (effects (font (size 1.27 1.27))))
+		(property "Rating" "10V X5R" (at 50.457 65.2 0) (effects (font (size 1.27 1.27))))
 		(pin "1" (uuid "2e7c387b-8aec-59ca-af16-520469c5376b"))
 		(pin "2" (uuid "84ff9636-5138-5dc0-8a9e-894b96ff5b2e"))
 		(instances

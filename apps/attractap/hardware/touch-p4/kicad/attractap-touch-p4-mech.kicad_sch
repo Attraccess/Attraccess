@@ -280,6 +280,58 @@
 		)
 	)
 	(symbol
+		(lib_id "Mechanical:Fiducial")
+		(at 238.76 60.96 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(dnp no)
+		(uuid "4a8af19f-445e-5f28-87eb-041855a368df")
+		(property "Reference" "FID804" (at 238.76 63.43 0) (effects (font (size 1.27 1.27))))
+		(property "Value" "Fiducial" (at 238.76 65.13 0) (effects (font (size 1.27 1.27))))
+		(property "Footprint" "Fiducial:Fiducial_1mm_Mask2mm"
+			(at 238.76 60.96 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "Datasheet" "" (at 238.76 60.96 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Description" "" (at 238.76 60.96 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(instances
+			(project "attractap-touch-p4"
+				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/7a51f2ad-2d48-5a47-9b66-64864065023d"
+					(reference "FID804")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Mechanical:Fiducial")
+		(at 264.16 60.96 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(dnp no)
+		(uuid "5fb3387c-94bd-5cde-bc7e-1e8f0bd69cda")
+		(property "Reference" "FID805" (at 264.16 63.43 0) (effects (font (size 1.27 1.27))))
+		(property "Value" "Fiducial" (at 264.16 65.13 0) (effects (font (size 1.27 1.27))))
+		(property "Footprint" "Fiducial:Fiducial_1mm_Mask2mm"
+			(at 264.16 60.96 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "Datasheet" "" (at 264.16 60.96 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Description" "" (at 264.16 60.96 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(instances
+			(project "attractap-touch-p4"
+				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/7a51f2ad-2d48-5a47-9b66-64864065023d"
+					(reference "FID805")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Mechanical:MountingHole")
 		(at 40.64 60.96 0)
 		(unit 1)
@@ -992,7 +1044,7 @@
 	)
 	(rectangle
 		(start 156.21 53.34)
-		(end 219.71 67.31)
+		(end 270.51 67.31)
 		(stroke (width 0.15) (type dash))
 		(fill (type none))
 		(uuid "5f004517-38a2-5cc6-8cef-d248f406e0e9")

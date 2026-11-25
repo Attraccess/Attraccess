@@ -266,8 +266,6 @@
 	)
 	(pad 42 smd rect (at -11.66 -1.63 90.00) (size 2.223 1.816) (layers F.Cu F.Paste F.Mask))
 	(pad 41 smd rect (at 11.66 -1.63 90.00) (size 2.223 1.816) (layers F.Cu F.Paste F.Mask))
-	(fp_circle (center 12.06 1.78) (end 12.09 1.78) (layer F.SilkS) (width 0.06))
-	(fp_arc (start 10.45 1.63) (end 10.45 1.50) (angle 358.84) (layer F.SilkS) (width 0.25))
 	(fp_line (start -11.55 1.00) (end -11.55 -4.60) (layer F.CrtYd) (width 0.05))
 	(fp_line (start -11.55 -4.60) (end 11.55 -4.60) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 11.55 -4.60) (end 11.55 1.00) (layer F.CrtYd) (width 0.05))
