@@ -27,9 +27,10 @@ Verdicts, after the edit of 25 November 2026:
 - **not checkable from free sources**: the claim rests on a paid standard,
   lab practice, an estimate or engineering judgement; compliance.md marks it
   "unverified".
-- **module-specific, to be revisited with the module choice**: a claim about
-  the ESP32-C6-MINI-1U and its antenna. The module may be replaced, so these
-  were left unchanged in substance; the claim column gives the check result.
+- **module-specific**: a claim about the ESP32-C6-MINI-1U and its antenna,
+  checked against the module's own documents. The module stays on revision A
+  (an ESP32-C5 was looked at and kept for revision B, design-notes.md,
+  "Decisions"); the antenna claims were rewritten with the antenna decision.
 - **not checked (design figure)**: board, component or simulation figures
   from the design files, outside this check.
 
@@ -67,7 +68,7 @@ Verdicts, after the edit of 25 November 2026:
 | Name, postal address, type and serial number on the device (a batch number would also do) | correct | RED Art. 10(6), (7) |
 | Instructions with frequency bands and maximum power | correct | RED Art. 10(8); FuAG §20(3) |
 | Instructions in German (was: always; now: required for non-commercial users only) | corrected | FuAG §20(1); RED Art. 10(8) |
-| LVD and EMC Directive not separately; the RED covers both | correct | RED Art. 1(4), 3(1), 50; EMCD Art. 2(2)(a) |
+| LVD and EMC Directive not separately; the RED covers both; safety applies "with no voltage limit applying", also below the LVD's range | correct; completed (review stage 4) | RED Art. 1(4), 3(1), 3(1)(a), 50; EMCD Art. 2(2)(a) |
 | RED cybersecurity applies since 1 August 2025 | correct | DR 2023/2444 Art. 1; DR 2022/30 Art. 3 |
 | Network protection: the reader can communicate over the internet, directly or through other equipment | correct | DR 2022/30 Art. 1(1) |
 | Protection of personal data: card numbers linked to names (personal data in the GDPR sense is our inference) | correct | DR 2022/30 Art. 1(2) as amended by DR 2023/2444 |
@@ -116,7 +117,7 @@ Verdicts, after the edit of 25 November 2026:
 | Radio and cybersecurity need cited standards for self-declaration; safety and EMC never need a notified body | correct | RED Art. 17(2), (3), (4) |
 | EN 300 328 V2.2.2 cited | correct | HS-RED no. 16; EN 300 328 |
 | EN 300 330 V2.1.1 cited | correct | HS-RED no. 17; EN 300 330 |
-| EN 301 489-3 and -17 cited, part 1 their common base (the two notices were missing) | corrected | HS-RED no. 168, 169; EN 301 489-3 §2.1; EN 301 489-17 §2.1, §6 |
+| EN 301 489-3 and -17 cited, part 1 their common base (the two notices were missing); with their clause 6 applied, no presumption for Art. 3(1)(b), so objective pass criteria in the test plan | corrected (meaning of the notice added in review stage 4) | HS-RED no. 168, 169; HS-RED 2025/893 recital; RED Art. 17(2), Annex II; EN 301 489-3 §2.1; EN 301 489-17 §2.1, §6 |
 | Versions and scopes of EN 301 489-1, -3 (NFC) and -17 (Wi-Fi, Bluetooth) | correct | EN 301 489-3 §3.1; EN 301 489-17 §1, table 1 |
 | EN 55035:2017 cited (EN 55032 only under the EMC Directive added) | correct | HS-RED no. 5; HS-EMC |
 | EN 62368-1 not cited under the RED (LVD cites only the 2014 edition, added); a 2024 edition exists | correct | HS-RED; HS-LVD; SIQ (secondary) |
@@ -132,31 +133,31 @@ Verdicts, after the edit of 25 November 2026:
 
 | Claim (short) | Verdict | Source |
 |---|---|---|
-| The reader uses the ESP32-C6-MINI-1U, with an antenna connector (correct) | module-specific, to be revisited with the module choice | DS §1.2 |
-| EU-type examination certificate SN24C0053, Sporton, notified body 2907, 6 March 2024 (correct; hardware version V1.2) | module-specific, to be revisited with the module choice | CE-1U p. 1 |
-| MINI-1 certificate SN23C0148 of 28 September 2023 (correct) | module-specific, to be revisited with the module choice | CE-1 p. 1 |
-| The certificates cover safety, EMC and radio, not cybersecurity (correct but incomplete: they also cover RF exposure under Art. 3(1)(a), and the EMC part was assessed against a draft EN 301 489-17 V3.2.6) | module-specific, to be revisited with the module choice | CE-1U pp. 1, 3 |
-| Espressif publishes the certificates only: ask for the reports (correct for the EU reports L330804KS102-M1, EA330804, EW330804 and ER330804; the FCC reports are public, measured to FCC rules; the MINI-1U's FCC ID is 2AC7Z-ESPC6MINIU) | module-specific, to be revisited with the module choice | CERTS; FAQ; FCC-G; FCC exhibits |
-| The certificates do not transfer to the reader | correct | CE-1U p. 2, note 2; EG 203 367 §6.1 |
+| The reader uses the ESP32-C6-MINI-1U, with an antenna connector (correct) | module-specific | DS §1.2 |
+| EU-type examination certificate SN24C0053, Sporton, notified body 2907, 6 March 2024 (correct; hardware version V1.2) | module-specific | CE-1U p. 1 |
+| MINI-1 certificate SN23C0148 of 28 September 2023 (correct) | module-specific | CE-1 p. 1 |
+| The certificates cover safety, EMC, radio and RF exposure, not cybersecurity; their EMC part used a draft EN 301 489-17 V3.2.6, so no EMC credit for the reader | corrected (review stage 4); module-specific | CE-1U pp. 1, 3; FAQ |
+| Espressif publishes the certificates only: ask for the reports (correct for the EU reports L330804KS102-M1, EA330804, EW330804 and ER330804; the FCC reports are public, measured to FCC rules; the MINI-1U's FCC ID is 2AC7Z-ESPC6MINIU) | module-specific | CERTS; FAQ; FCC-G; FCC exhibits |
+| The module's assessment "can be used as part of" the reader's, it does not replace it (was: "the certificates do not transfer") | corrected (review stage 4) | EG 203 367 §6.1; CE-1U p. 2, note 2 |
 | "The lab reuses the module's conducted radio results if used as its datasheet says" (now: what EG 203 367 says; the guide names neither modules nor conducted results, and calls an antenna outside the original assessment a deviation) | corrected | EG 203 367 §3.1, §6.1 notes 1 and 2 |
 | Labs typically reuse the module's conducted results | not checkable from free sources (lab practice) | none |
 | On the reader: radiated power and spurious emissions with NFC transmitting | correct | EG 203 367 §6.1 note 1, §6.2; EN 300 328 §4.3.2.2.3 |
 | On the reader: EMC with all radios running | correct | EG 203 367 §5.1.1.3, §5.2.3 |
 | RF exposure listed under EG 203 367 (now: separate, RED Art. 3(1)(a), outside the guide's scope) | corrected | EG 203 367 §1 |
-| The module is certified on condition of 20 cm to persons (correct; the FCC grant has the same condition) | module-specific, to be revisited with the module choice | CE-1U p. 2, note 1; FCC-G |
+| The module is certified on condition of 20 cm to persons (correct; the FCC grant has the same condition) | module-specific | CE-1U p. 2, note 1; FCC-G |
 | A reader that is touched needs its own RF exposure assessment | correct | CE-1U p. 2, note 1 |
 | A calculation is usually enough for RF exposure | not checkable from free sources (lab practice) | none |
-| VDE (0366) wants an EU-type examination when only module reports exist | correct (VDE's stated position) | VDE RED modules p. 2 |
-| "Certified up to 19.8 dBm" (was the MINI-1's figure, 19.81 dBm; the MINI-1U certificate states 18.19 dBm EIRP for Wi-Fi and 17.96 dBm for Bluetooth LE) | corrected; module-specific, to be revisited with the module choice | CE-1U p. 2; CE-1 p. 2 |
+| VDE (0366) wants an EU-type examination when only module reports exist (statement of 24 November 2020; reconfirm) | correct (VDE's stated position) | VDE RED modules p. 2 |
+| "Certified up to 19.8 dBm" (was the MINI-1's figure, 19.81 dBm; the MINI-1U certificate states 18.19 dBm EIRP for Wi-Fi and 17.96 dBm for Bluetooth LE) | corrected; module-specific | CE-1U p. 2; CE-1 p. 2 |
 | The limit is 20 dBm (now: e.i.r.p., for every antenna assembly) | correct | EN 300 328 §4.3.2.2.2, §4.3.2.2.3 |
-| The antenna is not part of the module (correct) | module-specific, to be revisited with the module choice | DS §10.2 |
-| The datasheet asks for 2.4 GHz, 50 ohm, at most 2.33 dBi, a monopole (partly correct: the datasheet recommends rather than asks, lists a matching connector as a fourth point, and the test antenna is a sleeve monopole, material code TFPD08H10060011) | module-specific, to be revisited with the module choice | DS §10.2; FCC exhibits (antenna specification) |
-| Datasheet quote on an antenna of a different type or gain (correct, exact excerpt) | module-specific, to be revisited with the module choice | DS §10.2 |
-| An adhesive antenna is often another type: ask the lab (correct as advice) | module-specific, to be revisited with the module choice | FAQ; eCFR 15.204(c) |
+| The antenna is not part of the module (correct) | module-specific | DS §10.2 |
+| The datasheet asks for 2.4 GHz, 50 ohm, at most 2.33 dBi, a monopole (partly correct: the datasheet recommends rather than asks, lists a matching connector as a fourth point, and the test antenna is a sleeve monopole, material code TFPD08H10060011) | module-specific | DS §10.2; FCC exhibits (antenna specification) |
+| Datasheet quote on an antenna of a different type or gain (correct, exact excerpt) | module-specific | DS §10.2 |
+| An adhesive antenna is often another type: ask the lab (correct as advice) | module-specific | FAQ; eCFR 15.204(c) |
 | Each antenna configuration sold is a radio configuration in the test plan | correct | EN 300 328 §4.2.4, §5.4.1 m) |
-| Adhesive antenna inside the case: one named antenna, tested with the reader (correct; an "integral antenna" in EN 300 328 terms) | module-specific, to be revisited with the module choice | EN 300 328 §3.1; EG 203 367 §6.1 note 1 |
-| SMA bulkhead antenna: manual names the permitted antennas, the declaration covers only those (correct; a "dedicated antenna", each must meet 20 dBm e.i.r.p.; a standard SMA jack is not allowed for a US version) | module-specific, to be revisited with the module choice | EN 300 328 §3.1, §4.2.4; RED Art. 10(8), Annex VI point 8; eCFR 15.203 |
-| Neither antenna is chosen; the case has no place for one yet | correct | design-notes.md, "Wi-Fi antenna" |
+| Adhesive antenna inside the case: one named antenna, tested with the reader (correct; an "integral antenna" in EN 300 328 terms) | module-specific | EN 300 328 §3.1; EG 203 367 §6.1 note 1 |
+| SMA bulkhead antenna: manual names the permitted antennas, the declaration covers only those (correct; a "dedicated antenna", each must meet 20 dBm e.i.r.p.; a standard SMA jack is not allowed for a US version) | module-specific | EN 300 328 §3.1, §4.2.4; RED Art. 10(8), Annex VI point 8; eCFR 15.203 |
+| The antennas are chosen (certified Deman, fallback Taoglas on an SMA bulkhead); the case has a bay for one | corrected (was: neither chosen) | design-notes.md, "Wi-Fi antenna"; FCC exhibits; eCFR 15.204 |
 | Where the antenna sits decides the radiated results | not checkable from free sources (engineering judgement) | none |
 
 ### Cybersecurity, under the RED
@@ -209,7 +210,7 @@ Verdicts, after the edit of 25 November 2026:
 | A supply sold with the reader becomes part of the tested product | not checkable from free sources (lab practice) | none |
 | EN 60825-1 does not apply to the LED; no laser label | correct | BSI 60825-1; IEC18 contents (clause 10.4) |
 | LED pulse figures (200 mA, 1 ms, 1/40) | not checked (design figure) | sensor data sheet |
-| PoE isolation "1500 V RMS for a minute" (now: one of three alternative tests) | corrected | IEEEI; IEEEW (secondary) |
+| PoE isolation: one of three alternative tests, then at least 2 Mohm at 500 V DC; the interpretation confirms only the RMS test; 802.3-2022 not read | corrected (review stage 4) | IEEEW (secondary); IEEEI |
 | Not asked by the safety standard "because both sides may be touched" (now: clause 5.4.11 applies only against earthed circuitry) | corrected | ULQA; FLIR p. 15 |
 | A CE lab may not test PoE isolation; customers expect it | not checkable from free sources (opinion) | none |
 
@@ -264,12 +265,13 @@ Verdicts, after the edit of 25 November 2026:
 | ESD 4 kV contact, 8 kV air, to all exposed surfaces | correct | EN 301 489-1 §9.3.2 |
 | Radiated immunity 3 V/m, 80 MHz to 6 GHz | correct | EN 301 489-1 §9.2.2 |
 | Fast transients 0.5 kV, RF common mode 3 V, if the cable may exceed 3 m (now stated for the Ethernet port too) | correct | EN 301 489-1 §9.4.1, §9.4.2, §9.5.1, §9.5.2 |
-| Surge 0.5 kV for indoor cables over 30 m; more for outdoor cables (1 kV, 10/700 µs added) | correct | EN 301 489-1 §9.8.2.1, §9.8.2.2 |
+| Surge 0.5 kV for indoor cables over 30 m; more for outdoor cables (1 kV, 10/700 µs added); 1.2/50 µs allowed instead where the coupling network disturbs a high-speed port | correct; completed (review stage 4) | EN 301 489-1 §9.8.2.1, §9.8.2.2; EN 301 489-17 table 6 |
 | Conducted emission at "class B" on the DC input (now: EN 301 489-1 table 5; class B for Ethernet and for the AC port of a dedicated supply; NFC exclusion band) | corrected | EN 301 489-1 §8.3.1, §8.3.2, §8.3.3, §8.4.3.2, §8.7.3 |
 | A terminal for installation wires means DC port tests (the quoted phrase is from design-notes, not a standard) | correct | EN 301 489-1 §9.4.1, §9.5.1, annex C.1 |
 | No surge test on DC power ports (PoE arrives on a wired network port, added) | correct | EN 301 489-1 §3.1, §9.8.1 |
 | Only the Ethernet port gets a surge, 0.5 kV, over 30 m | correct | EN 301 489-1 §9.8.2.2 |
 | EN 50130-4 is the EMC (immunity) standard for access control | correct | EVS 50130-4; iTeh 50130-4 preview §1 |
+| EN 50130-4 lists no directive (EVS) | wrong, corrected (review stage 4): EN 50130-4:2011 is cited under the EMC Directive, not under the RED, so it gives this radio product no presumption | OJ C 173 2016; EMC summary list 2022; HS-RED |
 | EN 50130-4 asks for surges through 42 ohm on ELV DC lines | not checkable from free sources (EN 50130-4, paid) | iTeh 50130-4 preview (clause 13 title only) |
 | EN 50130-4 consolidated English text, 24.80 EUR at EVS | correct | EVS 50130-4 |
 | German edition 79.96 EUR at DIN Media | correct | DIN Media 50130-4 |
@@ -287,14 +289,14 @@ Verdicts, after the edit of 25 November 2026:
 | Claim (short) | Verdict | Source |
 |---|---|---|
 | Failure points and remedies (items 1, 3 and 4; the pre-compliance kit) | not checkable from free sources (engineering judgement) | none |
-| ESD and transients: failed if the reader does not recover by itself (now also: no loss of stored data the test plan names as critical) | corrected | EN 301 489-1 §6.2, annex C.1; EN 301 489-3 §6.1; EN 301 489-17 §6.4, table 2 |
+| ESD and transients: failed if the reader does not recover by itself; part 1's clause 6 "shall not apply", the test plan sets objective criteria | corrected (review stage 4: EN 301 489-1 §6.2 no longer cited) | EN 301 489-17 §6.1, §6.4, table 2 |
 | Espressif's RF test firmware (now named: EspRFTestTool, or the ESP-IDF example `cert_test`) | correct | RFT; FAQ; DS §7 |
 
 ### Open points for the product
 
 | Claim (short) | Verdict | Source |
 |---|---|---|
-| Antenna gain 2.33 dBi at most (correct as the condition for reusing the module's reports; not a legal cap: any gain is allowed if the reader stays within 20 dBm e.i.r.p. and is tested with it) | module-specific, to be revisited with the module choice | DS §10.2; FAQ; EN 300 328 §4.3.2.2.3 |
+| Antenna gain 2.33 dBi at most (correct as the condition for reusing the module's reports; not a legal cap: any gain is allowed if the reader stays within 20 dBm e.i.r.p. and is tested with it) | module-specific | DS §10.2; FAQ; EN 300 328 §4.3.2.2.3 |
 | Type label: CE mark, model, serial number, name and postal address, crossed-out bin (producer identity and the post-2005 mark added) | correct | RED Art. 10(6), (7), 20(1); ElektroG §9 |
 | A copy of the declaration of conformity in the box (was missing) | corrected (added) | RED Art. 10(9) |
 | Technical file kept ten years (the declaration and the CRA's rule added) | correct | RED Art. 10(4); CRA Art. 13(13) |
@@ -319,14 +321,17 @@ Verdicts, after the edit of 25 November 2026:
 
 | Key | Full title | Version / date | URL | Clause or page relied on |
 |---|---|---|---|---|
-| RED | Directive 2014/53/EU (Radio Equipment Directive) | consolidated version of 30 May 2026 | <https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02014L0053-20260530> | Art. 1(4), 2(1), 3, 10(4), (6), (7), (8), (9), 16, 17(2), (3), (4), 18(3), 20(1), 50; Annex Ia Part I; Annex VI point 8 |
+| RED | Directive 2014/53/EU (Radio Equipment Directive) | consolidated version of 30 May 2026 | <https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02014L0053-20260530> | Art. 1(4), 2(1), 3, 3(1)(a), 10(4), (6), (7), (8), (9), 16, 17(2), (3), (4), 18(3), 20(1), 50; Annex Ia Part I; Annex II; Annex VI point 8 |
 | DR 2022/30 | Commission Delegated Regulation (EU) 2022/30 (RED Art. 3(3)(d), (e), (f)) | original text | <https://eur-lex.europa.eu/eli/reg_del/2022/30/oj> | Art. 1(1), (2), (3), Art. 3 |
 | DR 2023/2444 | Commission Delegated Regulation (EU) 2023/2444 amending 2022/30 | original text | <https://eur-lex.europa.eu/eli/reg_del/2023/2444/oj> | Art. 1 (application from 1 August 2025; new wording of Art. 1(2)) |
 | DR 2026/339 | Commission Delegated Regulation (EU) 2026/339 repealing 2022/30 | adopted 16 February 2026, OJ L of 29 April 2026 | <https://eur-lex.europa.eu/eli/reg_del/2026/339/oj> | Art. 1; recitals 4, 5 |
-| HS-RED | Commission Implementing Decision (EU) 2022/2191, harmonised standards for radio equipment | consolidated version of 15 November 2026 (last amended by 2026/2003) | <https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02022D2191-20261115> | Annex I nos. 5, 16, 17, 164, 165, 168, 169 with their notices; no entry for EN 301 489-1, EN 55032, EN 62368-1, EN 62311, EN 50665, EN 50364 |
+| HS-RED | Commission Implementing Decision (EU) 2022/2191, harmonised standards for radio equipment | consolidated version of 15 November 2026 (last amended by 2026/2003) | <https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02022D2191-20261115> | Annex I nos. 5, 16, 17, 65a, 164, 165, 168, 169 with their notices; no entry for EN 301 489-1, EN 55032, EN 62368-1, EN 62311, EN 50665, EN 50364 |
 | ID 2025/138 | Commission Implementing Decision (EU) 2025/138 (citation of EN 18031) | original text | <https://eur-lex.europa.eu/eli/dec_impl/2025/138/oj> | recital 6; Annex |
 | EMCD | Directive 2014/30/EU (EMC Directive) | original text | <https://eur-lex.europa.eu/eli/dir/2014/30/oj> | Art. 2(2)(a) |
 | HS-EMC | Commission Implementing Decision (EU) 2019/1326, harmonised standards for EMC | consolidated version of 10 June 2022 (the latest listed) | <https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02019D1326-20220610> | entries EN 55032:2015/A11:2020, EN 55035:2017/A11:2020 |
+| HS-RED 2025/893 | Commission Implementing Decision (EU) 2025/893, amending Implementing Decision (EU) 2022/2191 | original text | <https://eur-lex.europa.eu/eli/dec_impl/2025/893/oj> | recital on the notices for EN 301 489-3 and -17 ("performance-based criteria on a subjective basis") |
+| OJ C 173 2016 | Commission communication 2016/C 173/01, harmonised standards under Directive 2014/30/EU (EMC) | OJ C 173 of 13 May 2016 | <https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52016XC0513(01)> | entry EN 50130-4:2011 |
+| EMC summary list 2022 | European Commission, summary list of harmonised standards for the EMC Directive | 19 September 2022 | <https://single-market-economy.ec.europa.eu/single-market/european-standards/harmonised-standards/electromagnetic-compatibility-emc_en> | entry EN 50130-4:2011 |
 | HS-LVD | Commission Implementing Decision (EU) 2023/2723, harmonised standards for low-voltage equipment | consolidated versions of 30 April 2026 and 23 January 2027 | <https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02023D2723-20260430> | entries EN 62368-1:2014, EN 62311:2008, EN 50364:2010 |
 | CRA | Regulation (EU) 2024/2847 (Cyber Resilience Act) | OJ text of 20 November 2024 | <https://eur-lex.europa.eu/eli/reg/2024/2847/oj> | Art. 3(48), 7(1), 13(2), (3), (8), (9), (13), (17), (18), (19), 14(2), (4), 27(1), 32(2), (5), (6), 33(5), 64(10)(a), 69(1), (2), (3), 71(2); Annex I Parts I and II; Annex II; Annex III class I no. 1 |
 | CRA guidance | Commission guidance on the Cyber Resilience Act, C/2026/6013 | OJ C of 17 November 2026 | <https://eur-lex.europa.eu/eli/C/2026/6013/oj> | paras 25, 126, 137, 148, 149, 251 to 254 |
@@ -368,7 +373,7 @@ Verdicts, after the edit of 25 November 2026:
 | EN 300 330 | ETSI EN 300 330, short range devices 9 kHz to 25 MHz | V2.1.1 (2017-02) | <https://www.etsi.org/deliver/etsi_en/300300_300399/300330/02.01.01_60/en_300330v020101p.pdf> | §4.3.4 table 2 with notes 2, 3; §4.3.8.3 table 5; §4.3.9.3 table 6; §5.4.1; §6.2.9; annex C.2.3 |
 | EN 301 489-1 | ETSI EN 301 489-1, EMC for radio equipment, part 1: common technical requirements | V2.2.3 (2019-11) | <https://www.etsi.org/deliver/etsi_en/301400_301499/30148901/02.02.03_60/en_30148901v020203p.pdf> | §3.1; §6.2; §8.3.1, §8.3.2, §8.3.3 table 5; §8.4.3.2; §8.7.3; §9.2.2; §9.3.2; §9.4.1, §9.4.2; §9.5.1, §9.5.2; §9.8.1, §9.8.2.1, §9.8.2.2; annex C.1 |
 | EN 301 489-3 | ETSI EN 301 489-3, part 3: short range devices 9 kHz to 246 GHz | V2.3.2 (2023-01) | <https://www.etsi.org/deliver/etsi_en/301400_301499/30148903/02.03.02_60/en_30148903v020302p.pdf> | §2.1, §3.1, §6.1 |
-| EN 301 489-17 | ETSI EN 301 489-17, part 17: broadband and wideband data transmission systems | V3.3.1 (2024-09) | <https://www.etsi.org/deliver/etsi_en/301400_301499/30148917/03.03.01_60/en_30148917v030301p.pdf> | §1 table 1, §2.1, §6, §6.4, table 2 |
+| EN 301 489-17 | ETSI EN 301 489-17, part 17: broadband and wideband data transmission systems | V3.3.1 (2024-09) | <https://www.etsi.org/deliver/etsi_en/301400_301499/30148917/03.03.01_60/en_30148917v030301p.pdf> | §1 table 1, §2.1, §6, §6.1, §6.4, table 2, table 6 |
 | EG 203 367 | ETSI EG 203 367, guide to harmonised standards for multi-radio and combined equipment | V1.1.1 (2016-06), the only version | <https://www.etsi.org/deliver/etsi_eg/203300_203399/203367/01.01.01_60/eg_203367v010101p.pdf> | §1, §3.1, §5.1.1.3, §5.2.3, §6.1 notes 1 to 3, §6.2 |
 | IEC18 | IEC 62368-1:2018, table of contents (VDE Verlag preview) | edition 3.0 | <https://www.vde-verlag.de/iec-normen/preview-pdf/info_iec62368-1%7Bed3.0%7Db.pdf> | title of table 4; clauses 6.4.5, 10.4; table 40 |
 | EVS 50130-4 | EVS product page, EVS-EN 50130-4:2011+A1:2014 (consolidated) | read 25 November 2026 | <https://www.evs.ee/en/evs-en-50130-4-2011-a1-2014-consolidated> | scope; price; "Directives or regulations: None"; standard history (prEN 50130-4:2026) |
@@ -394,6 +399,9 @@ Verdicts, after the edit of 25 November 2026:
 | FCC exhibits | FCC exhibit list for 2AC7Z-ESPC6MINIU (test reports, antenna specification TFPD08H10060011) | read 25 November 2026 | <https://fccid.io/2AC7Z-ESPC6MINIU> | public test reports; antenna specification pp. 2, 3 |
 | eCFR 15.203 | 47 CFR 15.203, antenna requirement | current eCFR | <https://www.ecfr.gov/current/title-47/section-15.203> | full text |
 | eCFR 15.204 | 47 CFR 15.204, external amplifiers and antenna modifications | current eCFR | <https://www.ecfr.gov/current/title-47/chapter-I/subchapter-A/part-15/subpart-C/section-15.204> | (c)(1), (c)(4) |
+| eCFR 15.212 | 47 CFR 15.212, modular transmitters | current eCFR | <https://www.ecfr.gov/current/title-47/section-15.212> | (a)(1)(iv) |
+| eCFR 2.1043 | 47 CFR 2.1043, changes in certificated equipment | current eCFR | <https://www.ecfr.gov/current/title-47/section-2.1043> | (b)(1), (b)(2), (b)(4) |
+| FCC-UM | "ESP32-C6-MINI-1U User Manual v1.0", FCC exhibit "Users Manual" for 2AC7Z-ESPC6MINIU | pre-release v1.0, 2024 | <https://fccid.io/2AC7Z-ESPC6MINIU/User-Manual/2AC7Z-ESPC6MINIU-User-Manual-7149912.pdf> | chapter 4, pp. 14 to 17 |
 
 ### Test reports, UL, IEEE and other secondary sources
 

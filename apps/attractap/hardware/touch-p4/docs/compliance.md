@@ -54,7 +54,7 @@ Cybersecurity is the hard part, and it does not depend on the board:
 | Rule | Applies | What the manufacturer has to do |
 |---|---|---|
 | Radio Equipment Directive 2014/53/EU (RED) | yes | The reader contains radios: Wi-Fi and Bluetooth, and the 13.56 MHz NFC reader [RED Art. 2(1)]. Assess safety, EMC, radio and cybersecurity [RED Art. 3]. Keep the technical file and the declaration of conformity for ten years after the reader is placed on the market [RED Art. 10(4)]. Issue one EU declaration of conformity [RED Art. 18(3)], and ship each unit with a copy of it, or with a simplified declaration that gives the web address of the full text [RED Art. 10(9); FuAG §20(2)]. Put the CE mark on the device and its packaging [RED Art. 20(1)], and name, postal address, type and serial number on the device [RED Art. 10(6), (7)]. Instructions and safety information with the frequency bands and the maximum transmitted power [RED Art. 10(8); FuAG §20(3)]. They must be in German if the reader is sold for non-commercial users; for business-only sales the law asks for clear, understandable text [FuAG §20(1)]. German is advisable in any case. |
-| Low Voltage and EMC Directives | not separately | For radio equipment the RED covers both [RED Art. 1(4), 3(1), 50; EMCD Art. 2(2)(a)]. The declaration names the RED. |
+| Low Voltage and EMC Directives | not separately | For radio equipment the RED covers both [RED Art. 1(4), 3(1), 50; EMCD Art. 2(2)(a)]. Safety applies through RED Art. 3(1)(a) "with no voltage limit applying" [RED Art. 3(1)(a)]: the reader runs from 12 to 24 V and PoE, below the LVD's own range, and still has to be safe under the RED. The declaration names the RED. |
 | RED cybersecurity, Delegated Regulation (EU) 2022/30 | yes, until 10 December 2027 | Applies since 1 August 2025 [DR 2023/2444 Art. 1]: network protection, because the reader can communicate over the internet, directly or through other equipment [DR 2022/30 Art. 1(1)], and protection of personal data, because it processes card numbers linked to names [DR 2022/30 Art. 1(2)]. Repealed from 11 December 2027 by Delegated Regulation (EU) 2026/339, when the Cyber Resilience Act applies in full [DR 2026/339 Art. 1, recital 4]. Readers placed on the market before then stay under RED market surveillance for these requirements [DR 2026/339 recital 5]. |
 | Cyber Resilience Act (EU) 2024/2847 | yes | Since 11 September 2026: report exploited vulnerabilities and severe incidents, with an early warning within 24 hours, a notification within 72 hours and a final report later [CRA Art. 14(2), (4), 71(2)]. That already covers readers sold today [CRA Art. 69(3)]. From 11 December 2027: full conformity for every unit placed on the market [CRA Art. 69(2), 71(2)], with a support period that matches how long the reader is expected to be in use, at least five years, and its end date stated at purchase [CRA Art. 13(8), (19)]. See "Cybersecurity". |
 | RoHS 2011/65/EU | yes | Keep supplier declarations for all parts and the PCB in the technical file. They are the usual evidence; the Directive asks for technical documentation and internal production control, not for this form [RoHS Art. 7(b), (d)]. RoHS is named on the declaration of conformity [RoHS Annex VI; RED Art. 18(3)]. |
@@ -81,7 +81,7 @@ and EMC the manufacturer may always declare himself [RED Art. 17(2)].
 |---|---|---|
 | Radio, 2.4 GHz | EN 300 328 V2.2.2 | cited [HS-RED no. 16] |
 | Radio, 13.56 MHz | EN 300 330 V2.1.1 | cited [HS-RED no. 17] |
-| EMC | EN 301 489-1 V2.2.3, -3 V2.3.2 (NFC), -17 V3.3.1 (Wi-Fi, Bluetooth) | parts 3 and 17 cited, each with two notices: no presumption for emissions below 9 kHz, and none "if its clause 6 is applied" (clause 6 holds the performance criteria) [HS-RED no. 168, 169; EN 301 489-17 §6]. Part 1 is not cited; parts 3 and 17 apply it [EN 301 489-3 §2.1; EN 301 489-17 §2.1]. |
+| EMC | EN 301 489-1 V2.2.3, -3 V2.3.2 (NFC), -17 V3.3.1 (Wi-Fi, Bluetooth) | parts 3 and 17 cited, each with two notices: no presumption for emissions below 9 kHz, and none "if its clause 6 is applied" (clause 6 holds the performance criteria) [HS-RED no. 168, 169; EN 301 489-17 §6]. In plain words: tested with their performance criteria as written, the reader gets **no presumption of conformity for RED Art. 3(1)(b)**; the Commission found that these criteria "lay down performance-based criteria on a subjective basis" [HS-RED 2025/893 recital]. EMC is then assessed by the manufacturer without that presumption [RED Art. 17(2), Annex II], so the test plan and the technical file have to define objective pass criteria, for example a Wi-Fi packet error rate of 10 % at most, NFC reads that succeed, display and touch that recover without a reset. Part 1 is not cited; parts 3 and 17 apply it [EN 301 489-3 §2.1; EN 301 489-17 §2.1]. |
 | EMC, Ethernet port | EN 55032 (emission), EN 55035 (immunity) | EN 55035:2017 cited under the RED [HS-RED no. 5]; EN 55032 cited only under the EMC Directive [HS-EMC] |
 | Safety | EN IEC 62368-1:2020 + A11, or the 2024 edition | not cited under the RED [HS-RED]; under the LVD only the 2014 edition is cited [HS-LVD]. Ask the lab which edition it reports to. |
 | RF exposure | EN IEC 62311 with EN 50665; EN 50364 for the NFC reader | not cited under the RED [HS-RED] |
@@ -109,12 +109,17 @@ The reader uses the ESP32-C6-MINI-1U, the module with an antenna connector
 [DS §1.2]. It has an EU-type examination certificate (Sporton, notified body
 2907, SN24C0053 of 6 March 2024) [CE-1U p. 1]; the MINI-1 with PCB antenna,
 which the board had before, has its own (SN23C0148 of 28 September 2023)
-[CE-1 p. 1]. They cover safety, EMC and radio, not cybersecurity [CE-1U
-pp. 1, 3]. Espressif publishes the certificates only: ask for the test
-reports before asking labs for quotes [CERTS; FAQ].
+[CE-1 p. 1]. They cover safety, EMC, radio and RF exposure (EN IEC 62311
+and EN 50665, at 20 cm), not cybersecurity [CE-1U pp. 1, 3]. Their EMC part
+was assessed against a draft, EN 301 489-17 V3.2.6 [CE-1U p. 3], so it gives
+the reader no EMC credit; Espressif says the same: "Some data can be reused,
+but EMC testing is still required for the final product" [FAQ]. Espressif
+publishes the certificates only: ask for the test reports before asking labs
+for quotes [CERTS; FAQ].
 
-The certificates do not transfer to the reader [CE-1U p. 2, note 2;
-EG 203 367 §6.1]. ETSI EG 203 367 is a guide for the manufacturer, not a
+The module's assessment "can be used as part of the conformity assessment"
+of the reader; it does not replace it [EG 203 367 §6.1; CE-1U p. 2, note 2].
+ETSI EG 203 367 is a guide for the manufacturer, not a
 harmonised standard. It lets the module's radio assessment be reused if the
 module sits in equivalent assessment conditions and follows its installation
 instructions. A different host, or an antenna that was not part of the
@@ -137,8 +142,10 @@ practice).
 Points to watch:
 
 - One German notified body (VDE, 0366) reads the rules more strictly and
-  wants an EU-type examination whenever only module reports exist
-  [VDE RED modules p. 2]. Ask each lab how it sees this before it quotes.
+  wants an EU-type examination whenever only module reports exist (its
+  customer information "RED Information Radio Modules" of 24 November 2020)
+  [VDE RED modules p. 2]. Ask each lab how it sees this before it quotes, and
+  reconfirm with VDE that the 2020 statement still holds (open point below).
 - The MINI-1U is certified with at most 18.19 dBm EIRP for Wi-Fi and
   17.96 dBm for Bluetooth LE [CE-1U p. 2], against a limit of 20 dBm e.i.r.p.
   [EN 300 328 §4.3.2.2.3]. Keep the transmit power a firmware setting.
@@ -157,10 +164,50 @@ Points to watch:
     must name the permitted antenna or antennas, and the declaration covers
     only those [EN 300 328 §3.1, "dedicated antenna"; RED Art. 10(8),
     Annex VI point 8].
-- Neither antenna is chosen, and the case has no place for one yet
-  ([design-notes.md](design-notes.md#wi-fi-antenna)). Where the antenna sits
-  in the case decides the radiated results, not the board: keep it away from
-  the display's metal back and from the cables (engineering judgement).
+- The antennas (decided 25 November 2026): the one the module was certified
+  with, Shanghai Deman TFPD08H10060011, a sleeve monopole of 2.33 dBi at
+  2450 MHz with an MHF III plug [FCC exhibits, antenna specification; DS
+  §10.2], bought through Espressif or Deman; as fallback the Taoglas
+  GW.26.0111 (2.24 dBi peak, a screw-on monopole measured on a 150 x 90 mm
+  ground plane) on the CAB.A02 SMA bulkhead cable. Both are in the parts
+  lists ([parts.md](parts.md)).
+- What the fallback costs, in the US. "Any antenna that is of the same type
+  and of equal or less directional gain as an antenna that is authorized with
+  the intentional radiator may be marketed with, and used with, that
+  intentional radiator. No retesting of this system configuration is required.
+  The marketing or use of a system configuration that employs an antenna of a
+  different type, or that operates at a higher gain, than the antenna
+  authorized with the intentional radiator is not permitted unless the
+  procedures specified in § 2.1043 of this chapter are followed" [eCFR 15.204
+  (c)(4)]; "antenna type" means "antennas that have similar in-band and
+  out-of-band radiation patterns" [eCFR 15.204 (c)(1)]. The GW.26.0111 is
+  another type, so it needs a permissive change, which only the grantee
+  (Espressif) can file [eCFR 2.1043 (b)(4)], or the reader's own FCC ID.
+  Espressif's integration manual says the same: "The module shall be only used
+  with the external antenna(s) that has been originally tested and certified
+  with this module" [FCC-UM p. 15]. And a module's antenna "must either be
+  permanently attached or employ a 'unique' antenna coupler" [eCFR 15.212
+  (a)(1)(iv)]: "the use of a standard antenna jack or electrical connector is
+  prohibited" [eCFR 15.203]. The SMA bulkhead is therefore not for a US
+  version.
+- What the fallback costs, in the EU. There is no same-type-and-gain rule.
+  "Use of an antenna not included in the original assessment" is a deviation,
+  and the reader is then re-assessed against Art. 3.2 with the radio standard
+  [EG 203 367 §6.1 note 1]; "an assessment needs not necessarily lead to
+  testing" [EG 203 367 §6.1 note 2]. The 20 dBm e.i.r.p. limit "shall apply for
+  any combination of power level and intended antenna assembly" [EN 300 328
+  §4.3.2.2.3], and each antenna is declared with its gain [EN 300 328 §5.4.1
+  m)]. To reuse the module's reports Espressif asks that "the selected
+  antenna's gain must not exceed the gain of the certified antenna in that
+  report" [FAQ]; the GW.26.0111 meets that, its type differs. Ask the lab what
+  it reuses before choosing the fallback.
+- Where the antenna sits: the case has a bay at its top, above the board's
+  copper-free top edge, 40 x 10 x 4 mm, with the cable's way from the
+  module's connector drawn ([design-notes.md](design-notes.md#wi-fi-antenna)).
+  The certified antenna's specification gives 100 x 5.2 mm and no drawing, so
+  whether it fits the bay is open until a sample is at hand (design notes,
+  "Accepted deviations"). Keep any antenna away from the display's metal back
+  and from the cables (engineering judgement).
 
 ## Cybersecurity
 
@@ -285,8 +332,11 @@ report [CRA Art. 14(2)(a)]. The reporting duty applies already
 - PoE isolation is asked for by the Ethernet standard, not by the safety
   standard. IEEE 802.3 asks a powered device to isolate all its PoE leads
   from all external conductors [IEEEI]. The test is one of 1500 V RMS for
-  60 s, 2250 V DC for 60 s, or ten 1500 V impulses of 10/700 µs [IEEEI;
-  IEEEW (secondary)]. EN 62368-1 asks for separation of an Ethernet port
+  60 s, 2250 V DC for 60 s, or ten 1500 V impulses of 10/700 µs, followed by
+  an insulation resistance of at least 2 Mohm measured at 500 V DC [IEEEW
+  (secondary)]. The interpretation 3-07/04 quotes the text of 802.3af-2003
+  and confirms only the RMS test [IEEEI]; the current text, IEEE 802.3-2022,
+  was not read. EN 62368-1 asks for separation of an Ethernet port
   only from earthed circuitry (clause 5.4.11) [ULQA; FLIR p. 15]; the reader
   has none, so the safety standard asks no isolation here. A lab testing for
   CE may not test it; customers expect it (our assessment). What the board
@@ -417,7 +467,7 @@ From EN 301 489-1 V2.2.3, which was read:
 | Electrostatic discharge | 4 kV contact, 8 kV air, to all exposed surfaces [EN 301 489-1 §9.3.2] | display glass and its edges, LED windows, buzzer opening, screws, housing seams |
 | Radiated immunity | 3 V/m, 80 MHz to 6 GHz [EN 301 489-1 §9.2.2] | always |
 | Fast transients, RF common mode | 0.5 kV; 3 V [EN 301 489-1 §9.4.2, §9.5.2] | Ethernet port and DC input, each if its cable may be longer than 3 m [EN 301 489-1 §9.4.1, §9.5.1] |
-| Surge | 0.5 kV line to ground [EN 301 489-1 §9.8.2.2] | Ethernet port with indoor cables over 30 m. With outdoor cables 1 kV with a 10/700 µs pulse [EN 301 489-1 §9.8.2.1]: exclude outdoor cabling in the manual. |
+| Surge | 0.5 kV line to ground [EN 301 489-1 §9.8.2.2] | Ethernet port with indoor cables over 30 m. With outdoor cables 1 kV with a 10/700 µs pulse [EN 301 489-1 §9.8.2.1]: exclude outdoor cabling in the manual. Where the coupling network would disturb a high-speed port, the 1.2/50 µs wave may be used instead of 10/700 µs [EN 301 489-17 table 6]. |
 | Conducted emission, 150 kHz to 30 MHz | Ethernet: class B of EN 55032, table A.12 [EN 301 489-1 §8.7.3]. DC input: table 5 of EN 301 489-1, 79/66 dBµV (quasi-peak/average) up to 0.5 MHz and 73/60 dBµV above [EN 301 489-1 §8.3.3] | Ethernet port; the DC input if its cable may be longer than 3 m. With a DC cable of 3 m or less to a dedicated AC/DC supply, the supply's AC port instead, at class B [EN 301 489-1 §8.3.1, §8.4.3.2]. In transmit mode the NFC exclusion band applies [EN 301 489-1 §8.3.2]. |
 
 EN 301 489-1 tests a port whose cable may be longer than 3 m
@@ -432,8 +482,11 @@ longer than 30 m indoors [EN 301 489-1 §9.8.2.2]. The PoE supply arrives on
 that port, which counts as a wired network port [EN 301 489-1 §3.1]. Access
 control has an EMC product-family standard for immunity of its own,
 EN 50130-4, which covers access control systems for security applications
-[EVS 50130-4; iTeh 50130-4 preview §1]. EVS lists no directive for it
-[EVS 50130-4]. It asks for line-to-earth surges
+[EVS 50130-4; iTeh 50130-4 preview §1]. It is cited under the EMC
+Directive 2014/30/EU, in its base edition EN 50130-4:2011 (not with A1)
+[OJ C 173 2016; EMC summary list 2022], and not under the RED [HS-RED]: for
+this radio product it gives no presumption of conformity. Applying it is
+voluntary, asked for by customers in access control. It asks for line-to-earth surges
 through 42 ohm on extra-low-voltage DC lines as well (unverified: the free
 preview shows only that clause 13, "Slow high energy voltage surge", exists
 [iTeh 50130-4 preview]; confirm with the lab). The DC input is protected and
@@ -462,6 +515,7 @@ Board facts from the schematic and layout; the reasons are in
 | Switching regulators | AP63205 at the DC input, with spread spectrum. Two TLV62569 for 3.3 V and the core, at 1.5 MHz without spread spectrum. Small loops, input and output capacitors next to the ICs. |
 | DC input | Self-resetting fuse, a bidirectional TVS behind it at the connector, reverse-polarity diode, pi filter (2.2 uF, 2.2 uH, 2 x 2.2 uF; 100 V capacitors that keep 1.5 uF each at 24 V), a 47 uF electrolytic that damps the filter when a supply is plugged in live, and a TVS before the converter. The converter sits away from the NFC antenna, and the DC run does not go around the NFC loop. |
 | Display bus | 33 ohm series resistors on all RGB and sync lines; reduce GPIO drive strength in firmware if needed. |
+| Display edges and flex (ESD) | ESD arrays (U603, U604) on the four touch lines at the panel connector; the display's metal back tied to ground through conductive gaskets on four bare pads, and tape over the flex (installation manual). Per-port table: [design-notes.md](design-notes.md#esd-per-port). |
 | Clocks | Series resistors on the 50 MHz RMII clock, the SDIO clock and the flash clock. |
 | USB | TVS and ESD array at the connector, fuse, ferrite bead in the supply. |
 | Ethernet / PoE | Isolated PD module, 48 V side in its own area with 2 mm clearance and no copper under the module's isolation barrier, ferrite beads and TVS at the PoE input, capacitor across the barrier, RC from jack shield to ground. The Ethernet pairs pass under the jack's shell on the back layer, the 48 V nets on the inner layer. |
@@ -483,10 +537,11 @@ antennas, not emissions and not discharges.
    source or NXP's) and keep to it.
 2. **Discharges on the user's side.** The usual failures: the display or the
    touch controller loses its settings, the PN532 hangs, the MCU resets. The
-   test is failed if the reader does not recover by itself, or if it loses
-   settings that the test plan names as critical stored data
-   [EN 301 489-1 §6.2, annex C.1; EN 301 489-3 §6.1;
-   EN 301 489-17 §6.4, table 2]. In the housing: close the LED windows with
+   test is failed if the reader does not recover by itself
+   [EN 301 489-17 §6.4, table 2; part 1's clause 6 "shall not apply",
+   EN 301 489-17 §6.1], and, with the notice on clause 6 above, by the
+   objective pass criteria of the test plan, among them no loss of settings
+   it names as critical. In the housing: close the LED windows with
    a diffuser that overlaps the housing, cover or ground metal screws (the
    board's mounting holes are not connected to ground), and tie the
    display's metal back to ground: the board has four bare ground pads on
@@ -535,6 +590,19 @@ whether the reader still works.
   conformity, for ten years after the reader is placed on the market
   [RED Art. 10(4)]; under the Cyber Resilience Act for ten years or the
   support period, whichever is longer [CRA Art. 13(13)].
+
+## Open points for revision B
+
+- The ESP32-C5 for 5 GHz Wi-Fi (design-notes.md, "Decisions"): EN 301 893
+  V2.2.1 joins the test plan; it is cited under the RED [HS-RED no. 65a].
+  The C5 module's own certificates: the ESP32-C5-MINI-1U has none published
+  yet (check Espressif's documentation centre); the ESP32-C5-WROOM-1U has
+  EU-type examination certificate SN25C0297 (Sporton, notified body 2907, 9
+  December 2025), which includes EN 301 893 V2.1.1. A fixed EU country code
+  in the firmware and the indoor-use restriction for 5250 to 5350 MHz on the
+  packaging and in the manual.
+- Reconfirm with VDE (notified body 0366) whether its 2020 statement on
+  readers with pre-certified modules still holds.
 
 ## Test lab
 
