@@ -42,6 +42,11 @@ ANY_PAD = {'Resistor_SMD:R_Array_Convex_4x0402'}
 GROUND_PADS = {
     ('attractap:WIFIM-SMD_61P-L16.6-W13.2-P0.80-ESP32-C6-MINI-1-N4', 'C20627095'):
         ({str(n): '49' for n in range(54, 62)}, 0.35),
+    # The bidirectional TVS D107: the library's land for this part number has its pads 0.44 mm further
+    # from the centre than KiCad's D_SMB, the IPC pattern for DO-214AA that D106 uses too (and that matches
+    # the library for the unidirectional SMBJ28A). DO-214AA terminals lie 2.0 to 2.8 mm from the centre;
+    # both lands cover them. Same pad numbers.
+    ('Diode_SMD:D_SMB', 'C151259'): ({}, 0.5),
 }
 
 

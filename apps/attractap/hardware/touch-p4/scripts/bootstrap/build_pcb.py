@@ -37,7 +37,7 @@ from routes_board import (
     ep_vias,
     led_link,
     led_power,
-    mdi_routes,
+    mdi_routes, shield_route, buck_routes, usb_power_routes,
     module_ground,
     nfc_feeds,
     phy_fanout,
@@ -90,6 +90,7 @@ def build():
     ep_vias(board)
     poe_routes(B)
     mdi_routes(B)
+    shield_route(B)
     nfc_feeds(B)
     led_link(B)
     dc_route(B)
@@ -106,6 +107,8 @@ def build():
     lcd_fanout(B)
     mcu_top(B)
     mcu_left(B)
+    buck_routes(B)
+    usb_power_routes(B)
     plane_fanout(B)                 # last: its vias go where the fixed routes leave room
     pcbnew.SaveBoard(PCB, board)
     write_stackup(PCB)
@@ -117,11 +120,17 @@ def build():
 # placement. Its tracks for the nets below are not taken over: they have fixed routes now, or
 # finish_route.py routes them. Of its other tracks, those that come too close to a pad of one of the
 # parts below are removed and routed again. Empty both when a new autorouter result is committed.
-STALE_NETS = {'BUZ_P', 'BUZ_N', 'ETH_CT_RX', 'ETH_CT_TX', '+5V_POE'}
+STALE_NETS = {'BUZ_P', 'BUZ_N', 'ETH_CT_RX', 'ETH_CT_TX', 'ETH_SHIELD', '+5V_POE', '+5V_USB', '+5V_DC', 'BUCK_SW', 'BUCK_EN',
+              'DC_EN', 'BUCK_BST'}
 STALE_PARTS = {'R104', 'R105', 'R705', 'L103', 'C117', 'D106', 'D103', 'FB102', 'FB103', 'C408', 'C409',
                'U702', 'U703', 'C711', 'C712', 'C713', 'R706', 'TP814',
                'U704', 'C714', 'C715', 'R707', 'TP815',
-               'D701', 'D702', 'D703', 'D704', 'D705', 'D706', 'D707', 'D708'}
+               'D701', 'D702', 'D703', 'D704', 'D705', 'D706', 'D707', 'D708',
+               # review stage 3: the power path, the 3.3 V converter, supervisor, test points, fiducials
+               'U105', 'R107', 'R108', 'R109', 'R110', 'C118', 'U106', 'Q101', 'C119', 'U107', 'Q102', 'C121',
+               'R113', 'C120', 'U103', 'R111', 'R112', 'C108', 'L101', 'U204', 'C241', 'FID804', 'FID805',
+               'D107', 'C109', 'C301'}
+STALE_PARTS |= {'TP%d' % n for n in range(816, 831)}
 
 
 def routes_of_session(path):
@@ -156,11 +165,16 @@ def drop_stale(board):
                for pnet, x1, y1, x2, y2, _through, radius in pads if not radius):
             pads.append((t.GetNetname(), x, y, x, y, True, pcbnew.ToMM(t.GetWidth(F)) / 2))
     gone = []
+    kx1, ky1, kx2, ky2 = G.POE_BARRIER_DIP          # keep-out added after the autorouter ran
     for t in board.GetTracks():
         if t.IsLocked():
             continue
         net = t.GetNetname()
         if short(net) in STALE_NETS:
+            gone.append(t)
+            continue
+        ends = [unV(t.GetPosition())] if t.GetClass() == 'PCB_VIA' else [unV(t.GetStart()), unV(t.GetEnd())]
+        if any(kx1 - 0.5 <= x <= kx2 + 0.5 and ky1 - 0.5 <= y <= ky2 + 0.5 for x, y in ends):
             gone.append(t)
             continue
         via = t.GetClass() == 'PCB_VIA'
@@ -292,6 +306,40 @@ def drop_collisions(board):
     return len(gone)
 
 
+def drop_in_keepouts(board):
+    """Remove the autorouter's tracks and vias that touch a rule area for no tracks or no vias on their layer
+    (keep-outs added after it ran, such as those around the fiducials)."""
+    areas = [z for z in board.Zones() if z.GetIsRuleArea() and (z.GetDoNotAllowTracks() or z.GetDoNotAllowVias())]
+    gone = []
+    for t in board.GetTracks():
+        if t.IsLocked():
+            continue
+        via = t.GetClass() == 'PCB_VIA'
+        for z in areas:
+            if via and not z.GetDoNotAllowVias() or not via and not z.GetDoNotAllowTracks():
+                continue
+            if not via and not z.IsOnLayer(t.GetLayer()):
+                continue
+            if via and not any(z.IsOnLayer(l) for l in (F, B_)):
+                continue
+            o = z.Outline()
+            if via:
+                pts = [t.GetPosition()]
+                r = t.GetWidth(F) // 2
+            else:
+                a, b = t.GetStart(), t.GetEnd()
+                n = max(1, int(pcbnew.ToMM(int(math.hypot(b.x - a.x, b.y - a.y))) / 0.05))
+                pts = [pcbnew.VECTOR2I(a.x + (b.x - a.x) * k // n, a.y + (b.y - a.y) * k // n) for k in range(n + 1)]
+                r = t.GetWidth() // 2
+            if any(o.Contains(q) or o.SquaredDistance(q) <= r * r for q in pts):
+                gone.append(t)
+                break
+    for t in gone:
+        board.Remove(t)
+    _KEEP.extend(gone)
+    return len(gone)
+
+
 def drop_vias_in_pads(board):
     """Remove the autorouter's vias that sit in a pad of a two-pad part. In the oven the solder runs into
     such a hole and the part gets too little of it. The pad keeps its other connection, or
@@ -385,8 +433,15 @@ if __name__ == '__main__':
         for t in thin:                            # the autorouter's neck-downs go below the board minimum
             t.SetWidth(mm(0.11))
         print('widened %d tracks to 0.11 mm' % len(thin))
+        # tracks of nets the circuit no longer has come in without a net
+        orphans = [t for t in b.GetTracks() if not t.IsLocked() and t.GetNetCode() == 0]
+        for t in orphans:
+            b.Remove(t)
+        _KEEP.extend(orphans)
+        print('removed %d tracks and vias of nets that no longer exist' % len(orphans))
         print('removed %d tracks and vias that later changes made obsolete' % drop_stale(b))
         print('removed %d tracks and vias in the way of a moved pad or fixed route' % drop_collisions(b))
+        print('removed %d tracks and vias in keep-out areas added since' % drop_in_keepouts(b))
         print('removed %d vias in pads of two-pad parts' % drop_vias_in_pads(b))
         print('removed %d tracks and vias too close to the board edge' % drop_edge_violations(b))
         pcbnew.SaveBoard(PCB, b)

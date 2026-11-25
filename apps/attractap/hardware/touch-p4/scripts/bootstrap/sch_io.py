@@ -284,7 +284,7 @@ def mech(cv, P_, top):
     for k in range(4):
         cv.put(P_['H80%d' % (k + 1)], 40.64 + 25.4 * k, top + 25.4, fields='b')
     cv.begin('Fiducials')
-    for k in range(3):
+    for k in range(5):
         cv.put(P_['FID80%d' % (k + 1)], 162.56 + 25.4 * k, top + 25.4, fields='b')
     cv.begin('Test points: supply rails, I2C buses, RMII clock')
     tps = sorted((r for r in P_ if r.startswith('TP') and P_[r].sheet == 'mech'), key=lambda r: int(r[2:]))

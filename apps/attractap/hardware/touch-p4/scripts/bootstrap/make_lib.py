@@ -10,6 +10,7 @@ import shutil
 import sys
 
 from sexpr import Sym, dumps, find, first, loads
+from footprint_silk import buzzer_plus_mark, trim_silk
 import design as design_mod
 from lib_symbols import write_derived
 
@@ -321,6 +322,10 @@ def custom_pad_strokes(tree):
 # further out. At the 0.35 mm pitch 0.15 mm stays between two pads; a solder mask margin of 0.025 mm
 # leaves a mask web of 0.10 mm, JLCPCB's smallest.
 P4_PAD = (0.65, 0.20, 4.875, 0.025)
+# The first and last pad of each row would come 0.113 mm from the corner pad of the next row, diagonally
+# across the corner; the board's smallest clearance is 0.127 mm. Those eight pads end 0.02 mm earlier on
+# the inside (0.141 mm across the corner); the heel of the lead keeps 0.13 mm of pad beyond it.
+P4_CORNER_PADS, P4_CORNER_TRIM = {1, 26, 27, 52, 53, 78, 79, 104}, 0.02
 
 
 def p4_signal_pads(tree):
@@ -331,11 +336,17 @@ def p4_signal_pads(tree):
             continue
         at, size = first(pad, 'at'), first(pad, 'size')
         x, y = float(at[1]), float(at[2])
-        if abs(abs(x) - 5.0) < 0.01:
-            at[1] = math.copysign(centre, x)
-        elif abs(abs(y) - 5.0) < 0.01:
-            at[2] = math.copysign(centre, y)
-        size[1], size[2] = length, width
+        trim = P4_CORNER_TRIM if int(pad[1]) in P4_CORNER_PADS else 0.0
+        # the converted pads stand 5.0 mm off the centre; a second run finds them where this one put them
+        row_x = min(abs(abs(x) - 5.0), abs(abs(x) - centre - trim / 2)) < 0.01
+        row_y = min(abs(abs(y) - 5.0), abs(abs(y) - centre - trim / 2)) < 0.01
+        if row_x:
+            at[1] = round(math.copysign(centre + trim / 2, x), 4)
+        elif row_y:
+            at[2] = round(math.copysign(centre + trim / 2, y), 4)
+        # the converter wrote some pads turned by 90 degrees and others with width and length swapped
+        tall = float(size[2]) > float(size[1])
+        size[1], size[2] = (width, length - trim) if tall else (length - trim, width)
         if not first(pad, 'solder_mask_margin'):
             pad.append([Sym('solder_mask_margin'), mask])
 
@@ -372,6 +383,9 @@ def fix_footprint(name, text, fresh=True):
         custom_pad_strokes(tree)
     if name.startswith('QFN-104'):
         p4_signal_pads(tree)
+    if name.startswith('BUZ-SMD_4P-L8.5'):
+        buzzer_plus_mark(tree)
+    trim_silk(tree, name)
     attach_model(tree, name)
     if name.startswith('QFN-104'):
         paste_windows(tree, P4_PASTE_WINDOW, P4_PASTE_PITCH)

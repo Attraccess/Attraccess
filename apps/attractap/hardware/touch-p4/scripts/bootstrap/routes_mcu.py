@@ -26,15 +26,23 @@ def mcu_power_vias(B):
         if not (net.startswith(('+3V3', 'VDD', 'VDDO'))):
             continue
         dx, dy = x - cx, y - cy
-        if abs(dx) > abs(dy):
-            vx, vy = cx + math.copysign(4.15, dx), y
-            if abs(dy) > 4.2:                         # corner pin: stay clear of the neighbouring pad row
-                vy -= math.copysign(0.12, dy)
+        if max(abs(dx), abs(dy)) > 4.2 and min(abs(dx), abs(dy)) > 4.2:
+            # corner pin (4.37 mm along its row): the last pad of the next row lies across the corner. The
+            # track leaves the pad straight, in the middle of the 0.45 mm gap between its neighbour and
+            # that pad, and turns to a via on the diagonal, clear of both pad rows.
+            sx, sy = math.copysign(1, dx), math.copysign(1, dy)
+            if abs(dx) > abs(dy):
+                bend = (cx + sx * 4.45, y - sy * 0.025)
+            else:
+                bend = (x - sx * 0.025, cy + sy * 4.45)
+            vx, vy = cx + sx * 4.15, cy + sy * 4.15
+            B.track([(x, y), bend, (vx, vy)], net, 0.15)
         else:
-            vx, vy = x, cy + math.copysign(4.15, dy)
-            if abs(dx) > 4.2:
-                vx -= math.copysign(0.12, dx)
-        B.track([(x, y), (vx, vy)], net, 0.15)
+            if abs(dx) > abs(dy):
+                vx, vy = cx + math.copysign(4.15, dx), y
+            else:
+                vx, vy = x, cy + math.copysign(4.15, dy)
+            B.track([(x, y), (vx, vy)], net, 0.15)
         B.via(vx, vy, net)
     # Ground vias in the exposed pad, in the lanes between its nine solder paste windows (2.1 mm at a
     # pitch of 2.5 mm, see make_lib.py). A via under a paste window draws the solder into its hole.
@@ -100,7 +108,8 @@ def mcu_escape(B):
     B.track(dog(p('U201', 79), r206), net(79), w)
     B.track(dog(r206, p('U202', '1'), 'd'), net(79), w)
     # capacitors in the gaps of the unused pins 90 and 97/98
-    for num, cap, wd in ((91, 'C222', 0.25), (96, 'C206', 0.2)):
+    # (0.2 mm: as wide as the pad, which keeps 0.15 mm to the neighbouring pads 0.35 mm away)
+    for num, cap, wd in ((91, 'C222', 0.2), (96, 'C206', 0.2)):
         B.track(dog(p(cap, '1'), p('U201', num), 'd'), net(num), wd)
     # crystal
     c239, y3, y1, r209b = p('C239', '1'), p('Y201', '3'), p('Y201', '1'), p('R209', '2')
@@ -136,10 +145,6 @@ def mcu_escape(B):
     B.via(*vb2, net(55))
     B.track(dog(vb2, r604), net(55), w)
     B.track(dog(vb2, u601, 'd'), net(55), w)
-    # 3.3 V pins of larger parts: a via straight into the plane
-    x, y = p('U103', '1')
-    B.track([(x, y), (x, y - 1.2)], '+3V3', 0.25)
-    B.via(x, y - 1.2, '+3V3', size=0.6, drill=0.3)
     # supply pins of the panel connector (0.5 mm pitch): small vias in two rows, 3.3 V near, ground far
     for num, net, dy in (('2', '+3V3', -1.45), ('36', '+3V3', -1.45), ('1', 'GND', -2.25), ('7', 'GND', -2.25),
                          ('13', 'GND', -2.25), ('25', 'GND', -2.25), ('37', 'GND', -2.25)):

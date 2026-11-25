@@ -100,6 +100,8 @@ def place(B):
     m('C213', -10.1, 6.0, 180)
     # reset pull-up and capacitor: left of the passage that TP_RST, TP_INT and the touch I2C lines need
     # between here and the first resistor array
+    m('U204', -10.6, 11.2, 0)      # supervisor below the reset RC
+    m('C241', -13.4, 11.2, 90)
     m('R211', -9.0, 7.5, 0)
     m('C240', -9.0, 8.6, 180)
     # 3.3 V capacitors whose pins have a via straight into the plane: VDD_IO_5, VDD_ANA, VDD_LP, bulk
@@ -115,7 +117,7 @@ def place(B):
     # ====================================================== display interface
     f = rel(FPC)
     f('J601', 0, 0, 180)
-    for ref, x in (('RN601', 38.35), ('RN602', 40.85), ('RN603', 43.35), ('RN604', 45.85), ('RN605', 48.35)):
+    for ref, x in (('RN601', 38.15), ('RN602', 40.75), ('RN603', 43.35), ('RN604', 45.95), ('RN605', 48.55)):
         put(ref, x, FPC[1] - 6.0, 270)
     f('C601', 9.9, -3.8, 90)       # panel VCI
     f('C602', 11.0, -3.8, 90)
@@ -148,15 +150,19 @@ def place(B):
         put(ref, 30.6 + i * 1.1, 19.4, 90)
 
     # ================================================ supply: 3.3 V buck (top centre)
-    put('C105', 44.6, 24.6, 90)
-    put('C106', 46.8, 24.6, 90)
-    put('C107', 44.4, 27.4, 0)
-    put('R106', 46.6, 27.4, 0)
-    put('U103', 49.6, 24.6, 180)
-    put('C108', 49.6, 27.4, 0)
-    put('L101', 54.2, 24.6, 0)
+    # TI's layout (SLVSDG1C, 10.2): input capacitor at VIN and GND, the inductor right at SW, the feedback
+    # divider at FB and away from SW. Turned 0 degrees the converter has VIN (4) and FB (5) on the left,
+    # SW (3), GND (2) and EN (1) on the right, top to bottom.
+    put('C105', 43.2, 24.6, 90)    # 22 uF on the 5 V rail
+    put('C106', 46.2, 23.65, 180)  # input capacitor, its 5 V pad against VIN
+    put('C107', 48.5, 22.15, 90)    # 100 nF straight above VIN
+    put('U103', 49.8, 24.6, 0)
+    put('R106', 52.4, 27.35, 180)  # EN pull-up below the inductor
+    put('R112', 48.5, 27.1, 270)   # feedback divider below FB, on the side away from SW
+    put('R111', 47.0, 26.59, 0)
+    put('C108', 47.0, 27.6, 0)     # feed-forward capacitor across R111
+    put('L101', 54.6, 24.6, 0)
     put('C109', 58.2, 24.4, 90)
-    put('C110', 60.4, 24.4, 90)
     put('C111', 58.6, 27.4, 0)
 
     # ====================== supply: DC input converter (left column, away from the NFC loop)
@@ -164,13 +170,16 @@ def place(B):
     c('U104', 0, 0, 180)
     c('C112', -5.9, 0, 270)        # input capacitors, VDC on top
     c('C113', -3.3, 0, 270)
-    c('R103', -3.0, 3.2, 0)        # EN pull-up
+    c('R103', -3.0, 3.2, 0)        # EN divider, upper resistor
+    c('R113', 3.6, 3.2, 0)         # EN divider, lower resistor (below the inductor)
     c('C114', 0, 2.8, 0)           # bootstrap
     c('L102', 4.6, 0, 0)
     c('C115', 8.6, -0.2, 90)
     c('C116', 10.8, -0.2, 90)
     c('R105', 10.8, 2.55, 270)     # bleed resistor, +5V_DC on top, straight below C116
-    c('D107', 15.4, 0, 180)        # OR diode, +5V on the right
+    c('Q102', 15.4, 0, 90)         # ideal diode: MOSFET where the OR diode was, its controller below
+    c('U107', 15.4, 4.0, 0)
+    c('C121', 12.8, 4.0, 90)
 
     # ========= USB-C: service port only, at the right board edge next to the MCU's USB pins
     u = rel((82.3, 18.0))
@@ -183,7 +192,12 @@ def place(B):
     u('FB101', -14.2, -2.8, 180)
     u('C101', -18.2, -2.6, 90)
     u('R104', -18.2, 0.1, 270)     # bleed resistor, +5V_USB on top, straight below C101
-    u('D102', -21.4, -1.6, 90)     # USB OR diode
+    u('U105', -21.7, -1.6, 180)    # USB eFuse where the OR diode was: IN on the right, OUT on the left
+    u('R107', -20.1, -6.0, 90)     # UVLO/OVLO divider above it
+    u('R108', -21.4, -6.0, 90)
+    u('R109', -22.7, -6.0, 90)
+    u('C118', -24.3, -3.0, 90)     # slew rate and current limit on its left
+    u('R110', -24.3, -0.8, 90)
 
     # ===== DC input: both connectors at the top of the tongue's left margin. The jack opens downwards
     # into the second cut-away (see geometry.POCKET_X / POCKET_Y), so its plug stays inside the outline.
@@ -196,7 +210,9 @@ def place(B):
     put('D105', 5.5, 83.0, 0)
     put('L103', 3.3, 79.8, 90)     # VDC_R below (at the diode's cathode), VDC on top
     put('C117', 7.0, 79.8, 0)      # VDC_R on the left
+    put('D107', 11.1, 85.6, 270)   # bidirectional TVS right of the fuse: VDC_F at the top, ground below
     put('D106', 5.5, 76.0, 0)      # SMB package: its outline ends right below the converter's enable pull-up
+    put('C120', 20.0, 81.5, 0)     # 47 uF electrolytic in the free space right of the input column
 
     # ===================================================== Ethernet and PoE (right)
     put('J401', G.JACK_X, G.JACK_Y, 90)  # opens downwards into the cut-away
@@ -209,7 +225,9 @@ def place(B):
     put('C102', 81.2, 32.4, 180)   # 1 nF Y2 across the barrier, 48 V pad on the right
     put('C103', 72.6, 30.7, 0)     # 100u PoE output (+ pad above the module output pins)
     put('C104', 72.6, 25.4, 0)
-    put('D104', 64.4, 31.4, 0)     # PoE OR diode, +5V on the left
+    put('Q101', 64.4, 31.4, 90)    # PoE ideal diode where the OR diode was, its controller below
+    put('U106', 64.4, 35.2, 0)
+    put('C119', 61.8, 35.2, 90)
     e = rel(PHY)
     e('U401', 0, 0, 180)           # MDI pins face right (jack), crystal pins up
     # above the PHY: crystal, RMII strap, TXER pull-down
@@ -335,6 +353,11 @@ def place(B):
         'TP813': (7.6, 12.8),               # 4.6 mm apart: the labels C6_BOOT and C6_RX need that much
         'TP814': (5.75, 38.6),              # accelerometer INT1, straight above its pin 12
         'TP815': (G.PROX[0] - 1.7, G.PROX[1] - 3.8),   # proximity sensor INT, up and left of its pin 6
+        # 1 mm pads on every rail, both I2C buses and the RMII clock, each next to its circuit
+        'TP816': (13.0, 75.5), 'TP817': (16.0, 75.5), 'TP818': (66.5, 11.0), 'TP819': (66.5, 26.2),
+        'TP820': (59.0, 46.5), 'TP821': (24.7, 111.0), 'TP822': (22.0, 108.4), 'TP823': (15.9, 118.8),
+        'TP824': (61.0, 78.0), 'TP825': (26.5, 63.0), 'TP826': (26.5, 65.5), 'TP827': (17.0, 131.5),
+        'TP828': (19.5, 131.5), 'TP829': (63.3, 68.5), 'TP830': (66.5, 72.2),
     }
     for ref, (x, y) in tps.items():
         put(ref, x, y, 0)
@@ -343,3 +366,6 @@ def place(B):
     put('FID801', 9.4, 2.4, 0)
     put('FID802', 76.6, 2.4, 0)
     put('FID803', 67.0, 141.0, 0)
+    # local fiducials for the 0.35 mm pitch MCU, at two opposite corners of its package
+    put('FID804', 29.9, 47.4, 0)
+    put('FID805', 51.2, 59.8, 0)

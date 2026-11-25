@@ -79,9 +79,15 @@ def poe_routes(B):
     # with nothing but solder mask in between, and the back layer faces the display's metal back. A via
     # above the shell brings each net up to its bead.
     yv = G.JACK_REAR_CLEAR_Y - 0.4                       # the via's copper ends where the limit is
+    # The inner-layer track starts inside the pin's pad on the side away from the jack's shield pad GND2:
+    # from the pin's centre its 0.6 mm would come 2.6 mm from that pad, from there 3.06 mm.
+    g2 = p('J401', 'GND2')
     for name, pin, bead in (('POE_VP', j9, f2a), ('POE_VN', j10, f3a)):
         xv = bead[0]
-        B.track([pin, (xv, pin[1] - abs(xv - pin[0])), (xv, yv)], name, w, layer=IN2)
+        dx, dy = pin[0] - g2[0], pin[1] - g2[1]
+        k = 0.5 / math.hypot(dx, dy)
+        start = (pin[0] + dx * k, pin[1] + dy * k)
+        B.track([start, (xv, start[1] - abs(xv - start[0])), (xv, yv)], name, w, layer=IN2)
         B.via(xv, yv, name, size=0.8, drill=0.4)
         B.track([(xv, yv), bead], name, w)
     # filtered + : bead -> TVS cathode -> up the left side of the strip -> module pins 5 and 6
@@ -105,12 +111,22 @@ def poe_routes(B):
     B.track([m8, (m8[0], c1[1] + 1.2), c1], 'POE_VNF', w)
     # Module output: the two pins are joined between their pads, not around the pad ends, which would
     # be inside the module's isolation barrier (geometry.POE_UNDER_MODULE). Then on to the output
-    # capacitors and the OR-ing diode.
+    # capacitors and the ideal diode's MOSFET (its source).
     w5 = 0.5
-    o1, o2, c103, c104, d104 = p('U102', '1'), p('U102', '2'), p('C103', '1'), p('C104', '1'), p('D104', '2')
+    o1, o2, c103, c104, q = p('U102', '1'), p('U102', '2'), p('C103', '1'), p('C104', '1'), p('Q101', '2')
     B.track([o2, o1, (o1[0], c103[1] + 5.08), (c103[0], c103[1] + 5.08 - (c103[0] - o1[0])), c103], '+5V_POE', w5)
-    B.track([c103, (c103[0], d104[1]), d104], '+5V_POE', w5)
+    B.track(dog(c103, q), '+5V_POE', w5)
     B.track([c103, (c104[0], c103[1] - (c104[0] - c103[0])), c104], '+5V_POE', w5)
+
+
+def shield_route(B):
+    """The jack's two shield pads joined on the inner layer below its pin rows: 3.25 mm from PoE pin 10 (the
+    isolation rule asks 3 mm) and clear of the jack's two plastic pegs, whose holes lie 1.6 mm further down."""
+    if 'J401' not in B.fp:
+        return
+    g1, g2 = B.pad('J401', 'GND1'), B.pad('J401', 'GND2')
+    y = G.JACK_Y + 0.15
+    B.track([g1, (g1[0] + 0.8, y), (g2[0] - 0.8, y), g2], 'ETH_SHIELD', 0.2, layer=IN2)
 
 
 def mdi_routes(B):
@@ -135,7 +151,9 @@ def mdi_routes(B):
         B.track([vp, (xi, yp)], name + 'P', w, layer=B_)
         B.track([neg, (xi - d_neg, neg[1]), (xi, neg[1] + d_neg), (xi, yc)], name + 'N', w)
         B.via(xi, yc, name + 'N')
-        B.track([(xi, yc), (xo, yc + (xo - xi)), (xo, yn)], name + 'N', w, layer=B_)
+        # MDI_TN passes the jack's PoE pin 9: 0.1 mm further left keeps it 3 mm from it (3.06 mm)
+        s = 0.1 if name == 'MDI_T' else 0.0
+        B.track([(xi, yc), (xo - s, yc + (xo - s - xi)), (xo - s, yn - 1.0), (xo, yn)], name + 'N', w, layer=B_)
     # centre taps: from the capacitors straight down to jack pins 3 and 4
     B.track([p('C408', '1'), p('J401', '3')], 'ETH_CT_RX', 0.15)
     B.track([p('C409', '1'), p('J401', '4')], 'ETH_CT_TX', 0.15)
@@ -237,6 +255,12 @@ def dc_route(B):
     B.track([bot, top, (top[0], jack[1]), jack], 'VDC_IN', w)     # both pins of the + pole, then the jack
     B.track(dog(jack, f1), 'VDC_IN', w)
     B.track(dog(p('F102', '2'), p('D105', '2')), 'VDC_F', w)
+    # input TVS: its VDC_F pad beside the diode's, its ground pad straight down into the plane
+    d107a, d107g = p('D107', '1'), p('D107', '2')
+    B.track([p('D105', '2'), d107a], 'VDC_F', w)
+    for dy in (-0.45, 0.45):
+        B.track([d107g, (d107g[0] + 1.6, d107g[1] + dy)], 'GND', w)
+        B.via(d107g[0] + 1.6, d107g[1] + dy, 'GND', size=0.6, drill=0.3)
     # diode cathode -> filter inductor (straight above it) and the filter capacitor beside the inductor
     d105, l_in, c117 = p('D105', '1'), p('L103', '1'), p('C117', '1')
     B.track([d105, l_in], 'VDC_R', w)
@@ -333,6 +357,69 @@ def buzzer_routes(B):
     B.track([vb, (vb[0], da[1] - (vb[0] - xn)), (xn, da[1])], 'BUZ_N', w)
     B.track([(xn, da[1]), da], 'BUZ_N', w)
     B.track([(xn, da[1]), (xn, q3[1] - (xn - q3[0])), q3], 'BUZ_N', w)
+
+
+def usb_power_routes(B):
+    """The USB path through the eFuse U105 at full width. Its IN and OUT are 0.3 mm bars between the two pin
+    rows, reached from their ends: IN from the top (ferrite and C101 come in above the pin row), OUT from
+    the bottom, then above the 3.3 V converter's inductor to its input capacitor C106. (The router took
+    0.17 mm tracks here, the 5 V one between the inductor's pads.)"""
+    p = B.pad
+    vin, vout = p('U105', '5'), p('U105', '6')
+    fb, c101, c106 = p('FB101', '2'), p('C101', '1'), p('C106', '1')
+    top, bot = vin[1] - 1.2, vout[1] + 1.2                 # the bars' ends (2.4 mm long)
+    # as wide as the bar only until the wide track clears the other bar and the pin rows (0.15 mm)
+    xr, yi = c101[0] - 1.6, top - 0.15 - 0.3
+    B.track(dog(fb, c101), '+5V_USB', 0.6)
+    B.track([c101, (xr, c101[1]), (xr, yi - 0.15), (vin[0], yi - 0.15), (vin[0], yi)], '+5V_USB', 0.6)
+    B.track([(vin[0], yi), (vin[0], top + 0.2)], '+5V_USB', 0.3)
+    yo = c106[1] - 3.85                                    # above the inductor and C107's ground via
+    yw = bot + 0.15 + 0.4
+    B.track([(vout[0], bot - 0.2), (vout[0], yw)], '+5V', 0.3)
+    B.track([(vout[0], yw), (vout[0] - (yo - yw), yo), (c106[0], yo), c106], '+5V', 0.8)
+
+
+def buck_routes(B):
+    """The 3.3 V converter U103: the input loop (VIN - C106/C107 - ground), the switch node to the inductor,
+    the output into the 3.3 V plane and the feedback divider. Ground goes into the plane right below
+    through vias at the capacitors and under the converter, so the loops close through it."""
+    p = B.pad
+    vin, gnd, sw, en, fb = (p('U103', n) for n in '42315')
+    c106, c106g, c107, c107g = p('C106', '1'), p('C106', '2'), p('C107', '1'), p('C107', '2')
+    B.track([c106, vin], '+5V', 0.6)
+    B.track(dog(p('C105', '1'), c106), '+5V', 0.6)
+    B.track([c107, vin], '+5V', 0.4)
+    B.track([c107g, (c107g[0], c107g[1] - 0.75)], 'GND', 0.4)
+    B.via(c107g[0], c107g[1] - 0.75, 'GND')
+    for dy in (-0.35, 0.35):
+        B.track([c106g, (c106g[0] - 1.0, c106g[1] + dy)], 'GND', 0.4)
+        B.via(c106g[0] - 1.0, c106g[1] + dy, 'GND')
+    cx = (vin[0] + gnd[0]) / 2                           # under the converter, between its pad rows
+    B.track([gnd, (cx, gnd[1])], 'GND', 0.4)
+    B.via(cx, gnd[1], 'GND', size=0.6, drill=0.3)
+    l1, l2 = p('L101', '1'), p('L101', '2')
+    B.track([sw, (l1[0], sw[1])], 'BUCK_SW', 0.6)
+    c109, c109g = p('C109', '1'), p('C109', '2')
+    B.track(dog(l2, c109), '+3V3', 0.8)
+    for dx in (-0.6, 0.6):
+        B.via(c109[0] + dx, c109[1] + 0.95, '+3V3')
+        B.track([c109, (c109[0] + dx, c109[1] + 0.95)], '+3V3', 0.4)
+    B.track([c109g, (c109g[0], c109g[1] - 0.8)], 'GND', 0.4)
+    B.via(c109g[0], c109g[1] - 0.8, 'GND')
+    r112a, r112g, r111a, r111b, c108a, c108b = (p(r, n) for r, n in (('R112', '1'), ('R112', '2'), ('R111', '1'),
+                                                                     ('R111', '2'), ('C108', '1'), ('C108', '2')))
+    B.track([fb, r112a], 'BUCK_FB', 0.2)
+    B.track([r112a, r111b], 'BUCK_FB', 0.2)
+    B.track([r111b, c108b], 'BUCK_FB', 0.2)
+    B.track([r112g, (r112g[0], r112g[1] + 0.7)], 'GND', 0.3)
+    B.via(r112g[0], r112g[1] + 0.7, 'GND')
+    # the divider senses the 3.3 V plane right here
+    B.track([r111a, c108a], '+3V3', 0.25)
+    xs = r111a[0] - 0.8
+    B.track([((r111a[0] + c108a[0]) / 2, (r111a[1] + c108a[1]) / 2), (xs, (r111a[1] + c108a[1]) / 2)], '+3V3', 0.25)
+    B.via(xs, (r111a[1] + c108a[1]) / 2, '+3V3')
+    r106e = p('R106', '2')
+    B.track([r106e, (en[0] + 0.45, r106e[1]), en], 'BUCK_EN', 0.2)
 
 
 def plane_fanout(B):

@@ -16,7 +16,7 @@ LCM = (5.6, 12.8, 80.4, 89.4)              # metal-backed LCD module behind the 
 # Bare ground pads on the display side, behind the LCD module: for conductive tape or foam that ties
 # the LCD's metal back to ground (centre x, y; each LCD_GROUND_PAD mm square). They are openings in
 # the solder mask over the ground fill, placed where that fill has no track and no via.
-LCD_GROUND_PADS = ((13.5, 18.5), (66.0, 38.0), (48.0, 17.0), (43.0, 80.0))
+LCD_GROUND_PADS = ((13.5, 18.5), (64.2, 37.2), (48.0, 17.0), (43.0, 80.0))
 LCD_GROUND_PAD = 5.0
 
 # Slot the display flex passes through, directly below the LCD module edge
@@ -71,9 +71,11 @@ C6_KEEPOUT = (0.0, 0.0, 44.0, 6.0)
 C6_NOTCH = (14.9, 29.1, 5.65)
 
 # PoE primary side (48 V, isolated from everything else): no secondary copper in here, on any layer. The
-# second rectangle ends 2.1 mm above the 48 V pad of C102: the pours of the other layers lie above and
-# below that pad, and the clearance rule only looks at copper against copper on one layer.
-POE_PRIMARY = [(77.9, 35.0, 86.0, 78.0), (79.0, 28.8, 86.0, 35.0)]
+# second rectangle ends 3.1 mm above the 48 V pad of C102, the first 3.1 mm left of the filtered 48 V track
+# beside the module, as far as the 3 mm isolation rule keeps copper on one layer: the pours of the other
+# layers lie above and below that copper, and the clearance rule only looks at copper on one layer.
+POE_PRIMARY = [(77.3, 35.0, 86.0, 78.0), (79.0, 27.8, 86.0, 35.0),
+               (77.3, 33.0, 79.0, 35.0)]       # the step between them, 3 mm from the module's pin 8 corner
 # The barrier capacitor C102 is a Y2 safety capacitor in the 2211 case (Murata GA352, 5.7 x 2.8 mm, at
 # least 4.0 mm between its terminations). Its land pattern keeps the 4.5 mm gap of Murata's test board:
 # pads 1.2 x 3.0 mm, centres 2.85 mm either side of the part's origin.
@@ -83,6 +85,9 @@ BARRIER_CAP_PAD_X = 2.85
 # 2.3 mm from the output pin row at the pin 1/2 end, 5.3 mm at the pin 3/4 end (Silvertel Ag9900
 # datasheet, figure 23). No copper from that line to the 48 V pins. Corner points, clockwise.
 POE_UNDER_MODULE = [(71.8, 34.0), (77.9, 34.0), (77.9, 57.0), (74.8, 57.0)]
+# Silvertel's keep-out for the module (Ag9900 datasheet V3.5, figure 23) is a 3 mm band that also dips
+# into the output row between pins 2 and 3. No copper in that whole gap either: a superset of the band.
+POE_BARRIER_DIP = (67.4, 39.3, 71.8, 51.5)
 # Behind the jack: its metal shell reaches up to y = 71.0 (longest body, furthest back). No 48 V
 # copper, no part and no Ethernet pair on the component side beyond this line: the 48 V nets pass
 # under the rear wall of the shell on an inner layer, the Ethernet pairs on the back layer. (The
@@ -90,7 +95,7 @@ POE_UNDER_MODULE = [(71.8, 34.0), (77.9, 34.0), (77.9, 57.0), (74.8, 57.0)]
 # them and the shell would do no harm.)
 JACK_REAR_CLEAR_Y = 70.0
 # Where the autorouter must not go (the hand-routed 48 V tracks live here)
-POE_ROUTER_KEEPOUT = [(77.95, 35.0, 86.0, 71.4), (79.0, 30.6, 86.0, 35.0), (79.6, 71.4, 86.0, 78.6)]
+POE_ROUTER_KEEPOUT = [(77.35, 35.0, 86.0, 71.4), (79.0, 30.6, 86.0, 35.0), (79.6, 71.4, 86.0, 78.6)]
 
 MOUNT_HOLES = ((4.0, 3.5), (82.0, 3.5), (17.9, 139.4), (66.3, 117.0))
 # The last one stands in the gap of the copper around the NFC loop. Under its screw head and the insert

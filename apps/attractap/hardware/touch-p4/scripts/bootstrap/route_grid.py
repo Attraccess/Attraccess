@@ -462,6 +462,7 @@ def connect(board, netinfo, R, groups, g, hit, cells, width):
         best = None
         for kind, it in grp:
             if kind == 'p' and l in it['layers'] and it['x1'] <= x <= it['x2'] and it['y1'] <= y <= it['y2']:
+                PAD_SIDE[0] = min(it['x2'] - it['x1'], it['y2'] - it['y1'])
                 return (it['cx'], it['cy']), None
             if kind == 'v' and math.hypot(x - it['x'], y - it['y']) < 0.08:
                 return (it['x'], it['y']), None
@@ -477,12 +478,18 @@ def connect(board, netinfo, R, groups, g, hit, cells, width):
 
     body = list(cells)
     joins = []                                           # (layer, grid point, landing point, width)
+    PAD_SIDE = [None]
     for grp, last in ((groups[g], False), (groups[hit - 1], True)):
         cell = body[-1] if last else body[0]
+        PAD_SIDE[0] = None
         point, w_there = landing(grp, cell)
         if point is None:
             continue
         w_join = width if w_there is None else min(width, w_there)
+        if PAD_SIDE[0] is not None:
+            # the join runs from the grid point to the pad's centre, off the searched path by up to half a
+            # cell: no wider than the pad, so that it keeps the neighbouring pads' clearance in a dense row
+            w_join = min(w_join, max(PAD_SIDE[0], 0.15))
         inner = (body[-2] if last else body[1]) if len(body) > 1 else None
         if (w_there is not None and w_join < width and R.block[cell[0]][cell[1], cell[2]] and inner is not None and
                 inner[0] == cell[0]):

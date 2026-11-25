@@ -112,6 +112,8 @@ def zones(B):
         B.keepout(rect(x1, y1, x2, y2), all_cu, 'PoE primary side: no secondary copper pour', pours=True)
     B.keepout(G.POE_UNDER_MODULE, all_cu, 'PoE module: primary side and isolation barrier, no copper', pours=True,
               tracks=True, vias=True)
+    B.keepout(rect(*G.POE_BARRIER_DIP), all_cu, 'PoE module: barrier between output pins 2 and 3, no copper',
+              pours=True, tracks=True, vias=True)
     # the 3.3 V pour under the MCU feeds its supply pins through vias inside the pad ring
     cx, cy = unV(B.fp['U201'].GetPosition())
     # (above and left of the MCU it ends at the pad row: signals change to this layer right there)
@@ -124,6 +126,15 @@ def zones(B):
         bare = (hx, hy) == G.NFC_GAP_HOLE
         B.keepout(octagon, (F, B_), 'mounting hole: no %s under the screw head' % ('copper' if bare else 'tracks'),
                   pours=bare, tracks=True, vias=True)
+    # fiducials: the pick-and-place camera wants bare copper in the 2 mm mask opening and nothing else
+    # within the pad's clearance (0.5 mm pad radius + 0.6 mm). The pour keeps that clearance by itself;
+    # tracks and vias are kept out here, so that the routers see it too.
+    rf = 1.12 / math.cos(math.pi / 8)
+    for ref in sorted(r for r in B.fp if r.startswith('FID')):
+        fx, fy = unV(B.fp[ref].GetPosition())
+        octagon = [(fx + rf * math.cos(math.pi / 8 + i * math.pi / 4), fy + rf * math.sin(math.pi / 8 + i * math.pi / 4))
+                   for i in range(8)]
+        B.keepout(octagon, (F,), 'fiducial: no tracks or vias', pours=False, tracks=True, vias=True)
     # The jack's LED supply pins go solid into the 3.3 V plane. With thermal spokes such a pin can end
     # up on a single spoke where signal tracks on that layer pass it.
     for pad in B.fp['J401'].Pads():
@@ -272,15 +283,12 @@ def write_project(names):
     ns['classes'] = classes
     ns['netclass_patterns'] = patterns
     ns.setdefault('meta', {'version': 4})
-    sev = pro.setdefault('board', {}).setdefault('design_settings', {}).setdefault('rule_severities', {})
-    # converted footprints differ from their library copies in text only; silkscreen is clipped by the fab
-    for check in ('lib_footprint_issues', 'lib_footprint_mismatch', 'silk_over_copper', 'silk_overlap',
-                  'silk_edge_clearance'):
-        sev[check] = 'ignore'
+    # KiCad's default severities for every check: nothing is switched off or downgraded
+    pro.setdefault('board', {}).setdefault('design_settings', {}).pop('rule_severities', None)
     json.dump(pro, open(path, 'w'), indent=2)
     open(os.path.join(PROJECT, NAME + '.kicad_dru'), 'w').write(
         '(version 1)\n'
         '(rule "PoE isolation"\n'
         '  (condition "A.NetClass == \'PoE\' && B.NetClass != \'PoE\' && B.NetName != \'\''
-        ' && B.NetName != \'unconnected-*\'")\n'
-        '  (constraint clearance (min 2mm)))\n')
+        ' && B.NetName != \'unconnected-*\' && !(A.memberOfFootprint(\'J401\') && B.memberOfFootprint(\'J401\'))")\n'
+        '  (constraint clearance (min 3mm)))\n')

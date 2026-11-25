@@ -12,7 +12,7 @@ from board import OX, OY, inside, short
 
 PRIMARY = ('POE_VP', 'POE_VN', 'POE_VPF', 'POE_VNF')
 CELL = 0.05
-REACH = 3.0                             # mm around the 48 V copper that is looked at
+REACH = 5.0                             # mm around the 48 V copper that is looked at (the rule asks 3)
 # The port has to stand 1500 V RMS (IEEE 802.3), 2121 V at the peak. Clearance in air for a voltage peak,
 # conductors of any shape, up to 2000 m: IEC 60664-1 table F.2 (kV, mm).
 TEST_PEAK = 1500 * math.sqrt(2)
@@ -179,4 +179,5 @@ def distances(board):
                 along.append((hit[0], l, hit[1]))
             else:
                 through.append((math.hypot(hit[0], board.depth[l] - board.depth[m]), l + ' to ' + m, hit[1]))
-    return min(along), min(through)
+    # no other copper on another layer within REACH of the 48 V copper: nothing to measure
+    return (min(along) if along else (float('inf'), '', None)), (min(through) if through else (float('inf'), '', None))

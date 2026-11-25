@@ -168,11 +168,30 @@ def tidy(board, pads, tracks, vias, only=None, fixed=False):
         for v in list(vias):
             if skip(v):
                 continue
-            layers = {t['layer'] for t in by_net.get(v['net'], []) if dist(v['x'], v['y'], t)[0] <= JOIN}
+            # as KiCad connects them: a track end inside the via's pad, or the via's centre on the track
+            touching = [t for t in by_net.get(v['net'], [])
+                        if dist(v['x'], v['y'], t)[0] <= max(JOIN, t['w'] / 2) or
+                        min(math.hypot(t['x1'] - v['x'], t['y1'] - v['y']),
+                            math.hypot(t['x2'] - v['x'], t['y2'] - v['y'])) <= v['d'] / 2]
+            layers = {t['layer'] for t in touching}
             for q in pads:
                 if q['net'] == v['net'] and q['x1'] <= v['x'] <= q['x2'] and q['y1'] <= v['y'] <= q['y2']:
                     layers |= set(range(3)) if q['hole'] else set(q['layers'])
             if len(layers) < 2:
+                # a via that tracks of one layer end in joins them only through its pad: join them at its
+                # centre on that layer instead, then the via goes
+                for t in touching:
+                    ends = ((t['x1'], t['y1']), (t['x2'], t['y2']))
+                    ex, ey = min(ends, key=lambda e: math.hypot(e[0] - v['x'], e[1] - v['y']))
+                    if len(touching) > 1 and 0.002 <= math.hypot(ex - v['x'], ey - v['y']) <= v['d'] / 2:
+                        obj = pcbnew.PCB_TRACK(board)
+                        obj.SetStart(BD.V(ex, ey)); obj.SetEnd(BD.V(v['x'], v['y'])); obj.SetWidth(t['obj'].GetWidth())
+                        obj.SetLayer(t['obj'].GetLayer()); obj.SetNet(t['obj'].GetNet()); obj.SetLocked(t['locked'])
+                        board.Add(obj)
+                        new = dict(net=t['net'], layer=t['layer'], w=t['w'], x1=ex, y1=ey, x2=v['x'], y2=v['y'],
+                                   locked=t['locked'], obj=obj)
+                        tracks.append(new)
+                        by_net[t['net']].append(new)      # the track pass below must see it already
                 drop(v, vias)
                 changed += 1
         for t in list(tracks):
@@ -190,7 +209,7 @@ def tidy(board, pads, tracks, vias, only=None, fixed=False):
                 held = any(q['net'] == t['net'] and t['layer'] in (range(3) if q['hole'] else q['layers']) and
                            q['x1'] - 0.01 <= x <= q['x2'] + 0.01 and q['y1'] - 0.01 <= y <= q['y2'] + 0.01 for q in pads)
                 held = held or any(v['net'] == t['net'] and math.hypot(x - v['x'], y - v['y']) <= v['d'] / 2 for v in vias)
-                held = held or any(dist(x, y, o)[0] <= JOIN for o in others)
+                held = held or any(dist(x, y, o)[0] <= max(JOIN, o['w'] / 2) for o in others)
                 if held:
                     continue
                 # junctions along this track: ends of other tracks and vias on its centre line

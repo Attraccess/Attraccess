@@ -448,8 +448,24 @@ def fix(path):
     """Take back what the design rule check objects to, until it is clean (at most 8 rounds)."""
     state = json.load(open(STATE))
     report = os.path.join(REPORTS, 'post_route_drc.json')
+    stubs, opens_before, keep = [], None, set()      # stubs removed in the last round, to put back if needed
     for rnd in range(8):
         rep = drc(path, report)
+        opens = len(rep.get('unconnected_items', []))
+        if stubs and opens > opens_before:
+            # a removed stub was a link after all: back it goes, and it stays
+            board = pcbnew.LoadBoard(path)
+            for layer, a, b, w, code in stubs:
+                t = pcbnew.PCB_TRACK(board)
+                t.SetLayer(layer); t.SetStart(pcbnew.VECTOR2I(*a)); t.SetEnd(pcbnew.VECTOR2I(*b)); t.SetWidth(w)
+                t.SetNetCode(code)
+                board.Add(t)
+                keep.add((a, b))
+            pcbnew.SaveBoard(path, board)
+            del board
+            stubs = []
+            rep = drc(path, report)
+        stubs, opens_before = [], len(rep.get('unconnected_items', []))
         problems = rep.get('violations', []) + rep.get('unconnected_items', [])
         if not problems:
             print('design rule check clean after %d corrections round(s)' % rnd)
@@ -477,6 +493,15 @@ def fix(path):
                     hit = True
                 elif v.get('type') == 'starved_thermal' and u in pads:
                     pads[u].SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_FULL); state['solid'].append(u); hit = True
+                elif (v.get('type') == 'track_dangling' and u in by_id and by_id[u].GetClass() == 'PCB_TRACK' and
+                      mm(by_id[u].GetLength()) < 0.15):
+                    # a router stub of a step or two whose loose end lies on another track: the next round
+                    # shows whether anything depended on it
+                    s = by_id.pop(u)
+                    a, b = (s.GetStart().x, s.GetStart().y), (s.GetEnd().x, s.GetEnd().y)
+                    if (a, b) not in keep:
+                        stubs.append((s.GetLayer(), a, b, s.GetWidth(), s.GetNetCode()))
+                        board.Remove(s); hit = True
             undone += hit
             if not hit:
                 left.append('%s: %s' % (v.get('type'), v.get('description', '')[:90]))
