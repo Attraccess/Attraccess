@@ -41,7 +41,7 @@ STATE = os.path.join(REPORTS, 'post_route.json')
 # of it a track gets.
 WIDEN_NET = {'VDD_HP': 0.6, 'VDD_HP_1': 0.6, '+3V3': 0.5, '+5V': 0.8, 'VBUS': 0.8, 'VBUS_F': 0.8,
              '+5V_USB': 0.8, '+5V_POE': 0.8, '+5V_DC': 0.8}
-WIDEN_CLASS = {'Power': 0.4, 'Power5V': 0.6, 'NFC_RF': 0.3, 'DCSig': 0.25, 'USB': 0.25}
+WIDEN_CLASS = {'Power': 0.4, 'Power5V': 0.6, 'NFC_RF': 0.3, 'DCSig': 0.25}      # (the USB pair has its 90 ohm width)
 SWITCH_NODES = {'BUCK_SW', 'DC_SW', 'DCDC_SW', 'BL_SW'}      # stay as they are: no extra copper on a switch node
 MIN_TRACK = 0.127                                            # what the autorouter's 0.112 mm neck-downs become
 VIA_SMALL, VIA_LARGER = 0.45, 0.5                            # pad of a 0.2 mm via: ring 0.125 -> 0.15 mm

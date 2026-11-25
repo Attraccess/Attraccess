@@ -29,11 +29,18 @@ SILK_KEEP_IN = {
     'SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR': (-99, -1.4, 99, 1.4),
     'SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BR': (-99, -1.52, 99, 1.52),
     'SOD-123_L2.7-W1.6-LS3.7-RD-1': (-99, -0.65, 99, 0.65),
+    # The fuse's side lines stood 0.5 mm outside its courtyard, on the TVS beside it
+    'F1812': (-2.6, -99, 2.6, 99),
 }
+
+
+SILK_MIN_WIDTH = 0.15            # JLCPCB's smallest silkscreen line
 
 
 def _width(item):
     w = first(item, 'width') or first(first(item, 'stroke') or [], 'width')
+    if w and float(w[1]) < SILK_MIN_WIDTH:
+        w[1] = SILK_MIN_WIDTH            # widened in the footprint itself, then cut back like any other line
     return float(w[1]) if w else 0.12
 
 

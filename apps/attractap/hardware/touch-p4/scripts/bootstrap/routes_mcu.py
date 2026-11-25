@@ -132,16 +132,18 @@ def mcu_escape(B):
     # top edge: PSRAM and flash regulator outputs to their capacitors
     B.track(dog(p('U201', 72), p('C226', '1')), net(72), 0.2)
     B.track(dog(p('U201', 71), p('C223', '1')), net(71), 0.2)
-    # backlight PWM: under the board to the backlight driver
+    upper_left_cluster(B)
+    # backlight PWM: under the board to the backlight driver. On the back layer it runs right just above the
+    # pad row, below the USB pair's vias beside the 22 ohm resistors, then down at x = xc.
     bl, u601, r604 = p('U201', 55), p('U601', '4'), p('R604', '1')
-    va = (bl[0], bl[1] - 2.2)
+    cy = unV(B.fp['U201'].GetPosition())[1]
+    ya = cy - 5.0
     vb2 = (round(r604[0] + 0.08, 1), round(r604[1] - 0.95, 2))
     xc = 58.6
-    vi = (bl[0], unV(B.fp['U201'].GetPosition())[1] - 4.15)       # inside the pad ring, like a supply pin:
+    vi = (bl[0], cy - 4.15)                                       # inside the pad ring, like a supply pin:
     B.track([bl, vi], net(55), w)                                 # the front layer above the pins is needed
     B.via(*vi, net(55))                                           # for the Ethernet signals
-    B.track([vi, va, (va[0] + 0.4, va[1] - 0.4), (xc - 0.4, va[1] - 0.4), (xc, va[1])] +
-            dog((xc, va[1]), vb2)[1:], net(55), w, layer=B_)
+    B.track([vi, (bl[0], ya), (xc - 3.6, ya), (xc, ya + 3.6)] + dog((xc, ya + 3.6), vb2)[1:], net(55), w, layer=B_)
     B.via(*vb2, net(55))
     B.track(dog(vb2, r604), net(55), w)
     B.track(dog(vb2, u601, 'd'), net(55), w)
@@ -273,8 +275,50 @@ def uart_escape(B):
     v2 = (xg, yk - (xg - x) - 1.37)
     B.track([(x, y), v1], 'UART0_TX', 0.15)
     B.via(*v1, 'UART0_TX')
-    B.track([v1, (x, yk), (xg, yk - (xg - x)), v2], 'UART0_TX', 0.15, layer=B_)
+    # on the back 0.43 mm right of the pin, clear of the flash supply's via in C223's pad
+    xb = x + 0.43
+    B.track([v1, (x, v1[1] - 0.42), (xb, v1[1] - 0.84), (xb, yk), (xg, yk - (xg - xb)), v2], 'UART0_TX', 0.15,
+            layer=B_)
     B.via(*v2, 'UART0_TX')
+
+
+def upper_left_cluster(B):
+    """Pins 73 to 77, five supply pins side by side at 0.35 mm, only pin 75 with a via inside the pad row.
+    77 (VDD_DCDCC) to the 10 uF in the corner; 76 (VDD_HP_2) to a via just above the pads, into the core
+    rail's pour on the back layer; 74 (VDDO_4) up and left, below C230, to C231. 73 is left to the router.
+    The ground pads of C208 and C226 have a via in the pad."""
+    p = B.pad
+    net = lambda num: B.d.parts['U201'].nets[str(num)]
+    w = 0.15
+    B.track(dog(p('U201', 77), p('C208', '1')), net(77), w)
+    for ref in ('C208', 'C226'):
+        B.via(*p(ref, '2'), 'GND')
+    x, y = p('U201', 76)
+    v = ((p('U201', 77)[0] + p('U201', 74)[0] - 0.18) / 2, y - 1.07)    # midway between 77's and 74's tracks
+    B.track([(x, y), (x, v[1] + abs(v[0] - x)), v], net(76), w)
+    B.via(*v, net(76))
+    x, y = p('U201', 74)
+    c231, c230 = p('C231', '1'), p('C230', '1')
+    yb = c230[1] + 0.6                                  # 0.3 mm below C230's pad, 0.3 above C208's
+    xa = x - 0.18
+    B.track([(x, y), (x, y - 0.47), (xa, y - 0.65), (xa, yb), (c231[0], yb), c231], net(74), w)
+    # VDD_PSRAM: the 1 uF of the second row (C227) to the one of the first (C226), through the gap between C226
+    # and C223, so that it does not depend on a way through the corner
+    c227, c226, c223 = p('C227', '1'), p('C226', '1'), p('C223', '1')
+    xg = c226[0] + 0.53                                 # midway between C226 and the vias in C223's pads
+    B.track([c227, (xg, c227[1]), (xg, c226[1]), c226], 'VDD_PSRAM', 0.12)
+    # VDD_FLASH: the flash regulator's output (pin 71, C223) to the flash side (pin 30, C224, C225, the
+    # flash): a via in C223's pad (filled and capped), then on In2 down beside the pad row, right between the
+    # Ethernet vias above the pins and the vias inside the pad row, and down to the flash side's via.
+    cx, cy = unV(B.fp['U201'].GetPosition())
+    c224, c225 = p('C224', '1'), p('C225', '1')
+    vf = (c224[0] - 0.72, (c224[1] + c225[1]) / 2)      # flash_routes() puts its via there
+    yr = cy - 5.0
+    va = (c223[0] - 0.13, c223[1])                      # 0.13 mm left in the pad: UART0 TX passes on the back
+    B.via(*va, 'VDD_FLASH')
+    g = p('C223', '2')                                  # and C223's ground pad, which the tracks cut off the fill
+    B.via(g[0] - 0.15, g[1], 'GND')
+    B.track([va, (va[0], yr), (cx + 5.3, yr), (cx + 5.3, vf[1] - 0.5), vf], 'VDD_FLASH', 0.2, layer=pcbnew.In2_Cu)
 
 
 def lcd_fanout(B):

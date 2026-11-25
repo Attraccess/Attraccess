@@ -59,6 +59,7 @@ from routes_mcu import (
     psram_ring,
     uart_escape,
 )
+from routes_signal import usb_connector, usb_pair
 from silk import check as check_silk, silkscreen
 
 
@@ -76,10 +77,15 @@ def build():
     missing = [r for r in d.parts if r not in B.fp]
     if missing:
         raise SystemExit('not placed: ' + ' '.join(missing))
+    tall = placement.check_flex_area(board)
+    if tall:
+        raise SystemExit('under the folded display flex: ' + ', '.join('%s (%s)' % r for r in tall))
     documentation(B)
-    bad = check_silk(silkscreen(B))
+    S = silkscreen(B)
+    bad = check_silk(S)
     if bad:
         raise SystemExit('silkscreen: ' + '; '.join('"%s" %s' % item for item in bad))
+    print('reference designators on the silkscreen: %d, on the assembly drawing only: %d' % (S.refdes[0], len(S.refdes[1])))
     display_ground_pads(board)
     zones(B)
     relieve_small_parts(B)
@@ -109,6 +115,8 @@ def build():
     mcu_left(B)
     buck_routes(B)
     usb_power_routes(B)
+    print('USB pair: %s' % ', '.join('%s %.2f mm' % kv for kv in sorted(usb_pair(B).items())))
+    usb_connector(B)
     plane_fanout(B)                 # last: its vias go where the fixed routes leave room
     pcbnew.SaveBoard(PCB, board)
     write_stackup(PCB)
@@ -120,8 +128,8 @@ def build():
 # placement. Its tracks for the nets below are not taken over: they have fixed routes now, or
 # finish_route.py routes them. Of its other tracks, those that come too close to a pad of one of the
 # parts below are removed and routed again. Empty both when a new autorouter result is committed.
-STALE_NETS = {'BUZ_P', 'BUZ_N', 'ETH_CT_RX', 'ETH_CT_TX', 'ETH_SHIELD', '+5V_POE', '+5V_USB', '+5V_DC', 'BUCK_SW', 'BUCK_EN',
-              'DC_EN', 'BUCK_BST'}
+STALE_NETS = {'USB_DP', 'USB_DN', 'BUZ_P', 'BUZ_N', 'ETH_CT_RX', 'ETH_CT_TX', 'ETH_SHIELD', '+5V_POE', '+5V_USB', '+5V_DC', 'BUCK_SW', 'BUCK_EN',
+              'DC_EN', 'BUCK_BST', 'BL_PWM', 'VDC_F', 'VDC_IN', 'VDC_R', 'VDDO_3', 'VDDO_4', 'UART0_RX'}
 STALE_PARTS = {'R104', 'R105', 'R705', 'L103', 'C117', 'D106', 'D103', 'FB102', 'FB103', 'C408', 'C409',
                'U702', 'U703', 'C711', 'C712', 'C713', 'R706', 'TP814',
                'U704', 'C714', 'C715', 'R707', 'TP815',
@@ -129,7 +137,9 @@ STALE_PARTS = {'R104', 'R105', 'R705', 'L103', 'C117', 'D106', 'D103', 'FB102', 
                # review stage 3: the power path, the 3.3 V converter, supervisor, test points, fiducials
                'U105', 'R107', 'R108', 'R109', 'R110', 'C118', 'U106', 'Q101', 'C119', 'U107', 'Q102', 'C121',
                'R113', 'C120', 'U103', 'R111', 'R112', 'C108', 'L101', 'U204', 'C241', 'FID804', 'FID805',
-               'D107', 'C109', 'C301'}
+               'D107', 'C109', 'C301', 'R116', 'R117', 'R118', 'R119',
+               # review stage 3, second part: decoupling at the MCU's upper left corner, the DC input's TVS
+               'C208', 'C209', 'F102', 'D101'}
 STALE_PARTS |= {'TP%d' % n for n in range(816, 831)}
 
 
@@ -418,8 +428,17 @@ if __name__ == '__main__':
         b = pcbnew.LoadBoard(PCB)
         # tracks placed by this script are locked and stay; everything else is replaced by the result
         routes = routes_of_session(os.path.join(PROJECT, NAME + '.ses'))
+        before = {t.m_Uuid.AsString() for t in b.GetTracks()}
         print('ses', pcbnew.ImportSpecctraSES(b, routes))
         os.remove(routes)
+        # The session marks the tracks that were fixed when the autorouter ran as protected, and KiCad imports
+        # them locked. The fixed routes of now are the generator's own; everything from the session is free.
+        freed = 0
+        for t in b.GetTracks():
+            if t.m_Uuid.AsString() not in before and t.IsLocked():
+                t.SetLocked(False)
+                freed += 1
+        print('unlocked %d tracks and vias of the session' % freed)
         # The session names its vias after the four layers the autorouter saw ("Via[0-3]"). On a board with
         # more layers KiCad takes that for a buried via. All vias of this board go through.
         through = 0

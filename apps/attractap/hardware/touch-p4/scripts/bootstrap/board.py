@@ -113,9 +113,14 @@ class Board:
         fp.SetDNP(bool(part.dnp))
         fp.SetExcludedFromBOM(bool(not_fitted))
         fp.SetExcludedFromPosFiles(bool(not_fitted))
-        # Reference designators are on the assembly drawing layer only. The board is too dense for them:
-        # on the silkscreen they would overlap each other and the test point labels.
+        # The footprint's own designator field stays on the assembly drawing layer; the silkscreen gets a
+        # designator where one fits (silk_refdes.py).
         fp.Reference().SetLayer(pcbnew.F_Fab)
+        # KiCad's own footprints draw their silkscreen 0.12 mm wide; JLCPCB prints 0.15 mm at the least
+        for g in fp.GraphicalItems():
+            if g.GetLayer() in (pcbnew.F_SilkS, pcbnew.B_SilkS) and g.GetClass() == 'PCB_SHAPE' and \
+                    0 < g.GetWidth() < mm(0.15):
+                g.SetWidth(mm(0.15))
         fp.Reference().SetVisible(not ref.startswith(('H', 'FID')))
         self.b.Add(fp)
         for pad in fp.Pads():

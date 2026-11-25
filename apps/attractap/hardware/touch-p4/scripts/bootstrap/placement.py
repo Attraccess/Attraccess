@@ -34,11 +34,14 @@ def place(B):
     m('C223', -1.1, -8.6, 90)      # VDDO_FLASH
     m('C221', -5.5, -10.8, 90)     # VDD_HP_2
     m('C209', -4.4, -10.8, 90)     # VDD_DCDCC 100n
+    # VDD_DCDCC 10u: in the corner beside pin 77, the row's last pin, 2 mm of track away; ground through a
+    # via in the pad (filled and capped). There is room for one part there, between the regulator caps,
+    # the converter's enable pull-down and the pad row.
+    m('C208', -5.1, -6.75, 180)
     m('C211', -3.3, -10.8, 90)     # VDD_LDO 100n
     m('C227', -2.2, -10.8, 90)     # VDD_PSRAM 1u
     m('C229', -1.1, -10.8, 90)     # VDD_PSRAM_1
     m('C228', 0.0, -10.8, 90)      # VDD_PSRAM_0
-    m('C208', -12.2, -12.6, 0)     # VDD_DCDCC 10u (plane connected, left of the converter)
     m('C210', -12.2, -14.1, 0)     # VDD_LDO 10u
     # right of the top edge: VDD_IO_4, VDD_HP_1 link, USB series resistors
     m('C204', 6.9, -9.0, 90)
@@ -178,6 +181,8 @@ def place(B):
     c('C116', 10.8, -0.2, 90)
     c('R105', 10.8, 2.55, 270)     # bleed resistor, +5V_DC on top, straight below C116
     c('Q102', 15.4, 0, 90)         # ideal diode: MOSFET where the OR diode was, its controller below
+    put('R116', 27.1, 72.2, 0)     # DC present: divider from the converter's output to the IO expander
+    put('R117', 27.1, 73.8, 0)
     c('U107', 15.4, 4.0, 0)
     c('C121', 12.8, 4.0, 90)
 
@@ -188,7 +193,7 @@ def place(B):
     u('R102', -4.5, -2.2, 90)
     u('U101', -7.4, 0, 90)
     u('F101', -9.2, -4.2, 180)
-    u('D101', -13.2, 0.8, 180)
+    u('D101', -14.0, 0.8, 180)      # (0.8 mm left of where it was: the USB pair's via beside the ESD part)
     u('FB101', -14.2, -2.8, 180)
     u('C101', -18.2, -2.6, 90)
     u('R104', -18.2, 0.1, 270)     # bleed resistor, +5V_USB on top, straight below C101
@@ -206,13 +211,16 @@ def place(B):
     # fuse, reverse-polarity diode, input filter and TVS next to the converter, in the left column behind
     # the display. From the bottom up: fuse, diode, filter (inductor on the left, its capacitor on the
     # right), TVS, converter.
-    put('F102', 5.5, 86.7, 0)
+    put('F102', 4.3, 86.7, 0)
     put('D105', 5.5, 83.0, 0)
     put('L103', 3.3, 79.8, 90)     # VDC_R below (at the diode's cathode), VDC on top
     put('C117', 7.0, 79.8, 0)      # VDC_R on the left
-    put('D107', 11.1, 85.6, 270)   # bidirectional TVS right of the fuse: VDC_F at the top, ground below
+    # bidirectional TVS right of the fuse, below the diode, its body clear of the flex area (x < 11.5):
+    # VDC_F at the top, ground below
+    put('D107', 9.2, 88.4, 270)     # (its silkscreen clear of the slot's end and of F102's)
     put('D106', 5.5, 76.0, 0)      # SMB package: its outline ends right below the converter's enable pull-up
-    put('C120', 20.0, 81.5, 0)     # 47 uF electrolytic in the free space right of the input column
+    # 47 uF electrolytic (7.7 mm high): above the flex area, between the converter and the proximity sensor
+    put('C120', 17.8, 64.0, 0)
 
     # ===================================================== Ethernet and PoE (right)
     put('J401', G.JACK_X, G.JACK_Y, 90)  # opens downwards into the cut-away
@@ -226,6 +234,8 @@ def place(B):
     put('C103', 72.6, 30.7, 0)     # 100u PoE output (+ pad above the module output pins)
     put('C104', 72.6, 25.4, 0)
     put('Q101', 64.4, 31.4, 90)    # PoE ideal diode where the OR diode was, its controller below
+    put('R118', 66.5, 28.6, 0)     # PoE present: divider from the module's output to the IO expander
+    put('R119', 64.4, 28.2, 0)
     put('U106', 64.4, 35.2, 0)
     put('C119', 61.8, 35.2, 90)
     e = rel(PHY)
@@ -355,9 +365,9 @@ def place(B):
         'TP815': (G.PROX[0] - 1.7, G.PROX[1] - 3.8),   # proximity sensor INT, up and left of its pin 6
         # 1 mm pads on every rail, both I2C buses and the RMII clock, each next to its circuit
         'TP816': (13.0, 75.5), 'TP817': (16.0, 75.5), 'TP818': (66.5, 11.0), 'TP819': (66.5, 26.2),
-        'TP820': (59.0, 46.5), 'TP821': (24.7, 111.0), 'TP822': (22.0, 108.4), 'TP823': (15.9, 118.8),
+        'TP820': (59.0, 46.5), 'TP821': (24.7, 111.0), 'TP822': (22.0, 108.4), 'TP823': (22.5, 102.4),
         'TP824': (61.0, 78.0), 'TP825': (26.5, 63.0), 'TP826': (26.5, 65.5), 'TP827': (17.0, 131.5),
-        'TP828': (19.5, 131.5), 'TP829': (63.3, 68.5), 'TP830': (66.5, 72.2),
+        'TP828': (17.0, 134.0), 'TP829': (57.7, 75.3), 'TP830': (61.2, 80.8),
     }
     for ref, (x, y) in tps.items():
         put(ref, x, y, 0)
@@ -369,3 +379,31 @@ def place(B):
     # local fiducials for the 0.35 mm pitch MCU, at two opposite corners of its package
     put('FID804', 29.9, 47.4, 0)
     put('FID805', 51.2, 59.8, 0)
+
+
+# Parts low enough to lie under the folded display flex (0.35 to 0.9 mm high). J601 is where the flex ends.
+FLEX_LOW = ('R_0201', 'C_0201', 'R_0402', 'C_0402', 'R_0603', 'C_0603', 'L0603', 'R_1206', 'R_Array_Convex_4x0402',
+            'TestPoint', 'Fiducial')
+
+
+def check_flex_area(board):
+    """Parts whose body (fabrication outline, else courtyard) reaches into geometry.FLEX_KEEPOUT and are not on
+    the FLEX_LOW list: the folded flex lies on whatever stands there. Returns [(ref, footprint)]."""
+    import pcbnew
+    bad = []
+    for fp in board.GetFootprints():
+        if fp.GetLayer() != pcbnew.F_Cu or fp.GetReference() == 'J601':
+            continue
+        name = fp.GetFPID().GetLibItemName().wx_str()
+        fab = [g.GetBoundingBox() for g in fp.GraphicalItems() if g.GetLayer() == pcbnew.F_Fab and g.GetClass() == 'PCB_SHAPE']
+        cy = fp.GetCourtyard(pcbnew.F_CrtYd)
+        bb = fab[0] if fab else cy.BBox() if cy.OutlineCount() else fp.GetBoundingBox(False)
+        for f in fab[1:]:
+            bb.Merge(f)
+        x1, y1 = pcbnew.ToMM(bb.GetLeft()) - G.ORIGIN[0], pcbnew.ToMM(bb.GetTop()) - G.ORIGIN[1]
+        x2, y2 = pcbnew.ToMM(bb.GetRight()) - G.ORIGIN[0], pcbnew.ToMM(bb.GetBottom()) - G.ORIGIN[1]
+        if any(x1 < kx2 and x2 > kx1 and y1 < ky2 and y2 > ky1 for kx1, ky1, kx2, ky2 in G.FLEX_KEEPOUT) and \
+                not name.startswith(FLEX_LOW):
+            bad.append((fp.GetReference(), name))
+    return bad
+

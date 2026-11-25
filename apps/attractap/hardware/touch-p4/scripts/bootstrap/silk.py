@@ -31,6 +31,11 @@ TEST_POINTS = {
     'TP806': ('EN', 'r'), 'TP807': ('BOOT', 'r'), 'TP808': ('TX0', 'r'), 'TP809': ('RX0', 'r'),
     'TP810': ('EN', 'a'), 'TP811': ('BOOT', 'b'), 'TP812': ('TX', 'a'), 'TP813': ('RX', 'b'),
     'TP814': ('INT', 'l'), 'TP815': ('INT', 'l'),
+    # the supply and bus test points of review stage 3: the net, short
+    'TP816': ('VDC', 'l'), 'TP817': ('5V_DC', 'r'), 'TP818': ('5V_USB', 'l'), 'TP819': ('5V_POE', 'r'),
+    'TP820': ('VDD_FLASH', 'b'), 'TP821': ('TVDD', 'r'), 'TP822': ('AVDD', 'l'), 'TP823': ('DVDD', 'r'),
+    'TP824': ('BL_A', 'r'), 'TP825': ('SDA', 'r'), 'TP826': ('SCL', 'r'), 'TP827': ('NFC_SDA', 'r'),
+    'TP828': ('NFC_SCL', 'r'), 'TP829': ('REF_CLK', 'r'), 'TP830': ('PHY_3V3', 'r'),
 }
 
 
@@ -201,6 +206,8 @@ def component_side(S):
     B = S.B
     # ---- test points, in groups
     for ref, (label, where) in TEST_POINTS.items():
+        if int(ref[2:]) >= 816:
+            continue                       # placed last, where they fit (test_point_labels)
         x, y = unV(B.fp[ref].GetPosition())
         if where in 'rl':
             S.text(label, x + (1.7 if where == 'r' else -1.7), y, align='l' if where == 'r' else 'r')
@@ -229,7 +236,8 @@ def component_side(S):
     # ---- connectors
     S.text('USB-C', 82.3, 9.2)
     S.text('SERVICE', 82.3, 10.9)
-    S.text('12-24V DC', 6.1, 90.7)
+    S.text('12-24V', 4.1, 91.35)
+    S.text('DC', 4.1, 92.75)
     for num, mark in (('1', '+'), ('2', '-')):
         x, y = min(B.pads_num('J103', num), key=lambda p: p[1])
         S.text(mark, x, y - 3.6)
@@ -279,17 +287,89 @@ def display_side(S):
     S.text('NFC 13.56 MHZ', ax, ay + 4.2, 1.0, BACK)
 
 
+def test_point_labels(S):
+    """The labels of the small test points TP816 to TP830, each at the first place around its pad (the side
+    TEST_POINTS names first, then the others, upright beside it) where it lies on no pad, text, footprint
+    silkscreen, cut-out or board edge."""
+    B = S.B
+    keep = [t for t in S.texts]
+    lines = [g for g in S.b.GetDrawings() if g.GetLayer() == FRONT and g.GetClass() == 'PCB_SHAPE']
+    for fp in S.b.GetFootprints():
+        for g in fp.GraphicalItems():
+            if g.GetLayer() == FRONT and g.GetClass() == 'PCB_SHAPE':
+                lines.append(g)
+    for ref, (label, where) in TEST_POINTS.items():
+        if int(ref[2:]) < 816:
+            continue
+        x, y = unV(B.fp[ref].GetPosition())
+        sides = [where] + [s for s in 'rlab' if s != where]
+        placed = None
+        tries = []
+        for size in (1.0,):                         # JLCPCB: text at least 1.0 mm high
+            for extra in (0.0, 0.3, 0.8):
+                gap = 0.95 + size / 2 + extra
+                for side in sides:
+                    for shift in (0.0, -0.8, 0.8, -1.6, 1.6):
+                        if side in 'rl':
+                            tries.append((size, x + (gap if side == 'r' else -gap), y + shift, 'l' if side == 'r' else 'r', 0))
+                            tries.append((size, x + (gap if side == 'r' else -gap), y + shift, 'c', 90))
+                        else:
+                            tries.append((size, x + shift, y + (gap if side == 'b' else -gap), 'c', 0))
+        why = []
+        for size, px, py, align, rot in tries:
+            t = S.text(label, px, py, size=size, align=align, rot=rot)
+            bad = check(S, only=t, lines=lines)
+            if not bad:
+                placed = t
+                break
+            why.append('%.1f,%.1f %s %d: %s' % (px, py, align, rot, ', '.join(sorted({r for _, r in bad}))))
+            S.b.Remove(t)
+            S.texts.remove(t)
+        if not placed:
+            raise SystemExit('silkscreen: no room for the label of %s:\n  %s' % (ref, '\n  '.join(why[:24])))
+
+
 def silkscreen(B):
     S = Silk(B)
     component_side(S)
     display_side(S)
+    test_point_labels(S)
+    from silk_refdes import refdes            # (it imports this module)
+    S.refdes = refdes(S)
     return S
 
 
-def check(S):
-    """Texts that lie on a pad of their side, on another text, or off the board: [(text, reason)]."""
+def touches(g, rect, margin):
+    """Whether a footprint silkscreen shape comes within margin of a rectangle: a line by its own course,
+    anything else by its bounding box."""
+    w = pcbnew.ToMM(g.GetWidth()) / 2 + margin
+    x1, y1, x2, y2 = rect[0] - w, rect[1] - w, rect[2] + w, rect[3] + w
+    if g.GetShape() != pcbnew.SHAPE_T_SEGMENT:
+        bb = g.GetBoundingBox()
+        (a1, b1), (a2, b2) = unV(pcbnew.VECTOR2I(bb.GetLeft(), bb.GetTop())), unV(pcbnew.VECTOR2I(bb.GetRight(), bb.GetBottom()))
+        return a1 < x2 and x1 < a2 and b1 < y2 and y1 < b2
+    (ax, ay), (bx, by) = unV(g.GetStart()), unV(g.GetEnd())
+    t0, t1 = 0.0, 1.0
+    dx, dy = bx - ax, by - ay
+    for p, q in ((-dx, ax - x1), (dx, x2 - ax), (-dy, ay - y1), (dy, y2 - ay)):
+        if p == 0:
+            if q < 0:
+                return False
+            continue
+        r = q / p
+        if p < 0:
+            t0 = max(t0, r)
+        else:
+            t1 = min(t1, r)
+    return t0 <= t1
+
+
+def check(S, only=None, lines=()):
+    """Texts that lie on a pad of their side, on another text, or off the board: [(text, reason)]. only: look
+    at that one text alone; lines: footprint silkscreen it must not touch either."""
     def box(item, grow=0.0):
-        bb = item.GetBoundingBox()
+        # a text by its strokes (KiCad's own box adds the line spacing), anything else by its box
+        bb = item.GetEffectiveTextShape().BBox() if item.GetClass() == 'PCB_TEXT' else item.GetBoundingBox()
         (x1, y1), (x2, y2) = unV(pcbnew.VECTOR2I(bb.GetLeft(), bb.GetTop())), unV(pcbnew.VECTOR2I(bb.GetRight(), bb.GetBottom()))
         return x1 - grow, y1 - grow, x2 + grow, y2 + grow
 
@@ -308,7 +388,14 @@ def check(S):
                     pads[layer].append((fp.GetReference(), box(pad)))
     bad = []
     for i, t in enumerate(S.texts):
+        if only is not None and t is not only:
+            continue
         me = box(t)
+        if only is not None:
+            bad += [(t.GetText(), 'on a text') for o in S.texts if o is not t and o.GetLayer() == t.GetLayer() and
+                    overlap(me, box(o, 0.15))]
+            bad += [(t.GetText(), 'on footprint silkscreen') for g in lines if touches(g, me, 0.1)]
+            me = (me[0] - 0.15, me[1] - 0.15, me[2] + 0.15, me[3] + 0.15)       # 0.15 mm from pads, as JLCPCB asks
         if me[0] < 0.3 or me[1] < 0.3 or me[2] > G.BOARD_W - 0.3 or me[3] > G.BOARD_H - 0.3:
             bad.append((t.GetText(), 'at the board edge'))
         bad += [(t.GetText(), 'on a cut-out') for hole in holes if overlap(me, (hole[0] - 0.3, hole[1] - 0.3, hole[2] + 0.3, hole[3] + 0.3))]

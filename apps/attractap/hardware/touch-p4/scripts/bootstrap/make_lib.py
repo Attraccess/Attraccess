@@ -323,9 +323,11 @@ def custom_pad_strokes(tree):
 # leaves a mask web of 0.10 mm, JLCPCB's smallest.
 P4_PAD = (0.65, 0.20, 4.875, 0.025)
 # The first and last pad of each row would come 0.113 mm from the corner pad of the next row, diagonally
-# across the corner; the board's smallest clearance is 0.127 mm. Those eight pads end 0.02 mm earlier on
-# the inside (0.141 mm across the corner); the heel of the lead keeps 0.13 mm of pad beyond it.
-P4_CORNER_PADS, P4_CORNER_TRIM = {1, 26, 27, 52, 53, 78, 79, 104}, 0.02
+# across the corner; JLCPCB asks 0.15 mm between pads of different nets. Those eight pads end 0.04 mm
+# earlier on the inside (0.163 mm across the corner); the heel of the lead keeps 0.11 mm of pad beyond it.
+# The converter rounded the positions to 0.01 mm, which made some gaps 0.14 mm: every pad goes back onto
+# the 0.35 mm grid, 26 to a row centred on the package.
+P4_CORNER_PADS, P4_CORNER_TRIM, P4_PITCH = {1, 26, 27, 52, 53, 78, 79, 104}, 0.04, 0.35
 
 
 def p4_signal_pads(tree):
@@ -337,13 +339,17 @@ def p4_signal_pads(tree):
         at, size = first(pad, 'at'), first(pad, 'size')
         x, y = float(at[1]), float(at[2])
         trim = P4_CORNER_TRIM if int(pad[1]) in P4_CORNER_PADS else 0.0
-        # the converted pads stand 5.0 mm off the centre; a second run finds them where this one put them
-        row_x = min(abs(abs(x) - 5.0), abs(abs(x) - centre - trim / 2)) < 0.01
-        row_y = min(abs(abs(y) - 5.0), abs(abs(y) - centre - trim / 2)) < 0.01
+        # the converted pads stand 5.0 mm off the centre, earlier runs left them between 4.875 and 4.9: a pad
+        # belongs to the row whose offset it has (the other coordinate is at most 4.375)
+        row_x = abs(x) > 4.6
+        row_y = abs(y) > 4.6
+        snap = lambda v: round((round(v / P4_PITCH - 0.5) + 0.5) * P4_PITCH, 4)
         if row_x:
             at[1] = round(math.copysign(centre + trim / 2, x), 4)
+            at[2] = snap(y)
         elif row_y:
             at[2] = round(math.copysign(centre + trim / 2, y), 4)
+            at[1] = snap(x)
         # the converter wrote some pads turned by 90 degrees and others with width and length swapped
         tall = float(size[2]) > float(size[1])
         size[1], size[2] = (width, length - trim) if tall else (length - trim, width)

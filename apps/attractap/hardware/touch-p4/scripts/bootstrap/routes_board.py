@@ -134,7 +134,10 @@ def mdi_routes(B):
     sit between and beside them (regulator output, bias resistor)."""
     if 'U401' not in B.fp:
         return
-    w = 0.2
+    # 0.155 mm: 50.3 ohm on either outer layer (JLCPCB's impedance calculator, stack-up JLC06161H-3313, read
+    # 25 November 2026). The lines of a pair run 1.27 mm apart, the jack's pin pitch, which couples them
+    # little: about 100 ohm between them, as 100BASE-TX wants.
+    w = 0.155
     p = B.pad
     tp, tn, reg, rp, rn, iset = (p('U401', n) for n in ('30', '29', '28', '27', '26', '25'))
     # At the PHY the positive pin of each pair is the upper one and so takes the outer lane; at the jack
@@ -255,12 +258,12 @@ def dc_route(B):
     B.track([bot, top, (top[0], jack[1]), jack], 'VDC_IN', w)     # both pins of the + pole, then the jack
     B.track(dog(jack, f1), 'VDC_IN', w)
     B.track(dog(p('F102', '2'), p('D105', '2')), 'VDC_F', w)
-    # input TVS: its VDC_F pad beside the diode's, its ground pad straight down into the plane
+    # input TVS: its VDC_F pad below and right of the diode's, its ground pad straight down into the plane
     d107a, d107g = p('D107', '1'), p('D107', '2')
     B.track([p('D105', '2'), d107a], 'VDC_F', w)
-    for dy in (-0.45, 0.45):
-        B.track([d107g, (d107g[0] + 1.6, d107g[1] + dy)], 'GND', w)
-        B.via(d107g[0] + 1.6, d107g[1] + dy, 'GND', size=0.6, drill=0.3)
+    for dx in (-0.45, 0.45):
+        B.track([d107g, (d107g[0] + dx, d107g[1] + 2.0)], 'GND', w)
+        B.via(d107g[0] + dx, d107g[1] + 2.0, 'GND', size=0.6, drill=0.3)
     # diode cathode -> filter inductor (straight above it) and the filter capacitor beside the inductor
     d105, l_in, c117 = p('D105', '1'), p('L103', '1'), p('C117', '1')
     B.track([d105, l_in], 'VDC_R', w)
@@ -511,6 +514,9 @@ def plane_fanout(B):
         n = math.hypot(ox, oy) or 1.0
         ox, oy = ox / n, oy / n
         hw, hh = (x2 - x1) / 2, (y2 - y1) / 2
+        # a pad with a via of its own in it (filled and capped) needs no other
+        if any(vnet == net and x1 <= vx <= x2 and y1 <= vy <= y2 for (vx, vy), vnet in vias):
+            continue
         done = False
         # an existing via of the same net close by is good enough
         for (vx, vy), vnet in vias:

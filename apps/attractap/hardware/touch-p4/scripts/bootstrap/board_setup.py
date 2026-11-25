@@ -116,9 +116,15 @@ def zones(B):
               pours=True, tracks=True, vias=True)
     # the 3.3 V pour under the MCU feeds its supply pins through vias inside the pad ring
     cx, cy = unV(B.fp['U201'].GetPosition())
-    # (above and left of the MCU it ends at the pad row: signals change to this layer right there)
-    B.keepout(rect(cx - 5.6, cy - 5.6, cx + 7.0, cy + 7.0), (IN2,), 'MCU: 3.3 V pour stays whole, no tracks',
-              pours=False, tracks=True)
+    # (above and left of the MCU it ends at the pad row: signals change to this layer right there). With six
+    # layers 3.3 V has In3 to itself and In2 is ground fill here: the area ends inside the upper and the right
+    # pad row, which leaves room for the flash supply's link along them (routes_mcu.upper_left_cluster).
+    if G.COPPER_LAYERS == 6:
+        B.keepout(rect(cx - 5.6, cy - 4.8, cx + 5.05, cy + 7.0), (IN2,), 'MCU: In2 ground fill stays whole, no tracks',
+                  pours=False, tracks=True)
+    else:
+        B.keepout(rect(cx - 5.6, cy - 5.6, cx + 7.0, cy + 7.0), (IN2,), 'MCU: 3.3 V pour stays whole, no tracks',
+                  pours=False, tracks=True)
     rr = G.MOUNT_KEEPOUT_R / math.cos(math.pi / 8)
     for hx, hy in G.MOUNT_HOLES:
         octagon = [(hx + rr * math.cos(math.pi / 8 + i * math.pi / 4), hy + rr * math.sin(math.pi / 8 + i * math.pi / 4))
@@ -259,8 +265,9 @@ NETCLASSES = [
     ('PoE', 0.3, 0.6, 0.8, 0.4, ['POE_VP', 'POE_VN', 'POE_VPF', 'POE_VNF']),
     ('NFC_RF', 0.127, 0.3, 0.6, 0.3, ['NFC_TX1', 'NFC_TX2', 'NFC_F1', 'NFC_F2', 'NFC_M1', 'NFC_M2', 'NFC_ANT1',
                                       'NFC_ANT2']),
-    ('USB', 0.127, 0.25, 0.45, 0.2, ['USB_DP', 'USB_DN', 'USB_DP_M', 'USB_DN_M']),
-    ('MDI', 0.127, 0.2, 0.45, 0.2, ['MDI_TP', 'MDI_TN', 'MDI_RP', 'MDI_RN']),
+    # widths and gaps of the impedance-controlled lines: routes_signal.py (USB), routes_board.mdi_routes
+    ('USB', 0.127, 0.14, 0.45, 0.2, ['USB_DP', 'USB_DN', 'USB_DP_M', 'USB_DN_M']),
+    ('MDI', 0.127, 0.155, 0.45, 0.2, ['MDI_TP', 'MDI_TN', 'MDI_RP', 'MDI_RN']),
 ]
 
 
@@ -272,7 +279,7 @@ def write_project(names):
     for name, clr, w, vd, vdr, pats in NETCLASSES:
         c = {'name': name, 'clearance': clr, 'track_width': w, 'via_diameter': vd, 'via_drill': vdr,
              'microvia_diameter': 0.3, 'microvia_drill': 0.1, 'diff_pair_width': w,
-             'diff_pair_gap': 0.15 if name == 'USB' else 0.2, 'diff_pair_via_gap': 0.25,
+             'diff_pair_gap': {'USB': 0.15, 'MDI': 1.115}.get(name, 0.2), 'diff_pair_via_gap': 0.25,
              'wire_width': 6, 'bus_width': 12, 'line_style': 0,
              'pcb_color': 'rgba(0, 0, 0, 0.000)', 'schematic_color': 'rgba(0, 0, 0, 0.000)', 'priority': 0}
         if name == 'Default':
@@ -291,4 +298,8 @@ def write_project(names):
         '(rule "PoE isolation"\n'
         '  (condition "A.NetClass == \'PoE\' && B.NetClass != \'PoE\' && B.NetName != \'\''
         ' && B.NetName != \'unconnected-*\' && !(A.memberOfFootprint(\'J401\') && B.memberOfFootprint(\'J401\'))")\n'
-        '  (constraint clearance (min 3mm)))\n')
+        '  (constraint clearance (min 3mm)))\n'
+        # JLCPCB: 0.45 mm between the hole of a part's pad and any other hole (0.2 mm between two vias)
+        '(rule "part hole to via hole"\n'
+        '  (condition "(A.Type == \'Pad\' && B.Type == \'Via\') || (A.Type == \'Via\' && B.Type == \'Pad\')")\n'
+        '  (constraint hole_to_hole (min 0.45mm)))\n')
