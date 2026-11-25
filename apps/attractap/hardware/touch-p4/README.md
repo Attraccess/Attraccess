@@ -120,8 +120,11 @@ can be found again; `check` fails when it does not match the board.
 | File | Use |
 |---|---|
 | `attractap-touch-p4-gerbers.zip` | The PCB order: Gerber and drill files. |
-| `bom-lan.csv`, `cpl-lan.csv` | Assembly of the Ethernet/PoE version: parts list and positions. |
+| `attractap-touch-p4-fab.pdf` | Fabrication drawing: outline and cut-outs with dimensions, stack-up, drill table, smallest features, fabrication notes (finish, IPC class, via filling). Attach it to the order. |
+| `attractap-touch-p4.ipc` | IPC-D-356 netlist, for the fab's electrical test against the design. |
+| `bom-lan.csv`, `cpl-lan.csv` | Assembly of the Ethernet/PoE version: parts list and positions. The parts list has manufacturer, part number, description, an approved alternate and the lifecycle of every line. |
 | `bom-wifi.csv`, `cpl-wifi.csv` | Assembly of the Wi-Fi version. |
+| `parts-list-lan.csv`, `parts-list-wifi.csv` | Everything to buy for one reader: the assembly parts list plus the parts JLCPCB does not fit (display panel, Wi-Fi antenna). |
 
 `fab/board-front.pdf` (not in git) is the assembly drawing with the reference designators; the
 silkscreen has none. What the silkscreen does carry is described in the
@@ -147,7 +150,8 @@ What the board needs, for the order form:
 | Serial number on the board | option "Mark on PCB": number only, position specified. JLCPCB then prints a number that is different on every board into the white field beside `S/N` on the component side: a solid silkscreen rectangle of 10 x 2 mm, which is what it looks for. Without the option the field stays white, to write on. (JLCPCB no longer prints an order number; the text `JLCJLCJLCJLC` that used to mark its place is gone from the board.) |
 
 What the parts cost, what JLCPCB charges once per order, and which cheaper parts were considered:
-[docs/design-notes.md](docs/design-notes.md#cost).
+[docs/design-notes.md](docs/design-notes.md#cost). Lifecycle, approved alternates and how to source the
+parts JLCPCB does not stock: [docs/parts.md](docs/parts.md).
 
 Check before paying:
 
@@ -170,10 +174,19 @@ Check before paying:
 
 ### Parts and library
 
-Every fitted part carries its LCSC number in the `LCSC` field. Project symbols
-and footprints for the larger parts were converted from LCSC/EasyEDA with
+Every fitted part carries its LCSC number in the `LCSC` field, its maker in
+`Manufacturer`, its part number in `MPN`, and `BOM description`, `Alternate` and (for
+ICs and modules) `Lifecycle` from `scripts/bootstrap/parts_info.py`; passives take
+theirs from the table in `design.py`. Project symbols and footprints for the larger
+parts were converted from LCSC/EasyEDA with
 [easyeda2kicad](https://github.com/uPesy/easyeda2kicad.py); passives use the
-standard KiCad libraries.
+standard KiCad libraries. Every footprint with a body has a 3D model in
+`kicad/lib/attractap.3dshapes/` (gzip-compressed STEP, read by KiCad as it is): from
+the JLCEDA/EasyEDA official library (easyeda.com, lceda.cn) for the converted
+footprints, from KiCad's packages3D for the standard ones. Their placement is in
+`scripts/bootstrap/lib_models.py`, which `scripts/bootstrap/collect_models.py` writes
+(see the bootstrap README). The ESP32-C6 footprint carries the MINI-1U body, the
+PN532 footprint the NXP part's body; the NFC antenna is copper only.
 
 To add a part from LCSC:
 

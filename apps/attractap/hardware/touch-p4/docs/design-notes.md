@@ -153,6 +153,8 @@ new display section, not a part swap.
   rows) carry 48 V. No wall of a display frame fits between pin 9 and the LCD
   module's edge: the pin is 0.5 mm from it and its solder pad 0.1 mm. The tape
   on the LCD is the insulation there.
+- Depth behind the board: the case in `case/` leaves 13.9 mm, too little for the
+  Ethernet jack's shield springs (see "Case fit against the 3D models").
 - Depth between board and front: the display side of the board is 4.74 mm
   behind the front of the case (1.5 mm distance, 3.14 mm display, 0.1 mm
   recess). The case in `case/` is drawn for that.
@@ -1010,9 +1012,6 @@ Looked at and left as it is:
   Spreading them would take the fan-out of the MCU's upper edge apart.
 - Teardrops. KiCad makes them only in its board editor, not from a script. The
   larger via pads do part of their job.
-- 3D models. KiCad's library has one for the display connector only; those of
-  the other connectors and the modules would have to be downloaded and kept
-  in the repository.
 - The fourth core supply pin and the supply tracks at fine-pitch pins stay
   narrow (see "Layout rules used").
 
@@ -1260,6 +1259,63 @@ are made in the generator, which stays the source of truth (see
 | Symbols: D101, D103, D106 drawn as Zener diodes; U702 drawn as LIS2DE12, U703 as DRV5033, U701 as 74AHCT1G125, U104 as AP63203, U301 as MINI-1-N4. | Unidirectional TVS symbols; every symbol named after the fitted part (`make_lib.derived_symbols()`). |
 | Capacitor values without voltage and dielectric. | Every capacitor shows its rating (for example `16V X7R`), the resistors whose tolerance matters (feedback divider, current sense, NFC tuning, PHY bias) theirs; the rating comes with the part number from the maker's code. |
 | Title blocks without date; no revision history. | Date, drawn by, checked by, and the revision history on the root sheet. |
+| The overlap lint saw labels and part fields only: a field over another symbol's pin name or number, over its own body or a label over a pin's text went through. The PN532 body was too narrow for its pin names. | The lint also takes every pin's name and number (as KiCad places them), the pin lines and the bodies, with 0.25 mm between texts; the build fails on any hit. Text widths were measured on KiCad's font. The PN532 is 63.5 mm wide with its top pins spread, its reference and value outside the body. Every sheet was rendered at 200 dpi and read block by block. |
+| Parts lists with LCSC number and value only. | Every line carries manufacturer, part number, a full description (with rating and tolerance), an alternate and, for ICs and modules, the maker's lifecycle status (`scripts/bootstrap/parts_info.py`; [parts.md](parts.md) lists the sources). The display and the Wi-Fi antenna, which JLCPCB does not assemble, are in the parts lists too. A test fails when a fitted part lacks these data. |
+| No fabrication drawing, no netlist for the bare-board test. | `fab/jlcpcb/attractap-touch-p4-fab.pdf` (outline, dimensions, holes and cut-outs, stack-up, drill table, material, finish, IPC class, via fill) and `attractap-touch-p4.ipc` (IPC-D-356), both written by `export`. |
+| 3D models for the display connector only. | A model for every footprint with a body (`kicad/lib/attractap.3dshapes/`, `scripts/bootstrap/collect_models.py`); a test fails when one is missing. |
+
+#### Land patterns against the makers' drawings
+
+`check-footprints` compares every footprint with JLCPCB's library, the same EasyEDA
+source most of them were converted from. The critical ones were also measured against
+the makers' own drawings (pad tables read from the footprint files by a script; the
+drawings' figures, in the PDF's vector graphics where the text gave no number).
+Tolerance used: within 0.05 mm is a match; a pad longer or shifted by up to about
+0.2 mm with the terminal still covered is an acceptable deviation; a wrong pitch, pin
+order or hole position is a defect.
+
+| Part | Document | Result | Change |
+|---|---|---|---|
+| U201 ESP32-P4 (QFN-104, 0.35 mm) | Datasheet v0.7 fig. 6-1 (package); Espressif's KiCad footprint `ESP32-P4.kicad_mod` (espressif/kicad-libraries, 2025-10-07), as neither datasheet nor guidelines give a land pattern | Pitch, count, pin 1 and numbering match (worst 0.005 mm). Pads 0.15 x 0.65 mm, 0.125 mm further out than Espressif's 0.20 x 0.65 mm | Rework to Espressif's pads with the layout (stage 3 of this review) |
+| U301 ESP32-C6-MINI-1U | Datasheet v1.5 figs. 11-1, 11-2 | Pitch 0.80, pads 0.40 x 0.80, column and row spacing 11.80 / 9.80, corner pads and numbering match. Ground pads at 1.80 mm pitch and 0.05 mm off centre, against 1.975 mm | Ground pads moved to 1.975 mm, centred (`make_lib.c6_ground_pads`) |
+| J101 USB-C TYPE-C-31-M-12 | HRO drawing 2020-12-08 | Pitch, pin order, signal pads, locating holes and shell slot positions match. **The four power pads were polygons with a 0.1 mm outline: 0.70 x 1.40 mm in copper, 0.10 mm from VBUS to GND** where the drawing has 0.20 mm. Pads 0.19 mm further back than drawn and shell slots 0.2 mm wider: acceptable | Power pads 0.6 x 1.3 mm (`make_lib.usb_c_power_pads`); the DRC exception that allowed 0.09 mm at J101 is gone |
+| J102 PJ-002A | Same Sky datasheet rev 1.05 | Terminal positions, slots and orientation match | none |
+| J103 WAGO 250-202 / 2601-3102 | WAGO data sheets 250-202 (2019-05-01), 2601-3102 (2022-08-15) | Pitch 3.5, rows 5.0 and outlines match; pin 1 front right on both. Holes 1.2 mm suit the 2601 and are 0.1 mm over the 250's maximum | none; check the hole fill on the first boards |
+| J401 HY931147C | HanRun REV.A/1, mounting pattern | Signal and shield pins and pin 1 within 0.005 mm; large holes 11.40 against 11.43 mm; LED holes 1.10 against 1.02 mm | none |
+| J601 FH12-40S-0.5SH(55) | Hirose FH12 catalogue (2016-11-01) | Pitch, span, fixing tabs and pin 1 match. Signal pads 0.25 mm, Hirose's stencil opening, against 0.30 mm copper | Copper 0.30 mm, paste 0.25 mm (`make_lib.fpc_signal_pads`) |
+| U102 DP9900M / Ag9905M | SDAPO DP9900 series datasheet, section 4.1 (package and PCB footprint); Silvertel Ag9900 V3.5 figs. 3, 19, 23 | Pads 1.25 x 4.0 mm, 2.54 mm pitch, groups 13.56 apart (SDAPO 13.57), rows 14.00: SDAPO's pattern within 0.01 mm; Silvertel's pins within 0.03 mm. **The keep-out under the module was not Silvertel's stepped 3 mm band** | The band of fig. 23, free of copper on every layer (stage 3, with the 3 mm isolation) |
+| U501 PN532 (QFN-40) | Tokmas datasheet (Dec 2025); NXP SOT618-1 reflow footprint (2022-11-25) | Pads 0.28 x 0.665 mm at 6.485 / 5.155 against NXP's 0.29 x 0.90 at 7.00 / 5.20: 0.24 mm beyond the body (NXP 0.50, IPC 0.30), acceptable; exposed pad fits both makers | none |
+| U401 IP101GRI (QFN-32) | IC Plus datasheet R01 (2014); IPC-7351B nominal goals (toe 0.30, heel 0, side -0.04, as in KiCad's footprint generator) | Pitch, pin 1 and toe right; heel 0.10 mm short, acceptable; exposed pad 2.80 against 2.70 | none |
+| L102 CKCSA4020-6.8uH (no JLCPCB footprint) | CENKER datasheet, recommended pattern | Pads 1.6 x 3.5 mm 1.6 apart against 1.4 x 3.7, 1.2 apart: the terminals are covered. Terminals along x: placement angle 0 (or 180), as the export writes | none |
+
+#### Case fit against the 3D models
+
+The board was exported with every part's model (`kicad-cli pcb export step`), placed
+in the case design (`case/cad/attractap-touch-case.sc`: component side at `z_pf`,
+X = 103 − x, Y = 79.15 − y in KiCad coordinates) and checked with SolidCraft's
+interference and clearance checks against cap, dock, display frame and the LCD
+module. Heights are the makers' where they give one.
+
+| Part | Height above the board | Nearest case part | Gap |
+|---|---|---|---|
+| J401 RJ45 | body 13.95 max; shield springs at the mouth 15.21 ± 0.50 (HanRun HY931147C REV.A/1, side view) | dock plate, 13.9 mm from the board (`cav`; the case assumed 13.5 mm) | **springs 1.3 mm into the plate (nominal), up to 1.8 mm; body 0.1 mm, −0.05 mm at its maximum** |
+| U102 DP9900M | 13.35 ± 0.5 (SDAPO datasheet 4.1) | dock plate | 0.55 mm, 0.05 mm at the maximum (the case assumed 10 mm) |
+| J103 WAGO 250-202 | 13.2 (model) | dock plate | 0.70 mm |
+| J102, J103 pins | 1.95 mm out of the display side | cap front wall | 0.44 mm |
+| J401 pins | 1.45 mm out of the display side, unclipped | LCD module, 1.5 mm off the board | 0.1 mm; 0.5 mm clipped to 1 mm as the manual says |
+| J101 USB-C | 3.25 | cap side wall | 0.63 mm |
+
+The jack does not fit the case as drawn. Fix it in the case, not on the board: an
+opening in the dock plate under J401 (case X −42.5 to −25, Y −44 to −21.5; it leaves
+1.2 mm to the wall behind), or a case 2.4 mm deeper (`cav` 16.3 mm), which also moves
+the dock plate away from the proximity sensor and the magnet away from the hall
+switch, both simulated at today's distances. The opening is the smaller change. It
+belongs with the antenna's place in the case, the next change to the case design.
+
+Three of the converted models were placed off their pads by easyeda2kicad: the DC
+jack by 8 mm, the USB-C receptacle by 2.2 mm and the display connector by 2.6 mm.
+`collect_models.py` now moves each model onto its pads and holes (`model_fit.py`), and
+a test fails when a model's pins miss the holes or its terminals the pads.
 
 ### Open: cannot be settled on paper
 

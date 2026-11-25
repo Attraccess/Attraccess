@@ -106,6 +106,8 @@ HISTORY = [
     ('2026-11-22', 'Six layers; checked against the datasheets: PN532 paste, DC input capacitors'),
     ('2026-11-24', 'Simulated: NFC matching; ESP32-C6-MINI-1U with an antenna connector'),
     ('2026-11-25', 'Industry review: core divider 499k, 3 kV barrier capacitors, schematic redrawn, TVS symbols'),
+    ('2026-11-25', 'Industry review: parts data and alternates, fab drawing, IPC-D-356 netlist, 3D models, '
+                   'land patterns of USB-C, ESP32-C6 and display connector'),
 ]
 
 
