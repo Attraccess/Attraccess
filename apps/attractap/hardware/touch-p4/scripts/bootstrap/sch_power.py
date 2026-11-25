@@ -24,8 +24,8 @@ def usb(cv, P_, x0, y0):
     d = cv.tvs(P_['D101'], x, ya)
     fb = cv.inline(P_['FB101'], x + 17.78, ya)
     c = cv.hang(P_['C101'], x + 27.94, ya)
-    r = cv.hang(P_['R104'], x + 41.91, ya)
-    dd = cv.diode(P_['D102'], x + 58.42, ya)
+    r = cv.hang(P_['R104'], x + 44.45, ya)
+    dd = cv.diode(P_['D102'], x + 60.96, ya)
     cv.wire('F101.2', 'FB101.1')
     cv.wire('FB101.2', 'D102.2')
     k = dd.pin('1')
@@ -35,7 +35,7 @@ def usb(cv, P_, x0, y0):
     cc2, cc1 = cv.at('J101.B5'), cv.at('J101.A5')
     cv.hang(P_['R102'], cc2[0] + 5.08, cc2[1], gap=0)
     cv.wire('J101.B5', 'R102.1')
-    cv.hang(P_['R101'], cc1[0] + 12.7, cc1[1], gap=0)
+    cv.hang(P_['R101'], cc1[0] + 15.24, cc1[1], gap=0)
     cv.wire('J101.A5', 'R101.1')
     return f, d, fb, c, r
 
@@ -44,18 +44,18 @@ def dc_input(cv, P_, x0, y0):
     """DC 12 to 24 V: jack and terminal, fuse, reverse-polarity diode, pi filter, TVS, 5 V converter."""
     cv.begin('DC input 12 to 24 V')
     yb = y0
-    cv.put(P_['J102'], x0 + 7.62, yb + P)
-    cv.put(P_['J103'], x0 + 10.16, yb + 15.24, mirror=True)
+    cv.put(P_['J102'], x0 + 7.62, yb + P, fields='l')
+    cv.put(P_['J103'], x0 + 10.16, yb + 15.24, mirror=True, fields='l')
     xj = cv.at('J102.1')[0]
     cv.wire('J103.1', (xj + 7.62, cv.at('J103.1')[1]), (xj + 7.62, yb))
     cv.inline(P_['F102'], xj + 15.24, yb)
-    cv.diode(P_['D105'], xj + 27.94, yb)
-    cv.hang(P_['C117'], xj + 38.1, yb)
-    cv.inline(P_['L103'], xj + 58.42, yb)
-    cv.tvs(P_['D106'], xj + 68.58, yb)
-    cv.hang(P_['C112'], xj + 83.82, yb)
-    cv.hang(P_['C113'], xj + 99.06, yb)
-    converter(cv, P_, 'U104', 'R103', 'C114', 'L102', ['C115', 'C116', 'R105'], 'D107', xj + 142.24, yb)
+    cv.diode(P_['D105'], xj + 35.56, yb)
+    cv.hang(P_['C117'], xj + 43.18, yb)
+    cv.inline(P_['L103'], xj + 63.5, yb)
+    cv.tvs(P_['D106'], xj + 73.66, yb)
+    cv.hang(P_['C112'], xj + 88.9, yb)
+    cv.hang(P_['C113'], xj + 106.68, yb)
+    converter(cv, P_, 'U104', 'R103', 'C114', 'L102', ['C115', 'C116', 'R105'], 'D107', xj + 149.86, yb)
     cv.wire('J102.1', 'F102.1')
     cv.wire('F102.2', 'D105.2')
     cv.wire('D105.1', 'L103.1')
@@ -74,7 +74,7 @@ def converter(cv, P_, ic, ren, cbst, ind, outs, diode, ux, yin, out_net=None):
     bst, sw, fb = u.pin('6'), u.pin('5'), u.pin('1')
     c = cv.put(P_[cbst], bst[0] + 15.24, sw[1] - 3.81)
     cv.wire(bst, (bst[0] + P, bst[1]), (bst[0] + P, c.pin('1')[1]), c.pin('1'))
-    lx = bst[0] + 33.02
+    lx = bst[0] + 38.1
     cv.inline(P_[ind], lx, sw[1])
     cv.wire(sw, cv.at(ind + '.1'))
     xo = lx + 3.81 + P
@@ -82,7 +82,7 @@ def converter(cv, P_, ic, ren, cbst, ind, outs, diode, ux, yin, out_net=None):
     x = xo + 7.62
     for ref in outs:
         cv.hang(P_[ref], x, sw[1])
-        x += 13.97
+        x += 16.51
     end = (x, sw[1])
     if diode:
         dd = cv.diode(P_[diode], x + 3.81, sw[1])
@@ -115,8 +115,8 @@ def poe(cv, P_, x0, y0):
     xo = u.pin('1')[0] + P
     cv.wire('U102.2', (xo, cv.at('U102.2')[1]), (xo, yp))
     cv.hang(P_['C103'], xo + 10.16, yp)
-    cv.hang(P_['C104'], xo + 25.4, yp)
-    dd = cv.diode(P_['D104'], xo + 43.18, yp)
+    cv.hang(P_['C104'], xo + 30.48, yp)
+    dd = cv.diode(P_['D104'], xo + 48.26, yp)
     cv.wire('U102.1', 'D104.2')
     k = dd.pin('1')
     cv.wire(k, (k[0] + P, yp))
@@ -130,15 +130,15 @@ def rail(cv, P_, x0, y0):
     cv.begin('5 V rail and 3.3 V converter')
     y = y0
     cv.power('+5V', x0, y)
-    cv.put(P_['TP801'], x0 + 7.62, y)
+    cv.put(P_['TP801'], x0 + 7.62, y, fields='tp')
     cv.hang(P_['C105'], x0 + 15.24, y)
-    cv.hang(P_['C106'], x0 + 29.21, y)
-    cv.hang(P_['C107'], x0 + 43.18, y)
-    u = converter(cv, P_, 'U103', 'R106', 'C108', 'L101', ['C109', 'C110', 'C111'], None, x0 + 88.9, y,
+    cv.hang(P_['C106'], x0 + 31.75, y)
+    cv.hang(P_['C107'], x0 + 50.8, y)
+    u = converter(cv, P_, 'U103', 'R106', 'C108', 'L101', ['C109', 'C110', 'C111'], None, x0 + 96.52, y,
                   out_net='+3V3')
     cv.wire((x0, y), u.pin('3'))
     x3 = cv.at('L101.2')[0]
-    cv.put(P_['TP802'], x3 + 5.08, y)
+    cv.put(P_['TP802'], x3 + 5.08, y + P, fields='tp')
     cv.put(P_['TP804'], x0 + 7.62, y + 30.48)
     cv.put(P_['TP805'], x0 + 20.32, y + 30.48)
 
@@ -147,4 +147,4 @@ def power(cv, P_, top):
     usb(cv, P_, 25.4, top + 22.86)
     dc_input(cv, P_, 25.4, top + 96.52)
     poe(cv, P_, 38.1, top + 152.4)
-    rail(cv, P_, 198.12, top + 22.86)
+    rail(cv, P_, 187.96, top + 22.86)

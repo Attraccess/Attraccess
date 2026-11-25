@@ -17,7 +17,7 @@ def gpio(cv, P_, x, y):
     cv.begin('ESP32-P4: GPIO')
     u = cv.put(P_['U201'], x, y, unit=1)
     # USB Serial/JTAG: series resistors right at the pins, then on to the connector on the power sheet
-    for pin, r, dx in (('GPIO24', 'R215', 15.24), ('GPIO25', 'R216', 33.02)):
+    for pin, r, dx in (('GPIO24', 'R215', 17.78), ('GPIO25', 'R216', 35.56)):
         num = next(n for n, p in u.pins.items() if p[3] == pin)
         px, py = u.pin(num)
         cv.inline(P_[r], px + dx, py, reverse=True, fields='a' if r == 'R215' else 'b')
@@ -27,9 +27,9 @@ def gpio(cv, P_, x, y):
     for k, (pin, tp) in enumerate((('GPIO37', 'TP808'), ('GPIO38', 'TP809'))):
         num = next(n for n, p in u.pins.items() if p[3] == pin)
         px, py = u.pin(num)
-        tx = px + 20.32 + 10.16 * k
+        tx = px + 25.4 + 15.24 * k
         cv.wire((px, py), (tx, py))
-        cv.put(P_[tp], tx, py, fields={'Reference': (3.6, -3.3), 'Value': (3.6, -1.6)})
+        cv.put(P_[tp], tx, py, fields='tp')
 
 
 def system(cv, P_, x, y):
@@ -50,8 +50,8 @@ def crystal(cv, P_, x, y):
     cv.put(P_['Y201'], xc, yc, 270, fields='r')
     cv.wire('R209.2', (xc, yp), 'Y201.1')
     cv.wire('R210.2', (xc, yn), 'Y201.3')
-    cv.wire((xc, yp), (xc + 25.4, yp))
-    cv.hang(P_['C238'], xc + 25.4, yp, gap=P)
+    cv.wire((xc, yp), (xc + 33.02, yp))
+    cv.hang(P_['C238'], xc + 33.02, yp, gap=P)
     cv.wire((xc, yn), (xc + 5.08, yn))
     cv.hang(P_['C239'], xc + 5.08, yn, gap=P)
 
@@ -80,11 +80,11 @@ def flash(cv, P_, x, y):
 def reset(cv, P_, x, y):
     """Reset: RC on CHIP_PU, the button and its test point."""
     cv.begin('Reset')
-    cv.put(P_['TP806'], x + 5.08, y, fields={'Reference': (3.6, -3.3), 'Value': (3.6, -1.6)})
+    cv.put(P_['TP806'], x + 5.08, y, fields='tp')
     cv.stand(P_['R211'], x + 15.24, y)
     cv.hang(P_['C240'], x + 25.4, y)
-    sw = cv.put_at(P_['SW201'], '1', x + 38.1, y + 7.62, fields={'Reference': (0, -9.0), 'Value': (0, 4.4)})
-    cv.wire((x + 35.56, y), (x + 35.56, y + 7.62), sw.pin('1'))
+    sw = cv.put_at(P_['SW201'], '1', x + 45.72, y + 7.62, fields='b')
+    cv.wire((x + 43.18, y), (x + 43.18, y + 7.62), sw.pin('1'))
     cv.wire((x + 5.08, y), (x + 55.88, y))
     cv.label('CHIP_PU', x + 55.88, y, 'R')
 
@@ -96,8 +96,8 @@ def straps(cv, P_, x, y):
     cv.stand(P_['R212'], x + 7.62, y)
     cv.inline(P_['R217'], x + 20.32, y)
     cv.wire((x, y), 'R217.1')
-    cv.put(P_['TP807'], x + 30.48, y, fields={'Reference': (3.6, -3.3), 'Value': (3.6, -1.6)})
-    sw = cv.put_at(P_['SW202'], '1', x + 40.64, y + 7.62, fields={'Reference': (0, -9.0), 'Value': (0, 4.4)})
+    cv.put(P_['TP807'], x + 33.02, y, fields='tp')
+    sw = cv.put_at(P_['SW202'], '1', x + 40.64, y + 7.62, fields='b')
     cv.wire('R217.2', (x + 38.1, y), (x + 38.1, y + 7.62), sw.pin('1'))
     for k, (net, r) in enumerate((('RMII_TXD0', 'R213'), ('ETH_MDIO', 'R214'))):
         yy = y + 25.4 + 20.32 * k
@@ -121,7 +121,7 @@ def decoupling(cv, P_, x, y):
     """The capacitors of each supply pin, grouped by rail. Each names the pin it sits at."""
     cv.begin('3.3 V supply pins: one capacitor at each pin')
     refs = ['C201', 'C202', 'C203', 'C204', 'C205', 'C206', 'C207', 'C212', 'C210', 'C211', 'C208', 'C209']
-    cv.rail('+3V3', [P_[r] for r in refs], x, y, pitch=13.97, note=True)
+    cv.rail('+3V3', [P_[r] for r in refs], x, y, pitch=19.05, note=True)
     yb = y + 30.48
     cv.begin('VDD_BAT and USB PHY supply')
     for k, (r, net, caps) in enumerate((('R201', 'VDD_BAT', ['C213', 'C214']),
@@ -132,16 +132,16 @@ def decoupling(cv, P_, x, y):
         cx = x + 20.32
         for c in caps:
             cv.hang(P_[c], cx, yy)
-            cx += 13.97
+            cx += 16.51
         cv.wire((x, yy), r + '.1')
         cv.wire(r + '.2', (cx, yy))
         cv.label(net, cx, yy, 'R')
     cv.begin('Core rail: one capacitor at each pin')
     yc = yb
     xc = x + 96.52
-    end = cv.rail('VDD_HP', [P_[r] for r in ('C218', 'C219', 'C221', 'C222')], xc, yc, pitch=13.97, note=True)
-    cv.put(P_['TP803'], end, yc, fields={'Reference': (3.6, -3.3), 'Value': (4.6, -1.6)})
-    cv.wire((end - 13.97, yc), (end, yc))
+    end = cv.rail('VDD_HP', [P_[r] for r in ('C218', 'C219', 'C221', 'C222')], xc, yc, pitch=16.51, note=True)
+    cv.put(P_['TP803'], end, yc, fields='tp')
+    cv.wire((end - 16.51, yc), (end, yc))
     yh = yc + 25.4
     cv.label('VDD_HP', xc, yh, 'L')
     cv.inline(P_['R203'], xc + 7.62, yh)
@@ -154,8 +154,8 @@ def decoupling(cv, P_, x, y):
     for k, (net, caps) in enumerate((('VDD_FLASH', ['C223', 'C224', 'C225']),
                                       ('VDD_PSRAM', ['C226', 'C227', 'C228', 'C229']),
                                       ('VDDO_3', ['C230']), ('VDDO_4', ['C231']))):
-        xx = x + (0, 55.88, 132.08, 160.02)[k]
-        cv.rail(net, [P_[c] for c in caps], xx, yr, pitch=13.97, note=True)
+        xx = x + (0, 76.2, 177.8, 205.74)[k]
+        cv.rail(net, [P_[c] for c in caps], xx, yr, pitch=21.59, note=True)
 
 
 def core_converter(cv, P_, x, y):
@@ -163,24 +163,24 @@ def core_converter(cv, P_, x, y):
     cv.begin('Core 1.1 V converter (TLV62569)')
     u = cv.put(P_['U202'], x + 66.04, y + P)
     vin, en, sw, fb = u.pin('4'), u.pin('1'), u.pin('3'), u.pin('5')
-    cv.rail('+3V3', [P_['C232'], P_['C233']], x, vin[1], pitch=13.97, end=vin, note=True)
+    cv.rail('+3V3', [P_['C232'], P_['C233']], x, vin[1], pitch=16.51, end=vin, note=True)
     cv.wire(en, (en[0] - 5.08, en[1]))
     cv.hang(P_['R206'], en[0] - 5.08, en[1], gap=0, fields='l')
     cv.wire((en[0] - 5.08, en[1]), (en[0] - 10.16, en[1]))
     cv.label('EN_DCDC', en[0] - 10.16, en[1], 'L')
-    cv.inline(P_['L201'], sw[0] + 15.24, sw[1])
+    cv.inline(P_['L201'], sw[0] + 20.32, sw[1])
     cv.wire(sw, 'L201.1')
-    xd = sw[0] + 27.94                              # divider: VDD_HP - R204 - FB - R205 - GND, C236 over R204
+    xd = sw[0] + 33.02                              # divider: VDD_HP - R204 - FB - R205 - GND, C236 over R204
     cv.hang(P_['R204'], xd, sw[1])
-    cv.hang(P_['C236'], xd + 10.16, sw[1])
+    cv.hang(P_['C236'], xd + 17.78, sw[1])
     yfb = cv.at('R204.2')[1]
     cv.wire('R204.2', 'C236.2')
     cv.hang(P_['R205'], xd, yfb)
     cv.wire(fb, (fb[0] + P, fb[1]), (fb[0] + P, yfb), (xd, yfb))
-    xo = xd + 22.86
+    xo = xd + 33.02
     for c in ('C234', 'C235'):
         cv.hang(P_[c], xo, sw[1])
-        xo += 13.97
+        xo += 16.51
     cv.wire('L201.2', (xo, sw[1]))
     cv.label('VDD_HP', xo, sw[1], 'R')
     cv.wire((xd - 5.08, yfb), (xd - 5.08, yfb + 7.62))

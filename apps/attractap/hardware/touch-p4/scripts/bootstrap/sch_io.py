@@ -8,12 +8,12 @@ def nfc(cv, P_, top):
     nfc_supplies(cv, P_, 139.7, top + 20.32)
     nfc_crystal(cv, P_, 139.7, top + 101.6)
     host(cv, P_, 254.0, top + 116.84)
-    rf(cv, P_, 50.8, top + 165.1)
+    rf(cv, P_, 50.8, top + 182.88)
 
 
 def pn532(cv, P_, x, y):
     cv.begin('PN532')
-    cv.put(P_['U501'], x, y + 35.56, fields={'Reference': (0, -1.7), 'Value': (0, 0)})
+    cv.put(P_['U501'], x, y + 35.56, fields={'Reference': (-22.86, -38.4), 'Value': (-22.86, -36.7)})
 
 
 def nfc_supplies(cv, P_, x, y):
@@ -21,12 +21,12 @@ def nfc_supplies(cv, P_, x, y):
     transmitter supply, each through a ferrite with its capacitors."""
     cv.begin('Supplies')
     cv.power('+5V', x, y)
-    cv.inline(P_['FB501'], x + 7.62, y)
-    cv.hang(P_['C501'], x + 20.32, y)
-    cv.hang(P_['C502'], x + 34.29, y)
+    cv.inline(P_['FB501'], x + 12.7, y)
+    cv.hang(P_['C501'], x + 25.4, y)
+    cv.hang(P_['C502'], x + 43.18, y)
     cv.wire((x, y), 'FB501.1')
-    cv.wire('FB501.2', (x + 45.72, y))
-    cv.label('NFC_VBAT', x + 45.72, y, 'R')
+    cv.wire('FB501.2', (x + 55.88, y))
+    cv.label('NFC_VBAT', x + 55.88, y, 'R')
     for k, (fb, caps, net) in enumerate((('FB502', ['C505', 'C506'], 'NFC_AVDD'),
                                          ('FB503', ['C507', 'C508'], 'NFC_TVDD'))):
         yy = y + 22.86 + 22.86 * k
@@ -35,13 +35,13 @@ def nfc_supplies(cv, P_, x, y):
         if k == 0:
             for c in ('C503', 'C504'):
                 cv.hang(P_[c], cx, yy)
-                cx += 13.97
+                cx += 16.51
         cv.inline(P_[fb], cx + 3.81, yy)
         cv.wire((x, yy), fb + '.1')
         cx += 15.24
         for c in caps:
             cv.hang(P_[c], cx, yy)
-            cx += 13.97
+            cx += 16.51
         cv.wire(fb + '.2', (cx, yy))
         cv.label(net, cx, yy, 'R')
     cv.rail('+3V3', [P_['C509']], x + 96.52, y, note=True)
@@ -70,7 +70,7 @@ def host(cv, P_, x, y):
         xr = x + 7.62 + 10.16 * k
         cv.label(net, x, yy, 'L')
         cv.wire((x, yy), (xr, yy))
-        cv.stand(P_[r], xr, yy, fields={'Reference': (2.6, -1.5), 'Value': (2.6, 0.2)})
+        cv.stand(P_[r], xr, yy, fields='r')
     yr = y + 15.24
     cv.label('NFC_RST', x, yr, 'L')
     cv.wire((x, yr), (x + 7.62, yr))
@@ -97,7 +97,7 @@ def rf(cv, P_, x, y):
         cv.wire((x, yy), l0 + '.1')
         cv.wire(l0 + '.2', c1 + '.1')
         cv.wire(c1 + '.2', rq + '.1')
-    ant = cv.put(P_['ANT501'], xant, yant, 270, fields={'Reference': (8.0, -1.6), 'Value': (8.0, 0.1)})
+    ant = cv.put(P_['ANT501'], xant, yant, 270, fields='r')
     p1, p2 = ant.pin('1'), ant.pin('2')             # p1 (NFC_ANT2) above p2 (NFC_ANT1)
     cv.wire('R505.2', (xant - 22.86, ya), (xant - 22.86, p1[1]), p1)
     cv.wire('R504.2', (xant - 15.24, yb), (xant - 15.24, p2[1]), p2)
@@ -106,42 +106,42 @@ def rf(cv, P_, x, y):
     cv.wire((x + 35.56, ya), r.pin('1'))
     yr = r.pin('2')[1] - P
     cv.wire(r.pin('2'), (x + 35.56, yr))
-    cv.inline(P_['C520'], x + 45.72, yr, fields='a')
+    cv.inline(P_['C520'], x + 50.8, yr, fields='a')
     cv.wire((x + 35.56, yr), 'C520.1')
-    cv.inline(P_['R507'], x + 66.04, yr, fields='a')
+    cv.inline(P_['R507'], x + 73.66, yr, fields='a')
     cv.wire('C520.2', 'R507.1')
-    cv.wire((x + 55.88, yr), (x + 55.88, yr - 7.62))
-    cv.label('NFC_RX', x + 55.88, yr - 7.62, 'U')
-    cv.hang(P_['C521'], x + 76.2, yr, gap=0)
-    cv.wire('R507.2', (x + 86.36, yr))
-    cv.label('NFC_VMID', x + 86.36, yr, 'R')
+    cv.wire((x + 60.96, yr), (x + 60.96, yr - 7.62))
+    cv.label('NFC_RX', x + 60.96, yr - 7.62, 'U')
+    cv.hang(P_['C521'], x + 83.82, yr, gap=0)
+    cv.wire('R507.2', (x + 96.52, yr))
+    cv.label('NFC_VMID', x + 96.52, yr, 'R')
 
 
 # ---- Display -----------------------------------------------------------------------------------------
 def display(cv, P_, top):
-    panel(cv, P_, 391.16, top + 12.7)
+    panel(cv, P_, 365.76, top + 12.7)
     series(cv, P_, 50.8, top + 20.32)
-    backlight(cv, P_, 129.54, top + 22.86)
+    backlight(cv, P_, 119.38, top + 22.86)
     expander(cv, P_, 152.4, top + 104.14)
 
 
 def panel(cv, P_, x, y):
     cv.begin('Panel connector')
-    cv.put(P_['J601'], x, y + 49.53)
-    cv.rail('+3V3', [P_[c] for c in ('C601', 'C602', 'C603', 'C604')], x - 104.14, y + 2.54, pitch=13.97, note=True)
+    cv.put_at(P_['J601'], '1', x, y + 5.08)
+    cv.rail('+3V3', [P_[c] for c in ('C601', 'C602', 'C603', 'C604')], x - 104.14, y + 2.54, pitch=16.51, note=True)
     for k, (net, r) in enumerate((('I2C0_SCL', 'R601'), ('I2C0_SDA', 'R602'))):
         yy = y + 40.64 + P * k
         xr = x - 96.52 + 10.16 * k
         cv.label(net, x - 104.14, yy, 'L')
         cv.wire((x - 104.14, yy), (xr, yy))
-        cv.stand(P_[r], xr, yy, fields={'Reference': (2.6, -1.5), 'Value': (2.6, 0.2)})
+        cv.stand(P_[r], xr, yy, fields='r')
 
 
 def series(cv, P_, x, y):
     """33 ohm arrays in the RGB bus at the MCU: labels on both sides (a bus)."""
     cv.begin('Series resistors on the RGB bus')
     for k in range(5):
-        cv.put(P_['RN60%d' % (k + 1)], x, y + 20.32 * k + 5.08, 270, fields={'Reference': (0, -7.4), 'Value': (0, 4.4)})
+        cv.put(P_['RN60%d' % (k + 1)], x, y + 20.32 * k + 5.08, 270, fields={'Reference': (0, -10.4), 'Value': (0, -8.7)})
 
 
 def backlight(cv, P_, x, y):
@@ -162,9 +162,9 @@ def backlight(cv, P_, x, y):
     xo = sw[0] + 22.86
     cv.wire(ov, (xo, ov[1]), (xo, sw[1]))
     cv.hang(P_['C606'], xo + 7.62, sw[1])
-    cv.hang(P_['C607'], xo + 20.32, sw[1])
-    cv.wire('D601.1', (xo + 30.48, sw[1]))
-    cv.label('BL_A', xo + 30.48, sw[1], 'R')
+    cv.hang(P_['C607'], xo + 25.4, sw[1])
+    cv.wire('D601.1', (xo + 35.56, sw[1]))
+    cv.label('BL_A', xo + 35.56, sw[1], 'R')
     yk = fb[1] + 15.24
     cv.wire(fb, (fb[0] + P, fb[1]), (fb[0] + P, yk), (fb[0] + 12.7, yk))
     cv.hang(P_['R603'], fb[0] + 7.62, yk, gap=0, fields='l')
@@ -187,8 +187,8 @@ def expander(cv, P_, x, y):
 # ---- UI ----------------------------------------------------------------------------------------------
 def ui(cv, P_, top):
     leds(cv, P_, 30.48, top + 45.72)
-    buzzer(cv, P_, 274.32, top + 15.24)
-    tamper(cv, P_, 50.8, top + 157.48)
+    buzzer(cv, P_, 309.88, top + 15.24)
+    tamper(cv, P_, 50.8, top + 170.18)
 
 
 def leds(cv, P_, x, y):
@@ -205,17 +205,17 @@ def leds(cv, P_, x, y):
     cv.power('+5V', vcc[0] + 15.24, yc)
     cv.inline(P_['R701'], yo[0] + 20.32, yo[1])
     cv.wire(yo, 'R701.1')
-    pitch = 30.48
+    pitch = 35.56
     x0 = yo[0] + 45.72
     for row in range(2):
-        yy = yo[1] + 50.8 * row
+        yy = yo[1] + 58.42 * row
         rail = yy - 25.4
         cv.power('+5V', x0 - 30.48, rail)
         if row == 0:
             cv.hang(P_['C702'], x0 - 22.86, rail, note=True)
         for k in range(4):
             i = 4 * row + k
-            d = cv.put(P_['D70%d' % (i + 1)], x0 + pitch * k, yy, fields={'Reference': (0, 4.0), 'Value': (0, 5.7)})
+            d = cv.put(P_['D70%d' % (i + 1)], x0 + pitch * k, yy, fields={'Reference': (4.6, 9.4), 'Value': (8.6, 11.1)})
             vdd = d.pin('3')
             cv.wire(vdd, (vdd[0], rail))
             cv.hang(P_['C7%02d' % (i + 3)], vdd[0] + 12.7, rail, note=True)
@@ -224,9 +224,9 @@ def leds(cv, P_, x, y):
         cv.wire((x0 - 30.48, rail), (x0 + pitch * 3 + 12.7, rail))
     cv.wire('R701.2', 'D701.2')
     out = cv.at('D704.4')
-    yw = out[1] + 22.86
+    yw = out[1] + 25.4
     cv.wire(out, (out[0] + 5.08, out[1]), (out[0] + 5.08, yw), (x0 - 35.56, yw),
-            (x0 - 35.56, out[1] + 50.8), 'D705.2')
+            (x0 - 35.56, out[1] + 58.42), 'D705.2')
 
 
 def buzzer(cv, P_, x, y):
@@ -237,7 +237,7 @@ def buzzer(cv, P_, x, y):
     cv.wire((x, y), r.pin('1'))
     yp = y + 15.24
     cv.wire(r.pin('2'), (x, yp), (x + 15.24, yp))
-    bz = cv.put_at(P_['BZ701'], '1', x, yp + P)
+    bz = cv.put_at(P_['BZ701'], '1', x, yp + P, fields='l')
     cv.wire((x, yp), bz.pin('1'))
     d = cv.put_at(P_['D709'], '1', x + 15.24, yp + P, 270)
     cv.wire((x + 15.24, yp), d.pin('1'))
@@ -258,12 +258,12 @@ def tamper(cv, P_, x, y):
     cv.begin('Tamper detection')
     acc = cv.put(P_['U702'], x + 30.48, y, fields={'Reference': (11.4, -15.0), 'Value': (11.4, -13.3)})
     sa0 = acc.pin('3')
-    cv.wire(sa0, (sa0[0] - 17.78, sa0[1]))
-    cv.stand(P_['R706'], sa0[0] - 17.78, sa0[1], gap=0, fields='l')
+    cv.wire(sa0, (sa0[0] - 27.94, sa0[1]))
+    cv.stand(P_['R706'], sa0[0] - 27.94, sa0[1], gap=0, fields='l')
     i1 = acc.pin('12')
     cv.wire(i1, (i1[0] + 12.7, i1[1]))
-    cv.put(P_['TP814'], i1[0] + 12.7, i1[1], fields={'Reference': (3.6, -3.3), 'Value': (4.6, -1.6)})
-    cv.rail('+3V3', [P_['C711'], P_['C712']], x, y - 35.56, pitch=13.97)
+    cv.put(P_['TP814'], i1[0] + 12.7, i1[1], fields='tp')
+    cv.rail('+3V3', [P_['C711'], P_['C712']], x, y - 35.56, pitch=16.51)
     hall = cv.put(P_['U703'], x + 96.52, y, fields='l')
     cv.rail('+3V3', [P_['C713']], x + 106.68, y - 35.56)
     prox = cv.put(P_['U704'], x + 172.72, y)
@@ -273,8 +273,8 @@ def tamper(cv, P_, x, y):
     it = prox.pin('6')
     cv.wire(it, (it[0] + 30.48, it[1]))
     cv.stand(P_['R707'], it[0] + 17.78, it[1], gap=0, fields='r')
-    cv.put(P_['TP815'], it[0] + 30.48, it[1], fields={'Reference': (3.6, -3.3), 'Value': (4.6, -1.6)})
-    cv.rail('+3V3', [P_['C714'], P_['C715']], x + 137.16, y - 35.56, pitch=13.97)
+    cv.put(P_['TP815'], it[0] + 30.48, it[1], fields='tp')
+    cv.rail('+3V3', [P_['C714'], P_['C715']], x + 137.16, y - 35.56, pitch=16.51)
     return hall
 
 

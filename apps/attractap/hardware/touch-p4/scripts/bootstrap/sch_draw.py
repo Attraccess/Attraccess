@@ -21,7 +21,7 @@ POWER = {'GND': 'power:GND', '+3V3': 'power:+3V3', '+5V': 'power:+5V'}
 SIDE = {0: 'L', 90: 'D', 180: 'R', 270: 'U'}
 DIR = {'L': (-1, 0), 'R': (1, 0), 'U': (0, -1), 'D': (0, 1)}
 NS = uuid.UUID('6f1f0d6e-2c55-4d0e-9a3d-41747472ac70')
-CHAR = 0.8                                 # width of a character of KiCad's font, in text heights
+CHAR = 1.0                                 # width of a character of KiCad's font, in text heights (with spacing)
 
 
 def uid(*parts):
@@ -99,6 +99,69 @@ def body_box(sym, unit):
     return (min(xs), min(ys), max(xs), max(ys))
 
 
+def _hidden(node):
+    h = first(node, 'hide') if node else None
+    return bool(h) and (len(h) < 2 or str(h[1]) == 'yes')
+
+
+def pin_text_boxes(sym, unit):
+    """Where KiCad writes the pin names and numbers of a unit, in library coordinates (y up):
+    [(pin number, kind, (x1, y1, x2, y2))]. Names inside the body when the symbol has a name offset,
+    above the pin otherwise; numbers along the pin."""
+    pn, pnum = first(sym, 'pin_names'), first(sym, 'pin_numbers')
+    offset = float(first(pn, 'offset')[1]) if pn and first(pn, 'offset') else 0.508
+    names_hidden = _hidden(pn) if pn else False
+    numbers_hidden = _hidden(pnum) if pnum else False
+    out = []
+    for sub in find(sym, 'symbol'):
+        u = int(sub[1].rsplit('_', 2)[-2])
+        if u not in (0, unit):
+            continue
+        for p in find(sub, 'pin'):
+            if _hidden(p):
+                continue
+            at = first(p, 'at')
+            x, y, ang = float(at[1]), float(at[2]), float(at[3]) if len(at) > 3 else 0.0
+            ln = float(first(p, 'length')[1]) if first(p, 'length') else 0.0
+            dx, dy = round(math.cos(math.radians(ang))), round(math.sin(math.radians(ang)))
+            name, num = first(p, 'name'), first(p, 'number')
+            nsize = float(first(first(first(name, 'effects'), 'font'), 'size')[1]) if first(name, 'effects') else 1.27
+            msize = float(first(first(first(num, 'effects'), 'font'), 'size')[1]) if first(num, 'effects') else 1.27
+            text, number = str(name[1]), str(num[1])
+            ex, ey = x + dx * ln, y + dy * ln                    # inner end of the pin
+            mx, my = x + dx * ln / 2, y + dy * ln / 2            # middle of the pin
+            horizontal = dy == 0
+
+            def box(cx, cy, along, across):
+                return ((cx - along / 2, cy - across / 2, cx + along / 2, cy + across / 2) if horizontal
+                        else (cx - across / 2, cy - along / 2, cx + across / 2, cy + along / 2))
+            if text not in ('', '~') and not names_hidden:
+                w = len(text) * nsize * CHAR
+                if offset > 0:
+                    c = (ex + dx * (offset + w / 2), ey + dy * (offset + w / 2))
+                    out.append((str(number), 'name', box(c[0], c[1], w, nsize * 1.1)))
+                else:
+                    nx, ny = (0, 1) if horizontal else (-1, 0)
+                    c = (mx + nx * (nsize * 0.6 + 0.25), my + ny * (nsize * 0.6 + 0.25))
+                    out.append((str(number), 'name', box(c[0], c[1], w, nsize * 1.1)))
+            if not numbers_hidden:
+                w = len(number) * msize * CHAR
+                nx, ny = (0, 1) if horizontal else (-1, 0)
+                side = 1 if offset > 0 or text in ('', '~') or names_hidden else -1
+                c = (mx + side * nx * (msize * 0.6 + 0.25), my + side * ny * (msize * 0.6 + 0.25))
+                out.append((str(number), 'number', box(c[0], c[1], w, msize * 1.1)))
+    return out
+
+
+def is_box(sym, unit):
+    """Does the unit's drawing consist of a rectangle (a box symbol, with room for text inside)?"""
+    for sub in find(sym, 'symbol'):
+        u = int(sub[1].rsplit('_', 2)[-2])
+        if u in (0, unit) and find(sub, 'rectangle'):
+            return True
+    return False
+
+
 class Unit:
     """One placed symbol unit: its pins on the sheet and the box its drawing takes."""
 
@@ -106,14 +169,23 @@ class Unit:
         """mirror: flipped left to right (KiCad's "mirror y"), then turned by angle."""
         self.part, self.unit, self.x, self.y, self.angle, self.mirror = part, unit, x, y, angle, mirror
         self.pins = {}
+        self.pin_lines = []                        # the drawn pin lines: (x1, y1, x2, y2)
         m = -1 if mirror else 1
         for num, name, px, py, pang, plen, u in libs.symbol_pins(sym):
             if u not in (0, unit) and len({p[6] for p in libs.symbol_pins(sym)}) > 1:
                 continue
+            ex, ey = px + plen * round(math.cos(math.radians(pang))), py + plen * round(math.sin(math.radians(pang)))
             if mirror:
                 pang = 180 - pang
             side = SIDE[int(round(pang + angle)) % 360]
             self.pins[num] = tf(x, y, angle, m * px, py) + (side, name)
+            self.pin_lines.append(tf(x, y, angle, m * px, py) + tf(x, y, angle, m * ex, ey))
+        self.pin_text = []
+        for num, kind, (tx1, ty1, tx2, ty2) in pin_text_boxes(sym, unit):
+            corners = [tf(x, y, angle, m * cx, cy) for cx in (tx1, tx2) for cy in (ty1, ty2)]
+            self.pin_text.append((num, kind, (min(c[0] for c in corners), min(c[1] for c in corners),
+                                              max(c[0] for c in corners), max(c[1] for c in corners))))
+        self.boxed = is_box(sym, unit)
         bx1, by1, bx2, by2 = body_box(sym, unit)
         if mirror:
             bx1, bx2 = -bx2, -bx1
@@ -149,6 +221,7 @@ class Canvas:
         self.blocks = []                           # everything added while it is current
         self.owner = {'wire': [], 'label': [], 'power': []}
         self.flags = []                            # PWR_FLAG symbols: (net, x, y)
+        self.owned_texts = []                      # notes inside a block: (text item, block)
 
     def begin(self, title):
         self.block = title
@@ -221,6 +294,8 @@ class Canvas:
                 pos = (x1 - 0.8 - w / 2, u.y + (i - (n - 1) / 2) * step)
             elif where == 'a':
                 pos = (cx, y1 - 1.2 - (n - 1 - i) * step)
+            elif where == 'tp':
+                pos = (x2 + 0.9 + w / 2, u.y - 3.4 + i * step)
             elif where == 'b':
                 pos = (cx, y2 + 1.2 + i * step + (1.0 if two and sides == {'L', 'R'} else 0))
             else:                                  # inside a large box, under its top edge
@@ -287,12 +362,15 @@ class Canvas:
         self.wire((x, y), (x, y + 2 * P))
         self.power(net, x, y + 2 * P, 0 if net == 'GND' else 180)
 
-    def text(self, s, x, y, size=1.27, bold=False, justify='left'):
-        self.texts.append((s, snap(x) if size < 3 else x, y, size, bold, justify))
+    def text(self, s, x, y, size=1.27, bold=False, justify='left', own=True):
+        item = (s, snap(x) if size < 3 else x, y, size, bold, justify)
+        self.texts.append(item)
+        if own and self.block:
+            self.owned_texts.append((item, self.block))
 
     def frame(self, title, x1, y1, x2, y2):
         self.frames.append((x1, y1, x2, y2))
-        self.text(title, x1 + 1.5, y1 + 3.4, 2.0, bold=True)
+        self.text(title, x1 + 1.5, y1 + 3.4, 2.0, bold=True, own=False)
 
     def _pin_side(self, spec):
         ref, num = spec.split('.', 1)
@@ -334,7 +412,7 @@ class Canvas:
             self.wire((x, rail_y), u.pin('1'))
         return u
 
-    def rail(self, net, parts, x, y, pitch=12.7, note=False, end=None, first=7.62):
+    def rail(self, net, parts, x, y, pitch=16.51, note=False, end=None, first=7.62):
         """A horizontal supply wire: a power symbol (or a label) for net at x, the parts hanging below it
         one pitch apart. end: a pin or point the wire continues to. Returns the x after the last part."""
         if net in POWER:
@@ -356,4 +434,4 @@ class Canvas:
         else:
             self.label(net, x, y, net_side)
         self.wire((x, y), (x + length, y))
-        return self.put(part, x + length, y, fields={'Reference': (3.6, -3.3), 'Value': (3.6, -1.6)})
+        return self.put(part, x + length, y, fields='tp')

@@ -15,7 +15,7 @@ def module(cv, P_, x, y):
     v = u.pin('3')
     ry = v[1] - 7.62                                # supply comes in from above, capacitors hang from it
     cv.wire(v, (v[0] - P, v[1]), (v[0] - P, ry))
-    cv.rail('+3V3', [P_['C301'], P_['C302']], v[0] - 45.72, ry, pitch=13.97, end=(v[0] - P, ry))
+    cv.rail('+3V3', [P_['C301'], P_['C302']], v[0] - 45.72, ry, pitch=16.51, end=(v[0] - P, ry))
 
 
 def enable(cv, P_, x, y):
@@ -26,7 +26,7 @@ def enable(cv, P_, x, y):
     cv.inline(P_['R302'], x + 7.62, y)
     cv.stand(P_['R301'], x + 17.78, y)
     cv.hang(P_['C303'], x + 27.94, y)
-    cv.put(P_['TP810'], x + 38.1, y, fields={'Reference': (3.6, -3.3), 'Value': (4.6, -1.6)})
+    cv.put(P_['TP810'], x + 38.1, y, fields='tp')
     cv.wire((x, y), 'R302.1')
     cv.wire('R302.2', (x + 50.8, y))
     cv.label('C6_EN', x + 50.8, y, 'R')
@@ -49,7 +49,7 @@ def sdio(cv, P_, x, y):
         xr = x + 7.62 + 10.16 * k
         cv.label(net, x, yy, 'L')
         cv.wire((x, yy), (xr, yy))
-        cv.stand(P_[r], xr, yy, fields={'Reference': (2.6, -1.5), 'Value': (2.6, 0.2)})
+        cv.stand(P_[r], xr, yy, fields='r')
 
 
 def c6_test_points(cv, P_, x, y):
@@ -63,29 +63,29 @@ def eth(cv, P_, top):
     phy(cv, P_, 76.2, top + 43.18)
     phy_supply(cv, P_, 152.4, top + 20.32)
     eth_crystal(cv, P_, 152.4, top + 76.2)
-    straps(cv, P_, 152.4, top + 124.46)
-    rmii_resistors(cv, P_, 246.38, top + 20.32)
-    jack(cv, P_, 355.6, top + 43.18)
+    straps(cv, P_, 152.4, top + 137.16)
+    rmii_resistors(cv, P_, 223.52, top + 76.2)
+    jack(cv, P_, 340.36, top + 43.18)
 
 
 def phy(cv, P_, x, y):
     cv.begin('Ethernet PHY')
-    cv.put(P_['U401'], x, y + 30.48)
+    cv.put(P_['U401'], x, y + 30.48, fields={'Reference': (-9.5, -31.6), 'Value': (-9.5, -29.9)})
 
 
 def phy_supply(cv, P_, x, y):
     cv.begin('PHY supply')
     cv.power('+3V3', x, y)
-    cv.inline(P_['FB401'], x + 7.62, y)
-    end = x + 20.32
+    cv.inline(P_['FB401'], x + 12.7, y)
+    end = x + 25.4
     for c in ('C401', 'C402', 'C403'):
         cv.hang(P_[c], end, y, note=True)
-        end += 13.97
+        end += 16.51
     cv.wire((x, y), 'FB401.1')
     cv.wire('FB401.2', (end, y))
     cv.label('PHY_3V3', end, y, 'R')
     yr = y + 22.86
-    cv.rail('PHY_REG', [P_['C404'], P_['C405']], x, yr, pitch=13.97)
+    cv.rail('PHY_REG', [P_['C404'], P_['C405']], x, yr, pitch=16.51)
     cv.label('PHY_ISET', x + 40.64, yr, 'L')
     cv.wire((x + 40.64, yr), (x + 45.72, yr))
     cv.hang(P_['R401'], x + 45.72, yr, gap=0)
@@ -137,7 +137,7 @@ def jack(cv, P_, x, y):
     cv.begin('RJ45 jack with magnetics and PoE rectifiers')
     u = cv.put(P_['J401'], x, y)
     ctt, ctr = u.pin('4'), u.pin('3')
-    for pin, cap, dx in ((ctt, 'C409', 43.18), (ctr, 'C408', 30.48)):
+    for pin, cap, dx in ((ctt, 'C409', 50.8), (ctr, 'C408', 38.1)):
         cv.wire(pin, (pin[0] - dx, pin[1]))
         cv.hang(P_[cap], pin[0] - dx, pin[1], gap=0, fields='l')
     yk, gk = u.pin('12'), u.pin('14')
@@ -149,6 +149,6 @@ def jack(cv, P_, x, y):
     ys = s1[1] + 5.08
     cv.wire(s1, (s1[0], ys))
     cv.wire(s2, (s2[0], ys))
-    cv.wire((s1[0], ys), (s2[0] + 25.4, ys))
+    cv.wire((s1[0], ys), (s2[0] + 30.48, ys))
     cv.hang(P_['C410'], s2[0] + 12.7, ys, gap=0)
-    cv.hang(P_['R413'], s2[0] + 25.4, ys, gap=0)
+    cv.hang(P_['R413'], s2[0] + 30.48, ys, gap=0)

@@ -235,7 +235,8 @@ def name_nets(cv):
     comp = {}
     for k, items in points.items():
         comp.setdefault(find_(k), []).append((k, items))
-    taken = [b for kind, _o, b in boxes(cv)]
+    taken = [(b, o.startswith(('label ', 'power '))) for kind, o, b in boxes(cv)]
+    taken += [(b, False) for u in cv.units.values() for _n, _k, b in u.pin_text]
     for members in comp.values():
         items = [it for _k, its in members for it in its]
         nets = {it[2] for it in items}
@@ -254,7 +255,7 @@ def name_nets(cv):
             v = snap(lo + 1.27)
             while v + w + 0.6 <= hi + 0.01:
                 box = (v + 0.2, y1 - 1.75, v + 0.2 + w, y1 - 0.25) if horizontal else (x1 - 1.75, v + 0.2, x1 - 0.25, v + 0.2 + w)
-                if not any(overlap(box, b, -0.05) for b in taken) and not _box_on_wire(cv, box):
+                if not any(overlap(box, b, -0.05 if name else GAP) for b, name in taken) and not _box_on_wire(cv, box):
                     best = ((v, y1, 'R') if horizontal else (x1, v, 'D'))
                     break
                 v = snap(v + 1.27)
@@ -269,12 +270,12 @@ def name_nets(cv):
                              if (x1, y1, x2, y2) in segs), blk)
             cv.label(net, *best)
             cv.block = blk
-            taken.append(boxes(cv)[-1][2] if False else
-                         (best[0], best[1] - 1.75, best[0] + w, best[1]) if best[2] == 'R' else (best[0] - 1.75, best[1], best[0], best[1] + w))
+            taken.append(((best[0], best[1] - 1.75, best[0] + w, best[1]) if best[2] == 'R'
+                          else (best[0] - 1.75, best[1], best[0], best[1] + w), True))
 
 
 def _box_on_wire(cv, box):
-    for x1, y1, x2, y2 in cv.wires:
+    for x1, y1, x2, y2 in cv.wires + [s for u in cv.units.values() for s in u.pin_lines]:
         if overlap(box, (min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2)), -0.1):
             return True
     return False
@@ -315,29 +316,65 @@ def boxes(cv):
 
 
 def power_text(net, x, y, ang):
+    """Centre of a power symbol's name. Centred text: KiCad applies a justification in the turned
+    frame of a turned symbol, which puts it on the other side of the point."""
+    half = len(net) * 1.0 * CHAR / 2
     if net == 'GND':
-        return {0: (x, y + 3.6, None), 180: (x, y - 3.6, None), 90: (x + 3.3, y, 'left'), 270: (x - 3.3, y, 'right')}[ang]
-    return {0: (x, y - 3.6, None), 180: (x, y + 3.6, None), 90: (x - 3.3, y, 'right'), 270: (x + 3.3, y, 'left')}[ang]
+        return {0: (x, y + 3.6, None), 180: (x, y - 3.6, None), 90: (x + 3.3 + half, y, None),
+                270: (x - 3.3 - half, y, None)}[ang]
+    return {0: (x, y - 3.6, None), 180: (x, y + 3.6, None), 90: (x - 3.3 - half, y, None),
+            270: (x + 3.3 + half, y, None)}[ang]
+
+
+def _inside(a, b):
+    return a[0] >= b[0] and a[1] >= b[1] and a[2] <= b[2] and a[3] <= b[3]
+
+
+GAP = 0.25        # texts must keep this much room from other texts and from drawings (mm)
 
 
 def lint(cv):
-    """Overlapping texts and symbols, and texts on wires. Returns a list of findings."""
+    """Overlapping texts and symbols, and texts on wires. Returns a list of findings.
+
+    Covers the fields, labels, power symbol names and notes, the pin names and numbers that KiCad
+    writes inside and along a symbol, and the symbols' drawings: a field may lie inside a box symbol
+    (clear of its pin texts) but not on any other drawing, its own included."""
     items = boxes(cv)
     found = []
     texts = [(o, b) for kind, o, b in items if kind == 'text']
     bodies = [(o, b) for kind, o, b in items if kind == 'body']
+    boxed = {ref for (ref, _u), u in cv.units.items() if u.boxed}
+    pins = [('%s pin %s %s' % (ref, num, kind), b) for (ref, _u), u in cv.units.items() for num, kind, b in u.pin_text]
+    pin_lines = [(ref,) + s for (ref, _u), u in cv.units.items() for s in u.pin_lines]
     for i, (o1, b1) in enumerate(texts):
         for o2, b2 in texts[i + 1:]:
-            if overlap(b1, b2, -0.05):
+            same_part = ':' in o1 and o1.split(':')[0] == o2.split(':')[0]    # one part's stacked fields
+            net_names = o1.startswith(('label ', 'power ')) and o2.startswith(('label ', 'power '))
+            if overlap(b1, b2, -0.05 if same_part or net_names else GAP):
                 found.append('text %r on text %r at %.0f,%.0f' % (o1, o2, b1[0], b1[1]))
         for o2, b2 in bodies:
-            if overlap(b1, b2, -0.1) and not o1.startswith(o2 + ':'):
+            if overlap(b1, b2, GAP) and not (o2 in boxed and _inside(b1, b2)):
                 found.append('text %r on symbol %s' % (o1, o2))
+        for o2, b2 in pins:
+            if overlap(b1, b2, GAP):
+                found.append('text %r on %s' % (o1, o2))
         for x1, y1, x2, y2 in cv.wires:
             seg = (min(x1, x2) - 0.05, min(y1, y2) - 0.05, max(x1, x2) + 0.05, max(y1, y2) + 0.05)
             if overlap(b1, seg, -0.2):
                 found.append('text %r on a wire at %s' % (o1, (x1, y1, x2, y2)))
                 break
+        for ref, x1, y1, x2, y2 in pin_lines:
+            seg = (min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2))
+            if overlap(b1, seg, -0.1) and not o1.startswith(ref + ':'):
+                found.append('text %r on a pin of %s' % (o1, ref))
+                break
+    for i, (o1, b1) in enumerate(pins):
+        for o2, b2 in pins[i + 1:]:
+            if overlap(b1, b2, -0.05) and o1.split(' pin ')[0] == o2.split(' pin ')[0]:
+                found.append('%s on %s' % (o1, o2))
+        for o2, b2 in bodies:
+            if o1.split(' pin ')[0] != o2 and overlap(b1, b2, -0.1):
+                found.append('%s on symbol %s' % (o1, o2))
     for i, (o1, b1) in enumerate(bodies):
         for o2, b2 in bodies[i + 1:]:
             if overlap(b1, b2, -0.1):
@@ -437,6 +474,8 @@ def make_frames(cv, pad=1.9):
         tx, ty, just = power_text(net, x, y, ang)
         grow(blk, text_box(net, tx, ty, 1.0, just))
         grow(blk, (x - 1.3, y - 2.6, x + 1.3, y + 2.6))
+    for (s, x, y, size, _b, just), blk in cv.owned_texts:
+        grow(blk, text_box(s, x, y - size * 0.5, size, just))
     for title in cv.blocks:
         if title not in ext:
             continue

@@ -143,7 +143,7 @@ def derived_symbols(lib):
             left=[('5', 'TX+'), ('6', 'TX-'), ('4', 'CT_TX'), None, ('1', 'RX+'), ('2', 'RX-'), ('3', 'CT_RX'), None,
                   ('11', 'LED_Y_A'), ('12', 'LED_Y_K'), ('13', 'LED_G_A'), ('14', 'LED_G_K'), None, None],
             right=[('9', 'POE+'), ('10', 'POE-'), None, ('7', 'NC'), ('8', 'NC')],
-            bottom=[('GND1', 'SHIELD'), ('GND2', 'SHIELD')], width=20.32),
+            bottom=[('GND1', 'SH'), ('GND2', 'SH')], width=20.32),
         'TLV62569DBVR': box_symbol(
             'TLV62569DBVR', 'U', fp + 'SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR', '2 A synchronous buck, 2.5 to 5.5 V in, SOT-23-5',
             left=[('4', 'VIN'), ('1', 'EN')], right=[('3', 'SW'), ('5', 'FB')], bottom=[('2', 'GND')], width=12.7,
@@ -151,15 +151,32 @@ def derived_symbols(lib):
         # data in on the left, out on the right, so a chain of LEDs reads as one line
         'SK6812MINI-E': box_symbol(
             'SK6812MINI-E', 'D', fp + 'LED_SK6812MINI-E_ReverseMount_Clear', 'RGB LED with integrated driver, reverse mount',
-            left=[('2', 'DIN')], right=[('4', 'DOUT')], top=[('3', 'VDD')], bottom=[('1', 'GND')], width=10.16),
+            left=[None, None, ('2', 'DIN'), None, None], right=[None, None, ('4', 'DOUT'), None, None],
+            top=[('3', 'VDD')], bottom=[('1', 'GND')], width=15.24),
         'MLT-8530': box_symbol(
             'MLT-8530', 'BZ', fp + 'BUZ-SMD_4P-L8.5-W8.5-P8.50-BR', 'Electromagnetic buzzer 2.7 kHz; pads 3 and 4 hold it only',
             right=[('3', 'NC'), ('4', 'NC')], top=[('1', '+')], bottom=[('2', '-')], width=10.16),
         'AP3032KTR-G1': box_symbol(
             'AP3032KTR-G1', 'U', fp + 'SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BR', 'White LED boost driver, 1 MHz, OV protection',
             left=[('6', 'VIN'), ('4', 'CTRL')], right=[('1', 'SW'), ('5', 'OV'), ('3', 'FB')], bottom=[('2', 'GND')],
-            width=12.7),
+            width=17.78),
         # host and configuration pins on the left, the radio on the right, supplies on top, grounds below
+        # pin k of the connector carries panel pin 41-k; names would only repeat the numbers
+        # MAC side on the left, line side and configuration on the right
+        'IP101GRI': box_symbol(
+            'IP101GRI', 'U', fp + 'QFN-32_L4.0-W4.0-P0.40-BL-EP2.7', '10/100 Ethernet PHY, RMII, QFN-32 4 x 4 mm',
+            left=[('5', 'TXEN'), ('9', 'TXD0'), ('8', 'TXD1'), ('7', 'TXD2'), ('6', 'TXD3'), None,
+                  ('10', '50M_CLKI'), ('14', '50M_CLKO'), None, ('18', 'RXD0'), ('17', 'RXD1'), ('16', 'RXD2'),
+                  ('15', 'RXD3'), ('19', 'CRS_DV'), None, ('22', 'MDC'), ('23', 'MDIO'), None, ('32', 'RESET_N'),
+                  ('21', 'INTR/RXER')],
+            right=[('30', 'MDI_TP'), ('29', 'MDI_TN'), ('27', 'MDI_RP'), ('26', 'MDI_RN'), None,
+                   ('11', 'LED0/AD0'), ('12', 'LED3/AD3'), ('20', 'LEDMOD'), ('4', 'COL/RMII'), ('1', 'TXER'), None,
+                   ('2', 'X1'), ('3', 'X2'), None, ('25', 'ISET'), ('28', 'REGOUT'), ('24', 'TEST_ON')],
+            top=[('13', 'VDD'), None, ('31', 'AVDD33')], bottom=[('33', 'EP')], width=30.48,
+            datasheet=''),
+        'FH12-40S-0.5SH': box_symbol(
+            'FH12-40S-0.5SH', 'J', fp + 'FPC-SMD_FH12-40S-0.5SH-55', 'FPC connector, 40 pins, 0.5 mm, bottom contact',
+            left=[(str(k), '~') for k in range(1, 41)], right=[None] * 38 + [('41', 'MH'), ('42', 'MH')], width=10.16),
         'PN5321A3HN': box_symbol(
             'PN5321A3HN', 'U', fp + 'QFN-40_L6.0-W6.0-P0.50-BL-EP', 'NFC reader IC (PN532 family), QFN-40 6 x 6 mm',
             left=[('28', 'MOSI/SDA/HSU_TX'), ('27', 'NSS/P50_SCL/HSU_RX'), ('25', 'P70_IRQ'), ('38', 'RSTPD_N'), None,
@@ -171,8 +188,8 @@ def derived_symbols(lib):
                                                ('33', 'P33_INT1'), ('34', 'P34/SIC_CLK'), ('35', 'SIGOUT'),
                                                ('36', 'SIGIN'), ('37', 'SVDD'), ('20', 'N.C.'), ('21', 'N.C.'),
                                                ('22', 'N.C.'))],
-            top=[('40', 'VBAT'), None, ('39', 'DVDD'), None, ('23', 'PVDD')],
-            bottom=[('1', 'DVSS'), ('3', 'TVSS1'), ('7', 'TVSS2'), ('11', 'AVSS'), ('41', 'EP')], width=33.02,
+            top=[None, None, ('40', 'VBAT'), None, None, ('39', 'DVDD'), None, None, ('23', 'PVDD')],
+            bottom=[('1', 'DVSS'), ('3', 'TVSS1'), ('7', 'TVSS2'), ('11', 'AVSS'), ('41', 'EP')], width=63.5,
             datasheet='https://www.nxp.com/docs/en/nxp/data-sheets/PN532_C1.pdf'),
         'SN74LV1T125DBVR': renamed(lib['SN74AHCT1G125DBVR'], 'SN74LV1T125DBVR',
                                    'Single bus buffer, 3-state, 1.6 to 5.5 V, level shifting inputs'),

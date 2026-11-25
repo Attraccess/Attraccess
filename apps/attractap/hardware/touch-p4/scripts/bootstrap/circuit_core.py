@@ -245,9 +245,9 @@ def mcu(d):
     d.group('Reset, boot and straps')
     d.R('10k', '+3V3', 'CHIP_PU')
     d.C('1u', 'CHIP_PU')
-    d.add('SW', 'RESET', 'attractap:TS-1187A-B-A-B', 'attractap:SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5',
+    d.add('SW', 'RESET', 'Switch:SW_Push_Dual', 'attractap:SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5',
           {'1': 'CHIP_PU', '4': 'GND'}, nc=('2', '3'), lcsc='C318884', mpn='TS-1187A-B-A-B')
-    d.add('SW', 'BOOT', 'attractap:TS-1187A-B-A-B', 'attractap:SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5',
+    d.add('SW', 'BOOT', 'Switch:SW_Push_Dual', 'attractap:SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5',
           {'1': 'BOOT', '4': 'GND'}, nc=('2', '3'), lcsc='C318884', mpn='TS-1187A-B-A-B')
     d.R('10k', '+3V3', 'RMII_TXD1', desc='GPIO35 boot strap: high = boot from flash')
     # GPIO35 is also an RMII transmit line. The button and its test point are far away, so they hang
