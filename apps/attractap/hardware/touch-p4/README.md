@@ -242,6 +242,7 @@ is made. See [scripts/bootstrap/README.md](scripts/bootstrap/README.md).
   [design notes](docs/design-notes.md#display-mounting-and-flex).
 
 Further reading: [design notes](docs/design-notes.md),
+[design review: grades, criteria and decisions](docs/review.md),
 [pin map and firmware port](docs/firmware-port.md),
 [bring-up plan](docs/bring-up.md), [compliance checklist](docs/compliance.md),
 [case and installation manual](case/README.md).

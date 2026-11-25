@@ -1893,7 +1893,8 @@ readability, parts and parts list, layout, fabrication and assembly documents,
 EMC and safety, verification. ERC and DRC were run, every sheet was rendered and
 read, and the claims below were checked against their primary sources. The changes
 are made in the generator, which stays the source of truth (see
-[release.md](release.md)).
+[release.md](release.md)). The grading scale, what each grade asked for, the grades
+before and after, and the decisions taken on the way are in [review.md](review.md).
 
 | Finding | Change |
 |---|---|
