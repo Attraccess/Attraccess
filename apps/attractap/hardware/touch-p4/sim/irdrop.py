@@ -85,7 +85,7 @@ def network(board, net):
 
 
 def solve(board, net, source, loads):
-    """source: 'D102.1'; loads: {pad: amperes}. Returns ({pad: volts lost}, [busy conductors])."""
+    """source: 'U105.6'; loads: {pad: amperes}. Returns ({pad: volts lost}, [busy conductors])."""
     resistors, pad_node, find, n = network(board, net)
     missing = [p for p in [source] + list(loads) if p not in pad_node]
     if missing:
@@ -118,17 +118,18 @@ def ipc2221(board, w_mm, layer, rise=20.0):
     return (0.048 if layer in ('F.Cu', 'B.Cu') else 0.024) * rise ** 0.44 * area ** 0.725
 
 
-# Everything on at once, which the firmware never does: 1.5 A on the 5 V rail.
-RAIL_5V = {'U103.3': 0.90, 'L601.1': 0.13, 'FB501.1': 0.12, 'R702.1': 0.09,
+# Every 5 V load at its supply-sizing figure at once (docs/design-notes.md, "Power budget"): 1.65 A on the
+# 5 V rail, more than the firmware ever draws.
+RAIL_5V = {'U103.4': 1.00, 'L601.1': 0.13, 'FB501.1': 0.12, 'R702.1': 0.09,
            **{'D%d.3' % (701 + i): 0.036 for i in range(8)}}
 CASES = [
-    ('+5V', 'D102.1', RAIL_5V, 'from USB'), ('+5V', 'D107.1', RAIL_5V, 'from the DC converter'),
-    ('+5V', 'D104.1', RAIL_5V, 'from PoE'),
-    ('VBUS', 'J101.A4B9', {'F101.1': 1.5}, 'USB connector to fuse'),
-    ('+5V_USB', 'FB101.2', {'D102.2': 1.5}, 'ferrite to diode'),
-    ('VDC_IN', 'J103.1', {'F102.1': 0.75}, 'terminal to fuse, 12 V supply'),
-    ('VDC', 'L103.2', {'U104.3': 0.75}, 'filter to converter'),
-    ('+5V_DC', 'L102.2', {'D107.2': 1.5}, 'converter to diode'),
-    ('+5V_POE', 'U102.1', {'D104.2': 1.5}, 'PoE module to diode'),
+    ('+5V', 'U105.6', RAIL_5V, 'from USB (eFuse)'), ('+5V', 'Q102.3', RAIL_5V, 'from the DC converter'),
+    ('+5V', 'Q101.3', RAIL_5V, 'from PoE'),
+    ('VBUS', 'J101.A4B9', {'F101.1': 1.65}, 'USB connector to fuse'),
+    ('+5V_USB', 'FB101.2', {'U105.5': 1.65}, 'ferrite to eFuse'),
+    ('VDC_IN', 'J103.1', {'F102.1': 0.77}, 'terminal to fuse, 12 V supply'),
+    ('VDC', 'L103.2', {'U104.3': 0.77}, 'filter to converter'),
+    ('+5V_DC', 'L102.2', {'Q102.2': 1.65}, 'converter to ideal diode'),
+    ('+5V_POE', 'U102.1', {'Q101.2': 1.65}, 'PoE module to ideal diode'),
     ('NFC_VBAT', 'FB501.2', {'U501.40': 0.15}, 'PN532 supply'),
 ]

@@ -260,8 +260,9 @@ def ui(d):
         '7': 'I2C0_SDA', '8': 'I2C0_SCL',
     }, lcsc='C142526', mpn='VCNL4040M3OE', desc='Proximity and ambient light sensor, I2C address 0x60')
     d.C('100n', '+3V3', desc='proximity sensor')
-    # the datasheet asks for 2.2 uF at the emitter's anode; 10 uF is on the parts list already
-    d.C('10u', '+3V3', size='0603', desc='proximity sensor: emitter pulses of up to 200 mA')
+    # the datasheet asks for 2.2 uF at the emitter's anode: 4.7 uF keeps 3 uF at 3.3 V (10 uF would add to
+    # the 3.3 V converter's output capacitance, which TI limits)
+    d.C('4.7u', '+3V3', size='0603', desc='proximity sensor: emitter pulses of up to 200 mA')
     d.R('10k', '+3V3', 'PROX_INT', desc='proximity sensor interrupt: open drain')
 
 
@@ -292,5 +293,5 @@ def mech(d):
     for i in range(4):
         d.add('H', 'M3', 'Mechanical:MountingHole', 'MountingHole:MountingHole_3.2mm_M3', {})
     d.group('Fiducials')
-    for i in range(3):
+    for i in range(5):
         d.add('FID', 'Fiducial', 'Mechanical:Fiducial', 'Fiducial:Fiducial_1mm_Mask2mm', {})

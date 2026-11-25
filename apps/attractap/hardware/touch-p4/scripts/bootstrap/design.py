@@ -52,9 +52,11 @@ PASSIVES = {
     # populated" (ESP32-P4 Hardware Design Guidelines v2.0)
     ('R', '15k', '0402'): ('C25756', 'UNI-ROYAL (Uniroyal Elec)', '0402WGF1502TCE', '1% 62.5mW'),
     ('R', '22.1k', '0402'): ('C43473', 'UNI-ROYAL (Uniroyal Elec)', '0402WGF2212TCE', '1% 62.5mW'),
-    ('R', '33.2k', '0402'): ('C122548', 'UNI-ROYAL (Uniroyal Elec)', '0402WGF3322TCE', '1% 62.5mW'),
-    ('R', '97.6k', '0402'): ('C62742', 'UNI-ROYAL (Uniroyal Elec)', '0402WGF9762TCE', '1% 62.5mW'),
-    ('R', '340k', '0402'): ('C423187', 'UNI-ROYAL (Uniroyal Elec)', '0402WGF3403TCE', '1% 62.5mW'),
+    # the USB eFuse's UVLO/OVLO divider: 0.1 % thin film, so that the OVLO window (threshold +-1.7 %) stays
+    # between vSafe5V's 5.5 V and the 6 V that the 5 V loads stand (330 k is not made in 0402 at 0.1 %)
+    ('R', '29.4k', '0402'): ('C852690', 'YAGEO', 'RT0402BRD0729K4L', '0.1% 25ppm'),
+    ('R', '97.6k', '0402'): ('C852964', 'YAGEO', 'RT0402BRD0797K6L', '0.1% 25ppm'),
+    ('R', '330k', '0603'): ('C861327', 'YAGEO', 'RT0603BRD07330KL', '0.1% 25ppm'),
     ('R', '1.65k', '0402'): ('C25869', 'UNI-ROYAL (Uniroyal Elec)', '0402WGF1651TCE', '1% 62.5mW'),
     ('C', '2.2n', '0402'): ('C84703', 'Samsung Electro-Mechanics', 'CL05B222KB5NNNC', '50V X7R'),
     ('C', '100n/50V', '0402'): ('C307331', 'Samsung Electro-Mechanics', 'CL05B104KB54PNC', '50V X7R'),
@@ -97,7 +99,8 @@ def passive_desc(kind, value, size, rating):
         return 'MLCC %sF %s %s %s' % (v, rating, tol, size)
     if v == '0R':
         return 'Thick-film jumper 0R %s %s' % (rating.split()[-1], size)
-    return 'Thick-film resistor %s %s %s' % (v.replace('R', ''), rating, size)
+    film = 'Thin-film' if rating.startswith('0.1%') else 'Thick-film'
+    return '%s resistor %s %s %s' % (film, v.replace('R', ''), rating, size)
 
 
 NOT_FITTED = ('TP', 'H', 'FID', 'ANT')     # bare copper and holes: nothing to buy or place

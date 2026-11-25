@@ -65,6 +65,32 @@ class DesignTest(unittest.TestCase):
                 bad.append((name, round(fit, 2)))
         self.assertEqual(bad, [])
 
+    def test_new_ics_follow_their_makers_pin_tables(self):
+        """Symbol pins and connections of the power-path ICs against the datasheets' pin tables: TI
+        TPS25947 (SLVSFC9C) table 5-1, LM74700-Q1 (SNOSD17G) table 5-1 (DBV), TLV803 (SBVS157) DBZ pinout."""
+        from sexpr import find, first, loads
+        lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'kicad', 'lib', 'attractap.kicad_sym')
+        with open(lib, encoding='utf-8') as f:
+            syms = {s[1]: s for s in find(loads(f.read()), 'symbol')}
+        tables = {
+            'TPS259470ARPWR': {'1': 'EN/UVLO', '2': 'OVLO', '3': 'AUXOFF', '4': '~{FLT}', '5': 'IN', '6': 'OUT',
+                               '7': 'DVDT', '8': 'GND', '9': 'ILM', '10': 'ITIMER'},
+            'LM74700QDBVRQ1': {'1': 'VCAP', '2': 'GND', '3': 'EN', '4': 'CATHODE', '5': 'GATE', '6': 'ANODE'},
+            'TLV803SDBZR': {'1': 'GND', '2': '~{RESET}', '3': 'VDD'},
+        }
+        for name, table in tables.items():
+            pins = {}
+            for unit in find(syms[name], 'symbol'):
+                for pin in find(unit, 'pin'):
+                    pins[str(first(pin, 'number')[1])] = str(first(pin, 'name')[1])
+            self.assertEqual(pins, table, name)
+        # the eFuse: what TI says must not float is connected; AUXOFF and FLT are open-drain outputs and
+        # ITIMER may stay open ("for fastest response to overcurrent events"); nothing else is open
+        u105 = self.d.parts['U105']
+        self.assertEqual(set(u105.nc), {'3', '4', '10'})
+        for pin in ('1', '2', '5', '6', '7', '8', '9'):
+            self.assertIn(pin, u105.nets)
+
     def test_variants(self):
         self.assertEqual({p.variant for p in self.d.parts.values()}, {'', 'lan'})
         # the Wi-Fi version must work without the lan parts: none of them may sit on a supply path
@@ -86,6 +112,48 @@ class DesignTest(unittest.TestCase):
         buzzer = self.d.parts['BZ701']
         self.assertEqual(buzzer.nets, {'1': 'BUZ_P', '2': 'BUZ_N'})
         self.assertEqual(buzzer.nc, {'3', '4'})
+
+    def test_usb_efuse_opens_between_vsafe5v_and_what_the_5v_loads_stand(self):
+        """TPS25947 (SLVSFC9C, 6.5): UVLO and OVLO rise at 1.183 to 1.223 V; the divider is 0.1 %. The eFuse
+        must pass every vSafe5V source (USB PD R3.3 table 4.9: up to 5.5 V) and open before TLV62569 and
+        PN532 reach their 6.0 V absolute maximum; EN/UVLO and OVLO stand 6.5 V up to 23 V in."""
+        val = lambda ref: float(self.d.parts[ref].value.rstrip('k')) * 1e3
+        r1, r2, r3 = val('R107'), val('R108'), val('R109')
+        self.assertTrue(all('0.1%' in self.d.parts[r].extra.get('Rating', '') for r in ('R107', 'R108', 'R109')))
+        tol = 0.001
+
+        def trip(lo_th, hi_th, low):           # input voltage at which the pin reaches its threshold
+            lo = lo_th * (r1 * (1 - tol) + r2 * (1 - tol) + r3 * (1 + tol)) / (low(1 + tol))
+            hi = hi_th * (r1 * (1 + tol) + r2 * (1 + tol) + r3 * (1 - tol)) / (low(1 - tol))
+            return lo, hi
+        ov = trip(1.183, 1.223, lambda k: r3 * k)
+        uv = trip(1.183, 1.223, lambda k: (r2 + r3) * k)
+        self.assertGreater(ov[0], 5.5)
+        self.assertLess(ov[1], 5.8)
+        self.assertLess(uv[1], 4.5)              # a 4.75 V source with its cable drop still gets through
+        self.assertLess(23 * (r2 + r3) / (r1 + r2 + r3), 6.5)
+
+    def test_dc_input_clamps_surges_of_both_polarities(self):
+        """A bidirectional TVS at the connector (behind the fuse, ahead of the reverse-polarity diode), the
+        diode rated 100 V, the unidirectional TVS at the converter (docs/design-notes.md, "Power")."""
+        d107, d105, d106 = (self.d.parts[r] for r in ('D107', 'D105', 'D106'))
+        self.assertEqual((d107.mpn, d107.nets), ('SMBJ28CA', {'1': 'VDC_F', '2': 'GND'}))
+        self.assertEqual((d105.mpn, d105.nets), ('SS310', {'1': 'VDC_R', '2': 'VDC_F'}))
+        self.assertEqual((d106.mpn, d106.nets), ('SMBJ28A', {'1': 'VDC', '2': 'GND'}))
+
+    def test_3v3_converter_output_capacitance_is_in_tis_table(self):
+        """TLV62569 (SLVSDG1C table 4): 2.2 uH is proven with 10, 22 and 2 x 22 uF, effective +20 / -50 %,
+        so at most 52.8 uF (TI's answer on E2E, thread 980956). Every capacitor on the rail counts, the PHY's
+        behind its ferrite too. Effective values at 3.3 V from Samsung's DC-bias data; the parts without
+        data are counted at their full value."""
+        at_3v3 = {'CL10A106KP8NNNC': 4.46, 'CL21A226MAQNNNE': 13.69}
+        total = 0.0
+        for p in self.d.parts.values():
+            if p.ref.startswith('C') and set(p.nets.values()) & {'+3V3', 'PHY_3V3'} and 'GND' in p.nets.values():
+                nominal = float(p.value.split('/')[0].replace('u', 'e-6').replace('n', 'e-9')) * 1e6
+                total += at_3v3.get(p.mpn, nominal)
+        self.assertLess(total, 52.8)
+        self.assertGreater(total, 22.0)
 
     def test_each_source_reaches_the_5v_rail_through_a_blocking_switch(self):
         # ideal diodes: controller anode and MOSFET source on the input, cathode and drain on +5V
@@ -187,7 +255,8 @@ class GeometryTest(unittest.TestCase):
 
     def test_no_pour_within_2_mm_of_the_48_v_pad_of_the_barrier_capacitor(self):
         # C102 bridges the PoE barrier. Its 48 V pad is the right one (the part is turned by 180 degrees);
-        # the pours of the other layers must end 2 mm from it, which only the keep-out can see to.
+        # the pours of the other layers must end 3 mm from it (the isolation rule), which only the keep-out
+        # can see to.
         import placement
         placed = {}
         placement.place(type('B', (), {'put': lambda self, ref, x, y, rot=0: placed.__setitem__(ref, (x, y, rot)),
@@ -197,8 +266,8 @@ class GeometryTest(unittest.TestCase):
         (w, h), px = geometry.BARRIER_CAP_PAD, geometry.BARRIER_CAP_PAD_X
         pad = (x + px - w / 2, y - h / 2, x + px + w / 2, y + h / 2)
         x1, y1, x2, y2 = geometry.POE_PRIMARY[1]
-        self.assertLessEqual(y1, pad[1] - 2.0)
-        self.assertLessEqual(x1, pad[0] - 2.0)
+        self.assertLessEqual(y1, pad[1] - 3.0)
+        self.assertLessEqual(x1, pad[0] - 3.0)
         self.assertGreaterEqual(x2, geometry.BOARD_W)
 
     def test_room_for_the_plug(self):

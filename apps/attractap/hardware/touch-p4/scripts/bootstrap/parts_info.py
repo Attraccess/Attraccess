@@ -42,7 +42,7 @@ PARTS = {
     'C132016': ('Texas Instruments', 'Voltage supervisor 2.93 V, 200 ms, open-drain active-low reset, SOT-23', TI,
                 '3PEAK TPV803S-3STR (C2842356): 2.85 to 3.00 V, 140 to 280 ms'),
     'C67272': ('Infineon', 'N-channel MOSFET 30 V 5.3 A, 27 mOhm at 10 V, 40 mOhm at 4.5 V, +-20 V gate, SOT-23',
-               '', 'Diodes DMN3023L-7 (C443825): 25 mOhm at 10 V, +-20 V gate, same pins'),
+               DIGIKEY, 'Diodes DMN3023L-7 (C443825): 25 mOhm at 10 V, +-20 V gate, same pins'),
     'C2071056': ('Diodes Inc.', '5 V 2 A synchronous buck, 3.8 to 32 V in, TSOT-26', DIGIKEY,
                  'SCT SCT2325TVBR (C509064): fixed 5 V, check the inductor value'),
     'C264086': ('Diodes Inc.', 'White LED boost driver, 1 MHz, overvoltage protection, SOT-23-6', DIGIKEY,
@@ -96,6 +96,10 @@ PARTS = {
                   'Littelfuse SMAJ58A (C151246): same ratings'),
     'C178227': ('Littelfuse', 'TVS diode, unidirectional, 600 W, 28 V stand-off, 31.1 to 34.4 V breakdown, '
                 '45.4 V at 13.3 A, SMB', '', 'Vishay SMBJ28A-E3/52 (C553979): same ratings'),
+    'C151259': ('Littelfuse', 'TVS diode, bidirectional, 600 W, 28 V stand-off, 31.1 to 34.4 V breakdown, '
+                '45.4 V at 13.3 A, SMB', '', 'MDD SMBJ28CA (C115825): same ratings'),
+    'C7420364': ('R+O (Hongjiacheng)', 'Schottky diode 100 V 3 A, 0.85 V at 3 A, Tj 150 C, SMA', '',
+                 'MDD SS310 (C15874): 100 V 3 A, 0.85 V at 3 A, Tj 125 C'),
     'C8678': ('MDD (Microdiode)', 'Schottky diode 40 V 3 A, SMA', '',
               'Diodes Inc B340A-13-F (C85098): 40 V 3 A, 0.35 V at 0.5 A'),
     'C8598': ('CJ (Changjiang)', 'Schottky diode 40 V 1 A, SOD-123', '', 'MCC B5819W-TP (C84354): same ratings'),
@@ -117,6 +121,13 @@ PARTS = {
                'Chilisin BWLS00161109R56J00 (C6473441): 560 nH 5 %, Q 17, body 0.3 mm wider'),
     'C251040': ('Nichicon', 'Aluminium electrolytic 47 uF 50 V 20 %, 6.3 x 7.7 mm, 0.66 ohm at 100 kHz, 105 C',
                 '', 'ROQANG RVT1H470M0607 (C72523) or Lelon VZH470M1HTR-0607 (C164078)'),
+    # 0.1 % thin film for the USB eFuse's UVLO/OVLO divider (not commodity parts)
+    'C852690': ('YAGEO', 'Thin-film resistor 29.4 kOhm 0.1 % 25 ppm/K 62.5 mW, 0402', '',
+                'Panasonic ERA-2AEB2942X (C2074881): same ratings, no stock; FH TD03G2942BT (C667085) is 0603'),
+    'C852964': ('YAGEO', 'Thin-film resistor 97.6 kOhm 0.1 % 25 ppm/K 62.5 mW, 0402', '',
+                'Viking ARG02BTC9762 (C2686423): same ratings'),
+    'C861327': ('YAGEO', 'Thin-film resistor 330 kOhm 0.1 % 25 ppm/K 100 mW, 0603', '',
+                'Uniroyal TC0325B3303T5F (C2989388): same ratings'),
     'C7469977': ('FOSAN', 'Aluminium electrolytic 100 uF 16 V 20 %, 6.3 x 5.4 mm, 105 C 2000 h', '',
                  EQUIVALENT),
     'C25501': ('UNI-ROYAL (Uniroyal Elec)', 'Resistor array 4 x 33 ohm 5 % 62.5 mW, 4 x 0402 convex', '',

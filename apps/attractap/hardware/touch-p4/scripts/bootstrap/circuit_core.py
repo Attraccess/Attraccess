@@ -7,6 +7,8 @@ DC_INPUT_CAP = '2.2u/100V'      # C112, C113, C117; why this value: see power()
 BUCK_L = ('C98361', 'WPN4020H2R2MT')      # Sunlord 2.2 uH, 4 x 4 mm, Isat 6.1 A (L101)
 DC_BULK = ('C251040', 'UCD1H470MCL1GS')     # Nichicon 47 uF / 50 V, 6.3 x 7.7 mm, 0.66 ohm at 100 kHz (C120)
 DC_TVS = ('C178227', 'SMBJ28A')     # Littelfuse, D106
+DC_TVS_IN = ('C151259', 'SMBJ28CA')  # Littelfuse, D107
+DC_DIODE = ('C7420364', 'SS310')     # R+O (Hongjiacheng), D105
 
 
 def power(d):
@@ -36,15 +38,17 @@ def power(d):
     # microamps while VBUS is unpowered. Without a load the unplugged connector's VBUS would float, and a
     # USB-C host only switches its supply on when it finds VBUS at 0 V.
     d.R('4.7k', '+5V_USB', 'GND', ref='R104', desc='bleed: keeps VBUS at 0 V while another source powers the board')
-    # eFuse with true reverse current blocking: slew-limited start (inrush), 2 A limit, UVLO 4.3 V and
-    # OVLO 5.8 V set by one divider; EN/UVLO and OVLO stand 6.5 V, which the divider keeps up to 23 V in.
+    # eFuse with true reverse current blocking: slew-limited start (inrush), 2 A limit, UVLO 4.32 V and
+    # OVLO 5.62 V set by one divider of 0.1 % resistors: with the OVLO threshold's +-1.7 % the eFuse opens
+    # between 5.53 V (above vSafe5V's 5.5 V) and 5.74 V (below the 6.0 V that TLV62569 and PN532 stand).
+    # EN/UVLO and OVLO stand 6.5 V, which the divider keeps up to 23 V in.
     d.add('U', 'TPS259470ARPWR', 'attractap:TPS259470ARPWR', 'attractap:VQFN-10_L2.0-W2.0-P0.45-TL', {
         '5': '+5V_USB', '6': '+5V', '1': 'USB_EN', '2': 'USB_OV', '7': 'USB_DVDT', '9': 'USB_ILM', '8': 'GND',
     }, nc=('3', '4', '10'), ref='U105', lcsc='C3662799', mpn='TPS259470ARPWR',
         desc='USB input eFuse: soft start, current limit, no current back into VBUS')
-    d.R('340k', '+5V_USB', 'USB_EN', ref='R107', show=True, desc='UVLO 4.32 V rising')
-    d.R('33.2k', 'USB_EN', 'USB_OV', ref='R108', show=True)
-    d.R('97.6k', 'USB_OV', 'GND', ref='R109', show=True, desc='OVLO 5.79 V rising')
+    d.R('330k', '+5V_USB', 'USB_EN', size='0603', ref='R107', show=True, desc='UVLO 4.32 V rising')
+    d.R('29.4k', 'USB_EN', 'USB_OV', ref='R108', show=True)
+    d.R('97.6k', 'USB_OV', 'GND', ref='R109', show=True, desc='OVLO 5.62 V rising')
     d.R('1.65k', 'USB_ILM', 'GND', ref='R110', show=True, desc='current limit 1.8 to 2.2 A')
     d.C('2.2n', 'USB_DVDT', ref='C118', desc='output slew rate 0.9 V/ms')
 
@@ -74,11 +78,15 @@ def power(d):
         '4': '+5V', '1': 'BUCK_EN', '2': 'GND', '3': 'BUCK_SW', '5': 'BUCK_FB',
     }, lcsc='C141836', mpn='TLV62569DBVR', desc='3.3 V 2 A buck from the 5 V rail (second source SGM61020)')
     d.R('100k', '+5V', 'BUCK_EN', ref='R106')
-    d.C('22p', '+3V3', 'BUCK_FB', desc='feed-forward, zero at 72 kHz')
+    d.C('12p', '+3V3', 'BUCK_FB', desc='feed-forward, zero at 133 kHz (TI: optional, 117 kHz in its example)')
     d.add('L', '2.2uH 4.3A', 'Device:L', 'attractap:IND-SMD_L4.0-W4.0', {'1': 'BUCK_SW', '2': '+3V3'},
           lcsc=BUCK_L[0], mpn=BUCK_L[1])
-    d.C('22u', '+3V3', size='0805')
-    d.C('22u', '+3V3', size='0805')
+    # Output capacitor: TI's recommended 10 uF with 2.2 uH (SLVSDG1C table 4). The rail's other capacitors
+    # (P4, C6, PHY, sensors) count too: about 49 uF effective at 3.3 V in all, inside the 22 to 52.8 uF
+    # that TI has proven stable (2 x 22 uF nominal, +20 / -50 %). The second 22 uF that was here (C110)
+    # would have put the rail at 76 uF. docs/design-notes.md, "Power".
+    d.C('10u', '+3V3', size='0603', desc='3.3 V converter output')
+    d.ref('C')                      # C110, the second 22 uF, is gone; the numbers after it stay
     d.C('100n', '+3V3')
     d.R('100k', '+3V3', 'BUCK_FB', ref='R111', show=True)
     d.R('22.1k', 'BUCK_FB', 'GND', ref='R112', show=True, desc='3.315 V')
@@ -96,8 +104,14 @@ def power(d):
                'left pole = +, right pole = -')
     d.add('F', '1.1A PTC 33V', 'Device:Polyfuse', 'attractap:F1812', {'1': 'VDC_IN', '2': 'VDC_F'},
           lcsc='C21000', mpn='SMD1812P110TF/33', desc='Resettable fuse 1.1 A hold, 33 V')
-    d.add('D', 'SS34', 'Device:D_Schottky', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': 'VDC_R', '2': 'VDC_F'},
-          ref='D105', lcsc='C8678', mpn='SS34', desc='Reverse polarity protection')
+    # Surges (docs/design-notes.md, "Power"): the bidirectional TVS at the connector clamps both polarities;
+    # a negative surge would otherwise drive D105 into breakdown. D105 then sees up to 75 V in reverse, so
+    # it is a 100 V part. A reversed supply stays below the TVS's stand-off and D105 blocks it.
+    d.add('D', 'SMBJ28CA', 'attractap:SMBJ28CA', 'Diode_SMD:D_SMB', {'1': 'VDC_F', '2': 'GND'},
+          ref='D107', lcsc=DC_TVS_IN[0], mpn=DC_TVS_IN[1],
+          desc='TVS, DC input at the connector, bidirectional (stand-off 28 V, conducts from 31.1 V)')
+    d.add('D', 'SS310', 'Device:D_Schottky', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': 'VDC_R', '2': 'VDC_F'},
+          ref='D105', lcsc=DC_DIODE[0], mpn=DC_DIODE[1], desc='Reverse polarity protection, 100 V')
     # Input filter: without it the converter's 1.1 MHz ripple current runs straight out on the supply
     # cable (conducted emission). C117 - L103 - C112/C113 form a pi filter. The electrolytic C120 damps
     # the cable's inductance with the ceramics when a live supply is plugged in: without it the input
@@ -319,7 +333,9 @@ def wifi(d):
           lcsc='C20627095', mpn='ESP32-C6-MINI-1U-H4',
           desc='Wi-Fi 6 / BLE module with a connector for an external antenna (W.FL / MHF III); '
                'antenna per build: adhesive inside the case or on an SMA bulkhead')
-    d.C('22u', '+3V3', size='0805')
+    # Espressif's typical circuit has 22 uF here; 10 uF keeps the 3.3 V converter inside the output
+    # capacitance TI has proven (see the converter). The converter and the plane carry the TX bursts.
+    d.C('10u', '+3V3', size='0603', desc='Wi-Fi module supply')
     d.C('100n', '+3V3')
     d.group('Enable and boot')
     d.R('10k', '+3V3', 'C6_EN')

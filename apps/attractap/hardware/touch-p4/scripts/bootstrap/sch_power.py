@@ -43,7 +43,10 @@ def efuse(cv, P_, x, y):
     slew-rate capacitor and current-limit resistor below."""
     u = cv.put_at(P_['U105'], '5', x, y)
     xr = x - 15.24
-    cv.hang(P_['R107'], xr, y, fields='l')
+    # its text sits higher than usual on the right: the EN/UVLO label runs right below it
+    w = lambda s: len(s) * 1.27 / 2 + 1.8
+    cv.hang(P_['R107'], xr, y, fields={'Reference': (w('R107'), -3.4), 'Value': (w('330k'), -1.7),
+                                       'Rating': (w('0.1% 25ppm'), 0.0)})
     en, ov = u.pin('1'), u.pin('2')
     cv.hang(P_['R108'], xr, en[1], gap=0, fields='l')
     cv.hang(P_['R109'], xr, ov[1], gap=0, fields='l')
@@ -107,6 +110,7 @@ def dc_input(cv, P_, x0, y0):
     xj = cv.at('J102.1')[0]
     cv.wire('J103.1', (xj + 7.62, cv.at('J103.1')[1]), (xj + 7.62, yb))
     cv.inline(P_['F102'], xj + 15.24, yb)
+    cv.tvs(P_['D107'], xj + 27.94, yb)
     cv.diode(P_['D105'], xj + 35.56, yb)
     cv.hang(P_['C117'], xj + 43.18, yb)
     cv.hang(P_['C120'], xj + 60.96, yb)
@@ -202,7 +206,7 @@ def rail(cv, P_, x0, y0):
     cv.hang(P_['R112'], xd, yfb)
     cv.wire(fb, (fb[0] + P, fb[1]), (fb[0] + P, yfb), (xd, yfb))
     xo = xd + 33.02
-    for c in ('C109', 'C110', 'C111'):
+    for c in ('C109', 'C111'):
         cv.hang(P_[c], xo, sw[1])
         xo += 16.51
     cv.wire('L101.2', (xo + 10.16, sw[1]))

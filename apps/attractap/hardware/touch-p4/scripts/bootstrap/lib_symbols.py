@@ -198,6 +198,9 @@ def derived_symbols(lib):
         'SMBJ28A': renamed(libs.symbol('Diode:SM6T6V8A'), 'SMBJ28A',
                            '600 W unidirectional TVS diode, 28 V stand-off, SMB (DO-214AA)',
                            pin_names={'1': 'K', '2': 'A'}, footprint='Diode_SMD:D_SMB', datasheet=''),
+        'SMBJ28CA': renamed(libs.symbol('Diode:SMAJ10CA'), 'SMBJ28CA',
+                            '600 W bidirectional TVS diode, 28 V stand-off, SMB (DO-214AA)',
+                            footprint='Diode_SMD:D_SMB', datasheet=''),
         # ideal diode: the input (anode) on the left, the output (cathode) and the gate drive on the right
         'LM74700QDBVRQ1': box_symbol(
             'LM74700QDBVRQ1', 'U', fp + 'SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL',

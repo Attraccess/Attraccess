@@ -1,0 +1,85 @@
+* DC input: a surge while the board runs. IEC 61000-4-5 combination wave, 1.2/50 us open circuit, behind
+* rgen: 42 ohm is the line-to-earth test of EN 50130-4 (2 ohm generator + 40 ohm), here applied straight
+* across the input, so that all of its current flows through the input stage (in the real test it goes
+* from one line to earth, and this board has no earth). 2 ohm with 18 uF in series is the line-to-line test
+* of IEC 61000-4-5 for power ports, which no standard that applies to this board asks for (see the notes).
+* The supply (vsup) stays connected through the 1.5 mH decoupling inductor of the coupling network.
+* Input stage as fitted: fuse F102; TVS D107 (SMBJ28CA, bidirectional) behind it; D105 (SS310, 100 V;
+* breakdown taken at 110 V); C117 and C120 (47 uF less 20 %, with ESR and ESL); L103 (lsat: 2.2 uH, or
+* 0.1 uH when the surge current saturates it); C112/C113 and the TVS D106 (SMBJ28A). Both TVS at the top
+* of their breakdown range (34.4 V) with the slope of their 10/1000 us rating (45.4 V at 13.3 A); for
+* 8/20 us pulses ST gives 59 V at 68 A, a smaller slope. The converter draws constant power (2 A at 5 V,
+* 90 %). tvs1=0, bidir=0, bv105=45 is the input stage before (SS34, no TVS at the connector).
+.param vsup=24
+.param vs=1000
+.param pol=1
+.param rgen=42
+.param ccoup=1
+.param rfuse=0.05
+.param c0=2.2u
+.param v0=36.26
+.param vbr=34.4
+.param rtvs=0.833
+.param cbulk=37.6u
+.param esr=0.3
+.param esl=8n
+.param lsat=2.2u
+.param pload=11.1
+.param tvs1=1
+.param bidir=1
+.param bv105=110
+.param tvs2=1
+.param vbr1=34.4
+.param rtvs1=0.833
+Vsup sup 0 {vsup}
+Ldec sup jack 1.5m ic={pload/vsup}
+Bgen g 0 V = time > 50u ? {pol*vs*1.037}*(exp(-(time-50u)/68.2u) - exp(-(time-50u)/0.405u)) : 0
+Rgen g gx {rgen}
+Vsg gx gc 0
+Cc gc jack {ccoup}
+Rf jack n2 {rfuse}
+Vd105 n2 n2a 0
+D105 n2a vdcr SS34
+.model SS34 D(IS=5u RS=0.04 N=1.1 CJO=300p M=0.4 BV={bv105} IBV=1m)
+R117 vdcr c117 5m
+Xc117 c117 0 mlcc k=1
+L120 vdcr e120 {esl}
+R120 e120 f120 {esr}
+C120 f120 0 {cbulk}
+L103 vdcr l103 {lsat}
+R103 l103 vdc 0.10
+R112 vdc c112 2.5m
+Xc112 c112 0 mlcc k=2
+Vtvs vdc tvs 0
+Btvs tvs 0 I = {tvs2} * ((v(tvs) - {vbr} + sqrt((v(tvs) - {vbr})^2 + 1e-4)) / (2 * {rtvs}) - (-v(tvs) - 0.6 + sqrt((v(tvs) + 0.6)^2 + 1e-4)) / 0.1)
+* optional TVS at the input, after the fuse and before D105
+Vtvs1 n2 tvsi 0
+Btvs1 tvsi 0 I = {tvs1} * ((v(tvsi) - {vbr1} + sqrt((v(tvsi) - {vbr1})^2 + 1e-4)) / (2 * {rtvs1}) - ({bidir} > 0 ? (-v(tvsi) - {vbr1} + sqrt((v(tvsi) + {vbr1})^2 + 1e-4)) / (2 * {rtvs1}) : (-v(tvsi) - 0.6 + sqrt((v(tvsi) + 0.6)^2 + 1e-4)) / 0.1))
+Bconv vdc 0 I = v(vdc) > 4 ? {pload} / max(v(vdc), 4) : 0
+.subckt mlcc p n k=1
+Bq q 0 V = 1e6 * {k*c0*v0} * atan(v(p,n)/{v0})
+Vs q qc 0
+Cq qc 0 1u
+Fc p n Vs 1
+Rp p n 1g
+.ends
+.ic v(jack)={vsup} v(n2)={vsup} v(n2a)={vsup} v(gx)=0 v(vdcr)={vsup-0.35} v(c117)={vsup-0.35} v(e120)={vsup-0.35} v(f120)={vsup-0.35} v(l103)={vsup-0.4} v(vdc)={vsup-0.4} v(c112)={vsup-0.4} v(tvs)={vsup-0.4} v(tvsi)={vsup} v(gc)={vsup}
+.option method=gear reltol=1e-4
+.tran 10n 3m uic
+.control
+set noaskquit
+run
+meas tran v_converter max v(vdc) from=40u to=3m
+meas tran v_converter_min min v(vdc) from=40u to=3m
+meas tran v_c120 max v(vdcr) from=40u to=3m
+meas tran i_tvs max i(vtvs) from=40u to=3m
+meas tran i_tvs1 max i(vtvs1) from=40u to=3m
+meas tran i_tvs1_fwd min i(vtvs1) from=40u to=3m
+meas tran i_surge max i(vsg) from=40u to=3m
+meas tran i_surge_neg min i(vsg) from=40u to=3m
+meas tran i_d105_rev min i(vd105) from=40u to=3m
+let vrev = v(n2) - v(vdcr)
+meas tran v_d105_rev min vrev from=40u to=3m
+quit
+.endc
+.end

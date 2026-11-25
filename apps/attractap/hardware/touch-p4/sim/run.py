@@ -110,6 +110,20 @@ def dc_input():
     print('        28.0 V, 5 m of 2 x 1.5 mm2: %.1f V at the converter, %.1f A in the TVS' % (m['v_converter'], m['i_tvs']))
 
 
+def dc_surge():
+    print('DC input: a surge while the board runs (EN 50130-4 line-to-earth: 1.2/50 us behind 42 ohm, here '
+          'across the input; converter limit 40 V for 0.4 s, D105 100 V, TVS at the top of their range)')
+    for volt in (12, 24, 26.4, 28):
+        for kv in (1000, -1000):
+            m = max((spice.run('dc_surge.cir', vsup=volt, vs=abs(kv), pol=1 if kv > 0 else -1, esr=e, lsat=l)
+                     for e in (0.1, 0.8) for l in (2.2e-6, 0.1e-6)), key=lambda r: r['v_converter'])
+            check(m['v_converter'] < 40 and m['v_d105_rev'] > -80,
+                  '%4.1f V, %+.0f V: %.1f V at the converter, D105 %.0f V reverse, TVS %.1f A (input) %.1f A '
+                  '(converter), converter input down to %.1f V' % (
+                      volt, kv, m['v_converter'], -m['v_d105_rev'], max(m['i_tvs1'], -m['i_tvs1_fwd']),
+                      m['i_tvs'], m['v_converter_min']))
+
+
 def power_up():
     print('Power-up from USB through the eFuse (reset must stay low until the 3.3 V rail has been steady for 50 us)')
     for volt, cable, load in ((5.0, 0.25, 0.45), (4.5, 0.5, 0.45), (5.0, 0.25, 1.1)):
@@ -188,8 +202,12 @@ def poe_isolation(board):
     check(isolation.withstand(along) > 1.2 * isolation.TEST_PEAK,
           'along a layer: %.2f mm at the least (%s, at x %.1f y %.1f), good for %.1f kV peak in air; the test reaches %.1f kV'
           % (along, layer.replace('.Cu', ''), at[0], at[1], isolation.withstand(along) / 1e3, isolation.TEST_PEAK / 1e3))
-    check(through >= along - 0.05, 'through the board: %.2f mm at the least (%s): no 48 V copper lies over or under other copper'
-          % (through, layers.replace('.Cu', '')))
+    if through == float('inf'):
+        check(True, 'through the board: no other copper on another layer within %.0f mm of the 48 V copper'
+              % isolation.REACH)
+    else:
+        check(through >= along - 0.05, 'through the board: %.2f mm at the least (%s): no 48 V copper lies over or '
+              'under other copper' % (through, layers.replace('.Cu', '')))
 
 
 def heat(board):
@@ -229,10 +247,12 @@ def dock_magnet():
 
 
 def supply_tracks(board):
-    print('Supply tracks with everything on (1.5 A on the 5 V rail)')
+    print('Supply tracks with every load at its supply-sizing figure (1.65 A on the 5 V rail)')
     for net, source, loads, label in irdrop.CASES:
         drops, busy = irdrop.solve(board, net, source, loads)
-        tracks = [x for x in busy if x[1] == 'track' and x[4] > 0.3]
+        # IPC-2221's heating is for long conductors: a neck shorter than 1 mm between a pad and a wide track
+        # (into the eFuse's 0.3 mm power bars) stays at their temperature
+        tracks = [x for x in busy if x[1] == 'track' and x[4] > 1.0]
         cur, _k, w, layer, _l = max(tracks, key=lambda x: x[0] / irdrop.ipc2221(board, x[2], x[3]))
         limit = irdrop.ipc2221(board, w, layer)
         text = ('%-8s %-30s %3.0f mV lost; %.2f A in %.2f mm on %s (20 K rise at %.2f A)'
@@ -257,6 +277,7 @@ if __name__ == '__main__':
     solvers()
     nfc(board)
     dc_input()
+    dc_surge()
     power_up()
     supply_switch()
     signals(board)
