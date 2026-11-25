@@ -6,6 +6,7 @@ Output:
   fab/jlcpcb/                      what goes to JLCPCB (committed, so an order can be traced)
     attractap-touch-p4-gerbers.zip   Gerber and drill files, for the PCB order
     attractap-touch-p4-fab.pdf       fabrication drawing: outline, stack-up, drill table, notes
+    attractap-touch-p4-assembly.pdf  assembly drawing: designators, pin 1 and polarity, detail sheets
     attractap-touch-p4.ipc           IPC-D-356 netlist, for the fab's electrical test
     bom-<variant>.csv                assembly parts list: Comment, Designator, Footprint, LCSC Part #, then
                                      Manufacturer, Manufacturer Part, Description, Alternate, Lifecycle
@@ -120,6 +121,9 @@ def main():
     # fabrication drawing (fab_drawing.py reads the board with pcbnew)
     subprocess.run([sys.executable, os.path.join(HERE, 'fab_drawing.py'), pcb, os.path.join(jlc, NAME + '-fab.pdf')],
                    check=True)
+    # assembly drawing: every part with its designator, pin 1 and polarity; detail sheets of the dense areas
+    subprocess.run([sys.executable, os.path.join(HERE, 'assembly_drawing.py'), pcb,
+                    os.path.join(jlc, NAME + '-assembly.pdf')], check=True)
     pos = os.path.join(FAB, 'positions.csv')
     run('pcb', 'export', 'pos', '--format', 'csv', '--units', 'mm', '--side', 'both', '-o', pos, pcb)
     parts = os.path.join(FAB, 'parts.csv')

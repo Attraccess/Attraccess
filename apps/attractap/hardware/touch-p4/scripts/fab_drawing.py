@@ -199,12 +199,14 @@ NOTES = [
     'Stack-up JLC06161H-3313 as tabulated: on the JLCPCB order form "Specify Stackup: Yes".',
     'Copper 1 oz (35 um) finished on the outer layers, 0.5 oz (15 um) on the inner layers.',
     'Surface finish ENIG (the 0.35 mm pitch QFN needs a flat finish). Not OSP, not HASL.',
-    'Vias: epoxy filled and capped (plated over). No via lies under solder paste.',
+    'Vias: epoxy filled and capped (plated over), required: four lie in capacitor pads (C208, C223, C226).',
     'Solder mask green, both sides; silkscreen white, both sides.',
     'Fabricate and inspect to IPC-6012 class 2 and IPC-A-600 class 2.',
     'Plated slots at the DC jack and the USB-C shell; all other cut-outs milled, unplated.',
     'Outline and cut-out tolerance +-0.2 mm; drill tolerance per the fab\'s standard.',
-    'Impedance control: none ordered for this revision (see the design notes).',
+    'Impedance control +-10 %, outer layers over the first plane (L1/L2, L6/L5): USB pair 90 ohm diff., '
+    '0.14 mm / 0.15 mm gap (L6); Ethernet lines 50 ohm, 0.155 mm (L1), in pairs 1.27 mm apart = 100 ohm diff. '
+    'Fab may adjust widths.',
     'Electrical test: 100 % flying probe against the IPC-D-356 netlist of this package.',
     'Board marking: JLCPCB serial number in the field beside S/N on the component side, if ordered.',
 ]
