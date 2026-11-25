@@ -182,6 +182,48 @@ def decoupling(board, cu):
 BULK = set()          # filled from the board: capacitors of 4.7 uF and more
 
 
+# Switching converters: the loop that carries the switched current, from the start pad (the IC's supply pin
+# for a buck, the diode's cathode for the boost) to the capacitor there, through it to ground and back to
+# the IC's ground pin. (IC, title, start pad, IC ground pin, switch-node net)
+SWITCHERS = [
+    ('U104', 'AP63205, DC input to 5 V', ('U104', '3'), '4', 'DC_SW'),
+    ('U103', 'TLV62569, 5 V to 3.3 V', ('U103', '4'), '2', 'BUCK_SW'),
+    ('U202', 'TLV62569, 3.3 V to 1.1 V core', ('U202', '4'), '2', 'DCDC_SW'),
+    ('U601', 'AP3032, backlight boost', ('D601', '1'), '2', 'BL_SW'),
+]
+
+
+def switchers(board, cu):
+    """Per converter: the nearest capacitor on the hot loop's supply side and its copper path, the ground
+    side through the fill (straight), the loop's area, ground vias at both ends, the switch node's copper."""
+    rows = []
+    by = defaultdict(dict)
+    for p in board['pads']:
+        by[p['ref']][p['num']] = p
+    for ic, title, start, gnd_pin, sw in SWITCHERS:
+        if ic not in by:
+            continue
+        a = by[start[0]][start[1]]
+        dist = cu.distances(('pad',) + start)
+        caps = []
+        for ref, ps in by.items():
+            if ref.startswith('C') and len(ps) == 2:
+                nets = {short(p['net']): n for n, p in ps.items()}
+                if set(nets) == {short(a['net']), 'GND'} and ('pad', ref, nets[short(a['net'])]) in dist:
+                    caps.append((dist[('pad', ref, nets[short(a['net'])])], ref, ps[nets[short(a['net'])]], ps[nets['GND']]))
+        d, cref, cv, cg = min(caps, key=lambda c: c[0])
+        g = by[ic][gnd_pin]
+        back = math.hypot(cg['x'] - g['x'], cg['y'] - g['y'])
+        poly = [(a['x'], a['y']), (cv['x'], cv['y']), (cg['x'], cg['y']), (g['x'], g['y'])]
+        area = abs(sum(x1 * y2 - x2 * y1 for (x1, y1), (x2, y2) in zip(poly, poly[1:] + poly[:1]))) / 2
+        vias = lambda q: sum(1 for v in board['vias'] if short(v['net']) == 'GND' and math.hypot(v['x'] - q['x'], v['y'] - q['y']) < 1.0)
+        node = sum(math.hypot(t['x2'] - t['x1'], t['y2'] - t['y1']) * t['w'] for t in board['tracks']
+                   if short(t['net']) == sw and t['layer'] in ('F.Cu', 'B.Cu'))
+        node += sum(p['sx'] * p['sy'] for p in board['pads'] if short(p['net']) == sw)
+        rows.append((ic, title, cref, d, back, area, vias(g), vias(cg), node))
+    return rows
+
+
 def path_length(cu, a, b):
     d = cu.distances(a)
     return d.get(b, float('nan'))
@@ -212,6 +254,12 @@ def main(path):
             ends = [(dist[('pad', 'Y201', n)], n) for n in ('1', '3') if ('pad', 'Y201', n) in dist]
             if ends:
                 print('  pin %-4s %-8s %.1f mm to Y201 pad %s' % (p['num'], short(p['net']), *min(ends)))
+    print()
+    print('Switching converters: hot loop (capacitor, supply path, ground path through the fill, loop area,')
+    print('ground vias within 1 mm of the IC ground pin and of the capacitor, switch-node copper)')
+    for ic, title, cref, d, back, area, vg, vc, node in switchers(board, cu):
+        print('  %-5s %-32s %-5s %4.1f mm  %4.1f mm  %5.1f mm2  vias %d + %d  node %5.1f mm2'
+              % (ic, title, cref, d, back, area, vg, vc, node))
     print()
     print('Fast nets: track length and vias')
     length, vias, widths = defaultdict(float), defaultdict(int), defaultdict(set)

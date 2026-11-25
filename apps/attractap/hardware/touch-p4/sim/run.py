@@ -45,6 +45,10 @@ def nfc(board):
                           ('on the board, metal wall %d mm behind the loop' % nfc_loop.WALL_BEHIND, on_metal),
                           ('with metal across the gap in the copper around it', bridged)):
         print('   %-52s %.3f uH, %.2f ohm' % (label, l * 1e6, r))
+    # the field solver against two published closed forms for the loop alone (Mohan et al. 1999, 2-3 %)
+    for name, l in zip(('modified Wheeler formula', 'current-sheet expression'), nfc_loop.closed_forms()):
+        check(abs(free[0] / l - 1) < 0.06, 'in free air by the %s (Mohan et al. 1999): %.3f uH, the solver %+.1f %%'
+              % (name, l * 1e6, (free[0] / l - 1) * 100))
     # the copper of the outer layers must end outside the screw head and the insert at the hole in the gap
     hx, hy = geometry.NFC_GAP_HOLE[0] + OX, geometry.NFC_GAP_HOLE[1] + OY
     ring = np.array([[hx + r * np.cos(a), hy + r * np.sin(a)] for r in (2.0, 2.9) for a in np.linspace(0, 2 * np.pi, 72)])

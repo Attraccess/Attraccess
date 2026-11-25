@@ -5,7 +5,7 @@ on one) are meshed as one sheet, in which the loop induces eddy currents. A meta
 and metal across the gap in that copper can be added."""
 import numpy as np
 
-from board import OX, OY, geometry, inside
+from board import MU0, OX, OY, geometry, inside
 from peec import Mesh
 
 F0 = 13.56e6
@@ -16,6 +16,22 @@ TRACK_W, TRACK_T = 0.5 * MM, 35e-6
 # turn to the copper around it, 1 pF of pads and feed tracks.
 C_LOOP = 2.4e-12
 WALL_BEHIND = 18.0          # mm from the loop to a metal wall: board 1.6, dock plate 13.9 + 2.5 mm behind it
+TURNS, PITCH = 4, 0.9 * MM  # the footprint's (scripts/bootstrap/make_lib.py)
+
+
+def closed_forms():
+    """The loop in free air by the two closed forms of Mohan, Hershenson, Boyd and Lee, "Simple accurate
+    expressions for planar spiral inductances", IEEE J. Solid-State Circuits 34(10), October 1999, for a
+    square spiral, typical error 2 to 3 %: the modified Wheeler formula (eq. 1, table I: K1 2.34, K2 2.75)
+    and the current-sheet expression (eq. 2, table II: c1 1.27, c2 2.07, c3 0.18, c4 0.13). The 35 x 37 mm
+    loop counts as a square of the mean side. Returns (Wheeler, current sheet) in henry."""
+    side = (geometry.ANT_W + geometry.ANT_H) / 2 * MM          # centre line of the outer turn
+    d_out = side + TRACK_W
+    d_in = side - 2 * (TURNS - 1) * PITCH - TRACK_W
+    d_avg, rho = (d_out + d_in) / 2, (d_out - d_in) / (d_out + d_in)
+    wheeler = 2.34 * MU0 * TURNS ** 2 * d_avg / (1 + 2.75 * rho)
+    sheet = MU0 * TURNS ** 2 * d_avg * 1.27 / 2 * (np.log(2.07 / rho) + 0.18 * rho + 0.13 * rho ** 2)
+    return wheeler, sheet
 
 
 def centreline(board):

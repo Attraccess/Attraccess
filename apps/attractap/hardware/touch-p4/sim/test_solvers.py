@@ -91,7 +91,47 @@ def cases():
     z1, _d = field2d.line(below, None, w, t)
     zd, _d = field2d.pair(below, w, t, 1.5e-3, mask=(0.02e-3, 0.0))
     out.append(('pair far apart against two single lines, ohm', zd, 2 * z1, 0.015))
+    out += ir_drop_cases()
     return out
+
+
+def ir_drop_cases():
+    """The voltage-drop solver (irdrop.py) on made-up nets against Ohm's law: 20 mm of 0.3 mm track on the
+    top, a via with a 0.3 mm hole through 1.6 mm, 10 mm of 0.5 mm on the bottom; and two equal tracks side by
+    side between the same pads."""
+    import irdrop
+
+    class Net:
+        copper = {'F.Cu': 35e-6, 'B.Cu': 35e-6}
+        depth = {'F.Cu': 0.0, 'B.Cu': 1.6}
+
+        def __init__(self, tracks, vias, pads):
+            self.t, self.v, self.p = tracks, vias, pads
+
+        def net_tracks(self, _net):
+            return self.t
+
+        def net_vias(self, _net):
+            return self.v
+
+        def net_pads(self, _net):
+            return self.p
+
+    def pad(ref, x, layer):
+        return {'ref': ref, 'num': '1', 'x': x, 'y': 0.0, 'rot': 0, 'sx': 1.0, 'sy': 1.0, 'layers': [layer]}
+
+    def track(layer, x1, x2, w):
+        return {'layer': layer, 'x1': x1, 'y1': 0.0, 'x2': x2, 'y2': 0.0, 'w': w}
+
+    rho, t = irdrop.RHO, 35e-6
+    series = Net([track('F.Cu', 0, 20, 0.3), track('B.Cu', 20, 30, 0.5)], [{'x': 20, 'y': 0.0, 'dia': 0.6, 'drill': 0.3}],
+                 [pad('A', 0, 'F.Cu'), pad('B', 30, 'B.Cu')])
+    want = rho * 20e-3 / (0.3e-3 * t) + rho * 1.6e-3 / (math.pi * 0.3e-3 * irdrop.PLATING) + rho * 10e-3 / (0.5e-3 * t)
+    got = irdrop.solve(series, 'X', 'A.1', {'B.1': 1.0})[0]['B.1']
+    both = Net([track('F.Cu', 0, 20, 0.3), track('F.Cu', 0, 20, 0.3)], [], [pad('A', 0, 'F.Cu'), pad('B', 20, 'F.Cu')])
+    half = irdrop.solve(both, 'X', 'A.1', {'B.1': 1.0})[0]['B.1']
+    return [('IR drop: track, via, track in series, mohm', got * 1e3, want * 1e3, 0.001),
+            ('IR drop: two equal tracks side by side, mohm', half * 1e3, rho * 20e-3 / (0.3e-3 * t) / 2 * 1e3, 0.001)]
 
 
 if __name__ == '__main__':
