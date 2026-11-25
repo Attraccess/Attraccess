@@ -12,7 +12,7 @@ Output:
                                      Manufacturer, Manufacturer Part, Description, Alternate, Lifecycle
     cpl-<variant>.csv                Designator, Mid X, Mid Y, Layer, Rotation
     parts-list-<variant>.csv         everything to buy for a reader: the assembly list plus the parts that
-                                     JLCPCB does not fit (display panel, Wi-Fi antenna)
+                                     JLCPCB does not fit (the display panel)
   fab/gerbers/                     the files inside the zip, for a Gerber viewer
   fab/schematic.pdf, fab/board-front.pdf, fab/board-back.pdf
 

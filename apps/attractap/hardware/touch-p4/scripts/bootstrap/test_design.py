@@ -66,8 +66,9 @@ class DesignTest(unittest.TestCase):
         self.assertEqual(bad, [])
 
     def test_new_ics_follow_their_makers_pin_tables(self):
-        """Symbol pins and connections of the power-path ICs against the datasheets' pin tables: TI
-        TPS25947 (SLVSFC9C) table 5-1, LM74700-Q1 (SNOSD17G) table 5-1 (DBV), TLV803 (SBVS157) DBZ pinout."""
+        """Symbol pins and connections of the power-path ICs and the Wi-Fi module against the datasheets' pin
+        tables: TI TPS25947 (SLVSFC9C) table 5-1, LM74700-Q1 (SNOSD17G) table 5-1 (DBV), TLV803 (SBVS157) DBZ
+        pinout, ESP32-C5-MINI-1 (datasheet v1.4) table 3-1."""
         from sexpr import find, first, loads
         lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'kicad', 'lib', 'attractap.kicad_sym')
         with open(lib, encoding='utf-8') as f:
@@ -77,6 +78,14 @@ class DesignTest(unittest.TestCase):
                                '7': 'DVDT', '8': 'GND', '9': 'ILM', '10': 'ITIMER'},
             'LM74700QDBVRQ1': {'1': 'VCAP', '2': 'GND', '3': 'EN', '4': 'CATHODE', '5': 'GATE', '6': 'ANODE'},
             'TLV803SDBZR': {'1': 'GND', '2': '~{RESET}', '3': 'VDD'},
+            # ESP32-C5-MINI-1 datasheet v1.4, table 3-1
+            'ESP32-C5-MINI-1-N4': dict(
+                [(str(n), 'GND') for n in (1, 2, 42, 43, 46, 47, 48) + tuple(range(50, 66))]
+                + [(str(n), 'NC') for n in (5, 11, 12, 13, 14, 15, 18, 25, 27, 28, 29, 30, 36, 37, 38, 41, 44, 49)]
+                + [('3', '3V3'), ('4', 'IO28'), ('6', 'IO2'), ('7', 'IO3'), ('8', 'IO4'), ('9', 'IO5'), ('10', 'IO6'),
+                   ('16', 'IO0'), ('17', 'IO1'), ('19', 'IO7'), ('20', 'IO8'), ('21', 'IO9'), ('22', 'IO10'),
+                   ('23', 'IO13'), ('24', 'IO14'), ('26', 'IO15'), ('31', 'IO23'), ('32', 'IO24'), ('33', 'IO25'),
+                   ('34', 'IO26'), ('35', 'IO27'), ('39', 'TX0'), ('40', 'RX0'), ('45', 'EN')]),
         }
         for name, table in tables.items():
             pins = {}
@@ -141,19 +150,66 @@ class DesignTest(unittest.TestCase):
         self.assertEqual((d105.mpn, d105.nets), ('SS310', {'1': 'VDC_R', '2': 'VDC_F'}))
         self.assertEqual((d106.mpn, d106.nets), ('SMBJ28A', {'1': 'VDC', '2': 'GND'}))
 
-    def test_3v3_converter_output_capacitance_is_in_tis_table(self):
-        """TLV62569 (SLVSDG1C table 4): 2.2 uH is proven with 10, 22 and 2 x 22 uF, effective +20 / -50 %,
-        so at most 52.8 uF (TI's answer on E2E, thread 980956). Every capacitor on the rail counts, the PHY's
-        behind its ferrite too. Effective values at 3.3 V from Samsung's DC-bias data; the parts without
-        data are counted at their full value."""
+    # Capacitors inside the Wi-Fi module on its 3V3 pin (ESP32-C5-MINI-1 datasheet v1.4, figure 8-1): C6, C21
+    # and C29 of 10 uF, C19, C20 and C26 of 1 uF, C4, C8, C12 and C15 of 100 nF, C14 of 10 nF. No part
+    # numbers are published, so they count at their full value.
+    WIFI_MODULE_UF = 3 * 10 + 3 * 1 + 4 * 0.1 + 0.01
+
+    def rail_capacitance(self, nets):
+        """Every capacitor from one of these nets to ground, in uF at 3.3 V: Samsung's DC-bias data where the
+        board has it, the full value for the parts without data."""
         at_3v3 = {'CL10A106KP8NNNC': 4.46, 'CL21A226MAQNNNE': 13.69}
         total = 0.0
         for p in self.d.parts.values():
-            if p.ref.startswith('C') and set(p.nets.values()) & {'+3V3', 'PHY_3V3'} and 'GND' in p.nets.values():
-                nominal = float(p.value.split('/')[0].replace('u', 'e-6').replace('n', 'e-9')) * 1e6
+            if p.ref.startswith('C') and set(p.nets.values()) & nets and 'GND' in p.nets.values():
+                nominal = float(p.value.split('/')[0].replace('u', 'e-6').replace('n', 'e-9').replace('p', 'e-12')) * 1e6
                 total += at_3v3.get(p.mpn, nominal)
-        self.assertLess(total, 52.8)
-        self.assertGreater(total, 22.0)
+        return total
+
+    def test_3v3_converter_output_capacitance_is_in_tis_table(self):
+        """TLV62569 (SLVSDG1C table 4): 2.2 uH is proven with 10, 22 and 2 x 22 uF, effective +20 / -50 %,
+        so at most 52.8 uF (TI's answer on E2E, thread 980956) and at least 5 uF. Every capacitor on the rail
+        counts, the PHY's behind its ferrite too."""
+        shared = self.rail_capacitance({'+3V3', 'PHY_3V3'})
+        self.assertLess(shared, 52.8)
+        self.assertGreater(shared, 22.0)
+        self.assertNotIn('+3V3', self.d.parts['U301'].nets.values())
+
+    def test_wifi_converter_output_capacitance_is_in_tis_table(self):
+        """The Wi-Fi module's own TLV62569 (U302): the 22 uF and 100 nF at the module and the module's own
+        33.41 uF, inside the same 5 to 52.8 uF."""
+        radio = self.rail_capacitance({'+3V3_WIFI'}) + self.WIFI_MODULE_UF
+        self.assertLess(radio, 52.8)
+        self.assertGreater(radio - self.WIFI_MODULE_UF, 5.0)       # TI's smallest proven value even without them
+        self.assertEqual({p.ref for p in self.d.parts.values() if p.ref.startswith('C')
+                          and '+3V3_WIFI' in p.nets.values() and 'GND' in p.nets.values()}, {'C301', 'C302'})
+
+    def test_wifi_module_supply_is_always_on_and_carries_its_pull_ups(self):
+        """U302 starts with the 5 V rail like U103 (EN through 100 k, no switch), and everything that sets
+        the module's pins at reset hangs on the module's own rail: EN RC, IO28 pull-up, SDIO pull-ups."""
+        u302 = self.d.parts['U302']
+        self.assertEqual((u302.mpn, u302.nets['4'], u302.nets['1']), ('TLV62569DBVR', '+5V', 'WIFI_BUCK_EN'))
+        self.assertEqual({ref for ref, _pin in self.nets['WIFI_BUCK_EN']}, {'U302', 'R310'})
+        self.assertEqual(self.d.parts['R310'].nets, {'1': '+5V', '2': 'WIFI_BUCK_EN'})
+        self.assertEqual(self.d.parts['U301'].nets['@3V3'], '+3V3_WIFI')
+        for net in ('C5_EN', 'C5_IO28', 'SDIO_CMD', 'SDIO_D0', 'SDIO_D1', 'SDIO_D2', 'SDIO_D3'):
+            pulls = [r for r, _pin in self.nets[net] if r.startswith('R') and '+3V3_WIFI' in self.d.parts[r].nets.values()]
+            self.assertEqual(len(pulls), 1, net)
+            self.assertFalse(any(r.startswith('R') and '+3V3' in self.d.parts[r].nets.values()
+                                 for r, _pin in self.nets[net]), net)
+
+    def test_wifi_module_strapping_pins(self):
+        """ESP32-C5-MINI-1 datasheet v1.4, chapter 4: IO28 high at reset boots from flash (10 k pull-up,
+        HDG 1.3.9; the boot test point pulls it low for download), IO27 keeps its internal pull-up, IO26, IO25
+        and IO3 (MTDI) stay open, IO7 (SDIO D1, the JTAG-source strap) has its 51 k pull-up."""
+        u = self.d.parts['U301']                    # pins by name here; check-netlist checks the numbers
+        self.assertTrue({'@IO26', '@IO27', '@IO25', '@IO3', '@IO2'} <= u.nc)
+        self.assertEqual((u.nets['@IO28'], u.nets['@IO7']), ('C5_IO28', 'SDIO_D1'))
+        self.assertEqual({r for r, _pin in self.nets['C5_IO28']}, {'U301', 'R303', 'TP811'})
+        self.assertEqual(self.d.parts['R303'].value, '10k')
+        # SDIO on the C5's fixed pins (esp-hosted-mcu 3.1.0): CLK IO9, CMD IO10, D0 IO8, D1 IO7, D2 IO14, D3 IO13
+        self.assertEqual([u.nets['@' + n] for n in ('IO9', 'IO10', 'IO8', 'IO7', 'IO14', 'IO13')],
+                         ['SDIO_CLK', 'SDIO_CMD', 'SDIO_D0', 'SDIO_D1', 'SDIO_D2', 'SDIO_D3'])
 
     def test_each_source_reaches_the_5v_rail_through_a_blocking_switch(self):
         # ideal diodes: controller anode and MOSFET source on the input, cathode and drain on +5V

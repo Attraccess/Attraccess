@@ -16,12 +16,12 @@ signal.
 | Part | Ref | Status | Source |
 |---|---|---|---|
 | Espressif ESP32-P4NRW32X | U201 | Mass Production. The variants without X (NRW32, NRW16) are EOL: order the X | [products.espressif.com](https://products.espressif.com/) |
-| Espressif ESP32-C6-MINI-1U-H4 | U301 | Mass Production | [products.espressif.com](https://products.espressif.com/) |
+| Espressif ESP32-C5-MINI-1-N4-V1.2 | U301 | Mass production: its datasheet is v1.4, an official release, which Espressif issues "for products in mass production" (datasheet, "Datasheet Versioning") | [datasheet](https://documentation.espressif.com/esp32-c5-mini-1_mini-1u_datasheet_en.pdf) |
 | Winbond W25Q128JVSIQ | U203 | Active | [DigiKey](https://www.digikey.com/en/products/detail/winbond-electronics/W25Q128JVSIQ/5803943) |
 | IC Plus IP101GRI | U401 | not stated (listed on the maker's site) | [icplus.com.tw](https://www.icplus.com.tw/products/1?locale=en) |
 | Tokmas PN5321A3HN | U501 | not stated | none found |
 | NXP PN5321A3HN/C106 (alternate of U501) | | **Not Recommended for New Designs**; NXP points to the PN7160 | [nxp.com](https://www.nxp.com/products/PN5321A3HN) |
-| TI TLV62569DBVR | U103, U202 | ACTIVE | [ti.com](https://www.ti.com/product/TLV62569/part-details/TLV62569DBVR) |
+| TI TLV62569DBVR | U103, U202, U302 | ACTIVE | [ti.com](https://www.ti.com/product/TLV62569/part-details/TLV62569DBVR) |
 | TI TPS259470ARPWR | U105 | ACTIVE | [ti.com](https://www.ti.com/product/TPS25947/part-details/TPS259470ARPWR) |
 | TI LM74700QDBVRQ1 | U106, U107 | ACTIVE | [ti.com](https://www.ti.com/product/LM74700-Q1/part-details/LM74700QDBVRQ1) |
 | TI TLV803SDBZR | U204 | ACTIVE | [ti.com](https://www.ti.com/product/TLV803) |
@@ -57,7 +57,7 @@ Stock is LCSC / JLCPCB on 25 November 2026.
 | Winbond W25Q128JVSIQ (C97521) | GigaDevice GD25Q128ESIGR (C2928891) | 19953 / 20899 | Same SOP-8 208 mil pin table; ESP-IDF enables its quad mode |
 | IC Plus IP101GRI (C703537) | the same part, LCSC C910373 | 720 / 720 | Not the IP101GRR, which is the commercial-temperature part |
 | Tokmas PN5321A3HN (C53457895) | NXP PN5321A3HN/C106 (C28925) | 324 / 490 | Mutual alternates: Tokmas copies NXP's pin table. Check the firmware version and the antenna tuning on the first board |
-| TI TLV62569DBVR (C141836) | SGMICRO SGM61020XN5G/TR (C5153643) | 2930 / 2977 | For U103 only. Same SOT-23-5 pins, 0.6 V reference, 2 A: the divider stays. The core converter U202 must stay the TLV62569 (design notes, "Power") |
+| TI TLV62569DBVR (C141836) | SGMICRO SGM61020XN5G/TR (C5153643) | 2930 / 2977 | For U103 and U302 only. Same SOT-23-5 pins, 0.6 V reference, 2 A: the divider stays. The core converter U202 must stay the TLV62569 (design notes, "Power") |
 | TI LM74700QDBVRQ1 (C2941042) | Maxinmicro MX74700T (C22468156) | 47392 / 48337 | Same pins; 300 uA instead of 80 uA, not automotive-qualified |
 | TI TLV803SDBZR (C132016) | 3PEAK TPV803S-3STR (C2842356) | 9260 / 9265 | Same pins; resets at 2.85 to 3.00 V, holds the reset 140 to 280 ms |
 | Infineon IRLML0030TRPBF (C67272) | Diodes DMN3023L-7 (C443825) | 6560 / 6902 | Same SOT-23 pins; 25 mOhm at 10 V, +-20 V gate |
@@ -77,7 +77,7 @@ Stock is LCSC / JLCPCB on 25 November 2026.
 | CUI PJ-002A (C3096082) | Same Sky PJ-002AH (C2961147) | 925 / 1305 | Identical drawing and land pattern |
 | OPSCO SK6812MINI-E (C5149201) | OPSCO SK6812MINI-EA (C5378731) | 29520 / 29520 | Same datasheet apart from the part number |
 | Huaneng MLT-8530 (C94599) | XHXDZ SMD8530-16 ohm (C49246948) | 30830 / 30830 | 16 ohm, 2.7 kHz, same size; check which pad is + |
-| ESP32-C6-MINI-1U-H4 (C20627095) | ESP32-C6-MINI-1U-N4 (C7558096) | 0 / 0 | Rated to 85 C only |
+| ESP32-C5-MINI-1-N4-V1.2 (C54951860) | ESP32-C5-MINI-1-N4 (C50346179) | 0 / 0 | The same module listed without the revision suffix. The ESP32-C5-MINI-1-N8R2 has the same pins and land pattern (8 MB flash, 2 MB PSRAM on IO15, which is open here) but is not at JLCPCB or LCSC |
 | ESP32-P4NRW32X (C54540373) | ESP32-P4NRW16X (JLCPCB C55820335) | 0 / 0 | 16 MB PSRAM: the firmware must fit |
 | SDAPO DP9900M-5V (C5380106) | Silvertel Ag9905M | 0 | Same pin table and pin positions (SDAPO datasheet section 4.1, Silvertel Ag9900 fig. 3); check its seated height against the case, which leaves 13.9 mm |
 
@@ -109,9 +109,11 @@ not listed as an approved alternate.
   LCSC and no stocked drop-in. U103 is now a TI TLV62569DBVR (C141836), the same
   part as the core converter U202: one parts line for both, 490416 at JLCPCB, and
   the SGM61020 as second source for U103 (see the design notes, "Power").
-- **ESP32-C6-MINI-1U-H4 (U301)**: in stock (1851 / 3302). The -N4 is the fallback
-  if the -H4 runs out, at the cost of its 85 C rating (the thermal estimate has the
-  module at 79 C in a room of 40 C).
+- **ESP32-C5-MINI-1-N4-V1.2 (U301)**: 614 at JLCPCB on 25 November 2026, the only
+  stocked C5 module with a PCB antenna (no ESP32-C5-WROOM-1 of any variant was in
+  stock). Buy the modules for the planned production with the first order, or
+  order them in through JLCPCB's global sourcing like the ESP32-P4. Its alternates
+  have no stock (table above).
 - **DP9900M-5V (U102, Ethernet version only)**: 38 in stock. Reserve them with the
   order or source Silvertel Ag9905M through a distributor, and check its fit on the
   footprint first.
@@ -120,11 +122,6 @@ not listed as an approved alternate.
   reader IC (NXP PN7160 or ST ST25R3916). That needs a new driver in the firmware,
   which today talks the PN532's protocol, and a new matching network. Until then,
   buy enough PN532 for the planned production with the first order.
-- **Wi-Fi antenna** (not assembled by JLCPCB): the certified Shanghai Deman
-  TFPD08H10060011 is not sold by LCSC, Mouser or DigiKey. Ask Espressif's sales or
-  Deman for a quote and a minimum quantity. The stocked fallback is Taoglas
-  GW.26.0111 on a CAB.A02 cable; see `docs/compliance.md` for what that changes for
-  the radio approval.
 - **Display panel** (not assembled by JLCPCB): a commodity part without a
   guaranteed part number. Agree on a fixed type with the supplier and check every
   batch against the drawing (design notes, "Display mounting and flex").

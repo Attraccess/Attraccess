@@ -3577,11 +3577,11 @@
 		(effects (font (size 1.27 1.27)) (justify left))
 		(uuid "c4df3e72-cf08-5588-90af-bb3ba82b2dcd")
 	)
-	(hierarchical_label "C6_EN_M"
+	(hierarchical_label "C5_EN_M"
 		(shape passive)
 		(at 71.12 153.67 0)
 		(effects (font (size 1.27 1.27)) (justify left))
-		(uuid "3fc1ab3a-23b8-534e-ba82-6c66f23d2c9c")
+		(uuid "d40c395d-950c-5386-a4f5-0712145c97f4")
 	)
 	(hierarchical_label "BUZZER"
 		(shape passive)

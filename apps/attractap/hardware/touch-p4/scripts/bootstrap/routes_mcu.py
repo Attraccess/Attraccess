@@ -412,7 +412,7 @@ def mcu_left(B):
         B.via(*v, net)
     # the other four close up to 0.3 mm pitch on their way left (the upper one turns first), then each
     # drops to its via; LED data, the lowest, ends first
-    for num, net, turn, up, run, drop in ((86, 'SDIO_CMD', 0.60, 0.37, 4.70, 0.50), (87, 'C6_EN_M', 0.75, 0.42, 4.05, 0.45),
+    for num, net, turn, up, run, drop in ((86, 'SDIO_CMD', 0.60, 0.37, 4.70, 0.50), (87, 'C5_EN_M', 0.75, 0.42, 4.05, 0.45),
                                           (88, 'BUZZER', 0.90, 0.47, 3.35, 0.45)):
         x, y = m(num)
         B.track([(x, y), (x - turn, y), (x - turn - up, y - up), (x - run, y - up), (x - run - drop, y - up + drop)], net, w)

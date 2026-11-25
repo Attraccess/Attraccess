@@ -82,9 +82,9 @@ def power(d):
     d.add('L', '2.2uH 4.3A', 'Device:L', 'attractap:IND-SMD_L4.0-W4.0', {'1': 'BUCK_SW', '2': '+3V3'},
           lcsc=BUCK_L[0], mpn=BUCK_L[1])
     # Output capacitor: TI's recommended 10 uF with 2.2 uH (SLVSDG1C table 4). The rail's other capacitors
-    # (P4, C6, PHY, sensors) count too: about 49 uF effective at 3.3 V in all, inside the 22 to 52.8 uF
-    # that TI has proven stable (2 x 22 uF nominal, +20 / -50 %). The second 22 uF that was here (C110)
-    # would have put the rail at 76 uF. docs/design-notes.md, "Power".
+    # (P4, PHY, sensors) count too: about 44 uF effective at 3.3 V in all, inside the 22 to 52.8 uF that TI
+    # has proven stable (2 x 22 uF nominal, +20 / -50 %). The second 22 uF that was here (C110) would have
+    # put the rail at 76 uF. The Wi-Fi module has a converter of its own (U302). docs/design-notes.md, "Power".
     d.C('10u', '+3V3', size='0603', desc='3.3 V converter output')
     d.ref('C')                      # C110, the second 22 uF, is gone; the numbers after it stay
     d.C('100n', '+3V3')
@@ -172,7 +172,7 @@ P4_GPIO = {
     33: 'RMII_TX_EN', 34: 'RMII_TXD0', 35: 'RMII_TXD1', 36: 'ETH_MDIO',
     37: 'UART0_TX', 38: 'UART0_RX',
     39: 'SDIO_D0', 40: 'SDIO_D1', 41: 'SDIO_D2', 42: 'SDIO_D3', 43: 'SDIO_CLK_M', 44: 'SDIO_CMD',
-    45: 'C6_EN_M', 46: 'BUZZER', 47: 'LED_DATA',
+    45: 'C5_EN_M', 46: 'BUZZER', 47: 'LED_DATA',
     49: 'NFC_IRQ', 50: 'NFC_RST', 51: 'NFC_SDA', 52: 'NFC_SCL',
 }
 
@@ -313,37 +313,61 @@ def mcu(d):
 
 
 def wifi(d):
-    """Wi-Fi / Bluetooth co-processor: ESP32-C6-MINI-1U (esp-hosted over SDIO)."""
+    """Wi-Fi / Bluetooth co-processor: ESP32-C5-MINI-1 (esp-hosted over SDIO) with a 3.3 V converter of its own."""
     d.begin('wifi', 300)
-    c6 = {
-        '3V3': '+3V3', 'GND': 'GND', 'EN': 'C6_EN',
-        'IO18': 'SDIO_CMD', 'IO19': 'SDIO_CLK', 'IO20': 'SDIO_D0', 'IO21': 'SDIO_D1', 'IO22': 'SDIO_D2',
-        'IO23': 'SDIO_D3', 'IO8': 'C6_IO8', 'IO9': 'C6_IO9', 'TXD0': 'C6_TXD0', 'RXD0': 'C6_RXD0',
+    # Pins from the datasheet (v1.4, table 3-1); SDIO on the C5's fixed pins (esp-hosted-mcu 3.1.0,
+    # getting started, co-processor connections): CLK IO9, CMD IO10, D0 IO8, D1 IO7, D2 IO14, D3 IO13.
+    c5 = {
+        '3V3': '+3V3_WIFI', 'GND': 'GND', 'EN': 'C5_EN',
+        'IO9': 'SDIO_CLK', 'IO10': 'SDIO_CMD', 'IO8': 'SDIO_D0', 'IO7': 'SDIO_D1', 'IO14': 'SDIO_D2',
+        'IO13': 'SDIO_D3', 'IO28': 'C5_IO28', 'TX0': 'C5_TXD0', 'RX0': 'C5_RXD0',
     }
-    c6_nc = ('NC', 'IO2', 'IO3', 'IO4', 'IO5', 'IO0', 'IO1', 'IO6', 'IO7', 'IO12', 'IO13', 'IO14', 'IO15')
-    d.group('ESP32-C6 module')
-    # The module without an antenna of its own: the antenna is chosen per build, an adhesive one inside
-    # the case or one on an SMA bulkhead, and plugs into the connector on the module. Symbol and footprint
-    # are those of the MINI-1 with PCB antenna: the datasheet gives one land pattern for both (figures
-    # 11-1 and 11-2), the MINI-1U is the same module without the 4.1 mm of antenna. The -H4 (to 105 C) and
-    # not the -N4 (to 85 C): JLCPCB had 3364 of it and none of the -N4 on 24 November 2026, and the
-    # thermal estimate has the module at 79 C in a room of 40 C.
-    d.add('U', 'ESP32-C6-MINI-1U-H4', 'attractap:ESP32-C6-MINI-1U-H4',
-          'attractap:WIFIM-SMD_61P-L16.6-W13.2-P0.80-ESP32-C6-MINI-1-N4',
-          {'@' + k: v for k, v in c6.items()}, nc=tuple('@' + n for n in c6_nc),
-          lcsc='C20627095', mpn='ESP32-C6-MINI-1U-H4',
-          desc='Wi-Fi 6 / BLE module with a connector for an external antenna (W.FL / MHF III); '
-               'antenna per build: adhesive inside the case or on an SMA bulkhead')
-    # Espressif's typical circuit has 22 uF here; 10 uF keeps the 3.3 V converter inside the output
-    # capacitance TI has proven (see the converter). The converter and the plane carry the TX bursts.
-    d.C('10u', '+3V3', size='0603', desc='Wi-Fi module supply')
-    d.C('100n', '+3V3')
+    # Strapping pins left open (datasheet chapter 4): IO27 has its pull-up inside (boot from flash, ROM
+    # messages on); IO26 counts only with IO27 and IO28 low; IO25 and IO3 (MTDI) choose the SDIO edges at
+    # reset, which the slave driver sets again in its configuration; IO2 (MTMS) floats by default.
+    c5_nc = ('NC', 'IO0', 'IO1', 'IO2', 'IO3', 'IO4', 'IO5', 'IO6', 'IO15', 'IO23', 'IO24', 'IO25', 'IO26', 'IO27')
+    d.group('ESP32-C5 module')
+    # Dual-band Wi-Fi 6 with its own PCB antenna, which stands over the cut in the board's top edge. EU-type
+    # examination certificate 44024-05-2026-260268 (Eurofins, notified body 0980) for the module with this
+    # antenna; FCC ID 2AC7Z-ESPC5MINI1. Rated for 85 C of air around it: see the heat estimate in
+    # docs/design-notes.md. The -N4: 4 MB flash holds esp-hosted's two update images; no PSRAM needed.
+    d.add('U', 'ESP32-C5-MINI-1-N4', 'attractap:ESP32-C5-MINI-1-N4', 'attractap:CONN-SMD_ESP32-C5-MINI-1-N4',
+          {'@' + k: v for k, v in c5.items()}, nc=tuple('@' + n for n in c5_nc),
+          lcsc='C54951860', mpn='ESP32-C5-MINI-1-N4-V1.2',
+          desc='Wi-Fi 6 (2.4 and 5 GHz) / BLE 5 / 802.15.4 module with PCB antenna, 4 MB flash')
+    # Espressif's typical circuit: 22 uF and 100 nF at the 3V3 pin (datasheet figure 9-1). The module
+    # carries 33.4 uF of its own on that pin (figure 8-1), all on this rail: 47.2 uF with the 22 uF at its
+    # 13.7 uF at 3.3 V, inside the 52.8 uF that TI has proven for the TLV62569 (see U103).
+    d.C('22u', '+3V3_WIFI', size='0805', desc='Wi-Fi module supply, 3.3 V converter output')
+    d.C('100n', '+3V3_WIFI')
     d.group('Enable and boot')
-    d.R('10k', '+3V3', 'C6_EN')
-    d.C('1u', 'C6_EN')
-    d.R('1k', 'C6_EN_M', 'C6_EN', desc='host reset of the co-processor')
-    d.R('10k', '+3V3', 'C6_IO8')
+    # Reset: R301 and C303 hold EN low until the module's rail is up (Espressif: 10 k, 1 uF); the P4 resets
+    # the module through R302 (esp-hosted, GPIO45).
+    d.R('10k', '+3V3_WIFI', 'C5_EN')
+    d.C('1u', 'C5_EN')
+    d.R('1k', 'C5_EN_M', 'C5_EN', desc='host reset of the co-processor')
+    # IO28 high at reset boots from flash; held low at reset (test point C5_BOOT) it gives download mode
+    # over UART0. HDG 1.3.9: "place a pull-up resistor at the GPIO28 pin"; no capacitor fitted.
+    d.R('10k', '+3V3_WIFI', 'C5_IO28', desc='boot from flash; held low at reset: download over UART0')
     d.group('SDIO')
     d.R('22R', 'SDIO_CLK_M', 'SDIO_CLK', desc='source termination')
+    # 51 k pull-ups on CMD and D0 to D3 (esp-hosted), to the module's rail. The one on D1 (IO7) also gives
+    # the JTAG-source strap its level; that strap counts only once the eFuse JTAG_SEL_ENABLE is burnt.
     for n in ('SDIO_CMD', 'SDIO_D0', 'SDIO_D1', 'SDIO_D2', 'SDIO_D3'):
-        d.R('51k', '+3V3', n)
+        d.R('51k', '+3V3_WIFI', n)
+    # The radio's own 3.3 V converter: the module asks for 0.6 A (HDG 1.3.2) and brings 33.4 uF, which
+    # the shared 3.3 V rail has no room for. The same circuit as U103: TLV62569 with 2.2 uH, 100 k / 22.1 k
+    # (3.315 V) and 12 pF across the upper resistor. Always on, like U103: EN from the 5 V rail, no switch
+    # (a module whose supply an IO expander switched did not start, esp-hosted issue 127).
+    d.group('Wi-Fi module supply')
+    d.add('U', 'TLV62569DBVR', 'attractap:TLV62569DBVR', 'attractap:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR', {
+        '4': '+5V', '1': 'WIFI_BUCK_EN', '2': 'GND', '3': 'WIFI_BUCK_SW', '5': 'WIFI_BUCK_FB',
+    }, lcsc='C141836', mpn='TLV62569DBVR', desc='3.3 V 2 A buck for the Wi-Fi module, from the 5 V rail')
+    d.C('10u/25V', '+5V', size='0805', desc='Wi-Fi converter input')
+    d.C('100n', '+5V')
+    d.R('100k', '+5V', 'WIFI_BUCK_EN')
+    d.add('L', '2.2uH 4.3A', 'Device:L', 'attractap:IND-SMD_L4.0-W4.0', {'1': 'WIFI_BUCK_SW', '2': '+3V3_WIFI'},
+          lcsc=BUCK_L[0], mpn=BUCK_L[1])
+    d.C('12p', '+3V3_WIFI', 'WIFI_BUCK_FB', desc='feed-forward, zero at 133 kHz (as at U103)')
+    d.R('100k', '+3V3_WIFI', 'WIFI_BUCK_FB', show=True)
+    d.R('22.1k', 'WIFI_BUCK_FB', 'GND', show=True, desc='3.315 V')

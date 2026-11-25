@@ -27,8 +27,7 @@ import model_fit  # noqa: E402
 
 PACKAGES3D = 'https://gitlab.com/kicad/libraries/kicad-packages3D/-/raw/master/%s.3dshapes/%s.step'
 # whose conversion gives the model for a footprint, where it is not the fitted part's own
-SOURCE = {'attractap:QFN-40_L6.0-W6.0-P0.50-BL-EP': 'C28925',          # footprint of the NXP PN532
-          'attractap:WIFIM-SMD_61P-L16.6-W13.2-P0.80-ESP32-C6-MINI-1-N4': 'C20627095'}   # the MINI-1U body
+SOURCE = {'attractap:QFN-40_L6.0-W6.0-P0.50-BL-EP': 'C28925'}          # footprint of the NXP PN532
 # attractap footprints copied from a KiCad footprint, which brings its model
 KICAD_MODEL = {'attractap:LED_SK6812MINI-E_ReverseMount_Clear':
                'LED_SMD:LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount'}

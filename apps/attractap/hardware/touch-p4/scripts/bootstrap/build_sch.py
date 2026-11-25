@@ -29,7 +29,7 @@ SHEETS = [
     ('power', 'Power', 'Power input', 'USB-C, DC and PoE inputs, supply OR-ing, 3.3 V buck converter'),
     ('mcu', 'MCU', 'MCU', 'ESP32-P4 GPIO map, flash, crystal, reset and boot straps, USB'),
     ('mcu_power', 'MCU_Power', 'MCU power', 'ESP32-P4 supply pins, decoupling, 1.1 V core converter'),
-    ('wifi', 'WiFi', 'Wi-Fi', 'ESP32-C6-MINI-1U co-processor (esp-hosted over SDIO)'),
+    ('wifi', 'WiFi', 'Wi-Fi', 'ESP32-C5-MINI-1 co-processor (esp-hosted over SDIO) and its 3.3 V converter'),
     ('eth', 'Ethernet', 'Ethernet', 'IP101GRI RMII PHY, RJ45 with magnetics and PoE rectifiers (LAN version only)'),
     ('nfc', 'NFC', 'NFC', 'PN532 reader, EMC filter, antenna matching, PCB loop antenna'),
     ('display', 'Display', 'Display', '40-pin panel connector, backlight driver, IO expander'),
@@ -59,9 +59,12 @@ NOTES = {
         'U202 must be exactly TLV62569DBVR (no output discharge). The chip trims the 1.1 V rail through FB_DCDC.',
     ],
     'wifi': [
-        'The C6 runs the esp-hosted co-processor firmware. First flash through the C6 test points',
-        '(C6_TX, C6_RX, C6_EN, C6_BOOT), later updates over SDIO from the ESP32-P4.',
+        'The C5 runs the esp-hosted co-processor firmware. First flash through the C5 test points (C5_TX, C5_RX,',
+        'C5_EN, GND; C5_BOOT = IO28 held low at reset), later updates over SDIO from the ESP32-P4. Its USB pins',
+        'carry SDIO D2/D3, so these test points are the only wired way in.',
         'SDIO uses the P4 SDMMC slot 0 pins: D0-D3 = GPIO39-42, CLK = GPIO43, CMD = GPIO44.',
+        "The module's PCB antenna stands over the cut in the board's top edge: no copper and no metal near it.",
+        'U302 feeds only the module: always on with the 5 V rail; EN RC and all pull-ups on +3V3_WIFI.',
     ],
     'eth': [
         'All parts on this sheet are fitted on the LAN version only (field Variant = lan).',
@@ -117,6 +120,8 @@ HISTORY = [
                    'TLV62569 3.3 V converter, test points, DC and PoE present to the firmware'),
     ('2026-11-25', 'Industry review: layout rework (ESP32-P4 land pattern, decoupling, USB pair, impedance), '
                    '2.0 x 1.6 mm crystal, designators on the silkscreen, assembly drawing'),
+    ('2026-11-25', 'Wi-Fi module ESP32-C5-MINI-1 (2.4 and 5 GHz, PCB antenna) instead of the ESP32-C6-MINI-1U, '
+                   'with a 3.3 V converter of its own'),
 ]
 
 
@@ -309,7 +314,7 @@ def root_text(s, x, y, size, bold=False):
 
 def root_header():
     out = [root_text('Attractap Touch P4', 15, 22, 5.0, bold=True),
-           root_text('Reader board: ESP32-P4 + ESP32-C6 (Wi-Fi 6), 4.0 in 480x480 touch display, PN532 NFC, '
+           root_text('Reader board: ESP32-P4 + ESP32-C5 (dual-band Wi-Fi 6), 4.0 in 480x480 touch display, PN532 NFC, '
                      'optional 10/100 Ethernet with PoE, RGB LEDs, buzzer.', 15, 30, 2.0),
            root_text('Assembly variants: "wifi" leaves out every part with the field Variant = lan; "lan" fits all '
                      'parts. Parts marked DNP are never fitted.', 15, 35, 2.0),

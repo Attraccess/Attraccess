@@ -213,10 +213,10 @@
 		(stroke (width 0) (type default))
 		(uuid "f3bbbc6c-8d9f-5078-9932-f041dde1e594")
 	)
-	(label "C6_EN_M"
+	(label "C5_EN_M"
 		(at 31.75 110.49 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "0bccda99-8e9b-5644-a54c-40949bf9b50e")
+		(uuid "3c8d64a0-ee0f-54b8-8cc7-09e95936674b")
 	)
 	(wire
 		(pts (xy 34.29 113.03) (xy 31.75 113.03))
@@ -713,9 +713,9 @@
 			(uuid "113cfbe7-e3cb-5e0d-a006-cf524d964c6c")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
-		(pin "C6_EN_M" passive
+		(pin "C5_EN_M" passive
 			(at 34.29 110.49 180)
-			(uuid "f5649716-3444-5ab5-a5b3-fb40fc46e271")
+			(uuid "fc3d5b83-8649-5601-9897-728c3ed7bc22")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "ETH_MDC" passive
@@ -1007,70 +1007,80 @@
 		(stroke (width 0) (type default))
 		(uuid "cc0a7aa3-d67c-5d42-a62a-287299c670a3")
 	)
-	(label "C6_EN_M"
+	(label "+3V3_WIFI"
 		(at 31.75 219.71 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "470a6bc3-f929-5e7b-a88d-8c05b20ecb71")
+		(uuid "d467bb7b-f42b-58d0-9966-4033ed3aa7ba")
 	)
 	(wire
 		(pts (xy 34.29 222.25) (xy 31.75 222.25))
 		(stroke (width 0) (type default))
 		(uuid "0707aa66-3d1a-5598-905d-c28749c3340b")
 	)
-	(label "SDIO_CLK_M"
+	(label "C5_EN_M"
 		(at 31.75 222.25 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "ff6909d3-a91c-5d15-acf4-41f41289c945")
+		(uuid "4c90ba30-4928-58bd-86b5-418098a0641d")
 	)
 	(wire
 		(pts (xy 34.29 224.79) (xy 31.75 224.79))
 		(stroke (width 0) (type default))
 		(uuid "9fbcaf5d-aca4-5b86-af23-bd3aecdbc296")
 	)
-	(label "SDIO_CMD"
+	(label "SDIO_CLK_M"
 		(at 31.75 224.79 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "37888aa2-7015-5699-8efb-62be469f7b6e")
+		(uuid "22e02fed-7849-5d5f-bc24-1d055e9a563d")
 	)
 	(wire
 		(pts (xy 34.29 227.33) (xy 31.75 227.33))
 		(stroke (width 0) (type default))
 		(uuid "42f4d153-a72c-5f1d-a0d4-fbb2b2ca6e1a")
 	)
-	(label "SDIO_D0"
+	(label "SDIO_CMD"
 		(at 31.75 227.33 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "034cfb27-1bf0-5ddd-94f3-7f6949ae8040")
+		(uuid "f87780ec-9ed4-5b51-99bb-d840b0d533ab")
 	)
 	(wire
 		(pts (xy 110.49 219.71) (xy 113.03 219.71))
 		(stroke (width 0) (type default))
 		(uuid "9ad4b1c9-aa40-5edf-b26a-822817b343dc")
 	)
-	(label "SDIO_D1"
+	(label "SDIO_D0"
 		(at 113.03 219.71 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "8edd3936-ca93-568c-9dc4-7d6094cda0c6")
+		(uuid "434b8d40-91f2-5c4b-8619-90cbd15719b9")
 	)
 	(wire
 		(pts (xy 110.49 222.25) (xy 113.03 222.25))
 		(stroke (width 0) (type default))
 		(uuid "25f6f904-66ab-5cc4-800f-b94ca2c8d212")
 	)
-	(label "SDIO_D2"
+	(label "SDIO_D1"
 		(at 113.03 222.25 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "a3cc3d2d-006d-54ce-afd5-30fbd01d2b60")
+		(uuid "e2a428a1-455f-541e-8524-1ab09b730b45")
 	)
 	(wire
 		(pts (xy 110.49 224.79) (xy 113.03 224.79))
 		(stroke (width 0) (type default))
 		(uuid "6aed8bd0-cfe7-552d-a451-3b5bef74c00c")
 	)
-	(label "SDIO_D3"
+	(label "SDIO_D2"
 		(at 113.03 224.79 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "2f87ca29-f113-5f2c-8e09-b548d00ab834")
+		(uuid "3fb0ef99-cde9-5793-ae5b-e78ba8f7e7fd")
+	)
+	(wire
+		(pts (xy 110.49 227.33) (xy 113.03 227.33))
+		(stroke (width 0) (type default))
+		(uuid "c93d52d6-6408-5c36-b255-de39eb68ba8f")
+	)
+	(label "SDIO_D3"
+		(at 113.03 227.33 0)
+		(effects (font (size 1.27 1.27)) (justify left bottom))
+		(uuid "4781046b-fb5d-5450-a95a-c315a9e00c6e")
 	)
 	(sheet
 		(at 34.29 214.63)
@@ -1087,48 +1097,53 @@
 			(at 34.29 233.01 0)
 			(effects (font (size 1.27 1.27)) (justify left top))
 		)
-		(pin "C6_EN_M" passive
+		(pin "+3V3_WIFI" passive
 			(at 34.29 219.71 180)
-			(uuid "bb2e51e1-1b2a-5b66-8a0c-3bf1ede70be3")
+			(uuid "6fb211a0-db31-59a3-b31f-402dd92f3356")
+			(effects (font (size 1.27 1.27)) (justify left))
+		)
+		(pin "C5_EN_M" passive
+			(at 34.29 222.25 180)
+			(uuid "1675315e-03a8-5328-a336-db09c7fa20a7")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "SDIO_CLK_M" passive
-			(at 34.29 222.25 180)
+			(at 34.29 224.79 180)
 			(uuid "448c9eac-071a-556c-9c60-62f42e64c4b1")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "SDIO_CMD" passive
-			(at 34.29 224.79 180)
+			(at 34.29 227.33 180)
 			(uuid "42855c28-761e-5f21-a53f-92db7442769c")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "SDIO_D0" passive
-			(at 34.29 227.33 180)
+			(at 110.49 219.71 0)
 			(uuid "1eda06cb-8d7e-57eb-9d12-bd236446235d")
-			(effects (font (size 1.27 1.27)) (justify left))
+			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "SDIO_D1" passive
-			(at 110.49 219.71 0)
+			(at 110.49 222.25 0)
 			(uuid "f02b6c24-c53f-5fc3-b984-b5d40c1a862c")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "SDIO_D2" passive
-			(at 110.49 222.25 0)
+			(at 110.49 224.79 0)
 			(uuid "cfbec66d-22d9-5aab-a28a-d582d8888b1e")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "SDIO_D3" passive
-			(at 110.49 224.79 0)
+			(at 110.49 227.33 0)
 			(uuid "830ef79c-f41e-55a9-80cb-58393c46c51e")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(instances (project "attractap-touch-p4" (path "/c397a859-95c6-54a3-93b8-1e7535e299df" (page "5"))))
 	)
-	(text "ESP32-C6-MINI-1U co-processor (esp-hosted over SDIO)"
+	(text "ESP32-C5-MINI-1 co-processor (esp-hosted over SDIO) and its 3.3 V converter"
 		(exclude_from_sim no)
 		(at 34.29 237.61 0)
 		(effects (font (size 1 1)) (justify left bottom))
-		(uuid "8693322d-0d4b-5f37-a3fd-322ad12ae5b9")
+		(uuid "d8f8e5ce-cf35-5ec1-a68f-5bcf66add7fd")
 	)
 	(wire
 		(pts (xy 170.18 71.12) (xy 167.64 71.12))
@@ -2058,150 +2073,160 @@
 		(stroke (width 0) (type default))
 		(uuid "8a8c4a56-de3a-584d-bdf5-dd59ed05efc6")
 	)
-	(label "+5V_DC"
+	(label "+3V3_WIFI"
 		(at 167.64 231.14 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "aaefcf2b-487a-55d3-bd6c-758c4bf656b9")
+		(uuid "b28a3607-be4c-598a-b7e4-b0bd33e35871")
 	)
 	(wire
 		(pts (xy 170.18 233.68) (xy 167.64 233.68))
 		(stroke (width 0) (type default))
 		(uuid "502a26f8-413c-58d4-a6e9-d3ff57345f36")
 	)
-	(label "+5V_POE"
+	(label "+5V_DC"
 		(at 167.64 233.68 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "145ab138-7adb-5628-9b81-0dad21afdf0c")
+		(uuid "124238f1-e6b8-5045-9890-b959db25294d")
 	)
 	(wire
 		(pts (xy 170.18 236.22) (xy 167.64 236.22))
 		(stroke (width 0) (type default))
 		(uuid "bf2175fc-6646-58c4-bc4d-f5615f4e84f0")
 	)
-	(label "+5V_USB"
+	(label "+5V_POE"
 		(at 167.64 236.22 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "d2f3a9cf-76db-5cce-9f04-81f3f72654d8")
+		(uuid "6da62f9b-8b9f-5e30-949d-55d570264e7d")
 	)
 	(wire
 		(pts (xy 170.18 238.76) (xy 167.64 238.76))
 		(stroke (width 0) (type default))
 		(uuid "9d84a170-391e-5915-8d1e-f5cda5f02a41")
 	)
-	(label "BL_A"
+	(label "+5V_USB"
 		(at 167.64 238.76 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "59d447b8-f081-5618-866f-07c449cf34a7")
+		(uuid "bc227562-2934-5ddc-98a2-fbb5620b5ae6")
 	)
 	(wire
 		(pts (xy 170.18 241.3) (xy 167.64 241.3))
 		(stroke (width 0) (type default))
 		(uuid "6ca7f19f-ce30-5e11-8e78-ac1a35b3701d")
 	)
-	(label "I2C0_SCL"
+	(label "BL_A"
 		(at 167.64 241.3 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "665e85b2-b334-5d5f-8e5c-9937f3a3ce6b")
+		(uuid "8ba00b40-0309-5cac-9fab-840629ba8fa2")
 	)
 	(wire
 		(pts (xy 170.18 243.84) (xy 167.64 243.84))
 		(stroke (width 0) (type default))
 		(uuid "80df1797-3905-5418-a0d5-17e64e7e6746")
 	)
-	(label "I2C0_SDA"
+	(label "I2C0_SCL"
 		(at 167.64 243.84 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "dc313cbb-796d-52aa-9e82-6a389b0d0486")
+		(uuid "ac91fe7f-8f38-530e-b1ba-a6a9a7e2d0c1")
 	)
 	(wire
 		(pts (xy 170.18 246.38) (xy 167.64 246.38))
 		(stroke (width 0) (type default))
 		(uuid "30586426-2ca1-539d-b5cd-0462dd2e8d94")
 	)
-	(label "NFC_AVDD"
+	(label "I2C0_SDA"
 		(at 167.64 246.38 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "3bc090ba-7fec-5ef5-8d13-a5585edac992")
+		(uuid "07bfe7ea-6970-5715-8a83-cfb6b1d771e7")
 	)
 	(wire
 		(pts (xy 170.18 248.92) (xy 167.64 248.92))
 		(stroke (width 0) (type default))
 		(uuid "64ab3036-4b54-5c29-9a29-5f729a41ce7a")
 	)
-	(label "NFC_DVDD"
+	(label "NFC_AVDD"
 		(at 167.64 248.92 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "04ee97f6-8d04-5788-a772-6de912418583")
+		(uuid "7ae552ae-beff-5e64-ad58-7b3c7687ac84")
 	)
 	(wire
 		(pts (xy 246.38 231.14) (xy 248.92 231.14))
 		(stroke (width 0) (type default))
 		(uuid "cb288b34-7842-52fa-935f-44ce5d6a6b22")
 	)
-	(label "NFC_SCL"
+	(label "NFC_DVDD"
 		(at 248.92 231.14 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "7d63bd05-ceae-5e33-a76b-91980c09e5f2")
+		(uuid "c813a97f-a6c7-5cbf-957e-b09dff602ecc")
 	)
 	(wire
 		(pts (xy 246.38 233.68) (xy 248.92 233.68))
 		(stroke (width 0) (type default))
 		(uuid "e46e0489-a670-5cb0-808c-7b29f5dd23d3")
 	)
-	(label "NFC_SDA"
+	(label "NFC_SCL"
 		(at 248.92 233.68 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "273d5bac-fbb0-5b6c-86be-2495ad65a91d")
+		(uuid "9499dc32-14df-5367-9154-541bb962ced3")
 	)
 	(wire
 		(pts (xy 246.38 236.22) (xy 248.92 236.22))
 		(stroke (width 0) (type default))
 		(uuid "c6c4ae7b-a28e-558c-8bc8-158da5b536b6")
 	)
-	(label "NFC_TVDD"
+	(label "NFC_SDA"
 		(at 248.92 236.22 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "55f730d8-d3be-5364-aedd-58e26ed2901c")
+		(uuid "825baf74-d9b8-5cbc-9b18-0bdbdd411df1")
 	)
 	(wire
 		(pts (xy 246.38 238.76) (xy 248.92 238.76))
 		(stroke (width 0) (type default))
 		(uuid "edbf31d0-18fc-5e0e-a8f4-e13089a5e87d")
 	)
-	(label "PHY_3V3"
+	(label "NFC_TVDD"
 		(at 248.92 238.76 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "9475800e-772c-5f17-83a9-15e6dec35d3b")
+		(uuid "8e99e5da-e958-564c-8174-ff16dfb1b617")
 	)
 	(wire
 		(pts (xy 246.38 241.3) (xy 248.92 241.3))
 		(stroke (width 0) (type default))
 		(uuid "a59f1e1b-e000-5eeb-964a-1a4e75210d16")
 	)
-	(label "RMII_REF_CLK"
+	(label "PHY_3V3"
 		(at 248.92 241.3 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "95d391a0-d4d6-53e2-a943-845c35015dbc")
+		(uuid "69b13577-bf4d-5f28-a47c-6143c00e685e")
 	)
 	(wire
 		(pts (xy 246.38 243.84) (xy 248.92 243.84))
 		(stroke (width 0) (type default))
 		(uuid "d74a09f5-e144-51d1-8ca6-b938c984f1af")
 	)
-	(label "VDC"
+	(label "RMII_REF_CLK"
 		(at 248.92 243.84 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "df3837e3-2cad-528f-94f2-435a2a37dbff")
+		(uuid "ec36df07-8c71-529f-8576-91e4f81e86e1")
 	)
 	(wire
 		(pts (xy 246.38 246.38) (xy 248.92 246.38))
 		(stroke (width 0) (type default))
 		(uuid "a085dcb5-d5c2-5022-8ab3-e98955eec7bf")
 	)
-	(label "VDD_FLASH"
+	(label "VDC"
 		(at 248.92 246.38 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "ef7ffdc5-6f2d-5c82-9f1b-5596e0db8af2")
+		(uuid "81d69bf1-1dcd-5e27-abb9-8e50aa8f7aea")
+	)
+	(wire
+		(pts (xy 246.38 248.92) (xy 248.92 248.92))
+		(stroke (width 0) (type default))
+		(uuid "a33008c8-180a-5d8d-b02e-651dade3b5ac")
+	)
+	(label "VDD_FLASH"
+		(at 248.92 248.92 0)
+		(effects (font (size 1.27 1.27)) (justify left bottom))
+		(uuid "453f2cdf-b926-5e22-9b32-142461d15def")
 	)
 	(sheet
 		(at 170.18 226.06)
@@ -2221,78 +2246,83 @@
 			(at 170.18 254.6 0)
 			(effects (font (size 1.27 1.27)) (justify left top))
 		)
-		(pin "+5V_DC" passive
+		(pin "+3V3_WIFI" passive
 			(at 170.18 231.14 180)
+			(uuid "18c57852-0071-5ae0-ad4d-9aae09e28a76")
+			(effects (font (size 1.27 1.27)) (justify left))
+		)
+		(pin "+5V_DC" passive
+			(at 170.18 233.68 180)
 			(uuid "f8b001fa-869d-53e7-8492-2cb67a6ea739")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "+5V_POE" passive
-			(at 170.18 233.68 180)
+			(at 170.18 236.22 180)
 			(uuid "76b4850f-4d54-5abe-9bf6-5d83162d5727")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "+5V_USB" passive
-			(at 170.18 236.22 180)
+			(at 170.18 238.76 180)
 			(uuid "0a0a1e7c-af98-513f-b438-cd5d424c71ea")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "BL_A" passive
-			(at 170.18 238.76 180)
+			(at 170.18 241.3 180)
 			(uuid "36a4adf2-7a8b-52d4-ac47-cf2b631a2d1d")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "I2C0_SCL" passive
-			(at 170.18 241.3 180)
+			(at 170.18 243.84 180)
 			(uuid "f003c11a-6ff5-5fa7-892e-dd4d2050382e")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "I2C0_SDA" passive
-			(at 170.18 243.84 180)
+			(at 170.18 246.38 180)
 			(uuid "97dcc21e-0f36-5153-8a95-b4f35100a9d6")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "NFC_AVDD" passive
-			(at 170.18 246.38 180)
+			(at 170.18 248.92 180)
 			(uuid "fc793349-0a39-579f-8a6a-96d40193d8ec")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "NFC_DVDD" passive
-			(at 170.18 248.92 180)
+			(at 246.38 231.14 0)
 			(uuid "f9b9b999-e656-5ff9-abc7-d0f5249e0ada")
-			(effects (font (size 1.27 1.27)) (justify left))
+			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "NFC_SCL" passive
-			(at 246.38 231.14 0)
+			(at 246.38 233.68 0)
 			(uuid "cdb5d677-ce23-5791-a989-39515133620a")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "NFC_SDA" passive
-			(at 246.38 233.68 0)
+			(at 246.38 236.22 0)
 			(uuid "71029d27-543b-5b3a-b268-b31ee4952113")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "NFC_TVDD" passive
-			(at 246.38 236.22 0)
+			(at 246.38 238.76 0)
 			(uuid "4763eebc-7e89-5c57-812c-19ecc88aab8c")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "PHY_3V3" passive
-			(at 246.38 238.76 0)
+			(at 246.38 241.3 0)
 			(uuid "2f80f1a8-af0f-5da6-aaea-fff1a8066b82")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "RMII_REF_CLK" passive
-			(at 246.38 241.3 0)
+			(at 246.38 243.84 0)
 			(uuid "09d4c6b0-ac4b-554d-b069-4763fd8efa53")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "VDC" passive
-			(at 246.38 243.84 0)
+			(at 246.38 246.38 0)
 			(uuid "107fae02-6858-5e71-bc8a-f6856e7533ee")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "VDD_FLASH" passive
-			(at 246.38 246.38 0)
+			(at 246.38 248.92 0)
 			(uuid "08ed8fba-cd78-59e4-866c-73198534eecb")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
@@ -2312,11 +2342,11 @@
 		(effects (font (size 5 5) (bold yes)) (justify left bottom))
 		(uuid "efa3c450-6b88-549c-b4fa-663c93df6512")
 	)
-	(text "Reader board: ESP32-P4 + ESP32-C6 (Wi-Fi 6), 4.0 in 480x480 touch display, PN532 NFC, optional 10/100 Ethernet with PoE, RGB LEDs, buzzer."
+	(text "Reader board: ESP32-P4 + ESP32-C5 (dual-band Wi-Fi 6), 4.0 in 480x480 touch display, PN532 NFC, optional 10/100 Ethernet with PoE, RGB LEDs, buzzer."
 		(exclude_from_sim no)
 		(at 15 30 0)
 		(effects (font (size 2 2)) (justify left bottom))
-		(uuid "b110caab-c847-5cb1-b6ed-f41b33ad1b2c")
+		(uuid "7727f60a-e869-5c7d-8849-a211cec33092")
 	)
 	(text "Assembly variants: \"wifi\" leaves out every part with the field Variant = lan; \"lan\" fits all parts. Parts marked DNP are never fitted."
 		(exclude_from_sim no)
@@ -2383,6 +2413,12 @@
 		(at 15 67.8 0)
 		(effects (font (size 1.4 1.4)) (justify left bottom))
 		(uuid "3846eb85-a2f4-5ec7-9016-a1997ecd7545")
+	)
+	(text "A   2026-11-25   Wi-Fi module ESP32-C5-MINI-1 (2.4 and 5 GHz, PCB antenna) instead of the ESP32-C6-MINI-1U, with a 3.3 V converter of its own"
+		(exclude_from_sim no)
+		(at 15 70.2 0)
+		(effects (font (size 1.4 1.4)) (justify left bottom))
+		(uuid "c005ed25-94b6-5aab-8a92-e17e98bf719a")
 	)
 	(sheet_instances (path "/" (page "1")))
 	(embedded_fonts no)

@@ -221,18 +221,19 @@ def wifi_link(board):
         slack = 1e3 / mhz - si.SD_OUTPUT_DELAY * 1e9 - round_trip * 1e9
         check(round_trip < 2e-9, 'at %d MHz: clock out and data back take %.2f ns, which leaves the MCU %.1f ns after a module that answers within 14 ns'
               % (mhz, round_trip * 1e9, slack))
-    # Reset of the module: the MCU pulls C6_EN low through a resistor, against the pull-up and the capacitor
-    # there. esp-hosted holds the line low for 10 ms; the module needs 50 us below a quarter of its supply.
-    series = board.value_of(board.part_between('C6_EN_M', 'C6_EN', 'R')[0])
-    pull_up = board.value_of(board.part_between('+3V3', 'C6_EN', 'R')[0])
-    cap = board.value_of(board.part_between('C6_EN', 'GND', 'C')[0])
+    # Reset of the module: the MCU pulls C5_EN low through a resistor, against the pull-up (on the module's own
+    # rail) and the capacitor there. esp-hosted holds the line low for 10 ms; the module needs 50 us below a
+    # quarter of its supply.
+    series = board.value_of(board.part_between('C5_EN_M', 'C5_EN', 'R')[0])
+    pull_up = board.value_of(board.part_between('+3V3_WIFI', 'C5_EN', 'R')[0])
+    cap = board.value_of(board.part_between('C5_EN', 'GND', 'C')[0])
     low = 3.3 * series / (series + pull_up)
     tau = series * pull_up / (series + pull_up) * cap
     below = 10e-3 - tau * np.log((3.3 - low) / (0.25 * 3.3 - low)) if low < 0.25 * 3.3 else 0.0
     check(below > 50e-6, 'reset from the MCU: a 10 ms pulse takes the module\'s EN pin to %.2f V and holds it below 0.83 V for %.1f ms'
           % (low, below * 1e3))
     for net in ('SDIO_CMD', 'SDIO_D0', 'SDIO_D1', 'SDIO_D2', 'SDIO_D3'):
-        pull = [board.value_of(p) for p in board.part_between('+3V3', net, 'R')]
+        pull = [board.value_of(p) for p in board.part_between('+3V3_WIFI', net, 'R')]
         check(len(pull) == 1 and 10e3 <= pull[0] <= 90e3, '%s has its pull-up (%s)' % (net, ', '.join('%g k' % (r / 1e3) for r in pull) or 'none'))
 
 

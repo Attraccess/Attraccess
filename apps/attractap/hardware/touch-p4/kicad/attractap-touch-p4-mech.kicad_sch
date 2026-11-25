@@ -840,6 +840,33 @@
 			)
 		)
 	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 231.14 91.44 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(dnp no)
+		(uuid "dd5db678-030c-55df-8607-f4bb34d32c68")
+		(property "Reference" "TP831" (at 235.977 88.04 0) (effects (font (size 1.27 1.27))))
+		(property "Value" "3V3_WIFI" (at 237.882 89.74 0) (effects (font (size 1.27 1.27))))
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 231.14 91.44 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "Datasheet" "" (at 231.14 91.44 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Description" "" (at 231.14 91.44 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(pin "1" (uuid "c5b3ebc8-77a9-5074-9967-24973417491d"))
+		(instances
+			(project "attractap-touch-p4"
+				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/7a51f2ad-2d48-5a47-9b66-64864065023d"
+					(reference "TP831")
+					(unit 1)
+				)
+			)
+		)
+	)
 	(wire
 		(pts (xy 40.64 91.44) (xy 48.26 91.44))
 		(stroke (width 0) (type default))
@@ -914,6 +941,11 @@
 		(pts (xy 162.56 132.08) (xy 170.18 132.08))
 		(stroke (width 0) (type default))
 		(uuid "facc802d-1fbb-50dd-9ef9-758c3166c003")
+	)
+	(wire
+		(pts (xy 223.52 91.44) (xy 231.14 91.44))
+		(stroke (width 0) (type default))
+		(uuid "3af5cfea-083b-547d-8ea0-aeddae06ffd0")
 	)
 	(hierarchical_label "VDC"
 		(shape passive)
@@ -1005,6 +1037,12 @@
 		(effects (font (size 1.27 1.27)) (justify right))
 		(uuid "535f699b-6d27-582d-adcf-19c621583597")
 	)
+	(hierarchical_label "+3V3_WIFI"
+		(shape passive)
+		(at 223.52 91.44 180)
+		(effects (font (size 1.27 1.27)) (justify right))
+		(uuid "fd7fe8aa-e07a-5adb-9394-34684afce1db")
+	)
 	(text "Mechanical"
 		(exclude_from_sim no)
 		(at 12 15 0)
@@ -1051,7 +1089,7 @@
 	)
 	(rectangle
 		(start 25.4 81.28)
-		(end 182.88 134.62)
+		(end 245.11 134.62)
 		(stroke (width 0.15) (type dash))
 		(fill (type none))
 		(uuid "1441d2b5-b933-532c-a1ce-202cff060ba8")

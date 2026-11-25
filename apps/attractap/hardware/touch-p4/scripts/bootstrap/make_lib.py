@@ -284,18 +284,6 @@ def usb_c_power_pads(tree):
             pad[:] = [Sym('pad'), pad[1], Sym('smd'), Sym('rect'), at, [Sym('size'), 0.6, 1.3], layers]
 
 
-def c6_ground_pads(tree):
-    """The module's nine ground pads: 1.45 mm at a pitch of 1.975 mm, centred on the module (datasheet
-    v1.5, figures 11-1 and 11-2). The converted footprint had 1.80 mm and the block 0.05 mm off."""
-    for pad in find(tree, 'pad'):
-        size = first(pad, 'size')
-        if str(pad[1]) == '49' and size and abs(float(size[1]) - 1.45) < 0.01:
-            at = first(pad, 'at')
-            ix, iy = round((float(at[1]) - 0.02) / 1.8), round((float(at[2]) + 0.05) / 1.8)
-            if abs(float(at[1]) - ix * 1.975) > 0.001 and abs(float(at[1]) - ix * 1.8 - 0.02) < 0.01:
-                at[1], at[2] = round(ix * 1.975, 3), round(iy * 1.975, 3)
-
-
 def fpc_signal_pads(tree):
     """Hirose's mounting pattern for the FH12 has 0.30 mm signal pads; the converter took the 0.25 mm of
     the stencil opening. Copper 0.30 mm, paste 0.25 mm."""
@@ -381,8 +369,6 @@ def fix_footprint(name, text, fresh=True):
         proximity_sensor_outline(tree)
     if name.startswith('USB-C_SMD-TYPE-C-31-M-12'):
         usb_c_power_pads(tree)
-    if name.startswith('WIFIM-SMD_61P'):
-        c6_ground_pads(tree)
     if name.startswith('FPC-SMD_FH12-40S'):
         fpc_signal_pads(tree)
     if name.startswith('VQFN-10_L2.0-W2.0'):

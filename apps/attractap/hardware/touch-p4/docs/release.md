@@ -28,6 +28,7 @@ not been ordered yet: these are the dated states of its design.
 | A | 2026-11-25 | Industry review: parts data and alternates, fab drawing, IPC-D-356 netlist, 3D models, land patterns of USB-C, ESP32-C6 and display connector |
 | A | 2026-11-25 | Industry review: eFuse and ideal diodes on the 5 V rail, reset supervisor, damped DC input, TLV62569 3.3 V converter, test points, DC and PoE present to the firmware |
 | A | 2026-11-25 | Industry review: layout rework (ESP32-P4 land pattern, decoupling, USB pair, impedance), 2.0 x 1.6 mm crystal, designators on the silkscreen, assembly drawing |
+| A | 2026-11-25 | Wi-Fi module ESP32-C5-MINI-1 (2.4 and 5 GHz, PCB antenna) instead of the ESP32-C6-MINI-1U, with a 3.3 V converter of its own |
 
 ## Before an order
 

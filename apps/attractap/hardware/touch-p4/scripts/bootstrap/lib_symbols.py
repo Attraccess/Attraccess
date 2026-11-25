@@ -122,17 +122,19 @@ def derived_symbols(lib):
             'AP63205WU-7', 'U', fp + 'TSOT-26_L2.9-W1.6-P0.95-LS2.8-BL', '5 V 2 A synchronous buck, 3.8 to 32 V in',
             left=[('3', 'VIN'), ('2', 'EN')], right=[('6', 'BST'), ('5', 'SW'), ('1', 'FB')], bottom=[('4', 'GND')],
             width=12.7, datasheet='https://www.diodes.com/assets/Datasheets/AP63200-AP63201-AP63203-AP63205.pdf'),
-        # the fitted module has an antenna connector (MINI-1U); same pins and land pattern as the MINI-1
-        'ESP32-C6-MINI-1U-H4': box_symbol(
-            'ESP32-C6-MINI-1U-H4', 'U', fp + 'WIFIM-SMD_61P-L16.6-W13.2-P0.80-ESP32-C6-MINI-1-N4',
-            'ESP32-C6 module, Wi-Fi 6 / BLE 5 / 802.15.4, 4 MB flash, antenna connector, -40 to 105 C',
-            left=[('3', '3V3'), None, ('8', 'EN'), ('23', 'IO9'), ('22', 'IO8'), None, ('31', 'TXD0'), ('30', 'RXD0'),
-                  None] + [(n, 'GND') for n in ['1', '2', '11', '14'] + [str(k) for k in range(36, 54)]],
-            right=[('24', 'IO18'), ('25', 'IO19'), ('26', 'IO20'), ('27', 'IO21'), ('28', 'IO22'), ('29', 'IO23'), None]
-                  + [(n, 'IO%s' % io) for n, io in (('12', 0), ('13', 1), ('5', 2), ('6', 3), ('9', 4), ('10', 5),
-                                                     ('15', 6), ('16', 7), ('17', 12), ('18', 13), ('19', 14), ('20', 15))]
-                  + [None] + [(n, 'NC') for n in ('4', '7', '21', '32', '33', '34', '35')],
-            width=20.32, datasheet='https://www.espressif.com/sites/default/files/documentation/esp32-c6-mini-1_mini-1u_datasheet_en.pdf'),
+        # the Wi-Fi module with its own PCB antenna; pins from the datasheet (v1.4, table 3-1)
+        'ESP32-C5-MINI-1-N4': box_symbol(
+            'ESP32-C5-MINI-1-N4', 'U', fp + 'CONN-SMD_ESP32-C5-MINI-1-N4',
+            'ESP32-C5 module, Wi-Fi 6 2.4 and 5 GHz / BLE 5 / 802.15.4, 4 MB flash, PCB antenna, -40 to 85 C',
+            left=[('3', '3V3'), None, ('45', 'EN'), ('4', 'IO28'), ('35', 'IO27'), ('34', 'IO26'), None,
+                  ('39', 'TX0'), ('40', 'RX0'), None]
+                 + [(n, 'GND') for n in ['1', '2', '42', '43', '46', '47', '48'] + [str(k) for k in range(50, 66)]],
+            right=[('21', 'IO9'), ('22', 'IO10'), ('20', 'IO8'), ('19', 'IO7'), ('24', 'IO14'), ('23', 'IO13'), None]
+                  + [(n, 'IO%s' % io) for n, io in (('16', 0), ('17', 1), ('6', 2), ('7', 3), ('8', 4), ('9', 5),
+                                                     ('10', 6), ('26', 15), ('31', 23), ('32', 24), ('33', 25))]
+                  + [None] + [(n, 'NC') for n in ('5', '11', '12', '13', '14', '15', '18', '25', '27', '28', '29',
+                                                  '30', '36', '37', '38', '41', '44', '49')],
+            width=20.32, datasheet='https://documentation.espressif.com/esp32-c5-mini-1_mini-1u_datasheet_en.pdf'),
         # pin names from the jack's function: winding pairs to the PHY, PoE outputs, LEDs
         'HY931147C': box_symbol(
             'HY931147C', 'J', fp + 'RJ45-TH_HY931147C', 'RJ45 with 10/100 magnetics, PoE rectifier bridges and two LEDs',

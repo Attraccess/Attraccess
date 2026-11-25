@@ -11,6 +11,9 @@ was found. The sources are in docs/parts.md.
 
 # lifecycle sources (read on 25 November 2026)
 ESPRESSIF = 'Mass Production (products.espressif.com)'
+# a datasheet of version 1.0 or later is "publicly released for products in mass production" (Espressif's
+# datasheet versioning table); the ESP32-C5-MINI-1's is v1.4 of 14 September 2026
+ESPRESSIF_DS = 'Mass production (datasheet v1.4, official release)'
 TI = 'ACTIVE (ti.com)'
 DIGIKEY = 'Active (DigiKey part status)'
 NOT_STATED = 'not stated by the maker'
@@ -22,9 +25,11 @@ PARTS = {
     'C54540373': ('Espressif', 'MCU ESP32-P4, dual-core RISC-V 400 MHz, 32 MB PSRAM in package, chip revision '
                   'v3.x, QFN-104 10 x 10 mm', ESPRESSIF,
                   'Espressif ESP32-P4NRW16X (JLCPCB C55820335): 16 MB PSRAM, firmware must fit; no stock'),
-    'C20627095': ('Espressif', 'Wi-Fi 6 / BLE 5 / 802.15.4 module ESP32-C6, 4 MB flash, MHF III antenna '
-                  'connector, -40 to 105 C', ESPRESSIF,
-                  'Espressif ESP32-C6-MINI-1U-N4 (C7558096): -40 to 85 C; no stock'),
+    'C54951860': ('Espressif', 'Wi-Fi 6 (2.4 and 5 GHz) / BLE 5 / 802.15.4 module ESP32-C5, PCB antenna, 4 MB '
+                  'flash, chip revision v1.2, -40 to 85 C, 15.4 x 21.3 mm', ESPRESSIF_DS,
+                  'Espressif ESP32-C5-MINI-1-N4 (C50346179): the same module listed without the revision suffix; '
+                  'no stock. ESP32-C5-MINI-1-N8R2: same pins and land pattern, 8 MB flash, 2 MB PSRAM on IO15 '
+                  '(open here); not at JLCPCB'),
     'C97521': ('Winbond', '128 Mbit QSPI NOR flash, SOIC-8 208 mil', DIGIKEY,
                'GigaDevice GD25Q128ESIGR (C2928891)'),
     'C703537': ('IC Plus', '10/100 Ethernet PHY, RMII, -40 to 85 C, QFN-32 4 x 4 mm', NOT_STATED,
@@ -148,8 +153,4 @@ NOT_ASSEMBLED = [
      '4.0in 480x480 ST7701S + GT911, 40 pins', 'IPS TFT 4.0 in 480 x 480, RGB565, capacitive touch, 40-pin 0.5 mm '
      'flex; taped on, flex into J601 (docs/design-notes.md, "Display mounting and flex")',
      'any panel with the same drawing and pin table (docs/design-notes.md)'),
-    (('wifi', 'lan'), 1, 'Wi-Fi antenna', 'Shanghai Deman Electronics', 'TFPD08H10060011',
-     'Sleeve monopole 2.4 GHz, 2.33 dBi peak, MHF III plug: the antenna the module was certified with. '
-     'Quote from Espressif or Deman (docs/parts.md)',
-     'Taoglas GW.26.0111 (2.24 dBi) on CAB.A02 SMA bulkhead cable: radiated tests needed (docs/compliance.md)'),
 ]

@@ -287,8 +287,8 @@ def mech(d):
         ('GND', 'GND', 'power'), ('GND', 'GND', 'power'),
         ('CHIP_PU', 'EN', 'mcu'), ('BOOT', 'BOOT', 'mcu'), ('UART0_TX', 'TX0', 'mcu'),
         ('UART0_RX', 'RX0', 'mcu'),
-        ('C6_EN', 'C6_EN', 'wifi'), ('C6_IO9', 'C6_BOOT', 'wifi'), ('C6_TXD0', 'C6_TX', 'wifi'),
-        ('C6_RXD0', 'C6_RX', 'wifi'),
+        ('C5_EN', 'C5_EN', 'wifi'), ('C5_IO28', 'C5_BOOT', 'wifi'), ('C5_TXD0', 'C5_TX', 'wifi'),
+        ('C5_RXD0', 'C5_RX', 'wifi'),
         ('ACC_INT', 'ACC_INT', 'ui'), ('PROX_INT', 'PROX_INT', 'ui'),
     ):
         d.TP(net, label, sheet=sheet)
@@ -299,9 +299,12 @@ def mech(d):
         ('NFC_TVDD', 'TVDD', 'nfc'), ('NFC_AVDD', 'AVDD', 'nfc'), ('NFC_DVDD', 'DVDD', 'nfc'),
         ('BL_A', 'BL_A', 'display'), ('I2C0_SDA', 'SDA', 'display'), ('I2C0_SCL', 'SCL', 'display'),
         ('NFC_SDA', 'NFC_SDA', 'nfc'), ('NFC_SCL', 'NFC_SCL', 'nfc'), ('RMII_REF_CLK', 'REF_CLK', 'eth'),
-        ('PHY_3V3', 'PHY_3V3', 'eth'),
+        ('PHY_3V3', 'PHY_3V3', 'eth'), ('+3V3_WIFI', '3V3_WIFI', 'wifi'),
     ):
         d.TP(net, label, sheet='mech', small=True)
+    # ground beside the Wi-Fi module's test points: with EN, BOOT, TX and RX the only wired way to flash or
+    # recover the module (its USB pins carry SDIO D2 and D3)
+    d.TP('GND', 'GND', sheet='wifi')
     d.group('Mounting holes')
     for i in range(4):
         d.add('H', 'M3', 'Mechanical:MountingHole', 'MountingHole:MountingHole_3.2mm_M3', {})

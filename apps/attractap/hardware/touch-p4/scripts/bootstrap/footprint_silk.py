@@ -17,8 +17,9 @@ SILK_KEEP_IN = {
     'USB-C_SMD-TYPE-C-31-M-12_1': (-99, -99, 99, 3.65),
     # DC jack, turned 90 degrees at (8.05, 97.3): the plug end lies in the cut-away below y = 107.5
     'DC-IN-TH_PJ-002A': (-9.9, -99, 99, 99),
-    # Wi-Fi module at (22.0, 11.3): its connector end overhangs the notch at the top edge (y < 5.65)
-    'WIFIM-SMD_61P-L16.6-W13.2-P0.80-ESP32-C6-MINI-1-N4': (-99, -5.45, 99, 99),
+    # Wi-Fi module (geometry.WIFI_MODULE): its antenna end stands over the cut in the top edge, whose floor
+    # lies 7.9 mm above the module's centre; the outline stops 0.5 mm short of it
+    'CONN-SMD_ESP32-C5-MINI-1-N4': (-99, -7.4, 99, 99),
     # Small parts whose outline lay outside their pads, where the neighbours' pads are on this board. A
     # crystal of this kind fits its pads only one way or turned half round, which is the same: no silk.
     # A ferrite or an inductor has no polarity. The diode keeps its symbol, the SOT-23-6 its pin 1 dot.

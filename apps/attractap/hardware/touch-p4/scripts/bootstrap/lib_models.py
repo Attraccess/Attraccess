@@ -12,6 +12,7 @@ Written by collect_models.py; make_lib.py attaches the models. Do not edit by ha
 
 MODELS = {
     'BUZ-SMD_4P-L8.5-W8.5-P8.50-BR': ('EasyEDA (JLCEDA) library C94599, via easyeda2kicad', (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
+    'CONN-SMD_ESP32-C5-MINI-1-N4': ('EasyEDA (JLCEDA) library C54951860, via easyeda2kicad', (0.0, 2.95, 0.01), (0.0, 0.0, 0.0)),
     'CONN-TH_4P-P3.5-2601-3102': ('EasyEDA (JLCEDA) library C2765061, via easyeda2kicad', (0.0, 0.02, 0.1), (0.0, 0.0, 0.0)),
     'CP_Elec_6.3x5.4': ('KiCad packages3D, CP_Elec_6.3x5.4.step', (0, 0, 0), (0, 0, 0)),
     'CP_Elec_6.3x7.7': ('KiCad packages3D, CP_Elec_6.3x7.7.step', (0, 0, 0), (0, 0, 0)),
@@ -58,5 +59,4 @@ MODELS = {
     'TSSOP-16_L5.0-W4.4-P0.65-LS6.4-TL': ('EasyEDA (JLCEDA) library C477924, via easyeda2kicad', (0.0, 0.0, 0.02), (0.0, 0.0, 0.0)),
     'USB-C_SMD-TYPE-C-31-M-12_1': ('EasyEDA (JLCEDA) library C165948, via easyeda2kicad, moved 0.01, 2.22 mm onto its pads', (0.01, -2.47, 0.0), (0.0, 0.0, 180.0)),
     'VQFN-10_L2.0-W2.0-P0.45-TL': ('EasyEDA (JLCEDA) library C3662799, via easyeda2kicad', (-0.01, 0.0, 0.05), (0.0, 0.0, 0.0)),
-    'WIFIM-SMD_61P-L16.6-W13.2-P0.80-ESP32-C6-MINI-1-N4': ('EasyEDA (JLCEDA) library C20627095, via easyeda2kicad', (0.0, 0.63, 0.02), (0.0, 0.0, 0.0)),
 }

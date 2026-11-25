@@ -33,15 +33,8 @@ TOLERANCE = 0.3                   # mm between a library pad and the board pad o
 # other way. Only the positions of the pads are compared.
 ANY_PAD = {'Resistor_SMD:R_Array_Convex_4x0402'}
 # (footprint, LCSC number) -> (library pad number -> pad number on the board, tolerance in mm): the
-# library draws the part's ground pads in another way than the footprint does.
-# The Wi-Fi module: the footprint is the library's for the ESP32-C6-MINI-1 (C5736265), nine ground pads
-# numbered 49 at a pitch of 1.8 mm. The library's footprint for the MINI-1U numbers them 49 and 54 to 61
-# and draws them at 1.975 mm. The datasheet has one land pattern for both modules, with 2.05 mm (v1.5,
-# figures 11-1 and 11-2); the pads are 1.45 mm wide, so all three overlap by more than a millimetre.
-# Pins 1 to 48 and the corner pads 50 to 53 are compared by number as for every other part.
+# library draws the part's pads in another way than the footprint does.
 GROUND_PADS = {
-    ('attractap:WIFIM-SMD_61P-L16.6-W13.2-P0.80-ESP32-C6-MINI-1-N4', 'C20627095'):
-        ({str(n): '49' for n in range(54, 62)}, 0.35),
     # The bidirectional TVS D107: the library's land for this part number has its pads 0.44 mm further
     # from the centre than KiCad's D_SMB, the IPC pattern for DO-214AA that D106 uses too (and that matches
     # the library for the unidirectional SMBJ28A). DO-214AA terminals lie 2.0 to 2.8 mm from the centre;
