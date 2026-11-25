@@ -12,6 +12,23 @@ they can be opened, reviewed and ordered without running anything. Do not edit t
 KiCad files by hand: the next generator run overwrites the edit, and `check` fails
 when the KiCad files differ from what the generator gives (see the README).
 
+## Revision history
+
+The same lines stand in the title block of the root sheet (`HISTORY` in
+`scripts/bootstrap/build_sch.py`); a test fails when the two differ. Revision A has
+not been ordered yet: these are the dated states of its design.
+
+| Revision | Date | Change |
+|---|---|---|
+| A | 2026-11-15 | First design, generated from the circuit description |
+| A | 2026-11-21 | Review: Ethernet jack, silkscreen, tamper sensors (accelerometer, hall switch, proximity) |
+| A | 2026-11-22 | Six layers; checked against the datasheets: PN532 paste, DC input capacitors |
+| A | 2026-11-24 | Simulated: NFC matching; ESP32-C6-MINI-1U with an antenna connector |
+| A | 2026-11-25 | Industry review: core divider 499k, 3 kV barrier capacitors, schematic redrawn, TVS symbols |
+| A | 2026-11-25 | Industry review: parts data and alternates, fab drawing, IPC-D-356 netlist, 3D models, land patterns of USB-C, ESP32-C6 and display connector |
+| A | 2026-11-25 | Industry review: eFuse and ideal diodes on the 5 V rail, reset supervisor, damped DC input, TLV62569 3.3 V converter, test points, DC and PoE present to the firmware |
+| A | 2026-11-25 | Industry review: layout rework (ESP32-P4 land pattern, decoupling, USB pair, impedance), 2.0 x 1.6 mm crystal, designators on the silkscreen, assembly drawing |
+
 ## Before an order
 
 1. `pnpm nx run attractap-touch-p4-pcb:check` passes: tests, ERC, netlist against the

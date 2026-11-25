@@ -1059,7 +1059,7 @@ the page carries no date of its own):
 | SMD pad to pad, two nets | 0.150 | 0.15 | **0** | **At the limit**: the ESP32-P4's 0.35 mm pitch with Espressif's 0.20 mm pads, and the accelerometer's LGA pads (U702). The MCU's corner pads are trimmed to keep it (0.163 mm across each corner) |
 | Solder mask web | 0.100 | 0.10 (green, 1 oz) | **0** | **At the limit**, same pins: mask 0.025 mm larger than each pad. Green is the only colour with a 0.10 mm web, so the order says green |
 | Via, hole / diameter | 0.20 / 0.45 | 0.15 / 0.25; 0.20 hole with less than 0.45 mm costs extra | 0.05 / 0.20; **0** to the price step | 0.45 / 0.2 is the smallest via without a surcharge |
-| Via annular ring | 0.125 | (0.05 from the via sizes above; 0.15 mm preferred) | +0.075 | Most vias have 0.5 mm pads; 132 of them keep 0.45 mm where there is no room |
+| Via annular ring | 0.125 | (0.05 from the via sizes above; 0.15 mm preferred) | +0.075 | Most vias have 0.5 mm pads; 137 of them keep 0.45 mm where there is no room |
 | Plated hole ring (parts) | 0.155 (the PN532's thermal vias, part of its land pattern) | 0.15 minimum, 0.20 recommended | +0.005 to the minimum, -0.045 to the recommendation | The four vias in the PN532's exposed pad, which its land pattern draws as plated pads (0.3 mm hole); taken as vias, as they are made, JLCPCB asks 0.05 mm. Of the connectors, the Ethernet jack's shield pins have the smallest ring, 0.199 mm (HanRun's pattern) |
 | Hole to hole, vias | 0.385 | 0.20 | +0.185 | |
 | Hole to hole, part holes | 0.69 | 0.45 | +0.24 | |
@@ -1076,6 +1076,29 @@ gap, mask web), the cheapest via, and the silkscreen. None of them is a yield
 risk of the bare board at JLCPCB's stated capability; the pad gap and the mask
 web are the ones to look at on the first boards (solder bridges at the MCU,
 which the assembly's AOI and X-ray would find).
+
+### Switching converters: hot loops
+
+The loop that carries each converter's switched current, measured on the routed
+board by `scripts/layout_report.py`: for a buck, from the input capacitor to the
+IC's VIN pin and back from its ground pad to the IC's GND pin; for the backlight
+boost, from the diode's cathode to the output capacitor and back to the IC's GND
+pin. The makers ask for the capacitor right at those pins and a small switch node.
+
+| Converter | Capacitor | Supply side (copper path) | Ground side (straight, through the fill) | Loop area | Ground vias within 1 mm (IC GND pin + capacitor) | Switch-node copper |
+|---|---|---|---|---|---|---|
+| U104 AP63205, DC input to 5 V | C113 2.2 uF | 3.8 mm | 2.4 mm | 6.3 mm2 | 1 + 1 | 10.1 mm2 |
+| U103 TLV62569, 5 V to 3.3 V | C107 100 nF | 1.0 mm | 3.9 mm | 2.6 mm2 | 0 + 1 | 7.4 mm2 |
+| U202 TLV62569, 3.3 V to 1.1 V | C232 10 uF | 2.1 mm | 4.6 mm | 1.3 mm2 | 1 + 1 | 3.7 mm2 |
+| U601 AP3032, backlight boost | C606 1 uF | 2.5 mm | 5.2 mm | 0.3 mm2 | 0 + 1 | 5.5 mm2 |
+
+Every loop closes on the component side: the capacitor's ground pad and the
+IC's GND pin lie in one piece of ground fill, with In1 (ground) right below it.
+The loops are a few square millimetres, the switch nodes no larger than the IC
+pin, the inductor pad and the track between them. U103 and U601 have no via at
+their GND pin: in SOT-23 the GND pin sits between the switch pin and the
+inductor's pad, with no room for one; their ground reaches In1 through the
+capacitor's via and the fill.
 
 ### Decoupling and crystal at the MCU
 
@@ -1137,29 +1160,61 @@ What the component side allows:
   Simulated, the board's share of the impedance from a pin to its capacitors
   is 1.2 to 2.4 nH ("Simulation"), about what the package adds itself.
 
-What would meet every target: 0201 or 0402 capacitors on the back side, each on
-the via of its pin inside the pad row: about 2.5 mm of path for every pin (the
-pin's track to the via, the barrel through the board, the capacitor's pad).
-The cost: JLCPCB assembles both sides only with Standard PCBA, which this six
-layer board uses anyway; the second side costs 51.12 instead of 25.56 USD setup
-and 16.42 instead of 8.21 USD stencil, about 34 USD more per order (JLCPCB help
-article "PCB Assembly Cost", read 25 November 2026), plus 3 USD per extended
-part line for 0201 parts (all of them are extended). The display: an 0402 is
-0.55 mm high (0201: 0.33 mm), the LCD's metal back 1.5 mm off the board, so
-about 1 mm stays; the core rail's pour on the back would lose the area under
-the pads. Not done in revision A: the first boards show whether the MCU runs
-at full clock speed with today's decoupling (bring-up plan, "MCU").
+Two ways to meet every target were looked at; revision A takes neither (see
+"Accepted deviations"):
 
-Crystal Y201: XTAL_N 8.1 mm and XTAL_P 10.6 mm of track from the
-pins to the crystal's pads (target 5 mm). The 3.2 x 2.5 mm crystal stands 9 mm
-from its pins, beyond the parts of VDD_BAT and the reset line. Within 5 mm it
-would have to stand at pins 99 and 100, where pins 101 to 104 (VDD_ANA,
-VDD_BAT, reset, touch reset) leave the corner; the crystal's two signal pads
-lie diagonally, so one of the two lines would cross under it and out the other
-side. The way to 5 mm is a 2.0 x 1.6 mm crystal (a part change, with its own
-load capacitance) or the corner's other pins moved, a new layout of that
-corner. Not done: the two 0 ohm links R209 and R210 stay, the lines run on
-the component side over unbroken ground (In1) with the ground fill beside them.
+- 0201 capacitors on the component side. They are 0.3 mm narrower than 0402,
+  but what limits the pad row is not the part: one capacitor needs its own
+  track out of the row, and at 0.35 mm pitch only every other pin can have a
+  via inside the row. Outwards the escapes take the room (above). An 0201 is an
+  extended part at JLCPCB (no 0201 capacitor is a basic part), so it would add a
+  loading fee and change no pin's path.
+- 0201 capacitors on the back side, each on the via of its pin inside the pad
+  row: about 2.3 mm of path for every pin (the pin's track to the via, the
+  barrel through the board, the capacitor's pad). This needs assembly on both
+  sides (51.12 instead of 25.56 USD setup and 16.42 instead of 8.21 USD stencil,
+  about 34 USD more per order; JLCPCB help article "PCB Assembly Cost", read 25
+  November 2026), and the parts face the display's grounded metal back 1.5 mm
+  away. The board stays single-sided for assembly.
+
+Crystal Y201: a 40 MHz crystal of 2.0 x 1.6 mm (Hosonic E1SB40E00001AE, LCSC
+C2689435; second source Tai-Saw TZ1269D, C501798, same pads and load) in place
+of the 3.2 x 2.5 mm part, and without the two 0 ohm links that stood in its
+lines. XTAL_N 6.8 mm and XTAL_P 6.5 mm of track from the pins to the
+crystal's pads (8.1 and 10.6 mm before; target 5 mm).
+
+- Espressif's requirements (ESP32-P4 Hardware Design Guidelines, release
+  master of 12 November 2026, section 1.3.5 "Clock Source"): "The ESP32-P4
+  firmware only supports 40 MHz crystal", and "the accuracy of the selected
+  crystal should be within ±10 ppm". The Hosonic part is ±10 ppm at 25 °C and
+  ±10 ppm from -30 to +85 °C; the Tai-Saw part ±5 ppm and ±15 ppm from -40 to
+  +85 °C (makers' datasheets). Espressif states no ESR limit for the P4's
+  40 MHz crystal: the guideline names one only for the optional 32.768 kHz
+  crystal (70 kohm), and the P4 datasheet (v0.7) has no crystal table. Both
+  parts have an ESR of 40 ohm at most, the same as the 3.2 x 2.5 mm part they
+  replace, and a drive level of 100 uW at most.
+- Load capacitors, from Espressif's formula CL = C1 x C2 / (C1 + C2) + Cstray
+  (same section): CL 9 pF, Cstray estimated at 3 pF (the pins, about 7 mm of
+  track and the pads), so C1 = C2 = 2 x (9 - 3) = 12 pF, C0G (C238, C239, the
+  values fitted before). Espressif's own board implies about 4 pF of stray
+  capacitance (15 pF crystal with 22 pF capacitors); with 4 pF the crystal
+  would want 10 pF. The guideline says the values "need to be further adjusted
+  after an overall test": the bring-up plan measures the frequency and steps to
+  10 pF if it is low.
+- Layout (section 1.4.2 "Crystal"): "The gap should be at least 4.5 mm" from
+  the clock pin; "no vias for the clock input and output traces"; the load
+  capacitors "on the two sides of the crystal ... at the end of the clock
+  trace"; no signal under the crystal. The crystal is turned 45 degrees so
+  that its two crystal pads face the two pins and the lines pass either side of
+  its ground pad; its body stands 4.75 mm from the package edge. No via in
+  either line, the load capacitors at the far ends with their ground pads at
+  the crystal's ground pad, and a keep-out for tracks under the crystal on
+  every other layer. The lines run on the component side over unbroken ground
+  (In1) with the ground fill beside them.
+- Why not 5 mm: the 4.5 mm gap alone takes most of it, and the spot is fixed
+  between the NFC lines' four vias above it and the VDD_BAT parts below it.
+  The two signal pads of a four-pad crystal lie on a diagonal, so each line has
+  to pass the ground pad that stands between them.
 
 ## Cost
 
@@ -1289,6 +1344,106 @@ pieces.
 The 3.3 V converter U103 was an AP63203WU-7, of which JLCPCB had two pieces and
 LCSC none. It is now a TLV62569DBVR, the part of the core converter U202, with
 490416 in stock on 25 November 2026.
+
+## Accepted deviations
+
+Targets of the industry review that revision A does not fully meet, because
+meeting them would cost more than they are worth or the board has no room for
+them. Each one is decided, not forgotten: what the target was, what the board
+reaches, why it stops there, what covers the gap, and what a later revision can
+do. Everything else in the review meets its target.
+
+### Decoupling at the MCU (review item 5.3)
+
+- **Target.** A capacitor within 3 mm of copper (via included) of every
+  supply pin of the core, memory, regulator, analog, USB PHY and battery
+  supplies (VDD_HP, VDD_PSRAM, VDD_FLASH, VDDO_4, VDD_USBPHY, VDD_BAT, VDD_LDO,
+  VDD_DCDCC, VDD_ANA), within 5 mm for the 3.3 V IO pins; 10 uF close to
+  VDD_LDO and VDD_DCDCC.
+- **Reached.** 4 of the 21 pins (table in "Decoupling and crystal at the
+  MCU"): VDD_DCDCC 2.0 mm with its 10 uF, VDD_HP_3 1.4 mm, VDD_IO_6 1.3 mm,
+  VDDO_3 3.5 mm (target 5). The others 3.3 to 13.7 mm; VDD_LDO has the 10 uF
+  at 5.8 mm.
+- **Why.** The ESP32-P4 has 21 supply pins at 0.35 mm pitch. Only every other
+  pin can have a via inside the pad row, one capacitor fits per 1.05 mm of row
+  outwards, and the signals need that room to get out. 0201 parts on the
+  component side do not change it (the row, not the part, is the limit), and
+  on the back side they would need assembly on both sides, about 34 USD more
+  per order: the board stays single-sided for assembly (decided 25 November
+  2026).
+- **Mitigation.** The pins reach their capacitors through the via inside the
+  pad row and the planes (3.3 V on In3, the core rail's pour on the back).
+  Simulated, the board's share of the impedance from a pin to its capacitors is
+  1.2 to 2.4 nH, about what the package adds itself ("Simulation"). The
+  bring-up plan runs a CPU and PSRAM stress test at full clock for an hour, cold
+  and warm in the case, with the supplies on the scope (bring-up plan, "MCU",
+  step 5).
+- **Later revision.** 0201 capacitors on the back side, each on its pin's via
+  (about 2.3 mm for every pin), with a polyimide film between them and the
+  display's metal back; or the P4 in a module.
+
+### Crystal track length (review item 5.5)
+
+- **Target.** At most about 5 mm of track from each crystal pin to the crystal.
+- **Reached.** XTAL_N 6.8 mm, XTAL_P 6.5 mm with a 2.0 x 1.6 mm crystal and no
+  links in the lines (8.1 and 10.6 mm before).
+- **Why.** Espressif's layout guide asks for at least 4.5 mm between the
+  crystal and the clock pins, which takes most of the 5 mm. The spot is fixed
+  between the NFC lines' vias above it and the VDD_BAT parts below it, and the
+  crystal's two signal pads lie on a diagonal, so each line passes the ground
+  pad between them.
+- **Mitigation.** No vias, ground fill on both sides and unbroken ground below,
+  no track under the crystal on any layer. The longer track adds about 0.3 pF,
+  inside the 3 pF stray capacitance the load capacitors are sized for. The
+  bring-up plan measures the frequency and the load capacitors are changed if
+  it is off (bring-up plan, "MCU", step 3).
+- **Later revision.** Move the NFC lines' vias to the left and the crystal up
+  to 5 mm, with a new route of that corner.
+
+### Current from a USB-only supply (review item 2.4)
+
+- **Target.** Read the current the USB-C source offers (its CC level) and
+  limit the board to it.
+- **Reached.** A fixed limit: the firmware knows when USB is the only source
+  (DC and PoE present on the IO expander) and then keeps the board within
+  500 mA, the smallest any source offers (estimated 0.43 A).
+- **Why.** The free ADC pins are on the MCU's far side, and no way to the
+  USB-C connector was left without rerouting the USB pair, the backlight line
+  or the RMII bus.
+- **Mitigation.** A hard firmware requirement with a bring-up test
+  (firmware-port.md, rule 19; bring-up plan, "Power sources"). Without the
+  firmware the eFuse limits the current to 1.8 to 2.2 A and a source that
+  cannot deliver protects itself.
+- **Later revision.** CC1/CC2 to two ADC pins, so a 1.5 A or 3 A source can
+  run the board at full brightness.
+
+### Features at JLCPCB's limits (review item 6.2)
+
+- **Target.** Nothing at the fab's limit unless the part's pitch forces it.
+- **Reached.** Five features at the limit, none with a negative margin (table
+  in "Margins to JLCPCB's limits"): the pad gap and the mask web at the MCU's
+  0.35 mm pitch and the accelerometer's LGA, and the silkscreen's line width,
+  text height and distance to pads.
+- **Why.** Espressif's land pattern for the P4 sets the pad gap and the web;
+  the silkscreen is at JLCPCB's smallest so that designators fit at all.
+- **Mitigation.** Green solder mask, the only colour with a 0.10 mm web; the
+  assembly's AOI and X-ray look for bridges at the MCU; first boards inspected
+  (bring-up plan).
+- **Later revision.** None needed unless the first boards show bridges.
+
+### Designators of the small passives (review item 7.6)
+
+- **Target.** Every part's designator on the silkscreen; where a few cannot
+  fit, the assembly drawing covers them.
+- **Reached.** Every IC, crystal, inductor, bead, diode, transistor, connector,
+  switch, fuse, array and the buzzer carries its designator (23 of them with a
+  leader line; a test fails if one is missing). Of the 0402 and 0603 passives,
+  111 around the MCU, the PHY and the NFC chip carry none.
+- **Why.** At 1.0 mm text, JLCPCB's smallest, there is no room for them
+  between the parts without covering pads.
+- **Mitigation.** The assembly drawing (fab/jlcpcb/*-assembly.pdf) shows every
+  designator, with enlarged pages of those areas.
+- **Later revision.** None planned.
 
 ## Design review
 
@@ -1475,6 +1630,18 @@ Both are checked against closed-form results on every run. The circuits run in
 ngspice, and the Wi-Fi antenna in openEMS, a full-wave solver (the
 `simulate-antenna` target). Nothing was built or measured.
 
+Cross-checks against independent references (run with every `simulate`, or
+worked by hand where noted):
+
+| What | Model | Reference | Agreement |
+|---|---|---|---|
+| NFC loop in free air | 1.269 uH (`sim/peec.py`, the routed loop) | 1.239 uH by the modified Wheeler formula and 1.313 uH by the current-sheet expression for square spirals, Mohan, Hershenson, Boyd and Lee, IEEE J. Solid-State Circuits 34(10), 1999, eqs. 1 and 2, tables I and II, typical error 2 to 3 %; the 35 x 37 mm loop taken as a square | +2.4 % and -3.4 %, inside the formulas' own error and the square approximation |
+| Inductance and field of a single loop, a loop in a shorted ring, a loop over a plate | the same solver | Neumann's double integral and the closed forms in `sim/test_solvers.py` | within 1.5 % (210.6 against 210.5 nH for the loop alone) |
+| Impedance of the USB pair and the Ethernet lines | `sim/field2d.py` on the routed cross-sections | JLCPCB's impedance calculator for the stack-up, and TI's closed form (SNLA187) | within 1 ohm of the calculator (table in "Impedance") |
+| Stripline between two planes | `sim/field2d.py` | Cohn's closed form with the thickness correction | 53.8 against 54.3 ohm |
+| Voltage drop on supply tracks | `sim/irdrop.py` | Ohm's law on made-up nets: track, via and track in series; two tracks side by side | equal to 0.1 % (51.1 mohm) |
+| Heat in the closed case | `sim/thermal.py`: the board's mean rise, PoE, typical use, +30 K | by hand: the 3.4 W leave through the board's faces with the model's surface coefficients (6.9, 5.1 and 4.2 W/(m2 K) for the display side under the LCD, the display side beside it and the component side) over the board's 0.0107 m2 (the LCD covers 0.0057 m2 of it): 3.4 W / 0.11 W/K = 31 K | within 3 %; the textbook coefficients themselves are what the stated +-40 % is for |
+
 | Finding | Change |
 |---|---|
 | NFC loop: 1.25 uH on the board and 1.20 uH on a metal wall, where these notes expected 1.1 to 1.25 uH. The pours around the loop are open on one side and take only 2 %. Together with the loop's own 2.4 pF that put the fitted matching, calculated for 1.2 uH, at the edge of its range: 3.8 Vpp at the receiver input against a limit of 4 Vpp, above it on 45 boards in a hundred with the parts' tolerance, and the transmitter above 100 mA on five. | Parallel capacitors C515 and C519 10 pF instead of 18 pF, receive divider R506 3.9 k instead of 2.7 k: 41 mA and 1.9 Vpp at 1.25 uH, 35 mA and 1.2 Vpp at 1.20 uH, and no board in a hundred outside either limit. Figures in "NFC". |
@@ -1572,16 +1739,16 @@ Simulated and found right:
 
   | Supply | Typical use | Board | Warmest spot | Display | Everything on for a long time: board, LED rows |
   |---|---|---|---|---|---|
-  | USB | 2.6 W | +23 K | +33 K | +17 K | +42 K, +70 K |
-  | DC, 12 V | 3.0 W | +26 K | +37 K | +19 K | +48 K, +75 K |
-  | PoE | 3.6 W | +31 K | +40 K | +23 K | +55 K, +82 K |
+  | USB | 2.4 W | +21 K | +32 K | +15 K | +39 K, +70 K |
+  | DC, 12 V | 2.8 W | +25 K | +36 K | +18 K | +46 K, +74 K |
+  | PoE | 3.4 W | +30 K | +40 K | +22 K | +52 K, +82 K |
 
   In a room of 25 °C typical use is far from every limit. In a room of 40 °C
-  on PoE the estimate puts the display at 63 °C (limit 70 °C), the Wi-Fi
+  on PoE the estimate puts the display at 62 °C (limit 70 °C), the Wi-Fi
   module at 79 °C (105 °C for the -H4 that is fitted; the -N4 stands 85 °C)
-  and the air around the PoE module at 71 °C (85 °C): inside the limits, for
+  and the air around the PoE module at 70 °C (85 °C): inside the limits, for
   the display and the PoE module by less than the estimate is exact. The DC
-  input's fuse then holds 0.66 A against 0.28 A drawn. Everything on at once
+  input's fuse then holds 0.67 A against 0.27 A drawn. Everything on at once
   for a long
   time is beyond what the case can shed: the LED rows, on narrow copper
   between the cut-outs, get 70 to 80 K warmer than the room. The firmware
@@ -1715,8 +1882,8 @@ a test fails when a model's pins miss the holes or its terminals the pads.
   planes (see "Decoupling and crystal at the MCU"). Simulated, the board's
   share of the way from a pin to its capacitors is 1.2 to 2.4 nH, about what
   the package adds itself. If the MCU proves unstable at full clock speed,
-  this is the first suspect; capacitors on the back side under the pad row are
-  the remedy (about 34 USD more per order for the second assembly side).
+  this is the first suspect; see "Accepted deviations" for why revision A
+  stays single-sided and what a later revision can do.
 - **NFC range and tuning**, the second-source PN532, and the effect of the
   Ethernet plug and cable next to the loop on the lan version. The loop's
   inductance is simulated (1.25 uH on the board, 1.20 uH on a metal wall), not

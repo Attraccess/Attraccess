@@ -113,7 +113,14 @@ rail's name:
 2. `esptool.py chip_id` / `flash_id`: expect ESP32-P4 revision v3.x and a
    16 MB flash.
 3. Flash a hello-world. Check the 40 MHz crystal starts (the app runs, UART0 at
-   the TX0 test point shows the boot log).
+   the TX0 test point shows the boot log). Measure its frequency: with a
+   frequency counter and an active probe of 1 pF or less at C239 (the probe
+   pulls it by a few ppm), or by letting the P4 count its own time against an
+   NTP server for an hour (10 ppm is 36 ms per hour; the Wi-Fi module has a
+   crystal of its own and says nothing about this one). Within +-10 ppm
+   (+-400 Hz) is right. If it runs low by more than that, change the
+   load capacitors C238 and C239 from 12 pF to 10 pF (C32949); if high, to
+   15 pF (design notes, "Decoupling and crystal at the MCU").
 4. Measure `VDD_HP` again: about 1.1 V with ripple below 30 mV.
 5. Decoupling (design notes, "Decoupling and crystal at the MCU"): run a CPU
    and PSRAM stress test at the full clock (both cores busy, the display
@@ -121,7 +128,9 @@ rail's name:
    for ten minutes after the reader has warmed in its case. No reset, no
    PSRAM or flash error; watch `VDD_HP`, `VDD_PSRAM` (C226) and `VDD_FLASH`
    with the scope at 20 MHz bandwidth: dips below 1.05 V on `VDD_HP` or below
-   1.8 V on `VDD_PSRAM` are the sign to move capacitors to the back side.
+   1.8 V on `VDD_PSRAM` are the sign that the decoupling of a later revision
+   is needed (design notes, "Accepted deviations"); until then run the CPU
+   at a lower clock.
 
 ## Wi-Fi co-processor
 

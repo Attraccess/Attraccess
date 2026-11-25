@@ -9,7 +9,9 @@ plus PN532 module of the current readers with one board.
 > layout rules, and its power input, NFC antenna and fast signals have been
 > simulated from the routed copper; what those checks found and changed, and
 > what they could not settle, is in
-> [docs/design-notes.md](docs/design-notes.md#design-review). Expect a bring-up
+> [docs/design-notes.md](docs/design-notes.md#design-review); the review targets
+> it does not fully meet, each with its reason, are under
+> [Accepted deviations](docs/design-notes.md#accepted-deviations). Expect a bring-up
 > round (see [docs/bring-up.md](docs/bring-up.md)). CE marking needs lab tests on
 > the finished product (see [docs/compliance.md](docs/compliance.md)).
 
