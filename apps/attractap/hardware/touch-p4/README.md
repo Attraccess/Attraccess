@@ -121,14 +121,16 @@ can be found again; `check` fails when it does not match the board.
 |---|---|
 | `attractap-touch-p4-gerbers.zip` | The PCB order: Gerber and drill files. |
 | `attractap-touch-p4-fab.pdf` | Fabrication drawing: outline and cut-outs with dimensions, stack-up, drill table, smallest features, fabrication notes (finish, IPC class, via filling). Attach it to the order. |
+| `attractap-touch-p4-assembly.pdf` | Assembly drawing: every part of the component side with outline, pads, designator and value, pin 1 and polarity marked; an overview and detail sheets of the MCU, the PHY, the NFC chip and the power section. For assembly questions, inspection and repair. |
 | `attractap-touch-p4.ipc` | IPC-D-356 netlist, for the fab's electrical test against the design. |
 | `bom-lan.csv`, `cpl-lan.csv` | Assembly of the Ethernet/PoE version: parts list and positions. The parts list has manufacturer, part number, description, an approved alternate and the lifecycle of every line. |
 | `bom-wifi.csv`, `cpl-wifi.csv` | Assembly of the Wi-Fi version. |
 | `parts-list-lan.csv`, `parts-list-wifi.csv` | Everything to buy for one reader: the assembly parts list plus the parts JLCPCB does not fit (display panel, Wi-Fi antenna). |
 
-`fab/board-front.pdf` (not in git) is the assembly drawing with the reference designators; the
-silkscreen has none. What the silkscreen does carry is described in the
-[design notes](docs/design-notes.md#layout-rules-used).
+The silkscreen carries a designator wherever one fits beside its part (about half of them); the
+assembly drawing has them all. What else the silkscreen carries is described in the
+[design notes](docs/design-notes.md#layout-rules-used). `fab/board-front.pdf` and `board-back.pdf`
+(not in git) are plain plots of the copper and silkscreen layers.
 
 What the board needs, for the order form:
 
@@ -136,14 +138,14 @@ What the board needs, for the order form:
 |---|---|
 | Board | 6 layers, 86 x 143.5 mm, 1.6 mm FR-4 |
 | Stack-up | JLC06161H-3313: set "Specify Stackup" to "Yes" in the order form and pick it (no charge). The board file carries the thicknesses the order form shows for it: prepreg 0.0994, core 0.55, prepreg 0.1088, core 0.55, prepreg 0.0994 mm |
-| Smallest track and gap | 0.11 mm and 0.127 mm, 0.1 mm between the pads of the USB-C connector (JLCPCB's limit for boards with inner layers: 0.09 mm each). Two track segments are 0.112 mm wide, all others 0.126 mm or more |
+| Smallest track and gap | 0.11 mm and 0.127 mm (JLCPCB's limit for boards with inner layers: 0.09 mm each). Two track segments are 0.112 mm wide, all others 0.126 mm or more. Pads of two nets stand 0.15 mm apart at the least (the MCU's pins), JLCPCB's figure; every margin is in the [design notes](docs/design-notes.md#margins-to-jlcpcbs-limits) |
 | Smallest via | 0.45 mm pad with 0.2 mm hole (about one via in six; most have a 0.5 mm pad). No extra charge: by the order form's note on "Min via hole size/diameter", a 0.2 mm hole is free on boards with inner layers when the via is 0.45 mm wide or more. Leave that option at "0.3mm/(0.4/0.45mm)"; the smaller choices are for smaller pads and cost 39 USD and more |
-| Vias | "Epoxy Filled & Capped", the order form's choice for six layers, at no charge. The form offers no solder mask cover ("Tented") for boards with inner layers. No via hole lies under solder paste |
+| Vias | "Epoxy Filled & Capped", the order form's choice for six layers, at no charge. The form offers no solder mask cover ("Tented") for boards with inner layers. Required, not only free: four capacitor pads at the MCU (C208, C223, C226) have a via in the pad, which the filling and the copper cap keep from drawing in the solder. No other via lies under solder paste |
 | Solder mask | green. The mask webs between the MCU's pins are 0.1 mm wide, JLCPCB's limit for green; other colours need wider webs |
 | Milled openings | flex slot 3 mm wide, eight LED windows 3.4 x 3.0 mm with relieved corners, a cut 14.2 x 5.65 mm in the top edge (made for a module with PCB antenna), two cut-away corners, plated slots at the DC jack and USB-C |
 | Outline tolerance | the regular +/-0.2 mm is enough |
 | Surface finish | ENIG (18 USD on 5 boards, 45 USD on 100). Not the free OSP, which the form selects for six layers: it is as flat, but JLCPCB excludes it for contact areas, and the four ground pads for the display's metal back and the 30 test points would stay bare copper ([more](docs/design-notes.md#cost)) |
-| Impedance control | not needed |
+| Impedance control | "Yes", +-10 % (the fab drawing's note): USB pair 90 ohm differential (0.14 mm lines, 0.15 mm gap, back layer over In4), Ethernet lines 50 ohm (0.155 mm, component side over In1). Widths from JLCPCB's calculator for this stack-up ([design notes](docs/design-notes.md#impedance)); the fab may adjust them |
 | Assembly | top side only: 221 parts in 85 lines (Wi-Fi version), 258 parts in 96 lines (Ethernet/PoE version) |
 | Through-hole parts | DC jack J102, DC terminal J103 (two pins in a four-hole footprint, see below), and on the Ethernet/PoE version the jack J401 |
 | Not assembled by JLCPCB | the display panel (taped on, flex plugged into J601) |

@@ -311,6 +311,13 @@ has an EMC product standard of its own, EN 50130-4. It asks for line-to-earth
 surges through 42 ohm on extra-low-voltage DC lines as well (not read for this
 page: confirm with the lab). The DC input is protected and simulated for that
 test; the details are in [design-notes.md](design-notes.md#power), "Power".
+Optional cost before the lab: the standard itself, EN 50130-4:2011+A1:2014,
+consolidated English text, 24.80 EUR incl. tax from the Estonian standards
+body EVS (evs.ee, read 25 November 2026; DIN Media sells the German edition
+for 79.96 EUR). A new edition, prEN 50130-4:2026, is in draft. A line-to-line
+surge of 0.5 kV behind 2 ohm, IEC 61000-4-5's test for power ports, is not
+asked of this DC port by any of these standards; meeting it would take a
+converter rated for 60 V and a larger TVS (design notes, "Power").
 
 ## What the board design does
 

@@ -32,6 +32,9 @@ measured on hardware yet.
 | 16 | Wi-Fi transmit power and 802.11ax are settings, not constants | The test lab may ask for less power; some access points stall the link in 802.11ax mode | 4, 12 |
 | 17 | Secure boot with RSA-3072. Check the chip revision before Secure Download Mode is enabled | ECDSA secure boot has an erratum. On revision v3.1 the chip could no longer be flashed through its ROM | 9, 13 |
 | 18 | The hall switch counts only after it has read 0 once; ignore the accelerometer while the buzzer sounds | A reader without a dock magnet looks like a removed one; the buzzer shakes the board | "Tamper detection" |
+| 19 | **Hard requirement.** When USB is the only source, keep the board within the current the USB source offers: read whether DC and PoE are there (expander P5, P7); with neither, apply the limits in ["Power limits per source"](#power-limits-per-source) | A USB 2.0 port gives 500 mA; the board draws up to 0.9 A. The port shuts down or the eFuse sees VBUS sag and turns the board off | "Power limits per source" |
+| 20 | **Hard requirement.** All LED channels together below 100 mA steady (rule 2 keeps them there) | The 5 V sources' 30 % headroom assumes it (design notes, "Power budget") | 8 |
+| 21 | **Hard requirement.** The buzzer sounds only while the NFC field is off | The same budget counts either the buzzer or the NFC transmitter, not both | 6, 7 |
 
 What the firmware does not have to care about, because the board does it: the
 LEDs, the backlight, the buzzer and the PN532 are held off by resistors until
@@ -93,11 +96,30 @@ as the schematic (`P4_GPIO` in `scripts/bootstrap/circuit_core.py`).
 | P2 | LCD_SDA | out |
 | P3 | LCD_RST | out |
 | P4 | ETH_RST_N | out, low = PHY in reset. Must be pulsed low, see "Ethernet" below |
-| P5 | unused | |
+| P5 | DC_PRESENT | in: high while the DC converter's output is on (+5V_DC through 51 k / 100 k) |
 | P6 | DOCK_N | in: low while the reader is on its dock (hall switch U703), see "Tamper detection" below |
-| P7 | unused | |
+| P7 | POE_PRESENT | in: high while the PoE module's output is on (+5V_POE through 51 k / 100 k) |
 
 All expander pins are inputs with weak pull-ups after power-up.
+
+## Power limits per source
+
+The board does not read what a USB source offers. The firmware must limit the load when USB is the
+only source (rule 19), always to the smallest offer, 500 mA (a USB 2.0 port; a Type-C source at Default
+USB Power gives 500 or 900 mA). The hardware stays safe without it: the eFuse limits the USB current
+to 1.8 to 2.2 A and turns the board off when VBUS falls below about 3.9 V; a source that cannot
+deliver protects itself. What the firmware does:
+
+1. Read the expander's P5 (DC present) and P7 (PoE present). If either is high, no USB limit applies.
+   Read them again at least every 0.5 s (the expander's interrupt output is not connected).
+2. Otherwise: LEDs off, no buzzer, backlight at 30 % or less, NFC polling as usual. Estimated draw
+   0.43 A (3.3 V rail at its typical 0.34 A, backlight 30 %, PN532); bring-up measures it.
+
+Reading the source's CC level would let a charger that offers 1.5 or 3 A run the board without limits.
+It was drawn (both CC lines through 100 k to an ADC pin), but the only free ADC pins (GPIO53, GPIO54)
+sit on the MCU's left edge behind the crystal, and no way from there to the USB-C connector was left
+on any layer without moving the USB pair, the backlight line or the RMII bus. A service port does not
+need the full board; the limit above is the safe end of the same rule.
 
 ## I2C addresses
 

@@ -86,7 +86,13 @@ the Waveshare ESP32-S3-Touch-LCD-4). Points that drive the layout:
   own pin 1 is on the left, so **connector pin k = panel pin 41 - k**. The
   schematic and the board already account for that.
 - The folded flex covers the area x 11.5 to 62, y 76 to 89.5 and the tail up to
-  the connector. No tall parts are placed there.
+  the connector (`geometry.FLEX_KEEPOUT`). Only parts up to 0.9 mm high stand
+  there: 0402, 0603 and 1206 passives, resistor arrays and test pads. The build
+  stops if the body of any other part reaches into the area
+  (`placement.check_flex_area`). The input capacitor C120 (6.3 mm, 7.7 mm
+  high) and the TVS D107 stood in it until 25 November 2026; C120 now stands
+  above it, between the DC converter and the proximity sensor, D107 left of
+  the slot's end.
 
 Not verified with a real panel: the exact fold length. With the display 1.5 mm
 off the board the connector sits about 1.5 mm closer to the slot than the flex
@@ -251,8 +257,23 @@ figures at the same time, the eFuse would limit the USB current and the PoE
 module would run at its rating; neither is damaged. A PoE module in a case
 above 70 C has less: the reader is specified for indoor use (40 C).
 
-USB-C is a service port: the board draws up to 1 A from it without asking what
-the port can give. Use a port or supply that delivers that.
+USB as the only source. A USB 2.0 port gives 500 mA, a Type-C source at Default
+USB Power 500 or 900 mA, more only when its Rp says 1.5 or 3 A. The 5 V of the
+DC converter and of the PoE module reach the IO expander through dividers (P5,
+P7), so the firmware knows when USB is the only source; it then always takes
+the smallest offer, 500 mA: LEDs and buzzer off, backlight at 30 % or less (an
+estimated 0.43 A). Reading the source's CC level, which would let a 1.5 A
+charger run the full board, was drawn and dropped: the free ADC pins are on the
+MCU's far side, and no way to the USB-C connector was left without rerouting the
+USB pair, the backlight line or the RMII bus. These limits, the LED limit and buzzer-or-NFC above are hard
+requirements of the firmware, with a bring-up test each (firmware-port.md,
+"Power limits per source"; bring-up.md, "Power sources").
+
+The hardware stays safe without the firmware: the eFuse limits the USB current
+to 1.8 to 2.2 A and opens when VBUS falls below 3.9 to 4.0 V, the DC converter
+and the PoE module limit their own current, and a USB source that cannot
+deliver protects itself. Without firmware (MCU in reset) the LEDs, the
+backlight and the buzzer are held off by resistors.
 
 ### The 5 V rail's ceiling
 
@@ -797,8 +818,8 @@ does not read them yet; this is what it will find.
 | DCIN | 0.6 | 0.25 | DC input up to the converter |
 | PoE | 0.6 | 2.0 | 48 V side |
 | NFC_RF | 0.3 | 0.127 | transmitter to antenna |
-| USB | 0.25 | 0.127 | USB data |
-| MDI | 0.2 | 0.127 | Ethernet pairs |
+| USB | 0.14 | 0.127 | USB data: a coupled pair, 0.15 mm apart, 90 ohm |
+| MDI | 0.155 | 0.127 | Ethernet pairs: 50 ohm lines at the jack's 1.27 mm pitch, 100 ohm |
 
 The widths are the ones tracks are laid with. After the routing,
 `scripts/bootstrap/post_route.py` widens every supply track as far as the copper
@@ -825,7 +846,12 @@ their ground pin, the Wi-Fi module has four between its nine ground pads, the Po
 module two at its output ground pad, and the ground pins of the three QFN parts
 run straight into their exposed pads.
 
-No via hole lies under solder paste, where the solder would run into it: the
+Four vias lie in pads, on purpose, at the MCU's upper left corner where there
+is no room beside the pads: in the ground pads of C208 (10 uF), C223 and C226
+(1 uF each), and in C223's supply pad, where the flash supply changes to In2. JLCPCB fills and caps every via of a six-layer board (resin,
+then plated over), so the solder cannot run into these four.
+
+No other via hole lies under solder paste, where the solder would run into it: the
 vias of the MCU's and the PHY's exposed pads sit in the lanes between the paste
 windows, the four of the PN532's pad in its middle with the paste windows in a
 ring around them, the Wi-Fi module's where four of its ground pads meet, and
@@ -914,13 +940,6 @@ next to fine-pitch pins, so the board's minimum is set to 0.11 mm (the
 manufacturer's limit is 0.09 mm). All but two of those neck-downs are widened to
 0.127 mm afterwards.
 
-Not done in revision A: controlled-impedance routing. USB runs at full speed
-(12 Mbit/s) and the Ethernet pairs are 11 to 18 mm long and run side by side,
-so this is uncritical. Their width and gap (0.2 / 0.2 mm) are not calculated
-for 100 ohm; over the 0.1 mm of this stack-up they come out lower (roughly
-85 ohm, estimated, not from the manufacturer's calculator), and a 0.15 mm
-signal track near 50 ohm.
-
 Lengths of the fast buses on the routed board: the six SDIO lines to the Wi-Fi
 module are 38 to 46 mm, the RMII lines to the PHY 40 to 48 mm and its 50 MHz
 clock 59 mm, with two to four vias each. Both are well inside what these
@@ -949,9 +968,25 @@ sits at the line, next to the strap resistor, so the 50 MHz line has no long
 open branch. With the button pressed the pin sees 0.3 V.
 
 The silkscreen (`scripts/bootstrap/silk.py`) is for the person with the reader
-open in front of them. Reference designators are not on it: on a board this
-dense they would overlap. They are on the assembly drawing layer
-(`fab/board-front.pdf`).
+open in front of them.
+
+- Reference designators: wherever one fits beside its part
+  (`scripts/bootstrap/silk_refdes.py`): above, below or beside the part, upright
+  or turned, on no pad (0.15 mm), no part body, no other text (0.35 mm between
+  two designators, so neighbours do not read as one word) and no footprint
+  silkscreen. 143 of the 262 parts get one. The others stand
+  where a designator has no room: around the MCU's 0.35 mm pitch pins, at the
+  resistor arrays, between the NFC chip's matching parts. The assembly drawing
+  (`fab/jlcpcb/attractap-touch-p4-assembly.pdf`) shows every designator, pin 1
+  and polarity, with detail sheets of the MCU, the PHY, the NFC chip and the
+  power section at 6 to 9 : 1.
+- Test pads TP816 to TP830 (the rails, both I2C buses, the RMII clock, the
+  PHY's supply) each carry the net's short name (`VDC`, `5V_DC`, `5V_USB`,
+  `5V_POE`, `VDD_FLASH`, `TVDD`, `AVDD`, `DVDD`, `BL_A`, `SDA`, `SCL`,
+  `NFC_SDA`, `NFC_SCL`, `REF_CLK`, `PHY_3V3`), set by `silk.test_point_labels` at
+  the first side of the pad where it touches nothing. The pads stand next to
+  their circuit rather than in one row; the older ones (C6, P4 UART0, power) are
+  in labelled groups.
 
 - Component side, the side one sees with the reader off its dock: test points
   in named groups (C6, P4 UART0, power), how to get into download mode, the
@@ -973,6 +1008,158 @@ dense they would overlap. They are on the assembly drawing layer
 - The logo is drawn from the vector files in `case/logo/`. The mascot is not
   used: by the brand rules it keeps its natural colours, and a silkscreen has
   one.
+
+### Impedance
+
+Two kinds of lines are laid to an impedance, both on the outer layers, each over
+its ground plane (In1 under the component side, In4 under the back layer):
+
+- USB D+/D-: one via at each end, the rest a coupled pair on the back layer,
+  0.14 mm wide with a 0.15 mm gap, both lines the same length with the same
+  number of vias (`scripts/bootstrap/routes_signal.py`). USB 2.0 asks for 90 ohm
+  +-15 % between the lines; at full speed (12 Mbit/s) a mismatch would not show,
+  but the pair costs nothing extra.
+- The two Ethernet pairs from the PHY to the jack: 0.155 mm lines (50 ohm each)
+  at the jack's pin pitch of 1.27 mm, 1.115 mm apart. At that distance, eleven
+  times the height over the plane, the lines barely couple, so the pair is
+  twice one line: 100 ohm, what 100BASE-TX asks for (+-15 %).
+
+| Line | Width / gap (mm) | JLCPCB calculator | 2D field solution | Closed form (TI SNLA187) |
+|---|---|---|---|---|
+| USB pair, differential | 0.14 / 0.15 | 90.4 ohm | 90.9 ohm | 91.9 ohm |
+| Ethernet line alone | 0.155 | 50.3 ohm | 51.2 ohm | 48.9 ohm |
+| Ethernet pair, differential | 0.155 / 1.115 (0.95 where the transmit pair steps aside of the PoE pin) | 100.1 ohm | 100.5 (transmit) / 99.1 (receive) ohm | 97.8 ohm |
+
+Sources. JLCPCB's impedance calculator for its stack-up JLC06161H-3313 (its
+calculation service with the web page's inputs: prepreg 3313, 0.0994 mm,
+er 4.1; 1 oz outer copper; solder mask 1.0 mil on the laminate and 0.6 mil on
+the copper, er 3.8; read 25 November 2026). The 2D field solution is
+`sim/field2d.py` on the routed board: `pcb.sh simulate` measures width and gap
+of each pair from its tracks and solves the cross-section (odd mode); a pair
+of lines 1.5 mm apart against twice the single line is one of its self-tests.
+The closed form is the microstrip and edge-coupled formula in TI's LVDS Owner's
+Manual (SNLA187, fig. 5-1, p. 39), which leaves out the solder mask (the mask
+lowers the impedance by 2 to 3 ohm here); the Hammerstad-Jensen formula, also
+without mask, gives 53.3 ohm for the single line. The calculator's figures are
+the ones the order uses: the fabrication drawing asks for impedance control to
++-10 % with these targets and lets the fab adjust the widths
+([README](../README.md#ordering-at-jlcpcb)).
+
+### Margins to JLCPCB's limits
+
+The smallest features of the routed board (`scripts/fab_margins.py`, which reads
+the board file) against JLCPCB's published capabilities for boards with six
+layers (https://jlcpcb.com/capabilities/pcb-capabilities, read 25 November 2026;
+the page carries no date of its own):
+
+| Feature | This board | JLCPCB | Margin | Why it stands where it does |
+|---|---|---|---|---|
+| Track width | 0.112 | 0.09 | +0.022 | The autorouter's neck-downs between fine-pitch pins; every other track is 0.127 mm or more |
+| Track to track, track to pad | 0.127 (rule; DRC clean) | 0.09 | +0.037 | KiCad's rule for the whole board |
+| SMD pad to pad, two nets | 0.150 | 0.15 | **0** | **At the limit**: the ESP32-P4's 0.35 mm pitch with Espressif's 0.20 mm pads, and the accelerometer's LGA pads (U702). The MCU's corner pads are trimmed to keep it (0.163 mm across each corner) |
+| Solder mask web | 0.100 | 0.10 (green, 1 oz) | **0** | **At the limit**, same pins: mask 0.025 mm larger than each pad. Green is the only colour with a 0.10 mm web, so the order says green |
+| Via, hole / diameter | 0.20 / 0.45 | 0.15 / 0.25; 0.20 hole with less than 0.45 mm costs extra | 0.05 / 0.20; **0** to the price step | 0.45 / 0.2 is the smallest via without a surcharge |
+| Via annular ring | 0.125 | (0.05 from the via sizes above; 0.15 mm preferred) | +0.075 | Most vias have 0.5 mm pads; 132 of them keep 0.45 mm where there is no room |
+| Plated hole ring (parts) | 0.155 (the PN532's thermal vias, part of its land pattern) | 0.15 minimum, 0.20 recommended | +0.005 to the minimum, -0.045 to the recommendation | The four vias in the PN532's exposed pad, which its land pattern draws as plated pads (0.3 mm hole); taken as vias, as they are made, JLCPCB asks 0.05 mm. Of the connectors, the Ethernet jack's shield pins have the smallest ring, 0.199 mm (HanRun's pattern) |
+| Hole to hole, vias | 0.385 | 0.20 | +0.185 | |
+| Hole to hole, part holes | 0.69 | 0.45 | +0.24 | |
+| Via hole to track | 0.254 | 0.20 | +0.054 | KiCad's hole clearance is set to JLCPCB's value; the closest pair is an Ethernet via beside the next Ethernet line in the via field above the MCU |
+| Part hole to track | 0.31 (the PN532's thermal vias to a track on In2) | 0.28 minimum, 0.35 recommended | +0.03 to the minimum, -0.04 to the recommendation | The same vias of the PN532 (as vias: 0.2 mm, +0.11). Connector holes keep 0.383 mm or more (the Ethernet jack) |
+| Copper to board edge | 0.31 | 0.20 (milled) | +0.11 | Rule 0.3 mm |
+| Silkscreen line | 0.15 | 0.15 | **0** | **At the limit**: JLCPCB's smallest, chosen to fit the labels and designators |
+| Silkscreen text height | 1.0 | 1.0 | **0** | **At the limit**, as above. Legibility, not yield, is what suffers if the print smears |
+| Silkscreen to pad | 0.15 (generator) | 0.15 | **0** | **At the limit**: the generator keeps exactly what JLCPCB asks |
+| Impedance tolerance | +-10 % | +-10 % (+-5 % on request) | 0 | The standard; USB and Ethernet at their speeds need no more |
+
+Every feature at the limit is one of three kinds: the MCU's land pattern (pad
+gap, mask web), the cheapest via, and the silkscreen. None of them is a yield
+risk of the bare board at JLCPCB's stated capability; the pad gap and the mask
+web are the ones to look at on the first boards (solder bridges at the MCU,
+which the assembly's AOI and X-ray would find).
+
+### Decoupling and crystal at the MCU
+
+Copper path from each supply pin of the ESP32-P4 to its nearest capacitor, along
+tracks, via barrels and planes (`scripts/layout_report.py` on the routed board),
+against the review's targets: 3 mm for the core, memory, regulator, analog, USB
+PHY and battery pins, 5 mm for the 3.3 V IO pins. "24 Nov" is the board before
+review stage 3.
+
+| Pin | Supply | Target | 24 Nov | Now | Capacitor |
+|---|---|---|---|---|---|
+| 9 | VDD_LP | 5 | 8.1 | 8.0 | C206 |
+| 21 | VDD_IO_0 | 5 | 8.7 | 9.4 | C203 |
+| 26 | VDD_HP_0 | 3 | 9.5 | 10.2 | C219 |
+| 30 | VDD_FLASHIO | 3 | 9.4 | 9.2 | C224 |
+| 51 | VDD_USBPHY | 3 | 4.2 | 4.4 | C216 |
+| 54 | VDD_HP_1 | 5 | 6.8 | 6.9 | C220 |
+| 59 | VDD_PSRAM_0 | 3 | 13.8 | 13.7 | C226 |
+| 62 | VDD_IO_4 | 5 | 9.8 | 9.7 | C204 |
+| 67 | VDD_PSRAM_1 | 3 | 11.0 | 10.9 | C226 |
+| 71 | VDDO_FLASH | 3 | 3.5 | 3.6 | C223 |
+| 72 | VDDO_PSRAM | 3 | 3.2 | 3.3 | C226 |
+| 73 | VDDO_3 | 5 | - | **3.5** | C230 |
+| 74 | VDDO_4 | 3 | 4.6 | 4.6 | C231 |
+| 75 | VDD_LDO | 3 | 9.2 | 5.8 | C208 |
+| 76 | VDD_HP_2 | 3 | 6.1 | 9.1 | C221 |
+| 77 | VDD_DCDCC | 3 | 9.0 | **2.0** | C208 |
+| 85 | VDD_IO_5 | 5 | 8.4 | 7.0 | C208 |
+| 91 | VDD_HP_3 | 3 | 1.3 | **1.4** | C222 |
+| 96 | VDD_IO_6 | 5 | 1.2 | **1.3** | C206 |
+| 101 | VDD_ANA | 3 | 6.2 | 6.1 | C206 |
+| 102 | VDD_BAT | 3 | 3.2 | 3.4 | C214 |
+
+Bold: within the target. The "24 Nov" column was measured before the report
+counted a track that ends on another track (a T-junction) as connected, so a
+value there can read a little long. Two pins lost ground: VDD_HP_2 (76) gave
+its short way to the corner capacitor and reaches C221 through the core rail's
+pour; VDD_HP_0 (26) runs the same way as before, through its via, the back
+layer and the via at C219.
+
+What the component side allows:
+
+- The upper edge has seven supply pins in a row (71 to 77, 2.1 mm). A 0402
+  capacitor is 0.64 mm wide and needs 0.4 mm beside it for a track, so one
+  capacitor fits per 1.05 mm of pad row within reach: three of the seven, if
+  the pins between them had another way out. They have not: only every other
+  pin can have a via inside the pad row (0.35 mm pitch, 0.45 mm vias), and the
+  strip above the row carries those of the seven that go up. Rearranged here:
+  the 10 uF of VDD_DCDCC sits in the corner beside pin 77 (2 mm of track,
+  ground through a via in its pad), which also puts 10 uF within 6 mm of
+  VDD_LDO; VDDO_4 and VDD_HP_2 are routed by the script.
+- The other edges carry the escapes: the twenty display signals at the lower
+  edge, the SDIO, NFC and crystal lines on the left, the flash on the right,
+  Ethernet and UART above. A capacitor there takes a signal's only way out
+  (see "Layout rules used").
+- The pins that miss the target reach their capacitors through the via inside
+  the pad row and the plane (3.3 V on In3, the core rail on the back layer),
+  which the path counts as two via barrels and the way through the plane.
+  Simulated, the board's share of the impedance from a pin to its capacitors
+  is 1.2 to 2.4 nH ("Simulation"), about what the package adds itself.
+
+What would meet every target: 0201 or 0402 capacitors on the back side, each on
+the via of its pin inside the pad row: about 2.5 mm of path for every pin (the
+pin's track to the via, the barrel through the board, the capacitor's pad).
+The cost: JLCPCB assembles both sides only with Standard PCBA, which this six
+layer board uses anyway; the second side costs 51.12 instead of 25.56 USD setup
+and 16.42 instead of 8.21 USD stencil, about 34 USD more per order (JLCPCB help
+article "PCB Assembly Cost", read 25 November 2026), plus 3 USD per extended
+part line for 0201 parts (all of them are extended). The display: an 0402 is
+0.55 mm high (0201: 0.33 mm), the LCD's metal back 1.5 mm off the board, so
+about 1 mm stays; the core rail's pour on the back would lose the area under
+the pads. Not done in revision A: the first boards show whether the MCU runs
+at full clock speed with today's decoupling (bring-up plan, "MCU").
+
+Crystal Y201: XTAL_N 8.1 mm and XTAL_P 10.6 mm of track from the
+pins to the crystal's pads (target 5 mm). The 3.2 x 2.5 mm crystal stands 9 mm
+from its pins, beyond the parts of VDD_BAT and the reset line. Within 5 mm it
+would have to stand at pins 99 and 100, where pins 101 to 104 (VDD_ANA,
+VDD_BAT, reset, touch reset) leave the corner; the crystal's two signal pads
+lie diagonally, so one of the two lines would cross under it and out the other
+side. The way to 5 mm is a 2.0 x 1.6 mm crystal (a part change, with its own
+load capacitance) or the corner's other pins moved, a new layout of that
+corner. Not done: the two 0 ohm links R209 and R210 stay, the lines run on
+the component side over unbroken ground (In1) with the ground fill beside them.
 
 ## Cost
 
@@ -1458,7 +1645,7 @@ order or hole position is a defect.
 
 | Part | Document | Result | Change |
 |---|---|---|---|
-| U201 ESP32-P4 (QFN-104, 0.35 mm) | Datasheet v0.7 fig. 6-1 (package); Espressif's KiCad footprint `ESP32-P4.kicad_mod` (espressif/kicad-libraries, 2025-10-07), as neither datasheet nor guidelines give a land pattern | Pitch, count, pin 1 and numbering match (worst 0.005 mm). The converted pads were 0.15 x 0.65 mm, 0.125 mm further out than Espressif's 0.20 x 0.65 mm, and stored partly turned, partly with width and length swapped | Espressif's 0.20 x 0.65 mm from 4.55 to 5.20 mm off the centre, mask margin 0.025 mm (web 0.10 mm). The eight corner pads end 0.02 mm earlier on the inside: 0.14 mm across each corner, where Espressif's pattern has 0.113 mm (`make_lib.p4_signal_pads`) |
+| U201 ESP32-P4 (QFN-104, 0.35 mm) | Datasheet v0.7 fig. 6-1 (package); Espressif's KiCad footprint `ESP32-P4.kicad_mod` (espressif/kicad-libraries, 2025-10-07), as neither datasheet nor guidelines give a land pattern | Pitch, count, pin 1 and numbering match (worst 0.005 mm). The converted pads were 0.15 x 0.65 mm, 0.125 mm further out than Espressif's 0.20 x 0.65 mm, and stored partly turned, partly with width and length swapped | Espressif's 0.20 x 0.65 mm from 4.55 to 5.20 mm off the centre, mask margin 0.025 mm (web 0.10 mm). The eight corner pads end 0.04 mm earlier on the inside: 0.163 mm across each corner, where Espressif's pattern has 0.113 mm and JLCPCB asks for 0.15 mm between pads. The converter had rounded the pad positions to 0.01 mm (gaps of 0.14 mm in places); every pad now sits on the 0.35 mm grid (`make_lib.p4_signal_pads`) |
 | U105 TPS259470A (VQFN-10 RPW, 2 x 2 mm) | TI SLVSFC9C, RPW0010A package and example board layout | The converted pads are TI's polygons, drawn with a 0.1 mm outline that adds 0.05 mm of copper all round | Outline removed: the copper is TI's land (`make_lib.custom_pad_strokes`) |
 | U301 ESP32-C6-MINI-1U | Datasheet v1.5 figs. 11-1, 11-2 | Pitch 0.80, pads 0.40 x 0.80, column and row spacing 11.80 / 9.80, corner pads and numbering match. Ground pads at 1.80 mm pitch and 0.05 mm off centre, against 1.975 mm | Ground pads moved to 1.975 mm, centred (`make_lib.c6_ground_pads`) |
 | J101 USB-C TYPE-C-31-M-12 | HRO drawing 2020-12-08 | Pitch, pin order, signal pads, locating holes and shell slot positions match. **The four power pads were polygons with a 0.1 mm outline: 0.70 x 1.40 mm in copper, 0.10 mm from VBUS to GND** where the drawing has 0.20 mm. Pads 0.19 mm further back than drawn and shell slots 0.2 mm wider: acceptable | Power pads 0.6 x 1.3 mm (`make_lib.usb_c_power_pads`); the DRC exception that allowed 0.09 mm at J101 is gone |
@@ -1487,6 +1674,16 @@ module. Heights are the makers' where they give one.
 | J102, J103 pins | 1.95 mm out of the display side | cap front wall | 0.44 mm |
 | J401 pins | 1.45 mm out of the display side, unclipped | LCD module, 1.5 mm off the board | 0.1 mm; 0.5 mm clipped to 1 mm as the manual says |
 | J101 USB-C | 3.25 | cap side wall | 0.63 mm |
+| C120 47 uF electrolytic, 6.3 mm | 7.7 (model) | dock plate; cap side wall | 6.2 mm; 13.9 mm |
+| Parts of review stage 3: D106, D107 (SMB), F102, U105, U106, U107, Q101, Q102, U204 | 2.4 at most | none within 3 mm | more than 3 mm |
+
+Checked again on 25 November 2026 with the parts of review stage 3 (SolidCraft's
+clearance check, 3 mm and 15 mm). C120 also keeps clear of the folded display flex,
+which the case design does not model: its model (x 13.9 to 21.7, y 60.7 to 67.3)
+ends 8.7 mm before the area the flex lies on (y 76 and beyond) and 10.8 mm left of
+the flex tail's way to J601 (x 32.5 to 55.5); the fold itself is in the slot at
+y 89.5 to 92.5, 22 mm away. The build stops if a part taller than a small passive
+reaches into the flex area (`placement.check_flex_area`).
 
 The jack does not fit the case as drawn. Fix it in the case, not on the board: an
 opening in the dock plate under J401 (case X −42.5 to −25, Y −44 to −21.5; it leaves
@@ -1512,14 +1709,14 @@ a test fails when a model's pins miss the holes or its terminals the pads.
   bring-up plan), and measure how far the pins of a real jack stand out. If the
   flex does not reach at 1.5 mm, the fallback is the jack below the display
   (commit 74add084d has that board) with a case 19 mm longer.
-- **Decoupling at the MCU.** Of its 21 supply pins 7 have their nearest
-  capacitor more than 5 mm away (6.7 mm at most) and 5 within 3 mm; Espressif
-  asks for one at each pin. They connect through vias into the planes, which
-  are unbroken now. Simulated, the board's share of the way from a pin to its
-  capacitors is 1.2 to 2.4 nH, about what the package adds itself. The space next to the pins is taken by the signals that
-  leave the 0.35 mm pitch pad row, and the back of the board is under the
-  display. If the MCU proves unstable at full clock speed, this is the first
-  suspect, and it needs a new layout to change.
+- **Decoupling at the MCU.** 4 of its 21 supply pins have a capacitor
+  within the review's target (3 mm of copper for the core, memory and
+  regulator pins, 5 mm for IO); the others reach theirs through vias and the
+  planes (see "Decoupling and crystal at the MCU"). Simulated, the board's
+  share of the way from a pin to its capacitors is 1.2 to 2.4 nH, about what
+  the package adds itself. If the MCU proves unstable at full clock speed,
+  this is the first suspect; capacitors on the back side under the pad row are
+  the remedy (about 34 USD more per order for the second assembly side).
 - **NFC range and tuning**, the second-source PN532, and the effect of the
   Ethernet plug and cable next to the loop on the lan version. The loop's
   inductance is simulated (1.25 uH on the board, 1.20 uH on a metal wall), not

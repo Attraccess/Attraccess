@@ -115,6 +115,13 @@ rail's name:
 3. Flash a hello-world. Check the 40 MHz crystal starts (the app runs, UART0 at
    the TX0 test point shows the boot log).
 4. Measure `VDD_HP` again: about 1.1 V with ripple below 30 mV.
+5. Decoupling (design notes, "Decoupling and crystal at the MCU"): run a CPU
+   and PSRAM stress test at the full clock (both cores busy, the display
+   refreshing, Ethernet or Wi-Fi traffic) for an hour at room temperature and
+   for ten minutes after the reader has warmed in its case. No reset, no
+   PSRAM or flash error; watch `VDD_HP`, `VDD_PSRAM` (C226) and `VDD_FLASH`
+   with the scope at 20 MHz bandwidth: dips below 1.05 V on `VDD_HP` or below
+   1.8 V on `VDD_PSRAM` are the sign to move capacitors to the back side.
 
 ## Wi-Fi co-processor
 
@@ -240,6 +247,17 @@ depending on the supply, and is good to 40 % at best.
 7. Isolation, on a unit you can afford to lose: 1500 V RMS (or 2250 V DC) for a
    minute between the eight contacts of the jack tied together and the board's
    ground. Remove the display first.
+
+## Power sources and the firmware's limits
+
+1. DC and PoE present: the expander's P5 reads high only while a DC supply is
+   connected, P7 only while the PoE port gives power.
+2. USB as the only source (a USB 2.0 port, through a USB meter): with the
+   firmware's limits on, the board's current stays below 500 mA idle, while it
+   polls for cards and during Wi-Fi traffic (averaged over 1 s). Plug in DC:
+   the limits lift; pull it: they come back within 0.5 s.
+3. Without firmware (MCU held in reset) on a USB 2.0 port the board draws well
+   below 500 mA: LEDs, backlight and buzzer are held off by resistors.
 
 ## LEDs and buzzer
 
