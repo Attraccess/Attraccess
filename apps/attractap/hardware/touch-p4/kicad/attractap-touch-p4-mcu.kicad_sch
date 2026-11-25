@@ -1729,92 +1729,6 @@
 	)
 	(symbol
 		(lib_id "Device:R")
-		(at 294.64 69.85 90)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "9fc5360d-8b10-587d-93af-886ddc2b0478")
-		(property "Reference" "R209" (at 294.64 65.934 90) (effects (font (size 1.27 1.27))))
-		(property "Value" "0R" (at 294.64 67.634 90) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
-			(at 294.64 69.85 0)
-			(effects (font (size 1.27 1.27)) (hide yes))
-		)
-		(property "Datasheet" "" (at 294.64 69.85 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Description" "" (at 294.64 69.85 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "LCSC" "C17168" (at 294.64 69.85 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "MPN" "0402WGF0000TCE" (at 294.64 69.85 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Manufacturer" "UNI-ROYAL (Uniroyal Elec)"
-			(at 294.64 69.85 0)
-			(effects (font (size 1.27 1.27)) (hide yes))
-		)
-		(property "Alternate" "equivalent part of the same value, rating and package"
-			(at 294.64 69.85 0)
-			(effects (font (size 1.27 1.27)) (hide yes))
-		)
-		(property "BOM description" "Thick-film jumper 0R 62.5mW 0402"
-			(at 294.64 69.85 0)
-			(effects (font (size 1.27 1.27)) (hide yes))
-		)
-		(property "Rating" "jumper 62.5mW" (at 294.64 69.85 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "853b5d37-1f81-52cd-af94-6f0bfb4282ff"))
-		(pin "2" (uuid "4783c3c5-da27-5bac-9890-df02b0e5cc9e"))
-		(instances
-			(project "attractap-touch-p4"
-				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
-					(reference "R209")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 294.64 82.55 90)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "d843d7b3-2869-5d30-ba39-e68e60160788")
-		(property "Reference" "R210" (at 294.64 78.634 90) (effects (font (size 1.27 1.27))))
-		(property "Value" "0R" (at 294.64 80.334 90) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
-			(at 294.64 82.55 0)
-			(effects (font (size 1.27 1.27)) (hide yes))
-		)
-		(property "Datasheet" "" (at 294.64 82.55 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Description" "" (at 294.64 82.55 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "LCSC" "C17168" (at 294.64 82.55 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "MPN" "0402WGF0000TCE" (at 294.64 82.55 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Manufacturer" "UNI-ROYAL (Uniroyal Elec)"
-			(at 294.64 82.55 0)
-			(effects (font (size 1.27 1.27)) (hide yes))
-		)
-		(property "Alternate" "equivalent part of the same value, rating and package"
-			(at 294.64 82.55 0)
-			(effects (font (size 1.27 1.27)) (hide yes))
-		)
-		(property "BOM description" "Thick-film jumper 0R 62.5mW 0402"
-			(at 294.64 82.55 0)
-			(effects (font (size 1.27 1.27)) (hide yes))
-		)
-		(property "Rating" "jumper 62.5mW" (at 294.64 82.55 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(pin "1" (uuid "83f8ca23-da13-545e-8a58-ea7ca49c9834"))
-		(pin "2" (uuid "14760242-4834-5c0d-9e55-f46fd2229995"))
-		(instances
-			(project "attractap-touch-p4"
-				(path "/c397a859-95c6-54a3-93b8-1e7535e299df/90a249f1-f9d7-5739-a08a-eb8a2aa739fc"
-					(reference "R210")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:R")
 		(at 215.9 187.96 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -2606,20 +2520,20 @@
 		(uuid "68d5140c-d42a-56dc-b271-c6cb4535375a")
 		(property "Reference" "Y201" (at 316.776 75.35 270) (effects (font (size 1.27 1.27))))
 		(property "Value" "40MHz 9pF 10ppm" (at 323.761 77.05 270) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "attractap:CRYSTAL-SMD_4P-L3.2-W2.5-BL-2"
+		(property "Footprint" "Crystal:Crystal_SMD_2016-4Pin_2.0x1.6mm"
 			(at 309.88 76.2 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
 		(property "Datasheet" "" (at 309.88 76.2 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(property "Description" "" (at 309.88 76.2 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "LCSC" "C255943" (at 309.88 76.2 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "MPN" "X1E000021017700" (at 309.88 76.2 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Manufacturer" "Epson" (at 309.88 76.2 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Alternate" "Tai-Saw TZ0308D (C379787): 9 pF, +-10 ppm, ESR 30 ohm"
+		(property "LCSC" "C2689435" (at 309.88 76.2 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "MPN" "E1SB40E00001AE" (at 309.88 76.2 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Manufacturer" "Hosonic" (at 309.88 76.2 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Alternate" "Tai-Saw TZ1269D (C501798): 9 pF, +-5 ppm at 25 C, +-15 ppm -40 to 85 C, ESR 40 ohm, same pads"
 			(at 309.88 76.2 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "BOM description" "Crystal 40 MHz, 9 pF load, +-10 ppm, ESR 40 ohm, 3.2 x 2.5 mm"
+		(property "BOM description" "Crystal 40 MHz, 9 pF load, +-10 ppm at 25 C, +-10 ppm -30 to 85 C, ESR 40 ohm, 2.0 x 1.6 mm"
 			(at 309.88 76.2 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
@@ -2687,19 +2601,9 @@
 		(uuid "b455c6ad-e29d-55e8-9010-ee0d7928062e")
 	)
 	(wire
-		(pts (xy 287.02 69.85) (xy 290.83 69.85))
+		(pts (xy 287.02 69.85) (xy 309.88 69.85))
 		(stroke (width 0) (type default))
-		(uuid "084e7e86-eb18-51e4-97ee-0bcf24cbdf1a")
-	)
-	(wire
-		(pts (xy 287.02 82.55) (xy 290.83 82.55))
-		(stroke (width 0) (type default))
-		(uuid "bac8f108-9871-5590-80fc-830c3bdae3fb")
-	)
-	(wire
-		(pts (xy 298.45 69.85) (xy 309.88 69.85))
-		(stroke (width 0) (type default))
-		(uuid "effb8714-9ba7-5796-a7bf-507d9569ba97")
+		(uuid "493bfe82-3f6f-56f4-a5c7-bd7f3350ea85")
 	)
 	(wire
 		(pts (xy 309.88 69.85) (xy 309.88 72.39))
@@ -2707,9 +2611,9 @@
 		(uuid "46eed250-1a87-5339-911b-c304686fa8c5")
 	)
 	(wire
-		(pts (xy 298.45 82.55) (xy 309.88 82.55))
+		(pts (xy 287.02 82.55) (xy 309.88 82.55))
 		(stroke (width 0) (type default))
-		(uuid "ca365517-05b0-55c6-aa21-64d09ebda704")
+		(uuid "47c74ea5-8de6-50d4-bbb1-07b1cab76308")
 	)
 	(wire
 		(pts (xy 309.88 82.55) (xy 309.88 80.01))
@@ -2717,14 +2621,9 @@
 		(uuid "88cbf6e2-5100-5c32-8b06-24b8f458ff51")
 	)
 	(wire
-		(pts (xy 309.88 69.85) (xy 311.15 69.85))
+		(pts (xy 309.88 69.85) (xy 342.9 69.85))
 		(stroke (width 0) (type default))
-		(uuid "7e588bf1-8a9d-5053-b126-8154e15ea0c0")
-	)
-	(wire
-		(pts (xy 311.15 69.85) (xy 342.9 69.85))
-		(stroke (width 0) (type default))
-		(uuid "887f50c5-c339-570d-ae5b-7a2297635b7e")
+		(uuid "2f25a90d-9d40-5645-9a3d-86f49dad9962")
 	)
 	(wire
 		(pts (xy 342.9 69.85) (xy 342.9 72.39))
@@ -3324,12 +3223,6 @@
 		(uuid "76c1e83c-2ab9-5f43-8ecb-c2ed9e1b7bbc")
 	)
 	(junction
-		(at 311.15 69.85)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "a8de5f74-af6c-538e-a1ba-702eec1d934e")
-	)
-	(junction
 		(at 312.42 194.31)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -3811,16 +3704,6 @@
 		(effects (font (size 1.27 1.27)) (justify left bottom))
 		(uuid "51ecbc77-4bed-515a-8509-d683e312029e")
 	)
-	(label "XTAL_P_X"
-		(at 311.15 69.85 0)
-		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "24e7373b-6ea8-5581-aa14-1df876b4bc7e")
-	)
-	(label "XTAL_N_X"
-		(at 298.45 82.55 0)
-		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "47ad9916-b824-5aaa-9fbe-75643a491ae6")
-	)
 	(label "FLASH_CK"
 		(at 331.47 134.62 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
@@ -4226,9 +4109,9 @@
 	)
 	(text "40 MHz crystal"
 		(exclude_from_sim no)
-		(at 278.13 61.82 0)
+		(at 278.13 65.63 0)
 		(effects (font (size 2 2) (bold yes)) (justify left bottom))
-		(uuid "6b014699-e615-5c1a-b7ea-40c18288c251")
+		(uuid "b34b9451-28b1-50b1-9453-05aa6c312e2a")
 	)
 	(text "Flash"
 		(exclude_from_sim no)
@@ -4263,11 +4146,11 @@
 		(uuid "8344550c-26b8-5950-9fed-63503538798b")
 	)
 	(rectangle
-		(start 276.86 58.42)
+		(start 276.86 62.23)
 		(end 356.87 99.06)
 		(stroke (width 0.15) (type dash))
 		(fill (type none))
-		(uuid "e7d06510-ea2a-50d6-b1bc-0dc39f620f85")
+		(uuid "3ca24348-9096-55ef-b1bb-492e5b3dde68")
 	)
 	(rectangle
 		(start 281.94 110.49)

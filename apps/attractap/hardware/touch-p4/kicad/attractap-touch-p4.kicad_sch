@@ -2372,6 +2372,18 @@
 		(effects (font (size 1.4 1.4)) (justify left bottom))
 		(uuid "44437122-5ea2-53c3-9e90-7af5c90e7330")
 	)
+	(text "A   2026-11-25   Industry review: eFuse and ideal diodes on the 5 V rail, reset supervisor, damped DC input, TLV62569 3.3 V converter, test points, DC and PoE present to the firmware"
+		(exclude_from_sim no)
+		(at 15 65.4 0)
+		(effects (font (size 1.4 1.4)) (justify left bottom))
+		(uuid "36266cae-d701-54a3-a0ed-34a9a9b11073")
+	)
+	(text "A   2026-11-25   Industry review: layout rework (ESP32-P4 land pattern, decoupling, USB pair, impedance), 2.0 x 1.6 mm crystal, designators on the silkscreen, assembly drawing"
+		(exclude_from_sim no)
+		(at 15 67.8 0)
+		(effects (font (size 1.4 1.4)) (justify left bottom))
+		(uuid "3846eb85-a2f4-5ec7-9016-a1997ecd7545")
+	)
 	(sheet_instances (path "/" (page "1")))
 	(embedded_fonts no)
 )
