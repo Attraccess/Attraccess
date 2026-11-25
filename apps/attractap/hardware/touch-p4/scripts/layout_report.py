@@ -80,6 +80,23 @@ class Copper:
             ls = sorted(coppers, key=lambda n: self.z[n])
             for a, b in zip(ls, ls[1:]):
                 self._edge(('via', i, a), ('via', i, b), self.z[b] - self.z[a])
+        # a track end on another track of its net (a T-junction, as KiCad connects it)
+        for (layer, net), ts in by_layer.items():
+            for t in ts:
+                for x, y in ((t['x1'], t['y1']), (t['x2'], t['y2'])):
+                    for o in ts:
+                        if o is t:
+                            continue
+                        dx, dy = o['x2'] - o['x1'], o['y2'] - o['y1']
+                        L2 = dx * dx + dy * dy
+                        if L2 == 0:
+                            continue
+                        u = ((x - o['x1']) * dx + (y - o['y1']) * dy) / L2
+                        if 0 < u < 1 and math.hypot(x - o['x1'] - u * dx, y - o['y1'] - u * dy) <= o['w'] / 2:
+                            node = self._pt(layer, x, y)
+                            L = math.sqrt(L2)
+                            self._edge(node, self._pt(layer, o['x1'], o['y1']), u * L)
+                            self._edge(node, self._pt(layer, o['x2'], o['y2']), (1 - u) * L)
         # track ends on pads and vias
         for (layer, net), ts in by_layer.items():
             for t in ts:
