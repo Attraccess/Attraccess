@@ -85,6 +85,12 @@ def cases():
     z0, delay = field2d.line((b / 2, er), (b / 2, er), w, t, cell=5e-6)
     out.append(('stripline between two planes, ohm', z0, exact, 0.03))
     out.append(('its delay, ps/mm', delay * 1e9, math.sqrt(er) / field2d.C_LIGHT * 1e9, 0.01))
+    # Two microstrips far apart (gap 15 times the height) hardly couple: their differential impedance is
+    # twice that of one line alone, solved with the same mask.
+    below, w, t = (0.1e-3, 4.1), 0.15e-3, 0.035e-3
+    z1, _d = field2d.line(below, None, w, t)
+    zd, _d = field2d.pair(below, w, t, 1.5e-3, mask=(0.02e-3, 0.0))
+    out.append(('pair far apart against two single lines, ohm', zd, 2 * z1, 0.015))
     return out
 
 

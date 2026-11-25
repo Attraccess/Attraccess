@@ -169,6 +169,42 @@ def signals(board):
               '%-32s %3.0f mm: overshoot %.2f V, back to %.2f V (strongest drive: %.2f V, %.2f V)' % (name, length, over, back, over3, back3))
 
 
+def pair_geometry(board, pos, neg, layer):
+    """(track width, edge gap) of a routed pair on one layer, in metres: the most common width, and the
+    median distance from the middle of each straight piece of one line to the other line."""
+    def segs(net):
+        return [t for t in board.net_tracks(net) if t['layer'] == layer]
+    def dist(px, py, t):
+        dx, dy = t['x2'] - t['x1'], t['y2'] - t['y1']
+        L = dx * dx + dy * dy
+        u = 0 if L == 0 else max(0.0, min(1.0, ((px - t['x1']) * dx + (py - t['y1']) * dy) / L))
+        return np.hypot(px - t['x1'] - u * dx, py - t['y1'] - u * dy)
+    p, n = segs(pos), segs(neg)
+    widths = [round(t['w'], 3) for t in p + n]
+    w = max(set(widths), key=widths.count)
+    centre = [min(dist((t['x1'] + t['x2']) / 2, (t['y1'] + t['y2']) / 2, o) for o in n)
+              for t in p if np.hypot(t['x2'] - t['x1'], t['y2'] - t['y1']) > 1.0]
+    return w * 1e-3, (float(np.median(centre)) - w) * 1e-3
+
+
+def controlled_lines(board):
+    """The lines the order asks the fab to hold to an impedance, as routed, from the 2D field solution.
+    JLCPCB holds +-10 %; USB 2.0 wants 90 ohm +-15 % between D+ and D-, 100BASE-TX 100 ohm +-15 %."""
+    print('Controlled-impedance lines as routed (2D field solution, outer layer over the first plane)')
+    for name, pos, neg, layer, target in (('USB D+/D-', 'USB_DP', 'USB_DN', 'B.Cu', 90.0),
+                                          ('Ethernet transmit pair', 'MDI_TP', 'MDI_TN', 'F.Cu', 100.0),
+                                          ('Ethernet receive pair', 'MDI_RP', 'MDI_RN', 'F.Cu', 100.0)):
+        w, gap = pair_geometry(board, pos, neg, layer)
+        # the plane under a back-layer line lies above it in the stack-up
+        below = board.dielectric_above(layer) if layer == 'B.Cu' else board.dielectric_below(layer)
+        z, _delay = field2d.pair(below, w, board.copper[layer], gap)
+        check(abs(z / target - 1) <= 0.10, '%-24s %.3f mm wide, %.3f mm apart: %.1f ohm differential (target %.0f)'
+              % (name, w * 1e3, gap * 1e3, z, target))
+    w, _gap = pair_geometry(board, 'MDI_TP', 'MDI_TN', 'F.Cu')
+    z0, _delay = field2d.line(board.dielectric_below('F.Cu'), None, w, board.copper['F.Cu'])
+    print('        one Ethernet line alone, %.3f mm: %.1f ohm' % (w * 1e3, z0))
+
+
 def wifi_link(board):
     lines = field2d.board_lines(board)
     delays, skew, round_trip = si.sdio_timing(board, lines)
@@ -281,6 +317,7 @@ if __name__ == '__main__':
     power_up()
     supply_switch()
     signals(board)
+    controlled_lines(board)
     wifi_link(board)
     supply_tracks(board)
     supply_impedance(board)
