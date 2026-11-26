@@ -214,6 +214,21 @@ describe('MassIntroductionService', () => {
     await expect(service.start(introducer, { resourceId: 5, readerId: 3 })).resolves.toBeDefined();
   });
 
+  it('disarms the reader and ends the session when the store fails after arming', async () => {
+    const store = (service as unknown as { store: { attachReader: () => Promise<boolean> } }).store;
+    jest.spyOn(store, 'attachReader').mockRejectedValueOnce(new Error('database down'));
+
+    await expect(service.start(introducer, { resourceId: 5, readerId: 3 })).rejects.toThrow('database down');
+
+    expect(readerPort.disarm).toHaveBeenCalledWith(
+      expect.objectContaining({ readerId: 3, reason: MassIntroductionEndReason.CANCELLED }),
+    );
+    const [{ sessionId }] = readerPort.disarm.mock.calls.at(-1) as [{ sessionId: string }];
+    await expect(service.get(sessionId, introducer.id)).rejects.toBeInstanceOf(NotFoundException);
+    // Ended quietly: the introducer's start failed, there is nothing to tell them live.
+    expect(eventsOfType(MassIntroductionLiveEventType.ENDED)).toEqual([]);
+  });
+
   it('keeps the running session when its replacement cannot arm the reader', async () => {
     const running = await service.start(introducer, { resourceId: 5 });
     readerPort.arm.mockRejectedValueOnce(new ConflictException('busy'));

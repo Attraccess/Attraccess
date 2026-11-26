@@ -13,6 +13,7 @@ describe('AttractapSupervisionHandler', () => {
 
   const lastPayload = (socket: AuthenticatedWebSocket) =>
     (socket.sendMessage as jest.Mock).mock.calls.at(-1)?.[0].data.payload;
+  const lastMessage = (socket: AuthenticatedWebSocket) => (socket.sendMessage as jest.Mock).mock.calls.at(-1)?.[0].data;
 
   describe('armReader', () => {
     it('arms every socket of the reader and tells it to wait for a card', async () => {
@@ -332,6 +333,20 @@ describe('AttractapSupervisionHandler', () => {
 
       expect(errorSent(socket)).toBe('NO_SUPERVISORS_AVAILABLE');
       expect(fixture.supervisionService.createReaderRequest).not.toHaveBeenCalled();
+    });
+
+    it('answers SUPERVISION_FAILED at once when the request cannot be stored', async () => {
+      const socket = tappedSocket();
+      // With several instances the request lives in Valkey.
+      fixture.supervisionService.createReaderRequest.mockRejectedValueOnce(new Error('Connection is closed.'));
+
+      await expect(request(socket)).resolves.toBeUndefined();
+
+      expect(lastMessage(socket)).toEqual({
+        type: AttractapEventType.SUPERVISION_REQUEST,
+        payload: { error: 'SUPERVISION_FAILED' },
+      });
+      expect(socket.state.supervisionFlow).toBeNull();
     });
 
     it('refuses before anyone has tapped a card', async () => {

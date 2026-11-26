@@ -1,7 +1,8 @@
 import { ReaderDeletedEvent } from '../events';
 import { FakeCredentialStore, FakeUnitOfWork } from '../attractap-fake-stores.test-fixture';
 import type { ReaderCredentialRow } from './credential-store.port';
-import { CredentialRegistryService } from './credential-registry.service';
+import type { ClusterService } from '../../cluster/cluster.service';
+import { CLUSTER_CREDENTIAL_CACHE_MS, CredentialRegistryService } from './credential-registry.service';
 
 describe('CredentialRegistryService', () => {
   let store: FakeCredentialStore;
@@ -166,5 +167,49 @@ describe('CredentialRegistryService', () => {
     rows.delete(4);
     service.onReaderDeleted(new ReaderDeletedEvent(4));
     expect(await service.isActive(4, 'fp')).toBe(false);
+  });
+
+  describe('with several API instances (ATT-1163)', () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    /** A revoke made on another instance whose message never arrived here: only the row changes. */
+    const revokedElsewhere = (id: number) => seed(id, { ...paired(id, 'fp'), pairingState: 'revoked' });
+
+    it('reads a cached credential again once it is older than the cluster cache age', async () => {
+      const clustered = new CredentialRegistryService(store, new FakeUnitOfWork(), { enabled: true } as ClusterService);
+      const now = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+      seed(6, paired(6, 'fp'));
+      expect(await clustered.isActive(6, 'fp')).toBe(true);
+      revokedElsewhere(6);
+
+      now.mockReturnValue(1_000_000 + CLUSTER_CREDENTIAL_CACHE_MS - 1);
+      expect(await clustered.isActive(6, 'fp')).toBe(true);
+      now.mockReturnValue(1_000_000 + CLUSTER_CREDENTIAL_CACHE_MS);
+      expect(await clustered.isActive(6, 'fp')).toBe(false);
+      expect(store.reads).toBe(2);
+    });
+
+    it('keeps the cache until an invalidation when this is the only instance', async () => {
+      const single = new CredentialRegistryService(store, new FakeUnitOfWork(), { enabled: false } as ClusterService);
+      const now = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+      seed(7, paired(7, 'fp'));
+      expect(await single.isActive(7, 'fp')).toBe(true);
+      revokedElsewhere(7);
+
+      now.mockReturnValue(1_000_000 + 24 * 60 * 60_000);
+      expect(await single.isActive(7, 'fp')).toBe(true);
+      expect(store.reads).toBe(1);
+    });
+
+    it('checks the database, not the cache, for a recheck', async () => {
+      seed(8, paired(8, 'fp'));
+      expect(await service.isActive(8, 'fp')).toBe(true);
+      revokedElsewhere(8);
+
+      expect(await service.isActiveNow(8, 'fp')).toBe(false);
+      expect(await service.isActiveNow(8, 'other')).toBe(false);
+      seed(8, paired(8, 'fp'));
+      expect(await service.isActiveNow(8, 'fp')).toBe(true);
+    });
   });
 });
