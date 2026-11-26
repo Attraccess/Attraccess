@@ -28,19 +28,20 @@ describe('secure conversion against the emulated reader', () => {
   it('runs every step to secured and persists each transition', async () => {
     const h = createConversionHarness();
     await h.connect();
-    // Normative ordering: the digests are on the reader record before the burn command reaches the reader,
-    // and the read-back burn report is persisted before the bootloader write is commanded.
-    const onControl = h.device.onControl.bind(h.device);
+    // Normative ordering, checked at the moment each command is sent: the digests are on the reader record before the
+    // burn command leaves, and the read-back burn report is persisted before the bootloader write is commanded.
     const seen: string[] = [];
-    h.device.onControl = (message) => {
+    const violations: string[] = [];
+    h.onSend((message) => {
       seen.push(String(message['t']));
-      if (message['t'] === 'conversion.burn') expect(h.log).toContain('reader:digests');
-      if (message['t'] === 'conversion.write-bootloader') {
-        expect(h.log.indexOf('conversion:burnReport')).toBeGreaterThan(h.log.indexOf('reader:digests'));
-        expect(h.conversions.rows[0].state).toBe('digests-burned');
+      if (message['t'] === 'conversion.burn' && !h.log.includes('reader:digests')) violations.push('burn first');
+      if (
+        message['t'] === 'conversion.write-bootloader' &&
+        (!h.log.includes('conversion:burnReport') || h.conversions.rows[0].state !== 'digests-burned')
+      ) {
+        violations.push('write-bootloader first');
       }
-      return onControl(message);
-    };
+    });
 
     const status = await h.service.start(1, ' Lab door ', ADMIN);
     expect(status.conversion?.state).toBe('preflight');
@@ -52,6 +53,7 @@ describe('secure conversion against the emulated reader', () => {
       'conversion.burn',
       'conversion.write-bootloader',
     ]);
+    expect(violations).toEqual([]);
     let conversion = await latest(h);
     expect(conversion).toMatchObject({ state: 'bootloader-written', verified: true, burnReport: { ...DIGESTS } });
     expect(conversion.bytesDone).toBe(conversion.bytesTotal);
@@ -158,43 +160,115 @@ describe('secure conversion against the emulated reader', () => {
     await expect(h.service.cancel(1)).rejects.toThrow('can no longer be cancelled');
   });
 
+  it('refuses a cancel once the reader verified (the burn command has left)', async () => {
+    const h = createConversionHarness();
+    await h.connect();
+    const onControl = h.device.onControl.bind(h.device);
+    h.device.onControl = (message) =>
+      message['t'] === 'conversion.burn' ? { control: [], chunkRequests: [] } : onControl(message); // no answer yet
+    await h.service.start(1, 'Lab door', ADMIN);
+    await h.pump();
+    expect(await latest(h)).toMatchObject({ state: 'transferring', verified: true });
+    expect((await h.service.status(1)).canCancel).toBe(false);
+    await expect(h.service.cancel(1)).rejects.toThrow('can no longer be cancelled');
+    expect((await latest(h)).state).toBe('transferring');
+  });
+
   it.each([
-    [{ verifyFails: true }, 'verify-failed', 'transferring'],
-    [{ digestMismatch: true }, 'digest-mismatch', 'transferring'],
-    [{ stopBeforeBurn: true }, 'burn-refused', 'transferring'],
-    [{ smallFlash: true }, 'preflight-failed', 'preflight'],
-    [{ bootloaderReadbackFails: true }, 'bootloader-write-failed', 'digests-burned'],
-  ])('fails on %j with %s', async (faults, reason, failedInState) => {
+    [{ verifyFails: true }, 'verify-failed', 'transferring', true],
+    [{ digestMismatch: true }, 'digest-mismatch', 'transferring', false],
+    [{ stopBeforeBurn: true }, 'burn-refused', 'transferring', true],
+    [{ smallFlash: true }, 'preflight-failed', 'preflight', true],
+    [{ bootloaderReadbackFails: true }, 'bootloader-write-failed', 'digests-burned', true],
+  ])('fails on %j with %s', async (faults, reason, failedInState, retryable) => {
     const h = await started({ faults });
     const conversion = await latest(h);
     expect(conversion).toMatchObject({ state: 'failed', failureReason: reason, failedInState });
-    expect((await h.service.status(1)).canRetry).toBe(true);
+    expect((await h.service.status(1)).canRetry).toBe(retryable);
+    if (!retryable) await expect(h.service.retry(1, ADMIN)).rejects.toThrow('cannot be retried');
     if (reason === 'digest-mismatch') expect(conversion.burnReport?.digest0).toBe('0'.repeat(64));
     if (reason === 'preflight-failed')
       expect(conversion.preflight?.find((c) => c.check === 'flash-size')?.ok).toBe(false);
   });
 
-  it('stop-before-burn ends before the burn, leaves the reader plain and takes the recorded digests back', async () => {
+  it('never sends the burn to a stop-before-burn build and records no digests', async () => {
+    const h = createConversionHarness({ stopBeforeBurnBuild: true, faults: { stopBeforeBurn: true } });
+    await h.connect();
+    const sent: string[] = [];
+    h.onSend((message) => sent.push(String(message['t'])));
+    await h.service.start(1, 'Lab door', ADMIN);
+    await h.pump();
+    expect(sent).not.toContain('conversion.burn');
+    // The server ends it and lets the reader drop its staging.
+    expect(sent.at(-1)).toBe('conversion.cancel');
+    const status = await h.service.status(1);
+    expect(status.conversion).toMatchObject({
+      state: 'failed',
+      failureReason: 'burn-refused',
+      failedInState: 'transferring',
+      verified: true,
+    });
+    expect(status.canRetry).toBe(true);
+    expect(h.log).not.toContain('reader:digests');
+    expect(h.device).toMatchObject({ stage: 'none', profile: 'plain' });
+    expect(h.device.efuse).toMatchObject({ key0: null, key1: null, burns: 0 });
+    expect(await h.readers.findSecurity(1)).toMatchObject({ secureBootDigest0: null, secureBootDigest1: null });
+  });
+
+  it('takes the recorded digests back when the reader refuses the burn having burned nothing', async () => {
     const h = await started({ faults: { stopBeforeBurn: true } });
     expect(h.device.efuse).toMatchObject({ key0: null, key1: null, burns: 0 });
-    expect(h.device.profile).toBe('plain');
     // Recorded before the command (normative), cleared once the reader said it burned nothing.
     expect(h.log).toContain('reader:digests');
     expect(await h.readers.findSecurity(1)).toMatchObject({ secureBootDigest0: null, secureBootDigest1: null });
   });
 
-  it('keeps the recorded digests after an eFuse error (a partial burn is possible)', async () => {
+  it.each(['efuse-error', 'key-blocks'])(
+    'keeps the recorded digests and offers no retry after a %s refusal (the eFuses may hold digests)',
+    async (reason) => {
+      const h = createConversionHarness();
+      await h.connect();
+      const onControl = h.device.onControl.bind(h.device);
+      h.device.onControl = (message) =>
+        message['t'] === 'conversion.burn'
+          ? { control: [{ t: 'conversion.burn-refused', id: message['id'], reason }], chunkRequests: [] }
+          : onControl(message);
+      await h.service.start(1, 'Lab door', ADMIN);
+      await h.pump();
+      expect(await latest(h)).toMatchObject({ state: 'failed', failureReason: 'burn-failed' });
+      expect((await h.service.status(1)).canRetry).toBe(false);
+      expect(await h.readers.findSecurity(1)).toMatchObject({
+        secureBootDigest0: DIGESTS.digest0,
+        secureBootDigest1: DIGESTS.digest1,
+      });
+    },
+  );
+
+  it('does not burn digests the server no longer holds keys for', async () => {
+    const h = await started({ faults: { disconnectAfterChunks: 1 } });
+    await h.disconnect();
+    h.keysState.signingKey = { digest: '9'.repeat(64), fingerprint: '3'.repeat(64) }; // replaced meanwhile
+    const sent: string[] = [];
+    h.onSend((message) => sent.push(String(message['t'])));
+    await h.connect();
+    await h.pump();
+    expect(sent).not.toContain('conversion.burn');
+    expect(await latest(h)).toMatchObject({ state: 'failed', failureReason: 'no-signing-key' });
+    expect(h.log).not.toContain('reader:digests');
+    expect(h.device.stage).toBe('none');
+  });
+
+  it('offers the profile marker of the signed image', async () => {
     const h = createConversionHarness();
     await h.connect();
-    const onControl = h.device.onControl.bind(h.device);
-    h.device.onControl = (message) =>
-      message['t'] === 'conversion.burn'
-        ? { control: [{ t: 'conversion.burn-refused', id: message['id'], reason: 'efuse-error' }], chunkRequests: [] }
-        : onControl(message);
+    const offers: unknown[] = [];
+    h.onSend((message) => {
+      if (message['t'] === 'conversion.offer') offers.push(message['profileMarker']);
+    });
     await h.service.start(1, 'Lab door', ADMIN);
     await h.pump();
-    expect(await latest(h)).toMatchObject({ state: 'failed', failureReason: 'burn-refused' });
-    expect(await h.readers.findSecurity(1)).toMatchObject({ secureBootDigest0: DIGESTS.digest0 });
+    expect((await latest(h)).target.profileMarker).toBe('attractap-secure-profile-v2');
+    expect(offers).toEqual(['attractap-secure-profile-v2']);
   });
 
   it('retries a failed conversion when safe and completes', async () => {

@@ -3,6 +3,7 @@ import type { AttractapSecureConversionRecord } from '@attraccess/application-mo
 import type { SignedSecureImage } from '../secure-boot/secure-image.service';
 import type { SessionSecurityState } from '../security/session-security-state';
 import { ConversionImages } from './conversion-images';
+import { ConversionProtocolService } from './conversion-protocol.service';
 import { ATTRACTAP_SECURE_CONVERSION_STORE, type AttractapSecureConversionStore } from './secure-conversion-store.port';
 
 export type ConversionImageKind = 'app' | 'bootloader';
@@ -20,31 +21,52 @@ export interface ConversionChunkRequest {
 
 /**
  * Serves the signed images of the active conversion in chunks, the way OTA does: a chunk answer carries no offset, so
- * a repeated request on the same connection is ignored. Signed images are looked up once per conversion.
+ * a repeated request on the same connection is ignored. Signed images are looked up once per conversion; the caches
+ * hold the active conversion only.
  */
 @Injectable()
 export class ConversionTransferService {
   private readonly logger = new Logger(ConversionTransferService.name);
-  private readonly signed = new Map<string, SignedSecureImage>();
+  /** The conversion the caches below belong to. */
+  private cachedFor: number | null = null;
+  private readonly signed = new Map<ConversionImageKind, SignedSecureImage>();
   /** Per session: end of the last chunk served, by conversion and image. */
   private readonly served = new WeakMap<SessionSecurityState, Map<string, number>>();
-  private readonly persisted = new Map<number, number>();
+  private persisted = 0;
 
   public constructor(
     @Inject(ATTRACTAP_SECURE_CONVERSION_STORE) private readonly conversions: AttractapSecureConversionStore,
     private readonly images: ConversionImages,
+    private readonly protocol: ConversionProtocolService,
   ) {}
 
+  /** A plain update must not be offered meanwhile: the conversion stages into the same inactive app slot. */
+  public async stagingInUse(readerId: number): Promise<boolean> {
+    return (await this.conversions.findActive())?.readerId === readerId;
+  }
+
+  private cacheFor(conversion: AttractapSecureConversionRecord): void {
+    if (this.cachedFor === conversion.id) return;
+    this.cachedFor = conversion.id;
+    this.signed.clear();
+    this.persisted = 0;
+  }
+
+  /** The signed image, or null when the catalog changed under the conversion (the conversion then fails). */
   private async image(conversion: AttractapSecureConversionRecord, kind: ConversionImageKind) {
-    const key = `${conversion.id}:${kind}`;
-    const known = this.signed.get(key);
+    const known = this.signed.get(kind);
     if (known) return known;
     const { firmwareName, variant } = conversion.target;
     const image = await this.images.signed(firmwareName, variant, kind, conversion);
     const expected = kind === 'app' ? conversion.target.appSha256 : conversion.target.bootloaderSha256;
-    // The catalog changed under the conversion (new build): the offer no longer describes these bytes.
-    if ((await this.images.sha256(image)) !== expected) return null;
-    this.signed.set(key, image);
+    // A new build replaced the offered one: the offer no longer describes these bytes, and every later request would
+    // sign and hash the same wrong image again.
+    if ((await this.images.sha256(image)) !== expected) {
+      this.logger.warn(`Conversion ${conversion.id}: the ${kind} image changed since the offer`);
+      await this.protocol.fail(conversion, 'image-unavailable');
+      return null;
+    }
+    this.signed.set(kind, image);
     return image;
   }
 
@@ -61,6 +83,7 @@ export class ConversionTransferService {
     const conversion = await this.conversions.findActive();
     if (!conversion || conversion.readerId !== state.readerId || conversion.id !== id) return null;
     if (!TRANSFER_STATES.includes(conversion.state)) return null;
+    this.cacheFor(conversion);
 
     const served = this.served.get(state) ?? new Map<string, number>();
     this.served.set(state, served);
@@ -85,10 +108,9 @@ export class ConversionTransferService {
   private async recordProgress(conversion: AttractapSecureConversionRecord, kind: ConversionImageKind, end: number) {
     if (conversion.state !== 'transferring') return;
     const done = kind === 'app' ? end : conversion.target.appSize + end;
-    const last = this.persisted.get(conversion.id) ?? 0;
     const imageDone = end === (kind === 'app' ? conversion.target.appSize : conversion.target.bootloaderSize);
-    if (done - last < PROGRESS_WRITE_STEP && !imageDone && done >= last) return;
-    this.persisted.set(conversion.id, done);
+    if (done - this.persisted < PROGRESS_WRITE_STEP && !imageDone && done >= this.persisted) return;
+    this.persisted = done;
     await this.conversions.update(conversion.id, { bytesDone: done, lastSeenAt: new Date() }, ['transferring']);
   }
 }

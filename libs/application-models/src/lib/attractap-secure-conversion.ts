@@ -35,7 +35,10 @@ export const ATTRACTAP_CONVERSION_FAILURES = [
   'preflight-failed',
   'transfer-failed',
   'verify-failed',
+  // The reader refused the burn before touching an eFuse: nothing was burned.
   'burn-refused',
+  // The burn started or found the key blocks taken (eFuse error, key blocks in use): the eFuses may hold digests.
+  'burn-failed',
   'digest-mismatch',
   'bootloader-write-failed',
   'migration-failed',
@@ -99,6 +102,8 @@ export interface AttractapConversionTarget {
   appSize: number;
   bootloaderSha256: string;
   bootloaderSize: number;
+  /** Profile marker of the secure image the reader checks; absent on conversions started before it was recorded. */
+  profileMarker?: string;
 }
 
 /** One conversion of one reader. History rows stay; only one row is active per installation. */

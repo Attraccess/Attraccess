@@ -7,6 +7,7 @@ import type {
   AttractapSecureConversionRecord,
 } from '@attraccess/application-models';
 import { ATTRACTAP_READER_STORE, type AttractapReaderStore } from '../reader-store.port';
+import { SecureBootKeyService } from '../secure-boot/secure-boot-key.service';
 import { CREDENTIAL_CHANGED_EVENT } from '../security/pairing-model';
 import { SECURE_VERSION_FLOOR } from '../security/efuse-report';
 import { ConversionAudit, DEVICE_ACTOR } from './conversion-audit';
@@ -25,7 +26,10 @@ import { evaluatePreflight, preflightMac, preflightPassed } from './preflight';
 import { PreflightExpectations } from './preflight-expectations';
 import { ATTRACTAP_SECURE_CONVERSION_STORE, type AttractapSecureConversionStore } from './secure-conversion-store.port';
 
-/** Offline for longer than this after the bootloader write, and not secured: the conversion is interrupted. */
+/**
+ * Offline for longer than this after the burn (bootloader write pending or done), and not secured: the conversion is
+ * interrupted.
+ */
 export const INTERRUPTED_AFTER_MS = 15 * 60 * 1000;
 const SWEEP_INTERVAL_MS = 60 * 1000;
 
@@ -38,8 +42,19 @@ const AFTER_BOOTLOADER: readonly AttractapConversionState[] = [
 ];
 /** States before anything irreversible was written to the reader's boot path. */
 const BEFORE_BOOTLOADER: readonly AttractapConversionState[] = ['preflight', 'transferring', 'digests-burned'];
+/** Offline in these states for longer than INTERRUPTED_AFTER_MS: interrupted (digests-burned only with a report). */
+const SWEPT: readonly AttractapConversionState[] = ['digests-burned', 'bootloader-written', 'encrypting', 'migrating'];
+/** Stages only the secure app reports: the reader booted the new bootloader. */
+const SECURE_APP_STAGES: readonly ConversionStage[] = ['migrated', 'migration-failed'];
+/** Stages of the plain app after the verification: the bootloader was not written. */
+const PLAIN_APP_VERIFIED_STAGES: readonly ConversionStage[] = ['verified', 'burned'];
+/** Failures the secure app can still turn into success: it retries the migration on every boot. */
+const LATE_SUCCESS_FAILURES: readonly AttractapConversionFailure[] = ['migration-failed', 'efuse-check-failed'];
+/** Burn refusals after which the eFuses may hold digests: the recorded digests stay. */
+const MAY_HAVE_BURNED: readonly BurnRefusal[] = ['efuse-error', 'key-blocks'];
 
-const PROFILE_MARKER = 'attractap-secure-profile-v1';
+/** Conversions recorded before the target carried the image's profile marker were all v1. */
+const PROFILE_MARKER_V1 = 'attractap-secure-profile-v1';
 
 /**
  * The reader side of "Secure this reader": every message a reader sends about its conversion, the session ends and
@@ -56,6 +71,7 @@ export class ConversionProtocolService implements OnModuleInit, OnModuleDestroy 
     private readonly registry: ConversionSessionRegistry,
     private readonly expectations: PreflightExpectations,
     private readonly audit: ConversionAudit,
+    private readonly keys: SecureBootKeyService,
   ) {}
 
   public onModuleInit(): void {
@@ -114,7 +130,7 @@ export class ConversionProtocolService implements OnModuleInit, OnModuleDestroy 
       t: 'conversion.offer',
       id: conversion.id,
       variant: target.variant,
-      profileMarker: PROFILE_MARKER,
+      profileMarker: target.profileMarker ?? PROFILE_MARKER_V1,
       secureVersionFloor: SECURE_VERSION_FLOOR,
       digest0: conversion.digest0,
       digest1: conversion.digest1,
@@ -123,14 +139,34 @@ export class ConversionProtocolService implements OnModuleInit, OnModuleDestroy 
     });
   }
 
+  /** Ends a conversion before the burn and lets the reader drop its staging (nothing was burned). */
+  private async abortBeforeBurn(
+    session: ConversionSession,
+    conversion: AttractapSecureConversionRecord,
+    reason: AttractapConversionFailure,
+  ): Promise<void> {
+    if (await this.fail(conversion, reason)) this.sendCancel(session, conversion.id);
+  }
+
   /**
    * The burn: the digests are written to the reader's record first (normative), only then the command leaves. It names
-   * the reader's MAC from the preflight and both digests; the firmware refuses any mismatch.
+   * the reader's MAC from the preflight and both digests; the firmware refuses any mismatch. A stop-before-burn build
+   * never gets it, and neither does a reader whose digests are no longer the server's keys.
    */
   private async sendBurn(session: ConversionSession, conversion: AttractapSecureConversionRecord): Promise<void> {
     const mac = preflightMac(conversion.preflight);
     if (!mac) {
       await this.fail(conversion, 'protocol-error');
+      return;
+    }
+    if (session.state.conversionStopBeforeBurn) {
+      await this.abortBeforeBurn(session, conversion, 'burn-refused');
+      return;
+    }
+    // The keys may have changed since the start (or the signing key can no longer be opened): burning these digests
+    // would leave a reader no held key can update.
+    if (!(await this.keys.conversionKeysCurrent(conversion))) {
+      await this.abortBeforeBurn(session, conversion, 'no-signing-key');
       return;
     }
     const recorded = await this.readers.applySecurity(
@@ -207,6 +243,18 @@ export class ConversionProtocolService implements OnModuleInit, OnModuleDestroy 
     }
     const seen = (await this.move(conversion, { lastSeenAt: new Date() })) ?? conversion;
     const stage: ConversionStage = status.id === seen.id ? status.stage : 'none';
+    if (seen.state === 'digests-burned' && SECURE_APP_STAGES.includes(stage)) {
+      // The bootloader-written report was lost: the reader already runs the secure app.
+      const written = await this.move(seen, { state: 'bootloader-written' });
+      if (written) await this.onReturnAfterBootloader(written, stage, status);
+      return;
+    }
+    if (seen.state === 'interrupted' && seen.burnReport && PLAIN_APP_VERIFIED_STAGES.includes(stage)) {
+      // Interrupted between the burn and the bootloader write: the plain app still runs, so continue from the burn.
+      const resumed = await this.move(seen, { state: 'digests-burned' });
+      if (resumed) await this.drive(session, resumed, stage);
+      return;
+    }
     if (AFTER_BOOTLOADER.includes(seen.state)) {
       await this.onReturnAfterBootloader(seen, stage, status);
       return;
@@ -297,9 +345,10 @@ export class ConversionProtocolService implements OnModuleInit, OnModuleDestroy 
   }
 
   /**
-   * A refused burn. Every reason but `efuse-error` means the reader burned nothing, so the digests recorded before the
-   * command are taken back: the reader must not count as burned (that would block key changes). After an
-   * `efuse-error` a partial burn is possible, so the record stays.
+   * A refused burn. After `efuse-error` or `key-blocks` the eFuses may hold digests (a partial burn, or blocks already
+   * taken): the conversion fails as `burn-failed`, the recorded digests stay and no retry is offered. Every other
+   * reason means the reader burned nothing, so the digests recorded before the command are taken back: the reader must
+   * not count as burned (that would block key changes).
    */
   private async onBurnRefused(
     session: ConversionSession,
@@ -307,8 +356,9 @@ export class ConversionProtocolService implements OnModuleInit, OnModuleDestroy 
     reason: BurnRefusal,
   ): Promise<void> {
     if (conversion.state !== 'transferring') return;
-    const failed = await this.fail(conversion, 'burn-refused');
-    if (!failed || reason === 'efuse-error') return;
+    const mayHaveBurned = MAY_HAVE_BURNED.includes(reason);
+    const failed = await this.fail(conversion, mayHaveBurned ? 'burn-failed' : 'burn-refused');
+    if (!failed || mayHaveBurned) return;
     const reader = await this.readers.findSecurity(conversion.readerId);
     if (reader?.secureBootDigest0 !== conversion.digest0 || reader.secureBootDigest1 !== conversion.digest1) return;
     await this.readers.applySecurity(
@@ -371,22 +421,43 @@ export class ConversionProtocolService implements OnModuleInit, OnModuleDestroy 
     await this.move(conversion, patch);
   }
 
-  /** Called after an eFuse report of the reader was checked (T2). */
+  /**
+   * Called after an eFuse report of the reader was checked (T2). A secured reader ends its conversion as `secured`,
+   * also one still in `digests-burned` (its bootloader-written report was lost). A conversion that failed in the
+   * migration or the eFuse check turns `secured` when a later boot's migration succeeded.
+   */
   public async onEfuseReportChecked(readerId: number): Promise<void> {
-    const conversion = await this.conversions.findActive();
-    if (conversion?.readerId !== readerId || !AFTER_BOOTLOADER.includes(conversion.state)) return;
-    const reader = await this.readers.findSecurity(readerId);
+    const active = await this.conversions.findActive();
+    if (active?.readerId === readerId) return await this.onActiveEfuseReport(active);
+    const latest = await this.conversions.findLatestForReader(readerId);
+    if (latest?.state !== 'failed' || !latest.failureReason || !LATE_SUCCESS_FAILURES.includes(latest.failureReason)) {
+      return;
+    }
+    if (!(await this.readers.findSecurity(readerId))?.secured) return;
+    await this.move(latest, { state: 'secured', failedInState: null, failureReason: null, lastSeenAt: new Date() }, [
+      'failed',
+    ]);
+  }
+
+  private async onActiveEfuseReport(conversion: AttractapSecureConversionRecord): Promise<void> {
+    const securable: readonly AttractapConversionState[] = [...AFTER_BOOTLOADER, 'digests-burned'];
+    if (!securable.includes(conversion.state)) return;
+    const reader = await this.readers.findSecurity(conversion.readerId);
     if (reader?.secured) {
-      await this.move(conversion, { state: 'secured', lastSeenAt: new Date() }, AFTER_BOOTLOADER);
+      await this.move(conversion, { state: 'secured', lastSeenAt: new Date() }, securable);
     } else if (conversion.state === 'migrating') {
       await this.fail(conversion, 'efuse-check-failed');
     }
   }
 
-  /** `interrupted`: offline for more than 15 minutes after the bootloader write and not secured. */
+  /**
+   * `interrupted`: offline for more than 15 minutes after the burn and not secured. Before the bootloader write that
+   * is a reader that died in brick window 1; it may still come back (see onStatus).
+   */
   public async sweepInterrupted(now = Date.now()): Promise<void> {
     const conversion = await this.conversions.findActive();
-    if (!conversion || !['bootloader-written', 'encrypting', 'migrating'].includes(conversion.state)) return;
+    if (!conversion || !SWEPT.includes(conversion.state)) return;
+    if (conversion.state === 'digests-burned' && !conversion.burnReport) return;
     if (this.registry.isOnline(conversion.readerId)) return;
     const since = (conversion.lastSeenAt ?? conversion.stateChangedAt).getTime();
     if (now - since <= INTERRUPTED_AFTER_MS) return;

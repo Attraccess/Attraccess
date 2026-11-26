@@ -70,6 +70,7 @@ export class ConversionImages {
       appSize: app.size,
       bootloaderSha256: await this.sha256(bootloader),
       bootloaderSize: bootloader.size,
+      profileMarker: app.profileMarker,
     };
   }
 

@@ -31,7 +31,7 @@ export function registerAttractapFirmwareHandlerFixture() {
 
   let socket: any;
 
-  let mockConversionTransfer: { chunk: jest.Mock };
+  let mockConversionTransfer: { chunk: jest.Mock; stagingInUse: jest.Mock };
 
   let mockSecuredUpdates: { prepare: jest.Mock };
 
@@ -68,7 +68,10 @@ export function registerAttractapFirmwareHandlerFixture() {
     (handler as any).firmwareService = mockFirmwareService;
     (handler as any).metricsService = mockMetricsService;
     (handler as any).uiHandler = { onFirmwareInfo: jest.fn().mockResolvedValue(undefined) };
-    mockConversionTransfer = { chunk: jest.fn().mockResolvedValue(null) };
+    mockConversionTransfer = {
+      chunk: jest.fn().mockResolvedValue(null),
+      stagingInUse: jest.fn().mockResolvedValue(false),
+    };
     mockSecuredUpdates = { prepare: jest.fn().mockResolvedValue(null) };
     (handler as any).conversionTransfer = mockConversionTransfer;
     (handler as any).securedUpdates = mockSecuredUpdates;

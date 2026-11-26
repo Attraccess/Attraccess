@@ -59,6 +59,23 @@ describe('AttractapFirmwareHandler and the secure profile (ATT-1208)', () => {
     expect(fixture.mockSecuredUpdates.prepare).not.toHaveBeenCalled();
   });
 
+  it('offers no plain update to a reader whose conversion is staging into the inactive slot', async () => {
+    fixture.mockConversionTransfer.stagingInUse.mockResolvedValue(true);
+    fixture.mockExistsSync.mockReturnValue(true);
+    fixture.mockStatSync.mockReturnValue({ size: 8192 } as any);
+    await fixture.handler.handleFirmwareInfo(fixture.socket, info({ profile: 'plain', release: true }));
+    expect(fixture.mockConversionTransfer.stagingInUse).toHaveBeenCalledWith(42);
+    expect(fixture.socket.state.ota).toBeNull();
+    expect(sentTypes()).toEqual([]);
+  });
+
+  it('still offers the plain update without an active conversion', async () => {
+    fixture.mockExistsSync.mockReturnValue(true);
+    fixture.mockStatSync.mockReturnValue({ size: 8192 } as any);
+    await fixture.handler.handleFirmwareInfo(fixture.socket, info({ profile: 'plain', release: true }));
+    expect(sentTypes()).toEqual([AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED]);
+  });
+
   it('routes conversion chunk requests to the conversion transfer, not to OTA', async () => {
     fixture.mockConversionTransfer.chunk.mockResolvedValue(Buffer.from('abc'));
     const payload = { id: 3, conversion: 'app', offset: 0, length: 4096 };

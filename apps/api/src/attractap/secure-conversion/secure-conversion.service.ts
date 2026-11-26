@@ -11,7 +11,7 @@ import { ATTRACTAP_CONVERSION_CANCELLABLE_STATES } from '@attraccess/application
 import type { AuditActor } from '../../audit/recorder/audit-event';
 import { AttractapFirmwareService } from '../firmware.service';
 import { ATTRACTAP_READER_STORE, type AttractapReaderStore } from '../reader-store.port';
-import { SecureBootKeyService } from '../secure-boot/secure-boot-key.service';
+import { SecureBootKeyService, type SecureBootKeysState } from '../secure-boot/secure-boot-key.service';
 import { isDemoVariant } from '../security/secured-eligibility';
 import { ConversionAudit } from './conversion-audit';
 import { ConversionImages, isMissingKeyOrImage } from './conversion-images';
@@ -25,6 +25,15 @@ import { ATTRACTAP_SECURE_CONVERSION_STORE, type AttractapSecureConversionStore 
 export const PREFLIGHT_TIMEOUT_MS = 15_000;
 /** Failures in these states left nothing irreversible behind, or only the burned digests: a retry is safe. */
 const RETRYABLE_FAILED_IN: readonly AttractapConversionState[] = ['preflight', 'transferring', 'digests-burned'];
+/**
+ * Never retried: the eFuses may hold digests other than the recorded ones (a mismatching read-back, a failed or
+ * partial burn), or the reader is no longer the one that was paired.
+ */
+const UNRETRYABLE_FAILURES: readonly AttractapConversionFailure[] = [
+  'digest-mismatch',
+  'burn-failed',
+  'reader-changed',
+];
 
 export interface ConversionEligibility {
   /** The variant is not hardware-tested: the action is hidden, not just disabled. */
@@ -69,9 +78,14 @@ export class SecureConversionService {
 
   /** The digests a conversion burns now: KEY0 = current signing key, KEY1 = current recovery key. */
   private async targetDigests(): Promise<{ digest0: string; digest1: string } | null> {
-    const state = await this.keys.getState();
-    if (!state.signingKey || !state.recoveryKey) return null;
-    return { digest0: state.signingKey.digest.toLowerCase(), digest1: state.recoveryKey.digest.toLowerCase() };
+    return digestsOf(await this.keys.getState());
+  }
+
+  /** The variant is not hardware-tested (or a demo): the action is hidden. Only a catalog lookup. */
+  private notHardwareTested(reader: AttractapReader): boolean {
+    const { name, variant } = reader.firmware;
+    const catalog = name && variant ? this.firmware.getFirmwareDefinition(name, variant) : undefined;
+    return !catalog?.secureProfileHardwareTested || isDemoVariant(variant);
   }
 
   /** Every server-side gate. The same list decides the UI's button and is enforced on preflight, start and retry. */
@@ -80,10 +94,10 @@ export class SecureConversionService {
     const blockers: AttractapConversionBlocker[] = [];
     const name = reader.firmware.name;
     const variant = reader.firmware.variant;
-    const catalog = name && variant ? this.firmware.getFirmwareDefinition(name, variant) : undefined;
-    if (!catalog?.secureProfileHardwareTested || isDemoVariant(variant)) blockers.push('not-hardware-tested');
+    if (this.notHardwareTested(reader)) blockers.push('not-hardware-tested');
     if (!name || !variant || !this.firmware.getSecureImageSource(name, variant)) blockers.push('no-secure-image');
-    if ((await this.keys.getState()).status !== 'ready') blockers.push('recovery-check-missing');
+    const keys = await this.keys.getState();
+    if (keys.status !== 'ready') blockers.push('recovery-check-missing');
     if (reader.pairingState !== 'paired') blockers.push('reader-unpaired');
 
     // A reader that is still connecting has not sent READER_FIRMWARE_INFO yet: offline, not a list of wrong gates.
@@ -97,7 +111,7 @@ export class SecureConversionService {
       if (build?.profile !== 'plain') blockers.push('not-plain-profile');
     }
     if (reader.secured) blockers.push('already-secured');
-    const digests = await this.targetDigests();
+    const digests = digestsOf(keys);
     const recorded = [reader.secureBootDigest0, reader.secureBootDigest1];
     if (recorded.some(Boolean) && (!digests || recorded[0] !== digests.digest0 || recorded[1] !== digests.digest1)) {
       blockers.push('digests-differ');
@@ -109,8 +123,8 @@ export class SecureConversionService {
 
   /** Without the permission to secure readers the caller sees only whether the action exists at all. */
   public async eligibilityFor(readerId: number, canSecure: boolean): Promise<ConversionEligibility> {
-    const eligibility = await this.eligibility(readerId);
-    return canSecure ? eligibility : { hidden: eligibility.hidden, blockers: ['missing-permission'] };
+    if (canSecure) return await this.eligibility(readerId);
+    return { hidden: this.notHardwareTested(await this.reader(readerId)), blockers: ['missing-permission'] };
   }
 
   private async assertEligible(readerId: number): Promise<void> {
@@ -192,10 +206,13 @@ export class SecureConversionService {
     return await this.status(reader.id);
   }
 
-  /** Before the burn only: afterwards the reader is past the point where stopping helps. */
+  /**
+   * Before the burn only: afterwards the reader is past the point where stopping helps. The burn command leaves as
+   * soon as the reader verified its staging, so a verified conversion is no longer cancellable either.
+   */
   public async cancel(readerId: number): Promise<ConversionStatus> {
     const conversion = await this.conversions.findLatestForReader(readerId);
-    if (!conversion || !ATTRACTAP_CONVERSION_CANCELLABLE_STATES.includes(conversion.state)) {
+    if (!conversion || !canCancel(conversion)) {
       throw new ConflictException('This conversion can no longer be cancelled');
     }
     const now = new Date();
@@ -225,10 +242,19 @@ export class SecureConversionService {
     return {
       conversion,
       online: this.registry.isOnline(readerId),
-      canCancel: !!conversion && ATTRACTAP_CONVERSION_CANCELLABLE_STATES.includes(conversion.state),
+      canCancel: !!conversion && canCancel(conversion),
       canRetry: !!conversion && canRetry(conversion),
-      signingKeyAvailable: hasDigests ? (await this.keys.signingKeyForReader(reader)) !== null : null,
+      signingKeyAvailable: hasDigests ? await this.signingKeyAvailable(reader) : null,
     };
+  }
+
+  /** A key the server can no longer open (AUTH_SESSION_SECRET changed) is not available; the poll must not fail. */
+  private async signingKeyAvailable(reader: AttractapReader): Promise<boolean> {
+    try {
+      return (await this.keys.signingKeyForReader(reader)) !== null;
+    } catch {
+      return false;
+    }
   }
 
   /** The installation's active conversion, for the reader list. */
@@ -246,12 +272,21 @@ export function labStopBeforeBurn(state: { conversionStopBeforeBurn: boolean }):
   return process.env['ATTRACTAP_CONVERSION_LAB_STOP_BEFORE_BURN'] === 'true' && state.conversionStopBeforeBurn;
 }
 
+function digestsOf(state: SecureBootKeysState): { digest0: string; digest1: string } | null {
+  if (!state.signingKey || !state.recoveryKey) return null;
+  return { digest0: state.signingKey.digest.toLowerCase(), digest1: state.recoveryKey.digest.toLowerCase() };
+}
+
+function canCancel(conversion: AttractapSecureConversionRecord): boolean {
+  return ATTRACTAP_CONVERSION_CANCELLABLE_STATES.includes(conversion.state) && !conversion.verified;
+}
+
 function canRetry(conversion: AttractapSecureConversionRecord): boolean {
   const reason: AttractapConversionFailure | null = conversion.failureReason;
   return (
     conversion.state === 'failed' &&
     conversion.failedInState !== null &&
     RETRYABLE_FAILED_IN.includes(conversion.failedInState) &&
-    reason !== 'reader-changed'
+    (reason === null || !UNRETRYABLE_FAILURES.includes(reason))
   );
 }

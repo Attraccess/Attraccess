@@ -12,7 +12,7 @@ async function transferring() {
   const conversion = h.conversions.rows[0];
   expect(conversion.state).toBe('transferring');
   const images = (h.service as unknown as { images: ConversionImages }).images;
-  const transfer = new ConversionTransferService(h.conversions, images);
+  const transfer = new ConversionTransferService(h.conversions, images, h.protocol);
   return { h, conversion, transfer };
 }
 
@@ -36,6 +36,15 @@ describe('conversion transfer', () => {
   ])('answers nothing for %s', async (_name, request, readerId) => {
     const { transfer } = await transferring();
     await expect(transfer.chunk(new SessionSecurityState(readerId, 'f'.repeat(64)), request)).resolves.toBeNull();
+  });
+
+  it('fails the conversion once when the image no longer matches the offer, instead of re-signing it forever', async () => {
+    const { h, conversion, transfer } = await transferring();
+    h.conversions.rows[0].target.appSha256 = '0'.repeat(64); // a new build replaced the offered image
+    const request = { id: conversion.id, conversion: 'app', offset: 0, length: 4096 };
+    await expect(transfer.chunk(new SessionSecurityState(1, 'f'.repeat(64)), request)).resolves.toBeNull();
+    expect(h.conversions.rows[0]).toMatchObject({ state: 'failed', failureReason: 'image-unavailable' });
+    await expect(transfer.chunk(new SessionSecurityState(1, 'f'.repeat(64)), request)).resolves.toBeNull();
   });
 
   it('serves nothing once the conversion ended', async () => {

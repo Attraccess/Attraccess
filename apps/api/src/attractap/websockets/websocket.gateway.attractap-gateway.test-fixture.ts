@@ -165,7 +165,10 @@ export function gatewayProviders(
     AttractapAuthHandler,
     AttractapFirmwareHandler,
     LegacyFirmwareUpdateService,
-    { provide: ConversionTransferService, useValue: { chunk: jest.fn().mockResolvedValue(null) } },
+    {
+      provide: ConversionTransferService,
+      useValue: { chunk: jest.fn().mockResolvedValue(null), stagingInUse: jest.fn().mockResolvedValue(false) },
+    },
     { provide: SecuredReaderUpdates, useValue: { prepare: jest.fn().mockResolvedValue(null) } },
     AttractapCrashReportHandler,
     AttractapCardHandler,

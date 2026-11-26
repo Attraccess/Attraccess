@@ -388,7 +388,7 @@ function safeSettingValue(key: string, value: unknown): boolean {
   if (key === 'app.defaultLanguage') return value === 'en' || value === 'de';
   if (key === 'resources.activityVisibility') return value === 'all' || value === 'introduced';
   if (key === 'resources.listVisibility') return value === 'authenticated' || value === 'permitted-only';
-  if (key === 'attractap.cardWriterMode') return value === 'all' || value === 'selected';
+  if (key === 'attractap.cardWriterMode') return ['all', 'selected', 'secured'].includes(value);
   if (key === 'attractap.allowUidOnlyCards') return value === 'true' || value === 'false';
   if (key === 'attractap.cardWriterReaders') return /^(?:\d+(?:,\d+)*)?$/.test(value);
   if (key.startsWith('networkRestriction.') && !key.endsWith('.enabled'))

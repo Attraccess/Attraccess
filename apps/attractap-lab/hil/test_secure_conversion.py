@@ -1,16 +1,17 @@
 """'Secure this reader' on the plain lab reader, up to the burn and never past it (ATT-1208).
 
-The reader runs a stop-before-burn build (hil/run.sh): it refuses every burn command, and its burn code is compiled
-out. run.sh builds and packages the unsigned release secure image of the variant; this module offers it in the API's
-catalog as hardware-tested, creates the run's Secure Boot keys and passes the recovery check, so every server gate is
-real. The API runs with ATTRACTAP_CONVERSION_LAB_STOP_BEFORE_BURN=true, which skips only the release-build gate and
-only for a reader that cannot burn.
+The reader runs a stop-before-burn build (hil/run.sh): it reports that capability, so the server never sends it a burn
+command (the reader would refuse one; its burn code is compiled out). run.sh builds and packages the unsigned release
+secure image of the variant; this module offers it in the API's catalog as hardware-tested, creates the run's Secure
+Boot keys and passes the recovery check, so every server gate is real. The API runs with
+ATTRACTAP_CONVERSION_LAB_STOP_BEFORE_BURN=true, which skips only the release-build gate and only for a reader that
+cannot burn.
 
 Covered: eligibility, a read-only preflight (and one that fails on a simulated partition-table mismatch), the transfer
-with a reset in the middle that resumes, staging and verification on the reader, the refused burn (the reader stays
-plain and boots normally), a retry that is cancelled during the transfer, and the eFuse blocks read over USB before
-and after: unchanged. Never runs on the secure-lab place, and no release secure image ever boots: it only lands in the
-inactive app slot and the staging region.
+with a reset in the middle that resumes, staging and verification on the reader, the server ending the conversion
+instead of sending the burn (the reader drops its staging, stays plain and boots normally), a retry that is cancelled
+during the transfer, and the eFuse blocks read over USB before and after: unchanged. Never runs on the secure-lab place,
+and no release secure image ever boots: it only lands in the inactive app slot and the staging region.
 """
 
 import json
@@ -147,7 +148,7 @@ def test_preflight_fails_on_a_simulated_mismatch(api, admin, bench):
     assert [check["check"] for check in result["checks"] if not check["ok"]] == ["partition-table"]
 
 
-def test_transfer_resumes_after_a_reset_verifies_and_the_burn_is_refused(api, admin, bench, reader, target):
+def test_transfer_resumes_after_a_reset_verifies_and_the_burn_is_never_sent(api, admin, bench, reader, target):
     reader_id = bench["reader"]
     # A fresh boot: the reader may restart itself after the preflights (no conversion followed), which would drop the
     # console for good; a harness reset reopens it.
@@ -168,24 +169,27 @@ def test_transfer_resumes_after_a_reset_verifies_and_the_burn_is_refused(api, ad
     assert paused["conversion"]["state"] == "transferring"
     reader["console"].expect(r"Resuming the conversion transfer", mark, ONLINE_TIMEOUT)
     reader["console"].expect(r"Staged images verified; waiting for the burn command", mark, TRANSFER_TIMEOUT)
-    reader["console"].expect(r"Burn command refused \(stop-before-burn\)", mark, 120)
+    # The server never sends the burn to a stop-before-burn build: it ends the conversion and cancels the staging.
+    reader["console"].expect(r"Conversion cancelled by the server", mark, 120)
 
-    status = wait_status(api, admin, reader_id, lambda s: s["conversion"]["state"] == "failed", 120, "the refusal")
+    status = wait_status(api, admin, reader_id, lambda s: s["conversion"]["state"] == "failed", 120, "the failure")
     conversion = status["conversion"]
     assert conversion["failureReason"] == "burn-refused"
     assert conversion["failedInState"] == "transferring"
     assert conversion["verified"] is True
     assert status["canRetry"] is True
-    log = reader["console"].since(mark)
-    assert "Burning the Secure Boot digests" not in log
 
-    # The reader restarts into its plain app and comes back normally; the server took the digests back.
-    reader["console"].expect(r"Conversion stopped \([^)]*\); restarting", mark, 60)
+    # The reader restarts into its plain app and comes back normally; it never saw a burn command.
+    reader["console"].expect(r"Conversion stopped \(cancelled\); restarting", mark, 60)
+    log = reader["console"].since(mark)
+    assert "Burn command refused" not in log
+    assert "Burning the Secure Boot digests" not in log
     time.sleep(5)
     reboot_reader(target, reader)  # the self-restart dropped the console
     wait_eligible(api, admin, reader_id)
     record = call(api, admin, "GET", f"/attractap/readers/{reader_id}")
     assert record["firmwareProfile"] == "plain"
+    # Digests are recorded only right before a burn command leaves; none left.
     assert record["secureBootDigest0"] is None and record["secureBootDigest1"] is None
 
 

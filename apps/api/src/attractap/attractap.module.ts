@@ -33,10 +33,12 @@ import { EfuseReportService } from './security/efuse-report.service';
 import { ReaderSessionService } from './security/reader-session.service';
 import { SessionMetrics } from './security/session-metrics';
 import { SecureBootKeyService } from './secure-boot/secure-boot-key.service';
+import { SECURE_BOOT_KEY_CHANGE_GUARD } from './secure-boot/secure-boot-key-change-guard.port';
 import { SecureImageService } from './secure-boot/secure-image.service';
 import { AttractapSecureBootKeysController } from './secure-boot/secure-boot-keys.controller';
 import { ConversionAudit } from './secure-conversion/conversion-audit';
 import { ConversionImages } from './secure-conversion/conversion-images';
+import { ConversionKeyChangeGuard } from './secure-conversion/conversion-key-change-guard';
 import { ConversionProtocolService } from './secure-conversion/conversion-protocol.service';
 import { ConversionSessionRegistry } from './secure-conversion/conversion-session-registry';
 import { ConversionTransferService } from './secure-conversion/conversion-transfer.service';
@@ -125,6 +127,7 @@ import { ResourceListVisibilityModule } from '../resources/visibility/resource-l
     EfuseReportService,
     ReaderSessionService,
     SecureBootKeyService,
+    { provide: SECURE_BOOT_KEY_CHANGE_GUARD, useClass: ConversionKeyChangeGuard },
     SecureImageService,
     ConversionAudit,
     ConversionImages,

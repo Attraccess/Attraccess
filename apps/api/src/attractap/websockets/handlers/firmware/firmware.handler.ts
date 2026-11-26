@@ -136,7 +136,15 @@ export class AttractapFirmwareHandler {
     if (await this.isFirmwareLatest(data.payload)) return;
     // A reader on the secure profile only ever gets an image signed for its digests (never the plain image).
     if (build.profile === 'secure') await this.offerSecuredUpdate(socket, data.payload, build.secureVersion);
+    else if (await this.conversionStaging(socket))
+      this.logger.log(`Reader ${socket.readerId} is being secured: no update`);
     else await this.offerFirmwareUpdate(socket, data.payload);
+  }
+
+  /** A plain OTA would write the inactive app slot the reader's active conversion stages into. */
+  private async conversionStaging(socket: AuthenticatedWebSocket): Promise<boolean> {
+    if (socket.readerId === null) return false;
+    return await this.conversionTransfer.stagingInUse(socket.readerId);
   }
 
   /** Signed secure app for a secured reader; nothing when no held key matches its digests (shown in the UI). */

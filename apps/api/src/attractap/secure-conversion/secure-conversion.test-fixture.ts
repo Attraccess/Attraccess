@@ -88,13 +88,24 @@ export const DIGESTS = { digest0: '1'.repeat(64), digest1: '2'.repeat(64) };
 export const ADMIN: AuditActor = { id: 9, authenticationMethod: 'session' } as AuditActor;
 const FINGERPRINT = 'f'.repeat(64);
 
-/** A fake SESSION connection: what the server sends is collected, `control()` plays the reader. */
+type SendHook = (message: Record<string, unknown>) => void;
+
+/**
+ * A fake SESSION connection: what the server sends is collected, `control()` plays the reader. `onSend` runs at the
+ * moment the server sends (before anything else happens), for ordering assertions.
+ */
 class FakeConnection extends EventEmitter {
   sent: Array<Record<string, unknown>> = [];
   closed = false;
+  constructor(private readonly onSend: SendHook) {
+    super();
+  }
   sendFrame(type: FrameType, payload: Buffer) {
     if (this.closed) return false;
-    if (type === FrameType.CONTROL) this.sent.push(JSON.parse(payload.toString('utf8')));
+    if (type !== FrameType.CONTROL) return true;
+    const message = JSON.parse(payload.toString('utf8'));
+    this.onSend(message);
+    this.sent.push(message);
     return true;
   }
   close() {
@@ -160,7 +171,7 @@ export function createConversionHarness(options: HarnessOptions = {}) {
           size,
           keyDigest: DIGESTS.digest0,
           secureVersion: 1,
-          profileMarker: 'attractap-secure-profile-v1',
+          profileMarker: 'attractap-secure-profile-v2',
         };
       },
     ),
@@ -184,6 +195,10 @@ export function createConversionHarness(options: HarnessOptions = {}) {
   };
   const keys = {
     getState: jest.fn(async () => keysState),
+    conversionKeysCurrent: jest.fn(
+      async (d: { digest0: string; digest1: string }) =>
+        keysState.signingKey.digest === d.digest0 && keysState.recoveryKey.digest === d.digest1,
+    ),
     signingKeyForReader: jest.fn(async (r: { secureBootDigest0: string | null }) =>
       r.secureBootDigest0 === DIGESTS.digest0 ? ({} as never) : null,
     ),
@@ -193,8 +208,8 @@ export function createConversionHarness(options: HarnessOptions = {}) {
   const conversionAudit = new ConversionAudit(audit);
   const images = new ConversionImages(secureImages);
   const expectations = new PreflightExpectations(firmware);
-  const protocol = new ConversionProtocolService(conversions, readers, registry, expectations, conversionAudit);
-  const transfer = new ConversionTransferService(conversions, images);
+  const protocol = new ConversionProtocolService(conversions, readers, registry, expectations, conversionAudit, keys);
+  const transfer = new ConversionTransferService(conversions, images, protocol);
   const service = new SecureConversionService(
     conversions,
     readers,
@@ -213,6 +228,7 @@ export function createConversionHarness(options: HarnessOptions = {}) {
   let connection: FakeConnection | null = null;
   let state: SessionSecurityState | null = null;
   let pendingChunks: Array<Record<string, unknown>> = [];
+  let sendHook: SendHook = () => undefined;
 
   const settle = async () => {
     for (let i = 0; i < 20; i++) await new Promise((resolve) => setImmediate(resolve));
@@ -220,7 +236,7 @@ export function createConversionHarness(options: HarnessOptions = {}) {
 
   /** Opens a session: firmware info (build, capability) first, then the reader's conversion status. */
   async function connect(sendStatus = true) {
-    connection = new FakeConnection();
+    connection = new FakeConnection((message) => sendHook(message));
     state = new SessionSecurityState(1, FINGERPRINT);
     state.secureConversion = options.secureConversion ?? true;
     state.conversionStopBeforeBurn = options.stopBeforeBurnBuild ?? false;
@@ -289,6 +305,11 @@ export function createConversionHarness(options: HarnessOptions = {}) {
     disconnect,
     settle,
     sentToReader: () => connection?.sent ?? [],
+    /** Runs synchronously whenever the server sends a CONTROL message. */
+    onSend: (hook: SendHook) => {
+      sendHook = hook;
+    },
+    transfer,
     efuse,
   };
 }
