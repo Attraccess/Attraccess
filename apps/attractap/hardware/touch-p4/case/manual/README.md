@@ -84,6 +84,8 @@ Everything is shown lifted out of the cap in the order it goes in, lowest first.
 
 The dock takes three to five countersunk screws, and the reader later covers every screw head. Decide the cable route before drilling.
 
+Indoors only. The case is not sealed, and in the EU the reader's Wi-Fi may use its 5 GHz channels 36 to 64 inside buildings only. The Wi-Fi antenna sits behind the reader's top left corner: keep metal objects away from it. A metal wall behind the reader weakens Wi-Fi a little (by estimate 1 to 2 dB at 2.4 GHz).
+
 - **Cable through the wall:** drill a 20 mm hole 32 mm left of the dock's centre line, level with the single lower screw hole. That is the lower left corner of the dock's opening, right below the Ethernet plug, and the dock covers it. Leave both break-off tabs in place. The route is shown under "Where the cables run behind the reader" below.
 - **Cable along the wall from below:** snip a tab off the dock's bottom edge with side cutters. The left tab is for Ethernet, the right one for a power cable. Each frees an 8 mm wide notch. This cable is tied down inside the reader before the reader is hung; see the next section.
 
@@ -209,4 +211,4 @@ Nothing below has been checked on real parts. Each item can change a step or a p
 - [ ] **Cable route into the wall.** Modelled on 19 Nov 2026 with a 5.5 mm Ethernet cable at 18 mm bend radius and a 3.5 mm power lead; nothing collides in CAD. Not tried with real cables. The route from a flush-mount box is not modelled.
 - [ ] **LED brightness** through marble white diffusers compared with natural ones.
 - [ ] **Insert fit.** The printed holes are 4.0 mm for common M3 inserts. Check them against the inserts you buy.
-- [ ] **Outdoor use.** There are no seals; the buzzer holes and cable notches are open, and ABS+ ages in sunlight. Treat it as indoor or fully sheltered until a sealed variant exists.
+- [ ] **Outdoor use.** There are no seals; the buzzer holes and cable notches are open, and ABS+ ages in sunlight. Treat it as indoor only: a sealed variant would also need Wi-Fi limited to the channels allowed outdoors.

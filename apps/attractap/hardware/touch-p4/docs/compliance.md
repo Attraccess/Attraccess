@@ -5,8 +5,9 @@ reader (board, display, enclosure, power supply, firmware and documents)
 [RED Art. 2(1), 20(1)]. This page lists what applies in Germany and the EU,
 what the board design already does for it, and what is still open.
 
-It is a working checklist with the state of 25 November 2026, not legal
-advice. Every claim was checked against its source on that date. A reference
+It is a working checklist with the state of 26 November 2026, not legal
+advice. Every claim was checked against its source on 25 November 2026, those
+on the ESP32-C5 module and on 5 GHz Wi-Fi on 26 November 2026. A reference
 in square brackets names a source and the clause relied on, for example
 [RED Art. 10(9)]. [compliance-sources.md](compliance-sources.md) lists every
 source with its version and link, and the result of the check for each claim.
@@ -53,7 +54,7 @@ Cybersecurity is the hard part, and it does not depend on the board:
 
 | Rule | Applies | What the manufacturer has to do |
 |---|---|---|
-| Radio Equipment Directive 2014/53/EU (RED) | yes | The reader contains radios: Wi-Fi and Bluetooth, and the 13.56 MHz NFC reader [RED Art. 2(1)]. Assess safety, EMC, radio and cybersecurity [RED Art. 3]. Keep the technical file and the declaration of conformity for ten years after the reader is placed on the market [RED Art. 10(4)]. Issue one EU declaration of conformity [RED Art. 18(3)], and ship each unit with a copy of it, or with a simplified declaration that gives the web address of the full text [RED Art. 10(9); FuAG §20(2)]. Put the CE mark on the device and its packaging [RED Art. 20(1)], and name, postal address, type and serial number on the device [RED Art. 10(6), (7)]. Instructions and safety information with the frequency bands and the maximum transmitted power [RED Art. 10(8); FuAG §20(3)]. They must be in German if the reader is sold for non-commercial users; for business-only sales the law asks for clear, understandable text [FuAG §20(1)]. German is advisable in any case. |
+| Radio Equipment Directive 2014/53/EU (RED) | yes | The reader contains radios: Wi-Fi on 2.4 and 5 GHz and Bluetooth, and the 13.56 MHz NFC reader [RED Art. 2(1)]. Assess safety, EMC, radio and cybersecurity [RED Art. 3]. Keep the technical file and the declaration of conformity for ten years after the reader is placed on the market [RED Art. 10(4)]. Issue one EU declaration of conformity [RED Art. 18(3)], and ship each unit with a copy of it, or with a simplified declaration that gives the web address of the full text [RED Art. 10(9); FuAG §20(2)]. Put the CE mark on the device and its packaging [RED Art. 20(1)], and name, postal address, type and serial number on the device [RED Art. 10(6), (7)]. Instructions and safety information with the frequency bands and the maximum transmitted power [RED Art. 10(8); FuAG §20(3)], and for 5 GHz the indoor restriction on the packaging and in the instructions [RED Art. 10(10)] (see "5 GHz Wi-Fi"). They must be in German if the reader is sold for non-commercial users; for business-only sales the law asks for clear, understandable text [FuAG §20(1)]. German is advisable in any case. |
 | Low Voltage and EMC Directives | not separately | For radio equipment the RED covers both [RED Art. 1(4), 3(1), 50; EMCD Art. 2(2)(a)]. Safety applies through RED Art. 3(1)(a) "with no voltage limit applying" [RED Art. 3(1)(a)]: the reader runs from 12 to 24 V and PoE, below the LVD's own range, and still has to be safe under the RED. The declaration names the RED. |
 | RED cybersecurity, Delegated Regulation (EU) 2022/30 | yes, until 10 December 2027 | Applies since 1 August 2025 [DR 2023/2444 Art. 1]: network protection, because the reader can communicate over the internet, directly or through other equipment [DR 2022/30 Art. 1(1)], and protection of personal data, because it processes card numbers linked to names [DR 2022/30 Art. 1(2)]. Repealed from 11 December 2027 by Delegated Regulation (EU) 2026/339, when the Cyber Resilience Act applies in full [DR 2026/339 Art. 1, recital 4]. Readers placed on the market before then stay under RED market surveillance for these requirements [DR 2026/339 recital 5]. |
 | Cyber Resilience Act (EU) 2024/2847 | yes | Since 11 September 2026: report exploited vulnerabilities and severe incidents, with an early warning within 24 hours, a notification within 72 hours and a final report later [CRA Art. 14(2), (4), 71(2)]. That already covers readers sold today [CRA Art. 69(3)]. From 11 December 2027: full conformity for every unit placed on the market [CRA Art. 69(2), 71(2)], with a support period that matches how long the reader is expected to be in use, at least five years, and its end date stated at purchase [CRA Art. 13(8), (19)]. See "Cybersecurity". |
@@ -80,6 +81,7 @@ and EMC the manufacturer may always declare himself [RED Art. 17(2)].
 | Aspect | Standard | State on 25 November 2026 |
 |---|---|---|
 | Radio, 2.4 GHz | EN 300 328 V2.2.2 | cited [HS-RED no. 16] |
+| Radio, 5 GHz | EN 301 893 V2.2.1 | cited since 15 May 2025; V2.1.1 until 15 May 2028 [HS-RED no. 65, 65a; HS-RED 2025/893 Art. 2] |
 | Radio, 13.56 MHz | EN 300 330 V2.1.1 | cited [HS-RED no. 17] |
 | EMC | EN 301 489-1 V2.2.3, -3 V2.3.2 (NFC), -17 V3.3.1 (Wi-Fi, Bluetooth) | parts 3 and 17 cited, each with two notices: no presumption for emissions below 9 kHz, and none "if its clause 6 is applied" (clause 6 holds the performance criteria) [HS-RED no. 168, 169; EN 301 489-17 §6]. In plain words: tested with their performance criteria as written, the reader gets **no presumption of conformity for RED Art. 3(1)(b)**; the Commission found that these criteria "lay down performance-based criteria on a subjective basis" [HS-RED 2025/893 recital]. EMC is then assessed by the manufacturer without that presumption [RED Art. 17(2), Annex II], so the test plan and the technical file have to define objective pass criteria, for example a Wi-Fi packet error rate of 10 % at most, NFC reads that succeed, display and touch that recover without a reset. Part 1 is not cited; parts 3 and 17 apply it [EN 301 489-3 §2.1; EN 301 489-17 §2.1]. |
 | EMC, Ethernet port | EN 55032 (emission), EN 55035 (immunity) | EN 55035:2017 cited under the RED [HS-RED no. 5]; EN 55032 cited only under the EMC Directive [HS-EMC] |
@@ -105,39 +107,50 @@ and without such loading.
 
 ## What the certified Wi-Fi module saves
 
-The reader uses the ESP32-C6-MINI-1U, the module with an antenna connector
-[DS §1.2]. It has an EU-type examination certificate (Sporton, notified body
-2907, SN24C0053 of 6 March 2024) [CE-1U p. 1]; the MINI-1 with PCB antenna,
-which the board had before, has its own (SN23C0148 of 28 September 2023)
-[CE-1 p. 1]. They cover safety, EMC, radio and RF exposure (EN IEC 62311
-and EN 50665, at 20 cm), not cybersecurity [CE-1U pp. 1, 3]. Their EMC part
-was assessed against a draft, EN 301 489-17 V3.2.6 [CE-1U p. 3], so it gives
-the reader no EMC credit; Espressif says the same: "Some data can be reused,
-but EMC testing is still required for the final product" [FAQ]. Espressif
-publishes the certificates only: ask for the test reports before asking labs
-for quotes [CERTS; FAQ].
+The reader uses the ESP32-C5-MINI-1, a module with its own PCB antenna for
+2.4 and 5 GHz [DS-C5 §1]. It has an EU-type examination certificate for the
+model with its internal antenna (Eurofins Electrical and Electronic Testing NA,
+notified body 0980, 44024-05-2026-260268 of 27 May 2026) [CE-C5 pp. 1, 2]. It
+covers safety (EN IEC 62368-1:2024 + A11), health (EN 50665, EN IEC 62311),
+EMC (EN 55032, EN 301 489-1 V2.2.3, EN 301 489-17 V3.3.1) and radio
+(EN 300 328 V2.2.2, EN 301 893 V2.2.1), not cybersecurity [CE-C5 pp. 2, 3].
+Its EMC part was assessed on the module alone; Espressif says "Some data can
+be reused, but EMC testing is still required for the final product" [FAQ].
+Espressif publishes the certificate only: ask for the test reports it names
+(EFTA26010030-IE-01-E1, -02-R1 to -R4, -03-M1V1 and -04-L1, Eurofins TA
+Technology (Shanghai)) before asking labs for quotes [CE-C5 pp. 2, 3; FAQ].
 
-The module's assessment "can be used as part of the conformity assessment"
-of the reader; it does not replace it [EG 203 367 §6.1; CE-1U p. 2, note 2].
-ETSI EG 203 367 is a guide for the manufacturer, not a
-harmonised standard. It lets the module's radio assessment be reused if the
-module sits in equivalent assessment conditions and follows its installation
-instructions. A different host, or an antenna that was not part of the
-module's assessment, is a deviation: the reader is then re-assessed against
-the radio standard, which need not mean testing [EG 203 367 §3.1, §6.1
-notes 1 and 2]. Labs typically reuse results that do not depend on the
-antenna, such as the module's conducted measurements (unverified: lab
-practice, not stated in the guide). On the reader they measure:
+ETSI EG 203 367 is a guide for the manufacturer, not a harmonised standard.
+It lets the module's radio assessment be reused if the module sits in
+equivalent assessment conditions and follows its installation instructions.
+A different host, or an antenna that was not part of the module's assessment,
+is a deviation: the reader is then re-assessed against the radio standard,
+which need not mean testing [EG 203 367 §3.1, §6.1 notes 1 and 2]. Labs
+typically reuse results that do not depend on the antenna, such as the
+module's conducted measurements (unverified: lab practice, not stated in the
+guide).
 
-- radiated power and spurious emissions, with NFC transmitting at the same
-  time [EG 203 367 §6.1 note 1, §6.2; EN 300 328 §4.3.2.2.3],
+Here the antenna is the module's own, but the module does not sit where
+Espressif's design guide puts it: it stands in the board's top left corner,
+with its antenna over a cut in the top edge, not at the edge's middle
+(design notes, "Wi-Fi antenna" and "Accepted deviations"). In the full-wave
+model that place is within 3 dB of Espressif's position in every channel and
+radiates up to 5.5 dB more in some 5 GHz channels. Whether that still counts
+as equivalent conditions is the lab's judgement; plan for these measurements
+on the reader:
+
+- radiated power (e.i.r.p.) and spurious emissions on both bands, with NFC
+  transmitting at the same time [EG 203 367 §6.1 note 1, §6.2;
+  EN 300 328 §4.3.2.2.3; EN 301 893 §4.2.3],
 - EMC with all radios running [EG 203 367 §5.1.1.3, §5.2.3].
 
 Separately, RF exposure (RED Art. 3(1)(a), outside the guide's scope
-[EG 203 367 §1]). The module is certified on condition of 20 cm distance to
-persons [CE-1U p. 2, note 1]. A reader that is touched does not keep that, so
-it needs its own assessment; a calculation is usually enough (unverified: lab
-practice).
+[EG 203 367 §1]). The FCC grant asks for 20 cm between antenna and persons
+[FCC-C5]; the EU certificate names EN 50665 and EN IEC 62311 but no distance
+on its face [CE-C5 p. 2], so ask for the health report
+(EFTA26010030-IE-03-M1V1) as well. A reader that is touched does not keep
+20 cm, so it needs its own assessment; a calculation is usually enough
+(unverified: lab practice).
 
 Points to watch:
 
@@ -146,68 +159,89 @@ Points to watch:
   customer information "RED Information Radio Modules" of 24 November 2020)
   [VDE RED modules p. 2]. Ask each lab how it sees this before it quotes, and
   reconfirm with VDE that the 2020 statement still holds (open point below).
-- The MINI-1U is certified with at most 18.19 dBm EIRP for Wi-Fi and
-  17.96 dBm for Bluetooth LE [CE-1U p. 2], against a limit of 20 dBm e.i.r.p.
-  [EN 300 328 §4.3.2.2.3]. Keep the transmit power a firmware setting.
-- The antenna is not part of the module. The module's datasheet (v1.5,
-  section 10.2) asks for 2.4 GHz, 50 ohm and a gain of 2.33 dBi at most, the
-  gain of the antenna used for certification, a monopole. For an antenna "of
-  a different type or gain, additional testing, such as EMC, may be required
-  beyond the existing antenna test reports" [DS §10.2]. An adhesive antenna
-  is often another type: ask the lab what it reuses [FAQ; eCFR 15.204(c)].
-- Two antenna configurations are planned, and each one that is sold is a
-  radio configuration in the test plan [EN 300 328 §4.2.4, §5.4.1 m)]:
-  - an adhesive antenna inside the case. It is fixed and out of reach: one
-    named antenna, tested with the reader [EN 300 328 §3.1, "integral
-    antenna"].
-  - an antenna on an SMA bulkhead. The user can unscrew it, so the manual
-    must name the permitted antenna or antennas, and the declaration covers
-    only those [EN 300 328 §3.1, "dedicated antenna"; RED Art. 10(8),
-    Annex VI point 8].
-- The antennas (decided 25 November 2026): the one the module was certified
-  with, Shanghai Deman TFPD08H10060011, a sleeve monopole of 2.33 dBi at
-  2450 MHz with an MHF III plug [FCC exhibits, antenna specification; DS
-  §10.2], bought through Espressif or Deman; as fallback the Taoglas
-  GW.26.0111 (2.24 dBi peak, a screw-on monopole measured on a 150 x 90 mm
-  ground plane) on the CAB.A02 SMA bulkhead cable. Both are in the parts
-  lists ([parts.md](parts.md)).
-- What the fallback costs, in the US. "Any antenna that is of the same type
-  and of equal or less directional gain as an antenna that is authorized with
-  the intentional radiator may be marketed with, and used with, that
-  intentional radiator. No retesting of this system configuration is required.
-  The marketing or use of a system configuration that employs an antenna of a
-  different type, or that operates at a higher gain, than the antenna
-  authorized with the intentional radiator is not permitted unless the
-  procedures specified in § 2.1043 of this chapter are followed" [eCFR 15.204
-  (c)(4)]; "antenna type" means "antennas that have similar in-band and
-  out-of-band radiation patterns" [eCFR 15.204 (c)(1)]. The GW.26.0111 is
-  another type, so it needs a permissive change, which only the grantee
-  (Espressif) can file [eCFR 2.1043 (b)(4)], or the reader's own FCC ID.
-  Espressif's integration manual says the same: "The module shall be only used
-  with the external antenna(s) that has been originally tested and certified
-  with this module" [FCC-UM p. 15]. And a module's antenna "must either be
-  permanently attached or employ a 'unique' antenna coupler" [eCFR 15.212
-  (a)(1)(iv)]: "the use of a standard antenna jack or electrical connector is
-  prohibited" [eCFR 15.203]. The SMA bulkhead is therefore not for a US
-  version.
-- What the fallback costs, in the EU. There is no same-type-and-gain rule.
-  "Use of an antenna not included in the original assessment" is a deviation,
-  and the reader is then re-assessed against Art. 3.2 with the radio standard
-  [EG 203 367 §6.1 note 1]; "an assessment needs not necessarily lead to
-  testing" [EG 203 367 §6.1 note 2]. The 20 dBm e.i.r.p. limit "shall apply for
-  any combination of power level and intended antenna assembly" [EN 300 328
-  §4.3.2.2.3], and each antenna is declared with its gain [EN 300 328 §5.4.1
-  m)]. To reuse the module's reports Espressif asks that "the selected
-  antenna's gain must not exceed the gain of the certified antenna in that
-  report" [FAQ]; the GW.26.0111 meets that, its type differs. Ask the lab what
-  it reuses before choosing the fallback.
-- Where the antenna sits: the case has a bay at its top, above the board's
-  copper-free top edge, 40 x 10 x 4 mm, with the cable's way from the
-  module's connector drawn ([design-notes.md](design-notes.md#wi-fi-antenna)).
-  The certified antenna's specification gives 100 x 5.2 mm and no drawing, so
-  whether it fits the bay is open until a sample is at hand (design notes,
-  "Accepted deviations"). Keep any antenna away from the display's metal back
-  and from the cables (engineering judgement).
+- Transmit power. The certificate lists 19.85 dBm for Wi-Fi at 2.4 GHz,
+  16.36 dBm for Bluetooth LE, 20.58, 20.74 and 20.77 dBm in the bands 5150 to
+  5250, 5250 to 5350 and 5470 to 5725 MHz, and 13.97 dBm from 5725 to
+  5850 MHz [CE-C5 p. 2]; it does not say whether those are conducted or
+  radiated. The limits are e.i.r.p.: 20 dBm at 2.4 GHz [EN 300 328
+  §4.3.2.2.3], and at 5 GHz those of "5 GHz Wi-Fi" below. Espressif's antenna
+  peaks at 4.44 dBi at 2.4 GHz and 1.55 to 2.18 dBi at 5 GHz on its test
+  board [ANT-C5 §3.1]. Where the reader's antenna has more gain than that,
+  the transmit power has to come down by the difference. So the maximum
+  transmit power is a firmware setting, capped by what the lab measures on
+  the reader ([firmware-port.md](firmware-port.md), rule 24).
+- The antenna is part of the module and cannot be changed: the reader has one
+  radio configuration, no antenna choice and no antenna connector. Keep metal
+  away from the top left corner: in the model a metal wall behind the reader
+  costs 1.1 to 1.7 dB at 2.4 GHz (design notes, "Wi-Fi module").
+- For a later US version: the FCC grant is a single modular approval, with
+  20 cm to persons and co-located transmitters evaluated by the FCC's
+  procedures [FCC-C5]. This page covers the EU only.
+
+## 5 GHz Wi-Fi
+
+The EU harmonises the bands 5150 to 5350 and 5470 to 5725 MHz for Wi-Fi by
+Implementing Decision (EU) 2022/179, whose annex was replaced by Implementing
+Decision (EU) 2022/2307; it repealed Decision 2005/513/EC [WAS Art. 1, 5;
+WAS-A Art. 1(2)]. EN 301 893 V2.2.1 gives a presumption of conformity since
+15 May 2025 [HS-RED no. 65a; HS-RED 2025/893]; V2.1.1 keeps it until 15 May 2028
+[HS-RED 2025/893 Art. 2]. The module's certificate names V2.2.1 [CE-C5 p. 3].
+
+| Band (channels) | Use allowed | Mean e.i.r.p. | On this reader |
+|---|---|---|---|
+| 5150 to 5250 MHz (36 to 48) | indoors, including road vehicles, trains and aircraft; limited outdoor use, not "attached to a fixed outdoor antenna, fixed infrastructure or to the external body of road vehicles" [WAS Annex table 1, note 1] | 200 mW (23 dBm), 10 mW/MHz [WAS Annex table 1] | used |
+| 5250 to 5350 MHz (52 to 64) | "Indoor use: inside buildings only" [WAS Annex table 2] | 200 mW with transmit power control (TPC), otherwise 3 dB less, 100 mW (20 dBm); DFS [WAS Annex table 2] | used, as a station led by the access point's DFS |
+| 5470 to 5725 MHz (100 to 140) | indoors and outdoors [WAS Annex table 3] | 1 W with TPC, otherwise 500 mW; DFS [WAS Annex table 3]. A secondary device without radar detection keeps to the limits of 5250 to 5350 MHz [EN 301 893 §4.2.3.2.2 table 2, note 1] | used, the same way |
+| 5725 to 5875 MHz (149 to 165) | not in the Wi-Fi decision: a band for non-specific short-range devices at 25 mW e.i.r.p. [SRD Annex band 61] | 25 mW | not used |
+
+What it means for the reader:
+
+- **A station, no radar detection of its own.** EN 301 893 V2.2.1 calls the
+  access point the primary device and the reader a secondary device
+  [EN 301 893 §3.1]. "A secondary device shall not transmit before receiving
+  an appropriate enabling signal from the primary device"
+  [EN 301 893 §4.2.6.1.4.2 a)]; without radar detection it needs only channel
+  shutdown, when the access point orders it [EN 301 893 §4.2.6.2.1 table 5].
+  Up to 23 dBm e.i.r.p. a secondary device need not detect radar itself,
+  unless used in a fixed outdoor point-to-point or point-to-multipoint link
+  [EN 301 893 annex D, table D.2 note 2]. The C5 "only supports passive radar
+  detection", "cannot operate as a DFS AP in SoftAP mode", and "In SoftAP
+  mode, ESP32-C5 is not allowed to operate on DFS channels" [IDF-WIFI, DFS].
+  In station plus SoftAP mode its access point follows the station onto a DFS
+  channel [IDF-WIFI, DFS]. Firmware: a provisioning access point only on
+  2.4 GHz or channels 36 to 48, and off while the station uses a DFS channel
+  (firmware-port.md, rule 23).
+- **Power.** Without TPC: 20 dBm e.i.r.p. from 5250 to 5725 MHz, 23 dBm from
+  5150 to 5250 MHz [EN 301 893 §4.2.3.2.2 table 2]. The certificate's 20.74
+  and 20.77 dBm lie above 20 dBm (see "What the certified Wi-Fi module
+  saves"); keep the reader at 20 dBm e.i.r.p. there unless the lab confirms
+  that the firmware does TPC (firmware-port.md, rule 24).
+- **No country or band setting for the user.** "DFS settings shall not be
+  accessible to the user", which includes "not allowing the user to change
+  the country of operation and/or the operating frequency band if that
+  results in the equipment no longer being compliant" [WAS Annex tables 2, 3].
+  ESP-IDF starts in world mode ("01") with an automatic policy that takes the
+  connected access point's country; under `WIFI_COUNTRY_POLICY_MANUAL` "the
+  configured country info is used always", and only then does the 5 GHz
+  channel mask (`wifi_5g_channel_mask`) take effect [IDF-API,
+  `esp_wifi_set_country`, `wifi_country_t`]. Firmware: the manual policy with
+  the EU rules and channels 36 to 64 and 100 to 140 only, fixed at build time
+  (firmware-port.md, rule 22). Espressif's own table for Germany would allow
+  channels 149 to 165 at 25 mW and still cites the repealed 2005/513/EC
+  [IDF-REG]; the channel mask keeps them off.
+- **Indoor use, on the packaging and in the manual.** Channels 36 to 64 are
+  restricted to indoor use in every Member State (above), a restriction on
+  putting into service. The packaging then shows either the pictogram of
+  Implementing Regulation (EU) 2017/1354, a table with an exclamation mark on
+  a book and the Member States' codes below or next to it, or the words
+  "Restrictions or Requirements in" followed by those codes [RED Art. 10(10);
+  IR 2017/1354 Art. 2(1), Annex I, II]. The instructions list the Member
+  States and the kind of restriction: "5150 to 5350 MHz: indoor use only",
+  in all of them [IR 2017/1354 Art. 2(2)]. They also name the frequency bands
+  and the maximum power in each [RED Art. 10(8)]: 2400 to 2483.5 MHz, 5150 to
+  5350 MHz and 5470 to 5725 MHz, with the e.i.r.p. the lab measured. The
+  reader is an indoor device anyway ([spec.md](spec.md)), and its case is
+  not made for outdoors ([case/README.md](../case/README.md)).
 
 ## Cybersecurity
 
@@ -224,7 +258,7 @@ pairing and the service interface has to be authenticated, with credentials
 that are unique per device or set at first use and cannot be skipped. Then
 every requirement of both parts is documented with the standard's decision
 trees. (Unverified: EN 18031 is a paid standard and was not read; confirm
-with the lab.) The firmware of the ESP32-C6 is part of the product (our
+with the lab.) The firmware of the ESP32-C5 is part of the product (our
 reading: the RED counts software as a component [RED Art. 10(8)]).
 
 **From 11 December 2027, under the Cyber Resilience Act.**
@@ -510,7 +544,7 @@ Board facts from the schematic and layout; the reasons are in
 
 | Topic | Measure on the board |
 |---|---|
-| Wi-Fi antenna | None on the board: the module has a connector, and the antenna sits in or on the case. The strip without copper along the top edge (44 mm) and the cut in the board were made for a module with PCB antenna and remain on revision A. |
+| Wi-Fi antenna | The module's own PCB antenna for 2.4 and 5 GHz, in the board's top left corner over a cut in the top edge, with no copper on any layer under it and 15 mm to each side; ground fill along the keep-out's edge, stitched every 2.5 mm ([design-notes.md](design-notes.md#wi-fi-antenna)). |
 | Return paths | Six layers. Ground planes on In1 and In4 and a 3.3 V plane on In3, each in one piece and without tracks. Signals run on the two outer layers and on In2, with ground filled in between: every signal layer lies next to a plane that no track cuts. |
 | Switching regulators | AP63205 at the DC input, with spread spectrum. Two TLV62569 for 3.3 V and the core, at 1.5 MHz without spread spectrum. Small loops, input and output capacitors next to the ICs. |
 | DC input | Self-resetting fuse, a bidirectional TVS behind it at the connector, reverse-polarity diode, pi filter (2.2 uF, 2.2 uH, 2 x 2.2 uF; 100 V capacitors that keep 1.5 uF each at 24 V), a 47 uF electrolytic that damps the filter when a supply is plugged in live, and a TVS before the converter. The converter sits away from the NFC antenna, and the DC run does not go around the NFC loop. |
@@ -552,6 +586,11 @@ antennas, not emissions and not discharges.
 4. **Common-mode noise on the cables.** The DC filter works between the two
    wires only, and the PoE input has beads but no common-mode choke. A clip-on
    ferrite on the cable is the first remedy; a choke needs a new board.
+5. **Radiated power of the Wi-Fi module.** The certificate's 19.85 dBm at
+   2.4 GHz is 0.15 dB below the limit, on Espressif's board, and the module
+   stands in another place here (see "What the certified Wi-Fi module
+   saves"). Measure the e.i.r.p. on both bands in the closed case before the
+   lab does, and set the firmware's cap from it.
 
 Useful before the lab: a line impedance network and a spectrum analyser for
 the DC input, near-field probes, an ESD gun, and half a day in a pre-compliance
@@ -568,8 +607,12 @@ whether the reader still works.
   thickness. Whether it has to be flame-retardant is settled by the lab's
   fault test (see "Enclosure plastic").
 - The limit for the DC supply in the manual and on the label: 15 W or 100 W.
-- The Wi-Fi antenna or antennas: model and gain (2.33 dBi at most), and for
-  one on an SMA connector its name in the manual.
+- The Wi-Fi transmit power per band, from the lab's e.i.r.p. measurement on
+  the reader, as the firmware's cap (see "What the certified Wi-Fi module
+  saves").
+- Packaging and manual: the 5 GHz indoor restriction with the Member States'
+  codes, and the frequency bands with their maximum power (see "5 GHz
+  Wi-Fi").
 - Supply in the box or not. If so, it is part of the tested product.
 - Allowed cable lengths for the DC input and for Ethernet, and no outdoor
   cabling. They decide which port tests apply.
@@ -593,22 +636,15 @@ whether the reader still works.
 
 ## Open points for revision B
 
-- The ESP32-C5 for 5 GHz Wi-Fi (design-notes.md, "Decisions"): EN 301 893
-  V2.2.1 joins the test plan; it is cited under the RED [HS-RED no. 65a].
-  The C5 module's own certificates: the ESP32-C5-MINI-1U has none published
-  yet (check Espressif's documentation centre); the ESP32-C5-WROOM-1U has
-  EU-type examination certificate SN25C0297 (Sporton, notified body 2907, 9
-  December 2025), which includes EN 301 893 V2.1.1. A fixed EU country code
-  in the firmware and the indoor-use restriction for 5250 to 5350 MHz on the
-  packaging and in the manual.
 - Reconfirm with VDE (notified body 0366) whether its 2020 statement on
   readers with pre-certified modules still holds.
 
 ## Test lab
 
 Ask two or three accredited labs for a quote and name the exact configuration:
-ESP32-C6-MINI-1U module with each antenna that will be sold (inside the case,
-on an SMA bulkhead), NFC reader with PCB antenna, Ethernet with PoE, DC
+ESP32-C5-MINI-1 module with its PCB antenna, Wi-Fi on 2.4 and 5 GHz
+(channels 36 to 64 and 100 to 140) and Bluetooth LE, NFC reader with PCB
+antenna, Ethernet with PoE, DC
 supply, both assembly versions. Where a notified body is needed (see "Will it
 be easy?"), ask notified bodies for the RED, and from December 2027 for the
 Cyber Resilience Act, as well: an accredited lab alone is not enough there

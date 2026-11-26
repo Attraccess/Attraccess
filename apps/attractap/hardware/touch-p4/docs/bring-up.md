@@ -134,30 +134,41 @@ rail's name:
 
 ## Wi-Fi co-processor
 
-The module has no antenna of its own. Plug one into the connector on top of
-it before the board is powered, for every step below: the plug is a W.FL /
-MHF III, not a U.FL.
+The module is the ESP32-C5-MINI-1 with its antenna on the module, in the
+board's top left corner. Its USB pins carry SDIO D2 and D3, so it is flashed
+over UART only.
 
-1. Flash the esp-hosted co-processor firmware into the C6 through its test
-   points (C6_TX, C6_RX, C6_EN, C6_BOOT held low at reset). Take the same
-   release as the P4's esp-hosted component, 3.1.0 or newer.
+1. Flash the esp-hosted co-processor firmware into the C5 through its test
+   points beside the "C5" tag (TX, RX, EN, and BOOT held low at reset). Take
+   the same release as the P4's esp-hosted component, 3.1.0 or newer, built
+   for the 4 MB module.
 2. Run the esp-hosted host example on the P4 with SDMMC slot 0 and reset GPIO
    45, at 20 MHz first. Expect the "INIT event from ESP32 peripheral" log
    line and no version warning. If the P4 reports `send_op_cond returned
-   0x107`, look at the reset first: EN of the module (test point C6_EN) must
-   end high.
+   0x107`, look at the reset first: EN of the module (test point EN beside
+   the "C5" tag) must end high.
 3. Before Wi-Fi is used, run esp-hosted's raw throughput test in both
-   directions at 40 MHz for ten minutes, with the display running: no CRC
-   error (`0x109`) and no timeout (`0x107`). This tests the SDIO link alone.
-   Errors here are the board (timing, supply of the module) and are not cured
-   by firmware above the link; note at which clock they stop.
-4. Scan and connect to an access point. Note RSSI next to a current reader,
-   in the closed case, on channels 1 and 13 if the access point allows it,
-   with each antenna that is a candidate and at the place in the case it is
-   meant for. Nothing is modelled for these antennas: the current reader is
-   the reference. Download a few megabytes, on a Wi-Fi 6 access point as
-   well.
-5. Bluetooth with Wi-Fi connected: scan for ten minutes (the reports must
+   directions at 40 MHz and then at 50 MHz, ten minutes each, with the
+   display running: no CRC error (`0x109`) and no timeout (`0x107`). This
+   tests the SDIO link alone. Errors here are the board (timing, supply of
+   the module) or the C5's SDIO unit, and are not cured by firmware above the
+   link; note at which clock they stop, and fix the firmware's clock one step
+   below. Simulated, the board leaves the link 10.0 ns at 40 MHz and 5.0 ns
+   at 50 MHz (design notes, "Simulation").
+4. Check the country settings before connecting: the C5 reports the EU
+   country with the manual policy, and a scan lists 5 GHz access points on
+   channels 36 to 64 and 100 to 140 only, none on 149 to 165
+   ([firmware-port.md](firmware-port.md), rule 22). Start the provisioning
+   access point and check that it comes up on 2.4 GHz or channels 36 to 48.
+5. Scan and connect, on both bands. Note RSSI next to a current reader (with
+   the ESP32-C6 and its external antenna), in the closed case on the wall, on
+   channels 1 and 13, 36 and 64, 100 and 140 where the access point allows
+   it. The full-wave model puts this place within 3 dB of Espressif's in
+   every channel (design notes, "Wi-Fi module"); the current reader is the
+   reference for range. Download a few megabytes on each band, on a Wi-Fi 6
+   access point as well. Repeat one 5 GHz channel with the reader on a metal
+   wall.
+6. Bluetooth with Wi-Fi connected: scan for ten minutes (the reports must
    keep coming), then connect to the devices the plugins use.
 
 ## Display and touch
@@ -230,7 +241,15 @@ depending on the supply, and is good to 40 % at best.
    keeps it below 100 mA for all LEDs together in any case.
 3. On PoE: the module U102 after an hour (it stands in air that is as warm as
    the board).
-4. If the reader will be used in rooms above 30 °C, repeat step 1 in a warm
+4. The air beside the Wi-Fi module, which its 85 °C rating is about: a fine
+   thermocouple in the gap between the module's right edge and the pull-ups,
+   not touching copper, closed case on PoE. Once with the reader in its normal
+   state, once with the module sending 40 % of the time (an upload in steps,
+   the firmware's limit). Expected in a room of 40 °C: 63 to 75 °C and 65 to
+   84 °C (design notes, "Wi-Fi module"; scale by the room temperature in the
+   test). If the second reading leaves less than 5 K to 85 °C at 40 °C, lower
+   the firmware's transmit limit.
+5. If the reader will be used in rooms above 30 °C, repeat step 1 in a warm
    box at that temperature. The display is specified to 70 °C.
 
 ## Ethernet and PoE (lan version)
@@ -327,3 +346,9 @@ depending on the supply, and is good to 40 % at best.
    "ESD per port" and "Accepted deviations").
 3. Pre-scan radiated emissions with display running and Ethernet active, if a
    near-field probe or pre-compliance chamber is available.
+4. Wi-Fi transmit power: measure the e.i.r.p. of the closed reader on both
+   bands, in the firmware's test mode at the highest power and on the channels
+   the lab will use (lowest, middle and highest of each band), and set the
+   firmware's cap from it: 20 dBm e.i.r.p. at 2.4 GHz and from 5250 to
+   5725 MHz, 23 dBm from 5150 to 5250 MHz ([compliance.md](compliance.md),
+   "5 GHz Wi-Fi").

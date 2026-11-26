@@ -16,25 +16,30 @@ measured on hardware yet.
 |---|---|---|---|
 | 1 | Never leave the buzzer pin (GPIO46) high; stop the tone in every error path | 180 mA of direct current through the coil, twice its rating, and its resistor overloaded | 7 |
 | 2 | All eight LEDs: white at 70 % at most, and that only for seconds. Steady light at 30 % or less | The LED rows sit on narrow copper between the board's cut-outs. Estimated: steady white at 70 % makes them 30 K warmer than the rest of the board, which is 25 to 30 K above the room already | 8, 14 |
-| 3 | Read the chip's temperature sensor and dim backlight and LEDs when it passes about 80 °C | In a room of 40 °C on PoE the estimate puts the display at 63 °C (its limit: 70 °C) and the air around the PoE module at 71 °C (85 °C), which is closer than the estimate is exact. The Wi-Fi module reaches 79 °C and is the version for 105 °C | 14 |
+| 3 | Read the chip's temperature sensor and dim backlight and LEDs when it passes about 80 °C | In a room of 40 °C on PoE the estimate puts the display at 63 °C (its limit: 70 °C) and the air around the PoE module at 71 °C (85 °C), which is closer than the estimate is exact. The air beside the Wi-Fi module, which its 85 °C rating is about, reaches 75 °C with the module mostly receiving and 84 °C with it sending 40 % of the time (rule 25) | 14 |
 | 4 | Pulse the Ethernet PHY's reset through the IO expander before the EMAC starts | The PHY has no reset circuit; it may come up with the wrong address or without its clock | 5 |
-| 5 | esp-hosted: board "none", SDMMC slot 0, reset GPIO 45, and the reset line must end high | The defaults are those of Espressif's board (slot 1, GPIO54). With the wrong reset setting the C6 stays in reset: `send_op_cond returned 0x107` | 4 |
-| 6 | The same esp-hosted release on the P4 and in the C6, 3.1.0 or newer, and `esp_wifi_remote` pinned to match | Wi-Fi that does not associate, dropped packets, a link that dies and does not come back, a double free | 4 |
-| 7 | The first image flashed into the C6 is a current release | After a first image of 2.1 to 2.8 the C6 cannot be updated over SDIO any more | 4 |
+| 5 | esp-hosted: board "none", SDMMC slot 0, reset GPIO 45, and the reset line must end high | The defaults are those of Espressif's board (slot 1, GPIO54). With the wrong reset setting the C5 stays in reset: `send_op_cond returned 0x107` | 4 |
+| 6 | The same esp-hosted release on the P4 and in the C5, 3.1.0 or newer, and `esp_wifi_remote` pinned to match | Wi-Fi that does not associate, dropped packets, a link that dies and does not come back, a double free | 4 |
+| 7 | The first image flashed into the C5 is a current release | After a first image of 2.1 to 2.8 the C5 cannot be updated over SDIO any more | 4 |
 | 8 | Leave the drive strength of GPIO33 to 35 and GPIO39 to 44 at the default or lower | These lines have no series resistors. Simulated: 0.13 V of overshoot at the default, 0.8 V at the strongest setting | 5 |
-| 9 | Leave the C6's SDIO timing at its default edges; bring the link up at 20 MHz, then 40 MHz | CRC errors (`0x109`) on the link | 4 |
+| 9 | Leave the C5's SDIO timing at its default edges (set by the slave's configuration; its strap pins for the edges are left open); bring the link up at 20 MHz, then 40 MHz | CRC errors (`0x109`) on the link | 4 |
 | 10 | No ROM cache functions (`Cache_WriteBack_Addr()` and its relatives) in display code; use `esp_cache_msync()` | The SDIO link times out: "Unrecoverable host sdio state" | 4 |
 | 11 | Do not send LED data during an NFC exchange | The LED data rate (800 kHz) is next to the frequency a card answers on (848 kHz) | 6 |
 | 12 | Backlight PWM at 25 to 40 kHz | Below 2.5 kHz the driver restarts its soft start in every cycle | 3 |
 | 13 | Keep GPIO34 to 36 high or undriven up to a reset | They are strapping pins; driven low, the chip starts in the wrong mode | 10 |
 | 14 | On PoE keep the board above 100 mA: no deep sleep with the backlight off | The PoE module needs a minimum load; below it the switch may turn the port off and on | design notes, "Power" |
-| 15 | Bluetooth: keep the scan window well below the scan interval, and test connecting to the devices in use | Wi-Fi and Bluetooth share the C6's one radio. Connecting as a central failed for some devices until a correction of July 2026 | 4 |
-| 16 | Wi-Fi transmit power and 802.11ax are settings, not constants | The test lab may ask for less power; some access points stall the link in 802.11ax mode | 4, 12 |
+| 15 | Bluetooth: keep the scan window well below the scan interval, and test connecting to the devices in use | Wi-Fi and Bluetooth share the C5's one radio. Connecting as a central failed for some devices until a correction of July 2026 | 4 |
+| 16 | 802.11ax is a setting, not a constant | Some access points stall the link in 802.11ax mode | 4 |
 | 17 | Secure boot with RSA-3072. Check the chip revision before Secure Download Mode is enabled | ECDSA secure boot has an erratum. On revision v3.1 the chip could no longer be flashed through its ROM | 9, 13 |
 | 18 | The hall switch counts only after it has read 0 once; ignore the accelerometer while the buzzer sounds | A reader without a dock magnet looks like a removed one; the buzzer shakes the board | "Tamper detection" |
 | 19 | **Hard requirement.** When USB is the only source, keep the board within the current the USB source offers: read whether DC and PoE are there (expander P5, P7); with neither, apply the limits in ["Power limits per source"](#power-limits-per-source) | A USB 2.0 port gives 500 mA; the board draws up to 0.9 A. The port shuts down or the eFuse sees VBUS sag and turns the board off | "Power limits per source" |
 | 20 | **Hard requirement.** All LED channels together below 100 mA steady (rule 2 keeps them there) | The 5 V sources' 30 % headroom assumes it (design notes, "Power budget") | 8 |
 | 21 | **Hard requirement.** The buzzer sounds only while the NFC field is off | The same budget counts either the buzzer or the NFC transmitter, not both | 6, 7 |
+| 22 | **Hard requirement.** The Wi-Fi country is fixed in firmware to the EU rules: country policy manual, 802.11d off, 5 GHz channels 36 to 140 only. No setting lets the user change country or band | The radio would take the country an access point announces, or the user could pick one, and leave the rules for 5 GHz, which forbid both | 4 |
+| 23 | **Hard requirement.** No access point of the C5's own (provisioning) on channels 52 to 140: only 2.4 GHz or channels 36 to 48 | The C5 has no radar detection of its own; as an access point on those channels it breaks the 5 GHz radio standard | 4 |
+| 24 | **Hard requirement.** Wi-Fi transmit power a setting, capped at what the test lab measured on the reader; never above 20 dBm EIRP at 2.4 GHz and from 5250 to 5725 MHz | The module's certificate lists 19.85 dBm at 2.4 GHz, 0.15 dB below the limit, measured on Espressif's board; the antenna sits elsewhere here | 12 |
+| 25 | **Hard requirement.** The C5 sends no more than 40 % of the time, averaged over a minute | Estimated: the air beside the module passes its 85 °C rating on PoE in a room of 40 °C | 14 |
+| 26 | Never burn the C5's eFuse JTAG_SEL_ENABLE | The C5 would then read SDIO D1 (its GPIO7) at start to choose where its JTAG comes from | 4 |
 
 What the firmware does not have to care about, because the board does it: the
 LEDs, the backlight, the buzzer and the PN532 are held off by resistors until
@@ -71,10 +76,10 @@ the firmware drives their pins, and the MCU's reset waits for the 3.3 V rail
 | 36 | ETH MDIO | strapping pin, 1.5 k pull-up |
 | 37 | UART0 TX | test point TX0 |
 | 38 | UART0 RX | test point RX0 |
-| 39 to 42 | SDIO D0 to D3 | to the ESP32-C6, 51 k pull-ups |
+| 39 to 42 | SDIO D0 to D3 | to the ESP32-C5, 51 k pull-ups |
 | 43 | SDIO CLK | 22 ohm series |
 | 44 | SDIO CMD | 51 k pull-up |
-| 45 | C6_EN | resets the ESP32-C6 (through 1 k) |
+| 45 | C5_EN | resets the ESP32-C5 (through 1 k) |
 | 46 | BUZZER | 2.7 kHz square wave, high = coil on |
 | 47 | LED_DATA | 8 x SK6812, GRB, 800 kbit/s; 100 k pull-down on the board |
 | 48 | not connected | |
@@ -217,7 +222,7 @@ The board has three sensors for this and the firmware does not use them yet.
 4. **Wi-Fi**: the P4 has no radio. Add `esp_wifi_remote` + `esp_hosted`
    (SDIO, 4-bit). Board-specific settings: SDMMC slot 0, the pins above,
    reset GPIO 45. In esp-hosted's configuration that is three choices, and the
-   first is easy to miss: for a P4 with a C6 it selects the board
+   first is easy to miss: for a P4 host it selects the board
    "ESP32-P4-Function-EV-Board" by itself, which fixes the reset to GPIO54 and
    the bus to slot 1 on GPIO14 to 19. Set the board to "No specific PCB board"
    (`ESP_HOSTED_P4_DEV_BOARD_NONE`), the slot to "Slot 0 (IOMUX-fixed pins)"
@@ -225,57 +230,89 @@ The board has three sensors for this and the firmware does not use them yet.
    (`ESP_HOSTED_HOST_RESET_GPIO`). The names are those of esp-hosted's main
    branch in November 2026. The slot's pins are supplied with 3.3 V straight
    from the board, so the SD card supply setting of Espressif's board (one of
-   the chip's regulators) is not needed. The ESP32-C6 needs the esp-hosted
-   co-processor firmware:
-   first flash through the C6 test points (C6_TX, C6_RX, C6_EN, C6_BOOT),
-   later updates over the SDIO link from the P4. The C6 firmware version has to
-   be tracked together with the reader firmware. The module is the MINI-1U,
-   whose antenna is plugged in: nothing in the firmware depends on that, but
-   a board without its antenna must not be used to judge the radio (a
-   Bluetooth scan that goes silent was traced to exactly that).
+   the chip's regulators) is not needed. The ESP32-C5 needs the esp-hosted
+   co-processor firmware (3.1.0 or newer lists the C5 as an SDIO
+   co-processor), built for the 4 MB module (`partitions_eh_cp_ota_4m.csv`):
+   first flash through the C5's test points (TX, RX, EN, BOOT beside the "C5"
+   tag; its USB pins carry SDIO D2 and D3, so the C5 has no USB here), later
+   updates over the SDIO link from the P4. The C5 firmware version has to be
+   tracked together with the reader firmware. The module is the
+   ESP32-C5-MINI-1 with its antenna on the module, in the board's top left
+   corner, for 2.4 and 5 GHz.
 
    This pair has a record of problems, nearly all of them in firmware
    versions and settings. What the reports came down to is in the
-   [design notes](design-notes.md#wi-fi-and-bluetooth-the-esp32-c6-behind-the-esp32-p4);
+   [design notes](design-notes.md#wi-fi-and-bluetooth-the-esp32-c5-behind-the-esp32-p4);
    what follows from them for the firmware:
 
-   - **One version on both sides.** Build the C6 image from the same
-     esp-hosted release as the P4's component, and check the version the C6
+   - **One version on both sides.** Build the C5 image from the same
+     esp-hosted release as the P4's component, and check the version the C5
      reports at start. Use 3.1.0 or newer: 3.0.9 can lose the link for good
      after a failed buffer allocation.
    - **`esp_wifi_remote` to match.** Pin it in `idf_component.yml`. An
      esp-hosted from 2.11 on, built against an `esp_wifi_remote` older than
      1.3.1, frees a receive buffer twice.
-   - **The first image flashed into the C6 decides whether it can be updated
+   - **The first image flashed into the C5 decides whether it can be updated
      over SDIO later.** After a first image of 2.1 to 2.8, updates to newer
      releases fail (its boot loader and their images use different flash
      modes). Flash a current release at production.
    - **Reset polarity.** The line goes to the module's EN pin: low is reset,
      and it must end high. In the 2.x releases that is
      `ESP_HOSTED_SDIO_RESET_ACTIVE_HIGH`, the default; the other choice leaves
-     the C6 in reset, and the P4 then reports `send_op_cond returned 0x107`.
+     the C5 in reset, and the P4 then reports `send_op_cond returned 0x107`.
      The 3.x releases always pulse low.
      The pulse has to last at least 2 ms, because it reaches EN through 1 k
      into 1 uF; esp-hosted's is 10 ms.
    - **SDIO clock and edges.** Bring the link up at 20 MHz, then go to 40 MHz.
-     Leave the C6's timing at its default (`ESP_SDIO_PSEND_PSAMPLE`); other
-     edges gave Espressif CRC errors (`0x109`) on its own board.
+     Leave the C5's timing at its default (`EH_TRANSPORT_CP_SDIO_TIMING`:
+     sending and sampling on the rising edge); other edges gave Espressif CRC
+     errors (`0x109`) on its own board with the C6. The C5's strap pins for
+     the edges (GPIO25, MTDI) are left open; the slave's configuration sets
+     the edges. Bring-up reads the throughput and the error count at 40 and
+     50 MHz before the clock is fixed.
    - **No ROM cache functions.** Display code that calls `Cache_WriteBack_Addr()`
      or its relatives while SDIO is busy makes the link time out (`0x107`,
      "Unrecoverable host sdio state"). Use `esp_cache_msync()`.
    - **802.11ax.** On some access points the data path stalls on the first
-     large download when the C6 joins in 802.11ax mode. If that shows, limit
+     large download when the station joins in 802.11ax mode (seen with the C6;
+     the C5 has 802.11ax as well). If that shows, limit
      the station to b/g/n with `esp_wifi_set_protocol()`.
-   - **Bluetooth.** The controller runs on the C6 and NimBLE on the P4, with
+   - **Bluetooth.** The controller runs on the C5 and NimBLE on the P4, with
      HCI over the same SDIO link (`ESP_HOSTED_ENABLE_BT_NIMBLE`). The
-     controller settings in today's `sdkconfig.defaults` belong into the C6's
+     controller settings in today's `sdkconfig.defaults` belong into the C5's
      build then. The proxy is a central: connections that never completed
      for some devices were cured by a patch posted in esp-hosted issue 204 in
      July 2026 (the issue was still open in November 2026). Check that the
      release in use has it, and test with the devices the plugins talk to.
-     Wi-Fi and Bluetooth share the C6's one radio, so a scan that runs all the
+     Wi-Fi and Bluetooth share the C5's one radio, so a scan that runs all the
      time (the advertisement watch) takes air time from Wi-Fi: keep its window
      well below its interval.
+   - **The EU's rules for 5 GHz** (sources and clauses in
+     [compliance.md](compliance.md#5-ghz-wi-fi)). The C5 is a station that
+     only listens for radar: "ESP32-C5 supports DFS channels in the 5 GHz
+     band, but only supports passive radar detection" and "cannot operate as a
+     DFS AP in SoftAP mode" (ESP-IDF Wi-Fi guide, "Dynamic Frequency
+     Selection"). What the firmware sets, once, at start:
+     - The country, with `esp_wifi_set_country()` and
+       `WIFI_COUNTRY_POLICY_MANUAL` (Germany's channels and limits for the
+       EU build), so the radio never adopts the country an access point
+       announces. ESP-IDF's default is world mode with the automatic policy,
+       which follows the access point. The EU decision for 5 GHz requires that
+       the user cannot change the country or the band where that would break
+       the rules: no such setting in the user interface or the API.
+     - The 5 GHz channels, with `wifi_5g_channel_mask` in the same
+       `wifi_country_t` (it only takes effect under the manual policy):
+       channels 36 to 64 and 100 to 140. Not 149 to 165: in the EU those are a
+       short-range-device band at 25 mW, outside the RLAN decision, with
+       national conditions; the reader does not need them.
+     - No SoftAP on channels 52 to 140. A provisioning access point runs on
+       2.4 GHz (or channels 36 to 48), and stays off while the station is
+       connected on a DFS channel, because in STA+SoftAP mode the C5 moves its
+       access point to the station's channel. ESP-IDF 6.0.2, the version this
+       repository pins, does not yet have the hint on locking the SoftAP out
+       of DFS channels; the manual policy with the channel mask above does it.
+     - Indoor use only for channels 36 to 64 is a duty of the manual and the
+       packaging, not of the firmware (the reader is an indoor device).
 5. **Ethernet**: internal EMAC with RMII instead of the W5500. PHY driver
    `ip101`, address 1, external 50 MHz clock on GPIO32
    (`EMAC_CLK_EXT_IN`), MDC 31, MDIO 36, data pins as in the table. Set the
@@ -327,10 +364,18 @@ The board has three sensors for this and the firmware does not use them yet.
     long as the firmware does not drive them low before a reset.
 11. **Power source**: USB, DC and PoE end on the same 5 V rail. The firmware
     cannot tell them apart.
-12. **Wi-Fi transmit power**: keep it a setting, not a constant. The module is
-    certified up to 19.8 dBm against a limit of 20 dBm; if the reader's
-    surroundings raise the antenna gain by more than 0.2 dB, the test lab will
-    ask for less power.
+12. **Wi-Fi transmit power**: keep it a setting, not a constant, capped by the
+    value the test lab finds compliant on the reader
+    (`esp_wifi_set_max_tx_power()`, in steps of 0.25 dB). The module's
+    certificate lists 19.85 dBm at 2.4 GHz against a limit of 20 dBm
+    e.i.r.p., and 20.58 to 20.77 dBm in the three 5 GHz bands, measured with
+    Espressif's board. Here
+    the antenna sits in another place, which in the full-wave model radiates
+    up to 5.5 dB more in some 5 GHz channels than Espressif's position on the
+    same board (design notes, "Wi-Fi module"), so the lab measures it. The limits for a station
+    without radar detection: 20 dBm EIRP at 2.4 GHz, 23 dBm in 5150 to
+    5250 MHz, and 20 dBm in 5250 to 5725 MHz unless the firmware does transmit
+    power control (TPC), which the lab then has to confirm.
 13. **Chip revision**: the same part number ships as v3.0, v3.1 and v3.2. v3.0
     can need a second start now and then (erratum MSPI-749; the watchdog
     restarts it), and must not switch the peripheral power domain off in light
@@ -345,8 +390,16 @@ The board has three sensors for this and the firmware does not use them yet.
     31 K (PoE) above the room in typical use, and 42 to 55 K with everything
     on for a long time, when the LED rows reach 70 to 80 K above the room.
     Dim the backlight and the LEDs, in that order of how much it helps (LEDs
-    first), when the chip passes about 80 °C, and report it. The figures are
-    estimates within 40 %; the bring-up plan measures them.
+    first), when the chip passes about 80 °C, and report it; if that is not
+    enough, hold the radio back as well. The Wi-Fi module has its own limit:
+    its 85 °C rating is about the air right outside it, which the estimate
+    puts at up to 75 °C on PoE in a room of 40 °C when the module mostly
+    receives, and 84 °C when it sends 40 % of the time. So the firmware keeps
+    the module's sending to 40 % of the time, averaged over a minute
+    (counted from the bytes queued to the radio and the link rate, or from
+    esp-hosted's statistics). The reader's own traffic stays far below that;
+    it bites only on long uploads such as logs. The figures are estimates
+    within 40 %; the bring-up plan measures them.
 
 Not verified on hardware: everything in this list. It follows the Espressif
 documentation for the parts used.

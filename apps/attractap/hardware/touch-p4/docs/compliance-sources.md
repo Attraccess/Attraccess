@@ -3,12 +3,12 @@
 This page records, for every claim in [compliance.md](compliance.md), the
 result of the check against its primary source, and lists those sources.
 
-Checked on 25 November 2026. EU acts were read in their official text. EUR-Lex
+Checked on 25 November 2026; the ESP32-C5 module and 5 GHz Wi-Fi on 26 November 2026. EU acts were read in their official text. EUR-Lex
 answers automated requests with an empty reply, so the texts were downloaded
 by CELEX number from the EU Publications Office's document store
 (`https://publications.europa.eu/resource/celex/<CELEX>`), which serves the
 same documents; the list gives the usual EUR-Lex address. ETSI standards,
-German federal law (gesetze-im-internet.de), the eCFR, Espressif's documents
+German federal law (gesetze-im-internet.de), Espressif's documents
 and the other web pages were read at the addresses given. Paid standards
 (EN 18031, EN 55032, EN 55035, EN 50130-4, EN 50419, IEC 61000-4-5 and every
 edition of EN IEC 62368-1) were not read; only free previews, published test
@@ -18,7 +18,7 @@ primary text.
 How to read compliance.md: a reference such as [RED Art. 10(9)] names a
 source key from the list below (RED) and the clause relied on (Art. 10(9)).
 
-Verdicts, after the edit of 25 November 2026:
+Verdicts, after the edits of 25 and 26 November 2026:
 
 - **correct**: the source confirms the claim as it now stands.
 - **corrected**: the claim was wrong, partly correct or incomplete, and the
@@ -27,7 +27,7 @@ Verdicts, after the edit of 25 November 2026:
 - **not checkable from free sources**: the claim rests on a paid standard,
   lab practice, an estimate or engineering judgement; compliance.md marks it
   "unverified".
-- **module-specific**: a claim about the ESP32-C6-MINI-1U and its antenna,
+- **module-specific**: a claim about the ESP32-C5-MINI-1 and its antenna,
   checked against the module's own documents. The module stays on revision A
   (an ESP32-C5 was looked at and kept for revision B, design-notes.md,
   "Decisions"); the antenna claims were rewritten with the antenna decision.
@@ -131,34 +131,51 @@ Verdicts, after the edit of 25 November 2026:
 
 ### What the certified Wi-Fi module saves
 
+Rewritten on 26 November 2026 for the ESP32-C5-MINI-1; the claims about the
+ESP32-C6-MINI-1U and its external antennas are gone with that module.
+
 | Claim (short) | Verdict | Source |
 |---|---|---|
-| The reader uses the ESP32-C6-MINI-1U, with an antenna connector (correct) | module-specific | DS §1.2 |
-| EU-type examination certificate SN24C0053, Sporton, notified body 2907, 6 March 2024 (correct; hardware version V1.2) | module-specific | CE-1U p. 1 |
-| MINI-1 certificate SN23C0148 of 28 September 2023 (correct) | module-specific | CE-1 p. 1 |
-| The certificates cover safety, EMC, radio and RF exposure, not cybersecurity; their EMC part used a draft EN 301 489-17 V3.2.6, so no EMC credit for the reader | corrected (review stage 4); module-specific | CE-1U pp. 1, 3; FAQ |
-| Espressif publishes the certificates only: ask for the reports (correct for the EU reports L330804KS102-M1, EA330804, EW330804 and ER330804; the FCC reports are public, measured to FCC rules; the MINI-1U's FCC ID is 2AC7Z-ESPC6MINIU) | module-specific | CERTS; FAQ; FCC-G; FCC exhibits |
-| The module's assessment "can be used as part of" the reader's, it does not replace it (was: "the certificates do not transfer") | corrected (review stage 4) | EG 203 367 §6.1; CE-1U p. 2, note 2 |
-| "The lab reuses the module's conducted radio results if used as its datasheet says" (now: what EG 203 367 says; the guide names neither modules nor conducted results, and calls an antenna outside the original assessment a deviation) | corrected | EG 203 367 §3.1, §6.1 notes 1 and 2 |
+| The reader uses the ESP32-C5-MINI-1, with a PCB antenna for 2.4 and 5 GHz | module-specific | DS-C5 §1 |
+| EU-type examination certificate 44024-05-2026-260268, Eurofins Electrical and Electronic Testing NA, notified body 0980, 27 May 2026, model ESP32-C5-MINI-1 with internal antenna | module-specific | CE-C5 pp. 1, 2 |
+| It covers safety (EN IEC 62368-1:2024 + A11), health (EN 50665, EN IEC 62311), EMC (EN 55032, EN 301 489-1 V2.2.3, -17 V3.3.1) and radio (EN 300 328 V2.2.2, EN 301 893 V2.2.1), not cybersecurity | module-specific | CE-C5 pp. 2, 3 |
+| "Some data can be reused, but EMC testing is still required for the final product" | correct | FAQ |
+| Espressif publishes the certificate only; the reports it names are EFTA26010030-IE-01-E1, -02-R1 to -R4, -03-M1V1, -04-L1 | module-specific | CE-C5 pp. 2, 3; FAQ |
+| What EG 203 367 says about reuse, equivalent conditions and deviations | correct | EG 203 367 §3.1, §6.1 notes 1 and 2 |
 | Labs typically reuse the module's conducted results | not checkable from free sources (lab practice) | none |
-| On the reader: radiated power and spurious emissions with NFC transmitting | correct | EG 203 367 §6.1 note 1, §6.2; EN 300 328 §4.3.2.2.3 |
+| The module is not where Espressif's guide puts it; the model puts the place within 3 dB of Espressif's, up to 5.5 dB above it in some 5 GHz channels | not checkable from free sources (our simulation) | design-notes.md, "Wi-Fi antenna" and "Accepted deviations" |
+| On the reader: radiated power and spurious emissions on both bands with NFC transmitting | correct | EG 203 367 §6.1 note 1, §6.2; EN 300 328 §4.3.2.2.3; EN 301 893 §4.2.3 |
 | On the reader: EMC with all radios running | correct | EG 203 367 §5.1.1.3, §5.2.3 |
-| RF exposure listed under EG 203 367 (now: separate, RED Art. 3(1)(a), outside the guide's scope) | corrected | EG 203 367 §1 |
-| The module is certified on condition of 20 cm to persons (correct; the FCC grant has the same condition) | module-specific | CE-1U p. 2, note 1; FCC-G |
-| A reader that is touched needs its own RF exposure assessment | correct | CE-1U p. 2, note 1 |
-| A calculation is usually enough for RF exposure | not checkable from free sources (lab practice) | none |
+| RF exposure is separate, RED Art. 3(1)(a), outside the guide's scope | correct | EG 203 367 §1 |
+| The FCC grant asks for 20 cm to persons; the EU certificate names EN 50665 and EN IEC 62311 but no distance | module-specific | FCC-C5; CE-C5 p. 2 |
+| A reader that is touched needs its own RF exposure assessment; a calculation is usually enough | not checkable from free sources (lab practice; follows from the 20 cm condition) | FCC-C5 |
 | VDE (0366) wants an EU-type examination when only module reports exist (statement of 24 November 2020; reconfirm) | correct (VDE's stated position) | VDE RED modules p. 2 |
-| "Certified up to 19.8 dBm" (was the MINI-1's figure, 19.81 dBm; the MINI-1U certificate states 18.19 dBm EIRP for Wi-Fi and 17.96 dBm for Bluetooth LE) | corrected; module-specific | CE-1U p. 2; CE-1 p. 2 |
-| The limit is 20 dBm (now: e.i.r.p., for every antenna assembly) | correct | EN 300 328 §4.3.2.2.2, §4.3.2.2.3 |
-| The antenna is not part of the module (correct) | module-specific | DS §10.2 |
-| The datasheet asks for 2.4 GHz, 50 ohm, at most 2.33 dBi, a monopole (partly correct: the datasheet recommends rather than asks, lists a matching connector as a fourth point, and the test antenna is a sleeve monopole, material code TFPD08H10060011) | module-specific | DS §10.2; FCC exhibits (antenna specification) |
-| Datasheet quote on an antenna of a different type or gain (correct, exact excerpt) | module-specific | DS §10.2 |
-| An adhesive antenna is often another type: ask the lab (correct as advice) | module-specific | FAQ; eCFR 15.204(c) |
-| Each antenna configuration sold is a radio configuration in the test plan | correct | EN 300 328 §4.2.4, §5.4.1 m) |
-| Adhesive antenna inside the case: one named antenna, tested with the reader (correct; an "integral antenna" in EN 300 328 terms) | module-specific | EN 300 328 §3.1; EG 203 367 §6.1 note 1 |
-| SMA bulkhead antenna: manual names the permitted antennas, the declaration covers only those (correct; a "dedicated antenna", each must meet 20 dBm e.i.r.p.; a standard SMA jack is not allowed for a US version) | module-specific | EN 300 328 §3.1, §4.2.4; RED Art. 10(8), Annex VI point 8; eCFR 15.203 |
-| The antennas are chosen (certified Deman, fallback Taoglas on an SMA bulkhead); the case has a bay for one | corrected (was: neither chosen) | design-notes.md, "Wi-Fi antenna"; FCC exhibits; eCFR 15.204 |
-| Where the antenna sits decides the radiated results | not checkable from free sources (engineering judgement) | none |
+| Transmit power on the certificate: 19.85 dBm Wi-Fi 2.4 GHz, 16.36 dBm Bluetooth LE, 20.58 / 20.74 / 20.77 dBm at 5150 to 5250 / 5250 to 5350 / 5470 to 5725 MHz, 13.97 dBm at 5725 to 5850 MHz; conducted or radiated not stated | module-specific | CE-C5 p. 2 |
+| The limit at 2.4 GHz is 20 dBm e.i.r.p. | correct | EN 300 328 §4.3.2.2.2, §4.3.2.2.3 |
+| Espressif's antenna peaks at 4.44 dBi at 2.4 GHz and 1.55 to 2.18 dBi at 5 GHz on its test board | module-specific | ANT-C5 §3.1 |
+| The antenna is part of the module: one radio configuration | module-specific | DS-C5 §1; CE-C5 p. 2 |
+| A metal wall behind the reader costs 1.1 to 1.7 dB at 2.4 GHz | not checkable from free sources (our simulation) | design-notes.md, "Wi-Fi module" |
+| The FCC grant is a single modular approval with 20 cm and co-location by the FCC's procedures | module-specific | FCC-C5 |
+
+### 5 GHz Wi-Fi
+
+Added on 26 November 2026.
+
+| Claim (short) | Verdict | Source |
+|---|---|---|
+| 2022/179 harmonises 5150 to 5350 and 5470 to 5725 MHz, annex replaced by 2022/2307, repeals 2005/513/EC | correct | WAS Art. 1, 5; WAS-A Art. 1(2) |
+| EN 301 893 V2.2.1 cited since 15 May 2025; V2.1.1 until 15 May 2028 | correct | HS-RED no. 65, 65a; HS-RED 2025/893 Annex, Art. 2 |
+| Band table: uses, limits, TPC and DFS (5150 to 5250 MHz 200 mW, indoor plus limited outdoor; 5250 to 5350 MHz inside buildings only, 200 mW or 3 dB less without TPC, DFS; 5470 to 5725 MHz 1 W or 3 dB less, DFS) | correct | WAS Annex tables 1 to 3, notes |
+| A secondary device without radar detection keeps to the limits of 5250 to 5350 MHz in 5470 to 5725 MHz; without TPC 20 dBm, 23 dBm at 5150 to 5250 MHz | correct | EN 301 893 §4.2.3.2.2 table 2, note 1 |
+| 5725 to 5875 MHz is short-range-device band 61 at 25 mW e.i.r.p. (Decision 2006/771/EC, annex replaced by 2025/105) | correct | SRD Annex band 61 |
+| Primary and secondary device; a secondary device does not transmit before the enabling signal; without radar detection only channel shutdown | correct | EN 301 893 §3.1, §4.2.6.1.4.2 a), §4.2.6.2.1 table 5 |
+| Up to 23 dBm e.i.r.p. no radar detection for a secondary device, except fixed outdoor point-to-point or point-to-multipoint | correct | EN 301 893 annex D, table D.2 note 2 |
+| The C5 detects radar only passively, cannot be a DFS access point, its SoftAP may not use DFS channels, and in STA plus SoftAP mode the access point follows the station | correct (ESP-IDF latest, v6.1.1 and v6.0.2 alike) | IDF-WIFI, "Dynamic Frequency Selection", "Home Channel" |
+| DFS settings not accessible to the user, including country and band | correct | WAS Annex tables 2, 3 |
+| ESP-IDF default world mode with automatic policy; manual policy always uses the configured country; the 5 GHz mask works only under the manual policy | correct | IDF-API, `esp_wifi_set_country`, `wifi_country_t` |
+| Espressif's regulatory table for DE allows 5725 to 5875 MHz at 25 mW and cites 2005/513/EC | correct (master, commit 34ff741b of 8 May 2026) | IDF-REG |
+| Restriction on putting into service: pictogram or "Restrictions or Requirements in" with Member State codes on the packaging; the instructions list States and kinds of restriction | correct | RED Art. 10(10); IR 2017/1354 Art. 2(1), (2), Annex I, II |
+| Instructions name the frequency bands and the maximum power in each | correct | RED Art. 10(8) |
 
 ### Cybersecurity, under the RED
 
@@ -168,7 +185,7 @@ Verdicts, after the edit of 25 November 2026:
 | A declaration without a notified body needs EN 18031-1 and -2 in full | correct | RED Art. 17(3), (4) |
 | The standards "do not count if the user is allowed not to set and use a password" (now: tied to clauses 6.2.5.1 and 6.2.5.2; "rationale" and "guidance" never count) | corrected | HS-RED no. 164, 165; ID 2025/138 recital 6 |
 | Authentication everywhere; credentials unique per device or set at first use; decision trees | not checkable from free sources (EN 18031, paid) | none |
-| The ESP32-C6 firmware is part of the product | correct (our reading; no explicit text) | RED Art. 10(8) |
+| The ESP32-C5 firmware is part of the product | correct (our reading; no explicit text) | RED Art. 10(8) |
 
 ### Cybersecurity, under the Cyber Resilience Act
 
@@ -290,13 +307,15 @@ Verdicts, after the edit of 25 November 2026:
 |---|---|---|
 | Failure points and remedies (items 1, 3 and 4; the pre-compliance kit) | not checkable from free sources (engineering judgement) | none |
 | ESD and transients: failed if the reader does not recover by itself; part 1's clause 6 "shall not apply", the test plan sets objective criteria | corrected (review stage 4: EN 301 489-1 §6.2 no longer cited) | EN 301 489-17 §6.1, §6.4, table 2 |
-| Espressif's RF test firmware (now named: EspRFTestTool, or the ESP-IDF example `cert_test`) | correct | RFT; FAQ; DS §7 |
+| Radiated power of the Wi-Fi module (item 5): 0.15 dB below the 2.4 GHz limit on Espressif's board | module-specific | CE-C5 p. 2; EN 300 328 §4.3.2.2.3 |
+| Espressif's RF test firmware (now named: EspRFTestTool, or the ESP-IDF example `cert_test`) | correct | RFT; FAQ |
 
 ### Open points for the product
 
 | Claim (short) | Verdict | Source |
 |---|---|---|
-| Antenna gain 2.33 dBi at most (correct as the condition for reusing the module's reports; not a legal cap: any gain is allowed if the reader stays within 20 dBm e.i.r.p. and is tested with it) | module-specific | DS §10.2; FAQ; EN 300 328 §4.3.2.2.3 |
+| Transmit power per band from the lab's e.i.r.p. measurement, as the firmware's cap | not checkable from free sources (follows from the module section) | CE-C5 p. 2; EN 300 328 §4.3.2.2.3; EN 301 893 §4.2.3.2.2 |
+| Packaging and manual: 5 GHz indoor restriction with the Member States' codes; bands and maximum power | correct | RED Art. 10(8), 10(10); IR 2017/1354 Art. 2 |
 | Type label: CE mark, model, serial number, name and postal address, crossed-out bin (producer identity and the post-2005 mark added) | correct | RED Art. 10(6), (7), 20(1); ElektroG §9 |
 | A copy of the declaration of conformity in the box (was missing) | corrected (added) | RED Art. 10(9) |
 | Technical file kept ten years (the declaration and the CRA's rule added) | correct | RED Art. 10(4); CRA Art. 13(13) |
@@ -307,6 +326,7 @@ Verdicts, after the edit of 25 November 2026:
 | Claim (short) | Verdict | Source |
 |---|---|---|
 | Ask two or three accredited labs (now: also notified bodies where one is needed) | corrected | RED Art. 17(4); CRA Art. 32(2) |
+| Configuration for the quote: the C5 module with its PCB antenna on both bands, channels 36 to 64 and 100 to 140 | not checked (design figure) | firmware-port.md |
 | The Ethernet version with Wi-Fi fitted usually covers the Wi-Fi version | not checkable from free sources (lab practice) | consistent with EG 203 367 §6.1 note 3 |
 
 ### Sources
@@ -321,7 +341,7 @@ Verdicts, after the edit of 25 November 2026:
 
 | Key | Full title | Version / date | URL | Clause or page relied on |
 |---|---|---|---|---|
-| RED | Directive 2014/53/EU (Radio Equipment Directive) | consolidated version of 30 May 2026 | <https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02014L0053-20260530> | Art. 1(4), 2(1), 3, 3(1)(a), 10(4), (6), (7), (8), (9), 16, 17(2), (3), (4), 18(3), 20(1), 50; Annex Ia Part I; Annex II; Annex VI point 8 |
+| RED | Directive 2014/53/EU (Radio Equipment Directive) | consolidated version of 30 May 2026 | <https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02014L0053-20260530> | Art. 1(4), 2(1), 3, 3(1)(a), 10(4), (6), (7), (8), (9), (10), 16, 17(2), (3), (4), 18(3), 20(1), 50; Annex Ia Part I; Annex II; Annex VI point 8 |
 | DR 2022/30 | Commission Delegated Regulation (EU) 2022/30 (RED Art. 3(3)(d), (e), (f)) | original text | <https://eur-lex.europa.eu/eli/reg_del/2022/30/oj> | Art. 1(1), (2), (3), Art. 3 |
 | DR 2023/2444 | Commission Delegated Regulation (EU) 2023/2444 amending 2022/30 | original text | <https://eur-lex.europa.eu/eli/reg_del/2023/2444/oj> | Art. 1 (application from 1 August 2025; new wording of Art. 1(2)) |
 | DR 2026/339 | Commission Delegated Regulation (EU) 2026/339 repealing 2022/30 | adopted 16 February 2026, OJ L of 29 April 2026 | <https://eur-lex.europa.eu/eli/reg_del/2026/339/oj> | Art. 1; recitals 4, 5 |
@@ -330,6 +350,10 @@ Verdicts, after the edit of 25 November 2026:
 | EMCD | Directive 2014/30/EU (EMC Directive) | original text | <https://eur-lex.europa.eu/eli/dir/2014/30/oj> | Art. 2(2)(a) |
 | HS-EMC | Commission Implementing Decision (EU) 2019/1326, harmonised standards for EMC | consolidated version of 10 June 2022 (the latest listed) | <https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02019D1326-20220610> | entries EN 55032:2015/A11:2020, EN 55035:2017/A11:2020 |
 | HS-RED 2025/893 | Commission Implementing Decision (EU) 2025/893, amending Implementing Decision (EU) 2022/2191 | original text | <https://eur-lex.europa.eu/eli/dec_impl/2025/893/oj> | recital on the notices for EN 301 489-3 and -17 ("performance-based criteria on a subjective basis") |
+| WAS | Commission Implementing Decision (EU) 2022/179, harmonised use of the 5 GHz bands for wireless access systems including RLANs (WAS/RLAN) | of 8 February 2022, OJ L 29, 10.2.2022, p. 10; consolidated version of 25 November 2022 | <https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32022D0179> | Art. 1, 2(b), 5; Annex (as replaced by WAS-A) tables 1 to 3 and notes |
+| WAS-A | Commission Implementing Decision (EU) 2022/2307, amending 2022/179 | of 23 November 2022, OJ L 305, 25.11.2022, p. 63 | <https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32022D2307> | Art. 1(2) (annex replaced) |
+| SRD | Commission Decision 2006/771/EC, harmonisation of the radio spectrum for short-range devices, annex replaced by Implementing Decision (EU) 2025/105 | consolidated version of 23 January 2025 | <https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32025D0105> (2006/771/EC: CELEX 32006D0771(01)) | Annex, band 61 |
+| IR 2017/1354 | Commission Implementing Regulation (EU) 2017/1354, presentation of the information under RED Art. 10(10) | of 20 July 2017, OJ L 190, 21.7.2017, p. 7 | <https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32017R1354> | Art. 2(1), (2), 3; Annex I (pictogram), Annex II (codes) |
 | OJ C 173 2016 | Commission communication 2016/C 173/01, harmonised standards under Directive 2014/30/EU (EMC) | OJ C 173 of 13 May 2016 | <https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52016XC0513(01)> | entry EN 50130-4:2011 |
 | EMC summary list 2022 | European Commission, summary list of harmonised standards for the EMC Directive | 19 September 2022 | <https://single-market-economy.ec.europa.eu/single-market/european-standards/harmonised-standards/electromagnetic-compatibility-emc_en> | entry EN 50130-4:2011 |
 | HS-LVD | Commission Implementing Decision (EU) 2023/2723, harmonised standards for low-voltage equipment | consolidated versions of 30 April 2026 and 23 January 2027 | <https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02023D2723-20260430> | entries EN 62368-1:2014, EN 62311:2008, EN 50364:2010 |
@@ -370,6 +394,7 @@ Verdicts, after the edit of 25 November 2026:
 | Key | Full title | Version / date | URL | Clause or page relied on |
 |---|---|---|---|---|
 | EN 300 328 | ETSI EN 300 328, wideband transmission systems in the 2.4 GHz band | V2.2.2 (2019-07) | <https://www.etsi.org/deliver/etsi_en/300300_300399/300328/02.02.02_60/en_300328v020202p.pdf> | §3.1, §4.2.4, §4.3.2.2.2, §4.3.2.2.3, §5.4.1 m) |
+| EN 301 893 | ETSI EN 301 893, 5 GHz RLAN, harmonised standard for access to radio spectrum | V2.2.1 (2024-11) | <https://www.etsi.org/deliver/etsi_en/301800_301899/301893/02.02.01_60/en_301893v020201p.pdf> | §1 table 1, §3.1, §4.2.3.1.2, §4.2.3.2.2 table 2 and note 1, §4.2.6.1.2, §4.2.6.1.4.2 a), §4.2.6.2.1 table 5; annex B; annex D table D.2 note 2 |
 | EN 300 330 | ETSI EN 300 330, short range devices 9 kHz to 25 MHz | V2.1.1 (2017-02) | <https://www.etsi.org/deliver/etsi_en/300300_300399/300330/02.01.01_60/en_300330v020101p.pdf> | §4.3.4 table 2 with notes 2, 3; §4.3.8.3 table 5; §4.3.9.3 table 6; §5.4.1; §6.2.9; annex C.2.3 |
 | EN 301 489-1 | ETSI EN 301 489-1, EMC for radio equipment, part 1: common technical requirements | V2.2.3 (2019-11) | <https://www.etsi.org/deliver/etsi_en/301400_301499/30148901/02.02.03_60/en_30148901v020203p.pdf> | §3.1; §6.2; §8.3.1, §8.3.2, §8.3.3 table 5; §8.4.3.2; §8.7.3; §9.2.2; §9.3.2; §9.4.1, §9.4.2; §9.5.1, §9.5.2; §9.8.1, §9.8.2.1, §9.8.2.2; annex C.1 |
 | EN 301 489-3 | ETSI EN 301 489-3, part 3: short range devices 9 kHz to 246 GHz | V2.3.2 (2023-01) | <https://www.etsi.org/deliver/etsi_en/301400_301499/30148903/02.03.02_60/en_30148903v020302p.pdf> | §2.1, §3.1, §6.1 |
@@ -389,19 +414,15 @@ Verdicts, after the edit of 25 November 2026:
 
 | Key | Full title | Version / date | URL | Clause or page relied on |
 |---|---|---|---|---|
-| DS | ESP32-C6-MINI-1 & MINI-1U Datasheet | v1.5 (16 June 2026) | <https://www.espressif.com/sites/default/files/documentation/esp32-c6-mini-1_mini-1u_datasheet_en.pdf> | §1.2 p. 3; §7 p. 30; §10.2 pp. 42, 43 |
-| CE-1U | EU-type examination certificate SN24C0053, ESP32-C6-MINI-1U, Sporton International (USA) Inc., notified body 2907 | 6 March 2024, revision A | <https://www.espressif.com/sites/default/files/certificates/ESP32-C6-MINI-1U%20CE%20Certification.pdf> | pp. 1, 2 (notes 1, 2; maximum output power), 3 |
-| CE-1 | EU-type examination certificate SN23C0148, ESP32-C6-MINI-1, same notified body | 28 September 2023 | <https://www.espressif.com/sites/default/files/certificates/ESP32-C6-MINI-1%20CE%20Certification.pdf> | pp. 1, 2 |
-| CERTS | Espressif certificates page for the ESP32-C6-MINI-1 and -1U | read 25 November 2026 | <https://www.espressif.com/en/support/documents/certificates?keys=ESP32-C6-MINI-1> | list of certificates, no test reports |
+| DS-C5 | ESP32-C5-MINI-1 & MINI-1U Datasheet | v1.4 | <https://documentation.espressif.com/esp32-c5-mini-1_mini-1u_datasheet_en.pdf> | §1 (overview: PCB antenna, 2.4 and 5 GHz) |
+| CE-C5 | EU-type examination certificate 44024-05-2026-260268, ESP32-C5-MINI-1, Eurofins Electrical and Electronic Testing NA, Inc., notified body 0980 | 27 May 2026 | <https://documentation.espressif.com/ESP32-C5-MINI-1%20CE%20Certification.pdf> | p. 1 (certificate); p. 2 (annex: bands, transmit power, antenna, health and safety reports); p. 3 (EMC and radio reports) |
+| FCC-C5 | FCC grant, FCC ID 2AC7Z-ESPC5MINI1 (ESP32-C5-MINI-1), part 15E | granted 28 May 2026 | <https://documentation.espressif.com/ESP32-C5-MINI-1%20FCC-5G%20Certification.pdf> | grant notes (single modular; output power conducted; 20 cm; co-location) |
+| ANT-C5 | Sporton, "OTA Antenna Performance Data Summary", ESP-DUAL BAND-ANT C (PCB antenna), FCC exhibit "ANT Test Report" 9339346 for 2AC7Z-ESPC5MINI1 | tested 20 to 21 October 2025 | <https://fccid.io/2AC7Z-ESPC5MINI1> | §3.1 (maximum peak gain per band) |
 | FAQ | ESP-FAQ, Hardware related, RF related | latest, read 25 November 2026 | <https://docs.espressif.com/projects/esp-faq/en/latest/hardware-related/RF-related.html> | antenna selection and report reuse; RF information via sales; `cert_test` example |
-| RFT | ESP Test Tools, "EspRFTestTool Toolkit" (ESP32-C6) | latest, read 25 November 2026 | <https://docs.espressif.com/projects/esp-test-tools/en/latest/esp32c6/development_stage/rf_test_guide/rf_test_guide.html> | toolkit and test firmware |
-| FCC-G | FCC grant, FCC ID 2AC7Z-ESPC6MINIU (ESP32-C6-MINI-1U) | granted 6 March 2024 | <https://www.espressif.com/sites/default/files/ESP32-C6-MINI-1U%20FCC%20Certification.pdf> | grant notes (20 cm; output power conducted) |
-| FCC exhibits | FCC exhibit list for 2AC7Z-ESPC6MINIU (test reports, antenna specification TFPD08H10060011) | read 25 November 2026 | <https://fccid.io/2AC7Z-ESPC6MINIU> | public test reports; antenna specification pp. 2, 3 |
-| eCFR 15.203 | 47 CFR 15.203, antenna requirement | current eCFR | <https://www.ecfr.gov/current/title-47/section-15.203> | full text |
-| eCFR 15.204 | 47 CFR 15.204, external amplifiers and antenna modifications | current eCFR | <https://www.ecfr.gov/current/title-47/chapter-I/subchapter-A/part-15/subpart-C/section-15.204> | (c)(1), (c)(4) |
-| eCFR 15.212 | 47 CFR 15.212, modular transmitters | current eCFR | <https://www.ecfr.gov/current/title-47/section-15.212> | (a)(1)(iv) |
-| eCFR 2.1043 | 47 CFR 2.1043, changes in certificated equipment | current eCFR | <https://www.ecfr.gov/current/title-47/section-2.1043> | (b)(1), (b)(2), (b)(4) |
-| FCC-UM | "ESP32-C6-MINI-1U User Manual v1.0", FCC exhibit "Users Manual" for 2AC7Z-ESPC6MINIU | pre-release v1.0, 2024 | <https://fccid.io/2AC7Z-ESPC6MINIU/User-Manual/2AC7Z-ESPC6MINIU-User-Manual-7149912.pdf> | chapter 4, pp. 14 to 17 |
+| RFT | ESP Test Tools, "EspRFTestTool Toolkit" (ESP32-C5) | latest, read 26 November 2026 | <https://docs.espressif.com/projects/esp-test-tools/en/latest/esp32c5/development_stage/rf_test_guide/rf_test_guide.html> | toolkit and test firmware |
+| IDF-WIFI | ESP-IDF Programming Guide, ESP32-C5, Wi-Fi driver overview | latest, v6.1.1 and v6.0.2 compared, read 26 November 2026 | <https://docs.espressif.com/projects/esp-idf/en/latest/esp32c5/api-guides/wifi-driver/overview.html> | "Dynamic Frequency Selection (DFS)", "Home Channel" |
+| IDF-API | ESP-IDF API reference, ESP32-C5, Wi-Fi (`esp_wifi.h`, `esp_wifi_types.h`) | latest, read 26 November 2026 | <https://docs.espressif.com/projects/esp-idf/en/latest/esp32c5/api-reference/network/esp_wifi.html> | `esp_wifi_set_country`, `esp_wifi_set_country_code`, `wifi_country_t.wifi_5g_channel_mask`, `esp_wifi_set_max_tx_power` |
+| IDF-REG | ESP-IDF, `components/esp_wifi/regulatory/esp_wifi_regulatory.txt` | master, commit 34ff741b of 8 May 2026 | <https://raw.githubusercontent.com/espressif/esp-idf/master/components/esp_wifi/regulatory/esp_wifi_regulatory.txt> | entry `country DE` |
 
 ### Test reports, UL, IEEE and other secondary sources
 

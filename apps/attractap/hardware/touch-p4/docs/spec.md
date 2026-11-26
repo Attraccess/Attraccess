@@ -47,7 +47,7 @@ rails: 3.3 V (TLV62569, 2 A, 36 % headroom at the sizing figures), 1.1 V core
 |---|---|---|
 | Display and touch | 4.0" 480 x 480 panel, ST7701S, GT911 | RGB565 parallel, 40-pin flex; touch on I2C |
 | NFC | PN532, PCB loop 35 x 37 mm, 4 turns | 13.56 MHz, ISO/IEC 14443 A (MIFARE); I2C to the MCU |
-| Wi-Fi and Bluetooth LE | ESP32-C6-MINI-1U module (esp-hosted over SDIO) | 2.4 GHz Wi-Fi 6 and Bluetooth LE 5; antenna on the module's connector, inside or on the case |
+| Wi-Fi and Bluetooth LE | ESP32-C5-MINI-1 module (esp-hosted over SDIO) | Wi-Fi 6 on 2.4 GHz and 5 GHz (EU channels 36 to 64 indoors only, and 100 to 140), Bluetooth LE 5; the module's own PCB antenna in the board's top left corner |
 | Ethernet (lan) | IP101GRI PHY, HY931147C jack with magnetics | 10/100 Mbit/s, RMII |
 | USB-C | ESP32-P4 USB Serial/JTAG | flashing, console and debugging (USB 2.0 full speed) |
 | Feedback | 8 RGB LEDs SK6812MINI-E, buzzer | the LEDs shine through the board around the NFC area |
