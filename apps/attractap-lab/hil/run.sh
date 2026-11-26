@@ -157,6 +157,7 @@ if [[ "$READER_PROFILE" == secure-lab ]]; then
   READER_ELF="${READER_ELF:-$WORK/reader.elf}"
 elif [[ -z "${READER_IMAGE:-}" ]]; then
   require_idf
+  built_plain_reader=1
   firmware="$ROOT/apps/attractap/firmware"
   build="$firmware/build/hil-$VARIANT"
   # A plain lab image runs the "Secure this reader" conversion up to verify and refuses every burn (ATT-1208):
@@ -180,10 +181,11 @@ fi
 # "Secure this reader" on the plain place (test_secure_conversion.py, ATT-1208): the unsigned release secure
 # image of the variant, packaged like a release (secure_packaging.py), for the API to sign with the run's own
 # keys. The reader only streams it into its inactive slot and staging: its stop-before-burn build refuses the
-# burn, so this image never boots. Never on the secure-lab place. NO_CONVERSION_BUILD=1 skips it (tests skip).
+# burn, so this image never boots. Never on the secure-lab place, and only when run.sh built the stop-before-burn
+# reader itself (a supplied READER_IMAGE is not known to refuse burns). NO_CONVERSION_BUILD=1 skips it (tests skip).
 SECURE_IMAGE_DIR=
 SECURE_IMAGE_MANIFEST=
-if [[ "$READER_PROFILE" == plain && "${NO_CONVERSION_BUILD:-}" != 1 ]]; then
+if [[ "$READER_PROFILE" == plain && -n "${built_plain_reader:-}" && "${NO_CONVERSION_BUILD:-}" != 1 ]]; then
   require_idf
   secure_build="$ROOT/apps/attractap/firmware/build/hil-secure-$VARIANT"
   (cd "$ROOT/apps/attractap/firmware" &&
