@@ -4,7 +4,7 @@ import { flowLogFileName, toNdjson, toPlainText } from './flowLogExport';
 
 const node = (id: string, type: string) => ({ id, type, position: { x: 0, y: 0 }, data: {} }) as ResourceFlowNodeDto;
 const nodeTitle = (n?: ResourceFlowNodeDto) => (n ? `Title of ${n.type}` : 'Flow');
-const log = (id: number, flowRunId: string, extra: Partial<ResourceFlowLog & { node: ResourceFlowNodeDto }> = {}) =>
+const log = (id: number, flowRunId: string, extra: Record<string, unknown> = {}) =>
   ({
     id,
     flowRunId,
