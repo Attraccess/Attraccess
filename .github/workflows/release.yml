@@ -114,6 +114,10 @@ jobs:
       # Packing comes first so the later steps reuse the builds and packs made in the production env from the cache.
       - name: Test official plugin apps
         run: node scripts/ci-test-projects.mjs --group=plugins
+      # Loads every packed plugin in a real host (PostgreSQL) under its npm package name, as the marketplace installs
+      # it. `pack-test` only inspects the tarball; this fails when a real host refuses the plugin.
+      - name: Load packed official plugins in a real host
+        run: pnpm nx run api:verify-packed-plugins
       - name: Test packed Hello World fixture
         run: pnpm --dir examples/plugin-hello-world run pack-test
 
