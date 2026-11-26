@@ -372,11 +372,12 @@ export class McpOAuthService {
     const chosen = chosenKeys === undefined ? undefined : await this.chosenKeys(chosenKeys, current);
     const { payload } = await this.consumeLoaded(loaded);
     const requested = chosen ?? (payload.permissionKeys.length ? payload.permissionKeys : [...current].sort());
-    if (requested.some((permission) => !current.has(permission))) {
+    // A grant never stores an empty key list (a user without permissions) or more than the user holds.
+    if (requested.length === 0 || requested.some((permission) => !current.has(permission))) {
       return {
         redirectUrl: this.redirect(payload, issuer, {
           error: 'invalid_scope',
-          error_description: 'Requested permissions exceed those of the user',
+          error_description: requested.length ? 'Requested permissions exceed those of the user' : 'Nothing to grant',
         }),
       };
     }

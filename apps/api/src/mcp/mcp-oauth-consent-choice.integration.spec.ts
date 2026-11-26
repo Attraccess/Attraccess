@@ -1,5 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { mcpToolAllowed } from '@attraccess/shared';
 import { McpOAuthService } from './mcp-oauth.service';
+import { McpToolRegistry } from './mcp-tool-registry';
 import { McpRateLimitGuard } from './mcp-rate-limit.guard';
 import { McpTestApp, startMcpTestApp } from '../test-utils/mcp-app.test-fixture';
 
@@ -139,6 +141,14 @@ describe('MCP OAuth consent: choosing permissions, and the grant list (real appl
       const approved = await approve(user.id, flow.requestId);
       expect(new URL(approved.body.redirectUrl).searchParams.get('error')).toBe('invalid_scope');
     });
+
+    it('never stores an empty grant: a user without permissions gets invalid_scope for an all-permissions request', async () => {
+      const user = await t.createUser([]);
+      const flow = await start();
+      const approved = await approve(user.id, flow.requestId);
+      expect(new URL(approved.body.redirectUrl).searchParams.get('error')).toBe('invalid_scope');
+      expect(await t.db.getRepository('McpOAuthGrant').countBy({ userId: user.id })).toBe(0);
+    });
   });
 
   describe('consent view', () => {
@@ -162,12 +172,19 @@ describe('MCP OAuth consent: choosing permissions, and the grant list (real appl
       expect(listRoles).toEqual({
         name: 'listRoles',
         summary: expect.any(String),
-        requiredAll: expect.any(Array),
-        requiredAny: expect.any(Array),
+        requiredAll: [],
+        requiredAny: ['users.roles.manage', 'system.sso.manage', 'system.settings.manage'],
       });
       expect(listRoles.summary).not.toContain('\n');
-      // Only what the user's own permissions could unlock.
-      expect(view.body.tools.map((tool: { name: string }) => tool.name)).not.toContain('getAllUsers');
+      // Exactly what the user's own permissions could unlock.
+      const held = new Set(PERMISSIONS);
+      const unlockable = t.app
+        .get(McpToolRegistry)
+        .list()
+        .filter((tool) => mcpToolAllowed(tool.auth, held))
+        .map((tool) => tool.name);
+      expect(view.body.tools.map((tool: { name: string }) => tool.name).sort()).toEqual(unlockable.sort());
+      expect(unlockable.length).toBeLessThan(t.app.get(McpToolRegistry).list().length);
     });
 
     it('reports every available key as requested when the client asked for all', async () => {

@@ -92,11 +92,17 @@ describe('OpenAPI extensions', () => {
   // `@nestjs/swagger` stores extensions under this key and merges them into the operation.
   const extensionOf = (handler: unknown) => Reflect.getMetadata('swagger/apiExtension', handler as object) ?? {};
 
-  @Auth()
+  @Auth('resources.update')
   class ClassLevel {
     @Get()
     @Auth('resources.read')
     override() {
+      return true;
+    }
+
+    @Get()
+    @Auth()
+    relaxed() {
       return true;
     }
 
@@ -143,11 +149,17 @@ describe('OpenAPI extensions', () => {
       any: [],
       sessionOnly: false,
     });
+    // An empty method-level requirement replaces a non-empty class-level one too (getAllAndOverride).
+    expect(extensionOf(ClassLevel.prototype.relaxed)['x-attraccess-auth']).toEqual({
+      all: [],
+      any: [],
+      sessionOnly: false,
+    });
   });
 
   it('applies a class-level requirement to methods without their own', () => {
     expect(extensionOf(ClassLevel.prototype.plain)['x-attraccess-auth']).toEqual({
-      all: [],
+      all: ['resources.update'],
       any: [],
       sessionOnly: false,
     });

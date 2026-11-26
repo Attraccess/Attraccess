@@ -10,7 +10,7 @@ const grant = (overrides: Partial<McpOAuthGrantRecord>): McpOAuthGrantRecord => 
   permissionKeys: ['resources.read'],
   resource: 'https://example.test/api/mcp',
   createdAt: new Date('2026-01-01T00:00:00Z'),
-  expiresAt: new Date('2026-02-01T00:00:00Z'),
+  expiresAt: new Date('2099-02-01T00:00:00Z'),
   lastUsedAt: null,
   revokedAt: null,
   ...overrides,
@@ -21,9 +21,11 @@ describe('McpOAuthGrantsService', () => {
     grant({ id: 'g1' }),
     grant({ id: 'g2', clientId: 'gone' }),
     grant({ id: 'g3', clientId: 'operator' }),
+    grant({ id: 'revoked', revokedAt: new Date('2026-01-02T00:00:00Z') }),
+    grant({ id: 'expired', expiresAt: new Date('2026-01-02T00:00:00Z') }),
   ];
   const store = {
-    listActiveGrantsForUser: jest.fn(async () => grants),
+    listActiveGrantsForUser: jest.fn(async () => grants.slice(0, 3)),
     findGrant: jest.fn(async (id: string) => grants.find((entry) => entry.id === id) ?? null),
   };
   const oauth = {
@@ -58,7 +60,15 @@ describe('McpOAuthGrantsService', () => {
   it('reports a missing grant and the grant of another user the same way', async () => {
     oauth.revokeGrant.mockClear();
     await expect(service.revoke(8, 'g1')).rejects.toMatchObject({ code: 'not_found', status: 404 });
+    await expect(service.revoke(7, 'nope')).rejects.toMatchObject({ code: 'not_found', status: 404 });
     await expect(service.revoke(7, 'nope')).rejects.toBeInstanceOf(McpOAuthError);
+    expect(oauth.revokeGrant).not.toHaveBeenCalled();
+  });
+
+  it('reports a grant that already ended as missing and keeps its revocation time', async () => {
+    oauth.revokeGrant.mockClear();
+    await expect(service.revoke(7, 'revoked')).rejects.toMatchObject({ status: 404 });
+    await expect(service.revoke(7, 'expired')).rejects.toMatchObject({ status: 404 });
     expect(oauth.revokeGrant).not.toHaveBeenCalled();
   });
 });

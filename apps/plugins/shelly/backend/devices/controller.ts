@@ -291,6 +291,7 @@ export class ShellyController {
   }
 
   @Post('discovery')
+  @NotAnMcpTool('Network scan: the server probes every address of a caller-chosen range')
   async discover(@Body() body: DiscoverBody): Promise<DiscoveryResult> {
     const cidr = (body?.cidr ?? '').trim() || undefined;
     try {

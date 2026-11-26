@@ -4,6 +4,8 @@
  * an operation is a tool only if it declares `x-attraccess-auth` (set by `@Auth`, `@AuthAny`, `@SessionAuth`), is not
  * session-only, is not marked `@NotAnMcpTool` (`x-mcp-exclude`) and passes every technical exclusion below.
  */
+import { AUTH_EXTENSION, MCP_EXCLUDE_EXTENSION } from '@attraccess/plugins-backend-sdk';
+
 export type OpenApiDocument = {
   paths?: Record<string, Record<string, OpenApiOperation | unknown>>;
   components?: { schemas?: Record<string, unknown> };
@@ -20,8 +22,8 @@ type OpenApiOperation = {
   responses?: Record<string, { content?: Record<string, unknown> }>;
   callbacks?: Record<string, unknown>;
   'x-mcp-streaming'?: boolean;
-  'x-mcp-exclude'?: unknown;
-  'x-attraccess-auth'?: unknown;
+  [MCP_EXCLUDE_EXTENSION]?: unknown;
+  [AUTH_EXTENSION]?: unknown;
 };
 
 export type McpTool = {
@@ -289,15 +291,22 @@ function buildInputs(document: OpenApiDocument, entry: DocumentOperation): ToolI
   };
 }
 
-const stringList = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+const isStringList = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string');
 
-/** The requirement from `x-attraccess-auth`, or the reason the operation is not a tool. */
+/**
+ * The requirement from `x-attraccess-auth`, or the reason the operation is not a tool. Malformed metadata fails closed:
+ * reading it as "no requirement" would show the tool to every caller.
+ */
 function authRequirement(operation: OpenApiOperation): { all: string[]; any: string[] } | string {
-  const extension = operation['x-attraccess-auth'];
+  const extension = operation[AUTH_EXTENSION];
   if (!isSchema(extension)) return 'No auth metadata (public or custom-guarded route)';
-  if (extension.sessionOnly === true) return 'Session-only route';
-  return { all: stringList(extension.all), any: stringList(extension.any) };
+  const { all = [], any = [], sessionOnly = false } = extension;
+  if (!isStringList(all) || !isStringList(any) || typeof sessionOnly !== 'boolean') {
+    return 'Malformed auth metadata';
+  }
+  if (sessionOnly) return 'Session-only route';
+  return { all: [...all], any: [...any] };
 }
 
 /** Builds the tool for one operation, or throws why the operation cannot be a tool. */
@@ -342,8 +351,9 @@ export function generateMcpTools(document: OpenApiDocument): GeneratedMcpTools {
       skipped.push({ ...where, reason: auth });
       continue;
     }
-    if (operation['x-mcp-exclude'] !== undefined) {
-      const reason = isSchema(operation['x-mcp-exclude']) ? operation['x-mcp-exclude'].reason : undefined;
+    const exclusion = operation[MCP_EXCLUDE_EXTENSION];
+    if (exclusion !== undefined) {
+      const reason = isSchema(exclusion) ? exclusion.reason : undefined;
       skipped.push({ ...where, reason: `Marked @NotAnMcpTool${typeof reason === 'string' ? `: ${reason}` : ''}` });
       continue;
     }

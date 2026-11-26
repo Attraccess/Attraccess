@@ -32,10 +32,14 @@ export class McpOAuthGrantsService {
     });
   }
 
-  /** Ends the user's grant together with its tokens. A grant of another user is reported as missing. */
+  /**
+   * Ends the user's grant together with its tokens. A grant of another user, or one that already ended, is reported as
+   * missing, like on the list; the original revocation time is kept.
+   */
   async revoke(userId: number, grantId: string): Promise<void> {
     const grant = await this.oauthStore.findGrant(grantId);
-    if (!grant || grant.userId !== userId) throw new McpOAuthError('not_found', 'Unknown grant', 404);
+    const active = grant && grant.userId === userId && !grant.revokedAt && grant.expiresAt.getTime() > Date.now();
+    if (!active) throw new McpOAuthError('not_found', 'Unknown grant', 404);
     await this.oauth.revokeGrant(grant.id);
   }
 }

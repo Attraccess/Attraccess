@@ -89,6 +89,14 @@ describe('generateMcpTools', () => {
       expect(skippedReason(doc)).toBe('Session-only route');
     });
 
+    it.each([{ all: 'resources.manage' }, { all: [], any: [1] }, { all: [], any: [], sessionOnly: 'true' }])(
+      'fails closed on malformed auth metadata %j',
+      (metadata) => {
+        const doc = documentOf({ get: { operationId: 'oddThing', 'x-attraccess-auth': metadata } });
+        expect(skippedReason(doc)).toBe('Malformed auth metadata');
+      },
+    );
+
     it('skips operations marked @NotAnMcpTool and reports the reason', () => {
       const doc = documentOf({ post: { operationId: 'setSecret', 'x-mcp-exclude': { reason: 'Secret management' } } });
       expect(skippedReason(doc)).toBe('Marked @NotAnMcpTool: Secret management');

@@ -19,6 +19,7 @@ const WALL_ID = { name: 'id', type: Number } as const;
 /** Wall management. The public link of a wall is part of its answer, so managers can open it on any screen. */
 @ApiTags('Status walls')
 @Auth(STATUS_WALL_MANAGE_PERMISSION)
+@NotAnMcpTool('Secret management: every answer carries the public link token')
 @Controller('status-wall/walls')
 export class WallsController {
   constructor(@Inject(WallsService) private readonly walls: WallsService) {}
@@ -34,7 +35,6 @@ export class WallsController {
   @ApiOperation({ summary: 'Create a status wall' })
   @ApiBody({ type: WallBody })
   @ApiCreatedResponse({ type: WallDto })
-  @NotAnMcpTool('Secret management: returns the public link token')
   create(@Body(validated(WallBody)) body: WallBody): Promise<Wall> {
     return this.walls.create(body);
   }
@@ -55,7 +55,6 @@ export class WallsController {
   @ApiParam(WALL_ID)
   @ApiOkResponse({ type: WallDto })
   @ApiNotFoundResponse()
-  @NotAnMcpTool('Secret management: returns a new public link token')
   regenerate(@Param('id', ParseIntPipe) id: number): Promise<Wall> {
     return this.walls.regenerateToken(id);
   }

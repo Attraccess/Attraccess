@@ -250,7 +250,9 @@ export class WagoControllerApi {
     );
   }
 
-  @Post('controllers/:id/claim') claim(
+  @Post('controllers/:id/claim')
+  @NotAnMcpTool('Credential flow: delivers broker credentials to the PLC')
+  claim(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { name?: string; verifier?: string; mqttServerId?: number },
     @Req() request: AuthenticatedRequest,

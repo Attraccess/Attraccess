@@ -2,5 +2,5 @@
 # the repo. Unless a later match takes precedence,
 # they will be requested for review when someone opens a pull request.
 *       @jappyjan
-# The MCP manifest decides which API operations AI clients may call. Additions and changes need a security review.
+# openapi-tools.ts holds the rules that decide which API operations AI clients may call. Changes need a security review.
 /apps/api/src/mcp/openapi-tools.ts @jappyjan

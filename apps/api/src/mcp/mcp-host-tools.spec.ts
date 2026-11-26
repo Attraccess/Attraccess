@@ -127,6 +127,19 @@ describe('MCP tools of the real host OpenAPI document', () => {
     expect(FORMERLY_DENIED.filter((id) => tools.has(id))).toEqual([]);
   });
 
+  it('still finds every formerly denied operation in the document, so a rename cannot hide one from this check', () => {
+    const ids = new Set(
+      Object.values(document.paths ?? {}).flatMap((item) =>
+        Object.values(item).map((operation) => (operation as { operationId?: string } | undefined)?.operationId),
+      ),
+    );
+    expect(FORMERLY_DENIED.filter((id) => !ids.has(id))).toEqual([]);
+  });
+
+  it('carries a class-level requirement to the tools of that controller', () => {
+    expect(tools.get('mqttServersGetAll')?.auth).toEqual({ all: ['resources.update'], any: [] });
+  });
+
   it('still exposes ordinary reads, writes and the introducer operations', () => {
     for (const id of [
       'getAllResources',
