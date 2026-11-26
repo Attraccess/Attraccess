@@ -13,7 +13,7 @@ import {
   eligibleForPolicy,
   isDistTag,
   sameUpdatePolicy,
-  DEFAULT_PLUGIN_UPDATE_POLICY,
+  defaultUpdatePolicy,
   REGISTRY_PARENT,
   UPDATE_POLICY_KEY,
   normalizeUpdatePolicy,
@@ -33,6 +33,8 @@ import { existsSync } from 'fs';
 
 import { join } from 'path';
 import * as semver from 'semver';
+
+import { resolvePluginChannel } from '../../config/app.config';
 
 import { NpmInstallationPlan } from './installation-plan';
 
@@ -164,7 +166,7 @@ export class NpmInstallation {
 
   async install(
     name: string,
-    spec: string,
+    spec: string | undefined,
     registryId?: string,
     audit?: NpmPluginAuditState,
     planToken?: string,
@@ -175,8 +177,11 @@ export class NpmInstallation {
     const registry = await this.registry.registry(registryId);
     const { version, metadata } = await this.plan.resolveVersion(name, spec, registry);
     const plan = await this.plan.installPlan(name, version, registry.id);
-    if (plan.plugins.length > 1) return this.installGraph(plan, registry, spec, undefined, [], audit, planToken);
-    return this.installFromRegistry(name, version, registry, undefined, [], spec, metadata, audit);
+    // Without an explicit spec the install follows the host's plugin channel.
+    const requestedSpec = spec ?? resolvePluginChannel();
+    if (plan.plugins.length > 1)
+      return this.installGraph(plan, registry, requestedSpec, undefined, [], audit, planToken);
+    return this.installFromRegistry(name, version, registry, undefined, [], requestedSpec, metadata, audit);
   }
 
   async installFromRegistry(
@@ -323,8 +328,10 @@ export class NpmInstallation {
       current.registryId !== installed.registryId ||
       (policy !== undefined && currentPolicy !== undefined && !sameUpdatePolicy(currentPolicy, policy));
     try {
-      policy = await this.getUpdatePolicy();
+      const stored = await this.readUpdatePolicy();
+      policy = stored.policy;
       if (!policy.checksEnabled) return installed;
+      const channel = resolvePluginChannel();
       const candidates = await this.plan.installedVersionCandidates(name);
       const requested = isDistTag(installed.requestedSpec)
         ? await this.plan.resolveVersion(
@@ -341,7 +348,7 @@ export class NpmInstallation {
           (item) =>
             item.direction === 'newer' &&
             item.compatible &&
-            eligibleForPolicy(item, current, policy, requested?.version),
+            eligibleForPolicy(item, current, policy, requested?.version, !stored.explicit && channel === 'next'),
         );
         const blocked = candidates.some((item) => item.direction === 'newer' && item.compatible) && !candidate;
         const updated = {
@@ -475,12 +482,18 @@ export class NpmInstallation {
   }
 
   async getUpdatePolicy(): Promise<PluginUpdatePolicy> {
+    return (await this.readUpdatePolicy()).policy;
+  }
+
+  /** `explicit` is false while no policy was ever saved, so the host's default (channel dependent) applies. */
+  private async readUpdatePolicy(): Promise<{ policy: PluginUpdatePolicy; explicit: boolean }> {
+    const fallback = defaultUpdatePolicy(resolvePluginChannel());
     const raw = await this.settings.getPlainSetting(REGISTRY_PARENT, UPDATE_POLICY_KEY);
-    if (!raw) return DEFAULT_PLUGIN_UPDATE_POLICY;
+    if (!raw) return { policy: fallback, explicit: false };
     try {
-      return normalizeUpdatePolicy(JSON.parse(raw));
+      return { policy: normalizeUpdatePolicy(JSON.parse(raw)), explicit: true };
     } catch {
-      return DEFAULT_PLUGIN_UPDATE_POLICY;
+      return { policy: fallback, explicit: false };
     }
   }
 

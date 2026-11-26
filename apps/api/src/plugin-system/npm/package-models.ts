@@ -352,6 +352,13 @@ export const DEFAULT_PLUGIN_UPDATE_POLICY: PluginUpdatePolicy = {
   maintenanceWindow: { startMinute: 180, durationMinutes: 120 },
   prerelease: false,
 };
+/**
+ * The policy of a host that never saved one. A `next` host also moves plugins that follow `next` between prereleases
+ * (see `eligibleForPolicy`); other plugins stay on stable versions.
+ */
+export function defaultUpdatePolicy(channel: 'latest' | 'next'): PluginUpdatePolicy {
+  return channel === 'next' ? { ...DEFAULT_PLUGIN_UPDATE_POLICY, prerelease: true } : DEFAULT_PLUGIN_UPDATE_POLICY;
+}
 export function samePermissions(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((permission) => right.includes(permission));
 }
@@ -398,6 +405,8 @@ export function eligibleForPolicy(
   installed: InstalledNpmPlugin,
   policy: PluginUpdatePolicy,
   resolvedRequestedVersion?: string,
+  /** The host's default policy on a `next` host, which lets plugins requesting `next` follow it through prereleases. */
+  channelDefault = false,
 ): boolean {
   const override = installed.updateOverride ?? 'inherit';
   const checksEnabled = override !== 'off' && policy.checksEnabled;
@@ -405,7 +414,11 @@ export function eligibleForPolicy(
   if (!checksEnabled || mode === 'off' || candidate.deprecated || candidate.permissionAdditions.length > 0)
     return false;
   if (!policy.prerelease && semver.prerelease(candidate.version)) return false;
+  const followsChannel =
+    channelDefault && installed.requestedSpec === 'next' && candidate.version === resolvedRequestedVersion;
+  if (channelDefault && !followsChannel && semver.prerelease(candidate.version)) return false;
   if (candidate.semverImpact === 'major') return false;
+  if (followsChannel && mode === 'minor') return true;
   if (mode === 'patch') return candidate.semverImpact === 'patch';
   if (mode === 'minor') return candidate.semverImpact === 'patch' || candidate.semverImpact === 'minor';
   return matchesSpec(candidate.version, installed.requestedSpec, policy.prerelease, resolvedRequestedVersion);

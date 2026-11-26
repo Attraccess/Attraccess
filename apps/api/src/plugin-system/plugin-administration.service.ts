@@ -14,6 +14,8 @@ import { AUDIT_RECORDER, AuditActor, AuditDetails, AuditRecorder } from '../audi
 
 import { FileUpload } from '../common/types/file-upload.types';
 
+import { resolvePluginChannel } from '../config/app.config';
+
 import { AddPluginRegistryDto } from './dto/npm-plugin-request.dto';
 
 import { InstalledNpmPlugin, NpmPluginAuditState, NpmPluginService } from './npm-plugin.service';
@@ -111,8 +113,8 @@ export class PluginAdministrationService {
     );
   }
 
-  install(packageName: string, spec: string, registryId?: string, planToken?: string, actor?: AuditActor) {
-    return this.installWithAudit(actor, 'plugin.installed', packageName, spec, (state) =>
+  install(packageName: string, spec: string | undefined, registryId?: string, planToken?: string, actor?: AuditActor) {
+    return this.installWithAudit(actor, 'plugin.installed', packageName, spec ?? resolvePluginChannel(), (state) =>
       this.npmPluginService.install(packageName, spec, registryId, state, planToken),
     );
   }

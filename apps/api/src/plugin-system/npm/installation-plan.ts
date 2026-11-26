@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 import * as semver from 'semver';
+import { resolvePluginChannel } from '../../config/app.config';
 
 import { NpmPluginPackage, parseNpmPluginPackage } from './contract-validation';
 
@@ -135,9 +136,10 @@ export class NpmInstallationPlan {
     };
   }
 
+  /** `spec` omitted means the host's plugin channel (see `NpmPackageCatalog.channelVersion`). */
   async resolveVersion(
     name: string,
-    spec: string,
+    spec: string | undefined,
     registry: Registry,
   ): Promise<{
     version: string;
@@ -147,14 +149,17 @@ export class NpmInstallationPlan {
       versions?: Record<string, PackageVersion>;
       'dist-tags'?: Record<string, string>;
     };
-    const version = metadata.versions?.[spec]
-      ? spec
-      : (metadata['dist-tags']?.[spec] ?? semver.maxSatisfying(Object.keys(metadata.versions ?? {}), spec));
+    const followsChannel = spec === undefined || (spec === 'next' && resolvePluginChannel() === 'next');
+    const version = followsChannel
+      ? this.catalog.channelVersion(metadata)
+      : metadata.versions?.[spec]
+        ? spec
+        : (metadata['dist-tags']?.[spec] ?? semver.maxSatisfying(Object.keys(metadata.versions ?? {}), spec));
     if (!version || !metadata.versions?.[version]) throw new NotFoundException('Package version not found');
     return { version, metadata };
   }
 
-  async installPlan(name: string, spec: string, registryId?: string): Promise<PluginInstallPlan> {
+  async installPlan(name: string, spec: string | undefined, registryId?: string): Promise<PluginInstallPlan> {
     const registry = await this.registry.registry(registryId);
     const stateHash = createHash('sha256').update(JSON.stringify(readInstalledNpmPlugins())).digest('hex');
     const installed = this.state.listInstalled();

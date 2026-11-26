@@ -143,7 +143,7 @@ export class PluginController {
   @ApiQuery({ name: 'registryId', required: false, type: String })
   dependencyPlan(
     @Param('packageName') packageName: string,
-    @Query('spec') spec = 'latest',
+    @Query('spec') spec?: string,
     @Query('registryId') registryId?: string,
   ) {
     return this.npmPluginService.installPlan(packageName, spec, registryId);
@@ -192,7 +192,7 @@ export class PluginController {
   @Auth('system.plugins.manage')
   installPackageSpec(
     @Param('packageName') packageName: string,
-    @Body('spec') spec = 'latest',
+    @Body('spec') spec?: string,
     @Body('registryId') registryId?: string,
     @Req() req?: AuthenticatedRequest,
     @Body('planToken') planToken?: string,

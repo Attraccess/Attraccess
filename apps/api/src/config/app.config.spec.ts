@@ -1,6 +1,36 @@
 import { UPGRADE_DOCS_URL } from '../database/backend/database-type';
 import { resolveDatabaseBackend } from '../database/backend';
-import appConfig, { AppEnvSchema, DEFAULT_PLUGIN_DIR, resolveAppVersion, resolvePluginDir } from './app.config';
+import appConfig, {
+  AppEnvSchema,
+  DEFAULT_PLUGIN_DIR,
+  resolveAppVersion,
+  resolvePluginChannel,
+  resolvePluginDir,
+} from './app.config';
+
+describe('plugin channel configuration', () => {
+  const parse = (value?: string) =>
+    AppEnvSchema.parse({ AUTH_SESSION_SECRET: 'test-secret', ATTRACCESS_PLUGIN_CHANNEL: value });
+
+  it('defaults to latest, also when blank', () => {
+    expect(parse().ATTRACCESS_PLUGIN_CHANNEL).toBe('latest');
+    expect(parse('').ATTRACCESS_PLUGIN_CHANNEL).toBe('latest');
+  });
+
+  it.each(['latest', 'next'])('accepts %s', (channel) => {
+    expect(parse(channel).ATTRACCESS_PLUGIN_CHANNEL).toBe(channel);
+    expect(resolvePluginChannel({ ATTRACCESS_PLUGIN_CHANNEL: channel })).toBe(channel);
+  });
+
+  it('rejects any other value at boot', () => {
+    expect(() => parse('beta')).toThrow();
+  });
+
+  it('resolves to latest unless next is set', () => {
+    expect(resolvePluginChannel({})).toBe('latest');
+    expect(resolvePluginChannel({ ATTRACCESS_PLUGIN_CHANNEL: '' })).toBe('latest');
+  });
+});
 
 describe('plugin directory configuration', () => {
   it('defaults PLUGIN_DIR when it is not configured', () => {
