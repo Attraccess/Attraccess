@@ -142,7 +142,7 @@
     "saveError": "Update-Regel konnte nicht gespeichert werden",
     "available": "Update verfügbar",
     "availableTitle": "Plugin-Updates sind verfügbar",
-    "availableDescription": "{{count}} installiertes Marketplace-Plugin kann aktualisiert werden. Prüfe die verfügbare Version vor der Installation.",
+    "availableDescription": "Installierte Marketplace-Plugins mit Update: {{count}}. Attraccess installiert Updates im Wartungsfenster, sofern sie keine weiteren Plugin-Änderungen brauchen. Du kannst sie auch jetzt prüfen und installieren.",
     "reviewUpdates": "Updates prüfen",
     "modes": {
       "off": "Aus",
