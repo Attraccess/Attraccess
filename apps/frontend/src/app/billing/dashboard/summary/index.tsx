@@ -23,6 +23,7 @@ import {
 import { CreditCardIcon, RotateCcwIcon } from 'lucide-react';
 import { TransactionDetailsModal } from './transactionDetailsModal/index';
 import { RefundModal } from './transactionDetailsModal/refund/index';
+import { useReloadOnTransactionUpdates } from './useReloadOnTransactionUpdates';
 import { useCreditsFormatter } from '../../../../hooks/useCreditsFormatter';
 import de from './de.json';
 import en from './en.json';
@@ -65,6 +66,8 @@ export function SummaryCard(props: Props) {
       enabled: !!userId && !isDisabled,
     },
   );
+
+  useReloadOnTransactionUpdates(userId, !isDisabled);
 
   const [transactionsPage] = useState(1);
 
