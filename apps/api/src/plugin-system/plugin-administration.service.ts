@@ -197,7 +197,7 @@ export class PluginAdministrationService {
 
   /** Restarts the API process, which applies every pending plugin change. Allowed when none is pending. */
   async restart(actor: AuditActor) {
-    await this.record(actor, 'plugin.restart_requested', 1, 'plugin-policy', {
+    await this.record(actor, 'plugin.restart_requested', 1, 'plugin-system', {
       pendingChanges: isPluginRestartRequired() ? 1 : 0,
       restartRequested: 1,
     });
@@ -314,7 +314,7 @@ export class PluginAdministrationService {
     actor: AuditActor | undefined,
     action: PluginAuditAction,
     subjectId: number,
-    subjectType: 'plugin-package' | 'plugin-registry' | 'plugin-policy',
+    subjectType: 'plugin-package' | 'plugin-registry' | 'plugin-policy' | 'plugin-system',
     details: AuditDetails,
     outcome: 'succeeded' | 'failed' = 'succeeded',
     operationId?: string,

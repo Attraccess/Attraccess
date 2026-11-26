@@ -117,7 +117,7 @@ describe('PluginController', () => {
         expect.objectContaining({
           domain: 'administration',
           action: 'plugin.restart_requested',
-          subject: { type: 'plugin-policy', id: 1 },
+          subject: { type: 'plugin-system', id: 1 },
           details: { pendingChanges: 1, restartRequested: 1 },
         }),
       );

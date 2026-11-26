@@ -266,6 +266,7 @@
     "plugin-package": "Plugin-Paket",
     "plugin-registry": "Plugin-Registry",
     "plugin-policy": "Plugin-Regel",
+    "plugin-system": "Plugin-System",
     "flow": "Globaler Flow"
   },
   "fields": {

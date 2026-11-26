@@ -265,7 +265,7 @@ rules['plugin.retry_requested'] = {
   fields: { pluginId: identifier, pluginName: text, pluginVersion: text, restartRequested: flag },
 };
 rules['plugin.restart_requested'] = {
-  subject: 'plugin-policy',
+  subject: 'plugin-system',
   fields: { pendingChanges: flag, restartRequested: flag },
 };
 
