@@ -22,6 +22,12 @@ describe('plugin channel configuration', () => {
     expect(resolvePluginChannel({ ATTRACCESS_PLUGIN_CHANNEL: channel })).toBe(channel);
   });
 
+  it('ignores surrounding blanks, as the runtime reading does', () => {
+    expect(parse(' next ').ATTRACCESS_PLUGIN_CHANNEL).toBe('next');
+    expect(parse('  ').ATTRACCESS_PLUGIN_CHANNEL).toBe('latest');
+    expect(resolvePluginChannel({ ATTRACCESS_PLUGIN_CHANNEL: ' next ' })).toBe('next');
+  });
+
   it('rejects any other value at boot', () => {
     expect(() => parse('beta')).toThrow();
   });

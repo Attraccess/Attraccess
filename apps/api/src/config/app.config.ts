@@ -84,7 +84,8 @@ export const AppEnvSchema = z
     STATIC_DOCS_FILE_PATH: z.string().optional(),
     /** Plugin release channel: the npm dist-tag marketplace and installs use by default. Blank is the default `latest`. */
     ATTRACCESS_PLUGIN_CHANNEL: z.preprocess(
-      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      // Trimmed like `resolvePluginChannel` reads it.
+      (value) => (typeof value === 'string' ? value.trim() || undefined : value),
       z.enum(PLUGIN_CHANNELS).default('latest'),
     ),
     PLUGIN_DIR: z.string().min(1).default(resolvePluginDir),
