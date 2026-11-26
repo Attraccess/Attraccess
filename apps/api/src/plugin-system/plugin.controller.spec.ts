@@ -99,7 +99,7 @@ describe('PluginController', () => {
     });
   });
 
-  it('reports pending plugin changes until the process restarts', () => {
+  it('reports a restart as required once plugin changes are marked', () => {
     expect(controller.getPluginSystemStatus().restartRequired).toBe(false);
 
     markPluginRestartRequired();

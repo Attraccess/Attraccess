@@ -247,7 +247,7 @@ describe('NpmPluginService', () => {
     expect(isPluginRestartRequired()).toBe(true);
   });
 
-  it('restarts after removing a package when quarantine cleanup fails', async () => {
+  it('marks a restart as required after removing a package when quarantine cleanup fails', async () => {
     const name = '@attraccess/plugin';
     const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
     mkdirSync(join(fixture.root, installPath), { recursive: true });
@@ -322,7 +322,7 @@ describe('NpmPluginService', () => {
     expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
   });
 
-  it('restarts after backup cleanup fails following a successful install', async () => {
+  it('marks a restart as required when backup cleanup fails after a successful install', async () => {
     const name = '@attraccess/plugin';
     const tarball = await fixture.packageTarball(name);
     const target = join(fixture.root, `npm-${Buffer.from(name).toString('base64url')}`);

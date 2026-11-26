@@ -2,7 +2,7 @@ import { registerNpmPluginDependencyLifecycleFixture } from './npm-plugin-depend
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { PluginService } from './plugin.service';
-import { isPluginRestartRequired } from './runtime/restart-required';
+import { clearPluginRestartRequired, isPluginRestartRequired } from './runtime/restart-required';
 import { NpmPluginService } from './npm-plugin.service';
 import { rename } from 'fs/promises';
 import { createHash } from 'crypto';
@@ -209,17 +209,37 @@ describe('npm plugin dependency lifecycle', () => {
     expect(isPluginRestartRequired()).toBe(true);
   });
 
+  it.each([
+    ['update', '1.1.0'],
+    ['downgrade', '0.9.0'],
+  ])('marks a restart as required after a single-package %s without restarting', async (_change, target) => {
+    await fixture.publish(fixture.pkg('core'));
+    await fixture.install('core');
+    await fixture.publish(fixture.pkg('core', [], target));
+    clearPluginRestartRequired();
+
+    await fixture.service.replaceInstalled('core', target);
+
+    expect(fixture.service.listInstalled().map(({ name, version }) => [name, version])).toEqual([['core', target]]);
+    expect(isPluginRestartRequired()).toBe(true);
+    expect(PluginService.prototype.requestRestart).not.toHaveBeenCalled();
+  });
+
   it('protects dependencies and requires the exact transitive removal approval', async () => {
     await fixture.publish(fixture.pkg('core'));
     await fixture.publish(fixture.pkg('adapter', [fixture.dep('core')]));
     await fixture.publish(fixture.pkg('provider', [fixture.dep('adapter')]));
     await fixture.install('provider');
+    clearPluginRestartRequired();
     await expect(fixture.service.removeInstalled('core')).rejects.toThrow('adapter, provider');
     await expect(fixture.service.removeInstalled('core', ['adapter'])).rejects.toThrow('required by');
     expect(fixture.service.listInstalled()).toHaveLength(3);
+    expect(isPluginRestartRequired()).toBe(false);
     await fixture.service.removeInstalled('core', ['adapter', 'provider']);
     expect(fixture.service.listInstalled()).toEqual([]);
     expect(PluginService.getPlugins()).toEqual([]);
+    expect(isPluginRestartRequired()).toBe(true);
+    expect(PluginService.prototype.requestRestart).not.toHaveBeenCalled();
   });
 
   it('restores all files and state when grouped removal fails to persist', async () => {

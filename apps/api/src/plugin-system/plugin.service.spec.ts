@@ -3,7 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { PluginService } from './plugin.service';
-import { isPluginRestartRequired } from './runtime/restart-required';
+import { isPluginRestartRequired, markPluginRestartRequired } from './runtime/restart-required';
 import { PluginBootGuard } from './runtime/boot-guard';
 import { zipFileUpload } from './__test__/make-zip';
 
@@ -42,6 +42,14 @@ describe('PluginService', () => {
       const zip = zipFileUpload({ 'plugin.json': JSON.stringify({ ...fixture.VALID_MANIFEST, name: 'npm-tools' }) });
 
       await expect(new PluginService().uploadPlugin(zip)).rejects.toThrow('visible single path segment');
+    });
+
+    it('clears a required restart when the plugin system is configured, as at process start', () => {
+      markPluginRestartRequired();
+
+      PluginService.configure({ PLUGIN_DIR: fixture.root, RESTART_BY_EXIT: true });
+
+      expect(isPluginRestartRequired()).toBe(false);
     });
 
     it('returns an empty array when the plugin folder does not exist', () => {
