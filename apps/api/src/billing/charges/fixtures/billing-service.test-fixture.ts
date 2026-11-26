@@ -11,7 +11,10 @@ export function createBillingServiceFixture() {
   const ledgerStore = new FakeBillingLedgerStore();
   const configurationStore = new FakeBillingConfigurationStore();
   const unitOfWork = new FakeUnitOfWork();
-  const liveNotifications = { notifyTransactionUpdate: jest.fn().mockResolvedValue(undefined) };
+  const liveNotifications = {
+    notifyTransactionUpdate: jest.fn().mockResolvedValue(undefined),
+    notifyTransactionRemoved: jest.fn(),
+  };
   const email = { sendResourceUsageBillingSummaryEmail: jest.fn().mockResolvedValue(undefined) };
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
   const metrics = {

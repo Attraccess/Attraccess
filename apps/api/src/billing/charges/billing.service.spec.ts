@@ -504,14 +504,28 @@ describe('BillingService', () => {
         expect(f.ledgerStore.contexts.at(-1)).toBe(scope);
       });
 
-      it('publishes nothing and mails nothing when its own unit of work discarded the bill', async () => {
-        await pendingBill();
+      it('mails nothing and, once committed, only tells open billing pages that the pending bill is gone', async () => {
+        const bill = await pendingBill();
 
         await expect(f.service.chargeForResourceUsage(billableUsage())).resolves.toBeUndefined();
 
         expect(f.ledgerStore.transactions).toHaveLength(0);
+        expect(f.liveNotifications.notifyTransactionRemoved).toHaveBeenCalledWith(
+          expect.objectContaining({ id: bill.id, status: BillingTransactionStatus.Pending }),
+        );
         expect(f.liveNotifications.notifyTransactionUpdate).not.toHaveBeenCalled();
         expect(f.email.sendResourceUsageBillingSummaryEmail).not.toHaveBeenCalled();
+      });
+
+      it('tells open billing pages about the discard only after the caller’s unit of work committed', async () => {
+        await pendingBill();
+        const scope = fakeTransactionScope();
+
+        await f.service.chargeForResourceUsage(billableUsage(), scope);
+
+        expect(f.liveNotifications.notifyTransactionRemoved).not.toHaveBeenCalled();
+        (scope.afterCommit as jest.Mock).mock.calls.forEach(([callback]) => callback());
+        expect(f.liveNotifications.notifyTransactionRemoved).toHaveBeenCalledTimes(1);
       });
 
       it('settles a second time without an error and without creating a bill', async () => {

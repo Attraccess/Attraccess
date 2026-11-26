@@ -198,11 +198,13 @@ export class BillingService {
     });
 
     // A session without any charge leaves no bill: its pending one goes, unless a late meter correction needs it.
-    if (
-      grossCredits === BigInt(0) &&
-      (!existing || (await this.ledgerStore.discardPendingUsageBill(usage.id, context)))
-    ) {
-      return undefined;
+    if (grossCredits === BigInt(0)) {
+      if (!existing) return undefined;
+      if (await this.ledgerStore.discardPendingUsageBill(usage.id, context)) {
+        // An open billing page still lists the pending bill; it has no receipt, so nothing else is published.
+        context.afterCommit(() => this.liveNotificationsService.notifyTransactionRemoved(existing));
+        return undefined;
+      }
     }
 
     const billingFactor = usage.billingFactor ?? usage.user.billingFactor;

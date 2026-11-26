@@ -35,4 +35,12 @@ export class LiveNotificationsService {
 
     this.transactionSubjects.get(transaction.userId)?.next({ data: transaction });
   }
+
+  /**
+   * Publishes a transaction that was deleted, as it was before, for example the pending bill of a session without any
+   * charge. A subscriber that shows it loads its list again.
+   */
+  public notifyTransactionRemoved(transaction: BillingTransactionRecord): void {
+    this.transactionSubjects.get(transaction.userId)?.next({ data: transaction });
+  }
 }
