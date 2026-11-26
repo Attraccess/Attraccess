@@ -243,6 +243,21 @@ describe('automatic plugin updates (integration)', () => {
     expect(versions()).toEqual({ [NAME]: OLD, [OTHER]: OLD });
   });
 
+  it.each([
+    ['minor', OLD],
+    ['follow', NEWEST],
+  ] as const)(
+    'on a next host, a saved policy replaces the nightly default: in %s mode the plugin ends at %s',
+    async (mode, expected) => {
+      const { service, versions, runAt } = await host();
+      // Saving only the window still saves a policy. It keeps the prerelease flag the next-host default had.
+      await service.setUpdatePolicy({ maintenanceWindow: { startMinute: 180, durationMinutes: 120 } });
+      await service.setUpdatePolicy({ mode });
+      await runAt(inWindow);
+      expect(versions()[NAME]).toBe(expected);
+    },
+  );
+
   it('respects a saved maintenance window', async () => {
     const { service, versions, runAt } = await host();
     await service.setUpdatePolicy({ maintenanceWindow: { startMinute: 12 * 60, durationMinutes: 10 } });

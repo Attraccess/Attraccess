@@ -72,6 +72,8 @@ Für die globale Richtlinie gibt es noch keine Seite in der Weboberfläche. Ein 
 | `{"mode": "off"}`                                                    | Updates werden nicht automatisch installiert               |
 | `{"maintenanceWindow": {"startMinute": 60, "durationMinutes": 120}}` | Das Fenster läuft von 01:00 bis 03:00 Uhr                  |
 
+Auf einem Nightly-Host ersetzt das Speichern eines beliebigen Teils der globalen Richtlinie, auch nur des Wartungsfensters, den unter [Nightly-Hosts folgen `next`](#nightly-hosts-folgen-next) beschriebenen Nightly-Standard. Um mit einer gespeicherten Richtlinie weiter Nightly-Builds zu folgen, sende zusätzlich `{"mode": "follow", "prerelease": true}`. Jedes Plugin folgt dann seiner gewünschten Version oder seinem Kanal.
+
 Ein Plugin, dessen eigene Regel nicht **Globale Regel übernehmen** ist, verwendet diese anstelle des globalen Modus. Ausgeschaltete Update-Prüfungen (`checksEnabled: false`) gelten für alle Plugins.
 
 > [!WARNING]

@@ -72,6 +72,8 @@ The global policy has no page in the web interface yet. An administrator who may
 | `{"mode": "off"}`                                                    | Updates are not installed automatically        |
 | `{"maintenanceWindow": {"startMinute": 60, "durationMinutes": 120}}` | The window runs from 01:00 to 03:00            |
 
+On a nightly host, saving any part of the global policy, also only the maintenance window, replaces the nightly default described in [Nightly hosts follow `next`](#nightly-hosts-follow-next). To keep following nightly builds with a saved policy, also send `{"mode": "follow", "prerelease": true}`. Each plugin then follows its requested version or channel.
+
 A plugin whose own setting is not **Inherit global policy** uses that setting instead of the global mode. Disabled checks (`checksEnabled: false`) apply to every plugin.
 
 > [!WARNING]
