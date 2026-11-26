@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   Chip,
   Skeleton,
@@ -10,6 +10,9 @@ import {
   TableHeader,
   TableRow,
   TableScrollContainer,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from '@heroui/react';
 import { Trash2 } from 'lucide-react';
 import {
@@ -19,7 +22,7 @@ import {
   TableRowActions,
   useTranslations,
 } from '@attraccess/plugins-frontend-ui';
-import { useListMcpOAuthGrants, useRevokeMcpOAuthGrant } from '@attraccess/react-query-client';
+import { useListMcpOAuthGrants, useListPermissions, useRevokeMcpOAuthGrant } from '@attraccess/react-query-client';
 import type { McpOAuthGrantDto } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
@@ -47,6 +50,12 @@ export function McpGrantsCard({ oauthEnabled }: McpGrantsCardProps) {
     refetch,
   } = useListMcpOAuthGrants<McpOAuthGrantDto[]>({}, undefined, { retry: false });
   const { mutateAsync: revokeGrant, isPending: isRevoking } = useRevokeMcpOAuthGrant();
+  // Plugin permissions are named by the catalog entry, not by their key.
+  const { data: catalog } = useListPermissions();
+  const labelOf = useMemo(() => {
+    const byKey = new Map((catalog ?? []).map((permission) => [permission.key, permission]));
+    return (key: string) => permissionLabel(byKey.get(key) ?? { key });
+  }, [catalog, permissionLabel]);
 
   useEffect(() => {
     if (isError) showToast({ title: t('grants.errors.loadFailed'), type: 'error' });
@@ -94,20 +103,30 @@ export function McpGrantsCard({ oauthEnabled }: McpGrantsCardProps) {
                   <TableCell>
                     <span className="break-words">{grant.clientName}</span>
                     {!grant.registeredByOperator && (
-                      <Chip size="sm" color="warning" className="ml-2" title={t('grants.unverifiedHint')}>
-                        {t('grants.unverified')}
-                      </Chip>
+                      <Tooltip>
+                        <TooltipTrigger tabIndex={0} className="ml-2 inline-flex">
+                          <Chip size="sm" color="warning" variant="soft">
+                            {t('grants.unverified')}
+                          </Chip>
+                        </TooltipTrigger>
+                        <TooltipContent showArrow>{t('grants.unverifiedHint')}</TooltipContent>
+                      </Tooltip>
                     )}
                   </TableCell>
                   <TableCell>
-                    <span title={grant.permissionKeys.map((key) => permissionLabel({ key })).join(', ')}>
-                      {grant.permissionKeys
-                        .slice(0, MAX_LISTED_PERMISSIONS)
-                        .map((key) => permissionLabel({ key }))
-                        .join(', ')}
-                      {grant.permissionKeys.length > MAX_LISTED_PERMISSIONS &&
-                        ` ${t('grants.morePermissions', { count: grant.permissionKeys.length - MAX_LISTED_PERMISSIONS })}`}
-                    </span>
+                    <span>{grant.permissionKeys.slice(0, MAX_LISTED_PERMISSIONS).map(labelOf).join(', ')}</span>
+                    {grant.permissionKeys.length > MAX_LISTED_PERMISSIONS && (
+                      <Tooltip>
+                        <TooltipTrigger tabIndex={0} className="ml-2 inline-flex" data-cy="mcp-grant-more-permissions">
+                          <Chip size="sm" variant="soft">
+                            {t('grants.morePermissions', {
+                              count: grant.permissionKeys.length - MAX_LISTED_PERMISSIONS,
+                            })}
+                          </Chip>
+                        </TooltipTrigger>
+                        <TooltipContent showArrow>{grant.permissionKeys.map(labelOf).join(', ')}</TooltipContent>
+                      </Tooltip>
+                    )}
                   </TableCell>
                   <TableCell>
                     <DateTimeDisplay date={grant.createdAt} />

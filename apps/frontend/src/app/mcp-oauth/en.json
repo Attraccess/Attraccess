@@ -57,7 +57,10 @@
     "request": "The app sent an invalid sign-in request ({{code}}). Start the connection again from your app or contact its developer."
   },
   "tools": {
-    "title": "{{count}} tools enabled",
+    "title": {
+      "one": "{{count}} tool enabled",
+      "many": "{{count}} tools enabled"
+    },
     "description": "The app can use these tools with the permissions you selected. Each call is still checked against your permissions.",
     "none": "No tools are enabled by this selection."
   },

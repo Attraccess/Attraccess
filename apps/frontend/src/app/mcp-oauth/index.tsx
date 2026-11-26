@@ -66,7 +66,12 @@ export function McpOAuthAuthorizePage() {
     onError: (error: unknown) => {
       setDecided(null);
       // The API refuses a bad selection before it uses up the request: the user can correct it and try again.
-      if ((error as ApiFailure | undefined)?.status === 400) return setSelectionRejected(true);
+      // A refetch drops permissions the user lost in the meantime from the offer and from the selection.
+      if ((error as ApiFailure | undefined)?.status === 400) {
+        setSelectionRejected(true);
+        void consent.refetch();
+        return;
+      }
       setFailure(classify(error));
     },
   };
@@ -74,11 +79,11 @@ export function McpOAuthAuthorizePage() {
   const deny = useDenyMcpOAuthRequest(undefined, handlers);
 
   const view = consent.data;
-  const initialKeys = useMemo(() => {
+  // Always within what the user holds now, also after a refetch removed a permission the user had picked.
+  const selectedKeys = useMemo(() => {
     const available = new Set((view?.availablePermissions ?? []).map((permission) => permission.key));
-    return new Set((view?.requestedPermissionKeys ?? []).filter((key) => available.has(key)));
-  }, [view]);
-  const selectedKeys = chosen ?? initialKeys;
+    return new Set([...(chosen ?? view?.requestedPermissionKeys ?? [])].filter((key) => available.has(key)));
+  }, [view, chosen]);
   const unavailableLabels = useMemo(() => {
     const byKey = new Map((view?.permissions ?? []).map((permission) => [permission.key, permission]));
     return (view?.unavailablePermissions ?? []).map((key) => permissionLabel(byKey.get(key) ?? { key })).join(', ');
@@ -138,7 +143,7 @@ export function McpOAuthAuthorizePage() {
               </Alert>
 
               {view.unavailablePermissions.length > 0 && (
-                <Alert status="danger" data-cy="mcp-oauth-unavailable">
+                <Alert status="warning" data-cy="mcp-oauth-unavailable">
                   <AlertContent>
                     <AlertTitle>{t('unavailable.title')}</AlertTitle>
                     <AlertDescription>{t('unavailable.message', { permissions: unavailableLabels })}</AlertDescription>

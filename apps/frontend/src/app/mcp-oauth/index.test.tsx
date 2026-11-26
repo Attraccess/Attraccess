@@ -20,6 +20,7 @@ const state = vi.hoisted(() => ({
     { onSuccess: (value: { redirectUrl: string }) => void; onError: (error: unknown) => void }
   >,
   leave: vi.fn(),
+  refetch: vi.fn(),
 }));
 
 const t = (key: string, vars?: Record<string, unknown>) => [key, ...Object.values(vars ?? {})].join(':');
@@ -69,7 +70,7 @@ vi.mock('../../components/permissionPicker', () => ({
   ),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useGetMcpOAuthRequest: () => state.consent,
+  useGetMcpOAuthRequest: () => ({ ...state.consent, refetch: state.refetch }),
   useApproveMcpOAuthRequest: (_mutationKey: unknown, options: (typeof state.options)[string]) => {
     state.options.approve = options;
     return { mutate: state.approve };
@@ -243,6 +244,7 @@ it('lets the user correct the selection after the API rejects it, instead of end
   fireEvent.click(screen.getByText('approve'));
   act(() => state.options.approve.onError({ status: 400 }));
   expect(screen.getByText('selectionError')).toBeTruthy();
+  expect(state.refetch).toHaveBeenCalled();
   expect(screen.queryByText('error.expired')).toBeNull();
   expect(screen.queryByText('error.generic')).toBeNull();
   expect(approveButton().disabled).toBe(false);
@@ -250,6 +252,21 @@ it('lets the user correct the selection after the API rejects it, instead of end
   expect(screen.queryByText('selectionError')).toBeNull();
   fireEvent.click(approveButton());
   expect(state.approve).toHaveBeenCalledTimes(2);
+});
+
+it('drops a picked permission from the selection once the user no longer holds it', () => {
+  const { rerender } = render(<McpOAuthAuthorizePage />);
+  fireEvent.click(screen.getByLabelText('pick resources.update'));
+  state.consent = {
+    data: { ...view, availablePermissions: view.availablePermissions.filter(({ key }) => key !== 'resources.update') },
+    isError: false,
+  };
+  rerender(<McpOAuthAuthorizePage />);
+  fireEvent.click(approveButton());
+  expect(state.approve).toHaveBeenCalledWith({
+    path: { requestId: 'mcp_rq_abc' },
+    body: { permissionKeys: ['resources.read', 'users.roles.manage'] },
+  });
 });
 
 it('still ends the flow when the request has expired while approving', () => {

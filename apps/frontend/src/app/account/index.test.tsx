@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
   apiError: vi.fn(),
   options: {} as { onSuccess: () => void; onError: (error: unknown) => void },
   mcp: undefined as undefined | { url: string; oauthEnabled: boolean },
+  grants: [] as { id: string }[],
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -28,6 +29,7 @@ vi.mock('../../components/toastProvider', () => ({
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   useGetMcpConnectionInfo: () => ({ data: state.mcp }),
+  useListMcpOAuthGrants: () => ({ data: state.grants }),
   useRequestDeleteAccount: (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
     return {
@@ -77,6 +79,7 @@ beforeEach(() => {
   state.user = undefined;
   state.permission = false;
   state.mcp = undefined;
+  state.grants = [];
 });
 afterEach(cleanup);
 function open() {
@@ -162,4 +165,13 @@ it('offers the MCP topic only when the user can sign in to it with OAuth or an A
   fireEvent.click(screen.getByRole('button', { name: /topics.mcp.title/ }));
   expect(screen.getByText('MCP https://attraccess.example/api/mcp tokens:false')).toBeTruthy();
   expect(screen.getByText('Grants oauth:true')).toBeTruthy();
+});
+it('keeps the MCP topic for revoking connected apps when this address offers no way to connect', () => {
+  state.user = { id: 7, username: 'member', effectivePermissions: [] };
+  state.mcp = { url: 'http://192.168.1.50:3000/api/mcp', oauthEnabled: false };
+  state.grants = [{ id: 'g1' }];
+  open();
+  fireEvent.click(screen.getByRole('button', { name: /topics.mcp.title/ }));
+  expect(screen.getByText('Grants oauth:false')).toBeTruthy();
+  expect(screen.queryByText(/^MCP http/)).toBeNull();
 });

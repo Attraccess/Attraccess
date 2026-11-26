@@ -57,7 +57,10 @@
     "request": "Die App hat eine ungültige Anmeldeanfrage gesendet ({{code}}). Starte die Verbindung in deiner App erneut oder wende dich an ihre Entwickler."
   },
   "tools": {
-    "title": "{{count}} Tools aktiviert",
+    "title": {
+      "one": "{{count}} Tool aktiviert",
+      "many": "{{count}} Tools aktiviert"
+    },
     "description": "Die App kann diese Tools mit den gewählten Berechtigungen nutzen. Jeder Aufruf wird weiterhin gegen deine Berechtigungen geprüft.",
     "none": "Diese Auswahl aktiviert keine Tools."
   },

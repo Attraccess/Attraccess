@@ -24,7 +24,9 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ showToast: state.toast }) }));
 vi.mock('../../../hooks/useRbacCatalogTranslations', () => ({
-  useRbacCatalogTranslations: () => ({ permissionLabel: (permission: { key: string }) => `label ${permission.key}` }),
+  useRbacCatalogTranslations: () => ({
+    permissionLabel: (permission: { key: string; label?: string }) => permission.label ?? `label ${permission.key}`,
+  }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   useListMcpOAuthGrants: () => ({
@@ -34,6 +36,7 @@ vi.mock('@attraccess/react-query-client', () => ({
     refetch: state.refetch,
   }),
   useRevokeMcpOAuthGrant: () => ({ mutateAsync: state.revoke, isPending: false }),
+  useListPermissions: () => ({ data: [{ key: 'plugin.thing', pluginName: 'demo', label: 'Demo thing' }] }),
 }));
 
 const grant = (overrides: Record<string, unknown>) => ({
@@ -75,15 +78,21 @@ it('lists the connected apps with permissions and dates, marking self-registered
   expect(second.getByText('grants.neverUsed')).toBeTruthy();
 });
 
-it('collapses a long permission list to the first few labels, keeping the full list as a tooltip', () => {
-  const keys = ['a.one', 'b.two', 'c.three', 'd.four', 'e.five'];
+it('collapses a long permission list to the first few labels, keeping the full list as a tooltip', async () => {
+  const keys = ['a.one', 'b.two', 'c.three', 'd.four', 'plugin.thing'];
   state.grants = [grant({ permissionKeys: keys })];
   render(<McpGrantsCard oauthEnabled />);
   const cell = within(screen.getAllByRole('row')[1]);
-  const text = cell.getByText(/label a\.one, label b\.two, label c\.three/);
-  expect(text.textContent).toContain('grants.morePermissions');
-  expect(text.textContent).not.toContain('label d.four');
-  expect(text.getAttribute('title')).toBe(keys.map((key) => `label ${key}`).join(', '));
+  expect(cell.getByText('label a.one, label b.two, label c.three')).toBeTruthy();
+  expect(cell.queryByText(/label d\.four/)).toBeNull();
+  const more = cell.getByText('grants.morePermissions');
+  await userEvent.hover(more);
+  // Plugin permissions are named from the catalog.
+  expect(
+    await screen.findByText('label a.one, label b.two, label c.three, label d.four, Demo thing', undefined, {
+      timeout: 3000,
+    }),
+  ).toBeTruthy();
 });
 
 it('shows an empty state when OAuth is enabled and nothing is connected', () => {

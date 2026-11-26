@@ -24,7 +24,8 @@ import { McpConnectionCard, useMcpConnection } from './mcp';
 import { McpGrantsCard } from './mcp/McpGrantsCard';
 import { DateTimePreferencesForm } from './date-time';
 import { NotificationPreferencesForm } from './notifications';
-import { useRequestDeleteAccount, ApiError } from '@attraccess/react-query-client';
+import { useRequestDeleteAccount, ApiError, useListMcpOAuthGrants } from '@attraccess/react-query-client';
+import type { McpOAuthGrantDto } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
 import { SettingsDirectory, type SettingsDirectoryGroup } from '../../components/settingsDirectory';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
@@ -40,6 +41,12 @@ export default function AccountPage() {
   const toast = useToastMessage();
   const canUseApiTokens = Boolean(me && hasPermission('users.api-tokens.manage'));
   const mcpConnection = useMcpConnection(canUseApiTokens);
+  // Connected AI apps stay revocable even where this address offers no way to connect a new one.
+  const { data: mcpGrants } = useListMcpOAuthGrants<McpOAuthGrantDto[]>({}, undefined, {
+    retry: false,
+    enabled: Boolean(me),
+  });
+  const showMcp = Boolean(mcpConnection) || (mcpGrants?.length ?? 0) > 0;
 
   const { mutateAsync: requestDelete, isPending: isRequestingDelete } = useRequestDeleteAccount(undefined, {
     onSuccess: () => {
@@ -149,7 +156,7 @@ export default function AccountPage() {
               },
             ]
           : []),
-        ...(me && mcpConnection
+        ...(me && showMcp
           ? [
               {
                 key: 'mcp',
@@ -159,8 +166,10 @@ export default function AccountPage() {
                 searchTerms: [t('searchTerms.mcp')],
                 content: (
                   <div className="flex flex-col gap-8">
-                    <McpConnectionCard connection={mcpConnection} canUseApiTokens={canUseApiTokens} />
-                    <McpGrantsCard oauthEnabled={mcpConnection.oauthEnabled} />
+                    {mcpConnection && (
+                      <McpConnectionCard connection={mcpConnection} canUseApiTokens={canUseApiTokens} />
+                    )}
+                    <McpGrantsCard oauthEnabled={mcpConnection?.oauthEnabled ?? false} />
                   </div>
                 ),
               },
