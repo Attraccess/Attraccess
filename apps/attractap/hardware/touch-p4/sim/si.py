@@ -28,6 +28,10 @@ LINES = [
 
 # The SDIO link to the Wi-Fi module, from the MCU's pads to the module's: clock first.
 SDIO = [('CLK', ('SDIO_CLK_M', 'SDIO_CLK'))] + [(n, ('SDIO_' + n,)) for n in ('CMD', 'D0', 'D1', 'D2', 'D3')]
+# the SDIO lines from pad to pad, without the stubs to their pull-ups (a 51 k resistor at the end of 1 to 2 mm
+# of track, a fraction of a picofarad)
+ENDS = {'SDIO_CLK_M': ('U201', 'R304'), 'SDIO_CLK': ('R304', 'U301'),
+        **{'SDIO_' + n: ('U201', 'U301') for n in ('CMD', 'D0', 'D1', 'D2', 'D3')}}
 SD_OUTPUT_DELAY = 14e-9     # a high-speed SD card may take this long from the clock edge to valid data
 
 
@@ -49,7 +53,8 @@ def deck(board, lines, nets, freq, c_rx, flex_mm, r_drv, edge):
             r = series_resistor(board, nets[i - 1], net)
             out.append('Rs%d %s n%d %g' % (i, node, k + 1, max(r, 1e-3)))
             node, k = 'n%d' % (k + 1), k + 1
-        segments = [(lines[layer], mm) for layer, mm in sorted(board.length_by_layer(net).items())]
+        lengths = board.path_by_layer(net, *ENDS[net]) if net in ENDS else board.length_by_layer(net)
+        segments = [(lines[layer], mm) for layer, mm in sorted(lengths.items())]
         if flex_mm and net == nets[-1]:
             segments.append((FLEX, flex_mm))
         for (z0, delay), mm in segments:

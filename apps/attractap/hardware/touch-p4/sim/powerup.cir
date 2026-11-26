@@ -6,11 +6,16 @@
 * and the input less 0.15 V (switch and inductor at 0.6 A in dropout); input current = output power / 0.9.
 * Supervisor U204 (TLV803S): holds CHIP_PU low until +3V3 has been above its threshold for td. The part's
 * td is 120 to 280 ms; 2 ms here keeps the run short and changes only how long the reset lasts.
+* The Wi-Fi module's converter U302 (TLV62569, as U103) on the same 5 V rail, always on; its EN RC (R301
+* 10 k, C303 1 uF) holds the module off until +3V3_WIFI is up; then the module draws iwifi.
 .param vusb=5.0
 .param rcable=0.25
-.param iload=0.45
+* the board's current at 3.3 V once the MCU runs: on U103, and the Wi-Fi module's on U302 (together 0.45 A,
+* the running board of revision A's runs)
+.param iload=0.33
 .param vit=2.93
 .param td=2m
+.param iwifi=0.12
 Vusb src 0 PWL(0 0 10u {vusb})
 Rcab src c1 {rcable}
 Lcab c1 vbus 1u
@@ -30,14 +35,15 @@ Rlat onr onl 1k
 Clat onl 0 1n
 Bdly 0 dly I = v(onl) > 0.5 ? 1u/1.3m : -1m*v(dly)
 Cdly dly 0 1u
-Bramp 0 ramp I = v(dly) > 1 ? (v(ramp) < 6 ? 0.91 : 0) : -v(ramp)
+* (the ramp levels off smoothly at 6 V: a hard stop there made the solver take nanosecond steps)
+Bramp 0 ramp I = v(dly) > 1 ? 0.91*0.5*(1 - tanh((v(ramp) - 6)/0.05)) : -v(ramp)
 Cramp ramp 0 1m
 * the eFuse as a 28 mOhm switch that the ramp turns on: it holds the output at the ramp while the ramp is
 * below the input, and lets no current flow back
 Bef usb5 v5 I = v(dly) > 1 ? 0.5*(1+tanh((v(ramp)-v(v5)-0.06)/0.01)) * (v(usb5)-v(v5) + sqrt((v(usb5)-v(v5))^2 + 1e-6))/0.056 : 0
-* 5 V rail: 22u + 10u + 22u (LEDs) + 10u (backlight) + 10u (PN532) + the 3.3 V converter's input; at 5 V
-* they keep about 60 %
-C5 v5 0 45u
+* 5 V rail: 22u + 10u + 22u (LEDs) + 10u (backlight) + 10u (PN532) + the input capacitors of both 3.3 V
+* converters; at 5 V they keep about 60 %
+C5 v5 0 51u
 Rc5 v5 0 20k
 * U103, TLV62569
 Bena ena 0 V = v(v5) > 2.45 ? 1 : (v(v5) < 2.3 ? 0 : v(enl))
@@ -49,10 +55,26 @@ Rss ss 0 1g
 Bout v33i 0 V = min(3.3*v(ss), max(v(v5) - 0.15, 0))
 Vmeas v33i v33m 0
 Rout v33m v33 0.02
-C33 v33 0 60u
+* +3V3: about 44 uF at 3.3 V (test_design.py)
+C33 v33 0 44u
 * load: resistive until the MCU leaves reset, then the current of a running board
 Bload v33 0 I = v(v33)/60 + (v(chip_pu) > 2.3 ? {iload} : 0)
 Bin v5 0 I = v(enl) > 0.5 ? v(v33)*i(Vmeas)/(0.9*max(v(v5),1)) : 0
+* U302, TLV62569, the same circuit; +3V3_WIFI with 22 uF (13.7 uF at 3.3 V) and the module's 33.4 uF
+Bena3 ena3 0 V = v(v5) > 2.45 ? 1 : (v(v5) < 2.3 ? 0 : v(enl3))
+Rlat3 ena3 enl3 1k
+Clat3 enl3 0 1n
+Bss3 ss3 0 I = v(enl3) > 0.5 ? -1u*(v(ss3) < 1 ? 1 : 0) / 0.9 : 1m*v(ss3)
+Css3 ss3 0 1n
+Rss3 ss3 0 1g
+Bout3 v33wi 0 V = min(3.3*v(ss3), max(v(v5) - 0.15, 0))
+Vmeas3 v33wi v33wm 0
+Rout3 v33wm v33w 0.02
+C33w v33w 0 47u
+R301 v33w c5en 10k
+C303 c5en 0 1u
+Bloadw v33w 0 I = v(v33w)/1k + (v(c5en) > 2.475 ? {iwifi} : 0)
+Bin3 v5 0 I = v(enl3) > 0.5 ? v(v33w)*i(Vmeas3)/(0.9*max(v(v5),1)) : 0
 * supervisor: a timer runs while +3V3 is above the threshold; its open-drain output holds CHIP_PU low
 * until the timer reaches td. R211 and C240 as before.
 Btmr 0 tmr I = v(v33) > {vit} ? 1u/{td} : -1m*v(tmr)
@@ -60,8 +82,10 @@ Ctmr tmr 0 1u
 R211 v33 chip_pu 10k
 C240 chip_pu 0 1u
 Bsup chip_pu 0 I = v(tmr) < 1 ? v(chip_pu)/50 : 0
-.option method=gear
-.tran 5u 20m uic
+* reltol 0.01 instead of 0.001: the behavioural eFuse and converters take the default down to nanosecond
+* steps once the rails are up; where both finish, the results agree within 0.2 %
+.option method=gear reltol=0.01
+.tran 5u 30m uic
 .control
 set noaskquit
 run
@@ -73,8 +97,11 @@ meas tran i_inrush max i(lcab) from=0 to=100u
 meas tran i_slew max i(lcab) from=1.4m to=3.5m
 meas tran i_ramp max i(lcab) from=200u to=8m
 meas tran t_5v_ok when v(v5)=4.5 rise=1
-meas tran v5_running min v(v5) from=15m to=20m
-meas tran v33_running min v(v33) from=15m to=20m
+meas tran t_wifi_ok when v(v33w)=3.135 rise=1
+meas tran t_c5_en when v(c5en)=2.475 rise=1
+meas tran v5_running min v(v5) from=25m to=30m
+meas tran v33_running min v(v33) from=25m to=30m
+meas tran v33w_running min v(v33w) from=25m to=30m
 quit
 .endc
 .end

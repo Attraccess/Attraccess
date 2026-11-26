@@ -148,15 +148,33 @@ def place(B):
     put('R604', 57.4, 73.4, 0)     # CTRL pull-down
 
     # =================================================== Wi-Fi module (top left)
-    put('U301', 22.0, 11.3, 0)
-    put('C301', 12.4, 9.4, 90)
-    put('C302', 14.2, 7.4, 90)
-    put('R301', 13.0, 13.4, 0)
-    put('C303', 13.0, 14.4, 0)
-    put('R302', 13.0, 15.4, 0)
-    put('R303', 24.4, 18.6, 0)     # IO8 pull-up
-    for i, ref in enumerate(('R305', 'R306', 'R307', 'R308', 'R309')):
-        put(ref, 30.6 + i * 1.1, 19.4, 90)
+    wx, wy = G.WIFI_MODULE
+    put('U301', wx, wy, 0)         # antenna up, over the cut in the top edge (geometry.WIFI_NOTCH)
+    # Its own 3.3 V converter in the column left of it, built like U103 (TI SLVSDG1C 10.2) and turned so that
+    # the output ends at the module's 3V3 pin (pin 3, left side). The inductor's output pad and C301 (22 uF,
+    # the converter's output capacitor and the module's at once) lie level with pin 3; C301's ground pad
+    # faces the module's ground pins 1 and 2. The converter below the inductor, its switch pin straight under
+    # the inductor's switch pad (turned 90 degrees: SW, GND, EN face up, VIN and FB down); the input
+    # capacitors below VIN, the feedback divider below FB, away from the switch node.
+    put('C301', wx - 8.8, wy - 5.3, 90)     # 22 uF: + pad down, level with pin 3; ground pad up, at pins 1 and 2
+    put('L301', wx - 11.9, wy - 3.5, 90)    # output pad up, level with C301's + pad; switch pad down
+    put('C302', wx - 8.8, wy - 2.3, 270)    # 100 nF under C301, + pad up
+    put('U302', wx - 12.3, wy + 1.3, 90)
+    put('R310', wx - 9.8, wy + 0.0, 180)    # EN pull-up beside the EN pin, the 5 V pad outwards
+    put('C305', wx - 13.25, wy + 4.5, 270)  # 100 nF straight below VIN
+    put('C304', wx - 15.6, wy + 3.7, 270)   # 10 uF beside it
+    put('R311', wx - 9.8, wy + 2.1, 180)    # feedback divider beside and below FB, on the side away from SW
+    put('C306', wx - 9.8, wy + 3.1, 180)
+    put('R312', wx - 11.3, wy + 4.5, 270)
+    # enable: RC and the host's series resistor right of the EN pin (right side, top, pin 45), in a column
+    put('C303', wx + 9.3, wy - 5.95, 0)
+    put('R301', wx + 9.3, wy - 4.7, 180)
+    put('R302', wx + 9.3, wy - 3.45, 180)
+    put('R303', wx + 9.3, wy - 2.2, 180)   # IO28 pull-up, on the way to the boot test point beside it
+    # SDIO pull-ups in a column below the module's lower right corner, signal pad (2) on the left, 1 mm apart:
+    # each sits at the end of its line's front-layer stub (routes_sdio.py), D2 at the top, D1 at the bottom
+    for ref, dy in (('R308', 8.5), ('R309', 9.5), ('R305', 10.5), ('R306', 11.5), ('R307', 12.5)):
+        put(ref, wx + 3.46, wy + dy, 180)
 
     # ================================================ supply: 3.3 V buck (top centre)
     # TI's layout (SLVSDG1C, 10.2): input capacitor at VIN and GND, the inductor right at SW, the feedback
@@ -363,10 +381,13 @@ def place(B):
 
     # ============================================================ test points
     tps = {
-        'TP801': (26.0, 24.6), 'TP802': (26.0, 27.8), 'TP803': (26.0, 31.0), 'TP804': (22.6, 27.8),
+        'TP801': (22.6, 24.4), 'TP802': (26.0, 27.8), 'TP803': (26.0, 31.0), 'TP804': (22.6, 27.8),
         'TP805': (57.0, 37.0), 'TP806': (14.6, 21.0), 'TP807': (14.6, 24.2), 'TP808': (14.6, 27.4),
-        'TP809': (14.6, 30.6), 'TP810': (3.0, 9.6), 'TP811': (3.0, 12.8), 'TP812': (7.6, 9.6),
-        'TP813': (7.6, 12.8),               # 4.6 mm apart: the labels C6_BOOT and C6_RX need that much
+        'TP809': (14.6, 30.6),
+        # the Wi-Fi module's, right of it: EN and BOOT above, TX and RX below, ground beside them
+        'TP810': (41.1, 9.6), 'TP811': (45.7, 9.6), 'TP812': (41.1, 12.8),
+        'TP813': (45.7, 12.8),              # 4.6 mm apart: the labels C5_BOOT and C5_RX need that much
+        'TP832': (50.3, 11.2),
         'TP814': (5.75, 38.6),              # accelerometer INT1, straight above its pin 12
         'TP815': (G.PROX[0] - 1.7, G.PROX[1] - 3.8),   # proximity sensor INT, up and left of its pin 6
         # 1 mm pads on every rail, both I2C buses and the RMII clock, each next to its circuit
@@ -374,12 +395,13 @@ def place(B):
         'TP820': (59.0, 46.5), 'TP821': (24.7, 111.0), 'TP822': (22.0, 108.4), 'TP823': (22.5, 102.4),
         'TP824': (61.0, 78.0), 'TP825': (26.5, 63.0), 'TP826': (26.5, 65.5), 'TP827': (17.0, 131.5),
         'TP828': (17.0, 134.0), 'TP829': (57.7, 75.3), 'TP830': (61.2, 80.8),
+        'TP831': (G.WIFI_MODULE[0] - 17.2, 9.0),          # the Wi-Fi module's rail, left of its inductor
     }
     for ref, (x, y) in tps.items():
         put(ref, x, y, 0)
     for ref, (x, y) in zip(('H801', 'H802', 'H803', 'H804'), G.MOUNT_HOLES):
         put(ref, x, y, 0)
-    put('FID801', 9.4, 2.4, 0)
+    put('FID801', 3.0, 9.6, 0)     # below the upper left hole: the cut under the Wi-Fi antenna takes the corner
     put('FID802', 76.6, 2.4, 0)
     put('FID803', 67.0, 141.0, 0)
     # local fiducials for the 0.35 mm pitch MCU, at two opposite corners of its package

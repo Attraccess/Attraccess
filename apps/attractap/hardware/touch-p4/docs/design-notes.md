@@ -6,7 +6,7 @@ Why the board looks the way it does, and what is still an assumption.
 
 | Topic | Decision | Reason |
 |---|---|---|
-| MCU | ESP32-P4NRW32X chip + ESP32-C6-MINI-1U | Chosen for display performance. The P4 has no radio, so Wi-Fi runs on a certified C6 module over SDIO. |
+| MCU | ESP32-P4NRW32X chip + ESP32-C5-MINI-1 | Chosen for display performance. The P4 has no radio, so Wi-Fi (2.4 and 5 GHz) runs on a certified C5 module over SDIO; see "Wi-Fi module: ESP32-C5-MINI-1". |
 | Display | commodity 4.0" 480x480 RGB panel (ST7701S, GT911) | Size and resolution of today's readers; the MIPI versions of this size cost several times more. |
 | NFC | PN532 on board | Keeps the firmware's NFC stack unchanged. |
 | NFC position | separate zone below the display | The LCD's metal back shields 13.56 MHz; an antenna behind the screen does not work. |
@@ -17,7 +17,7 @@ Why the board looks the way it does, and what is still an assumption.
 | Ethernet jack | behind the lower right corner of the display, 51 mm above the lower board edge | A plug with its boot and the cable's bend into the wall need 49 mm below the jack, inside the case. The price: the jack's pins stand out of the display side behind the display. The display sits 1.5 to 2 mm off the board and the pins are clipped (see "Display mounting and flex"). Below the display the jack would need a case 19 mm longer. |
 | USB-C | service port at the board edge next to the MCU | Only used for flashing and debugging, never offered to users. |
 | Tamper detection | an accelerometer, an infrared proximity sensor that looks at the dock's plate, and a hall switch facing a magnet in the dock | The accelerometer notices knocks, tilting and tearing off. The proximity sensor says that the reader has left its dock, and its light path lies inside the closed case, out of reach. The hall switch says the same in a second, simpler way, but a magnet held to the case fools it. All three are read over I2C, because the MCU's four free pins are blocked by capacitors at the pad row. |
-| Wi-Fi antenna | external, chosen per build: an adhesive antenna inside the case, or an antenna on an SMA bulkhead | Decided on 24 November 2026. Every board gets the ESP32-C6-MINI-1U, the module with an antenna connector; the MINI-1 with PCB antenna is dropped. See "Wi-Fi antenna". |
+| Wi-Fi antenna | the module's own dual-band PCB antenna, over a cut in the top edge | Decided on 25 November 2026 with the C5 (the user). The external antennas of the C6-MINI-1U and their bay are gone. See "Wi-Fi antenna" and its accepted deviation. |
 | Assembly | all parts on one side | The display is taped to the other side; cheaper assembly. |
 | Layers | six: signals on both outer layers and one inner layer, each next to a plane of its own | Two signal layers are not enough around the MCU. On four layers the third one shared its layer with the 3.3 V pour and cut it apart, so the fast buses had no unbroken plane to return on (see [Review against layout rules](#review-against-layout-rules)). |
 
@@ -109,41 +109,57 @@ module's pin (datasheet figure 9-1). On that rail: 22 uF (13.7 uF at 3.3 V)
 the module's capacitors. U103 then carries 0.89 A at the sizing figures
 (55 % headroom) and the radio's converter 0.6 A (70 %).
 
-Heat, first look, before the layout changes. What the 85 °C rating limits is
-the air right outside the module, not its inside, so the old figure of 79 °C
-(40 °C room + the board under the C6 + 15 K/W x 0.30 W, the module's inside)
-cannot be held against it. The heat model (`sim/thermal.py`) has no air node.
-It gives two bounds for that air: below, the air in the cavity between board
-and dock plate, taken as the mean of the board and the dock plate's inner face
-(that face runs at 0.47 times the board's rise in the model's chain of
-surfaces); above, the board beside the module, from which the module and its
-neighbours warm the air next to it. The C5's losses: 0.40 W in typical use (connected, receiving
-at 5 GHz, 110 mA, with little sending), 0.88 W at half the time sending at
-5 GHz, 1.36 W sending all the time (1.41 W in, 45 mW radiated). On the
-committed board, in a room of 40 °C, with PoE (the warmest supply):
+Heat. What the 85 °C rating limits is the air right outside the module, not
+its inside, so the old figure of 79 °C (40 °C room + the board under the C6 +
+15 K/W x 0.30 W, the module's inside) cannot be held against it. The heat
+model (`sim/thermal.py`) has no air node. It gives two bounds for that air:
+below, the air in the cavity between board and dock plate, taken as the mean
+of the board and the dock plate's inner face (that face runs at 0.47 times the
+board's rise in the model's chain of surfaces); above, the board beside the
+module, from which the module and its neighbours warm the air next to it. The
+C5's losses: 0.40 W in typical use (connected, receiving at 5 GHz, 110 mA,
+with little sending), 0.88 W at half the time sending at 5 GHz, 1.36 W
+sending all the time (1.41 W in, 45 mW radiated); in between in proportion to
+the share of time it sends. On the routed board (25 November 2026), in a room
+of 40 °C, the air outside the module lies between:
 
-| Case | Board beside the module | Air in the cavity | Module inside |
-|---|---|---|---|
-| typical use, module 0.40 W | 75 °C | 63 °C | 81 °C |
-| typical use, module sending half the time (0.88 W) | 87 °C | 66 °C | 100 °C |
-| everything on within the firmware limits (LEDs at 100 mA, no beep with NFC), module 0.88 W | 100 °C | 76 °C | 113 °C |
+| Rest of the board | Module sends | USB | DC, 12 V | PoE |
+|---|---|---|---|---|
+| typical use | rarely (0.40 W) | 57 to 67 °C | 59 to 70 °C | 63 to 75 °C |
+| typical use | 40 % of the time (0.78 W) | 59 to 76 °C | 62 to 79 °C | 65 to 84 °C |
+| typical use | 50 % (0.88 W) | 60 to 78 °C | 62 to 81 °C | 66 to 86 °C |
+| typical use | all the time (1.36 W) | 63 to 89 °C | 65 to 92 °C | 69 to 97 °C |
+| everything on for a long time | rarely | 66 to 79 °C | 72 to 85 °C | 76 to 91 °C |
+| everything on for a long time | 40 % | 69 to 87 °C | 74 to 93 °C | 78 to 100 °C |
 
-In typical use the module's air stays below 85 °C by 10 K at the upper bound
-(the estimate is +-40 %). Sending for a long time does not: the radio's
-average loss has to be limited by the firmware (a transmit duty limit), to
-be sized with the heat model of the final layout. The model is run again
-with the new converter and the module's place.
+In typical use the module's air stays below 85 °C at the upper bound as long
+as the module sends no more than 40 % of the time on average (PoE: 84 °C);
+the lower bound stays below 85 °C even when it sends all the time. So the
+firmware limits the module's transmit share to 40 %, averaged over a minute
+([firmware-port.md](firmware-port.md)). The reader's own traffic (card
+checks, the user interface, updates, which are downloads) stays far below
+that; the rule bites only on long uploads, such as logs. With everything on
+for a long time the upper bound reaches 85 °C on DC and passes it on PoE
+(91 °C) with the radio silent: the board itself is then 43 to 49 K above the
+room. That state is
+beyond what the case can shed anyway (the LED rows 75 to 82 K above the
+room, see "Simulation") and is ended by the firmware's temperature rule,
+which dims backlight and LEDs and then also holds the radio back. The
+estimate is +-40 %; the bring-up plan measures the air beside the module in
+the closed case. The module's inside, for reference: 81 °C in typical use on
+PoE (15 K/W x 0.40 W above the board under it).
 
-Placement, first look. The MINI-1 is 2.2 mm wider and 4.7 mm longer than the
-C6-MINI-1U footprint. It fits the old place at the top left, its antenna
-over the cut in the top edge widened to 16.4 mm. Espressif's guide
+Placement. The MINI-1 is 2.2 mm wider and 4.7 mm longer than the C6-MINI-1U
+footprint. It sits in the old place at the top left, its antenna over a cut
+in the top edge, now 28.9 mm wide and 6.0 mm deep. Espressif's guide
 (HDG 1.4.7, figures 22 and 23) recommends a board corner with the antenna's
 ground point at the board edge, the antenna beyond the edge or over a cut on
 both sides and below it, and 15 mm of free space round it inside the housing.
 On this board the corner that fits that orientation is the top right one,
 where USB-C, its eFuse path and a mounting hole sit; the case leaves 1.5 to
-2.3 mm to its walls. What stays short is quantified with the full-wave model
-at 2.4 and 5 GHz and recorded under "Accepted deviations".
+2.3 mm to its walls. The full-wave model compares the two places at 2.4 and
+5 GHz ("Wi-Fi antenna"); what stays short is recorded under "Accepted
+deviations".
 
 ## Mechanics
 
@@ -153,8 +169,9 @@ board, x right, y down, millimetres. The user looks at the other side.
 | Item | Position |
 |---|---|
 | Board | 86 x 143.5, corner radius 2, both bottom corners cut away |
-| Strip above the display | y 0 to 7: Wi-Fi module, two mounting holes |
-| Cut in the top edge at the Wi-Fi module | x 14.9 to 29.1, y 0 to 5.65: made for the PCB antenna of the MINI-1. The MINI-1U is 4.1 mm shorter at that end; revision A keeps the cut |
+| Strip above the display | y 0 to 7: the Wi-Fi module's antenna, two mounting holes |
+| Wi-Fi module | x 20.1 to 35.5, y 0.3 to 21.6 (pad centre 27.8, 13.9), antenna up; its converter in the column left of it |
+| Cut in the top edge under the Wi-Fi antenna | x 8.6 to 37.5, y 0 to 6.0; no copper on any layer for x below 50.5, y below 6.3 |
 | Display cover lens (84.3 x 84.3) | x 0.85 to 85.15, y 7.0 to 91.3 |
 | LCD module (metal back) | x 5.6 to 80.4, y 12.8 to 89.4 |
 | Flex slot | x 11.5 to 62.0, y 89.5 to 92.5 |
@@ -244,12 +261,10 @@ new display section, not a part swap.
 
 ### Enclosure hints
 
-- Wi-Fi antenna: the module has none of its own. The case needs a place for
-  an adhesive antenna, or a hole for an SMA bulkhead, and a path for the
-  cable from the connector on top of the module; it has neither yet (see
-  "Wi-Fi antenna"). The strip without copper along the top edge (44 mm wide)
-  and the cut in the board were made for a module with PCB antenna and stay
-  on revision A.
+- Wi-Fi antenna: on the module, over the cut in the top edge (x 8.6 to 37.5).
+  Keep metal away from the strip above the display for x below 50.5 mm: no
+  screws, no metal face plate there unless it has a window over that strip
+  (see "Wi-Fi antenna" for what a metal front costs).
 - Both bottom corners of the board are cut away. The Ethernet jack opens
   downwards into the one on the right (16.5 x 51 mm), the DC jack into the
   one in the other corner (12 x 36 mm). Plugs and cables stay inside the board
@@ -296,9 +311,6 @@ new display section, not a part swap.
   housing, so that pushing the plug in does not bend it.
 - USB-C is on the side edge behind the display. It needs no opening in the
   housing if flashing is done before assembly.
-- The antenna connector on top of the module is not a U.FL: it is the
-  smaller third-generation kind (Hirose W.FL, I-PEX MHF III, Amphenol AMMC).
-  A U.FL pigtail does not fit.
 - No tracks run on the outer layers within 3.3 mm of a mounting hole centre,
   so a screw head or standoff up to 6.6 mm across is safe. At the hole beside
   the NFC loop there is no copper pour either on the outer layers: that hole
@@ -312,7 +324,7 @@ new display section, not a part swap.
 - The display's metal back should be tied to the board's ground: it is a large
   plate close to the board, and discharges onto the glass end up on it. The
   display side of the board has four bare ground pads of 5 x 5 mm behind the
-  LCD module, at (13.5, 18.5), (66, 38), (48, 17) and (43, 80). Put conductive
+  LCD module, at (12.0, 23.5), (64.2, 37.2), (48, 17) and (43, 80). Put conductive
   tape or foam on at least two of them before the display goes on; leave them
   out of the area the mounting tape covers.
 
@@ -320,9 +332,10 @@ new display section, not a part swap.
 
 | Rail | Source | Loads |
 |---|---|---|
-| +5V | USB-C through the eFuse U105; the DC converter through the ideal diode U107/Q102; the PoE module through the ideal diode U106/Q101 | 3.3 V converter, backlight, LEDs, buzzer, PN532 |
+| +5V | USB-C through the eFuse U105; the DC converter through the ideal diode U107/Q102; the PoE module through the ideal diode U106/Q101 | the two 3.3 V converters, backlight, LEDs, buzzer, PN532 |
 | +5V_DC | AP63205 buck, 2 A, from the DC connectors (PTC fuse, TVS at the connector, reverse-polarity diode, damped input filter, TVS at the converter) | feeds +5V |
-| +3V3 | TLV62569 buck U103, 2 A, from +5V | P4, C6, PHY, sensors, panel logic, the core converter U202 |
+| +3V3 | TLV62569 buck U103, 2 A, from +5V | P4, PHY, sensors, panel logic, the core converter U202 |
+| +3V3_WIFI | TLV62569 buck U302, 2 A, from +5V, always on | the Wi-Fi module U301 alone, with its EN RC and its pull-ups |
 | VDD_HP 1.1 V | TLV62569 U202 from +3V3, controlled by the P4 | P4 core |
 | P4 internal LDOs | VDDO_FLASH 3.3 V, VDDO_PSRAM 1.9 V | flash, in-package PSRAM |
 
@@ -341,47 +354,75 @@ the supply to deliver; "maximum" is the highest consumption the maker states.
 |---|---|---|---|
 | ESP32-P4, I/O, flash, PSRAM | 0.380 | 0.200 | HDG v2.0 1.3.2: "minimum operating supply current ... 380 mA (including flash and PSRAM)"; datasheet v0.7 table 5-7: 150 mA at 400 MHz, dual core, all peripheral clocks on, "higher when accessing flash/PSRAM": 50 mA added (W25Q128JV: 25 mA at most) |
 | ESP32-P4 core through U202 | 0.196 | (in the line above) | datasheet table 5-2: the core supply must deliver 0.5 A at 1.1 V; through U202 at 85 % that is 0.196 A at 3.3 V |
-| ESP32-C6-MINI-1U | 0.382 | 0.382 | datasheet v1.5 table 6-4: 802.11b at 20.5 dBm, 100 % duty |
 | IP101GRI PHY | 0.045 | 0.045 | datasheet R05: below 0.15 W at 100BASE-TX full duplex |
 | VCNL4040 emitter | 0.200 | 0.005 (average) | datasheet rev. 2.0: 200 mA pulses at 1/40 duty or less |
 | Display panel logic and touch | 0.060 | 0.060 | allowance: the panel's data gives no current; ST7701S and GT911 typically draw tens of mA together. Measured at bring-up |
 | Jack LEDs (2 x 1.3 mA), accelerometer, hall switch, IO expander, pull-ups, supervisor | 0.010 | 0.010 | 1 k LED resistors; LIS2DH12 185 uA, DRV5032 2.7 mA peak, TCA9554 0.6 mA |
-| **Total** | **1.27** | **0.70** | |
-| Headroom to 2 A | **36 %** | 65 % | |
+| **Total** | **0.89** | **0.32** | |
+| Headroom to 2 A | **55 %** | 84 % | |
 
-5 V rail, with the 3.3 V converter at 88 % efficiency and the rail at its lowest
+Wi-Fi module rail (TLV62569 U302, 2 A, the same circuit as U103; current limit at
+least 3 A):
+
+| Load | Sizing (A) | Maximum (A) | Source |
+|---|---|---|---|
+| ESP32-C5-MINI-1 | 0.600 | 0.426 | HDG 1.3.2: "output current is no less than 600 mA"; datasheet v1.4 table 6-2: IVDD 0.6 A. Table 6-5: 802.11a at 16.5 dBm, 100 % duty, 426 mA (338 mA at 2.4 GHz, 802.11b at 19 dBm, table 6-4) |
+| EN pull-up, IO28 pull-up, five 51 k SDIO pull-ups | 0.001 | 0.001 | |
+| **Total** | **0.60** | **0.43** | |
+| Headroom to 2 A | **70 %** | 79 % | |
+
+5 V rail, with the 3.3 V converters at 88 % efficiency and the rail at its lowest
 (4.75 V):
 
 | Load | Sizing (A) | Maximum (A) | Source |
 |---|---|---|---|
-| 3.3 V converter | 1.00 | 0.55 | the table above |
+| 3.3 V converter U103 | 0.70 | 0.25 | the first table above |
+| Wi-Fi module's converter U302 | 0.47 | 0.34 | the second table above |
 | Backlight (4S2P, 39 mA, through AP3032) | 0.13 | 0.13 | 13 V at 39 mA, 85 % |
 | 8 SK6812MINI-E | 0.30 | 0.10 (firmware limit) | 12 mA per colour (spec C5149201); the firmware keeps the sum of all channels below 100 mA |
 | PN532 | 0.12 | 0.12 | transmitter 100 mA (the matching keeps it below 60 mA, see "NFC") plus 20 mA |
 | Buzzer | 0.10 | 0 while the NFC field is on | MLT-8530: 95 mA at 5 Vo-p; the firmware beeps after the field is off |
 | Level shifter, bleed resistors | 0.003 | 0.003 | |
-| **Total** | **1.65** | **0.90** | |
+| **Total** | **1.82** | **0.94** | |
 
 | Source | Rating | Headroom at the maximum | Headroom at the sizing figures |
 |---|---|---|---|
-| USB-C (eFuse current limit) | 1.8 A minimum (R110 1.65 k) | 50 % | 8 % |
-| DC converter AP63205 | 2 A | 55 % | 17 % |
-| PoE module DP9905M | 1.8 A up to 70 C (9 W), 1.2 A at 85 C (6 W) | 50 % (25 % at 85 C) | 8 % |
+| USB-C (eFuse current limit) | 1.8 A minimum (R110 1.65 k) | 48 % | -1 % |
+| DC converter AP63205 | 2 A | 53 % | 9 % |
+| PoE module DP9905M | 1.8 A up to 70 C (9 W), 1.2 A at 85 C (6 W) | 48 % (22 % at 85 C) | -1 % |
 
-The 3.3 V converter is sized for the makers' supply figures with 36 % to
-spare. Each 5 V source has at least 30 % to spare at the highest consumption
-the makers state, with the two firmware limits in the table (LED current,
-buzzer and NFC field not at once). If all loads drew their supply-sizing
-figures at the same time, the eFuse would limit the USB current and the PoE
-module would run at its rating; neither is damaged. A PoE module in a case
-above 70 C has less: the reader is specified for indoor use (40 C).
+Both 3.3 V converters are sized for the makers' supply figures with at least
+30 % to spare: U103 55 %, U302 70 %. Each 5 V source has at least 30 % to spare
+at the highest consumption the makers state, with the two firmware limits in
+the table (LED current, buzzer and NFC field not at once). The sum of every
+supply-sizing figure, 1.82 A, is 1 % above the eFuse's lowest current limit
+and the PoE module's 9 W. At that sum the eFuse would hold the USB current at
+its limit (1.8 to 2.2 A) and let the 5 V rail sag, retrying after a fault
+(TPS259470A: the auto-retry version); the PoE module would run 1 % over its
+rating, which its own current limit covers; the DC converter keeps 9 %.
+Nothing is damaged. The sum cannot be reached under the firmware's limits: the
+LEDs stay below 100 mA (0.30 A in the sum), the buzzer is silent while the NFC
+field is on (0.10 A), which leaves 1.52 A (16 % below the eFuse's and the PoE
+module's ratings); and the sum stacks figures that do not coincide (the P4's
+380 mA "minimum operating supply current" next to its core's 0.5 A, the
+proximity emitter's 200 mA pulses at 1/40 duty, the Wi-Fi module's 0.6 A supply
+figure against the 426 mA it draws at most). A PoE module in a case above 70 C
+has less: the reader is specified for indoor use (40 C).
+
+Before the Wi-Fi module had a converter of its own, U103 carried it too: 1.49 A
+at the sizing figures with the C5's 0.6 A, 25.6 % below its 2 A, and 82 uF of
+output capacitance with the module's own 33.4 uF (see "3.3 V converter").
+Revision A's C6 module carried capacitors of its own as well, which the count
+there did not include; its rail was probably above the 52.8 uF too. The second
+converter settles both.
 
 USB as the only source. A USB 2.0 port gives 500 mA, a Type-C source at Default
 USB Power 500 or 900 mA, more only when its Rp says 1.5 or 3 A. The 5 V of the
 DC converter and of the PoE module reach the IO expander through dividers (P5,
 P7), so the firmware knows when USB is the only source; it then always takes
 the smallest offer, 500 mA: LEDs and buzzer off, backlight at 30 % or less (an
-estimated 0.43 A). Reading the source's CC level, which would let a 1.5 A
+estimated 0.45 A with the 3.3 V rails at their typical 0.37 A, the Wi-Fi module
+receiving). Reading the source's CC level, which would let a 1.5 A
 charger run the full board, was drawn and dropped: the free ADC pins are on the
 MCU's far side, and no way to the USB-C connector was left without rerouting the
 USB pair, the backlight line or the RMII bus. These limits, the LED limit and buzzer-or-NFC above are hard
@@ -408,7 +449,7 @@ source. What each source gives at most, and what each 5 V load takes:
 
 | Load | Recommended maximum | Absolute maximum |
 |---|---|---|
-| TLV62569 VIN (3.3 V converter) | 5.5 V | 6.0 V (SLVSDG1C 6.1, 6.3) |
+| TLV62569 VIN (both 3.3 V converters, U103 and U302) | 5.5 V | 6.0 V (SLVSDG1C 6.1, 6.3) |
 | PN532 VBAT | 5.5 V | 6.0 V (PN532/C1 rev 3.6, tables 290 and 291) |
 | SK6812MINI-E VDD | 5.5 V | 5.5 V "limit parameter"; no other figure (spec SK6812MINI-E-012 rev B, 7 and 9) |
 | SN74LV1T125 VCC | 5.5 V | 7.0 V (SCLS745D 6.1, 6.3) |
@@ -470,18 +511,25 @@ within its recommended range. Two cases come close:
   0.8 V and the DC converter would start from its output at volts. Both
   figures are typical only; 4.7 k leaves a factor of 30 for VBUS. Each
   resistor costs 1 mA while its source is on.
-- Simulated (`sim/powerup.cir`, `sim/switchover.cir`): USB plugged in at 5.0 V
-  behind 0.25 ohm and at 4.5 V behind 0.5 ohm: the 3.3 V rail is up 5.0 ms
-  after the plug and the reset ends 4.7 ms later (the model shortens the
-  supervisor's delay to 2 ms; the part has 120 to 280 ms); the 5 V rail runs at
-  4.82 and 4.19 V. At the plug 3.8 A flow for microseconds into C101 (10 uF, what
-  USB 2.0 7.2.4.1 allows at attach), then 42 mA while the eFuse ramps the rail
-  at 0.91 V/ms. Changing supplies with 0.9 A on +5V and 0.6 A on +3V3 (DC to
-  USB; USB at 4.75 V with DC at 5.05 V plugged in and pulled; PoE to DC; PoE and
-  USB, PoE pulled): +3V3 stays at 3.13 V or above, over the supervisor's 2.99 V.
-  Running on DC with USB unplugged, VBUS stays at 0 mV; running on USB, the DC
-  converter's output at 1 mV. The eFuse's reverse blocking (29 mV, 50 us
-  re-enable) and R104 are in the model.
+- Simulated (`sim/powerup.cir`, `sim/switchover.cir`, with both 3.3 V
+  converters): USB plugged in at 5.0 V behind 0.25 ohm and at 4.5 V behind
+  0.5 ohm, 0.33 A on +3V3 and 0.12 A on +3V3_WIFI: both 3.3 V rails are up
+  5.0 ms after the plug and the reset ends 4.7 ms later (the model shortens
+  the supervisor's delay to 2 ms; the part has 120 to 280 ms); the 5 V rail
+  runs at 4.82 and 4.18 V. With 0.67 A and 0.43 A from the good port, 4.58 V.
+  At the plug 3.8 A flow for microseconds into C101 (10 uF, what USB 2.0
+  7.2.4.1 allows at attach), then 47 mA while the eFuse ramps the rail at
+  0.91 V/ms. Changing supplies with 0.9 A on +5V and 0.6 A at 3.3 V (0.17 A on
+  +3V3, 0.43 A on +3V3_WIFI; DC to USB; USB at 4.75 V with DC at 5.05 V plugged
+  in and pulled; PoE to DC; PoE and USB, PoE pulled): +5V stays at 4.06 V or
+  above, +3V3 at 3.30 V, over the supervisor's 2.99 V, and +3V3_WIFI at 3.29 V,
+  over the module's 3.0 V. Running on DC with USB unplugged, VBUS stays at
+  0 mV; running on USB, the DC converter's output at 1 mV. The eFuse's reverse
+  blocking (29 mV, 50 us re-enable) and R104 are in the model. Tried and left
+  out of the checks: with the board's maximum (1.82 A at 5 V) on USB alone at
+  4.75 V behind 0.43 ohm, the 5 V rail falls to the eFuse's undervoltage
+  limit and the board turns off. That load is outside what USB alone may
+  carry: the USB-only rule caps it ("Current from a USB-only supply").
 
 ### 3.3 V converter
 
@@ -496,16 +544,16 @@ R111 100 k / R112 22.1 k: 3.315 V.
   behind its ferrite. With Samsung's DC-bias data at 3.3 V (22 uF 0805
   CL21A226MAQNNNE: 13.69 uF; 10 uF 0603 CL10A106KP8NNNC: 4.46 uF) the rail
   had about 76 uF effective. Now: 10 uF at the converter (C109; the second
-  22 uF is gone), 10 uF instead of 22 uF at the Wi-Fi module (C301; Espressif's
-  typical circuit shows 22 uF, the converter and the plane carry its bursts),
-  4.7 uF at the proximity sensor's emitter (C715; Vishay asks 2.2 uF). That
-  is 49 uF counting the capacitors without data at their full value; the test
-  `test_3v3_converter_output_capacitance_is_in_tis_table` adds it up.
+  22 uF is gone) and 4.7 uF at the proximity sensor's emitter (C715; Vishay
+  asks 2.2 uF); the Wi-Fi module and its capacitors have a converter of their
+  own (below). That is 44.5 uF counting the capacitors without data at their
+  full value; the test `test_3v3_converter_output_capacitance_is_in_tis_table`
+  adds it up.
 - Feed-forward capacitor C108 12 pF across R111: a zero at 133 kHz. TI
   recommends 6.8 pF with 200 k (zero at 117 kHz). The loop crossover is not
   published; SLVA289 places the zero near it. Bring-up measures the load step
   (0.1 to 1 A) with and without C108.
-- Current: 1.27 A at the sizing figures, 36 % below its 2 A (table above);
+- Current: 0.89 A at the sizing figures, 55 % below its 2 A (table above);
   the current limit is 3 A at least (DBV package).
 - Layout (TI 10.2): turned so that VIN and FB face left and SW faces the
   inductor. C107 100 nF straight above VIN, C106 10 uF beside it; their ground
@@ -516,6 +564,57 @@ R111 100 k / R112 22.1 k: 3.315 V.
 - The supervisor U204 (TLV803S, 2.93 V) holds the P4 in reset until the rail
   has been above its threshold for 120 to 280 ms, and resets it when the rail
   falls below that.
+
+### The Wi-Fi module's converter
+
+U302: the circuit of U103 (TLV62569, 2.2 uH WPN4020H2R2MT, R311 100 k / R312
+22.1 k, 3.315 V, C306 12 pF across R311), for the ESP32-C5-MINI-1 alone. Its
+parts are all on the board already, about 0.22 USD.
+
+- Why. The module asks its supply for 0.6 A (HDG 1.3.2) and has 33.4 uF on its
+  3V3 pin (datasheet v1.4, figure 8-1: C6, C21, C29 10 uF; C19, C20, C26 1 uF;
+  C4, C8, C12, C15 100 nF; C14 10 nF). On U103 that made 1.49 A at the sizing
+  figures (25.6 % headroom) and about 82 uF of output capacitance.
+- Output capacitance: C301 22 uF (13.69 uF at 3.3 V) and C302 100 nF at the
+  module's pin, Espressif's typical circuit (figure 9-1), and the module's
+  33.4 uF at full value: 47.2 uF, inside the 52.8 uF; without the module's
+  capacitors still 13.8 uF, above TI's smallest proven value (10 uF - 50 %)
+  (`test_wifi_converter_output_capacitance_is_in_tis_table`). C301 is both the
+  converter's output capacitor and the module's.
+- Current: 0.60 A at the sizing figure, 0.43 A at most: 70 % below its 2 A.
+- Always on, as the C6's supply was: EN through R310 100 k from the 5 V rail,
+  no switch (a module whose supply an IO expander switched did not start,
+  esp-hosted issue 127). Everything that sets the module's pins at reset hangs
+  on its own rail: the EN RC (R301 10 k, C303 1 uF), the IO28 pull-up R303 and
+  the SDIO pull-ups R305 to R309
+  (`test_wifi_module_supply_is_always_on_and_carries_its_pull_ups`).
+- Power-up order. Both converters start from the 5 V rail together (each at
+  2.45 V, with the same soft start): +3V3 and +3V3_WIFI are up within
+  microseconds of each other, 5.0 ms after a USB plug in the simulation. The
+  module's EN rises 13.4 ms later (its RC to 0.75 x 3.3 V). The supervisor
+  holds the P4 in reset for 120 to 280 ms after +3V3, so no P4 pin drives the
+  module before its rail is up and its straps are read; esp-hosted's later
+  resets run with both rails up. When the 5 V rail goes, both rails fall
+  together and the supervisor resets the P4 below 2.93 V.
+- Layout (TI 10.2), in the column left of the module: turned 90 degrees, so
+  that SW, GND and EN face up to the inductor and VIN and FB face down. C305
+  100 nF straight below VIN, C304 10 uF beside it, their ground vias and one
+  under the converter between its pad rows close the input loop through In1.
+  SW runs straight up into L301's pad; L301's output pad lies level with C301's
+  + pad, and C301's ground pad faces the module's ground pins 1 and 2, its +
+  pad the module's 3V3 pin (pin 3). The divider sits below FB and senses the
+  rail at C302 along the module's edge (`routes_wifi.wifi_buck_routes`).
+- On the routed board (`scripts/layout_report.py`, pad centres): the input
+  loop is C305 to VIN 1.4 mm along copper and 5.1 mm back through the fill,
+  1.1 mm2, switch-node copper 7.4 mm2, as small as U103's ("Switching
+  converters: hot loops"). C301's + pad lies 1.8 mm from the module's 3V3 pin
+  and 3.2 mm from L301's output pad; its ground pad 1.8 mm from the module's
+  ground pins 1 and 2, with a via 0.75 mm away into In1, and 7.2 mm from
+  U302's GND pin, which it reaches through In1 (that via, and the 0.6 mm via
+  between U302's pad rows). Both makers want this capacitor at their pin;
+  it sits nearer the module's, because the output loop carries the
+  inductor's triangular ripple, not the input loop's chopped current, which
+  TI names the critical one.
 
 ### DC input
 
@@ -769,105 +868,140 @@ the Ethernet clock in the cold, look here first.
 
 ## Wi-Fi antenna
 
-Decided on 24 November 2026: every board gets the ESP32-C6-MINI-1U, the
-module with a connector and no antenna of its own, and the antenna is chosen
-per build:
+The ESP32-C5-MINI-1 carries its own dual-band PCB antenna, fed through a
+diplexer, in the 5.85 mm at the top end of the module (datasheet v1.4, fig.
+11-1). Nothing else is bought or fitted for the radio; the external antennas,
+their cable and the antenna bay of the C6-MINI-1U are gone.
 
-- an adhesive antenna inside the case, or
-- an antenna on an SMA bulkhead in the case wall, with a pigtail to the module.
+Its place, from `scripts/bootstrap/geometry.py` (board coordinates, mm):
 
-The antennas, decided with the review on 25 November 2026: the certified
-one, Shanghai Deman TFPD08H10060011 (a sleeve monopole of 2.33 dBi, MHF III,
-bought through Espressif or Deman), and as fallback the Taoglas GW.26.0111
-(2.24 dBi) on the CAB.A02 SMA bulkhead cable. Both are in the parts lists;
-sourcing in [parts.md](parts.md), what the fallback means for the FCC and
-the RED in the [compliance checklist](compliance.md#what-the-certified-wi-fi-module-saves).
-From the module's datasheet (v1.5, section 10.2):
+| | |
+|---|---|
+| Module | pad centre (27.8, 13.9): body x 20.1 to 35.5, y 0.3 to 21.6, antenna up |
+| Antenna area | x 20.1 to 35.5, y 0.3 to 6.15; its lower boundary (the module's ground edge) at y 6.15 |
+| Cut in the top edge | x 8.6 to 37.5, 6.0 deep: no board under the antenna and on both sides of it. Its floor lies 0.15 mm above the antenna's lower boundary; it reaches 2 mm beyond the module on the right (the antenna's ground point) and 11.5 mm on the left (its open end) |
+| Copper keep-out | x 0 to 50.5, y 0 to 6.3, on all six layers: the antenna area and 15 mm beside it on both sides, down to 0.2 mm above the module's top row of pads |
+| Ground at the edge | the module's nine ground pads with twelve vias between them, as Espressif's land pattern shows them: 0.45 mm, their rims just touching the pads (`post_route.py` leaves them at that size rather than widen them into the pads); filled and capped by the order, so none draws solder. No via in the module's pads: the autorouter's via in the upper left ground pad, laid out for the C6, is removed with its track (`build_pcb.py`, `same_net_in_stale_pads`). Ground fill on all layers below the keep-out, stitched by `post_route.py` |
 
-- The connector is of the third generation: Hirose W.FL, I-PEX MHF III or
-  Amphenol AMMC. It is not a U.FL; the pigtail has to match.
-- The antenna: 2.4 GHz, 50 ohm, and a gain of 2.33 dBi at most, which is the
-  gain of the antenna the module was certified with (a monopole, Espressif's
-  material code TFPD08H10060011). With an antenna "of a different type or
-  gain, additional testing, such as EMC, may be required": see the
-  [compliance checklist](compliance.md).
-- The module ships without an antenna.
+Espressif's guide (HDG 1.4.7, figures 22 and 23) recommends the antenna beyond
+the board edge, the antenna's ground point (its right end) at a board edge or
+corner, and "a clearance of at least 15 mm in all directions" inside the
+housing. Where the antenna cannot stand out, it asks for the board cut away on
+both sides of the antenna and below it. On this board:
 
-Its place in the case (`case/cad/attractap-touch-case.sc`, bodies "Wi-Fi
-antenna bay (ref)" and "Wi-Fi antenna cable (ref)"): a bay 40 x 10 x 4 mm
-inside the cap's top wall, over the board's copper-free strip at the top
-edge, so the antenna sees no copper within 6 mm on the board side; above the
-dock's cleat (1.0 mm), 0.45 mm beyond the board edge, clear of the cap. The
-cable leaves the module's connector straight towards the top edge, 2.4 mm
-below the board in the space in front of the dock, and enters the bay 8 mm
-further on; any length from 10 mm up fits. The certified antenna's
-specification gives 100 x 5.2 mm and no drawing: as a rigid part it does not
-fit the case, which has 88 mm across inside. The bulkhead of the fallback does
-not fit in the cap's top wall either: behind a 2.4 mm wall a typical SMA
-bulkhead jack reaches about 11 mm into the case, into the board's upper mounting boss or onto the
-board. Both are recorded under "Accepted deviations".
+- The antenna stays inside the outline, because the case has 1.5 mm to its top
+  wall; the cut is the fallback the guide names.
+- The ground point lies on the board's inner side, 51 mm from its right edge
+  and 35 mm from the left one. Figure 22 ticks only the right-hand corners for
+  this orientation: the top right corner (position 3) is where USB-C, its
+  eFuse path and a mounting hole sit.
+- The cut reaches 11.5 mm beyond the open end, not 15 mm: the upper left
+  mounting hole stops it.
+- In the case the antenna has 1.8 mm to the top wall, 4.7 mm to the front wall
+  (both printed), 13.1 mm to the dock plate (printed) and, with the reader on a
+  metal wall, 15.6 mm to the wall. The display's metal back (x 5.6 to 80.4, y
+  12.8 to 89.4) lies 6.7 mm below the antenna area, on the board's other side
+  and 3.9 mm behind the antenna's plane; it is tied to the board's ground on
+  four pads.
 
-The part is the ESP32-C6-MINI-1U-H4 (C20627095, to 105 C), not the -N4 (to
-85 C): JLCPCB had 3364 of the -H4 and none of the -N4 on 24 November 2026, it
-costs about 0.25 USD more than the module with PCB antenna, and the thermal
-estimate has the module at 79 C in a room of 40 C on PoE.
+What that costs is in the full-wave model below, against the same stand-in at
+Espressif's position 3, and recorded under "Accepted deviations".
 
-Nothing changed on the board. The datasheet gives one land pattern for both
-modules (figures 11-1 and 11-2): the MINI-1U is the MINI-1 without the 4.1 mm
-that carry the antenna. Symbol and footprint of U301 keep the MINI-1's names,
-and the footprint's outline shows the longer module. JLCPCB's library draws
-the nine ground pads of the two modules differently (pitch 1.8 mm for the
-MINI-1, which is this footprint, 1.975 mm for the MINI-1U; the datasheet has
-2.05 mm). The pads are 1.45 mm wide and overlap in every case;
-`check-footprints` knows the difference.
+Front materials. The model has the case's top strip printed (ABS or PETG), a
+wooden or printed face plate behaves like it. An aluminium face plate over the
+strip above the display costs 1.5 to 1.9 dB at 2.4 GHz and 0.7 to 1.2 dB at 5 GHz
+against the printed front; with a window over the antenna and its keep-out (x
+up to 50.5 mm) it costs nothing. So: printed, wood or other non-metal fronts
+anywhere; a metal front only with that window. The face plate variant's metal
+sheet outline (`case/cad/faceplate/`) has no such window yet.
 
-Open:
+Full-wave model (`sim/wifi_antenna.py`, openEMS). Espressif does not publish
+the antenna's shape. A stand-in of the same size and kind, an inverted-F with a
+long arm for 2.4 GHz and a short branch off the feed for 5 GHz, ground point on
+the right, was tuned on a 40 x 55 mm evaluation board with the antenna out over
+its edge to 2.429 GHz (-10 dB) and 5.435 GHz (-8 dB). Then the same stand-in on
+this board: in its place (top left), and in the top right corner with the
+antenna out over the edge, its right end 1 mm inside the board's (Espressif's
+position 3, fig. 23 "Max 1"), with the case grown by as much, so that the
+antenna has the same distances to its walls. Radiated of the power fed in (the
+mismatch included), and in brackets of the power accepted, in dB:
 
-- The certified antenna's drawing and a sample, from Espressif or Deman,
-  before the case is printed (parts.md).
-- Range with the antenna in the bay: not modelled, to be measured (bring-up
-  plan).
+| Case | 2.4 GHz: resonance | ch. 1 / 7 / 13 | 5 GHz: resonance | 5.18 / 5.50 / 5.70 GHz |
+|---|---|---|---|---|
+| Evaluation board | 2.429 | -2.4 / -2.4 / -2.6 (-1.9 / -1.9 / -1.9) | 5.440 | -6.8 / -4.8 / -5.4 (-4.4 / -3.9 / -3.3) |
+| This board, top left | 2.375 | -2.7 / -2.9 / -3.4 (-1.7 / -1.6 / -1.4) | 5.435 | -3.9 / -2.8 / -4.0 (-1.8 / -2.0 / -1.7) |
+| with the display | 2.377 | -2.7 / -3.0 / -3.4 (-1.7 / -1.6 / -1.4) | 5.440 | -4.0 / -2.6 / -4.2 (-1.9 / -1.8 / -2.0) |
+| **in the case, with the display** | 2.325 | **-3.0 / -3.5 / -4.1** (-1.5 / -1.4 / -1.3) | 5.430 | **-3.8 / -2.5 / -4.0** (-1.9 / -1.7 / -1.9) |
+| in the case, metal wall 16.4 mm behind | 2.308 | -4.7 / -4.9 / -5.2 (-2.6 / -2.4 / -2.3) | 5.430 | -4.3 / -3.0 / -4.6 (-2.6 / -2.4 / -2.7) |
+| in the case, aluminium face plate | 2.321 | -4.5 / -5.2 / -6.0 (-1.9 / -1.8 / -1.7) | 5.425 | -4.5 / -3.2 / -5.2 (-2.2 / -2.0 / -2.5) |
+| aluminium face plate with a window over the antenna | 2.325 | -2.8 / -3.5 / -4.2 (-1.6 / -1.5 / -1.4) | 5.430 | -3.7 / -2.4 / -4.0 (-1.8 / -1.7 / -1.9) |
+| Position 3, on the board | 2.487 | -1.7 / -1.4 / -1.3 (-1.1 / -1.2 / -1.2) | 5.820 | -9.3 / -5.4 / -3.6 (-3.6 / -2.9 / -2.7) |
+| **Position 3, in the case, with the display** | 2.427 | **-1.1 / -1.1 / -1.2** (-1.1 / -1.1 / -1.0) | 5.800 | **-9.3 / -5.0 / -3.2** (-3.9 / -2.9 / -2.5) |
+| Position 3, in the case, metal wall | 2.433 | -2.6 / -2.6 / -2.7 (-2.4 / -2.4 / -2.3) | 5.805 | -10.9 / -6.1 / -4.4 (-5.3 / -4.1 / -3.7) |
 
-## Wi-Fi and Bluetooth: the ESP32-C6 behind the ESP32-P4
+In the case with the display, the top left place radiates 1.9 / 2.4 / 2.9 dB
+less than position 3 at 2.4 GHz and 5.5 / 2.5 dB more to 0.8 dB less at 5 GHz.
+Of the power the antenna accepts it radiates 0.3 to 0.4 dB less at 2.4 GHz and
+0.6 to 2.0 dB more at 5 GHz: the difference at 2.4 GHz is mostly matching. The
+cut and the keep-out pull the stand-in down by 54 MHz, the case by 50 MHz more
+(2.429, 2.375, 2.325 GHz), so channel 13 sits on the upper edge of the match; at position 3 the
+board pulls the 5 GHz resonance up to 5.8 GHz instead. Both places are within
+3 dB of each other in every channel, the limit set for keeping the top left
+place (review of 25 November 2026). The absolute figures are the stand-in's;
+Espressif's own antenna on its test board radiates 77 to 83 % (-0.8 to -1.1
+dB) at 2.4 GHz and 51 to 68 % (-1.6 to -2.9 dB) at 5 GHz (antenna report for
+FCC ID 2AC7Z-ESPC5MINI1, "ESP-DUAL BAND-ANT C", Sporton, 1 December 2025).
+The display's metal back changes almost nothing; a metal wall costs 1.1 to 1.7
+dB at 2.4 GHz and 0.5 to 0.6 dB at 5 GHz and sends most of the rest forward (76 % and 88 %
+towards the room against 47 %).
 
-The P4 has no radio. The C6 module runs Espressif's esp-hosted firmware and is
+Range against the C6 readers in use is measured at bring-up, on both bands
+(bring-up plan).
+
+## Wi-Fi and Bluetooth: the ESP32-C5 behind the ESP32-P4
+
+The P4 has no radio. The C5 module runs Espressif's esp-hosted firmware and is
 the P4's Wi-Fi adapter and Bluetooth controller over SDIO. This pairing has a
 reputation for trouble. On 24 November 2026 the reports in Espressif's
 esp-hosted tracker and in the trackers of ESPHome and Arduino were read for
-what caused them, and each cause was held against this board.
+what caused them, and each cause was held against this board. They were about
+the ESP32-C6, the co-processor of most P4 boards, and were read again on 25
+November 2026, after the switch to the C5, for whether their cause depends on
+the module.
 
 What Espressif asks of the hardware
-([getting started](https://github.com/espressif/esp-hosted-mcu/blob/main/docs/getting-started-mcu.md#1-sdio)),
+([getting started](https://github.com/espressif/esp-hosted-mcu/blob/v3.1.0/docs/getting-started-mcu.md#1-sdio);
+for the tracks, the C5's hardware design guide, HDG 1.4.9),
 and what the board has:
 
 | Asked for | Here |
 |---|---|
-| The C6's fixed SDIO pins (CLK 19, CMD 18, D0 to D3 20 to 23) | as asked |
+| The C5's fixed SDIO pins (CLK 9, CMD 10, D0 8, D1 7, D2 14, D3 13), chip revision v1.0 or later | as asked; the module's chip is revision v1.0 or v1.2 |
 | On the P4 the pins of slot 0, which are wired straight to the SDIO unit, for the best timing; slot 1 goes through the pin matrix | slot 0 (GPIO39 to 44). Most boards with this pair, Espressif's included, use slot 1, because their slot 0 holds the SD card |
-| 51 k pull-ups on CMD and D0 to D3 | R305 to R309, 51 k |
-| A reset line from the host to the module's EN pin | GPIO45 through 1 k (R302) to EN, which has 10 k and 1 uF. esp-hosted's 10 ms pulse takes EN to 0.3 V and holds it below its threshold for 8.4 ms |
-| Short tracks of equal length, clock matched to data first; series termination where needed | 37 to 46 mm, clock 39 mm with 22 ohm at the P4. Simulated: clock and data arrive within 0.2 ns of each other, and clock out plus data back take 1.1 ns of the 25 ns that one clock period at 40 MHz has |
-| A supply at the module that does not dip | 10 uF and 100 nF at the module, from the 3.3 V plane of the 2 A converter. Espressif's typical circuit has 22 uF; 10 uF keeps the 3.3 V converter inside the output capacitance TI has proven (see "Power") |
+| 51 k pull-ups on CMD and D0 to D3 | R305 to R309, 51 k, to the module's own 3.3 V rail |
+| A reset line from the host to the module's EN pin | GPIO45 through 1 k (R302) to EN, which has 10 k (R301, to the module's rail) and 1 uF (C303). esp-hosted's 10 ms pulse takes EN to 0.3 V and holds it below its threshold for 8.4 ms |
+| Lengths, layers and ground (HDG 1.4.9): command and data within 50 mil (1.27 mm) of the clock, serpentines if needed; at most 2000 mil (50.8 mm); 50 ohm +-10 %; no change of layer; an unbroken reference plane below; ground copper round the clock | A bus laid out by hand (`routes_sdio.py`): the six lines on the back layer over the ground plane In4, 0.15 mm (49 ohm). Every line 40.3 mm from pad to pad, the clock through its 22 ohm (R304) at the P4: serpentines in the straight run make them equal to within 0.01 mm. The clock on the bus's west edge, 1.2 mm from its neighbour, with ground fill on both sides, stitched every 2.5 mm. Each line changes layer once at each end, with a ground via within 0.7 to 1.7 mm of each signal via; that is short of "no change of layer", see "Accepted deviations" ("SDIO tracks to the Wi-Fi module") |
+| A supply at the module that does not dip, at least 0.6 A (HDG 1.3.2) | a converter of its own, U302 (TLV62569, 2 A), with Espressif's 22 uF (C301) and 100 nF (C302) at the module's pin (see "The Wi-Fi module's converter") |
 
 The reports, by cause:
 
 | Report | Cause | Here |
 |---|---|---|
-| Wi-Fi does not associate, `Dropping packet(s) from stream`, restart loops ([ESPHome 10956](https://github.com/esphome/esphome/issues/10956), [esp-hosted 151](https://github.com/espressif/esp-hosted-mcu/issues/151)) | The C6 ran another esp-hosted version than the P4. Bought boards come with an old one, or none | The module comes empty. We flash it, through its test points, and keep both sides on one version |
-| `send_op_cond returned 0x107`, `card init failed` at start ([esp-hosted 127](https://github.com/espressif/esp-hosted-mcu/issues/127), [Arduino 11404](https://github.com/espressif/arduino-esp32/issues/11404)) | The C6 was held in reset by the wrong reset polarity in the configuration, was not powered (its supply switched by an IO expander), or had no firmware | The module's supply is not switched. The polarity is a firmware setting ([firmware-port.md](firmware-port.md)) |
+| Wi-Fi does not associate, `Dropping packet(s) from stream`, restart loops ([ESPHome 10956](https://github.com/esphome/esphome/issues/10956), [esp-hosted 151](https://github.com/espressif/esp-hosted-mcu/issues/151)) | The co-processor ran another esp-hosted version than the P4. Bought boards come with an old one, or none | The module comes empty. We flash it, through its test points, and keep both sides on one version |
+| `send_op_cond returned 0x107`, `card init failed` at start ([esp-hosted 127](https://github.com/espressif/esp-hosted-mcu/issues/127), [Arduino 11404](https://github.com/espressif/arduino-esp32/issues/11404)) | The co-processor was held in reset by the wrong reset polarity in the configuration, was not powered (its supply switched by an IO expander), or had no firmware | The module's supply is not switched. The polarity is a firmware setting ([firmware-port.md](firmware-port.md)) |
 | `Unrecoverable host sdio state` (0x107) after minutes or hours ([esp-hosted 167](https://github.com/espressif/esp-hosted-mcu/issues/167), [121](https://github.com/espressif/esp-hosted-mcu/issues/121)) | By Espressif's analysis of 18 November 2026, three things: a display library that called the chip's ROM cache functions while SDIO was busy; a fault in esp-hosted 3.0.9, fixed in 3.1.0; and on one custom board something not found yet, where Espressif asked about noise on the pins that share the SDIO pins' supply and about the module's 3.3 V | Firmware, for the first two. On the third: the SDIO pins' supply group (GPIO39 to 48) also carries the module's reset, the buzzer signal and the LED data line here, all of them slow signals into high impedances, and no power stage |
-| CRC errors (0x109) under load on a custom board ([esp-hosted 167](https://github.com/espressif/esp-hosted-mcu/issues/167)) | Not settled. Espressif reads it as the timing margin between the two chips, which depends on track length and load: its own board shows none at 50 MHz with the C6's default clock edges and many with the other edges. The reporter found no host timing that cured it and suspects the C6's SDIO unit | The board's share of the timing is 1.1 ns (see above). Stay with the default edges |
-| Downloads stall after about 100 kB ([esp-hosted 184](https://github.com/espressif/esp-hosted-mcu/issues/184)) | The access point: gone with other access points, and on one Wi-Fi 6 network gone when the C6 was kept from 802.11ax | Firmware |
+| CRC errors (0x109) under load on a custom board ([esp-hosted 167](https://github.com/espressif/esp-hosted-mcu/issues/167)) | Not settled. Espressif reads it as the timing margin between the two chips, which depends on track length and load: its own board shows none at 50 MHz with the C6's default clock edges and many with the other edges. The reporter found no host timing that cured it and suspects the C6's SDIO unit | The board's share of the timing is 1.01 ns (see above). Stay with the default edges, which the C5's slave driver has as well (sending and sampling on the rising edge). Whether the C5's SDIO unit behaves like the C6's is not known: the bring-up plan reads the throughput and the error count at 40 and 50 MHz |
+| Downloads stall after about 100 kB ([esp-hosted 184](https://github.com/espressif/esp-hosted-mcu/issues/184)) | The access point: gone with other access points, and on one Wi-Fi 6 network gone when the C6 was kept from 802.11ax | Firmware; the C5 has 802.11ax as well |
 | Double free in the SDIO receive task ([esp-hosted 210](https://github.com/espressif/esp-hosted-mcu/issues/210)) | `esp_wifi_remote` older than the esp-hosted it was built with | Firmware |
-| The C6's firmware cannot be updated over SDIO any more ([esp-hosted 143](https://github.com/espressif/esp-hosted-mcu/issues/143)) | Co-processor firmware 2.1 to 2.8 flashed first: its boot loader does not start later images | Firmware: the first image flashed is a newer one. The test points remain as a way back |
-| Bluetooth scan goes silent after 90 s ([esp-hosted 180](https://github.com/espressif/esp-hosted-mcu/issues/180)) | The board had the module without an antenna of its own (MINI-1U) and no antenna plugged in | That is this board's module: plug the antenna in before the board is powered (bring-up plan) |
+| The co-processor's firmware cannot be updated over SDIO any more ([esp-hosted 143](https://github.com/espressif/esp-hosted-mcu/issues/143)) | Co-processor firmware 2.1 to 2.8 flashed first: its boot loader does not start later images | Firmware: the first image flashed is a newer one. The test points remain as a way back |
+| Bluetooth scan goes silent after 90 s ([esp-hosted 180](https://github.com/espressif/esp-hosted-mcu/issues/180)) | The board had the module without an antenna of its own (MINI-1U) and no antenna plugged in | Was this board's module. The C5-MINI-1 has its antenna on board; nothing to plug in |
 | Bluetooth: connecting as central never completes for some devices ([esp-hosted 204](https://github.com/espressif/esp-hosted-mcu/issues/204)) | A fault on the host side. A patch posted in the report in July 2026 cured it for the reporter; the report was still open in November 2026 | Firmware. It matters: the reader's Bluetooth proxy is a central that scans and connects |
-| "The early board had wrong crystal capacitors and a fault in the radio part" (a comment on [esp-hosted 155](https://github.com/espressif/esp-hosted-mcu/issues/155)) | A board with a bare C6 chip | Certified module with its own crystal and antenna match |
+| "The early board had wrong crystal capacitors and a fault in the radio part" (a comment on [esp-hosted 155](https://github.com/espressif/esp-hosted-mcu/issues/155)) | A board with a bare C6 chip | Certified module with its own crystal, antenna and match |
 
 None of the causes that were found is in the circuit or the layout of this
 board. Nearly all are firmware versions and settings, which
-[firmware-port.md](firmware-port.md) lists, and two are in the assembly (an
-empty module, a missing antenna). Two reports from custom boards are not
+[firmware-port.md](firmware-port.md) lists, and one is in the assembly (an
+empty module; the missing antenna went with the C6-MINI-1U). Two reports from custom boards are not
 settled, though: the timeouts whose cause Espressif has not found, and the CRC
 errors it puts down to timing margin. A board of our own can have a fault of
 that kind too, and no report can rule it out for a board nobody has built. So
@@ -963,7 +1097,7 @@ Ratings below are from the makers' datasheets.
 | Display glass edges, flex behind them | the 0.25 mm seam round the glass; the flex leaves the display at the lower edge | 8 kV air | touch lines (TP_INT, TP_RST, I2C0 SDA and SCL): U603, U604 USBLC6-2SC6 at the connector (added in review stage 4); the display's metal back tied to ground through conductive gaskets on the four bare pads; tape over the flex (installation manual) | parts rated 15 kV air |
 | NFC area | solid 2.4 mm front wall | 8 kV air | no opening; the loop is shunted to ground by its matching network | no gap |
 | LED windows, buzzer holes, lock screws, seams | diffusers in eight windows, holes near the buzzer, two floating M3 screws from below | 8 kV air; 4 kV contact on the screws | none on the board: SK6812MINI-E rated 2 kV HBM, buzzer and its FET without a figure, screws float | not shown by datasheets: accepted deviation below |
-| Wi-Fi antenna | inside the case, behind a seam | 8 kV air at the seam | the RF line has no ESD part (the module leaves its ESD diode unfitted, datasheet fig. 8-2); the bay keeps the antenna 4 mm behind the cap's top wall | not shown; the bulkhead fallback would need an ESD warning label at the connector |
+| Wi-Fi antenna | printed on the module, inside the case, behind the cap's top wall | 8 kV air at the seam | the RF line has no ESD part (the module leaves its ESD diode D2 unfitted, datasheet v1.4 fig. 8-1); the antenna lies 1.8 mm behind the top wall and 4.7 mm behind the front wall, with no conductive path to the outside | not shown; ESD pre-test on the top wall (bring-up plan) |
 | Buttons and test points | on the board, in service only | left out as service | CHIP_PU 10 k + 1 uF + supervisor; BOOT behind 1 k | service |
 
 Sources: ETSI EN 301 489-1 V2.2.3 (2019-11) clauses 6.2, 7.2, 9.3; EN 301 489-17
@@ -971,7 +1105,7 @@ V3.3.1 clause 6.4; IEC 61000-4-2 Ed. 2.0 clause 8.3.2; EN 55035:2017 common
 modification 1; ST USBLC6-2SC6 datasheet rev. 5 p. 1; R+O SMAJ datasheet rev.
 2.2 p. 1; Littelfuse SMBJ datasheet (07/04/25) p. 1; HanRun HY931147C REV.A/1;
 IC Plus IP101G datasheet R01 clause 7.1; OPSCO SK6812MINI-E spec B/2;
-Espressif ESP32-C6-MINI-1U datasheet v1.5 fig. 8-2.
+Espressif ESP32-C5-MINI-1 datasheet v1.4 fig. 8-1.
 
 ## Layout rules used
 
@@ -1150,11 +1284,13 @@ open in front of them.
   `5V_POE`, `VDD_FLASH`, `TVDD`, `AVDD`, `DVDD`, `BL_A`, `SDA`, `SCL`,
   `NFC_SDA`, `NFC_SCL`, `REF_CLK`, `PHY_3V3`), set by `silk.test_point_labels` at
   the first side of the pad where it touches nothing. The pads stand next to
-  their circuit rather than in one row; the older ones (C6, P4 UART0, power) are
-  in labelled groups.
+  their circuit rather than in one row; the older ones (C5, P4 UART0, power) are
+  in labelled groups. TP831 (`3V3_WIFI`) is the Wi-Fi module's rail, beside its
+  converter; TP832 (`GND`) is the ground pad of the C5 group, for the clip of a
+  USB-serial adapter.
 
 - Component side, the side one sees with the reader off its dock: test points
-  in named groups (C6, P4 UART0, power), how to get into download mode, the
+  in named groups (C5, P4 UART0, power), how to get into download mode, the
   limits of the connectors, the border of the 48 V side, the LED numbers as the
   firmware counts them, and a white field of 10 x 2 mm beside `S/N`: JLCPCB
   prints a number that differs from board to board into a field of that size
@@ -1254,16 +1390,18 @@ pin. The makers ask for the capacitor right at those pins and a small switch nod
 |---|---|---|---|---|---|---|
 | U104 AP63205, DC input to 5 V | C113 2.2 uF | 3.8 mm | 2.4 mm | 6.3 mm2 | 1 + 1 | 10.1 mm2 |
 | U103 TLV62569, 5 V to 3.3 V | C107 100 nF | 1.0 mm | 3.9 mm | 2.6 mm2 | 0 + 1 | 7.4 mm2 |
+| U302 TLV62569, 5 V to 3.3 V for the Wi-Fi module | C305 100 nF | 1.4 mm | 5.1 mm | 1.1 mm2 | 0 + 1 | 7.4 mm2 |
 | U202 TLV62569, 3.3 V to 1.1 V | C232 10 uF | 2.1 mm | 4.6 mm | 1.3 mm2 | 1 + 1 | 3.7 mm2 |
 | U601 AP3032, backlight boost | C606 1 uF | 2.5 mm | 5.2 mm | 0.3 mm2 | 0 + 1 | 5.5 mm2 |
 
 Every loop closes on the component side: the capacitor's ground pad and the
 IC's GND pin lie in one piece of ground fill, with In1 (ground) right below it.
 The loops are a few square millimetres, the switch nodes no larger than the IC
-pin, the inductor pad and the track between them. U103 and U601 have no via at
-their GND pin: in SOT-23 the GND pin sits between the switch pin and the
+pin, the inductor pad and the track between them. U103, U302 and U601 have no
+via at their GND pin: in SOT-23 the GND pin sits between the switch pin and the
 inductor's pad, with no room for one; their ground reaches In1 through the
-capacitor's via and the fill.
+capacitor's via and the fill (U302 also through a via between its pad rows,
+1.3 mm from the pin).
 
 ### Decoupling and crystal at the MCU
 
@@ -1395,7 +1533,9 @@ The table is from before the design review. The review added parts worth about
 one extended part line, the buzzer resistor. The tamper sensors add about
 2.7 USD per board (accelerometer 0.89, proximity sensor 1.57, hall switch
 0.17, five capacitors, two resistors) and three extended part lines; the dock
-needs a magnet of a few cents.
+needs a magnet of a few cents. The ESP32-C5 switch adds about 0.4 USD from 100
+pieces (the module 0.16, its converter 0.22) and no new lines; the external
+antenna the C6-MINI-1U needed, never in the table, is no longer bought.
 
 The table is for the parts only. The bare boards, from JLCPCB's order form on
 21 November 2026 (86 x 143.5 mm, 1.6 mm, green, slowest build time, without
@@ -1450,11 +1590,12 @@ The largest lines are the ESP32-P4 (6.15), the PN532 (5.89), the Wi-Fi module
 (4.19) and the flash (2.26); on the Ethernet/PoE version also the PoE module
 (6.70), the jack (2.60) and the PHY (1.03).
 
-The Wi-Fi module with antenna connector (ESP32-C6-MINI-1U-H4) costs 0.21 to
-0.27 USD more than the module with PCB antenna that the table was made with
-(4.19 against 3.98 for one, 3.49 against 3.22 from 30 pieces, JLCPCB on
-24 November 2026). The antenna, and the pigtail for one on a bulkhead, come
-on top; they are not chosen and not in JLCPCB's assembly.
+The Wi-Fi module is now the ESP32-C5-MINI-1-N4-V1.2 (C54951860): 4.90 USD for
+one, 3.78 from 30 pieces, 3.36 from 100 (JLCPCB, 25 November 2026), against
+4.13, 3.42 and 3.20 for the ESP32-C6-MINI-1U-H4 the table was made with. Its
+own 3.3 V converter adds about 0.22 USD from 100 pieces (TLV62569, 2.2 uH,
+22 uF, 10 uF and small parts, all already lines of the parts list). No antenna
+or cable comes on top any more.
 
 Savings that were looked at and not taken:
 
@@ -1503,8 +1644,7 @@ pieces.
 | DC jack PJ-002A (J102), inductor CKCSA252012-2.2uH/M (L103, L201, two per board) | 1022 and 1171 in stock: enough for a first order, low for a series. |
 | Inductor CKCSA4020-6.8uH/M (L102) | 2228 in stock, but JLCPCB's library has no footprint for this part number, so `check-footprints` cannot compare it. It shares its 4 x 4 mm footprint with L101, has two pads and no polarity. Look at it in the placement preview. |
 | Display panel | Commodity part without a guaranteed part number. Agree on a fixed type with the supplier. |
-| ESP32-C6-MINI-1U-H4 (U301, Wi-Fi module) | 3364 in stock on 24 November 2026. The -N4 of the same module (C7558096, to 85 C) had none. |
-| Wi-Fi antenna, pigtail | Not chosen, and not parts JLCPCB assembles: bought and fitted by hand. The pigtail's plug must be a W.FL / MHF III. |
+| ESP32-C5-MINI-1-N4-V1.2 (U301, Wi-Fi module) | 614 in stock on 25 November 2026, the only stocked C5 module with a PCB antenna; none of the ESP32-C5-WROOM-1. Its alternates had no stock (parts.md). |
 
 The 3.3 V converter U103 was an AP63203WU-7, of which JLCPCB had two pieces and
 LCSC none. It is now a TLV62569DBVR, the part of the core converter U202, with
@@ -1596,28 +1736,76 @@ do. Everything else in the review meets its target.
   (bring-up plan).
 - **Later revision.** None needed unless the first boards show bridges.
 
-### Wi-Fi antenna in the case (review item 9.3)
+### Wi-Fi antenna placement (review item 9.3)
 
-- **Target.** An antenna from the module's certified list in both parts
-  lists, a place for it in the case and its cable's route drawn.
-- **Reached.** The certified Deman TFPD08H10060011 and the Taoglas fallback
-  are in both parts lists, with how to buy them. The case has a bay for an
-  antenna inside its top wall, 40 x 10 x 4 mm over the board's copper-free top
-  edge, and the cable's route from the module's connector to it.
-- **Why.** Deman publishes no drawing of the certified antenna; its
-  specification, filed with the FCC, gives "100 x 5.2" mm. As a rigid part that
-  does not fit inside the case (88 mm across); the cable may be part of the
-  100 mm. The fallback's SMA bulkhead does not fit the top wall either (about
-  11 mm of jack inside, onto the board's upper boss or the board), and it is out
-  of stock until 2027 at Digi-Key.
-- **Mitigation.** Ask Espressif or Deman for the drawing and samples before
-  the case is printed (parts.md). An antenna that fits the bay and is not the
-  certified one needs the lab's re-assessment in the EU and is not for a US
-  version (compliance.md). Range is measured against a current reader at
-  bring-up.
-- **Later revision.** With the drawing: the bay sized to the antenna, or a
-  side-wall bulkhead with the board's upper boss moved; or the ESP32-C5
-  (see "Decisions").
+- **Target.** Espressif's placement for a module with PCB antenna (ESP32-C5
+  HDG 1.4.7, figures 22 and 23): the antenna beyond the board edge, or over a
+  cut on both sides and below it with at least 15 mm on the open end's side;
+  the antenna's ground point within 1 mm of a board edge, at a corner (only the
+  right-hand corners are ticked for this module); 15 mm of free space round the
+  antenna inside the housing.
+- **Reached.** The module at the top edge, its antenna over a cut 6.0 mm deep
+  from x 8.6 to 37.5: 11.5 mm beyond the open end, 2 mm beyond the ground
+  point, the cut's floor 0.15 mm above the antenna's lower boundary; no copper
+  on any layer within 15 mm beside it (keep-out x 0 to 50.5). The ground point
+  lies on the board's inner side, 51 mm from the right edge. Inside the case
+  1.8 mm to the top wall and 4.7 mm to the front wall. In the full-wave model,
+  in the case with the display, the stand-in radiates -3.0 / -3.5 / -4.1 dB of
+  the power fed in at 2.4 GHz (channels 1, 7, 13) and -3.8 / -2.5 / -4.0 dB at
+  5.18 / 5.50 / 5.70 GHz, against -1.1 / -1.1 / -1.2 and -9.3 / -5.0 / -3.2 dB
+  at Espressif's position 3: within 3 dB in every channel (Wi-Fi antenna, full-
+  wave table).
+- **Why.** Position 3 is the board's top right corner, where USB-C, its eFuse
+  path, its ESD part and a mounting hole sit and the USB pair starts: moving
+  them would re-route the impedance-controlled USB pair and move the case's
+  boss (review items 5.2, 4.5 and 2.3, at A- today). Out over the edge the
+  antenna would need a case 7 mm taller. 15 mm of clearance does not fit in a
+  case with 1.5 mm to its walls. The upper left mounting hole stops the cut at
+  11.5 mm.
+- **Mitigation.** The cut on both sides and below the antenna, the copper keep-out
+  on all layers, the ground vias under the module, a printed front over the
+  antenna (an aluminium face plate only with a window over x 0 to 50.5 mm;
+  without it the model loses 1.5 to 1.9 dB at 2.4 GHz). The module's certificate
+  covers its antenna; the reader's radiated tests are done in the lab with the
+  reader in its case (compliance.md). Range on both bands against a C6 reader
+  in use is measured at bring-up.
+- **Later revision.** The module in the top right corner with the USB-C
+  connector moved down the right edge or to the top edge left of the module, or
+  a case with room for the antenna out over the edge.
+
+### SDIO tracks to the Wi-Fi module (review item 5.2)
+
+- **Target.** Espressif's layout rules for the C5's SDIO lines (HDG 1.4.9):
+  command and data within 50 mil (1.27 mm) of the clock's length, serpentines
+  if needed; 2000 mil (50.8 mm) at most; 50 ohm +-10 %; "Ensure that SDIO
+  traces do not cross layers", over an unbroken reference plane; ground copper
+  round the clock.
+- **Reached.** All but one: the six lines are 40.3 mm each from pad to
+  pad, equal to within 0.01 mm (`scripts/layout_report.py`), 0.15 mm on the back
+  layer over the ground plane In4 (49 ohm), the clock with ground fill on both
+  sides. The one rule missed: each line changes layer twice, once beside the
+  MCU and once below the module (two vias per line, the same in all six). A
+  ground via stands within 1.7 mm of every one of them (0.7 to 1.45 mm below
+  the module, 0.9 to 1.7 mm beside the MCU; `routes_sdio.py` places those
+  that the post-route step finds no room for).
+- **Why.** The pads of both chips are on the front layer, and the front layer
+  between them is taken: the core converter (U202, L201 and its capacitors)
+  stands in the way, and the 5 V feed (0.8 mm) and the core supply (0.6 mm)
+  cross it on that layer. Moving the converter away would lengthen the MCU's
+  core decoupling paths (review item 5.3, which may not drop). So any other
+  layer means a via at each end.
+- **Mitigation.** Both changes of layer go between two ground planes (In1
+  under the front layer, In4 over the back layer) with a ground via within
+  1.7 mm of each signal via, so the return current changes plane close by;
+  equal via counts keep the lines equal in delay. The timing on the routed board
+  (`sim/si.py`): clock and data arrive within 0.18 ns of each other, and
+  clock out and data back take 1.01 ns, which leaves the P4 5.0 ns at 50 MHz
+  (10.0 ns at 40 MHz) after a module that answers within the 14 ns of the SD
+  standard.
+  Bring-up runs esp-hosted's raw throughput test at 40 and 50 MHz and counts
+  CRC errors and timeouts before anything else uses the link.
+- **Later revision.** The module next to the P4's slot-0 pins, with the core
+  converter moved to the P4's other side, would allow a front-layer bus.
 
 ### ESD at the LED windows, the buzzer and the lock screws (review item 9.1)
 
@@ -1887,36 +2075,25 @@ Simulated and found right:
   than the current for a 20 K rise. The USB input's 1.5 A runs through 13 mm
   of inner layer 0.62 mm wide, more than the rule for a free inner track
   allows; this one lies 0.1 mm from a plane that takes its 70 mW.
-- SDIO link to the Wi-Fi module: the clock arrives 0.6 ns after it leaves
-  the MCU, the data lines 0.4 ns, so they stay within 0.2 ns of each other;
-  clock out and data back take 1.1 ns. After a module that answers within the
-  14 ns of the SD standard that leaves the MCU 9.9 ns at 40 MHz and 4.9 ns at
-  50 MHz. The board is not what limits this link (see "Wi-Fi and Bluetooth").
-- Wi-Fi antenna, in a full-wave model (`sim/wifi_antenna.py`). This is the
-  PCB antenna of the ESP32-C6-MINI-1, which the board had when it was
-  simulated and has no more (see "Wi-Fi antenna"); the result stays here
-  because the strip and the cut it was made for are still on the board. The
-  module's antenna is not published, so a stand-in of the same size and kind
-  was tuned on a small evaluation board and then put on this board unchanged:
-
-  | Case | Resonance | Bandwidth at -6 dB | Radiated of the power fed in, channel 1 / 7 / 13 | Of that towards the room |
-  |---|---|---|---|---|
-  | on an evaluation board of 40 x 55 mm | 2.422 GHz | 104 MHz | -5.3 / -5.4 / -5.7 dB | 47 % |
-  | on this board | 2.394 GHz | 164 MHz | -2.1 / -2.4 / -2.8 dB | 48 % |
-  | with the display, on its four ground pads | 2.394 GHz | 156 MHz | -2.1 / -2.4 / -2.9 dB | 48 % |
-  | with the display, not grounded | 2.394 GHz | 160 MHz | the same within 0.1 dB | 48 % |
-  | in the printed case | 2.364 GHz | 174 MHz | -2.2 / -2.6 / -3.2 dB | 47 % |
-  | in the case, metal wall 16 mm behind | 2.372 GHz | 188 MHz | -3.9 / -4.6 / -5.5 dB | 78 % |
-
-  The display's metal back changes nothing: it lies over the board's own
-  ground, and the gap between the two has no resonance in the band. The board
-  does not cost anything either; with its large ground the stand-in radiates
-  3 dB more than on the small evaluation board. Board and case together pull
-  the resonance down by 58 MHz; the case's share of that costs 0.2 dB in the
-  middle of the band and 0.4 dB at the top channel. A metal wall takes 2 dB of the radiated
-  power and sends most of the rest forward: towards the room it comes to the
-  same. So the model does not bear out the "less range than a development
-  board" that these notes expected from the 7 mm between antenna and display.
+- SDIO link to the Wi-Fi module (the C5, routed again on 26 November 2026):
+  all six lines are 40.3 mm from pad to pad. The clock arrives 0.59 ns after
+  it leaves the MCU, the data lines 0.41 to 0.42 ns, so they stay within
+  0.18 ns of each other: the clock's 22 ohm and the module's input slow it,
+  not its length. Clock out and data back take 1.01 ns. After a module that answers within the 14 ns of the SD
+  standard that leaves the MCU 10.0 ns at 40 MHz and 5.0 ns at 50 MHz. The
+  board is not what limits this link (see "Wi-Fi and Bluetooth").
+- Wi-Fi antenna, in a full-wave model (`sim/wifi_antenna.py`, the
+  `simulate-antenna` target; rerun on 25 November 2026 for the C5-MINI-1).
+  The module's antenna is not published, so a dual-band stand-in of the same
+  size and kind (an inverted F with a 2.4 GHz arm and a 5 GHz arm) was tuned on
+  a small evaluation board to 2.429 and 5.440 GHz and then put on this board
+  unchanged, in the C5's place and at Espressif's position 3 for comparison:
+  on the board, with the display, in the printed case, with a metal wall
+  behind and with a face plate of aluminium, with and without a window. The
+  table and what follows from it are in "Wi-Fi antenna". In short: in the case
+  with the display the stand-in radiates -3.0 to -4.1 dB of the power fed in at
+  2.4 GHz and -2.5 to -4.0 dB at 5 GHz, within 3 dB of position 3 in every
+  channel; a closed aluminium face plate costs up to 1.9 dB more at 2.4 GHz.
   The absolute figures are the stand-in's, not the module's.
 - Supply impedance at the MCU, the board without the chip's package: above
   30 MHz the core rail looks like 1.1 nH (2.4 nH for one pin alone), a pin of
@@ -1942,18 +2119,24 @@ Simulated and found right:
 - Heat in the closed case, estimated within 40 % (textbook figures for still
   air, rise over the room):
 
-  | Supply | Typical use | Board | Warmest spot | Display | Everything on for a long time: board, LED rows |
-  |---|---|---|---|---|---|
-  | USB | 2.4 W | +21 K | +32 K | +15 K | +39 K, +70 K |
-  | DC, 12 V | 2.8 W | +25 K | +36 K | +18 K | +46 K, +74 K |
-  | PoE | 3.4 W | +30 K | +40 K | +22 K | +52 K, +82 K |
+  | Supply | Typical use | Board | Warmest spot | Display | Wi-Fi module: board under it, cavity | Everything on for a long time: board, LED rows, Wi-Fi module's board, cavity |
+  |---|---|---|---|---|---|---|
+  | USB | 2.5 W | +22 K | +33 K | +16 K | +27 K, +16 K | +39 K, +70 K, +48 K, +29 K |
+  | DC, 12 V | 2.9 W | +26 K | +37 K | +19 K | +30 K, +19 K | +46 K, +75 K, +54 K, +34 K |
+  | PoE | 3.5 W | +31 K | +40 K | +23 K | +35 K, +23 K | +52 K, +82 K, +60 K, +38 K |
 
-  In a room of 25 °C typical use is far from every limit. In a room of 40 °C
-  on PoE the estimate puts the display at 62 °C (limit 70 °C), the Wi-Fi
-  module at 79 °C (105 °C for the -H4 that is fitted; the -N4 stands 85 °C)
-  and the air around the PoE module at 70 °C (85 °C): inside the limits, for
+  (Run again on 25 November 2026 with the C5, its converter and their
+  places, and on 26 November 2026 on the board routed again for the SDIO bus,
+  with the same figures but 1 K more at the LED rows on DC; with the C6 each
+  case had 0.1 W less and up to 1 K less.) In a room of 25 °C
+  typical use is far from every limit. In a room of 40 °C on PoE the estimate
+  puts the display at 63 °C (limit 70 °C), the air around the PoE module at
+  71 °C (85 °C) and the air right outside the Wi-Fi module between 63 °C (the
+  cavity) and 75 °C (the board under it; limit 85 °C): inside the limits, for
   the display and the PoE module by less than the estimate is exact. The DC
-  input's fuse then holds 0.67 A against 0.27 A drawn. Everything on at once
+  input's fuse then holds 0.66 A against 0.28 A drawn. The module's losses,
+  the bounds and the transmit limit that follows: "Wi-Fi module:
+  ESP32-C5-MINI-1". Everything on at once
   for a long
   time is beyond what the case can shed: the LED rows, on narrow copper
   between the cut-outs, get 70 to 80 K warmer than the room. The firmware
@@ -1996,14 +2179,14 @@ before and after, and the decisions taken on the way are in [review.md](review.m
 | Capacitor values without voltage and dielectric. | Every capacitor shows its rating (for example `16V X7R`), the resistors whose tolerance matters (feedback divider, current sense, NFC tuning, PHY bias) theirs; the rating comes with the part number from the maker's code. |
 | Title blocks without date; no revision history. | Date, drawn by, checked by, and the revision history on the root sheet. |
 | The overlap lint saw labels and part fields only: a field over another symbol's pin name or number, over its own body or a label over a pin's text went through. The PN532 body was too narrow for its pin names. | The lint also takes every pin's name and number (as KiCad places them), the pin lines and the bodies, with 0.25 mm between texts; the build fails on any hit. Text widths were measured on KiCad's font. The PN532 is 63.5 mm wide with its top pins spread, its reference and value outside the body. Every sheet was rendered at 200 dpi and read block by block. |
-| Parts lists with LCSC number and value only. | Every line carries manufacturer, part number, a full description (with rating and tolerance), an alternate and, for ICs and modules, the maker's lifecycle status (`scripts/bootstrap/parts_info.py`; [parts.md](parts.md) lists the sources). The display and the Wi-Fi antenna, which JLCPCB does not assemble, are in the parts lists too. A test fails when a fitted part lacks these data. |
+| Parts lists with LCSC number and value only. | Every line carries manufacturer, part number, a full description (with rating and tolerance), an alternate and, for ICs and modules, the maker's lifecycle status (`scripts/bootstrap/parts_info.py`; [parts.md](parts.md) lists the sources). The display and the Wi-Fi antenna, which JLCPCB does not assemble, are in the parts lists too (the antenna since gone with the C5's PCB antenna). A test fails when a fitted part lacks these data. |
 | No fabrication drawing, no netlist for the bare-board test. | `fab/jlcpcb/attractap-touch-p4-fab.pdf` (outline, dimensions, holes and cut-outs, stack-up, drill table, material, finish, IPC class, via fill) and `attractap-touch-p4.ipc` (IPC-D-356), both written by `export`. |
 | 3D models for the display connector only. | A model for every footprint with a body (`kicad/lib/attractap.3dshapes/`, `scripts/bootstrap/collect_models.py`); a test fails when one is missing. |
 | Supply OR-ing with three Schottky diodes: the 5 V rail sat at about 4.6 V, the diodes leaked back into an unplugged USB port when warm, and nothing limited the USB inrush. | USB through an eFuse (TPS259470A: soft start, 2 A limit, reverse blocking, lockouts), DC and PoE through ideal diodes (LM74700-Q1 with IRLML0030); see "Power". |
 | 3.3 V converter AP63203: no stock at LCSC or JLCPCB. | TLV62569 (the core converter's part), laid out as TI shows. |
 | The 5 V rail now follows its source; its ceiling was not stated against what the 5 V loads stand. | Table in "The 5 V rail's ceiling"; the eFuse's OVLO with a 0.1 % divider opens between 5.53 and 5.74 V. |
 | DC input: the TVS clamps 45 V at its rated current against the converter's 40 V; which surge test applies was not stated. | Standards worked out (EN 301 489-1: none on DC power ports; EN 50130-4: line to earth through 42 ohm); a bidirectional TVS at the connector and a 100 V reverse-polarity diode; `sim/dc_surge.cir`: 39.6 V at most at the converter. |
-| 3.3 V rail: about 76 uF effective at 3.3 V on a converter that TI has proven up to 52.8 uF. | About 49 uF: one 10 uF at the converter, 10 uF at the Wi-Fi module, 4.7 uF at the proximity emitter; a test adds it up. |
+| 3.3 V rail: about 76 uF effective at 3.3 V on a converter that TI has proven up to 52.8 uF. | About 49 uF: one 10 uF at the converter, 10 uF at the Wi-Fi module, 4.7 uF at the proximity emitter; a test adds it up. Since the C5: 44.5 uF, the Wi-Fi module on a converter of its own with 47.2 uF, its own capacitors counted; a test for each rail. |
 | DRC run with lowered severities (50 warnings at KiCad's defaults). | KiCad's default severities, no rule switched off or lowered: 0 errors, 0 warnings, 0 unconnected. Silkscreen cut back from pads and board edges in the generator; fiducials with a copper keep-out; 3 mm PoE spacing everywhere. |
 
 #### Land patterns against the makers' drawings

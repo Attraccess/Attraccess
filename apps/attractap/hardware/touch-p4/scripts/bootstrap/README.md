@@ -27,6 +27,9 @@ files were written. Comments and docstrings do not count as a change.
 | `silk.py` | The silkscreen of both sides: logo from the vector files in `case/logo/`, labels, the GPIO map (from `circuit_core.P4_GPIO`), notes. Checks that no text lies on a pad, on another text or off the board. |
 | `routes_mcu.py` | Fixed routes at the MCU: supply vias, the fan-out of all four sides, the flash, the display bus, and the NFC host signals at the PN532. |
 | `routes_board.py` | Fixed routes elsewhere: 48 V nets, Ethernet pairs, antenna feeds, DC input with its filter, buzzer, LED link, ground vias, and the via fan-out of the supply pads. |
+| `routes_sdio.py` | The SDIO bus between the MCU and the Wi-Fi module, laid out by hand: back-layer lanes, serpentines that make all six lines equal in length (Espressif's HDG 1.4.9), and the ground vias at its changes of layer. |
+| `routes_wifi.py` | The Wi-Fi module's own 3.3 V converter: input loop, switch node, output into the module's 3V3 pin, feedback, enable. |
+| `copper_path.py` | The copper path between two pads of a net without its stubs; `scripts/layout_report.py` and `sim/si.py` measure the SDIO lines with it. |
 | `finish_route.py` | Grid router that closes the connections the autorouter leaves open, including the ground and 3.3 V pads that are cut off from their pours. |
 | `route_grid.py` | Its engine: obstacle raster, net connectivity, path search, conversion to tracks and vias. |
 | `post_route.py` | After the routing: widens supply tracks and neck-downs, enlarges via pads, adds a ground via beside the via of every fast signal and stitching vias. With `--fix` it reads KiCad's design rule check and takes back whatever is part of a violation. |

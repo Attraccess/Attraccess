@@ -177,7 +177,7 @@ def dims(page):
 def features():
     """Cut-outs and holes, from the datum."""
     s = G.SLOT
-    a = G.C6_NOTCH
+    a = G.WIFI_NOTCH
     w, h = G.LED_WINDOW
     rows = [('Flex slot', '%.1f to %.1f' % (s[0], s[2]), '%.1f to %.1f' % (s[1], s[3]),
              '%.1f x %.1f, ends r 1.0' % (s[2] - s[0], s[3] - s[1])),

@@ -9,6 +9,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..', 'scripts', 'bootstrap'))
+import copper_path  # noqa: E402  (the track between two pads, without stubs)
 import design      # noqa: E402  (the circuit description: part values and nets)
 import geometry    # noqa: E402  (board coordinates)
 
@@ -60,6 +61,17 @@ class Board:
         for t in self.net_tracks(net):
             out[t['layer']] += math.hypot(t['x2'] - t['x1'], t['y2'] - t['y1'])
         return out
+
+    def path_by_layer(self, net, ref_a, ref_b):
+        """Millimetres on each layer of the track a signal of the net runs along from its pad on part ref_a to
+        its pad on part ref_b, without stubs branching off it (sim/si.py: the pull-ups of the SDIO lines)."""
+        pads = self.net_pads(net)
+        pad_a = next(p for p in pads if p['ref'] == ref_a)
+        pad_b = next(p for p in pads if p['ref'] == ref_b)
+        out = copper_path.path(self.net_tracks(net), self.net_vias(net), pad_a, pad_b)
+        if out is None:
+            raise ValueError('%s: no track from %s to %s' % (net, ref_a, ref_b))
+        return collections.Counter(out)
 
     def footprint(self, ref):
         return next(f for f in self.footprints if f['ref'] == ref)

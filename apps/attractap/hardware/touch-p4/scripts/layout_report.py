@@ -18,6 +18,7 @@ from collections import defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, 'bootstrap'))
+import copper_path  # noqa: E402  (the track between two pads, without stubs)
 
 MCU = 'U201'
 SUPPLY = re.compile(r'^(\+3V3|VDD|VDDO)')
@@ -188,6 +189,7 @@ BULK = set()          # filled from the board: capacitors of 4.7 uF and more
 SWITCHERS = [
     ('U104', 'AP63205, DC input to 5 V', ('U104', '3'), '4', 'DC_SW'),
     ('U103', 'TLV62569, 5 V to 3.3 V', ('U103', '4'), '2', 'BUCK_SW'),
+    ('U302', 'TLV62569, 5 V to 3.3 V for the Wi-Fi module', ('U302', '4'), '2', 'WIFI_BUCK_SW'),
     ('U202', 'TLV62569, 3.3 V to 1.1 V core', ('U202', '4'), '2', 'DCDC_SW'),
     ('U601', 'AP3032, backlight boost', ('D601', '1'), '2', 'BL_SW'),
 ]
@@ -274,6 +276,23 @@ def main(path):
         for n in nets:
             print('    %-14s %6.1f mm  %d vias  widths %s' % (n, length[n], vias[n],
                   ', '.join('%s %.3f' % w for w in sorted(widths[n]))))
+    # ESP32-C5 HDG 1.4.9: CMD and D0 to D3 within 50 mil (1.27 mm) of CLK, at most 2000 mil (50.8 mm) in all,
+    # no change of layer (the clock counts from the MCU's pad, through its series resistor). The bus runs on
+    # the back layer (routes_sdio.py): two vias in every line, one at each end, is what it is built for
+    def pad_to_pad(net, a, c):
+        """the line from pad to pad, without the stub to its pull-up"""
+        pads = [p for p in board['pads'] if short(p['net']) == net]
+        got = copper_path.path([t for t in board['tracks'] if short(t['net']) == net],
+                               [v for v in board['vias'] if short(v['net']) == net],
+                               next(p for p in pads if p['ref'] == a), next(p for p in pads if p['ref'] == c))
+        return sum(got.values()) if got else float('nan')
+    clk = pad_to_pad('SDIO_CLK_M', MCU, 'R304') + pad_to_pad('SDIO_CLK', 'R304', 'U301')
+    rest = {n: pad_to_pad(n, MCU, 'U301') for n in ('SDIO_CMD', 'SDIO_D0', 'SDIO_D1', 'SDIO_D2', 'SDIO_D3')}
+    worst = max(rest, key=lambda n: abs(rest[n] - clk))
+    print('  SDIO against the ESP32-C5 HDG 1.4.9: CLK %.1f mm; %s differs most, by %.1f mm (rule 1.27); longest %.1f mm '
+          '(rule 50.8); vias %d to %d per line (rule 0; built for 2)'
+          % (clk, worst, rest[worst] - clk, max(list(rest.values()) + [clk]),
+             min(vias[n] for n in list(rest) + ['SDIO_CLK']), max(vias[n] for n in list(rest) + ['SDIO_CLK', 'SDIO_CLK_M'])))
 
 
 if __name__ == '__main__':

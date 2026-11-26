@@ -16,7 +16,7 @@ LCM = (5.6, 12.8, 80.4, 89.4)              # metal-backed LCD module behind the 
 # Bare ground pads on the display side, behind the LCD module: for conductive tape or foam that ties
 # the LCD's metal back to ground (centre x, y; each LCD_GROUND_PAD mm square). They are openings in
 # the solder mask over the ground fill, placed where that fill has no track and no via.
-LCD_GROUND_PADS = ((13.5, 18.5), (64.2, 37.2), (48.0, 17.0), (43.0, 80.0))
+LCD_GROUND_PADS = ((12.0, 23.5), (64.2, 37.2), (48.0, 17.0), (43.0, 80.0))
 LCD_GROUND_PAD = 5.0
 
 # Slot the display flex passes through, directly below the LCD module edge
@@ -63,12 +63,21 @@ LED_Y_BOT = 139.0
 LED_WINDOW = (3.4, 3.0)                     # cut-out per LED; it is part of the LED footprint
 LED_CUTOUT = (3.64, 3.24)                   # the same including the corner reliefs: what is really milled away
 
-# Wi-Fi module antenna: no copper on any layer in this rectangle. The module (x 15.4 to 28.6) should
-# have 15 mm free of copper on each side of its antenna; to the left the board ends before that.
-C6_KEEPOUT = (0.0, 0.0, 44.0, 6.0)
-# The board is cut away under the module's antenna (13.2 x 5.4 mm), as Espressif asks for when the
-# antenna cannot stand out over the board edge: x1, x2 and depth of the cut in the top edge.
-C6_NOTCH = (14.9, 29.1, 5.65)
+# Wi-Fi module ESP32-C5-MINI-1 (datasheet v1.4, fig. 11-1): 15.4 mm wide, 21.3 mm long; its pads centred
+# 7.7 mm above its lower edge, its antenna area the 5.85 mm at the other end. Placed antenna up at the top
+# edge: (x, y) of the pad centre, the body's top 0.3 mm inside the board edge.
+WIFI_MODULE = (27.8, 13.9)
+WIFI_W, WIFI_TOP, WIFI_BOTTOM, WIFI_ANT = 15.4, 13.6, 7.7, 7.75   # width; top, bottom, antenna boundary from the centre
+# ESP32-C5 HDG 1.4.7: the antenna beyond the board edge, or, where it cannot be, the board cut away on both
+# sides of the antenna and below it, the antenna's ground point (its right end) close to the board edge. The
+# case keeps the antenna inside the board outline, so the board is cut: x1, x2 and depth of the cut in the
+# top edge. Its floor lies 0.15 mm above the antenna's lower boundary (fig. 23: at most 1 mm away); it
+# reaches 2 mm beyond the module on the right ("Max 2") and 11.5 mm on the left, the open end's side,
+# where fig. 23 asks for 15 mm and the upper left mounting hole stops it.
+WIFI_NOTCH = (8.6, 37.5, 6.0)
+# No copper on any layer here: the antenna area and 15 mm beside it on both sides, down to 0.2 mm above
+# the module's top row of pads (6.5).
+WIFI_KEEPOUT = (0.0, 0.0, 50.5, 6.3)
 
 # PoE primary side (48 V, isolated from everything else): no secondary copper in here, on any layer. The
 # second rectangle ends 3.1 mm above the 48 V pad of C102, the first 3.1 mm left of the filtered 48 V track

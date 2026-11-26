@@ -3,8 +3,8 @@
 # Usage: tools/pcb.sh <command>      (see the case statement below, or the README)
 set -eo pipefail
 
-# Full-wave model of a module with PCB antenna on the board (sim/wifi_antenna.py; the module fitted now has
-# an antenna connector instead). It needs a Python with openEMS,
+# Full-wave model of the Wi-Fi module's PCB antenna on the board at 2.4 and 5 GHz (sim/wifi_antenna.py). It
+# needs a Python with openEMS,
 # which OPENEMS_PYTHON names (Debian and Ubuntu: the package python3-openems), and no KiCad: so it runs
 # before KiCad is looked for.
 if [[ "${1:-}" == simulate-antenna ]]; then
@@ -15,7 +15,7 @@ if [[ "${1:-}" == simulate-antenna ]]; then
         echo "pcb.sh: '$py' has no openEMS. Set OPENEMS_PYTHON to a Python that can import openEMS and CSXCAD." >&2; exit 1; }
     mkdir -p "$root/fab/reports"
     cd "$root/sim"
-    "$py" -u wifi_antenna.py "$@" | grep --line-buffered -E '^(case|reference|board|display|display_floating|in_case|metal_wall) ' | tee "$root/fab/reports/wifi-antenna.txt"
+    "$py" -u wifi_antenna.py "$@" | grep --line-buffered -E '^(case|reference|board|display|in_case|metal_wall|faceplate|p3_[a-z_]+) ' | tee "$root/fab/reports/wifi-antenna.txt"
     exit "${PIPESTATUS[0]}"
 fi
 

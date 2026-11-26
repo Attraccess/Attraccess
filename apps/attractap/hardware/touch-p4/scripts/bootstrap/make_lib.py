@@ -274,6 +274,22 @@ def proximity_sensor_outline(tree):
                      [S('width'), 0.1]])
 
 
+def wifi_module_outline(tree):
+    """The converted footprint of the ESP32-C5-MINI-1 has no fabrication layer. The module on it as the datasheet
+    draws it (v1.4, fig. 11-1): 15.4 x 21.3 mm, 13.6 mm above the pad centre and 7.7 mm below it, with the
+    antenna area's boundary 7.75 mm above the centre. The courtyard already covers the antenna area."""
+    S = Sym
+    tree[:] = [i for i in tree if not (isinstance(i, list) and i and i[0] in ('fp_line', 'fp_text')
+                                       and first(i, 'layer')[1] == 'F.Fab' and i[0] == 'fp_line')]
+    tree[:] = [i for i in tree if not (isinstance(i, list) and i and i[0] == 'fp_text' and i[2] == 'ANTENNA AREA')]
+    hw, top, bot, ant = 7.7, -13.6, 7.7, -7.75
+    for p, q in (((-hw, top), (hw, top)), ((hw, top), (hw, bot)), ((hw, bot), (-hw, bot)), ((-hw, bot), (-hw, top)),
+                 ((-hw, ant), (hw, ant))):
+        tree.append([S('fp_line'), [S('start'), *p], [S('end'), *q], [S('layer'), S('F.Fab')], [S('width'), 0.1]])
+    tree.append([S('fp_text'), S('user'), 'ANTENNA AREA', [S('at'), 0, (top + ant) / 2], [S('layer'), S('F.Fab')],
+                 [S('effects'), [S('font'), [S('size'), 1, 1], [S('thickness'), 0.15]]]])
+
+
 def usb_c_power_pads(tree):
     """The converter drew the four 0.6 mm power pads of the USB-C receptacle as polygons with a 0.1 mm
     outline, which KiCad makes 0.7 x 1.4 mm: 0.10 mm from VBUS to GND where HRO's drawing has 0.20 mm.
@@ -371,6 +387,8 @@ def fix_footprint(name, text, fresh=True):
         usb_c_power_pads(tree)
     if name.startswith('FPC-SMD_FH12-40S'):
         fpc_signal_pads(tree)
+    if name == 'CONN-SMD_ESP32-C5-MINI-1-N4':
+        wifi_module_outline(tree)
     if name.startswith('VQFN-10_L2.0-W2.0'):
         custom_pad_strokes(tree)
     if name.startswith('QFN-104'):

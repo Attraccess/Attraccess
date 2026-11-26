@@ -26,16 +26,16 @@ ALIGN = {'l': pcbnew.GR_TEXT_H_ALIGN_LEFT, 'c': pcbnew.GR_TEXT_H_ALIGN_CENTER, '
 
 # Test points: label and where it goes ('r': right of the pad, 'l': left of it, 'b': below it, 'a': above it).
 TEST_POINTS = {
-    'TP801': ('5V', 'r'), 'TP802': ('3V3', 'r'), 'TP803': ('VDD_HP', 'r'), 'TP804': ('GND', 'b'),
+    'TP801': ('5V', 'b'), 'TP802': ('3V3', 'r'), 'TP803': ('VDD_HP', 'r'), 'TP804': ('GND', 'b'),
     'TP805': ('GND', 'b'),
     'TP806': ('EN', 'r'), 'TP807': ('BOOT', 'r'), 'TP808': ('TX0', 'r'), 'TP809': ('RX0', 'r'),
-    'TP810': ('EN', 'a'), 'TP811': ('BOOT', 'b'), 'TP812': ('TX', 'a'), 'TP813': ('RX', 'b'),
+    'TP810': ('EN', 'a'), 'TP811': ('BOOT', 'a'), 'TP812': ('TX', 'b'), 'TP813': ('RX', 'b'), 'TP832': ('GND', 'b'),
     'TP814': ('INT', 'l'), 'TP815': ('INT', 'l'),
     # the supply and bus test points of review stage 3: the net, short
     'TP816': ('VDC', 'l'), 'TP817': ('5V_DC', 'r'), 'TP818': ('5V_USB', 'l'), 'TP819': ('5V_POE', 'r'),
     'TP820': ('VDD_FLASH', 'b'), 'TP821': ('TVDD', 'r'), 'TP822': ('AVDD', 'r'), 'TP823': ('DVDD', 'r'),
     'TP824': ('BL_A', 'r'), 'TP825': ('SDA', 'r'), 'TP826': ('SCL', 'r'), 'TP827': ('NFC_SDA', 'r'),
-    'TP828': ('NFC_SCL', 'r'), 'TP829': ('REF_CLK', 'r'), 'TP830': ('PHY_3V3', 'r'),
+    'TP828': ('NFC_SCL', 'r'), 'TP829': ('REF_CLK', 'r'), 'TP830': ('PHY_3V3', 'r'), 'TP831': ('3V3_WIFI', 'b'),
 }
 
 
@@ -193,7 +193,7 @@ def gpio_map(S, x, y, pitch=1.75):
         ('LED', 'DIN %d' % g('LED_DATA'), '8x SK6812', ''),
         ('BUZZER', 'IO %d' % g('BUZZER'), '2.7 KHZ', ''),
         ('BACKLIGHT', '', 'PWM %d' % g('BL_PWM'), ''),
-        ('C6', 'EN %d' % g('C6_EN'), 'SDIO %d-%d' % (g('SDIO_D0'), g('SDIO_CMD')), ''),
+        ('C5', 'EN %d' % g('C5_EN'), 'SDIO %d-%d' % (g('SDIO_D0'), g('SDIO_CMD')), ''),
     ]
     for i, row in enumerate(rows):
         for dx, cell in zip((0.0, 8.0, 15.2, 23.2), row):
@@ -213,10 +213,10 @@ def component_side(S):
             S.text(label, x + (1.7 if where == 'r' else -1.7), y, align='l' if where == 'r' else 'r')
         else:
             S.text(label, x, y + (1.8 if where == 'b' else -1.8))
-    S.text('C6', 10.4, 11.2, 1.0, tag=True)
-    S.text('P4 UART0', 13.4, 18.55, 1.0, align='l', tag=True)
+    S.text('C5', 43.4, 16.6, 1.0, tag=True)
+    S.text('P4 UART0', 14.4, 32.6, 1.0, align='r', tag=True)
     S.text('115200 8N1', 15.4, 32.3, 1.0, align='l')
-    S.text('POWER', 24.75, 22.1, 1.0, align='l', tag=True)
+    S.text('POWER', 22.4, 22.6, 1.0, tag=True)
     # ---- buttons
     for ref, label in (('SW201', 'RST'), ('SW202', 'BOOT')):
         x, y = unV(B.fp[ref].GetPosition())
@@ -243,8 +243,8 @@ def component_side(S):
         S.text(mark, x, y - 3.6)
     S.text('DISPLAY FLEX', 43.85, 74.0)
     S.text('FLEX FOLDS OVER THIS AREA', 36.75, 82.5)
-    S.text('ANTENNA ZONE', 36.6, 2.2)
-    S.text('NO METAL HERE', 36.6, 3.9)
+    S.text('ANTENNA ZONE', 44.0, 2.2)
+    S.text('NO METAL HERE', 44.0, 3.9)
     # ---- 48 V side: its border beside the Ethernet pair, and its name
     x48 = G.POE_PRIMARY[0][0]
     S.line([(x48, 57.4), (x48, G.JACK_REAR_CLEAR_Y + 0.4)], dash=(1.0, 0.7))
@@ -368,7 +368,7 @@ def cutouts():
     """The board's notches, pocket, slot and LED windows as boxes (x1, y1, x2, y2)."""
     w, h = G.LED_CUTOUT
     holes = [(G.NOTCH_X, G.NOTCH_Y, G.BOARD_W, G.BOARD_H), (0, G.POCKET_Y, G.POCKET_X, G.BOARD_H), G.SLOT,
-             (G.C6_NOTCH[0], 0, G.C6_NOTCH[1], G.C6_NOTCH[2])]
+             (G.WIFI_NOTCH[0], 0, G.WIFI_NOTCH[1], G.WIFI_NOTCH[2])]
     return holes + [(x - w / 2, y - h / 2, x + w / 2, y + h / 2) for y in (G.LED_Y_TOP, G.LED_Y_BOT) for x in G.LED_X]
 
 

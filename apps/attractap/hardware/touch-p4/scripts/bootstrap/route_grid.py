@@ -250,7 +250,7 @@ def build_raster(board, net, width, clearance, pads, tracks, vias, groups, soft_
         R.block[l][NY - int(e / CELL) - 1:, :] = True
         R.rect(l, G.NOTCH_X, G.NOTCH_Y, G.BOARD_W, G.BOARD_H, e)
         R.rect(l, 0, G.POCKET_Y, G.POCKET_X, G.BOARD_H, e)
-        R.rect(l, G.C6_NOTCH[0], 0, G.C6_NOTCH[1], G.C6_NOTCH[2], e)
+        R.rect(l, G.WIFI_NOTCH[0], 0, G.WIFI_NOTCH[1], G.WIFI_NOTCH[2], e)
         R.rect(l, *G.SLOT, e)
         w, h = G.LED_CUTOUT
         for y in (G.LED_Y_TOP, G.LED_Y_BOT):

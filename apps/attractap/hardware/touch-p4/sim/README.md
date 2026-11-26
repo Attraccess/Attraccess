@@ -34,7 +34,7 @@ Needs KiCad 10 with its Python (numpy is the only package used) and
 | Supply tracks | `irdrop.py` | Each supply net that is routed as tracks as a network of track and via resistances, with everything on at once. | 0.2 V lost; outer tracks below the current for a 20 K rise (IPC-2221) |
 | Supply impedance | `pdn.py` | Lumped model of the MCU's core and 3.3 V rails: every capacitor with its own inductance and that of its way to the pins, from the distances on the board. | none: report only |
 | PoE isolation | `isolation.py` | The copper of every layer around the 48 V side drawn into a raster of 0.05 mm. Shortest way from 48 V copper to any other copper along each layer, and through the board from each layer to every other. The pads of the three parts that bridge the barrier by design (module, capacitor, jack) are left out. | clearance in air for the peak of the 1500 V RMS test, with a fifth to spare (IEC 60664-1); no way through the board shorter than along a layer |
-| Heat | `thermal.py` | The board as a plate of 1 mm cells that spreads heat through its copper (coverage of each layer from the filled zones) and loses it through both faces, by textbook figures for still air: to the display and out of the front, to the dock plate and the wall. Each part's loss where the part sits; the PoE module's and the display's into the air inside. Typical use and everything on, for each of the three supplies. An estimate within 40 %. | typical use in a room of 40 °C: every part inside its limit, display below 70 °C, the DC fuse holding 1.5 times its current |
+| Heat | `thermal.py` | The board as a plate of 1 mm cells that spreads heat through its copper (coverage of each layer from the filled zones) and loses it through both faces, by textbook figures for still air: to the display and out of the front, to the dock plate and the wall. Each part's loss where the part sits; the PoE module's and the display's into the air inside. Typical use and everything on, for each of the three supplies. An estimate within 40 %. | typical use in a room of 40 °C: every part inside its limit, display below 70 °C, the DC fuse holding 1.5 times its current, the board under the Wi-Fi module (the upper bound of the air around it) below the module's 85 °C |
 | Dock magnet | `dock.py` | Field of the dock's magnet at the hall switch: on the dock, off its axis, with the weakest magnet and warm, and while the reader is lifted off. | twice the switch's highest threshold on the dock |
 
 The Wi-Fi antenna has a simulation of its own, which is not part of `simulate`: see below.
@@ -45,34 +45,33 @@ KiCad), `board.py` reads it, `spice.py` runs ngspice, `run.py` runs everything.
 ## The Wi-Fi antenna
 
 ```bash
-pnpm nx run attractap-touch-p4-pcb:simulate-antenna      # about a quarter of an hour
+pnpm nx run attractap-touch-p4-pcb:simulate-antenna      # about three quarters of an hour
 ```
 
-The board has the ESP32-C6-MINI-1U now, the module with an antenna connector and no antenna of its own.
-This model is of the module with PCB antenna (MINI-1) that the board had before, so it describes no
-reader that is built any more. It is kept for the question it answered: what the display, the case and
-a metal wall do to a module antenna at this place. Nothing here models the antennas that are plugged
-in now.
-
-`wifi_antenna.py` is a full-wave model (FDTD, [openEMS](https://www.openems.de/)) of the Wi-Fi module's
-antenna on this board. The module's antenna is a meandered inverted-F on the module's own board, and
-its exact shape is not published. So the model uses a stand-in of the same size and kind, tunes it on a
-small evaluation board, and then puts it on this board unchanged, in five cases:
+`wifi_antenna.py` is a full-wave model (FDTD, [openEMS](https://www.openems.de/)) of the PCB antenna of the
+Wi-Fi module (ESP32-C5-MINI-1) on this board, at 2.4 and 5 GHz, each band with a pulse of its own. The
+module's antenna is a dual-band printed antenna fed through a diplexer, and its exact shape is not
+published. So the model uses a stand-in of the same size and kind, an inverted-F with a long arm for
+2.4 GHz and a short branch for 5 GHz, ground point on the right as Espressif draws it; tunes it on a small
+evaluation board to about 2.44 and 5.5 GHz; and then puts it on this board unchanged:
 
 | Case | What is in the model |
 |---|---|
 | `reference` | the module at the edge of an evaluation board of 40 x 55 mm, its antenna out over the edge |
-| `board` | this board: its ground, the strip without copper beside the antenna, the cut under it |
+| `board` | this board at the module's place (`geometry.WIFI_MODULE`): its ground, the cut under the antenna, the copper keep-out beside it |
 | `display` | the same with the display's metal back 1.5 mm from the board, on its four ground pads |
-| `display_floating` | the same without those four connections |
-| `metal_wall` | `display` with a metal wall 16 mm behind the component side |
+| `in_case` | `display` in the printed case: front, top and side walls, dock plate |
+| `metal_wall` | `in_case` with a metal wall 16.4 mm behind the component side |
+| `faceplate` | `in_case` with a 0.8 mm aluminium face plate over the front (a window for the display) |
+| `faceplate_window` | the same with the strip above the display left open over the antenna and its keep-out |
+| `p3_board`, `p3_in_case`, `p3_metal_wall` | the module at Espressif's recommended place, the board's top right corner with the antenna out over the edge (HDG 1.4.7, fig. 22 position 3, fig. 23), the case grown so that the antenna keeps the same distances to its walls |
 
-It prints the resonance, the match and the bandwidth of each case, and for the middle of the band how
-much of the power fed in is radiated and how much of that goes to the display's side, where the room
-is. What changes from case to case is the result; the absolute figures belong to the stand-in. The
-target is not part of `simulate` or `check`: it needs a Python with openEMS (`OPENEMS_PYTHON`; Debian
-and Ubuntu have it as `python3-openems`) and does not depend on the routed copper, only on the
-dimensions at the top of the script.
+It prints, per case and band, the resonance, the match and the bandwidth, and for three channels how much
+of the power fed in is radiated (and, in brackets, of the power the antenna accepts), and how much of it
+goes to the display's side, where the room is. What changes from case to case is the result; the absolute
+figures belong to the stand-in. The target is not part of `simulate` or `check`: it needs a Python with
+openEMS (`OPENEMS_PYTHON`; Debian and Ubuntu have it as `python3-openems`) and does not depend on the
+routed copper, only on `geometry.py` and the dimensions at the top of the script.
 
 ## What the models leave out
 

@@ -59,6 +59,8 @@ from routes_mcu import (
     psram_ring,
     uart_escape,
 )
+from routes_sdio import sdio_bus
+from routes_wifi import wifi_buck_routes
 from routes_signal import usb_connector, usb_pair
 from silk import check as check_silk, silkscreen
 
@@ -119,7 +121,9 @@ def build():
     lcd_fanout(B)
     mcu_top(B)
     mcu_left(B)
+    print('SDIO bus: %s' % ', '.join('%s %.2f mm' % kv for kv in sorted(sdio_bus(B).items())))
     buck_routes(B)
+    wifi_buck_routes(B)
     usb_power_routes(B)
     print('USB pair: %s' % ', '.join('%s %.2f mm' % kv for kv in sorted(usb_pair(B).items())))
     usb_connector(B)
@@ -136,7 +140,9 @@ def build():
 # parts below are removed and routed again. Empty both when a new autorouter result is committed.
 STALE_NETS = {'USB_DP', 'USB_DN', 'BUZ_P', 'BUZ_N', 'ETH_CT_RX', 'ETH_CT_TX', 'ETH_SHIELD', '+5V_POE', '+5V_USB', '+5V_DC', 'BUCK_SW', 'BUCK_EN',
               'DC_EN', 'BUCK_BST', 'BL_PWM', 'VDC_F', 'VDC_IN', 'VDC_R', 'VDDO_3', 'VDDO_4', 'UART0_RX',
-              'XTAL_P', 'XTAL_N'}
+              'XTAL_P', 'XTAL_N',
+              # the ESP32-C5 module: its SDIO pins lie on another side than the C6's
+              'SDIO_CMD', 'SDIO_CLK', 'SDIO_D0', 'SDIO_D1', 'SDIO_D2', 'SDIO_D3'}
 STALE_PARTS = {'R104', 'R105', 'R705', 'L103', 'C117', 'D106', 'D103', 'FB102', 'FB103', 'C408', 'C409',
                'U702', 'U703', 'C711', 'C712', 'C713', 'R706', 'TP814',
                'U704', 'C714', 'C715', 'R707', 'TP815',
@@ -150,8 +156,13 @@ STALE_PARTS = {'R104', 'R105', 'R705', 'L103', 'C117', 'D106', 'D103', 'FB102', 
                # review stage 3, third part: the 2.0 x 1.6 mm crystal and its load capacitors
                'Y201', 'C238', 'C239',
                # review stage 4: ESD protection of the touch lines
-               'U603', 'U604'}
-STALE_PARTS |= {'TP%d' % n for n in range(816, 831)}
+               'U603', 'U604',
+               # the ESP32-C5-MINI-1 in place of the C6-MINI-1U, its own converter, its parts and test points
+               'U301', 'U302', 'L301', 'FID801',
+               # the SDIO bus laid out by hand (routes_sdio.py): its pull-ups and the 5 V test point moved
+               'TP801'}
+STALE_PARTS |= {'TP%d' % n for n in range(816, 833)} | {'C%d' % n for n in range(301, 307)} | \
+    {'R%d' % n for n in range(301, 313)}
 
 
 def routes_of_session(path):
@@ -213,10 +224,55 @@ def drop_stale(board):
                    for x, y in ((xa + (xb - xa) * k / n, ya + (yb - ya) * k / n) for k in range(n + 1))):
                 gone.append(t)
                 break
+    ids = {t.m_Uuid.AsString() for t in gone}
+    gone += [t for t in same_net_in_stale_pads(board) if t.m_Uuid.AsString() not in ids]
     for t in gone:
         board.Remove(t)
     _KEEP.extend(gone)
     return len(gone)
+
+
+def same_net_in_stale_pads(board):
+    """The autorouter's vias that stand in a pad of their own net on one of the STALE_PARTS, and the
+    session's tracks of that net hanging on each, up to the next pad, fixed item or junction. They were
+    laid out for the part that stood there before (the C6 module had its ground pads elsewhere); being the
+    pad's own net, they pass drop_stale's clearance test."""
+    pads = [pad for fp in board.GetFootprints() if fp.GetReference() in STALE_PARTS for pad in fp.Pads()
+            if pad.GetAttribute() == pcbnew.PAD_ATTRIB_SMD]
+    free = [t for t in board.GetTracks() if not t.IsLocked()]
+    fixed = [t for t in board.GetTracks() if t.IsLocked()]
+    ends = {}                                      # (x, y) -> free tracks with an end there
+    for t in free:
+        if t.GetClass() == 'PCB_TRACK':
+            for p in ((t.GetStartX(), t.GetStartY()), (t.GetEndX(), t.GetEndY())):
+                ends.setdefault(p, []).append(t)
+    at_via = {(t.GetX(), t.GetY()): t for t in free if t.GetClass() == 'PCB_VIA'}
+
+    def held(p, net):
+        """A pad or a fixed item of the net at this point ends the chain."""
+        v = pcbnew.VECTOR2I(*p)
+        return (any(pad.GetNetCode() == net and pad.HitTest(v) for fp in board.GetFootprints() for pad in fp.Pads())
+                or any(t.GetNetCode() == net and t.HitTest(v) for t in fixed))
+
+    out = []
+    for via in [t for t in free if t.GetClass() == 'PCB_VIA']:
+        net = via.GetNetCode()
+        if not any(pad.GetNetCode() == net and pad.HitTest(via.GetPosition()) for pad in pads):
+            continue
+        out.append(via)
+        todo = [(via.GetX(), via.GetY())]
+        while todo:
+            p = todo.pop()
+            for t in [t for t in ends.get(p, []) if t.GetNetCode() == net and t not in out]:
+                out.append(t)
+                q = (t.GetEndX(), t.GetEndY()) if (t.GetStartX(), t.GetStartY()) == p else (t.GetStartX(), t.GetStartY())
+                onward = [u for u in ends.get(q, []) if u.GetNetCode() == net and u not in out]
+                if held(q, net) or len(onward) > 1:
+                    continue                       # a pad, a fixed item or a junction: the rest stays
+                if q in at_via and at_via[q].GetNetCode() == net and at_via[q] not in out:
+                    out.append(at_via[q])
+                todo.append(q)
+    return out
 
 
 def drop_collisions(board):
@@ -383,7 +439,7 @@ def drop_edge_violations(board, clearance=0.3):
     or a cut-out (it keeps a slightly smaller distance of its own). finish_route.py routes them again."""
     w, h = G.LED_CUTOUT
     holes = [(G.NOTCH_X, G.NOTCH_Y, G.BOARD_W + 9, G.BOARD_H + 9), (-9, G.POCKET_Y, G.POCKET_X, G.BOARD_H + 9), G.SLOT,
-             (G.C6_NOTCH[0], -9, G.C6_NOTCH[1], G.C6_NOTCH[2])]
+             (G.WIFI_NOTCH[0], -9, G.WIFI_NOTCH[1], G.WIFI_NOTCH[2])]
     holes += [(x - w / 2, y - h / 2, x + w / 2, y + h / 2) for y in (G.LED_Y_TOP, G.LED_Y_BOT) for x in G.LED_X]
     # outside the board outline: four half planes as wide rectangles
     holes += [(-9, -9, 0, G.BOARD_H + 9), (G.BOARD_W, -9, G.BOARD_W + 9, G.BOARD_H + 9), (-9, -9, G.BOARD_W + 9, 0),

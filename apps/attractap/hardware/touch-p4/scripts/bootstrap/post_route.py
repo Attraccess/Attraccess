@@ -40,9 +40,9 @@ STATE = os.path.join(REPORTS, 'post_route.json')
 # Target widths in mm, by net (short name) or by net class. The copper next to a track decides how much
 # of it a track gets.
 WIDEN_NET = {'VDD_HP': 0.6, 'VDD_HP_1': 0.6, '+3V3': 0.5, '+5V': 0.8, 'VBUS': 0.8, 'VBUS_F': 0.8,
-             '+5V_USB': 0.8, '+5V_POE': 0.8, '+5V_DC': 0.8}
+             '+5V_USB': 0.8, '+5V_POE': 0.8, '+5V_DC': 0.8, '+3V3_WIFI': 0.6}
 WIDEN_CLASS = {'Power': 0.4, 'Power5V': 0.6, 'NFC_RF': 0.3, 'DCSig': 0.25}      # (the USB pair has its 90 ohm width)
-SWITCH_NODES = {'BUCK_SW', 'DC_SW', 'DCDC_SW', 'BL_SW'}      # stay as they are: no extra copper on a switch node
+SWITCH_NODES = {'BUCK_SW', 'WIFI_BUCK_SW', 'DC_SW', 'DCDC_SW', 'BL_SW'}      # stay as they are: no extra copper on a switch node
 MIN_TRACK = 0.127                                            # what the autorouter's 0.112 mm neck-downs become
 VIA_SMALL, VIA_LARGER = 0.45, 0.5                            # pad of a 0.2 mm via: ring 0.125 -> 0.15 mm
 MARGIN = 0.012                                               # kept on top of every clearance
@@ -52,7 +52,9 @@ RETURN_VIA_NEAR = 1.3            # a ground via this close to a signal via is go
 RETURN_VIA_FIELD = 2.2           # ... and this close where signal vias stand side by side
 STITCH, STITCH_RF = 5.0, 2.5     # pitch of the stitching vias
 # Where the fills lie next to the Wi-Fi antenna: the strip along the top edge and the area around the module
-RF_AREAS = ((0.0, 0.0, G.BOARD_W, 9.0), (0.0, 9.0, 46.0, 22.0))
+# the Wi-Fi module and its antenna, and the SDIO bus from the module to the MCU (routes_sdio.py: ground copper
+# round the clock line, ESP32-C5 HDG 1.4.9)
+RF_AREAS = ((0.0, 0.0, G.BOARD_W, 9.0), (0.0, 9.0, 46.0, 22.0), (22.0, 22.0, 31.0, 49.0))
 VIA_D, VIA_DRILL = 0.5, 0.2      # new ground vias: ring 0.15 mm
 
 
@@ -264,6 +266,12 @@ def enlarge_vias(C):
     changed = {}
     for it in sorted((it for it in C.items if it['kind'] == 'via'), key=lambda it: (it['net'], it['a'])):
         if abs(2 * it['r'] - VIA_SMALL) > 1e-6 or mm(it['obj'].GetDrillValue()) > 0.21:
+            continue
+        # not into a pad it keeps clear of now, of any net: the ground vias between the Wi-Fi module's ground
+        # pads just fill the gaps between them (routes_board.module_ground), and a larger ring would reach
+        # under the solder paste
+        pads = [pad_dist(it['a'], it['a'], o['poly']) for o in C.near(it['a'], it['a'], 1.0) if o['kind'] == 'pad']
+        if any(VIA_SMALL / 2 - 1e-6 <= d < VIA_LARGER / 2 for d in pads):
             continue
         if C.room(it['a'], it['a'], it['net'], None, skip=it) - MARGIN >= VIA_LARGER / 2:
             changed[it['obj'].m_Uuid.AsString()] = VIA_SMALL
@@ -481,7 +489,7 @@ def fix(path):
             hit = False
             for u in ids:
                 if u in state['vias'] and u in by_id:
-                    board.Remove(by_id.pop(u)); state['vias'].remove(u); hit = True
+                    board.Delete(by_id.pop(u)); state['vias'].remove(u); hit = True
                 elif u in state['sizes'] and u in by_id:
                     by_id[u].SetWidth(F, pcbnew.FromMM(state['sizes'].pop(u))); hit = True
                 elif u in state['widths'] and u in by_id:
@@ -495,14 +503,18 @@ def fix(path):
                 elif v.get('type') == 'starved_thermal' and u in pads:
                     pads[u].SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_FULL); state['solid'].append(u); hit = True
                 elif (v.get('type') == 'track_dangling' and u in by_id and by_id[u].GetClass() == 'PCB_TRACK' and
-                      mm(by_id[u].GetLength()) < 0.15):
-                    # a router stub of a step or two whose loose end lies on another track: the next round
-                    # shows whether anything depended on it
+                      mm(by_id[u].GetLength()) < 0.5):
+                    # a router stub of a few steps (0.15 mm straight, 0.21 mm diagonal) with a loose end, one
+                    # segment per round: the next round shows whether anything depended on it, and puts it back
                     s = by_id.pop(u)
-                    a, b = (s.GetStart().x, s.GetStart().y), (s.GetEnd().x, s.GetEnd().y)
+                    # (plain integers: after a board is reloaded SWIG may return the start as an unwrapped
+                    # pointer, without .x)
+                    a, b = (s.GetStartX(), s.GetStartY()), (s.GetEndX(), s.GetEndY())
                     if (a, b) not in keep:
                         stubs.append((s.GetLayer(), a, b, s.GetWidth(), s.GetNetCode()))
-                        board.Remove(s); hit = True
+                        # Delete, not Remove: a removed item belongs to Python, which cannot free it, and
+                        # after that SWIG hands back unwrapped objects (KiCad 10)
+                        board.Delete(s); hit = True
             undone += hit
             if not hit:
                 left.append('%s: %s' % (v.get('type'), v.get('description', '')[:90]))
@@ -517,7 +529,9 @@ def fix(path):
                 print('  not from this script:', line)
             json.dump(state, open(STATE, 'w'))
             return 1
-        del by_id, pads, board
+        # the proxies of removed or changed items (s, t) must not outlive this board either
+        s = t = None
+        del by_id, pads, board, s, t
     json.dump(state, open(STATE, 'w'))
     print('still not clean after 8 rounds')
     return 1

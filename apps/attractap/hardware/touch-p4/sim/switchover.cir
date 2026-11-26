@@ -20,7 +20,10 @@
 .param vdc=5.0
 .param vpoe=5.0
 .param i5=0.9
-.param i33=0.6
+* 0.6 A on the 3.3 V side as before the Wi-Fi module had a converter of its own: 0.43 A of it the module
+* sending (U302), the rest U103
+.param i33=0.17
+.param iw=0.43
 * USB
 Busb src_u 0 V = (time > {tusb_on} && time < {tusb_off}) ? {vusb} : 0
 Rusb src_u usb5 0.43
@@ -38,24 +41,33 @@ Rpoe poe5 0 100k
 Bid1 dc5 v5 I = (v(dc5) > 3.9 ? (v(dc5)-v(v5)-0.02 + sqrt((v(dc5)-v(v5)-0.02)^2 + 1e-8))/0.06 : 0) + 1e-12*(exp(min(v(dc5)-v(v5), 1.2)/0.035)-1) - 2u*(v(v5) > v(dc5) ? 1 : 0)
 Bid2 poe5 v5 I = (v(poe5) > 3.9 ? (v(poe5)-v(v5)-0.02 + sqrt((v(poe5)-v(v5)-0.02)^2 + 1e-8))/0.06 : 0) + 1e-12*(exp(min(v(poe5)-v(v5), 1.2)/0.035)-1) - 2u*(v(v5) > v(poe5) ? 1 : 0)
 * eFuse reverse current blocking: blk = 1 while blocked
-Btgt tgt 0 V = (v(usb5)-v(v5) < -0.029) ? 1 : ((v(usb5)-v(v5) > 0.104) ? 0 : (v(blk) > 0.5 ? 1 : 0))
+* (the 104 mV threshold is smoothed over a few millivolts: where IN - OUT settles right at it, a hard
+* threshold made the model switch at every step)
+Btgt tgt 0 V = (v(usb5)-v(v5) < -0.029) ? 1 : (v(blk) > 0.5 ? 0.5*(1 - tanh((v(usb5)-v(v5)-0.104)/0.003)) : 0)
 Bblk 0 blk I = v(tgt) > v(blk) ? 1u*(v(tgt)-v(blk))/1u : 1u*(v(tgt)-v(blk))/50u
 Cblk blk 0 1u
 Buv uvr 0 V = v(usb5) > 4.32 ? 1 : (v(usb5) < 3.92 ? 0 : v(uvl))
 Ruv uvr uvl 1k
 Cuv uvl 0 1n
 Bef usb5 v5 I = (v(uvl) > 0.5 ? 1 : 0) * (1 - v(blk)) * 2*tanh((v(usb5)-v(v5)-0.017)/0.028/2) - 5u*(v(blk) > 0.5 ? 1 : 0)
-* +5V rail: its capacitors and loads (LEDs, backlight, PN532, buzzer: constant current) and the 3.3 V
-* converter (constant power)
-C5 v5 0 45u
+* +5V rail: its capacitors and loads (LEDs, backlight, PN532, buzzer: constant current) and the two 3.3 V
+* converters (constant power): U103 for the board, U302 for the Wi-Fi module sending (426 mA)
+C5 v5 0 51u
 Bl5 v5 0 I = v(v5) > 1 ? {i5} : {i5}*v(v5)
 Bin v5 0 I = v(v5) > 2.45 ? v(v33)*{i33}/(0.9*max(v(v5),2.45)) : 0
+Bin3 v5 0 I = v(v5) > 2.45 ? v(v33w)*{iw}/(0.9*max(v(v5),2.45)) : 0
 * 3.3 V converter: 3.3 V, or the input less 0.15 V in dropout
 Bout v33i 0 V = v(v5) > 2.45 ? min(3.3, v(v5) - 0.15) : 0
 Rout v33i v33 0.02
-C33 v33 0 60u
+C33 v33 0 44u
 Bl33 v33 0 I = {i33} * min(1, v(v33)/3)
-.ic v(v5)=0 v(v33)=0 v(blk)=0 v(usb5)=0 v(dc5)=0 v(poe5)=0
+* (the second converter starts with a 1 ms soft start: two converters filling their capacitors at once
+* would otherwise pull the start-up rail below their 2.45 V lockout, and the model would chatter there)
+Bout3 v33wi 0 V = v(v5) > 2.45 ? min(min(3.3, v(v5) - 0.15), 3.3*time/1m) : 0
+Rout3 v33wi v33w 0.02
+C33w v33w 0 47u
+Bl33w v33w 0 I = {iw} * min(1, v(v33w)/3)
+.ic v(v5)=0 v(v33)=0 v(v33w)=0 v(blk)=0 v(usb5)=0 v(dc5)=0 v(poe5)=0
 .option method=gear
 .tran 2u 12m uic
 .control
@@ -63,6 +75,7 @@ set noaskquit
 run
 meas tran v5_min min v(v5) from=1m to=12m
 meas tran v33_min min v(v33) from=1m to=12m
+meas tran v33w_min min v(v33w) from=1m to=12m
 meas tran v5_end find v(v5) at=11.9m
 meas tran usb_back max v(usb5) from=1m to=12m
 meas tran dc_back max v(dc5) from=1m to=12m

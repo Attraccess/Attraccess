@@ -247,6 +247,23 @@ in the next review:
 - Compliance: EN 50130-4 is cited under the EMC Directive, not the RED. The
   restriction notices on EN 301 489-3/-17 mean the test plan must set objective
   pass criteria. The module's certificate gives the host no EMC credit.
+- A text block that grows with every revision needs its space reserved and
+  linted. The root sheet's revision history grew into the sheet symbols below
+  it; the lint checked texts against texts only, and now checks free text
+  against sheet symbols, pins and labels on every sheet, the root included.
+- A rule in the maker's layout guide is met wherever the board allows it, and
+  only the part that cannot be met goes into a deviation, with the reason. The
+  first C5 layout argued the HDG's SDIO length rule away with a timing estimate;
+  the bus now meets it with serpentines and misses only the one rule the
+  front layer leaves no room for.
+- A claim about the routed board is measured on the routed board. The notes
+  said every SDIO via had a ground via beside it, while the post-route step
+  had found no room below the module (nearest 2.6 to 6.4 mm). The generator
+  now places those ground vias itself, and the notes give the measured
+  distances (0.7 to 1.7 mm).
+- A module's own capacitors sit on the rail of the converter that feeds it and
+  count towards that converter's limit. The C6 module's were never counted;
+  the C5's (33.4 uF) are, in the capacitance tests.
 
 ## Running the review again
 

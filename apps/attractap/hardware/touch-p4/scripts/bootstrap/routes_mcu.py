@@ -102,7 +102,7 @@ def mcu_escape(B):
     p = B.pad
     net = lambda num: B.d.parts['U201'].nets[str(num)]
     w = 0.15
-    B.track(dog(p('U201', 84), p('R304', '1')), net(84), w)                   # SDIO clock to its resistor
+    # (the SDIO clock, pin 84, to its resistor: routes_sdio.py)
     # converter enable: pin 79 -> pull-down -> converter pin 1
     r206 = p('R206', '1')
     B.track(dog(p('U201', 79), r206), net(79), w)
@@ -376,10 +376,11 @@ def mcu_top(B):
     B.track([c220, (xk, c220[1]), (xk, r203[1]), r203], 'VDD_HP_1', w)
     # GPIO35 strap resistor to the BOOT branch resistor above it
     B.track([p('R212', '2'), p('R217', '1')], 'RMII_TXD1', w)
-    # UART0 RX: under the flash regulator's capacitor, up beside it to a via
+    # UART0 RX: under the flash regulator's capacitor, up beside it to a via, 0.165 mm clear of UART0 TX on the
+    # back layer (uart_escape: 0.43 mm right of pin 69)
     rx, c223 = m(70), p('C223', '1')
     yh = c223[1] + 0.49
-    v = (c223[0] + 0.72, yh - 1.07)
+    v = (c223[0] + 0.77, yh - 1.07)
     B.track([rx, (rx[0], yh + 0.43), (rx[0] + 0.43, yh), (v[0], yh), v], 'UART0_RX', w)
     B.via(*v, 'UART0_RX')
     # Ethernet pins: columns 0.5 mm apart, vias alternating between two rows. Third value: how far above
@@ -396,27 +397,38 @@ def mcu_top(B):
         B.via(xv, y - rows[k % 2], net)
 
 
-def mcu_left(B):
-    """Fan-out of the MCU's left edge above the NFC pins: the four SDIO data lines (pins 80 to 83) and
-    SDIO command, Wi-Fi enable, buzzer and LED data (pins 86 to 89). Each group runs in a channel that is
-    just high enough for its four tracks, between fixed tracks and parts. The vias form a staircase to
-    the left: the track nearest the open side ends first, the others pass its via."""
-    w = 0.15
+def left_escape(B):
+    """{net: points} of the fan-out from the MCU's left edge to the vias where these lines change layer:
+    the four SDIO data lines (pins 80 to 83), and SDIO command, Wi-Fi enable and buzzer (pins 86 to 88).
+    mcu_left() draws them; routes_sdio.py measures the SDIO ones for the length matching."""
     m = lambda num: B.pad('U201', num)
+    out = {}
     # SDIO data: vias up and to the left, into the space below the core converter's enable resistor
     for num, net, via in ((80, 'SDIO_D0', (-2.0, -0.53)), (81, 'SDIO_D1', (-2.7, -0.93)),
                           (82, 'SDIO_D2', (-3.4, -0.43)), (83, 'SDIO_D3', (-4.25, -0.42))):
         x, y = m(num)
         v = (x + via[0], y + via[1])
-        B.track([(x, y), (v[0] - via[1], y), v], net, w)
-        B.via(*v, net)
-    # the other four close up to 0.3 mm pitch on their way left (the upper one turns first), then each
-    # drops to its via; LED data, the lowest, ends first
+        out[net] = [(x, y), (v[0] - via[1], y), v]
+    # the other three close up to 0.3 mm pitch on their way left (the upper one turns first), then each
+    # drops to its via
     for num, net, turn, up, run, drop in ((86, 'SDIO_CMD', 0.60, 0.37, 4.70, 0.50), (87, 'C5_EN_M', 0.75, 0.42, 4.05, 0.45),
                                           (88, 'BUZZER', 0.90, 0.47, 3.35, 0.45)):
         x, y = m(num)
-        B.track([(x, y), (x - turn, y), (x - turn - up, y - up), (x - run, y - up), (x - run - drop, y - up + drop)], net, w)
-        B.via(x - run - drop, y - up + drop, net)
+        out[net] = [(x, y), (x - turn, y), (x - turn - up, y - up), (x - run, y - up), (x - run - drop, y - up + drop)]
+    return out
+
+
+def mcu_left(B):
+    """Fan-out of the MCU's left edge above the NFC pins: the four SDIO data lines (pins 80 to 83) and
+    SDIO command, Wi-Fi enable, buzzer and LED data (pins 86 to 89). Each group runs in a channel that is
+    just high enough for its four tracks, between fixed tracks and parts. The vias form a staircase to
+    the left: the track nearest the open side ends first, the others pass its via. LED data, the lowest,
+    ends first."""
+    w = 0.15
+    m = lambda num: B.pad('U201', num)
+    for net, pts in left_escape(B).items():
+        B.track(pts, net, w)
+        B.via(*pts[-1], net)
     x, y = m(89)                                        # (leaves room for the ground via of C222 below it)
     B.track([(x, y), (x - 2.88, y), (x - 3.1, y - 0.22)], 'LED_DATA', w)
     B.via(x - 3.1, y - 0.22, 'LED_DATA')

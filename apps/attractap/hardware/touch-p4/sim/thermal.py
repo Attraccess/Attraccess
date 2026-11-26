@@ -20,9 +20,13 @@ U_FRONT_LCD = 1 / (1 / 24 + 1 / 330 + 1 / 10)
 U_FRONT_CASE = 1 / (1 / 12 + 1 / 83 + 1 / 10)
 U_BACK = 1 / (1 / 8 + 1 / 80 + 1 / 10)
 DISPLAY_W = 0.6             # backlight and panel logic
-# watts lost in each part: (typical use, everything on for a long time). The 3.3 V load is 1.5 W / 3.3 W.
-COMMON = {'U201': (0.60, 1.00), 'U202': (0.05, 0.08), 'U301': (0.30, 0.80), 'U501': (0.30, 0.35), 'U601': (0.10, 0.10),
-          'U103': (0.12, 0.25), 'L101': (0.05, 0.10), 'R702': (0.00, 0.10),
+# watts lost in each part: (typical use, everything on for a long time). U103's 3.3 V load is 1.2 W / 2.5 W.
+# The Wi-Fi module (ESP32-C5-MINI-1, datasheet v1.4 tables 6-4, 6-5) in typical use: connected, receiving at
+# 5 GHz (110 mA) with little sending, 0.40 W; at most what the firmware's transmit limit lets through on
+# average: sending 40 % of the time at 5 GHz (426 mA, 1.36 W lost) and receiving the rest, 0.78 W, here
+# rounded up to 0.80 W. Its own converter U302 at about 88 to 90 %.
+COMMON = {'U201': (0.60, 1.00), 'U202': (0.05, 0.08), 'U301': (0.40, 0.80), 'U501': (0.30, 0.35), 'U601': (0.10, 0.10),
+          'U103': (0.10, 0.18), 'L101': (0.04, 0.07), 'U302': (0.05, 0.09), 'L301': (0.01, 0.02), 'R702': (0.00, 0.10),
           **{'D%d' % (701 + i): (0.03, 0.11) for i in range(8)}}
 # The eFuse (28 mOhm) and the ideal diodes' MOSFETs (45 mOhm hot) at 0.9 and 1.65 A; D105 is a 100 V
 # Schottky, 0.1 to 0.15 V above a 40 V one at the same current.
@@ -35,11 +39,19 @@ SUPPLY = {
 # own body, not to the board: it warms the inside of the case as a whole, like the display does.
 INTO_THE_AIR = {'USB': (DISPLAY_W, DISPLAY_W), 'DC, 12 V': (DISPLAY_W, DISPLAY_W), 'PoE': (DISPLAY_W + 0.68, DISPLAY_W + 1.20)}
 MODULE_AIR_MAX = 85         # degC of the air around the PoE module, from its data sheet
-# K/W from the part's inside to the board under it, and what its inside stands (degC). U301 is the
-# ESP32-C6-MINI-1U-H4, the version of the module for 105 degC around it (the -N4 is for 85 degC).
+# degC of the air "immediately outside" the Wi-Fi module (ESP32-C5-MINI-1 datasheet v1.4, table 1-1 note 3,
+# table 6-2). The model has no air node: the board under the module stands for that air from above (the
+# module and its neighbours warm the air next to it from there), the cavity between board and dock plate
+# from below.
+WIFI_AIR_MAX = 85
+# the dock plate's inner face against the board's rise, in the chain of surfaces behind the board (U_BACK)
+DOCK_SHARE = (1 / 80 + 1 / 10) * U_BACK
+# K/W from the part's inside to the board under it, and what its inside stands (degC). The Wi-Fi module U301
+# is held to the air around it instead (WIFI_AIR_MAX); its inside is reported with 15 K/W.
 JUNCTION = {'U201': (8, 105), 'U103': (40, 125), 'U104': (40, 125), 'U105': (40, 125), 'Q101': (40, 150), 'Q102': (40, 150),
-            'D105': (20, 125),
-            'U102': (10, 85), 'U301': (15, 105), 'U501': (10, 125)}
+            'D105': (20, 125), 'U302': (40, 125),
+            'U102': (10, 85), 'U501': (10, 125)}
+WIFI_INSIDE = 15            # K/W, the module's inside to the board under it
 DISPLAY_MAX = 70            # degC the panel is specified for when it works
 # hold current of the DC input's fuse (1.1 A at 25 degC) against its own temperature, from its data sheet
 FUSE_DERATING = ((25, 1.00), (40, 0.87), (50, 0.79), (60, 0.70), (70, 0.61), (85, 0.48))

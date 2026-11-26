@@ -130,13 +130,21 @@ def dc_surge():
 
 def power_up():
     print('Power-up from USB through the eFuse (reset must stay low until the 3.3 V rail has been steady for 50 us)')
-    for volt, cable, load in ((5.0, 0.25, 0.45), (4.5, 0.5, 0.45), (5.0, 0.25, 1.1)):
-        m = spice.run('powerup.cir', vusb=volt, rcable=cable, iload=load)
+    # 3.3 V loads (U103, U302): a running board with the Wi-Fi module receiving, 0.45 A in all, from a good and
+    # a weak USB source; and 1.1 A in all with the module sending
+    for volt, cable, load, wifi in ((5.0, 0.25, 0.33, 0.12), (4.5, 0.5, 0.33, 0.12), (5.0, 0.25, 0.67, 0.43)):
+        m = spice.run('powerup.cir', vusb=volt, rcable=cable, iload=load, iwifi=wifi)
         wait = m['t_reset_ends'] - m['t_rail_ok']
-        check(m['reset_at_rail_ok'] < 0.25 * 3.3 and wait > 50e-6 and m['v5_running'] > 3.8 and m['v33_running'] > 3.2,
-              '%.1f V behind %.2f ohm, %.2f A at 3.3 V: rail up after %.1f ms, reset released %.1f ms later '
-              '(supervisor delay shortened to 2 ms; the part has 120 to 280 ms), running at %.2f V on the 5 V rail'
-              % (volt, cable, load, m['t_rail_ok'] * 1e3, wait * 1e3, m['v5_running']))
+        # the MCU drives nothing before the Wi-Fi module's rail is up: its reset ends after that, by the
+        # supervisor's delay (2 ms here, 120 to 280 ms in the part)
+        order = m['t_reset_ends'] - m['t_wifi_ok']
+        check(m['reset_at_rail_ok'] < 0.25 * 3.3 and wait > 50e-6 and m['v5_running'] > 3.8 and m['v33_running'] > 3.2
+              and order > 1e-3 and m['t_c5_en'] > m['t_wifi_ok'] and m['v33w_running'] > 3.2,
+              '%.1f V behind %.2f ohm, %.2f + %.2f A at 3.3 V: rail up after %.1f ms, reset released %.1f ms later '
+              '(supervisor delay shortened to 2 ms; the part has 120 to 280 ms), running at %.2f V on the 5 V rail; '
+              'Wi-Fi rail up after %.1f ms, the module\'s EN %.1f ms after that, %.2f V with it running'
+              % (volt, cable, load, wifi, m['t_rail_ok'] * 1e3, wait * 1e3, m['v5_running'], m['t_wifi_ok'] * 1e3,
+                 (m['t_c5_en'] - m['t_wifi_ok']) * 1e3, m['v33w_running']))
     m = spice.run('powerup.cir')
     check(m['i_slew'] < 0.1, 'USB attach: %.1f A for microseconds into C101 (10 uF, what USB 2.0 7.2.4.1 allows '
           'at attach), then %.0f mA while the eFuse ramps the 5 V rail at 0.91 V/ms' % (m['i_inrush'], m['i_slew'] * 1e3))
@@ -144,7 +152,7 @@ def power_up():
 
 def supply_switch():
     print('Changing supplies while the board runs (supervisor resets below 2.87 to 2.99 V; 0.9 A on +5V, '
-          '0.6 A on +3V3)')
+          '0.6 A at 3.3 V: 0.17 A on +3V3, 0.43 A on +3V3_WIFI; the module stands 3.0 V)')
     cases = (('DC, USB plugged in, DC pulled', dict(tdc_on=0, tdc_off=6e-3, tusb_on=2e-3)),
              ('USB at 4.75 V, DC at 5.05 V plugged in and pulled', dict(tusb_on=1e-4, tdc_on=2e-3, tdc_off=6e-3,
                                                                        vusb=4.75, vdc=5.05)),
@@ -152,8 +160,8 @@ def supply_switch():
              ('PoE and USB at 4.75 V, PoE pulled', dict(tpoe_on=0, tusb_on=1e-4, tpoe_off=6e-3, vusb=4.75)))
     for name, kw in cases:
         m = spice.run('switchover.cir', **kw)
-        check(m['v33_min'] > 2.99, '%s: +5V at least %.2f V, +3V3 at least %.2f V'
-              % (name, m['v5_min'], m['v33_min']))
+        check(m['v33_min'] > 2.99 and m['v33w_min'] > 3.0, '%s: +5V at least %.2f V, +3V3 at least %.2f V, '
+              '+3V3_WIFI at least %.2f V' % (name, m['v5_min'], m['v33_min'], m['v33w_min']))
     m = spice.run('switchover.cir', tdc_on=0, tusb_on=1)
     check(m['usb_back'] < 0.8, 'running on DC, USB unplugged: VBUS at %.0f mV (a USB-C host wants below 0.8 V)'
           % (m['usb_back'] * 1e3))
@@ -214,8 +222,12 @@ def wifi_link(board):
     delays, skew, round_trip = si.sdio_timing(board, lines)
     print('SDIO link to the Wi-Fi module: what the board adds to the timing')
     print('        MCU to module: ' + ', '.join('%s %.2f ns' % (n, d * 1e9) for n, d in delays.items()))
-    lengths = {n: sum(sum(board.length_by_layer(net).values()) for net in nets) for n, nets in si.SDIO}
-    check(skew < 0.5e-9, 'clock and data arrive within %.2f ns of each other (tracks %.0f to %.0f mm)'
+    lengths = {n: sum(sum(board.path_by_layer(net, *si.ENDS[net]).values()) for net in nets) for n, nets in si.SDIO}
+    worst = max((n for n in lengths if n != 'CLK'), key=lambda n: abs(lengths[n] - lengths['CLK']))
+    check(abs(lengths[worst] - lengths['CLK']) <= 1.27 and max(lengths.values()) <= 50.8,
+          'pad to pad (the clock through its resistor): CLK %.2f mm, %s differs most, by %+.2f mm; Espressif asks '
+          'for 1.27 mm at most and 50.8 mm in all (HDG 1.4.9)' % (lengths['CLK'], worst, lengths[worst] - lengths['CLK']))
+    check(skew < 0.5e-9, 'clock and data arrive within %.2f ns of each other (tracks %.1f to %.1f mm)'
           % (skew * 1e9, min(lengths.values()), max(lengths.values())))
     for mhz in (40, 50):
         slack = 1e3 / mhz - si.SD_OUTPUT_DELAY * 1e9 - round_trip * 1e9
@@ -265,6 +277,11 @@ def heat(board):
         if supply == 'PoE':
             ok = ok and 40 + t[on].mean() < thermal.MODULE_AIR_MAX
             text += ', air around the PoE module +%.0f K' % t[on].mean()
+        # the Wi-Fi module's air: below the board under it, above the cavity between board and dock plate
+        cavity = 0.5 * (1 + thermal.DOCK_SHARE) * t[on].mean()
+        ok = ok and 40 + at['U301'] < thermal.WIFI_AIR_MAX
+        text += ', Wi-Fi module: board under it +%.0f K, cavity +%.0f K, inside +%.0f K' % (
+            at['U301'], cavity, at['U301'] + parts['U301'][0] * thermal.WIFI_INSIDE)
         if 'F102' in at:
             amps = watts / 0.88 / 12
             hold = thermal.fuse_hold(40 + at['F102'])
@@ -272,9 +289,11 @@ def heat(board):
             text += ', fuse holds %.2f A against %.2f A' % (hold, amps)
         check(ok, text + ': inside every limit in a room of 40 degC')
         t, at, parts, on, lcd = thermal.solve(board, supply, 1)
-        print('        %-9s everything on for a long time, %.1f W: board +%.0f K, LED rows +%.0f K, display +%.0f K'
+        print('        %-9s everything on for a long time, %.1f W: board +%.0f K, LED rows +%.0f K, display +%.0f K, '
+              'Wi-Fi module: board under it +%.0f K, cavity +%.0f K'
               % (supply, sum(w[1] for w in parts.values()) + thermal.INTO_THE_AIR[supply][1], t[on].mean(),
-                 max(at['D70%d' % k] for k in range(1, 9)), thermal.display_rise(t[lcd & on].mean())))
+                 max(at['D70%d' % k] for k in range(1, 9)), thermal.display_rise(t[lcd & on].mean()), at['U301'],
+                 0.5 * (1 + thermal.DOCK_SHARE) * t[on].mean()))
 
 
 def dock_magnet():

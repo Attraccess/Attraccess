@@ -10,16 +10,19 @@ from board import B_, F, IN2, V, dog, mm, unV
 
 
 def module_ground(B):
-    """Ground vias that plane_fanout() cannot place: four between the nine ground pads under the Wi-Fi
+    """Ground vias that plane_fanout() cannot place: twelve between the nine ground pads under the Wi-Fi
     module, two beside the output ground pad of the PoE module (under the module, on the secondary
     side) and one for the backlight driver."""
-    # The module's nine ground pads carry solder paste. The vias sit where four pads meet, on the ground
-    # fill between them and under the solder mask, so no paste runs into a hole.
-    pads = [unV(pad.GetPosition()) for pad in B.fp['U301'].Pads() if pad.GetNumber() == '49']
+    # The Wi-Fi module's nine ground pads (1.2 mm at 1.65 mm): a via in the middle of each of the twelve
+    # 0.45 mm gaps between two neighbours, where Espressif's land pattern has them (ESP32-C5-MINI-1 datasheet
+    # v1.4, fig. 11-1). The smallest via, 0.45 mm, just fills a gap and touches no paste; the order fills and
+    # caps every via.
+    pads = [unV(pad.GetPosition()) for pad in B.fp['U301'].Pads() if pad.GetNumber() == '61']
     xs, ys = sorted({round(x, 3) for x, _y in pads}), sorted({round(y, 3) for _x, y in pads})
-    for xa, xb in zip(xs, xs[1:]):
-        for ya, yb in zip(ys, ys[1:]):
-            B.via((xa + xb) / 2, (ya + yb) / 2, 'GND', size=0.6, drill=0.3)
+    gaps = [((xa + xb) / 2, y) for xa, xb in zip(xs, xs[1:]) for y in ys]
+    gaps += [(x, (ya + yb) / 2) for ya, yb in zip(ys, ys[1:]) for x in xs]
+    for x, y in gaps:
+        B.via(x, y, 'GND', size=0.45, drill=0.2)
     x, y = B.pad('U102', 3)
     for dy in (-0.4, 0.4):
         B.track([(x, y + dy), (x + 2.7, y + dy)], 'GND', 0.5)
@@ -456,7 +459,7 @@ def plane_fanout(B):
         return math.hypot(px - x1 - t * dx, py - y1 - t * dy)
     holes = [G.SLOT] + [(x - 2.0, y - 1.8, x + 2.0, y + 1.8) for y in (G.LED_Y_TOP, G.LED_Y_BOT) for x in G.LED_X]
     ax, ay = G.ANT_C
-    keep = holes + [G.C6_KEEPOUT, (ax - G.ANT_W / 2 - 1, ay - G.ANT_H / 2 - 1, ax + G.ANT_W / 2 + 1, ay + G.ANT_H / 2 + 1)]
+    keep = holes + [G.WIFI_KEEPOUT, (ax - G.ANT_W / 2 - 1, ay - G.ANT_H / 2 - 1, ax + G.ANT_W / 2 + 1, ay + G.ANT_H / 2 + 1)]
     kr = G.MOUNT_KEEPOUT_R + 0.3
     keep += G.POE_PRIMARY + [(hx - kr, hy - kr, hx + kr, hy + kr) for hx, hy in G.MOUNT_HOLES]
 
@@ -495,7 +498,7 @@ def plane_fanout(B):
     # ICs and connectors whose supply pads get a via too. Without one, a converter's or protection
     # diode's ground pin would depend on what the routing leaves of the copper fill around it.
     # (MCU, PHY, PN532 and Wi-Fi module have vias in their exposed pads.)
-    ics = ('U101', 'U103', 'U104', 'U202', 'U203', 'U601', 'U602', 'U701', 'J101', 'J601')
+    ics = ('U101', 'U103', 'U104', 'U202', 'U203', 'U302', 'U601', 'U602', 'U701', 'J101', 'J601')
     failed, made, served = [], 0, set()
     for net, x1, y1, x2, y2, ref, pad in list(pads):
         if net not in (gnd, p3v3):

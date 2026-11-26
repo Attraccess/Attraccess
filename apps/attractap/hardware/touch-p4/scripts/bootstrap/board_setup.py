@@ -19,7 +19,7 @@ def outline(B):
     px, py = G.POCKET_X, G.POCKET_Y
     # outer contour: rectangle with both bottom corners cut away (Ethernet plug on the right, DC plug on
     # the left), rounded corners
-    ax1, ax2, ad = G.C6_NOTCH                 # cut under the Wi-Fi antenna, inside corners rounded
+    ax1, ax2, ad = G.WIFI_NOTCH                 # cut under the Wi-Fi antenna, inside corners rounded
     ar = 1.0
     ak = ar * (1 - math.sqrt(0.5))
     pts_lines = [
@@ -107,7 +107,7 @@ def zones(B):
     # copper around the loop must stay open on one side, otherwise it acts as a shorted turn
     B.keepout(rect(ax + G.ANT_W / 2 - 1.0, ay - 2.0, G.NOTCH_X, ay + 0.5), all_cu,
               'NFC antenna: gap in the surrounding copper', pours=True)
-    B.keepout(rect(*G.C6_KEEPOUT), all_cu, 'Wi-Fi antenna: no copper', pours=True, tracks=True, vias=True)
+    B.keepout(rect(*G.WIFI_KEEPOUT), all_cu, 'Wi-Fi antenna: no copper', pours=True, tracks=True, vias=True)
     for x1, y1, x2, y2 in G.POE_PRIMARY:
         B.keepout(rect(x1, y1, x2, y2), all_cu, 'PoE primary side: no secondary copper pour', pours=True)
     B.keepout(G.POE_UNDER_MODULE, all_cu, 'PoE module: primary side and isolation barrier, no copper', pours=True,
@@ -260,7 +260,8 @@ NETCLASSES = [
     ('Power', 0.127, 0.25, 0.6, 0.3, ['+3V3', 'VDD_HP', 'VDD_HP_1', 'VDD_BAT', 'VDD_USBPHY', 'VDD_FLASH', 'VDD_PSRAM',
                                      'DCDC_SW', 'PHY_3V3', 'PHY_REG', 'NFC_VBAT', 'NFC_TVDD', 'NFC_AVDD', 'NFC_DVDD',
                                      'BL_SW', 'BL_A', 'BL_K', 'BUZ_P', 'BUZ_N']),
-    ('Power5V', 0.15, 0.5, 0.8, 0.4, ['+5V', '+5V_USB', '+5V_POE', '+5V_DC', 'VBUS_F', 'BUCK_SW']),
+    ('Power5V', 0.15, 0.5, 0.8, 0.4, ['+5V', '+5V_USB', '+5V_POE', '+5V_DC', 'VBUS_F', 'BUCK_SW', 'WIFI_BUCK_SW',
+                                      '+3V3_WIFI']),
     # DC input, up to 28 V
     ('DCIN', 0.25, 0.6, 0.8, 0.4, ['VDC_IN', 'VDC_F', 'VDC_R', 'VDC', 'DC_SW']),
     ('DCSig', 0.2, 0.25, 0.6, 0.3, ['DC_EN', 'DC_BST']),
