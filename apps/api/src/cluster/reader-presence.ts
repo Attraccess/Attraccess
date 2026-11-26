@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import type Redis from 'ioredis';
 import type { ClusterBus, ClusterInstances, ReaderHolder, ReaderPresence } from './cluster.types';
+import { aliveKey } from './cluster-instances';
 import { valkeyCall } from './valkey-call';
 
 const readerKey = (readerId: number) => `attraccess:cluster:reader:${readerId}`;
@@ -61,6 +62,10 @@ export class LocalReaderPresence implements ReaderPresence {
     // Without other instances a reader is only lost through its own socket closing.
   }
 
+  onReaderMoved(): void {
+    // Without other instances a reader never moves.
+  }
+
   onReaderConnected(handler: (readerId: number, instanceId: string) => void): void {
     this.connectedHandlers.push(handler);
   }
@@ -80,9 +85,11 @@ export class ValkeyReaderPresence implements ReaderPresence {
   private readonly logger = new Logger('ReaderPresence');
   private readonly local = new LocalHoldings();
   private readonly lostHandlers: Array<(readerId: number) => Promise<void> | void> = [];
+  private readonly movedHandlers: Array<(readerId: number) => Promise<void> | void> = [];
   private readonly connectedHandlers: Array<(readerId: number, instanceId: string) => void> = [];
   /** Writes are retried every heartbeat: an outage is logged once, not once per reader and heartbeat. */
   private writesFailing = false;
+  private resyncing = false;
 
   constructor(
     private readonly client: PresenceClient,
@@ -122,7 +129,7 @@ export class ValkeyReaderPresence implements ReaderPresence {
     const beats =
       remote.length > 0
         ? await valkeyCall(this.client, () =>
-            this.client.mget(...remote.map(([instanceId]) => `attraccess:cluster:alive:${instanceId}`)),
+            this.client.mget(...remote.map(([instanceId]) => aliveKey(instanceId))),
           )
         : [];
     const holders: ReaderHolder[] = remote
@@ -136,27 +143,38 @@ export class ValkeyReaderPresence implements ReaderPresence {
     this.lostHandlers.push(handler);
   }
 
+  onReaderMoved(handler: (readerId: number) => Promise<void> | void): void {
+    this.movedHandlers.push(handler);
+  }
+
   onReaderConnected(handler: (readerId: number, instanceId: string) => void): void {
     this.connectedHandlers.push(handler);
   }
 
   /** Writes every reader this instance holds again (each heartbeat). */
   async resync(): Promise<void> {
-    for (const [readerId] of this.local.readers) {
-      const newest = this.local.newest(readerId);
-      if (newest !== null) await this.write(readerId, newest);
+    // A stalled Valkey makes a pass slow; passes never pile up behind it.
+    if (this.resyncing) return;
+    this.resyncing = true;
+    try {
+      for (const [readerId] of this.local.readers) {
+        const newest = this.local.newest(readerId);
+        if (newest !== null) await this.write(readerId, newest);
+      }
+    } finally {
+      this.resyncing = false;
     }
   }
 
-  /** A gone instance's readers are dropped; those nobody else holds count as lost. */
+  /** A gone instance's readers are dropped; those nobody else holds count as lost, the others as moved. */
   async reapInstance(instanceId: string): Promise<void> {
     const readerIds = (await valkeyCall(this.client, () => this.client.smembers(instanceReadersKey(instanceId)))).map(
       Number,
     );
     for (const readerId of readerIds) {
       await valkeyCall(this.client, () => this.client.hdel(readerKey(readerId), instanceId));
-      if ((await this.holders(readerId)).length > 0) continue;
-      for (const handler of this.lostHandlers) {
+      const stillHeld = (await this.holders(readerId)).length > 0;
+      for (const handler of stillHeld ? this.movedHandlers : this.lostHandlers) {
         try {
           await handler(readerId);
         } catch (error) {

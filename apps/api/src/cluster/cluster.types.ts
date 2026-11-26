@@ -53,6 +53,11 @@ export interface ReaderPresence {
   holders(readerId: number): Promise<ReaderHolder[]>;
   /** Runs on the instance that cleaned up a gone instance, for each reader that no instance holds any more. */
   onReaderLost(handler: (readerId: number) => Promise<void> | void): void;
+  /**
+   * Runs on the instance that cleaned up a gone instance, for each of its readers that another instance holds now
+   * (it reconnected there before the cleanup): flows armed through the gone instance's socket are gone with it.
+   */
+  onReaderMoved(handler: (readerId: number) => Promise<void> | void): void;
   /** Runs on every instance when a reader signs in anywhere, with the holding instance. */
   onReaderConnected(handler: (readerId: number, instanceId: string) => void): void;
 }

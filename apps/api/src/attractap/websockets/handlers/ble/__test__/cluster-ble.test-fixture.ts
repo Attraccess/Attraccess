@@ -209,6 +209,7 @@ export class FakeClusterNetwork {
             .filter((holder) => !this.dead.has(holder.instanceId))
             .sort((a, b) => b.connectedAt - a.connectedAt),
         onReaderLost: () => undefined,
+        onReaderMoved: () => undefined,
         onReaderConnected: (handler: (readerId: number, instanceId: string) => void) =>
           this.connectedHandlers.push({ node: name, handler }),
       },
