@@ -176,7 +176,7 @@ describe('MatterPage', () => {
       await screen.findByText(/Upgrade or downgrade Attraccess, the Matter plugin or the sidecar/),
     ).toBeInTheDocument();
     expect(screen.getByText(/sidecar 9\.9\.9/)).toBeInTheDocument();
-    expect(screen.getByText(/sidecar 0\.5\.0-alpha\.0, matter\.js 0\.18\.0/)).toBeInTheDocument();
+    expect(screen.getByText(/sidecar 0\.5\.1-alpha\.0, matter\.js 0\.18\.0/)).toBeInTheDocument();
   });
 
   it('says to upgrade Attraccess when the host version is unavailable', async () => {

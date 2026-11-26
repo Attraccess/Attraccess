@@ -1667,7 +1667,7 @@
   "PluginController_dependencyPlan": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "19cba110"
+    "shape": "c392e96a"
   },
   "PluginController_removalPlan": {
     "decision": "allow",
