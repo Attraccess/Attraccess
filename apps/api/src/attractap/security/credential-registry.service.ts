@@ -1,4 +1,5 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { ClusterService } from '../../cluster/cluster.service';
 import { OnEvent } from '@nestjs/event-emitter';
 import { remoteEvent } from '../websockets/reader-event-relay';
 import { CREDENTIAL_CHANGED_EVENT } from './pairing-model';
@@ -37,6 +38,9 @@ const NO_SECURITY_REPORT: CredentialSecurityPatch = {
   securityReportProblems: null,
 };
 
+/** How long a cached credential holds when other API instances may change it. */
+export const CLUSTER_CREDENTIAL_CACHE_MS = 10_000;
+
 /** The credential columns of a reader row as `markPaired` found them, so an undo can put them back. */
 export type CredentialSnapshot = AttractapCredentialSnapshot;
 
@@ -47,21 +51,36 @@ export type CredentialSnapshot = AttractapCredentialSnapshot;
  */
 @Injectable()
 export class CredentialRegistryService {
-  private readonly cache = new Map<number, ActiveCredential | null>();
+  private readonly cache = new Map<number, { value: ActiveCredential | null; at: number }>();
   /** Bumped on every invalidation so a read that started earlier cannot re-cache stale state. */
   private readonly generations = new Map<number, number>();
+  /**
+   * With several API instances a change made elsewhere arrives as a pub/sub message, which can be lost: the cache
+   * then only holds this long, so a revoked credential is refused here soon even without it (ATT-1163).
+   */
+  private readonly maxAgeMs: number;
 
   public constructor(
     @Inject(ATTRACTAP_CREDENTIAL_STORE) private readonly store: AttractapCredentialStore,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
-  ) {}
+    @Optional() cluster?: ClusterService,
+  ) {
+    this.maxAgeMs = cluster?.enabled ? CLUSTER_CREDENTIAL_CACHE_MS : Number.POSITIVE_INFINITY;
+  }
 
   public async get(readerId: number): Promise<ActiveCredential | null> {
-    if (this.cache.has(readerId)) return this.cache.get(readerId) ?? null;
+    const cached = this.cache.get(readerId);
+    if (cached && Date.now() - cached.at < this.maxAgeMs) return cached.value;
     const generation = this.generations.get(readerId) ?? 0;
     const value = await this.store.findState(readerId);
-    if ((this.generations.get(readerId) ?? 0) === generation) this.cache.set(readerId, value);
+    if ((this.generations.get(readerId) ?? 0) === generation) this.cache.set(readerId, { value, at: Date.now() });
     return value;
+  }
+
+  /** As {@link isActive}, read from the database rather than the cache. */
+  public async isActiveNow(readerId: number, fingerprint: string): Promise<boolean> {
+    const credential = await this.store.findState(readerId);
+    return credential?.state === 'paired' && credential.fingerprint === fingerprint;
   }
 
   public invalidate(readerId: number): void {

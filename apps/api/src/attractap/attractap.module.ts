@@ -7,6 +7,7 @@ import { WebsocketService } from './websockets/websocket.service';
 import { ReaderRouter } from './websockets/reader-router';
 import { ReaderScreenService } from './websockets/reader-screen.service';
 import { ReaderEventRelay } from './websockets/reader-event-relay';
+import { ReaderCredentialRecheck } from './websockets/reader-credential-recheck';
 import { ClusterPairingService } from './security/cluster-pairing.service';
 import { AttractapGateway } from './websockets/websocket.gateway';
 import { AttractapNfcCardsController } from './card.controller';
@@ -133,6 +134,7 @@ import { ResourceListVisibilityModule } from '../resources/visibility/resource-l
     ReaderRouter,
     ReaderScreenService,
     ReaderEventRelay,
+    ReaderCredentialRecheck,
     AttractapGateway,
     WebSocketEventService,
     AttractapFirmwareService,
