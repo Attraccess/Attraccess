@@ -220,6 +220,8 @@ export class SecureConversionService {
       conversion.id,
       { state: 'cancelled', stateChangedAt: now, endedAt: now },
       ATTRACTAP_CONVERSION_CANCELLABLE_STATES,
+      // Checked again in the write: a verification persisted after the read above wins, and the burn goes ahead.
+      true,
     );
     if (!cancelled) throw new ConflictException('This conversion can no longer be cancelled');
     const session = this.registry.get(readerId);

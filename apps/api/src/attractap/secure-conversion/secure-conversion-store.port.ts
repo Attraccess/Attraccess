@@ -18,12 +18,15 @@ export interface AttractapSecureConversionStore {
   insert(conversion: NewAttractapSecureConversion, at: Date): Promise<AttractapSecureConversionRecord | null>;
   /**
    * Writes the patch only while the conversion is in one of `whenStates` (compare and set), so two messages or a
-   * cancel and a reader report cannot both move it. A terminal state clears `active`. Null when it did not apply.
+   * cancel and a reader report cannot both move it. With `onlyUnverified` it also applies only while the reader has
+   * not verified its staging (the burn command leaves right after that). A terminal state clears `active`. Null when
+   * it did not apply.
    */
   update(
     id: number,
     patch: AttractapSecureConversionPatch,
     whenStates: readonly AttractapConversionState[],
+    onlyUnverified?: boolean,
   ): Promise<AttractapSecureConversionRecord | null>;
 }
 

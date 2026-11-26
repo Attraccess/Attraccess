@@ -67,4 +67,19 @@ describe('secure conversion store on PostgreSQL', () => {
     await expect(store.findLatestForReader(1)).resolves.toMatchObject({ state: 'failed', burnReport });
     await expect(store.listActiveFor([1, 2])).resolves.toEqual([expect.objectContaining({ id: second.id })]);
   });
+
+  it('cancels only while the reader has not verified its staging', async () => {
+    const at = new Date('2026-11-23T11:00:00Z');
+    const active = await store.findActive();
+    if (active) await store.update(active.id, { state: 'cancelled', endedAt: at }, [active.state]);
+    const row = await store.insert(conversion(3), at);
+    if (!row) throw new Error('the conversion was refused');
+    await store.update(row.id, { state: 'transferring', verified: true }, ['preflight']);
+    await expect(store.update(row.id, { state: 'cancelled' }, ['preflight', 'transferring'], true)).resolves.toBeNull();
+    await expect(store.findById(row.id)).resolves.toMatchObject({ state: 'transferring', verified: true });
+    await store.update(row.id, { verified: false }, ['transferring']);
+    await expect(
+      store.update(row.id, { state: 'cancelled' }, ['preflight', 'transferring'], true),
+    ).resolves.toMatchObject({ state: 'cancelled' });
+  });
 });

@@ -6,6 +6,7 @@ import type {
   AttractapSecureConversionPatch,
   AttractapSecureConversionRecord,
 } from '@attraccess/application-models';
+import { ReaderDeletedEvent } from '../events';
 import { ATTRACTAP_READER_STORE, type AttractapReaderStore } from '../reader-store.port';
 import { SecureBootKeyService } from '../secure-boot/secure-boot-key.service';
 import { CREDENTIAL_CHANGED_EVENT } from '../security/pairing-model';
@@ -476,5 +477,15 @@ export class ConversionProtocolService implements OnModuleInit, OnModuleDestroy 
     if (conversion?.readerId === readerId && BEFORE_BOOTLOADER.includes(conversion.state)) {
       await this.fail(conversion, 'reader-changed');
     }
+  }
+
+  /**
+   * Reader deleted: its conversion can never go on (the row has no foreign key), so it ends in any state instead of
+   * blocking the installation's next conversion and key changes for good.
+   */
+  @OnEvent(ReaderDeletedEvent.EVENT_NAME)
+  public async onReaderDeleted(event: ReaderDeletedEvent): Promise<void> {
+    const conversion = await this.conversions.findActive();
+    if (conversion?.readerId === event.readerId) await this.fail(conversion, 'reader-changed');
   }
 }

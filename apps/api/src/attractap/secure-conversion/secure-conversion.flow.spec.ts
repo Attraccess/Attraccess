@@ -1,4 +1,5 @@
 import { projectAttractapAuditEvent, type AttractapAuditAction } from '../../audit/policies/attractap';
+import { ReaderDeletedEvent } from '../events';
 import { INTERRUPTED_AFTER_MS } from './conversion-protocol.service';
 import { ADMIN, DIGESTS, createConversionHarness, type HarnessOptions } from './secure-conversion.test-fixture';
 
@@ -174,6 +175,25 @@ describe('secure conversion against the emulated reader', () => {
     expect((await latest(h)).state).toBe('transferring');
   });
 
+  it('refuses a cancel that read the conversion just before the verification was persisted', async () => {
+    const h = createConversionHarness();
+    await h.connect();
+    const onControl = h.device.onControl.bind(h.device);
+    h.device.onControl = (message) =>
+      message['t'] === 'conversion.burn' ? { control: [], chunkRequests: [] } : onControl(message);
+    await h.service.start(1, 'Lab door', ADMIN);
+    await h.pump();
+    // The cancel's read saw the row before `verified` was written; the write must still not win.
+    const verified = await latest(h);
+    const findLatest = h.conversions.findLatestForReader.bind(h.conversions);
+    h.conversions.findLatestForReader = async (id) => {
+      const row = await findLatest(id);
+      return row && { ...row, verified: false };
+    };
+    await expect(h.service.cancel(1)).rejects.toThrow('can no longer be cancelled');
+    expect(await h.conversions.findById(verified.id)).toMatchObject({ state: 'transferring', verified: true });
+  });
+
   it.each([
     [{ verifyFails: true }, 'verify-failed', 'transferring', true],
     [{ digestMismatch: true }, 'digest-mismatch', 'transferring', false],
@@ -332,6 +352,24 @@ describe('secure conversion against the emulated reader', () => {
     await h.protocol.onCredentialChanged(1);
     expect(await latest(h)).toMatchObject({ state: 'failed', failureReason: 'reader-changed' });
     expect((await h.service.status(1)).canRetry).toBe(false);
+  });
+
+  it.each([
+    [{ disconnectAfterChunks: 1 }, 'transferring'],
+    [{}, 'encrypting'],
+  ])('ends the conversion of a deleted reader (%j, in %s)', async (faults, state) => {
+    const h = await started({ faults });
+    if (state === 'encrypting') await h.disconnect();
+    expect((await latest(h)).state).toBe(state);
+    await h.protocol.onReaderDeleted(new ReaderDeletedEvent(1));
+    expect(await latest(h)).toMatchObject({ state: 'failed', failureReason: 'reader-changed', failedInState: state });
+    await expect(h.conversions.findActive()).resolves.toBeNull();
+  });
+
+  it('leaves the conversion alone when another reader is deleted', async () => {
+    const h = await started({ faults: { disconnectAfterChunks: 1 } });
+    await h.protocol.onReaderDeleted(new ReaderDeletedEvent(2));
+    expect((await latest(h)).state).toBe('transferring');
   });
 
   it('closes the session on a malformed conversion message', async () => {

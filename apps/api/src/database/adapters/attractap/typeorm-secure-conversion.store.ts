@@ -75,15 +75,17 @@ export class TypeOrmAttractapSecureConversionStore implements AttractapSecureCon
     id: number,
     patch: AttractapSecureConversionPatch,
     whenStates: readonly AttractapConversionState[],
+    onlyUnverified = false,
   ): Promise<AttractapSecureConversionRecord | null> {
     const ending = patch.state !== undefined && ATTRACTAP_CONVERSION_TERMINAL_STATES.includes(patch.state);
     const values = { ...patch, ...(ending ? { active: false } : {}) };
-    const result = await this.rows
+    const query = this.rows
       .createQueryBuilder()
       .update(AttractapSecureConversion)
       .set(values as Partial<AttractapSecureConversion>)
-      .where('id = :id AND state IN (:...states)', { id, states: [...whenStates] })
-      .execute();
+      .where('id = :id AND state IN (:...states)', { id, states: [...whenStates] });
+    if (onlyUnverified) query.andWhere('verified = false');
+    const result = await query.execute();
     if (!result.affected) return null;
     return await this.findById(id);
   }

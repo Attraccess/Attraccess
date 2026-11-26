@@ -72,9 +72,14 @@ export class FakeConversionStore implements AttractapSecureConversionStore {
     this.log.push(`conversion:insert`);
     return structuredClone(row);
   }
-  async update(id: number, patch: AttractapSecureConversionPatch, whenStates: readonly AttractapConversionState[]) {
+  async update(
+    id: number,
+    patch: AttractapSecureConversionPatch,
+    whenStates: readonly AttractapConversionState[],
+    onlyUnverified = false,
+  ) {
     const row = this.rows.find((r) => r.id === id);
-    if (!row || !whenStates.includes(row.state)) return null;
+    if (!row || !whenStates.includes(row.state) || (onlyUnverified && row.verified)) return null;
     Object.assign(row, structuredClone(patch));
     // One write: the burn report is logged first, as it is what must be on disk before the next command.
     if (patch.burnReport) this.log.push('conversion:burnReport');
