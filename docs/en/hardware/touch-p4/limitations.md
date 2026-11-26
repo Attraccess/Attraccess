@@ -22,7 +22,7 @@ not reopened without a new reason.
   capacitor fits per 1.05 mm of row, and the signal escapes need that room. 0201 parts on the component
   side change nothing (the row is the limit, and 0201 is an extended part at JLCPCB). 0201 parts on the
   back side need a second assembly side (about 34 USD more per order) and face the display's metal back
-  1.5 mm away; the board stays single-sided.
+  1.7 mm away, where the folded display flex also lies; the board stays single-sided.
 - **Mitigation.** Each pin has a via inside the pad row into the 3.3 V plane or the core pour. Simulated,
   the board adds 1.1 to 2.4 nH, about what the package adds itself. Bring-up runs a CPU and PSRAM stress
   test at full clock for an hour, cold and warm in the case, with the supplies on the scope.
@@ -138,7 +138,7 @@ What only a built board can settle. Each is a step in the [Bring-up plan](hardwa
 
 | Open point | What is known | How bring-up settles it |
 |---|---|---|
-| Display flex against the jack's pins | The flex allows at most 2.0 mm board-to-LCD (drawing, +-0.4 mm); the pins need room (at least 1.45 mm long). At 1.5 mm with clipped pins each side has 0.5 mm. A second drawing shows a 0.8 mm shorter flex; other makers may differ. A short flex cannot be repaired | Before ordering: lay the panel you will buy on a 1:1 print with a 1.5 mm spacer, and measure a real jack's pins. Fallback if it does not reach: the jack below the display (commit 74add084d) with a case 19 mm longer |
+| Display flex fold and reach | Measured on one sample panel (26 November 2026): the flex folds flat onto the LCD's metal back, its stiff part (touch controller, 1.3 mm high) ends about 13.5 mm from the glass edge (from photos, +-0.5 mm; the slot needs 14.2 mm at most), its end reaches 25.6 mm. After the S-bend through the slot it should reach about 3.6 mm into J601; the S-bend's length is calculated, not tried, and the FH12's insertion depth is not checked against its drawing. Other makers' panels may differ. A short flex cannot be repaired | Before ordering: lay the panel you will buy on a 1:1 print with a 1.7 mm spacer and plug the flex in. Fallback if it does not reach: move J601 and the slot towards the display's lower edge (the slot must stay past the stiff part) |
 | MCU stability with the decoupling as routed | See the deviation above; first suspect if the MCU is unstable at full clock | CPU and PSRAM stress test, one hour, cold and warm, supplies on the scope |
 | Crystal frequency | Load capacitors 12 pF for an estimated 3 pF stray; Espressif's board implies 4 pF (10 pF capacitors) | Measure the frequency; step to 10 pF if it is low |
 | NFC loop, tuning and range | Loop simulated, not measured: 1.25 uH on the board, 1.20 uH on metal. Every board stays inside the transmitter limit for 1.12 to 1.25 uH, 99 in 100 for 1.08 to 1.27 uH. The field powers a card up to 19 mm out (15 mm on metal); whether the reader hears the card is not modelled. The lan version's plug and cable sit 8 mm from the loop | Measure the loop before switching the field on, then the transmitter current; tune with a network analyser with the display fitted; tune the lan version with the cable plugged in; check read range with the cards in use |

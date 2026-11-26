@@ -40,7 +40,7 @@ Schienen: 3,3 V (TLV62569, 2 A, 36 % Reserve bei den Auslegungswerten), 1,1-V-Ke
 |---|---|
 | Einsatz | in Innenräumen, an einer Wand oder einer Maschine; trocken, nicht kondensierend |
 | Umgebungstemperatur | 0 bis 40 °C im Betrieb. Im geschlossenen Gehäuse bei 40 °C mit PoE ergibt die Schätzung 62 °C am Display (Grenze 70 °C) und 79 °C am WLAN-Modul |
-| Platine | 86,0 x 143,5 mm, sechs Lagen, 1,6 mm, ENIG, Bauteile auf einer Seite; das Display ist auf die andere Seite geklebt, 1,5 mm von der Platine entfernt |
+| Platine | 86,0 x 143,5 mm, sechs Lagen, 1,6 mm, ENIG, Bauteile auf einer Seite; das Display ist auf die andere Seite geklebt, 1,7 mm von der Platine entfernt |
 
 ## Schnittstellen
 

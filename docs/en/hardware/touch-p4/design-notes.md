@@ -53,7 +53,7 @@ The 3D-printable case itself is described in [Case](hardware/touch-p4/case.md).
 | Cut in the top edge under the Wi-Fi antenna | x 8.6 to 37.5, y 0 to 6.0; no copper on any layer for x below 50.5, y below 6.3 |
 | Display cover lens (84.3 x 84.3) | x 0.85 to 85.15, y 7.0 to 91.3 |
 | LCD module (metal back) | x 5.6 to 80.4, y 12.8 to 89.4 |
-| Flex slot | x 11.5 to 62.0, y 89.5 to 92.5 |
+| Flex slot (behind the display) | x 33.05 to 54.65, y 73.3 to 76.3 |
 | Ethernet jack | x 68.8 to 84.9, y 71.2 to 92.8, opens downwards into its cut-away. Pin rows at y 73.0 and 75.55, behind the display |
 | Cut-away for the Ethernet plug | x above 69.5, y above 92.5 (16.5 x 51) |
 | Cut-away for the DC plug | x below 12, y above 107.5 (12 x 36) |
@@ -63,36 +63,43 @@ The 3D-printable case itself is described in [Case](hardware/touch-p4/case.md).
 | DC jack | x 1.2 to 10.2, y 93.6 to 108, opens downwards into the DC cut-away |
 | DC terminal | centre (16.7, 100.2), wires enter from below at 40 degrees |
 | USB-C | right board edge, y 13.5 to 22.5, opens sideways |
-| Display ground pads (5 x 5, bare, display side) | (12.0, 23.5), (64.2, 37.2), (48, 17), (43, 80) |
+| Display ground pads (5 x 5, bare, display side) | (12.0, 23.5), (64.2, 37.2), (48, 17), (18, 36.5) |
 
 ### Display mounting and flex
 
-Panel drawing used: Hongxiangrui HXR040WQI-H401-R4018 (same pinout as the Waveshare ESP32-S3-Touch-LCD-4). LCD module
-2.06 mm thick, 3.14 mm with bonding layer, touch sensor and 0.55 mm cover lens.
+Panel drawing used for the pinout: Hongxiangrui HXR040WQI-H401-R4018 (same pinout as the Waveshare
+ESP32-S3-Touch-LCD-4). The mechanics come from a sample panel measured on 26 November 2026: glass 84.23 x 84.25 mm,
+3.5 mm from the front of the glass to the metal back (the drawing says 3.14). The LCD module's outline matches the
+drawing: the display frame printed from it fits the sample.
 
-- The flex leaves the LCD module's bottom edge 1.9 mm above the lens edge and is 25 mm long from the lens edge,
-  contacts facing away from the glass. The touch panel's own tail is soldered onto the main tail at a steel-stiffened
-  joint.
-- The flex goes through the slot and folds onto the component side. Its stiff parts must lie flat after the turn;
-  measured from the LCD module's edge they begin at 4.8 mm (components on the main tail), 5.3 mm (touch tail joint)
-  and 6.4 mm (touch controller). That limits the board-to-metal-back distance to **2.0 mm** (scaled from the drawing,
-  +-0.4 mm).
-- The Ethernet jack sets the lower bound: its pins stand at least 1.45 mm out of the display side (datasheet minimum
-  pin length 3.05 mm, no maximum). Behind the metal back are pins 1 to 8, 11, 12 (signals, 3.3 V), one shield tab and
-  one plastic post; the 48 V pins 9 and 10 come out 0.8 and 2.1 mm beside it.
-- So: **clip the jack's pins, tabs and posts to 1 mm** on the display side after soldering, put **polyimide tape** on
-  the metal back over x 66 to 80.4, y 69 to 89.4, wrapped 2 mm round the module's side edge next to pin 9, and mount
-  the display **1.5 mm** off the board. That leaves 0.5 mm on each side. Unclipped pins touch the metal back at 1.5 mm
-  and may at 2 mm.
-- After the fold the contacts face the board: J601 is a **bottom-contact** Hirose FH12-40S-0.5SH with its opening
-  towards the slot. Panel pin 1 is on the right seen from the component side, so **connector pin k = panel pin 41 -
-  k**; schematic and board account for it.
-- The folded flex covers x 11.5 to 62, y 76 to 89.5 and the tail up to the connector (`geometry.FLEX_KEEPOUT`). Only
-  parts up to 0.9 mm high stand there (0402, 0603, 1206 passives, resistor arrays, test pads);
-  `placement.check_flex_area` stops the build otherwise.
-- With the display at 1.5 mm the connector sits about 1.5 mm closer to the slot than the flex end (0.7 mm for the
-  shorter flex of a second drawing), so the flex bows slightly. The real fold length is not verified (see [Known
-  limitations](hardware/touch-p4/limitations.md)).
+- The flex leaves the LCD module's bottom edge 1.9 mm above the lens edge, contacts facing away from the glass. The
+  touch panel's own tail carries the touch controller and is soldered onto the main tail. Together they are stiff
+  from just under the glass edge to about 13.5 mm past it (chip piece about 10 x 8 mm at x 15 to 25, its joint and a
+  side tab of the main tail): no bend may cross that part. Beyond it only the plain contact strip continues, 20.4 mm
+  wide, its stiffened contacts from 19.4 mm, its end 25.6 mm from the lens edge.
+- The first layout ran the flex through a slot just below the module edge and round onto the component side. Both of
+  its bends fall inside the stiff part, so that route does not work with the real panel.
+- Now the flex folds 180 degrees round the module's bottom edge and lies flat on the metal back, which it does
+  without strain (tried on the sample). The touch controller faces the board: 1.3 mm from the flex's underside to the
+  chip's top. Past the stiff part the contact strip goes through a slot behind the display (x 33.05 to 54.65,
+  y 73.3 to 76.3, centred on J601), in an S-bend onto the component side and into J601. The folded flex reaches
+  25.6 mm from the lens edge; after the S-bend its end lies about 3.6 mm inside the connector's opening (y 72.3). The
+  stiff part's end (13.5 mm) is read off photos, +-0.5 mm; the slot needs it within 14.2 mm.
+- The board-to-metal-back distance is bounded by the chip (1.3 mm, plus 0.2) and the Ethernet jack's pins below, and
+  by the S-bend's flex length above: **1.5 to 2.0 mm**. The case holds the display at **1.7 mm**.
+- The Ethernet jack's pins stand at least 1.45 mm out of the display side (datasheet minimum pin length 3.05 mm, no
+  maximum). Behind the metal back are pins 1 to 8, 11, 12 (signals, 3.3 V), one shield tab and one plastic post; the
+  48 V pins 9 and 10 come out 0.8 and 2.1 mm beside it.
+- So: **clip the jack's pins, tabs and posts to 1 mm** on the display side after soldering and put **polyimide tape**
+  on the metal back over x 66 to 80.4, y 69 to 89.4, wrapped 2 mm round the module's side edge next to pin 9. At
+  1.7 mm the clipped pins clear the metal back by 0.7 mm; unclipped they would clear it by 0.25 mm at best.
+- After the fold and the S-bend the contacts face the board: J601 is a **bottom-contact** Hirose FH12-40S-0.5SH with
+  its opening towards the slot. Panel pin 1 is on the right seen from the component side, so **connector pin k =
+  panel pin 41 - k**; schematic and board account for it.
+- On the component side the flex only covers the strip from the slot into J601 (`geometry.FLEX_KEEPOUT`, x 32.5 to
+  55.5, y 66 to 77.3). Only parts up to 0.9 mm high stand there; `placement.check_flex_area` stops the build
+  otherwise. On the display side it covers x 14.5 to 62.5, y 72.5 to 89.4 (`geometry.FLEX_BEHIND_LCD`); no ground pad
+  lies there (a test checks it).
 - The metal back is tied to board ground through conductive tape or foam on at least two of the four bare ground pads,
   kept out of the mounting tape's area. Discharges onto the glass end up on the metal back.
 
@@ -132,7 +139,7 @@ MIPI DSI on a 20-pin flex, 77 x 80 mm: it does not fit; using it would be a new 
 - **Jack pins on the display side** (x 68 to 86, y 71 to 88) must not be pressed on or touched by metal; pins 9 and 10
   (x 81.2 and 82.5) carry 48 V. Pin 9 is 0.5 mm from the LCD module's edge (its pad 0.1 mm), so no frame wall fits
   there: the tape is the insulation.
-- **Depth.** Display side of the board 4.74 mm behind the case front (1.5 mm gap, 3.14 mm display, 0.1 mm recess).
+- **Depth.** Display side of the board 5.3 mm behind the case front (1.7 mm gap, 3.5 mm display, 0.1 mm recess).
   Behind the board 13.9 mm to the dock plate, with recesses and a window for the tallest parts (see [Case
   fit](#case-fit)).
 - **DC.** The cut-away takes a straight 5.5 mm barrel plug up to 11 mm thick; check with the shipped supply's plug.
@@ -159,8 +166,8 @@ checks. Heights are the makers' where given.
 | J401 RJ45 | body 13.95 max; shield springs at the mouth 15.21 +- 0.50 (HanRun HY931147C) | dock plate at 13.9 mm, 0.8 mm recess under the jack, window (9.5 x 6.9) under the springs | body 0.90 (0.70 at max); springs 1.70 to the wall behind the window (1.14 at max), 1.0 to the window's sides |
 | U102 DP9900M | 13.35 +- 0.5 | dock plate, 0.8 mm recess | 1.35 (0.80 at max) |
 | J103 WAGO 250-202 | 13.2 | dock plate | 0.70 |
-| J102, J103 pins | 1.95 out of the display side | cap front wall | 0.44 |
-| J401 pins | 1.45 out of the display side, unclipped | LCD module at 1.5 mm | 0.1; 0.5 clipped to 1 mm |
+| J102, J103 pins | 1.95 out of the display side | cap front wall | 1.0 |
+| J401 pins | 1.45 out of the display side, unclipped | LCD module at 1.7 mm | 0.25; 0.7 clipped to 1 mm |
 | J101 USB-C | 3.25 | cap side wall | 0.63 |
 | C120 47 uF, 6.3 mm | 7.7 | dock plate; cap side wall | 6.2; 13.9 |
 | D106, D107, F102, U105, U106, U107, Q101, Q102, U204 | 2.4 at most | none within 3 mm | more than 3 |
@@ -169,8 +176,8 @@ checks. Heights are the makers' where given.
   supports. The lower wall-screw pair (flush-mount box spacing) sits 8.5 mm below the springs.
 - The openings stand 47 mm from the proximity sensor's axis (its light ends 8 mm from it; `geometry.DOCK_OPENINGS`,
   checked by a test) and 56 mm from the magnet's axis.
-- C120 keeps clear of the folded flex: its model (x 13.9 to 21.7, y 60.7 to 67.3) ends 8.7 mm before the flex area and
-  10.8 mm left of the tail's way to J601.
+- C120 keeps clear of the display flex: its model (x 13.9 to 21.7, y 60.7 to 67.3) ends 10.8 mm left of the flex's
+  strip into J601.
 - `collect_models.py` moves every converted model onto its pads and holes (`model_fit.py`); a test fails when a
   model's pins miss.
 

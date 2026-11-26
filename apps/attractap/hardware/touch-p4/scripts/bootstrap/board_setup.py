@@ -61,7 +61,9 @@ def documentation(B):
     B.text('LCD module (metal back)', 43, 14.6, 1.0, Dw)
     for x1, y1, x2, y2 in G.FLEX_KEEPOUT:
         B.edge(rect(x1, y1, x2, y2), layer=pcbnew.Cmts_User, width=0.1)
-    B.text('folded display flex lies here: no tall parts', 37, 82.5, 1.0, pcbnew.Cmts_User)
+    B.text('display flex: no tall parts', 44, 77.9, 0.8, pcbnew.Cmts_User)
+    B.edge(rect(*G.FLEX_BEHIND_LCD), layer=pcbnew.Cmts_User, width=0.1)
+    B.text('folded display flex behind the LCD (other side)', 38.5, 84.0, 1.0, pcbnew.Cmts_User)
     B.text('Ethernet plug', 77.8, G.NOTCH_Y + 15, 1.0, Dw, rot=90)
 
 

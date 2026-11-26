@@ -241,8 +241,7 @@ def component_side(S):
     for num, mark in (('1', '+'), ('2', '-')):
         x, y = min(B.pads_num('J103', num), key=lambda p: p[1])
         S.text(mark, x, y - 3.6)
-    S.text('DISPLAY FLEX', 43.85, 74.0)
-    S.text('FLEX FOLDS OVER THIS AREA', 36.75, 82.5)
+    S.text('DISPLAY FLEX', 43.85, 77.6)
     S.text('ANTENNA ZONE', 44.0, 2.2)
     S.text('NO METAL HERE', 44.0, 3.9)
     # ---- 48 V side: its border beside the Ethernet pair, and its name

@@ -88,7 +88,8 @@ The hardware (heat-set inserts, screws, tape, cable ties) is listed in the
   has no effect, so the script turns each part with a temporary move before the export.
 - **Manual scenes**: `manual/attractap-manual-scenes.sc` is a copy of the design with extra bodies
   for illustration; print files never come from it. It, the renders on this page and the manual's
-  figures still show an earlier depth stack: a cap 1.2 mm deeper, with the display 2 mm off the board.
+  figures still show an earlier depth stack: a cap 0.64 mm deeper, with the display 2 mm off the board,
+  and the display flex's earlier route through the board below the display.
 
 The scripts are plain Python without dependencies; run them with `python3 -I`. They drive SolidCraft
 through its command-line tool (the path at the top of each script is the macOS one) or write step
@@ -105,25 +106,26 @@ files for it, and use `rsvg-convert` for labels.
 ## Not yet verified
 
 - **Nothing has been printed.** Fits, the swing-on motion and the strain relief are checked in CAD only.
-- **Display dimensions.** From the mechanical drawing on the display's product page (AliExpress item
-  1005005675144653, the same drawing as the Makerfabs datasheet the board was laid out from): 3.14 mm
-  in total, made of the cover lens (0.55 mm), touch sensor (0.35 mm), bonding layer (0.175 mm) and
-  LCD module (2.06 mm); a corner radius of at least 1 mm is assumed. Nothing is measured, and these
-  decide whether the screen sits flush and how far the display's metal back is from the board.
-  Measure the panel you buy; if it differs, set `disp_t` and `lens_t` and export the parts again.
+- **Display dimensions.** Measured on a sample panel (26 November 2026): glass 84.23 x 84.25 mm, 3.5 mm
+  from the front of the glass to the metal back (`disp_t`; the drawing on the display's product page,
+  AliExpress item 1005005675144653, says 3.14 mm). The display frame printed from the drawing's LCD
+  outline fits the sample. Not measured: the cover lens alone (`lens_t`, 0.55 mm by the drawing) and the
+  corner radius (at least 1 mm assumed). They decide whether the screen sits flush. Measure the panel you
+  buy; if it differs, set `disp_t` and `lens_t` and export the parts again.
   - `lens_t` is the lens alone: the touch sensor (76.5 x 76.7 mm) is smaller than the lens, so the
     border the frame holds has no sensor behind it.
   - The sensor is 0.9 mm wider than the frame's opening for the LCD module (75.6 mm). The frame's rim
     reaches 0.4 mm under each side edge of the sensor and, with the 0.3 mm tape, presses on it by
     0.05 mm. An opening of 77.3 mm would clear it.
-  - By the drawing the lens border carries its own tape (3M 9495, 0.175 mm). If the panel comes with
-    it, it can replace the manual's 0.3 mm tape; the glass then sits 0.1 mm lower and the rim presses
+  - The sample's lens border carries its own tape (3M, with a liner; 0.175 mm 3M 9495 by the drawing,
+    not measured). It can replace the manual's 0.3 mm tape; the glass then sits 0.1 mm lower and the rim presses
     on the sensor's edges by 0.2 mm, so widen the opening first.
-- **Display distance to the board.** The case holds the display 1.5 mm off the board (`disp_gap`).
-  Details in the [design notes](hardware/touch-p4/design-notes.md).
-  - The display's flex wraps round the board, and its stiff parts must lie flat behind the board.
-    By the panel drawing that works up to 2.0 mm between the board and the LCD's metal back; 1.5 mm
-    leaves 0.5 mm to spare.
+- **Display distance to the board.** The case holds the display 1.7 mm off the board (`disp_gap`).
+  Details in the [design notes](hardware/touch-p4/design-notes.md#display-mounting-and-flex).
+  - The display's flex folds flat onto the LCD's metal back and goes through a slot behind the display.
+    The touch controller on it faces the board, 1.3 mm high; the board allows 1.5 to 2.0 mm, and 1.7 mm
+    leaves room for print tolerance. The frame is open along the display's lower edge, where the fold
+    lies.
   - On the lan version the Ethernet jack J401 has its solder pins behind the display: 16 pins, two
     shield tabs and two plastic posts, 11 of them behind the LCD's metal back, standing at least
     1.45 mm out of the board. They are clipped to 1 mm and that corner of the LCD gets polyimide tape
@@ -133,9 +135,9 @@ files for it, and use `rsvg-convert` for labels.
     edge); the tape on the LCD is the insulation.
   - Turning the jack the other way does not work without a longer case: below the display its plug
     room shrinks from 51 to 32 mm, and a wall cable would need a plug ending 12 mm below the jack.
-- **Inserts close to the front face.** Only 2.3 mm lie between the board and the front wall. The
-  insert holes of the four PCB bosses are 3.2 mm deep (`pcb_ins_depth`), reaching 0.9 mm into the
-  2.4 mm front wall and leaving 1.5 mm. Check on the first print that pressing the inserts in does
+- **Inserts close to the front face.** Only 2.9 mm lie between the board and the front wall. The
+  insert holes of the four PCB bosses are 3.2 mm deep (`pcb_ins_depth`), reaching 0.3 mm into the
+  2.4 mm front wall and leaving 2.1 mm. Check on the first print that pressing the inserts in does
   not mark the front.
 - **Dock magnet.** The ring is at X 30.5, Y 10.95 (board point 12.5, 38.2); the magnet's face is
   10.3 mm from the hall switch, which by calculation gives 22 mT, four times what the switch needs.

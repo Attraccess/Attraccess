@@ -89,8 +89,9 @@ Die Hardware (Einschmelzmuttern, Schrauben, Klebeband, Kabelbinder) ist in der
   vorübergehenden Verschiebung.
 - **Szenen der Anleitung**: `manual/attractap-manual-scenes.sc` ist eine Kopie des Designs mit zusätzlichen
   Körpern zur Illustration; Druckdateien kommen nie daraus. Sie, die Renderings auf dieser Seite und die
-  Abbildungen der Anleitung zeigen noch einen früheren Tiefenaufbau: eine um 1,2 mm tiefere Kappe, mit dem
-  Display 2 mm von der Platine entfernt.
+  Abbildungen der Anleitung zeigen noch einen früheren Tiefenaufbau: eine um 0,64 mm tiefere Kappe, mit dem
+  Display 2 mm von der Platine entfernt, und den früheren Weg des Display-Flexkabels durch die Platine unterhalb des
+  Displays.
 
 Die Skripte sind reines Python ohne Abhängigkeiten; führen Sie sie mit `python3 -I` aus. Sie steuern
 SolidCraft über sein Kommandozeilenwerkzeug (der Pfad am Anfang jedes Skripts ist der für macOS) oder
@@ -107,27 +108,27 @@ schreiben Step-Dateien dafür und nutzen `rsvg-convert` für Beschriftungen.
 ## Noch nicht geprüft
 
 - **Nichts wurde gedruckt.** Passungen, die Schwenkbewegung beim Einhängen und die Zugentlastung sind nur in CAD geprüft.
-- **Displaymaße.** Aus der Maßzeichnung auf der Produktseite des Displays (AliExpress-Artikel
-  1005005675144653, dieselbe Zeichnung wie im Makerfabs-Datenblatt, nach dem die Platine gelayoutet wurde):
-  insgesamt 3,14 mm, zusammengesetzt aus der Deckscheibe (0,55 mm), dem Touch-Sensor (0,35 mm), der
-  Klebeschicht (0,175 mm) und dem LCD-Modul (2,06 mm); angenommen wird ein Eckenradius von mindestens 1 mm.
-  Nichts ist gemessen, und diese Maße entscheiden, ob der Bildschirm bündig sitzt und wie weit die
-  Metallrückseite des Displays von der Platine entfernt ist. Vermessen Sie das Panel, das Sie kaufen; weicht
-  es ab, setzen Sie `disp_t` und `lens_t` und exportieren Sie die Teile erneut.
+- **Displaymaße.** Gemessen an einem Muster-Panel (26. November 2026): Glas 84,23 x 84,25 mm, 3,5 mm von der
+  Vorderseite des Glases bis zur Metallrückseite (`disp_t`; die Zeichnung auf der Produktseite des Displays,
+  AliExpress-Artikel 1005005675144653, sagt 3,14 mm). Der nach dem LCD-Umriss der Zeichnung gedruckte Displayrahmen
+  passt auf das Muster. Nicht gemessen: die Deckscheibe allein (`lens_t`, 0,55 mm laut Zeichnung) und der Eckenradius
+  (angenommen mindestens 1 mm). Sie entscheiden, ob der Bildschirm bündig sitzt. Vermessen Sie das Panel, das Sie
+  kaufen; weicht es ab, setzen Sie `disp_t` und `lens_t` und exportieren Sie die Teile erneut.
   - `lens_t` ist nur die Deckscheibe: Der Touch-Sensor (76,5 x 76,7 mm) ist kleiner als die Deckscheibe,
     sodass der Rand, den der Rahmen hält, keinen Sensor dahinter hat.
   - Der Sensor ist 0,9 mm breiter als die Öffnung des Rahmens für das LCD-Modul (75,6 mm). Der Rand des
     Rahmens reicht 0,4 mm unter jede Seitenkante des Sensors und drückt mit dem 0,3-mm-Klebeband mit
     0,05 mm darauf. Eine Öffnung von 77,3 mm würde ihn freilassen.
-  - Nach der Zeichnung trägt der Rand der Deckscheibe ein eigenes Klebeband (3M 9495, 0,175 mm). Wird es
-    mit dem Panel geliefert, kann es das 0,3-mm-Klebeband der Anleitung ersetzen; das Glas sitzt dann
+  - Der Rand der Deckscheibe des Musters trägt ein eigenes Klebeband (3M, mit Schutzfolie; laut Zeichnung
+    3M 9495 mit 0,175 mm, nicht gemessen). Es kann das 0,3-mm-Klebeband der Anleitung ersetzen; das Glas sitzt dann
     0,1 mm tiefer, und der Rand drückt mit 0,2 mm auf die Kanten des Sensors, weiten Sie also zuerst die
     Öffnung.
-- **Abstand des Displays zur Platine.** Das Gehäuse hält das Display 1,5 mm von der Platine entfernt
-  (`disp_gap`). Einzelheiten in den [Designnotizen](hardware/touch-p4/design-notes.md).
-  - Das Flexkabel des Displays wird um die Platine geführt, und seine steifen Teile müssen flach hinter der
-    Platine liegen. Nach der Zeichnung des Panels funktioniert das bis zu 2,0 mm zwischen Platine und
-    Metallrückseite des LCD; 1,5 mm lassen 0,5 mm Reserve.
+- **Abstand des Displays zur Platine.** Das Gehäuse hält das Display 1,7 mm von der Platine entfernt
+  (`disp_gap`). Einzelheiten in den [Designnotizen](hardware/touch-p4/design-notes.md#displaymontage-und-flexkabel).
+  - Das Flexkabel des Displays faltet sich flach auf die Metallrückseite des LCD und geht durch einen Schlitz
+    hinter dem Display. Der Touch-Controller darauf zeigt zur Platine, 1,3 mm hoch; die Platine erlaubt 1,5 bis
+    2,0 mm, und 1,7 mm lassen Raum für Drucktoleranzen. Der Rahmen ist am unteren Rand des Displays offen, wo die
+    Faltung liegt.
   - Bei der LAN-Version hat die Ethernet-Buchse J401 ihre Lötpins hinter dem Display: 16 Pins, zwei
     Schirmlaschen und zwei Kunststoffzapfen, 11 davon hinter der Metallrückseite des LCD, die mindestens
     1,45 mm aus der Platine herausstehen. Sie werden auf 1 mm gekürzt, und diese Ecke des LCD bekommt
@@ -139,9 +140,9 @@ schreiben Step-Dateien dafür und nutzen `rsvg-convert` für Beschriftungen.
   - Die Buchse andersherum zu drehen geht nicht ohne ein längeres Gehäuse: Unter dem Display schrumpft ihr
     Steckerraum von 51 auf 32 mm, und ein Kabel aus der Wand bräuchte einen Stecker, der 12 mm unter der
     Buchse endet.
-- **Einschmelzmuttern nahe der Frontfläche.** Nur 2,3 mm liegen zwischen Platine und Frontwand. Die Löcher
+- **Einschmelzmuttern nahe der Frontfläche.** Nur 2,9 mm liegen zwischen Platine und Frontwand. Die Löcher
   für die Einschmelzmuttern der vier Platinen-Schraubdome sind 3,2 mm tief (`pcb_ins_depth`), reichen also
-  0,9 mm in die 2,4 mm dicke Frontwand und lassen 1,5 mm stehen. Prüfen Sie beim ersten Druck, dass das
+  0,3 mm in die 2,4 mm dicke Frontwand und lassen 2,1 mm stehen. Prüfen Sie beim ersten Druck, dass das
   Einpressen der Einschmelzmuttern die Front nicht markiert.
 - **Dock-Magnet.** Der Ring liegt bei X 30,5, Y 10,95 (Platinenpunkt 12,5, 38,2); die Fläche des Magneten
   ist 10,3 mm vom Hall-Schalter entfernt, was rechnerisch 22 mT ergibt, das Vierfache dessen, was der

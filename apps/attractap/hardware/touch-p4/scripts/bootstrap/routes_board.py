@@ -196,8 +196,8 @@ def led_link(B):
 
 
 def led_power(B):
-    """5 V for the top LED row: a bus in the strip between the flex slot and the LED windows."""
-    yb = G.SLOT[3] + 0.8
+    """5 V for the top LED row: a bus in the strip between the display's lower edge and the LED windows."""
+    yb = G.LED_BUS_Y
     xs = []
     for i in range(len(G.LED_X)):
         p3 = B.pad('D%d' % (701 + i), '3')

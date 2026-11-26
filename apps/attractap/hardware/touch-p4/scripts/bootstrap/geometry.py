@@ -16,11 +16,28 @@ LCM = (5.6, 12.8, 80.4, 89.4)              # metal-backed LCD module behind the 
 # Bare ground pads on the display side, behind the LCD module: for conductive tape or foam that ties
 # the LCD's metal back to ground (centre x, y; each LCD_GROUND_PAD mm square). They are openings in
 # the solder mask over the ground fill, placed where that fill has no track and no via.
-LCD_GROUND_PADS = ((12.0, 23.5), (64.2, 37.2), (48.0, 17.0), (43.0, 80.0))
+# None lies under the folded display flex (FLEX_BEHIND_LCD).
+LCD_GROUND_PADS = ((12.0, 23.5), (64.2, 37.2), (48.0, 17.0), (18.0, 36.5))
 LCD_GROUND_PAD = 5.0
 
-# Slot the display flex passes through, directly below the LCD module edge
-SLOT = (11.5, 89.5, 62.0, 92.5)
+# The display flex (measured on a sample panel, 26 November 2026). It leaves the LCD module's lower edge
+# and folds 180 degrees round that edge onto the module's metal back, where it lies flat; its stiff
+# parts (touch controller, the joint of the touch tail, the tab of the main tail) end 13.5 mm from the
+# lens edge. Past them only the plain contact strip continues, 20.4 mm wide: from 19.4 mm the
+# stiffened contacts, its end 25.6 mm from the lens edge. The strip goes through SLOT behind the
+# display in an S-bend onto the component side and into J601. The stiff part may not bend, so the old
+# route (through a slot below the module edge and round onto the component side) does not work.
+FLEX_STIFF_END = 13.5                      # from the lens edge, folded behind the module
+FLEX_STRIP_W = 20.42
+FLEX_END = 25.6
+# Area on the display side the folded flex covers (the touch tail's stiff part at x 15 to 25, chip
+# towards the board): no ground pad here
+FLEX_BEHIND_LCD = (14.5, 72.5, 62.5, 89.4)
+# Slot behind the display for the contact strip, centred on J601, between the stiff part's end and the
+# connector's opening (y 72.3)
+SLOT = (33.05, 73.3, 54.65, 76.3)
+# The 5 V bus of the top LED row runs at this height, between the display's lower edge and the LEDs
+LED_BUS_Y = 93.3
 # Cut-away corner that leaves room for the Ethernet plug and cable: 51 mm from the jack to the lower
 # board edge, for a plug with its boot (30 mm) and the cable's bend into the wall behind it. That
 # length puts the jack behind the lower right corner of the display. Its through-hole pins stand out
@@ -37,20 +54,23 @@ JACK_PINS_OTHER = tuple((-5.72 + 1.27 * k, -6.49 if k % 2 == 0 else -3.95) for k
     (-6.63, 6.49), (-4.09, 6.49), (4.09, 6.49), (6.63, 6.49),        # LED pins 11 to 14
     (-7.75, -0.65), (7.75, -0.65), (-5.7, 2.4), (5.7, 2.4))          # shield tabs, plastic posts
 JACK_PIN_OUT = (1.45, 1.9)     # how far they stand out of a 1.6 mm board: 3.05 mm is the datasheet's minimum length
-# Distance between the display side of the board and the LCD module's metal back. The upper limit comes
-# from the display's flex: it wraps round the upper slot edge onto the component side, and the stiff
-# parts of its two tails (touch controller 6.4 mm, components 4.8 mm from the module edge) must lie
-# flat behind the board after the turn. The lower limit comes from the jack's pins: clipped to 1 mm
-# after soldering they clear the metal back at this distance; unclipped they may touch it.
+# Distance between the display side of the board and the LCD module's metal back. The folded flex with
+# the touch controller lies in it, chip towards the board: 1.3 mm from the flex's underside to the
+# chip's top (measured). The lower limit leaves that 0.2 mm, and the jack's pins, clipped to 1 mm after
+# soldering, clear the metal back by 0.5 mm; unclipped they may touch it. The upper limit comes from the
+# flex's length: the S-bend through SLOT needs more of it the farther the board is. The case holds the
+# display at DISPLAY_GAP_SET, inside the range with room for print tolerance.
+FLEX_CHIP_H = 1.3
 DISPLAY_GAP = (1.5, 2.0)
+DISPLAY_GAP_SET = 1.7
 JACK_PIN_CLIPPED = 1.0
 # Second cut-away in the other bottom corner, for the DC plug: everything with x < POCKET_X and
 # y > POCKET_Y is cut away. The DC jack sits above it and opens into it.
 POCKET_X = 12.0
 POCKET_Y = 107.5
 
-# Area on the component side covered by the folded display flex: no tall parts here
-FLEX_KEEPOUT = [(11.5, 76.0, 62.0, 89.5), (32.5, 66.0, 55.5, 76.0)]
+# Area on the component side the display flex covers, from SLOT into J601: no tall parts here
+FLEX_KEEPOUT = [(32.5, 66.0, 55.5, 77.3)]
 
 # NFC loop antenna centre (footprint ANT501)
 ANT_C = (44.5, 117.0)

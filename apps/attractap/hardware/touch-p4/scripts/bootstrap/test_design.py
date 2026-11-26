@@ -276,7 +276,28 @@ class GeometryTest(unittest.TestCase):
 
     def test_display_clears_the_clipped_pins(self):
         self.assertGreaterEqual(geometry.DISPLAY_GAP[0] - geometry.JACK_PIN_CLIPPED, 0.5)
-        self.assertLessEqual(geometry.DISPLAY_GAP[1], 2.0)      # the display's flex reaches no further
+        self.assertLessEqual(geometry.DISPLAY_GAP[1], 2.0)      # the flex's S-bend through the slot
+        self.assertGreaterEqual(geometry.DISPLAY_GAP[0], geometry.FLEX_CHIP_H + 0.2)  # the folded touch chip
+        self.assertTrue(geometry.DISPLAY_GAP[0] <= geometry.DISPLAY_GAP_SET <= geometry.DISPLAY_GAP[1])
+
+    def test_flex_slot_between_stiff_part_and_connector(self):
+        g = geometry
+        lens_edge = g.LENS[3]
+        # the stiff part of the folded flex lies flat behind the module, before the slot (0.8 mm: the bend)
+        self.assertGreaterEqual(lens_edge - g.FLEX_STIFF_END, g.SLOT[3] + 0.8)
+        self.assertGreaterEqual(g.SLOT[1], 72.3 + 0.8)          # J601's opening (its courtyard edge)
+        self.assertGreaterEqual(g.SLOT[2] - g.SLOT[0], g.FLEX_STRIP_W + 1.0)
+        self.assertAlmostEqual((g.SLOT[0] + g.SLOT[2]) / 2, 43.85)  # centred on J601
+        # the flex must reach into J601: its end lies past the opening even after the S-bend
+        s_bend = 2 * (math.pi / 2 * 0.75) + (max(g.DISPLAY_GAP) + 1.6 - 1.5)  # two 0.75 mm bends, path
+        reach = lens_edge - g.FLEX_END + s_bend - 1.5          # where the end lands on the component side
+        self.assertLess(reach, 72.3 - 3.0)                      # at least 3 mm into the connector
+
+    def test_ground_pads_clear_of_the_folded_flex(self):
+        x1, y1, x2, y2 = geometry.FLEX_BEHIND_LCD
+        h = geometry.LCD_GROUND_PAD / 2
+        for x, y in geometry.LCD_GROUND_PADS:
+            self.assertFalse(x - h < x2 and x + h > x1 and y - h < y2 and y + h > y1, (x, y))
 
     def test_jack_opens_into_the_cut_away(self):
         front = geometry.JACK_Y + 13.32

@@ -55,7 +55,7 @@ Das 3D-druckbare Gehäuse selbst ist unter [Gehäuse](hardware/touch-p4/case.md)
 | Ausschnitt im oberen Rand unter der WLAN-Antenne | x 8,6 bis 37,5, y 0 bis 6,0; kein Kupfer auf irgendeiner Lage für x unter 50,5, y unter 6,3 |
 | Display-Deckglas (84,3 x 84,3) | x 0,85 bis 85,15, y 7,0 bis 91,3 |
 | LCD-Modul (Metallrückseite) | x 5,6 bis 80,4, y 12,8 bis 89,4 |
-| Flexkabel-Schlitz | x 11,5 bis 62,0, y 89,5 bis 92,5 |
+| Flexkabel-Schlitz (hinter dem Display) | x 33,05 bis 54,65, y 73,3 bis 76,3 |
 | Ethernet-Buchse | x 68,8 bis 84,9, y 71,2 bis 92,8, öffnet nach unten in ihren Ausschnitt. Pin-Reihen bei y 73,0 und 75,55, hinter dem Display |
 | Ausschnitt für den Ethernet-Stecker | x über 69,5, y über 92,5 (16,5 x 51) |
 | Ausschnitt für den DC-Stecker | x unter 12, y über 107,5 (12 x 36) |
@@ -65,37 +65,47 @@ Das 3D-druckbare Gehäuse selbst ist unter [Gehäuse](hardware/touch-p4/case.md)
 | DC-Buchse | x 1,2 bis 10,2, y 93,6 bis 108, öffnet nach unten in den DC-Ausschnitt |
 | DC-Klemme | Mitte (16,7; 100,2), die Drähte treten von unten im Winkel von 40 Grad ein |
 | USB-C | rechter Platinenrand, y 13,5 bis 22,5, öffnet seitlich |
-| Massepads des Displays (5 x 5, blank, Displayseite) | (12,0; 23,5), (64,2; 37,2), (48; 17), (43; 80) |
+| Massepads des Displays (5 x 5, blank, Displayseite) | (12,0; 23,5), (64,2; 37,2), (48; 17), (18; 36,5) |
 
 ### Displaymontage und Flexkabel
 
-Verwendete Panel-Zeichnung: Hongxiangrui HXR040WQI-H401-R4018 (dieselbe Pinbelegung wie beim Waveshare
-ESP32-S3-Touch-LCD-4). LCD-Modul 2,06 mm dick, 3,14 mm mit Klebeschicht, Touch-Sensor und 0,55 mm dickem Deckglas.
+Für die Pinbelegung dient die Panel-Zeichnung Hongxiangrui HXR040WQI-H401-R4018 (dieselbe Pinbelegung wie das Waveshare
+ESP32-S3-Touch-LCD-4). Die Mechanik stammt von einem Muster-Panel, gemessen am 26. November 2026: Glas 84,23 x 84,25 mm,
+3,5 mm von der Vorderseite des Glases bis zur Metallrückseite (die Zeichnung sagt 3,14). Der Umriss des LCD-Moduls
+stimmt mit der Zeichnung überein: Der danach gedruckte Displayrahmen passt auf das Muster.
 
-- Das Flexkabel verlässt den unteren Rand des LCD-Moduls 1,9 mm über dem Rand des Deckglases und ist ab dem Rand des
-  Deckglases 25 mm lang, die Kontakte vom Glas weg. Der eigene Schwanz des Touch-Panels ist an einer stahlversteiften
-  Verbindung auf den Hauptschwanz gelötet.
-- Das Flexkabel geht durch den Schlitz und faltet sich auf die Bestückungsseite. Seine steifen Teile müssen nach der
-  Wendung flach liegen; vom Rand des LCD-Moduls gemessen beginnen sie bei 4,8 mm (Bauteile am Hauptschwanz), 5,3 mm
-  (Lötverbindung des Touch-Schwanzes) und 6,4 mm (Touch-Controller). Das begrenzt den Abstand zwischen Platine und
-  Metallrückseite auf **2,0 mm** (aus der Zeichnung skaliert, +-0,4 mm).
-- Die Ethernet-Buchse setzt die untere Grenze: Ihre Pins ragen mindestens 1,45 mm aus der Displayseite heraus
-  (Mindest-Pinlänge laut Datenblatt 3,05 mm, kein Maximum). Hinter der Metallrückseite liegen die Pins 1 bis 8, 11, 12
-  (Signale, 3,3 V), eine Schirmlasche und ein Kunststoffzapfen; die 48-V-Pins 9 und 10 treten 0,8 und 2,1 mm daneben
-  heraus.
-- Also: **die Pins, Laschen und Zapfen der Buchse nach dem Löten auf der Displayseite auf 1 mm kürzen**,
-  **Polyimidband** auf die Metallrückseite über x 66 bis 80,4, y 69 bis 89,4 kleben, neben Pin 9 2 mm um die Seitenkante
-  des Moduls herumgeführt, und das Display **1,5 mm** vor der Platine montieren. Das lässt auf jeder Seite 0,5 mm.
-  Ungekürzte Pins berühren die Metallrückseite bei 1,5 mm und können sie bei 2 mm berühren.
-- Nach der Faltung zeigen die Kontakte zur Platine: J601 ist ein **Bottom-Contact**-Steckverbinder Hirose FH12-40S-0.5SH
-  mit seiner Öffnung zum Schlitz. Von der Bestückungsseite gesehen liegt Panel-Pin 1 rechts, also **Steckverbinder-Pin k
-  = Panel-Pin 41 - k**; Schaltplan und Platine berücksichtigen das.
-- Das gefaltete Flexkabel deckt x 11,5 bis 62, y 76 bis 89,5 und den Schwanz bis zum Steckverbinder ab
-  (`geometry.FLEX_KEEPOUT`). Dort stehen nur Bauteile bis 0,9 mm Höhe (Passive in 0402, 0603 und 1206,
-  Widerstandsarrays, Testpads); sonst bricht `placement.check_flex_area` den Build ab.
-- Mit dem Display bei 1,5 mm sitzt der Steckverbinder etwa 1,5 mm näher am Schlitz als das Ende des Flexkabels (0,7 mm
-  beim kürzeren Flexkabel einer zweiten Zeichnung), sodass sich das Flexkabel leicht wölbt. Die echte Faltlänge ist
-  nicht geprüft (siehe [Bekannte Einschränkungen](hardware/touch-p4/limitations.md)).
+- Das Flexkabel verlässt den unteren Rand des LCD-Moduls 1,9 mm über dem Rand des Deckglases, die Kontakte zeigen vom
+  Glas weg. Der eigene Schwanz des Touch-Panels trägt den Touch-Controller und ist auf den Hauptschwanz gelötet.
+  Zusammen sind sie von knapp unter der Glaskante bis etwa 13,5 mm dahinter steif (Chipstück etwa 10 x 8 mm bei x 15
+  bis 25, seine Lötstelle und eine seitliche Lasche des Hauptschwanzes): Keine Biegung darf diesen Teil kreuzen.
+  Danach geht nur der glatte Kontaktstreifen weiter, 20,4 mm breit, seine versteiften Kontakte ab 19,4 mm, sein Ende
+  25,6 mm vom Rand des Deckglases.
+- Das erste Layout führte das Flexkabel durch einen Schlitz knapp unter dem Modulrand und um die Platine herum auf die
+  Bestückungsseite. Beide Biegungen dieses Wegs fallen in den steifen Teil, mit dem echten Panel geht er also nicht.
+- Jetzt faltet sich das Flexkabel um 180 Grad um den unteren Rand des Moduls und liegt flach auf der Metallrückseite,
+  was es ohne Spannung tut (am Muster ausprobiert). Der Touch-Controller zeigt zur Platine: 1,3 mm von der Unterseite
+  des Flexkabels bis zur Oberseite des Chips. Hinter dem steifen Teil geht der Kontaktstreifen durch einen Schlitz
+  hinter dem Display (x 33,05 bis 54,65, y 73,3 bis 76,3, mittig zu J601), in einer S-Biegung auf die Bestückungsseite
+  und in J601. Das gefaltete Flexkabel reicht 25,6 mm vom Rand des Deckglases; nach der S-Biegung liegt sein Ende etwa
+  3,6 mm hinter der Öffnung des Steckverbinders (y 72,3). Das Ende des steifen Teils (13,5 mm) ist aus Fotos
+  abgelesen, +-0,5 mm; der Schlitz braucht es innerhalb von 14,2 mm.
+- Den Abstand von der Platine zur Metallrückseite begrenzen unten der Chip (1,3 mm, plus 0,2) und die Pins der
+  Ethernet-Buchse, oben die Länge des Flexkabels für die S-Biegung: **1,5 bis 2,0 mm**. Das Gehäuse hält das Display
+  bei **1,7 mm**.
+- Die Pins der Ethernet-Buchse stehen mindestens 1,45 mm aus der Displayseite heraus (Mindest-Pinlänge laut Datenblatt
+  3,05 mm, kein Maximum). Hinter der Metallrückseite liegen die Pins 1 bis 8, 11, 12 (Signale, 3,3 V), eine
+  Schirmlasche und ein Kunststoffzapfen; die 48-V-Pins 9 und 10 kommen 0,8 und 2,1 mm daneben heraus.
+- Also: **die Pins, Laschen und Zapfen der Buchse** nach dem Löten auf der Displayseite **auf 1 mm kürzen** und
+  **Polyimidband** auf die Metallrückseite über x 66 bis 80,4, y 69 bis 89,4 kleben, 2 mm um die Seitenkante des Moduls
+  neben Pin 9 herumgeschlagen. Bei 1,7 mm halten die gekürzten Pins 0,7 mm Abstand zur Metallrückseite; ungekürzt wären
+  es bestenfalls 0,25 mm.
+- Nach der Faltung und der S-Biegung zeigen die Kontakte zur Platine: J601 ist ein **Hirose FH12-40S-0.5SH mit
+  Kontakten unten**, mit seiner Öffnung zum Schlitz. Von der Bestückungsseite gesehen liegt Panel-Pin 1 rechts, also
+  **Steckverbinder-Pin k = Panel-Pin 41 - k**; Schaltplan und Platine berücksichtigen das.
+- Auf der Bestückungsseite deckt das Flexkabel nur den Streifen vom Schlitz in J601 ab (`geometry.FLEX_KEEPOUT`,
+  x 32,5 bis 55,5, y 66 bis 77,3). Dort stehen nur Bauteile bis 0,9 mm Höhe; sonst bricht `placement.check_flex_area`
+  den Build ab. Auf der Displayseite deckt es x 14,5 bis 62,5, y 72,5 bis 89,4 ab (`geometry.FLEX_BEHIND_LCD`); dort
+  liegt kein Massepad (ein Test prüft das).
 - Die Metallrückseite wird über Leitband oder Leitschaum auf mindestens zwei der vier blanken Massepads mit der Masse
   der Platine verbunden, außerhalb des Bereichs des Montagebands. Entladungen auf das Glas landen auf der
   Metallrückseite.
@@ -137,7 +147,7 @@ verwenden wäre ein neuer Display-Abschnitt.
 - **Pins der Buchse auf der Displayseite** (x 68 bis 86, y 71 bis 88): Nichts darf auf sie drücken, kein Metall darf sie
   berühren; die Pins 9 und 10 (x 81,2 und 82,5) führen 48 V. Pin 9 ist 0,5 mm vom Rand des LCD-Moduls entfernt (sein Pad
   0,1 mm), daher passt dort keine Rahmenwand: Das Band ist die Isolierung.
-- **Tiefe.** Die Displayseite der Platine liegt 4,74 mm hinter der Front des Gehäuses (1,5 mm Abstand, 3,14 mm Display,
+- **Tiefe.** Die Displayseite der Platine liegt 5,3 mm hinter der Front des Gehäuses (1,7 mm Abstand, 3,5 mm Display,
   0,1 mm Vertiefung). Hinter der Platine 13,9 mm bis zur Dock-Platte, mit Vertiefungen und einem Fenster für die
   höchsten Bauteile (siehe [Gehäusepassung](#gehäusepassung)).
 - **DC.** Der Ausschnitt nimmt einen geraden 5,5-mm-Hohlstecker bis 11 mm Dicke auf; mit dem Stecker des ausgelieferten
@@ -166,8 +176,8 @@ Abstandsprüfungen von SolidCraft geprüft. Höhen sind die der Hersteller, wo s
 | J401 RJ45 | Körper 13,95 max.; Schirmfedern an der Öffnung 15,21 +- 0,50 (HanRun HY931147C) | Dock-Platte bei 13,9 mm, 0,8 mm tiefe Vertiefung unter der Buchse, Fenster (9,5 x 6,9) unter den Federn | Körper 0,90 (0,70 im Maximum); Federn 1,70 bis zur Wand hinter dem Fenster (1,14 im Maximum), 1,0 zu den Seiten des Fensters |
 | U102 DP9900M | 13,35 +- 0,5 | Dock-Platte, 0,8 mm tiefe Vertiefung | 1,35 (0,80 im Maximum) |
 | J103 WAGO 250-202 | 13,2 | Dock-Platte | 0,70 |
-| J102, J103 Pins | 1,95 aus der Displayseite | Vorderwand der Kappe | 0,44 |
-| J401 Pins | 1,45 aus der Displayseite, ungekürzt | LCD-Modul bei 1,5 mm | 0,1; 0,5 auf 1 mm gekürzt |
+| J102, J103 Pins | 1,95 aus der Displayseite | Vorderwand der Kappe | 1,0 |
+| J401 Pins | 1,45 aus der Displayseite, ungekürzt | LCD-Modul bei 1,7 mm | 0,25; 0,7 auf 1 mm gekürzt |
 | J101 USB-C | 3,25 | Seitenwand der Kappe | 0,63 |
 | C120 47 uF, 6,3 mm | 7,7 | Dock-Platte; Seitenwand der Kappe | 6,2; 13,9 |
 | D106, D107, F102, U105, U106, U107, Q101, Q102, U204 | höchstens 2,4 | keines innerhalb von 3 mm | mehr als 3 |
@@ -176,8 +186,8 @@ Abstandsprüfungen von SolidCraft geprüft. Höhen sind die der Hersteller, wo s
   Stützen. Das untere Paar der Wandschrauben (Abstand einer Unterputzdose) sitzt 8,5 mm unter den Federn.
 - Die Öffnungen stehen 47 mm von der Achse des Näherungssensors entfernt (sein Licht endet 8 mm von ihr;
   `geometry.DOCK_OPENINGS`, von einem Test geprüft) und 56 mm von der Achse des Magneten.
-- C120 hält Abstand zum gefalteten Flexkabel: Sein Modell (x 13,9 bis 21,7, y 60,7 bis 67,3) endet 8,7 mm vor dem
-  Flexkabelbereich und 10,8 mm links vom Weg des Schwanzes zu J601.
+- C120 hält Abstand zum Flexkabel des Displays: Sein Modell (x 13,9 bis 21,7, y 60,7 bis 67,3) endet 10,8 mm links vom
+  Streifen des Flexkabels in J601.
 - `collect_models.py` schiebt jedes konvertierte Modell auf seine Pads und Löcher (`model_fit.py`); ein Test schlägt
   fehl, wenn die Pins eines Modells danebenliegen.
 

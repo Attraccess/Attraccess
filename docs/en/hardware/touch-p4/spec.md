@@ -38,7 +38,7 @@ the NFC field is on. Internal rails: 3.3 V (TLV62569, 2 A, 36 % headroom at the 
 |---|---|
 | Use | indoors, on a wall or a machine; dry, non-condensing |
 | Ambient temperature | 0 to 40 °C in operation. In the closed case at 40 °C on PoE the estimate puts the display at 62 °C (limit 70 °C) and the Wi-Fi module at 79 °C |
-| Board | 86.0 x 143.5 mm, six layers, 1.6 mm, ENIG, components on one side; the display is taped to the other side 1.5 mm off the board |
+| Board | 86.0 x 143.5 mm, six layers, 1.6 mm, ENIG, components on one side; the display is taped to the other side 1.7 mm off the board |
 
 ## Interfaces
 
