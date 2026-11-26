@@ -324,5 +324,34 @@ describe('plugin channel', () => {
         updateCheck: { state: 'available', candidate: next },
       });
     });
+
+    it('keeps checking a plugin that requests next after the package has no next tag on a latest host', async () => {
+      const { service, internals } = serviceWith(metadata({ '0.2.1': stable }, { latest: '0.2.1' }), 'latest', {
+        getPlainSetting: jest.fn().mockResolvedValue(undefined),
+      });
+      writeFileSync(
+        join(fixture.root, '.npm-plugin-state.json'),
+        JSON.stringify([
+          {
+            name: NAME,
+            version: '0.2.1',
+            requestedSpec: 'next',
+            registryId: 'npm',
+            registryUrl: 'https://registry.npmjs.org',
+            integrity: 'sha512-test',
+            installPath: 'npm-plugin',
+            permissions: [],
+            lastError: null,
+          },
+        ]),
+      );
+      jest
+        .spyOn(internals.registry, 'registry')
+        .mockResolvedValue({ id: 'npm', name: 'npm', url: 'https://r' } as never);
+      await expect(service.checkInstalled(NAME)).resolves.toMatchObject({ updateCheck: { state: 'up-to-date' } });
+      // The dialog saves the requested spec together with the update setting.
+      await expect(service.updateVersionPolicy(NAME, 'next', 'off')).resolves.toMatchObject({ updateOverride: 'off' });
+      await expect(service.updateVersionPolicy(NAME, 'beta', 'off')).rejects.toThrow('Package version not found');
+    });
   });
 });

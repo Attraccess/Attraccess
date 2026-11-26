@@ -336,7 +336,7 @@ export class NpmInstallation {
       const channel = resolvePluginChannel();
       const candidates = await this.plan.installedVersionCandidates(name);
       const requested = isDistTag(installed.requestedSpec)
-        ? await this.plan.resolveVersion(
+        ? await this.plan.resolveRequestedSpec(
             name,
             installed.requestedSpec,
             await this.registry.registry(installed.registryId),
@@ -456,7 +456,7 @@ export class NpmInstallation {
   async updateRequestedSpec(name: string, requestedSpec: string): Promise<InstalledNpmPlugin> {
     const installed = this.state.installed(name);
     const registry = await this.registry.registry(installed.registryId);
-    await this.plan.resolveVersion(name, requestedSpec, registry);
+    await this.plan.resolveRequestedSpec(name, requestedSpec, registry);
     return this.state.mutateInstalls(async () => {
       const updated = { ...this.state.installed(name), requestedSpec };
       await this.state.writeState(updated);
@@ -485,7 +485,7 @@ export class NpmInstallation {
     if (!['inherit', 'off', 'patch', 'minor', 'follow'].includes(updateOverride ?? ''))
       throw new BadRequestException('Invalid plugin update override');
     const installed = this.state.installed(name);
-    await this.plan.resolveVersion(name, requestedSpec, await this.registry.registry(installed.registryId));
+    await this.plan.resolveRequestedSpec(name, requestedSpec, await this.registry.registry(installed.registryId));
     return this.state.mutateInstalls(async () => {
       const updated = { ...this.state.installed(name), requestedSpec, updateOverride };
       await this.state.writeState(updated);

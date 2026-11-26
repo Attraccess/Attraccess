@@ -136,11 +136,20 @@ export class NpmInstallationPlan {
     };
   }
 
+  /**
+   * What the requested spec of an installed plugin resolves to. A `next` host records `next` also for a package without
+   * that tag, and the host's channel can change later, so a missing `next` then stands for `latest`.
+   */
+  async resolveRequestedSpec(name: string, spec: string, registry: Registry) {
+    return this.resolveVersion(name, spec, registry, spec === 'next' ? 'latest' : undefined);
+  }
+
   /** `spec` omitted means the host's plugin channel (see `NpmPackageCatalog.channelVersion`). */
   async resolveVersion(
     name: string,
     spec: string | undefined,
     registry: Registry,
+    fallbackTag?: string,
   ): Promise<{
     version: string;
     metadata: { versions?: Record<string, PackageVersion>; 'dist-tags'?: Record<string, string> };
@@ -154,7 +163,9 @@ export class NpmInstallationPlan {
       ? this.catalog.channelVersion(metadata)
       : metadata.versions?.[spec]
         ? spec
-        : (metadata['dist-tags']?.[spec] ?? semver.maxSatisfying(Object.keys(metadata.versions ?? {}), spec));
+        : (metadata['dist-tags']?.[spec] ??
+          semver.maxSatisfying(Object.keys(metadata.versions ?? {}), spec) ??
+          metadata['dist-tags']?.[fallbackTag]);
     if (!version || !metadata.versions?.[version]) throw new NotFoundException('Package version not found');
     return { version, metadata };
   }
