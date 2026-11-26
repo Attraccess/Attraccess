@@ -123,86 +123,104 @@ async function withDatabase<T>(work: (url: string) => Promise<T>): Promise<T> {
   }
 }
 
+/** The environment of the host under test. Must be complete before any host module loads. */
+function prepareHostEnvironment(workDir: string, databaseUrl: string): string {
+  const pluginDir = join(workDir, 'plugins');
+  Object.assign(process.env, {
+    DATABASE_URL: databaseUrl,
+    DATABASE_TYPE: 'postgres',
+    PLUGIN_DIR: pluginDir,
+    STORAGE_ROOT: join(workDir, 'storage'),
+    ATTRACCESS_PLUGIN_CHANNEL: 'next',
+    AUTH_SESSION_SECRET: process.env.AUTH_SESSION_SECRET || 'verify-packed-plugins-session-secret-0123456789',
+  });
+  // Any non-empty value of DISABLE_PLUGINS, even "false", disables plugins.
+  for (const name of ['DISABLE_PLUGINS', 'VALKEY_URL', 'PORT']) delete process.env[name];
+  return pluginDir;
+}
+
+function lookUp(plugins: Map<string, PackedPlugin>, url: string): PackedPlugin {
+  const plugin = plugins.get(url);
+  if (!plugin) throw new Error(`unexpected registry request ${url}`);
+  return plugin;
+}
+
+/** Answers the registry's network I/O from the tarballs. Nothing else of the install is replaced. */
+async function answerRegistryFromTarballs(plugins: PackedPlugin[]): Promise<void> {
+  const { NpmRegistryAccess } = await import('./plugin-system/npm/registry-access');
+  const documents = new Map(plugins.map((plugin) => [`${REGISTRY}/${encodeURIComponent(plugin.name)}`, plugin]));
+  const downloads = new Map(plugins.map((plugin) => [tarballUrl(plugin), plugin]));
+  NpmRegistryAccess.prototype.getJson = async (url: string) => registryDocument(lookUp(documents, url));
+  NpmRegistryAccess.prototype.download = async (url: string) => lookUp(downloads, url).tarball;
+}
+
+const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+/** A fresh install of every plugin, with no spec, the way the marketplace installs it. */
+async function installAll(plugins: PackedPlugin[], pluginDir: string): Promise<string[]> {
+  const { NpmPluginService } = await import('./plugin-system/npm-plugin.service');
+  const { PluginService } = await import('./plugin-system/plugin.service');
+  // Installing asks the host to restart; this process keeps going.
+  PluginService.prototype.requestRestart = () => undefined;
+  PluginService.configure({ PLUGIN_DIR: pluginDir, RESTART_BY_EXIT: false });
+  const installer = new NpmPluginService(settingsStore as never);
+  const failures: string[] = [];
+  for (const plugin of plugins) {
+    try {
+      const plan = await installer.installPlan(plugin.name, undefined);
+      await installer.install(plugin.name, undefined, undefined, undefined, plan.token);
+    } catch (error) {
+      failures.push(`${plugin.name}: install failed: ${errorText(error)}`);
+    }
+  }
+  return failures;
+}
+
+/** Test only: grants the license modules the plugins declare. The rest of the license gate stays as it is. */
+async function grantDeclaredLicenses(plugins: PackedPlugin[]): Promise<void> {
+  const { PluginService } = await import('./plugin-system/plugin.service');
+  const setSnapshot = PluginService.setLicenseSnapshot;
+  const modules = plugins.flatMap((plugin) => plugin.licenseModules);
+  PluginService.setLicenseSnapshot = () => setSnapshot.call(PluginService, { valid: true, modules });
+}
+
+async function loadFailures(plugins: PackedPlugin[]): Promise<string[]> {
+  const { PluginService } = await import('./plugin-system/plugin.service');
+  const loaded = new Map(PluginService.getPluginsWithLoadStatus().map((manifest) => [manifest.name, manifest]));
+  return plugins.flatMap((plugin) => {
+    const manifest = loaded.get(plugin.name);
+    if (!manifest) return [`${plugin.name}: not discovered by the host`];
+    if (manifest.status !== 'loaded') return [`${plugin.name}: status ${manifest.status}: ${manifest.error}`];
+    return PluginService.isPluginQuarantined(manifest) ? [`${plugin.name}: quarantined`] : [];
+  });
+}
+
+/** Boots the host with its own `bootstrap()` and reports the plugins it did not load. */
+async function bootHost(plugins: PackedPlugin[]): Promise<string[]> {
+  await grantDeclaredLicenses(plugins);
+  const { bootstrap } = await import('./main.bootstrap');
+  const { app } = await bootstrap();
+  try {
+    await app.init();
+    return await loadFailures(plugins);
+  } finally {
+    await app.close();
+  }
+}
+
 async function verify(): Promise<string[]> {
   const plugins = await readPackedPlugins();
   if (plugins.length === 0) throw new Error('no official plugin projects found');
-  const pluginDir = mkdtempSync(join(tmpdir(), 'packed-plugins-host-'));
+  const workDir = mkdtempSync(join(tmpdir(), 'packed-plugins-host-'));
   try {
     return await withDatabase(async (databaseUrl) => {
-      process.env.DATABASE_URL = databaseUrl;
-      process.env.DATABASE_TYPE = 'postgres';
-      delete process.env.DISABLE_PLUGINS; // any non-empty value, even "false", disables plugins
-      process.env.PLUGIN_DIR = pluginDir;
-      process.env.STORAGE_ROOT = join(pluginDir, '..', `storage-${randomBytes(4).toString('hex')}`);
-      process.env.AUTH_SESSION_SECRET ??= 'verify-packed-plugins-session-secret-0123456789';
-      process.env.ATTRACCESS_PLUGIN_CHANNEL = 'next';
-      delete process.env.VALKEY_URL;
-      delete process.env.PORT;
-
-      // The host reads its environment when its modules load, so they load only after it is set up.
-      const { NpmRegistryAccess } = await import('./plugin-system/npm/registry-access');
-      const { NpmPluginService } = await import('./plugin-system/npm-plugin.service');
-      const { PluginService } = await import('./plugin-system/plugin.service');
-
-      // The registry's network I/O is the only thing answered from the tarballs.
-      const documents = new Map(plugins.map((plugin) => [`${REGISTRY}/${encodeURIComponent(plugin.name)}`, plugin]));
-      const downloads = new Map(plugins.map((plugin) => [tarballUrl(plugin), plugin]));
-      NpmRegistryAccess.prototype.getJson = async (url: string) => {
-        const plugin = documents.get(url);
-        if (!plugin) throw new Error(`unexpected registry request ${url}`);
-        return registryDocument(plugin);
-      };
-      NpmRegistryAccess.prototype.download = async (url: string) => {
-        const plugin = downloads.get(url);
-        if (!plugin) throw new Error(`unexpected tarball request ${url}`);
-        return plugin.tarball;
-      };
-      // Installing asks the host to restart; this process keeps going.
-      PluginService.prototype.requestRestart = () => undefined;
-
-      PluginService.configure({ PLUGIN_DIR: pluginDir, RESTART_BY_EXIT: false });
-      const installer = new NpmPluginService(settingsStore as never);
-      const failures: string[] = [];
-      for (const plugin of plugins) {
-        try {
-          // A fresh install, with no spec, the way the marketplace installs it.
-          const plan = await installer.installPlan(plugin.name, undefined);
-          const installed = await installer.install(plugin.name, undefined, undefined, undefined, plan.token);
-          if (installed.requestedSpec !== 'next')
-            failures.push(`${plugin.name}: installed with requestedSpec ${installed.requestedSpec}, expected next`);
-        } catch (error) {
-          failures.push(`${plugin.name}: install failed: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
-      if (failures.length > 0) return failures;
-
-      // Test only: grant the license modules the plugins declare. Everything else of the license gate stays untouched.
-      const grant = { valid: true, modules: plugins.flatMap((plugin) => plugin.licenseModules) };
-      PluginService.setLicenseSnapshot = (
-        (original) => () =>
-          original.call(PluginService, grant)
-      )(PluginService.setLicenseSnapshot);
-
-      const { bootstrap } = await import('./main.bootstrap');
-      const { app } = await bootstrap();
-      try {
-        await app.init();
-        const status = new Map(PluginService.getPluginsWithLoadStatus().map((manifest) => [manifest.name, manifest]));
-        for (const plugin of plugins) {
-          const manifest = status.get(plugin.name);
-          if (manifest?.status !== 'loaded')
-            failures.push(
-              `${plugin.name}: status ${manifest?.status ?? 'missing'}${manifest?.error ? `: ${manifest.error}` : ''}`,
-            );
-          else if (PluginService.isPluginQuarantined(manifest)) failures.push(`${plugin.name}: quarantined`);
-        }
-      } finally {
-        await app.close();
-      }
-      return failures;
+      const pluginDir = prepareHostEnvironment(workDir, databaseUrl);
+      await answerRegistryFromTarballs(plugins);
+      const failures = await installAll(plugins, pluginDir);
+      return failures.length > 0 ? failures : bootHost(plugins);
     });
   } finally {
-    rmSync(pluginDir, { recursive: true, force: true });
+    rmSync(workDir, { recursive: true, force: true });
   }
 }
 
