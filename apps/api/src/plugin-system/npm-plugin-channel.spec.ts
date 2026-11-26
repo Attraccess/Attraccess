@@ -4,7 +4,12 @@ import { NpmPluginService } from './npm-plugin.service';
 import type { ServiceInternals } from './npm-plugin.test-fixture';
 import { setupNpmPluginFixture } from './npm-plugin.test-fixture';
 import { npmInternals } from './npm/fixtures/compose.test-fixture';
-import { eligibleForPolicy, type InstalledNpmPlugin, type InstalledNpmPluginVersion } from './npm/package-models';
+import {
+  eligibleForPolicy,
+  semverImpact,
+  type InstalledNpmPlugin,
+  type InstalledNpmPluginVersion,
+} from './npm/package-models';
 import { DEFAULT_PLUGIN_UPDATE_POLICY } from './npm-plugin.service';
 
 jest.mock('dns/promises', () => ({ lookup: jest.fn() }));
@@ -222,6 +227,18 @@ describe('plugin channel', () => {
       expect(
         eligibleForPolicy(candidate('0.3.0', { semverImpact: 'patch' }), installed('next'), policy, '0.3.0', true),
       ).toBe(true);
+    });
+
+    it.each([
+      ['0.3.0-nightly.4.1', '0.3.0', 'minor'],
+      ['1.0.0-nightly.4.1', '1.0.0', 'patch'],
+      ['2.0.0-rc.1', '2.0.0', 'patch'],
+      ['1.0.0-nightly.4.1', '1.0.0-nightly.5.1', 'prerelease'],
+      ['0.9.0', '1.0.0', 'major'],
+      ['0.9.0', '1.0.0-nightly.1.1', 'major'],
+      ['2.0.0', '1.0.0', 'major'],
+    ])('rates %s -> %s as %s', (current, target, impact) => {
+      expect(semverImpact(current, target)).toBe(impact);
     });
 
     it('keeps a plugin installed as latest off nightlies', () => {

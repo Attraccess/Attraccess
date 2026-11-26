@@ -367,7 +367,8 @@ export function samePermissions(left: string[], right: string[]): boolean {
 export function semverImpact(current: string, target: string): InstalledNpmPluginVersion['semverImpact'] {
   if (!semver.valid(current) || !semver.valid(target) || semver.eq(current, target)) return 'none';
   const difference = semver.diff(current, target);
-  if (difference === 'major' || difference === 'premajor') return 'major';
+  // Not `diff` alone: it also calls `1.0.0-nightly.1` -> `1.0.0` major, although that is the release of the same line.
+  if (semver.major(current) !== semver.major(target)) return 'major';
   if (difference === 'minor' || difference === 'preminor') return 'minor';
   if (semver.prerelease(target)) return 'prerelease';
   return 'patch';
