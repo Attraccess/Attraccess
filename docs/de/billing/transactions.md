@@ -23,6 +23,8 @@ Jede Transaktion enthaelt folgende Informationen:
 
 Für neue Nutzungssitzungen speichern abgeschlossene zeitabhängige Abrechnungsposten die gemessene Dauer, die aufgerundeten Minuten und den beim Sitzungsstart gespeicherten Tarif. Spätere Änderungen an Preisen, Abrechnungsfaktoren oder Betriebsverläufen berechnen abgeschlossene Transaktionen nicht neu.
 
+Eine Sitzung ganz ohne Kosten (kein Sitzungspreis, keine zeitabhängigen Kosten und kein Posten mit Preis) erzeugt keine Transaktion: Ihr ausstehender Eintrag verschwindet, wenn die Sitzung endet. Eine Sitzung, deren Kosten ein Abrechnungsfaktor auf 0 Credits senkt, erhält weiterhin eine Transaktion.
+
 Bei einer Gesamtsumme ungleich null zeigt der Standardbeleg per E-Mail getrennte Berechnungen für Sitzungs- und Betriebsdauer sowie den gespeicherten Abrechnungsfaktor. Bei einer Gesamtsumme von null wird keine Abrechnungs-E-Mail versendet. Angepasste E-Mail-Vorlagen bleiben beim Aktualisieren des Standardbelegs erhalten; Administratoren können die Vorlage auf den Standard zurücksetzen, um das neue Layout zu übernehmen. Historische Transaktionen werden nicht umgeschrieben.
 
 ### Geteilte Sitzungen
