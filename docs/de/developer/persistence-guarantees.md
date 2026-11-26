@@ -130,8 +130,8 @@ Prozesslokale Annahmen, die ein zweites Replikat brechen würde:
 
 Was PostgreSQL für eine geteilte Datenbank bereits liefert: die atomaren Guthaben- und Nutzungs-Integritätsgarantien
 (Constraints, Trigger, Advisory Locks), Einzelgewinner bei Unique-Schlüsseln und atomare Sitzungs- und Token-Rotation.
-Für mehrere Replikate fehlen noch ein Leader oder eine Sperre für Zeitgeber sowie geteilte Live Updates; die
-Skalierungs-Folgearbeiten übernehmen das.
+Für mehrere Replikate fehlen noch ein Leader oder eine Sperre für Zeitgeber sowie geteilte Live Updates für die Themen
+außer Masseneinweisungen und Aufsicht; die Skalierungs-Folgearbeiten übernehmen das.
 
 ### Über Valkey geteilt (ATT-1163)
 
@@ -144,9 +144,12 @@ des einen Prozesses, wie bisher.
 - **Leser-Präsenz**: welche Instanzen eine Websocket-Verbindung je Leser halten, neueste Verbindung zuerst. „Leser ist
   offline" heißt, keine Instanz hält ihn. Leser-Arbeit läuft auf den haltenden Instanzen: im Prozess, wenn es diese
   ist, sonst über den Pub/Sub-Bus in Valkey (Anfrage/Antwort mit Zeitlimits).
-- **Bildschirm-Sperre je Leser**: Ein Ablauf belegt einen Leser (Masseneinweisung, Aufsicht, Karten-Einlernen,
-  Karten-Zurücksetzen), per atomarer Sperre genommen und per Vergleichen-und-Löschen freigegeben, mit TTL, damit eine
-  abgestürzte Instanz keinen Leser blockiert. Ein zweiter Ablauf bekommt die übliche 409.
+- **Bildschirm-Sperre je Leser**: Ein Ablauf belegt einen Leser (Masseneinweisung, im Web gestartete Aufsicht,
+  Karten-Einlernen, Karten-Zurücksetzen), per atomarer Sperre genommen und per Vergleichen-und-Löschen freigegeben, mit
+  TTL, damit eine abgestürzte Instanz keinen Leser blockiert. Ein zweiter Ablauf bekommt die übliche 409. Eine am Leser
+  gestartete Aufsicht nimmt keine Sperre; sie schützt der Socket-Zustand der Instanz, die den Leser hält. Verbindet
+  sich ein Leser neu mit einer anderen Instanz, bevor seine alte aufgeräumt ist, endet ein über den alten Socket
+  gestarteter Ablauf dann.
 - **Masseneinweisungen**: Sitzungen, Teilnehmende und Zähler falscher Codes liegen mit nativen TTLs in Valkey. Jede
   Person wird je Sitzung höchstens einmal eingewiesen (atomare Beitritts-Sperre; ein gleichzeitiger Beitritt wartet auf
   den Gewinner), fünf falsche Codes je Minute zählen über alle Instanzen, und eine Sitzung endet genau einmal.
@@ -164,7 +167,9 @@ Weiter je Prozess: der blockierte Aufsichtsaufruf der anfragenden Person und ein
 Plugin-BLE-Verbindung (beide schlagen sauber fehl, wenn diese Instanz wegfällt; sie werden nicht verschoben), die
 Metrik-Messwerte, Rate Limits ohne Valkey, Zeitgeber und die übrigen Live-Themen. Pub/Sub ist ohne Zustellgarantie:
 Eine Nachricht, die während eines Wiederverbindens veröffentlicht wird, geht verloren; wichtige Ergebnisse
-(Aufsichtsergebnisse, Abläufe) liegen deshalb zusätzlich in Valkey und werden nach der Frist nachgeschlagen.
+(Aufsichtsergebnisse, Abläufe) liegen deshalb zusätzlich in Valkey und werden nach der Frist nachgeschlagen. Ein
+widerrufener oder neu gekoppelter Leser-Schlüssel verlässt sich ebenfalls nicht auf seine Nachricht: Jede Instanz
+hält Schlüssel höchstens 10 s im Cache und prüft die Leser, die sie hält, alle 30 s gegen die Datenbank.
 
 Ebenfalls je Instanz, gewollt oder als bekannte Grenze:
 

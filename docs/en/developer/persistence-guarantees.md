@@ -123,8 +123,8 @@ Process-local assumptions that a second replica would break:
 
 What PostgreSQL already provides for a shared database: the atomic balance and usage-integrity guarantees
 (constraints, triggers, advisory locks), single-winner claims on unique keys and atomic session and token rotation.
-Still missing for several replicas: a leader or lock for schedulers and shared live updates; the scaling follow-ups own
-them.
+Still missing for several replicas: a leader or lock for schedulers and shared live updates for the topics other than
+mass introductions and supervision; the scaling follow-ups own them.
 
 ### Shared through Valkey (ATT-1163)
 
@@ -137,9 +137,11 @@ as before.
 - **Reader presence**: which instances hold a websocket of each reader, newest connection first. "Reader is offline"
   means no instance holds it. Reader work runs on the holding instances: in process when it is this one, over the
   Valkey pub/sub bus (request/response with timeouts) otherwise.
-- **Reader screen claim**: one flow at a time owns a reader (mass introduction, supervision, card enrollment, card
-  reset), taken with an atomic claim and released compare-and-delete, with a TTL so a crashed holder cannot block a
-  reader. A second flow gets the usual 409.
+- **Reader screen claim**: one flow at a time owns a reader (mass introduction, supervision started from the web, card
+  enrollment, card reset), taken with an atomic claim and released compare-and-delete, with a TTL so a crashed holder
+  cannot block a reader. A second flow gets the usual 409. A supervision started at the reader takes no claim; the
+  socket state of the instance holding the reader guards it. When a reader reconnects to another instance before its
+  old one is cleaned up, a flow armed through the old socket ends then.
 - **Mass introductions**: sessions, participants and wrong-code counters live in Valkey with native TTLs. A user is
   introduced at most once per session (an atomic join claim; a concurrent join waits for the winner), five wrong codes
   per minute count across instances, and a session ends exactly once.
@@ -154,7 +156,9 @@ as before.
 Still per process: the requester's blocked supervision call and a plugin BLE link routed through another instance
 (both fail cleanly when that instance dies, they are not migrated), the metrics gauges, rate limits without Valkey,
 schedulers and the other live topics. Pub/sub is fire-and-forget: a message published while an instance reconnects is
-lost, so outcomes that matter (supervision results, expiries) are also kept in Valkey and looked up after the deadline.
+lost, so outcomes that matter (supervision results, expiries) are also kept in Valkey and looked up after the deadline. A
+revoked or re-paired reader credential does not rely on its message either: each instance caches credentials for at
+most 10 s and checks the readers it holds against the database every 30 s.
 
 Also per instance, on purpose or as a known limit:
 
