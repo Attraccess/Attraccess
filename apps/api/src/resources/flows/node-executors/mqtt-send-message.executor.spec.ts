@@ -298,6 +298,65 @@ describe('MqttSendMessageExecutor', () => {
       expect(result.payload).toEqual({ response: { topic: 'dev/reply', payload: 'fresh' } });
     });
 
+    it('ignores a message that arrives before the command is sent', async () => {
+      mqttClientService.subscribe.mockImplementation(async () => {
+        reply('dev/reply', 'unsolicited');
+      });
+      mqttClientService.publish.mockImplementation(async () => {
+        reply('dev/reply', 'answer');
+      });
+
+      const result = await executor.execute(
+        makeNode({ serverId: 42, topic: 'dev/cmd', responseTopic: 'dev/reply' }),
+        {},
+        ctx,
+      );
+
+      expect(result.payload).toEqual({ response: { topic: 'dev/reply', payload: 'answer' } });
+    });
+
+    it('gives concurrent requests on the same reply topic each their own reply', async () => {
+      let asked = 0;
+      mqttClientService.publish.mockImplementation(async () => {
+        asked += 1;
+        reply('dev/reply', `answer ${asked}`);
+      });
+      const node = makeNode({ serverId: 42, topic: 'dev/cmd', responseTopic: 'dev/reply' });
+
+      const results = await Promise.all([
+        executor.execute(node, { run: 1 }, ctx),
+        executor.execute(node, { run: 2 }, ctx),
+      ]);
+
+      expect(results.map((result) => result.payload)).toEqual([
+        { run: 1, response: { topic: 'dev/reply', payload: 'answer 1' } },
+        { run: 2, response: { topic: 'dev/reply', payload: 'answer 2' } },
+      ]);
+    });
+
+    it('lets the next request on a reply topic go ahead after one timed out', async () => {
+      jest.useFakeTimers();
+      try {
+        const node = makeNode({
+          serverId: 42,
+          topic: 'dev/cmd',
+          responseTopic: 'dev/reply',
+          responseTimeoutSeconds: 1,
+        });
+        const first = executor.execute(node, {}, ctx).catch((error: unknown) => error);
+        await jest.advanceTimersByTimeAsync(1000);
+        expect(await first).toBeInstanceOf(Error);
+
+        mqttClientService.publish.mockImplementation(async () => {
+          reply('dev/reply', 'late but fine');
+        });
+        const second = await executor.execute(node, {}, ctx);
+        expect(second.payload).toEqual({ response: { topic: 'dev/reply', payload: 'late but fine' } });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it('fails as an acknowledgement timeout when no reply arrives and cleans up', async () => {
       jest.useFakeTimers();
       try {

@@ -201,6 +201,27 @@ describe('metering a Tasmota plug over MQTT (flows as customers build them)', ()
     expect(all.map((report) => report.kind === 'reading' && report.value)).toEqual(['1234.6', '1234.7', '1234.8']);
   });
 
+  it('gives overlapping collections of one plug each their own reading', async () => {
+    // The plug's counter moves between two requests; each collection must get the answer to its own request.
+    broker.client.publish.mockImplementation(async (_serverId: number, topic: string) => {
+      if (topic !== `${PLUG}/cmnd/Status`) return;
+      broker.state.total = Number((broker.state.total + 0.1).toFixed(3));
+      events.emit(
+        MqttMessageEvent.EVENT_NAME,
+        new MqttMessageEvent(SERVER, `${PLUG}/stat/STATUS10`, { StatusSNS: { ENERGY: { Total: broker.state.total } } }),
+      );
+    });
+    const executor = executorFor(plugMeterFlow());
+
+    const [interim, final] = await Promise.all([runMetering(executor, 'interim'), runMetering(executor, 'final')]);
+    await Promise.all([interim.run, final.run]);
+
+    expect([...interim.reports, ...final.reports]).toEqual([
+      { kind: 'reading', mode: 'total', value: '1234.667', source: 'Tasmota' },
+      { kind: 'reading', mode: 'total', value: '1234.767', source: 'Tasmota' },
+    ]);
+  });
+
   it('fails the start without reporting when the plug does not answer', async () => {
     broker.state.online = false;
     const { run, reports } = await runMetering(executorFor(plugMeterFlow()), 'start');

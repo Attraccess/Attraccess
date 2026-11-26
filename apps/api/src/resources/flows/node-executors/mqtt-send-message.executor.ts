@@ -20,6 +20,8 @@ class MqttResponseTimeoutError extends Error {
 
 export class MqttSendMessageExecutor implements NodeExecutor {
   private readonly logger = new Logger(MqttSendMessageExecutor.name);
+  /** The exchange in progress per server and reply topic; later requests on the same topic wait for it. */
+  private readonly exchanges = new Map<string, Promise<unknown>>();
 
   constructor(
     private readonly mqttClientService: MqttClientService,
@@ -38,13 +40,27 @@ export class MqttSendMessageExecutor implements NodeExecutor {
       return { payload: input };
     }
 
-    const response = await this.request(
-      serverId,
-      responseTopic,
-      data.responseTimeoutSeconds ?? DEFAULT_RESPONSE_TIMEOUT_SECONDS,
-      () => this.publish(serverId, topic, payload, data),
+    const response = await this.oneAtATime(`${serverId}|${responseTopic}`, () =>
+      this.request(serverId, responseTopic, data.responseTimeoutSeconds ?? DEFAULT_RESPONSE_TIMEOUT_SECONDS, () =>
+        this.publish(serverId, topic, payload, data),
+      ),
     );
     return { payload: { ...input, response } };
+  }
+
+  /**
+   * Devices such as Tasmota put nothing in a reply that names the command it answers. Two flow runs asking on the
+   * same reply topic at once would both take the first reply, so exchanges on one topic run one after another.
+   */
+  private async oneAtATime<T>(key: string, exchange: () => Promise<T>): Promise<T> {
+    const previous = this.exchanges.get(key) ?? Promise.resolve();
+    const current = previous.catch(() => undefined).then(exchange);
+    this.exchanges.set(key, current);
+    try {
+      return await current;
+    } finally {
+      if (this.exchanges.get(key) === current) this.exchanges.delete(key);
+    }
   }
 
   /**
@@ -58,11 +74,13 @@ export class MqttSendMessageExecutor implements NodeExecutor {
     timeoutSeconds: number,
     publish: () => Promise<void>,
   ): Promise<{ topic: string; payload: unknown }> {
+    let sent = false;
     let onMessage: (event: MqttMessageEvent) => void = () => undefined;
     const reply = new Promise<{ topic: string; payload: unknown }>((resolve) => {
       onMessage = (event) => {
-        // A retained message the broker replays on subscribe is an old value, not the reply.
-        if (event.serverId !== serverId || event.retained || !topicMatches(responseTopic, event.topic)) return;
+        if (event.serverId !== serverId || !topicMatches(responseTopic, event.topic)) return;
+        // Anything before the command went out, and a retained value the broker replays on subscribe, is not the reply.
+        if (!sent || event.retained) return;
         resolve({ topic: event.topic, payload: event.payload });
       };
     });
@@ -70,6 +88,7 @@ export class MqttSendMessageExecutor implements NodeExecutor {
     this.eventEmitter.on(MqttMessageEvent.EVENT_NAME, onMessage as unknown as () => void);
     try {
       await this.mqttClientService.subscribe(serverId, responseTopic, undefined, true);
+      sent = true;
       await publish();
       const timeout = new Promise<never>((_, reject) => {
         timer = setTimeout(
