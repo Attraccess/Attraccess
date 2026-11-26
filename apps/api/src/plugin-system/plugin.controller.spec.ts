@@ -10,6 +10,7 @@ import { PluginAdministrationService } from './plugin-administration.service';
 import { PluginService } from './plugin.service';
 import { markPluginRestartRequired } from './runtime/restart-required';
 import { snapshotRunningFrontend } from './runtime/frontend-snapshots';
+import { markPluginRemoved } from './runtime/removed-plugins';
 import { PluginUninstallService } from './plugin-uninstall.service';
 import { PluginModule } from './plugin.module';
 import { LoadedPluginManifest } from './plugin.manifest';
@@ -179,6 +180,15 @@ describe('PluginController', () => {
       await expect(controller.retryPlugin(plugin.id, req)).rejects.toThrow(BadRequestException);
       expect(service.requestRestart).not.toHaveBeenCalled();
     });
+  });
+
+  it('no longer lists a removed plugin while its code runs until the restart', () => {
+    jest
+      .spyOn(PluginService, 'getPluginsWithLoadStatus')
+      .mockReturnValue([frontendPlugin('kept'), frontendPlugin('removed')]);
+    markPluginRemoved('removed');
+
+    expect(controller.getAllPlugins().map((plugin) => plugin.id)).toEqual(['kept']);
   });
 
   describe('getFrontendPluginFile', () => {

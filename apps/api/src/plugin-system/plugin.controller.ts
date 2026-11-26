@@ -27,6 +27,7 @@ import { PluginAdministrationService } from './plugin-administration.service';
 import { PluginService } from './plugin.service';
 import { isPluginRestartRequired } from './runtime/restart-required';
 import { frontendAssetRoot } from './runtime/frontend-snapshots';
+import { isPluginRemoved } from './runtime/removed-plugins';
 
 import { AuthenticatedRequest, Auth, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 
@@ -317,7 +318,8 @@ export class PluginController {
     type: [LoadedPluginManifest],
   })
   getAllPlugins() {
-    return PluginService.getPluginsWithLoadStatus();
+    // A removed plugin runs until the restart, but it is gone for the admin and its frontend files are: not listed.
+    return PluginService.getPluginsWithLoadStatus().filter((plugin) => !isPluginRemoved(plugin.id));
   }
 
   @Get('status')
