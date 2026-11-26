@@ -49,30 +49,30 @@ export function PluginRestartBanner() {
     <Alert
       status="warning"
       role="status"
-      // Wraps on a phone, so the button moves below the text instead of squeezing it.
-      className="flex-wrap rounded-none border-b border-warning/40 bg-warning-soft shadow-none"
+      className="rounded-none border-b border-warning/40 bg-warning-soft shadow-none"
       data-cy="plugin-restart-banner"
     >
       <AlertStatusIcon status="warning" />
       <AlertContent>
         <AlertTitle>{t('title')}</AlertTitle>
         <AlertDescription>{t('description')}</AlertDescription>
+        {/* The action sits under the text (HeroUI's alert action layout), so it stays in view at any width. */}
+        <ConfirmableButton
+          label={isRestarting ? t('restarting') : t('restartNow')}
+          icon={<RotateCw size={16} />}
+          status="warning"
+          isPending={isRestarting}
+          onConfirm={restart}
+          confirm={{
+            title: t('confirmTitle'),
+            message: t('confirmMessage'),
+            confirmLabel: t('restartNow'),
+            'data-cy': 'plugin-restart-confirm',
+            confirmDataCy: 'plugin-restart-confirm-button',
+          }}
+          data-cy="plugin-restart-button"
+        />
       </AlertContent>
-      <ConfirmableButton
-        label={isRestarting ? t('restarting') : t('restartNow')}
-        icon={<RotateCw size={16} />}
-        status="warning"
-        isPending={isRestarting}
-        onConfirm={restart}
-        confirm={{
-          title: t('confirmTitle'),
-          message: t('confirmMessage'),
-          confirmLabel: t('restartNow'),
-          'data-cy': 'plugin-restart-confirm',
-          confirmDataCy: 'plugin-restart-confirm-button',
-        }}
-        data-cy="plugin-restart-button"
-      />
     </Alert>
   );
 }
