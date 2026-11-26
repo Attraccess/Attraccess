@@ -28,8 +28,10 @@ While changes are pending, plugin administrators (users with the `system.plugins
 confirm: Attraccess is unavailable for a moment, open sessions and reader connections reconnect on their own, and the
 page reloads when the server is back. The banner then disappears and the changed plugins are active.
 
-- Until the restart, an installed or updated plugin is on disk but not loaded, and a removed plugin keeps running
-  in the background. Removing a plugin reloads the page once, because its pages are gone.
+- Until the restart, an installed or updated plugin is on disk but not loaded. An updated plugin keeps running in its
+  old version, and its pages stay on that version too.
+- A removed plugin keeps running in the background until the restart, but it can no longer add readers or use
+  Bluetooth. Removing a plugin reloads the page once, because its pages are gone.
 - Two actions still restart Attraccess at once: **Retry** on a plugin that failed to load, and a license key change
   that changes which plugins may load (see [License missing](#license-missing)). Such a restart also applies pending
   changes.

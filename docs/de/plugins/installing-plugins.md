@@ -29,9 +29,10 @@ neu starten** und bestätigen Sie: Attraccess ist kurz nicht erreichbar, offene 
 Lesegeräten verbinden sich selbst wieder, und die Seite lädt neu, sobald der Server wieder läuft. Danach verschwindet
 der Hinweis und die geänderten Plugins sind aktiv.
 
-- Bis zum Neustart liegt ein installiertes oder aktualisiertes Plugin auf dem Datenträger, ist aber nicht geladen, und
-  ein entferntes Plugin läuft im Hintergrund weiter. Nach dem Entfernen lädt die Seite einmal neu, weil die Seiten des
-  Plugins fehlen.
+- Bis zum Neustart liegt ein installiertes oder aktualisiertes Plugin auf dem Datenträger, ist aber nicht geladen. Ein
+  aktualisiertes Plugin läuft in seiner alten Version weiter, und auch seine Seiten bleiben bei dieser Version.
+- Ein entferntes Plugin läuft bis zum Neustart im Hintergrund weiter, kann aber keine Lesegeräte mehr anlegen und kein
+  Bluetooth mehr nutzen. Nach dem Entfernen lädt die Seite einmal neu, weil die Seiten des Plugins fehlen.
 - Zwei Aktionen starten Attraccess weiterhin sofort neu: **Erneut versuchen** bei einem Plugin, das nicht geladen
   werden konnte, und eine Änderung des Lizenzschlüssels, die ändert, welche Plugins geladen werden dürfen (siehe
   [Lizenz fehlt](#lizenz-fehlt)). Ein solcher Neustart übernimmt auch ausstehende Änderungen.
