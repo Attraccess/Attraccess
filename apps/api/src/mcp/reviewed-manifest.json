@@ -1837,17 +1837,17 @@
   "getCardWriterSettings": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "69241050"
+    "shape": "c8a64cae"
   },
   "updateCardWriterSettings": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "bf362e46"
+    "shape": "74239d90"
   },
   "updateUidOnlyCardsSetting": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "ad0013d0"
+    "shape": "e47f0fc2"
   },
   "getFirmwares": {
     "decision": "allow",
@@ -1952,27 +1952,27 @@
   "getSecureConversionStatus": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "96655381"
+    "shape": "1e370fc8"
   },
   "startSecureConversion": {
     "decision": "deny",
     "reason": "Irreversible hardware action: starts a reader conversion that burns eFuses; it needs the typed confirmation in the web UI.",
-    "shape": "45dfef9b"
+    "shape": "706aa9fe"
   },
   "cancelSecureConversion": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "be220525"
+    "shape": "26396d3c"
   },
   "retrySecureConversion": {
     "decision": "deny",
     "reason": "Irreversible hardware action: starts a reader conversion that burns eFuses; it needs the typed confirmation in the web UI.",
-    "shape": "b29356de"
+    "shape": "473b2a07"
   },
   "getActiveSecureConversion": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "57e2bd9e"
+    "shape": "3e2ef909"
   },
   "getResourceReaderUiSettings": {
     "decision": "allow",

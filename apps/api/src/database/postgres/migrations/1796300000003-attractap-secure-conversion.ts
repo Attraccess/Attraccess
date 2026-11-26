@@ -4,8 +4,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * "Secure this reader" (ATT-1208): one row per conversion, kept as history. The partial unique index allows one
  * active conversion per installation.
  */
-export class AttractapSecureConversion1796300000000 implements MigrationInterface {
-  name = 'AttractapSecureConversion1796300000000';
+export class AttractapSecureConversion1796300000003 implements MigrationInterface {
+  name = 'AttractapSecureConversion1796300000003';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
