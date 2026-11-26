@@ -26,6 +26,7 @@ import { PluginAdministrationService } from './plugin-administration.service';
 
 import { PluginService } from './plugin.service';
 import { isPluginRestartRequired } from './runtime/restart-required';
+import { frontendAssetRoot } from './runtime/frontend-snapshots';
 
 import { AuthenticatedRequest, Auth, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 
@@ -382,8 +383,9 @@ export class PluginController {
     }
 
     const segments = frontendAssetSegments(filePath);
+    // An update waiting for the restart keeps serving the frontend of the version that runs.
     const opened = openFrontendAsset(
-      PluginService.PLUGIN_PATH,
+      frontendAssetRoot(PluginService.PLUGIN_PATH, plugin),
       plugin.pluginDirectory,
       plugin.main.frontend.directory,
       segments,

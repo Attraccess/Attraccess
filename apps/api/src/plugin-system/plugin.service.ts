@@ -21,8 +21,8 @@ import { type PluginManifestInfo } from '@attraccess/plugins-backend-sdk';
 import { assertBundleCompatible, assertManifestCompatible } from './runtime/plugin-compatibility';
 import { assertInstallableNamespace } from './plugin-storage/storage-loader';
 import { INTERNAL_PLUGIN_DIRECTORIES, PluginBootGuard } from './runtime/boot-guard';
-import { clearPluginRestartRequired, markPluginRestartRequired } from './runtime/restart-required';
-
+import { markPluginRestartRequired, resetPendingPluginChanges } from './runtime/restart-required';
+import { snapshotRunningFrontend } from './runtime/frontend-snapshots';
 import { PluginSandboxService } from './plugin-sandbox.service';
 
 import {
@@ -142,7 +142,7 @@ export class PluginService {
     getImplementationClass().loadedPlugins.clear();
     getImplementationClass().pluginLoadErrors.clear();
     getImplementationClass().licenseGate = null;
-    clearPluginRestartRequired();
+    resetPendingPluginChanges(getImplementationClass().PLUGIN_PATH);
     PluginBootGuard.loadFailures(getImplementationClass().PLUGIN_PATH);
     getImplementationClass().logger.log(
       `PluginService configured. Path: ${getImplementationClass().PLUGIN_PATH}, RestartByExit: ${getImplementationClass().RESTART_BY_EXIT_FLAG}`,
@@ -280,6 +280,7 @@ export class PluginService {
         // old archive on disk until the new one has been placed successfully.
         if (replacing) {
           PluginService.logger.log(`Replacing uploaded plugin ${pluginName}`);
+          snapshotRunningFrontend(PluginService.PLUGIN_PATH, PluginService.getDiscoveredPlugins(), pluginName);
           await rename(pluginFolder, backupFolder);
         }
 

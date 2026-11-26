@@ -5,6 +5,7 @@ import { join } from 'path';
 import { PluginMigrationService } from './plugin-migration.service';
 import { PluginService } from './plugin.service';
 import { isPluginRestartRequired } from './runtime/restart-required';
+import { isPluginRemoved } from './runtime/removed-plugins';
 import { PluginUninstallService } from './plugin-uninstall.service';
 import { compilePluginStorage } from './plugin-storage/storage-schema';
 import { assertNamespaceUnclaimed, claimStorageNames } from './plugin-storage/storage-registry';
@@ -52,6 +53,25 @@ describe('PluginUninstallService', () => {
     readers.deleteAllForPlugin.mockRejectedValueOnce(new Error('db locked'));
     await uninstaller().deletePlugin(second.id);
     expect(existsSync(join(fixture.root, 'delete-me'))).toBe(false);
+  });
+
+  it('refuses the reader and BLE calls of the removed plugin before deleting its rows', async () => {
+    const plugin = writeDeletablePlugin();
+    let removedWhenReadersWent = false;
+    readers.deleteAllForPlugin.mockImplementationOnce(async () => {
+      removedWhenReadersWent = isPluginRemoved(plugin.id);
+    });
+
+    await uninstaller().deletePlugin(plugin.id);
+
+    expect(removedWhenReadersWent).toBe(true);
+    expect(isPluginRemoved(plugin.id)).toBe(true);
+  });
+
+  it('refuses the reader and BLE calls of an npm plugin whose health entries it clears on removal', async () => {
+    const plugin = writeDeletablePlugin();
+    await uninstaller().clearHealthEntries(plugin.name);
+    expect(isPluginRemoved(plugin.id)).toBe(true);
   });
 
   describe('health entries', () => {

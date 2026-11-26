@@ -16,6 +16,7 @@ import { PluginReadersService } from './readers/plugin-readers.service';
 
 import { PluginService } from './plugin.service';
 import { markPluginRestartRequired } from './runtime/restart-required';
+import { markPluginRemoved } from './runtime/removed-plugins';
 
 import { ResourceHealthService } from '../resources/health/resource-health.service';
 
@@ -43,8 +44,11 @@ export class PluginUninstallService {
    * logged, never blocking.
    */
   async clearHealthEntries(pluginName: string): Promise<void> {
-    // Its runtime runs until the restart: a report after the clear must not leave an entry behind.
+    // Its runtime runs until the restart: a report after the clear must not leave an entry behind, and it must not
+    // register readers or BLE endpoints again.
     retirePluginResourceHealth(pluginName);
+    for (const manifest of PluginService.getDiscoveredPlugins())
+      if (manifest.name === pluginName) markPluginRemoved(manifest.id);
     try {
       const health = this.moduleRef?.get(ResourceHealthService, { strict: false });
       if (health) await clearAllPluginResourceHealth(pluginName, health);
@@ -84,6 +88,9 @@ export class PluginUninstallService {
         );
       }
     }
+
+    // Its code runs until the restart: refuse its reader and BLE calls before their rows go.
+    markPluginRemoved(plugin.id);
 
     // The plugin's BLE endpoints reference a plugin that is going away. A failure is logged, never blocking.
     try {
