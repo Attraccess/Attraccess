@@ -143,11 +143,14 @@ The license key and the email (SMTP) server are not environment variables. Enter
 
 ## Plugins
 
-| Variable          | Default                | Description                    |
-| ----------------- | ---------------------- | ------------------------------ |
-| `PLUGIN_DIR`      | `/app/storage/plugins` | Directory for plugins          |
-| `DISABLE_PLUGINS` | `false`                | Disable the plugin system      |
-| `RESTART_BY_EXIT` | `false`                | Automatically restart on crash |
+| Variable                    | Default                | Description                                |
+| --------------------------- | ---------------------- | ------------------------------------------ |
+| `PLUGIN_DIR`                | `/app/storage/plugins` | Directory for plugins                      |
+| `DISABLE_PLUGINS`           | `false`                | Disable the plugin system                  |
+| `RESTART_BY_EXIT`           | `false`                | Automatically restart on crash             |
+| `ATTRACCESS_PLUGIN_CHANNEL` | `latest`               | Plugin release channel: `latest` or `next` |
+
+`ATTRACCESS_PLUGIN_CHANNEL` is the npm dist-tag the marketplace and plugin installs use by default: `latest` (released plugin versions) or `next` (nightly builds). Official release images use `latest`; the nightly images (`nightly-<sha>`, `nightly-latest`) set `next`, so a nightly host installs and keeps updating the nightly plugin builds that match it. Set the variable to override the image default; any other value stops the API at startup with a configuration error. See [Installing Plugins](plugins/installing-plugins.md#release-channels).
 
 ## Static Files
 

@@ -27,12 +27,26 @@ Offizielle Plugins werden auf npm unter diesen Dist-Tags veröffentlicht:
 | `next`   | Nightly-Builds von `main` | Builds aus erfolgreichen, hardwaregeprüften `main`-Builds, z. B. `0.2.0-nightly.1180.1` (Plugin-Version, dann `-nightly.<Lauf>.<Versuch>`). |
 | `alpha`  | Niemand (veraltet)        | Eingefrorene Builds aus der Zeit vor den Release-Kanälen.                                                                                   |
 
-Um ein Nightly zu testen, öffne **Einstellungen → Plugins**, öffne das Aktionsmenü (**⋯**) des installierten Plugins, wähle **Version verwalten** und trage `next` (oder eine bestimmte Nightly-Version) unter **Gewünschte Version oder Kanal** ein. Nightly-Versionen sind Vorabversionen und werden nie automatisch installiert.
+### Welchen Kanal ein Host verwendet
 
-Sobald ein Plugin einmal released wurde, bietet der Marktplatz nur noch released Versionen an. Bis dahin gilt:
+Jeder Attraccess-Host hat einen Plugin-Kanal, gesetzt über die Umgebungsvariable `ATTRACCESS_PLUGIN_CHANNEL` (siehe [Umgebungsvariablen](installation/environment-variables.md#plugins)):
 
-- Bei WAGO, Shelly und RabbitMQ bleibt `latest` auf einem Nightly-Build (`0.1.0-nightly.925.2`, für Hosts `^1.9.0`), bis Attraccess 1.11.0 stabile Versionen veröffentlicht. Der aktuelle Plugin-Code ist für Attraccess 2.0 gebaut (`attraccessVersion.min` `2.0.0-0`) und läuft nicht auf 1.x-Hosts; 1.x-Hosts behalten daher die 1.x-Builds.
-- npm setzt `latest` bei der ersten Veröffentlichung eines Pakets automatisch. Ein Plugin, das zuerst von einem Nightly veröffentlicht wird (wie Matter), hat deshalb bis zu seinem ersten Release ein Nightly als `latest`. Das Release behandelt ein Nightly-`latest` als „noch nie released" und veröffentlicht das Plugin.
+- **Release-Images** verwenden `latest`. Der Marktplatz zeigt und installiert die `latest`-Version, Vorabversionen werden nie automatisch installiert.
+- **Nightly-Images** (`nightly-<sha>`, `nightly-latest`) verwenden `next`. Ihr Marktplatz zeigt, und eine Installation ohne gewählte Version installiert, die höhere der Versionen `next` und `latest` eines Plugins, die der Host ausführen kann. Ein Plugin ohne `next`-Build oder mit einem `next`-Build, der einen neueren Host braucht, bleibt auf `latest`. Ein Nightly-Build stammt immer aus demselben Commit-Bereich wie das Image, die Plugins passen also zum Host.
+
+Eine ausdrücklich gewählte Version (**Version verwalten** oder die API) hat immer Vorrang.
+
+### Nightly-Hosts folgen `next`
+
+Ein Plugin, das auf einem Nightly-Host ohne gewählte Version installiert wird, merkt sich `next` als gewünschte Version. Mit der Standard-Update-Richtlinie bringt das Wartungsfenster es dann auf den neuesten kompatiblen Build von `next` (oder von `latest`, falls höher): von Nightly zu Nightly und von einem Nightly zum Release. Die üblichen Schutzmechanismen gelten weiter: Es wird nichts automatisch installiert, wenn die neue Version zusätzliche Berechtigungen verlangt, eine neue Hauptversion ist, als veraltet markiert ist oder die Update-Einstellung des Plugins **Aus** oder **Nur Patch** ist. Das gilt nur, solange die Update-Richtlinie nie gespeichert wurde; eine unter **Einstellungen → Plugins** gespeicherte Richtlinie bleibt unverändert.
+
+Auf einem Release-Host ändert sich nichts: Vorabversionen werden nie automatisch installiert.
+
+### Ein Plugin auf `next` umstellen
+
+Ein Plugin, das als `latest` installiert wurde, bleibt auf `latest`, auch auf einem Nightly-Host. Zum Umstellen öffne **Einstellungen → Plugins**, öffne das Aktionsmenü (**⋯**) des installierten Plugins, wähle **Version verwalten** und trage `next` (oder eine bestimmte Nightly-Version) unter **Gewünschte Version oder Kanal** ein. Alternativ entfernst du das Plugin und installierst es erneut über den Marktplatz; seine Daten bleiben erhalten.
+
+Sobald ein Plugin einmal released wurde, bietet der Marktplatz eines Release-Hosts nur noch released Versionen an. npm setzt `latest` bei der ersten Veröffentlichung eines Pakets automatisch; ein Plugin, das zuerst von einem Nightly veröffentlicht wird, hat deshalb bis zu seinem ersten Release ein Nightly als `latest`. Das Release behandelt ein Nightly-`latest` als „noch nie released" und veröffentlicht das Plugin.
 
 ## Plugin hochladen
 

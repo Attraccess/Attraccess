@@ -1920,6 +1920,15 @@ so they share the workspace toolchain, caching and CI.
     above the released version.
   - Nothing publishes to `alpha` any more; existing `alpha` tags are frozen. See
     [Release channels](plugins/installing-plugins.md#release-channels).
+  - **Plugin load guard:** the `plugins` job of pull requests, nightlies and releases also runs
+    `pnpm nx run api:verify-packed-plugins` after packing. It installs every packed plugin tarball under its npm
+    package name (`@attraccess/plugin-<name>`) through the host's npm install path, boots a real API host on PostgreSQL
+    (core and plugin migrations, plugin discovery, `AppModule`) and fails if any plugin does not reach the loaded
+    state. License-gated plugins load because the guard grants the license modules they declare, so their storage
+    compilation and migrations still run. `pack-test` only inspects the tarball, so it cannot see what a host refuses
+    at install or load time. The nightly `publish-plugins` and the release `plugins` job run only after it passed.
+    Run it locally after `pnpm nx run-many --target=pack --projects=tag:type:plugin`; it needs PostgreSQL and an
+    administrative `TEST_DATABASE_URL`.
   - Preview the plan locally against the real registry with
     `node apps/plugins/scripts/plugin-publish-plan.mjs --channel=next --dry-run` (or `--channel=latest`); add
     `--out=plan.json` for the machine-readable plan.

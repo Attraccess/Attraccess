@@ -27,12 +27,26 @@ Official plugins are published to npm under these dist-tags:
 | `next`   | Nightly builds of main | Builds from green, hardware-gated main builds, versioned like `0.2.0-nightly.1180.1` (the plugin version, then `-nightly.<run>.<attempt>`). |
 | `alpha`  | Nobody (legacy)        | Frozen builds from before release channels existed.                                                                                         |
 
-To try a nightly, open **Settings → Plugins**, open the installed plugin's actions menu (**⋯**), choose **Manage version** and enter `next` (or a specific nightly version) as **Requested version or channel**. Nightly versions are prereleases, so they are never installed automatically.
+### Which channel a host uses
 
-Once a plugin has had a release, the marketplace offers only released versions. Until then:
+Every Attraccess host has a plugin channel, set by the `ATTRACCESS_PLUGIN_CHANNEL` environment variable (see [Environment Variables](installation/environment-variables.md#plugins)):
 
-- The WAGO, Shelly and RabbitMQ `latest` versions stay at a nightly build (`0.1.0-nightly.925.2`, for hosts `^1.9.0`) until Attraccess 1.11.0 publishes them as stable versions. The current plugin code is built for Attraccess 2.0 (`attraccessVersion.min` `2.0.0-0`) and does not run on 1.x hosts, so 1.x hosts keep the 1.x builds.
-- npm sets `latest` automatically on a package's first publish. A plugin first published by a nightly (like Matter) therefore has a nightly `latest` until its first release. The release treats a nightly `latest` as never released and publishes the plugin.
+- **Release images** use `latest`. The marketplace shows and installs the `latest` version, and prereleases are never installed automatically.
+- **Nightly images** (`nightly-<sha>`, `nightly-latest`) use `next`. Their marketplace shows, and an install without a chosen version installs, the higher of the `next` and `latest` versions of a plugin that the host can run. A plugin without a `next` build, or whose `next` build needs a newer host, stays on `latest`. A nightly build always comes from the same commit range as the image, so the plugins match the host.
+
+The version you choose explicitly (**Manage version** or the API) always wins.
+
+### Nightly hosts follow `next`
+
+A plugin installed on a nightly host without a chosen version records `next` as its requested version. Under the default update policy, the maintenance window then moves it to the newest compatible build of `next` (or of `latest`, if that is higher), from one nightly to the next and from a nightly to the release. The usual safeguards still apply: nothing is installed automatically if the new version asks for more permissions, is a new major version, is deprecated, or if the plugin's update setting is **off** or **patch only**. This applies only while the update policy was never saved; a policy you saved under **Settings → Plugins** is not changed.
+
+On a release host nothing changes: prereleases are never installed automatically.
+
+### Switching a plugin to `next`
+
+A plugin that was installed as `latest` stays on `latest`, also on a nightly host. To switch it, open **Settings → Plugins**, open the installed plugin's actions menu (**⋯**), choose **Manage version** and enter `next` (or a specific nightly version) as **Requested version or channel**. You can also remove the plugin and install it again from the marketplace; its data is kept.
+
+Once a plugin has had a release, the marketplace of a release host offers only released versions. npm sets `latest` automatically on a package's first publish, so a plugin first published by a nightly has a nightly `latest` until its first release. The release treats a nightly `latest` as never released and publishes the plugin.
 
 ## Uploading a Plugin
 
