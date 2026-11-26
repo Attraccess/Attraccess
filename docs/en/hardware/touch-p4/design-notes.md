@@ -53,7 +53,7 @@ The 3D-printable case itself is described in [Case](hardware/touch-p4/case.md).
 | Cut in the top edge under the Wi-Fi antenna | x 8.6 to 37.5, y 0 to 6.0; no copper on any layer for x below 50.5, y below 6.3 |
 | Display cover lens (84.3 x 84.3) | x 0.85 to 85.15, y 7.0 to 91.3 |
 | LCD module (metal back) | x 5.6 to 80.4, y 12.8 to 89.4 |
-| Flex slot (behind the display) | x 33.05 to 54.65, y 73.3 to 76.3 |
+| Flex slot (behind the display) | x 33.05 to 54.65, y 73.3 to 83.8 |
 | Ethernet jack | x 68.8 to 84.9, y 71.2 to 92.8, opens downwards into its cut-away. Pin rows at y 73.0 and 75.55, behind the display |
 | Cut-away for the Ethernet plug | x above 69.5, y above 92.5 (16.5 x 51) |
 | Cut-away for the DC plug | x below 12, y above 107.5 (12 x 36) |
@@ -82,9 +82,12 @@ drawing: the display frame printed from it fits the sample.
 - Now the flex folds 180 degrees round the module's bottom edge and lies flat on the metal back, which it does
   without strain (tried on the sample). The touch controller faces the board: 1.3 mm from the flex's underside to the
   chip's top. Past the stiff part the contact strip goes through a slot behind the display (x 33.05 to 54.65,
-  y 73.3 to 76.3, centred on J601), in an S-bend onto the component side and into J601. The folded flex reaches
-  25.6 mm from the lens edge; after the S-bend its end lies about 3.6 mm inside the connector's opening (y 72.3). The
-  stiff part's end (13.5 mm) is read off photos, +-0.5 mm; the slot needs it within 14.2 mm.
+  y 73.3 to 83.8, centred on J601), in an S-bend onto the component side and into J601. The folded flex reaches
+  25.6 mm from the lens edge; after the S-bend its end lies about 3.6 mm inside the connector's opening (y 72.3).
+- The slot is 10.5 mm long. On the first print it was 3 mm (y 73.3 to 76.3) and the strip entered J601 at an angle;
+  the longer slot lets it run in at a shallow angle. The stiff part's end (13.5 mm from the lens edge, read off
+  photos, +-0.5 mm) now lies over the slot, which is fine: the stiff part rests on the metal back, not on the board.
+  The slot allows that end anywhere from 7.5 to 18 mm.
 - The board-to-metal-back distance is bounded by the chip (1.3 mm, plus 0.2) and the Ethernet jack's pins below, and
   by the S-bend's flex length above: **1.5 to 2.0 mm**. The case holds the display at **1.7 mm**.
 - The Ethernet jack's pins stand at least 1.45 mm out of the display side (datasheet minimum pin length 3.05 mm, no
@@ -97,7 +100,7 @@ drawing: the display frame printed from it fits the sample.
   its opening towards the slot. Panel pin 1 is on the right seen from the component side, so **connector pin k =
   panel pin 41 - k**; schematic and board account for it.
 - On the component side the flex only covers the strip from the slot into J601 (`geometry.FLEX_KEEPOUT`, x 32.5 to
-  55.5, y 66 to 77.3). Only parts up to 0.9 mm high stand there; `placement.check_flex_area` stops the build
+  55.5, y 66 to 84.5). Only parts up to 0.9 mm high stand there; `placement.check_flex_area` stops the build
   otherwise. On the display side it covers x 14.5 to 62.5, y 72.5 to 89.4 (`geometry.FLEX_BEHIND_LCD`); no ground pad
   lies there (a test checks it).
 - The metal back is tied to board ground through conductive tape or foam on at least two of the four bare ground pads,

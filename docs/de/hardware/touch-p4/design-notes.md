@@ -55,7 +55,7 @@ Das 3D-druckbare Gehäuse selbst ist unter [Gehäuse](hardware/touch-p4/case.md)
 | Ausschnitt im oberen Rand unter der WLAN-Antenne | x 8,6 bis 37,5, y 0 bis 6,0; kein Kupfer auf irgendeiner Lage für x unter 50,5, y unter 6,3 |
 | Display-Deckglas (84,3 x 84,3) | x 0,85 bis 85,15, y 7,0 bis 91,3 |
 | LCD-Modul (Metallrückseite) | x 5,6 bis 80,4, y 12,8 bis 89,4 |
-| Flexkabel-Schlitz (hinter dem Display) | x 33,05 bis 54,65, y 73,3 bis 76,3 |
+| Flexkabel-Schlitz (hinter dem Display) | x 33,05 bis 54,65, y 73,3 bis 83,8 |
 | Ethernet-Buchse | x 68,8 bis 84,9, y 71,2 bis 92,8, öffnet nach unten in ihren Ausschnitt. Pin-Reihen bei y 73,0 und 75,55, hinter dem Display |
 | Ausschnitt für den Ethernet-Stecker | x über 69,5, y über 92,5 (16,5 x 51) |
 | Ausschnitt für den DC-Stecker | x unter 12, y über 107,5 (12 x 36) |
@@ -85,10 +85,13 @@ stimmt mit der Zeichnung überein: Der danach gedruckte Displayrahmen passt auf 
 - Jetzt faltet sich das Flexkabel um 180 Grad um den unteren Rand des Moduls und liegt flach auf der Metallrückseite,
   was es ohne Spannung tut (am Muster ausprobiert). Der Touch-Controller zeigt zur Platine: 1,3 mm von der Unterseite
   des Flexkabels bis zur Oberseite des Chips. Hinter dem steifen Teil geht der Kontaktstreifen durch einen Schlitz
-  hinter dem Display (x 33,05 bis 54,65, y 73,3 bis 76,3, mittig zu J601), in einer S-Biegung auf die Bestückungsseite
+  hinter dem Display (x 33,05 bis 54,65, y 73,3 bis 83,8, mittig zu J601), in einer S-Biegung auf die Bestückungsseite
   und in J601. Das gefaltete Flexkabel reicht 25,6 mm vom Rand des Deckglases; nach der S-Biegung liegt sein Ende etwa
-  3,6 mm hinter der Öffnung des Steckverbinders (y 72,3). Das Ende des steifen Teils (13,5 mm) ist aus Fotos
-  abgelesen, +-0,5 mm; der Schlitz braucht es innerhalb von 14,2 mm.
+  3,6 mm hinter der Öffnung des Steckverbinders (y 72,3).
+- Der Schlitz ist 10,5 mm lang. Beim ersten Druck war er 3 mm (y 73,3 bis 76,3), und der Streifen ging schräg in J601;
+  der längere Schlitz lässt ihn flach einlaufen. Das Ende des steifen Teils (13,5 mm vom Rand des Deckglases, aus Fotos
+  abgelesen, +-0,5 mm) liegt jetzt über dem Schlitz, was nicht stört: Der steife Teil liegt auf der Metallrückseite,
+  nicht auf der Platine. Der Schlitz erlaubt dieses Ende irgendwo zwischen 7,5 und 18 mm.
 - Den Abstand von der Platine zur Metallrückseite begrenzen unten der Chip (1,3 mm, plus 0,2) und die Pins der
   Ethernet-Buchse, oben die Länge des Flexkabels für die S-Biegung: **1,5 bis 2,0 mm**. Das Gehäuse hält das Display
   bei **1,7 mm**.
@@ -103,7 +106,7 @@ stimmt mit der Zeichnung überein: Der danach gedruckte Displayrahmen passt auf 
   Kontakten unten**, mit seiner Öffnung zum Schlitz. Von der Bestückungsseite gesehen liegt Panel-Pin 1 rechts, also
   **Steckverbinder-Pin k = Panel-Pin 41 - k**; Schaltplan und Platine berücksichtigen das.
 - Auf der Bestückungsseite deckt das Flexkabel nur den Streifen vom Schlitz in J601 ab (`geometry.FLEX_KEEPOUT`,
-  x 32,5 bis 55,5, y 66 bis 77,3). Dort stehen nur Bauteile bis 0,9 mm Höhe; sonst bricht `placement.check_flex_area`
+  x 32,5 bis 55,5, y 66 bis 84,5). Dort stehen nur Bauteile bis 0,9 mm Höhe; sonst bricht `placement.check_flex_area`
   den Build ab. Auf der Displayseite deckt es x 14,5 bis 62,5, y 72,5 bis 89,4 ab (`geometry.FLEX_BEHIND_LCD`); dort
   liegt kein Massepad (ein Test prüft das).
 - Die Metallrückseite wird über Leitband oder Leitschaum auf mindestens zwei der vier blanken Massepads mit der Masse

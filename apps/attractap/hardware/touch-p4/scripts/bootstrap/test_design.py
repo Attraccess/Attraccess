@@ -283,8 +283,12 @@ class GeometryTest(unittest.TestCase):
     def test_flex_slot_between_stiff_part_and_connector(self):
         g = geometry
         lens_edge = g.LENS[3]
-        # the stiff part of the folded flex lies flat behind the module, before the slot (0.8 mm: the bend)
-        self.assertGreaterEqual(lens_edge - g.FLEX_STIFF_END, g.SLOT[3] + 0.8)
+        # the strip bends down right past the stiff part, over the slot, +-0.5 mm for the measurement and
+        # the bend; the slot is long enough for a shallow, straight run into J601
+        stiff_end = lens_edge - g.FLEX_STIFF_END
+        self.assertGreaterEqual(stiff_end - 1.5, g.SLOT[1])
+        self.assertLessEqual(stiff_end + 1.5, g.SLOT[3])
+        self.assertGreaterEqual(g.SLOT[3] - g.SLOT[1], 10.0)
         self.assertGreaterEqual(g.SLOT[1], 72.3 + 0.8)          # J601's opening (its courtyard edge)
         self.assertGreaterEqual(g.SLOT[2] - g.SLOT[0], g.FLEX_STRIP_W + 1.0)
         self.assertAlmostEqual((g.SLOT[0] + g.SLOT[2]) / 2, 43.85)  # centred on J601

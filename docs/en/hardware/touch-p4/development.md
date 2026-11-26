@@ -242,7 +242,7 @@ Order form:
 | Smallest via | 0.45 mm pad, 0.2 mm hole (about one via in five; most have 0.5 mm pads). Free with inner layers at 0.45 mm or wider: leave "Min via hole size/diameter" at "0.3mm/(0.4/0.45mm)"; smaller choices cost 39 USD and more |
 | Vias | "Epoxy Filled & Capped", no charge, and required: C208, C223 and C226 at the MCU have a via in the pad, and the twelve ground vias between the Wi-Fi module's ground pads touch the pads (Espressif's land pattern). No other via lies under paste. "Tented" is not offered with inner layers |
 | Solder mask | green: the 0.1 mm webs between the MCU's pins are JLCPCB's limit for green |
-| Milled openings | flex slot 3 mm wide, eight LED windows 3.4 x 3.0 mm with relieved corners, a cut 28.9 x 6.0 mm in the top edge under the Wi-Fi antenna, two cut-away corners, plated slots at the DC jack and USB-C |
+| Milled openings | flex slot 10.5 x 21.6 mm, eight LED windows 3.4 x 3.0 mm with relieved corners, a cut 28.9 x 6.0 mm in the top edge under the Wi-Fi antenna, two cut-away corners, plated slots at the DC jack and USB-C |
 | Outline tolerance | the regular +/-0.2 mm |
 | Surface finish | ENIG (18 USD on 5 boards, 48 on 100, 336 on 1000). Not the free OSP: JLCPCB excludes it for contact areas, and the four display ground pads and 30 test points would stay bare copper |
 | Impedance control | "Yes", +/-10 % (33 USD per order): USB pair 90 ohm differential (0.14 mm lines, 0.15 mm gap, back layer over In4), Ethernet 50 ohm (0.155 mm, component side over In1), from JLCPCB's calculator for this stack-up; the fab may adjust widths |

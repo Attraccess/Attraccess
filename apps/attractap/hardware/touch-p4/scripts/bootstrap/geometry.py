@@ -33,9 +33,11 @@ FLEX_END = 25.6
 # Area on the display side the folded flex covers (the touch tail's stiff part at x 15 to 25, chip
 # towards the board): no ground pad here
 FLEX_BEHIND_LCD = (14.5, 72.5, 62.5, 89.4)
-# Slot behind the display for the contact strip, centred on J601, between the stiff part's end and the
-# connector's opening (y 72.3)
-SLOT = (33.05, 73.3, 54.65, 76.3)
+# Slot behind the display for the contact strip, centred on J601. It starts 1 mm from the connector's
+# opening (y 72.3) and is 10.5 mm long, so the stiff part's end lies over it and the strip can run at a
+# shallow angle straight into J601 (a 3 mm slot on the first print forced it in at an angle). The stiff
+# part may lie over the slot; it rests on the metal back, not on the board.
+SLOT = (33.05, 73.3, 54.65, 83.8)
 # The 5 V bus of the top LED row runs at this height, between the display's lower edge and the LEDs
 LED_BUS_Y = 93.3
 # Cut-away corner that leaves room for the Ethernet plug and cable: 51 mm from the jack to the lower
@@ -70,7 +72,7 @@ POCKET_X = 12.0
 POCKET_Y = 107.5
 
 # Area on the component side the display flex covers, from SLOT into J601: no tall parts here
-FLEX_KEEPOUT = [(32.5, 66.0, 55.5, 77.3)]
+FLEX_KEEPOUT = [(32.5, 66.0, 55.5, 84.5)]
 
 # NFC loop antenna centre (footprint ANT501)
 ANT_C = (44.5, 117.0)
