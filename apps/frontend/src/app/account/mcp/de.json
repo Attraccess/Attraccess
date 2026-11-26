@@ -22,6 +22,7 @@
       "lastUsed": "Zuletzt genutzt",
       "expires": "Läuft ab"
     },
+    "morePermissions": "+{{count}} weitere",
     "unverified": "Nicht verifiziert",
     "unverifiedHint": "Die App hat sich selbst registriert, daher kann Attraccess ihren Namen nicht bestätigen.",
     "neverUsed": "Nie",

@@ -167,8 +167,8 @@ it('counts the tools the current selection enables and updates when it changes',
   expect(toolCount()).toBe('tools.title:3');
   fireEvent.click(screen.getByLabelText('pick resources.read'));
   fireEvent.click(screen.getByLabelText('pick resources.update'));
-  // Nothing selected: only the tools that need no permission remain.
-  expect(toolCount()).toBe('tools.title:1');
+  // Nothing selected: nothing can be allowed, so even the tools that need no permission do not count.
+  expect(toolCount()).toBe('tools.title:0');
 });
 
 it('lists the names and summaries of the enabled tools', () => {

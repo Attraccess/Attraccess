@@ -3,6 +3,7 @@ import {
   Accordion,
   AccordionBody,
   AccordionHeading,
+  AccordionIndicator,
   AccordionItem,
   AccordionPanel,
   AccordionTrigger,
@@ -45,9 +46,12 @@ export function McpOAuthPermissionChoice({
   );
   const enabledTools = useMemo(
     () =>
-      tools.filter((tool) =>
-        mcpToolAllowed({ all: tool.requiredAll, any: tool.requiredAny }, selectedKeys as ReadonlySet<string>),
-      ),
+      // Nothing selected means nothing can be allowed, so the tools with no requirement do not count either.
+      selectedKeys.size === 0
+        ? []
+        : tools.filter((tool) =>
+            mcpToolAllowed({ all: tool.requiredAll, any: tool.requiredAny }, selectedKeys as ReadonlySet<string>),
+          ),
     [tools, selectedKeys],
   );
 
@@ -95,6 +99,7 @@ export function McpOAuthPermissionChoice({
           <AccordionHeading>
             <AccordionTrigger>
               <span data-cy="mcp-oauth-tools-count">{t('tools.title', { count: enabledTools.length })}</span>
+              <AccordionIndicator />
             </AccordionTrigger>
           </AccordionHeading>
           <AccordionPanel>
@@ -103,7 +108,7 @@ export function McpOAuthPermissionChoice({
               {enabledTools.length === 0 ? (
                 <p className="text-sm text-muted">{t('tools.none')}</p>
               ) : (
-                <ul className="flex flex-col gap-1 text-sm" data-cy="mcp-oauth-tools-list">
+                <ul className="flex max-h-80 flex-col gap-1 overflow-y-auto text-sm" data-cy="mcp-oauth-tools-list">
                   {enabledTools.map((tool) => (
                     <li key={tool.name}>
                       <span className="font-mono">{tool.name}</span>

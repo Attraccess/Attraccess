@@ -22,6 +22,7 @@
       "lastUsed": "Last used",
       "expires": "Expires"
     },
+    "morePermissions": "+{{count}} more",
     "unverified": "Unverified",
     "unverifiedHint": "The app registered itself, so Attraccess cannot confirm its name.",
     "neverUsed": "Never",

@@ -26,6 +26,9 @@ import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTransla
 import en from './en.json';
 import de from './de.json';
 
+/** More than this many permissions are collapsed to "+N more" (the full list is in the tooltip). */
+const MAX_LISTED_PERMISSIONS = 3;
+
 interface McpGrantsCardProps {
   /** OAuth sign-in works on this deployment. Without it the card only shows up while old grants exist. */
   oauthEnabled: boolean;
@@ -96,7 +99,16 @@ export function McpGrantsCard({ oauthEnabled }: McpGrantsCardProps) {
                       </Chip>
                     )}
                   </TableCell>
-                  <TableCell>{grant.permissionKeys.map((key) => permissionLabel({ key })).join(', ')}</TableCell>
+                  <TableCell>
+                    <span title={grant.permissionKeys.map((key) => permissionLabel({ key })).join(', ')}>
+                      {grant.permissionKeys
+                        .slice(0, MAX_LISTED_PERMISSIONS)
+                        .map((key) => permissionLabel({ key }))
+                        .join(', ')}
+                      {grant.permissionKeys.length > MAX_LISTED_PERMISSIONS &&
+                        ` ${t('grants.morePermissions', { count: grant.permissionKeys.length - MAX_LISTED_PERMISSIONS })}`}
+                    </span>
+                  </TableCell>
                   <TableCell>
                     <DateTimeDisplay date={grant.createdAt} />
                   </TableCell>
