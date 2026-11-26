@@ -81,6 +81,8 @@ export class ValkeyReaderPresence implements ReaderPresence {
   private readonly local = new LocalHoldings();
   private readonly lostHandlers: Array<(readerId: number) => Promise<void> | void> = [];
   private readonly connectedHandlers: Array<(readerId: number, instanceId: string) => void> = [];
+  /** Writes are retried every heartbeat: an outage is logged once, not once per reader and heartbeat. */
+  private writesFailing = false;
 
   constructor(
     private readonly client: PresenceClient,
@@ -171,8 +173,16 @@ export class ValkeyReaderPresence implements ReaderPresence {
         await this.client.hset(readerKey(readerId), this.instances.id, String(connectedAt));
         await this.client.sadd(instanceReadersKey(this.instances.id), String(readerId));
       });
+      if (this.writesFailing) this.logger.log('Recording reader presence works again');
+      this.writesFailing = false;
     } catch (error) {
-      this.logger.warn(`Could not record reader ${readerId} as connected: ${(error as Error).message}`);
+      if (!this.writesFailing) {
+        this.logger.warn(
+          `Could not record reader ${readerId} as connected: ${(error as Error).message}; ` +
+            'retried every heartbeat, not logged again until it works',
+        );
+      }
+      this.writesFailing = true;
     }
   }
 }
