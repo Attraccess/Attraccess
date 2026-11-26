@@ -34,7 +34,7 @@
   },
   "unavailable": {
     "title": "Für dein Konto nicht erlaubt",
-    "message": "Die App fragt Berechtigungen an, die du nicht hast: {{permissions}}. Wenn du erlaubst, erhält die App einen Fehler."
+    "message": "Die App fragt Berechtigungen an, die du nicht hast: {{permissions}}. Die App erhält nur die Berechtigungen, die du unten auswählst."
   },
   "approve": "Erlauben",
   "deny": "Ablehnen",

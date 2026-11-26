@@ -34,7 +34,7 @@
   },
   "unavailable": {
     "title": "Not allowed for your account",
-    "message": "The app asks for permissions you do not have: {{permissions}}. Allowing it sends an error back to the app."
+    "message": "The app asks for permissions you do not have: {{permissions}}. The app only gets the permissions you select below."
   },
   "approve": "Allow",
   "deny": "Deny",
