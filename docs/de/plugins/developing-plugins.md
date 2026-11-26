@@ -1289,7 +1289,7 @@ pnpm nx zip plugin-rabbitmq
 pnpm nx show projects --projects=tag:type:plugin
 ```
 
-**Ladeprüfung der Pakete:** der `plugins`-Job von Pull Requests, Nightlies und Releases führt nach dem Packen auch
+**Ladeprüfung der Pakete:** Der `plugins`-Job von Pull Requests, Nightlies und Releases führt nach dem Packen auch
 `pnpm nx run api:verify-packed-plugins` aus. Sie installiert jeden gepackten Plugin-Tarball unter seinem
 npm-Paketnamen (`@attraccess/plugin-<name>`) über den npm-Installationsweg des Hosts, startet einen echten
 API-Host auf PostgreSQL (Core- und Plugin-Migrationen, Plugin-Erkennung, `AppModule`) und schlägt fehl, wenn ein

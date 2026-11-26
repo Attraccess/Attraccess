@@ -54,7 +54,7 @@ export function PluginsSection() {
             <AlertContent>
               <AlertTitle>{t('updatePolicy.availableTitle')}</AlertTitle>
               <AlertDescription>
-                {t('updatePolicy.availableDescription', { count: String(availableUpdates.length) })}
+                {t('updatePolicy.availableDescription', { count: availableUpdates.length })}
               </AlertDescription>
               <Button
                 className="mt-2"

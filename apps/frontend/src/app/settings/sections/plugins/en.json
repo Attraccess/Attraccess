@@ -142,7 +142,10 @@
     "saveError": "Could not save update policy",
     "available": "Update available",
     "availableTitle": "Plugin updates are available",
-    "availableDescription": "Installed marketplace plugins with an update: {{count}}. Attraccess installs updates in the maintenance window, unless they need other plugin changes. You can also review and install them now.",
+    "availableDescription": {
+      "one": "One installed marketplace plugin has an update. Attraccess installs it in the maintenance window and then restarts, unless it needs other plugin changes or installing it failed. You can also review and install it now.",
+      "many": "{{count}} installed marketplace plugins have an update. Attraccess installs them in the maintenance window and then restarts, unless an update needs other plugin changes or installing it failed. You can also review and install them now."
+    },
     "reviewUpdates": "Review updates",
     "modes": {
       "off": "Off",

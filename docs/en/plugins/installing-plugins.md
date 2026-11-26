@@ -23,7 +23,7 @@ Official plugins are published to npm under these dist-tags:
 
 | Tag      | Moved by               | Contents                                                                                                                                    |
 | -------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `latest` | Attraccess releases    | The plugin version published with an Attraccess release. **The marketplace shows and installs this version.**                               |
+| `latest` | Attraccess releases    | The plugin version published with an Attraccess release. **A release host's marketplace shows and installs this version.**                  |
 | `next`   | Nightly builds of main | Builds from green, hardware-gated main builds, versioned like `0.2.0-nightly.1180.1` (the plugin version, then `-nightly.<run>.<attempt>`). |
 | `alpha`  | Nobody (legacy)        | Frozen builds from before release channels existed.                                                                                         |
 
@@ -52,13 +52,13 @@ Once a plugin has had a release, the marketplace of a release host offers only r
 
 Attraccess keeps plugins installed from npm up to date. This applies to every host, release and nightly. Plugins uploaded as a ZIP file are not updated.
 
-- **Checks:** the host asks the plugin's registry for new versions about once an hour, and again when the maintenance window opens. **Settings → Plugins** shows when an update is available. You can also check at once with **Check all now** on that page.
+- **Checks:** the host asks the plugin's registry for new versions about once an hour, and again when the maintenance window opens. **Settings → Plugins** shows when an update is available that the host may install on its own; newer versions it never installs automatically (see below) are listed only under **Manage version**. You can also check at once with **Check all now** on that page.
 - **Maintenance window:** updates are installed only inside this window, by default from 03:00 to 05:00. The times are the server's local time, which is UTC in the official Docker images unless you set `TZ`.
 - **What is installed:** with the default policy, the newest compatible patch or minor release. Nightly hosts also move plugins that request `next` to nightly builds, as described above.
-- **Never installed automatically:** a new major version, a version that asks for more permissions, a deprecated version, a version that is not compatible with the host, and an update that would also need other plugins installed or changed. Install those yourself with **Manage version**.
+- **Never installed automatically:** a new major version, a version that asks for more permissions, a deprecated version, a version that is not compatible with the host, an update that would also need other plugins installed or changed, a version published by a different npm user than the installed one, and any version from a registry on another machine that does not use HTTPS. Install those yourself with **Manage version**.
 - **Restart:** after installing the updates that are due, Attraccess restarts once to activate them. Plan the window for a time when a short interruption is acceptable.
 - **Failures:** if an update cannot be installed, the installed version stays, the server log names the reason and Attraccess tries that version again after 24 hours at the earliest. A newer version is tried without this pause. If a new version is installed but fails to load after the restart, Attraccess does not go back to the previous version: **Settings → Plugins** shows the error, and you can choose another version with **Manage version**. A later update is still installed automatically.
-- **Audit log:** each automatic installation, successful or not, and its activation after the restart are recorded in the audit log without a user.
+- **Audit log:** each automatic installation, successful or not, and its activation after the restart are recorded in the audit log without a user (shown as **System or anonymous**).
 
 ### Turning automatic updates off
 

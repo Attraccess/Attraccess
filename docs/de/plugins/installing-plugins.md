@@ -21,11 +21,11 @@ Wenn eine Abhängigkeit nicht geladen werden kann, bleiben ihre abhängigen Plug
 
 Offizielle Plugins werden auf npm unter diesen Dist-Tags veröffentlicht:
 
-| Tag      | Gesetzt von               | Inhalt                                                                                                                                      |
-| -------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `latest` | Attraccess-Releases       | Die mit einem Attraccess-Release veröffentlichte Plugin-Version. **Der Marktplatz zeigt und installiert diese Version.**                    |
-| `next`   | Nightly-Builds von `main` | Builds aus erfolgreichen, hardwaregeprüften `main`-Builds, z. B. `0.2.0-nightly.1180.1` (Plugin-Version, dann `-nightly.<Lauf>.<Versuch>`). |
-| `alpha`  | Niemand (veraltet)        | Eingefrorene Builds aus der Zeit vor den Release-Kanälen.                                                                                   |
+| Tag      | Gesetzt von               | Inhalt                                                                                                                                       |
+| -------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `latest` | Attraccess-Releases       | Die mit einem Attraccess-Release veröffentlichte Plugin-Version. **Der Marktplatz eines Release-Hosts zeigt und installiert diese Version.** |
+| `next`   | Nightly-Builds von `main` | Builds aus erfolgreichen, hardwaregeprüften `main`-Builds, z. B. `0.2.0-nightly.1180.1` (Plugin-Version, dann `-nightly.<Lauf>.<Versuch>`).  |
+| `alpha`  | Niemand (veraltet)        | Eingefrorene Builds aus der Zeit vor den Release-Kanälen.                                                                                    |
 
 ### Welchen Kanal ein Host verwendet
 
@@ -38,9 +38,9 @@ Eine ausdrücklich gewählte Version (**Version verwalten** oder die API) hat im
 
 ### Nightly-Hosts folgen `next`
 
-Ein Plugin, das auf einem Nightly-Host über den Marktplatz oder über die API ohne Versionsangabe installiert wird, merkt sich `next` als gewünschte Version. Mit der Standard-Update-Richtlinie bringen die [automatischen Updates](#automatische-updates) es dann auf den neuesten kompatiblen Build von `next` (oder von `latest`, falls höher): von Nightly zu Nightly und von einem Nightly zum Release. Nur Plugins, die `next` wünschen, werden auf Nightly-Builds gebracht. Diese Regel gilt nur, solange die globale Update-Richtlinie nie gespeichert wurde; eine gespeicherte Richtlinie gilt unverändert.
+Ein Plugin, das auf einem Nightly-Host über den Marktplatz oder über die API ohne Versionsangabe installiert wird, merkt sich `next` als gewünschte Version. Mit der Standard-Update-Regel bringen die [automatischen Updates](#automatische-updates) es dann auf den neuesten kompatiblen Build von `next` (oder von `latest`, falls höher): von Nightly zu Nightly und von einem Nightly zum Release. Nur Plugins, die `next` wünschen, werden auf Nightly-Builds gebracht. Diese Regel gilt nur, solange die globale Update-Regel nie gespeichert wurde; eine gespeicherte Regel gilt unverändert.
 
-Auf einem Release-Host installiert die Standard-Richtlinie nie eine Vorabversion.
+Auf einem Release-Host installiert die Standard-Update-Regel nie eine Vorabversion.
 
 ### Ein Plugin auf `next` umstellen
 
@@ -52,25 +52,25 @@ Sobald ein Plugin einmal released wurde, bietet der Marktplatz eines Release-Hos
 
 Attraccess hält über npm installierte Plugins aktuell. Das gilt für jeden Host, ob Release oder Nightly. Als ZIP-Datei hochgeladene Plugins werden nicht aktualisiert.
 
-- **Prüfungen:** Der Host fragt die Registry des Plugins etwa stündlich nach neuen Versionen, und erneut, wenn das Wartungsfenster beginnt. **Einstellungen → Plugins** zeigt an, wenn ein Update verfügbar ist. Mit **Alle jetzt prüfen** auf dieser Seite prüfst du sofort.
+- **Prüfungen:** Der Host fragt die Registry des Plugins etwa stündlich nach neuen Versionen, und erneut, wenn das Wartungsfenster beginnt. **Einstellungen → Plugins** zeigt an, wenn ein Update verfügbar ist, das der Host selbst installieren darf; neuere Versionen, die er nie automatisch installiert (siehe unten), stehen nur unter **Version verwalten**. Mit **Alle jetzt prüfen** auf dieser Seite prüfst du sofort.
 - **Wartungsfenster:** Updates werden nur in diesem Fenster installiert, standardmäßig von 03:00 bis 05:00 Uhr. Es gilt die Ortszeit des Servers; in den offiziellen Docker-Images ist das UTC, sofern du `TZ` nicht setzt.
-- **Was installiert wird:** Mit der Standard-Richtlinie das neueste kompatible Patch- oder Minor-Release. Nightly-Hosts bringen außerdem Plugins, die `next` wünschen, auf Nightly-Builds, wie oben beschrieben.
-- **Nie automatisch installiert:** eine neue Hauptversion, eine Version mit zusätzlichen Berechtigungen, eine als veraltet markierte Version, eine mit dem Host nicht kompatible Version und ein Update, für das weitere Plugins installiert oder geändert werden müssten. Solche installierst du selbst über **Version verwalten**.
+- **Was installiert wird:** Mit der Standard-Update-Regel das neueste kompatible Patch- oder Minor-Release. Nightly-Hosts bringen außerdem Plugins, die `next` wünschen, auf Nightly-Builds, wie oben beschrieben.
+- **Nie automatisch installiert:** eine neue Hauptversion, eine Version mit zusätzlichen Berechtigungen, eine als veraltet markierte Version, eine mit dem Host nicht kompatible Version, ein Update, für das weitere Plugins installiert oder geändert werden müssten, eine Version, die ein anderer npm-Benutzer veröffentlicht hat als die installierte, und jede Version aus einer Registry auf einem anderen Rechner ohne HTTPS. Solche installierst du selbst über **Version verwalten**.
 - **Neustart:** Nach der Installation der fälligen Updates startet Attraccess einmal neu, um sie zu aktivieren. Lege das Fenster in eine Zeit, in der eine kurze Unterbrechung vertretbar ist.
 - **Fehler:** Kann ein Update nicht installiert werden, bleibt die installierte Version bestehen, das Server-Log nennt den Grund, und Attraccess versucht diese Version frühestens nach 24 Stunden erneut. Eine neuere Version wird ohne diese Pause versucht. Wird eine neue Version installiert, lädt aber nach dem Neustart nicht, kehrt Attraccess nicht zur vorherigen Version zurück: **Einstellungen → Plugins** zeigt den Fehler, und du kannst über **Version verwalten** eine andere Version wählen. Ein späteres Update wird weiterhin automatisch installiert.
-- **Audit-Log:** Jede automatische Installation, erfolgreich oder nicht, und ihre Aktivierung nach dem Neustart werden ohne Benutzer im Audit-Log festgehalten.
+- **Audit-Log:** Jede automatische Installation, erfolgreich oder nicht, und ihre Aktivierung nach dem Neustart werden ohne Benutzer im Audit-Log festgehalten (angezeigt als **System oder anonym**).
 
 ### Automatische Updates ausschalten
 
 Für ein einzelnes Plugin öffne **⋯ → Version verwalten**, stelle **Automatische Update-Regel des Plugins** auf **Aus** und speichere die Versionsregel. **Nur Patches** beschränkt das Plugin auf Patch-Releases.
 
-Für die globale Richtlinie gibt es noch keine Seite in der Weboberfläche. Ein Administrator, der Plugins verwalten darf, ändert sie mit `POST /api/plugins/update-policy`:
+Für die globale Update-Regel gibt es noch keine Seite in der Weboberfläche. Ein Administrator, der Plugins verwalten darf, ändert sie mit `POST /api/plugins/update-policy`:
 
 - `{"checksEnabled": false}`: keine Update-Prüfungen und keine automatische Installation.
 - `{"mode": "off"}`: Updates werden nicht automatisch installiert.
 - `{"maintenanceWindow": {"startMinute": 60, "durationMinutes": 120}}`: Das Fenster läuft von 01:00 bis 03:00 Uhr.
 
-Auf einem Nightly-Host ersetzt das Speichern eines beliebigen Teils der globalen Richtlinie, auch nur des Wartungsfensters, den unter [Nightly-Hosts folgen `next`](#nightly-hosts-folgen-next) beschriebenen Nightly-Standard. Die gespeicherte Richtlinie installiert keine Vorabversionen, solange du nicht `"prerelease": true` sendest. Um mit einer gespeicherten Richtlinie weiter Nightly-Builds zu folgen, sende zusätzlich `{"mode": "follow", "prerelease": true}`. Jedes Plugin folgt dann seiner gewünschten Version oder seinem Kanal.
+Auf einem Nightly-Host ersetzt das Speichern eines beliebigen Teils der globalen Update-Regel, auch nur des Wartungsfensters, den unter [Nightly-Hosts folgen `next`](#nightly-hosts-folgen-next) beschriebenen Nightly-Standard. Die gespeicherte Regel installiert keine Vorabversionen, solange du nicht `"prerelease": true` sendest. Um mit einer gespeicherten Regel weiter Nightly-Builds zu folgen, sende zusätzlich `{"mode": "follow", "prerelease": true}`. Jedes Plugin folgt dann seiner gewünschten Version oder seinem Kanal.
 
 Ein Plugin, dessen eigene Regel nicht **Globale Regel übernehmen** ist, verwendet diese anstelle des globalen Modus. Ausgeschaltete Update-Prüfungen (`checksEnabled: false`) gelten für alle Plugins.
 
