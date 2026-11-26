@@ -22,6 +22,8 @@ type LostHandler = (readerId: number, flowId: string) => Promise<void> | void;
 
 const SHOWING = 'reader-screen.showing';
 const SHOWING_TIMEOUT_MS = 5_000;
+/** How long a moved reader's claim must stay unexplained before its flow ends. */
+export const MOVED_RECHECK_MS = 1_000;
 
 /** True when this socket runs the flow that `owner` names. */
 export function socketRunsFlow(socket: AuthenticatedWebSocket, owner: string): boolean {
@@ -48,6 +50,9 @@ export class ReaderScreenService implements OnModuleInit {
   private readonly logger = new Logger(ReaderScreenService.name);
   private readonly lostHandlers = new Map<ReaderScreenFlow, LostHandler>();
   readonly cluster: ClusterService;
+
+  /** Shorter in tests. */
+  movedRecheckMs = MOVED_RECHECK_MS;
 
   constructor(
     @Optional() cluster?: ClusterService,
@@ -98,6 +103,17 @@ export class ReaderScreenService implements OnModuleInit {
     const owner = await this.cluster.claims.owner(readerId);
     const parsed = owner ? parseOwner(owner) : null;
     if (!owner || !parsed) return;
+    if (await this.runsAnywhere(readerId, owner)) return;
+    // A claim taken just now may be for an arm still on its way to the holder: only one nobody runs a moment later
+    // is the gone socket's.
+    await new Promise((resolve) => setTimeout(resolve, this.movedRecheckMs));
+    if ((await this.cluster.claims.owner(readerId)) !== owner || (await this.runsAnywhere(readerId, owner))) return;
+    await this.cluster.claims.release(readerId, owner);
+    this.logger.log(`Reader ${readerId} moved away from its gone instance; ending its ${parsed.flow} flow`);
+    await this.lostHandlers.get(parsed.flow)?.(readerId, parsed.flowId);
+  }
+
+  private async runsAnywhere(readerId: number, owner: string): Promise<boolean> {
     const holders = (await this.cluster.presence.holders(readerId)).map((holder) => holder.instanceId);
     const answers = await Promise.all(
       holders.map((instanceId) =>
@@ -107,10 +123,7 @@ export class ReaderScreenService implements OnModuleInit {
           .catch(() => true),
       ),
     );
-    if (answers.some(Boolean)) return;
-    await this.cluster.claims.release(readerId, owner);
-    this.logger.log(`Reader ${readerId} moved away from its gone instance; ending its ${parsed.flow} flow`);
-    await this.lostHandlers.get(parsed.flow)?.(readerId, parsed.flowId);
+    return answers.some(Boolean);
   }
 
   private runsLocally(readerId: number, owner: string): boolean {

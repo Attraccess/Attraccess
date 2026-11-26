@@ -158,7 +158,9 @@ Still per process: the requester's blocked supervision call and a plugin BLE lin
 schedulers and the other live topics. Pub/sub is fire-and-forget: a message published while an instance reconnects is
 lost, so outcomes that matter (supervision results, expiries) are also kept in Valkey and looked up after the deadline. A
 revoked or re-paired reader credential does not rely on its message either: each instance caches credentials for at
-most 10 s and checks the readers it holds against the database every 30 s.
+most 10 s and checks the readers it holds against the database every 30 s. If Valkey fails in the moment between arming a reader on another
+instance and recording it in the mass introduction, that reader can stay armed and busy until the session's 15 min
+lifetime ends.
 
 Also per instance, on purpose or as a known limit:
 

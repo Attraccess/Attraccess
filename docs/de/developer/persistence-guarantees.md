@@ -169,7 +169,9 @@ Metrik-Messwerte, Rate Limits ohne Valkey, Zeitgeber und die übrigen Live-Theme
 Eine Nachricht, die während eines Wiederverbindens veröffentlicht wird, geht verloren; wichtige Ergebnisse
 (Aufsichtsergebnisse, Abläufe) liegen deshalb zusätzlich in Valkey und werden nach der Frist nachgeschlagen. Ein
 widerrufener oder neu gekoppelter Leser-Schlüssel verlässt sich ebenfalls nicht auf seine Nachricht: Jede Instanz
-hält Schlüssel höchstens 10 s im Cache und prüft die Leser, die sie hält, alle 30 s gegen die Datenbank.
+hält Schlüssel höchstens 10 s im Cache und prüft die Leser, die sie hält, alle 30 s gegen die Datenbank. Fällt Valkey genau zwischen dem Scharfschalten eines Lesers auf einer
+anderen Instanz und seinem Eintrag in die Masseneinweisung aus, kann dieser Leser bis zum Ende der 15 min Laufzeit der
+Sitzung scharf und belegt bleiben.
 
 Ebenfalls je Instanz, gewollt oder als bekannte Grenze:
 

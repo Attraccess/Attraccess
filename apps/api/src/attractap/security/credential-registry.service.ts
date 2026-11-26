@@ -77,10 +77,9 @@ export class CredentialRegistryService {
     return value;
   }
 
-  /** As {@link isActive}, read from the database rather than the cache. */
-  public async isActiveNow(readerId: number, fingerprint: string): Promise<boolean> {
-    const credential = await this.store.findState(readerId);
-    return credential?.state === 'paired' && credential.fingerprint === fingerprint;
+  /** The reader's credential as the database has it now, bypassing the cache. */
+  public currentNow(readerId: number): Promise<ActiveCredential | null> {
+    return this.store.findState(readerId);
   }
 
   public invalidate(readerId: number): void {

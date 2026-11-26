@@ -54,8 +54,9 @@ export class ReaderCredentialRecheck implements OnModuleInit, OnModuleDestroy {
       }
       for (const [readerId, fingerprints] of held) {
         try {
-          const active = await Promise.all([...fingerprints].map((fp) => this.registry.isActiveNow(readerId, fp)));
-          if (active.every(Boolean)) continue;
+          const current = await this.registry.currentNow(readerId);
+          const active = (fingerprint: string) => current?.state === 'paired' && current.fingerprint === fingerprint;
+          if ([...fingerprints].every(active)) continue;
           this.logger.warn(`Reader ${readerId} holds a credential that is no longer active; disconnecting it`);
           // Handled as a change relayed from another instance: the cache is cleared and the sockets end here.
           this.events.emit(remoteEvent(CREDENTIAL_CHANGED_EVENT), readerId);

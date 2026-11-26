@@ -206,10 +206,9 @@ describe('CredentialRegistryService', () => {
       expect(await service.isActive(8, 'fp')).toBe(true);
       revokedElsewhere(8);
 
-      expect(await service.isActiveNow(8, 'fp')).toBe(false);
-      expect(await service.isActiveNow(8, 'other')).toBe(false);
+      expect((await service.currentNow(8))?.state).not.toBe('paired');
       seed(8, paired(8, 'fp'));
-      expect(await service.isActiveNow(8, 'fp')).toBe(true);
+      expect(await service.currentNow(8)).toEqual({ state: 'paired', fingerprint: 'fp' });
     });
   });
 });
