@@ -43,6 +43,18 @@ namespace Staging
     constexpr uint32_t NVS_RECORD_OFFSET = 3072;
     constexpr uint32_t VERIFIED_RECORD_OFFSET = 3584;
 
+    // The order a wipe erases the region in: everything behind the header sector first, the header sector last. A
+    // wipe cut short (power, flash error) keeps the header, so the region still counts as pending and the wipe is
+    // finished later (the plain app on the server's cancel, the secure app on its next boot). The other way round a
+    // cut could leave the plaintext NVS backup, incl. the reader's P-256 key, behind a header that is gone: never
+    // pending, never erased.
+    struct EraseRange
+    {
+        uint32_t offset;
+        uint32_t length;
+    };
+    constexpr EraseRange WIPE_ORDER[] = {{SECTOR, REGION_SIZE - SECTOR}, {HEADER_OFFSET, SECTOR}};
+
     constexpr uint32_t APP_SLOT_MAX = 0x640000;
     constexpr uint32_t HEADER_VERSION = 1;
     constexpr size_t HEADER_BYTES = 160;

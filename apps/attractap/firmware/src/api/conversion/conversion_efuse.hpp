@@ -23,6 +23,10 @@ namespace ConversionEfuse
     bool burnDigests(const Staging::Digest &digest0, const Staging::Digest &digest1);
 
     bool rdDisLocked();
+    // Secure Boot and flash encryption are both enabled: the only chip the secure app may migrate on (step 8).
+    bool chipSecured();
+    // KEY4 holds the NVS HMAC key: encrypted NVS was initialised on this chip before.
+    bool nvsKeyPresent();
     // KEY4 holds the NVS HMAC key and is read-protected: the state RD_DIS may be locked in.
     bool nvsKeyReadProtected();
     // Writes WR_DIS_RD_DIS once; true when the lock is (now) set. Always false where the lock is compiled out.

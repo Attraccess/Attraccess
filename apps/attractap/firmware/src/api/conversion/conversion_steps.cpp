@@ -146,7 +146,14 @@ namespace
     }
 
     // Writes the signed bootloader at 0x0 and reads it back; on failure puts the original bootloader back.
-    bool writeBootloader(const Staging::Header &header, std::string &shaHex)
+    enum class BootloaderWrite
+    {
+        Written,
+        Original,      // the original bootloader is in place: never touched, or written back
+        RestoreFailed, // neither read back: the reader must not restart
+    };
+
+    BootloaderWrite writeBootloader(const Staging::Header &header, std::string &shaHex)
     {
         const uint32_t size = header.bootloaderSize;
         std::unique_ptr<uint8_t[]> image(new (std::nothrow) uint8_t[size]);
@@ -155,7 +162,7 @@ namespace
         if (!image || !original || !readBack || !StagingFlash::read(Staging::BOOTLOADER_OFFSET, image.get(), size) ||
             esp_flash_read(nullptr, original.get(), BOOTLOADER_FLASH_OFFSET, size) != ESP_OK)
         {
-            return false;
+            return BootloaderWrite::Original; // nothing written
         }
         Staging::Digest digest{};
         for (int attempt = 0; attempt < BOOTLOADER_WRITE_ATTEMPTS; attempt++)
@@ -166,7 +173,7 @@ namespace
                 sha256(readBack.get(), size, digest) && digest == header.bootloaderSha256)
             {
                 shaHex = Staging::hex(digest.data(), digest.size());
-                return true;
+                return BootloaderWrite::Written;
             }
         }
         logger.error("Bootloader write did not read back; restoring the original bootloader");
@@ -177,10 +184,11 @@ namespace
                 esp_flash_read(nullptr, readBack.get(), BOOTLOADER_FLASH_OFFSET, size) == ESP_OK &&
                 memcmp(readBack.get(), original.get(), size) == 0)
             {
-                break;
+                return BootloaderWrite::Original;
             }
         }
-        return false;
+        logger.error("The original bootloader did not read back either; staying on without a restart");
+        return BootloaderWrite::RestoreFailed;
     }
 }
 
@@ -325,7 +333,7 @@ namespace ConversionClient
         if (!StagingFlash::readHeader(header) || id == 0 || id != header.conversionId || !bothBurned(header))
         {
             logger.error("Write-bootloader refused: no burned, staged conversion with this id");
-            sendControl(ConversionMessages::bootloaderWritten(id, false, ""));
+            sendControl(ConversionMessages::bootloaderWritten(id, false, "", ConversionMessages::BOOTLOADER_REFUSED));
             return;
         }
         s.header = header;
@@ -337,7 +345,8 @@ namespace ConversionClient
         if (!problems.empty() || !slot || !restageNvsIfChanged())
         {
             logger.error("Staged images or settings failed the re-check; not writing the bootloader");
-            sendControl(ConversionMessages::bootloaderWritten(id, false, ""));
+            sendControl(
+                ConversionMessages::bootloaderWritten(id, false, "", ConversionMessages::BOOTLOADER_RECHECK_FAILED));
             finish("re-verify failed");
             return;
         }
@@ -347,12 +356,24 @@ namespace ConversionClient
         logger.warn("Writing the secure bootloader; do not cut the power");
         const esp_partition_t *running = esp_ota_get_running_partition();
         std::string sha;
-        if (esp_ota_set_boot_partition(slot) != ESP_OK || !writeBootloader(header, sha))
+        const BootloaderWrite written =
+            esp_ota_set_boot_partition(slot) == ESP_OK ? writeBootloader(header, sha) : BootloaderWrite::Original;
+        if (written != BootloaderWrite::Written)
         {
-            // The original bootloader is back and the plain app still boots.
             if (running)
                 esp_ota_set_boot_partition(running);
-            sendControl(ConversionMessages::bootloaderWritten(id, false, sha));
+            if (written == BootloaderWrite::RestoreFailed)
+            {
+                // No valid bootloader at 0x0: a restart would brick the reader. The plain app stays on with
+                // "Don't unplug" (finish() keeps the Bootloader phase), so a retried write can still fix it.
+                sendControl(ConversionMessages::bootloaderWritten(id, false, "",
+                                                                  ConversionMessages::BOOTLOADER_RESTORE_FAILED));
+                finish("bootloader restore failed");
+                return;
+            }
+            // The original bootloader is back and the plain app still boots.
+            sendControl(
+                ConversionMessages::bootloaderWritten(id, false, sha, ConversionMessages::BOOTLOADER_WRITE_FAILED));
             ConversionUi::set(ConversionUi::Phase::Burn);
             finish("bootloader write failed");
             return;

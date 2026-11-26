@@ -4,11 +4,13 @@
 // signed_image_test.cpp.
 #include <ArduinoJson.h>
 
+#include <algorithm>
 #include <cstring>
 #include <string>
 #include <vector>
 
 #include "api/conversion/conversion_messages.hpp"
+#include "api/conversion/migration_plan.hpp"
 #include "api/conversion/nvs_backup_codec.hpp"
 #include "api/conversion/staging_format.hpp"
 #include "check.hpp"
@@ -53,6 +55,77 @@ namespace
               "progress sector records fit");
         CHECK(Staging::chunkCount(Staging::APP_SLOT_MAX) <= Staging::APP_BITMAP_BYTES * 8, "bitmap covers an app slot");
         CHECK(Staging::chunkCount(Staging::BOOTLOADER_MAX) <= Staging::BOOTLOADER_BITMAP_BYTES * 8, "and a bootloader");
+    }
+
+    // A wipe cut short at any sector (power, flash error) leaves either a valid header (still pending: NVS stays
+    // protected and the wipe is finished later) or nothing at all; never the NVS backup without its header.
+    void wipeOrder()
+    {
+        std::vector<uint8_t> written(Staging::REGION_SIZE, 0x5a);
+        Staging::encodeHeader(sampleHeader(), written.data());
+        std::vector<uint32_t> sectors;
+        uint32_t covered = 0;
+        for (const Staging::EraseRange &range : Staging::WIPE_ORDER)
+        {
+            CHECK(range.offset % Staging::SECTOR == 0 && range.length % Staging::SECTOR == 0, "sector aligned");
+            covered += range.length;
+            for (uint32_t at = range.offset; at < range.offset + range.length; at += Staging::SECTOR)
+                sectors.push_back(at);
+        }
+        CHECK(covered == Staging::REGION_SIZE, "a wipe covers the whole region once");
+        CHECK(!sectors.empty() && sectors.back() == Staging::HEADER_OFFSET, "the header sector is erased last");
+        for (size_t cut = 0; cut <= sectors.size(); cut++)
+        {
+            std::vector<uint8_t> flash = written;
+            for (size_t i = 0; i < cut; i++)
+                std::fill(flash.begin() + sectors[i], flash.begin() + sectors[i] + Staging::SECTOR, 0xff);
+            Staging::Header header;
+            const bool pending = Staging::decodeHeader(flash.data(), Staging::HEADER_BYTES, header);
+            const bool empty = std::all_of(flash.begin(), flash.end(), [](uint8_t b) { return b == 0xff; });
+            CHECK(pending != empty, "a wipe cut after " << cut << " sector(s) leaves a header or an empty region");
+        }
+    }
+
+    // Step 8 on the secure app's start-up, and every power cut of it: once the staged backup may be half erased (the
+    // MIGRATING marker is committed before the wipe starts), the next boot never restores from it again.
+    void migrationPlan()
+    {
+        using MigrationPlan::Start;
+        using MigrationPlan::alreadyMigrated;
+        using MigrationPlan::start;
+        CHECK(start(false, true, true, false) == Start::Normal, "plain builds never migrate");
+        CHECK(start(true, false, true, true) == Start::Normal, "no staged conversion: the usual NVS init");
+        CHECK(start(true, true, false, false) == Start::NotSecured &&
+                  start(true, true, false, true) == Start::NotSecured,
+              "no Secure Boot or flash encryption: NVS and staging untouched");
+        CHECK(start(true, true, true, false) == Start::Migrate, "staged and secured: migrate");
+        CHECK(start(true, true, true, true) == Start::FinishWipe, "migrated before a restart: only finish the wipe");
+
+        CHECK(!alreadyMigrated(false, 42, MigrationPlan::MIGRATING, 42), "no marker (first boot)");
+        CHECK(alreadyMigrated(true, 42, MigrationPlan::MIGRATING, 42), "MIGRATING: entries are in, the wipe was cut");
+        CHECK(alreadyMigrated(true, 42, MigrationPlan::MIGRATED, 42), "MIGRATED with a header left (wipe failed)");
+        CHECK(!alreadyMigrated(true, 42, MigrationPlan::FAILED, 42), "FAILED: restore again from the intact backup");
+        CHECK(!alreadyMigrated(true, 41, MigrationPlan::MIGRATED, 42), "a marker of an earlier conversion");
+
+        // Cut points of migrate(): {marker present, staged backup intact}. Restoring needs an intact backup.
+        struct Cut
+        {
+            const char *point;
+            bool marker;
+            bool backupIntact;
+        };
+        const Cut cuts[] = {{"before the NVS erase", false, true},
+                            {"after the encrypted NVS init", false, true},
+                            {"during the restore", false, true},
+                            {"after the MIGRATING marker", true, true},
+                            {"during the staging wipe", true, false}};
+        for (const Cut &cut : cuts)
+        {
+            const Start next = start(true, true, true, alreadyMigrated(cut.marker, 42, MigrationPlan::MIGRATING, 42));
+            CHECK(next != Start::Migrate || cut.backupIntact, "cut " << cut.point << ": never restore a wiped backup");
+            CHECK(next == Start::Migrate || next == Start::FinishWipe,
+                  "cut " << cut.point << ": the migration goes on");
+        }
     }
 
     void headerCodec()
@@ -306,8 +379,13 @@ namespace
         deserializeJson(doc, ConversionMessages::burnRefused(42, "stop-before-burn"));
         CHECK(doc["t"] == "conversion.burn-refused" && doc["reason"] == "stop-before-burn", "burn refusal");
         deserializeJson(doc, ConversionMessages::bootloaderWritten(42, true, SHA));
-        CHECK(doc["t"] == "conversion.bootloader-written" && doc["ok"] == true && doc["sha256"] == SHA,
+        CHECK(doc["t"] == "conversion.bootloader-written" && doc["ok"] == true && doc["sha256"] == SHA &&
+                  !doc["reason"].is<const char *>(),
               "bootloader written");
+        deserializeJson(doc, ConversionMessages::bootloaderWritten(42, false, "",
+                                                                   ConversionMessages::BOOTLOADER_RESTORE_FAILED));
+        CHECK(doc["ok"] == false && doc["sha256"] == "" && doc["reason"] == "restore-failed",
+              "a failed restore is reported apart from a failed write");
         deserializeJson(doc, ConversionMessages::chunkRequest(42, ConversionMessages::ITEM_BOOTLOADER, 8192, 4096));
         CHECK(doc["event"] == "EVENT" && doc["data"]["type"] == "FIRMWARE_REQUEST_CHUNK" &&
                   doc["data"]["payload"]["conversion"] == "bootloader" && doc["data"]["payload"]["offset"] == 8192 &&
@@ -319,6 +397,8 @@ namespace
 int main()
 {
     stagingLayout();
+    wipeOrder();
+    migrationPlan();
     headerCodec();
     progressBitmap();
     records();

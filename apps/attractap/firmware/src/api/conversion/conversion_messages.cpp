@@ -267,13 +267,17 @@ namespace ConversionMessages
         return serialize(doc);
     }
 
-    std::string bootloaderWritten(uint32_t id, bool ok, const std::string &sha256)
+    std::string bootloaderWritten(uint32_t id, bool ok, const std::string &sha256, const char *reason)
     {
         JsonDocument doc;
         doc["t"] = "conversion.bootloader-written";
         putId(doc, id);
         doc["ok"] = ok;
         doc["sha256"] = sha256;
+        if (!ok && reason)
+        {
+            doc["reason"] = reason;
+        }
         return serialize(doc);
     }
 

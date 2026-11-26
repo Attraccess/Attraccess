@@ -135,7 +135,13 @@ namespace ConversionMessages
     std::string burned(uint32_t id, const std::string &mac, const std::string &digest0, const std::string &digest1,
                        const char *key0Purpose, const char *key1Purpose);
     std::string burnRefused(uint32_t id, const char *reason);
-    std::string bootloaderWritten(uint32_t id, bool ok, const std::string &sha256);
+    // `reason` of a failed `conversion.bootloader-written` (omitted on success). Only restore-failed leaves the
+    // reader unbootable: it stays on, without a restart, showing "Don't unplug", so a retried write can still fix it.
+    constexpr const char *BOOTLOADER_REFUSED = "refused";              // no burned, staged conversion with this id
+    constexpr const char *BOOTLOADER_RECHECK_FAILED = "recheck-failed"; // staged images or settings failed the re-check
+    constexpr const char *BOOTLOADER_WRITE_FAILED = "write-failed";    // did not read back; the original is back
+    constexpr const char *BOOTLOADER_RESTORE_FAILED = "restore-failed"; // and the original did not read back either
+    std::string bootloaderWritten(uint32_t id, bool ok, const std::string &sha256, const char *reason = nullptr);
 
     // Item names of the chunk request.
     constexpr const char *ITEM_APP = "app";

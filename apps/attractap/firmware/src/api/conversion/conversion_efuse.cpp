@@ -11,7 +11,9 @@
 #include "esp_efuse.h"
 #include "esp_efuse_table.h"
 #include "esp_flash.h"
+#include "esp_flash_encrypt.h"
 #include "esp_heap_caps.h"
+#include "esp_secure_boot.h"
 #include "psa/crypto.h"
 
 namespace
@@ -125,11 +127,20 @@ namespace ConversionEfuse
         return esp_efuse_read_field_bit(ESP_EFUSE_WR_DIS_RD_DIS);
     }
 
-    bool nvsKeyReadProtected()
+    bool chipSecured()
+    {
+        return esp_secure_boot_enabled() && esp_flash_encryption_enabled();
+    }
+
+    bool nvsKeyPresent()
     {
         const esp_efuse_block_t block = keyBlock(4);
-        return esp_efuse_get_key_purpose(block) == ESP_EFUSE_KEY_PURPOSE_HMAC_UP && !esp_efuse_key_block_unused(block) &&
-               esp_efuse_get_key_dis_read(block);
+        return esp_efuse_get_key_purpose(block) == ESP_EFUSE_KEY_PURPOSE_HMAC_UP && !esp_efuse_key_block_unused(block);
+    }
+
+    bool nvsKeyReadProtected()
+    {
+        return nvsKeyPresent() && esp_efuse_get_key_dis_read(keyBlock(4));
     }
 
     bool lockRdDis()
@@ -156,6 +167,8 @@ namespace ConversionEfuse
     const char *keyPurposeName(int) { return "USER"; }
     bool burnDigests(const Staging::Digest &, const Staging::Digest &) { return false; }
     bool rdDisLocked() { return false; }
+    bool chipSecured() { return false; }
+    bool nvsKeyPresent() { return false; }
     bool nvsKeyReadProtected() { return false; }
     bool lockRdDis() { return false; }
 }

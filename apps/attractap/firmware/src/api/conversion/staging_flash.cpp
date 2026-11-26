@@ -99,8 +99,14 @@ namespace StagingFlash
 
     bool wipe()
     {
-        return erase(Staging::HEADER_OFFSET, Staging::SECTOR) &&
-               erase(Staging::SECTOR, Staging::REGION_SIZE - Staging::SECTOR);
+        for (const Staging::EraseRange &range : Staging::WIPE_ORDER)
+        {
+            if (!erase(range.offset, range.length))
+            {
+                return false; // the header stays: still pending, wiped again later
+            }
+        }
+        return true;
     }
 
     uint32_t appChunksDone(const Staging::Header &header)

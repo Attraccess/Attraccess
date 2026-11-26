@@ -16,10 +16,11 @@ namespace StagingFlash
     bool erase(uint32_t offset, size_t length);
 
     bool readHeader(Staging::Header &out);
-    // Writes a new header after wiping the whole region.
+    // Writes a new header after wiping the whole region. A cut during the wipe leaves the old header (another
+    // conversion, so the next offer starts over); a cut after it leaves no header.
     bool startTransfer(const Staging::Header &header);
-    // Erases the region, the header sector first: a power cut half way leaves no header, so nothing half-staged is
-    // ever taken for a conversion.
+    // Erases the region in Staging::WIPE_ORDER, the header sector last: a wipe cut short still counts as pending, so
+    // the plaintext NVS backup is never left behind without a header.
     bool wipe();
 
     // Progress bitmaps (staging_format.hpp): chunks done in a row, and marking one more done.
