@@ -231,7 +231,7 @@ export class UsageAccessCache {
     }
     // Without a retry limit SUBSCRIBE waits in the offline queue until Valkey is reachable, instead of failing for
     // good when Valkey is down at startup. Once subscribed, ioredis subscribes again after every reconnect.
-    this.authorizationCacheSubscriber = this.valkeyClient.duplicate({ maxRetriesPerRequest: null });
+    this.authorizationCacheSubscriber = this.valkeyClient.duplicate({ maxRetriesPerRequest: null, commandTimeout: undefined });
     logValkeyOutages(this.authorizationCacheSubscriber, this.logger, {
       lost: (reason) =>
         `Authorization cache invalidation subscriber lost its Valkey connection (${reason}); ` +

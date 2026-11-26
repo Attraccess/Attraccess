@@ -137,7 +137,7 @@ export class ValkeyClusterBus implements ClusterBus {
 
   start(): void {
     // Without a retry limit SUBSCRIBE waits until Valkey is reachable instead of failing for good at startup.
-    const subscriber = this.client.duplicate({ maxRetriesPerRequest: null });
+    const subscriber = this.client.duplicate({ maxRetriesPerRequest: null, commandTimeout: undefined });
     this.subscriber = subscriber;
     logValkeyOutages(subscriber, this.logger, {
       lost: (reason) =>
