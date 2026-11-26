@@ -248,6 +248,7 @@ export class ShellyController {
   }
 
   @Post('devices')
+  @NotAnMcpTool('Network probe: the server connects to a caller-chosen IP address')
   async add(@Body() body: AddDeviceBody): Promise<ShellyDevice> {
     if (body?.ipAddress !== undefined && typeof body.ipAddress !== 'string') {
       throw new BadRequestException('ipAddress must be a string');
