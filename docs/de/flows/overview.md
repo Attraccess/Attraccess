@@ -54,5 +54,5 @@ Ein **Ressourcen-Flow** gehört zu einer Ressource und reagiert auf deren Ereign
 - [Payloads, Variablen & Vorlagen](flows/payloads-variables-templates.md) -- Knotendaten und gespeicherte Werte verwenden
 - [Globale Flows](flows/global-flows.md) -- Flows, die auf jede Ressource reagieren
 - [Knotentypen](flows/node-types.md) -- Alle verfügbaren Knotentypen
-- [MQTT & IoT](mqtt/overview.md) -- Hardware verbinden
+- [MQTT & IoT](devices/mqtt/overview.md) -- Hardware verbinden
 - [Abrechnung](billing/overview.md) -- Kostenerfassung automatisieren

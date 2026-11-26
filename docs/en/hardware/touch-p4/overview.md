@@ -51,10 +51,10 @@ Written from the board by the `build` and `render` targets (see [Working on the 
 | --- | --- |
 | ![KiCad 3D render of the component side](../../../_media/hardware/touch-p4/board-top.png) | ![KiCad 3D render of the display side](../../../_media/hardware/touch-p4/board-bottom.png) |
 
-- [Schematic](https://github.com/Attraccess/Attraccess/blob/main/docs/_media/hardware/touch-p4/schematic.pdf) (PDF, every sheet)
-- [Copper and silkscreen of the component side](https://github.com/Attraccess/Attraccess/blob/main/docs/_media/hardware/touch-p4/board-front.pdf) and [of the display side](https://github.com/Attraccess/Attraccess/blob/main/docs/_media/hardware/touch-p4/board-back.pdf) (PDF, 1:1, for the paper check in the [bring-up plan](hardware/touch-p4/bring-up.md#before-ordering))
+- [Schematic](_media/hardware/touch-p4/schematic.pdf ':ignore') (PDF, every sheet)
+- [Copper and silkscreen of the component side](_media/hardware/touch-p4/board-front.pdf ':ignore') and [of the display side](_media/hardware/touch-p4/board-back.pdf ':ignore') (PDF, 1:1, for the paper check in the [bring-up plan](hardware/touch-p4/bring-up.md#before-ordering))
 - [Fabrication drawing](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/fab/jlcpcb/attractap-touch-p4-fab.pdf) and [assembly drawing](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/fab/jlcpcb/attractap-touch-p4-assembly.pdf) (PDF, part of the order package, see [Ordering at JLCPCB](#ordering-at-jlcpcb))
-- [Installation manual](hardware/touch-p4/installation-manual.md) of the case, also as [PDF](https://github.com/Attraccess/Attraccess/blob/main/docs/_media/hardware/touch-p4/attractap-installation-manual.pdf)
+- [Installation manual](hardware/touch-p4/installation-manual.md) of the case, also as [PDF](_media/hardware/touch-p4/attractap-installation-manual-en.pdf ':ignore')
 
 ## Project folder
 

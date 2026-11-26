@@ -66,12 +66,31 @@
   - [Firmware-Updates](attractap/firmware-updates.md)
   - [Reader-Sicherheit](attractap/reader-security.md)
   - [Reader-Anzeige](attractap/reader-ui.md)
+  - [LED-Leitfaden (Lite)](attractap/led-guide.md)
 
-- **MQTT & IoT**
-  - [Überblick](mqtt/overview.md)
-  - [Server einrichten](mqtt/server-setup.md)
-  - [Nachrichten-Explorer](mqtt/message-explorer.md)
-  - [Beispiele](mqtt/examples.md)
+- **Hardware**
+  - [Waveshare ESP32-S3-Touch-LCD-4 (Touch V1, V2)](hardware/waveshare-esp32-s3-touch-lcd-4.md)
+  - **Attractap Touch P4 (in Entwicklung)**
+    - [Überblick](hardware/touch-p4/overview.md)
+    - [Spezifikation](hardware/touch-p4/spec.md)
+    - [Designnotizen](hardware/touch-p4/design-notes.md)
+    - [Design-Review](hardware/touch-p4/review.md)
+    - [Bauteile](hardware/touch-p4/parts.md)
+    - [Simulationen](hardware/touch-p4/simulations.md)
+    - [Platinengenerator](hardware/touch-p4/board-generator.md)
+    - [Firmware-Portierung](hardware/touch-p4/firmware-port.md)
+    - [Inbetriebnahmeplan](hardware/touch-p4/bring-up.md)
+    - [Konformität](hardware/touch-p4/compliance.md)
+    - [Konformitätsquellen](hardware/touch-p4/compliance-sources.md)
+    - [Freigabe](hardware/touch-p4/release.md)
+    - [Gehäuse](hardware/touch-p4/case.md)
+    - [Installationsanleitung](hardware/touch-p4/installation-manual.md)
+
+- **Geräte**
+  - [MQTT](devices/mqtt/overview.md)
+  - [MQTT-Server einrichten](devices/mqtt/server-setup.md)
+  - [MQTT-Nachrichten-Explorer](devices/mqtt/message-explorer.md)
+  - [MQTT-Beispiele](devices/mqtt/examples.md)
 
 - **Abrechnung**
   - [Überblick](billing/overview.md)

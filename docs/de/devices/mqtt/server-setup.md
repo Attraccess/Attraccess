@@ -118,8 +118,8 @@ Mit dem installierten **RabbitMQ-Plugin** zeigt ein MQTT-Server, den Attraccess 
 
 ## Siehe auch
 
-- [Ueberblick](mqtt/overview.md) -- Was ist MQTT?
-- [Nachrichten-Explorer](mqtt/message-explorer.md) -- MQTT-Nachrichten live beobachten und senden
-- [Beispiele](mqtt/examples.md) -- Praktische MQTT-Integrationsbeispiele
+- [Ueberblick](devices/mqtt/overview.md) -- Was ist MQTT?
+- [Nachrichten-Explorer](devices/mqtt/message-explorer.md) -- MQTT-Nachrichten live beobachten und senden
+- [Beispiele](devices/mqtt/examples.md) -- Praktische MQTT-Integrationsbeispiele
 - [Flows & Automatisierung](flows/overview.md) -- Automatisierungs-Workflows erstellen
 - [Umgebungsvariablen](installation/environment-variables.md) -- Serverkonfiguration

@@ -436,6 +436,6 @@ Beispiel nach **Auf MQTT-Nachricht warten** mit Inhalt `{"heartbeats":1500}`: **
 
 - [Payloads, Variablen & Vorlagen](flows/payloads-variables-templates.md) — Datenpfade und vollständige Beispiele
 - [Flow-Editor](flows/flow-editor.md) — Knoten hinzufügen und verbinden
-- [MQTT & IoT](mqtt/overview.md) — MQTT-Server konfigurieren
+- [MQTT & IoT](devices/mqtt/overview.md) — MQTT-Server konfigurieren
 - [Zähler](flows/energy-metering.md) — Beliebigen Verbrauch erfassen und abrechnen
 - [Abrechnung](billing/overview.md) — Details zum Abrechnungssystem

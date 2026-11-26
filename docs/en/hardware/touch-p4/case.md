@@ -18,7 +18,7 @@ A 3D-printable case for the [Attractap Touch P4 board](hardware/touch-p4/overvie
 - A cable either disappears into the wall behind the dock or leaves through a notch at the bottom, where a cable tie on a saddle inside the cap takes the pull off the jack.
 - Screws go into heat-set inserts. The reader comes off the wall with two screws, the board out of the cap with four more.
 
-The [installation manual](hardware/touch-p4/installation-manual.md) ([PDF](https://github.com/Attraccess/Attraccess/blob/main/docs/_media/hardware/touch-p4/attractap-installation-manual.pdf)) shows every step with figures: parts and hardware list, inserts, assembly, drilling template, cable routes, desk stand and service.
+The [installation manual](hardware/touch-p4/installation-manual.md) ([PDF](_media/hardware/touch-p4/attractap-installation-manual-en.pdf ':ignore')) shows every step with figures: parts and hardware list, inserts, assembly, drilling template, cable routes, desk stand and service.
 
 ## Design files
 
@@ -65,7 +65,7 @@ The scripts are plain Python without dependencies; run them with `python3 -I`. T
 | `manual/tools/scenes.py`, `scenelib.py` | Scene and camera set-up and the labels of the manual's figures |
 | `manual/tools/gen_hardware.py`, `gen_strain_relief.py`, `gen_wall_route.py` | Step files that add screws, inserts, cables and cable ties to the manual's scene file |
 | `manual/tools/drill.py` | The drilling template |
-| `manual/tools/build_pdf.py` | The manual PDF, `docs/_media/hardware/touch-p4/attractap-installation-manual.pdf`, from the manual's page `docs/en/hardware/touch-p4/installation-manual.md` (needs a Chromium-based browser) |
+| `manual/tools/build_pdf.py` | The manual PDFs, `docs/_media/hardware/touch-p4/attractap-installation-manual-en.pdf` and `-de.pdf`, from the manual's pages `docs/en/hardware/touch-p4/installation-manual.md` and `docs/de/hardware/touch-p4/installation-manual.md` (needs a Chromium-based browser) |
 
 ## Not yet verified
 

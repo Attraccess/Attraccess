@@ -15,7 +15,7 @@ This manual describes the CAD design, revision 2. No part has been printed or te
 
 ## Parts, hardware and tools
 
-One reader needs five printed parts for the wall, six for the desk. The print files are in [`../cad/`](https://github.com/Attraccess/Attraccess/tree/main/apps/attractap/hardware/touch-p4/case/cad); each 3MF already lies on its print face.
+One reader needs five printed parts for the wall, six for the desk. The print files are in [`case/cad/`](https://github.com/Attraccess/Attraccess/tree/main/apps/attractap/hardware/touch-p4/case/cad); each 3MF already lies on its print face.
 
 | Printed part | File | Qty | Colour | Prints lying on |
 | --- | --- | --- | --- | --- |

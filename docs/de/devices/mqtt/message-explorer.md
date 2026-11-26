@@ -74,6 +74,6 @@ Ein Abonnement wird pro Person, Server und Filter höchstens einmal in 5 Minuten
 
 ## Siehe auch
 
-- [MQTT-Server einrichten](mqtt/server-setup.md)
+- [MQTT-Server einrichten](devices/mqtt/server-setup.md)
 - [Flow-Editor](flows/flow-editor.md)
 - [Knotentypen](flows/node-types.md)

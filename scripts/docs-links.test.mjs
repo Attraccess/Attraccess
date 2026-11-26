@@ -5,8 +5,9 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 // Checks internal links in docs/<lang>/ the way the docs site (docsify 4.13.1, hash routing, relativePath off)
-// resolves them. Not handled, because the docs do not use them: setext headings, headings inside blockquotes or
-// lists, reference-style links, raw <a href> links, links split across lines and percent-encoded anchors.
+// resolves them, and that the English and German docs have the same pages. Not handled, because the docs do not use
+// them: setext headings, headings inside blockquotes or lists, reference-style links, raw <a href> links, links split
+// across lines and percent-encoded anchors.
 
 const DOCS = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'docs');
 const LANGUAGES = ['en', 'de'];
@@ -100,19 +101,27 @@ function anchorsOf(file) {
   return anchorCache.get(file);
 }
 
-/** Internal links of a line, with inline code removed: { image, target }. Links docsify does not compile are skipped. */
+/**
+ * Internal links of a line, with inline code removed: { image, target }, plus raw: true for ':ignore' links, which
+ * docsify leaves to the browser. Web links and ':include' embeds are skipped.
+ */
 function internalLinks(line) {
   const links = [];
   const pattern = /(!?)\[[^\]]*\]\(([^)\s]+)(?:\s+("[^"]*"|'[^']*'))?\)/g;
   for (const [, bang, target, title = ''] of line.replace(/`[^`]*`/g, '').matchAll(pattern)) {
-    if (/^(https?:|mailto:|#\/)/.test(target) || /:(ignore|include)\b/.test(title)) continue;
-    links.push({ image: bang === '!', target });
+    if (/^(https?:|mailto:|#\/)/.test(target) || /:include\b/.test(title)) continue;
+    links.push({ image: bang === '!', target, ...(/:ignore\b/.test(title) && { raw: true }) });
   }
   return links;
 }
 
-function linkProblem(file, languageRoot, { image, target }) {
+function linkProblem(file, languageRoot, { image, target, raw }) {
   const [pathPart, anchor] = target.split('#');
+  if (raw) {
+    // The browser resolves it from the folder of index.html: docs/ on docs.attraccess.org and under the API's /docs/.
+    if (/^[./]/.test(pathPart)) return `${target} (':ignore' link; write it from the docs folder, e.g. _media/x.pdf)`;
+    return fs.existsSync(path.join(DOCS, pathPart)) ? null : `${target} (missing file)`;
+  }
   if (image) {
     // Images are resolved from the page's folder.
     return fs.existsSync(path.resolve(path.dirname(file), pathPart)) ? null : `${target} (missing image)`;
@@ -192,6 +201,41 @@ test('relative page links are rejected, relative images are resolved from the pa
   assert.match(linkProblem(file, root, { image: true, target: '../missing.png' }), /missing image/);
 });
 
-test('links with a single-quoted title are checked, :ignore links are skipped', () => {
-  assert.deepEqual(internalLinks("[a](x.md#c 'title') and [b](y.md ':ignore')"), [{ image: false, target: 'x.md#c' }]);
+test('links with a single-quoted title are checked, :ignore links are marked raw, :include embeds skipped', () => {
+  assert.deepEqual(internalLinks("[a](x.md#c 'title') and [b](y.pdf ':ignore') and [c](z.md ':include')"), [
+    { image: false, target: 'x.md#c' },
+    { image: false, target: 'y.pdf', raw: true },
+  ]);
+});
+
+test(':ignore links are resolved from the docs folder', () => {
+  const file = path.join(DOCS, 'en', 'home.md');
+  const root = path.join(DOCS, 'en');
+  assert.equal(linkProblem(file, root, { image: false, target: '_media/logo.png', raw: true }), null);
+  assert.match(
+    linkProblem(file, root, { image: false, target: '../_media/logo.png', raw: true }),
+    /from the docs folder/,
+  );
+  assert.match(linkProblem(file, root, { image: false, target: '_media/missing.pdf', raw: true }), /missing file/);
+});
+
+/** Sidebar entries in order with their depth: page links, and "section" for a heading (its title is translated). */
+function sidebarOutline(language) {
+  return fs
+    .readFileSync(path.join(DOCS, language, '_sidebar.md'), 'utf8')
+    .split('\n')
+    .flatMap((line) => {
+      const depth = line.match(/^(\s*)- /)?.[1].length;
+      if (depth === undefined) return [];
+      return [`${depth} ${line.match(/\]\(([^)\s]+)/)?.[1] ?? 'section'}`];
+    });
+}
+
+test('the German docs have the same pages and sidebar as the English docs', () => {
+  const pages = (language) =>
+    markdownFiles(path.join(DOCS, language))
+      .map((file) => path.relative(path.join(DOCS, language), file))
+      .sort();
+  assert.deepEqual(pages('de'), pages('en'));
+  assert.deepEqual(sidebarOutline('de'), sidebarOutline('en'));
 });

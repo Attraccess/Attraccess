@@ -29,7 +29,7 @@ im Browser in Betrieb, benennen seine Ein- und Ausgänge, lesen Modbus-Zähler u
 - Upgrade von 1.x: Die 1.x-Tabellen und -Daten des Plugins bleiben erhalten und werden an Ort und Stelle übernommen.
   Aktualisieren Sie vorher auf Attraccess 1.11 (siehe
   [Upgrade auf Attraccess 2.0](installation/updating.md#upgrade-auf-attraccess-20)).
-- Ein in Attraccess eingerichteter [MQTT-Server](mqtt/server-setup.md), den der Controller erreichen kann.
+- Ein in Attraccess eingerichteter [MQTT-Server](devices/mqtt/server-setup.md), den der Controller erreichen kann.
 - WAGO-CC100-Hardware (`751-9301`, Firmware 31) im selben privaten Netzwerk wie Attraccess. Die getestete Kompatibilität
   steht unter [Produktivbetrieb und Kompatibilität](plugins/wago/production-support.md).
 - Optional: Modbus-Geräte an der RS-485-Schnittstelle des Controllers, zum Beispiel ein WAGO-879-3020-Zähler.

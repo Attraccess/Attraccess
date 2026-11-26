@@ -1,5 +1,6 @@
-"""Builds the installation manual's PDF, docs/_media/hardware/touch-p4/attractap-installation-manual.pdf, from its page in
-the documentation, docs/en/hardware/touch-p4/installation-manual.md (paths from the repository root).
+"""Builds the installation manual's PDFs, docs/_media/hardware/touch-p4/attractap-installation-manual-<lang>.pdf, from its
+pages in the documentation, docs/<lang>/hardware/touch-p4/installation-manual.md, in English and German (paths from the
+repository root).
 
     python3 -I build_pdf.py [path to a Chromium-based browser]
 
@@ -9,8 +10,9 @@ the manual uses: headings, paragraphs, tables, numbered lists, bullet and check 
 import html, os, re, shutil, subprocess, sys, tempfile
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), *[".."] * 7))
-PAGE = os.path.join(REPO, "docs", "en", "hardware", "touch-p4", "installation-manual.md")
-OUT = os.path.join(REPO, "docs", "_media", "hardware", "touch-p4", "attractap-installation-manual.pdf")
+LANGUAGES = ("en", "de")
+PAGE = os.path.join(REPO, "docs", "{lang}", "hardware", "touch-p4", "installation-manual.md")
+OUT = os.path.join(REPO, "docs", "_media", "hardware", "touch-p4", "attractap-installation-manual-{lang}.pdf")
 BROWSERS = ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Chromium.app/Contents/MacOS/Chromium",
             "chromium", "chromium-browser", "google-chrome"]
 
@@ -38,21 +40,21 @@ figure + p { color: #5E6A72; font-size: 9.5pt; break-before: avoid; }
 """
 
 
-SITE = "https://docs.attraccess.org/#/en/"
+SITE = "https://docs.attraccess.org/#/{lang}/"
 
 
-def href(target):
+def href(target, lang):
     """A page of the documentation (written from the language root, as the docs site wants it) becomes its address on
     the docs site; web links stay as they are."""
     page, _, anchor = target.partition("#")
     if re.match(r"^[a-z]+:", target) or not page.endswith(".md"):
         return target
-    return SITE + page[:-3] + (f"?id={anchor}" if anchor else "")
+    return SITE.format(lang=lang) + page[:-3] + (f"?id={anchor}" if anchor else "")
 
 
-def inline(text):
+def inline(text, lang):
     t = html.escape(text, quote=False)
-    t = re.sub(r"(\]\()([^)\s]+)\)", lambda m: m.group(1) + href(m.group(2)) + ")", t)
+    t = re.sub(r"(\]\()([^)\s]+)\)", lambda m: m.group(1) + href(m.group(2), lang) + ")", t)
     t = re.sub(r"\[`([^`]+)`\]\(([^)]+)\)", r'<a href="\2"><code>\1</code></a>', t)
     t = re.sub(r"`([^`]+)`", r"<code>\1</code>", t)
     t = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', t)
@@ -63,32 +65,32 @@ def cells(line):
     return [c.strip() for c in line.strip().strip("|").split("|")]
 
 
-def block(lines):
+def block(lines, lang):
     first = lines[0]
     m = re.match(r"(#{1,3}) (.*)", first)
     if m:
-        return f"<h{len(m.group(1))}>{inline(m.group(2))}</h{len(m.group(1))}>"
+        return f"<h{len(m.group(1))}>{inline(m.group(2), lang)}</h{len(m.group(1))}>"
     m = re.match(r"!\[(.*)\]\((.+)\)$", first)
     if m:
         return f'<figure><img src="{html.escape(m.group(2))}" alt="{html.escape(m.group(1))}"></figure>'
     if first.startswith("|"):
         head, body = cells(first), [cells(l) for l in lines[2:]]
-        rows = "".join("<tr>" + "".join(f"<td>{inline(c)}</td>" for c in r) + "</tr>" for r in body)
-        return "<table><tr>" + "".join(f"<th>{inline(c)}</th>" for c in head) + "</tr>" + rows + "</table>"
+        rows = "".join("<tr>" + "".join(f"<td>{inline(c, lang)}</td>" for c in r) + "</tr>" for r in body)
+        return "<table><tr>" + "".join(f"<th>{inline(c, lang)}</th>" for c in head) + "</tr>" + rows + "</table>"
     if re.match(r"\d+\. ", first):
-        return "<ol>" + "".join(f"<li>{inline(re.sub(r'^\d+\. ', '', l))}</li>" for l in lines) + "</ol>"
+        return "<ol>" + "".join(f"<li>{inline(re.sub(r'^\d+\. ', '', l), lang)}</li>" for l in lines) + "</ol>"
     if first.startswith("- [ ] "):
-        return '<ul class="check">' + "".join(f"<li>{inline(l[6:])}</li>" for l in lines) + "</ul>"
+        return '<ul class="check">' + "".join(f"<li>{inline(l[6:], lang)}</li>" for l in lines) + "</ul>"
     if first.startswith("- "):
-        return "<ul>" + "".join(f"<li>{inline(l[2:])}</li>" for l in lines) + "</ul>"
-    return f"<p>{inline(' '.join(lines))}</p>"
+        return "<ul>" + "".join(f"<li>{inline(l[2:], lang)}</li>" for l in lines) + "</ul>"
+    return f"<p>{inline(' '.join(lines), lang)}</p>"
 
 
-def to_html(markdown):
+def to_html(markdown, lang):
     blocks = [b.splitlines() for b in re.split(r"\n\s*\n", markdown.strip())]
     title = html.escape(blocks[0][0].lstrip("# "))
-    return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><title>{title}</title><style>{CSS}</style></head><body>'
-            + "\n".join(block(b) for b in blocks) + "</body></html>")
+    return (f'<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><title>{title}</title><style>{CSS}</style></head><body>'
+            + "\n".join(block(b, lang) for b in blocks) + "</body></html>")
 
 
 def browser():
@@ -100,13 +102,15 @@ def browser():
 
 
 if __name__ == "__main__":
-    out = OUT
-    page = os.path.join(os.path.dirname(PAGE), ".manual-print.html")   # next to the page: its image links resolve
-    open(page, "w").write(to_html(open(PAGE).read()))
-    try:
-        with tempfile.TemporaryDirectory() as profile:
-            subprocess.run([browser(), "--headless=new", "--disable-gpu", "--no-pdf-header-footer", f"--user-data-dir={profile}",
-                            f"--print-to-pdf={out}", "file://" + page], check=True, capture_output=True, timeout=180)
-    finally:
-        os.remove(page)
-    print("ok", out)
+    for lang in LANGUAGES:
+        source, out = PAGE.format(lang=lang), OUT.format(lang=lang)
+        page = os.path.join(os.path.dirname(source), ".manual-print.html")   # next to the page: its image links resolve
+        open(page, "w").write(to_html(open(source).read(), lang))
+        try:
+            with tempfile.TemporaryDirectory() as profile:
+                subprocess.run([browser(), "--headless=new", "--disable-gpu", "--no-pdf-header-footer",
+                                f"--user-data-dir={profile}", f"--print-to-pdf={out}", "file://" + page],
+                               check=True, capture_output=True, timeout=180)
+        finally:
+            os.remove(page)
+        print("ok", out)

@@ -4,7 +4,7 @@
 Diese Seite zeigt praktische Beispiele, wie Sie MQTT mit Attraccess verwenden können, um Maschinen zu steuern, Sensordaten zu empfangen und Geräte in Produktions- und Laborumgebungen zu automatisieren.
 
 > [!NOTE]
-> Alle Beispiele setzen voraus, dass Sie bereits [einen MQTT-Broker verbunden](mqtt/server-setup.md) haben und mit den Grundlagen von [Flows](flows/overview.md) vertraut sind.
+> Alle Beispiele setzen voraus, dass Sie bereits [einen MQTT-Broker verbunden](devices/mqtt/server-setup.md) haben und mit den Grundlagen von [Flows](flows/overview.md) vertraut sind.
 
 ## Beispiel 1: Maschinensteuerung ueber MQTT-Relais
 
@@ -127,8 +127,8 @@ Siehe [Knotentypen](flows/node-types.md) fuer eine vollstaendige Liste der verfu
 
 ## Siehe auch
 
-- [Ueberblick](mqtt/overview.md) -- Was ist MQTT?
-- [Server einrichten](mqtt/server-setup.md) -- Attraccess mit einem MQTT-Broker verbinden
+- [Ueberblick](devices/mqtt/overview.md) -- Was ist MQTT?
+- [Server einrichten](devices/mqtt/server-setup.md) -- Attraccess mit einem MQTT-Broker verbinden
 - [Flows & Automatisierung](flows/overview.md) -- Automatisierungs-Workflows erstellen
 - [Flow-Editor](flows/flow-editor.md) -- Den visuellen Editor verwenden
 - [Knotentypen](flows/node-types.md) -- Alle verfuegbaren Knotentypen

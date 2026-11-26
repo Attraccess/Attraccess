@@ -248,12 +248,32 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Firmware-Updates](https://docs.attraccess.org/de/attractap/firmware-updates.md): Wie Attractap-Leser Over-the-Air-Firmware-Updates vom Attraccess-Backend erhalten, inklusive Firmware-Varianten und Fehlerbehebung.
 - [Reader-Sicherheit](https://docs.attraccess.org/de/attractap/reader-security.md): Wie Attractap-Touch-V2-Reader gesichert werden, damit sie nur mit deinen eigenen Secure-Boot-Schlüsseln signierte Firmware akzeptieren, inklusive Backup und Wiederherstellung der Schlüssel.
 - [Reader-Anzeige](https://docs.attraccess.org/de/attractap/reader-ui.md): Wie Plugins Hinweise und Abfragen auf Attractap-Bildschirmen anzeigen, welche Leser das können, sowie Admin-Einstellungen und Alarme.
+- [LED-Leitfaden (Lite)](https://docs.attraccess.org/de/attractap/led-guide.md): Erklärt die Animationen des LED-Rings und die einmaligen Rückmeldungen des displaylosen Attractap-Lite-Lesers.
 
-## Deutsch: MQTT & IoT
-- [Überblick](https://docs.attraccess.org/de/mqtt/overview.md): Stellt MQTT und IoT vor: Nutzen mit Attraccess, Funktionsweise und Integration in Flows.
-- [Server einrichten](https://docs.attraccess.org/de/mqtt/server-setup.md): So verbinden Sie Attraccess mit einem MQTT-Broker und testen die Verbindung, inklusive gängiger Broker und mehrerer Server.
-- [Nachrichten-Explorer](https://docs.attraccess.org/de/mqtt/message-explorer.md): Wie Sie MQTT-Nachrichten live ansehen und Testnachrichten für jeden eingerichteten MQTT-Server senden, wer den Explorer nutzen darf und wo Sie ihn finden.
-- [Beispiele](https://docs.attraccess.org/de/mqtt/examples.md): Praktische MQTT-Beispiele: Maschinensteuerung über Relais, Sensordaten empfangen und MQTT in Flows für Nutzungsereignisse.
+## Deutsch: Hardware
+- [Waveshare ESP32-S3-Touch-LCD-4 (Touch V1, V2)](https://docs.attraccess.org/de/hardware/waveshare-esp32-s3-touch-lcd-4.md): Referenzschaltpläne der Waveshare-Platine ESP32-S3-Touch-LCD-4, V3.0 und V4.0, auf der die Attractap-Touch-V1- und V2-Leser aufbauen.
+
+## Deutsch: Attractap Touch P4 (in Entwicklung)
+- [Überblick](https://docs.attraccess.org/de/hardware/touch-p4/overview.md): Die Leserplatine Attractap Touch P4 (Revision A, in Entwicklung): was auf ihr sitzt, Zeichnungen und Renderings, wie das KiCad-Projekt erzeugt und geprüft wird und wie man sie bestellt.
+- [Spezifikation](https://docs.attraccess.org/de/hardware/touch-p4/spec.md): Spezifikation der Leserplatine Touch P4: Funktion, Versorgung, Umgebung, Schnittstellen und EMV-Ziele.
+- [Designnotizen](https://docs.attraccess.org/de/hardware/touch-p4/design-notes.md): Warum die Touch-P4-Platine so entworfen ist: Bauteile, Stromversorgung, Layout, Antennen, Simulationen, das Design-Review und die akzeptierten Abweichungen.
+- [Design-Review](https://docs.attraccess.org/de/hardware/touch-p4/review.md): Die Aufzeichnung des Design-Reviews der Touch P4: Noten, Kriterien, Entscheidungen und was das Review gefunden hat.
+- [Bauteile](https://docs.attraccess.org/de/hardware/touch-p4/parts.md): Lebenszyklus, freigegebene Alternativen und Beschaffung jedes Bauteils auf der Touch-P4-Platine.
+- [Simulationen](https://docs.attraccess.org/de/hardware/touch-p4/simulations.md): Die Feld- und Schaltungssimulationen auf der gerouteten Touch-P4-Platine, was sie modellieren und wo ihre Grenzen liegen.
+- [Platinengenerator](https://docs.attraccess.org/de/hardware/touch-p4/board-generator.md): Der Python-Generator, der Bibliothek, Schaltplan und Platine der Touch P4 aus einer einzigen Schaltungsbeschreibung schreibt, und wie man seine Schritte ausführt.
+- [Firmware-Portierung](https://docs.attraccess.org/de/hardware/touch-p4/firmware-port.md): Pin-Belegung der Touch-P4-Platine und die Regeln, die die Leser-Firmware darauf einhalten muss: WLAN-Co-Prozessor, EU-Funkeinstellungen, Leistungs- und Wärmegrenzen.
+- [Inbetriebnahmeplan](https://docs.attraccess.org/de/hardware/touch-p4/bring-up.md): Schritt-für-Schritt-Plan zum Einschalten und Testen der ersten bestückten Touch-P4-Platinen, von den Versorgungsschienen bis zu WLAN, NFC, Wärme und Vorab-Konformitätsprüfungen.
+- [Konformität](https://docs.attraccess.org/de/hardware/touch-p4/compliance.md): Was CE-Kennzeichnung und EU-Marktregeln vom Touch-P4-Leser verlangen: Funk (2,4 und 5 GHz), EMV, Sicherheit, Cybersicherheit, Registrierungen und was noch offen ist.
+- [Konformitätsquellen](https://docs.attraccess.org/de/hardware/touch-p4/compliance-sources.md): Die Primärquelle, die Version und das Ergebnis der Prüfung zu jeder Aussage der CE- und Marktcheckliste des Touch P4.
+- [Freigabe](https://docs.attraccess.org/de/hardware/touch-p4/release.md): Wie eine Revision der Touch-P4-Platine freigegeben und bestellt wird und die datierten Stände der Revision A.
+- [Gehäuse](https://docs.attraccess.org/de/hardware/touch-p4/case.md): Das 3D-druckbare Wand- und Tischgehäuse des Attractap-Touch-P4-Lesers: Teile, Druck, Konstruktionsdateien und was noch nicht geprüft ist.
+- [Installationsanleitung](https://docs.attraccess.org/de/hardware/touch-p4/installation-manual.md): Wie Sie den Attractap-Touch-P4-Leser in seinem gedruckten Gehäuse zusammenbauen und an einer Wand oder auf einem Tischständer montieren.
+
+## Deutsch: Geräte
+- [MQTT](https://docs.attraccess.org/de/devices/mqtt/overview.md): Stellt MQTT und IoT vor: Nutzen mit Attraccess, Funktionsweise und Integration in Flows.
+- [MQTT-Server einrichten](https://docs.attraccess.org/de/devices/mqtt/server-setup.md): So verbinden Sie Attraccess mit einem MQTT-Broker und testen die Verbindung, inklusive gängiger Broker und mehrerer Server.
+- [MQTT-Nachrichten-Explorer](https://docs.attraccess.org/de/devices/mqtt/message-explorer.md): Wie Sie MQTT-Nachrichten live ansehen und Testnachrichten für jeden eingerichteten MQTT-Server senden, wer den Explorer nutzen darf und wo Sie ihn finden.
+- [MQTT-Beispiele](https://docs.attraccess.org/de/devices/mqtt/examples.md): Praktische MQTT-Beispiele: Maschinensteuerung über Relais, Sensordaten empfangen und MQTT in Flows für Nutzungsereignisse.
 
 ## Deutsch: Abrechnung
 - [Überblick](https://docs.attraccess.org/de/billing/overview.md): Stellt die Abrechnung vor: Credits werden bei Ressourcennutzung abgezogen; Credit-System, Zahlungsintegration und nötige Berechtigung.

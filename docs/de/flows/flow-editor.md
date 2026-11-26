@@ -83,7 +83,7 @@ Die Knotenfarben zeigen den aktuellen Zustand an:
 
 ## MQTT-Flows testen
 
-Für Flows mit MQTT-Knoten öffnet die Schaltfläche **MQTT-Explorer** in der Werkzeugleiste ein Panel neben der Arbeitsfläche. Es zeigt Nachrichten live und lässt Sie Testnachrichten senden, während Sie den Flow bearbeiten. Siehe [MQTT-Nachrichten-Explorer](mqtt/message-explorer.md).
+Für Flows mit MQTT-Knoten öffnet die Schaltfläche **MQTT-Explorer** in der Werkzeugleiste ein Panel neben der Arbeitsfläche. Es zeigt Nachrichten live und lässt Sie Testnachrichten senden, während Sie den Flow bearbeiten. Siehe [MQTT-Nachrichten-Explorer](devices/mqtt/message-explorer.md).
 
 ## Flow speichern
 
@@ -92,5 +92,5 @@ Klicken Sie auf **Speichern** in der Werkzeugleiste, um Ihre Änderungen zu spei
 ## Siehe auch
 
 - [Knotentypen](flows/node-types.md) -- Alle verfügbaren Knoten und ihre Einstellungen
-- [MQTT-Nachrichten-Explorer](mqtt/message-explorer.md) -- MQTT-Nachrichten neben dem Flow beobachten und senden
+- [MQTT-Nachrichten-Explorer](devices/mqtt/message-explorer.md) -- MQTT-Nachrichten neben dem Flow beobachten und senden
 - [Flows-Überblick](flows/overview.md) -- Was Flows sind und wie sie funktionieren

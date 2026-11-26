@@ -73,3 +73,5 @@ Attractap-Leser sind fuer die Montage neben einer Maschine oder Tuer konzipiert.
 - [Ueberblick](attractap/overview.md) -- Was ist Attractap?
 - [Einrichtung](attractap/setup.md) -- Leser registrieren und konfigurieren
 - [Firmware-Updates](attractap/firmware-updates.md) -- Leser-Firmware aktualisieren
+- [Waveshare ESP32-S3-Touch-LCD-4](hardware/waveshare-esp32-s3-touch-lcd-4.md) -- Schaltpläne der Platine in den Touch-Lesern
+- [Attractap Touch P4](hardware/touch-p4/overview.md) -- Die Leser-Platine in Entwicklung: Design, Zeichnungen, Gehäuse und Anleitung

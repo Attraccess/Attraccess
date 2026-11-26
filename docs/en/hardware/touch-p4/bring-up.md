@@ -7,8 +7,8 @@ when a step fails. Use a current-limited bench supply for the first power-up.
 ## Before ordering
 
 1. Lay a sample display on a 1:1 print of the board (the plots of the
-   [component side](https://github.com/Attraccess/Attraccess/blob/main/docs/_media/hardware/touch-p4/board-front.pdf) and the
-   [display side](https://github.com/Attraccess/Attraccess/blob/main/docs/_media/hardware/touch-p4/board-back.pdf), glued back to back on 1.6 mm card), on a spacer of
+   [component side](_media/hardware/touch-p4/board-front.pdf ':ignore') and the
+   [display side](_media/hardware/touch-p4/board-back.pdf ':ignore'), glued back to back on 1.6 mm card), on a spacer of
    1.5 mm: check that the flex reaches J601 through the slot with the fold
    described in the design notes, that its stiff parts lie flat behind the
    board, that it goes into the connector to its stop without being stretched,
