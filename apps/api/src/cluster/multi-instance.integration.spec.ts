@@ -4,7 +4,7 @@ import { ConflictException, ForbiddenException, NotFoundException, RequestTimeou
 import { GenericContainer, StartedTestContainer } from 'testcontainers';
 import { DataSource } from 'typeorm';
 import { Resource, ResourceIntroduction, User } from '@attraccess/database-entities';
-import { ResourceType } from '@attraccess/application-models';
+import { ResourceType, SupervisionMode } from '@attraccess/application-models';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { firstValueFrom, filter, take, timeout } from 'rxjs';
 import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
@@ -43,11 +43,13 @@ import { AttractapMassIntroductionHandler } from '../attractap/websockets/handle
 import { AttractapSupervisionHandler } from '../attractap/websockets/handlers/supervision/supervision.handler';
 import { AttractapEventType, AuthenticatedWebSocket } from '../attractap/websockets/websocket.types';
 import { ClusterService } from './cluster.service';
+import { aliveKey } from './cluster-instances';
 
 jest.setTimeout(120_000);
 
 const FAST = { heartbeatEveryMs: 200, sweepEveryMs: 200, deadlineSweepEveryMs: 50 };
 const READER_ID = 3;
+const OTHER_READER_ID = 4;
 const RESOURCE_ID = 5;
 
 async function waitFor(condition: () => boolean | Promise<boolean>, timeoutMs = 10_000): Promise<void> {
@@ -166,7 +168,16 @@ describe('several API instances on one Valkey', () => {
           },
         },
         { provide: UsersService, useValue: { findOne: async ({ id }: { id: number }) => users[id] ?? null } },
-        { provide: ATTRACTAP_RESOURCE_READS, useValue: {} },
+        {
+          provide: ATTRACTAP_RESOURCE_READS,
+          useValue: {
+            findResource: async (id: number) => ({
+              id,
+              type: ResourceType.Machine,
+              supervisionMode: SupervisionMode.SUPERVISION_REQUIRED,
+            }),
+          },
+        },
         { provide: SettingsService, useValue: {} },
         { provide: MetricsService, useValue: {} },
         { provide: RbacService, useValue: {} },
@@ -202,13 +213,15 @@ describe('several API instances on one Valkey', () => {
     return instance;
   }
 
-  /** A reader websocket signed in on `instance`: every message is ACKed and recorded. */
-  /** Resolves once Valkey lists the reader on this instance, as a real connect would before anyone routes to it. */
-  async function connectReader(instance: Instance, id: string) {
+  /**
+   * A reader websocket signed in on `instance`: every message is ACKed and recorded. Resolves once Valkey lists the
+   * reader on this instance, as a real connect would before anyone routes to it.
+   */
+  async function connectReader(instance: Instance, id: string, readerId = READER_ID) {
     const sent: Array<{ type: string; payload: Record<string, unknown> }> = [];
     const socket = {
       id,
-      readerId: READER_ID,
+      readerId,
       readyState: 1,
       state: {
         cardRelay: true,
@@ -224,13 +237,33 @@ describe('several API instances on one Valkey', () => {
       }),
     } as unknown as AuthenticatedWebSocket;
     instance.websockets.sockets.set(id, socket);
-    instance.cluster.presence.socketConnected(READER_ID, id);
+    instance.cluster.presence.socketConnected(readerId, id);
     await waitFor(async () =>
-      (await instance.cluster.presence.holders(READER_ID)).some(
+      (await instance.cluster.presence.holders(readerId)).some(
         (holder) => holder.instanceId === instance.cluster.instanceId,
       ),
     );
     return { socket, sent, ofType: (type: AttractapEventType) => sent.filter((message) => message.type === type) };
+  }
+
+  /** The instance stops beating without a goodbye (call `halt()` first), so the others clean up after it. */
+  async function forgetHeartbeat(instance: Instance): Promise<void> {
+    const admin = new Redis(container.getMappedPort(6379), container.getHost());
+    await admin.del(aliveKey(instance.cluster.instanceId));
+    admin.disconnect();
+  }
+
+  async function crash(instance: Instance): Promise<void> {
+    instance.cluster.halt();
+    await forgetHeartbeat(instance);
+  }
+
+  /** True once another instance has finished cleaning up after `gone` (it leaves the instance list last). */
+  async function reaped(gone: Instance): Promise<boolean> {
+    const admin = new Redis(container.getMappedPort(6379), container.getHost());
+    const score = await admin.zscore('attraccess:cluster:instances', gone.cluster.instanceId);
+    admin.disconnect();
+    return score === null;
   }
 
   const introductionRows = (userId: number) =>
@@ -362,14 +395,16 @@ describe('several API instances on one Valkey', () => {
       // Bring the deadline forward instead of waiting 15 minutes.
       await a.cluster.deadlines.schedule('mass-introduction', session.id, Date.now());
 
-      await waitFor(() => ended.length === 2);
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await waitFor(() => ended.length === 2 && reader.ofType(AttractapEventType.MASS_INTRODUCTION_END).length === 1);
       expect(ended.sort()).toEqual(['a:expired', 'b:expired']);
       expect(reader.ofType(AttractapEventType.MASS_INTRODUCTION_END).map((message) => message.payload.reason)).toEqual([
         'expired',
       ]);
       // The reader is free again.
       await b.massIntroductions.start(introducer, { resourceId: RESOURCE_ID, readerId: READER_ID });
+      // Nothing expired a second time meanwhile.
+      expect(ended).toHaveLength(2);
+      expect(reader.ofType(AttractapEventType.MASS_INTRODUCTION_END)).toHaveLength(1);
     });
 
     it('marks the session DETACHED when the reader leaves on its instance', async () => {
@@ -385,6 +420,24 @@ describe('several API instances on one Valkey', () => {
       await expect(
         b.cards.startEnrollOfNewNfcCard({ readerId: READER_ID, userId: byName('alice').id }),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('mass introductions started twice at once', () => {
+    it('leaves one session when the same introducer starts for the same target on both instances', async () => {
+      const a = await startInstance('a');
+      const b = await startInstance('b');
+      const started = await Promise.all([
+        a.massIntroductions.start(introducer, { resourceId: RESOURCE_ID }),
+        b.massIntroductions.start(introducer, { resourceId: RESOURCE_ID }),
+      ]);
+      const found = await Promise.allSettled(
+        started.map((session) => b.massIntroductions.get(session.id, introducer.id)),
+      );
+      expect(found.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      for (const result of found) {
+        if (result.status === 'rejected') expect(result.reason).toBeInstanceOf(NotFoundException);
+      }
     });
   });
 
@@ -429,6 +482,9 @@ describe('several API instances on one Valkey', () => {
         b.supervision.reject(id, supervisor),
       ]);
       expect(decisions.filter((decision) => decision.status === 'fulfilled')).toHaveLength(1);
+      for (const decision of decisions) {
+        if (decision.status === 'rejected') expect(decision.reason).toBeInstanceOf(NotFoundException);
+      }
       expect(startedSessions.length).toBeLessThanOrEqual(1);
       const outcome = await pending.then(
         () => 'approved',
@@ -477,24 +533,136 @@ describe('several API instances on one Valkey', () => {
 
       await expect(pending).rejects.toBeInstanceOf(RequestTimeoutException);
       await waitFor(() => expired.length === 2);
-      await new Promise((resolve) => setTimeout(resolve, 300));
       expect(expired.sort()).toEqual(['a', 'b']);
       await expect(b.supervision.approve(id, supervisor)).rejects.toBeInstanceOf(NotFoundException);
       expect(startedSessions).toHaveLength(0);
+      // Nothing expired a second time meanwhile.
+      expect(expired).toHaveLength(2);
     });
 
     it('keeps one armed reader per requester across instances', async () => {
       const a = await startInstance('a');
       const b = await startInstance('b');
-      await connectReader(a, 'socket-a');
+      // Two readers, so the screen claim cannot be what refuses the second request.
+      const readers = [await connectReader(a, 'socket-a'), await connectReader(b, 'socket-b', OTHER_READER_ID)];
       const requester = byName('requester');
-      const results = await Promise.allSettled([
-        a.supervision.requestSupervisedSession(RESOURCE_ID, requester, { readerId: READER_ID }),
-        b.supervision.requestSupervisedSession(RESOURCE_ID, requester, { readerId: READER_ID }),
+      const controllers = [new AbortController(), new AbortController()];
+      const settled: Array<PromiseSettledResult<unknown> | undefined> = [undefined, undefined];
+      const attempts = [
+        a.supervision.requestSupervisedSession(RESOURCE_ID, requester, { readerId: READER_ID }, controllers[0].signal),
+        b.supervision.requestSupervisedSession(
+          RESOURCE_ID,
+          requester,
+          { readerId: OTHER_READER_ID },
+          controllers[1].signal,
+        ),
+      ];
+      attempts.forEach((attempt, index) =>
+        attempt.then(
+          (value) => (settled[index] = { status: 'fulfilled', value }),
+          (reason) => (settled[index] = { status: 'rejected', reason }),
+        ),
+      );
+
+      await waitFor(() => settled.some(Boolean));
+      const loser = settled.findIndex(Boolean);
+      const winner = 1 - loser;
+      const refusal = settled[loser] as PromiseRejectedResult;
+      expect(refusal.status).toBe('rejected');
+      expect(refusal.reason).toBeInstanceOf(ConflictException);
+      expect(refusal.reason.message).toBe('You already have a supervision request waiting at a reader');
+      await waitFor(() => readers[winner].ofType(AttractapEventType.SUPERVISION_START).length === 1);
+      expect(readers[loser].ofType(AttractapEventType.SUPERVISION_START)).toHaveLength(0);
+
+      // The requester leaves: the winner ends now instead of at its expiry, and its reader is told.
+      controllers[winner].abort();
+      await waitFor(() => settled[winner] !== undefined);
+      expect((settled[winner] as PromiseRejectedResult).reason).toBeInstanceOf(RequestTimeoutException);
+      await waitFor(() => readers[winner].ofType(AttractapEventType.SUPERVISION_RESOLVED).length === 1);
+      expect(readers[winner].ofType(AttractapEventType.SUPERVISION_RESOLVED)[0].payload).toEqual(
+        expect.objectContaining({ success: false }),
+      );
+    });
+  });
+
+  describe('supervision started at the reader', () => {
+    /** The requester tapped their card at the reader on `instance`, which asks for a supervisor. */
+    async function requestAtReader(instance: Instance) {
+      const reader = await connectReader(instance, `socket-${instance.name}`);
+      reader.socket.state.verifiedUserId = byName('requester').id;
+      await instance.supervisionHandler.handleSupervisionRequest(reader.socket, {
+        type: AttractapEventType.SUPERVISION_REQUEST,
+        payload: { resourceId: RESOURCE_ID },
+      });
+      const [answer] = reader.ofType(AttractapEventType.SUPERVISION_REQUEST);
+      expect(answer.payload).toEqual(expect.objectContaining({ success: true, supervisorNames: ['supervisor'] }));
+      return { reader, requestId: answer.payload.requestId as string };
+    }
+
+    async function expectGoneEverywhere(...everywhere: Instance[]) {
+      for (const instance of everywhere) {
+        expect(await instance.supervision.listPendingForSupervisor(users[2].id)).toEqual([]);
+      }
+    }
+
+    it('tells the reader on A when a supervisor approves on B, and starts one session', async () => {
+      const a = await startInstance('a');
+      const b = await startInstance('b');
+      const { reader, requestId } = await requestAtReader(a);
+      expect((await b.supervision.listPendingForSupervisor(users[2].id)).map((request) => request.id)).toEqual([
+        requestId,
       ]);
-      expect(
-        results.filter((result) => result.status === 'rejected' && result.reason instanceof ConflictException).length,
-      ).toBeGreaterThanOrEqual(1);
+
+      await b.supervision.approve(requestId, users[2]);
+      await waitFor(() => reader.ofType(AttractapEventType.SUPERVISION_RESOLVED).length === 1);
+      expect(reader.ofType(AttractapEventType.SUPERVISION_RESOLVED)[0].payload).toEqual(
+        expect.objectContaining({ success: true, supervisorUsername: 'supervisor' }),
+      );
+      expect(reader.socket.state.supervisionFlow).toBeNull();
+      expect(startedSessions).toEqual([byName('requester').id]);
+      await expectGoneEverywhere(a, b);
+    });
+
+    it('tells the reader on A when a supervisor rejects on B, and starts nothing', async () => {
+      const a = await startInstance('a');
+      const b = await startInstance('b');
+      const { reader, requestId } = await requestAtReader(a);
+
+      await b.supervision.reject(requestId, users[2]);
+      await waitFor(() => reader.ofType(AttractapEventType.SUPERVISION_RESOLVED).length === 1);
+      expect(reader.ofType(AttractapEventType.SUPERVISION_RESOLVED)[0].payload).toEqual(
+        expect.objectContaining({ success: false }),
+      );
+      expect(reader.socket.state.supervisionFlow).toBeNull();
+      expect(startedSessions).toEqual([]);
+      await expectGoneEverywhere(a, b);
+    });
+
+    it("ends a request whose requester's instance crashed: popups closed once, the reader on B freed", async () => {
+      const a = await startInstance('a');
+      const b = await startInstance('b');
+      const reader = await connectReader(b, 'socket-b');
+      const expired: string[] = [];
+      b.supervisionLive
+        .getSupervisorSubject(users[2].id)
+        .subscribe(({ data }) => data.type === SupervisionLiveEventType.EXPIRED && expired.push(data.requestId));
+      const pending = a.supervision.requestSupervisedSession(RESOURCE_ID, byName('requester'), { readerId: READER_ID });
+      pending.catch(() => undefined);
+      await waitFor(() => reader.ofType(AttractapEventType.SUPERVISION_START).length === 1);
+      const [{ id }] = await b.supervision.listPendingForSupervisor(users[2].id);
+      expect(await b.cluster.claims.owner(READER_ID)).toBe(`supervision:${id}`);
+
+      await crash(a);
+      await waitFor(() => reaped(a));
+      await waitFor(() => reader.ofType(AttractapEventType.SUPERVISION_RESOLVED).length === 1);
+      expect(reader.ofType(AttractapEventType.SUPERVISION_RESOLVED)[0].payload).toEqual(
+        expect.objectContaining({ success: false }),
+      );
+      expect(reader.socket.state.supervisionFlow).toBeNull();
+      await waitFor(async () => (await b.cluster.claims.owner(READER_ID)) === null);
+      await expectGoneEverywhere(b);
+      expect(expired).toEqual([id]);
+      expect(startedSessions).toEqual([]);
     });
   });
 
@@ -559,16 +727,56 @@ describe('several API instances on one Valkey', () => {
       const b = await startInstance('b');
       await connectReader(a, 'socket-a');
       const session = await b.massIntroductions.start(introducer, { resourceId: RESOURCE_ID, readerId: READER_ID });
-      a.cluster.halt();
-      const admin = new Redis(container.getMappedPort(6379), container.getHost());
-      await admin.del(`attraccess:cluster:alive:${a.cluster.instanceId}`);
-      admin.disconnect();
+      await crash(a);
 
       await waitFor(async () => (await b.cluster.presence.holders(READER_ID)).length === 0);
       await waitFor(async () => (await b.cluster.claims.owner(READER_ID)) === null);
       await waitFor(
         async () => (await b.massIntroductions.get(session.id, introducer.id)).reader?.state === 'detached',
       );
+    });
+
+    describe('a reader that reconnected elsewhere before its crashed instance was cleaned up', () => {
+      /** The reader shows a mass introduction through A; A crashes and the reader reconnects to B at once. */
+      async function moveReaderAfterCrash() {
+        const a = await startInstance('a');
+        const b = await startInstance('b');
+        await connectReader(a, 'socket-a');
+        const session = await b.massIntroductions.start(introducer, { resourceId: RESOURCE_ID, readerId: READER_ID });
+        const owner = `mass-introduction:${session.id}`;
+        expect(await b.cluster.claims.owner(READER_ID)).toBe(owner);
+        a.cluster.halt();
+        const moved = await connectReader(b, 'socket-b');
+        return { a, b, session, owner, moved };
+      }
+
+      it('ends the flow armed through the crashed instance and frees the reader', async () => {
+        const { a, b, session } = await moveReaderAfterCrash();
+        await forgetHeartbeat(a);
+
+        await waitFor(() => reaped(a));
+        await waitFor(async () => (await b.cluster.claims.owner(READER_ID)) === null);
+        await waitFor(
+          async () => (await b.massIntroductions.get(session.id, introducer.id)).reader?.state === 'detached',
+        );
+        expect((await b.cluster.presence.holders(READER_ID)).map((holder) => holder.instanceId)).toEqual([
+          b.cluster.instanceId,
+        ]);
+        // Another flow may arm the reader now.
+        await expect(
+          b.cards.startEnrollOfNewNfcCard({ readerId: READER_ID, userId: byName('alice').id }),
+        ).resolves.toBeUndefined();
+      });
+
+      it("keeps the flow when the reader's live socket still runs it", async () => {
+        const { a, b, session, owner, moved } = await moveReaderAfterCrash();
+        moved.socket.state.massIntroductionFlow = { sessionId: session.id };
+        await forgetHeartbeat(a);
+
+        await waitFor(() => reaped(a));
+        expect(await b.cluster.claims.owner(READER_ID)).toBe(owner);
+        expect((await b.massIntroductions.get(session.id, introducer.id)).reader?.state).toBe('active');
+      });
     });
   });
 });

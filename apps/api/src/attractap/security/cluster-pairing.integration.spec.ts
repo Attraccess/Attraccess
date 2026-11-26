@@ -228,6 +228,47 @@ describe('reader pairing across API instances', () => {
     expect((await a.pairings.resolve(code, { ...actor, userId: 2 })).id).toBe(waiting.id);
   });
 
+  it('lets a burst of parallel guesses on both instances test no more codes than the limit', async () => {
+    const a = await instance('a');
+    const b = await instance('b');
+    const code = await a.reader().pair();
+    const tries = await Promise.allSettled(
+      Array.from({ length: 12 }, (_, index) => (index % 2 ? a : b).pairings.resolve('AAAAAA', actor)),
+    );
+    const reasons = tries.map((attempt) => (attempt as PromiseRejectedResult).reason as Error);
+    expect(reasons.filter((reason) => reason.message === 'PairingCodeNotFound')).toHaveLength(5);
+    expect(reasons.filter((reason) => reason instanceof EnrollmentRateLimitedException)).toHaveLength(7);
+    // The right code is refused as well until the window ends.
+    await expect(b.pairings.resolve(code, actor)).rejects.toBeInstanceOf(EnrollmentRateLimitedException);
+  });
+
+  it('takes approver attempts atomically: a wrong code keeps its attempt, anything else hands it back', async () => {
+    const { cluster } = await instance('a');
+    const limits = new EnrollmentLimitsService(cluster);
+    const parallel = async (count: number) => {
+      const results = await Promise.allSettled(Array.from({ length: count }, () => limits.beginApproverAttempt(7)));
+      for (const result of results) {
+        if (result.status === 'rejected') expect(result.reason).toBeInstanceOf(EnrollmentRateLimitedException);
+      }
+      return results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []));
+    };
+
+    const taken = await parallel(8);
+    expect(taken).toHaveLength(5);
+    const refused = await limits.beginApproverAttempt(7).catch((error: EnrollmentRateLimitedException) => error);
+    expect((refused as EnrollmentRateLimitedException).retryAfterSeconds).toBeGreaterThan(0);
+    expect((refused as EnrollmentRateLimitedException).retryAfterSeconds).toBeLessThanOrEqual(60);
+
+    await taken[0].notWrong();
+    await taken[1].notWrong();
+    await taken[2].wrong();
+    expect(await parallel(4)).toHaveLength(2);
+    // Another approver has their own limit.
+    await expect(limits.beginApproverAttempt(8)).resolves.toEqual(
+      expect.objectContaining({ wrong: expect.any(Function), notWrong: expect.any(Function) }),
+    );
+  });
+
   it('answers not found for a reader whose instance is gone', async () => {
     const a = await instance('a');
     const b = await instance('b');

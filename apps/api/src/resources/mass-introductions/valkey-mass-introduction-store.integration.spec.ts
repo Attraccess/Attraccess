@@ -1,3 +1,4 @@
+import { ServiceUnavailableException } from '@nestjs/common';
 import Redis from 'ioredis';
 import { GenericContainer, StartedTestContainer } from 'testcontainers';
 import { ValkeySupervisionStore, type StoredSupervisionRequest } from '../supervision/supervision-store';
@@ -123,6 +124,47 @@ describe('shared mass-introduction and supervision stores against Valkey', () =>
     await expect(b.joinOnce('s4', 8, async () => participant(8))).resolves.toEqual(
       expect.objectContaining({ added: true }),
     );
+  });
+
+  it('grants nothing when the winner recorded the user between the look-up and the claim', async () => {
+    await a.create(session('s6'));
+    await a.joinOnce('s6', 7, async () => participant(7));
+    // Instance B looked the participant up just before A recorded it, then found the join claim free.
+    let staleLookUps = 1;
+    const lagging = new Proxy(clientB, {
+      get(target, property) {
+        if (property === 'hget') {
+          return (...args: Parameters<Redis['hget']>) =>
+            staleLookUps-- > 0 ? Promise.resolve(null) : target.hget(...args);
+        }
+        const value = Reflect.get(target, property, target);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const grant = jest.fn(async () => participant(7));
+
+    const result = await new ValkeyMassIntroductionStore(lagging, 5).joinOnce('s6', 7, grant);
+
+    expect(grant).not.toHaveBeenCalled();
+    expect(result).toEqual({ participant: expect.objectContaining({ userId: 7 }), added: false });
+    expect(await clientA.exists('attraccess:mass-introduction:join:s6:7')).toBe(0);
+  });
+
+  it('answers 503 when another join of the same user holds the claim too long', async () => {
+    await a.create(session('s7'));
+    await clientA.set('attraccess:mass-introduction:join:s7:7', 'held-elsewhere', 'PX', 30_000);
+    const realNow = Date.now.bind(Date);
+    let calls = 0;
+    // The first look sets the deadline; every later one is past it.
+    jest.spyOn(Date, 'now').mockImplementation(() => realNow() + (calls++ === 0 ? 0 : 60_000));
+    const grant = jest.fn(async () => participant(7));
+
+    try {
+      await expect(b.joinOnce('s7', 7, grant)).rejects.toBeInstanceOf(ServiceUnavailableException);
+    } finally {
+      jest.restoreAllMocks();
+    }
+    expect(grant).not.toHaveBeenCalled();
   });
 
   it('counts wrong codes across instances: five per minute, cleared by a right one', async () => {
