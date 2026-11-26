@@ -1,6 +1,7 @@
+import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { SecureReaderButton } from './SecureReaderButton';
 
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
