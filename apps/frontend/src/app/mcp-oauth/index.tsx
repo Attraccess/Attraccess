@@ -7,7 +7,7 @@ import {
   useGetMcpOAuthRequest,
 } from '@attraccess/react-query-client';
 import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
-import { PermissionChipGroups } from '../../components/permissionList';
+import { McpOAuthPermissionChoice } from './McpOAuthPermissionChoice';
 import { useRbacCatalogTranslations } from '../../hooks/useRbacCatalogTranslations';
 import en from './en.json';
 import de from './de.json';
@@ -49,6 +49,9 @@ export function McpOAuthAuthorizePage() {
   const [decided, setDecided] = useState<Decision | null>(null);
   const [redirecting, setRedirecting] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(() => (isFramed() ? 'framed' : null));
+  // Until the user changes it, the selection is what the client asked for, within what the user holds.
+  const [chosen, setChosen] = useState<Set<string> | null>(null);
+  const [selectionRejected, setSelectionRejected] = useState(false);
 
   const consent = useGetMcpOAuthRequest({ path: { requestId: requestId ?? '' } }, undefined, {
     enabled: Boolean(requestId) && failure !== 'framed',
@@ -62,6 +65,8 @@ export function McpOAuthAuthorizePage() {
     },
     onError: (error: unknown) => {
       setDecided(null);
+      // The API refuses a bad selection before it uses up the request: the user can correct it and try again.
+      if ((error as ApiFailure | undefined)?.status === 400) return setSelectionRejected(true);
       setFailure(classify(error));
     },
   };
@@ -69,6 +74,11 @@ export function McpOAuthAuthorizePage() {
   const deny = useDenyMcpOAuthRequest(undefined, handlers);
 
   const view = consent.data;
+  const initialKeys = useMemo(() => {
+    const available = new Set((view?.availablePermissions ?? []).map((permission) => permission.key));
+    return new Set((view?.requestedPermissionKeys ?? []).filter((key) => available.has(key)));
+  }, [view]);
+  const selectedKeys = chosen ?? initialKeys;
   const unavailableLabels = useMemo(() => {
     const byKey = new Map((view?.permissions ?? []).map((permission) => [permission.key, permission]));
     return (view?.unavailablePermissions ?? []).map((key) => permissionLabel(byKey.get(key) ?? { key })).join(', ');
@@ -77,7 +87,9 @@ export function McpOAuthAuthorizePage() {
   const decide = (decision: Decision) => {
     if (!requestId || decided) return;
     setDecided(decision);
-    (decision === 'approve' ? approve : deny).mutate({ path: { requestId } });
+    setSelectionRejected(false);
+    if (decision === 'deny') return deny.mutate({ path: { requestId } });
+    approve.mutate({ path: { requestId }, body: { permissionKeys: [...selectedKeys].sort() } });
   };
 
   const problem = !requestId ? 'missing' : (failure ?? (consent.isError ? classify(consent.error) : null));
@@ -134,19 +146,25 @@ export function McpOAuthAuthorizePage() {
                 </Alert>
               )}
 
-              <section aria-labelledby="mcp-oauth-permissions" className="flex flex-col gap-3">
-                <h4 id="mcp-oauth-permissions" className="text-base font-semibold">
-                  {t('permissions.title')}
-                </h4>
-                {view.requestedAll && (
-                  <p className="text-sm text-muted">{t('permissions.all', { count: view.permissions.length })}</p>
-                )}
-                {view.permissions.length === 0 ? (
-                  <p className="text-sm text-muted">{t('permissions.none')}</p>
-                ) : (
-                  <PermissionChipGroups permissions={view.permissions} uncategorizedLabel={t('permissions.other')} />
-                )}
-              </section>
+              <McpOAuthPermissionChoice
+                availablePermissions={view.availablePermissions}
+                tools={view.tools}
+                selectedKeys={selectedKeys}
+                onChange={(keys) => {
+                  setChosen(keys);
+                  setSelectionRejected(false);
+                }}
+                requestedAll={view.requestedAll}
+                isDisabled={decided !== null || redirecting}
+              />
+
+              {selectionRejected && (
+                <Alert status="danger" data-cy="mcp-oauth-selection-error">
+                  <AlertContent>
+                    <AlertDescription>{t('selectionError')}</AlertDescription>
+                  </AlertContent>
+                </Alert>
+              )}
 
               <p className="text-sm text-muted">{t('notice')}</p>
             </>
@@ -164,7 +182,9 @@ export function McpOAuthAuthorizePage() {
               {t('deny')}
             </Button>
             <Button
-              isDisabled={!view || (decided !== null && decided !== 'approve') || redirecting}
+              isDisabled={
+                !view || selectedKeys.size === 0 || (decided !== null && decided !== 'approve') || redirecting
+              }
               isPending={decided === 'approve'}
               onPress={() => decide('approve')}
               data-cy="mcp-oauth-approve"

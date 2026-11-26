@@ -11,5 +11,34 @@
     "oauthUnavailable": "Die Anmeldung per OAuth ist nicht verfügbar, weil Attraccess hier nicht über HTTPS erreichbar ist. Verwende ein API-Token."
   },
   "docs": "So verbindest du einen KI-Client",
-  "docsUrl": "https://docs.attraccess.org/#/de/developer/mcp"
+  "docsUrl": "https://docs.attraccess.org/#/de/developer/mcp",
+  "grants": {
+    "title": "Verbundene KI-Apps",
+    "description": "KI-Apps, denen du den Zugriff per OAuth erlaubt hast. Widerrufen meldet eine App sofort ab; sie muss den Zugriff neu anfragen.",
+    "columns": {
+      "client": "App",
+      "permissions": "Berechtigungen",
+      "approved": "Erlaubt",
+      "lastUsed": "Zuletzt genutzt",
+      "expires": "Läuft ab"
+    },
+    "unverified": "Nicht verifiziert",
+    "unverifiedHint": "Die App hat sich selbst registriert, daher kann Attraccess ihren Namen nicht bestätigen.",
+    "neverUsed": "Nie",
+    "empty": "Es ist keine KI-App verbunden.",
+    "actions": {
+      "revoke": "Widerrufen"
+    },
+    "revokeConfirm": {
+      "title": "{{name}} widerrufen?",
+      "message": "Die App verliert den Zugriff sofort und muss die Berechtigung neu anfragen."
+    },
+    "success": {
+      "revoked": "App widerrufen"
+    },
+    "errors": {
+      "loadFailed": "Die verbundenen KI-Apps konnten nicht geladen werden",
+      "revokeFailed": "Die App konnte nicht widerrufen werden"
+    }
+  }
 }

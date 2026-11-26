@@ -62,6 +62,9 @@ vi.mock('./mcp', async (importOriginal) => ({
     </div>
   ),
 }));
+vi.mock('./mcp/McpGrantsCard', () => ({
+  McpGrantsCard: ({ oauthEnabled }: { oauthEnabled: boolean }) => <div>Grants oauth:{String(oauthEnabled)}</div>,
+}));
 vi.mock('../user-management/details/components/setPasswordForm', () => ({
   SetPasswordForm: ({ userId, username }: { userId: number; username: string }) => (
     <div>
@@ -158,4 +161,5 @@ it('offers the MCP topic only when the user can sign in to it with OAuth or an A
   open();
   fireEvent.click(screen.getByRole('button', { name: /topics.mcp.title/ }));
   expect(screen.getByText('MCP https://attraccess.example/api/mcp tokens:false')).toBeTruthy();
+  expect(screen.getByText('Grants oauth:true')).toBeTruthy();
 });

@@ -11,10 +11,26 @@
   },
   "selfRegistered": "Die App hat sich selbst registriert, daher kann Attraccess ihren Namen nicht bestätigen.",
   "permissions": {
-    "title": "Angeforderte Berechtigungen",
-    "all": "Die App hat keine bestimmten Berechtigungen genannt und fragt deshalb alles an, was du heute darfst ({{count}} Berechtigungen).",
+    "title": "Zu erlaubende Berechtigungen",
+    "hint": "Wähle, was die App tun darf. Du kannst mehr oder weniger erlauben, als sie angefragt hat, aber nie mehr, als du selbst darfst.",
+    "all": "Die App hat keine bestimmten Berechtigungen genannt und fragt daher alles an, was du heute darfst ({{count}} Berechtigungen).",
     "none": "Du hast derzeit keine Berechtigungen, die die App nutzen könnte.",
-    "other": "Sonstige"
+    "label": "Berechtigungen",
+    "placeholder": "Berechtigungen auswählen",
+    "searchPlaceholder": "Berechtigungen suchen...",
+    "empty": "Keine Berechtigungen gefunden",
+    "picker": {
+      "title": "Wähle, was die App darf",
+      "description": "Wähle den minimal nötigen Zugriff für die App. Sie kann nur Berechtigungen nutzen, die du aktuell besitzt.",
+      "selectedCount": "{{selected}} von {{total}} Berechtigungen ausgewählt",
+      "previewLabel": "Zugriffsbereich",
+      "emptyPreview": "Keine Zugriffe ausgewählt",
+      "edit": "Bearbeiten",
+      "selectCategory": "Alle auswählen",
+      "clearCategory": "Alle entfernen",
+      "apply": "Berechtigungen speichern",
+      "cancel": "Abbrechen"
+    }
   },
   "unavailable": {
     "title": "Für dein Konto nicht erlaubt",
@@ -39,5 +55,11 @@
     "invalid_client": "Diese App ist bei Attraccess nicht registriert. Starte die Verbindung in deiner App erneut.",
     "invalid_redirect_uri": "Die App möchte zu einer Adresse zurückkehren, die sie nicht registriert hat. Starte die Verbindung in deiner App erneut.",
     "request": "Die App hat eine ungültige Anmeldeanfrage gesendet ({{code}}). Starte die Verbindung in deiner App erneut oder wende dich an ihre Entwickler."
-  }
+  },
+  "tools": {
+    "title": "{{count}} Tools aktiviert",
+    "description": "Die App kann diese Tools mit den gewählten Berechtigungen nutzen. Jeder Aufruf wird weiterhin gegen deine Berechtigungen geprüft.",
+    "none": "Diese Auswahl aktiviert keine Tools."
+  },
+  "selectionError": "Diese Auswahl konnte nicht erlaubt werden. Prüfe sie und versuche es erneut oder starte die Verbindung in deiner App neu."
 }

@@ -21,6 +21,7 @@ import { TwoFactorCard } from './two-factor';
 import { PasskeysCard } from './passkeys';
 import { ApiTokensCard } from './api-tokens';
 import { McpConnectionCard, useMcpConnection } from './mcp';
+import { McpGrantsCard } from './mcp/McpGrantsCard';
 import { DateTimePreferencesForm } from './date-time';
 import { NotificationPreferencesForm } from './notifications';
 import { useRequestDeleteAccount, ApiError } from '@attraccess/react-query-client';
@@ -156,7 +157,12 @@ export default function AccountPage() {
                 description: t('topics.mcp.description'),
                 icon: <BotIcon size={19} />,
                 searchTerms: [t('searchTerms.mcp')],
-                content: <McpConnectionCard connection={mcpConnection} canUseApiTokens={canUseApiTokens} />,
+                content: (
+                  <div className="flex flex-col gap-8">
+                    <McpConnectionCard connection={mcpConnection} canUseApiTokens={canUseApiTokens} />
+                    <McpGrantsCard oauthEnabled={mcpConnection.oauthEnabled} />
+                  </div>
+                ),
               },
             ]
           : []),
