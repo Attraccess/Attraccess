@@ -50,7 +50,7 @@ describe('automatic plugin updates (integration)', () => {
     else process.env.ATTRACCESS_PLUGIN_CHANNEL = previousChannel;
   });
 
-  async function host(options: { permissionsOfNewVersions?: string[] } = {}) {
+  async function host(options: { permissionsOfNewVersions?: string[]; installed?: string; published?: string[] } = {}) {
     const stored: Record<string, string> = {};
     const service = new NpmPluginService({
       getPlainSetting: async (_parent: string, key: string) => stored[key],
@@ -102,14 +102,13 @@ describe('automatic plugin updates (integration)', () => {
     const scheduler = new PluginUpdateScheduler(service, administration, pluginService);
 
     for (const name of [NAME, OTHER]) {
-      await publish(name, OLD);
+      await publish(name, options.installed ?? OLD);
       await service.install(name, undefined);
     }
     restart.mockClear();
-    for (const name of [NAME, OTHER]) {
-      await publish(name, MIDDLE, options.permissionsOfNewVersions);
-      await publish(name, NEWEST, options.permissionsOfNewVersions);
-    }
+    for (const name of [NAME, OTHER])
+      for (const version of options.published ?? [MIDDLE, NEWEST])
+        await publish(name, version, options.permissionsOfNewVersions);
     const versions = () => Object.fromEntries(service.listInstalled().map((plugin) => [plugin.name, plugin.version]));
     const runAt = async (now: Date) => {
       jest.setSystemTime(now);
@@ -197,8 +196,10 @@ describe('automatic plugin updates (integration)', () => {
 
     // The restarted host has a new scheduler; the failure is on disk, so the same version is left alone.
     const attempts = download.mock.calls.length;
-    const restarted = new PluginUpdateScheduler(service, null as never, { requestRestart: restart } as never);
+    const notCalled = { applyAutomaticUpdate: jest.fn() };
+    const restarted = new PluginUpdateScheduler(service, notCalled as never, { requestRestart: restart } as never);
     await restarted.run(new Date(inWindow.getTime() + 5 * 60_000));
+    expect(notCalled.applyAutomaticUpdate).not.toHaveBeenCalled();
     expect(download).toHaveBeenCalledTimes(attempts);
 
     // A newer build is tried right away.
@@ -264,6 +265,20 @@ describe('automatic plugin updates (integration)', () => {
     await runAt(inWindow);
     expect(versions()[NAME]).toBe(OLD);
     expect(await service.getUpdatePolicy()).toMatchObject({ prerelease: false });
+  });
+
+  it('on a release host, installs the newest patch or minor release and no prerelease or major', async () => {
+    process.env.ATTRACCESS_PLUGIN_CHANNEL = 'latest';
+    const { service, restart, versions, runAt } = await host({
+      installed: '1.0.0',
+      published: ['1.0.1', '1.1.0', '1.2.0-beta.1', '2.0.0'],
+    });
+    expect(service.listInstalled()[0].requestedSpec).toBe('latest');
+
+    await runAt(inWindow);
+
+    expect(versions()).toEqual({ [NAME]: '1.1.0', [OTHER]: '1.1.0' });
+    expect(restart).toHaveBeenCalledTimes(1);
   });
 
   it('respects a saved maintenance window', async () => {
