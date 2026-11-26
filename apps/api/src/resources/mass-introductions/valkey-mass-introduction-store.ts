@@ -1,3 +1,4 @@
+import { ServiceUnavailableException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type Redis from 'ioredis';
 import { valkeyCall } from '../../cluster/valkey-call';
@@ -68,6 +69,7 @@ c = redis.call('incr', KEYS[1])
 if c == 1 then redis.call('pexpire', KEYS[1], ARGV[1]) end
 return 1`;
 
+const RENEW_JOIN_SCRIPT = `if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('pexpire', KEYS[1], ARGV[2]) else return 0 end`;
 const RELEASE_JOIN_SCRIPT = `if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end`;
 
 type StoreClient = Pick<
@@ -178,7 +180,9 @@ export class ValkeyMassIntroductionStore implements MassIntroductionStore {
         this.client.set(joinKey(sessionId, userId), token, 'PX', JOIN_CLAIM_TTL_MS, 'NX'),
       );
       if (claimed === 'OK') return this.grantClaimed(sessionId, userId, token, grant);
-      if (Date.now() >= deadline) throw new Error('Another join of this user did not finish in time');
+      if (Date.now() >= deadline) {
+        throw new ServiceUnavailableException('Another join of this user is still in progress, try again');
+      }
       await new Promise((resolve) => setTimeout(resolve, JOIN_POLL_MS));
     }
   }
@@ -210,6 +214,24 @@ export class ValkeyMassIntroductionStore implements MassIntroductionStore {
     token: string,
     grant: () => Promise<MassIntroductionParticipant>,
   ): Promise<{ participant: MassIntroductionParticipant; added: boolean }> {
+    // The winner may have recorded the participant and released its claim between our look-up and our claim.
+    const recorded = await this.participant(sessionId, userId).catch(async (error: Error) => {
+      await this.releaseJoin(sessionId, userId, token);
+      throw error;
+    });
+    if (recorded) {
+      await this.releaseJoin(sessionId, userId, token);
+      return { participant: recorded, added: false };
+    }
+    // A slow grant keeps its claim, so nobody else grants the same user meanwhile.
+    const renew = setInterval(
+      () =>
+        void this.call(() =>
+          this.client.eval(RENEW_JOIN_SCRIPT, 1, joinKey(sessionId, userId), token, JOIN_CLAIM_TTL_MS),
+        ).catch(() => undefined),
+      JOIN_CLAIM_TTL_MS / 3,
+    );
+    renew.unref?.();
     try {
       const participant = await grant();
       const added = await this.call(() =>
@@ -224,11 +246,16 @@ export class ValkeyMassIntroductionStore implements MassIntroductionStore {
       );
       return { participant, added: added === 1 };
     } finally {
+      clearInterval(renew);
       // The participant is recorded (or the grant failed and the user may retry): the claim has done its job.
-      await this.call(() => this.client.eval(RELEASE_JOIN_SCRIPT, 1, joinKey(sessionId, userId), token)).catch(
-        () => undefined,
-      );
+      await this.releaseJoin(sessionId, userId, token);
     }
+  }
+
+  private async releaseJoin(sessionId: string, userId: number, token: string): Promise<void> {
+    await this.call(() => this.client.eval(RELEASE_JOIN_SCRIPT, 1, joinKey(sessionId, userId), token)).catch(
+      () => undefined,
+    );
   }
 
   private call<T>(command: () => Promise<T>): Promise<T> {

@@ -147,7 +147,16 @@ export class MassIntroductionService {
       await this.attachReader(session, user, dto.readerId);
     }
 
-    for (const existing of replaced) {
+    // Looked up again: a start running at the same time (another tab, another instance) may have created one since.
+    // Of those, each start ends only the older ones, so of two concurrent starts exactly one stays.
+    const known = new Set(replaced.map((existing) => existing.id));
+    const concurrent = (await this.store.findForIntroducer(user.id, target)).filter(
+      (other) =>
+        !known.has(other.id) &&
+        other.id !== session.id &&
+        (other.createdAt < session.createdAt || (other.createdAt === session.createdAt && other.id < session.id)),
+    );
+    for (const existing of [...replaced, ...concurrent]) {
       await this.end(existing.id, MassIntroductionEndReason.CANCELLED);
     }
 
@@ -181,7 +190,16 @@ export class MassIntroductionService {
     // A concurrent start may have replaced this session while the reader was being armed; its
     // end() could not disarm a reader it did not know about yet.
     const reader = { id: readerId, name: readerName, state: MassIntroductionReaderState.ACTIVE };
-    if (!(await this.store.attachReader(session.id, reader))) {
+    let attached: boolean;
+    try {
+      attached = await this.store.attachReader(session.id, reader);
+    } catch (error) {
+      // Valkey failed after the reader was armed: the reader must not stay armed for a session nobody can end.
+      this.readerPort.disarm({ readerId, sessionId: session.id, reason: MassIntroductionEndReason.CANCELLED });
+      await this.end(session.id, MassIntroductionEndReason.CANCELLED, { silent: true }).catch(() => undefined);
+      throw error;
+    }
+    if (!attached) {
       this.readerPort.disarm({ readerId, sessionId: session.id, reason: MassIntroductionEndReason.CANCELLED });
       throw new GoneException('The mass introduction was replaced while starting');
     }
