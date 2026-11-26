@@ -249,6 +249,9 @@ Check these first in the next review:
   everything near it.
 - A maker's layout rule is not argued away with an estimate (see [Ground rules](#ground-rules)).
 - A claim about the routed board is measured on the routed board, not taken from the notes.
+- Pads that match by number do not prove polarity. A library may number a diode's anode 1 where KiCad
+  numbers the cathode 1 (the SS310, D105). Compare the pin names of every polarised part with the
+  library entry of its part number, and look at the polarity marks in JLCPCB's placement preview.
 
 ## Current grades
 

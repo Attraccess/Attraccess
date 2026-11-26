@@ -260,6 +260,10 @@ Diese im nächsten Review zuerst prüfen:
   [Grundregeln](#grundregeln)).
 - Eine Aussage über die geroutete Platine wird an der gerouteten Platine gemessen, nicht aus den Notizen
   übernommen.
+- Pads, die nach Nummer passen, beweisen keine Polarität. Eine Bibliothek kann die Anode einer Diode mit 1
+  nummerieren, wo KiCad die Kathode mit 1 nummeriert (die SS310, D105). Die Pinnamen jedes gepolten Bauteils
+  mit dem Bibliothekseintrag seiner Teilenummer vergleichen und die Polaritätsmarken in JLCPCBs
+  Bestückungsvorschau ansehen.
 
 ## Aktuelle Noten
 

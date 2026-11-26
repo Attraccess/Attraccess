@@ -40,6 +40,9 @@ GROUND_PADS = {
     # the library for the unidirectional SMBJ28A). DO-214AA terminals lie 2.0 to 2.8 mm from the centre;
     # both lands cover them. Same pad numbers.
     ('Diode_SMD:D_SMB', 'C151259'): ({}, 0.5),
+    # The SS310 D105: the library numbers the anode 1 and the cathode 2, the board (KiCad's diode) the
+    # cathode 1. Matched by function, the library footprint is turned by 180 (export_fab.JLC_ROTATION).
+    ('attractap:SMA_L4.3-W2.6-LS5.2-RD', 'C7420364'): ({'1': '2', '2': '1'}, TOLERANCE),
 }
 
 

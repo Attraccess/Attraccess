@@ -57,6 +57,7 @@ render() {
         cli pcb render --side "$side" --width 1500 --height 2300 --quality basic \
             -o "$media/board-$side.png" "$PCB"
     done
+    stamp board-render
 }
 
 # Freerouting 2.5.0 is built for Java 25.
@@ -109,7 +110,12 @@ finish_routing() {
     stamp board
 }
 
-export_fab() { (cd "$PCB_ROOT/scripts" && "${KICAD_PYTHON:-python3}" export_fab.py); }
+export_fab() {
+    (cd "$PCB_ROOT/scripts" && "${KICAD_PYTHON:-python3}" export_fab.py) &&
+        stamp board-fab
+}
+# Record the sources the generated files were made from (scripts/check-generated.mjs, run before each commit).
+stamp() { node "$PCB_ROOT/../../../../scripts/check-generated.mjs" --stamp "$@" >/dev/null; }
 
 # The generator is the master (docs/en/hardware/touch-p4/development.md): each generator step records what it wrote, and
 # check-source fails when a KiCad file differs from that or the generator changed since.

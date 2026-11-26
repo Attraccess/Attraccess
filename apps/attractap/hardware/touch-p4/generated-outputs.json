@@ -1,0 +1,48 @@
+{
+  "board-fab": {
+    "sources": [
+      "apps/attractap/hardware/touch-p4/kicad/*.kicad_{pcb,sch,pro}",
+      "apps/attractap/hardware/touch-p4/kicad/lib/**",
+      "apps/attractap/hardware/touch-p4/scripts/{export_fab,fab_drawing,assembly_drawing,pdfdoc}.py"
+    ],
+    "outputs": [
+      "apps/attractap/hardware/touch-p4/fab/jlcpcb/**",
+      "docs/_media/hardware/touch-p4/{schematic,board-front,board-back}.pdf"
+    ],
+    "command": "pnpm nx run attractap-touch-p4-pcb:build"
+  },
+  "board-render": {
+    "sources": [
+      "apps/attractap/hardware/touch-p4/kicad/attractap-touch-p4.kicad_pcb",
+      "apps/attractap/hardware/touch-p4/kicad/lib/attractap.3dshapes/**"
+    ],
+    "outputs": ["docs/_media/hardware/touch-p4/board-{top,bottom}.png"],
+    "command": "pnpm nx run attractap-touch-p4-pcb:render"
+  },
+  "case-parts": {
+    "sources": [
+      "apps/attractap/hardware/touch-p4/case/cad/attractap-touch-case.sc",
+      "apps/attractap/hardware/touch-p4/case/cad/tools/export_parts.py"
+    ],
+    "outputs": ["apps/attractap/hardware/touch-p4/case/cad/*.{3mf,step,stl}"],
+    "command": "python3 -I apps/attractap/hardware/touch-p4/case/cad/tools/export_parts.py"
+  },
+  "manual-figures": {
+    "sources": [
+      "apps/attractap/hardware/touch-p4/case/manual/attractap-manual-scenes.sc",
+      "apps/attractap/hardware/touch-p4/case/manual/tools/{scenes,scenelib,gen_hardware,gen_strain_relief,gen_wall_route,drill}.py",
+      "apps/attractap/hardware/touch-p4/case/manual/tools/*.json"
+    ],
+    "outputs": ["docs/_media/hardware/touch-p4/manual/**"],
+    "command": "render the figures with apps/attractap/hardware/touch-p4/case/manual/tools/scenes.py (see docs/en/hardware/touch-p4/case.md), then node scripts/check-generated.mjs --stamp manual-figures"
+  },
+  "manual-pdf": {
+    "sources": [
+      "docs/{en,de}/hardware/touch-p4/installation-manual.md",
+      "docs/_media/hardware/touch-p4/manual/**",
+      "apps/attractap/hardware/touch-p4/case/manual/tools/build_pdf.py"
+    ],
+    "outputs": ["docs/_media/hardware/touch-p4/attractap-installation-manual-{en,de}.pdf"],
+    "command": "python3 -I apps/attractap/hardware/touch-p4/case/manual/tools/build_pdf.py"
+  }
+}

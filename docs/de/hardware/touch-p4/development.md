@@ -61,6 +61,12 @@ prüfen und bestellen kann.
   (`scripts/check_source.py`) schlägt fehl, wenn sich eine KiCad-Datei von dem unterscheidet, was der
   Generator schrieb, oder wenn sich der Generator nach dem Schreiben der Dateien geändert hat. Kommentare
   und Docstrings zählen nicht.
+- Die übrigen erzeugten Dateien (Bestellpaket, Platinen-Renderings und -PDFs, Druckdateien des Gehäuses,
+  Abbildungen und PDFs der Anleitung) stehen mit ihren Quellen in `generated-outputs.json`. Jeder Generator
+  hält die Quellen, aus denen er erzeugt hat, in `generated-stamps.json` fest; der Pre-Commit-Hook
+  (`scripts/check-generated.mjs --staged`) lehnt einen Commit ab, dessen gestagte Quellen vom Stempel
+  abweichen, und nennt den Befehl, der die Dateien neu erzeugt. Die neuen Ausgaben und die Stempeldatei mit
+  der Quelländerung stagen.
 
 ## Werkzeuge
 
@@ -244,29 +250,38 @@ Bestellformular:
 | Lötstopplack | grün: Die 0,1-mm-Stege zwischen den Pins des MCU sind JLCPCBs Grenze für Grün |
 | Gefräste Öffnungen | Flexschlitz 3 mm breit, acht LED-Fenster 3,4 x 3,0 mm mit freigestellten Ecken, ein Ausschnitt 28,9 x 6,0 mm in der Oberkante unter der WLAN-Antenne, zwei abgeschnittene Ecken, durchkontaktierte Langlöcher an der DC-Buchse und an USB-C |
 | Umrisstoleranz | die übliche +/-0,2 mm |
-| Oberfläche | ENIG (18 USD für 5 Platinen, 45 USD für 100). Nicht das kostenlose OSP: JLCPCB schließt es für Kontaktflächen aus, und die vier Masse-Pads für das Display und die 30 Testpunkte blieben blankes Kupfer |
-| Impedanzkontrolle | "Yes", +/-10 %: USB-Paar 90 Ohm differenziell (0,14-mm-Leitungen, 0,15 mm Abstand, Rückseitenlage über In4), Ethernet 50 Ohm (0,155 mm, Bestückungsseite über In1), aus JLCPCBs Rechner für diesen Lagenaufbau; die Fertigung darf die Breiten anpassen |
-| Bestückung | Standard PCBA, nur Oberseite: 221 Bauteile in 85 Zeilen (wifi), 258 Bauteile in 96 Zeilen (lan) |
+| Oberfläche | ENIG (18 USD für 5 Platinen, 48 für 100, 336 für 1000). Nicht das kostenlose OSP: JLCPCB schließt es für Kontaktflächen aus, und die vier Masse-Pads für das Display und die 30 Testpunkte blieben blankes Kupfer |
+| Impedanzkontrolle | "Yes", +/-10 % (33 USD pro Bestellung): USB-Paar 90 Ohm differenziell (0,14-mm-Leitungen, 0,15 mm Abstand, Rückseitenlage über In4), Ethernet 50 Ohm (0,155 mm, Bestückungsseite über In1), aus JLCPCBs Rechner für diesen Lagenaufbau; die Fertigung darf die Breiten anpassen |
+| Bestückung | Standard PCBA, nur Oberseite: 233 Bauteile in 85 Zeilen (wifi), 270 Bauteile in 96 Zeilen (lan). Randstreifen "Added by JLCPCB": der Nutzen wird 96 x 143,5 mm groß |
 | Durchsteckbauteile | DC-Buchse J102, DC-Klemme J103 und bei der LAN-Version die Buchse J401 |
 | Nicht bestückt | das Displaypanel (aufgeklebt, Flexkabel in J601 gesteckt) |
-| Seriennummer | "Mark on PCB", nur Nummer, Position festgelegt: JLCPCB druckt eine auf jeder Platine andere Nummer in das weiße Feld von 10 x 2 mm neben `S/N` auf der Bestückungsseite. Ohne die Option bleibt das Feld weiß, zum Beschriften |
+| Seriennummer | "Mark on PCB" = "2D barcode (Serial Number)", Druck "Number Only", Position "Specify Position": JLCPCB druckt eine auf jeder Platine andere Nummer in das weiße Feld von 10 x 2 mm neben `S/N` auf der Bestückungsseite. Ohne die Option bleibt das Feld weiß, zum Beschriften |
 
 Der Bestückungsdruck trägt einen Bezeichner, wo immer einer passt (etwa die Hälfte der Bauteile); die
 Bestückungszeichnung hat alle. Kosten und Beschaffung: [Bauteile und Beschaffung](hardware/touch-p4/parts.md).
 
 Vor dem Bezahlen prüfen:
 
-- **Lagerbestand.** JLCPCBs Bauteilliste zeigt, was nicht vorrätig ist. Der ESP32-P4 (U201) muss vor der
-  Bestückungsbestellung über JLCPCBs Bauteilbeschaffung bestellt werden; vom PoE-Modul (U102) ist wenig
-  vorrätig.
+- **Lagerbestand.** JLCPCBs Bauteilliste zeigt, was nicht vorrätig ist. Der ESP32-P4 (U201) ist bei JLCPCB
+  und LCSC nicht vorrätig und muss vor der Bestückungsbestellung in JLCPCBs Bauteillager gekauft werden.
+  Ab einigen hundert Platinen reichen auch PoE-Modul, PN532, ESP32-C5-Modul, LIS2DH12, DC-Buchse und
+  L103/L201 nicht ([Bauteile und Beschaffung](hardware/touch-p4/parts.md)). JLCPCBs "Do not place" für ein
+  fehlendes Bauteil taugt nur für ein Angebot, nie für eine Bestellung.
 - **DC-Klemme J103.** Die WAGO 250-202 hat zwei Pins, das Footprint vier Löcher (es nimmt auch die
   WAGO 2601-3102 auf). Bestellbemerkung: Pins im oberen linken und im unteren rechten Loch, Kabeleinführung
   zum Platinenrand mit den beiden abgeschnittenen Ecken. Die Fertigungszeichnung zeigt den Umriss des Körpers.
-- **Rotation.** Die Bestückungsdateien tragen JLCPCBs Winkel, wo er von KiCads abweicht (U501, U701, Q701,
-  die Widerstandsarrays); `check-footprints` deckt jedes Bauteil außer L102 ab (kein Bibliotheks-Footprint;
-  zwei Pads, keine Polarität). Prüfen Sie dennoch jedes gepolte Bauteil in JLCPCBs Bestückungsvorschau,
-  besonders U102 (gleiche Pads um 180 Grad gedreht), D101, D103, D105, D106 (Kathode links, zum Platinenrand
-  hin; D107 ist bidirektional), C103, C120, Q101, Q102, die LEDs und die ICs.
+- **Rotation.** Die Bestückungsdateien tragen JLCPCBs Winkel, wo er von KiCads abweicht
+  (`JLC_ROTATION` in `scripts/export_fab.py`: U501, U701, U702, U204, U703, Q101, Q102, Q701, die
+  Widerstandsarrays, D105). `check-footprints` ordnet jedes Footprint über die Padnummern JLCPCBs Bibliothek
+  zu, außer L102 (kein Bibliotheks-Footprint; zwei Pads, keine Polarität). Eine Bibliothek, die die Pins
+  anders nummeriert, sieht es nicht: JLCPCBs Eintrag für die SS310 (D105) nummeriert die Anode mit 1, KiCad
+  die Kathode, daher braucht D105 eine halbe Drehung, die die Pads allein nicht zeigen.
+  Geprüft in JLCPCBs Bestückungsvorschau am 26. November 2026 (Polaritätsmarken gegen die Netze): D101,
+  D103, D105 (nach der Korrektur), D106, D601, D709, C103, C120, BZ701 und U102 sitzen richtig; die LEDs,
+  U107, U204, U302, U601, U703, U704 und Y501 nummerieren ihre Pins wie JLCPCBs Bibliothek. D107 ist
+  bidirektional. **Vor jeder Bestellung jedes gepolte Bauteil erneut in der Vorschau prüfen:** eine neue
+  Teilenummer oder eine Änderung in JLCPCBs Bibliothek kann ein Bauteil drehen, ohne dass eine Prüfung hier
+  es bemerkt.
 
 ## Eine Revision freigeben
 

@@ -6,6 +6,8 @@ set -e
 
 # These read the Git index, so they check exactly what is being committed.
 node scripts/check-file-size.mjs --staged
+# Generated files (board package, renders, case, manual) must be regenerated when their sources change.
+node scripts/check-generated.mjs --staged
 # Parsing every source takes a while; only staged app or library TypeScript can add a cycle.
 if git diff --cached --name-only --diff-filter=ACMR | grep -qE '^(apps|libs)/.*\.([cm]?ts|tsx)$'; then
     node scripts/check-import-cycles.mjs --staged

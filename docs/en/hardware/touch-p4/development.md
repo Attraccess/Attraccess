@@ -60,6 +60,12 @@ without running anything.
 - Each generator step records a stamp in `kicad/generated-from.json`. `check-source`
   (`scripts/check_source.py`) fails when a KiCad file differs from what the generator wrote, or when
   the generator changed after the files were written. Comments and docstrings do not count.
+- The other generated files (order package, board renders and PDFs, case print files, the manual's
+  figures and PDFs) are listed with their sources in `generated-outputs.json`. Each generator records
+  the sources it ran on in `generated-stamps.json`; the pre-commit hook
+  (`scripts/check-generated.mjs --staged`) refuses a commit whose staged sources differ from the
+  stamp, and names the command that regenerates the files. Stage the new outputs and the stamp file
+  with the source change.
 
 ## Toolchain
 
@@ -238,28 +244,37 @@ Order form:
 | Solder mask | green: the 0.1 mm webs between the MCU's pins are JLCPCB's limit for green |
 | Milled openings | flex slot 3 mm wide, eight LED windows 3.4 x 3.0 mm with relieved corners, a cut 28.9 x 6.0 mm in the top edge under the Wi-Fi antenna, two cut-away corners, plated slots at the DC jack and USB-C |
 | Outline tolerance | the regular +/-0.2 mm |
-| Surface finish | ENIG (18 USD on 5 boards, 45 USD on 100). Not the free OSP: JLCPCB excludes it for contact areas, and the four display ground pads and 30 test points would stay bare copper |
-| Impedance control | "Yes", +/-10 %: USB pair 90 ohm differential (0.14 mm lines, 0.15 mm gap, back layer over In4), Ethernet 50 ohm (0.155 mm, component side over In1), from JLCPCB's calculator for this stack-up; the fab may adjust widths |
-| Assembly | Standard PCBA, top side only: 221 parts in 85 lines (wifi), 258 parts in 96 lines (lan) |
+| Surface finish | ENIG (18 USD on 5 boards, 48 on 100, 336 on 1000). Not the free OSP: JLCPCB excludes it for contact areas, and the four display ground pads and 30 test points would stay bare copper |
+| Impedance control | "Yes", +/-10 % (33 USD per order): USB pair 90 ohm differential (0.14 mm lines, 0.15 mm gap, back layer over In4), Ethernet 50 ohm (0.155 mm, component side over In1), from JLCPCB's calculator for this stack-up; the fab may adjust widths |
+| Assembly | Standard PCBA, top side only: 233 parts in 85 lines (wifi), 270 parts in 96 lines (lan). Edge rails "Added by JLCPCB": the panel becomes 96 x 143.5 mm |
 | Through-hole parts | DC jack J102, DC terminal J103, and on the lan version the jack J401 |
 | Not assembled | the display panel (taped on, flex plugged into J601) |
-| Serial number | "Mark on PCB", number only, position specified: JLCPCB prints a unique number into the 10 x 2 mm white field beside `S/N` on the component side. Without it the field stays white to write on |
+| Serial number | "Mark on PCB" = "2D barcode (Serial Number)", printing "Number Only", position "Specify Position": JLCPCB prints a unique number into the 10 x 2 mm white field beside `S/N` on the component side. Without it the field stays white to write on |
 
 The silkscreen carries a designator wherever one fits (about half the parts); the assembly drawing
 has them all. Cost and sourcing: [parts and sourcing](hardware/touch-p4/parts.md).
 
 Check before paying:
 
-- **Stock.** JLCPCB's parts list shows what it lacks. The ESP32-P4 (U201) has to be ordered in
-  through its parts sourcing before the assembly order; the PoE module (U102) is stocked thinly.
+- **Stock.** JLCPCB's parts list shows what it lacks. The ESP32-P4 (U201) is out of stock at JLCPCB and
+  LCSC and has to be bought into JLCPCB's parts stock before the assembly order. From a few hundred
+  boards on, the PoE module, PN532, ESP32-C5 module, LIS2DH12, DC jack and L103/L201 run short too
+  ([parts and sourcing](hardware/touch-p4/parts.md)). JLCPCB offers "Do not place" for a part it lacks:
+  only for a quote, never for an order.
 - **DC terminal J103.** The WAGO 250-202 has two pins, the footprint four holes (it also takes the
   WAGO 2601-3102). Order remark: pins in the upper left and lower right hole, wire entry towards
   the edge with the two cut-away corners. The fabrication drawing shows the body outline.
-- **Rotation.** The placement files carry JLCPCB's angle where it differs from KiCad's (U501, U701,
-  Q701, the resistor arrays); `check-footprints` covers every part except L102 (no library footprint;
-  two pads, no polarity). Still check every polarised part in JLCPCB's placement preview, in
-  particular U102 (same pads turned by 180 degrees), D101, D103, D105, D106 (cathode left, towards
-  the board edge; D107 is bidirectional), C103, C120, Q101, Q102, the LEDs and the ICs.
+- **Rotation.** The placement files carry JLCPCB's angle where it differs from KiCad's
+  (`JLC_ROTATION` in `scripts/export_fab.py`: U501, U701, U702, U204, U703, Q101, Q102, Q701, the
+  resistor arrays, D105). `check-footprints` matches every footprint to JLCPCB's library by pad
+  number, except L102 (no library footprint; two pads, no polarity). It cannot see a library that
+  numbers the pins differently: JLCPCB's entry for the SS310 (D105) numbers the anode 1, KiCad the
+  cathode, so D105 needs a half turn that the pads alone do not show.
+  Checked in JLCPCB's placement preview on 26 November 2026 (polarity marks against the nets): D101,
+  D103, D105 (after the fix), D106, D601, D709, C103, C120, BZ701 and U102 sit right; the LEDs, U107,
+  U204, U302, U601, U703, U704 and Y501 number their pins as JLCPCB's library does. D107 is
+  bidirectional. **Check every polarised part in the preview again before each order:** a new part
+  number or a library change at JLCPCB can turn a part without any check here noticing.
 
 ## Releasing a revision
 

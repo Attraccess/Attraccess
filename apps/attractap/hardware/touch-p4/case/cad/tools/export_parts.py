@@ -85,6 +85,9 @@ def main():
                 if command["command"] == "file.export":
                     path = command["params"]["path"]
                     print(f"{os.path.getsize(path):>9}  {os.path.relpath(path, OUT)}")
+    # record the sources these files were made from (scripts/check-generated.mjs, run before each commit)
+    repo = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), *[".."] * 7))
+    subprocess.run(["node", os.path.join(repo, "scripts", "check-generated.mjs"), "--stamp", "case-parts"], check=True)
 
 
 if __name__ == "__main__":

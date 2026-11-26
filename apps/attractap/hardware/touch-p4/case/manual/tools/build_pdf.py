@@ -114,3 +114,5 @@ if __name__ == "__main__":
         finally:
             os.remove(page)
         print("ok", out)
+    # record the sources these files were made from (scripts/check-generated.mjs, run before each commit)
+    subprocess.run(["node", os.path.join(REPO, "scripts", "check-generated.mjs"), "--stamp", "manual-pdf"], check=True)
