@@ -9,6 +9,7 @@ import { PluginController } from './plugin.controller';
 import { PluginAdministrationService } from './plugin-administration.service';
 import { PluginService } from './plugin.service';
 import { markPluginRestartRequired } from './runtime/restart-required';
+import { snapshotRunningFrontend } from './runtime/frontend-snapshots';
 import { PluginUninstallService } from './plugin-uninstall.service';
 import { PluginModule } from './plugin.module';
 import { LoadedPluginManifest } from './plugin.manifest';
@@ -56,6 +57,7 @@ describe('PluginController', () => {
       deletePlugin: jest.fn(),
       requestRestart: jest.fn(),
       clearHealthEntries: jest.fn(),
+      stopRemovedPlugin: jest.fn(),
     };
     npmService = {
       findInstalledByPluginId: jest.fn(),
@@ -238,6 +240,27 @@ describe('PluginController', () => {
         .getStream()
         .on('error', () => undefined)
         .destroy();
+    });
+
+    it('keeps serving the running version after an update replaced its files, until the restart', async () => {
+      const plugin = frontendPlugin('updated');
+      jest.spyOn(PluginService, 'getPlugins').mockReturnValue([plugin]);
+      mkdirSync(join(root, 'updated', 'frontend'), { recursive: true });
+      writeFileSync(join(root, 'updated', 'frontend', 'index.js'), 'v1');
+      const read = async () => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of controller.getFrontendPluginFile('updated', 'index.js', res).getStream())
+          chunks.push(chunk as Buffer);
+        return Buffer.concat(chunks).toString();
+      };
+
+      await snapshotRunningFrontend(root, [plugin], 'updated');
+      writeFileSync(join(root, 'updated', 'frontend', 'index.js'), 'v2');
+      expect(await read()).toBe('v1');
+
+      // The restart loads the new version and serves its files.
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      expect(await read()).toBe('v2');
     });
 
     it('throws when the plugin is unknown', () => {
@@ -438,6 +461,8 @@ describe('PluginController', () => {
 
     expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin');
     expect(service.clearHealthEntries).toHaveBeenCalledWith('npm-runtime-name');
+    // Its code runs until the restart: its reader and BLE use stops by its plugin id, not by a shared name.
+    expect(service.stopRemovedPlugin).toHaveBeenCalledWith(plugin.id);
   });
 
   it('uses the data-preserving npm removal flow when npm manifest discovery fails', async () => {

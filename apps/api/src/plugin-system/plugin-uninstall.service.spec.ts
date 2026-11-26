@@ -68,10 +68,14 @@ describe('PluginUninstallService', () => {
     expect(isPluginRemoved(plugin.id)).toBe(true);
   });
 
-  it('refuses the reader and BLE calls of an npm plugin whose health entries it clears on removal', async () => {
-    const plugin = writeDeletablePlugin();
-    await uninstaller().clearHealthEntries(plugin.name);
-    expect(isPluginRemoved(plugin.id)).toBe(true);
+  it('stops a removed npm plugin: refuses its reader and BLE calls and ends its open BLE sessions', async () => {
+    const closePluginSessions = jest.fn().mockResolvedValue(undefined);
+    const service = new PluginUninstallService({ ...bleEndpoints, closePluginSessions } as never, readers as never);
+
+    await service.stopRemovedPlugin('npm-plugin');
+
+    expect(isPluginRemoved('npm-plugin')).toBe(true);
+    expect(closePluginSessions).toHaveBeenCalledWith('npm-plugin', 'shutdown');
   });
 
   describe('health entries', () => {

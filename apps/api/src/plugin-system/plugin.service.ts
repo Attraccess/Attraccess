@@ -280,7 +280,7 @@ export class PluginService {
         // old archive on disk until the new one has been placed successfully.
         if (replacing) {
           PluginService.logger.log(`Replacing uploaded plugin ${pluginName}`);
-          snapshotRunningFrontend(PluginService.PLUGIN_PATH, PluginService.getDiscoveredPlugins(), pluginName);
+          await snapshotRunningFrontend(PluginService.PLUGIN_PATH, PluginService.getDiscoveredPlugins(), pluginName);
           await rename(pluginFolder, backupFolder);
         }
 

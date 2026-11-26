@@ -124,7 +124,9 @@ export class PluginAdministrationService {
   async removePackageGraph(packageName: string, approvedDependants: string[], actor?: AuditActor) {
     const removing = this.npmPluginService.removalPlan(packageName);
     const pluginNames = this.pluginNamesOf(removing);
+    const pluginIds = this.pluginIdsOf(removing);
     await this.npmPluginService.removeInstalled(packageName, approvedDependants);
+    await this.stopRemoved(pluginIds);
     await this.clearHealthEntries(pluginNames);
     for (const plugin of removing) await this.recordPackage(actor, 'plugin.removed', plugin);
   }
@@ -132,7 +134,9 @@ export class PluginAdministrationService {
   async removeInstalled(packageName: string, actor?: AuditActor) {
     const installed = this.npmPluginService.listInstalled().find((plugin) => plugin.name === packageName);
     const pluginNames = this.pluginNamesOf(installed ? [installed] : []);
+    const pluginIds = this.pluginIdsOf(installed ? [installed] : []);
     await this.npmPluginService.removeInstalled(packageName);
+    await this.stopRemoved(pluginIds);
     await this.clearHealthEntries(pluginNames);
     if (installed) await this.recordPackage(actor, 'plugin.removed', installed);
   }
@@ -142,15 +146,26 @@ export class PluginAdministrationService {
    * directories, so discovery still finds them.
    */
   private pluginNamesOf(packages: Array<Pick<InstalledNpmPlugin, 'installPath'>>): string[] {
+    return this.manifestsOf(packages).map((manifest) => manifest.name);
+  }
+
+  private pluginIdsOf(packages: Array<Pick<InstalledNpmPlugin, 'installPath'>>): string[] {
+    return this.manifestsOf(packages).map((manifest) => manifest.id);
+  }
+
+  private manifestsOf(packages: Array<Pick<InstalledNpmPlugin, 'installPath'>>) {
     const directories = new Set(packages.map((plugin) => plugin.installPath));
-    return PluginService.getDiscoveredPlugins()
-      .filter((manifest) => directories.has(manifest.pluginDirectory))
-      .map((manifest) => manifest.name);
+    return PluginService.getDiscoveredPlugins().filter((manifest) => directories.has(manifest.pluginDirectory));
   }
 
   /** The removed plugins' health entries go, so no door stays blocked by a plugin that is gone. */
   private async clearHealthEntries(pluginNames: string[]) {
     for (const name of pluginNames) await this.pluginUninstall.clearHealthEntries(name);
+  }
+
+  /** Stops the reader and BLE use of the removed packages' still running code (by plugin id, read before removal). */
+  private async stopRemoved(pluginIds: string[]) {
+    for (const id of pluginIds) await this.pluginUninstall.stopRemovedPlugin(id);
   }
 
   async addRegistry(body: AddPluginRegistryDto, actor: AuditActor) {
@@ -223,7 +238,9 @@ export class PluginAdministrationService {
         : undefined);
     if (installed) {
       const pluginNames = this.pluginNamesOf([installed]);
+      const pluginIds = this.pluginIdsOf([installed]);
       await this.npmPluginService.removeInstalled(installed.name);
+      await this.stopRemoved(pluginIds);
       await this.clearHealthEntries(pluginNames);
       await this.recordPackage(actor, 'plugin.removed', installed);
       return;

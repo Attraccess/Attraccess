@@ -44,16 +44,26 @@ export class PluginUninstallService {
    * logged, never blocking.
    */
   async clearHealthEntries(pluginName: string): Promise<void> {
-    // Its runtime runs until the restart: a report after the clear must not leave an entry behind, and it must not
-    // register readers or BLE endpoints again.
+    // Its runtime runs until the restart: a report after the clear must not leave an entry behind.
     retirePluginResourceHealth(pluginName);
-    for (const manifest of PluginService.getDiscoveredPlugins())
-      if (manifest.name === pluginName) markPluginRemoved(manifest.id);
     try {
       const health = this.moduleRef?.get(ResourceHealthService, { strict: false });
       if (health) await clearAllPluginResourceHealth(pluginName, health);
     } catch (error) {
       PluginUninstallService.logger.error(`Failed to clear the health entries of plugin ${pluginName}`, error as Error);
+    }
+  }
+
+  /**
+   * The removed plugin's code runs until the restart: refuse its reader and BLE calls, and end the BLE sessions and
+   * watches it already holds (its endpoints stay, as an npm removal keeps plugin data). A failure is logged.
+   */
+  async stopRemovedPlugin(pluginId: string): Promise<void> {
+    markPluginRemoved(pluginId);
+    try {
+      await this.ble.closePluginSessions(pluginId, 'shutdown');
+    } catch (error) {
+      PluginUninstallService.logger.error(`Failed to close the BLE sessions of plugin ${pluginId}`, error as Error);
     }
   }
 

@@ -182,7 +182,11 @@ export class NpmPluginState {
     await mkdir(backupDirectory, { recursive: true });
     if (existsSync(target)) {
       // The running version stays loaded until the restart; so does its frontend.
-      snapshotRunningFrontend(PluginService.PLUGIN_PATH, PluginService.getDiscoveredPlugins(), pluginDirectory(name));
+      await snapshotRunningFrontend(
+        PluginService.PLUGIN_PATH,
+        PluginService.getDiscoveredPlugins(),
+        pluginDirectory(name),
+      );
       await rename(target, backup);
     }
     try {
