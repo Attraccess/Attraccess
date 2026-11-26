@@ -120,48 +120,41 @@ deep stock, with the SGM61020 as second source for U103 and U302.
 
 ## Cost
 
-Prices as of November 2026, in USD, from JLCPCB.
+### JLCPCB quote
 
-### Parts per board
+The quote from JLCPCB's order flow on 26 November 2026, for the lan version (all parts) with the committed
+upload package: Gerbers, `bom-lan.csv`, `cpl-lan.csv`. Board options as in
+[Ordering at JLCPCB](hardware/touch-p4/development.md#ordering-at-jlcpcb), Standard PCBA on the top side,
+edge rails added by JLCPCB, slowest build time. In USD, converted from JLCPCB's EUR prices at its own rate
+(1 USD = 0.9102 EUR). Without shipping, VAT and customs, and without the display panel, which JLCPCB does
+not fit.
 
-| | 5 boards | 100 boards |
-|---|---|---|
-| Wi-Fi version | 27.90 | 19.80 |
-| Ethernet/PoE version | 38.70 | 27.60 |
+| Boards | PCB | Parts | Assembly fees | Parts JLCPCB lacks | Total | Per board |
+|---|---|---|---|---|---|---|
+| 5 | 94.23 | 219.47 | 190.10 | 31.04 | 534.84 | 106.97 |
+| 10 | 104.74 | 380.18 | 207.06 | 54.07 | 746.04 | 74.60 |
+| 100 | 309.53 | 2984.22 | 366.93 | 450.99 | 4111.67 | 41.12 |
+| 1000 | 2134.73 | 13785.11 | 1291.94 | 16966.66 | 34178.43 | 34.18 |
 
-The table was priced with an earlier parts list. Add to it:
+- **PCB:** includes the engineering fee (33.00), impedance control (33.08), ENIG and the production-file
+  confirmation, from 100 boards also testing and film.
+- **Assembly fees:** setup (25.75) and stencil (8.27) once per order, feeder loading for the extended
+  parts (132.33 per order), placement, hand soldering of the through-hole parts (J102, J103, J401), manual
+  assembly, X-ray inspection and packaging.
+- **Parts JLCPCB lacks:** JLCPCB's quote leaves these unplaced; they are priced here and have to be bought
+  into JLCPCB's parts stock before the assembly order, so price and lead time may still change.
+  - The ESP32-P4 (U201) is out of stock at JLCPCB and LCSC at every quantity. LCSC's price breaks:
+    6.21 (1), 5.41 (10), 4.51 (100); JLCPCB lists 4.47 at 1000.
+  - At 1000 boards six more lines are short, priced at JLCPCB's list: PoE module U102 (837 short, 4.50
+    each), PN532 U501 (877, 3.72), ESP32-C5 module U301 (386, 3.16), DC jack J102 (85, 0.57), LIS2DH12
+    U702 (181, 0.49), inductors L103 and L201 (926, 0.02).
+- The largest lines at 1000 boards are the PoE module (4.50), the ESP32-P4 (4.47), the PN532 (3.72) and
+  the ESP32-C5 module (3.16).
+- At 1000 boards JLCPCB suggests a 2 x 1 panel (182 x 143.5 mm, 500 panels) to lower the assembly cost.
+  Not quoted.
+- The wifi version leaves out the Ethernet and PoE parts; the PoE module alone is 4.50 per board.
 
-- input filter, three resistors, a second level shifter and the buzzer resistor: about 0.3 per board;
-- tamper sensors: about 2.7 per board (accelerometer 0.89, proximity sensor 1.57, hall switch 0.17,
-  five capacitors, two resistors), plus a magnet of a few cents for the dock;
-- the ESP32-C5 module and its own 3.3 V converter: about 0.4 per board from 100 pieces. The table was
-  priced with the ESP32-C6-MINI-1U-H4 (4.13 / 3.42 / 3.20 for 1 / 30 / 100 pieces); the C5 module costs
-  4.90 / 3.78 / 3.36, and its converter (TLV62569, 2.2 uH, 22 uF, 10 uF and small parts, all existing
-  lines) about 0.22. No external antenna or cable is bought.
-
-The largest lines are the ESP32-P4 (6.15), the PN532 (5.89), the Wi-Fi module (4.19 in the table) and
-the flash (2.26); on the Ethernet/PoE version also the PoE module (6.70), the jack (2.60) and the PHY
-(1.03).
-
-### Per order
-
-Once per order JLCPCB adds 3 USD for every extended part line (50 lines on the Wi-Fi version, 57 on the
-Ethernet/PoE version; preferred parts not counted), the setup and stencil fees, the bare boards and
-shipping. On five boards the extended-part fees alone are 30 to 34 USD per board, so a small prototype
-costs far more per board than the parts table shows.
-
-### Bare boards
-
-From JLCPCB's order form filled in by hand (86 x 143.5 mm, 1.6 mm, green, slowest build time, without
-shipping and tax), per order. JLCPCB's review of the Gerber files can still change them.
-
-| Boards | Four layers, ENIG | Six layers, ENIG | Six layers, OSP | Six layers with ENIG, per board |
-|---|---|---|---|---|
-| 5 | 50.70 | 59.00 | 41.00 | 11.80 |
-| 10 | 59.70 | 68.40 | 49.00 | 6.84 |
-| 30 | 95.90 | 106.00 | 80.80 | 3.53 |
-| 50 | 132.00 | 143.60 | 112.70 | 2.87 |
-| 100 | 208.50 | 253.50 | 208.30 | 2.54 |
+### Layers, vias and finish
 
 - Six layers cost 8 to 12 more per order up to 50 boards and 45 more on 100 (0.45 per board). They take 7
   to 9 working days, four layers 3 to 6.

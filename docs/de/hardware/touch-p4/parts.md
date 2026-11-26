@@ -127,51 +127,42 @@ hoher Bestand, mit dem SGM61020 als zweiter Quelle für U103 und U302.
 
 ## Kosten
 
-Preise vom November 2026, in USD, von JLCPCB.
+### Angebot von JLCPCB
 
-### Bauteile pro Platine
+Das Angebot aus JLCPCBs Bestellablauf vom 26. November 2026, für die LAN-Version (alle Bauteile) mit dem
+eingecheckten Upload-Paket: Gerber-Dateien, `bom-lan.csv`, `cpl-lan.csv`. Platinenoptionen wie unter
+[Bestellen bei JLCPCB](hardware/touch-p4/development.md#bestellen-bei-jlcpcb), Standard-PCBA auf der
+Oberseite, Randstreifen von JLCPCB, langsamste Fertigungszeit. In USD, umgerechnet aus JLCPCBs EUR-Preisen
+zu JLCPCBs eigenem Kurs (1 USD = 0,9102 EUR). Ohne Versand, Mehrwertsteuer und Zoll und ohne das
+Display-Panel, das JLCPCB nicht bestückt.
 
-| | 5 Platinen | 100 Platinen |
-|---|---|---|
-| WLAN-Version | 27,90 | 19,80 |
-| Ethernet/PoE-Version | 38,70 | 27,60 |
+| Platinen | Leiterplatte | Bauteile | Bestückungsgebühren | Bauteile, die JLCPCB fehlen | Gesamt | Pro Platine |
+|---|---|---|---|---|---|---|
+| 5 | 94,23 | 219,47 | 190,10 | 31,04 | 534,84 | 106,97 |
+| 10 | 104,74 | 380,18 | 207,06 | 54,07 | 746,04 | 74,60 |
+| 100 | 309,53 | 2984,22 | 366,93 | 450,99 | 4111,67 | 41,12 |
+| 1000 | 2134,73 | 13785,11 | 1291,94 | 16966,66 | 34178,43 | 34,18 |
 
-Die Tabelle wurde mit einer früheren Stückliste berechnet. Hinzu kommen:
+- **Leiterplatte:** enthält die Engineering-Gebühr (33,00), die Impedanzkontrolle (33,08), ENIG und die
+  Bestätigung der Produktionsdateien, ab 100 Platinen auch Test und Film.
+- **Bestückungsgebühren:** Einrichtung (25,75) und Schablone (8,27) einmal pro Bestellung, das Rüsten der
+  Feeder für die Extended-Bauteile (132,33 pro Bestellung), Bestückung, Handlöten der THT-Bauteile (J102,
+  J103, J401), manuelle Montage, Röntgenprüfung und Verpackung.
+- **Bauteile, die JLCPCB fehlen:** JLCPCBs Angebot lässt sie unbestückt; sie sind hier eingerechnet und
+  müssen vor dem Bestückungsauftrag in JLCPCBs Bauteillager gekauft werden, Preis und Lieferzeit können
+  sich also noch ändern.
+  - Der ESP32-P4 (U201) ist bei JLCPCB und LCSC in keiner Menge vorrätig. LCSCs Preisstaffel: 6,21 (1),
+    5,41 (10), 4,51 (100); JLCPCB nennt 4,47 bei 1000.
+  - Bei 1000 Platinen fehlen sechs weitere Zeilen, zu JLCPCBs Listenpreis: PoE-Modul U102 (837 fehlen,
+    4,50 pro Stück), PN532 U501 (877, 3,72), ESP32-C5-Modul U301 (386, 3,16), DC-Buchse J102 (85, 0,57),
+    LIS2DH12 U702 (181, 0,49), Spulen L103 und L201 (926, 0,02).
+- Die größten Zeilen bei 1000 Platinen sind das PoE-Modul (4,50), der ESP32-P4 (4,47), der PN532 (3,72)
+  und das ESP32-C5-Modul (3,16).
+- Bei 1000 Platinen schlägt JLCPCB einen 2-x-1-Nutzen vor (182 x 143,5 mm, 500 Nutzen), um die
+  Bestückungskosten zu senken. Nicht angefragt.
+- Die WLAN-Version lässt die Ethernet- und PoE-Bauteile weg; allein das PoE-Modul kostet 4,50 pro Platine.
 
-- Eingangsfilter, drei Widerstände, ein zweiter Pegelwandler und der Summerwiderstand: etwa 0,3 pro
-  Platine;
-- Manipulationssensoren: etwa 2,7 pro Platine (Beschleunigungssensor 0,89, Annäherungssensor 1,57,
-  Hall-Schalter 0,17, fünf Kondensatoren, zwei Widerstände), dazu ein Magnet für wenige Cent für das Dock;
-- das ESP32-C5-Modul und sein eigener 3,3-V-Wandler: etwa 0,4 pro Platine ab 100 Stück. Die Tabelle wurde
-  mit dem ESP32-C6-MINI-1U-H4 berechnet (4,13 / 3,42 / 3,20 für 1 / 30 / 100 Stück); das C5-Modul kostet
-  4,90 / 3,78 / 3,36, und sein Wandler (TLV62569, 2,2 uH, 22 uF, 10 uF und Kleinteile, alle schon Zeilen
-  der Stückliste) etwa 0,22. Es wird keine externe Antenne und kein Kabel gekauft.
-
-Die größten Zeilen sind der ESP32-P4 (6,15), der PN532 (5,89), das WLAN-Modul (4,19 in der Tabelle) und
-der Flash (2,26); bei der Ethernet/PoE-Version außerdem das PoE-Modul (6,70), die Buchse (2,60) und der
-PHY (1,03).
-
-### Pro Bestellung
-
-Einmal pro Bestellung berechnet JLCPCB 3 USD für jede Extended-Bauteilzeile (50 Zeilen bei der
-WLAN-Version, 57 bei der Ethernet/PoE-Version; bevorzugte Bauteile nicht mitgezählt), die Einrichtungs-
-und Schablonengebühren, die unbestückten Platinen und den Versand. Bei fünf Platinen machen allein die
-Gebühren für Extended-Bauteile 30 bis 34 USD pro Platine aus, sodass ein kleiner Prototyp pro Platine weit
-mehr kostet, als die Bauteiltabelle zeigt.
-
-### Unbestückte Platinen
-
-Aus dem von Hand ausgefüllten Bestellformular von JLCPCB (86 x 143,5 mm, 1,6 mm, grün, langsamste
-Fertigungszeit, ohne Versand und Steuer), pro Bestellung. JLCPCBs Prüfung der Gerber-Dateien kann sie noch
-ändern.
-
-| Platinen | Vier Lagen, ENIG | Sechs Lagen, ENIG | Sechs Lagen, OSP | Sechs Lagen mit ENIG, pro Platine |
-|---|---|---|---|---|
-| 5 | 50,70 | 59,00 | 41,00 | 11,80 |
-| 10 | 59,70 | 68,40 | 49,00 | 6,84 |
-| 30 | 95,90 | 106,00 | 80,80 | 3,53 |
-| 50 | 132,00 | 143,60 | 112,70 | 2,87 |
-| 100 | 208,50 | 253,50 | 208,30 | 2,54 |
+### Lagen, Vias und Oberfläche
 
 - Sechs Lagen kosten bis 50 Platinen 8 bis 12 mehr pro Bestellung und bei 100 45 mehr (0,45 pro Platine).
   Sie brauchen 7 bis 9 Werktage, vier Lagen 3 bis 6.
