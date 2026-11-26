@@ -209,6 +209,7 @@ Alle Einträge in einem **Payload setzen**-Knoten lesen dieselbe Eingangs-Payloa
 | **HTTP-Anfrage**, bestätigt (`acknowledged`) | Antwort-Body direkt; `{"energy_wh":1500}` wird mit `{{energy_wh}}` gelesen          |
 | **HTTP-Anfrage**, nur senden (`dispatch`)    | Ursprüngliche Payload; kein Antwort-Body                                            |
 | **Auf MQTT-Nachricht warten**, Erfolg        | `{ "topic": "…", "payload": … }`; keine vorherigen Felder und keine `serverId`      |
+| **MQTT-Nachricht senden**, Antwort-Topic     | Eingangs-Felder plus `response: { "topic": "…", "payload": … }`                     |
 | **Abrechnungsposten hinzufügen**             | Der Posten: `name`, `description`, `externalReference`, `unitPrice`, `quantity`     |
 | **PC sperren / entsperren**                  | Eingangs-Felder, wobei `companion` durch `{ "delivered": true/false }` ersetzt wird |
 

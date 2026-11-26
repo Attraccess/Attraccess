@@ -28,6 +28,16 @@ export const MqttSendMessageNodeDataSchema = z
         'Dispatch continues after the broker accepts the publish call. Acknowledged waits for the MQTT publish callback.',
     }),
     acknowledgementTimeoutSeconds: AcknowledgementTimeoutSecondsSchema,
+    responseTopic: z.string().optional().meta({
+      helpText:
+        'Optional topic filter (+ and # allowed) the device answers on. The node listens before it publishes, so a fast reply is never missed, and forwards the input plus response {topic, payload}.',
+    }),
+    responseTimeoutSeconds: z
+      .number()
+      .int()
+      .positive('Timeout must be a positive integer (seconds)')
+      .optional()
+      .meta({ helpText: 'How long to wait for the reply after publishing. Default 10 seconds.' }),
   })
   .extend(ExternalEffectPolicySchema.shape);
 

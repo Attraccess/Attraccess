@@ -660,6 +660,14 @@
               "label": "Acknowledgement timeout (seconds)",
               "helpText": "Maximum time to wait for the MQTT publish acknowledgement. Leave empty to use the integration default."
             },
+            "responseTopic": {
+              "label": "Reply topic",
+              "helpText": "Optional topic filter (+ and # allowed) the device answers on. The node listens before it publishes, so a fast reply is never missed, and forwards the input plus response {topic, payload}."
+            },
+            "responseTimeoutSeconds": {
+              "label": "Reply timeout (seconds)",
+              "helpText": "How long to wait for the reply after publishing. Default 10 seconds."
+            },
             "failureBehavior": {
               "label": "On failure",
               "helpText": "Fail flow logs the failure and stops the triggering operation. Continue through failure output logs the failure and sends the original input plus flowError {kind, message} through Failure. Log and continue logs the failure and sends the unchanged input through Output.",

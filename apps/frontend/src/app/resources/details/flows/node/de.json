@@ -660,6 +660,14 @@
               "label": "Bestätigungs-Timeout (Sekunden)",
               "helpText": "Maximale Wartezeit auf die MQTT-Publish-Bestätigung. Leer lassen, um die Standardvorgabe der Integration zu verwenden."
             },
+            "responseTopic": {
+              "label": "Antwort-Topic",
+              "helpText": "Optionaler Topic-Filter (+ und # erlaubt), unter dem das Gerät antwortet. Der Knoten hört vor dem Senden zu, verpasst also keine schnelle Antwort, und gibt die Eingabe plus response {topic, payload} weiter."
+            },
+            "responseTimeoutSeconds": {
+              "label": "Antwort-Timeout (Sekunden)",
+              "helpText": "Wie lange nach dem Senden auf die Antwort gewartet wird. Standard 10 Sekunden."
+            },
             "failureBehavior": {
               "label": "Bei Fehler",
               "helpText": "Flow abbrechen protokolliert den Fehler und stoppt die auslösende Operation. Über Fehlerausgang fortsetzen protokolliert den Fehler und sendet die ursprüngliche Eingabe plus flowError {kind, message} über Fehler. Protokollieren und fortsetzen protokolliert den Fehler und sendet die unveränderte Eingabe über Ausgabe.",
