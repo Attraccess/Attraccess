@@ -30,6 +30,7 @@ import { collectContributions, pendingKey, skipProvider, type Collected, type De
 import { contributionKey, type UiContributionRecord, type UiSlotsState } from './ui-socket-state';
 
 const USAGE_CHANGED = 'ui-slot.usage-changed';
+const SYNC = 'ui-slot.sync';
 const CONTRIBUTIONS = 'ui-slot.contributions';
 const CONTRIBUTIONS_TIMEOUT_MS = 5_000;
 
@@ -117,6 +118,7 @@ export class UiSlotService implements OnModuleInit {
   onModuleInit(): void {
     this.router?.on(USAGE_CHANGED, (resourceId: number) => this.invalidateResource(resourceId));
     this.router?.handle(CONTRIBUTIONS, (readerId: number) => this.contributionsOf(readerId));
+    this.router?.on(SYNC, (readerId: number | null) => this.syncReader(readerId ?? undefined));
   }
 
   /** The reader's slot contributions, from whichever instance holds it (the admin view). */
@@ -206,6 +208,12 @@ export class UiSlotService implements OnModuleInit {
   onDefaultLanguage(language: 'en' | 'de'): void {
     this.defaultLanguage = language;
     this.syncReader(undefined);
+  }
+
+  /** As {@link syncReader}, on every API instance (a settings change made here, ATT-1163). */
+  syncReaderEverywhere(readerId: number | undefined): void {
+    if (!this.router) return this.syncReader(readerId);
+    this.router.everywhere(SYNC, readerId ?? null, () => this.syncReader(readerId));
   }
 
   syncReader(readerId: number | undefined): void {
