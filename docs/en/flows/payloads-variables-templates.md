@@ -266,7 +266,7 @@ With the example reading of `42`, the True branch sends `{"temperature":42,"limi
 
 ## Inspecting and Troubleshooting a Run
 
-Open **Flow logs**, choose a recording duration and click **Start recording** before triggering the flow. Inspect the node entries' `input` and `output` data to find the exact paths and see where fields change. Logs are collected while recording and remain in the page until you leave or reload.
+Open **Flow logs**, choose a recording duration and click **Start recording** before triggering the flow. Inspect the node entries' `input` and `output` data to find the exact paths and see where fields change. Logs are collected while recording and remain in the page until you leave or reload. Before that, **Download** saves them as NDJSON or plain text, for example for a bug report. The file can contain personal data from the payloads.
 
 | Symptom                                       | Check                                                                                                                   |
 | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
