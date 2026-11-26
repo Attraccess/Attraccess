@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type Redis from 'ioredis';
-import { defaultInstanceName } from '../resources/usage/sessions/session-change-coordination';
+import { resolveInstanceName } from '../resources/usage/sessions/session-change-coordination';
 import type { ClusterInstances } from './cluster.types';
 import { valkeyCall } from './valkey-call';
 
@@ -18,7 +18,7 @@ const INSTANCES_KEY = 'attraccess:cluster:instances';
 const aliveKey = (id: string) => `attraccess:cluster:alive:${id}`;
 const reapKey = (id: string) => `attraccess:cluster:reap:${id}`;
 
-export function newInstanceId(name = defaultInstanceName()): string {
+export function newInstanceId(name = resolveInstanceName()): string {
   return `${name}|${randomUUID()}`;
 }
 

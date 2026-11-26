@@ -1,5 +1,8 @@
 import { Inject, Injectable, OnApplicationShutdown, OnModuleInit, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type Redis from 'ioredis';
+import type { ValkeyConfigType } from '../config/valkey.config';
+import { resolveInstanceName } from '../resources/usage/sessions/session-change-coordination';
 import { VALKEY_CLIENT } from '../valkey/valkey.module';
 import { LocalClusterBus, ValkeyClusterBus } from './cluster-bus';
 import { LocalClusterDeadlines, ValkeyClusterDeadlines } from './cluster-deadlines';
@@ -42,8 +45,12 @@ export class ClusterService implements OnModuleInit, OnApplicationShutdown {
   constructor(
     @Inject(VALKEY_CLIENT) valkey: Redis | null,
     @Optional() @Inject(CLUSTER_OPTIONS) private readonly options: ClusterOptions = {},
+    @Optional() config?: ConfigService,
   ) {
-    const id = newInstanceId(options.instanceName);
+    // The same name as the session-change locks (ATTRACCESS_INSTANCE_NAME, else `<hostname>:<PORT>`), per boot unique.
+    const id = newInstanceId(
+      options.instanceName ?? resolveInstanceName(config?.get<ValkeyConfigType>('valkey')?.ATTRACCESS_INSTANCE_NAME),
+    );
     this.valkey = valkey;
     this.enabled = valkey !== null;
     if (!valkey) {
