@@ -1,6 +1,6 @@
 import { UseGuards, applyDecorators } from '@nestjs/common';
 import { ApiBearerAuth, ApiForbiddenResponse, ApiUnauthorizedResponse } from '@nestjs/swagger';
-import { DualAuthGuard } from '@attraccess/plugins-backend-sdk';
+import { AuthRequirement, DualAuthGuard } from '@attraccess/plugins-backend-sdk';
 import { IsResourceGroupIntroducerGuard } from './isIntroducerGuard';
 
 /**
@@ -12,6 +12,8 @@ import { IsResourceGroupIntroducerGuard } from './isIntroducerGuard';
  */
 export function IsResourceGroupIntroducer() {
   return applyDecorators(
+    // No permission list: the guard decides per resource. Empty keeps it an MCP tool, the REST guard stays in charge.
+    AuthRequirement({ all: [], any: [], sessionOnly: false }),
     UseGuards(DualAuthGuard, IsResourceGroupIntroducerGuard),
     ApiBearerAuth(),
     ApiUnauthorizedResponse({ description: 'User is not authenticated' }),

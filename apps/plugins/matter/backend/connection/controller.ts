@@ -1,4 +1,4 @@
-import { Auth, type AuthenticatedRequest, type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
+import { Auth, type AuthenticatedRequest, type PluginAuditPrincipal, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Inject, Post, Put, Req } from '@nestjs/common';
 import { conflict } from '../fabric/errors';
 import { MatterFabricGuard } from '../fabric/guard';
@@ -34,6 +34,7 @@ export class MatterConnectionController {
 
   @Auth(...MATTER_OPERATIONS.connectionSave)
   @Put()
+  @NotAnMcpTool('Credential flow: stores the sidecar credential')
   async put(@Body() body: unknown, @Req() request: AuthenticatedRequest): Promise<PublicSettings> {
     const parsed = settingsSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException(validationMessages(parsed.error));

@@ -12,3 +12,4 @@ export * from './lib/live-updates';
 export * from './lib/device-language';
 export * from './lib/enrollment-code';
 export * from './lib/mqtt-explorer';
+export * from './lib/mcp-tool-access';

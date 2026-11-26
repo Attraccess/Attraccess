@@ -1,4 +1,4 @@
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 
 import { Body, Controller, ForbiddenException, Get, Patch, Post, Req, Delete } from '@nestjs/common';
 
@@ -136,6 +136,7 @@ export class SettingsController {
   @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Generate a new metrics API key', operationId: 'generateMetricsApiKey' })
   @ApiResponse({ status: 201, description: 'Metrics API key generated.', type: GenerateMetricsApiKeyResponseDto })
+  @NotAnMcpTool('Secret management: generates and returns the metrics API key')
   async generateMetricsApiKey(@Req() req: AuthenticatedRequest): Promise<GenerateMetricsApiKeyResponseDto> {
     return this.administration.generateMetricsApiKey(auditActorOf(req.user));
   }
@@ -144,6 +145,7 @@ export class SettingsController {
   @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Remove the metrics API key', operationId: 'deleteMetricsApiKey' })
   @ApiResponse({ status: 200, description: 'Metrics API key removed.', type: MetricsSettingsDto })
+  @NotAnMcpTool('Secret management: removes the metrics API key')
   async deleteMetricsApiKey(@Req() req: AuthenticatedRequest): Promise<MetricsSettingsDto> {
     return this.administration.deleteMetricsApiKey(auditActorOf(req.user));
   }

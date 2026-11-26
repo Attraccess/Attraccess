@@ -3,4 +3,4 @@
 # they will be requested for review when someone opens a pull request.
 *       @jappyjan
 # The MCP manifest decides which API operations AI clients may call. Additions and changes need a security review.
-/apps/api/src/mcp/reviewed-manifest.json @jappyjan
+/apps/api/src/mcp/openapi-tools.ts @jappyjan

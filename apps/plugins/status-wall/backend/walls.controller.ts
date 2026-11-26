@@ -1,4 +1,4 @@
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseIntPipe, Post, Put } from '@nestjs/common';
 import {
   ApiBody,
@@ -34,6 +34,7 @@ export class WallsController {
   @ApiOperation({ summary: 'Create a status wall' })
   @ApiBody({ type: WallBody })
   @ApiCreatedResponse({ type: WallDto })
+  @NotAnMcpTool('Secret management: returns the public link token')
   create(@Body(validated(WallBody)) body: WallBody): Promise<Wall> {
     return this.walls.create(body);
   }
@@ -54,6 +55,7 @@ export class WallsController {
   @ApiParam(WALL_ID)
   @ApiOkResponse({ type: WallDto })
   @ApiNotFoundResponse()
+  @NotAnMcpTool('Secret management: returns a new public link token')
   regenerate(@Param('id', ParseIntPipe) id: number): Promise<Wall> {
     return this.walls.regenerateToken(id);
   }

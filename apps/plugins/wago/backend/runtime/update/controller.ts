@@ -1,4 +1,4 @@
-import { Auth, type AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, type AuthenticatedRequest, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 import {
   BadRequestException,
   Body,
@@ -15,6 +15,7 @@ import { WagoManagedRuntimeService } from '../managed/service';
 import { wagoAuditPrincipal } from '../../audit/index';
 import { WagoNetworkChangeService } from '../../network/service';
 
+@NotAnMcpTool('Credential flow and runtime lifecycle: network changes, root recovery and runtime updates of PLCs')
 @Controller('wago')
 @Auth('system.settings.manage')
 export class WagoUpdatesController {

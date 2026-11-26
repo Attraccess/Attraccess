@@ -1,4 +1,4 @@
-import { Auth, type AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, type AuthenticatedRequest, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 import {
   BadRequestException,
   Body,
@@ -45,6 +45,7 @@ export class MatterBackupController {
   @Auth(...MATTER_OPERATIONS.backupDownload)
   @Get('backups/:id/download')
   @Header('Content-Type', 'application/octet-stream')
+  @NotAnMcpTool('Secret material: serves a fabric backup')
   async download(@Param('id') id: string, @Req() request: AuthenticatedRequest): Promise<StreamableFile> {
     const parsedId = idParamSchema.safeParse(id);
     if (!parsedId.success) throw new BadRequestException(['id: must be a UUID']);
@@ -59,6 +60,7 @@ export class MatterBackupController {
   @Auth(...MATTER_OPERATIONS.restoreValidate)
   @Post('restore/validate')
   @HttpCode(200)
+  @NotAnMcpTool('Key material: restores a fabric from a backup')
   validate(@Body() body: unknown, @Req() request: AuthenticatedRequest): Promise<RestoreValidation> {
     const input = parse(validateSchema, body);
     return this.restore.validate(input.source, input.recoveryKey, principalOf(request));
@@ -67,6 +69,7 @@ export class MatterBackupController {
   @Auth(...MATTER_OPERATIONS.restoreConfirm)
   @Post('restore/confirm')
   @HttpCode(200)
+  @NotAnMcpTool('Key material: restores a fabric from a backup')
   confirm(@Body() body: unknown, @Req() request: AuthenticatedRequest): Promise<RestoreResult> {
     const input = parse(confirmSchema, body);
     return this.restore.confirm(input.validationId, input.confirmFabricId, principalOf(request));
@@ -75,6 +78,7 @@ export class MatterBackupController {
   @Auth(...MATTER_OPERATIONS.restoreCancel)
   @Post('restore/:validationId/cancel')
   @HttpCode(204)
+  @NotAnMcpTool('Key material: restores a fabric from a backup')
   async cancel(@Param('validationId') validationId: string, @Req() request: AuthenticatedRequest): Promise<void> {
     const parsedId = idParamSchema.safeParse(validationId);
     if (!parsedId.success) throw new BadRequestException(['validationId: must be a UUID']);
