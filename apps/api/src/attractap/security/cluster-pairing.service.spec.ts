@@ -44,9 +44,11 @@ function setup() {
       isAlive: jest.fn(async (id: string) => live.includes(id)),
     },
   };
+  const attempt = { wrong: jest.fn(async () => undefined), notWrong: jest.fn(async () => undefined) };
   const limits = {
     assertApproverAllowed: jest.fn(async () => undefined),
-    recordWrongCode: jest.fn(async () => undefined),
+    beginApproverAttempt: jest.fn(async () => attempt),
+    attempt,
   };
   let created: (id: string) => void = () => undefined;
   const pairing = {
@@ -138,7 +140,8 @@ describe('ClusterPairingService', () => {
       answers.a['pairing.match'] = () => [];
       answers.b['pairing.match'] = () => [];
       await expect(service.resolve('K7P3XQ', actor)).rejects.toThrow('PairingCodeNotFound');
-      expect(limits.recordWrongCode).toHaveBeenCalledWith(7);
+      expect(limits.beginApproverAttempt).toHaveBeenCalledWith(7);
+      expect(limits.attempt.wrong).toHaveBeenCalled();
     });
 
     it('asks to wait when readers on two instances show the code, without counting it', async () => {
@@ -146,7 +149,7 @@ describe('ClusterPairingService', () => {
       answers.a['pairing.match'] = () => [view('p1')];
       answers.b['pairing.match'] = () => [view('p2')];
       await expect(service.resolve('K7P3XQ', actor)).rejects.toBeInstanceOf(ConflictException);
-      expect(limits.recordWrongCode).not.toHaveBeenCalled();
+      expect(limits.attempt.wrong).not.toHaveBeenCalled();
     });
 
     it('answers 503 and counts nothing when an instance stays silent', async () => {
@@ -156,7 +159,7 @@ describe('ClusterPairingService', () => {
         throw new ClusterRequestTimeoutError('pairing.match', 'b');
       };
       await expect(service.resolve('K7P3XQ', actor)).rejects.toBeInstanceOf(ServiceUnavailableException);
-      expect(limits.recordWrongCode).not.toHaveBeenCalled();
+      expect(limits.attempt.wrong).not.toHaveBeenCalled();
     });
 
     it('ignores an instance that went away', async () => {
@@ -167,14 +170,14 @@ describe('ClusterPairingService', () => {
 
     it('stops a throttled approver before asking anyone', async () => {
       const { service, limits, cluster } = setup();
-      limits.assertApproverAllowed.mockRejectedValue(new EnrollmentRateLimitedException(30));
+      limits.beginApproverAttempt.mockRejectedValue(new EnrollmentRateLimitedException(30));
       await expect(service.resolve('K7P3XQ', actor)).rejects.toBeInstanceOf(EnrollmentRateLimitedException);
       expect(cluster.bus.request).not.toHaveBeenCalled();
     });
 
     it('answers 503 when Valkey is unreachable', async () => {
       const { service, limits } = setup();
-      limits.assertApproverAllowed.mockRejectedValue(new Error('Connection is closed.'));
+      limits.beginApproverAttempt.mockRejectedValue(new Error('Connection is closed.'));
       await expect(service.resolve('K7P3XQ', actor)).rejects.toThrow(VALKEY_UNAVAILABLE_MESSAGE);
     });
   });

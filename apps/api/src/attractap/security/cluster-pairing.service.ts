@@ -1,5 +1,4 @@
 import {
-  ConflictException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -15,7 +14,7 @@ import { ENROLLMENT_REQUEST_TTL_MS } from '../../device-enrollment/device-enroll
 import { EnrollmentLimitsService } from '../../device-enrollment/enrollment-limits.service';
 import { EnrollmentRateLimitedException } from '../../device-enrollment/enrollment-rate-limited.exception';
 import type { Actor, ApproveInput, PairingView } from './pairing-model';
-import { PairingService, TERMINAL_VISIBLE_MS } from './pairing.service';
+import { PairingService, resolveCodeAmong, TERMINAL_VISIBLE_MS } from './pairing.service';
 
 /** Which instance holds the pairing socket of a request; outlives the request by the time it stays visible. */
 const holderKey = (id: string) => `attraccess:pairing:request:${id}`;
@@ -108,16 +107,9 @@ export class ClusterPairingService {
   public async resolve(rawCode: string, actor: Actor): Promise<PairingView> {
     if (!this.cluster.enabled) return this.pairing.resolve(rawCode, actor);
     return orServiceUnavailable(
-      (async () => {
-        await this.limits.assertApproverAllowed(actor.userId);
-        const matches = (await this.everyInstance<PairingView[]>(MESSAGES.match, { code: rawCode }, true)).flat();
-        if (matches.length === 0) {
-          await this.limits.recordWrongCode(actor.userId);
-          throw new NotFoundException('PairingCodeNotFound');
-        }
-        if (matches.length > 1) throw new ConflictException('PairingCodeAmbiguous');
-        return revive(matches[0]);
-      })(),
+      resolveCodeAmong(this.limits, actor, async () =>
+        (await this.everyInstance<PairingView[]>(MESSAGES.match, { code: rawCode }, true)).flat(),
+      ).then(revive),
     );
   }
 

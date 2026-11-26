@@ -26,6 +26,31 @@ local count = redis.call('GET', KEYS[1])
 if not count then return {0, 0} end
 return {tonumber(count), redis.call('PTTL', KEYS[1])}`;
 
+/**
+ * Takes one attempt unless the limit is used up, in one step: parallel guesses never get more than the limit checked.
+ * Returns {1, 0} when taken, {0, remaining window} when refused.
+ */
+const TAKE_SCRIPT = `
+local count = tonumber(redis.call('GET', KEYS[1]) or '0')
+if count >= tonumber(ARGV[2]) then
+  local ttl = redis.call('PTTL', KEYS[1])
+  return {0, ttl}
+end
+count = redis.call('INCR', KEYS[1])
+if count == 1 or redis.call('PTTL', KEYS[1]) < 0 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end
+return {1, 0}`;
+/** Hands back an attempt that turned out not to be a wrong code. */
+const GIVE_BACK_SCRIPT = `
+local count = tonumber(redis.call('GET', KEYS[1]) or '0')
+if count > 0 then redis.call('DECR', KEYS[1]) end
+return 0`;
+
+/** One approver attempt at a code: `wrong()` once it was a wrong code, `notWrong()` otherwise. */
+export interface ApproverAttempt {
+  wrong(): Promise<void>;
+  notWrong(): Promise<void>;
+}
+
 export interface Admission {
   allowed: boolean;
   reason?: 'RATE_LIMITED';
@@ -132,6 +157,32 @@ export class EnrollmentLimitsService {
       remainingMs = failures.firstAt + windowMs - now;
     }
     throw new EnrollmentRateLimitedException(Math.max(1, Math.ceil(remainingMs / 1000)));
+  }
+
+  /**
+   * Starts one approver attempt at a code; throws the 429 exception while the approver is over the wrong-code limit.
+   * With Valkey the attempt is counted up front, atomically, and handed back unless it was wrong, so a burst of
+   * parallel guesses (on one or several instances) cannot test more codes than the limit.
+   */
+  async beginApproverAttempt(userId: number): Promise<ApproverAttempt> {
+    if (!this.shared) {
+      await this.assertApproverAllowed(userId);
+      return { wrong: () => this.recordWrongCode(userId), notWrong: async () => undefined };
+    }
+    const valkey = this.shared;
+    const { limit, windowMs } = ENROLLMENT_APPROVER_WRONG_CODES;
+    const [taken, ttlMs] = (await valkeyCall(valkey, () =>
+      valkey.eval(TAKE_SCRIPT, 1, approverKey(userId), windowMs, limit),
+    )) as [number, number];
+    if (taken !== 1) {
+      throw new EnrollmentRateLimitedException(Math.max(1, Math.ceil((ttlMs > 0 ? ttlMs : windowMs) / 1000)));
+    }
+    return {
+      wrong: async () => undefined,
+      notWrong: async () => {
+        await valkeyCall(valkey, () => valkey.eval(GIVE_BACK_SCRIPT, 1, approverKey(userId))).catch(() => undefined);
+      },
+    };
   }
 
   async recordWrongCode(userId: number, now = Date.now()): Promise<void> {

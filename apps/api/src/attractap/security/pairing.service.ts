@@ -287,14 +287,7 @@ export class PairingService implements OnApplicationShutdown {
    * a code two readers show at the same time is not a wrong code, the admin just waits for the next one.
    */
   public async resolve(rawCode: string, actor: Actor): Promise<PairingView> {
-    await this.limits.assertApproverAllowed(actor.userId);
-    const matches = this.matching(rawCode);
-    if (matches.length === 0) {
-      await this.limits.recordWrongCode(actor.userId);
-      throw new NotFoundException('PairingCodeNotFound');
-    }
-    if (matches.length > 1) throw new ConflictException('PairingCodeAmbiguous');
-    return this.view(matches[0], false);
+    return resolveCodeAmong(this.limits, actor, async () => this.matching(rawCode).map((r) => this.view(r, false)));
   }
 
   /** The waiting readers on this instance that show this code. Counts nothing: the caller decides what is wrong. */
@@ -307,12 +300,19 @@ export class PairingService implements OnApplicationShutdown {
    * waiting readers on other API instances show `input.code` (the cluster facade asks them).
    */
   public async approve(id: string, input: ApproveInput, actor: Actor, matchesElsewhere = 0): Promise<PairingView> {
-    await this.limits.assertApproverAllowed(actor.userId);
-    const request = this.mustFind(id);
-    if (isTerminal(request) || request.approving) throw new ConflictException('PairingNotWaiting');
-    const method = this.verifyProof(request, input, matchesElsewhere);
+    const attempt = await this.limits.beginApproverAttempt(actor.userId);
+    let method: PairingMethod | null;
+    let request: PairingRequest;
+    try {
+      request = this.mustFind(id);
+      if (isTerminal(request) || request.approving) throw new ConflictException('PairingNotWaiting');
+      method = this.verifyProof(request, input, matchesElsewhere);
+    } catch (error) {
+      await attempt.notWrong();
+      throw error;
+    }
     if (!method) {
-      await this.limits.recordWrongCode(actor.userId);
+      await attempt.wrong();
       throw new NotFoundException('PairingCodeNotFound');
     }
     // A correct code does not reset the wrong-code count; it runs out with its window.
@@ -321,6 +321,7 @@ export class PairingService implements OnApplicationShutdown {
     // While it is set, a disconnect, cancel or expiry only records that the request should end.
     request.approving = true;
     try {
+      await attempt.notWrong();
       const readerId = await this.approval.run(request, input, method, actor);
       request.state = 'completed';
       request.mode = input.mode;
@@ -517,4 +518,30 @@ export class PairingService implements OnApplicationShutdown {
     if (!request) throw new NotFoundException('Pairing not found');
     return request;
   }
+}
+
+/**
+ * One approver attempt at a code over `findMatches` (this instance's waiting readers, or every instance's): a miss
+ * counts as a wrong code; a code two readers show is not one, the admin just waits for the next.
+ */
+export async function resolveCodeAmong(
+  limits: Pick<EnrollmentLimitsService, 'beginApproverAttempt'>,
+  actor: Actor,
+  findMatches: () => Promise<PairingView[]>,
+): Promise<PairingView> {
+  const attempt = await limits.beginApproverAttempt(actor.userId);
+  let matches: PairingView[];
+  try {
+    matches = await findMatches();
+  } catch (error) {
+    await attempt.notWrong();
+    throw error;
+  }
+  if (matches.length === 0) {
+    await attempt.wrong();
+    throw new NotFoundException('PairingCodeNotFound');
+  }
+  await attempt.notWrong();
+  if (matches.length > 1) throw new ConflictException('PairingCodeAmbiguous');
+  return matches[0];
 }
