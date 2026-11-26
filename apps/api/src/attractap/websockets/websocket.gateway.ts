@@ -212,7 +212,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     // Plugin BLE sessions and pending calls are bound to this connection's reader identity.
     this.readerBleDriver.socketClosed(socket);
     this.onReaderSessionEnded(socket, reason, readerId);
-    if (socket.state.supervisionFlow) this.supervisionHandler.cancelForSocket(socket);
+    if (socket.state.supervisionFlow) this.supervisionHandler.cancelForSocket(socket, readerId);
     if (socket.state.massIntroductionFlow) this.massIntroductionHandler.cancelForSocket(socket, readerId);
     this.cardHandler.endCardFlows(socket, readerId);
   }

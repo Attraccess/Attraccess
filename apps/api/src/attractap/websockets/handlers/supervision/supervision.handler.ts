@@ -101,12 +101,15 @@ export class AttractapSupervisionHandler implements OnModuleInit {
     this.cancelForSocket(socket);
   }
 
-  /** Cancels any in-progress supervision flow for this socket (also used on disconnect). */
-  public cancelForSocket(socket: AuthenticatedWebSocket): void {
+  /**
+   * Cancels any in-progress supervision flow for this socket. Also used on disconnect, which clears
+   * `socket.readerId` first and passes the old id, so a web-armed flow's screen claim is released.
+   */
+  public cancelForSocket(socket: AuthenticatedWebSocket, readerId: number | null = socket.readerId): void {
     const requestId = socket.state.supervisionFlow?.requestId;
     if (requestId) {
       void this.supervisionService.cancelReaderRequest(requestId);
-      if (socket.readerId != null) this.screen.release(socket.readerId, screenOwner('supervision', requestId));
+      if (readerId != null) this.screen.release(readerId, screenOwner('supervision', requestId));
     }
     socket.state.supervisionFlow = null;
   }
@@ -275,43 +278,55 @@ export class AttractapSupervisionHandler implements OnModuleInit {
     // on the same flow before touching its state or messaging the reader.
     let createdRequestId: string | null = null;
 
-    const { requestId, expiresAt } = await this.supervisionService.createReaderRequest({
-      resourceId,
-      requester,
-      // No notes/project from the reader's two-card flow; the estimate survives an approval on the web.
-      dto,
-      canAskDuration,
-      eligibleSupervisorIds,
-      callbacks: {
-        onResolved: (_session, supervisor) => {
-          if (socket.state.supervisionFlow?.requestId !== createdRequestId) {
-            return;
-          }
-          socket.state.supervisionFlow = null;
-          void socket.sendMessage(
-            new AttractapEvent(AttractapEventType.SUPERVISION_RESOLVED, {
-              success: true,
-              resourceId,
-              supervisorUsername: supervisor.username,
-              supervisorDisplayName: supervisor.displayName,
-            }),
-          );
+    let created: Awaited<ReturnType<SupervisionService['createReaderRequest']>>;
+    try {
+      created = await this.supervisionService.createReaderRequest({
+        resourceId,
+        requester,
+        // No notes/project from the reader's two-card flow; the estimate survives an approval on the web.
+        dto,
+        canAskDuration,
+        eligibleSupervisorIds,
+        callbacks: {
+          onResolved: (_session, supervisor) => {
+            if (socket.state.supervisionFlow?.requestId !== createdRequestId) {
+              return;
+            }
+            socket.state.supervisionFlow = null;
+            void socket.sendMessage(
+              new AttractapEvent(AttractapEventType.SUPERVISION_RESOLVED, {
+                success: true,
+                resourceId,
+                supervisorUsername: supervisor.username,
+                supervisorDisplayName: supervisor.displayName,
+              }),
+            );
+          },
+          onFailed: (error) => {
+            if (socket.state.supervisionFlow?.requestId !== createdRequestId) {
+              return;
+            }
+            socket.state.supervisionFlow = null;
+            void socket.sendMessage(
+              new AttractapEvent(AttractapEventType.SUPERVISION_RESOLVED, {
+                success: false,
+                resourceId,
+                error: error?.message ?? 'SUPERVISION_FAILED',
+              }),
+            );
+          },
         },
-        onFailed: (error) => {
-          if (socket.state.supervisionFlow?.requestId !== createdRequestId) {
-            return;
-          }
-          socket.state.supervisionFlow = null;
-          void socket.sendMessage(
-            new AttractapEvent(AttractapEventType.SUPERVISION_RESOLVED, {
-              success: false,
-              resourceId,
-              error: error?.message ?? 'SUPERVISION_FAILED',
-            }),
-          );
-        },
-      },
-    });
+      });
+    } catch (error) {
+      // With several instances the request lives in Valkey; unreachable, the reader hears at once instead of
+      // waiting out its own timeout.
+      this.logger.warn(`Could not create a supervision request at the reader: ${(error as Error).message}`);
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.SUPERVISION_REQUEST, { error: 'SUPERVISION_FAILED' }),
+      );
+      return;
+    }
+    const { requestId, expiresAt } = created;
 
     createdRequestId = requestId;
     // No screen claim: the reader started this itself, and a web arm for it is delivered to this instance, whose

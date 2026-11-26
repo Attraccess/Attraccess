@@ -113,6 +113,28 @@ type StoreClient = Pick<
   'status' | 'set' | 'get' | 'eval' | 'zadd' | 'zrangebyscore' | 'zremrangebyscore' | 'mget'
 >;
 
+/**
+ * JSON for Valkey. The requester is the signed-in user, whose `effectivePermissions` is a Set (JSON would make it
+ * `{}`): it travels as an array and is a Set again when read, so permission checks on another instance see it.
+ */
+export function encodeRequest(request: StoredSupervisionRequest): string {
+  const requester = request.requester as SupervisionUser & { effectivePermissions?: unknown };
+  const permissions = requester.effectivePermissions;
+  return JSON.stringify({
+    ...request,
+    requester: permissions instanceof Set ? { ...requester, effectivePermissions: [...permissions] } : requester,
+  });
+}
+
+export function decodeRequest(raw: string): StoredSupervisionRequest {
+  const request = JSON.parse(raw) as StoredSupervisionRequest;
+  const requester = request.requester as SupervisionUser & { effectivePermissions?: unknown };
+  if (Array.isArray(requester.effectivePermissions)) {
+    requester.effectivePermissions = new Set(requester.effectivePermissions as string[]);
+  }
+  return request;
+}
+
 /** Several API instances (ATT-1163): requests in Valkey, with a pending index scored by expiry. */
 export class ValkeySupervisionStore implements SupervisionStore {
   constructor(private readonly client: StoreClient) {}
@@ -120,14 +142,14 @@ export class ValkeySupervisionStore implements SupervisionStore {
   async create(request: StoredSupervisionRequest): Promise<void> {
     const ttl = Math.max(1, request.expiresAt - Date.now() + KEY_GRACE_MS);
     await this.call(async () => {
-      await this.client.set(requestKey(request.id), JSON.stringify(request), 'PX', ttl);
+      await this.client.set(requestKey(request.id), encodeRequest(request), 'PX', ttl);
       await this.client.zadd(PENDING_KEY, request.expiresAt, request.id);
     });
   }
 
   async get(requestId: string): Promise<StoredSupervisionRequest | null> {
     const raw = await this.call(() => this.client.get(requestKey(requestId)));
-    return raw ? (JSON.parse(raw) as StoredSupervisionRequest) : null;
+    return raw ? decodeRequest(raw) : null;
   }
 
   async listPending(): Promise<StoredSupervisionRequest[]> {
@@ -136,14 +158,14 @@ export class ValkeySupervisionStore implements SupervisionStore {
     const ids = await this.call(() => this.client.zrangebyscore(PENDING_KEY, '-inf', '+inf'));
     if (ids.length === 0) return [];
     const raws = await this.call(() => this.client.mget(...ids.map(requestKey)));
-    return raws.flatMap((raw) => (raw ? [JSON.parse(raw) as StoredSupervisionRequest] : []));
+    return raws.flatMap((raw) => (raw ? [decodeRequest(raw)] : []));
   }
 
   async claim(requestId: string): Promise<StoredSupervisionRequest | null> {
     const raw = await this.call(() =>
       this.client.eval(CLAIM_REQUEST_SCRIPT, 2, requestKey(requestId), PENDING_KEY, requestId),
     );
-    return raw ? (JSON.parse(raw as string) as StoredSupervisionRequest) : null;
+    return raw ? decodeRequest(raw as string) : null;
   }
 
   async reserveReaderRequest(requesterId: number, requestId: string, ttlMs: number): Promise<boolean> {

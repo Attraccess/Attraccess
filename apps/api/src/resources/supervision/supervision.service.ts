@@ -490,7 +490,8 @@ export class SupervisionService {
     this.logger.debug(
       `Supervision request ${request.id} created for resource ${resourceId} (requester ${requester.id}, supervisor ${supervisorUserId})`,
     );
-    this.emitRequested(request);
+    // Aborted while it was being stored: EXPIRED went out already, a popup now would never close.
+    if (this.settlement.waiters.has(request.id)) this.emitRequested(request);
     return promise;
   }
 
