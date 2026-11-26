@@ -10,10 +10,10 @@ import {
   PreparedPlugin,
   samePermissions,
   PluginUpdatePolicy,
+  automaticUpdateRefusal,
   eligibleForPolicy,
   isDistTag,
   sameUpdatePolicy,
-  defaultUpdatePolicy,
   DEFAULT_PLUGIN_UPDATE_POLICY,
   REGISTRY_PARENT,
   UPDATE_POLICY_KEY,
@@ -352,6 +352,7 @@ export class NpmInstallation {
             (item) =>
               item.direction === 'newer' &&
               item.compatible &&
+              !automaticUpdateRefusal(item, current) &&
               eligibleForPolicy(item, current, policy, requested?.version, !stored.explicit && channel === 'next'),
           )
           .sort((left, right) => semver.rcompare(left.version, right.version));
@@ -497,9 +498,12 @@ export class NpmInstallation {
     return (await this.readUpdatePolicy()).policy;
   }
 
-  /** `explicit` is false while no policy was ever saved, so the host's default (channel dependent) applies. */
+  /**
+   * `explicit` is false while no policy was ever saved. Then, on a `next` host, plugins that request `next` also follow
+   * it through prereleases (see `eligibleForPolicy`); the policy itself is the same on every host.
+   */
   private async readUpdatePolicy(): Promise<{ policy: PluginUpdatePolicy; explicit: boolean }> {
-    const fallback = defaultUpdatePolicy(resolvePluginChannel());
+    const fallback = DEFAULT_PLUGIN_UPDATE_POLICY;
     const raw = await this.settings.getPlainSetting(REGISTRY_PARENT, UPDATE_POLICY_KEY);
     if (!raw) return { policy: fallback, explicit: false };
     try {
@@ -511,11 +515,7 @@ export class NpmInstallation {
 
   async setUpdatePolicy(patch: Partial<PluginUpdatePolicy>): Promise<PluginUpdatePolicy> {
     return this.state.mutateInstalls(async () => {
-      // The first save builds on the release default, not the host's: the next-host default allows prereleases only
-      // for plugins that follow `next`, while a saved prerelease flag would allow them for every plugin.
-      const stored = await this.readUpdatePolicy();
-      const base = stored.explicit ? stored.policy : DEFAULT_PLUGIN_UPDATE_POLICY;
-      const policy = normalizeUpdatePolicy({ ...base, ...patch });
+      const policy = normalizeUpdatePolicy({ ...(await this.readUpdatePolicy()).policy, ...patch });
       await this.settings.setPlainSetting(REGISTRY_PARENT, UPDATE_POLICY_KEY, JSON.stringify(policy));
       return policy;
     });

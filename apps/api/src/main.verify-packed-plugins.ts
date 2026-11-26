@@ -64,6 +64,9 @@ async function readPackedPlugins(): Promise<PackedPlugin[]> {
     try {
       await tar.x({ file: join(dist, files[0]), cwd: unpacked, filter: (path) => path === 'package/package.json' });
       const manifest = JSON.parse(readFileSync(join(unpacked, 'package/package.json'), 'utf8')) as PluginManifest;
+      // The marketplace installs official plugins under this name, and their storage names derive from it.
+      if (manifest.name !== `@attraccess/plugin-${project}`)
+        throw new Error(`apps/plugins/${project} packs as ${manifest.name}, not @attraccess/plugin-${project}`);
       packed.push({
         name: manifest.name,
         version: manifest.version,

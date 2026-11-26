@@ -277,6 +277,8 @@ export type InstalledNpmPluginVersion = {
   homepage: string | null;
   semverImpact: 'major' | 'minor' | 'patch' | 'prerelease' | 'none';
   matchesRequestedSpec: boolean;
+  /** The npm user who published this version, or the installed version's publisher when the registry does not say. */
+  publisher: string | null;
 };
 
 export type MarketplacePlugin = {
@@ -354,24 +356,32 @@ export const DEFAULT_PLUGIN_UPDATE_POLICY: PluginUpdatePolicy = {
   maintenanceWindow: { startMinute: 180, durationMinutes: 120 },
   prerelease: false,
 };
-/**
- * The policy of a host that never saved one. A `next` host also moves plugins that follow `next` between prereleases
- * (see `eligibleForPolicy`); other plugins stay on stable versions.
- */
-export function defaultUpdatePolicy(channel: 'latest' | 'next'): PluginUpdatePolicy {
-  return channel === 'next' ? { ...DEFAULT_PLUGIN_UPDATE_POLICY, prerelease: true } : DEFAULT_PLUGIN_UPDATE_POLICY;
-}
 export function samePermissions(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((permission) => right.includes(permission));
 }
 export function semverImpact(current: string, target: string): InstalledNpmPluginVersion['semverImpact'] {
   if (!semver.valid(current) || !semver.valid(target) || semver.eq(current, target)) return 'none';
-  const difference = semver.diff(current, target);
-  // Not `diff` alone: it also calls `1.0.0-nightly.1` -> `1.0.0` major, although that is the release of the same line.
+  // Compares the version numbers, not `semver.diff`: it calls `1.0.0-nightly.1` -> `1.0.0` (the release of the same
+  // line) and even `1.0.0-nightly.1` -> `1.3.0` major, so a `patch` override would let a minor update through.
   if (semver.major(current) !== semver.major(target)) return 'major';
-  if (difference === 'minor' || difference === 'preminor') return 'minor';
+  if (semver.minor(current) !== semver.minor(target)) return 'minor';
   if (semver.prerelease(target)) return 'prerelease';
   return 'patch';
+}
+/**
+ * Why the host must not install `candidate` on its own although the update policy allows it, or null. Nobody reviews
+ * an automatic update, so it only comes over HTTPS (or from this machine) and from the installed version's publisher.
+ */
+export function automaticUpdateRefusal(
+  candidate: InstalledNpmPluginVersion,
+  installed: InstalledNpmPlugin,
+): string | null {
+  const { protocol, hostname } = new URL(installed.registryUrl);
+  if (protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(hostname))
+    return `${installed.registryUrl} does not use HTTPS`;
+  if (installed.publisher && candidate.publisher && candidate.publisher !== installed.publisher)
+    return `${candidate.version} was published by ${candidate.publisher}, not ${installed.publisher}`;
+  return null;
 }
 export function matchesSpec(
   version: string,
@@ -416,10 +426,10 @@ export function eligibleForPolicy(
   const mode = effectiveUpdateMode(policy.mode, override);
   if (!checksEnabled || mode === 'off' || candidate.deprecated || candidate.permissionAdditions.length > 0)
     return false;
-  if (!policy.prerelease && semver.prerelease(candidate.version)) return false;
+  // Only the plugins that request `next` follow it through prereleases, and only under a `next` host's default.
   const followsChannel =
     channelDefault && installed.requestedSpec === 'next' && candidate.version === resolvedRequestedVersion;
-  if (channelDefault && !followsChannel && semver.prerelease(candidate.version)) return false;
+  if (!policy.prerelease && !followsChannel && semver.prerelease(candidate.version)) return false;
   if (candidate.semverImpact === 'major') return false;
   if (followsChannel && mode === 'minor') return true;
   if (mode === 'patch') return candidate.semverImpact === 'patch';

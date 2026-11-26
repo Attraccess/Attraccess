@@ -26,6 +26,8 @@ import { AddPluginRegistryDto } from './dto/npm-plugin-request.dto';
 
 import { InstalledNpmPlugin, NpmPluginAuditState, NpmPluginService } from './npm-plugin.service';
 
+import { automaticUpdateRefusal } from './npm/package-models';
+
 import { PluginService } from './plugin.service';
 
 import { PluginUninstallService } from './plugin-uninstall.service';
@@ -132,6 +134,7 @@ export class PluginAdministrationService {
       packageName,
       before?.requestedSpec ?? version,
       async (state) => {
+        await this.assertAutomaticUpdateSource(packageName, version, before);
         const plan = await this.npmPluginService.installPlan(packageName, version, before?.registryId);
         if (plan.plugins.some((plugin) => plugin.name !== packageName && plugin.action !== 'reuse'))
           throw new BadRequestException('The update needs other plugins installed or changed; install it manually');
@@ -140,6 +143,17 @@ export class PluginAdministrationService {
       before,
       onRestartRequired,
     );
+  }
+
+  /** The check of the update offer, repeated right before an unattended install (see `automaticUpdateRefusal`). */
+  private async assertAutomaticUpdateSource(packageName: string, version: string, before?: InstalledNpmPlugin) {
+    if (!before) throw new NotFoundException('Plugin package is not installed');
+    const candidate = (await this.npmPluginService.installedVersionCandidates(packageName)).find(
+      (item) => item.version === version,
+    );
+    if (!candidate) throw new NotFoundException('Package version not found');
+    const refusal = automaticUpdateRefusal(candidate, before);
+    if (refusal) throw new BadRequestException(`${refusal}; install it manually`);
   }
 
   /** `recordAs` is the requested spec to remember when it differs from the `spec` that is installed. */

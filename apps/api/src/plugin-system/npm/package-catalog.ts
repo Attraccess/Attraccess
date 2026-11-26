@@ -167,7 +167,7 @@ export class NpmPackageCatalog {
       throw new BadRequestException('Registry metadata identity does not match the requested package');
     const version = this.channelVersion(metadata);
     const pkg = version ? metadata.versions?.[version] : undefined;
-    if (!pkg) throw new NotFoundException('Package has no latest version');
+    if (!pkg) throw new NotFoundException('Package has no version to install');
     if (packageName(pkg) !== name)
       throw new BadRequestException('Registry metadata identity does not match the requested package');
     return this.marketplacePlugin(pkg, registry, registryPublisher(pkg) ?? registryPublisher(metadata), name);

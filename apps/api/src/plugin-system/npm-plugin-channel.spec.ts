@@ -216,7 +216,7 @@ describe('plugin channel', () => {
         permissionAdditions: [],
         ...overrides,
       }) as InstalledNpmPluginVersion;
-    const policy = { ...DEFAULT_PLUGIN_UPDATE_POLICY, prerelease: true };
+    const policy = DEFAULT_PLUGIN_UPDATE_POLICY;
     const next = '0.3.0-nightly.5.1';
 
     it('lets a plugin requesting next follow a newer nightly under the host default', () => {
@@ -230,8 +230,12 @@ describe('plugin channel', () => {
     });
 
     it.each([
-      ['0.3.0-nightly.4.1', '0.3.0', 'minor'],
+      ['0.3.0-nightly.4.1', '0.3.0', 'patch'],
       ['1.0.0-nightly.4.1', '1.0.0', 'patch'],
+      ['1.0.0-nightly.4.1', '1.3.0', 'minor'],
+      ['1.0.0-rc.1', '1.0.5', 'patch'],
+      ['1.2.3', '1.3.0-nightly.1.1', 'minor'],
+      ['1.2.3', '1.2.4-nightly.1.1', 'prerelease'],
       ['2.0.0-rc.1', '2.0.0', 'patch'],
       ['1.0.0-nightly.4.1', '1.0.0-nightly.5.1', 'prerelease'],
       ['0.9.0', '1.0.0', 'major'],
@@ -268,14 +272,16 @@ describe('plugin channel', () => {
       expect(eligibleForPolicy(candidate(next), installed('next'), DEFAULT_PLUGIN_UPDATE_POLICY, next, false)).toBe(
         false,
       );
-      expect(eligibleForPolicy(candidate(next), installed('next'), policy, next, false)).toBe(false);
+      const savedWithPrereleases = { ...DEFAULT_PLUGIN_UPDATE_POLICY, prerelease: true };
+      expect(eligibleForPolicy(candidate(next), installed('next'), savedWithPrereleases, next, false)).toBe(false);
     });
 
     it('treats a missing stored policy as the channel default and a stored one as explicit', async () => {
       process.env.ATTRACCESS_PLUGIN_CHANNEL = 'next';
       const getPlainSetting = jest.fn().mockResolvedValue(undefined);
       const { service } = serviceWith({}, 'next', { getPlainSetting });
-      await expect(service.getUpdatePolicy()).resolves.toMatchObject({ mode: 'minor', prerelease: true });
+      // The policy reads the same on every host, so a client that saves it back does not allow prereleases.
+      await expect(service.getUpdatePolicy()).resolves.toEqual(DEFAULT_PLUGIN_UPDATE_POLICY);
       getPlainSetting.mockResolvedValue(
         JSON.stringify({
           mode: 'minor',

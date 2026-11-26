@@ -133,6 +133,7 @@ export class NpmInstallationPlan {
       homepage: pkg?.homepage ?? null,
       semverImpact: semverImpact(installed.version, version),
       matchesRequestedSpec: matchesSpec(version, installed.requestedSpec),
+      publisher,
     };
   }
 
@@ -165,7 +166,7 @@ export class NpmInstallationPlan {
         ? spec
         : (metadata['dist-tags']?.[spec] ??
           semver.maxSatisfying(Object.keys(metadata.versions ?? {}), spec) ??
-          metadata['dist-tags']?.[fallbackTag]);
+          (fallbackTag ? metadata['dist-tags']?.[fallbackTag] : undefined));
     if (!version || !metadata.versions?.[version]) throw new NotFoundException('Package version not found');
     return { version, metadata };
   }
