@@ -42,7 +42,15 @@ Diese Software enthält Komponenten, die unter der MIT-Lizenz stehen. Diese Teil
 - Hat ein Plugin keine eigene Lizenz, gilt für das Plugin diese Lizenz (die des Kerns).
 - Die Erlaubnis zur kostenlosen Nutzung durch Privatpersonen und gemeinnützige Organisationen (Abschnitt 2.1) und der Lizenzschlüssel für gemeinnützige Nutzung erstrecken sich **nicht automatisch** auf Plugins mit eigener, kommerzieller Lizenz. Solche Plugins erfordern die dort genannte Lizenz, zum Beispiel ein bezahltes Lizenzmodul.
 
-## 6. Keine Garantie
+## 6. Hardware
+
+- Für die Hardware-Designs der Attractap-Lesegeräte (`apps/attractap/hardware/`, mit Schaltplänen, Leiterplatten,
+  Gehäuse und ihrer Dokumentation) gilt stattdessen die Lizenz in
+  [apps/attractap/hardware/LICENSE.md](./apps/attractap/hardware/LICENSE.md).
+- Sie erlaubt die nicht-kommerzielle Nutzung, verbietet den Verkauf des Designs und der danach gebauten Geräte und
+  schließt die kommerzielle Nutzung ohne gesonderte Lizenz aus, auch ohne Testphase.
+
+## 7. Keine Garantie
 
 DIE SOFTWARE WIRD OHNE JEGLICHE GARANTIE ZUR VERFÜGUNG GESTELLT. DER AUTOR ÜBERNIMMT KEINE HAFTUNG FÜR DIREKTE ODER INDIREKTE SCHÄDEN ODER FOLGEKOSTEN.
 
