@@ -66,6 +66,7 @@ import { PluginSandboxService } from './plugin-sandbox.service';
 
 import { PluginController } from './plugin.controller';
 import { PluginAdministrationService } from './plugin-administration.service';
+import { PluginUpdateScheduler } from './plugin-update-scheduler.service';
 
 import { PluginUninstallService } from './plugin-uninstall.service';
 
@@ -247,6 +248,7 @@ export class PluginModule {
         PluginLiveUpdatesService,
         PluginSystemEventsBridge,
         PluginLicenseWatcher,
+        PluginUpdateScheduler,
         PluginBleService,
         ...READER_PROVIDERS,
         ReaderUiWiring,

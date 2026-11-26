@@ -38,15 +38,44 @@ Eine ausdrücklich gewählte Version (**Version verwalten** oder die API) hat im
 
 ### Nightly-Hosts folgen `next`
 
-Ein Plugin, das auf einem Nightly-Host über den Marktplatz oder über die API ohne Versionsangabe installiert wird, merkt sich `next` als gewünschte Version. Mit der Standard-Update-Richtlinie bringt das Wartungsfenster es dann auf den neuesten kompatiblen Build von `next` (oder von `latest`, falls höher): von Nightly zu Nightly und von einem Nightly zum Release. Die üblichen Schutzmechanismen gelten weiter: Es wird nichts automatisch installiert, wenn die neue Version zusätzliche Berechtigungen verlangt, eine neue Hauptversion ist, als veraltet markiert ist oder die Update-Einstellung des Plugins **Aus** oder **Nur Patch** ist. Das gilt nur, solange die Update-Richtlinie nie gespeichert wurde; eine unter **Einstellungen → Plugins** gespeicherte Richtlinie bleibt unverändert.
+Ein Plugin, das auf einem Nightly-Host über den Marktplatz oder über die API ohne Versionsangabe installiert wird, merkt sich `next` als gewünschte Version. Mit der Standard-Update-Richtlinie bringen die [automatischen Updates](#automatische-updates) es dann auf den neuesten kompatiblen Build von `next` (oder von `latest`, falls höher): von Nightly zu Nightly und von einem Nightly zum Release. Nur Plugins, die `next` wünschen, werden auf Nightly-Builds gebracht. Diese Regel gilt nur, solange die globale Update-Richtlinie nie gespeichert wurde; eine gespeicherte Richtlinie gilt unverändert.
 
-Auf einem Release-Host ändert sich nichts: Vorabversionen werden nie automatisch installiert.
+Auf einem Release-Host installiert die Standard-Richtlinie nie eine Vorabversion.
 
 ### Ein Plugin auf `next` umstellen
 
 Ein Plugin, das als `latest` installiert wurde, bleibt auf `latest`, auch auf einem Nightly-Host. Zum Umstellen öffne **Einstellungen → Plugins**, öffne das Aktionsmenü (**⋯**) des installierten Plugins, wähle **Version verwalten** und trage `next` (oder eine bestimmte Nightly-Version) unter **Gewünschte Version oder Kanal** ein. Alternativ entfernst du das Plugin und installierst es erneut über den Marktplatz; seine Daten bleiben erhalten.
 
 Sobald ein Plugin einmal released wurde, bietet der Marktplatz eines Release-Hosts nur noch released Versionen an. npm setzt `latest` bei der ersten Veröffentlichung eines Pakets automatisch; ein Plugin, das zuerst von einem Nightly veröffentlicht wird, hat deshalb bis zu seinem ersten Release ein Nightly als `latest`. Das Release behandelt ein Nightly-`latest` als „noch nie released" und veröffentlicht das Plugin.
+
+## Automatische Updates
+
+Attraccess hält über npm installierte Plugins aktuell. Das gilt für jeden Host, ob Release oder Nightly. Als ZIP-Datei hochgeladene Plugins werden nicht aktualisiert.
+
+- **Prüfungen:** Der Host fragt die Registry des Plugins etwa stündlich nach neuen Versionen, und erneut, wenn das Wartungsfenster beginnt. **Einstellungen → Plugins** zeigt an, wenn ein Update verfügbar ist. Mit **Alle jetzt prüfen** auf dieser Seite prüfst du sofort.
+- **Wartungsfenster:** Updates werden nur in diesem Fenster installiert, standardmäßig von 03:00 bis 05:00 Uhr. Es gilt die Ortszeit des Servers; in den offiziellen Docker-Images ist das UTC, sofern du `TZ` nicht setzt.
+- **Was installiert wird:** Mit der Standard-Richtlinie das neueste kompatible Patch- oder Minor-Release. Nightly-Hosts bringen außerdem Plugins, die `next` wünschen, auf Nightly-Builds, wie oben beschrieben.
+- **Nie automatisch installiert:** eine neue Hauptversion, eine Version mit zusätzlichen Berechtigungen, eine als veraltet markierte Version, eine mit dem Host nicht kompatible Version und ein Update, für das weitere Plugins installiert oder geändert werden müssten. Solche installierst du selbst über **Version verwalten**.
+- **Neustart:** Nach der Installation der fälligen Updates startet Attraccess einmal neu, um sie zu aktivieren. Lege das Fenster in eine Zeit, in der eine kurze Unterbrechung vertretbar ist.
+- **Fehler:** Kann ein Update nicht installiert werden, bleibt die installierte Version bestehen, das Server-Log nennt den Grund, und Attraccess versucht diese Version frühestens nach 24 Stunden erneut. Eine neuere Version wird ohne diese Pause versucht. Wird eine neue Version installiert, lädt aber nach dem Neustart nicht, kehrt Attraccess nicht zur vorherigen Version zurück: **Einstellungen → Plugins** zeigt den Fehler, und du kannst über **Version verwalten** eine andere Version wählen. Ein späteres Update wird weiterhin automatisch installiert.
+- **Audit-Log:** Jede automatische Installation, erfolgreich oder nicht, und ihre Aktivierung nach dem Neustart werden ohne Benutzer im Audit-Log festgehalten.
+
+### Automatische Updates ausschalten
+
+Für ein einzelnes Plugin öffne **⋯ → Version verwalten**, stelle **Automatische Update-Regel des Plugins** auf **Aus** und speichere die Versionsregel. **Nur Patches** beschränkt das Plugin auf Patch-Releases.
+
+Für die globale Richtlinie gibt es noch keine Seite in der Weboberfläche. Ein Administrator, der Plugins verwalten darf, ändert sie mit `POST /api/plugins/update-policy`:
+
+| Request-Body                                                         | Wirkung                                                    |
+| -------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `{"checksEnabled": false}`                                           | Keine Update-Prüfungen und keine automatische Installation |
+| `{"mode": "off"}`                                                    | Updates werden nicht automatisch installiert               |
+| `{"maintenanceWindow": {"startMinute": 60, "durationMinutes": 120}}` | Das Fenster läuft von 01:00 bis 03:00 Uhr                  |
+
+Ein Plugin, dessen eigene Regel nicht **Globale Regel übernehmen** ist, verwendet diese anstelle des globalen Modus. Ausgeschaltete Update-Prüfungen (`checksEnabled: false`) gelten für alle Plugins.
+
+> [!WARNING]
+> Eine gewünschte Version hält ein Plugin mit **Nur Patches** oder **Patches und Minor** nicht auf dieser Version: Installierst du eine ältere Version, kann das nächste Wartungsfenster sie wieder aktualisieren. Soll ein Plugin auf seiner aktuellen Version bleiben, stelle seine automatische Update-Regel auf **Aus**. Die gewünschte Version oder der Versionsbereich beschränkt automatische Updates nur mit **Paketregel folgen**.
 
 ## Plugin hochladen
 

@@ -345,12 +345,15 @@ export class NpmInstallation {
         const current = this.state.installed(name);
         // Candidates and dist-tag resolutions belong to the snapshot used for the registry request.
         if (snapshotChanged(current, await this.getUpdatePolicy())) return null;
-        const candidate = candidates.find(
-          (item) =>
-            item.direction === 'newer' &&
-            item.compatible &&
-            eligibleForPolicy(item, current, policy, requested?.version, !stored.explicit && channel === 'next'),
-        );
+        // The newest eligible version: an update installed on its own must not climb one release at a time.
+        const [candidate] = candidates
+          .filter(
+            (item) =>
+              item.direction === 'newer' &&
+              item.compatible &&
+              eligibleForPolicy(item, current, policy, requested?.version, !stored.explicit && channel === 'next'),
+          )
+          .sort((left, right) => semver.rcompare(left.version, right.version));
         const blocked = candidates.some((item) => item.direction === 'newer' && item.compatible) && !candidate;
         const updated = {
           ...current,
@@ -396,6 +399,13 @@ export class NpmInstallation {
       checked.push(...results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])));
     }
     return checked;
+  }
+
+  async recordAutoUpdateFailure(name: string, version: string, failedAt: Date): Promise<void> {
+    await this.state.mutateInstalls(async () => {
+      const current = this.state.installed(name);
+      await this.state.writeState({ ...current, autoUpdateFailure: { version, failedAt: failedAt.toISOString() } });
+    });
   }
 
   async replaceInstalled(

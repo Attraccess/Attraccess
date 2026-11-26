@@ -52,6 +52,8 @@ export type InstalledNpmPlugin = {
     error: string | null;
   };
   knownGoodVersion?: string | null;
+  /** The last version the host failed to install on its own; it is not retried for a while. */
+  autoUpdateFailure?: { version: string; failedAt: string };
 };
 
 export type PluginInstallPlan = {

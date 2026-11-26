@@ -1,6 +1,6 @@
 import { Inject, Injectable, OnApplicationBootstrap, OnModuleInit, Optional } from '@nestjs/common';
 
-import { AUDIT_RECORDER, auditActorOf, AuditRecorder } from '../audit/recorder/audit-event';
+import { AUDIT_RECORDER, auditActorOf, AuditRecorder, SYSTEM_AUDIT_ACTOR } from '../audit/recorder/audit-event';
 import { AuditQueryService } from '../audit/audit-query.service';
 
 import { readAuditSettings } from '../audit/audit.config';
@@ -113,7 +113,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
               domain: 'administration',
               action: 'plugin.activation_completed',
               operationId: pending.operationId,
-              actor: auditActorOf({ ...pending, id: pending.actorId }),
+              actor: pending.actorId === null ? SYSTEM_AUDIT_ACTOR : auditActorOf({ ...pending, id: pending.actorId }),
               subject: { type: 'plugin-package', id: auditSubjectKeyId(installed.name) },
               outcome: loaded ? 'succeeded' : 'failed',
               details: {
@@ -205,6 +205,10 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
 
   async checkAllInstalled(): Promise<InstalledNpmPlugin[]> {
     return this.installation.checkAllInstalled();
+  }
+
+  async recordAutoUpdateFailure(name: string, version: string, failedAt: Date): Promise<void> {
+    return this.installation.recordAutoUpdateFailure(name, version, failedAt);
   }
 
   async replaceInstalled(

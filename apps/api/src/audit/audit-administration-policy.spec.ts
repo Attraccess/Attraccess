@@ -196,4 +196,14 @@ describe('administration audit policy', () => {
     ])
       expect(templateEvent(rejected)).toBeNull();
   });
+
+  it('accepts the system actor only for what the host does on its own', () => {
+    const system = { actorId: null, subjectType: 'plugin-package', subjectId: 7, details: { packageName: 'p' } };
+    for (const action of ['plugin.replaced', 'plugin.activation_completed'])
+      expect(projectAdministrationAuditEvent({ ...system, action })).toMatchObject({ actorId: null });
+    for (const action of ['plugin.installed', 'plugin.removed', 'plugin.update_override_updated'])
+      expect(projectAdministrationAuditEvent({ ...system, action })).toBeNull();
+    for (const credential of [{ authenticationMethod: 'session' as const }, { apiTokenId: 9 }])
+      expect(projectAdministrationAuditEvent({ ...system, action: 'plugin.replaced', ...credential })).toBeNull();
+  });
 });

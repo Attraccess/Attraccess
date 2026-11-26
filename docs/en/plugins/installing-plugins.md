@@ -38,15 +38,44 @@ The version you choose explicitly (**Manage version** or the API) always wins.
 
 ### Nightly hosts follow `next`
 
-A plugin installed on a nightly host from the marketplace, or through the API without a version, records `next` as its requested version. Under the default update policy, the maintenance window then moves it to the newest compatible build of `next` (or of `latest`, if that is higher), from one nightly to the next and from a nightly to the release. The usual safeguards still apply: nothing is installed automatically if the new version asks for more permissions, is a new major version, is deprecated, or if the plugin's update setting is **off** or **patch only**. This applies only while the update policy was never saved; a policy you saved under **Settings → Plugins** is not changed.
+A plugin installed on a nightly host from the marketplace, or through the API without a version, records `next` as its requested version. Under the default update policy, [automatic updates](#automatic-updates) then move it to the newest compatible build of `next` (or of `latest`, if that is higher): from one nightly to the next, and from a nightly to the release. Only plugins that request `next` are moved to nightly builds. This rule applies only while the global update policy was never saved; a saved policy applies as it is.
 
-On a release host nothing changes: prereleases are never installed automatically.
+On a release host the default policy never installs a prerelease.
 
 ### Switching a plugin to `next`
 
 A plugin that was installed as `latest` stays on `latest`, also on a nightly host. To switch it, open **Settings → Plugins**, open the installed plugin's actions menu (**⋯**), choose **Manage version** and enter `next` (or a specific nightly version) as **Requested version or channel**. You can also remove the plugin and install it again from the marketplace; its data is kept.
 
 Once a plugin has had a release, the marketplace of a release host offers only released versions. npm sets `latest` automatically on a package's first publish, so a plugin first published by a nightly has a nightly `latest` until its first release. The release treats a nightly `latest` as never released and publishes the plugin.
+
+## Automatic updates
+
+Attraccess keeps plugins installed from npm up to date. This applies to every host, release and nightly. Plugins uploaded as a ZIP file are not updated.
+
+- **Checks:** the host asks the plugin's registry for new versions about once an hour, and again when the maintenance window opens. **Settings → Plugins** shows when an update is available. You can also check at once with **Check all now** on that page.
+- **Maintenance window:** updates are installed only inside this window, by default from 03:00 to 05:00. The times are the server's local time, which is UTC in the official Docker images unless you set `TZ`.
+- **What is installed:** with the default policy, the newest compatible patch or minor release. Nightly hosts also move plugins that request `next` to nightly builds, as described above.
+- **Never installed automatically:** a new major version, a version that asks for more permissions, a deprecated version, a version that is not compatible with the host, and an update that would also need other plugins installed or changed. Install those yourself with **Manage version**.
+- **Restart:** after installing the updates that are due, Attraccess restarts once to activate them. Plan the window for a time when a short interruption is acceptable.
+- **Failures:** if an update cannot be installed, the installed version stays, the server log names the reason and Attraccess tries that version again after 24 hours at the earliest. A newer version is tried without this pause. If a new version is installed but fails to load after the restart, Attraccess does not go back to the previous version: **Settings → Plugins** shows the error, and you can choose another version with **Manage version**. A later update is still installed automatically.
+- **Audit log:** each automatic installation, successful or not, and its activation after the restart are recorded in the audit log without a user.
+
+### Turning automatic updates off
+
+For one plugin, open **⋯ → Manage version**, set **Plugin automatic update policy** to **Off** and save the version policy. **Patch only** limits the plugin to patch releases.
+
+The global policy has no page in the web interface yet. An administrator who may manage plugins changes it with `POST /api/plugins/update-policy`:
+
+| Request body                                                         | Effect                                         |
+| -------------------------------------------------------------------- | ---------------------------------------------- |
+| `{"checksEnabled": false}`                                           | No update checks and no automatic installation |
+| `{"mode": "off"}`                                                    | Updates are not installed automatically        |
+| `{"maintenanceWindow": {"startMinute": 60, "durationMinutes": 120}}` | The window runs from 01:00 to 03:00            |
+
+A plugin whose own setting is not **Inherit global policy** uses that setting instead of the global mode. Disabled checks (`checksEnabled: false`) apply to every plugin.
+
+> [!WARNING]
+> A requested version does not hold a plugin at that version under **Patch only** or **Patch and minor**: if you install an older version, the next maintenance window can update it again. To keep a plugin at its current version, set its automatic update policy to **Off**. The requested version or range limits automatic updates only with **Follow package policy**.
 
 ## Uploading a Plugin
 
