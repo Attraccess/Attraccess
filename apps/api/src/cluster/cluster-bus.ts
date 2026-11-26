@@ -112,6 +112,7 @@ export class ValkeyClusterBus implements ClusterBus {
   private readonly pending = new Map<string, PendingRequest>();
   private subscribed: Promise<void> = Promise.resolve();
   private targetCheck: NodeJS.Timeout | null = null;
+  private publishFailing = false;
 
   constructor(
     private readonly client: BusClient,
@@ -217,8 +218,17 @@ export class ValkeyClusterBus implements ClusterBus {
   private async publish(channel: string, envelope: Envelope): Promise<void> {
     try {
       await valkeyCall(this.client, () => this.client.publish(channel, JSON.stringify(envelope)));
+      if (this.publishFailing) this.logger.log('Cluster messages are sent again');
+      this.publishFailing = false;
     } catch (error) {
-      this.logger.warn(`Cluster message ${envelope.type} was not sent: ${(error as Error).message}`);
+      // Logged once per outage, not once per message.
+      if (!this.publishFailing) {
+        this.logger.warn(
+          `Cluster message ${envelope.type} was not sent: ${(error as Error).message}; ` +
+            'not logged again until sending works',
+        );
+      }
+      this.publishFailing = true;
     }
   }
 

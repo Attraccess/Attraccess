@@ -15,7 +15,7 @@ export const SWEEP_EVERY_MS = 2_000;
 const REAP_CLAIM_TTL_MS = 60_000;
 
 const INSTANCES_KEY = 'attraccess:cluster:instances';
-const aliveKey = (id: string) => `attraccess:cluster:alive:${id}`;
+export const aliveKey = (id: string) => `attraccess:cluster:alive:${id}`;
 const reapKey = (id: string) => `attraccess:cluster:reap:${id}`;
 
 export function newInstanceId(name = resolveInstanceName()): string {
