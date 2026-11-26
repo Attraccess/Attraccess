@@ -7,7 +7,7 @@ import { SubHeading } from '../components/SubHeading';
 import { NetworkRestrictionDrafts } from '../useNetworkRestrictionDrafts';
 import { isSameRange, isValidRange, splitRangeInput } from './networkRange';
 import { RangeSuggestions } from './RangeSuggestions';
-import { buildRangeSuggestions } from './rangeSuggestions';
+import { buildRangeSuggestions } from './buildRangeSuggestions';
 import { NetworkRestrictionRoleTable } from './NetworkRestrictionRoleTable';
 import en from './en.json';
 import de from './de.json';
