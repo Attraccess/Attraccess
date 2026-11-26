@@ -390,7 +390,7 @@ least 3 A):
 |---|---|---|---|
 | USB-C (eFuse current limit) | 1.8 A minimum (R110 1.65 k) | 48 % | -1 % |
 | DC converter AP63205 | 2 A | 53 % | 9 % |
-| PoE module DP9905M | 1.8 A up to 70 C (9 W), 1.2 A at 85 C (6 W) | 48 % (22 % at 85 C) | -1 % |
+| PoE module DP9900M-5V | 1.8 A up to 70 C (9 W), 1.2 A at 85 C (6 W) | 48 % (22 % at 85 C) | -1 % |
 
 Both 3.3 V converters are sized for the makers' supply figures with at least
 30 % to spare: U103 55 %, U302 70 %. Each 5 V source has at least 30 % to spare
@@ -446,7 +446,7 @@ source. What each source gives at most, and what each 5 V load takes:
 | USB-C, a compliant source | 5.5 V | vSafe5V, USB PD R3.3 table 4.9 (4.75 to 5.5 V); USB 2.0 with the VBUS Max Limit ECN: 5.5 V |
 | USB-C, a faulty source | 5.53 to 5.74 V, then the eFuse opens | OVLO below |
 | DC converter AP63205 | 5.05 V (CCM), about 5.2 V in PFM at light load | DS41326 rev 3-2: 4.95 / 5.00 / 5.05 V; figures 6 and 7 (typical) |
-| PoE module DP9905M | 5.25 V, about 5.5 V for a moment at a load step | datasheet: 4.75 / 5 / 5.25 V; load step 50 - 100 - 50 %: +276 mV (typical scope shot) |
+| PoE module DP9900M-5V | 5.25 V, about 5.5 V for a moment at a load step | datasheet: 4.75 / 5 / 5.25 V; load step 50 - 100 - 50 %: +276 mV (typical scope shot) |
 
 | Load | Recommended maximum | Absolute maximum |
 |---|---|---|
@@ -694,7 +694,7 @@ Other notes:
 
 - Nothing but the TVS may sit across the PoE input. Extra capacitance there
   breaks the PoE detection signature.
-- The PoE module needs a minimum load (100 mA DP9905M, 200 mA Ag9905M). With the
+- The PoE module needs a minimum load (100 mA DP9900M-5V, 200 mA Ag9905M). With the
   backlight on the board draws more than that. A deep-sleep mode would need a
   dummy load. A PoE module that is connected but carries no load because
   another source is higher may whistle, and the switch may turn the port off and

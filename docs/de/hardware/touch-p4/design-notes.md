@@ -407,7 +407,7 @@ ihrem Tiefstwert (4,75 V):
 |---|---|---|---|
 | USB-C (eFuse-Strombegrenzung) | mindestens 1,8 A (R110 1,65 k) | 48 % | -1 % |
 | DC-Wandler AP63205 | 2 A | 53 % | 9 % |
-| PoE-Modul DP9905M | 1,8 A bis 70 C (9 W), 1,2 A bei 85 C (6 W) | 48 % (22 % bei 85 C) | -1 % |
+| PoE-Modul DP9900M-5V | 1,8 A bis 70 C (9 W), 1,2 A bei 85 C (6 W) | 48 % (22 % bei 85 C) | -1 % |
 
 Beide 3,3-V-Wandler sind auf die Versorgungswerte der Hersteller mit mindestens
 30 % Reserve ausgelegt: U103 55 %, U302 70 %. Jede 5-V-Quelle hat beim höchsten
@@ -468,7 +468,7 @@ ihrer Quelle. Was jede Quelle höchstens liefert und was jede 5-V-Last aufnimmt:
 | USB-C, eine konforme Quelle | 5,5 V | vSafe5V, USB PD R3.3 Tabelle 4.9 (4,75 bis 5,5 V); USB 2.0 mit dem VBUS Max Limit ECN: 5,5 V |
 | USB-C, eine fehlerhafte Quelle | 5,53 bis 5,74 V, dann öffnet das eFuse | OVLO unten |
 | DC-Wandler AP63205 | 5,05 V (CCM), etwa 5,2 V im PFM bei geringer Last | DS41326 Rev. 3-2: 4,95 / 5,00 / 5,05 V; Abbildungen 6 und 7 (typisch) |
-| PoE-Modul DP9905M | 5,25 V, etwa 5,5 V kurzzeitig bei einem Lastsprung | Datenblatt: 4,75 / 5 / 5,25 V; Lastsprung 50 - 100 - 50 %: +276 mV (typische Oszilloskopaufnahme) |
+| PoE-Modul DP9900M-5V | 5,25 V, etwa 5,5 V kurzzeitig bei einem Lastsprung | Datenblatt: 4,75 / 5 / 5,25 V; Lastsprung 50 - 100 - 50 %: +276 mV (typische Oszilloskopaufnahme) |
 
 | Last | Empfohlenes Maximum | Absolutes Maximum |
 |---|---|---|
@@ -723,7 +723,7 @@ Weitere Hinweise:
 
 - Nichts außer der TVS darf über dem PoE-Eingang liegen. Zusätzliche Kapazität dort
   zerstört die PoE-Erkennungssignatur.
-- Das PoE-Modul braucht eine Mindestlast (100 mA beim DP9905M, 200 mA beim Ag9905M).
+- Das PoE-Modul braucht eine Mindestlast (100 mA beim DP9900M-5V, 200 mA beim Ag9905M).
   Bei eingeschalteter Hintergrundbeleuchtung zieht die Platine mehr als das. Ein
   Deep-Sleep-Modus bräuchte eine Dummy-Last. Ein PoE-Modul, das angeschlossen ist,
   aber keine Last trägt, weil eine andere Quelle höher liegt, kann pfeifen, und der
@@ -2286,9 +2286,9 @@ vorher und nachher und die unterwegs getroffenen Entscheidungen stehen in [revie
 | Stücklisten nur mit LCSC-Nummer und Wert. | Jede Zeile trägt Hersteller, Bauteilnummer, eine vollständige Beschreibung (mit Nennwert und Toleranz), eine Alternative und, für ICs und Module, den Lebenszyklusstatus des Herstellers (`scripts/bootstrap/parts_info.py`; [parts.md](hardware/touch-p4/parts.md) listet die Quellen). Das Display und die WLAN-Antenne, die JLCPCB nicht bestückt, stehen ebenfalls in den Stücklisten (die Antenne ist inzwischen mit der Platinenantenne des C5 entfallen). Ein Test schlägt fehl, wenn einem bestückten Bauteil diese Daten fehlen. |
 | Keine Fertigungszeichnung, keine Netzliste für den Test der unbestückten Platine. | `fab/jlcpcb/attractap-touch-p4-fab.pdf` (Umriss, Maße, Bohrungen und Ausschnitte, Lagenaufbau, Bohrtabelle, Material, Oberfläche, IPC-Klasse, Via-Füllung) und `attractap-touch-p4.ipc` (IPC-D-356), beide von `export` geschrieben. |
 | 3D-Modelle nur für den Display-Anschluss. | Ein Modell für jedes Footprint mit einem Körper (`kicad/lib/attractap.3dshapes/`, `scripts/bootstrap/collect_models.py`); ein Test schlägt fehl, wenn eines fehlt. |
-| Versorgungs-ODER mit drei Schottky-Dioden: Die 5-V-Schiene lag bei etwa 4,6 V, die Dioden speisten warm in einen nicht angesteckten USB-Port zurück, und nichts begrenzte den USB-Einschaltstrom. | USB über eine eFuse (TPS259470A: Sanftanlauf, 2-A-Grenze, Rückstromsperre, Sperrschwellen), DC und PoE über ideale Dioden (LM74700-Q1 mit IRLML0030); siehe "Power". |
+| Versorgungs-ODER mit drei Schottky-Dioden: Die 5-V-Schiene lag bei etwa 4,6 V, die Dioden speisten warm in einen nicht angesteckten USB-Port zurück, und nichts begrenzte den USB-Einschaltstrom. | USB über eine eFuse (TPS259470A: Sanftanlauf, 2-A-Grenze, Rückstromsperre, Sperrschwellen), DC und PoE über ideale Dioden (LM74700-Q1 mit IRLML0030); siehe „Stromversorgung“. |
 | 3,3-V-Wandler AP63203: kein Bestand bei LCSC oder JLCPCB. | TLV62569 (das Bauteil des Kernwandlers), aufgebaut wie von TI gezeigt. |
-| Die 5-V-Schiene folgt jetzt ihrer Quelle; ihre Obergrenze war nicht gegen das angegeben, was die 5-V-Lasten aushalten. | Tabelle in "The 5 V rail's ceiling"; die OVLO der eFuse mit einem 0,1-%-Teiler öffnet zwischen 5,53 und 5,74 V. |
+| Die 5-V-Schiene folgt jetzt ihrer Quelle; ihre Obergrenze war nicht gegen das angegeben, was die 5-V-Lasten aushalten. | Tabelle in „Die Obergrenze der 5-V-Schiene“; die OVLO der eFuse mit einem 0,1-%-Teiler öffnet zwischen 5,53 und 5,74 V. |
 | DC-Eingang: Die TVS-Diode klemmt bei ihrem Nennstrom auf 45 V gegen die 40 V des Wandlers; welche Surge-Prüfung gilt, war nicht angegeben. | Normen ausgearbeitet (EN 301 489-1: keine an DC-Stromanschlüssen; EN 50130-4: Leitung gegen Erde über 42 Ohm); eine bidirektionale TVS-Diode am Anschluss und eine 100-V-Verpolschutzdiode; `sim/dc_surge.cir`: höchstens 39,6 V am Wandler. |
 | 3,3-V-Schiene: etwa 76 uF effektiv bei 3,3 V an einem Wandler, den TI bis 52,8 uF nachgewiesen hat. | Etwa 49 uF: ein 10 uF am Wandler, 10 uF am WLAN-Modul, 4,7 uF am Näherungssender; ein Test addiert sie. Seit dem C5: 44,5 uF, das WLAN-Modul an einem eigenen Wandler mit 47,2 uF, seine eigenen Kondensatoren eingerechnet; ein Test je Schiene. |
 | DRC mit abgesenkten Schweregraden ausgeführt (50 Warnungen bei KiCads Standardwerten). | KiCads Standard-Schweregrade, keine Regel abgeschaltet oder abgesenkt: 0 Fehler, 0 Warnungen, 0 nicht verbundene. Bestückungsdruck im Generator von Pads und Platinenrändern zurückgenommen; Passmarken mit Kupfer-Sperrfläche; überall 3 mm PoE-Abstand. |
@@ -2383,10 +2383,10 @@ ein Test schlägt fehl, wenn die Pins eines Modells die Löcher oder seine Ansch
 - **Abblockung am MCU.** 4 seiner 21 Versorgungspins haben einen Kondensator
   innerhalb des Review-Ziels (3 mm Kupfer für die Kern-, Speicher- und
   Reglerpins, 5 mm für IO); die anderen erreichen ihre über Vias und die
-  Flächen (siehe "Decoupling and crystal at the MCU"). Simuliert beträgt der Anteil der Platine am Weg von einem Pin
+  Flächen (siehe „Abblockung und Quarz am MCU“). Simuliert beträgt der Anteil der Platine am Weg von einem Pin
   zu seinen Kondensatoren 1,2 bis 2,4 nH, etwa so viel, wie das Gehäuse
   selbst beiträgt. Wenn der MCU bei voller Taktfrequenz instabil läuft,
-  ist dies der erste Verdächtige; siehe "Accepted deviations", warum Revision A
+  ist dies der erste Verdächtige; siehe „Akzeptierte Abweichungen“, warum Revision A
   einseitig bleibt und was eine spätere Revision tun kann.
 - **NFC-Reichweite und Abstimmung**, der zweite PN532-Lieferant und die Wirkung von
   Ethernet-Stecker und -Kabel neben der Schleife bei der Version lan. Die Induktivität der Schleife
@@ -2397,11 +2397,11 @@ ein Test schlägt fehl, wenn die Pins eines Modells die Löcher oder seine Ansch
   vor dem Gehäuse (15 mm an einer Metallwand). Was kein Modell hier sagt, ist,
   wie gut der Leser die Karte hört.
 - **WLAN-Antenne und Reichweite.** Die Antennen sind gewählt, und das Gehäuse hat
-  einen Schacht für eine, mit eingezeichnetem Kabelweg (siehe "Wi-Fi antenna"); ob die
+  einen Schacht für eine, mit eingezeichnetem Kabelweg (siehe „WLAN-Antenne“); ob die
   zertifizierte Antenne hineinpasst, wartet auf ihre Zeichnung. Das Antennenmodell oben wurde
   für das Modul mit Platinenantenne gemacht und sagt nichts über eine Antenne im
   Schacht. Vergleichen Sie den ersten Leser mit einem aktuellen (Inbetriebnahmeplan).
-- **Isolation der PoE-Seite** unter einer 1500-V-Prüfung (siehe "PoE isolation").
+- **Isolation der PoE-Seite** unter einer 1500-V-Prüfung (siehe „PoE-Potenzialtrennung“).
   Das Kupfer der Platine hält überall 2,0 mm ein, an der verlegten Platine gemessen,
   was in Luft für diese Prüfung genügt. Was eine Prüfung zeigen muss, ist, was in
   den Bauteilen und in der Baugruppe liegt: das Modul, C102 und das Klebeband zwischen
@@ -2417,18 +2417,18 @@ ein Test schlägt fehl, wenn die Pins eines Modells die Löcher oder seine Ansch
   Schwellen des Beschleunigungssensors ein Klopfen von einer schließenden Tür unterscheiden.
 - **Hot-Plug eines 24-V-Netzteils.** Laut Simulation bleibt der Eingang des Wandlers
   unter 35 V, gegen seine Grenze von 40 V, seit der 47-uF-Elektrolytkondensator C120
-  den Eingang dämpft (siehe "Power"). Der Wert stammt aus einem Modell, messen Sie ihn also an
+  den Eingang dämpft (siehe „Stromversorgung“). Der Wert stammt aus einem Modell, messen Sie ihn also an
   der ersten Platine, mit einigen Metern dickem Draht zu einem steifen Netzteil
   (Inbetriebnahmeplan).
 - **Der USB-Port an einem warmen Leser, der aus einer anderen Quelle läuft.** R104 hält
   VBUS des nicht angesteckten Ports nahe 0 V gegen die wenigen Mikroampere, die die eFuse U105
-  zurückspeist (siehe "Power"). Prüfen Sie an der ersten Platine, warm, dass ein USB-C-Host
+  zurückspeist (siehe „Stromversorgung“). Prüfen Sie an der ersten Platine, warm, dass ein USB-C-Host
   seine Versorgung weiterhin einschaltet (Inbetriebnahmeplan).
 - **Die Stabilität des 3,3-V-Wandlers.** Die Kondensatoren der Schiene kommen auf etwa
   49 uF effektiv, am oberen Ende dessen, was TI für den
-  TLV62569 als stabil nachgewiesen hat (siehe "Power"). Ein Laststoß an der ersten Platine, mit und ohne
+  TLV62569 als stabil nachgewiesen hat (siehe „Stromversorgung“). Ein Laststoß an der ersten Platine, mit und ohne
   den Feed-forward-Kondensator C108, zeigt den Spielraum (Inbetriebnahmeplan).
 - **Was das Leistungsbudget voraussetzt.** Es verlässt sich darauf, dass die Firmware die
   LEDs zusammen unter 100 mA hält und nur piept, solange das NFC-Feld aus ist, und
-  es nimmt 60 mA für die 3,3-V-Versorgung des Displaypanels an (siehe "Power"). Messen Sie
+  es nimmt 60 mA für die 3,3-V-Versorgung des Displaypanels an (siehe „Stromversorgung“). Messen Sie
   das Panel und prüfen Sie beide Firmware-Grenzen an der ersten Platine (Inbetriebnahmeplan).

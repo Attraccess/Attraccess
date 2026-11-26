@@ -31,7 +31,7 @@ Ergebnisse nach den Änderungen vom 25. und 26. November 2026:
 - **modulspezifisch**: eine Aussage zum ESP32-C5-MINI-1 und seiner Antenne,
   geprüft an den eigenen Dokumenten des Moduls. Das Modul bleibt bei Revision A
   (ein ESP32-C5 wurde betrachtet und für Revision B beibehalten, design-notes.md,
-  „Decisions“); die Antennenaussagen wurden mit der Antennenentscheidung neu geschrieben.
+  „Entscheidungen“); die Antennenaussagen wurden mit der Antennenentscheidung neu geschrieben.
 - **nicht geprüft (Designwert)**: Platinen-, Bauteil- oder Simulationswerte
   aus den Designdateien, außerhalb dieser Prüfung.
 
@@ -144,7 +144,7 @@ ESP32-C6-MINI-1U und seinen externen Antennen sind mit diesem Modul entfallen.
 | Espressif veröffentlicht nur die Bescheinigung; die Berichte, die sie nennt, sind EFTA26010030-IE-01-E1, -02-R1 bis -R4, -03-M1V1, -04-L1 | modulspezifisch | CE-C5 S. 2, 3; FAQ |
 | Was EG 203 367 zu Wiederverwendung, gleichwertigen Bedingungen und Abweichungen sagt | korrekt | EG 203 367 §3.1, §6.1 Anmerkungen 1 und 2 |
 | Labore verwenden die leitungsgebundenen Ergebnisse des Moduls typischerweise wieder | aus freien Quellen nicht prüfbar (Laborpraxis) | keine |
-| Das Modul sitzt nicht dort, wo Espressifs Leitfaden es platziert; das Modell legt den Platz auf 3 dB an Espressifs heran, in einigen 5-GHz-Kanälen bis zu 5,5 dB darüber | aus freien Quellen nicht prüfbar (unsere Simulation) | design-notes.md, „Wi-Fi antenna“ und „Accepted deviations“ |
+| Das Modul sitzt nicht dort, wo Espressifs Leitfaden es platziert; das Modell legt den Platz auf 3 dB an Espressifs heran, in einigen 5-GHz-Kanälen bis zu 5,5 dB darüber | aus freien Quellen nicht prüfbar (unsere Simulation) | design-notes.md, „WLAN-Antenne“ und „Akzeptierte Abweichungen“ |
 | Am Leser: abgestrahlte Leistung und Störaussendungen in beiden Bändern bei sendendem NFC | korrekt | EG 203 367 §6.1 Anmerkung 1, §6.2; EN 300 328 §4.3.2.2.3; EN 301 893 §4.2.3 |
 | Am Leser: EMV bei laufenden Funkanwendungen | korrekt | EG 203 367 §5.1.1.3, §5.2.3 |
 | Die Exposition gegenüber Hochfrequenz ist gesondert zu betrachten, RED Art. 3(1)(a), außerhalb des Anwendungsbereichs des Leitfadens | korrekt | EG 203 367 §1 |
@@ -255,7 +255,7 @@ Am 26. November 2026 ergänzt.
 | PoE: Volt mal Ampere verwendet den aufgenommenen Strom (die 3 bis 9 W sind Designwerte) | korrekt | FLIR S. 48; AIR S. 51 |
 | 12 bis 24 V: unter 50 V, also nur die 15-W-Regel | korrekt | FLIR S. 48 |
 | 12 bis 24 V: Die Klasse folgt der angegebenen Grenze der Versorgung | korrekt | ULTB |
-| Leistung des Lesers 2,5, 4,5 und 8,3 W | nicht geprüft (Designwert) | design-notes.md, „Power budget“ |
+| Leistung des Lesers 2,5, 4,5 und 8,3 W | nicht geprüft (Designwert) | design-notes.md, „Leistungsbilanz“ |
 | FLIR: 8,1 W, CTC advanced, 2021; PoE-Anschluss PS2 | korrekt | FLIR S. 1, 2, 8 |
 | FLIR: 7,0 „also keine Lichtbogenquelle“ am PoE-Anschluss, nach dem Fehlertest keine (jetzt: die Prüfung nennt keinen Anschluss; eine widerstandsbedingte Quelle wurde auf der Seite der externen Versorgung gefunden) | korrigiert | FLIR S. 48 |
 | FLIR: Metallgehäuse, weil der externe Eingang über 100 W gemessen wurde | korrekt | FLIR S. 2, 10, 47 |
@@ -454,4 +454,4 @@ Am 26. November 2026 ergänzt.
 
 | Schlüssel | Vollständiger Titel | Version / Datum | URL | Herangezogene Klausel oder Seite |
 |---|---|---|---|---|
-| design-notes.md | Touch P4 design notes | dieser Branch | [design-notes.md](hardware/touch-p4/design-notes.md) | „Wi-Fi antenna“, „Power“, „Power budget“, „Simulation“, „Decisions“ (DC-Anschlüsse) |
+| design-notes.md | Touch P4 design notes | dieser Branch | [design-notes.md](hardware/touch-p4/design-notes.md) | „WLAN-Antenne“, „Stromversorgung“, „Leistungsbilanz“, „Simulation“, „Entscheidungen“ (DC-Anschlüsse) |

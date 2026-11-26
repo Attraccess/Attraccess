@@ -19,7 +19,7 @@ untersuchen Sie die Ursache, wenn ein Schritt fehlschlägt. Verwenden Sie für d
    review“ aufgeführt sind.
 3. Prüfen Sie, dass JLCPCB (oder der gewählte Bestücker) jede Zeile der Stückliste liefern kann, insbesondere
    den ESP32-P4NRW32X (am 22. November 2026 keiner auf Lager), und für
-   die Ethernet-Version das PoE-Modul DP9900M-5V (38 auf Lager, fallend). Die Liste der knappen Zeilen steht unter „Sourcing risks“
+   die Ethernet-Version das PoE-Modul DP9900M-5V (38 auf Lager, fallend). Die Liste der knappen Zeilen steht unter „Beschaffungsrisiken“
    in den Designnotizen.
 4. Führen Sie die Ziele `check` und `check-footprints` aus ([Übersicht](hardware/touch-p4/overview.md#arbeiten-am-design)) und sehen Sie sich die
    Gerbers in einem Viewer an. `check` enthält die Simulationen; ihr Bericht ist
@@ -59,7 +59,7 @@ untersuchen Sie die Ursache, wenn ein Schritt fehlschlägt. Verwenden Sie für d
    (der Eingang des Wandlers, wo die TVS D106 sitzt): Die Spitze muss
    unter 40 V bleiben. Auf die steigende Flanke bei 30 V triggern. Laut
    Simulation zu erwarten: unter 35 V, auch bei einem 26,4-V-Netzteil; der Elektrolytkondensator C120
-   dämpft das Schwingen (Designnotizen, „Power“). Einmal mit einigen Metern
+   dämpft das Schwingen (Designnotizen, „Stromversorgung“). Einmal mit einigen Metern
    dickem Draht zu einem Labor- oder Hutschienen-Netzteil durchführen (5 m 1,5-mm2-Draht in der
    Klemme), das ist der schlimmste Fall: Dicker Draht hat wenig Widerstand, um das Schwingen
    zu dämpfen, und sehr kurzer Draht zu wenig Induktivität, um eines zu erzeugen. Ist
@@ -81,7 +81,7 @@ untersuchen Sie die Ursache, wenn ein Schritt fehlschlägt. Verwenden Sie für d
     Testpunkt). Das Nachschwingen nach jeder Stufe ansehen. Dann den
     Feed-Forward-Kondensator C108 (12 pF) entfernen und wiederholen. Die Kondensatoren der Schiene
     kommen auf etwa 49 uF effektiv, am oberen Ende dessen, was TI für diesen Wandler
-    als stabil nachgewiesen hat (Designnotizen, „Power“), und das Nachschwingen zeigt, wie viel
+    als stabil nachgewiesen hat (Designnotizen, „Stromversorgung“), und das Nachschwingen zeigt, wie viel
     Phasenreserve bleibt (die Methode des Application Reports SLVA289 von TI).
     Die Variante behalten, die schneller und mit weniger Überschwingen einschwingt, und sie
     in der Schaltungsbeschreibung festhalten.
@@ -90,7 +90,7 @@ untersuchen Sie die Ursache, wenn ein Schritt fehlschlägt. Verwenden Sie für d
     Polaritäten, mit der Platine im Betrieb bei 12 V und bei 24 V. Die Platine
     muss danach weiterlaufen, und D105, D106 und D107 müssen unbeschädigt sein. Der
     simulierte Fall (1 kV) und der Schutz stehen in den Designnotizen,
-    „Power“.
+    „Stromversorgung“.
 
 Weitere Schienen und wo man sie misst. Die kleinen Testpunkte tragen den Namen
 der Schiene:
@@ -122,16 +122,16 @@ der Schiene:
    eigenen Quarz und sagt nichts über diesen aus). Innerhalb von +-10 ppm
    (+-400 Hz) ist richtig. Läuft er um mehr als das zu langsam, die
    Lastkondensatoren C238 und C239 von 12 pF auf 10 pF (C32949) ändern; bei zu schnell auf
-   15 pF (Designnotizen, „Decoupling and crystal at the MCU“).
+   15 pF (Designnotizen, „Abblockung und Quarz am MCU“).
 4. `VDD_HP` erneut messen: etwa 1,1 V mit einer Welligkeit unter 30 mV.
-5. Abblockung (Designnotizen, „Decoupling and crystal at the MCU“): einen CPU-
+5. Abblockung (Designnotizen, „Abblockung und Quarz am MCU“): einen CPU-
    und PSRAM-Stresstest mit vollem Takt laufen lassen (beide Kerne ausgelastet, das Display
    wird aktualisiert, Ethernet- oder WLAN-Verkehr) eine Stunde lang bei Raumtemperatur und
    zehn Minuten, nachdem sich der Leser in seinem Gehäuse erwärmt hat. Kein Reset, kein
    PSRAM- oder Flash-Fehler; `VDD_HP`, `VDD_PSRAM` (C226) und `VDD_FLASH`
    mit dem Oszilloskop bei 20 MHz Bandbreite beobachten: Einbrüche unter 1,05 V an `VDD_HP` oder unter
    1,8 V an `VDD_PSRAM` sind das Zeichen, dass die Abblockung einer späteren Revision
-   nötig ist (Designnotizen, „Accepted deviations“); bis dahin die CPU
+   nötig ist (Designnotizen, „Akzeptierte Abweichungen“); bis dahin die CPU
    mit niedrigerem Takt betreiben.
 
 ## WLAN-Co-Prozessor
@@ -179,7 +179,7 @@ Ecke der Platine. Seine USB-Pins führen SDIO D2 und D3, es wird also nur
    den Eingangsstrom notieren, bevor das Panel eingesteckt ist, und mit laufendem Panel.
    Die Differenz mal 1,4 ist etwa der Strom des Panels bei 3,3 V (sie enthält auch,
    was die MCU für den RGB-Bus mehr zieht, ist also eine obere Schranke).
-   Das Leistungsbudget geht von 60 mA aus (Designnotizen, „Power“).
+   Das Leistungsbudget geht von 60 mA aus (Designnotizen, „Stromversorgung“).
 3. Hintergrundbeleuchtung: PWM an GPIO26. Bei voller Aussteuerung etwa 0,2 V an R603 messen
    (39 mA).
 4. Touch: Der GT911 antwortet an I2C0. Die Ausrichtung der Koordinaten prüfen.
@@ -294,7 +294,7 @@ und ist bestenfalls auf 40 % genau.
    erlaubt 70 % für Weiß.
 2. Die LED-Grenze der Firmware: Das Leistungsbudget verlässt sich darauf, dass die LEDs zusammen
    unter 100 mA ziehen, alle Kanäle aller acht LEDs gezählt (Designnotizen,
-   „Power“). Das hellste Muster einstellen, das die Firmware erlaubt, und den
+   „Stromversorgung“). Das hellste Muster einstellen, das die Firmware erlaubt, und den
    Anstieg des 5-V-Stroms gegenüber allen dunklen LEDs messen: unter 100 mA.
 3. Piepton mit 2,7 kHz: in der Werkstatt laut genug, kein hörbares Rauschen und keine
    Störung auf dem Display während des Piepens. Der Schall verlässt den Buzzer
@@ -343,7 +343,7 @@ und ist bestenfalls auf 40 % genau.
    je Polarität und Punkt. Der Leser darf zurücksetzen, muss sich aber
    selbst erholen, danach mit funktionierendem Touch, WLAN und NFC (Kriterium B). Das
    sind die Punkte, die der Entwurf aus Datenblättern nicht zeigen konnte (Designnotizen,
-   „ESD per port“ und „Accepted deviations“).
+   „ESD je Anschluss“ und „Akzeptierte Abweichungen“).
 3. Abgestrahlte Störaussendung vorab scannen, bei laufendem Display und aktivem Ethernet, wenn eine
    Nahfeldsonde oder eine Vorab-Konformitätskammer verfügbar ist.
 4. WLAN-Sendeleistung: die EIRP des geschlossenen Lesers auf beiden
@@ -351,4 +351,4 @@ und ist bestenfalls auf 40 % genau.
    die das Labor verwenden wird (niedrigster, mittlerer und höchster jedes Bandes), und die
    Obergrenze der Firmware daraus festlegen: 20 dBm EIRP bei 2,4 GHz und von 5250 bis
    5725 MHz, 23 dBm von 5150 bis 5250 MHz ([compliance.md](hardware/touch-p4/compliance.md),
-   „5 GHz Wi-Fi“).
+   „5-GHz-WLAN“).

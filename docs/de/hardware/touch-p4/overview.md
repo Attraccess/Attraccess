@@ -37,7 +37,7 @@ Aus derselben Platine entstehen zwei Bestückungsvarianten:
 Das WLAN-Modul (ESP32-C5-MINI-1) bringt seine eigene Antenne mit, es muss also keine Antenne gekauft
 oder platziert werden. Es sitzt in der oberen linken Ecke der Platine und nicht in der Mitte der Oberkante,
 wo Espressifs Leitfaden es vorsieht. Das Vollwellenmodell hält es in jedem Kanal innerhalb von 3 dB von
-diesem Platz. Siehe "Wi-Fi antenna" in den
+diesem Platz. Siehe „WLAN-Antenne“ in den
 [Designnotizen](hardware/touch-p4/design-notes.md#wlan-antenne) und die zugehörige akzeptierte Abweichung. Auf 5 GHz
 ist der Leser nur für den Betrieb in Innenräumen gedacht, und seine Firmware muss die Kanal- und Leistungsregeln
 der EU einhalten ([firmware-port.md](hardware/touch-p4/firmware-port.md), [compliance.md](hardware/touch-p4/compliance.md)).
@@ -219,7 +219,7 @@ PN532-Footprint den Körper des NXP-Bauteils; die NFC-Antenne ist nur Kupfer.
 
 Um ein Bauteil von LCSC hinzuzufügen, tragen Sie es in die Schaltungsbeschreibung ein, holen Sie die
 Konvertierungen aller LCSC-Bauteile der Platine in einen Ordner und bauen Sie die Bibliothek
-daraus neu auf (der [Platinengenerator](hardware/touch-p4/board-generator.md#schritte), "Steps"):
+daraus neu auf (der [Platinengenerator](hardware/touch-p4/board-generator.md#schritte), „Schritte“):
 
 ```bash
 easyeda2kicad --lcsc_id C54540373 C5736265 ... C12345 --full --output /tmp/lcsc/lcsc

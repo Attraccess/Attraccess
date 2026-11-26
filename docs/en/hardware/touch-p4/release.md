@@ -40,8 +40,8 @@ not been ordered yet: these are the dated states of its design.
 3. Stock: every line of the parts list of the variant to be ordered is in stock at
    JLCPCB, or ordered in through its parts sourcing (see "Sourcing risks" in the
    design notes).
-4. Someone other than the author reads the schematic PDF, the fabrication drawing and
-   the assembly drawing (`fab/`), checks the open points of the design notes, and
+4. Someone other than the author reads the schematic PDF (`docs/_media/hardware/touch-p4/`),
+   the fabrication drawing and the assembly drawing (`fab/jlcpcb/`), checks the open points of the design notes, and
    signs off: their name goes into `CHECKED_BY` in `scripts/bootstrap/build_sch.py`,
    which puts it into every title block. Regenerate the schematic and commit.
 5. A new revision letter if anything changed since the last order: `rev` in the title

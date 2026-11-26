@@ -63,7 +63,7 @@ für den Ethernet-Anschluss ([compliance.md](hardware/touch-p4/compliance.md)).
 
 | Prüfung | Ziel | Wo |
 |---|---|---|
-| Elektrostatische Entladung, IEC 61000-4-2 | 4 kV Kontakt, 8 kV Luft, Kriterium B | alles, was berührt werden kann: Glas und seine Kanten, LED-Fenster, Fugen, Schrauben; die Schirme der Steckverbinder. Schutz je Anschluss: Designnotizen, "ESD per port" |
+| Elektrostatische Entladung, IEC 61000-4-2 | 4 kV Kontakt, 8 kV Luft, Kriterium B | alles, was berührt werden kann: Glas und seine Kanten, LED-Fenster, Fugen, Schrauben; die Schirme der Steckverbinder. Schutz je Anschluss: Designnotizen, „ESD je Anschluss“ |
 | Gestrahlte Störfestigkeit | 3 V/m, 80 MHz bis 6 GHz | gesamter Leser |
 | Schnelle Transienten, HF-Gleichtakt | 0,5 kV; 3 V | Ethernet; der DC-Eingang, wenn sein Kabel länger als 3 m sein darf |
 | Surge | 0,5 kV Leitung gegen Erde | Ethernet mit Innenraumkabeln über 30 m. Der DC-Eingang ist für den Surge der EN 50130-4 Leitung gegen Erde über 42 Ohm ausgelegt (simuliert: höchstens 39,6 V am Wandler, Grenze 40 V) |

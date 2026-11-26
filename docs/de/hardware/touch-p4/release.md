@@ -38,10 +38,10 @@ noch nicht bestellt: Dies sind die datierten Stände ihres Designs.
    passt zur Platine.
 2. `pnpm nx run attractap-touch-p4-pcb:check-footprints` läuft durch (es braucht das Internet).
 3. Bestand: Jede Zeile der Stückliste der zu bestellenden Variante ist bei
-   JLCPCB lieferbar oder wird über dessen Bauteilbeschaffung zugekauft (siehe „Sourcing risks“ in den
+   JLCPCB lieferbar oder wird über dessen Bauteilbeschaffung zugekauft (siehe „Beschaffungsrisiken“ in den
    Designnotizen).
-4. Eine andere Person als der Autor liest den Schaltplan als PDF, die Fertigungszeichnung und
-   die Bestückungszeichnung (`fab/`), prüft die offenen Punkte der Designnotizen und
+4. Eine andere Person als der Autor liest den Schaltplan als PDF (`docs/_media/hardware/touch-p4/`),
+   die Fertigungszeichnung und die Bestückungszeichnung (`fab/jlcpcb/`), prüft die offenen Punkte der Designnotizen und
    gibt frei: Ihr Name kommt in `CHECKED_BY` in `scripts/bootstrap/build_sch.py`,
    das ihn in jedes Schriftfeld einträgt. Erzeugen Sie den Schaltplan neu und committen Sie ihn.
 5. Ein neuer Revisionsbuchstabe, wenn sich seit der letzten Bestellung etwas geändert hat: `rev` in den Schriftfeldern

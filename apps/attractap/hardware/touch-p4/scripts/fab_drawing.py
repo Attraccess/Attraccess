@@ -1,9 +1,13 @@
 """Fabrication drawing of the Touch P4 board: outline with dimensions, holes and cut-outs, stack-up,
 drill table, smallest features and the fabrication notes. Read from the board file, so it follows
-every change; written by export_fab.py into fab/jlcpcb/ (one A3 page).
+every change; written by export_fab.py into fab/jlcpcb/ (one A3 page). Of the notes, the vias in pads
+and the impedance-controlled lines (widths, gaps and layers) are read from the board and its project
+file too; the others are the order's fixed terms.
 
 Usage: fab_drawing.py <board.kicad_pcb> <out.pdf>     (KiCad's Python: it reads the board with pcbnew)
 """
+import collections
+import json
 import math
 import os
 import sys
@@ -199,17 +203,63 @@ NOTES = [
     'Stack-up JLC06161H-3313 as tabulated: on the JLCPCB order form "Specify Stackup: Yes".',
     'Copper 1 oz (35 um) finished on the outer layers, 0.5 oz (15 um) on the inner layers.',
     'Surface finish ENIG (the 0.35 mm pitch QFN needs a flat finish). Not OSP, not HASL.',
-    'Vias: epoxy filled and capped (plated over), required: four lie in capacitor pads (C208, C223, C226).',
+    '{vias_in_pads}',
     'Solder mask green, both sides; silkscreen white, both sides.',
     'Fabricate and inspect to IPC-6012 class 2 and IPC-A-600 class 2.',
     'Plated slots at the DC jack and the USB-C shell; all other cut-outs milled, unplated.',
     'Outline and cut-out tolerance +-0.2 mm; drill tolerance per the fab\'s standard.',
-    'Impedance control +-10 %, outer layers over the first plane (L1/L2, L6/L5): USB pair 90 ohm diff., '
-    '0.14 mm / 0.15 mm gap (L6); Ethernet lines 50 ohm, 0.155 mm (L1), in pairs 1.27 mm apart = 100 ohm diff. '
-    'Fab may adjust widths.',
+    '{impedance}',
     'Electrical test: 100 % flying probe against the IPC-D-356 netlist of this package.',
     'Board marking: JLCPCB serial number in the field beside S/N on the component side, if ordered.',
 ]
+
+
+LAYER_NAMES = {'F.Cu': 'L1', 'In1.Cu': 'L2', 'In2.Cu': 'L3', 'In3.Cu': 'L4', 'In4.Cu': 'L5', 'B.Cu': 'L6'}
+
+
+def vias_in_pads(board):
+    """Note: the vias that stand in a pad of a surface-mount part, which is why they must be filled."""
+    pads = []
+    for fp in board.GetFootprints():
+        for pad in fp.Pads():
+            if pad.GetAttribute() == pcbnew.PAD_ATTRIB_SMD:
+                box = pad.GetBoundingBox()
+                pads.append((box.GetLeft(), box.GetTop(), box.GetRight(), box.GetBottom(), fp.GetReference(), pad))
+    count = collections.Counter()
+    for via in board.GetTracks():
+        if via.GetClass() != 'PCB_VIA':
+            continue
+        pos = via.GetPosition()
+        for x1, y1, x2, y2, ref, pad in pads:
+            if x1 <= pos.x <= x2 and y1 <= pos.y <= y2 and pad.HitTest(pos):
+                count[ref] += 1
+                break
+    refs = ', '.join(r if n == 1 else '%s (%d)' % (r, n) for r, n in sorted(count.items()))
+    return ('Vias: epoxy filled and capped (plated over), required: %d lie in the pads of surface-mount parts (%s).'
+            % (sum(count.values()), refs))
+
+
+def impedance(board, pcb_path):
+    """Note: widths and gaps of the impedance-controlled lines from the project's net classes, and the layers
+    the lines run on from the board. The figures in ohms assume an outer layer over the first plane."""
+    project = json.load(open(os.path.splitext(pcb_path)[0] + '.kicad_pro'))
+    classes = {c['name']: c for c in project['net_settings']['classes']}
+    layers = collections.defaultdict(set)
+    for t in board.GetTracks():
+        if t.GetClass() == 'PCB_TRACK':
+            name = t.GetNetname().split('/')[-1]
+            for cls, nets in (('USB', ('USB_DP', 'USB_DN')), ('MDI', ('MDI_TP', 'MDI_TN', 'MDI_RP', 'MDI_RN'))):
+                if name in nets:
+                    layers[cls].add(LAYER_NAMES[board.GetLayerName(t.GetLayer())])
+    inner = sorted(n for used in layers.values() for n in used if n not in ('L1', 'L6'))
+    if inner:
+        sys.exit('impedance-controlled lines on an inner layer (%s): the impedance note does not cover that' % inner)
+    usb, mdi = classes['USB'], classes['MDI']
+    return ('Impedance control +-10 %%, outer layers over the first plane (L1/L2, L6/L5): USB pair 90 ohm diff., '
+            '%g mm / %g mm gap (%s); Ethernet lines 50 ohm, %g mm (%s), in pairs %g mm apart (centre to centre) '
+            '= 100 ohm diff. Fab may adjust widths.'
+            % (usb['track_width'], usb['diff_pair_gap'], ', '.join(sorted(layers['USB'])), mdi['track_width'],
+               ', '.join(sorted(layers['MDI'])), round(mdi['track_width'] + mdi['diff_pair_gap'], 3)))
 
 
 def draw(pcb_path, out):
@@ -247,7 +297,8 @@ def draw(pcb_path, out):
     yr = table(page, xr, 40, 'Smallest features', ('Feature', 'Value'), smallest(board), (44, 61), size=2.0)
     page.text('Notes', xr, yr, 3.0, bold=True)
     yr += 2.0
-    for n, note in enumerate(NOTES, 1):
+    facts = {'vias_in_pads': vias_in_pads(board), 'impedance': impedance(board, pcb_path)}
+    for n, note in enumerate((note.format(**facts) for note in NOTES), 1):
         words, line = note.split(), ''
         lines = []
         for w in words:

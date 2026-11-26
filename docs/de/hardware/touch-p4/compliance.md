@@ -145,7 +145,7 @@ Leitfaden nicht genannt).
 Hier ist die Antenne die eigene des Moduls, aber das Modul sitzt nicht dort, wo
 Espressifs Designleitfaden es platziert: Es steht in der oberen linken Ecke der
 Platine, mit seiner Antenne über einem Ausschnitt im oberen Rand, nicht in der
-Mitte des Randes (Designnotizen, „Wi-Fi antenna“ und „Accepted deviations“). Im
+Mitte des Randes (Designnotizen, „WLAN-Antenne“ und „Akzeptierte Abweichungen“). Im
 Vollwellenmodell liegt dieser Platz in jedem Kanal innerhalb von 3 dB von
 Espressifs Position und strahlt in einigen 5-GHz-Kanälen bis zu 5,5 dB mehr ab.
 Ob das noch als gleichwertige Bedingungen gilt, beurteilt das Labor; diese
@@ -565,7 +565,7 @@ Surges Leitung gegen Erde über 42 Ohm auf DC-Leitungen mit Kleinspannung
 (ungeprüft: Die freie Vorschau zeigt nur, dass Klausel 13, "Slow high energy
 voltage surge", existiert [iTeh 50130-4 preview]; mit dem Labor bestätigen).
 Der DC-Eingang ist für diese Prüfung geschützt und simuliert; die Einzelheiten
-stehen in [design-notes.md](hardware/touch-p4/design-notes.md#stromversorgung), „Power“.
+stehen in [design-notes.md](hardware/touch-p4/design-notes.md#stromversorgung), „Stromversorgung“.
 Optionale Kosten vor dem Labor: die Norm selbst, EN 50130-4:2011+A1:2014,
 konsolidierter englischer Text, 24,80 EUR inkl. Steuer bei der estnischen
 Normungsstelle EVS [EVS 50130-4] (DIN Media verkauft die deutsche Ausgabe für
@@ -576,7 +576,7 @@ Produktnormen entscheiden, ob und mit welchem Pegel sie gilt
 2 Ohm an diesem DC-Anschluss wird von keiner der obigen Normen verlangt, soweit
 sie sich lesen ließen (der Pegel und die 2 Ohm der IEC 61000-4-5 sind ungeprüft:
 kostenpflichtige Norm). Ihn zu erfüllen, brauchte einen Wandler für 60 V und
-eine größere TVS (Designnotizen, „Power“).
+eine größere TVS (Designnotizen, „Stromversorgung“).
 
 ## Was das Platinendesign leistet
 
