@@ -6,5 +6,5 @@
   "confirmTitle": "Attraccess jetzt neu starten?",
   "confirmMessage": "Der Server ist während des Neustarts kurz nicht erreichbar und übernimmt dabei die ausstehenden Plugin-Änderungen. Offene Sitzungen und Verbindungen von Lesegeräten verbinden sich danach selbst wieder.",
   "restartError": "Der Neustart konnte nicht abgeschlossen werden",
-  "restartErrorDescription": "Attraccess war nicht rechtzeitig wieder erreichbar. Laden Sie die Seite neu oder versuchen Sie es erneut."
+  "restartErrorDescription": "Attraccess wurde nicht neu gestartet oder war nicht rechtzeitig wieder erreichbar. Laden Sie die Seite neu oder versuchen Sie es erneut."
 }

@@ -48,7 +48,12 @@ export function PluginRestartBanner() {
   };
 
   return (
-    <Alert status="warning" role="status" className="rounded-none" data-cy="plugin-restart-banner">
+    <Alert
+      status="warning"
+      role="status"
+      className="rounded-none border-b border-warning/40 bg-warning-soft shadow-none"
+      data-cy="plugin-restart-banner"
+    >
       <AlertStatusIcon status="warning" />
       <AlertContent>
         <AlertTitle>{t('title')}</AlertTitle>
