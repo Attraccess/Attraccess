@@ -4,7 +4,7 @@ import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-mo
 
 import type { TransactionContext } from '../../../database/transaction-context';
 
-import type { FlowTriggerStore } from '../flow-trigger-store.port';
+import { DEFAULT_OUTPUT_HANDLE, type FlowTriggerStore } from '../flow-trigger-store.port';
 
 import { FlowLogRecorderService } from '../logs/flow-log-recorder.service';
 
@@ -74,9 +74,10 @@ export class FlowExecutionEngine {
     this.logger.debug(`Looking for outgoing edges from node ID: ${node.id} (Type: ${node.type})`);
 
     // Edges and targets must belong to the same canvas; another owner's nodes (e.g. a disabled flow) never run.
+    // A result without a handle continues on the default output only, never on `failure` or another branch.
     const edgesFromThisNode = await this.flowStore.findOutgoingEdges(
       node,
-      resultOfPreviousNode.outputHandle,
+      resultOfPreviousNode.outputHandle ?? DEFAULT_OUTPUT_HANDLE,
       transactionManager,
     );
 

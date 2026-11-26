@@ -1,11 +1,4 @@
-import {
-  Flow,
-  Resource,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceUsage,
-  User,
-} from '@attraccess/database-entities';
+import { Flow, Resource, ResourceFlowEdge, ResourceFlowNode, ResourceUsage, User } from '@attraccess/database-entities';
 import { ResourceFlowNodeType, ResourceType, ResourceUsageAction } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
@@ -20,6 +13,7 @@ describe('TypeOrmFlowTriggerStore (PostgreSQL)', () => {
   let laserId: number;
   let drillId: number;
   let enabledFlowId: number;
+  let disabledFlowId: number;
 
   const ids = (nodes: Array<{ id: string }>) => nodes.map((node) => node.id).sort();
 
@@ -43,6 +37,7 @@ describe('TypeOrmFlowTriggerStore (PostgreSQL)', () => {
       flows.create({ name: 'Named', enabled: true, scope: 'resource' as never }),
     ]);
     enabledFlowId = enabled.id;
+    disabledFlowId = disabled.id;
 
     const node = (id: string, owner: { resourceId?: number; flowId?: number }, nodeType = type) =>
       nodes.create({
@@ -84,7 +79,13 @@ describe('TypeOrmFlowTriggerStore (PostgreSQL)', () => {
       edge('e-laser', 'laser-own', 'laser-target', { resourceId: laser.id }, 'output'),
       edge('e-drill', 'drill-own', 'drill-target', { resourceId: drill.id }, 'output'),
       edge('e-global', 'global-on', 'global-target', { flowId: enabled.id }, 'output'),
-      edge('e-global-other-handle', 'global-on', 'global-other', { flowId: enabled.id }, 'other'),
+      edge('e-global-legacy', 'global-on', 'global-legacy', { flowId: enabled.id }, null),
+      edge('e-global-failure', 'global-on', 'global-failure', { flowId: enabled.id }, 'failure'),
+      edge('e-global-true', 'global-on', 'global-true', { flowId: enabled.id }, 'output-true'),
+      // Same source id on another canvas: never followed from the enabled flow's node.
+      edge('e-foreign-output', 'global-on', 'foreign', { flowId: disabled.id }, 'output'),
+      edge('e-foreign-legacy', 'global-on', 'foreign', { flowId: disabled.id }, null),
+      edge('e-foreign-failure', 'global-on', 'foreign', { flowId: disabled.id }, 'failure'),
     ]);
   });
 
@@ -148,9 +149,23 @@ describe('TypeOrmFlowTriggerStore (PostgreSQL)', () => {
       .findTriggerNodes(type)
       .then((nodes) => nodes.filter((node) => node.id === 'global-on'));
 
-    expect((await store.findOutgoingEdges(laserNode, 'output')).map((edge) => edge.id)).toEqual(['e-laser']);
-    expect((await store.findOutgoingEdges(globalNode, 'output')).map((edge) => edge.id)).toEqual(['e-global']);
-    expect(ids(await store.findOutgoingEdges(globalNode, undefined))).toEqual(['e-global', 'e-global-other-handle']);
+    expect(ids(await store.findOutgoingEdges(laserNode, 'output'))).toEqual(['e-laser']);
+    expect(ids(await store.findOutgoingEdges(globalNode, 'output'))).toEqual(['e-global', 'e-global-legacy']);
+    expect(ids(await store.findOutgoingEdges(globalNode, 'failure'))).toEqual(['e-global-failure']);
+    expect(ids(await store.findOutgoingEdges(globalNode, 'output-true'))).toEqual(['e-global-true']);
+    expect(await store.findOutgoingEdges(globalNode, 'output-false')).toEqual([]);
+  });
+
+  it('follows the edges of another canvas only from that canvas', async () => {
+    const nodes = source.getRepository(ResourceFlowNode);
+    const globalOn = await nodes.findOneByOrFail({ id: 'global-on' });
+    const onDisabledCanvas = { ...globalOn, position: { ...globalOn.position }, flowId: disabledFlowId };
+
+    expect(ids(await store.findOutgoingEdges(onDisabledCanvas, 'output'))).toEqual([
+      'e-foreign-legacy',
+      'e-foreign-output',
+    ]);
+    expect(ids(await store.findOutgoingEdges(onDisabledCanvas, 'failure'))).toEqual(['e-foreign-failure']);
   });
 
   it('finds a node on the canvas of another node and nothing on a foreign canvas', async () => {

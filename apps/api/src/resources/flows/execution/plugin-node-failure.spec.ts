@@ -143,6 +143,18 @@ describe('plugin node failure behaviour', () => {
     });
   });
 
+  it('continues only on the normal output when the node succeeds without naming a handle', async () => {
+    // Like the WAGO command node: outputs ['output', 'failure'], success returns no handle.
+    buildDoorFlow(registerFailingNode({ execute: async (_node, input) => ({ payload: input }) }), {
+      failureBehavior: 'failure-output',
+    });
+
+    await expect(scope.service.handleResourceSessionStartedEvent(doorUnlockEvent())).resolves.toBeUndefined();
+
+    expect(afterOutput).toHaveBeenCalledTimes(1);
+    expect(afterFailure).not.toHaveBeenCalled();
+  });
+
   it('fails the flow when the failure hook throws or answers with an unknown behaviour', async () => {
     for (const getFailureBehavior of [
       () => {

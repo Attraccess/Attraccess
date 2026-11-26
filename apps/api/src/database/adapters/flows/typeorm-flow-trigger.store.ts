@@ -10,7 +10,11 @@ import {
 } from '@attraccess/application-models';
 import type { TransactionContext } from '../../transaction-context';
 import { ScopedUnitOfWork, UNIT_OF_WORK } from '../../unit-of-work';
-import type { FlowTriggerStore, InactivityTarget } from '../../../resources/flows/flow-trigger-store.port';
+import {
+  DEFAULT_OUTPUT_HANDLE,
+  type FlowTriggerStore,
+  type InactivityTarget,
+} from '../../../resources/flows/flow-trigger-store.port';
 import { managerFor } from '../resources/persistence-context';
 import { activeUsageSql } from '../usage/active-usage-queries';
 import {
@@ -44,13 +48,18 @@ export class TypeOrmFlowTriggerStore implements FlowTriggerStore {
 
   async findOutgoingEdges(
     node: FlowNodeRecord,
-    outputHandle: string | undefined,
+    outputHandle: string,
     context?: TransactionContext,
   ): Promise<FlowEdgeRecord[]> {
-    const edges = await this.manager(context)
-      .getRepository(ResourceFlowEdge)
-      // `sourceHandle: undefined` is no condition: a result without a handle follows every edge of the node.
-      .find({ where: { source: node.id, sourceHandle: outputHandle, ...sameOwnerWhere(node) } });
+    const onHandle = (sourceHandle: string | ReturnType<typeof IsNull>): FindOptionsWhere<ResourceFlowEdge> => ({
+      source: node.id,
+      sourceHandle,
+      ...sameOwnerWhere(node),
+    });
+    // Edges saved without a handle are the default output.
+    const where =
+      outputHandle === DEFAULT_OUTPUT_HANDLE ? [onHandle(outputHandle), onHandle(IsNull())] : onHandle(outputHandle);
+    const edges = await this.manager(context).getRepository(ResourceFlowEdge).find({ where });
     return edges.map(toEdgeRecord);
   }
 
