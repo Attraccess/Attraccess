@@ -1,4 +1,5 @@
-"""The generator is the master; the KiCad files are its output (docs/release.md, "Source of truth").
+"""The generator is the master; the KiCad files are its output (docs/en/hardware/touch-p4/release.md,
+"Source of truth").
 
 Each generator step stamps what it wrote into kicad/generated-from.json: a fingerprint of the generator's
 inputs and the SHA-256 of every KiCad file it wrote. The check fails when

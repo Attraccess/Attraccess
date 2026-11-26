@@ -84,7 +84,7 @@ def power(d):
     # Output capacitor: TI's recommended 10 uF with 2.2 uH (SLVSDG1C table 4). The rail's other capacitors
     # (P4, PHY, sensors) count too: about 44 uF effective at 3.3 V in all, inside the 22 to 52.8 uF that TI
     # has proven stable (2 x 22 uF nominal, +20 / -50 %). The second 22 uF that was here (C110) would have
-    # put the rail at 76 uF. The Wi-Fi module has a converter of its own (U302). docs/design-notes.md, "Power".
+    # put the rail at 76 uF. The Wi-Fi module has a converter of its own (U302). Design notes, "Power".
     d.C('10u', '+3V3', size='0603', desc='3.3 V converter output')
     d.ref('C')                      # C110, the second 22 uF, is gone; the numbers after it stay
     d.C('100n', '+3V3')
@@ -104,7 +104,7 @@ def power(d):
                'left pole = +, right pole = -')
     d.add('F', '1.1A PTC 33V', 'Device:Polyfuse', 'attractap:F1812', {'1': 'VDC_IN', '2': 'VDC_F'},
           lcsc='C21000', mpn='SMD1812P110TF/33', desc='Resettable fuse 1.1 A hold, 33 V')
-    # Surges (docs/design-notes.md, "Power"): the bidirectional TVS at the connector clamps both polarities;
+    # Surges (design notes, "Power"): the bidirectional TVS at the connector clamps both polarities;
     # a negative surge would otherwise drive D105 into breakdown. D105 then sees up to 75 V in reverse, so
     # it is a 100 V part. A reversed supply stays below the TVS's stand-off and D105 blocks it.
     d.add('D', 'SMBJ28CA', 'attractap:SMBJ28CA', 'Diode_SMD:D_SMB', {'1': 'VDC_F', '2': 'GND'},
@@ -116,7 +116,7 @@ def power(d):
     # cable (conducted emission). C117 - L103 - C112/C113 form a pi filter. The electrolytic C120 damps
     # the cable's inductance with the ceramics when a live supply is plugged in: without it the input
     # rang up to 38 V (24 V) and 40 V (26.4 V) at the converter, whose limit is 40 V for 0.4 s.
-    # Ceramics of 2.2 uF / 100 V: they keep their capacitance at 24 V (docs/design-notes.md, "Power").
+    # Ceramics of 2.2 uF / 100 V: they keep their capacitance at 24 V (design notes, "Power").
     d.C(DC_INPUT_CAP, 'VDC_R', size='1206', ref='C117',
         desc='DC input filter, connector side. 100 V X7R: keeps 1.5 uF at 24 V')
     d.add('C', '47u/50V', 'Device:C_Polarized', 'Capacitor_SMD:CP_Elec_6.3x7.7', {'1': 'VDC_R', '2': 'GND'},
@@ -330,7 +330,7 @@ def wifi(d):
     # Dual-band Wi-Fi 6 with its own PCB antenna, which stands over the cut in the board's top edge. EU-type
     # examination certificate 44024-05-2026-260268 (Eurofins, notified body 0980) for the module with this
     # antenna; FCC ID 2AC7Z-ESPC5MINI1. Rated for 85 C of air around it: see the heat estimate in
-    # docs/design-notes.md. The -N4: 4 MB flash holds esp-hosted's two update images; no PSRAM needed.
+    # the design notes. The -N4: 4 MB flash holds esp-hosted's two update images; no PSRAM needed.
     d.add('U', 'ESP32-C5-MINI-1-N4-V1.2', 'attractap:ESP32-C5-MINI-1-N4-V1.2', 'attractap:CONN-SMD_ESP32-C5-MINI-1-N4',
           {'@' + k: v for k, v in c5.items()}, nc=tuple('@' + n for n in c5_nc),
           lcsc='C54951860', mpn='ESP32-C5-MINI-1-N4-V1.2',

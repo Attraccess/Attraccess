@@ -68,6 +68,24 @@
   - [Reader Display](attractap/reader-ui.md)
   - [LED Guide (Lite)](attractap/led-guide.md)
 
+- **Hardware**
+  - [Waveshare ESP32-S3-Touch-LCD-4 (Touch V1, V2)](hardware/waveshare-esp32-s3-touch-lcd-4.md)
+  - **Attractap Touch P4 (in development)**
+    - [Overview](hardware/touch-p4/overview.md)
+    - [Specification](hardware/touch-p4/spec.md)
+    - [Design Notes](hardware/touch-p4/design-notes.md)
+    - [Design Review](hardware/touch-p4/review.md)
+    - [Parts](hardware/touch-p4/parts.md)
+    - [Simulations](hardware/touch-p4/simulations.md)
+    - [Board Generator](hardware/touch-p4/board-generator.md)
+    - [Firmware Port](hardware/touch-p4/firmware-port.md)
+    - [Bring-up Plan](hardware/touch-p4/bring-up.md)
+    - [Compliance](hardware/touch-p4/compliance.md)
+    - [Compliance Sources](hardware/touch-p4/compliance-sources.md)
+    - [Releasing](hardware/touch-p4/release.md)
+    - [Case](hardware/touch-p4/case.md)
+    - [Installation Manual](hardware/touch-p4/installation-manual.md)
+
 - **Devices**
   - [MQTT](devices/mqtt/overview.md)
   - [MQTT Server Setup](devices/mqtt/server-setup.md)

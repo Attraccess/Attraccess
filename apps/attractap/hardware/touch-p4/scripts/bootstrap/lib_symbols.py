@@ -1,6 +1,6 @@
 """Symbols of the project library that are drawn here instead of taken unchanged from the LCSC
 conversion or KiCad's library: named after the part that is fitted, or redrawn so that the schematic
-reads well (see scripts/bootstrap/README.md, "Schematic drawing"). make_lib.py writes them into
+reads well (see docs/en/hardware/touch-p4/board-generator.md, "Schematic drawing"). make_lib.py writes them into
 kicad/lib/attractap.kicad_sym."""
 import os
 

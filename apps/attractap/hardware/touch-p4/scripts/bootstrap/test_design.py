@@ -144,7 +144,7 @@ class DesignTest(unittest.TestCase):
 
     def test_dc_input_clamps_surges_of_both_polarities(self):
         """A bidirectional TVS at the connector (behind the fuse, ahead of the reverse-polarity diode), the
-        diode rated 100 V, the unidirectional TVS at the converter (docs/design-notes.md, "Power")."""
+        diode rated 100 V, the unidirectional TVS at the converter (design notes, "Power")."""
         d107, d105, d106 = (self.d.parts[r] for r in ('D107', 'D105', 'D106'))
         self.assertEqual((d107.mpn, d107.nets), ('SMBJ28CA', {'1': 'VDC_F', '2': 'GND'}))
         self.assertEqual((d105.mpn, d105.nets), ('SS310', {'1': 'VDC_R', '2': 'VDC_F'}))
@@ -398,7 +398,8 @@ class ReleaseTest(unittest.TestCase):
     def test_revision_history_in_the_release_notes_matches_the_title_block(self):
         import re
         import build_sch
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'docs', 'release.md')
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', '..', '..',
+                            'docs', 'en', 'hardware', 'touch-p4', 'release.md')
         rows = re.findall(r'^\| ([A-Z]) \| (\d{4}-\d\d-\d\d) \| (.+?) \|$', open(path).read(), re.M)
         self.assertEqual([(d, c) for _rev, d, c in rows], [(d, c) for d, c in build_sch.HISTORY])
         self.assertEqual({rev for rev, _d, _c in rows}, {build_sch.REV})

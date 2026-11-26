@@ -78,7 +78,7 @@ NOTES = {
         'I2C address 0x24. I0 high / I1 low selects I2C. VBAT runs from 5 V, PVDD (interface) from 3.3 V.',
         'C513/C517 (series), C514/C518 + C515/C519 (parallel) and R504/R505 are calculated starting values',
         'for the loop as simulated from the copper: 1.25 uH, or 1.20 uH on a metal wall. With parts of 5 %',
-        'the transmitter stays below 100 mA for a loop of 1.10 to 1.25 uH (sim/, docs/design-notes.md).',
+        'the transmitter stays below 100 mA for a loop of 1.10 to 1.25 uH (simulations, design notes).',
         'Tune them on an assembled unit with the display fitted, using a network analyser (about 40 ohm at TX).',
     ],
     'display': [
@@ -100,11 +100,11 @@ NOTES = {
 }
 
 
-# Who drew and who checked this revision. The release procedure (docs/release.md) has the checker sign
+# Who drew and who checked this revision. The release procedure (docs/en/hardware/touch-p4/release.md) has the checker sign
 # here before an order.
 DRAWN_BY = 'Attraccess, generated from design.py'
-CHECKED_BY = 'open: sign-off before ordering (docs/release.md)'
-# Revision A has not been built; these are the dated states of its design, newest last. docs/release.md has
+CHECKED_BY = 'open: sign-off before ordering (release procedure)'
+# Revision A has not been built; these are the dated states of its design, newest last. The release notes have
 # the same table (a test compares them).
 REV = 'A'
 DATE = '2026-11-25'

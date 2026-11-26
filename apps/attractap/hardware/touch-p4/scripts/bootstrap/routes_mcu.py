@@ -1,6 +1,6 @@
 """Fixed routes at the ESP32-P4: supply vias, the fan-out of all four sides, flash, display bus, and the
 host-signal fan-out at the PN532. The routers cannot solve the first millimetres around a 0.35 mm pitch part
-(see docs/design-notes.md), so these are laid out here and locked.
+(see the design notes), so these are laid out here and locked.
 
 Every route ends on a pad or a via and uses only horizontal, vertical and 45 degree segments."""
 

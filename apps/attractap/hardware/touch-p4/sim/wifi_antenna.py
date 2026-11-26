@@ -18,7 +18,7 @@ at 5 GHz, in free space; FCC ID 2AC7Z-ESPC5MINI1, exhibit "ANT Test Report").
 Usage: wifi_antenna.py [case ...] [--band 2.4|5] [--arms LB HB]
 cases: reference board display in_case metal_wall faceplate p3_board p3_in_case p3_metal_wall
 Needs a Python with openEMS and CSXCAD (Debian: python3-openems). Three to ten minutes per case and band;
-not part of the simulate target. Results of revision A: docs/design-notes.md, "Simulation".
+not part of the simulate target. Results of revision A: design notes, "Simulation".
 Lengths in mm. x across the board, y up (the board's top edge is y = 0, the board hangs below it),
 z = 0 is the component side, which faces the wall; the display is on the side of negative z."""
 import os

@@ -15,7 +15,7 @@
     "test": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/scripts/**/*"],
+      "inputs": ["{projectRoot}/scripts/**/*", "{workspaceRoot}/docs/en/hardware/touch-p4/release.md"],
       "options": {
         "command": "python3 -I apps/attractap/hardware/touch-p4/scripts/bootstrap/test_design.py"
       }
@@ -105,7 +105,9 @@
       "outputs": [
         "{projectRoot}/fab/gerbers",
         "{projectRoot}/fab/jlcpcb",
-        "{projectRoot}/fab/*.pdf",
+        "{workspaceRoot}/docs/_media/hardware/touch-p4/schematic.pdf",
+        "{workspaceRoot}/docs/_media/hardware/touch-p4/board-front.pdf",
+        "{workspaceRoot}/docs/_media/hardware/touch-p4/board-back.pdf",
         "{projectRoot}/fab/*.csv"
       ],
       "options": {
@@ -117,7 +119,7 @@
       "cache": true,
       "parallelism": false,
       "inputs": ["{projectRoot}/kicad/**/*", "{projectRoot}/tools/**/*"],
-      "outputs": ["{projectRoot}/fab/render-top.png", "{projectRoot}/fab/render-bottom.png"],
+      "outputs": ["{workspaceRoot}/docs/_media/hardware/touch-p4/board-top.png", "{workspaceRoot}/docs/_media/hardware/touch-p4/board-bottom.png"],
       "options": {
         "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh render"
       }

@@ -2,7 +2,7 @@
 
 Usage: run.py <board.json>      (the JSON that dump_board.py writes; tools/pcb.sh simulate does both)
 Needs numpy and ngspice (NGSPICE names the program if it is not on the PATH). Exit code 1 if a limit
-is missed. What is modelled, and what is not, is in README.md."""
+is missed. What is modelled, and what is not, is in docs/en/hardware/touch-p4/simulations.md."""
 import sys
 
 import numpy as np

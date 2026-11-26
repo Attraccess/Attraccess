@@ -73,3 +73,5 @@ Attractap readers are designed to be mounted next to a machine or door. Consider
 - [Overview](attractap/overview.md) -- What is Attractap?
 - [Setup](attractap/setup.md) -- Register and configure readers
 - [Firmware Updates](attractap/firmware-updates.md) -- Update reader firmware
+- [Waveshare ESP32-S3-Touch-LCD-4](hardware/waveshare-esp32-s3-touch-lcd-4.md) -- Schematics of the board inside the Touch readers
+- [Attractap Touch P4](hardware/touch-p4/overview.md) -- The reader board in development: design, drawings, case and manual

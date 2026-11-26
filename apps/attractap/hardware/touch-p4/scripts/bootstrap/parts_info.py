@@ -1,12 +1,12 @@
 """Parts-list data of every part that is not a plain resistor or capacitor, by LCSC number: manufacturer,
 full description, lifecycle and an approved alternate. design.py puts them on the parts; the parts lists
-in fab/jlcpcb/ and docs/parts.md show them.
+in fab/jlcpcb/ and the parts page of the documentation show them.
 
 Manufacturer and part number are LCSC's (EasyEDA part data). Lifecycle is the maker's own status where
 the maker publishes one, else the part status a distributor shows (DigiKey), with the date it was read;
 "not stated" where neither gives one. An alternate is listed only when its maker's pin table and package
 match the fitted part (a datasheet statement or the two pin tables compared); "none" where no such part
-was found. The sources are in docs/parts.md.
+was found. The sources are on the parts page (docs/en/hardware/touch-p4/parts.md).
 """
 
 # lifecycle sources (read on 25 November 2026)
@@ -151,6 +151,6 @@ def info(lcsc):
 NOT_ASSEMBLED = [
     (('wifi', 'lan'), 1, 'Display panel', 'commodity (Elecrow DIS16804D or the same panel)',
      '4.0in 480x480 ST7701S + GT911, 40 pins', 'IPS TFT 4.0 in 480 x 480, RGB565, capacitive touch, 40-pin 0.5 mm '
-     'flex; taped on, flex into J601 (docs/design-notes.md, "Display mounting and flex")',
-     'any panel with the same drawing and pin table (docs/design-notes.md)'),
+     'flex; taped on, flex into J601 (design notes, "Display mounting and flex")',
+     'any panel with the same drawing and pin table (design notes)'),
 ]

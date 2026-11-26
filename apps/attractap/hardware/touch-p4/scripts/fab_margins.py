@@ -1,5 +1,5 @@
 """The smallest features of the routed board, for the margins against the fab's limits (the table in
-docs/design-notes.md, "Margins to JLCPCB's limits").
+the design notes, "Margins to JLCPCB's limits").
 
 Usage: fab_margins.py <board.kicad_pcb>     (KiCad's Python: it reads the board with pcbnew)
 """

@@ -14,7 +14,8 @@ Output:
     parts-list-<variant>.csv         everything to buy for a reader: the assembly list plus the parts that
                                      JLCPCB does not fit (the display panel)
   fab/gerbers/                     the files inside the zip, for a Gerber viewer
-  fab/schematic.pdf, fab/board-front.pdf, fab/board-back.pdf
+  docs/_media/hardware/touch-p4/   (in the repository root) schematic.pdf, and board-front.pdf and
+                                   board-back.pdf, plots of copper and silkscreen of each side at 1:1
 
 Variants: a schematic symbol with the field ``Variant = lan`` is only fitted on the
 Ethernet/PoE version. Symbols marked DNP are never fitted.
@@ -38,6 +39,8 @@ import parts_info  # noqa: E402
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT = os.path.normpath(os.path.join(HERE, '..', 'kicad'))
 FAB = os.path.normpath(os.path.join(HERE, '..', 'fab'))
+# drawings for the documentation (docs/en/hardware/touch-p4/overview.md, "Drawings and renders")
+MEDIA = os.path.normpath(os.path.join(HERE, '..', '..', '..', '..', '..', 'docs', '_media', 'hardware', 'touch-p4'))
 NAME = 'attractap-touch-p4'
 CLI = os.environ.get('KICAD_CLI') or (
     os.path.join(os.environ['KICAD'], 'bin', 'kicad-cli') if os.environ.get('KICAD') else 'kicad-cli')
@@ -129,11 +132,12 @@ def main():
     parts = os.path.join(FAB, 'parts.csv')
     fields = 'Reference,Value,Footprint,LCSC,MPN,Variant,Manufacturer,BOM description,Alternate,Lifecycle'
     run('sch', 'export', 'bom', '--fields', fields, '--labels', fields, '--exclude-dnp', '-o', parts, sch)
-    run('sch', 'export', 'pdf', '-o', os.path.join(FAB, 'schematic.pdf'), sch)
+    os.makedirs(MEDIA, exist_ok=True)
+    run('sch', 'export', 'pdf', '-o', os.path.join(MEDIA, 'schematic.pdf'), sch)
     run('pcb', 'export', 'pdf', '--layers', 'F.Cu,F.SilkS,F.Fab,Edge.Cuts,Dwgs.User', '--mode-single',
-        '-o', os.path.join(FAB, 'board-front.pdf'), pcb)
+        '-o', os.path.join(MEDIA, 'board-front.pdf'), pcb)
     run('pcb', 'export', 'pdf', '--layers', 'B.Cu,B.SilkS,Edge.Cuts,Dwgs.User', '--mode-single', '--mirror',
-        '-o', os.path.join(FAB, 'board-back.pdf'), pcb)
+        '-o', os.path.join(MEDIA, 'board-back.pdf'), pcb)
 
     rows = [r for r in csv.DictReader(open(parts)) if not r['Reference'].startswith(NOT_ASSEMBLED)]
     positions = {r['Ref']: r for r in csv.DictReader(open(pos))}

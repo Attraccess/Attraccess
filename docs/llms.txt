@@ -75,6 +75,25 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Reader Display](https://docs.attraccess.org/en/attractap/reader-ui.md): How plugins show notes and prompts on Attractap reader screens, which readers support them, and the related admin settings and alerts.
 - [LED Guide (Lite)](https://docs.attraccess.org/en/attractap/led-guide.md): Explains the LED ring animations and one-time feedback signals of the display-less Attractap Lite reader.
 
+## English: Hardware
+- [Waveshare ESP32-S3-Touch-LCD-4 (Touch V1, V2)](https://docs.attraccess.org/en/hardware/waveshare-esp32-s3-touch-lcd-4.md): Reference schematics of the Waveshare ESP32-S3-Touch-LCD-4 board, V3.0 and V4.0, that the Attractap Touch V1 and V2 readers are built on.
+
+## English: Attractap Touch P4 (in development)
+- [Overview](https://docs.attraccess.org/en/hardware/touch-p4/overview.md): The Attractap Touch P4 reader board (revision A, in development): what is on it, drawings and renders, how the KiCad project is generated and checked, and how to order it.
+- [Specification](https://docs.attraccess.org/en/hardware/touch-p4/spec.md): Specification of the Touch P4 reader board: function, supply, environment, interfaces and EMC targets.
+- [Design Notes](https://docs.attraccess.org/en/hardware/touch-p4/design-notes.md): Why the Touch P4 board is designed as it is: parts, power, layout, antennas, simulations, the design review and the accepted deviations.
+- [Design Review](https://docs.attraccess.org/en/hardware/touch-p4/review.md): The record of the Touch P4 design review: grades, criteria, decisions and what the review caught.
+- [Parts](https://docs.attraccess.org/en/hardware/touch-p4/parts.md): Lifecycle, approved alternates and sourcing of every part on the Touch P4 board.
+- [Simulations](https://docs.attraccess.org/en/hardware/touch-p4/simulations.md): The field and circuit simulations run on the routed Touch P4 board, what they model and their limits.
+- [Board Generator](https://docs.attraccess.org/en/hardware/touch-p4/board-generator.md): The Python generator that writes the Touch P4 library, schematic and board from one circuit description, and how to run its steps.
+- [Firmware Port](https://docs.attraccess.org/en/hardware/touch-p4/firmware-port.md): Pin map of the Touch P4 board and the rules the reader firmware must follow on it: Wi-Fi co-processor, EU radio settings, power and heat limits.
+- [Bring-up Plan](https://docs.attraccess.org/en/hardware/touch-p4/bring-up.md): Step-by-step plan for powering up and testing the first assembled Touch P4 boards, from power rails to Wi-Fi, NFC, heat and pre-compliance checks.
+- [Compliance](https://docs.attraccess.org/en/hardware/touch-p4/compliance.md): What CE marking and the EU market rules ask of the Touch P4 reader: radio (2.4 and 5 GHz), EMC, safety, cybersecurity, registrations, and what is still open.
+- [Compliance Sources](https://docs.attraccess.org/en/hardware/touch-p4/compliance-sources.md): The primary source, version and verdict for every claim of the Touch P4 CE and market checklist.
+- [Releasing](https://docs.attraccess.org/en/hardware/touch-p4/release.md): How a Touch P4 board revision is released and ordered, and the dated states of revision A.
+- [Case](https://docs.attraccess.org/en/hardware/touch-p4/case.md): The 3D-printable wall and desk case of the Attractap Touch P4 reader: parts, printing, design files and what is not yet verified.
+- [Installation Manual](https://docs.attraccess.org/en/hardware/touch-p4/installation-manual.md): How to assemble the Attractap Touch P4 reader in its printed case and mount it on a wall or a desk stand.
+
 ## English: Devices
 - [MQTT](https://docs.attraccess.org/en/devices/mqtt/overview.md): Introduces MQTT and IoT: why use MQTT with Attraccess, how it works and how it integrates with flows.
 - [MQTT Server Setup](https://docs.attraccess.org/en/devices/mqtt/server-setup.md): How to add and test an MQTT broker connection in Attraccess, including common brokers, multiple servers and connection status.

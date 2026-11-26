@@ -1,0 +1,109 @@
+# Simulations of the Touch P4 board
+<!-- llms-description: The field and circuit simulations run on the routed Touch P4 board, what they model and their limits. -->
+
+Field and circuit simulations of the routed board, in [`sim/`](https://github.com/Attraccess/Attraccess/tree/main/apps/attractap/hardware/touch-p4/sim) of the board's project folder. They read the copper out of
+the board file and the part values out of the circuit description
+(`scripts/bootstrap/`), so they follow the design: change a value or the
+layout, run them again.
+
+```bash
+pnpm nx run attractap-touch-p4-pcb:simulate     # part of the check target
+```
+
+The report goes to the terminal and to `fab/reports/simulation.txt`. Every line
+marked `ok` or `FAIL` compares a result with a limit from a datasheet; the
+target fails if one is missed. What the results were on revision A, and what
+they changed, is in the [design notes](hardware/touch-p4/design-notes.md#simulation).
+
+Needs KiCad 10 with its Python (numpy is the only package used) and
+[ngspice](https://ngspice.sourceforge.io/). `tools/pcb.sh` takes ngspice from
+`NGSPICE`, the PATH or nixpkgs.
+
+## What is simulated
+
+| Part of the report | Files | Model | Limits checked |
+|---|---|---|---|
+| Field solvers | `test_solvers.py` | Both solvers against results known in closed form: a loop of track, the same inside a shorted ring and above a copper plate, a stripline. | within 2 to 4 % |
+| NFC loop | `nfc_loop.py`, `peec.py` | Inductance and resistance of the loop at 13.56 MHz from the antenna footprint, with the eddy currents in the pours around it (all layers, meshed as one sheet). Also with a metal wall behind the reader and with metal across the gap in the copper around the loop. | no copper on the outer layers under the screw that stands in that gap |
+| NFC field | `nfc_loop.py`, `peec.py` | Field strength in front of the reader, from the loop's current and the eddy currents it raises, averaged over the 72 x 42 mm of a card held parallel to the reader: for a card that lies on the case and outwards from there, on a wall of wood or stone and on a metal one. | at most 7.5 A/m at a card on the case; 1.5 A/m (what a card needs by ISO/IEC 14443) at least 10 mm in front of the case |
+| NFC matching | `nfc_match.py`, `nfc_tx.cir` | Load between TX1 and TX2, transmitter supply current, voltage at the receiver input and loop current, for the loop on a wall of wood or stone and on a metal one. 20 000 boards with capacitors and filter inductors spread evenly over 5 %, driver resistance 2 to 5 ohm, transmitter supply 2.7 to 3.4 V. One run in the time domain with the bridge's square wave. | transmitter 100 mA (150 mA limiting value), receiver input 4 Vpp, damping resistors 0.1 W |
+| DC input | `dc_hotplug.cir` | A live supply plugged in through four cables: cable inductance, fuse, the three ceramic capacitors with their loss of capacitance over voltage, filter inductor, TVS at the upper end of its breakdown range. | converter input 40 V at 24 V supply |
+| DC surge | `dc_surge.cir` | A 1.2/50 us surge of +-1 kV behind 42 ohm (EN 50130-4, line to earth), applied across the DC input while the board runs at 12 to 28 V: both TVS at the top of their breakdown range, C120 with low and high ESR, L103 unsaturated and saturated. | converter input 40 V; D105 80 V reverse |
+| Power-up | `powerup.cir` | USB plugged in: cable, fuse, ferrite, diode, the 5 V rail's capacitors, the 3.3 V converter with its lockout and soft start, the reset network. Behavioural converter. | reset low until the rail has been up for 50 us; 5 V rail above 3.8 V when running |
+| Fast lines | `field2d.py`, `si.py` | Impedance and delay of a track on each signal layer from a 2D field solution of the layer stack. Then every fast line as transmission lines of its routed lengths with its series resistor, driven by a 1 ns edge behind 33 ohm (the MCU's default drive strength) and 17 ohm (the strongest), into a capacitance. | overshoot 0.5 V and no swing back below 80 % at the default strength |
+| Wi-Fi link | `si.py` | What the board adds to the timing of the SDIO link between the MCU and the Wi-Fi module: delay of the clock and of every data line, the difference between them, the round trip. The pull-ups Espressif asks for, and the reset pulse through R302 into C303. | clock and data within 0.5 ns, round trip 2 ns, a pull-up of 10 to 90 k on CMD and D0 to D3, reset low for 50 us |
+| Supply tracks | `irdrop.py` | Each supply net that is routed as tracks as a network of track and via resistances, with everything on at once. | 0.2 V lost; outer tracks below the current for a 20 K rise (IPC-2221) |
+| Supply impedance | `pdn.py` | Lumped model of the MCU's core and 3.3 V rails: every capacitor with its own inductance and that of its way to the pins, from the distances on the board. | none: report only |
+| PoE isolation | `isolation.py` | The copper of every layer around the 48 V side drawn into a raster of 0.05 mm. Shortest way from 48 V copper to any other copper along each layer, and through the board from each layer to every other. The pads of the three parts that bridge the barrier by design (module, capacitor, jack) are left out. | clearance in air for the peak of the 1500 V RMS test, with a fifth to spare (IEC 60664-1); no way through the board shorter than along a layer |
+| Heat | `thermal.py` | The board as a plate of 1 mm cells that spreads heat through its copper (coverage of each layer from the filled zones) and loses it through both faces, by textbook figures for still air: to the display and out of the front, to the dock plate and the wall. Each part's loss where the part sits; the PoE module's and the display's into the air inside. Typical use and everything on, for each of the three supplies. An estimate within 40 %. | typical use in a room of 40 °C: every part inside its limit, display below 70 °C, the DC fuse holding 1.5 times its current, the board under the Wi-Fi module (the upper bound of the air around it) below the module's 85 °C |
+| Dock magnet | `dock.py` | Field of the dock's magnet at the hall switch: on the dock, off its axis, with the weakest magnet and warm, and while the reader is lifted off. | twice the switch's highest threshold on the dock |
+
+The Wi-Fi antenna has a simulation of its own, which is not part of `simulate`: see below.
+
+`dump_board.py` writes the board as JSON (it is the one script that needs
+KiCad), `board.py` reads it, `spice.py` runs ngspice, `run.py` runs everything.
+
+## The Wi-Fi antenna
+
+```bash
+pnpm nx run attractap-touch-p4-pcb:simulate-antenna      # about three quarters of an hour
+```
+
+`wifi_antenna.py` is a full-wave model (FDTD, [openEMS](https://www.openems.de/)) of the PCB antenna of the
+Wi-Fi module (ESP32-C5-MINI-1) on this board, at 2.4 and 5 GHz, each band with a pulse of its own. The
+module's antenna is a dual-band printed antenna fed through a diplexer, and its exact shape is not
+published. So the model uses a stand-in of the same size and kind, an inverted-F with a long arm for
+2.4 GHz and a short branch for 5 GHz, ground point on the right as Espressif draws it; tunes it on a small
+evaluation board to about 2.44 and 5.5 GHz; and then puts it on this board unchanged:
+
+| Case | What is in the model |
+|---|---|
+| `reference` | the module at the edge of an evaluation board of 40 x 55 mm, its antenna out over the edge |
+| `board` | this board at the module's place (`geometry.WIFI_MODULE`): its ground, the cut under the antenna, the copper keep-out beside it |
+| `display` | the same with the display's metal back 1.5 mm from the board, on its four ground pads |
+| `in_case` | `display` in the printed case: front, top and side walls, dock plate |
+| `metal_wall` | `in_case` with a metal wall 16.4 mm behind the component side |
+| `faceplate` | `in_case` with a 0.8 mm aluminium face plate over the front (a window for the display) |
+| `faceplate_window` | the same with the strip above the display left open over the antenna and its keep-out |
+| `p3_board`, `p3_in_case`, `p3_metal_wall` | the module at Espressif's recommended place, the board's top right corner with the antenna out over the edge (HDG 1.4.7, fig. 22 position 3, fig. 23), the case grown so that the antenna keeps the same distances to its walls |
+
+It prints, per case and band, the resonance, the match and the bandwidth, and for three channels how much
+of the power fed in is radiated (and, in brackets, of the power the antenna accepts), and how much of it
+goes to the display's side, where the room is. What changes from case to case is the result; the absolute
+figures belong to the stand-in. The target is not part of `simulate` or `check`: it needs a Python with
+openEMS (`OPENEMS_PYTHON`; Debian and Ubuntu have it as `python3-openems`) and does not depend on the
+routed copper, only on `geometry.py` and the dimensions at the top of the script.
+
+## What the models leave out
+
+- **The chips are simple.** No maker publishes an IBIS or SPICE model for the
+  ESP32-P4, the PN532 or the converters. Drivers are a ramp behind a
+  resistance, receivers a capacitance, converters follow their datasheet's
+  lockout and soft start. The figures are the datasheets' typical ones.
+- **The NFC loop's own capacitance** (2.4 pF) is an estimate, and each
+  picofarad counts like 1 % of inductance. The DC terminal, the Ethernet plug
+  and cable, a card or a phone in the field are not in the model; all of them
+  lower the inductance.
+- **Heat** is an estimate: the surface figures are textbook values for still
+  air, the losses of the parts are estimates too, and a reader in the sun or
+  over a radiator is not a room of 40 °C.
+- **NFC range** is the range of the field that powers a card. Whether the
+  reader hears the card's answer out there is not in the model.
+- **Emissions** and immunity: nothing here stands in for an EMC test.
+- Nothing here checks a pin number, a footprint or the firmware.
+
+A simulation does not replace the bring-up plan. It says where the first board
+should land, so that a measurement that lands elsewhere stands out.
+
+## Running parts by hand
+
+```bash
+. tools/kicad-env.sh
+cd sim
+kicad_python dump_board.py ../kicad/attractap-touch-p4.kicad_pcb /tmp/board.json
+python3 run.py /tmp/board.json          # any Python with numpy
+python3 test_solvers.py
+```
+
+`spice.run('dc_hotplug.cir', vsup=26.4)` runs one deck with other values for
+its `.param` lines; the decks also run as they are with `ngspice -b`.

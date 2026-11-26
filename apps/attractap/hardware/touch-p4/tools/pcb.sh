@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Every operation on the Touch P4 board, as the Nx targets of this project run them.
-# Usage: tools/pcb.sh <command>      (see the case statement below, or the README)
+# Usage: tools/pcb.sh <command>      (see the case statement below, or docs/en/hardware/touch-p4/overview.md)
 set -eo pipefail
 
 # Full-wave model of the Wi-Fi module's PCB antenna on the board at 2.4 and 5 GHz (sim/wifi_antenna.py). It
@@ -51,10 +51,11 @@ check_netlist() {
 }
 
 render() {
-    mkdir -p "$PCB_ROOT/fab"
+    local media="$PCB_ROOT/../../../../docs/_media/hardware/touch-p4"
+    mkdir -p "$media"
     for side in top bottom; do
         cli pcb render --side "$side" --width 1500 --height 2300 --quality basic \
-            -o "$PCB_ROOT/fab/render-$side.png" "$PCB"
+            -o "$media/board-$side.png" "$PCB"
     done
 }
 
@@ -110,7 +111,7 @@ finish_routing() {
 
 export_fab() { (cd "$PCB_ROOT/scripts" && "${KICAD_PYTHON:-python3}" export_fab.py); }
 
-# The generator is the master (docs/release.md): each generator step records what it wrote, and
+# The generator is the master (docs/en/hardware/touch-p4/release.md): each generator step records what it wrote, and
 # check-source fails when a KiCad file differs from that or the generator changed since.
 stamp() { (cd "$PCB_ROOT/scripts" && "${KICAD_PYTHON:-python3}" check_source.py --stamp "$1"); }
 check_source() { (cd "$PCB_ROOT/scripts" && "${KICAD_PYTHON:-python3}" check_source.py); }
@@ -124,7 +125,7 @@ ngspice_bin() {
     fi
 }
 
-# Field and circuit simulations on the routed board (sim/README.md). The board is read with KiCad's
+# Field and circuit simulations on the routed board (docs/en/hardware/touch-p4/simulations.md). The board is read with KiCad's
 # Python; the simulations need numpy only, so they run with it as well (SIM_PYTHON names another one).
 simulate() {
     mkdir -p "$REPORTS"
@@ -161,7 +162,7 @@ case "${1:-}" in
     check-footprints) check_footprints ;;
     simulate) simulate ;;
     render) render ;;
-    # The three generator steps overwrite the KiCad files. See scripts/bootstrap/README.md.
+    # The three generator steps overwrite the KiCad files. See docs/en/hardware/touch-p4/board-generator.md.
     generate-library) shift; bootstrap make_lib.py "$@" ;;
     check-source) check_source ;;
     generate-schematic) bootstrap build_sch.py && erc && check_netlist && stamp schematic ;;

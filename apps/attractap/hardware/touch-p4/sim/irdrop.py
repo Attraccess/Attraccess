@@ -118,7 +118,7 @@ def ipc2221(board, w_mm, layer, rise=20.0):
     return (0.048 if layer in ('F.Cu', 'B.Cu') else 0.024) * rise ** 0.44 * area ** 0.725
 
 
-# Every 5 V load at its supply-sizing figure at once (docs/design-notes.md, "Power budget"): 1.65 A on the
+# Every 5 V load at its supply-sizing figure at once (design notes, "Power budget"): 1.65 A on the
 # 5 V rail, more than the firmware ever draws.
 RAIL_5V = {'U103.4': 1.00, 'L601.1': 0.13, 'FB501.1': 0.12, 'R702.1': 0.09,
            **{'D%d.3' % (701 + i): 0.036 for i in range(8)}}

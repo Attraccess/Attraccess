@@ -1,7 +1,7 @@
 """Build the project library kicad/lib from the LCSC/EasyEDA conversions and generate the NFC antenna.
 
 Usage: make_lib.py <dir with lcsc.kicad_sym and lcsc.pretty>
-The LCSC conversions were produced with easyeda2kicad (see README). This script only needs to be
+The LCSC conversions were produced with easyeda2kicad (see docs/en/hardware/touch-p4/overview.md). This script only needs to be
 re-run when a part is added to design.py.
 """
 import os
