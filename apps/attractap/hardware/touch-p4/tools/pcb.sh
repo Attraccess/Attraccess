@@ -111,7 +111,7 @@ finish_routing() {
 
 export_fab() { (cd "$PCB_ROOT/scripts" && "${KICAD_PYTHON:-python3}" export_fab.py); }
 
-# The generator is the master (docs/en/hardware/touch-p4/release.md): each generator step records what it wrote, and
+# The generator is the master (docs/en/hardware/touch-p4/development.md): each generator step records what it wrote, and
 # check-source fails when a KiCad file differs from that or the generator changed since.
 stamp() { (cd "$PCB_ROOT/scripts" && "${KICAD_PYTHON:-python3}" check_source.py --stamp "$1"); }
 check_source() { (cd "$PCB_ROOT/scripts" && "${KICAD_PYTHON:-python3}" check_source.py); }
@@ -162,7 +162,7 @@ case "${1:-}" in
     check-footprints) check_footprints ;;
     simulate) simulate ;;
     render) render ;;
-    # The three generator steps overwrite the KiCad files. See docs/en/hardware/touch-p4/board-generator.md.
+    # The three generator steps overwrite the KiCad files. See docs/en/hardware/touch-p4/development.md.
     generate-library) shift; bootstrap make_lib.py "$@" ;;
     check-source) check_source ;;
     generate-schematic) bootstrap build_sch.py && erc && check_netlist && stamp schematic ;;

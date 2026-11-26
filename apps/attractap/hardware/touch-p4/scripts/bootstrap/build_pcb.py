@@ -1,6 +1,6 @@
 """Build the Attractap Touch P4 board file with KiCad's pcbnew Python API.
 
-Usage (see docs/en/hardware/touch-p4/board-generator.md for the environment):
+Usage (see docs/en/hardware/touch-p4/development.md for the environment):
     python3 build_pcb.py place     # outline, parts, nets, zones, fixed routes -> kicad/attractap-touch-p4.kicad_pcb
     python3 build_pcb.py dsn       # export Specctra DSN for the autorouter
     python3 build_pcb.py ses       # import the autorouter result (dsn / autorouter / ses can be repeated)

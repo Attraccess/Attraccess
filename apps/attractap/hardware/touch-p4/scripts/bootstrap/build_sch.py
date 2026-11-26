@@ -101,7 +101,7 @@ NOTES = {
 }
 
 
-# Who drew and who checked this revision. The release procedure (docs/en/hardware/touch-p4/release.md) has the checker sign
+# Who drew and who checked this revision. The release procedure (docs/en/hardware/touch-p4/development.md) has the checker sign
 # here before an order.
 DRAWN_BY = 'Attraccess, generated from design.py'
 CHECKED_BY = 'nobody yet: sign-off before ordering (docs: Releasing)'

@@ -73,18 +73,18 @@
   - **Attractap Touch P4 (in development)**
     - [Overview](hardware/touch-p4/overview.md)
     - [Specification](hardware/touch-p4/spec.md)
-    - [Design Notes](hardware/touch-p4/design-notes.md)
-    - [Design Review](hardware/touch-p4/review.md)
-    - [Parts](hardware/touch-p4/parts.md)
-    - [Simulations](hardware/touch-p4/simulations.md)
-    - [Board Generator](hardware/touch-p4/board-generator.md)
-    - [Firmware Port](hardware/touch-p4/firmware-port.md)
-    - [Bring-up Plan](hardware/touch-p4/bring-up.md)
-    - [Compliance](hardware/touch-p4/compliance.md)
-    - [Compliance Sources](hardware/touch-p4/compliance-sources.md)
-    - [Releasing](hardware/touch-p4/release.md)
     - [Case](hardware/touch-p4/case.md)
     - [Installation Manual](hardware/touch-p4/installation-manual.md)
+    - **Development**
+      - [Working on the Board](hardware/touch-p4/development.md)
+      - [Design](hardware/touch-p4/design-notes.md)
+      - [Known Limitations](hardware/touch-p4/limitations.md)
+      - [Design Standards and Review Criteria](hardware/touch-p4/review.md)
+      - [Parts and Sourcing](hardware/touch-p4/parts.md)
+      - [Pin Map and Firmware Port](hardware/touch-p4/firmware-port.md)
+      - [Simulations](hardware/touch-p4/simulations.md)
+      - [Bring-up Plan](hardware/touch-p4/bring-up.md)
+      - [CE and Market Checklist](hardware/touch-p4/compliance.md)
 
 - **Devices**
   - [MQTT](devices/mqtt/overview.md)

@@ -1,9 +1,9 @@
-# Spezifikation, Revision A
+# Spezifikation
 <!-- llms-description: Spezifikation der Leserplatine Touch P4: Funktion, Versorgung, Umgebung, Schnittstellen und EMV-Ziele. -->
 
-Was die Attractap-Touch-P4-Leserplatine leisten soll, auf einer Seite. Die Werte
-stammen aus den Designnotizen, die ihre Quellen nennen. Revision A ist noch nicht
-gebaut, es sind daher Entwurfswerte, keine Messwerte.
+Was die Attractap-Touch-P4-Leserplatine leisten soll, auf einer Seite, für alle, die sie auswählen,
+installieren oder prüfen. Die Werte sind Entwurfswerte, keine Messwerte; ihre Quellen stehen in den
+[Designnotizen](hardware/touch-p4/design-notes.md).
 
 ## Funktion
 
@@ -28,8 +28,8 @@ dürfen beliebige Kombinationen angeschlossen sein, und die höchste Spannung sp
 | PoE (Version lan) | IEEE-802.3af-Endgerät (Powered Device), 37 bis 57 V an der Buchse (isoliertes Modul DP9900M-5V) | typisch 3,4 W; bei der höchsten Leistungsaufnahme der Platine etwa 5,6 W | Isolation des Moduls (1500-V-Prüfung), TVS-Diode und Ferritperlen an seinem Eingang, 3 mm Kriechstrecke auf der Platine |
 | USB-C (Service) | 5 V, USB-2.0-Port oder Type-C-Quelle | höchstens 0,5 A, wenn USB die einzige Quelle ist (Firmware-Grenze; geschätzt 0,43 A) | eFuse: Sanftanlauf, Strombegrenzung 1,8 bis 2,2 A, Abschaltung über 5,53 bis 5,74 V und unter 3,9 V, Rückstromsperre; ESD-Array |
 
-Die höchste Leistungsaufnahme der Platine an der 5-V-Schiene beträgt 0,90 A nach den
-Maximalwerten der Hersteller (1,65 A nach deren Werten für die Auslegung der Versorgung), mit zwei Firmware-Grenzen: die
+Höchste Leistungsaufnahme an der 5-V-Schiene: 0,90 A nach den Maximalwerten der Hersteller,
+1,65 A nach deren Werten für die Auslegung der Versorgung, mit zwei Firmware-Grenzen: die
 LEDs zusammen unter 100 mA und kein Piepton, solange das NFC-Feld an ist. Interne
 Schienen: 3,3 V (TLV62569, 2 A, 36 % Reserve bei den Auslegungswerten), 1,1-V-Kern
 (TLV62569, vom MCU gesetzt).
@@ -59,11 +59,11 @@ Schienen: 3,3 V (TLV62569, 2 A, 36 % Reserve bei den Auslegungswerten), 1,1-V-Ke
 
 Der Leser hat Funkmodule, daher gilt die RED. Die Ziele sind die der EN 301 489-1
 mit den Teilen 3 (NFC) und 17 (Wi-Fi), EN 55032 Klasse B für die Störaussendung und EN 55035
-für den Ethernet-Anschluss ([compliance.md](hardware/touch-p4/compliance.md)).
+für den Ethernet-Anschluss ([Konformitäts-Checkliste](hardware/touch-p4/compliance.md)).
 
 | Prüfung | Ziel | Wo |
 |---|---|---|
-| Elektrostatische Entladung, IEC 61000-4-2 | 4 kV Kontakt, 8 kV Luft, Kriterium B | alles, was berührt werden kann: Glas und seine Kanten, LED-Fenster, Fugen, Schrauben; die Schirme der Steckverbinder. Schutz je Anschluss: Designnotizen, „ESD je Anschluss“ |
+| Elektrostatische Entladung, IEC 61000-4-2 | 4 kV Kontakt, 8 kV Luft, Kriterium B | alles, was berührt werden kann: Glas und seine Kanten, LED-Fenster, Fugen, Schrauben; die Schirme der Steckverbinder. Schutz je Anschluss in den [Designnotizen](hardware/touch-p4/design-notes.md) |
 | Gestrahlte Störfestigkeit | 3 V/m, 80 MHz bis 6 GHz | gesamter Leser |
 | Schnelle Transienten, HF-Gleichtakt | 0,5 kV; 3 V | Ethernet; der DC-Eingang, wenn sein Kabel länger als 3 m sein darf |
 | Surge | 0,5 kV Leitung gegen Erde | Ethernet mit Innenraumkabeln über 30 m. Der DC-Eingang ist für den Surge der EN 50130-4 Leitung gegen Erde über 42 Ohm ausgelegt (simuliert: höchstens 39,6 V am Wandler, Grenze 40 V) |

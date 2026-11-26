@@ -1,16 +1,15 @@
-# Specification, revision A
+# Specification
 <!-- llms-description: Specification of the Touch P4 reader board: function, supply, environment, interfaces and EMC targets. -->
 
-What the Attractap Touch P4 reader board is built to do, on one page. Figures come
-from the design notes, which give their sources; revision A is not built yet, so
-they are design values, not measurements.
+What the Attractap Touch P4 reader board is built to do, on one page, for anyone choosing,
+installing or testing it. The figures are design values, not measurements; their sources are in
+the [design notes](hardware/touch-p4/design-notes.md).
 
 ## Function
 
-A wall-mounted access and machine reader for Attraccess: it reads NFC cards and
-tags, shows a touch screen, and talks to the Attraccess server over Wi-Fi or
-Ethernet. One ESP32-P4 runs everything; the Wi-Fi module and the NFC chip are its
-co-processors.
+A wall-mounted access and machine reader for Attraccess: it reads NFC cards and tags, shows a
+touch screen, and talks to the Attraccess server over Wi-Fi or Ethernet. One ESP32-P4 runs
+everything; the Wi-Fi module and the NFC chip are its co-processors.
 
 | Assembly version | Contains |
 |---|---|
@@ -19,8 +18,8 @@ co-processors.
 
 ## Supply
 
-Each source feeds the 5 V rail through a switch that blocks reverse current, so
-any combination may be connected; the highest one feeds the board.
+Each source feeds the 5 V rail through a switch that blocks reverse current, so any combination
+may be connected; the highest one feeds the board.
 
 | Source | Range | Current drawn | Protection |
 |---|---|---|---|
@@ -28,11 +27,10 @@ any combination may be connected; the highest one feeds the board.
 | PoE (lan version) | IEEE 802.3af powered device, 37 to 57 V at the jack (isolated module DP9900M-5V) | typical 3.4 W; at the board's highest consumption about 5.6 W | the module's isolation (1500 V test), TVS and ferrite beads at its input, 3 mm creepage on the board |
 | USB-C (service) | 5 V, USB 2.0 port or Type-C source | at most 0.5 A when USB is the only source (firmware limit; estimated 0.43 A) | eFuse: soft start, 1.8 to 2.2 A limit, cut-off above 5.53 to 5.74 V and below 3.9 V, reverse blocking; ESD array |
 
-The board's highest consumption at the 5 V rail is 0.90 A by the makers' maximum
-figures (1.65 A by their supply-sizing figures), with two firmware limits: the
-LEDs below 100 mA together, and no beep while the NFC field is on. Internal
-rails: 3.3 V (TLV62569, 2 A, 36 % headroom at the sizing figures), 1.1 V core
-(TLV62569, set by the MCU).
+Highest consumption at the 5 V rail: 0.90 A by the makers' maximum figures, 1.65 A by their
+supply-sizing figures, with two firmware limits: the LEDs below 100 mA together, and no beep while
+the NFC field is on. Internal rails: 3.3 V (TLV62569, 2 A, 36 % headroom at the sizing figures),
+1.1 V core (TLV62569, set by the MCU).
 
 ## Environment
 
@@ -57,13 +55,13 @@ rails: 3.3 V (TLV62569, 2 A, 36 % headroom at the sizing figures), 1.1 V core
 
 ## EMC, ESD and surge targets
 
-The reader has radios, so the RED applies; the targets are those of EN 301 489-1
-with parts 3 (NFC) and 17 (Wi-Fi), EN 55032 class B for emission, and EN 55035
-for the Ethernet port ([compliance.md](hardware/touch-p4/compliance.md)).
+The reader has radios, so the RED applies. The targets are those of EN 301 489-1 with parts 3 (NFC)
+and 17 (Wi-Fi), EN 55032 class B for emission, and EN 55035 for the Ethernet port
+([compliance checklist](hardware/touch-p4/compliance.md)).
 
 | Test | Target | Where |
 |---|---|---|
-| Electrostatic discharge, IEC 61000-4-2 | 4 kV contact, 8 kV air, criterion B | everything that can be touched: glass and its edges, LED windows, seams, screws; the connectors' shells. Per-port protection: design notes, "ESD per port" |
+| Electrostatic discharge, IEC 61000-4-2 | 4 kV contact, 8 kV air, criterion B | everything that can be touched: glass and its edges, LED windows, seams, screws; the connectors' shells. per-port protection in the [design notes](hardware/touch-p4/design-notes.md) |
 | Radiated immunity | 3 V/m, 80 MHz to 6 GHz | whole reader |
 | Fast transients, RF common mode | 0.5 kV; 3 V | Ethernet; the DC input when its cable may be longer than 3 m |
 | Surge | 0.5 kV line to ground | Ethernet with indoor cables over 30 m. The DC input is built for EN 50130-4's line-to-earth surge through 42 ohm (simulated: 39.6 V at most at the converter, limit 40 V) |

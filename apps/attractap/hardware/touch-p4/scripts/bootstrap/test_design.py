@@ -395,11 +395,11 @@ class SilkscreenTest(unittest.TestCase):
 
 
 class ReleaseTest(unittest.TestCase):
-    def test_revision_history_in_the_release_notes_matches_the_title_block(self):
+    def test_revision_history_in_the_development_page_matches_the_title_block(self):
         import re
         import build_sch
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', '..', '..',
-                            'docs', 'en', 'hardware', 'touch-p4', 'release.md')
+                            'docs', 'en', 'hardware', 'touch-p4', 'development.md')
         rows = re.findall(r'^\| ([A-Z]) \| (\d{4}-\d\d-\d\d) \| (.+?) \|$', open(path).read(), re.M)
         self.assertEqual([(d, c) for _rev, d, c in rows], [(d, c) for d, c in build_sch.HISTORY])
         self.assertEqual({rev for rev, _d, _c in rows}, {build_sch.REV})

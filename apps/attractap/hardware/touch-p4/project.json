@@ -15,7 +15,7 @@
     "test": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/scripts/**/*", "{workspaceRoot}/docs/en/hardware/touch-p4/release.md"],
+      "inputs": ["{projectRoot}/scripts/**/*", "{workspaceRoot}/docs/en/hardware/touch-p4/development.md"],
       "options": {
         "command": "python3 -I apps/attractap/hardware/touch-p4/scripts/bootstrap/test_design.py"
       }
