@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Card, Skeleton } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Skeleton } from '@heroui/react';
 import { Button, StatusDialog, useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import {
   useApproveMcpOAuthRequest,
@@ -115,14 +115,14 @@ export function McpOAuthAuthorizePage() {
   const warn = view ? view.loopbackRedirect || !view.registeredByOperator : false;
   return (
     <UnauthorizedLayout>
-      <Card className="w-full" data-cy="mcp-oauth-consent">
-        <Card.Header>
-          <Card.Title className="break-words">
+      <div className="flex w-full flex-col gap-4" data-cy="mcp-oauth-consent">
+        <header className="flex flex-col gap-1">
+          <h2 className="break-words text-xl font-semibold">
             {view ? t('title', { client: view.clientName }) : <Skeleton className="h-6 w-64 rounded-md" />}
-          </Card.Title>
-          <Card.Description>{t('intro')}</Card.Description>
-        </Card.Header>
-        <Card.Content className="flex flex-col gap-4">
+          </h2>
+          <p className="text-sm text-muted">{t('intro')}</p>
+        </header>
+        <div className="flex flex-col gap-4">
           {!view ? (
             <Skeleton className="h-32 w-full rounded-md" />
           ) : (
@@ -169,8 +169,8 @@ export function McpOAuthAuthorizePage() {
               <p className="text-sm text-muted">{t('notice')}</p>
             </>
           )}
-        </Card.Content>
-        <Card.Footer className="flex flex-col items-end gap-2">
+        </div>
+        <footer className="flex flex-col items-end gap-2">
           <div className="flex justify-end gap-2">
             <Button
               variant="secondary"
@@ -195,8 +195,8 @@ export function McpOAuthAuthorizePage() {
           <p role="status" aria-live="polite" className="text-sm text-muted" data-cy="mcp-oauth-returning">
             {redirecting ? t(decided === 'deny' ? 'returningDenied' : 'returningApproved') : ''}
           </p>
-        </Card.Footer>
-      </Card>
+        </footer>
+      </div>
     </UnauthorizedLayout>
   );
 }

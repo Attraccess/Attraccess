@@ -1,4 +1,9 @@
-import { Auth, type AuthenticatedRequest, type PluginAuditPrincipal, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
+import {
+  Auth,
+  type AuthenticatedRequest,
+  type PluginAuditPrincipal,
+  NotAnMcpTool,
+} from '@attraccess/plugins-backend-sdk';
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Inject, Post, Put, Req } from '@nestjs/common';
 import { conflict } from '../fabric/errors';
 import { MatterFabricGuard } from '../fabric/guard';

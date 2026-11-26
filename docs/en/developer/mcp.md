@@ -31,6 +31,7 @@ MCP clients that support the MCP authorization flow need no token. They find eve
 3. The browser opens the Attraccess consent page. If you are not signed in you sign in first (including two-factor authentication or SSO) and return to the page. The page shows the app's name, where it returns to and the permissions it asks for. An app that registered itself gets a warning, because Attraccess cannot confirm its name. The page refuses to work inside a frame.
 
    You choose what the app gets, the same way as for an API token: the permission picker starts with what the app asked for (everything you can do, if it named nothing) and lists only permissions you hold now. You can allow less or more than the app asked for, but never more than you may do yourself. A section titled "N tools enabled" lists the tools the current selection gives the app and updates as you change it. **Allow** stays disabled while nothing is selected.
+
 4. **Allow** sends the client a one-time authorization code (valid for 2 minutes) that it exchanges for tokens at the token endpoint. **Deny** sends it `access_denied`. A consent request that nobody answers expires after 10 minutes.
 
 If the app is unknown or asks to return to an address it did not register, Attraccess shows an error page and never sends the browser to that address. Errors in the request of a self-registered app with an `https` redirect URI are shown on that page too; operator-registered apps and apps on this device (`localhost`) get the error back as an OAuth error redirect.
