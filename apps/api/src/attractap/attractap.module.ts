@@ -13,6 +13,7 @@ import { ResourceActionGuard } from './websockets/handlers/resource-action.guard
 import { ReaderTimeZoneService } from './websockets/reader-time-zone.service';
 import { AttractapAuthHandler } from './websockets/handlers/auth/auth.handler';
 import { AttractapFirmwareHandler } from './websockets/handlers/firmware/firmware.handler';
+import { LegacyFirmwareUpdateService } from './websockets/legacy-firmware-update.service';
 import { AttractapCrashReportHandler } from './websockets/handlers/crash-report/crash-report.handler';
 import { AttractapCardHandler } from './websockets/handlers/card/card.handler';
 import { AttractapFormsHandler } from './websockets/handlers/forms/forms.handler';
@@ -133,6 +134,7 @@ import { ResourceListVisibilityModule } from '../resources/visibility/resource-l
     AttractapAuthHandler,
     ReaderTimeZoneService,
     AttractapFirmwareHandler,
+    LegacyFirmwareUpdateService,
     AttractapCrashReportHandler,
     AttractapCardHandler,
     AttractapFormsHandler,

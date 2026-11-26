@@ -113,6 +113,15 @@ export class AttractapFirmwareHandler {
     if (!(await this.isFirmwareLatest(data.payload))) await this.offerFirmwareUpdate(socket, data.payload);
   }
 
+  /**
+   * Offers the latest image to an old reader on the update-only token connection (LegacyFirmwareUpdateService).
+   * False when there is none: unknown firmware or variant, already the latest, or the image is missing.
+   */
+  public async offerLegacyUpdate(socket: AuthenticatedWebSocket, current: AttractapFirmware): Promise<boolean> {
+    if (await this.isFirmwareLatest(current)) return false;
+    return this.offerFirmwareUpdate(socket, current);
+  }
+
   /** Sends READER_FIRMWARE_UPDATE_REQUIRED; false when no update can be offered. */
   private async offerFirmwareUpdate(socket: AuthenticatedWebSocket, current: AttractapFirmware): Promise<boolean> {
     this.logger.debug('Firmware is not up to date, notifying client to start OTA');
